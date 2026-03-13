@@ -11,4 +11,4 @@ __pycache__/
 .mypy_cache/
 apps/web/node_modules/
 apps/web/dist/
-
+*.tsbuildinfo
