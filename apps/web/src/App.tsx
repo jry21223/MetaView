@@ -1,20 +1,64 @@
-import { startTransition, useDeferredValue, useState } from "react";
+import { startTransition, useDeferredValue, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
-import { runPipeline } from "./api/client";
+import { getRuntimeCatalog, runPipeline } from "./api/client";
 import { ControlPanel } from "./components/ControlPanel";
 import { PreviewCanvas } from "./components/PreviewCanvas";
-import type { PipelineResponse, TopicDomain } from "./types";
+import type {
+  ModelProvider,
+  PipelineResponse,
+  RuntimeCatalog,
+  SandboxMode,
+  TopicDomain,
+} from "./types";
 
 const defaultPrompt = "请可视化讲解二分查找的边界收缩过程，突出 left / mid / right 的变化。";
+const fallbackRuntimeCatalog: RuntimeCatalog = {
+  default_provider: "mock",
+  sandbox_engine: "preview-dry-run",
+  providers: [
+    {
+      name: "mock",
+      model: "mock-cir-studio-001",
+      description: "本地确定性规则提供者，用于 MVP 阶段替代真实大模型。",
+    },
+  ],
+  sandbox_modes: ["dry_run", "off"],
+};
 
 export default function App() {
   const [prompt, setPrompt] = useState(defaultPrompt);
   const [domain, setDomain] = useState<TopicDomain>("algorithm");
+  const [provider, setProvider] = useState<ModelProvider>("mock");
+  const [sandboxMode, setSandboxMode] = useState<SandboxMode>("dry_run");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<PipelineResponse | null>(null);
+  const [runtimeCatalog, setRuntimeCatalog] = useState<RuntimeCatalog>(fallbackRuntimeCatalog);
   const deferredResult = useDeferredValue(result);
+
+  useEffect(() => {
+    let active = true;
+
+    void getRuntimeCatalog()
+      .then((catalog) => {
+        if (!active) {
+          return;
+        }
+
+        setRuntimeCatalog(catalog);
+        setProvider(catalog.default_provider);
+      })
+      .catch(() => {
+        if (active) {
+          setRuntimeCatalog(fallbackRuntimeCatalog);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -22,7 +66,7 @@ export default function App() {
     setError(null);
 
     try {
-      const response = await runPipeline(prompt, domain);
+      const response = await runPipeline(prompt, domain, provider, sandboxMode);
       startTransition(() => {
         setResult(response);
       });
@@ -52,9 +96,15 @@ export default function App() {
         <ControlPanel
           prompt={prompt}
           domain={domain}
+          provider={provider}
+          sandboxMode={sandboxMode}
+          providers={runtimeCatalog.providers}
+          sandboxModes={runtimeCatalog.sandbox_modes}
           loading={loading}
           onPromptChange={setPrompt}
           onDomainChange={setDomain}
+          onProviderChange={setProvider}
+          onSandboxModeChange={setSandboxMode}
           onSubmit={handleSubmit}
         />
 
@@ -75,6 +125,35 @@ export default function App() {
             <h3>智能体诊断</h3>
           </div>
           {error ? <p className="error-text">{error}</p> : null}
+          {result ? (
+            <div className="runtime-summary">
+              <div>
+                <span>Provider</span>
+                <strong>{result.runtime.provider.name}</strong>
+                <small>{result.runtime.provider.model}</small>
+              </div>
+              <div>
+                <span>Sandbox</span>
+                <strong>{result.runtime.sandbox.status}</strong>
+                <small>{result.runtime.sandbox.engine}</small>
+              </div>
+              <div>
+                <span>Duration</span>
+                <strong>{result.runtime.sandbox.duration_ms} ms</strong>
+                <small>{result.runtime.sandbox.mode}</small>
+              </div>
+            </div>
+          ) : null}
+          {result ? (
+            <ul className="trace-list">
+              {result.runtime.agent_traces.map((trace) => (
+                <li key={trace.agent}>
+                  <strong>{trace.agent}</strong>
+                  <span>{trace.summary}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
           <ul className="diagnostic-list">
             {(result?.diagnostics ?? []).map((diagnostic, index) => (
               <li key={`${diagnostic.agent}-${index}`}>
@@ -82,7 +161,9 @@ export default function App() {
                 <span>{diagnostic.message}</span>
               </li>
             ))}
-            {!result && !error ? <li className="empty-state">提交题目后展示 Planner / Critic 的诊断结果。</li> : null}
+            {!result && !error ? (
+              <li className="empty-state">提交题目后展示 Planner / Critic / Sandbox 的诊断结果。</li>
+            ) : null}
           </ul>
         </section>
 
@@ -97,4 +178,3 @@ export default function App() {
     </main>
   );
 }
-

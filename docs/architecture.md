@@ -11,6 +11,8 @@
 - `PlannerAgent`: 将题目转成结构化 CIR 草案。
 - `CoderAgent`: 根据 CIR 生成渲染脚本草案。
 - `CriticAgent`: 对 CIR 和脚本进行可视化可读性检查。
+- `ProviderRegistry`: 统一管理模型 Provider，当前内置 `mock` provider。
+- `PreviewDryRunSandbox`: 对预览脚本执行静态校验与本地 node dry-run。
 - `PipelineOrchestrator`: 统一编排 Planner -> Coder -> Critic。
 
 ### `apps/web`
@@ -44,7 +46,8 @@ CIR 当前采用轻量结构：
 
 - 浏览器原生 Canvas 预览
 - FastAPI 编排层
-- Mock 多智能体
+- Mock Provider 抽象
+- 预览脚本级 dry-run 沙盒
 
 ### 下一版本
 
@@ -53,4 +56,3 @@ CIR 当前采用轻量结构：
 - RLEF 自修复循环
 - WebGPU 渲染器
 - 导出与分享能力
-

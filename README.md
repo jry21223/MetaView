@@ -11,9 +11,10 @@
 当前实现的是可运行 MVP：
 
 1. 用户输入算法或数学题目。
-2. 后端生成结构化 CIR。
-3. 后端输出渲染脚本草案和诊断信息。
-4. 前端用浏览器原生 Canvas 对 CIR 进行即时可视化预览。
+2. 选择模型 Provider 与 dry-run 沙盒模式。
+3. 后端生成结构化 CIR，并执行脚本级 dry-run 校验。
+4. 后端输出渲染脚本草案、运行时信息和诊断结果。
+5. 前端用浏览器原生 Canvas 对 CIR 进行即时可视化预览。
 
 ## 快速开始
 
@@ -31,6 +32,12 @@ make dev-api
 ```
 
 默认地址：`http://127.0.0.1:8000`
+
+可用接口：
+
+- `GET /health`
+- `GET /api/v1/runtime`
+- `POST /api/v1/pipeline`
 
 ### 3. 启动前端
 
@@ -53,8 +60,7 @@ make check
 
 ## 下一阶段
 
-- 接入真实 LLM Provider 和多智能体编排器。
-- 将当前 Canvas 预览升级为 manim-web / WebGPU 渲染适配层。
-- 引入沙盒 dry-run、执行反馈与 RLEF 闭环。
+- 接入真实 LLM Provider（OpenAI / 开源本地模型）和密钥配置。
+- 将当前脚本级 dry-run 升级为容器级执行沙盒与反馈回注。
+- 将 Canvas 预览升级为 manim-web / WebGPU 渲染适配层。
 - 建立题库、CIR 评测集和可视化回归测试。
-

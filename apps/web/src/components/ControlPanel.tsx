@@ -1,22 +1,34 @@
 import type { FormEvent } from "react";
 
-import type { TopicDomain } from "../types";
+import type { ModelProvider, ProviderDescriptor, SandboxMode, TopicDomain } from "../types";
 
 interface ControlPanelProps {
   prompt: string;
   domain: TopicDomain;
+  provider: ModelProvider;
+  sandboxMode: SandboxMode;
+  providers: ProviderDescriptor[];
+  sandboxModes: SandboxMode[];
   loading: boolean;
   onPromptChange: (value: string) => void;
   onDomainChange: (value: TopicDomain) => void;
+  onProviderChange: (value: ModelProvider) => void;
+  onSandboxModeChange: (value: SandboxMode) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }
 
 export function ControlPanel({
   prompt,
   domain,
+  provider,
+  sandboxMode,
+  providers,
+  sandboxModes,
   loading,
   onPromptChange,
   onDomainChange,
+  onProviderChange,
+  onSandboxModeChange,
   onSubmit,
 }: ControlPanelProps) {
   return (
@@ -43,20 +55,52 @@ export function ControlPanel({
 
         <label>
           <span>题型</span>
-          <select value={domain} onChange={(event) => onDomainChange(event.target.value as TopicDomain)}>
+          <select
+            value={domain}
+            onChange={(event) => onDomainChange(event.target.value as TopicDomain)}
+          >
             <option value="algorithm">算法</option>
             <option value="math">高等数学</option>
           </select>
         </label>
 
+        <div className="select-grid">
+          <label>
+            <span>模型 Provider</span>
+            <select
+              value={provider}
+              onChange={(event) => onProviderChange(event.target.value as ModelProvider)}
+            >
+              {providers.map((item) => (
+                <option key={item.name} value={item.name}>
+                  {item.name} / {item.model}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            <span>沙盒模式</span>
+            <select
+              value={sandboxMode}
+              onChange={(event) => onSandboxModeChange(event.target.value as SandboxMode)}
+            >
+              {sandboxModes.map((mode) => (
+                <option key={mode} value={mode}>
+                  {mode}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
         <div className="form-actions">
           <button type="submit" disabled={loading || prompt.trim().length < 5}>
             {loading ? "生成中..." : "生成可视化草案"}
           </button>
-          <p>后续这里会接入模型选择、点数消耗、沙盒 dry-run 和导出策略。</p>
+          <p>当前已支持 Provider 选择与 dry-run 沙盒校验，真实大模型与容器沙盒将在下一阶段接入。</p>
         </div>
       </form>
     </section>
   );
 }
-
