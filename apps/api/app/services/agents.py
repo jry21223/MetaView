@@ -12,6 +12,7 @@ from app.schemas import (
     VisualKind,
     VisualToken,
 )
+from app.services.providers.base import CodingHints, CritiqueHints, PlanningHints
 
 
 def _normalize_title(prompt: str) -> str:
@@ -61,7 +62,7 @@ def _visual_kind(prompt: str, domain: TopicDomain) -> VisualKind:
 class PlannerAgent:
     name: str = "planner"
 
-    def run(self, request: PipelineRequest) -> CirDocument:
+    def run(self, request: PipelineRequest, hints: PlanningHints | None = None) -> CirDocument:
         tokens = _keyword_tokens(request.prompt, request.domain)
         visual_kind = _visual_kind(request.prompt, request.domain)
         title = _normalize_title(request.prompt)
@@ -149,6 +150,13 @@ class PlannerAgent:
             ]
             summary = "数学题会被拆解为对象定义、推导变换与结论落点三个教学片段。"
 
+        if hints:
+            summary = f"{summary} 当前规划焦点：{hints.focus}。"
+            if hints.concepts:
+                steps[0].annotations.append(f"Provider 概念提示：{', '.join(hints.concepts)}。")
+            if hints.warnings:
+                steps[-1].annotations.extend(hints.warnings)
+
         return CirDocument(
             title=title,
             domain=request.domain,
@@ -161,8 +169,9 @@ class PlannerAgent:
 class CoderAgent:
     name: str = "coder"
 
-    def run(self, cir: CirDocument) -> str:
+    def run(self, cir: CirDocument, hints: CodingHints | None = None) -> str:
         lines = [
+            f"// renderer-target: {hints.target}" if hints else "// renderer-target: preview-js",
             "export const previewTimeline = [",
         ]
 
@@ -178,6 +187,9 @@ class CoderAgent:
             lines.append("  },")
 
         lines.append("];")
+        if hints and hints.style_notes:
+            lines.append("")
+            lines.append(f"// style-notes: {' | '.join(hints.style_notes)}")
         return "\n".join(lines)
 
 
@@ -185,13 +197,19 @@ class CoderAgent:
 class CriticAgent:
     name: str = "critic"
 
-    def run(self, cir: CirDocument) -> list[AgentDiagnostic]:
+    def run(self, cir: CirDocument, hints: CritiqueHints | None = None) -> list[AgentDiagnostic]:
         diagnostics: list[AgentDiagnostic] = [
             AgentDiagnostic(
                 agent=self.name,
                 message="已检查 CIR 连贯性，当前版本适合作为 Web 预览输入。",
             )
         ]
+
+        if hints:
+            for check in hints.checks:
+                diagnostics.append(AgentDiagnostic(agent=self.name, message=f"检查项：{check}"))
+            for warning in hints.warnings:
+                diagnostics.append(AgentDiagnostic(agent=self.name, message=warning))
 
         for step in cir.steps:
             if len(step.tokens) > 4:

@@ -9,6 +9,21 @@ class TopicDomain(str, Enum):
     MATH = "math"
 
 
+class ProviderName(str, Enum):
+    MOCK = "mock"
+
+
+class SandboxMode(str, Enum):
+    DRY_RUN = "dry_run"
+    OFF = "off"
+
+
+class SandboxStatus(str, Enum):
+    PASSED = "passed"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
 class VisualKind(str, Enum):
     ARRAY = "array"
     FLOW = "flow"
@@ -52,6 +67,8 @@ class CirDocument(BaseModel):
 class PipelineRequest(BaseModel):
     prompt: str = Field(min_length=5, max_length=1200)
     domain: TopicDomain = TopicDomain.ALGORITHM
+    provider: ProviderName | None = None
+    sandbox_mode: SandboxMode = SandboxMode.DRY_RUN
 
 
 class AgentDiagnostic(BaseModel):
@@ -59,9 +76,45 @@ class AgentDiagnostic(BaseModel):
     message: str
 
 
+class ProviderDescriptor(BaseModel):
+    name: ProviderName
+    model: str
+    description: str
+
+
+class AgentTrace(BaseModel):
+    agent: str
+    provider: ProviderName
+    model: str
+    summary: str
+
+
+class SandboxReport(BaseModel):
+    mode: SandboxMode
+    engine: str
+    status: SandboxStatus
+    duration_ms: int = 0
+    warnings: list[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+
+
+class PipelineRuntime(BaseModel):
+    provider: ProviderDescriptor
+    sandbox: SandboxReport
+    agent_traces: list[AgentTrace] = Field(default_factory=list)
+
+
+class RuntimeCatalog(BaseModel):
+    default_provider: ProviderName
+    sandbox_engine: str
+    providers: list[ProviderDescriptor] = Field(default_factory=list)
+    sandbox_modes: list[SandboxMode] = Field(default_factory=list)
+
+
 class PipelineResponse(BaseModel):
     request_id: str = Field(default_factory=lambda: str(uuid4()))
     cir: CirDocument
     renderer_script: str
     diagnostics: list[AgentDiagnostic] = Field(default_factory=list)
+    runtime: PipelineRuntime
 
