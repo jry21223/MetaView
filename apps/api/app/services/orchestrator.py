@@ -38,7 +38,12 @@ class PipelineOrchestrator:
             openai_supports_vision=settings.openai_supports_vision,
             openai_timeout_s=settings.openai_timeout_s,
         )
-        self.default_provider = settings.default_provider
+        self.default_router_provider = (
+            settings.default_router_provider or settings.default_provider
+        )
+        self.default_generation_provider = (
+            settings.default_generation_provider or settings.default_provider
+        )
         self.sandbox = PreviewDryRunSandbox(timeout_ms=settings.sandbox_timeout_ms)
         self.validator = CirValidator()
         self.repair_service = PipelineRepairService()
@@ -50,7 +55,9 @@ class PipelineOrchestrator:
 
     def runtime_catalog(self) -> RuntimeCatalog:
         return RuntimeCatalog(
-            default_provider=self.default_provider,
+            default_provider=self.default_generation_provider,
+            default_router_provider=self.default_router_provider,
+            default_generation_provider=self.default_generation_provider,
             sandbox_engine=self.sandbox.engine_name,
             providers=self.provider_registry.list_descriptors(),
             skills=self.skill_registry.list_descriptors(),
@@ -58,11 +65,15 @@ class PipelineOrchestrator:
         )
 
     def run(self, request: PipelineRequest) -> PipelineResponse:
-        provider_name = request.provider or self.default_provider
-        provider = self.provider_registry.get(provider_name)
+        router_provider_name = request.router_provider or self.default_router_provider
+        generation_provider_name = (
+            request.generation_provider or request.provider or self.default_generation_provider
+        )
+        router_provider = self.provider_registry.get(router_provider_name)
+        generation_provider = self.provider_registry.get(generation_provider_name)
         if request.domain is None:
             try:
-                effective_domain, route_trace = provider.route(
+                effective_domain, route_trace = router_provider.route(
                     request.prompt,
                     source_image=request.source_image,
                 )
@@ -74,11 +85,18 @@ class PipelineOrchestrator:
             route_trace = self._explicit_route_trace(effective_domain)
 
         skill = self.skill_registry.get(effective_domain)
-        effective_request = request.model_copy(update={"domain": effective_domain})
+        effective_request = request.model_copy(
+            update={
+                "domain": effective_domain,
+                "provider": generation_provider_name,
+                "router_provider": router_provider_name,
+                "generation_provider": generation_provider_name,
+            }
+        )
         repair_actions: list[str] = []
         repair_count = 0
 
-        planning_hints, planning_trace = provider.plan(
+        planning_hints, planning_trace = generation_provider.plan(
             prompt=effective_request.prompt,
             domain=effective_domain.value,
             skill_brief=skill.planning_brief(has_image=bool(request.source_image)),
@@ -96,10 +114,12 @@ class PipelineOrchestrator:
             repair_count += 1
             validation_report = self.validator.validate(cir)
 
-        coding_hints, coding_trace = provider.code(title=cir.title, step_count=len(cir.steps))
+        coding_hints, coding_trace = generation_provider.code(
+            title=cir.title, step_count=len(cir.steps)
+        )
         renderer_script = self.coder.run(cir, hints=coding_hints)
 
-        critique_hints, critique_trace = provider.critique(
+        critique_hints, critique_trace = generation_provider.critique(
             title=cir.title, renderer_script=renderer_script
         )
         diagnostics = self.critic.run(cir, hints=critique_hints)
@@ -130,13 +150,19 @@ class PipelineOrchestrator:
             diagnostics=[
                 AgentDiagnostic(
                     agent="router",
-                    message=f"已自动路由到 {skill.descriptor.label}。",
+                    message=(
+                        f"已自动路由到 {skill.descriptor.label}。"
+                        if request.domain is None
+                        else f"使用显式 domain：{skill.descriptor.label}。"
+                    ),
                 )
             ]
             + diagnostics,
             runtime=PipelineRuntime(
                 skill=skill.descriptor,
-                provider=provider.descriptor,
+                provider=generation_provider.descriptor,
+                router_provider=router_provider.descriptor,
+                generation_provider=generation_provider.descriptor,
                 sandbox=sandbox_report,
                 validation=validation_report,
                 agent_traces=[route_trace, planning_trace, coding_trace, critique_trace],

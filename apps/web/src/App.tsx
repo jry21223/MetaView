@@ -123,6 +123,8 @@ const fallbackSkills: SkillDescriptor[] = [
 
 const fallbackRuntimeCatalog: RuntimeCatalog = {
   default_provider: "mock",
+  default_router_provider: "mock",
+  default_generation_provider: "mock",
   sandbox_engine: "preview-dry-run",
   providers: [
     {
@@ -156,9 +158,29 @@ function activeProviderSupportsVision(catalog: RuntimeCatalog, providerName: Mod
   return catalog.providers.find((candidate) => candidate.name === providerName)?.supports_vision ?? false;
 }
 
+function resolveConfiguredProvider(
+  catalog: RuntimeCatalog,
+  requestedProvider: ModelProvider | null | undefined,
+  fallbackProvider: ModelProvider,
+): ModelProvider {
+  const configuredProviders = catalog.providers.filter((candidate) => candidate.configured);
+  if (configuredProviders.some((candidate) => candidate.name === requestedProvider)) {
+    return requestedProvider as ModelProvider;
+  }
+  if (configuredProviders.some((candidate) => candidate.name === fallbackProvider)) {
+    return fallbackProvider;
+  }
+  return configuredProviders[0]?.name ?? fallbackProvider;
+}
+
 export default function App() {
   const [prompt, setPrompt] = useState(defaultPrompt);
-  const [provider, setProvider] = useState<ModelProvider>("mock");
+  const [routerProvider, setRouterProvider] = useState<ModelProvider>(
+    fallbackRuntimeCatalog.default_router_provider,
+  );
+  const [generationProvider, setGenerationProvider] = useState<ModelProvider>(
+    fallbackRuntimeCatalog.default_generation_provider,
+  );
   const [sandboxMode, setSandboxMode] = useState<SandboxMode>("dry_run");
   const [sourceImage, setSourceImage] = useState<string | null>(null);
   const [sourceImageName, setSourceImageName] = useState<string | null>(null);
@@ -171,15 +193,25 @@ export default function App() {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const deferredResult = useDeferredValue(result);
   const activeSkill = result?.runtime.skill ?? null;
-  const providerSupportsVision = activeProviderSupportsVision(runtimeCatalog, provider);
+  const routerProviderSupportsVision = activeProviderSupportsVision(
+    runtimeCatalog,
+    routerProvider,
+  );
+  const generationProviderSupportsVision = activeProviderSupportsVision(
+    runtimeCatalog,
+    generationProvider,
+  );
 
   async function refreshRuntimeCatalog(): Promise<RuntimeCatalog> {
     try {
       const catalog = await getRuntimeCatalog();
       setRuntimeCatalog(catalog);
-      if (!catalog.providers.some((candidate) => candidate.name === provider && candidate.configured)) {
-        setProvider(catalog.default_provider);
-      }
+      setRouterProvider((current) =>
+        resolveConfiguredProvider(catalog, current, catalog.default_router_provider),
+      );
+      setGenerationProvider((current) =>
+        resolveConfiguredProvider(catalog, current, catalog.default_generation_provider),
+      );
       return catalog;
     } catch {
       setRuntimeCatalog(fallbackRuntimeCatalog);
@@ -207,7 +239,20 @@ export default function App() {
         }
 
         setRuntimeCatalog(catalog);
-        setProvider(catalog.default_provider);
+        setRouterProvider(
+          resolveConfiguredProvider(
+            catalog,
+            catalog.default_router_provider,
+            catalog.default_router_provider,
+          ),
+        );
+        setGenerationProvider(
+          resolveConfiguredProvider(
+            catalog,
+            catalog.default_generation_provider,
+            catalog.default_generation_provider,
+          ),
+        );
       })
       .catch(() => {
         if (active) {
@@ -237,7 +282,8 @@ export default function App() {
     try {
       const response = await runPipeline(
         prompt,
-        provider,
+        routerProvider,
+        generationProvider,
         sandboxMode,
         sourceImage,
         sourceImageName,
@@ -262,7 +308,23 @@ export default function App() {
         setSelectedRunId(requestId);
       });
       setPrompt(run.request.prompt);
-      setProvider(run.request.provider ?? "mock");
+      setRouterProvider(
+        resolveConfiguredProvider(
+          runtimeCatalog,
+          run.request.router_provider ?? run.response.runtime.router_provider?.name,
+          runtimeCatalog.default_router_provider,
+        ),
+      );
+      setGenerationProvider(
+        resolveConfiguredProvider(
+          runtimeCatalog,
+          run.request.generation_provider ??
+            run.request.provider ??
+            run.response.runtime.generation_provider?.name ??
+            run.response.runtime.provider?.name,
+          runtimeCatalog.default_generation_provider,
+        ),
+      );
       setSandboxMode(run.request.sandbox_mode);
       setSourceImage(run.request.source_image ?? null);
       setSourceImageName(run.request.source_image_name ?? null);
@@ -281,7 +343,9 @@ export default function App() {
       exported_at: new Date().toISOString(),
       request: {
         prompt,
-        provider,
+        provider: generationProvider,
+        router_provider: routerProvider,
+        generation_provider: generationProvider,
         source_image_name: sourceImageName,
         sandbox_mode: sandboxMode,
       },
@@ -305,14 +369,19 @@ export default function App() {
     const providerExistsAndIsConfigured = catalog.providers.some(
       (candidate) => candidate.name === payload.name && candidate.configured,
     );
-    setProvider(providerExistsAndIsConfigured ? payload.name : catalog.default_provider);
+    setGenerationProvider(
+      providerExistsAndIsConfigured ? payload.name : catalog.default_generation_provider,
+    );
   }
 
   async function handleDeleteProvider(name: string) {
     await deleteCustomProvider(name);
     const catalog = await refreshRuntimeCatalog();
-    if (provider === name) {
-      setProvider(catalog.default_provider);
+    if (routerProvider === name) {
+      setRouterProvider(catalog.default_router_provider);
+    }
+    if (generationProvider === name) {
+      setGenerationProvider(catalog.default_generation_provider);
     }
   }
 
@@ -335,15 +404,18 @@ export default function App() {
       <div className="workspace-grid">
         <ControlPanel
           prompt={prompt}
-          provider={provider}
+          routerProvider={routerProvider}
+          generationProvider={generationProvider}
           sandboxMode={sandboxMode}
           providers={runtimeCatalog.providers}
           sandboxModes={runtimeCatalog.sandbox_modes}
           loading={loading}
           sourceImageName={sourceImageName}
-          providerSupportsVision={providerSupportsVision}
+          routerProviderSupportsVision={routerProviderSupportsVision}
+          generationProviderSupportsVision={generationProviderSupportsVision}
           onPromptChange={setPrompt}
-          onProviderChange={setProvider}
+          onRouterProviderChange={setRouterProvider}
+          onGenerationProviderChange={setGenerationProvider}
           onSandboxModeChange={setSandboxMode}
           onSourceImageChange={handleSourceImageChange}
           onSubmit={handleSubmit}
@@ -377,8 +449,9 @@ export default function App() {
           {error ? <p className="error-text">{error}</p> : null}
           {result ? (
             <p className="panel-note">
-              当前任务自动路由到 <strong>{result.runtime.skill.label}</strong>，Provider 为{" "}
-              <strong>{result.runtime.provider.label}</strong>。
+              当前任务自动路由到 <strong>{result.runtime.skill.label}</strong>，路由模型为{" "}
+              <strong>{result.runtime.router_provider.label}</strong>，规划/编码模型为{" "}
+              <strong>{result.runtime.generation_provider.label}</strong>。
             </p>
           ) : null}
           {result ? (
@@ -389,9 +462,14 @@ export default function App() {
                 <small>{result.runtime.skill.id}</small>
               </div>
               <div>
-                <span>Provider</span>
-                <strong>{result.runtime.provider.name}</strong>
-                <small>{result.runtime.provider.model}</small>
+                <span>Router</span>
+                <strong>{result.runtime.router_provider.name}</strong>
+                <small>{result.runtime.router_provider.model}</small>
+              </div>
+              <div>
+                <span>Generation</span>
+                <strong>{result.runtime.generation_provider.name}</strong>
+                <small>{result.runtime.generation_provider.model}</small>
               </div>
               <div>
                 <span>Sandbox</span>

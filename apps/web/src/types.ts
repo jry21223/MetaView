@@ -108,7 +108,9 @@ export interface CirValidationReport {
 
 export interface PipelineRuntime {
   skill: SkillDescriptor;
-  provider: ProviderDescriptor;
+  provider?: ProviderDescriptor | null;
+  router_provider: ProviderDescriptor;
+  generation_provider: ProviderDescriptor;
   sandbox: SandboxReport;
   validation: CirValidationReport;
   agent_traces: AgentTrace[];
@@ -117,7 +119,9 @@ export interface PipelineRuntime {
 }
 
 export interface RuntimeCatalog {
-  default_provider: ModelProvider;
+  default_provider?: ModelProvider | null;
+  default_router_provider: ModelProvider;
+  default_generation_provider: ModelProvider;
   sandbox_engine: string;
   providers: ProviderDescriptor[];
   skills: SkillDescriptor[];
@@ -138,7 +142,9 @@ export interface PipelineRunSummary {
   prompt: string;
   title: string;
   domain: TopicDomain;
-  provider: ModelProvider;
+  provider?: ModelProvider | null;
+  router_provider: ModelProvider;
+  generation_provider: ModelProvider;
   sandbox_status: SandboxStatus;
 }
 
@@ -148,6 +154,8 @@ export interface PipelineRunDetail {
     prompt: string;
     domain?: TopicDomain | null;
     provider?: ModelProvider | null;
+    router_provider?: ModelProvider | null;
+    generation_provider?: ModelProvider | null;
     source_image?: string | null;
     source_image_name?: string | null;
     sandbox_mode: SandboxMode;

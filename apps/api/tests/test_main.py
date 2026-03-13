@@ -1,6 +1,8 @@
 from fastapi.testclient import TestClient
 
-from app.main import app
+from app.main import app, orchestrator
+from app.schemas import AgentTrace, ProviderDescriptor, ProviderKind, TopicDomain
+from app.services.providers.base import CodingHints, CritiqueHints, PlanningHints
 
 client = TestClient(app)
 
@@ -27,6 +29,8 @@ def test_pipeline_returns_cir() -> None:
     assert len(payload["cir"]["steps"]) == 3
     assert "previewTimeline" in payload["renderer_script"]
     assert payload["runtime"]["skill"]["id"] == "algorithm-process-viz"
+    assert payload["runtime"]["router_provider"]["name"] == "mock"
+    assert payload["runtime"]["generation_provider"]["name"] == "mock"
     assert payload["runtime"]["provider"]["name"] == "mock"
     assert payload["runtime"]["sandbox"]["status"] == "passed"
     assert payload["runtime"]["validation"]["status"] == "valid"
@@ -40,6 +44,8 @@ def test_runtime_catalog() -> None:
 
     payload = response.json()
     assert payload["default_provider"] == "mock"
+    assert payload["default_router_provider"] == "mock"
+    assert payload["default_generation_provider"] == "mock"
     assert payload["sandbox_engine"] == "preview-dry-run"
     assert payload["providers"][0]["name"] == "mock"
     assert payload["providers"][0]["label"] == "Mock Provider"
@@ -80,6 +86,8 @@ def test_pipeline_runs_history_endpoints() -> None:
     detail = detail_response.json()
     assert detail["request"]["prompt"] == "请讲解动态规划中的状态定义与转移。"
     assert detail["request"]["domain"] == "algorithm"
+    assert detail["request"]["router_provider"] == "mock"
+    assert detail["request"]["generation_provider"] == "mock"
     assert detail["response"]["request_id"] == request_id
 
 
@@ -131,3 +139,134 @@ def test_custom_provider_crud() -> None:
     delete_response = client.delete("/api/v1/providers/custom/local-ollama")
     assert delete_response.status_code == 200
     assert delete_response.json()["deleted"] is True
+
+
+def test_pipeline_supports_dual_provider_orchestration(monkeypatch) -> None:
+    class RouterStubProvider:
+        descriptor = ProviderDescriptor(
+            name="router-stub",
+            label="Router Stub",
+            kind=ProviderKind.MOCK,
+            model="router-model-v1",
+            description="stub router",
+            configured=True,
+        )
+
+        def route(
+            self, prompt: str, source_image: str | None = None
+        ) -> tuple[TopicDomain, AgentTrace]:
+            return (
+                TopicDomain.MATH,
+                AgentTrace(
+                    agent="router",
+                    provider=self.descriptor.name,
+                    model=self.descriptor.model,
+                    summary="router stub picked math",
+                ),
+            )
+
+        def plan(self, *args, **kwargs):
+            raise AssertionError("router provider should not handle planning")
+
+        def code(self, *args, **kwargs):
+            raise AssertionError("router provider should not handle coding")
+
+        def critique(self, *args, **kwargs):
+            raise AssertionError("router provider should not handle critique")
+
+    class GenerationStubProvider:
+        descriptor = ProviderDescriptor(
+            name="generation-stub",
+            label="Generation Stub",
+            kind=ProviderKind.OPENAI_COMPATIBLE,
+            model="generation-model-v2",
+            description="stub generation",
+            configured=True,
+        )
+
+        def route(self, *args, **kwargs):
+            raise AssertionError("generation provider should not handle routing")
+
+        def plan(
+            self,
+            prompt: str,
+            domain: str,
+            skill_brief: str,
+            source_image: str | None = None,
+        ) -> tuple[PlanningHints, AgentTrace]:
+            return (
+                PlanningHints(
+                    focus="突出函数和切线",
+                    concepts=["函数", "切线", "变化率"],
+                    warnings=[],
+                ),
+                AgentTrace(
+                    agent="planner",
+                    provider=self.descriptor.name,
+                    model=self.descriptor.model,
+                    summary="generation stub planned math flow",
+                ),
+            )
+
+        def code(self, title: str, step_count: int) -> tuple[CodingHints, AgentTrace]:
+            return (
+                CodingHints(
+                    target="manim-web-ts",
+                    style_notes=["keep timeline deterministic"],
+                ),
+                AgentTrace(
+                    agent="coder",
+                    provider=self.descriptor.name,
+                    model=self.descriptor.model,
+                    summary=f"generation stub coded {step_count} steps",
+                ),
+            )
+
+        def critique(
+            self, title: str, renderer_script: str
+        ) -> tuple[CritiqueHints, AgentTrace]:
+            return (
+                CritiqueHints(
+                    checks=["check overlap", "check narration density"],
+                    warnings=[],
+                ),
+                AgentTrace(
+                    agent="critic",
+                    provider=self.descriptor.name,
+                    model=self.descriptor.model,
+                    summary="generation stub reviewed renderer",
+                ),
+            )
+
+    original_get = orchestrator.provider_registry.get
+
+    def fake_get(name: str):
+        if name == "router-stub":
+            return RouterStubProvider()
+        if name == "generation-stub":
+            return GenerationStubProvider()
+        return original_get(name)
+
+    monkeypatch.setattr(orchestrator.provider_registry, "get", fake_get)
+
+    response = client.post(
+        "/api/v1/pipeline",
+        json={
+            "prompt": "请讲解导数如何表示函数在一点附近的变化率。",
+            "router_provider": "router-stub",
+            "generation_provider": "generation-stub",
+            "sandbox_mode": "dry_run",
+            "persist_run": False,
+        },
+    )
+    assert response.status_code == 200
+
+    payload = response.json()
+    traces = {trace["agent"]: trace for trace in payload["runtime"]["agent_traces"]}
+    assert payload["cir"]["domain"] == "math"
+    assert payload["runtime"]["router_provider"]["name"] == "router-stub"
+    assert payload["runtime"]["generation_provider"]["name"] == "generation-stub"
+    assert traces["router"]["provider"] == "router-stub"
+    assert traces["planner"]["provider"] == "generation-stub"
+    assert traces["coder"]["provider"] == "generation-stub"
+    assert traces["critic"]["provider"] == "generation-stub"

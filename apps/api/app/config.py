@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://127.0.0.1:5173", "http://localhost:5173"]
     cors_origin_regex: str = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
     default_provider: str = "mock"
+    default_router_provider: str | None = None
+    default_generation_provider: str | None = None
     sandbox_timeout_ms: int = 1500
     max_repair_attempts: int = 2
     history_db_path: str = "data/pipeline_runs.db"

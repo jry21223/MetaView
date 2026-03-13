@@ -84,7 +84,8 @@ export async function deleteCustomProvider(name: string): Promise<void> {
 
 export async function runPipeline(
   prompt: string,
-  provider: ModelProvider,
+  routerProvider: ModelProvider,
+  generationProvider: ModelProvider,
   sandboxMode: SandboxMode,
   sourceImage?: string | null,
   sourceImageName?: string | null,
@@ -96,7 +97,9 @@ export async function runPipeline(
     },
     body: JSON.stringify({
       prompt,
-      provider,
+      provider: generationProvider,
+      router_provider: routerProvider,
+      generation_provider: generationProvider,
       source_image: sourceImage ?? null,
       source_image_name: sourceImageName ?? null,
       sandbox_mode: sandboxMode,

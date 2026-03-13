@@ -55,12 +55,32 @@ class RunRepository:
                     title TEXT NOT NULL,
                     domain TEXT NOT NULL,
                     provider TEXT NOT NULL,
+                    router_provider TEXT,
+                    generation_provider TEXT,
                     sandbox_status TEXT NOT NULL,
                     request_payload TEXT NOT NULL,
                     response_payload TEXT NOT NULL
                 )
                 """
             )
+            columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(pipeline_runs)").fetchall()
+            }
+            if "router_provider" not in columns:
+                connection.execute(
+                    """
+                    ALTER TABLE pipeline_runs
+                    ADD COLUMN router_provider TEXT
+                    """
+                )
+            if "generation_provider" not in columns:
+                connection.execute(
+                    """
+                    ALTER TABLE pipeline_runs
+                    ADD COLUMN generation_provider TEXT
+                    """
+                )
 
     def save_run(self, request: PipelineRequest, response: PipelineResponse) -> str:
         created_at = datetime.now(timezone.utc).isoformat()
@@ -76,11 +96,13 @@ class RunRepository:
                     title,
                     domain,
                     provider,
+                    router_provider,
+                    generation_provider,
                     sandbox_status,
                     request_payload,
                     response_payload
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     response.request_id,
@@ -88,7 +110,13 @@ class RunRepository:
                     effective_request.prompt,
                     response.cir.title,
                     response.cir.domain.value,
-                    response.runtime.provider.name,
+                    response.runtime.provider.name if response.runtime.provider else "",
+                    response.runtime.router_provider.name
+                    if response.runtime.router_provider
+                    else response.runtime.provider.name if response.runtime.provider else "",
+                    response.runtime.generation_provider.name
+                    if response.runtime.generation_provider
+                    else response.runtime.provider.name if response.runtime.provider else "",
                     response.runtime.sandbox.status.value,
                     json.dumps(effective_request.model_dump(mode="json"), ensure_ascii=False),
                     json.dumps(response.model_dump(mode="json"), ensure_ascii=False),
@@ -101,7 +129,16 @@ class RunRepository:
         with closing(self._connect()) as connection:
             rows = connection.execute(
                 """
-                SELECT request_id, created_at, prompt, title, domain, provider, sandbox_status
+                SELECT
+                    request_id,
+                    created_at,
+                    prompt,
+                    title,
+                    domain,
+                    provider,
+                    COALESCE(router_provider, provider) AS router_provider,
+                    COALESCE(generation_provider, provider) AS generation_provider,
+                    sandbox_status
                 FROM pipeline_runs
                 ORDER BY created_at DESC
                 LIMIT ?
@@ -117,6 +154,8 @@ class RunRepository:
                 title=row["title"],
                 domain=TopicDomain(row["domain"]),
                 provider=row["provider"],
+                router_provider=row["router_provider"],
+                generation_provider=row["generation_provider"],
                 sandbox_status=SandboxStatus(row["sandbox_status"]),
             )
             for row in rows

@@ -4,15 +4,18 @@ import type { ModelProvider, ProviderDescriptor, SandboxMode } from "../types";
 
 interface ControlPanelProps {
   prompt: string;
-  provider: ModelProvider;
+  routerProvider: ModelProvider;
+  generationProvider: ModelProvider;
   sandboxMode: SandboxMode;
   providers: ProviderDescriptor[];
   sandboxModes: SandboxMode[];
   loading: boolean;
   sourceImageName: string | null;
-  providerSupportsVision: boolean;
+  routerProviderSupportsVision: boolean;
+  generationProviderSupportsVision: boolean;
   onPromptChange: (value: string) => void;
-  onProviderChange: (value: ModelProvider) => void;
+  onRouterProviderChange: (value: ModelProvider) => void;
+  onGenerationProviderChange: (value: ModelProvider) => void;
   onSandboxModeChange: (value: SandboxMode) => void;
   onSourceImageChange: (value: string | null, name: string | null) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -23,15 +26,18 @@ const genericPlaceholder =
 
 export function ControlPanel({
   prompt,
-  provider,
+  routerProvider,
+  generationProvider,
   sandboxMode,
   providers,
   sandboxModes,
   loading,
   sourceImageName,
-  providerSupportsVision,
+  routerProviderSupportsVision,
+  generationProviderSupportsVision,
   onPromptChange,
-  onProviderChange,
+  onRouterProviderChange,
+  onGenerationProviderChange,
   onSandboxModeChange,
   onSourceImageChange,
   onSubmit,
@@ -80,9 +86,14 @@ export function ControlPanel({
               ? `当前已附带题图：${sourceImageName}`
               : "可选。物理题、几何题或结构题推荐上传图片，系统会自动辅助建模。"}
           </small>
-          {!providerSupportsVision && sourceImageName ? (
+          {!routerProviderSupportsVision && sourceImageName ? (
             <small className="field-hint">
-              当前 Provider 未声明视觉能力，题图不会发送给远程模型，但系统仍会用于自动路由与本地辅助规划。
+              当前路由模型未声明视觉能力，题图不会发送给路由阶段，系统会回退到文本与本地规则辅助判断。
+            </small>
+          ) : null}
+          {!generationProviderSupportsVision && sourceImageName ? (
+            <small className="field-hint">
+              当前规划/编码模型未声明视觉能力，题图不会发送给远程模型，但系统仍会用于自动路由与本地辅助规划。
             </small>
           ) : null}
           {sourceImageName ? (
@@ -98,10 +109,26 @@ export function ControlPanel({
 
         <div className="select-grid">
           <label>
-            <span>模型 Provider</span>
+            <span>路由模型</span>
             <select
-              value={provider}
-              onChange={(event) => onProviderChange(event.target.value as ModelProvider)}
+              value={routerProvider}
+              onChange={(event) => onRouterProviderChange(event.target.value as ModelProvider)}
+            >
+              {providers.map((item) => (
+                <option key={item.name} value={item.name} disabled={!item.configured}>
+                  {item.label} / {item.model}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            <span>规划/编码模型</span>
+            <select
+              value={generationProvider}
+              onChange={(event) =>
+                onGenerationProviderChange(event.target.value as ModelProvider)
+              }
             >
               {providers.map((item) => (
                 <option key={item.name} value={item.name} disabled={!item.configured}>
@@ -130,7 +157,7 @@ export function ControlPanel({
           <button type="submit" disabled={loading || prompt.trim().length < 5}>
             {loading ? "生成中..." : "生成可视化草案"}
           </button>
-          <p>未配置的 Provider 会自动禁用。当前支持自动学科判断、dry-run 校验、历史回看与自定义 Provider。</p>
+          <p>未配置的 Provider 会自动禁用。当前支持自动学科判断、双模型编排、dry-run 校验、历史回看与自定义 Provider。</p>
         </div>
       </form>
     </section>

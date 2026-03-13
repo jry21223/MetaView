@@ -13,8 +13,8 @@
 当前版本已经打通完整的可交付链路：
 
 1. 用户输入算法、数学、物理、化学、生物或地理题目。
-2. 选择模型 Provider、dry-run 沙盒模式，并可附带题目图片。
-3. 后端先自动判断题目所属学科，再路由到对应 skill，生成结构化 CIR，执行验证与自动修复。
+2. 选择路由模型、规划/编码模型、dry-run 沙盒模式，并可附带题目图片。
+3. 后端先由路由模型自动判断题目所属学科，再把对应 skill 注入规划/编码模型，生成结构化 CIR，执行验证与自动修复。
 4. 后端执行脚本级 dry-run 校验，并持久化任务到 SQLite。
 5. 前端用 `manim-web` 在浏览器内完成正式预览，并支持历史回看、JSON 导出和 WebGPU 能力检测。
 
@@ -81,6 +81,8 @@ make docker-up
 
 - `ALGO_VIS_HISTORY_DB_PATH`: SQLite 历史库路径
 - `ALGO_VIS_CORS_ORIGIN_REGEX`: 本地联调默认允许的浏览器来源规则
+- `ALGO_VIS_DEFAULT_ROUTER_PROVIDER`: 默认路由模型
+- `ALGO_VIS_DEFAULT_GENERATION_PROVIDER`: 默认规划/编码模型
 - `ALGO_VIS_OPENAI_API_KEY`: 启用内置 OpenAI 兼容 Provider
 - `ALGO_VIS_OPENAI_BASE_URL`: OpenAI 兼容 API 地址
 - `ALGO_VIS_OPENAI_MODEL`: 使用的模型名
@@ -91,7 +93,7 @@ make docker-up
 
 当前版本支持通过前端面板或 HTTP API 注册自定义 OpenAI 兼容模型提供商，例如本地 `Ollama`、`vLLM` 网关或第三方代理服务。自定义 Provider 会持久化到 SQLite，并自动出现在运行时目录中。
 
-内置 `openai` Provider 继续走环境变量配置；自定义 Provider 则通过 `POST /api/v1/providers/custom` 动态注册。当前 Provider 配置还允许显式声明是否支持视觉输入，这会影响题图是否发送给远程模型。
+内置 `openai` Provider 继续走环境变量配置；自定义 Provider 则通过 `POST /api/v1/providers/custom` 动态注册。当前 Provider 配置还允许显式声明是否支持视觉输入，这会影响题图是否发送给路由模型和规划模型。
 
 ## 学科技能层
 
@@ -124,9 +126,14 @@ make docker-up
    - `Model`
    - `API Key`
    - 是否支持图片
-3. 保存后把它选为当前 Provider。
+3. 保存后把它选为“规划/编码模型”；路由模型则可以继续使用更便宜的通用模型或 `mock`。
 
-注意：当前系统会把同一个 Provider 同时用于自动学科路由、规划、编码和批评。如果你后续想把“路由模型 / 规划模型 / Manim 编码模型”拆开，就需要再扩一层多模型编排。
+当前系统已经支持双模型编排：
+
+- `router_provider`: 负责学科自动路由
+- `generation_provider`: 负责 Planner / Coder / Critic
+
+这意味着你现在就可以把便宜模型留给路由，把 Manim 特化模型专门留给生成链路。
 
 ## 渲染层说明
 
@@ -135,7 +142,7 @@ make docker-up
 ## 已完成范围
 
 - monorepo、Git hooks、CI、Conventional Commits
-- FastAPI 编排层、学科技能注册表、内置与自定义 OpenAI 兼容 Provider 适配
+- FastAPI 编排层、双模型编排、学科技能注册表、内置与自定义 OpenAI 兼容 Provider 适配
 - CIR 校验器、自动修复链路、脚本级 dry-run 沙盒
 - SQLite 历史持久化、回放接口与自定义 Provider 存储
 - React 工作台、自动学科判断、题图上传、`manim-web` 预览、运行时视图、历史记录与 JSON 导出

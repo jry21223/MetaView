@@ -1,7 +1,7 @@
 from enum import Enum
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class TopicDomain(str, Enum):
@@ -94,10 +94,20 @@ class PipelineRequest(BaseModel):
     prompt: str = Field(min_length=5, max_length=1200)
     domain: TopicDomain | None = None
     provider: str | None = None
+    router_provider: str | None = None
+    generation_provider: str | None = None
     source_image: str | None = Field(default=None, max_length=3_500_000)
     source_image_name: str | None = Field(default=None, max_length=200)
     sandbox_mode: SandboxMode = SandboxMode.DRY_RUN
     persist_run: bool = True
+
+    @model_validator(mode="after")
+    def apply_provider_aliases(self) -> "PipelineRequest":
+        generation_provider = self.generation_provider or self.provider
+        self.generation_provider = generation_provider
+        if self.provider is None:
+            self.provider = generation_provider
+        return self
 
 
 class AgentDiagnostic(BaseModel):
@@ -159,20 +169,44 @@ class CirValidationReport(BaseModel):
 
 class PipelineRuntime(BaseModel):
     skill: SkillDescriptor
-    provider: ProviderDescriptor
+    provider: ProviderDescriptor | None = None
+    router_provider: ProviderDescriptor | None = None
+    generation_provider: ProviderDescriptor | None = None
     sandbox: SandboxReport
     validation: CirValidationReport
     agent_traces: list[AgentTrace] = Field(default_factory=list)
     repair_count: int = 0
     repair_actions: list[str] = Field(default_factory=list)
 
+    @model_validator(mode="after")
+    def apply_provider_aliases(self) -> "PipelineRuntime":
+        generation_provider = self.generation_provider or self.provider
+        router_provider = self.router_provider or generation_provider
+        self.generation_provider = generation_provider
+        self.router_provider = router_provider
+        self.provider = generation_provider
+        return self
+
 
 class RuntimeCatalog(BaseModel):
-    default_provider: str
+    default_provider: str | None = None
+    default_router_provider: str | None = None
+    default_generation_provider: str | None = None
     sandbox_engine: str
     providers: list[ProviderDescriptor] = Field(default_factory=list)
     skills: list[SkillDescriptor] = Field(default_factory=list)
     sandbox_modes: list[SandboxMode] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def apply_provider_aliases(self) -> "RuntimeCatalog":
+        default_generation_provider = (
+            self.default_generation_provider or self.default_provider or ProviderName.MOCK.value
+        )
+        default_router_provider = self.default_router_provider or default_generation_provider
+        self.default_generation_provider = default_generation_provider
+        self.default_router_provider = default_router_provider
+        self.default_provider = default_generation_provider
+        return self
 
 
 class PipelineResponse(BaseModel):
@@ -189,8 +223,19 @@ class PipelineRunSummary(BaseModel):
     prompt: str
     title: str
     domain: TopicDomain
-    provider: str
+    provider: str | None = None
+    router_provider: str | None = None
+    generation_provider: str | None = None
     sandbox_status: SandboxStatus
+
+    @model_validator(mode="after")
+    def apply_provider_aliases(self) -> "PipelineRunSummary":
+        generation_provider = self.generation_provider or self.provider
+        router_provider = self.router_provider or generation_provider
+        self.generation_provider = generation_provider
+        self.router_provider = router_provider
+        self.provider = generation_provider
+        return self
 
 
 class PipelineRunDetail(BaseModel):

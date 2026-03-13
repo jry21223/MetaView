@@ -32,7 +32,8 @@ export function HistoryPanel({ runs, selectedRunId, onSelectRun }: HistoryPanelP
             </div>
             <p>{run.prompt}</p>
             <div className="history-item-meta">
-              <span>{run.provider}</span>
+              <span>route:{run.router_provider}</span>
+              <span>gen:{run.generation_provider}</span>
               <span>{run.domain}</span>
               <span>{new Date(run.created_at).toLocaleString()}</span>
             </div>
