@@ -1,16 +1,19 @@
-import { startTransition, useDeferredValue, useEffect, useState } from "react";
+import { lazy, startTransition, Suspense, useDeferredValue, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
 import {
+  deleteCustomProvider,
   getPipelineRun,
   getPipelineRuns,
   getRuntimeCatalog,
   runPipeline,
+  upsertCustomProvider,
 } from "./api/client";
 import { ControlPanel } from "./components/ControlPanel";
 import { HistoryPanel } from "./components/HistoryPanel";
-import { PreviewCanvas } from "./components/PreviewCanvas";
+import { ProviderManager } from "./components/ProviderManager";
 import type {
+  CustomProviderUpsertRequest,
   ModelProvider,
   PipelineResponse,
   PipelineRunSummary,
@@ -20,21 +23,33 @@ import type {
 } from "./types";
 
 const defaultPrompt = "请可视化讲解二分查找的边界收缩过程，突出 left / mid / right 的变化。";
+const PreviewCanvas = lazy(async () => {
+  const module = await import("./components/PreviewCanvas");
+  return { default: module.default };
+});
 const fallbackRuntimeCatalog: RuntimeCatalog = {
   default_provider: "mock",
   sandbox_engine: "preview-dry-run",
   providers: [
     {
       name: "mock",
+      label: "Mock Provider",
+      kind: "mock",
       model: "mock-cir-studio-001",
       description: "本地确定性规则提供者，用于 MVP 阶段替代真实大模型。",
       configured: true,
+      is_custom: false,
+      base_url: null,
     },
     {
       name: "openai",
+      label: "OpenAI Compatible",
+      kind: "openai_compatible",
       model: "not-configured",
       description: "OpenAI 兼容 Provider，需配置环境变量后启用。",
       configured: false,
+      is_custom: false,
+      base_url: null,
     },
   ],
   sandbox_modes: ["dry_run", "off"],
@@ -54,6 +69,20 @@ export default function App() {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const deferredResult = useDeferredValue(result);
 
+  async function refreshRuntimeCatalog(): Promise<RuntimeCatalog> {
+    try {
+      const catalog = await getRuntimeCatalog();
+      setRuntimeCatalog(catalog);
+      if (!catalog.providers.some((candidate) => candidate.name === provider && candidate.configured)) {
+        setProvider(catalog.default_provider);
+      }
+      return catalog;
+    } catch {
+      setRuntimeCatalog(fallbackRuntimeCatalog);
+      return fallbackRuntimeCatalog;
+    }
+  }
+
   async function loadRuns() {
     try {
       const historyRuns = await getPipelineRuns();
@@ -67,20 +96,18 @@ export default function App() {
   useEffect(() => {
     let active = true;
 
-    void getRuntimeCatalog()
-      .then((catalog) => {
-        if (!active) {
-          return;
-        }
+    void getRuntimeCatalog().then((catalog) => {
+      if (!active) {
+        return;
+      }
 
-        setRuntimeCatalog(catalog);
-        setProvider(catalog.default_provider);
-      })
-      .catch(() => {
-        if (active) {
-          setRuntimeCatalog(fallbackRuntimeCatalog);
-        }
-      });
+      setRuntimeCatalog(catalog);
+      setProvider(catalog.default_provider);
+    }).catch(() => {
+      if (active) {
+        setRuntimeCatalog(fallbackRuntimeCatalog);
+      }
+    });
 
     return () => {
       active = false;
@@ -154,6 +181,23 @@ export default function App() {
     URL.revokeObjectURL(url);
   }
 
+  async function handleCreateProvider(payload: CustomProviderUpsertRequest) {
+    await upsertCustomProvider(payload);
+    const catalog = await refreshRuntimeCatalog();
+    const providerExistsAndIsConfigured = catalog.providers.some(
+      (candidate) => candidate.name === payload.name && candidate.configured,
+    );
+    setProvider(providerExistsAndIsConfigured ? payload.name : catalog.default_provider);
+  }
+
+  async function handleDeleteProvider(name: string) {
+    await deleteCustomProvider(name);
+    const catalog = await refreshRuntimeCatalog();
+    if (provider === name) {
+      setProvider(catalog.default_provider);
+    }
+  }
+
   return (
     <main className="app-shell">
       <section className="hero">
@@ -165,7 +209,7 @@ export default function App() {
           <span>Planner</span>
           <span>Coder</span>
           <span>Critic</span>
-          <span>Canvas MVP</span>
+          <span>manim-web</span>
         </div>
       </section>
 
@@ -189,9 +233,14 @@ export default function App() {
           <div className="panel-header">
             <span className="panel-kicker">Preview</span>
             <h3>前端即时渲染</h3>
-            <p>当前使用 Canvas 进行轻量场景预览，后续可替换为 manim-web / WebGPU 适配层。</p>
+            <p>当前预览已切换为 manim-web 正式渲染层，运行时由 three.js 承载，并显式展示 WebGPU 能力检测。</p>
           </div>
-          <PreviewCanvas cir={deferredResult?.cir ?? null} />
+          <Suspense fallback={<div className="preview-empty">加载 manim-web 渲染器...</div>}>
+            <PreviewCanvas
+              cir={deferredResult?.cir ?? null}
+              sceneKey={deferredResult?.request_id ?? "empty-preview"}
+            />
+          </Suspense>
         </section>
       </div>
 
@@ -305,6 +354,32 @@ export default function App() {
           ) : (
             <div className="history-empty">选择历史任务或先生成新任务后，这里会展示验证与修复细节。</div>
           )}
+        </section>
+      </div>
+
+      <div className="workspace-grid workspace-grid-bottom">
+        <ProviderManager
+          providers={runtimeCatalog.providers}
+          onCreateProvider={handleCreateProvider}
+          onDeleteProvider={handleDeleteProvider}
+        />
+        <section className="panel panel-history-detail">
+          <div className="panel-header">
+            <span className="panel-kicker">Runtime Catalog</span>
+            <h3>当前 Provider 目录</h3>
+            <p>这里展示内置 provider 与已持久化的自定义 provider 的可用状态。</p>
+          </div>
+          <ul className="diagnostic-list">
+            {runtimeCatalog.providers.map((providerItem) => (
+              <li key={providerItem.name}>
+                <strong>{providerItem.label}</strong>
+                <span>
+                  {providerItem.name} / {providerItem.kind} / {providerItem.model} /{" "}
+                  {providerItem.configured ? "configured" : "disabled"}
+                </span>
+              </li>
+            ))}
+          </ul>
         </section>
       </div>
     </main>

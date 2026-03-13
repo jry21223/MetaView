@@ -37,8 +37,8 @@ export function ControlPanel({
         <span className="panel-kicker">Prompt Studio</span>
         <h1>基于 CIR 的算法与高数可视化工作台</h1>
         <p>
-          当前版本先打通 Planner、Coder、Critic 的后端链路，并在浏览器中用原生
-          Canvas 做即时预览。
+          当前版本已经打通 Planner、Coder、Critic 的后端链路，前端使用 manim-web
+          正式渲染层，并支持选择内置或自定义 OpenAI 兼容 Provider。
         </p>
       </div>
 
@@ -73,7 +73,7 @@ export function ControlPanel({
             >
               {providers.map((item) => (
                 <option key={item.name} value={item.name} disabled={!item.configured}>
-                  {item.name} / {item.model}
+                  {item.label} / {item.model}
                 </option>
               ))}
             </select>
@@ -98,7 +98,7 @@ export function ControlPanel({
           <button type="submit" disabled={loading || prompt.trim().length < 5}>
             {loading ? "生成中..." : "生成可视化草案"}
           </button>
-          <p>未配置的 Provider 会自动禁用。当前支持任务持久化、dry-run 校验与历史回看。</p>
+          <p>未配置的 Provider 会自动禁用。当前支持 dry-run 校验、任务持久化与历史回看。</p>
         </div>
       </form>
     </section>

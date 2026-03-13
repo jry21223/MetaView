@@ -10,10 +10,12 @@
 - dry-run sandbox
 - SQLite 历史记录与前端回放
 - JSON 导出与 Docker 化启动
+- manim-web 正式渲染层
+- 自定义 OpenAI 兼容 Provider 管理
 
 ## 后续增强
 
 - 容器级安全沙盒与执行反馈回注
-- manim-web / WebGPU 正式渲染适配器
+- 更底层的 WebGPU 原生渲染适配器
 - 题库、模板库与可视化回归测试
 - 账号、额度、计费与白标能力

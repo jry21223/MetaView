@@ -3,18 +3,33 @@ from __future__ import annotations
 import json
 import sqlite3
 from contextlib import closing
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
 from app.schemas import (
+    CustomProviderUpsertRequest,
     PipelineRequest,
     PipelineResponse,
     PipelineRunDetail,
     PipelineRunSummary,
-    ProviderName,
+    ProviderKind,
     SandboxStatus,
     TopicDomain,
 )
+
+
+@dataclass(frozen=True)
+class StoredCustomProvider:
+    name: str
+    label: str
+    kind: ProviderKind
+    base_url: str
+    model: str
+    api_key: str | None
+    description: str
+    temperature: float
+    enabled: bool
 
 
 class RunRepository:
@@ -71,7 +86,7 @@ class RunRepository:
                     request.prompt,
                     response.cir.title,
                     request.domain.value,
-                    response.runtime.provider.name.value,
+                    response.runtime.provider.name,
                     response.runtime.sandbox.status.value,
                     json.dumps(request.model_dump(mode="json"), ensure_ascii=False),
                     json.dumps(response.model_dump(mode="json"), ensure_ascii=False),
@@ -99,7 +114,7 @@ class RunRepository:
                 prompt=row["prompt"],
                 title=row["title"],
                 domain=TopicDomain(row["domain"]),
-                provider=ProviderName(row["provider"]),
+                provider=row["provider"],
                 sandbox_status=SandboxStatus(row["sandbox_status"]),
             )
             for row in rows
@@ -124,3 +139,134 @@ class RunRepository:
             request=PipelineRequest.model_validate(json.loads(row["request_payload"])),
             response=PipelineResponse.model_validate(json.loads(row["response_payload"])),
         )
+
+
+class CustomProviderRepository:
+    def __init__(self, db_path: str) -> None:
+        self.db_path = Path(db_path)
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._initialize()
+
+    def _connect(self) -> sqlite3.Connection:
+        connection = sqlite3.connect(self.db_path)
+        connection.row_factory = sqlite3.Row
+        return connection
+
+    def _initialize(self) -> None:
+        with closing(self._connect()) as connection, connection:
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS custom_providers (
+                    name TEXT PRIMARY KEY,
+                    label TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    base_url TEXT NOT NULL,
+                    model TEXT NOT NULL,
+                    api_key TEXT,
+                    description TEXT NOT NULL,
+                    temperature REAL NOT NULL,
+                    enabled INTEGER NOT NULL
+                )
+                """
+            )
+
+    def upsert(self, provider: CustomProviderUpsertRequest) -> StoredCustomProvider:
+        stored = StoredCustomProvider(
+            name=provider.name,
+            label=provider.label,
+            kind=ProviderKind.OPENAI_COMPATIBLE,
+            base_url=provider.base_url.rstrip("/"),
+            model=provider.model,
+            api_key=provider.api_key or None,
+            description=provider.description,
+            temperature=provider.temperature,
+            enabled=provider.enabled,
+        )
+
+        with closing(self._connect()) as connection, connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO custom_providers (
+                    name, label, kind, base_url, model, api_key, description, temperature, enabled
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    stored.name,
+                    stored.label,
+                    stored.kind.value,
+                    stored.base_url,
+                    stored.model,
+                    stored.api_key,
+                    stored.description,
+                    stored.temperature,
+                    1 if stored.enabled else 0,
+                ),
+            )
+
+        return stored
+
+    def list_all(self) -> list[StoredCustomProvider]:
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                """
+                SELECT
+                    name, label, kind, base_url, model, api_key, description, temperature, enabled
+                FROM custom_providers
+                ORDER BY name ASC
+                """
+            ).fetchall()
+
+        return [
+            StoredCustomProvider(
+                name=row["name"],
+                label=row["label"],
+                kind=ProviderKind(row["kind"]),
+                base_url=row["base_url"],
+                model=row["model"],
+                api_key=row["api_key"],
+                description=row["description"],
+                temperature=float(row["temperature"]),
+                enabled=bool(row["enabled"]),
+            )
+            for row in rows
+        ]
+
+    def get(self, name: str) -> StoredCustomProvider | None:
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                """
+                SELECT
+                    name, label, kind, base_url, model, api_key, description, temperature, enabled
+                FROM custom_providers
+                WHERE name = ?
+                """,
+                (name,),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return StoredCustomProvider(
+            name=row["name"],
+            label=row["label"],
+            kind=ProviderKind(row["kind"]),
+            base_url=row["base_url"],
+            model=row["model"],
+            api_key=row["api_key"],
+            description=row["description"],
+            temperature=float(row["temperature"]),
+            enabled=bool(row["enabled"]),
+        )
+
+    def delete(self, name: str) -> bool:
+        with closing(self._connect()) as connection, connection:
+            cursor = connection.execute(
+                """
+                DELETE FROM custom_providers
+                WHERE name = ?
+                """,
+                (name,),
+            )
+
+        return cursor.rowcount > 0

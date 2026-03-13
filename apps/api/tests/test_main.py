@@ -41,8 +41,18 @@ def test_runtime_catalog() -> None:
     assert payload["default_provider"] == "mock"
     assert payload["sandbox_engine"] == "preview-dry-run"
     assert payload["providers"][0]["name"] == "mock"
+    assert payload["providers"][0]["label"] == "Mock Provider"
     assert payload["providers"][1]["name"] == "openai"
     assert payload["providers"][1]["configured"] is False
+
+
+def test_runtime_catalog_allows_local_dev_cors_origin() -> None:
+    response = client.get(
+        "/api/v1/runtime",
+        headers={"Origin": "http://127.0.0.1:4174"},
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:4174"
 
 
 def test_pipeline_runs_history_endpoints() -> None:
@@ -69,3 +79,31 @@ def test_pipeline_runs_history_endpoints() -> None:
     detail = detail_response.json()
     assert detail["request"]["prompt"] == "请讲解动态规划中的状态定义与转移。"
     assert detail["response"]["request_id"] == request_id
+
+
+def test_custom_provider_crud() -> None:
+    create_response = client.post(
+        "/api/v1/providers/custom",
+        json={
+            "name": "local-ollama",
+            "label": "Local Ollama",
+            "base_url": "http://127.0.0.1:11434/v1",
+            "model": "qwen2.5-coder",
+            "api_key": "",
+            "description": "本地自定义 provider",
+            "temperature": 0.1,
+            "enabled": True,
+        },
+    )
+    assert create_response.status_code == 200
+    payload = create_response.json()
+    assert payload["name"] == "local-ollama"
+    assert payload["is_custom"] is True
+
+    runtime_response = client.get("/api/v1/runtime")
+    providers = runtime_response.json()["providers"]
+    assert any(provider["name"] == "local-ollama" for provider in providers)
+
+    delete_response = client.delete("/api/v1/providers/custom/local-ollama")
+    assert delete_response.status_code == 200
+    assert delete_response.json()["deleted"] is True

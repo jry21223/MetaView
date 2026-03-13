@@ -3,15 +3,17 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.schemas import (
+    CustomProviderUpsertRequest,
     PipelineRequest,
     PipelineResponse,
     PipelineRunDetail,
     PipelineRunSummary,
+    ProviderDescriptor,
     RuntimeCatalog,
 )
 from app.services.orchestrator import PipelineOrchestrator
 from app.services.providers.openai import ProviderInvocationError
-from app.services.providers.registry import ProviderUnavailableError
+from app.services.providers.registry import ProviderRegistrationError, ProviderUnavailableError
 
 settings = get_settings()
 orchestrator = PipelineOrchestrator(settings=settings)
@@ -20,6 +22,7 @@ app = FastAPI(title=settings.app_name, version=settings.app_version)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
+    allow_origin_regex=settings.cors_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -57,3 +60,23 @@ def get_pipeline_run(request_id: str) -> PipelineRunDetail:
     if run is None:
         raise HTTPException(status_code=404, detail="Pipeline run not found")
     return run
+
+
+@app.post(f"{settings.api_prefix}/providers/custom", response_model=ProviderDescriptor)
+def upsert_custom_provider(payload: CustomProviderUpsertRequest) -> ProviderDescriptor:
+    try:
+        return orchestrator.upsert_custom_provider(payload)
+    except ProviderRegistrationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.delete(f"{settings.api_prefix}/providers/custom/{{name}}")
+def delete_custom_provider(name: str) -> dict[str, bool]:
+    try:
+        deleted = orchestrator.delete_custom_provider(name)
+    except ProviderRegistrationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Custom provider not found")
+    return {"deleted": True}

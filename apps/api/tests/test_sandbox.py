@@ -30,7 +30,8 @@ def test_sandbox_passes_valid_script() -> None:
     sandbox = PreviewDryRunSandbox(timeout_ms=500)
     report = sandbox.run(
         script="""
-// renderer-target: preview-js
+import { Scene } from "manim-web";
+// renderer-target: manim-web-ts
 export const previewTimeline = [
   {
     id: "step-1",
@@ -39,6 +40,9 @@ export const previewTimeline = [
     tokens: ["输入:left"],
   },
 ];
+export async function construct(scene: Scene) {
+  scene.add();
+}
         """.strip(),
         cir=build_cir(),
         mode=SandboxMode.DRY_RUN,

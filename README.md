@@ -5,7 +5,7 @@
 ## 当前阶段
 
 - `apps/api`: FastAPI 后端，提供 CIR 规划、多智能体编排、验证修复、历史持久化和运行时目录。
-- `apps/web`: React + Vite 前端，提供题目输入、历史回看、导出、运行时展示和 Canvas 可视化预览。
+- `apps/web`: React + Vite 前端，提供题目输入、历史回看、导出、运行时展示、`manim-web` 正式预览和自定义模型提供商管理。
 - `docs`: 架构说明、研发路线和 Git 协作规范。
 - `docker-compose.yml`: API + Web 联调与部署入口。
 
@@ -15,7 +15,7 @@
 2. 选择模型 Provider 与 dry-run 沙盒模式。
 3. 后端生成结构化 CIR，执行验证与自动修复。
 4. 后端执行脚本级 dry-run 校验，并持久化任务到 SQLite。
-5. 前端用浏览器原生 Canvas 做即时预览，并支持历史回看与 JSON 导出。
+5. 前端用 `manim-web` 在浏览器内完成正式预览，并支持历史回看、JSON 导出和 WebGPU 能力检测。
 
 ## 快速开始
 
@@ -42,6 +42,8 @@ make dev-api
 - `POST /api/v1/pipeline`
 - `GET /api/v1/runs`
 - `GET /api/v1/runs/{request_id}`
+- `POST /api/v1/providers/custom`
+- `DELETE /api/v1/providers/custom/{name}`
 
 ### 3. 启动前端
 
@@ -77,16 +79,27 @@ make docker-up
 ## 环境变量
 
 - `ALGO_VIS_HISTORY_DB_PATH`: SQLite 历史库路径
-- `ALGO_VIS_OPENAI_API_KEY`: 启用 OpenAI 兼容 Provider
+- `ALGO_VIS_CORS_ORIGIN_REGEX`: 本地联调默认允许的浏览器来源规则
+- `ALGO_VIS_OPENAI_API_KEY`: 启用内置 OpenAI 兼容 Provider
 - `ALGO_VIS_OPENAI_BASE_URL`: OpenAI 兼容 API 地址
 - `ALGO_VIS_OPENAI_MODEL`: 使用的模型名
 - `VITE_API_BASE_URL`: 前端构建时 API 基地址，默认同源
 
+## 自定义 Provider
+
+当前版本支持通过前端面板或 HTTP API 注册自定义 OpenAI 兼容模型提供商，例如本地 `Ollama`、`vLLM` 网关或第三方代理服务。自定义 Provider 会持久化到 SQLite，并自动出现在运行时目录中。
+
+内置 `openai` Provider 继续走环境变量配置；自定义 Provider 则通过 `POST /api/v1/providers/custom` 动态注册。
+
+## 渲染层说明
+
+前端正式渲染层已经替换为 `manim-web`。当前运行时实际由 `three.js` 承载，并在界面上展示浏览器 `WebGPU` 能力检测结果；这意味着用户能直接在浏览器里获得交互式预览，而不必先走后端视频合成链路。
+
 ## 已完成范围
 
 - monorepo、Git hooks、CI、Conventional Commits
-- FastAPI 编排层、Provider 注册表、OpenAI 兼容 Provider 适配位
+- FastAPI 编排层、Provider 注册表、内置与自定义 OpenAI 兼容 Provider 适配
 - CIR 校验器、自动修复链路、脚本级 dry-run 沙盒
-- SQLite 历史持久化与回放接口
-- React 工作台、运行时视图、历史记录与 JSON 导出
+- SQLite 历史持久化、回放接口与自定义 Provider 存储
+- React 工作台、`manim-web` 预览、运行时视图、历史记录与 JSON 导出
 - Docker 化启动入口

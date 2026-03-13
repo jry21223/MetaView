@@ -5,7 +5,7 @@ from app.schemas import (
     PipelineResponse,
     PipelineRuntime,
     ProviderDescriptor,
-    ProviderName,
+    ProviderKind,
     SandboxMode,
     SandboxReport,
     SandboxStatus,
@@ -20,7 +20,7 @@ def test_run_repository_save_and_load(tmp_path) -> None:
     request = PipelineRequest(
         prompt="请讲解二分查找。",
         domain=TopicDomain.ALGORITHM,
-        provider=ProviderName.MOCK,
+        provider="mock",
         sandbox_mode=SandboxMode.DRY_RUN,
     )
     response = PipelineResponse(
@@ -34,7 +34,9 @@ def test_run_repository_save_and_load(tmp_path) -> None:
         renderer_script="export const previewTimeline = [];",
         runtime=PipelineRuntime(
             provider=ProviderDescriptor(
-                name=ProviderName.MOCK,
+                name="mock",
+                label="Mock Provider",
+                kind=ProviderKind.MOCK,
                 model="mock-cir-studio-001",
                 description="mock",
             ),

@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 import httpx
 
-from app.schemas import AgentTrace, ProviderDescriptor, ProviderName
+from app.schemas import AgentTrace, ProviderDescriptor, ProviderKind, ProviderName
 from app.services.providers.base import CodingHints, CritiqueHints, PlanningHints
 
 
@@ -31,14 +31,23 @@ class OpenAICompatibleProvider:
     model: str
     base_url: str = "https://api.openai.com/v1"
     timeout_s: float = 20.0
+    provider_id: str = ProviderName.OPENAI.value
+    label: str = "OpenAI Compatible"
+    description: str = "OpenAI 兼容 Provider，使用远程模型生成规划、编码和批评提示。"
+    is_custom: bool = False
+    temperature: float = 0.2
     descriptor: ProviderDescriptor = field(init=False)
 
     def __post_init__(self) -> None:
         self.descriptor = ProviderDescriptor(
-            name=ProviderName.OPENAI,
+            name=self.provider_id,
+            label=self.label,
+            kind=ProviderKind.OPENAI_COMPATIBLE,
             model=self.model,
-            description="OpenAI 兼容 Provider，使用远程模型生成规划、编码和批评提示。",
+            description=self.description,
             configured=True,
+            is_custom=self.is_custom,
+            base_url=self.base_url,
         )
 
     def plan(self, prompt: str, domain: str) -> tuple[PlanningHints, AgentTrace]:
@@ -105,17 +114,14 @@ class OpenAICompatibleProvider:
     def _chat(self, system_prompt: str, user_prompt: str) -> dict:
         response = httpx.post(
             f"{self.base_url.rstrip('/')}/chat/completions",
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            },
+            headers=self._headers(),
             json={
                 "model": self.model,
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-                "temperature": 0.2,
+                "temperature": self.temperature,
             },
             timeout=self.timeout_s,
         )
@@ -131,3 +137,9 @@ class OpenAICompatibleProvider:
             raise ProviderInvocationError("Provider content 不是字符串。")
 
         return _extract_json_object(content)
+
+    def _headers(self) -> dict[str, str]:
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        return headers

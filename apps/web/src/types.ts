@@ -1,7 +1,8 @@
 export type TopicDomain = "algorithm" | "math";
-export type ModelProvider = "mock" | "openai";
+export type ModelProvider = string;
 export type SandboxMode = "dry_run" | "off";
 export type SandboxStatus = "passed" | "failed" | "skipped";
+export type ProviderKind = "mock" | "openai_compatible";
 
 export type VisualKind = "array" | "flow" | "formula" | "graph" | "text";
 
@@ -36,9 +37,13 @@ export interface AgentDiagnostic {
 
 export interface ProviderDescriptor {
   name: ModelProvider;
+  label: string;
+  kind: ProviderKind;
   model: string;
   description: string;
   configured: boolean;
+  is_custom: boolean;
+  base_url?: string | null;
 }
 
 export interface AgentTrace {
@@ -116,4 +121,15 @@ export interface PipelineRunDetail {
     persist_run: boolean;
   };
   response: PipelineResponse;
+}
+
+export interface CustomProviderUpsertRequest {
+  name: string;
+  label: string;
+  base_url: string;
+  model: string;
+  api_key?: string;
+  description: string;
+  temperature: number;
+  enabled: boolean;
 }

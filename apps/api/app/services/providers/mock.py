@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from app.schemas import AgentTrace, ProviderDescriptor, ProviderName
+from app.schemas import AgentTrace, ProviderDescriptor, ProviderKind, ProviderName
 from app.services.providers.base import CodingHints, CritiqueHints, PlanningHints
 
 
@@ -29,9 +29,12 @@ def _concepts_from_prompt(prompt: str, domain: str) -> list[str]:
 class MockModelProvider:
     descriptor: ProviderDescriptor = field(
         default_factory=lambda: ProviderDescriptor(
-            name=ProviderName.MOCK,
+            name=ProviderName.MOCK.value,
+            label="Mock Provider",
+            kind=ProviderKind.MOCK,
             model="mock-cir-studio-001",
             description="本地确定性规则提供者，用于 MVP 阶段替代真实大模型。",
+            is_custom=False,
         )
     )
 
@@ -49,8 +52,8 @@ class MockModelProvider:
 
     def code(self, title: str, step_count: int) -> tuple[CodingHints, AgentTrace]:
         style_notes = [
-            "优先保证时间线字段完整，再追求动画细节。",
-            "确保每个镜头至少包含 id、title、visualKind 和 tokens。",
+            "优先输出可直接交给 manim-web 的 construct(scene) 草案。",
+            "同时保留 previewTimeline 元数据，供 dry-run 沙盒和前端调试使用。",
         ]
         trace = AgentTrace(
             agent="coder",
@@ -58,7 +61,7 @@ class MockModelProvider:
             model=self.descriptor.model,
             summary=f"为《{title}》生成 {step_count} 个镜头的预览脚本草案。",
         )
-        return CodingHints(target="web-preview-js", style_notes=style_notes), trace
+        return CodingHints(target="manim-web-ts", style_notes=style_notes), trace
 
     def critique(self, title: str, renderer_script: str) -> tuple[CritiqueHints, AgentTrace]:
         warnings = []

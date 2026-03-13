@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 
@@ -170,8 +171,14 @@ class CoderAgent:
     name: str = "coder"
 
     def run(self, cir: CirDocument, hints: CodingHints | None = None) -> str:
+        import_line = (
+            'import { Scene, Text, MathTex, Rectangle, Circle, Line, Arrow, VGroup, '
+            'FadeIn, FadeOut, Write, Create, DOWN, RIGHT, LEFT } from "manim-web";'
+        )
         lines = [
-            f"// renderer-target: {hints.target}" if hints else "// renderer-target: preview-js",
+            f"// renderer-target: {hints.target}" if hints else "// renderer-target: manim-web-ts",
+            import_line,
+            "",
             "export const previewTimeline = [",
         ]
 
@@ -187,6 +194,53 @@ class CoderAgent:
             lines.append("  },")
 
         lines.append("];")
+        lines.append("")
+        lines.append("export async function construct(scene: Scene) {")
+        lines.append(
+            "  const title = new Text("
+            f"{{ text: {json.dumps(cir.title)}, fontSize: 40, color: \"#f8fafc\" }}"
+            ").toEdge(DOWN, 6.8);"
+        )
+        lines.append("  scene.add(title);")
+        lines.append("  await scene.play(new FadeIn(title));")
+        lines.append("")
+        lines.append("  for (const step of previewTimeline) {")
+        lines.append(
+            "    const card = new Rectangle("
+            "{ width: 10.5, height: 4.2, color: \"#93c5fd\", fillOpacity: 0.08 }"
+            ").moveTo([0, 0.2, 0]);"
+        )
+        lines.append(
+            "    const heading = new Text("
+            "{ text: step.title, fontSize: 28, color: \"#e2e8f0\" }"
+            ").moveTo([0, 1.5, 0]);"
+        )
+        lines.append(
+            "    const body = step.visualKind === \"formula\""
+        )
+        lines.append(
+            "      ? new MathTex({"
+            " latex: step.tokens.map((token) => token.split(\":\")[1]).join(\"\\\\quad\"),"
+            " fontSize: 34, color: \"#f8fafc\" }).moveTo([0, 0.4, 0])"
+        )
+        lines.append(
+            "      : new Text({ text: step.tokens.join(\"   \"),"
+            " fontSize: 22, color: \"#cbd5e1\" }).moveTo([0, 0.4, 0]);"
+        )
+        lines.append("    scene.add(card, heading, body);")
+        lines.append(
+            "    await scene.play("
+            "new Create(card), new Write(heading), new FadeIn(body)"
+            ");"
+        )
+        lines.append("    await scene.wait(0.4);")
+        lines.append(
+            "    await scene.play("
+            "new FadeOut(card), new FadeOut(heading), new FadeOut(body)"
+            ");"
+        )
+        lines.append("  }")
+        lines.append("}")
         if hints and hints.style_notes:
             lines.append("")
             lines.append(f"// style-notes: {' | '.join(hints.style_notes)}")

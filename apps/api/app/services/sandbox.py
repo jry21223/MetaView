@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import tempfile
@@ -57,6 +58,8 @@ class PreviewDryRunSandbox:
         errors: list[str] = []
         if "export const previewTimeline = [" not in script:
             errors.append("渲染脚本缺少 previewTimeline 导出。")
+        if "export async function construct(scene: Scene)" not in script:
+            errors.append("渲染脚本缺少 construct(scene) 入口。")
         if "visualKind:" not in script:
             errors.append("渲染脚本缺少 visualKind 字段。")
         if not cir.steps:
@@ -64,7 +67,11 @@ class PreviewDryRunSandbox:
         return errors
 
     def _node_validate(self, node_binary: str, script: str, cir: CirDocument) -> str | None:
-        executable_script = script.replace("export const", "const", 1)
+        timeline_block = self._extract_timeline_block(script)
+        if timeline_block is None:
+            return "未能从脚本中提取 previewTimeline。"
+
+        executable_script = timeline_block.replace("export const", "const", 1)
         probe = textwrap.dedent(
             f"""
             {executable_script}
@@ -118,3 +125,13 @@ class PreviewDryRunSandbox:
         stderr = result.stderr.strip()
         stdout = result.stdout.strip()
         return stderr or stdout or "node dry-run 执行失败。"
+
+    def _extract_timeline_block(self, script: str) -> str | None:
+        match = re.search(
+            r"export const previewTimeline = \[(?P<body>.*?)\];",
+            script,
+            flags=re.DOTALL,
+        )
+        if not match:
+            return None
+        return f"export const previewTimeline = [{match.group('body')}];"

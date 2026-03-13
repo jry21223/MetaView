@@ -14,6 +14,11 @@ class ProviderName(str, Enum):
     OPENAI = "openai"
 
 
+class ProviderKind(str, Enum):
+    MOCK = "mock"
+    OPENAI_COMPATIBLE = "openai_compatible"
+
+
 class SandboxMode(str, Enum):
     DRY_RUN = "dry_run"
     OFF = "off"
@@ -79,7 +84,7 @@ class CirDocument(BaseModel):
 class PipelineRequest(BaseModel):
     prompt: str = Field(min_length=5, max_length=1200)
     domain: TopicDomain = TopicDomain.ALGORITHM
-    provider: ProviderName | None = None
+    provider: str | None = None
     sandbox_mode: SandboxMode = SandboxMode.DRY_RUN
     persist_run: bool = True
 
@@ -90,15 +95,19 @@ class AgentDiagnostic(BaseModel):
 
 
 class ProviderDescriptor(BaseModel):
-    name: ProviderName
+    name: str
+    label: str
+    kind: ProviderKind
     model: str
     description: str
     configured: bool = True
+    is_custom: bool = False
+    base_url: str | None = None
 
 
 class AgentTrace(BaseModel):
     agent: str
-    provider: ProviderName
+    provider: str
     model: str
     summary: str
 
@@ -134,7 +143,7 @@ class PipelineRuntime(BaseModel):
 
 
 class RuntimeCatalog(BaseModel):
-    default_provider: ProviderName
+    default_provider: str
     sandbox_engine: str
     providers: list[ProviderDescriptor] = Field(default_factory=list)
     sandbox_modes: list[SandboxMode] = Field(default_factory=list)
@@ -154,7 +163,7 @@ class PipelineRunSummary(BaseModel):
     prompt: str
     title: str
     domain: TopicDomain
-    provider: ProviderName
+    provider: str
     sandbox_status: SandboxStatus
 
 
@@ -162,3 +171,14 @@ class PipelineRunDetail(BaseModel):
     created_at: str
     request: PipelineRequest
     response: PipelineResponse
+
+
+class CustomProviderUpsertRequest(BaseModel):
+    name: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]{1,30}$")
+    label: str = Field(min_length=2, max_length=40)
+    base_url: str = Field(min_length=8, max_length=300)
+    model: str = Field(min_length=1, max_length=100)
+    api_key: str | None = Field(default=None, max_length=300)
+    description: str = Field(default="", max_length=200)
+    temperature: float = Field(default=0.2, ge=0.0, le=2.0)
+    enabled: bool = True

@@ -2,17 +2,19 @@ from app.config import Settings
 from app.schemas import (
     AgentDiagnostic,
     CirValidationReport,
+    CustomProviderUpsertRequest,
     PipelineRequest,
     PipelineResponse,
     PipelineRunDetail,
     PipelineRunSummary,
     PipelineRuntime,
+    ProviderDescriptor,
     RuntimeCatalog,
     SandboxMode,
     ValidationStatus,
 )
 from app.services.agents import CoderAgent, CriticAgent, PlannerAgent
-from app.services.history import RunRepository
+from app.services.history import CustomProviderRepository, RunRepository
 from app.services.providers.registry import ProviderRegistry
 from app.services.repair import PipelineRepairService
 from app.services.sandbox import PreviewDryRunSandbox
@@ -21,7 +23,12 @@ from app.services.validation import CirValidator
 
 class PipelineOrchestrator:
     def __init__(self, settings: Settings) -> None:
+        self.repository = RunRepository(db_path=settings.history_db_path)
+        self.custom_provider_repository = CustomProviderRepository(
+            db_path=settings.history_db_path
+        )
         self.provider_registry = ProviderRegistry(
+            custom_provider_repository=self.custom_provider_repository,
             openai_api_key=settings.openai_api_key,
             openai_base_url=settings.openai_base_url,
             openai_model=settings.openai_model,
@@ -31,7 +38,6 @@ class PipelineOrchestrator:
         self.sandbox = PreviewDryRunSandbox(timeout_ms=settings.sandbox_timeout_ms)
         self.validator = CirValidator()
         self.repair_service = PipelineRepairService()
-        self.repository = RunRepository(db_path=settings.history_db_path)
         self.max_repair_attempts = settings.max_repair_attempts
         self.planner = PlannerAgent()
         self.coder = CoderAgent()
@@ -118,6 +124,14 @@ class PipelineOrchestrator:
 
     def get_run(self, request_id: str) -> PipelineRunDetail | None:
         return self.repository.get_run(request_id=request_id)
+
+    def upsert_custom_provider(
+        self, payload: CustomProviderUpsertRequest
+    ) -> ProviderDescriptor:
+        return self.provider_registry.upsert_custom_provider(payload)
+
+    def delete_custom_provider(self, name: str) -> bool:
+        return self.provider_registry.delete_custom_provider(name)
 
     def _sandbox_diagnostics(self, sandbox_report) -> list[AgentDiagnostic]:
         diagnostics: list[AgentDiagnostic] = []

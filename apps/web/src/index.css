@@ -147,6 +147,7 @@ select {
 }
 
 .prompt-form textarea,
+.prompt-form input,
 .prompt-form select {
   width: 100%;
   border: 1px solid rgba(148, 163, 184, 0.35);
@@ -158,6 +159,7 @@ select {
 }
 
 .prompt-form textarea:focus,
+.prompt-form input:focus,
 .prompt-form select:focus {
   outline: none;
   border-color: rgba(15, 118, 110, 0.5);
@@ -216,8 +218,54 @@ select {
   min-height: 560px;
   height: 100%;
   border-radius: 24px;
+  overflow: hidden;
   border: 1px solid rgba(148, 163, 184, 0.25);
-  background: rgba(255, 255, 255, 0.55);
+  background: #0f172a;
+}
+
+.preview-shell {
+  position: relative;
+  min-height: 560px;
+}
+
+.preview-empty {
+  display: grid;
+  gap: 10px;
+  place-items: center;
+  min-height: 560px;
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background:
+    radial-gradient(circle at top left, rgba(20, 184, 166, 0.22), transparent 28%),
+    linear-gradient(180deg, #0f172a 0%, #111827 100%);
+  color: #e2e8f0;
+  text-align: center;
+  padding: 24px;
+}
+
+.preview-empty span {
+  max-width: 460px;
+  color: #94a3b8;
+}
+
+.preview-runtime-badges {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.preview-runtime-badges span {
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.74);
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
 }
 
 .diagnostic-list {
@@ -341,6 +389,14 @@ select {
   color: var(--text-muted);
 }
 
+.inline-action {
+  border: 0;
+  background: transparent;
+  color: var(--warm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .diagnostic-list li {
   display: grid;
   gap: 6px;
@@ -407,6 +463,11 @@ select {
   }
 
   .preview-canvas {
+    min-height: 420px;
+  }
+
+  .preview-shell,
+  .preview-empty {
     min-height: 420px;
   }
 }
