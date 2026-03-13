@@ -1,0 +1,16 @@
+{
+  "name": "algo-visual-platform",
+  "private": true,
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "build:web": "npm --workspace apps/web run build",
+    "lint:web": "npm --workspace apps/web run lint",
+    "setup:git-hooks": "git config core.hooksPath .githooks"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.4.4",
+    "@commitlint/config-conventional": "^20.4.4"
+  }
+}

@@ -1,0 +1,42 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Node dependencies
+        run: npm install
+
+      - name: Install Python dependencies
+        run: python -m pip install -r apps/api/requirements-dev.txt
+
+      - name: Lint web
+        run: npm --workspace apps/web run lint
+
+      - name: Build web
+        run: npm --workspace apps/web run build
+
+      - name: Lint api
+        run: python -m ruff check apps/api/app apps/api/tests
+
+      - name: Test api
+        run: python -m pytest apps/api/tests -q
+

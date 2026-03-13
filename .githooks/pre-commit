@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+
+npm --workspace apps/web run lint
+
+if [ -x .venv/bin/python ]; then
+  .venv/bin/ruff check apps/api/app apps/api/tests
+  .venv/bin/pytest apps/api/tests -q
+else
+  echo "Skipping Python checks because .venv is missing."
+fi
+

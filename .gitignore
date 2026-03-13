@@ -1,0 +1,14 @@
+.DS_Store
+.idea/
+.vscode/
+.venv/
+node_modules/
+dist/
+coverage/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+apps/web/node_modules/
+apps/web/dist/
+
