@@ -17,6 +17,7 @@ const initialState: CustomProviderUpsertRequest = {
   api_key: "",
   description: "自定义 OpenAI 兼容模型提供商",
   temperature: 0.2,
+  supports_vision: false,
   enabled: true,
 };
 
@@ -136,6 +137,22 @@ export function ProviderManager({
         </label>
 
         <label>
+          <span>视觉能力</span>
+          <select
+            value={form.supports_vision ? "vision" : "text"}
+            onChange={(event) =>
+              setForm((current) => ({
+                ...current,
+                supports_vision: event.target.value === "vision",
+              }))
+            }
+          >
+            <option value="text">仅文本</option>
+            <option value="vision">支持图片</option>
+          </select>
+        </label>
+
+        <label>
           <span>API Key</span>
           <input
             type="password"
@@ -161,7 +178,7 @@ export function ProviderManager({
           <button type="submit" disabled={saving}>
             {saving ? "保存中..." : "保存自定义 Provider"}
           </button>
-          <p>同名 Provider 会被覆盖更新；禁用后会保留配置，但不会出现在可用运行时中。</p>
+          <p>同名 Provider 会被覆盖更新；视觉能力会影响题图是否发送给远程模型。</p>
         </div>
       </form>
 
@@ -179,6 +196,7 @@ export function ProviderManager({
             <div className="history-item-meta">
               <span>{provider.name}</span>
               <span>{provider.kind}</span>
+              <span>{provider.supports_vision ? "vision" : "text"}</span>
               <span>{provider.configured ? "enabled" : "disabled"}</span>
               <button
                 type="button"

@@ -6,7 +6,8 @@ from typing import Any
 
 import httpx
 
-from app.schemas import AgentTrace, ProviderDescriptor, ProviderKind, ProviderName
+from app.schemas import AgentTrace, ProviderDescriptor, ProviderKind, ProviderName, TopicDomain
+from app.services.domain_router import infer_domain
 from app.services.providers.base import CodingHints, CritiqueHints, PlanningHints
 
 
@@ -36,6 +37,7 @@ class OpenAICompatibleProvider:
     label: str = "OpenAI Compatible"
     description: str = "OpenAI 兼容 Provider，使用远程模型生成规划、编码和批评提示。"
     is_custom: bool = False
+    supports_vision: bool = False
     temperature: float = 0.2
     descriptor: ProviderDescriptor = field(init=False)
 
@@ -48,8 +50,38 @@ class OpenAICompatibleProvider:
             description=self.description,
             configured=True,
             is_custom=self.is_custom,
+            supports_vision=self.supports_vision,
             base_url=self.base_url,
         )
+
+    def route(
+        self,
+        prompt: str,
+        source_image: str | None = None,
+    ) -> tuple[TopicDomain, AgentTrace]:
+        payload = self._chat(
+            system_prompt=(
+                "You are a domain router for an educational visualization platform. "
+                "Return strict JSON with keys: domain and reason. "
+                "Allowed domains: algorithm, math, physics, chemistry, biology, geography."
+            ),
+            user_prompt=f"prompt={prompt}",
+            source_image=source_image if self.supports_vision else None,
+        )
+        domain_value = str(payload.get("domain", "")).strip().lower()
+        try:
+            domain = TopicDomain(domain_value)
+        except ValueError:
+            domain = infer_domain(prompt, source_image if self.supports_vision else None)
+
+        reason = str(payload.get("reason", "")).strip() or f"自动路由到 {domain.value}"
+        trace = AgentTrace(
+            agent="router",
+            provider=self.descriptor.name,
+            model=self.descriptor.model,
+            summary=reason,
+        )
+        return domain, trace
 
     def plan(
         self,
@@ -66,13 +98,17 @@ class OpenAICompatibleProvider:
                 "and givens before planning."
             ),
             user_prompt=f"domain={domain}\nprompt={prompt}\n{skill_brief}",
-            source_image=source_image,
+            source_image=source_image if self.supports_vision else None,
         )
         hints = PlanningHints(
             focus=str(payload.get("focus", "聚焦核心概念与步骤展开")),
             concepts=[str(item) for item in payload.get("concepts", [])][:6],
             warnings=[str(item) for item in payload.get("warnings", [])][:4],
         )
+        if source_image and not self.supports_vision:
+            hints.warnings.append(
+                "当前 provider 未声明视觉能力，题图未发送到远程模型，仅按文本继续规划。"
+            )
         trace = AgentTrace(
             agent="planner",
             provider=self.descriptor.name,

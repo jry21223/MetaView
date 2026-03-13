@@ -13,8 +13,8 @@
 当前版本已经打通完整的可交付链路：
 
 1. 用户输入算法、数学、物理、化学、生物或地理题目。
-2. 选择模型 Provider、dry-run 沙盒模式，并可在物理题中附带静态题目图片。
-3. 后端按学科路由到对应 skill，生成结构化 CIR，执行验证与自动修复。
+2. 选择模型 Provider、dry-run 沙盒模式，并可附带题目图片。
+3. 后端先自动判断题目所属学科，再路由到对应 skill，生成结构化 CIR，执行验证与自动修复。
 4. 后端执行脚本级 dry-run 校验，并持久化任务到 SQLite。
 5. 前端用 `manim-web` 在浏览器内完成正式预览，并支持历史回看、JSON 导出和 WebGPU 能力检测。
 
@@ -84,13 +84,14 @@ make docker-up
 - `ALGO_VIS_OPENAI_API_KEY`: 启用内置 OpenAI 兼容 Provider
 - `ALGO_VIS_OPENAI_BASE_URL`: OpenAI 兼容 API 地址
 - `ALGO_VIS_OPENAI_MODEL`: 使用的模型名
+- `ALGO_VIS_OPENAI_SUPPORTS_VISION`: 内置 OpenAI 兼容 Provider 是否支持图片输入
 - `VITE_API_BASE_URL`: 前端构建时 API 基地址，默认同源
 
 ## 自定义 Provider
 
 当前版本支持通过前端面板或 HTTP API 注册自定义 OpenAI 兼容模型提供商，例如本地 `Ollama`、`vLLM` 网关或第三方代理服务。自定义 Provider 会持久化到 SQLite，并自动出现在运行时目录中。
 
-内置 `openai` Provider 继续走环境变量配置；自定义 Provider 则通过 `POST /api/v1/providers/custom` 动态注册。
+内置 `openai` Provider 继续走环境变量配置；自定义 Provider 则通过 `POST /api/v1/providers/custom` 动态注册。当前 Provider 配置还允许显式声明是否支持视觉输入，这会影响题图是否发送给远程模型。
 
 ## 学科技能层
 
@@ -107,6 +108,26 @@ make docker-up
 
 其中物理 skill 已支持“静态题目图片 -> 物理建模 -> 动图草案”的首版链路：前端可上传题图，后端会先把对象、约束、已知量和目标量提取成建模提示，再生成符合物理定律的预览流程。
 
+## Manim 特化模型接入
+
+你在开发文档里提到的 Manim 特化模型，目前没有作为内置模型直接打包进项目；当前项目真正用到的是：
+
+- `mock` Provider
+- 内置 `openai` 兼容 Provider
+- 你自行注册的自定义 OpenAI 兼容 Provider
+
+如果你要接入类似 `prithivMLmods/Pyxidis-Manim-CodeGen-1.7B` 这类 Manim 特化模型，当前正确用法是：
+
+1. 先把该模型部署成 OpenAI 兼容接口，常见方式是 `vLLM`、`LocalAI`、`LM Studio` 或其他带 `/v1/chat/completions` 的服务。
+2. 在前端“自定义模型提供商”面板里填写：
+   - `Base URL`
+   - `Model`
+   - `API Key`
+   - 是否支持图片
+3. 保存后把它选为当前 Provider。
+
+注意：当前系统会把同一个 Provider 同时用于自动学科路由、规划、编码和批评。如果你后续想把“路由模型 / 规划模型 / Manim 编码模型”拆开，就需要再扩一层多模型编排。
+
 ## 渲染层说明
 
 前端正式渲染层已经替换为 `manim-web`。当前运行时实际由 `three.js` 承载，并在界面上展示浏览器 `WebGPU` 能力检测结果；这意味着用户能直接在浏览器里获得交互式预览，而不必先走后端视频合成链路。
@@ -117,6 +138,6 @@ make docker-up
 - FastAPI 编排层、学科技能注册表、内置与自定义 OpenAI 兼容 Provider 适配
 - CIR 校验器、自动修复链路、脚本级 dry-run 沙盒
 - SQLite 历史持久化、回放接口与自定义 Provider 存储
-- React 工作台、物理题图上传、`manim-web` 预览、运行时视图、历史记录与 JSON 导出
+- React 工作台、自动学科判断、题图上传、`manim-web` 预览、运行时视图、历史记录与 JSON 导出
 - 算法 / 数学 / 物理 / 化学 / 生物 / 地理 skill 模块
 - Docker 化启动入口

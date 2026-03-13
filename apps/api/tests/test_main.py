@@ -16,7 +16,6 @@ def test_pipeline_returns_cir() -> None:
         "/api/v1/pipeline",
         json={
             "prompt": "请可视化讲解二分查找为什么能在有序数组中快速定位答案。",
-            "domain": "algorithm",
             "provider": "mock",
             "sandbox_mode": "dry_run",
         },
@@ -32,6 +31,7 @@ def test_pipeline_returns_cir() -> None:
     assert payload["runtime"]["sandbox"]["status"] == "passed"
     assert payload["runtime"]["validation"]["status"] == "valid"
     assert payload["runtime"]["repair_count"] == 0
+    assert payload["runtime"]["agent_traces"][0]["agent"] == "router"
 
 
 def test_runtime_catalog() -> None:
@@ -62,7 +62,6 @@ def test_pipeline_runs_history_endpoints() -> None:
         "/api/v1/pipeline",
         json={
             "prompt": "请讲解动态规划中的状态定义与转移。",
-            "domain": "algorithm",
             "provider": "mock",
             "sandbox_mode": "dry_run",
             "persist_run": True,
@@ -80,6 +79,7 @@ def test_pipeline_runs_history_endpoints() -> None:
     assert detail_response.status_code == 200
     detail = detail_response.json()
     assert detail["request"]["prompt"] == "请讲解动态规划中的状态定义与转移。"
+    assert detail["request"]["domain"] == "algorithm"
     assert detail["response"]["request_id"] == request_id
 
 
@@ -88,7 +88,6 @@ def test_physics_pipeline_supports_static_image_prompt() -> None:
         "/api/v1/pipeline",
         json={
             "prompt": "请根据题图讲解斜面上小球的受力、加速度与运动轨迹。",
-            "domain": "physics",
             "provider": "mock",
             "source_image": "data:image/png;base64,ZmFrZS1pbWFnZS1ieXRlcw==",
             "source_image_name": "inclined-plane.png",
@@ -115,6 +114,7 @@ def test_custom_provider_crud() -> None:
             "api_key": "",
             "description": "本地自定义 provider",
             "temperature": 0.1,
+            "supports_vision": True,
             "enabled": True,
         },
     )
@@ -122,6 +122,7 @@ def test_custom_provider_crud() -> None:
     payload = create_response.json()
     assert payload["name"] == "local-ollama"
     assert payload["is_custom"] is True
+    assert payload["supports_vision"] is True
 
     runtime_response = client.get("/api/v1/runtime")
     providers = runtime_response.json()["providers"]

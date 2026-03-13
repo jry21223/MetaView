@@ -20,7 +20,6 @@ import type {
   RuntimeCatalog,
   SandboxMode,
   SkillDescriptor,
-  TopicDomain,
 } from "./types";
 
 const defaultPrompt = "请可视化讲解二分查找的边界收缩过程，突出 left / mid / right 的变化。";
@@ -134,6 +133,7 @@ const fallbackRuntimeCatalog: RuntimeCatalog = {
       description: "本地确定性规则提供者，用于 MVP 阶段替代真实大模型。",
       configured: true,
       is_custom: false,
+      supports_vision: false,
       base_url: null,
     },
     {
@@ -144,6 +144,7 @@ const fallbackRuntimeCatalog: RuntimeCatalog = {
       description: "OpenAI 兼容 Provider，需配置环境变量后启用。",
       configured: false,
       is_custom: false,
+      supports_vision: false,
       base_url: null,
     },
   ],
@@ -151,17 +152,12 @@ const fallbackRuntimeCatalog: RuntimeCatalog = {
   sandbox_modes: ["dry_run", "off"],
 };
 
-function findSkill(catalog: RuntimeCatalog, domain: TopicDomain): SkillDescriptor {
-  return (
-    catalog.skills.find((candidate) => candidate.domain === domain) ??
-    fallbackSkills.find((candidate) => candidate.domain === domain) ??
-    fallbackSkills[0]
-  );
+function activeProviderSupportsVision(catalog: RuntimeCatalog, providerName: ModelProvider): boolean {
+  return catalog.providers.find((candidate) => candidate.name === providerName)?.supports_vision ?? false;
 }
 
 export default function App() {
   const [prompt, setPrompt] = useState(defaultPrompt);
-  const [domain, setDomain] = useState<TopicDomain>("algorithm");
   const [provider, setProvider] = useState<ModelProvider>("mock");
   const [sandboxMode, setSandboxMode] = useState<SandboxMode>("dry_run");
   const [sourceImage, setSourceImage] = useState<string | null>(null);
@@ -174,7 +170,8 @@ export default function App() {
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const deferredResult = useDeferredValue(result);
-  const activeSkill = result?.runtime.skill ?? findSkill(runtimeCatalog, domain);
+  const activeSkill = result?.runtime.skill ?? null;
+  const providerSupportsVision = activeProviderSupportsVision(runtimeCatalog, provider);
 
   async function refreshRuntimeCatalog(): Promise<RuntimeCatalog> {
     try {
@@ -227,14 +224,6 @@ export default function App() {
     void loadRuns();
   }, []);
 
-  function handleDomainChange(nextDomain: TopicDomain) {
-    setDomain(nextDomain);
-    if (nextDomain !== "physics") {
-      setSourceImage(null);
-      setSourceImageName(null);
-    }
-  }
-
   function handleSourceImageChange(value: string | null, name: string | null) {
     setSourceImage(value);
     setSourceImageName(name);
@@ -248,7 +237,6 @@ export default function App() {
     try {
       const response = await runPipeline(
         prompt,
-        domain,
         provider,
         sandboxMode,
         sourceImage,
@@ -274,7 +262,6 @@ export default function App() {
         setSelectedRunId(requestId);
       });
       setPrompt(run.request.prompt);
-      setDomain(run.request.domain);
       setProvider(run.request.provider ?? "mock");
       setSandboxMode(run.request.sandbox_mode);
       setSourceImage(run.request.source_image ?? null);
@@ -294,7 +281,6 @@ export default function App() {
       exported_at: new Date().toISOString(),
       request: {
         prompt,
-        domain,
         provider,
         source_image_name: sourceImageName,
         sandbox_mode: sandboxMode,
@@ -334,11 +320,11 @@ export default function App() {
     <main className="app-shell">
       <section className="hero">
         <div>
-          <span className="hero-kicker">Skill-routed Preview</span>
-          <h2>把题目路由到学科技能，再把逻辑翻译成 CIR 与浏览器原生动画。</h2>
+          <span className="hero-kicker">Auto Skill Routing</span>
+          <h2>输入题目，模型自动判断学科、选择 skill，再生成 CIR 与浏览器原生动画。</h2>
         </div>
         <div className="hero-badges">
-          <span>{activeSkill.label}</span>
+          <span>{activeSkill?.label ?? "模型自动判断"}</span>
           <span>Planner</span>
           <span>Coder</span>
           <span>Critic</span>
@@ -349,15 +335,14 @@ export default function App() {
       <div className="workspace-grid">
         <ControlPanel
           prompt={prompt}
-          domain={domain}
           provider={provider}
           sandboxMode={sandboxMode}
           providers={runtimeCatalog.providers}
           sandboxModes={runtimeCatalog.sandbox_modes}
           loading={loading}
           sourceImageName={sourceImageName}
+          providerSupportsVision={providerSupportsVision}
           onPromptChange={setPrompt}
-          onDomainChange={handleDomainChange}
           onProviderChange={setProvider}
           onSandboxModeChange={setSandboxMode}
           onSourceImageChange={handleSourceImageChange}
@@ -369,15 +354,14 @@ export default function App() {
             <span className="panel-kicker">Preview</span>
             <h3>前端即时渲染</h3>
             <p>
-              当前预览由 manim-web 正式渲染层驱动，three.js 承载运行时；当选择物理 skill
-              时，还可以用静态题图辅助建模。
+              当前预览由 manim-web 正式渲染层驱动，three.js 承载运行时。题图可选，系统会结合 Provider 能力自动决定是否发送到模型。
             </p>
           </div>
           <Suspense fallback={<div className="preview-empty">加载 manim-web 渲染器...</div>}>
             <PreviewCanvas
               cir={deferredResult?.cir ?? null}
               sceneKey={deferredResult?.request_id ?? "empty-preview"}
-              skillLabel={activeSkill.label}
+              skillLabel={activeSkill?.label ?? "自动路由"}
               sourceImageName={sourceImageName}
             />
           </Suspense>
@@ -393,12 +377,17 @@ export default function App() {
           {error ? <p className="error-text">{error}</p> : null}
           {result ? (
             <p className="panel-note">
-              当前任务由 <strong>{result.runtime.skill.label}</strong> 路由，Provider 为{" "}
+              当前任务自动路由到 <strong>{result.runtime.skill.label}</strong>，Provider 为{" "}
               <strong>{result.runtime.provider.label}</strong>。
             </p>
           ) : null}
           {result ? (
             <div className="runtime-summary">
+              <div>
+                <span>Skill</span>
+                <strong>{result.runtime.skill.domain}</strong>
+                <small>{result.runtime.skill.id}</small>
+              </div>
               <div>
                 <span>Provider</span>
                 <strong>{result.runtime.provider.name}</strong>
@@ -408,11 +397,6 @@ export default function App() {
                 <span>Sandbox</span>
                 <strong>{result.runtime.sandbox.status}</strong>
                 <small>{result.runtime.sandbox.engine}</small>
-              </div>
-              <div>
-                <span>Duration</span>
-                <strong>{result.runtime.sandbox.duration_ms} ms</strong>
-                <small>{result.runtime.sandbox.mode}</small>
               </div>
             </div>
           ) : null}
@@ -435,7 +419,7 @@ export default function App() {
           {result ? (
             <ul className="trace-list">
               {result.runtime.agent_traces.map((trace) => (
-                <li key={trace.agent}>
+                <li key={`${trace.agent}-${trace.summary}`}>
                   <strong>{trace.agent}</strong>
                   <span>{trace.summary}</span>
                 </li>
@@ -450,7 +434,7 @@ export default function App() {
               </li>
             ))}
             {!result && !error ? (
-              <li className="empty-state">提交题目后展示 Planner / Critic / Sandbox 的诊断结果。</li>
+              <li className="empty-state">提交题目后展示 Router / Planner / Critic / Sandbox 的诊断结果。</li>
             ) : null}
           </ul>
         </section>
@@ -517,25 +501,19 @@ export default function App() {
         <section className="panel panel-history-detail">
           <div className="panel-header">
             <span className="panel-kicker">Skill Routing</span>
-            <h3>当前学科技能</h3>
-            <p>系统会按学科路由到不同 skill，把领域约束显式注入 Planner、Coder 和 Critic。</p>
+            <h3>当前自动路由状态</h3>
+            <p>系统会先由模型判断题目所属学科，再把对应领域约束注入 Planner、Coder 和 Critic。</p>
           </div>
           <div className="skill-card">
-            <strong>{activeSkill.label}</strong>
-            <p>{activeSkill.description}</p>
+            <strong>{activeSkill?.label ?? "等待模型判断"}</strong>
+            <p>{activeSkill?.description ?? "提交题目后，这里会显示模型推断出的 skill。"} </p>
             <div className="history-item-meta">
-              <span>{activeSkill.id}</span>
-              <span>{activeSkill.domain}</span>
-              <span>{activeSkill.supports_image_input ? "image-assisted" : "text-only"}</span>
+              <span>{activeSkill?.id ?? "auto-routing"}</span>
+              <span>{activeSkill?.domain ?? "unknown"}</span>
+              <span>{activeSkill?.supports_image_input ? "image-aware" : "text-first"}</span>
             </div>
           </div>
           <ul className="diagnostic-list">
-            {activeSkill.execution_notes.map((note, index) => (
-              <li key={`${activeSkill.id}-note-${index}`}>
-                <strong>rule</strong>
-                <span>{note}</span>
-              </li>
-            ))}
             {runtimeCatalog.skills.map((skill) => (
               <li key={skill.id}>
                 <strong>{skill.label}</strong>

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from app.schemas import AgentTrace, ProviderDescriptor, ProviderKind, ProviderName
+from app.schemas import AgentTrace, ProviderDescriptor, ProviderKind, ProviderName, TopicDomain
+from app.services.domain_router import infer_domain
 from app.services.providers.base import CodingHints, CritiqueHints, PlanningHints
 
 
@@ -51,8 +52,23 @@ class MockModelProvider:
             model="mock-cir-studio-001",
             description="本地确定性规则提供者，用于 MVP 阶段替代真实大模型。",
             is_custom=False,
+            supports_vision=False,
         )
     )
+
+    def route(
+        self,
+        prompt: str,
+        source_image: str | None = None,
+    ) -> tuple[TopicDomain, AgentTrace]:
+        domain = infer_domain(prompt, source_image)
+        trace = AgentTrace(
+            agent="router",
+            provider=self.descriptor.name,
+            model=self.descriptor.model,
+            summary=f"基于规则与提示词自动路由到 {domain.value}。",
+        )
+        return domain, trace
 
     def plan(
         self,

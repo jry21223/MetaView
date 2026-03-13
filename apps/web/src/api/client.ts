@@ -7,7 +7,6 @@ import type {
   ProviderDescriptor,
   RuntimeCatalog,
   SandboxMode,
-  TopicDomain,
 } from "../types";
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
@@ -85,7 +84,6 @@ export async function deleteCustomProvider(name: string): Promise<void> {
 
 export async function runPipeline(
   prompt: string,
-  domain: TopicDomain,
   provider: ModelProvider,
   sandboxMode: SandboxMode,
   sourceImage?: string | null,
@@ -98,7 +96,6 @@ export async function runPipeline(
     },
     body: JSON.stringify({
       prompt,
-      domain,
       provider,
       source_image: sourceImage ?? null,
       source_image_name: sourceImageName ?? null,

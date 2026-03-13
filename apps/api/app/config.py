@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model: str | None = None
+    openai_supports_vision: bool = False
     openai_timeout_s: float = 20.0
 
 

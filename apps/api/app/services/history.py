@@ -29,6 +29,7 @@ class StoredCustomProvider:
     api_key: str | None
     description: str
     temperature: float
+    supports_vision: bool
     enabled: bool
 
 
@@ -63,6 +64,7 @@ class RunRepository:
 
     def save_run(self, request: PipelineRequest, response: PipelineResponse) -> str:
         created_at = datetime.now(timezone.utc).isoformat()
+        effective_request = request.model_copy(update={"domain": response.cir.domain})
 
         with closing(self._connect()) as connection, connection:
             connection.execute(
@@ -83,12 +85,12 @@ class RunRepository:
                 (
                     response.request_id,
                     created_at,
-                    request.prompt,
+                    effective_request.prompt,
                     response.cir.title,
-                    request.domain.value,
+                    response.cir.domain.value,
                     response.runtime.provider.name,
                     response.runtime.sandbox.status.value,
-                    json.dumps(request.model_dump(mode="json"), ensure_ascii=False),
+                    json.dumps(effective_request.model_dump(mode="json"), ensure_ascii=False),
                     json.dumps(response.model_dump(mode="json"), ensure_ascii=False),
                 ),
             )
@@ -165,10 +167,22 @@ class CustomProviderRepository:
                     api_key TEXT,
                     description TEXT NOT NULL,
                     temperature REAL NOT NULL,
+                    supports_vision INTEGER NOT NULL DEFAULT 0,
                     enabled INTEGER NOT NULL
                 )
                 """
             )
+            columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(custom_providers)").fetchall()
+            }
+            if "supports_vision" not in columns:
+                connection.execute(
+                    """
+                    ALTER TABLE custom_providers
+                    ADD COLUMN supports_vision INTEGER NOT NULL DEFAULT 0
+                    """
+                )
 
     def upsert(self, provider: CustomProviderUpsertRequest) -> StoredCustomProvider:
         stored = StoredCustomProvider(
@@ -180,6 +194,7 @@ class CustomProviderRepository:
             api_key=provider.api_key or None,
             description=provider.description,
             temperature=provider.temperature,
+            supports_vision=provider.supports_vision,
             enabled=provider.enabled,
         )
 
@@ -187,9 +202,10 @@ class CustomProviderRepository:
             connection.execute(
                 """
                 INSERT OR REPLACE INTO custom_providers (
-                    name, label, kind, base_url, model, api_key, description, temperature, enabled
+                    name, label, kind, base_url, model, api_key, description, temperature,
+                    supports_vision, enabled
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     stored.name,
@@ -200,6 +216,7 @@ class CustomProviderRepository:
                     stored.api_key,
                     stored.description,
                     stored.temperature,
+                    1 if stored.supports_vision else 0,
                     1 if stored.enabled else 0,
                 ),
             )
@@ -211,7 +228,8 @@ class CustomProviderRepository:
             rows = connection.execute(
                 """
                 SELECT
-                    name, label, kind, base_url, model, api_key, description, temperature, enabled
+                    name, label, kind, base_url, model, api_key, description, temperature,
+                    supports_vision, enabled
                 FROM custom_providers
                 ORDER BY name ASC
                 """
@@ -227,6 +245,7 @@ class CustomProviderRepository:
                 api_key=row["api_key"],
                 description=row["description"],
                 temperature=float(row["temperature"]),
+                supports_vision=bool(row["supports_vision"]),
                 enabled=bool(row["enabled"]),
             )
             for row in rows
@@ -237,7 +256,8 @@ class CustomProviderRepository:
             row = connection.execute(
                 """
                 SELECT
-                    name, label, kind, base_url, model, api_key, description, temperature, enabled
+                    name, label, kind, base_url, model, api_key, description, temperature,
+                    supports_vision, enabled
                 FROM custom_providers
                 WHERE name = ?
                 """,
@@ -256,6 +276,7 @@ class CustomProviderRepository:
             api_key=row["api_key"],
             description=row["description"],
             temperature=float(row["temperature"]),
+            supports_vision=bool(row["supports_vision"]),
             enabled=bool(row["enabled"]),
         )
 

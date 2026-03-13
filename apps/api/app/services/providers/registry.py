@@ -28,12 +28,14 @@ class ProviderRegistry:
         openai_api_key: str | None,
         openai_base_url: str,
         openai_model: str | None,
+        openai_supports_vision: bool,
         openai_timeout_s: float,
     ) -> None:
         self.custom_provider_repository = custom_provider_repository
         self.openai_api_key = openai_api_key
         self.openai_base_url = openai_base_url
         self.openai_model = openai_model
+        self.openai_supports_vision = openai_supports_vision
         self.openai_timeout_s = openai_timeout_s
 
     def get(self, name: str) -> ModelProvider:
@@ -52,6 +54,7 @@ class ProviderRegistry:
                 label="OpenAI Compatible",
                 description="OpenAI 兼容 Provider，使用远程模型生成规划、编码和批评提示。",
                 is_custom=False,
+                supports_vision=self.openai_supports_vision,
             )
 
         custom_provider = self.custom_provider_repository.get(name)
@@ -93,6 +96,7 @@ class ProviderRegistry:
             description="OpenAI 兼容 Provider，需配置 API Key 与模型名后启用。",
             configured=bool(self.openai_api_key and self.openai_model),
             is_custom=False,
+            supports_vision=self.openai_supports_vision,
             base_url=self.openai_base_url,
         )
 
@@ -105,6 +109,7 @@ class ProviderRegistry:
             description=provider.description or "自定义 OpenAI 兼容模型提供商。",
             configured=provider.enabled,
             is_custom=True,
+            supports_vision=provider.supports_vision,
             base_url=provider.base_url,
         )
 
@@ -120,5 +125,6 @@ class ProviderRegistry:
             label=provider.label,
             description=provider.description or "自定义 OpenAI 兼容模型提供商。",
             is_custom=True,
+            supports_vision=provider.supports_vision,
             temperature=provider.temperature,
         )

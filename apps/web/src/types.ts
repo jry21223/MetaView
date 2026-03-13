@@ -59,6 +59,7 @@ export interface ProviderDescriptor {
   description: string;
   configured: boolean;
   is_custom: boolean;
+  supports_vision: boolean;
   base_url?: string | null;
 }
 
@@ -145,7 +146,7 @@ export interface PipelineRunDetail {
   created_at: string;
   request: {
     prompt: string;
-    domain: TopicDomain;
+    domain?: TopicDomain | null;
     provider?: ModelProvider | null;
     source_image?: string | null;
     source_image_name?: string | null;
@@ -163,5 +164,6 @@ export interface CustomProviderUpsertRequest {
   api_key?: string;
   description: string;
   temperature: number;
+  supports_vision: boolean;
   enabled: boolean;
 }

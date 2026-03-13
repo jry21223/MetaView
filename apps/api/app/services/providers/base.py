@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from app.schemas import AgentTrace, ProviderDescriptor
+from app.schemas import AgentTrace, ProviderDescriptor, TopicDomain
 
 
 @dataclass(frozen=True)
@@ -27,6 +27,13 @@ class CritiqueHints:
 
 class ModelProvider(Protocol):
     descriptor: ProviderDescriptor
+
+    def route(
+        self,
+        prompt: str,
+        source_image: str | None = None,
+    ) -> tuple[TopicDomain, AgentTrace]:
+        ...
 
     def plan(
         self,

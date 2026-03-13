@@ -1,6 +1,7 @@
 from app.config import Settings
 from app.schemas import (
     AgentDiagnostic,
+    AgentTrace,
     CirValidationReport,
     CustomProviderUpsertRequest,
     PipelineRequest,
@@ -14,6 +15,7 @@ from app.schemas import (
     ValidationStatus,
 )
 from app.services.agents import CoderAgent, CriticAgent, PlannerAgent
+from app.services.domain_router import infer_domain
 from app.services.history import CustomProviderRepository, RunRepository
 from app.services.providers.registry import ProviderRegistry
 from app.services.repair import PipelineRepairService
@@ -33,6 +35,7 @@ class PipelineOrchestrator:
             openai_api_key=settings.openai_api_key,
             openai_base_url=settings.openai_base_url,
             openai_model=settings.openai_model,
+            openai_supports_vision=settings.openai_supports_vision,
             openai_timeout_s=settings.openai_timeout_s,
         )
         self.default_provider = settings.default_provider
@@ -57,17 +60,31 @@ class PipelineOrchestrator:
     def run(self, request: PipelineRequest) -> PipelineResponse:
         provider_name = request.provider or self.default_provider
         provider = self.provider_registry.get(provider_name)
-        skill = self.skill_registry.get(request.domain)
+        if request.domain is None:
+            try:
+                effective_domain, route_trace = provider.route(
+                    request.prompt,
+                    source_image=request.source_image,
+                )
+            except Exception:
+                effective_domain = infer_domain(request.prompt, request.source_image)
+                route_trace = self._fallback_route_trace(effective_domain)
+        else:
+            effective_domain = request.domain
+            route_trace = self._explicit_route_trace(effective_domain)
+
+        skill = self.skill_registry.get(effective_domain)
+        effective_request = request.model_copy(update={"domain": effective_domain})
         repair_actions: list[str] = []
         repair_count = 0
 
         planning_hints, planning_trace = provider.plan(
-            prompt=request.prompt,
-            domain=request.domain.value,
+            prompt=effective_request.prompt,
+            domain=effective_domain.value,
             skill_brief=skill.planning_brief(has_image=bool(request.source_image)),
             source_image=request.source_image,
         )
-        cir = self.planner.run(request, skill=skill, hints=planning_hints)
+        cir = self.planner.run(effective_request, skill=skill, hints=planning_hints)
         validation_report = self.validator.validate(cir)
 
         if (
@@ -110,20 +127,26 @@ class PipelineOrchestrator:
         response = PipelineResponse(
             cir=cir,
             renderer_script=renderer_script,
-            diagnostics=diagnostics,
+            diagnostics=[
+                AgentDiagnostic(
+                    agent="router",
+                    message=f"已自动路由到 {skill.descriptor.label}。",
+                )
+            ]
+            + diagnostics,
             runtime=PipelineRuntime(
                 skill=skill.descriptor,
                 provider=provider.descriptor,
                 sandbox=sandbox_report,
                 validation=validation_report,
-                agent_traces=[planning_trace, coding_trace, critique_trace],
+                agent_traces=[route_trace, planning_trace, coding_trace, critique_trace],
                 repair_count=repair_count,
                 repair_actions=repair_actions,
             ),
         )
 
-        if request.persist_run:
-            self.repository.save_run(request=request, response=response)
+        if effective_request.persist_run:
+            self.repository.save_run(request=effective_request, response=response)
 
         return response
 
@@ -167,3 +190,19 @@ class PipelineOrchestrator:
 
     def _repair_diagnostics(self, repair_actions: list[str]) -> list[AgentDiagnostic]:
         return [AgentDiagnostic(agent="repair", message=action) for action in repair_actions]
+
+    def _fallback_route_trace(self, domain) -> AgentTrace:
+        return AgentTrace(
+            agent="router",
+            provider="system",
+            model="heuristic-domain-router",
+            summary=f"Provider 路由失败，已回退到规则路由：{domain.value}",
+        )
+
+    def _explicit_route_trace(self, domain) -> AgentTrace:
+        return AgentTrace(
+            agent="router",
+            provider="user",
+            model="manual-domain",
+            summary=f"使用显式 domain：{domain.value}",
+        )

@@ -92,7 +92,7 @@ class CirDocument(BaseModel):
 
 class PipelineRequest(BaseModel):
     prompt: str = Field(min_length=5, max_length=1200)
-    domain: TopicDomain = TopicDomain.ALGORITHM
+    domain: TopicDomain | None = None
     provider: str | None = None
     source_image: str | None = Field(default=None, max_length=3_500_000)
     source_image_name: str | None = Field(default=None, max_length=200)
@@ -113,6 +113,7 @@ class ProviderDescriptor(BaseModel):
     description: str
     configured: bool = True
     is_custom: bool = False
+    supports_vision: bool = False
     base_url: str | None = None
 
 
@@ -206,4 +207,5 @@ class CustomProviderUpsertRequest(BaseModel):
     api_key: str | None = Field(default=None, max_length=300)
     description: str = Field(default="", max_length=200)
     temperature: float = Field(default=0.2, ge=0.0, le=2.0)
+    supports_vision: bool = False
     enabled: bool = True
