@@ -1,12 +1,19 @@
 import { startTransition, useDeferredValue, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
-import { getRuntimeCatalog, runPipeline } from "./api/client";
+import {
+  getPipelineRun,
+  getPipelineRuns,
+  getRuntimeCatalog,
+  runPipeline,
+} from "./api/client";
 import { ControlPanel } from "./components/ControlPanel";
+import { HistoryPanel } from "./components/HistoryPanel";
 import { PreviewCanvas } from "./components/PreviewCanvas";
 import type {
   ModelProvider,
   PipelineResponse,
+  PipelineRunSummary,
   RuntimeCatalog,
   SandboxMode,
   TopicDomain,
@@ -21,6 +28,13 @@ const fallbackRuntimeCatalog: RuntimeCatalog = {
       name: "mock",
       model: "mock-cir-studio-001",
       description: "本地确定性规则提供者，用于 MVP 阶段替代真实大模型。",
+      configured: true,
+    },
+    {
+      name: "openai",
+      model: "not-configured",
+      description: "OpenAI 兼容 Provider，需配置环境变量后启用。",
+      configured: false,
     },
   ],
   sandbox_modes: ["dry_run", "off"],
@@ -35,7 +49,20 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<PipelineResponse | null>(null);
   const [runtimeCatalog, setRuntimeCatalog] = useState<RuntimeCatalog>(fallbackRuntimeCatalog);
+  const [runs, setRuns] = useState<PipelineRunSummary[]>([]);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const deferredResult = useDeferredValue(result);
+
+  async function loadRuns() {
+    try {
+      const historyRuns = await getPipelineRuns();
+      setRuns(historyRuns);
+      setHistoryError(null);
+    } catch (loadError) {
+      setHistoryError(loadError instanceof Error ? loadError.message : "历史记录加载失败");
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -60,6 +87,10 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    void loadRuns();
+  }, []);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
@@ -69,12 +100,58 @@ export default function App() {
       const response = await runPipeline(prompt, domain, provider, sandboxMode);
       startTransition(() => {
         setResult(response);
+        setSelectedRunId(response.request_id);
       });
+      await loadRuns();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "请求失败");
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleSelectRun(requestId: string) {
+    try {
+      const run = await getPipelineRun(requestId);
+      startTransition(() => {
+        setResult(run.response);
+        setSelectedRunId(requestId);
+      });
+      setPrompt(run.request.prompt);
+      setDomain(run.request.domain);
+      setProvider(run.request.provider ?? "mock");
+      setSandboxMode(run.request.sandbox_mode);
+      setError(null);
+    } catch (loadError) {
+      setHistoryError(loadError instanceof Error ? loadError.message : "任务详情加载失败");
+    }
+  }
+
+  function handleExportCurrent() {
+    if (!result) {
+      return;
+    }
+
+    const exportedPayload = {
+      exported_at: new Date().toISOString(),
+      request: {
+        prompt,
+        domain,
+        provider,
+        sandbox_mode: sandboxMode,
+      },
+      response: result,
+    };
+
+    const blob = new Blob([JSON.stringify(exportedPayload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${result.request_id}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -145,6 +222,22 @@ export default function App() {
             </div>
           ) : null}
           {result ? (
+            <div className="validation-summary">
+              <div>
+                <span>Validation</span>
+                <strong>{result.runtime.validation.status}</strong>
+              </div>
+              <div>
+                <span>Repair Count</span>
+                <strong>{result.runtime.repair_count}</strong>
+              </div>
+              <div>
+                <span>Issues</span>
+                <strong>{result.runtime.validation.issues.length}</strong>
+              </div>
+            </div>
+          ) : null}
+          {result ? (
             <ul className="trace-list">
               {result.runtime.agent_traces.map((trace) => (
                 <li key={trace.agent}>
@@ -172,7 +265,46 @@ export default function App() {
             <span className="panel-kicker">Renderer Draft</span>
             <h3>脚本草案</h3>
           </div>
+          <div className="panel-toolbar">
+            <button type="button" className="ghost-button" onClick={handleExportCurrent} disabled={!result}>
+              导出当前任务 JSON
+            </button>
+          </div>
           <pre>{result?.renderer_script ?? "// 生成后显示渲染时间线草案"}</pre>
+        </section>
+      </div>
+
+      <div className="workspace-grid workspace-grid-bottom">
+        <HistoryPanel runs={runs} selectedRunId={selectedRunId} onSelectRun={handleSelectRun} />
+        <section className="panel panel-history-detail">
+          <div className="panel-header">
+            <span className="panel-kicker">Repair Loop</span>
+            <h3>验证与修复详情</h3>
+            <p>这里汇总 CIR 校验结果、自动修复动作与后续接入 RLEF 的承接位。</p>
+          </div>
+          {historyError ? <p className="error-text">{historyError}</p> : null}
+          {result ? (
+            <ul className="diagnostic-list">
+              {result.runtime.validation.issues.map((issue, index) => (
+                <li key={`${issue.code}-${index}`}>
+                  <strong>{issue.severity}</strong>
+                  <span>{issue.message}</span>
+                </li>
+              ))}
+              {result.runtime.repair_actions.map((action, index) => (
+                <li key={`repair-${index}`}>
+                  <strong>repair</strong>
+                  <span>{action}</span>
+                </li>
+              ))}
+              {result.runtime.validation.issues.length === 0 &&
+              result.runtime.repair_actions.length === 0 ? (
+                <li className="empty-state">当前任务未触发额外修复动作。</li>
+              ) : null}
+            </ul>
+          ) : (
+            <div className="history-empty">选择历史任务或先生成新任务后，这里会展示验证与修复细节。</div>
+          )}
         </section>
       </div>
     </main>

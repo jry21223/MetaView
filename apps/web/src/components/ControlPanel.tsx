@@ -72,7 +72,7 @@ export function ControlPanel({
               onChange={(event) => onProviderChange(event.target.value as ModelProvider)}
             >
               {providers.map((item) => (
-                <option key={item.name} value={item.name}>
+                <option key={item.name} value={item.name} disabled={!item.configured}>
                   {item.name} / {item.model}
                 </option>
               ))}
@@ -98,7 +98,7 @@ export function ControlPanel({
           <button type="submit" disabled={loading || prompt.trim().length < 5}>
             {loading ? "生成中..." : "生成可视化草案"}
           </button>
-          <p>当前已支持 Provider 选择与 dry-run 沙盒校验，真实大模型与容器沙盒将在下一阶段接入。</p>
+          <p>未配置的 Provider 会自动禁用。当前支持任务持久化、dry-run 校验与历史回看。</p>
         </div>
       </form>
     </section>
