@@ -12,11 +12,27 @@ def _concepts_from_prompt(prompt: str, domain: str) -> list[str]:
     if domain == "algorithm":
         if "二分" in prompt or "binary" in prompt_lower:
             return ["边界", "有序性", "收缩"]
+        if "排序" in prompt or "sort" in prompt_lower:
+            return ["比较", "交换", "有序段"]
         if "动态规划" in prompt or "dp" in prompt_lower:
             return ["状态", "转移", "初始化"]
         if "图" in prompt or "graph" in prompt_lower:
             return ["节点", "边", "遍历"]
         return ["输入", "状态", "输出"]
+
+    if domain == "physics":
+        if "电路" in prompt or "circuit" in prompt_lower:
+            return ["拓扑", "电流", "电压"]
+        return ["受力", "约束", "轨迹"]
+
+    if domain == "chemistry":
+        return ["键", "构型", "反应物"]
+
+    if domain == "biology":
+        return ["结构", "阶段", "调控"]
+
+    if domain == "geography":
+        return ["区域", "流向", "时序"]
 
     if "导数" in prompt or "derivative" in prompt_lower:
         return ["函数", "切线", "极限"]
@@ -38,15 +54,26 @@ class MockModelProvider:
         )
     )
 
-    def plan(self, prompt: str, domain: str) -> tuple[PlanningHints, AgentTrace]:
+    def plan(
+        self,
+        prompt: str,
+        domain: str,
+        skill_brief: str,
+        source_image: str | None = None,
+    ) -> tuple[PlanningHints, AgentTrace]:
         concepts = _concepts_from_prompt(prompt, domain)
         focus = f"突出 {' / '.join(concepts[:2])} 的教学主线"
         warnings = ["当前为 mock provider，输出稳定但不会做真正的开放域推理。"]
+        if source_image:
+            warnings.append(
+                "已收到静态题图，当前 mock provider 会按图片辅助建模流程补充受力与约束。"
+            )
+        skill_name = skill_brief.splitlines()[0].split("=", 1)[-1]
         trace = AgentTrace(
             agent="planner",
             provider=self.descriptor.name,
             model=self.descriptor.model,
-            summary=f"{focus}；概念：{', '.join(concepts)}",
+            summary=f"{focus}；概念：{', '.join(concepts)}；skill={skill_name}",
         )
         return PlanningHints(focus=focus, concepts=concepts, warnings=warnings), trace
 

@@ -9,6 +9,7 @@ from app.schemas import (
     SandboxMode,
     SandboxReport,
     SandboxStatus,
+    SkillDescriptor,
     TopicDomain,
     ValidationStatus,
 )
@@ -33,6 +34,12 @@ def test_run_repository_save_and_load(tmp_path) -> None:
         ),
         renderer_script="export const previewTimeline = [];",
         runtime=PipelineRuntime(
+            skill=SkillDescriptor(
+                id="algorithm-process-viz",
+                domain=TopicDomain.ALGORITHM,
+                label="算法过程可视化",
+                description="算法 skill",
+            ),
             provider=ProviderDescriptor(
                 name="mock",
                 label="Mock Provider",

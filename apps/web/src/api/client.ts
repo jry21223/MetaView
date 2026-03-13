@@ -88,6 +88,8 @@ export async function runPipeline(
   domain: TopicDomain,
   provider: ModelProvider,
   sandboxMode: SandboxMode,
+  sourceImage?: string | null,
+  sourceImageName?: string | null,
 ): Promise<PipelineResponse> {
   const response = await fetch(`${API_BASE_URL}/api/v1/pipeline`, {
     method: "POST",
@@ -98,6 +100,8 @@ export async function runPipeline(
       prompt,
       domain,
       provider,
+      source_image: sourceImage ?? null,
+      source_image_name: sourceImageName ?? null,
       sandbox_mode: sandboxMode,
     }),
   });

@@ -19,6 +19,7 @@ import type {
   PipelineRunSummary,
   RuntimeCatalog,
   SandboxMode,
+  SkillDescriptor,
   TopicDomain,
 } from "./types";
 
@@ -27,6 +28,100 @@ const PreviewCanvas = lazy(async () => {
   const module = await import("./components/PreviewCanvas");
   return { default: module.default };
 });
+
+const fallbackSkills: SkillDescriptor[] = [
+  {
+    id: "algorithm-process-viz",
+    domain: "algorithm",
+    label: "算法过程可视化",
+    description: "将排序、搜索、图论与动态规划的状态迁移过程转成可交互动画。",
+    version: "1.0.0",
+    triggers: ["可视化算法", "排序演示", "图论遍历", "状态转移"],
+    dependencies: ["manim-web", "manim-algorithm", "manim-code-blocks"],
+    supports_image_input: false,
+    execution_notes: [
+      "提取循环与条件分支的关键状态。",
+      "同步代码高亮与变量变化。",
+      "递归场景优先拆出调用栈镜头。",
+    ],
+  },
+  {
+    id: "math-theorem-walkthrough",
+    domain: "math",
+    label: "数学定理攻略",
+    description: "生成数学证明、函数图像和线性代数变换的视觉步进动画。",
+    version: "1.0.0",
+    triggers: ["数学证明", "函数图像绘制", "几何变换", "微积分演示"],
+    dependencies: ["manim-web", "katex", "sympy", "numpy"],
+    supports_image_input: false,
+    execution_notes: [
+      "先定义对象与坐标系。",
+      "推导过程不能跳步。",
+      "导数与积分要显式跟踪变量。",
+    ],
+  },
+  {
+    id: "physics-simulation-viz",
+    domain: "physics",
+    label: "物理模拟可视化",
+    description: "支持力学、电学与场论过程演示，并可从静态题目图片提取对象关系。",
+    version: "1.0.0",
+    triggers: ["物理模拟", "力学实验", "电路分析", "电磁场演示"],
+    dependencies: ["manim-web", "manim-physics", "manim-circuit"],
+    supports_image_input: true,
+    execution_notes: [
+      "题图先提取对象、受力与约束。",
+      "建模先于动画。",
+      "结果必须回到物理定律校核。",
+    ],
+  },
+  {
+    id: "molecular-structure-viz",
+    domain: "chemistry",
+    label: "分子结构可视化",
+    description: "解析分子结构、键变化与反应机理，生成球棍模型与过程动画。",
+    version: "1.0.0",
+    triggers: ["分子结构", "化学反应演示", "分子键断裂", "原子轨道"],
+    dependencies: ["manim-web", "manim-chemistry", "rdkit"],
+    supports_image_input: false,
+    execution_notes: [
+      "明确键连接与构型。",
+      "关键断键成键要同步叙事。",
+      "结果要审查化合价与守恒。",
+    ],
+  },
+  {
+    id: "biology-process-viz",
+    domain: "biology",
+    label: "生物过程可视化",
+    description: "用于细胞、遗传、代谢与生态系统中具有阶段性变化的知识过程。",
+    version: "1.0.0",
+    triggers: ["细胞分裂", "遗传规律", "代谢通路", "生态系统"],
+    dependencies: ["manim-web", "numpy"],
+    supports_image_input: false,
+    execution_notes: [
+      "先确定结构层级。",
+      "阶段切换与调控箭头分离呈现。",
+      "结论要回到功能解释。",
+    ],
+  },
+  {
+    id: "geospatial-process-viz",
+    domain: "geography",
+    label: "地理演化可视化",
+    description: "展示板块运动、水循环、人口迁移和区域空间演化过程。",
+    version: "1.0.0",
+    triggers: ["板块运动", "水循环", "人口迁移", "区域分析"],
+    dependencies: ["manim-web", "geopandas", "matplotlib"],
+    supports_image_input: false,
+    execution_notes: [
+      "统一底图坐标。",
+      "强调方向、流向和区域差异。",
+      "最后回到区域分析结论。",
+    ],
+  },
+];
+
 const fallbackRuntimeCatalog: RuntimeCatalog = {
   default_provider: "mock",
   sandbox_engine: "preview-dry-run",
@@ -52,14 +147,25 @@ const fallbackRuntimeCatalog: RuntimeCatalog = {
       base_url: null,
     },
   ],
+  skills: fallbackSkills,
   sandbox_modes: ["dry_run", "off"],
 };
+
+function findSkill(catalog: RuntimeCatalog, domain: TopicDomain): SkillDescriptor {
+  return (
+    catalog.skills.find((candidate) => candidate.domain === domain) ??
+    fallbackSkills.find((candidate) => candidate.domain === domain) ??
+    fallbackSkills[0]
+  );
+}
 
 export default function App() {
   const [prompt, setPrompt] = useState(defaultPrompt);
   const [domain, setDomain] = useState<TopicDomain>("algorithm");
   const [provider, setProvider] = useState<ModelProvider>("mock");
   const [sandboxMode, setSandboxMode] = useState<SandboxMode>("dry_run");
+  const [sourceImage, setSourceImage] = useState<string | null>(null);
+  const [sourceImageName, setSourceImageName] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<PipelineResponse | null>(null);
@@ -68,6 +174,7 @@ export default function App() {
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const deferredResult = useDeferredValue(result);
+  const activeSkill = result?.runtime.skill ?? findSkill(runtimeCatalog, domain);
 
   async function refreshRuntimeCatalog(): Promise<RuntimeCatalog> {
     try {
@@ -96,18 +203,20 @@ export default function App() {
   useEffect(() => {
     let active = true;
 
-    void getRuntimeCatalog().then((catalog) => {
-      if (!active) {
-        return;
-      }
+    void getRuntimeCatalog()
+      .then((catalog) => {
+        if (!active) {
+          return;
+        }
 
-      setRuntimeCatalog(catalog);
-      setProvider(catalog.default_provider);
-    }).catch(() => {
-      if (active) {
-        setRuntimeCatalog(fallbackRuntimeCatalog);
-      }
-    });
+        setRuntimeCatalog(catalog);
+        setProvider(catalog.default_provider);
+      })
+      .catch(() => {
+        if (active) {
+          setRuntimeCatalog(fallbackRuntimeCatalog);
+        }
+      });
 
     return () => {
       active = false;
@@ -118,13 +227,33 @@ export default function App() {
     void loadRuns();
   }, []);
 
+  function handleDomainChange(nextDomain: TopicDomain) {
+    setDomain(nextDomain);
+    if (nextDomain !== "physics") {
+      setSourceImage(null);
+      setSourceImageName(null);
+    }
+  }
+
+  function handleSourceImageChange(value: string | null, name: string | null) {
+    setSourceImage(value);
+    setSourceImageName(name);
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setError(null);
 
     try {
-      const response = await runPipeline(prompt, domain, provider, sandboxMode);
+      const response = await runPipeline(
+        prompt,
+        domain,
+        provider,
+        sandboxMode,
+        sourceImage,
+        sourceImageName,
+      );
       startTransition(() => {
         setResult(response);
         setSelectedRunId(response.request_id);
@@ -148,6 +277,8 @@ export default function App() {
       setDomain(run.request.domain);
       setProvider(run.request.provider ?? "mock");
       setSandboxMode(run.request.sandbox_mode);
+      setSourceImage(run.request.source_image ?? null);
+      setSourceImageName(run.request.source_image_name ?? null);
       setError(null);
     } catch (loadError) {
       setHistoryError(loadError instanceof Error ? loadError.message : "任务详情加载失败");
@@ -165,6 +296,7 @@ export default function App() {
         prompt,
         domain,
         provider,
+        source_image_name: sourceImageName,
         sandbox_mode: sandboxMode,
       },
       response: result,
@@ -202,10 +334,11 @@ export default function App() {
     <main className="app-shell">
       <section className="hero">
         <div>
-          <span className="hero-kicker">Web-native Preview</span>
-          <h2>把题目先翻译成 CIR，再驱动浏览器原生渲染。</h2>
+          <span className="hero-kicker">Skill-routed Preview</span>
+          <h2>把题目路由到学科技能，再把逻辑翻译成 CIR 与浏览器原生动画。</h2>
         </div>
         <div className="hero-badges">
+          <span>{activeSkill.label}</span>
           <span>Planner</span>
           <span>Coder</span>
           <span>Critic</span>
@@ -222,10 +355,12 @@ export default function App() {
           providers={runtimeCatalog.providers}
           sandboxModes={runtimeCatalog.sandbox_modes}
           loading={loading}
+          sourceImageName={sourceImageName}
           onPromptChange={setPrompt}
-          onDomainChange={setDomain}
+          onDomainChange={handleDomainChange}
           onProviderChange={setProvider}
           onSandboxModeChange={setSandboxMode}
+          onSourceImageChange={handleSourceImageChange}
           onSubmit={handleSubmit}
         />
 
@@ -233,12 +368,17 @@ export default function App() {
           <div className="panel-header">
             <span className="panel-kicker">Preview</span>
             <h3>前端即时渲染</h3>
-            <p>当前预览已切换为 manim-web 正式渲染层，运行时由 three.js 承载，并显式展示 WebGPU 能力检测。</p>
+            <p>
+              当前预览由 manim-web 正式渲染层驱动，three.js 承载运行时；当选择物理 skill
+              时，还可以用静态题图辅助建模。
+            </p>
           </div>
           <Suspense fallback={<div className="preview-empty">加载 manim-web 渲染器...</div>}>
             <PreviewCanvas
               cir={deferredResult?.cir ?? null}
               sceneKey={deferredResult?.request_id ?? "empty-preview"}
+              skillLabel={activeSkill.label}
+              sourceImageName={sourceImageName}
             />
           </Suspense>
         </section>
@@ -251,6 +391,12 @@ export default function App() {
             <h3>智能体诊断</h3>
           </div>
           {error ? <p className="error-text">{error}</p> : null}
+          {result ? (
+            <p className="panel-note">
+              当前任务由 <strong>{result.runtime.skill.label}</strong> 路由，Provider 为{" "}
+              <strong>{result.runtime.provider.label}</strong>。
+            </p>
+          ) : null}
           {result ? (
             <div className="runtime-summary">
               <div>
@@ -315,7 +461,12 @@ export default function App() {
             <h3>脚本草案</h3>
           </div>
           <div className="panel-toolbar">
-            <button type="button" className="ghost-button" onClick={handleExportCurrent} disabled={!result}>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={handleExportCurrent}
+              disabled={!result}
+            >
               导出当前任务 JSON
             </button>
           </div>
@@ -365,17 +516,31 @@ export default function App() {
         />
         <section className="panel panel-history-detail">
           <div className="panel-header">
-            <span className="panel-kicker">Runtime Catalog</span>
-            <h3>当前 Provider 目录</h3>
-            <p>这里展示内置 provider 与已持久化的自定义 provider 的可用状态。</p>
+            <span className="panel-kicker">Skill Routing</span>
+            <h3>当前学科技能</h3>
+            <p>系统会按学科路由到不同 skill，把领域约束显式注入 Planner、Coder 和 Critic。</p>
+          </div>
+          <div className="skill-card">
+            <strong>{activeSkill.label}</strong>
+            <p>{activeSkill.description}</p>
+            <div className="history-item-meta">
+              <span>{activeSkill.id}</span>
+              <span>{activeSkill.domain}</span>
+              <span>{activeSkill.supports_image_input ? "image-assisted" : "text-only"}</span>
+            </div>
           </div>
           <ul className="diagnostic-list">
-            {runtimeCatalog.providers.map((providerItem) => (
-              <li key={providerItem.name}>
-                <strong>{providerItem.label}</strong>
+            {activeSkill.execution_notes.map((note, index) => (
+              <li key={`${activeSkill.id}-note-${index}`}>
+                <strong>rule</strong>
+                <span>{note}</span>
+              </li>
+            ))}
+            {runtimeCatalog.skills.map((skill) => (
+              <li key={skill.id}>
+                <strong>{skill.label}</strong>
                 <span>
-                  {providerItem.name} / {providerItem.kind} / {providerItem.model} /{" "}
-                  {providerItem.configured ? "configured" : "disabled"}
+                  {skill.domain} / {skill.version} / {skill.supports_image_input ? "image" : "text"}
                 </span>
               </li>
             ))}

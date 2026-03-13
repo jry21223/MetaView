@@ -7,6 +7,10 @@ from pydantic import BaseModel, Field
 class TopicDomain(str, Enum):
     ALGORITHM = "algorithm"
     MATH = "math"
+    PHYSICS = "physics"
+    CHEMISTRY = "chemistry"
+    BIOLOGY = "biology"
+    GEOGRAPHY = "geography"
 
 
 class ProviderName(str, Enum):
@@ -47,6 +51,11 @@ class VisualKind(str, Enum):
     FORMULA = "formula"
     GRAPH = "graph"
     TEXT = "text"
+    MOTION = "motion"
+    CIRCUIT = "circuit"
+    MOLECULE = "molecule"
+    MAP = "map"
+    CELL = "cell"
 
 
 class LayoutInstruction(BaseModel):
@@ -85,6 +94,8 @@ class PipelineRequest(BaseModel):
     prompt: str = Field(min_length=5, max_length=1200)
     domain: TopicDomain = TopicDomain.ALGORITHM
     provider: str | None = None
+    source_image: str | None = Field(default=None, max_length=3_500_000)
+    source_image_name: str | None = Field(default=None, max_length=200)
     sandbox_mode: SandboxMode = SandboxMode.DRY_RUN
     persist_run: bool = True
 
@@ -103,6 +114,18 @@ class ProviderDescriptor(BaseModel):
     configured: bool = True
     is_custom: bool = False
     base_url: str | None = None
+
+
+class SkillDescriptor(BaseModel):
+    id: str
+    domain: TopicDomain
+    label: str
+    description: str
+    version: str = "1.0.0"
+    triggers: list[str] = Field(default_factory=list)
+    dependencies: list[str] = Field(default_factory=list)
+    supports_image_input: bool = False
+    execution_notes: list[str] = Field(default_factory=list)
 
 
 class AgentTrace(BaseModel):
@@ -134,6 +157,7 @@ class CirValidationReport(BaseModel):
 
 
 class PipelineRuntime(BaseModel):
+    skill: SkillDescriptor
     provider: ProviderDescriptor
     sandbox: SandboxReport
     validation: CirValidationReport
@@ -146,6 +170,7 @@ class RuntimeCatalog(BaseModel):
     default_provider: str
     sandbox_engine: str
     providers: list[ProviderDescriptor] = Field(default_factory=list)
+    skills: list[SkillDescriptor] = Field(default_factory=list)
     sandbox_modes: list[SandboxMode] = Field(default_factory=list)
 
 

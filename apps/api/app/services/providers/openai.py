@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from typing import Any
 
 import httpx
 
@@ -50,13 +51,22 @@ class OpenAICompatibleProvider:
             base_url=self.base_url,
         )
 
-    def plan(self, prompt: str, domain: str) -> tuple[PlanningHints, AgentTrace]:
+    def plan(
+        self,
+        prompt: str,
+        domain: str,
+        skill_brief: str,
+        source_image: str | None = None,
+    ) -> tuple[PlanningHints, AgentTrace]:
         payload = self._chat(
             system_prompt=(
                 "You are a planner for an educational visualization platform. "
-                "Return strict JSON with keys: focus, concepts, warnings."
+                "Return strict JSON with keys: focus, concepts, warnings. "
+                "If an image is provided, extract physical objects, constraints, "
+                "and givens before planning."
             ),
-            user_prompt=f"domain={domain}\nprompt={prompt}",
+            user_prompt=f"domain={domain}\nprompt={prompt}\n{skill_brief}",
+            source_image=source_image,
         )
         hints = PlanningHints(
             focus=str(payload.get("focus", "聚焦核心概念与步骤展开")),
@@ -67,7 +77,7 @@ class OpenAICompatibleProvider:
             agent="planner",
             provider=self.descriptor.name,
             model=self.descriptor.model,
-            summary=f"远程 provider 已规划焦点：{hints.focus}",
+            summary=f"远程 provider 已规划焦点：{hints.focus}。",
         )
         return hints, trace
 
@@ -111,7 +121,21 @@ class OpenAICompatibleProvider:
         )
         return hints, trace
 
-    def _chat(self, system_prompt: str, user_prompt: str) -> dict:
+    def _chat(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        source_image: str | None = None,
+    ) -> dict:
+        user_content: str | list[dict[str, Any]]
+        if source_image:
+            user_content = [
+                {"type": "text", "text": user_prompt},
+                {"type": "image_url", "image_url": {"url": source_image}},
+            ]
+        else:
+            user_content = user_prompt
+
         response = httpx.post(
             f"{self.base_url.rstrip('/')}/chat/completions",
             headers=self._headers(),
@@ -119,7 +143,7 @@ class OpenAICompatibleProvider:
                 "model": self.model,
                 "messages": [
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
+                    {"role": "user", "content": user_content},
                 ],
                 "temperature": self.temperature,
             },
@@ -132,6 +156,14 @@ class OpenAICompatibleProvider:
             content = payload["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
             raise ProviderInvocationError("Provider 响应缺少 choices.message.content。") from exc
+
+        if isinstance(content, list):
+            text_chunks = [
+                item.get("text", "")
+                for item in content
+                if isinstance(item, dict) and item.get("type") == "text"
+            ]
+            content = "\n".join(chunk for chunk in text_chunks if chunk)
 
         if not isinstance(content, str):
             raise ProviderInvocationError("Provider content 不是字符串。")

@@ -12,6 +12,8 @@
 - JSON 导出与 Docker 化启动
 - manim-web 正式渲染层
 - 自定义 OpenAI 兼容 Provider 管理
+- 学科技能路由与 skill 文件沉淀
+- 物理题图输入与图片辅助建模
 
 ## 后续增强
 

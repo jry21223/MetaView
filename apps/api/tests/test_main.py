@@ -27,6 +27,7 @@ def test_pipeline_returns_cir() -> None:
     assert payload["cir"]["domain"] == "algorithm"
     assert len(payload["cir"]["steps"]) == 3
     assert "previewTimeline" in payload["renderer_script"]
+    assert payload["runtime"]["skill"]["id"] == "algorithm-process-viz"
     assert payload["runtime"]["provider"]["name"] == "mock"
     assert payload["runtime"]["sandbox"]["status"] == "passed"
     assert payload["runtime"]["validation"]["status"] == "valid"
@@ -44,6 +45,7 @@ def test_runtime_catalog() -> None:
     assert payload["providers"][0]["label"] == "Mock Provider"
     assert payload["providers"][1]["name"] == "openai"
     assert payload["providers"][1]["configured"] is False
+    assert any(skill["id"] == "physics-simulation-viz" for skill in payload["skills"])
 
 
 def test_runtime_catalog_allows_local_dev_cors_origin() -> None:
@@ -79,6 +81,27 @@ def test_pipeline_runs_history_endpoints() -> None:
     detail = detail_response.json()
     assert detail["request"]["prompt"] == "请讲解动态规划中的状态定义与转移。"
     assert detail["response"]["request_id"] == request_id
+
+
+def test_physics_pipeline_supports_static_image_prompt() -> None:
+    response = client.post(
+        "/api/v1/pipeline",
+        json={
+            "prompt": "请根据题图讲解斜面上小球的受力、加速度与运动轨迹。",
+            "domain": "physics",
+            "provider": "mock",
+            "source_image": "data:image/png;base64,ZmFrZS1pbWFnZS1ieXRlcw==",
+            "source_image_name": "inclined-plane.png",
+            "sandbox_mode": "dry_run",
+        },
+    )
+    assert response.status_code == 200
+
+    payload = response.json()
+    assert payload["runtime"]["skill"]["id"] == "physics-simulation-viz"
+    assert payload["cir"]["domain"] == "physics"
+    assert any(step["title"] == "题图解析" for step in payload["cir"]["steps"])
+    assert "静态题图" in payload["cir"]["summary"]
 
 
 def test_custom_provider_crud() -> None:

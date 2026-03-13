@@ -18,6 +18,7 @@ from app.services.history import CustomProviderRepository, RunRepository
 from app.services.providers.registry import ProviderRegistry
 from app.services.repair import PipelineRepairService
 from app.services.sandbox import PreviewDryRunSandbox
+from app.services.skill_catalog import SubjectSkillRegistry
 from app.services.validation import CirValidator
 
 
@@ -39,6 +40,7 @@ class PipelineOrchestrator:
         self.validator = CirValidator()
         self.repair_service = PipelineRepairService()
         self.max_repair_attempts = settings.max_repair_attempts
+        self.skill_registry = SubjectSkillRegistry()
         self.planner = PlannerAgent()
         self.coder = CoderAgent()
         self.critic = CriticAgent()
@@ -48,19 +50,24 @@ class PipelineOrchestrator:
             default_provider=self.default_provider,
             sandbox_engine=self.sandbox.engine_name,
             providers=self.provider_registry.list_descriptors(),
+            skills=self.skill_registry.list_descriptors(),
             sandbox_modes=[SandboxMode.DRY_RUN, SandboxMode.OFF],
         )
 
     def run(self, request: PipelineRequest) -> PipelineResponse:
         provider_name = request.provider or self.default_provider
         provider = self.provider_registry.get(provider_name)
+        skill = self.skill_registry.get(request.domain)
         repair_actions: list[str] = []
         repair_count = 0
 
         planning_hints, planning_trace = provider.plan(
-            prompt=request.prompt, domain=request.domain.value
+            prompt=request.prompt,
+            domain=request.domain.value,
+            skill_brief=skill.planning_brief(has_image=bool(request.source_image)),
+            source_image=request.source_image,
         )
-        cir = self.planner.run(request, hints=planning_hints)
+        cir = self.planner.run(request, skill=skill, hints=planning_hints)
         validation_report = self.validator.validate(cir)
 
         if (
@@ -105,6 +112,7 @@ class PipelineOrchestrator:
             renderer_script=renderer_script,
             diagnostics=diagnostics,
             runtime=PipelineRuntime(
+                skill=skill.descriptor,
                 provider=provider.descriptor,
                 sandbox=sandbox_report,
                 validation=validation_report,

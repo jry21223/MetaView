@@ -28,7 +28,13 @@ class CritiqueHints:
 class ModelProvider(Protocol):
     descriptor: ProviderDescriptor
 
-    def plan(self, prompt: str, domain: str) -> tuple[PlanningHints, AgentTrace]:
+    def plan(
+        self,
+        prompt: str,
+        domain: str,
+        skill_brief: str,
+        source_image: str | None = None,
+    ) -> tuple[PlanningHints, AgentTrace]:
         ...
 
     def code(self, title: str, step_count: int) -> tuple[CodingHints, AgentTrace]:
@@ -36,4 +42,3 @@ class ModelProvider(Protocol):
 
     def critique(self, title: str, renderer_script: str) -> tuple[CritiqueHints, AgentTrace]:
         ...
-

@@ -1,10 +1,26 @@
-export type TopicDomain = "algorithm" | "math";
+export type TopicDomain =
+  | "algorithm"
+  | "math"
+  | "physics"
+  | "chemistry"
+  | "biology"
+  | "geography";
 export type ModelProvider = string;
 export type SandboxMode = "dry_run" | "off";
 export type SandboxStatus = "passed" | "failed" | "skipped";
 export type ProviderKind = "mock" | "openai_compatible";
 
-export type VisualKind = "array" | "flow" | "formula" | "graph" | "text";
+export type VisualKind =
+  | "array"
+  | "flow"
+  | "formula"
+  | "graph"
+  | "text"
+  | "motion"
+  | "circuit"
+  | "molecule"
+  | "map"
+  | "cell";
 
 export interface VisualToken {
   id: string;
@@ -46,6 +62,18 @@ export interface ProviderDescriptor {
   base_url?: string | null;
 }
 
+export interface SkillDescriptor {
+  id: string;
+  domain: TopicDomain;
+  label: string;
+  description: string;
+  version: string;
+  triggers: string[];
+  dependencies: string[];
+  supports_image_input: boolean;
+  execution_notes: string[];
+}
+
 export interface AgentTrace {
   agent: string;
   provider: ModelProvider;
@@ -78,6 +106,7 @@ export interface CirValidationReport {
 }
 
 export interface PipelineRuntime {
+  skill: SkillDescriptor;
   provider: ProviderDescriptor;
   sandbox: SandboxReport;
   validation: CirValidationReport;
@@ -90,6 +119,7 @@ export interface RuntimeCatalog {
   default_provider: ModelProvider;
   sandbox_engine: string;
   providers: ProviderDescriptor[];
+  skills: SkillDescriptor[];
   sandbox_modes: SandboxMode[];
 }
 
@@ -117,6 +147,8 @@ export interface PipelineRunDetail {
     prompt: string;
     domain: TopicDomain;
     provider?: ModelProvider | null;
+    source_image?: string | null;
+    source_image_name?: string | null;
     sandbox_mode: SandboxMode;
     persist_run: boolean;
   };

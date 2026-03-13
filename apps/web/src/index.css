@@ -208,6 +208,12 @@ select {
   color: var(--text-muted);
 }
 
+.field-hint,
+.panel-note {
+  margin: 0;
+  color: var(--text-muted);
+}
+
 .panel-preview {
   display: grid;
   gap: 18px;
@@ -379,6 +385,7 @@ select {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
@@ -395,6 +402,8 @@ select {
   color: var(--warm);
   font-weight: 700;
   cursor: pointer;
+  padding: 0;
+  justify-self: flex-start;
 }
 
 .diagnostic-list li {
@@ -430,6 +439,21 @@ select {
   color: #dbeafe;
   font-family: "IBM Plex Mono", monospace;
   font-size: 13px;
+}
+
+.skill-card {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: rgba(15, 118, 110, 0.07);
+  border: 1px solid rgba(15, 118, 110, 0.15);
+}
+
+.skill-card p {
+  margin: 0;
+  color: var(--text-muted);
 }
 
 @media (max-width: 1080px) {
