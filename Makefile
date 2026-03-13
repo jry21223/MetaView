@@ -1,4 +1,4 @@
-.PHONY: bootstrap setup-hooks dev-web dev-api lint test build check
+.PHONY: bootstrap setup-hooks dev-web dev-api lint test build check docker-build docker-up
 
 bootstrap:
 	npm install
@@ -26,3 +26,8 @@ build:
 
 check: lint test build
 
+docker-build:
+	docker compose build
+
+docker-up:
+	docker compose up --build

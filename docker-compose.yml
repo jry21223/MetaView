@@ -1,0 +1,29 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      ALGO_VIS_DEFAULT_PROVIDER: ${ALGO_VIS_DEFAULT_PROVIDER:-mock}
+      ALGO_VIS_SANDBOX_TIMEOUT_MS: ${ALGO_VIS_SANDBOX_TIMEOUT_MS:-1500}
+      ALGO_VIS_MAX_REPAIR_ATTEMPTS: ${ALGO_VIS_MAX_REPAIR_ATTEMPTS:-2}
+      ALGO_VIS_HISTORY_DB_PATH: ${ALGO_VIS_HISTORY_DB_PATH:-data/pipeline_runs.db}
+      ALGO_VIS_OPENAI_API_KEY: ${ALGO_VIS_OPENAI_API_KEY:-}
+      ALGO_VIS_OPENAI_BASE_URL: ${ALGO_VIS_OPENAI_BASE_URL:-https://api.openai.com/v1}
+      ALGO_VIS_OPENAI_MODEL: ${ALGO_VIS_OPENAI_MODEL:-}
+      ALGO_VIS_OPENAI_TIMEOUT_S: ${ALGO_VIS_OPENAI_TIMEOUT_S:-20.0}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+    depends_on:
+      - api
+    ports:
+      - "5173:80"

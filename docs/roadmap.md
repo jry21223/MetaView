@@ -1,26 +1,19 @@
 # 研发路线图
 
-## Phase 1
+## 已完成
 
 - monorepo 搭建
 - 前后端 MVP 打通
 - Git 规范与 CI 建立
+- 模型 Provider 注册表
+- CIR 验证器与自动修复链路
+- dry-run sandbox
+- SQLite 历史记录与前端回放
+- JSON 导出与 Docker 化启动
 
-## Phase 2
+## 后续增强
 
-- 接入模型供应层
-- 增加 CIR 验证器
-- 引入 dry-run sandbox
-
-## Phase 3
-
-- 引入 manim-web / WebGPU 渲染适配器
-- 增加导出与历史记录
-- 增加多题型模板库
-
-## Phase 4
-
-- 引入收费、额度、账号体系
-- B2B 白标 API
-- 评测集与可视化质量回归
-
+- 容器级安全沙盒与执行反馈回注
+- manim-web / WebGPU 正式渲染适配器
+- 题库、模板库与可视化回归测试
+- 账号、额度、计费与白标能力

@@ -1,6 +1,7 @@
 .DS_Store
 .idea/
 .vscode/
+.env
 .venv/
 node_modules/
 dist/
@@ -12,3 +13,6 @@ __pycache__/
 apps/web/node_modules/
 apps/web/dist/
 *.tsbuildinfo
+data/*.db
+data/*.sqlite3
+apps/api/tests/.tmp/
