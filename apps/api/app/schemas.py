@@ -11,6 +11,7 @@ class TopicDomain(str, Enum):
 
 class ProviderName(str, Enum):
     MOCK = "mock"
+    OPENAI = "openai"
 
 
 class SandboxMode(str, Enum):
@@ -22,6 +23,17 @@ class SandboxStatus(str, Enum):
     PASSED = "passed"
     FAILED = "failed"
     SKIPPED = "skipped"
+
+
+class ValidationSeverity(str, Enum):
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+
+
+class ValidationStatus(str, Enum):
+    VALID = "valid"
+    INVALID = "invalid"
 
 
 class VisualKind(str, Enum):
@@ -69,6 +81,7 @@ class PipelineRequest(BaseModel):
     domain: TopicDomain = TopicDomain.ALGORITHM
     provider: ProviderName | None = None
     sandbox_mode: SandboxMode = SandboxMode.DRY_RUN
+    persist_run: bool = True
 
 
 class AgentDiagnostic(BaseModel):
@@ -80,6 +93,7 @@ class ProviderDescriptor(BaseModel):
     name: ProviderName
     model: str
     description: str
+    configured: bool = True
 
 
 class AgentTrace(BaseModel):
@@ -98,10 +112,25 @@ class SandboxReport(BaseModel):
     errors: list[str] = Field(default_factory=list)
 
 
+class ValidationIssue(BaseModel):
+    severity: ValidationSeverity
+    code: str
+    message: str
+    step_id: str | None = None
+
+
+class CirValidationReport(BaseModel):
+    status: ValidationStatus
+    issues: list[ValidationIssue] = Field(default_factory=list)
+
+
 class PipelineRuntime(BaseModel):
     provider: ProviderDescriptor
     sandbox: SandboxReport
+    validation: CirValidationReport
     agent_traces: list[AgentTrace] = Field(default_factory=list)
+    repair_count: int = 0
+    repair_actions: list[str] = Field(default_factory=list)
 
 
 class RuntimeCatalog(BaseModel):
@@ -118,3 +147,18 @@ class PipelineResponse(BaseModel):
     diagnostics: list[AgentDiagnostic] = Field(default_factory=list)
     runtime: PipelineRuntime
 
+
+class PipelineRunSummary(BaseModel):
+    request_id: str
+    created_at: str
+    prompt: str
+    title: str
+    domain: TopicDomain
+    provider: ProviderName
+    sandbox_status: SandboxStatus
+
+
+class PipelineRunDetail(BaseModel):
+    created_at: str
+    request: PipelineRequest
+    response: PipelineResponse
