@@ -13,6 +13,7 @@ import { CodeAdapterPanel } from "./components/CodeAdapterPanel";
 import { ControlPanel } from "./components/ControlPanel";
 import { HistoryPanel } from "./components/HistoryPanel";
 import { ProviderManager } from "./components/ProviderManager";
+import { TaskQueuePanel } from "./components/TaskQueuePanel";
 import type {
   CustomProviderUpsertRequest,
   ModelProvider,
@@ -23,6 +24,7 @@ import type {
 } from "./types";
 
 const defaultPrompt = "请可视化讲解二分查找的边界收缩过程，突出 left / mid / right 的变化。";
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000").replace(/\/$/, "");
 
 const fallbackRuntimeCatalog: RuntimeCatalog = {
   default_provider: "mock",
@@ -556,6 +558,13 @@ export default function App() {
         <summary className="advanced-summary">代码转换测试</summary>
         <div className="advanced-grid advanced-grid-single">
           <CodeAdapterPanel />
+        </div>
+      </details>
+
+      <details className="panel panel-advanced workspace-grid-bottom">
+        <summary className="advanced-summary">📋 任务队列 & 过程回放</summary>
+        <div className="advanced-grid">
+          <TaskQueuePanel apiBaseUrl={API_BASE_URL} />
         </div>
       </details>
 
