@@ -26,6 +26,8 @@ from app.services.preview_video_renderer import PreviewVideoRenderError
 from app.services.providers.openai import ProviderInvocationError
 from app.services.providers.registry import ProviderRegistrationError, ProviderUnavailableError
 from app.services.skill_catalog import SubjectSkillUnavailableError
+from pydantic import BaseModel, Field
+from typing import Optional
 
 settings = get_settings()
 orchestrator = PipelineOrchestrator(settings=settings)
@@ -172,3 +174,152 @@ def delete_custom_provider(name: str) -> dict[str, bool]:
     if not deleted:
         raise HTTPException(status_code=404, detail="Custom provider not found")
     return {"deleted": True}
+
+
+# ========== ManimCat 风格架构 API ==========
+
+class ConceptDesignRequest(BaseModel):
+    """概念设计请求"""
+    prompt: str = Field(min_length=5, max_length=1200)
+    domain: Optional[str] = None
+    source_code: Optional[str] = None
+    source_image: Optional[str] = None
+
+
+class ConceptDesignResponse(BaseModel):
+    """概念设计响应"""
+    success: bool
+    concept_id: str
+    title: str
+    domain: str
+    objects: list[str]
+    key_moments: list[str]
+    scenes_count: int
+    complexity_score: int
+    duration_estimate: float
+    metadata: dict
+
+
+class CodeGenerationRequest(BaseModel):
+    """代码生成请求"""
+    concept_id: str
+    optimize: bool = True
+
+
+class CodeGenerationResponse(BaseModel):
+    """代码生成响应"""
+    success: bool
+    code: str
+    scene_class_name: str
+    lines_of_code: int
+    diagnostics: list[str]
+    metadata: dict
+
+
+class ProcessReplayResponse(BaseModel):
+    """过程回放响应"""
+    process_id: str
+    prompt: str
+    stages: list[dict]
+    result: Optional[dict] = None
+    error: Optional[str] = None
+
+
+@app.post(f"{settings.api_prefix}/concept/design", response_model=ConceptDesignResponse)
+def design_concept(payload: ConceptDesignRequest) -> ConceptDesignResponse:
+    """
+    概念设计接口 - ManimCat 风格架构第一阶段
+    
+    将用户输入转换为结构化的动画概念设计
+    """
+    result = orchestrator.concept_designer.design(
+        prompt=payload.prompt,
+        source_image=payload.source_image,
+        source_code=payload.source_code
+    )
+    
+    if not result.success:
+        raise HTTPException(status_code=400, detail=result.error)
+    
+    return ConceptDesignResponse(
+        success=True,
+        concept_id=str(uuid4()),
+        title=result.concept.title,
+        domain=result.concept.domain,
+        objects=result.concept.objects,
+        key_moments=result.concept.key_moments,
+        scenes_count=len(result.scenes),
+        complexity_score=result.concept.complexity_score,
+        duration_estimate=result.concept.duration_estimate,
+        metadata=result.metadata
+    )
+
+
+@app.post(f"{settings.api_prefix}/code/generate", response_model=CodeGenerationResponse)
+def generate_code(payload: CodeGenerationRequest) -> CodeGenerationResponse:
+    """
+    代码生成接口 - ManimCat 风格架构第二阶段
+    
+    根据概念设计生成 Manim 代码
+    """
+    # 从 process registry 获取概念设计
+    process = orchestrator.process_registry.get_process(payload.concept_id)
+    
+    if not process:
+        raise HTTPException(status_code=404, detail="Concept not found")
+    
+    # TODO: 从 process 中提取 concept 和 scenes
+    # 这里简化处理，实际应该从 process 中恢复
+    result = orchestrator.code_generator.generate(
+        concept=None,  # 需要从 process 中恢复
+        scenes=[]
+    )
+    
+    if not result.success:
+        raise HTTPException(status_code=400, detail=result.error)
+    
+    return CodeGenerationResponse(
+        success=True,
+        code=result.code,
+        scene_class_name=result.scene_class_name,
+        lines_of_code=len(result.code.split('\n')),
+        diagnostics=result.diagnostics,
+        metadata=result.metadata
+    )
+
+
+@app.get(f"{settings.api_prefix}/process", response_model=list[dict])
+def list_processes(
+    limit: int = Query(default=20, ge=1, le=100),
+    status: Optional[str] = None
+) -> list[dict]:
+    """获取过程列表"""
+    processes = orchestrator.process_registry.list_processes(
+        limit=limit,
+        status=status
+    )
+    return [p.to_dict() for p in processes]
+
+
+@app.get(f"{settings.api_prefix}/process/{process_id}", response_model=dict)
+def get_process(process_id: str) -> dict:
+    """获取过程详情"""
+    process = orchestrator.process_registry.get_process(process_id)
+    if not process:
+        raise HTTPException(status_code=404, detail="Process not found")
+    return process.to_dict()
+
+
+@app.get(f"{settings.api_prefix}/process/{process_id}/replay", response_model=ProcessReplayResponse)
+def replay_process(process_id: str) -> ProcessReplayResponse:
+    """回放过程历史"""
+    replay = orchestrator.process_registry.replay_process(process_id)
+    if not replay:
+        raise HTTPException(status_code=404, detail="Process not found")
+    return ProcessReplayResponse(**replay)
+
+
+@app.get(f"{settings.api_prefix}/tasks", response_model=dict)
+def get_task_queue_stats() -> dict:
+    """获取任务队列统计"""
+    return orchestrator.queue_processor.get_queue_stats()

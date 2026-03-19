@@ -1,32 +1,57 @@
 # MetaView
 
-数智化学科可视化平台。
+数智化学科可视化平台 - **演算视界**项目。
 
 基于特调大模型、学科技能路由、CIR 中间表示和 Web 原生渲染的多学科可视化平台可交付版。
 
-## 当前阶段
+## 🎯 项目定位
 
-- `apps/api`: FastAPI 后端，提供 CIR 规划、多智能体编排、验证修复、历史持久化和运行时目录。
-- `apps/web`: React + Vite 前端，提供多学科题目输入、物理题图上传、历史回看、视频预览、自定义代码转换测试和模型提供商管理。
-- `skills`: 按学科拆分的 skill 模块，沉淀算法、数学、物理、化学、生物、地理的领域规则。
-- `docs`: 架构说明、研发路线和 Git 协作规范。
-- `docker-compose.yml`: API + Web 联调与部署入口。
+**面向多学科教育的"题目/代码/知识过程驱动可视化内容生成平台"**
 
-当前版本已经打通完整的可交付链路：
+核心理念：把"输入知识内容"变成"自动生成动画讲解"。
 
-1. 用户输入题目。
-2. 选择路由模型、规划/编码模型、dry-run 沙盒模式，并可附带题目图片。
-3. 后端先由路由模型自动判断题目所属学科，再把已启用的 subject skill 注入规划/编码模型，生成结构化 CIR，执行验证与自动修复。
-4. 后端执行脚本级 dry-run 校验，并持久化任务到 SQLite。
-5. 后端输出 Python Manim 脚本并生成 MP4 预览，前端负责播放视频、查看调试信息和回看历史结果。
+## 📦 当前阶段
 
-当前默认启用三个模块：
+### 核心模块
 
-- `algorithm`
-- `math`
-- `code`
+- ✅ `apps/api`: FastAPI 后端，CIR 规划、多智能体编排、验证修复、历史持久化
+- ✅ `apps/web`: React + Vite 前端，多学科题目输入、历史回看、视频预览
+- ✅ `skills`: 7 大学科技能 (算法/数学/物理/化学/生物/地理/代码)
+- ✅ `docs`: 架构说明、API 文档、Git 协作规范
+- ✅ `docker-compose.yml`: API + Web 联调与部署入口
 
-其他学科规则仍保留在代码里，但默认不加载。可通过环境变量 `ALGO_VIS_ENABLED_DOMAINS` 开启。
+### ManimCat 风格架构 (新增)
+
+- ✅ **概念设计阶段**: 将用户输入转换为结构化动画概念设计
+- ✅ **代码生成阶段**: 根据概念设计生成 Manim 代码
+- ✅ **队列处理器**: 管理动画生成任务的队列处理
+- ✅ **Manim 执行器**: 执行 Manim 脚本并生成视频
+- ✅ **过程注册表**: 管理动画生成过程的状态和记忆
+- ✅ **提示词覆盖**: 针对不同学科和场景的提示词模板
+
+### 完整链路
+
+1. 用户输入题目/知识点
+2. **概念设计**: 提取动画核心概念、对象、场景
+3. **代码生成**: 根据概念设计生成 Manim 脚本
+4. 学科路由 → 技能注入 → CIR 生成 → 验证修复
+5. 脚本级 dry-run 校验 → 过程持久化
+6. Manim 执行 → MP4 预览
+7. 前端播放视频 + 过程回放
+
+---
+
+当前默认启用学科：
+
+- `algorithm` - 算法过程可视化
+- `math` - 数学定理攻略
+- `code` - 源码算法可视化
+
+其他学科可通过环境变量 `ALGO_VIS_ENABLED_DOMAINS` 开启：
+- `physics` - 物理模拟可视化 (支持题图)
+- `chemistry` - 分子结构可视化
+- `biology` - 生物过程可视化
+- `geography` - 地理演化可视化
 
 ## 快速开始
 
@@ -49,16 +74,31 @@ make dev-api
 
 可用接口：
 
-- `GET /health`
-- `GET /api/v1/runtime`
-- `POST /api/v1/pipeline`
-- `GET /api/v1/runs`
-- `GET /api/v1/runs/{request_id}`
-- `POST /api/v1/providers/custom`
-- `POST /api/v1/providers/custom/test`
-- `DELETE /api/v1/providers/custom/{name}`
-- `POST /api/v1/manim/prepare`
-- `POST /api/v1/manim/render`
+**核心接口**:
+- `GET /health` - 健康检查
+- `GET /api/v1/runtime` - 运行时目录
+- `POST /api/v1/pipeline` - 执行完整流程
+- `GET /api/v1/runs` - 历史列表
+- `GET /api/v1/runs/{request_id}` - 历史详情
+
+**ManimCat 风格架构接口**:
+- `POST /api/v1/concept/design` - 概念设计
+- `POST /api/v1/code/generate` - 代码生成
+- `GET /api/v1/process` - 过程列表
+- `GET /api/v1/process/{id}` - 过程详情
+- `GET /api/v1/process/{id}/replay` - 过程回放
+- `GET /api/v1/tasks` - 任务队列统计
+
+**Provider 管理**:
+- `POST /api/v1/providers/custom` - 注册 Provider
+- `POST /api/v1/providers/custom/test` - 测试 Provider
+- `DELETE /api/v1/providers/custom/{name}` - 删除 Provider
+
+**Manim 脚本**:
+- `POST /api/v1/manim/prepare` - 准备脚本
+- `POST /api/v1/manim/render` - 渲染视频
+
+完整 API 文档：[docs/API.md](docs/API.md)
 
 ### 3. 启动前端
 

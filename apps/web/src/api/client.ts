@@ -183,3 +183,145 @@ export async function renderManimScript(
 
   return (await response.json()) as ManimScriptRenderResponse;
 }
+
+// ========== ManimCat 风格架构 API ==========
+
+export interface ConceptDesignRequest {
+  prompt: string;
+  domain?: string;
+  source_code?: string;
+  source_image?: string;
+}
+
+export interface ConceptDesignResponse {
+  success: boolean;
+  concept_id: string;
+  title: string;
+  domain: string;
+  objects: string[];
+  key_moments: string[];
+  scenes_count: number;
+  complexity_score: number;
+  duration_estimate: number;
+  metadata: Record<string, any>;
+}
+
+export interface CodeGenerationRequest {
+  concept_id: string;
+  optimize?: boolean;
+}
+
+export interface CodeGenerationResponse {
+  success: boolean;
+  code: string;
+  scene_class_name: string;
+  lines_of_code: number;
+  diagnostics: string[];
+  metadata: Record<string, any>;
+}
+
+export interface Process {
+  process_id: string;
+  prompt: string;
+  states: Array<{
+    stage: string;
+    status: string;
+    data: Record<string, any>;
+    timestamp: string;
+  }>;
+  result?: Record<string, any>;
+  error?: string;
+  created_at: string;
+  completed_at?: string;
+}
+
+export interface TaskQueueStats {
+  queued: number;
+  active: number;
+  completed: number;
+  failed: number;
+  max_concurrent: number;
+  max_queue_size: number;
+}
+
+export async function designConcept(
+  payload: ConceptDesignRequest,
+): Promise<ConceptDesignResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/concept/design`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, "Concept design request failed"));
+  }
+
+  return (await response.json()) as ConceptDesignResponse;
+}
+
+export async function generateCode(
+  payload: CodeGenerationRequest,
+): Promise<CodeGenerationResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/code/generate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, "Code generation request failed"));
+  }
+
+  return (await response.json()) as CodeGenerationResponse;
+}
+
+export async function getProcesses(limit = 50, status?: string): Promise<Process[]> {
+  const url = new URL(`${API_BASE_URL}/api/v1/process`);
+  url.searchParams.set("limit", limit.toString());
+  if (status) {
+    url.searchParams.set("status", status);
+  }
+
+  const response = await fetch(url.toString());
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, "Process list request failed"));
+  }
+
+  return (await response.json()) as Process[];
+}
+
+export async function getProcess(processId: string): Promise<Process> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/process/${processId}`);
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, "Process detail request failed"));
+  }
+
+  return (await response.json()) as Process;
+}
+
+export async function replayProcess(processId: string): Promise<Process> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/process/${processId}/replay`);
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, "Process replay request failed"));
+  }
+
+  return (await response.json()) as Process;
+}
+
+export async function getTaskQueueStats(): Promise<TaskQueueStats> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/tasks`);
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, "Task queue stats request failed"));
+  }
+
+  return (await response.json()) as TaskQueueStats;
+}
