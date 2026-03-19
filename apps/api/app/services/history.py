@@ -26,11 +26,31 @@ class StoredCustomProvider:
     kind: ProviderKind
     base_url: str
     model: str
+    router_model: str | None
+    planning_model: str | None
+    coding_model: str | None
+    critic_model: str | None
+    test_model: str | None
     api_key: str | None
     description: str
     temperature: float
     supports_vision: bool
     enabled: bool
+
+    @property
+    def stage_models(self) -> dict[str, str]:
+        stage_models: dict[str, str] = {}
+        if self.router_model:
+            stage_models["router"] = self.router_model
+        if self.planning_model:
+            stage_models["planning"] = self.planning_model
+        if self.coding_model:
+            stage_models["coding"] = self.coding_model
+        if self.critic_model:
+            stage_models["critic"] = self.critic_model
+        if self.test_model:
+            stage_models["test"] = self.test_model
+        return stage_models
 
 
 class RunRepository:
@@ -203,6 +223,11 @@ class CustomProviderRepository:
                     kind TEXT NOT NULL,
                     base_url TEXT NOT NULL,
                     model TEXT NOT NULL,
+                    router_model TEXT,
+                    planning_model TEXT,
+                    coding_model TEXT,
+                    critic_model TEXT,
+                    test_model TEXT,
                     api_key TEXT,
                     description TEXT NOT NULL,
                     temperature REAL NOT NULL,
@@ -222,15 +247,38 @@ class CustomProviderRepository:
                     ADD COLUMN supports_vision INTEGER NOT NULL DEFAULT 0
                     """
                 )
+            stage_columns = {
+                "router_model",
+                "planning_model",
+                "coding_model",
+                "critic_model",
+                "test_model",
+            }
+            for column in stage_columns:
+                if column in columns:
+                    continue
+                connection.execute(
+                    f"""
+                    ALTER TABLE custom_providers
+                    ADD COLUMN {column} TEXT
+                    """
+                )
 
     def upsert(self, provider: CustomProviderUpsertRequest) -> StoredCustomProvider:
+        existing = self.get(provider.name)
+        api_key = provider.api_key or (existing.api_key if existing is not None else None)
         stored = StoredCustomProvider(
             name=provider.name,
             label=provider.label,
             kind=ProviderKind.OPENAI_COMPATIBLE,
             base_url=provider.base_url.rstrip("/"),
             model=provider.model,
-            api_key=provider.api_key or None,
+            router_model=provider.router_model,
+            planning_model=provider.planning_model,
+            coding_model=provider.coding_model,
+            critic_model=provider.critic_model,
+            test_model=provider.test_model,
+            api_key=api_key,
             description=provider.description,
             temperature=provider.temperature,
             supports_vision=provider.supports_vision,
@@ -241,10 +289,11 @@ class CustomProviderRepository:
             connection.execute(
                 """
                 INSERT OR REPLACE INTO custom_providers (
-                    name, label, kind, base_url, model, api_key, description, temperature,
+                    name, label, kind, base_url, model, router_model, planning_model,
+                    coding_model, critic_model, test_model, api_key, description, temperature,
                     supports_vision, enabled
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     stored.name,
@@ -252,6 +301,11 @@ class CustomProviderRepository:
                     stored.kind.value,
                     stored.base_url,
                     stored.model,
+                    stored.router_model,
+                    stored.planning_model,
+                    stored.coding_model,
+                    stored.critic_model,
+                    stored.test_model,
                     stored.api_key,
                     stored.description,
                     stored.temperature,
@@ -267,8 +321,9 @@ class CustomProviderRepository:
             rows = connection.execute(
                 """
                 SELECT
-                    name, label, kind, base_url, model, api_key, description, temperature,
-                    supports_vision, enabled
+                    name, label, kind, base_url, model, router_model, planning_model,
+                    coding_model, critic_model, test_model, api_key, description,
+                    temperature, supports_vision, enabled
                 FROM custom_providers
                 ORDER BY name ASC
                 """
@@ -281,6 +336,11 @@ class CustomProviderRepository:
                 kind=ProviderKind(row["kind"]),
                 base_url=row["base_url"],
                 model=row["model"],
+                router_model=row["router_model"],
+                planning_model=row["planning_model"],
+                coding_model=row["coding_model"],
+                critic_model=row["critic_model"],
+                test_model=row["test_model"],
                 api_key=row["api_key"],
                 description=row["description"],
                 temperature=float(row["temperature"]),
@@ -295,8 +355,9 @@ class CustomProviderRepository:
             row = connection.execute(
                 """
                 SELECT
-                    name, label, kind, base_url, model, api_key, description, temperature,
-                    supports_vision, enabled
+                    name, label, kind, base_url, model, router_model, planning_model,
+                    coding_model, critic_model, test_model, api_key, description,
+                    temperature, supports_vision, enabled
                 FROM custom_providers
                 WHERE name = ?
                 """,
@@ -312,6 +373,11 @@ class CustomProviderRepository:
             kind=ProviderKind(row["kind"]),
             base_url=row["base_url"],
             model=row["model"],
+            router_model=row["router_model"],
+            planning_model=row["planning_model"],
+            coding_model=row["coding_model"],
+            critic_model=row["critic_model"],
+            test_model=row["test_model"],
             api_key=row["api_key"],
             description=row["description"],
             temperature=float(row["temperature"]),

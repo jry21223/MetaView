@@ -1,12 +1,13 @@
 from enum import Enum
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class TopicDomain(str, Enum):
     ALGORITHM = "algorithm"
     MATH = "math"
+    CODE = "code"
     PHYSICS = "physics"
     CHEMISTRY = "chemistry"
     BIOLOGY = "biology"
@@ -96,6 +97,8 @@ class PipelineRequest(BaseModel):
     provider: str | None = None
     router_provider: str | None = None
     generation_provider: str | None = None
+    source_code: str | None = Field(default=None, max_length=60_000)
+    source_code_language: str | None = Field(default=None, max_length=20)
     source_image: str | None = Field(default=None, max_length=3_500_000)
     source_image_name: str | None = Field(default=None, max_length=200)
     sandbox_mode: SandboxMode = SandboxMode.DRY_RUN
@@ -120,11 +123,13 @@ class ProviderDescriptor(BaseModel):
     label: str
     kind: ProviderKind
     model: str
+    stage_models: dict[str, str] = Field(default_factory=dict)
     description: str
     configured: bool = True
     is_custom: bool = False
     supports_vision: bool = False
     base_url: str | None = None
+    temperature: float | None = None
 
 
 class SkillDescriptor(BaseModel):
@@ -144,6 +149,7 @@ class AgentTrace(BaseModel):
     provider: str
     model: str
     summary: str
+    raw_output: str | None = None
 
 
 class SandboxReport(BaseModel):
@@ -213,6 +219,7 @@ class PipelineResponse(BaseModel):
     request_id: str = Field(default_factory=lambda: str(uuid4()))
     cir: CirDocument
     renderer_script: str
+    preview_video_url: str | None = None
     diagnostics: list[AgentDiagnostic] = Field(default_factory=list)
     runtime: PipelineRuntime
 
@@ -249,8 +256,64 @@ class CustomProviderUpsertRequest(BaseModel):
     label: str = Field(min_length=2, max_length=40)
     base_url: str = Field(min_length=8, max_length=300)
     model: str = Field(min_length=1, max_length=100)
+    router_model: str | None = Field(default=None, max_length=100)
+    planning_model: str | None = Field(default=None, max_length=100)
+    coding_model: str | None = Field(default=None, max_length=100)
+    critic_model: str | None = Field(default=None, max_length=100)
+    test_model: str | None = Field(default=None, max_length=100)
     api_key: str | None = Field(default=None, max_length=300)
     description: str = Field(default="", max_length=200)
     temperature: float = Field(default=0.2, ge=0.0, le=2.0)
     supports_vision: bool = False
     enabled: bool = True
+
+    @field_validator(
+        "api_key",
+        "router_model",
+        "planning_model",
+        "coding_model",
+        "critic_model",
+        "test_model",
+        mode="before",
+    )
+    @classmethod
+    def normalize_optional_strings(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+
+class CustomProviderTestResponse(BaseModel):
+    ok: bool
+    provider: str
+    model: str
+    message: str
+    raw_excerpt: str | None = None
+
+
+class ManimScriptPrepareRequest(BaseModel):
+    source: str = Field(min_length=1, max_length=80_000)
+    scene_class_name: str = Field(
+        default="GeneratedScene",
+        min_length=1,
+        max_length=80,
+        pattern=r"^[A-Za-z_][A-Za-z0-9_]*$",
+    )
+
+
+class ManimScriptPrepareResponse(BaseModel):
+    code: str
+    scene_class_name: str
+    diagnostics: list[str] = Field(default_factory=list)
+    is_runnable: bool = True
+
+
+class ManimScriptRenderRequest(ManimScriptPrepareRequest):
+    require_real: bool = True
+
+
+class ManimScriptRenderResponse(ManimScriptPrepareResponse):
+    request_id: str
+    preview_video_url: str
+    render_backend: str

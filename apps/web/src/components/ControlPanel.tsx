@@ -4,6 +4,8 @@ import type { ModelProvider, ProviderDescriptor, SandboxMode } from "../types";
 
 interface ControlPanelProps {
   prompt: string;
+  sourceCode: string;
+  sourceCodeLanguage: string;
   routerProvider: ModelProvider;
   generationProvider: ModelProvider;
   sandboxMode: SandboxMode;
@@ -14,6 +16,8 @@ interface ControlPanelProps {
   routerProviderSupportsVision: boolean;
   generationProviderSupportsVision: boolean;
   onPromptChange: (value: string) => void;
+  onSourceCodeChange: (value: string) => void;
+  onSourceCodeLanguageChange: (value: string) => void;
   onRouterProviderChange: (value: ModelProvider) => void;
   onGenerationProviderChange: (value: ModelProvider) => void;
   onSandboxModeChange: (value: SandboxMode) => void;
@@ -24,8 +28,23 @@ interface ControlPanelProps {
 const genericPlaceholder =
   "例如：请讲解二分查找边界收缩；或说明定积分如何逼近面积；或根据题图分析斜面小球受力。";
 
+function routerModelLabel(provider: ProviderDescriptor): string {
+  return provider.stage_models.router ?? provider.model;
+}
+
+function generationModelLabel(provider: ProviderDescriptor): string {
+  const planningModel = provider.stage_models.planning ?? provider.model;
+  const codingModel = provider.stage_models.coding ?? planningModel;
+  if (planningModel === codingModel) {
+    return planningModel;
+  }
+  return `规划 ${planningModel} / 编码 ${codingModel}`;
+}
+
 export function ControlPanel({
   prompt,
+  sourceCode,
+  sourceCodeLanguage,
   routerProvider,
   generationProvider,
   sandboxMode,
@@ -36,6 +55,8 @@ export function ControlPanel({
   routerProviderSupportsVision,
   generationProviderSupportsVision,
   onPromptChange,
+  onSourceCodeChange,
+  onSourceCodeLanguageChange,
   onRouterProviderChange,
   onGenerationProviderChange,
   onSandboxModeChange,
@@ -60,11 +81,9 @@ export function ControlPanel({
   return (
     <section className="panel panel-form">
       <div className="panel-header">
-        <span className="panel-kicker">Prompt Studio</span>
-        <h1>统一输入，模型自动判断学科与渲染 skill</h1>
-        <p>
-          当前版本不再要求手动选择学科。系统会根据题目文本与可选题图，自动路由到算法、数学、物理、化学、生物或地理 skill。
-        </p>
+        <span className="panel-kicker">Prompt</span>
+        <h1>输入题目，生成视频预览</h1>
+        <p>先走后端渲染视频，保证 MVP 可交付；实时前端渲染后续再逐步完善。</p>
       </div>
 
       <form className="prompt-form" onSubmit={onSubmit}>
@@ -77,6 +96,29 @@ export function ControlPanel({
             rows={8}
           />
         </label>
+
+        <div className="select-grid">
+          <label>
+            <span>源码语言</span>
+            <select
+              value={sourceCodeLanguage}
+              onChange={(event) => onSourceCodeLanguageChange(event.target.value)}
+            >
+              <option value="">未指定</option>
+              <option value="python">Python</option>
+              <option value="cpp">C++</option>
+            </select>
+          </label>
+          <label>
+            <span>源码输入</span>
+            <textarea
+              value={sourceCode}
+              onChange={(event) => onSourceCodeChange(event.target.value)}
+              placeholder="可选。粘贴 Python 或 C++ 算法源码后，系统会优先切到源码算法模块。"
+              rows={8}
+            />
+          </label>
+        </div>
 
         <label>
           <span>题目图片</span>
@@ -116,7 +158,7 @@ export function ControlPanel({
             >
               {providers.map((item) => (
                 <option key={item.name} value={item.name} disabled={!item.configured}>
-                  {item.label} / {item.model}
+                  {item.label} / {routerModelLabel(item)}
                 </option>
               ))}
             </select>
@@ -132,7 +174,7 @@ export function ControlPanel({
             >
               {providers.map((item) => (
                 <option key={item.name} value={item.name} disabled={!item.configured}>
-                  {item.label} / {item.model}
+                  {item.label} / {generationModelLabel(item)}
                 </option>
               ))}
             </select>
@@ -155,9 +197,9 @@ export function ControlPanel({
 
         <div className="form-actions">
           <button type="submit" disabled={loading || prompt.trim().length < 5}>
-            {loading ? "生成中..." : "生成可视化草案"}
+            {loading ? "生成中..." : "生成预览视频"}
           </button>
-          <p>未配置的 Provider 会自动禁用。当前支持自动学科判断、双模型编排、dry-run 校验、历史回看与自定义 Provider。</p>
+          <p>未配置的 Provider 会自动禁用。</p>
         </div>
       </form>
     </section>

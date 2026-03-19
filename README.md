@@ -1,22 +1,32 @@
-# 数智化学科可视化平台
+# MetaView
+
+数智化学科可视化平台。
 
 基于特调大模型、学科技能路由、CIR 中间表示和 Web 原生渲染的多学科可视化平台可交付版。
 
 ## 当前阶段
 
 - `apps/api`: FastAPI 后端，提供 CIR 规划、多智能体编排、验证修复、历史持久化和运行时目录。
-- `apps/web`: React + Vite 前端，提供多学科题目输入、物理题图上传、历史回看、运行时展示、`manim-web` 正式预览和自定义模型提供商管理。
+- `apps/web`: React + Vite 前端，提供多学科题目输入、物理题图上传、历史回看、视频预览、自定义代码转换测试和模型提供商管理。
 - `skills`: 按学科拆分的 skill 模块，沉淀算法、数学、物理、化学、生物、地理的领域规则。
 - `docs`: 架构说明、研发路线和 Git 协作规范。
 - `docker-compose.yml`: API + Web 联调与部署入口。
 
 当前版本已经打通完整的可交付链路：
 
-1. 用户输入算法、数学、物理、化学、生物或地理题目。
+1. 用户输入题目。
 2. 选择路由模型、规划/编码模型、dry-run 沙盒模式，并可附带题目图片。
-3. 后端先由路由模型自动判断题目所属学科，再把对应 skill 注入规划/编码模型，生成结构化 CIR，执行验证与自动修复。
+3. 后端先由路由模型自动判断题目所属学科，再把已启用的 subject skill 注入规划/编码模型，生成结构化 CIR，执行验证与自动修复。
 4. 后端执行脚本级 dry-run 校验，并持久化任务到 SQLite。
-5. 前端用 `manim-web` 在浏览器内完成正式预览，并支持历史回看、JSON 导出和 WebGPU 能力检测。
+5. 后端输出 Python Manim 脚本并生成 MP4 预览，前端负责播放视频、查看调试信息和回看历史结果。
+
+当前默认启用三个模块：
+
+- `algorithm`
+- `math`
+- `code`
+
+其他学科规则仍保留在代码里，但默认不加载。可通过环境变量 `ALGO_VIS_ENABLED_DOMAINS` 开启。
 
 ## 快速开始
 
@@ -24,6 +34,7 @@
 
 ```bash
 make bootstrap
+make bootstrap-manim
 npm run setup:git-hooks
 cp .env.example .env
 ```
@@ -44,7 +55,10 @@ make dev-api
 - `GET /api/v1/runs`
 - `GET /api/v1/runs/{request_id}`
 - `POST /api/v1/providers/custom`
+- `POST /api/v1/providers/custom/test`
 - `DELETE /api/v1/providers/custom/{name}`
+- `POST /api/v1/manim/prepare`
+- `POST /api/v1/manim/render`
 
 ### 3. 启动前端
 
@@ -79,10 +93,14 @@ make docker-up
 
 ## 环境变量
 
+- `ALGO_VIS_ENABLED_DOMAINS`: 当前启用的学科模块，逗号分隔，默认 `algorithm,math`
 - `ALGO_VIS_HISTORY_DB_PATH`: SQLite 历史库路径
 - `ALGO_VIS_CORS_ORIGIN_REGEX`: 本地联调默认允许的浏览器来源规则
 - `ALGO_VIS_DEFAULT_ROUTER_PROVIDER`: 默认路由模型
 - `ALGO_VIS_DEFAULT_GENERATION_PROVIDER`: 默认规划/编码模型
+- `ALGO_VIS_PREVIEW_RENDER_BACKEND`: `auto`、`manim` 或 `fallback`
+- `ALGO_VIS_MANIM_PYTHON_PATH`: 真实渲染时使用的 Python 环境，默认 `.venv-manim/bin/python`
+- `ALGO_VIS_MANIM_RENDER_TIMEOUT_S`: 单次 `manim` 渲染超时，默认 180 秒
 - `ALGO_VIS_OPENAI_API_KEY`: 启用内置 OpenAI 兼容 Provider
 - `ALGO_VIS_OPENAI_BASE_URL`: OpenAI 兼容 API 地址
 - `ALGO_VIS_OPENAI_MODEL`: 使用的模型名
@@ -97,10 +115,11 @@ make docker-up
 
 ## 学科技能层
 
-当前内置 skill：
+当前默认启用 skill：
 
 - `algorithm-process-viz`
 - `math-theorem-walkthrough`
+- `source-code-algorithm-viz`
 - `physics-simulation-viz`
 - `molecular-structure-viz`
 - `biology-process-viz`
@@ -135,9 +154,38 @@ make docker-up
 
 这意味着你现在就可以把便宜模型留给路由，把 Manim 特化模型专门留给生成链路。
 
+## Runtime Prompt 模块
+
+运行时真正发给 provider 的提示词已拆到独立模块：
+
+- [router.py](/Users/jerry/Desktop/demoo/apps/api/app/services/prompts/router.py)
+- [planner.py](/Users/jerry/Desktop/demoo/apps/api/app/services/prompts/planner.py)
+- [coder.py](/Users/jerry/Desktop/demoo/apps/api/app/services/prompts/coder.py)
+- [critic.py](/Users/jerry/Desktop/demoo/apps/api/app/services/prompts/critic.py)
+- [domain_guidance.py](/Users/jerry/Desktop/demoo/apps/api/app/services/prompts/domain_guidance.py)
+
+新增学科或模块时，优先扩展这里，而不是回到 `openai.py` 里写硬编码字符串。
+
+## 自定义 Provider
+
+前端 Provider 面板现已支持：
+
+- 新增
+- 编辑
+- 删除
+- 连通性测试
+
+编辑已有 provider 时，如果 API Key 留空，后端会保留旧 key，不会被空值覆盖。
+
 ## 渲染层说明
 
-前端正式渲染层已经替换为 `manim-web`。当前运行时实际由 `three.js` 承载，并在界面上展示浏览器 `WebGPU` 能力检测结果；这意味着用户能直接在浏览器里获得交互式预览，而不必先走后端视频合成链路。
+当前主链路统一产出 Python Manim 脚本，并由后端生成 MP4 预览视频。前端不再承担 `py2ts` 或 `manim-web` 的实时转换职责，而是提供视频播放、原始返回查看和脚本转换测试入口。
+
+真实渲染默认走 `auto` 模式：
+
+- 若 `.venv-manim` 中可用 `manim`，优先使用 `manim-cli` 真渲染。
+- 若 `manim` 不可用，则自动降级到 fallback 预览视频。
+- 自定义代码测试面板可直接触发“转换并真实渲染”接口。
 
 ## 已完成范围
 
@@ -145,6 +193,6 @@ make docker-up
 - FastAPI 编排层、双模型编排、学科技能注册表、内置与自定义 OpenAI 兼容 Provider 适配
 - CIR 校验器、自动修复链路、脚本级 dry-run 沙盒
 - SQLite 历史持久化、回放接口与自定义 Provider 存储
-- React 工作台、自动学科判断、题图上传、`manim-web` 预览、运行时视图、历史记录与 JSON 导出
+- React 工作台、自动学科判断、题图上传、视频预览、运行时视图、历史记录、JSON 导出与代码转换测试
 - 算法 / 数学 / 物理 / 化学 / 生物 / 地理 skill 模块
 - Docker 化启动入口

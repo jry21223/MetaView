@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from app.schemas import AgentTrace, ProviderDescriptor, ProviderKind, ProviderName, TopicDomain
+from app.schemas import (
+    AgentTrace,
+    CirDocument,
+    ProviderDescriptor,
+    ProviderKind,
+    ProviderName,
+    TopicDomain,
+)
 from app.services.domain_router import infer_domain
 from app.services.providers.base import CodingHints, CritiqueHints, PlanningHints
 
@@ -60,8 +67,9 @@ class MockModelProvider:
         self,
         prompt: str,
         source_image: str | None = None,
+        source_code: str | None = None,
     ) -> tuple[TopicDomain, AgentTrace]:
-        domain = infer_domain(prompt, source_image)
+        domain = infer_domain(prompt, source_image, source_code=source_code)
         trace = AgentTrace(
             agent="router",
             provider=self.descriptor.name,
@@ -76,6 +84,8 @@ class MockModelProvider:
         domain: str,
         skill_brief: str,
         source_image: str | None = None,
+        source_code: str | None = None,
+        source_code_language: str | None = None,
     ) -> tuple[PlanningHints, AgentTrace]:
         concepts = _concepts_from_prompt(prompt, domain)
         focus = f"突出 {' / '.join(concepts[:2])} 的教学主线"
@@ -83,6 +93,11 @@ class MockModelProvider:
         if source_image:
             warnings.append(
                 "已收到静态题图，当前 mock provider 会按图片辅助建模流程补充受力与约束。"
+            )
+        if source_code:
+            warnings.append(
+                f"已收到 {source_code_language or 'unknown'} 源码，"
+                "当前 mock provider 会按源码摘要辅助规划。"
             )
         skill_name = skill_brief.splitlines()[0].split("=", 1)[-1]
         trace = AgentTrace(
@@ -93,25 +108,30 @@ class MockModelProvider:
         )
         return PlanningHints(focus=focus, concepts=concepts, warnings=warnings), trace
 
-    def code(self, title: str, step_count: int) -> tuple[CodingHints, AgentTrace]:
+    def code(self, cir: CirDocument) -> tuple[CodingHints, AgentTrace]:
         style_notes = [
-            "优先输出可直接交给 manim-web 的 construct(scene) 草案。",
-            "同时保留 previewTimeline 元数据，供 dry-run 沙盒和前端调试使用。",
+            "输出本地 Python Manim 模板，供 dry-run 沙盒和后端视频预览使用。",
+            "主页实际预览以后端渲染的视频为准。",
         ]
         trace = AgentTrace(
             agent="coder",
             provider=self.descriptor.name,
             model=self.descriptor.model,
-            summary=f"为《{title}》生成 {step_count} 个镜头的预览脚本草案。",
+            summary=f"为《{cir.title}》生成 {len(cir.steps)} 个镜头的预览脚本草案。",
         )
-        return CodingHints(target="manim-web-ts", style_notes=style_notes), trace
+        return CodingHints(target="python-manim", style_notes=style_notes), trace
 
-    def critique(self, title: str, renderer_script: str) -> tuple[CritiqueHints, AgentTrace]:
+    def critique(
+        self,
+        title: str,
+        renderer_script: str,
+        domain: TopicDomain,
+    ) -> tuple[CritiqueHints, AgentTrace]:
         warnings = []
-        if "visualKind" not in renderer_script:
-            warnings.append("渲染脚本缺少 visualKind 字段。")
+        if "class " not in renderer_script or "Scene" not in renderer_script:
+            warnings.append("渲染脚本缺少 Scene 类定义。")
         checks = [
-            "检查时间线数组结构是否完整。",
+            "检查 Scene 类、construct 方法和动画调用是否完整。",
             "检查镜头标题与实体数是否适合单屏展示。",
         ]
         trace = AgentTrace(
@@ -120,4 +140,24 @@ class MockModelProvider:
             model=self.descriptor.model,
             summary=f"已对《{title}》的预览脚本执行结构审查。",
         )
-        return CritiqueHints(checks=checks, warnings=warnings), trace
+        return CritiqueHints(checks=checks, warnings=warnings, blocking_issues=[]), trace
+
+    def repair_code(
+        self,
+        cir: CirDocument,
+        renderer_script: str,
+        issues: list[str],
+    ) -> tuple[CodingHints, AgentTrace]:
+        trace = AgentTrace(
+            agent="repair",
+            provider=self.descriptor.name,
+            model=self.descriptor.model,
+            summary=f"mock provider 收到 {len(issues)} 条修复问题，回退到本地模板。",
+        )
+        return (
+            CodingHints(
+                target="python-manim",
+                style_notes=["mock repair fallback to local template"],
+            ),
+            trace,
+        )

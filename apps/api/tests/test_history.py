@@ -32,7 +32,13 @@ def test_run_repository_save_and_load(tmp_path) -> None:
             summary="摘要",
             steps=[],
         ),
-        renderer_script="export const previewTimeline = [];",
+        renderer_script=(
+            "from manim import *\n\n"
+            "class Demo(Scene):\n"
+            "    def construct(self):\n"
+            "        self.wait(0.5)\n"
+        ),
+        preview_video_url="/media/previews/run-1.mp4",
         runtime=PipelineRuntime(
             skill=SkillDescriptor(
                 id="algorithm-process-viz",
@@ -49,7 +55,7 @@ def test_run_repository_save_and_load(tmp_path) -> None:
             ),
             sandbox=SandboxReport(
                 mode=SandboxMode.DRY_RUN,
-                engine="preview-dry-run",
+                engine="python-manim-static",
                 status=SandboxStatus.PASSED,
             ),
             validation=CirValidationReport(status=ValidationStatus.VALID),
@@ -66,3 +72,4 @@ def test_run_repository_save_and_load(tmp_path) -> None:
     assert detail is not None
     assert detail.request.prompt == "请讲解二分查找。"
     assert detail.response.request_id == "run-1"
+    assert detail.response.preview_video_url == "/media/previews/run-1.mp4"

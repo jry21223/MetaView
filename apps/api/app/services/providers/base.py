@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from app.schemas import AgentTrace, ProviderDescriptor, TopicDomain
+from app.schemas import AgentTrace, CirDocument, ProviderDescriptor, TopicDomain
 
 
 @dataclass(frozen=True)
@@ -17,12 +17,14 @@ class PlanningHints:
 class CodingHints:
     target: str
     style_notes: list[str]
+    renderer_script: str | None = None
 
 
 @dataclass(frozen=True)
 class CritiqueHints:
     checks: list[str]
     warnings: list[str]
+    blocking_issues: list[str]
 
 
 class ModelProvider(Protocol):
@@ -32,6 +34,7 @@ class ModelProvider(Protocol):
         self,
         prompt: str,
         source_image: str | None = None,
+        source_code: str | None = None,
     ) -> tuple[TopicDomain, AgentTrace]:
         ...
 
@@ -41,11 +44,26 @@ class ModelProvider(Protocol):
         domain: str,
         skill_brief: str,
         source_image: str | None = None,
+        source_code: str | None = None,
+        source_code_language: str | None = None,
     ) -> tuple[PlanningHints, AgentTrace]:
         ...
 
-    def code(self, title: str, step_count: int) -> tuple[CodingHints, AgentTrace]:
+    def code(self, cir: CirDocument) -> tuple[CodingHints, AgentTrace]:
         ...
 
-    def critique(self, title: str, renderer_script: str) -> tuple[CritiqueHints, AgentTrace]:
+    def critique(
+        self,
+        title: str,
+        renderer_script: str,
+        domain: TopicDomain,
+    ) -> tuple[CritiqueHints, AgentTrace]:
+        ...
+
+    def repair_code(
+        self,
+        cir: CirDocument,
+        renderer_script: str,
+        issues: list[str],
+    ) -> tuple[CodingHints, AgentTrace]:
         ...

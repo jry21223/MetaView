@@ -1,8 +1,10 @@
 .DS_Store
+.claude/
 .idea/
 .vscode/
 .env
 .venv/
+.venv-manim/
 node_modules/
 dist/
 coverage/
@@ -15,4 +17,9 @@ apps/web/dist/
 *.tsbuildinfo
 data/*.db
 data/*.sqlite3
+data/media/
+data/debug/
+apps/api/data/
+*.log
+apps/web/dev.log
 apps/api/tests/.tmp/

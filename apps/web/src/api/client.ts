@@ -1,5 +1,8 @@
 import type {
+  CustomProviderTestResponse,
   CustomProviderUpsertRequest,
+  ManimScriptPrepareResponse,
+  ManimScriptRenderResponse,
   ModelProvider,
   PipelineResponse,
   PipelineRunDetail,
@@ -82,11 +85,31 @@ export async function deleteCustomProvider(name: string): Promise<void> {
   }
 }
 
+export async function testCustomProvider(
+  payload: CustomProviderUpsertRequest,
+): Promise<CustomProviderTestResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/providers/custom/test`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, "Custom provider test failed"));
+  }
+
+  return (await response.json()) as CustomProviderTestResponse;
+}
+
 export async function runPipeline(
   prompt: string,
   routerProvider: ModelProvider,
   generationProvider: ModelProvider,
   sandboxMode: SandboxMode,
+  sourceCode?: string | null,
+  sourceCodeLanguage?: string | null,
   sourceImage?: string | null,
   sourceImageName?: string | null,
 ): Promise<PipelineResponse> {
@@ -100,6 +123,8 @@ export async function runPipeline(
       provider: generationProvider,
       router_provider: routerProvider,
       generation_provider: generationProvider,
+      source_code: sourceCode ?? null,
+      source_code_language: sourceCodeLanguage ?? null,
       source_image: sourceImage ?? null,
       source_image_name: sourceImageName ?? null,
       sandbox_mode: sandboxMode,
@@ -111,4 +136,50 @@ export async function runPipeline(
   }
 
   return (await response.json()) as PipelineResponse;
+}
+
+export async function prepareManimScript(
+  source: string,
+  sceneClassName = "GeneratedScene",
+): Promise<ManimScriptPrepareResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/manim/prepare`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      source,
+      scene_class_name: sceneClassName,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, "Manim prepare request failed"));
+  }
+
+  return (await response.json()) as ManimScriptPrepareResponse;
+}
+
+export async function renderManimScript(
+  source: string,
+  sceneClassName = "GeneratedScene",
+  requireReal = true,
+): Promise<ManimScriptRenderResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/manim/render`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      source,
+      scene_class_name: sceneClassName,
+      require_real: requireReal,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, "Manim render request failed"));
+  }
+
+  return (await response.json()) as ManimScriptRenderResponse;
 }

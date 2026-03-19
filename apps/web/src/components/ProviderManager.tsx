@@ -1,7 +1,12 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 
-import type { CustomProviderUpsertRequest, ProviderDescriptor } from "../types";
+import { testCustomProvider } from "../api/client";
+import type {
+  CustomProviderTestResponse,
+  CustomProviderUpsertRequest,
+  ProviderDescriptor,
+} from "../types";
 
 interface ProviderManagerProps {
   providers: ProviderDescriptor[];
@@ -14,12 +19,37 @@ const initialState: CustomProviderUpsertRequest = {
   label: "Local Ollama",
   base_url: "http://127.0.0.1:11434/v1",
   model: "qwen2.5-coder",
+  router_model: "qwen2.5-coder:3b",
+  planning_model: "",
+  coding_model: "",
+  critic_model: "",
+  test_model: "",
   api_key: "",
   description: "自定义 OpenAI 兼容模型提供商",
   temperature: 0.2,
   supports_vision: false,
   enabled: true,
 };
+
+function stageModelSummary(provider: ProviderDescriptor): string[] {
+  const items: string[] = [];
+  if (provider.stage_models.router) {
+    items.push(`router ${provider.stage_models.router}`);
+  }
+  if (provider.stage_models.planning) {
+    items.push(`planning ${provider.stage_models.planning}`);
+  }
+  if (provider.stage_models.coding) {
+    items.push(`coding ${provider.stage_models.coding}`);
+  }
+  if (provider.stage_models.critic) {
+    items.push(`critic ${provider.stage_models.critic}`);
+  }
+  if (provider.stage_models.test) {
+    items.push(`test ${provider.stage_models.test}`);
+  }
+  return items;
+}
 
 export function ProviderManager({
   providers,
@@ -29,6 +59,8 @@ export function ProviderManager({
   const [form, setForm] = useState<CustomProviderUpsertRequest>(initialState);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<CustomProviderTestResponse | null>(null);
 
   const customProviders = providers.filter((provider) => provider.is_custom);
 
@@ -36,10 +68,12 @@ export function ProviderManager({
     event.preventDefault();
     setSaving(true);
     setError(null);
+    setTestResult(null);
 
     try {
       await onCreateProvider(form);
       setForm(initialState);
+      setEditingName(null);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "保存 provider 失败");
     } finally {
@@ -50,6 +84,7 @@ export function ProviderManager({
   async function handleDelete(name: string) {
     setSaving(true);
     setError(null);
+    setTestResult(null);
 
     try {
       await onDeleteProvider(name);
@@ -58,6 +93,50 @@ export function ProviderManager({
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleTest() {
+    setSaving(true);
+    setError(null);
+    setTestResult(null);
+
+    try {
+      const result = await testCustomProvider(form);
+      setTestResult(result);
+    } catch (testError) {
+      setError(testError instanceof Error ? testError.message : "测试 provider 失败");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleEdit(provider: ProviderDescriptor) {
+    setForm({
+      name: provider.name,
+      label: provider.label,
+      base_url: provider.base_url ?? "",
+      model: provider.model,
+      router_model: provider.stage_models.router ?? "",
+      planning_model: provider.stage_models.planning ?? "",
+      coding_model: provider.stage_models.coding ?? "",
+      critic_model: provider.stage_models.critic ?? "",
+      test_model: provider.stage_models.test ?? "",
+      api_key: "",
+      description: provider.description,
+      temperature: provider.temperature ?? 0.2,
+      supports_vision: provider.supports_vision,
+      enabled: provider.configured,
+    });
+    setEditingName(provider.name);
+    setError(null);
+    setTestResult(null);
+  }
+
+  function handleCancelEdit() {
+    setForm(initialState);
+    setEditingName(null);
+    setError(null);
+    setTestResult(null);
   }
 
   return (
@@ -74,6 +153,7 @@ export function ProviderManager({
             <span>Provider ID</span>
             <input
               value={form.name}
+              disabled={editingName !== null}
               onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
             />
           </label>
@@ -96,7 +176,7 @@ export function ProviderManager({
 
         <div className="select-grid">
           <label>
-            <span>模型名</span>
+            <span>默认模型</span>
             <input
               value={form.model}
               onChange={(event) => setForm((current) => ({ ...current, model: event.target.value }))}
@@ -119,6 +199,63 @@ export function ProviderManager({
             />
           </label>
         </div>
+
+        <div className="select-grid">
+          <label>
+            <span>路由模型</span>
+            <input
+              value={form.router_model ?? ""}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, router_model: event.target.value }))
+              }
+              placeholder="留空则使用默认模型"
+            />
+          </label>
+          <label>
+            <span>规划模型</span>
+            <input
+              value={form.planning_model ?? ""}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, planning_model: event.target.value }))
+              }
+              placeholder="留空则使用默认模型"
+            />
+          </label>
+        </div>
+
+        <div className="select-grid">
+          <label>
+            <span>编码模型</span>
+            <input
+              value={form.coding_model ?? ""}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, coding_model: event.target.value }))
+              }
+              placeholder="留空则使用默认模型"
+            />
+          </label>
+          <label>
+            <span>审查模型</span>
+            <input
+              value={form.critic_model ?? ""}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, critic_model: event.target.value }))
+              }
+              placeholder="留空则使用默认模型"
+            />
+          </label>
+        </div>
+
+        <label>
+          <span>连通性测试模型</span>
+          <input
+            value={form.test_model ?? ""}
+            onChange={(event) =>
+              setForm((current) => ({ ...current, test_model: event.target.value }))
+            }
+            placeholder="留空则使用默认模型"
+          />
+        </label>
 
         <label>
           <span>状态</span>
@@ -173,11 +310,33 @@ export function ProviderManager({
         </label>
 
         {error ? <p className="error-text">{error}</p> : null}
+        {testResult ? (
+          <div className="skill-card">
+            <strong>连接测试成功</strong>
+            <p>
+              {testResult.provider} / {testResult.model} / {testResult.message}
+            </p>
+            {testResult.raw_excerpt ? <pre>{testResult.raw_excerpt}</pre> : null}
+          </div>
+        ) : null}
 
         <div className="form-actions">
           <button type="submit" disabled={saving}>
-            {saving ? "保存中..." : "保存自定义 Provider"}
+            {saving ? "处理中..." : editingName ? "保存修改" : "保存自定义 Provider"}
           </button>
+          <button type="button" className="ghost-button" onClick={handleTest} disabled={saving}>
+            测试连通性
+          </button>
+          {editingName ? (
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={handleCancelEdit}
+              disabled={saving}
+            >
+              取消编辑
+            </button>
+          ) : null}
           <p>同名 Provider 会被覆盖更新；视觉能力会影响题图是否发送给远程模型。</p>
         </div>
       </form>
@@ -193,11 +352,22 @@ export function ProviderManager({
               <span>{provider.model}</span>
             </div>
             <p>{provider.base_url}</p>
+            {stageModelSummary(provider).length > 0 ? (
+              <p>{stageModelSummary(provider).join(" / ")}</p>
+            ) : null}
             <div className="history-item-meta">
               <span>{provider.name}</span>
               <span>{provider.kind}</span>
               <span>{provider.supports_vision ? "vision" : "text"}</span>
               <span>{provider.configured ? "enabled" : "disabled"}</span>
+              <button
+                type="button"
+                className="inline-action"
+                onClick={() => handleEdit(provider)}
+                disabled={saving}
+              >
+                编辑
+              </button>
               <button
                 type="button"
                 className="inline-action"

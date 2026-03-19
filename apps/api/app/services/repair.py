@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from app.schemas import (
     CirDocument,
     CirValidationReport,
@@ -7,6 +9,10 @@ from app.schemas import (
     VisualKind,
     VisualToken,
 )
+from app.services.providers.base import CritiqueHints
+
+_SELF_PLAY_MOVE_POINTER_PATTERN = re.compile(r"self\.play\(\s*move_pointer\s*\(")
+_CTEX_PATTERN = re.compile(r"TexTemplateLibrary\.ctex")
 
 
 class PipelineRepairService:
@@ -68,8 +74,42 @@ class PipelineRepairService:
         actions: list[str] = []
         if sandbox_report.errors:
             actions.append("检测到脚本 dry-run 失败，已触发重新生成。")
-        if any("length" in error for error in sandbox_report.errors):
-            actions.append("脚本镜头数与 CIR 不一致，已按 CIR 重新同步时间线。")
+        if any("Scene" in error for error in sandbox_report.errors):
+            actions.append("脚本缺少有效 Scene 结构，已回退到本地 Manim 模板。")
         if cir.steps:
-            actions.append("重新按修复后的 CIR 生成预览脚本。")
+            actions.append("重新按修复后的 CIR 生成 Python Manim 预览脚本。")
         return actions
+
+    def collect_blocking_script_issues(
+        self,
+        *,
+        renderer_script: str,
+        critique_hints: CritiqueHints | None = None,
+        extra_issues: list[str] | None = None,
+    ) -> list[str]:
+        issues: list[str] = []
+        if critique_hints:
+            issues.extend(critique_hints.blocking_issues)
+        if _SELF_PLAY_MOVE_POINTER_PATTERN.search(renderer_script):
+            issues.append(
+                "检测到 `self.play(move_pointer(...))`。若 `move_pointer` 内部已执行 `self.play`，"
+                "这会变成 `self.play(None)` 并导致运行时报错。"
+            )
+        if _CTEX_PATTERN.search(renderer_script):
+            issues.append(
+                "检测到 `TexTemplateLibrary.ctex`。当前后端真实渲染链路中，"
+                "这对中文标题/旁白较脆弱；"
+                "请优先改用 `Text` 渲染中文说明，仅将 `Tex/MathTex` 用于公式或短数学标签。"
+            )
+        if extra_issues:
+            issues.extend(extra_issues)
+
+        deduped: list[str] = []
+        seen: set[str] = set()
+        for issue in issues:
+            normalized = issue.strip()
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            deduped.append(normalized)
+        return deduped

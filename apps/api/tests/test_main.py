@@ -1,8 +1,16 @@
 from fastapi.testclient import TestClient
 
 from app.main import app, orchestrator
-from app.schemas import AgentTrace, ProviderDescriptor, ProviderKind, TopicDomain
+from app.schemas import (
+    AgentTrace,
+    CirDocument,
+    ProviderDescriptor,
+    ProviderKind,
+    TopicDomain,
+)
+from app.services.preview_video_renderer import PreviewVideoArtifacts
 from app.services.providers.base import CodingHints, CritiqueHints, PlanningHints
+from app.services.providers.openai import ProviderInvocationError
 
 client = TestClient(app)
 
@@ -27,7 +35,9 @@ def test_pipeline_returns_cir() -> None:
     payload = response.json()
     assert payload["cir"]["domain"] == "algorithm"
     assert len(payload["cir"]["steps"]) == 3
-    assert "previewTimeline" in payload["renderer_script"]
+    assert "from manim import *" in payload["renderer_script"]
+    assert "class GeneratedPreviewScene(Scene):" in payload["renderer_script"]
+    assert payload["preview_video_url"]
     assert payload["runtime"]["skill"]["id"] == "algorithm-process-viz"
     assert payload["runtime"]["router_provider"]["name"] == "mock"
     assert payload["runtime"]["generation_provider"]["name"] == "mock"
@@ -36,6 +46,9 @@ def test_pipeline_returns_cir() -> None:
     assert payload["runtime"]["validation"]["status"] == "valid"
     assert payload["runtime"]["repair_count"] == 0
     assert payload["runtime"]["agent_traces"][0]["agent"] == "router"
+    video_response = client.get(payload["preview_video_url"])
+    assert video_response.status_code == 200
+    assert "video/mp4" in video_response.headers["content-type"]
 
 
 def test_runtime_catalog() -> None:
@@ -46,12 +59,12 @@ def test_runtime_catalog() -> None:
     assert payload["default_provider"] == "mock"
     assert payload["default_router_provider"] == "mock"
     assert payload["default_generation_provider"] == "mock"
-    assert payload["sandbox_engine"] == "preview-dry-run"
+    assert payload["sandbox_engine"] == "python-manim-static"
     assert payload["providers"][0]["name"] == "mock"
     assert payload["providers"][0]["label"] == "Mock Provider"
     assert payload["providers"][1]["name"] == "openai"
     assert payload["providers"][1]["configured"] is False
-    assert any(skill["id"] == "physics-simulation-viz" for skill in payload["skills"])
+    assert [skill["domain"] for skill in payload["skills"]] == ["algorithm", "math", "code"]
 
 
 def test_runtime_catalog_allows_local_dev_cors_origin() -> None:
@@ -61,6 +74,57 @@ def test_runtime_catalog_allows_local_dev_cors_origin() -> None:
     )
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:4174"
+
+
+def test_prepare_manim_endpoint_extracts_and_wraps_code() -> None:
+    response = client.post(
+        "/api/v1/manim/prepare",
+        json={
+            "source": """
+<think>
+internal reasoning
+</think>
+
+```python3
+def construct(self):
+    text = Text("hello")
+    self.play(Write(text))
+```
+            """.strip()
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["is_runnable"] is True
+    assert payload["scene_class_name"] == "GeneratedScene"
+    assert "from manim import *" in payload["code"]
+    assert "class GeneratedScene(Scene):" in payload["code"]
+    assert "def construct(self):" in payload["code"]
+    assert payload["diagnostics"]
+
+
+def test_render_manim_endpoint_supports_fallback_backend() -> None:
+    response = client.post(
+        "/api/v1/manim/render",
+        json={
+            "source": """
+```python
+from manim import *
+
+class Demo(Scene):
+    def construct(self):
+        title = Text("hello render")
+        self.play(Write(title))
+        self.wait(0.5)
+```
+            """.strip(),
+            "require_real": False,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["preview_video_url"]
+    assert payload["render_backend"] in {"manim-cli", "storyboard-fallback"}
 
 
 def test_pipeline_runs_history_endpoints() -> None:
@@ -91,7 +155,39 @@ def test_pipeline_runs_history_endpoints() -> None:
     assert detail["response"]["request_id"] == request_id
 
 
-def test_physics_pipeline_supports_static_image_prompt() -> None:
+def test_pipeline_routes_source_code_to_code_domain() -> None:
+    response = client.post(
+        "/api/v1/pipeline",
+        json={
+            "prompt": "请根据源码讲解这个算法的状态变化。",
+            "provider": "mock",
+            "source_code_language": "cpp",
+            "source_code": """
+#include <vector>
+using namespace std;
+
+int binarySearch(vector<int>& nums, int target) {
+    int left = 0, right = nums.size() - 1;
+    while (left <= right) {
+        int mid = left + (right - left) / 2;
+        if (nums[mid] == target) return mid;
+        if (nums[mid] < target) left = mid + 1;
+        else right = mid - 1;
+    }
+    return -1;
+}
+            """.strip(),
+            "sandbox_mode": "dry_run",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["cir"]["domain"] == "code"
+    assert payload["runtime"]["skill"]["id"] == "source-code-algorithm-viz"
+    assert "binary search" in payload["cir"]["summary"].lower()
+
+
+def test_pipeline_rejects_disabled_domain() -> None:
     response = client.post(
         "/api/v1/pipeline",
         json={
@@ -102,13 +198,8 @@ def test_physics_pipeline_supports_static_image_prompt() -> None:
             "sandbox_mode": "dry_run",
         },
     )
-    assert response.status_code == 200
-
-    payload = response.json()
-    assert payload["runtime"]["skill"]["id"] == "physics-simulation-viz"
-    assert payload["cir"]["domain"] == "physics"
-    assert any(step["title"] == "题图解析" for step in payload["cir"]["steps"])
-    assert "静态题图" in payload["cir"]["summary"]
+    assert response.status_code == 400
+    assert "未启用" in response.json()["detail"]
 
 
 def test_custom_provider_crud() -> None:
@@ -119,6 +210,8 @@ def test_custom_provider_crud() -> None:
             "label": "Local Ollama",
             "base_url": "http://127.0.0.1:11434/v1",
             "model": "qwen2.5-coder",
+            "router_model": "qwen2.5-coder:3b",
+            "coding_model": "qwen2.5-coder:32b",
             "api_key": "",
             "description": "本地自定义 provider",
             "temperature": 0.1,
@@ -131,14 +224,153 @@ def test_custom_provider_crud() -> None:
     assert payload["name"] == "local-ollama"
     assert payload["is_custom"] is True
     assert payload["supports_vision"] is True
+    assert payload["stage_models"] == {
+        "router": "qwen2.5-coder:3b",
+        "coding": "qwen2.5-coder:32b",
+    }
 
     runtime_response = client.get("/api/v1/runtime")
     providers = runtime_response.json()["providers"]
-    assert any(provider["name"] == "local-ollama" for provider in providers)
+    local_provider = next(provider for provider in providers if provider["name"] == "local-ollama")
+    assert local_provider["stage_models"] == {
+        "router": "qwen2.5-coder:3b",
+        "coding": "qwen2.5-coder:32b",
+    }
 
     delete_response = client.delete("/api/v1/providers/custom/local-ollama")
     assert delete_response.status_code == 200
     assert delete_response.json()["deleted"] is True
+
+
+def test_custom_provider_test_endpoint(monkeypatch) -> None:
+    from app.services.providers.openai import OpenAICompatibleProvider
+
+    def fake_test_connection(self):
+        return "pong", ("pong raw output " * 80).strip()
+
+    monkeypatch.setattr(OpenAICompatibleProvider, "test_connection", fake_test_connection)
+
+    response = client.post(
+        "/api/v1/providers/custom/test",
+        json={
+            "name": "test-ollama",
+            "label": "Test Ollama",
+            "base_url": "http://127.0.0.1:11434/v1",
+            "model": "qwen2.5-coder",
+            "test_model": "qwen2.5-coder:1.5b",
+            "api_key": "",
+            "description": "测试 provider",
+            "temperature": 0.1,
+            "supports_vision": False,
+            "enabled": True,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["message"] == "pong"
+    assert payload["model"] == "qwen2.5-coder:1.5b"
+    assert "pong raw output" in payload["raw_excerpt"]
+    assert payload["raw_excerpt"].endswith("pong raw output")
+
+
+def test_custom_provider_addition_preserves_disabled_state() -> None:
+    create_response = client.post(
+        "/api/v1/providers/custom",
+        json={
+            "name": "disabled-ollama",
+            "label": "Disabled Ollama",
+            "base_url": "http://127.0.0.1:11434/v1/",
+            "model": "qwen2.5-coder",
+            "api_key": "",
+            "description": "默认禁用的 provider",
+            "temperature": 0.3,
+            "supports_vision": False,
+            "enabled": False,
+        },
+    )
+    assert create_response.status_code == 200
+
+    payload = create_response.json()
+    assert payload["name"] == "disabled-ollama"
+    assert payload["configured"] is False
+    assert payload["is_custom"] is True
+    assert payload["base_url"] == "http://127.0.0.1:11434/v1"
+
+    runtime_response = client.get("/api/v1/runtime")
+    assert runtime_response.status_code == 200
+    providers = runtime_response.json()["providers"]
+    disabled_provider = next(
+        provider for provider in providers if provider["name"] == "disabled-ollama"
+    )
+    assert disabled_provider["configured"] is False
+    assert disabled_provider["base_url"] == "http://127.0.0.1:11434/v1"
+
+    pipeline_response = client.post(
+        "/api/v1/pipeline",
+        json={
+            "prompt": "请讲解二分查找。",
+            "router_provider": "mock",
+            "generation_provider": "disabled-ollama",
+            "sandbox_mode": "dry_run",
+            "persist_run": False,
+        },
+    )
+    assert pipeline_response.status_code == 400
+    assert "Provider disabled-ollama 未配置" in pipeline_response.json()["detail"]
+
+    delete_response = client.delete("/api/v1/providers/custom/disabled-ollama")
+    assert delete_response.status_code == 200
+    assert delete_response.json()["deleted"] is True
+
+
+def test_custom_provider_edit_preserves_existing_api_key() -> None:
+    first_response = client.post(
+        "/api/v1/providers/custom",
+        json={
+            "name": "editable-ollama",
+            "label": "Editable Ollama",
+            "base_url": "http://127.0.0.1:11434/v1",
+            "model": "qwen2.5-coder",
+            "router_model": "qwen2.5-coder:3b",
+            "api_key": "secret-key",
+            "description": "原始 provider",
+            "temperature": 0.4,
+            "supports_vision": False,
+            "enabled": True,
+        },
+    )
+    assert first_response.status_code == 200
+
+    second_response = client.post(
+        "/api/v1/providers/custom",
+        json={
+            "name": "editable-ollama",
+            "label": "Editable Ollama Updated",
+            "base_url": "http://127.0.0.1:11434/v1/",
+            "model": "qwen3-coder",
+            "api_key": "",
+            "router_model": "",
+            "planning_model": "qwen3-thinking",
+            "description": "更新后的 provider",
+            "temperature": 0.6,
+            "supports_vision": True,
+            "enabled": True,
+        },
+    )
+    assert second_response.status_code == 200
+
+    stored = orchestrator.custom_provider_repository.get("editable-ollama")
+    assert stored is not None
+    assert stored.api_key == "secret-key"
+    assert stored.label == "Editable Ollama Updated"
+    assert stored.model == "qwen3-coder"
+    assert stored.router_model is None
+    assert stored.planning_model == "qwen3-thinking"
+    assert stored.supports_vision is True
+
+    delete_response = client.delete("/api/v1/providers/custom/editable-ollama")
+    assert delete_response.status_code == 200
 
 
 def test_pipeline_supports_dual_provider_orchestration(monkeypatch) -> None:
@@ -153,7 +385,10 @@ def test_pipeline_supports_dual_provider_orchestration(monkeypatch) -> None:
         )
 
         def route(
-            self, prompt: str, source_image: str | None = None
+            self,
+            prompt: str,
+            source_image: str | None = None,
+            source_code: str | None = None,
         ) -> tuple[TopicDomain, AgentTrace]:
             return (
                 TopicDomain.MATH,
@@ -162,6 +397,7 @@ def test_pipeline_supports_dual_provider_orchestration(monkeypatch) -> None:
                     provider=self.descriptor.name,
                     model=self.descriptor.model,
                     summary="router stub picked math",
+                    raw_output='{"domain":"math","reason":"router stub picked math"}',
                 ),
             )
 
@@ -193,6 +429,8 @@ def test_pipeline_supports_dual_provider_orchestration(monkeypatch) -> None:
             domain: str,
             skill_brief: str,
             source_image: str | None = None,
+            source_code: str | None = None,
+            source_code_language: str | None = None,
         ) -> tuple[PlanningHints, AgentTrace]:
             return (
                 PlanningHints(
@@ -205,38 +443,63 @@ def test_pipeline_supports_dual_provider_orchestration(monkeypatch) -> None:
                     provider=self.descriptor.name,
                     model=self.descriptor.model,
                     summary="generation stub planned math flow",
+                    raw_output='{"focus":"突出函数和切线","concepts":["函数","切线","变化率"]}',
                 ),
             )
 
-        def code(self, title: str, step_count: int) -> tuple[CodingHints, AgentTrace]:
+        def code(self, cir: CirDocument) -> tuple[CodingHints, AgentTrace]:
             return (
                 CodingHints(
-                    target="manim-web-ts",
-                    style_notes=["keep timeline deterministic"],
+                    target="python-manim",
+                    style_notes=["keep animation deterministic"],
+                    renderer_script="""
+<analysis>
+hidden
+</analysis>
+
+```python
+from manim import *
+
+class ProviderRenderer(Scene):
+    def construct(self):
+        title = Text("provider renderer")
+        self.play(Write(title))
+        self.wait(0.5)
+```
+                    """.strip(),
                 ),
                 AgentTrace(
                     agent="coder",
                     provider=self.descriptor.name,
                     model=self.descriptor.model,
-                    summary=f"generation stub coded {step_count} steps",
+                    summary=f"generation stub coded {len(cir.steps)} steps",
+                    raw_output="```ts\nprovider renderer raw output\n```",
                 ),
             )
 
         def critique(
-            self, title: str, renderer_script: str
+            self,
+            title: str,
+            renderer_script: str,
+            domain: TopicDomain,
         ) -> tuple[CritiqueHints, AgentTrace]:
             return (
                 CritiqueHints(
                     checks=["check overlap", "check narration density"],
                     warnings=[],
+                    blocking_issues=[],
                 ),
                 AgentTrace(
                     agent="critic",
                     provider=self.descriptor.name,
                     model=self.descriptor.model,
                     summary="generation stub reviewed renderer",
+                    raw_output='{"checks":["check overlap"],"warnings":[]}',
                 ),
             )
+
+        def repair_code(self, cir: CirDocument, renderer_script: str, issues: list[str]):
+            raise AssertionError("generation stub should not need repair for this test")
 
     original_get = orchestrator.provider_registry.get
 
@@ -266,7 +529,214 @@ def test_pipeline_supports_dual_provider_orchestration(monkeypatch) -> None:
     assert payload["cir"]["domain"] == "math"
     assert payload["runtime"]["router_provider"]["name"] == "router-stub"
     assert payload["runtime"]["generation_provider"]["name"] == "generation-stub"
+    assert "class ProviderRenderer(Scene):" in payload["renderer_script"]
+    assert "provider renderer" in payload["renderer_script"]
     assert traces["router"]["provider"] == "router-stub"
     assert traces["planner"]["provider"] == "generation-stub"
     assert traces["coder"]["provider"] == "generation-stub"
     assert traces["critic"]["provider"] == "generation-stub"
+    assert traces["planner"]["raw_output"] is not None
+    assert "突出函数和切线" in traces["planner"]["raw_output"]
+    assert traces["coder"]["raw_output"] is not None
+    assert "provider renderer raw output" in traces["coder"]["raw_output"]
+
+
+def test_pipeline_returns_502_when_generation_provider_times_out(monkeypatch) -> None:
+    class TimeoutGenerationProvider:
+        descriptor = ProviderDescriptor(
+            name="timeout-stub",
+            label="Timeout Stub",
+            kind=ProviderKind.OPENAI_COMPATIBLE,
+            model="timeout-model-v1",
+            description="stub timeout",
+            configured=True,
+        )
+
+        def route(self, *args, **kwargs):
+            raise AssertionError("generation provider should not handle routing")
+
+        def plan(self, *args, **kwargs):
+            raise ProviderInvocationError(
+                "Provider 请求超时（3s），请检查模型服务是否可达。"
+            )
+
+        def code(self, *args, **kwargs):
+            raise AssertionError("timeout provider should fail during planning")
+
+        def critique(self, *args, **kwargs):
+            raise AssertionError("timeout provider should fail during planning")
+
+    original_get = orchestrator.provider_registry.get
+
+    def fake_get(name: str):
+        if name == "timeout-stub":
+            return TimeoutGenerationProvider()
+        return original_get(name)
+
+    monkeypatch.setattr(orchestrator.provider_registry, "get", fake_get)
+
+    response = client.post(
+        "/api/v1/pipeline",
+        json={
+            "prompt": "请讲解二分查找边界收缩。",
+            "router_provider": "mock",
+            "generation_provider": "timeout-stub",
+            "sandbox_mode": "dry_run",
+            "persist_run": False,
+        },
+    )
+    assert response.status_code == 502
+    assert "Provider 请求超时" in response.json()["detail"]
+
+
+def test_pipeline_repairs_critic_blocking_issues_before_render(monkeypatch, tmp_path) -> None:
+    class RepairingProvider:
+        descriptor = ProviderDescriptor(
+            name="repairing-stub",
+            label="Repairing Stub",
+            kind=ProviderKind.OPENAI_COMPATIBLE,
+            model="repair-model-v1",
+            description="stub repair flow",
+            configured=True,
+        )
+
+        def route(self, *args, **kwargs):
+            raise AssertionError("generation provider should not handle routing")
+
+        def plan(self, *args, **kwargs):
+            return (
+                PlanningHints(
+                    focus="突出二分查找边界收缩",
+                    concepts=["left", "mid", "right"],
+                    warnings=[],
+                ),
+                AgentTrace(
+                    agent="planner",
+                    provider=self.descriptor.name,
+                    model=self.descriptor.model,
+                    summary="planned binary search",
+                ),
+            )
+
+        def code(self, cir: CirDocument):
+            return (
+                CodingHints(
+                    target="python-manim",
+                    style_notes=[],
+                    renderer_script="""
+```python
+from manim import *
+
+class BrokenScene(Scene):
+    def construct(self):
+        title = Text("broken")
+        def move_pointer():
+            self.play(title.animate.shift(RIGHT * 0.5), run_time=0.1)
+        self.play(move_pointer())
+        self.wait(0.1)
+```
+                    """.strip(),
+                ),
+                AgentTrace(
+                    agent="coder",
+                    provider=self.descriptor.name,
+                    model=self.descriptor.model,
+                    summary="generated broken script",
+                ),
+            )
+
+        def critique(self, title: str, renderer_script: str, domain: TopicDomain):
+            if "self.play(move_pointer())" in renderer_script:
+                return (
+                    CritiqueHints(
+                        checks=[
+                            (
+                                '{"name":"runtime","status":"fail",'
+                                '"details":"self.play(move_pointer()) 会报错"}'
+                            )
+                        ],
+                        warnings=[],
+                        blocking_issues=["self.play(move_pointer()) 会报错"],
+                    ),
+                    AgentTrace(
+                        agent="critic",
+                        provider=self.descriptor.name,
+                        model=self.descriptor.model,
+                        summary="found blocking runtime issue",
+                    ),
+                )
+            return (
+                CritiqueHints(checks=["final script ok"], warnings=[], blocking_issues=[]),
+                AgentTrace(
+                    agent="critic",
+                    provider=self.descriptor.name,
+                    model=self.descriptor.model,
+                    summary="final script ok",
+                ),
+            )
+
+        def repair_code(self, cir: CirDocument, renderer_script: str, issues: list[str]):
+            assert any("move_pointer" in issue for issue in issues)
+            return (
+                CodingHints(
+                    target="python-manim",
+                    style_notes=[],
+                    renderer_script="""
+```python
+from manim import *
+
+class FixedScene(Scene):
+    def construct(self):
+        title = Text("fixed")
+        def move_pointer():
+            self.play(title.animate.shift(RIGHT * 0.5), run_time=0.1)
+        move_pointer()
+        self.wait(0.1)
+```
+                    """.strip(),
+                ),
+                AgentTrace(
+                    agent="repair",
+                    provider=self.descriptor.name,
+                    model=self.descriptor.model,
+                    summary="repaired script",
+                ),
+            )
+
+    original_get = orchestrator.provider_registry.get
+
+    def fake_get(name: str):
+        if name == "repairing-stub":
+            return RepairingProvider()
+        return original_get(name)
+
+    def fake_render(*, script: str, request_id: str, cir: CirDocument):
+        assert "self.play(move_pointer())" not in script
+        assert "move_pointer()" in script
+        output = tmp_path / f"{request_id}.mp4"
+        output.write_bytes(b"fake")
+        return PreviewVideoArtifacts(
+            file_path=output,
+            url="/media/fake.mp4",
+            backend="manim-cli",
+        )
+
+    monkeypatch.setattr(orchestrator.provider_registry, "get", fake_get)
+    monkeypatch.setattr(orchestrator.preview_video_renderer, "render", fake_render)
+
+    response = client.post(
+        "/api/v1/pipeline",
+        json={
+            "prompt": "请讲解二分查找边界收缩。",
+            "router_provider": "mock",
+            "generation_provider": "repairing-stub",
+            "sandbox_mode": "dry_run",
+            "persist_run": False,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert "class FixedScene(Scene):" in payload["renderer_script"]
+    assert payload["preview_video_url"] == "/media/fake.mp4"
+    assert any(trace["agent"] == "repair" for trace in payload["runtime"]["agent_traces"])
+    assert any("critic-review" in action for action in payload["runtime"]["repair_actions"])

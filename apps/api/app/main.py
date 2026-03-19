@@ -1,9 +1,18 @@
+from pathlib import Path
+from uuid import uuid4
+
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.schemas import (
+    CustomProviderTestResponse,
     CustomProviderUpsertRequest,
+    ManimScriptPrepareRequest,
+    ManimScriptPrepareResponse,
+    ManimScriptRenderRequest,
+    ManimScriptRenderResponse,
     PipelineRequest,
     PipelineResponse,
     PipelineRunDetail,
@@ -11,14 +20,19 @@ from app.schemas import (
     ProviderDescriptor,
     RuntimeCatalog,
 )
+from app.services.manim_script import ManimScriptError, prepare_manim_script
 from app.services.orchestrator import PipelineOrchestrator
+from app.services.preview_video_renderer import PreviewVideoRenderError
 from app.services.providers.openai import ProviderInvocationError
 from app.services.providers.registry import ProviderRegistrationError, ProviderUnavailableError
+from app.services.skill_catalog import SubjectSkillUnavailableError
 
 settings = get_settings()
 orchestrator = PipelineOrchestrator(settings=settings)
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
+media_root = Path(settings.preview_media_root)
+media_root.mkdir(parents=True, exist_ok=True)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -26,6 +40,11 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+app.mount(
+    settings.preview_media_url_prefix,
+    StaticFiles(directory=media_root),
+    name="preview-media",
 )
 
 
@@ -40,8 +59,68 @@ def run_pipeline(request: PipelineRequest) -> PipelineResponse:
         return orchestrator.run(request)
     except ProviderUnavailableError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SubjectSkillUnavailableError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except ProviderInvocationError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@app.post(
+    f"{settings.api_prefix}/manim/prepare",
+    response_model=ManimScriptPrepareResponse,
+)
+def prepare_manim_endpoint(
+    payload: ManimScriptPrepareRequest,
+) -> ManimScriptPrepareResponse:
+    try:
+        prepared = prepare_manim_script(
+            payload.source,
+            scene_class_name=payload.scene_class_name,
+        )
+    except ManimScriptError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return ManimScriptPrepareResponse(
+        code=prepared.code,
+        scene_class_name=prepared.scene_class_name,
+        diagnostics=prepared.diagnostics,
+        is_runnable=True,
+    )
+
+
+@app.post(
+    f"{settings.api_prefix}/manim/render",
+    response_model=ManimScriptRenderResponse,
+)
+def render_manim_endpoint(
+    payload: ManimScriptRenderRequest,
+) -> ManimScriptRenderResponse:
+    try:
+        prepared = prepare_manim_script(
+            payload.source,
+            scene_class_name=payload.scene_class_name,
+        )
+        request_id = str(uuid4())
+        preview_video = orchestrator.preview_video_renderer.render(
+            script=prepared.code,
+            request_id=request_id,
+            scene_class_name=prepared.scene_class_name,
+            require_real=payload.require_real,
+        )
+    except ManimScriptError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except PreviewVideoRenderError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return ManimScriptRenderResponse(
+        request_id=request_id,
+        code=prepared.code,
+        scene_class_name=prepared.scene_class_name,
+        diagnostics=prepared.diagnostics,
+        is_runnable=True,
+        preview_video_url=preview_video.url,
+        render_backend=preview_video.backend,
+    )
 
 
 @app.get(f"{settings.api_prefix}/runtime", response_model=RuntimeCatalog)
@@ -68,6 +147,19 @@ def upsert_custom_provider(payload: CustomProviderUpsertRequest) -> ProviderDesc
         return orchestrator.upsert_custom_provider(payload)
     except ProviderRegistrationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post(
+    f"{settings.api_prefix}/providers/custom/test",
+    response_model=CustomProviderTestResponse,
+)
+def test_custom_provider(payload: CustomProviderUpsertRequest) -> CustomProviderTestResponse:
+    try:
+        return orchestrator.test_custom_provider(payload)
+    except ProviderRegistrationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ProviderInvocationError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @app.delete(f"{settings.api_prefix}/providers/custom/{{name}}")

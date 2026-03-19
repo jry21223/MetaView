@@ -1,6 +1,7 @@
 export type TopicDomain =
   | "algorithm"
   | "math"
+  | "code"
   | "physics"
   | "chemistry"
   | "biology"
@@ -9,6 +10,7 @@ export type ModelProvider = string;
 export type SandboxMode = "dry_run" | "off";
 export type SandboxStatus = "passed" | "failed" | "skipped";
 export type ProviderKind = "mock" | "openai_compatible";
+export type ProviderStage = "router" | "planning" | "coding" | "critic" | "test";
 
 export type VisualKind =
   | "array"
@@ -56,11 +58,13 @@ export interface ProviderDescriptor {
   label: string;
   kind: ProviderKind;
   model: string;
+  stage_models: Partial<Record<ProviderStage, string>>;
   description: string;
   configured: boolean;
   is_custom: boolean;
   supports_vision: boolean;
   base_url?: string | null;
+  temperature?: number | null;
 }
 
 export interface SkillDescriptor {
@@ -80,6 +84,7 @@ export interface AgentTrace {
   provider: ModelProvider;
   model: string;
   summary: string;
+  raw_output?: string | null;
 }
 
 export interface SandboxReport {
@@ -132,6 +137,7 @@ export interface PipelineResponse {
   request_id: string;
   cir: CirDocument;
   renderer_script: string;
+  preview_video_url?: string | null;
   diagnostics: AgentDiagnostic[];
   runtime: PipelineRuntime;
 }
@@ -156,6 +162,8 @@ export interface PipelineRunDetail {
     provider?: ModelProvider | null;
     router_provider?: ModelProvider | null;
     generation_provider?: ModelProvider | null;
+    source_code?: string | null;
+    source_code_language?: string | null;
     source_image?: string | null;
     source_image_name?: string | null;
     sandbox_mode: SandboxMode;
@@ -169,9 +177,35 @@ export interface CustomProviderUpsertRequest {
   label: string;
   base_url: string;
   model: string;
+  router_model?: string;
+  planning_model?: string;
+  coding_model?: string;
+  critic_model?: string;
+  test_model?: string;
   api_key?: string;
   description: string;
   temperature: number;
   supports_vision: boolean;
   enabled: boolean;
+}
+
+export interface CustomProviderTestResponse {
+  ok: boolean;
+  provider: string;
+  model: string;
+  message: string;
+  raw_excerpt?: string | null;
+}
+
+export interface ManimScriptPrepareResponse {
+  code: string;
+  scene_class_name: string;
+  diagnostics: string[];
+  is_runnable: boolean;
+}
+
+export interface ManimScriptRenderResponse extends ManimScriptPrepareResponse {
+  request_id: string;
+  preview_video_url: string;
+  render_backend: string;
 }

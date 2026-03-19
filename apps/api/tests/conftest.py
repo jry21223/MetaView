@@ -13,3 +13,5 @@ if TEST_DB_PATH.exists():
     TEST_DB_PATH.unlink()
 
 os.environ["ALGO_VIS_HISTORY_DB_PATH"] = str(TEST_DB_PATH)
+os.environ["ALGO_VIS_ENABLED_DOMAINS"] = "algorithm,math,code"
+os.environ["ALGO_VIS_PREVIEW_RENDER_BACKEND"] = "fallback"

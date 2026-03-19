@@ -12,7 +12,7 @@ export function HistoryPanel({ runs, selectedRunId, onSelectRun }: HistoryPanelP
       <div className="panel-header">
         <span className="panel-kicker">History</span>
         <h3>任务历史</h3>
-        <p>所有持久化任务都会写入本地 SQLite，可随时回看 CIR、脚本与运行时信息。</p>
+        <p>所有持久化任务都会写入本地 SQLite，可随时回看预览结果。</p>
       </div>
 
       <div className="history-list">

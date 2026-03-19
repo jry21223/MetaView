@@ -1,4 +1,4 @@
-import { lazy, startTransition, Suspense, useDeferredValue, useEffect, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
 import {
@@ -9,6 +9,7 @@ import {
   runPipeline,
   upsertCustomProvider,
 } from "./api/client";
+import { CodeAdapterPanel } from "./components/CodeAdapterPanel";
 import { ControlPanel } from "./components/ControlPanel";
 import { HistoryPanel } from "./components/HistoryPanel";
 import { ProviderManager } from "./components/ProviderManager";
@@ -19,119 +20,22 @@ import type {
   PipelineRunSummary,
   RuntimeCatalog,
   SandboxMode,
-  SkillDescriptor,
 } from "./types";
 
 const defaultPrompt = "请可视化讲解二分查找的边界收缩过程，突出 left / mid / right 的变化。";
-const PreviewCanvas = lazy(async () => {
-  const module = await import("./components/PreviewCanvas");
-  return { default: module.default };
-});
-
-const fallbackSkills: SkillDescriptor[] = [
-  {
-    id: "algorithm-process-viz",
-    domain: "algorithm",
-    label: "算法过程可视化",
-    description: "将排序、搜索、图论与动态规划的状态迁移过程转成可交互动画。",
-    version: "1.0.0",
-    triggers: ["可视化算法", "排序演示", "图论遍历", "状态转移"],
-    dependencies: ["manim-web", "manim-algorithm", "manim-code-blocks"],
-    supports_image_input: false,
-    execution_notes: [
-      "提取循环与条件分支的关键状态。",
-      "同步代码高亮与变量变化。",
-      "递归场景优先拆出调用栈镜头。",
-    ],
-  },
-  {
-    id: "math-theorem-walkthrough",
-    domain: "math",
-    label: "数学定理攻略",
-    description: "生成数学证明、函数图像和线性代数变换的视觉步进动画。",
-    version: "1.0.0",
-    triggers: ["数学证明", "函数图像绘制", "几何变换", "微积分演示"],
-    dependencies: ["manim-web", "katex", "sympy", "numpy"],
-    supports_image_input: false,
-    execution_notes: [
-      "先定义对象与坐标系。",
-      "推导过程不能跳步。",
-      "导数与积分要显式跟踪变量。",
-    ],
-  },
-  {
-    id: "physics-simulation-viz",
-    domain: "physics",
-    label: "物理模拟可视化",
-    description: "支持力学、电学与场论过程演示，并可从静态题目图片提取对象关系。",
-    version: "1.0.0",
-    triggers: ["物理模拟", "力学实验", "电路分析", "电磁场演示"],
-    dependencies: ["manim-web", "manim-physics", "manim-circuit"],
-    supports_image_input: true,
-    execution_notes: [
-      "题图先提取对象、受力与约束。",
-      "建模先于动画。",
-      "结果必须回到物理定律校核。",
-    ],
-  },
-  {
-    id: "molecular-structure-viz",
-    domain: "chemistry",
-    label: "分子结构可视化",
-    description: "解析分子结构、键变化与反应机理，生成球棍模型与过程动画。",
-    version: "1.0.0",
-    triggers: ["分子结构", "化学反应演示", "分子键断裂", "原子轨道"],
-    dependencies: ["manim-web", "manim-chemistry", "rdkit"],
-    supports_image_input: false,
-    execution_notes: [
-      "明确键连接与构型。",
-      "关键断键成键要同步叙事。",
-      "结果要审查化合价与守恒。",
-    ],
-  },
-  {
-    id: "biology-process-viz",
-    domain: "biology",
-    label: "生物过程可视化",
-    description: "用于细胞、遗传、代谢与生态系统中具有阶段性变化的知识过程。",
-    version: "1.0.0",
-    triggers: ["细胞分裂", "遗传规律", "代谢通路", "生态系统"],
-    dependencies: ["manim-web", "numpy"],
-    supports_image_input: false,
-    execution_notes: [
-      "先确定结构层级。",
-      "阶段切换与调控箭头分离呈现。",
-      "结论要回到功能解释。",
-    ],
-  },
-  {
-    id: "geospatial-process-viz",
-    domain: "geography",
-    label: "地理演化可视化",
-    description: "展示板块运动、水循环、人口迁移和区域空间演化过程。",
-    version: "1.0.0",
-    triggers: ["板块运动", "水循环", "人口迁移", "区域分析"],
-    dependencies: ["manim-web", "geopandas", "matplotlib"],
-    supports_image_input: false,
-    execution_notes: [
-      "统一底图坐标。",
-      "强调方向、流向和区域差异。",
-      "最后回到区域分析结论。",
-    ],
-  },
-];
 
 const fallbackRuntimeCatalog: RuntimeCatalog = {
   default_provider: "mock",
   default_router_provider: "mock",
   default_generation_provider: "mock",
-  sandbox_engine: "preview-dry-run",
+  sandbox_engine: "python-manim-static",
   providers: [
     {
       name: "mock",
       label: "Mock Provider",
       kind: "mock",
       model: "mock-cir-studio-001",
+      stage_models: {},
       description: "本地确定性规则提供者，用于 MVP 阶段替代真实大模型。",
       configured: true,
       is_custom: false,
@@ -143,6 +47,7 @@ const fallbackRuntimeCatalog: RuntimeCatalog = {
       label: "OpenAI Compatible",
       kind: "openai_compatible",
       model: "not-configured",
+      stage_models: {},
       description: "OpenAI 兼容 Provider，需配置环境变量后启用。",
       configured: false,
       is_custom: false,
@@ -150,9 +55,24 @@ const fallbackRuntimeCatalog: RuntimeCatalog = {
       base_url: null,
     },
   ],
-  skills: fallbackSkills,
+  skills: [],
   sandbox_modes: ["dry_run", "off"],
 };
+
+function resolvePreviewVideoUrl(url: string | null | undefined): string | null {
+  if (!url) {
+    return null;
+  }
+  if (/^https?:\/\//.test(url)) {
+    return url;
+  }
+
+  const apiBaseUrl = String(import.meta.env.VITE_API_BASE_URL ?? "").trim();
+  if (!apiBaseUrl) {
+    return url;
+  }
+  return new URL(url, `${apiBaseUrl.replace(/\/$/, "")}/`).toString();
+}
 
 function activeProviderSupportsVision(catalog: RuntimeCatalog, providerName: ModelProvider): boolean {
   return catalog.providers.find((candidate) => candidate.name === providerName)?.supports_vision ?? false;
@@ -175,6 +95,8 @@ function resolveConfiguredProvider(
 
 export default function App() {
   const [prompt, setPrompt] = useState(defaultPrompt);
+  const [sourceCode, setSourceCode] = useState("");
+  const [sourceCodeLanguage, setSourceCodeLanguage] = useState("");
   const [routerProvider, setRouterProvider] = useState<ModelProvider>(
     fallbackRuntimeCatalog.default_router_provider,
   );
@@ -191,8 +113,11 @@ export default function App() {
   const [runs, setRuns] = useState<PipelineRunSummary[]>([]);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
-  const deferredResult = useDeferredValue(result);
   const activeSkill = result?.runtime.skill ?? null;
+  const previewVideoUrl = resolvePreviewVideoUrl(result?.preview_video_url);
+  const hasRawProviderOutput = Boolean(
+    result?.runtime.agent_traces.some((trace) => Boolean(trace.raw_output)),
+  );
   const routerProviderSupportsVision = activeProviderSupportsVision(
     runtimeCatalog,
     routerProvider,
@@ -285,6 +210,8 @@ export default function App() {
         routerProvider,
         generationProvider,
         sandboxMode,
+        sourceCode,
+        sourceCodeLanguage || null,
         sourceImage,
         sourceImageName,
       );
@@ -308,6 +235,8 @@ export default function App() {
         setSelectedRunId(requestId);
       });
       setPrompt(run.request.prompt);
+      setSourceCode(run.request.source_code ?? "");
+      setSourceCodeLanguage(run.request.source_code_language ?? "");
       setRouterProvider(
         resolveConfiguredProvider(
           runtimeCatalog,
@@ -343,6 +272,8 @@ export default function App() {
       exported_at: new Date().toISOString(),
       request: {
         prompt,
+        source_code: sourceCode || null,
+        source_code_language: sourceCodeLanguage || null,
         provider: generationProvider,
         router_provider: routerProvider,
         generation_provider: generationProvider,
@@ -389,21 +320,24 @@ export default function App() {
     <main className="app-shell">
       <section className="hero">
         <div>
-          <span className="hero-kicker">Auto Skill Routing</span>
-          <h2>输入题目，模型自动判断学科、选择 skill，再生成 CIR 与浏览器原生动画。</h2>
+          <span className="hero-kicker">Video MVP</span>
+          <h2>输入题目，后端直接生成预览视频。</h2>
+          <p className="hero-copy">
+            当前主链路统一输出 Python Manim，并通过后端渲染视频；前端不再承担实时脚本转换。
+          </p>
         </div>
         <div className="hero-badges">
           <span>{activeSkill?.label ?? "模型自动判断"}</span>
-          <span>Planner</span>
-          <span>Coder</span>
-          <span>Critic</span>
-          <span>manim-web</span>
+          <span>Backend Render</span>
+          <span>Video Preview</span>
         </div>
       </section>
 
       <div className="workspace-grid">
         <ControlPanel
           prompt={prompt}
+          sourceCode={sourceCode}
+          sourceCodeLanguage={sourceCodeLanguage}
           routerProvider={routerProvider}
           generationProvider={generationProvider}
           sandboxMode={sandboxMode}
@@ -414,6 +348,8 @@ export default function App() {
           routerProviderSupportsVision={routerProviderSupportsVision}
           generationProviderSupportsVision={generationProviderSupportsVision}
           onPromptChange={setPrompt}
+          onSourceCodeChange={setSourceCode}
+          onSourceCodeLanguageChange={setSourceCodeLanguage}
           onRouterProviderChange={setRouterProvider}
           onGenerationProviderChange={setGenerationProvider}
           onSandboxModeChange={setSandboxMode}
@@ -424,38 +360,59 @@ export default function App() {
         <section className="panel panel-preview">
           <div className="panel-header">
             <span className="panel-kicker">Preview</span>
-            <h3>前端即时渲染</h3>
-            <p>
-              当前预览由 manim-web 正式渲染层驱动，three.js 承载运行时。题图可选，系统会结合 Provider 能力自动决定是否发送到模型。
-            </p>
+            <h3>视频预览</h3>
+            <p>主页优先播放后端生成的 MP4 预览视频。</p>
           </div>
-          <Suspense fallback={<div className="preview-empty">加载 manim-web 渲染器...</div>}>
-            <PreviewCanvas
-              cir={deferredResult?.cir ?? null}
-              sceneKey={deferredResult?.request_id ?? "empty-preview"}
-              skillLabel={activeSkill?.label ?? "自动路由"}
-              sourceImageName={sourceImageName}
-            />
-          </Suspense>
+          {previewVideoUrl ? (
+            <div className="preview-video-shell">
+              <video
+                key={previewVideoUrl}
+                className="preview-video"
+                src={previewVideoUrl}
+                controls
+                playsInline
+                autoPlay
+                muted
+                loop
+              />
+            </div>
+          ) : (
+            <div className="preview-empty">
+              <strong>{loading ? "后端渲染中" : "等待生成结果"}</strong>
+              <span>
+                {loading
+                  ? "正在生成预览视频，首次渲染会比前端实时预览稍慢。"
+                  : "提交题目后，这里会显示后端渲染好的 MP4 视频。"}
+              </span>
+            </div>
+          )}
         </section>
       </div>
 
       <div className="workspace-grid workspace-grid-bottom">
         <section className="panel panel-diagnostics">
           <div className="panel-header">
-            <span className="panel-kicker">Diagnostics</span>
-            <h3>智能体诊断</h3>
+            <span className="panel-kicker">Status</span>
+            <h3>本次结果</h3>
           </div>
           {error ? <p className="error-text">{error}</p> : null}
           {result ? (
             <p className="panel-note">
-              当前任务自动路由到 <strong>{result.runtime.skill.label}</strong>，路由模型为{" "}
-              <strong>{result.runtime.router_provider.label}</strong>，规划/编码模型为{" "}
-              <strong>{result.runtime.generation_provider.label}</strong>。
+              当前任务自动路由到 <strong>{result.runtime.skill.label}</strong>，并已生成可播放的视频预览。
+            </p>
+          ) : null}
+          {hasRawProviderOutput ? (
+            <p className="panel-note">
+              已捕获 LLM 原始返回，展开下方“高级调试与脚本信息”可查看完整内容。
             </p>
           ) : null}
           {result ? (
             <div className="runtime-summary">
+              <div>
+                <span>标题</span>
+                <strong>{result.cir.title}</strong>
+                <small>{result.cir.domain}</small>
+              </div>
               <div>
                 <span>Skill</span>
                 <strong>{result.runtime.skill.domain}</strong>
@@ -472,137 +429,173 @@ export default function App() {
                 <small>{result.runtime.generation_provider.model}</small>
               </div>
               <div>
-                <span>Sandbox</span>
-                <strong>{result.runtime.sandbox.status}</strong>
-                <small>{result.runtime.sandbox.engine}</small>
+                <span>视频预览</span>
+                <strong>{result.preview_video_url ? "ready" : "fallback"}</strong>
+                <small>{result.preview_video_url ?? "未生成视频 URL"}</small>
               </div>
             </div>
-          ) : null}
-          {result ? (
-            <div className="validation-summary">
-              <div>
-                <span>Validation</span>
-                <strong>{result.runtime.validation.status}</strong>
-              </div>
-              <div>
-                <span>Repair Count</span>
-                <strong>{result.runtime.repair_count}</strong>
-              </div>
-              <div>
-                <span>Issues</span>
-                <strong>{result.runtime.validation.issues.length}</strong>
-              </div>
-            </div>
-          ) : null}
-          {result ? (
-            <ul className="trace-list">
-              {result.runtime.agent_traces.map((trace) => (
-                <li key={`${trace.agent}-${trace.summary}`}>
-                  <strong>{trace.agent}</strong>
-                  <span>{trace.summary}</span>
-                </li>
-              ))}
-            </ul>
           ) : null}
           <ul className="diagnostic-list">
-            {(result?.diagnostics ?? []).map((diagnostic, index) => (
+            {(result?.diagnostics ?? []).slice(0, 4).map((diagnostic, index) => (
               <li key={`${diagnostic.agent}-${index}`}>
                 <strong>{diagnostic.agent}</strong>
                 <span>{diagnostic.message}</span>
               </li>
             ))}
             {!result && !error ? (
-              <li className="empty-state">提交题目后展示 Router / Planner / Critic / Sandbox 的诊断结果。</li>
+              <li className="empty-state">提交题目后，这里会显示简短结果概览。</li>
             ) : null}
           </ul>
         </section>
 
-        <section className="panel panel-code">
-          <div className="panel-header">
-            <span className="panel-kicker">Renderer Draft</span>
-            <h3>脚本草案</h3>
-          </div>
-          <div className="panel-toolbar">
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={handleExportCurrent}
-              disabled={!result}
-            >
-              导出当前任务 JSON
-            </button>
-          </div>
-          <pre>{result?.renderer_script ?? "// 生成后显示渲染时间线草案"}</pre>
-        </section>
-      </div>
-
-      <div className="workspace-grid workspace-grid-bottom">
         <HistoryPanel runs={runs} selectedRunId={selectedRunId} onSelectRun={handleSelectRun} />
-        <section className="panel panel-history-detail">
-          <div className="panel-header">
-            <span className="panel-kicker">Repair Loop</span>
-            <h3>验证与修复详情</h3>
-            <p>这里汇总 CIR 校验结果、自动修复动作与后续接入 RLEF 的承接位。</p>
-          </div>
-          {historyError ? <p className="error-text">{historyError}</p> : null}
-          {result ? (
-            <ul className="diagnostic-list">
-              {result.runtime.validation.issues.map((issue, index) => (
-                <li key={`${issue.code}-${index}`}>
-                  <strong>{issue.severity}</strong>
-                  <span>{issue.message}</span>
-                </li>
-              ))}
-              {result.runtime.repair_actions.map((action, index) => (
-                <li key={`repair-${index}`}>
-                  <strong>repair</strong>
-                  <span>{action}</span>
-                </li>
-              ))}
-              {result.runtime.validation.issues.length === 0 &&
-              result.runtime.repair_actions.length === 0 ? (
-                <li className="empty-state">当前任务未触发额外修复动作。</li>
-              ) : null}
-            </ul>
-          ) : (
-            <div className="history-empty">选择历史任务或先生成新任务后，这里会展示验证与修复细节。</div>
-          )}
-        </section>
       </div>
 
-      <div className="workspace-grid workspace-grid-bottom">
-        <ProviderManager
-          providers={runtimeCatalog.providers}
-          onCreateProvider={handleCreateProvider}
-          onDeleteProvider={handleDeleteProvider}
-        />
-        <section className="panel panel-history-detail">
-          <div className="panel-header">
-            <span className="panel-kicker">Skill Routing</span>
-            <h3>当前自动路由状态</h3>
-            <p>系统会先由模型判断题目所属学科，再把对应领域约束注入 Planner、Coder 和 Critic。</p>
-          </div>
-          <div className="skill-card">
-            <strong>{activeSkill?.label ?? "等待模型判断"}</strong>
-            <p>{activeSkill?.description ?? "提交题目后，这里会显示模型推断出的 skill。"} </p>
-            <div className="history-item-meta">
-              <span>{activeSkill?.id ?? "auto-routing"}</span>
-              <span>{activeSkill?.domain ?? "unknown"}</span>
-              <span>{activeSkill?.supports_image_input ? "image-aware" : "text-first"}</span>
+      <details className="panel panel-advanced workspace-grid-bottom">
+        <summary className="advanced-summary">高级调试信息</summary>
+        <div className="advanced-grid">
+          <section className="panel panel-history-detail panel-nested">
+            <div className="panel-header">
+              <span className="panel-kicker">Diagnostics</span>
+              <h3>完整诊断</h3>
             </div>
-          </div>
-          <ul className="diagnostic-list">
-            {runtimeCatalog.skills.map((skill) => (
-              <li key={skill.id}>
-                <strong>{skill.label}</strong>
-                <span>
-                  {skill.domain} / {skill.version} / {skill.supports_image_input ? "image" : "text"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      </div>
+            {result ? (
+              <ul className="trace-list">
+                {result.runtime.agent_traces.map((trace) => (
+                  <li key={`${trace.agent}-${trace.summary}`}>
+                    <strong>{trace.agent}</strong>
+                    <span>{trace.summary}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <ul className="diagnostic-list">
+              {(result?.diagnostics ?? []).map((diagnostic, index) => (
+                <li key={`${diagnostic.agent}-${index}`}>
+                  <strong>{diagnostic.agent}</strong>
+                  <span>{diagnostic.message}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="panel-toolbar">
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={handleExportCurrent}
+                disabled={!result}
+              >
+                导出当前任务 JSON
+              </button>
+            </div>
+          </section>
+
+          <section className="panel panel-code panel-nested">
+            <div className="panel-header">
+              <span className="panel-kicker">LLM Raw Output</span>
+              <h3>模型原始返回</h3>
+              <p>展示每个 agent 阶段从远程 provider 收到的原始内容。</p>
+            </div>
+            {hasRawProviderOutput ? (
+              <div className="raw-output-list">
+                {result?.runtime.agent_traces
+                  .filter((trace) => Boolean(trace.raw_output))
+                  .map((trace) => (
+                    <article className="raw-output-card" key={`${trace.agent}-${trace.model}`}>
+                      <div className="raw-output-head">
+                        <strong>{trace.agent}</strong>
+                        <span>
+                          {trace.provider} / {trace.model}
+                        </span>
+                      </div>
+                      <p>{trace.summary}</p>
+                      <pre>{trace.raw_output}</pre>
+                    </article>
+                  ))}
+              </div>
+            ) : (
+              <div className="preview-empty raw-output-empty">
+                <strong>暂无原始返回</strong>
+                <span>当前结果来自本地模板或 mock provider，未记录远程 LLM 原始内容。</span>
+              </div>
+            )}
+          </section>
+
+          <section className="panel panel-history-detail panel-nested">
+            <div className="panel-header">
+              <span className="panel-kicker">Repair Loop</span>
+              <h3>验证与修复详情</h3>
+            </div>
+            {historyError ? <p className="error-text">{historyError}</p> : null}
+            {result ? (
+              <ul className="diagnostic-list">
+                {result.runtime.validation.issues.map((issue, index) => (
+                  <li key={`${issue.code}-${index}`}>
+                    <strong>{issue.severity}</strong>
+                    <span>{issue.message}</span>
+                  </li>
+                ))}
+                {result.runtime.repair_actions.map((action, index) => (
+                  <li key={`repair-${index}`}>
+                    <strong>repair</strong>
+                    <span>{action}</span>
+                  </li>
+                ))}
+                {result.runtime.validation.issues.length === 0 &&
+                result.runtime.repair_actions.length === 0 ? (
+                  <li className="empty-state">当前任务未触发额外修复动作。</li>
+                ) : null}
+              </ul>
+            ) : (
+              <div className="history-empty">生成任务后，这里会展示验证与修复细节。</div>
+            )}
+          </section>
+        </div>
+      </details>
+
+      <details className="panel panel-advanced workspace-grid-bottom">
+        <summary className="advanced-summary">代码转换测试</summary>
+        <div className="advanced-grid advanced-grid-single">
+          <CodeAdapterPanel />
+        </div>
+      </details>
+
+      <details className="panel panel-advanced workspace-grid-bottom">
+        <summary className="advanced-summary">Provider 管理</summary>
+        <div className="advanced-grid">
+          <ProviderManager
+            providers={runtimeCatalog.providers}
+            onCreateProvider={handleCreateProvider}
+            onDeleteProvider={handleDeleteProvider}
+          />
+
+          <section className="panel panel-history-detail panel-nested">
+            <div className="panel-header">
+              <span className="panel-kicker">Skill Routing</span>
+              <h3>当前路由状态</h3>
+              <p>保留为调试视图，主界面不再默认展开。</p>
+            </div>
+            <div className="skill-card">
+              <strong>{activeSkill?.label ?? "等待模型判断"}</strong>
+              <p>{activeSkill?.description ?? "提交题目后，这里会显示当前 skill。"} </p>
+              <div className="history-item-meta">
+                <span>{activeSkill?.id ?? "auto-routing"}</span>
+                <span>{activeSkill?.domain ?? "unknown"}</span>
+                <span>{activeSkill?.supports_image_input ? "image-aware" : "text-first"}</span>
+              </div>
+            </div>
+            <ul className="diagnostic-list">
+              {runtimeCatalog.skills.map((skill) => (
+                <li key={skill.id}>
+                  <strong>{skill.label}</strong>
+                  <span>
+                    {skill.domain} / {skill.version} / {skill.supports_image_input ? "image" : "text"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+      </details>
     </main>
   );
 }

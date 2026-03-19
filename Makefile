@@ -1,9 +1,13 @@
-.PHONY: bootstrap setup-hooks dev-web dev-api lint test build check docker-build docker-up
+.PHONY: bootstrap bootstrap-manim setup-hooks dev-web dev-api lint test build check docker-build docker-up
 
 bootstrap:
 	npm install
 	python3 -m venv .venv
 	.venv/bin/pip install -r apps/api/requirements-dev.txt
+
+bootstrap-manim:
+	python3 -m venv .venv-manim
+	.venv-manim/bin/pip install -r apps/api/requirements-manim.txt
 
 setup-hooks:
 	git config core.hooksPath .githooks

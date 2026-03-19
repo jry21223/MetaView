@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass
 
@@ -14,8 +13,10 @@ from app.schemas import (
     VisualKind,
     VisualToken,
 )
+from app.services.manim_script import build_manim_script_from_cir
 from app.services.providers.base import CodingHints, CritiqueHints, PlanningHints
 from app.services.skill_catalog import SubjectSkill
+from app.services.source_code_module import inspect_source_code
 
 
 def _normalize_title(prompt: str) -> str:
@@ -89,6 +90,18 @@ def _math_tokens(prompt: str) -> list[str]:
     return ["object", "rule", "transform", "conclusion"]
 
 
+def _code_tokens(request: PipelineRequest) -> list[str]:
+    if request.source_code:
+        insights = inspect_source_code(
+            request.source_code,
+            request.source_code_language,
+        )
+        structures = insights.structures[0] if insights.structures else "state"
+        operations = insights.operations[0] if insights.operations else "update"
+        return [insights.algorithm_name, structures, operations, "result"]
+    return ["function", "structure", "update", "result"]
+
+
 def _physics_tokens(prompt: str) -> list[str]:
     prompt_lower = prompt.lower()
     if "电路" in prompt or "circuit" in prompt_lower:
@@ -132,6 +145,8 @@ def _geography_tokens(prompt: str) -> list[str]:
 
 
 def _tokens_for_domain(prompt: str, domain: TopicDomain) -> list[str]:
+    if domain == TopicDomain.CODE:
+        return ["function", "structure", "update", "result"]
     if domain == TopicDomain.ALGORITHM:
         return _algorithm_tokens(prompt)
     if domain == TopicDomain.PHYSICS:
@@ -147,6 +162,8 @@ def _tokens_for_domain(prompt: str, domain: TopicDomain) -> list[str]:
 
 def _primary_visual_kind(prompt: str, domain: TopicDomain, skill: SubjectSkill) -> VisualKind:
     prompt_lower = prompt.lower()
+    if domain == TopicDomain.CODE:
+        return VisualKind.ARRAY
     if domain == TopicDomain.ALGORITHM:
         if "图" in prompt or "graph" in prompt_lower or "树" in prompt or "tree" in prompt_lower:
             return VisualKind.GRAPH
@@ -179,9 +196,26 @@ class PlannerAgent:
         skill: SubjectSkill,
         hints: PlanningHints | None = None,
     ) -> CirDocument:
-        tokens = _tokens_for_domain(request.prompt, request.domain)
-        primary_visual = _primary_visual_kind(request.prompt, request.domain, skill)
-        title = _normalize_title(request.prompt)
+        code_insights = (
+            inspect_source_code(request.source_code, request.source_code_language)
+            if request.domain == TopicDomain.CODE and request.source_code
+            else None
+        )
+        tokens = (
+            _code_tokens(request)
+            if request.domain == TopicDomain.CODE
+            else _tokens_for_domain(request.prompt, request.domain)
+        )
+        primary_visual = (
+            code_insights.primary_visual_kind
+            if code_insights is not None
+            else _primary_visual_kind(request.prompt, request.domain, skill)
+        )
+        title = (
+            _normalize_title(f"{code_insights.algorithm_name} source walkthrough")
+            if code_insights is not None
+            else _normalize_title(request.prompt)
+        )
 
         if request.domain == TopicDomain.ALGORITHM:
             steps = self._algorithm_steps(tokens, primary_visual)
@@ -189,6 +223,13 @@ class PlannerAgent:
         elif request.domain == TopicDomain.MATH:
             steps = self._math_steps(tokens)
             summary = "数学题会被拆成对象定义、推导形变与结论落点三个镜头。"
+        elif request.domain == TopicDomain.CODE:
+            steps = self._code_steps(tokens, primary_visual, code_insights)
+            summary = (
+                code_insights.summary
+                if code_insights is not None
+                else "源码模块会围绕代码结构、状态推进和结果收束规划镜头。"
+            )
         elif request.domain == TopicDomain.PHYSICS:
             steps = self._physics_steps(
                 tokens,
@@ -228,6 +269,60 @@ class PlannerAgent:
             summary=summary,
             steps=steps,
         )
+
+    def _code_steps(
+        self,
+        tokens: list[str],
+        primary_visual: VisualKind,
+        code_insights,
+    ) -> list[CirStep]:
+        language = code_insights.language if code_insights is not None else "unknown"
+        algorithm_name = code_insights.algorithm_name if code_insights is not None else tokens[0]
+        operations = (
+            ", ".join(code_insights.operations[:3])
+            if code_insights is not None and code_insights.operations
+            else tokens[2]
+        )
+        structures = (
+            ", ".join(code_insights.structures[:3])
+            if code_insights is not None and code_insights.structures
+            else tokens[1]
+        )
+        return [
+            _build_step(
+                index=1,
+                title="源码结构",
+                narration="先定位函数入口、输入结构和关键变量，明确这段源码在解决什么问题。",
+                visual_kind=VisualKind.TEXT,
+                items=[
+                    ("语言", language, "secondary"),
+                    ("算法", algorithm_name, "primary"),
+                ],
+                annotations=["第一屏要把函数职责、输入输出和核心变量讲清楚。"],
+            ),
+            _build_step(
+                index=2,
+                title="控制流推进",
+                narration="按源码里的循环、分支或递归顺序推进动画，并同步展示状态更新。",
+                visual_kind=primary_visual,
+                items=[
+                    ("结构", structures, "primary"),
+                    ("操作", operations, "accent"),
+                ],
+                annotations=["镜头要与源码块对齐，突出索引、指针或容器状态的变化。"],
+            ),
+            _build_step(
+                index=3,
+                title="结果与复杂度",
+                narration="最后收束返回值、终止条件，以及时间空间复杂度的来源。",
+                visual_kind=VisualKind.TEXT,
+                items=[
+                    ("输出", tokens[3], "primary"),
+                    ("复杂度", "time/space", "secondary"),
+                ],
+                annotations=["结尾要解释为什么代码在此处返回，以及复杂度如何产生。"],
+            ),
+        ]
 
     def _algorithm_steps(self, tokens: list[str], primary_visual: VisualKind) -> list[CirStep]:
         return [
@@ -493,74 +588,11 @@ class CoderAgent:
     name: str = "coder"
 
     def run(self, cir: CirDocument, hints: CodingHints | None = None) -> str:
-        import_line = (
-            'import { Scene, Text, MathTex, Rectangle, Circle, Line, Arrow, VGroup, '
-            'FadeIn, FadeOut, Write, Create, DOWN } from "manim-web";'
-        )
-        lines = [
-            f"// renderer-target: {hints.target}" if hints else "// renderer-target: manim-web-ts",
-            import_line,
-            "",
-            "export const previewTimeline = [",
-        ]
-
-        for step in cir.steps:
-            serialized_tokens = ", ".join(
-                f'"{token.label}:{token.value or token.label}"' for token in step.tokens
-            )
-            lines.append("  {")
-            lines.append(f'    id: "{step.id}",')
-            lines.append(f'    title: "{step.title}",')
-            lines.append(f'    visualKind: "{step.visual_kind.value}",')
-            lines.append(f"    tokens: [{serialized_tokens}],")
-            lines.append("  },")
-
-        lines.append("];")
-        lines.append("")
-        lines.append("export async function construct(scene: Scene) {")
-        lines.append(
-            "  const title = new Text("
-            f"{{ text: {json.dumps(cir.title)}, fontSize: 40, color: \"#f8fafc\" }}"
-            ").toEdge(DOWN, 6.8);"
-        )
-        lines.append("  scene.add(title);")
-        lines.append("  await scene.play(new FadeIn(title));")
-        lines.append("")
-        lines.append("  for (const step of previewTimeline) {")
-        lines.append(
-            "    const card = new Rectangle("
-            "{ width: 10.5, height: 4.2, color: \"#93c5fd\", fillOpacity: 0.08 }"
-            ").moveTo([0, 0.2, 0]);"
-        )
-        lines.append(
-            "    const heading = new Text("
-            "{ text: step.title, fontSize: 28, color: \"#e2e8f0\" }"
-            ").moveTo([0, 1.5, 0]);"
-        )
-        lines.append("    const body = step.visualKind === \"formula\"")
-        lines.append(
-            "      ? new MathTex({"
-            " latex: step.tokens.map((token) => token.split(\":\")[1]).join(\"\\\\quad\"),"
-            " fontSize: 34, color: \"#f8fafc\" }).moveTo([0, 0.4, 0])"
-        )
-        lines.append(
-            "      : new Text({ text: step.tokens.join(\"   \"),"
-            " fontSize: 22, color: \"#cbd5e1\" }).moveTo([0, 0.4, 0]);"
-        )
-        lines.append("    scene.add(card, heading, body);")
-        lines.append(
-            "    await scene.play(new Create(card), new Write(heading), new FadeIn(body));"
-        )
-        lines.append("    await scene.wait(0.4);")
-        lines.append(
-            "    await scene.play(new FadeOut(card), new FadeOut(heading), new FadeOut(body));"
-        )
-        lines.append("  }")
-        lines.append("}")
+        script = build_manim_script_from_cir(cir)
         if hints and hints.style_notes:
-            lines.append("")
-            lines.append(f"// style-notes: {' | '.join(hints.style_notes)}")
-        return "\n".join(lines)
+            style_notes = " | ".join(hints.style_notes)
+            script = f"{script.rstrip()}\n\n# style-notes: {style_notes}\n"
+        return script
 
 
 @dataclass
@@ -571,7 +603,7 @@ class CriticAgent:
         diagnostics: list[AgentDiagnostic] = [
             AgentDiagnostic(
                 agent=self.name,
-                message="已检查 CIR 连贯性，当前版本适合作为 Web 预览输入。",
+                message="已检查 CIR 连贯性，当前版本适合作为 Python Manim 视频预览输入。",
             )
         ]
 

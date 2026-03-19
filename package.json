@@ -1,5 +1,5 @@
 {
-  "name": "algo-visual-platform",
+  "name": "metaview",
   "private": true,
   "workspaces": [
     "apps/web"

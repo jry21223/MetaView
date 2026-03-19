@@ -30,19 +30,13 @@ def test_sandbox_passes_valid_script() -> None:
     sandbox = PreviewDryRunSandbox(timeout_ms=500)
     report = sandbox.run(
         script="""
-import { Scene } from "manim-web";
-// renderer-target: manim-web-ts
-export const previewTimeline = [
-  {
-    id: "step-1",
-    title: "问题拆解",
-    visualKind: "array",
-    tokens: ["输入:left"],
-  },
-];
-export async function construct(scene: Scene) {
-  scene.add();
-}
+from manim import *
+
+class Demo(Scene):
+    def construct(self):
+        text = Text("二分查找")
+        self.play(Write(text))
+        self.wait(0.5)
         """.strip(),
         cir=build_cir(),
         mode=SandboxMode.DRY_RUN,
@@ -55,7 +49,7 @@ export async function construct(scene: Scene) {
 def test_sandbox_fails_invalid_script() -> None:
     sandbox = PreviewDryRunSandbox(timeout_ms=500)
     report = sandbox.run(
-        script='const broken = "missing export";',
+        script='print("missing manim scene")',
         cir=build_cir(),
         mode=SandboxMode.DRY_RUN,
     )

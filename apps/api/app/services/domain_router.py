@@ -1,10 +1,18 @@
 from __future__ import annotations
 
 from app.schemas import TopicDomain
+from app.services.source_code_module import should_route_to_code
 
 
-def infer_domain(prompt: str, source_image: str | None = None) -> TopicDomain:
+def infer_domain(
+    prompt: str,
+    source_image: str | None = None,
+    source_code: str | None = None,
+) -> TopicDomain:
     prompt_lower = prompt.lower()
+
+    if should_route_to_code(prompt, source_code):
+        return TopicDomain.CODE
 
     if source_image:
         physics_score = _keyword_score(
@@ -35,6 +43,19 @@ def infer_domain(prompt: str, source_image: str | None = None) -> TopicDomain:
             return TopicDomain.PHYSICS
 
     scores: dict[TopicDomain, int] = {
+        TopicDomain.CODE: _keyword_score(
+            prompt_lower,
+            [
+                "源码",
+                "代码",
+                "cpp",
+                "c++",
+                "python",
+                "source code",
+                "class solution",
+                "#include",
+            ],
+        ),
         TopicDomain.ALGORITHM: _keyword_score(
             prompt_lower,
             [

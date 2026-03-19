@@ -79,6 +79,12 @@ select {
   font-size: clamp(2rem, 5vw, 3.6rem);
 }
 
+.hero-copy {
+  margin: 0;
+  max-width: 760px;
+  color: var(--text-muted);
+}
+
 .hero-badges {
   display: flex;
   flex-wrap: wrap;
@@ -193,6 +199,13 @@ select {
   cursor: pointer;
 }
 
+.ghost-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
 .form-actions button:disabled {
   cursor: not-allowed;
   opacity: 0.65;
@@ -232,6 +245,26 @@ select {
 .preview-shell {
   position: relative;
   min-height: 560px;
+}
+
+.preview-video-shell {
+  min-height: 560px;
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: #020617;
+}
+
+.preview-video {
+  display: block;
+  width: 100%;
+  min-height: 560px;
+  background: #020617;
+}
+
+.preview-video-shell-compact,
+.preview-video-shell-compact .preview-video {
+  min-height: 320px;
 }
 
 .preview-empty {
@@ -321,6 +354,9 @@ select {
 
 .panel-toolbar {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
   justify-content: flex-end;
   margin-top: 16px;
 }
@@ -441,6 +477,57 @@ select {
   font-size: 13px;
 }
 
+.raw-output-list {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.raw-output-card {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.raw-output-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.raw-output-head strong,
+.raw-output-head span {
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.raw-output-head span,
+.raw-output-card p {
+  color: var(--text-muted);
+}
+
+.raw-output-card p {
+  margin: 0;
+}
+
+.raw-output-card pre {
+  min-height: 0;
+  max-height: 340px;
+  margin: 0;
+}
+
+.raw-output-empty {
+  min-height: 240px;
+}
+
+.advanced-grid-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .skill-card {
   display: grid;
   gap: 10px;
@@ -454,6 +541,41 @@ select {
 .skill-card p {
   margin: 0;
   color: var(--text-muted);
+}
+
+.panel-advanced {
+  padding-top: 14px;
+}
+
+.advanced-summary {
+  cursor: pointer;
+  font-weight: 700;
+  list-style: none;
+}
+
+.advanced-summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 18px;
+}
+
+.panel-nested {
+  min-width: 0;
+}
+
+.compact-runtime-summary {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.code-adapter-result {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
 }
 
 @media (max-width: 1080px) {
@@ -481,16 +603,20 @@ select {
   }
 
   .select-grid,
+  .converter-status-grid,
+  .advanced-grid,
   .runtime-summary,
   .validation-summary {
     grid-template-columns: 1fr;
   }
 
-  .preview-canvas {
+  .preview-canvas,
+  .preview-video {
     min-height: 420px;
   }
 
   .preview-shell,
+  .preview-video-shell,
   .preview-empty {
     min-height: 420px;
   }

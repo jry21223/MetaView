@@ -1,0 +1,4 @@
+interface:
+  display_name: "学科化 Manim 提示词"
+  short_description: "Subject-specific prompt bundles for precise Manim generation"
+  default_prompt: "Use $generate-subject-manim-prompts to draft subject-specific concept, code, and repair prompts for a Python Manim lesson animation."

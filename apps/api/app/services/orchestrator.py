@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from app.config import Settings
 from app.schemas import (
     AgentDiagnostic,
@@ -17,6 +19,11 @@ from app.schemas import (
 from app.services.agents import CoderAgent, CriticAgent, PlannerAgent
 from app.services.domain_router import infer_domain
 from app.services.history import CustomProviderRepository, RunRepository
+from app.services.manim_script import ManimScriptError, prepare_manim_script
+from app.services.preview_video_renderer import (
+    PreviewVideoRenderer,
+    PreviewVideoRenderError,
+)
 from app.services.providers.registry import ProviderRegistry
 from app.services.repair import PipelineRepairService
 from app.services.sandbox import PreviewDryRunSandbox
@@ -35,6 +42,11 @@ class PipelineOrchestrator:
             openai_api_key=settings.openai_api_key,
             openai_base_url=settings.openai_base_url,
             openai_model=settings.openai_model,
+            openai_router_model=settings.openai_router_model,
+            openai_planning_model=settings.openai_planning_model,
+            openai_coding_model=settings.openai_coding_model,
+            openai_critic_model=settings.openai_critic_model,
+            openai_test_model=settings.openai_test_model,
             openai_supports_vision=settings.openai_supports_vision,
             openai_timeout_s=settings.openai_timeout_s,
         )
@@ -48,10 +60,24 @@ class PipelineOrchestrator:
         self.validator = CirValidator()
         self.repair_service = PipelineRepairService()
         self.max_repair_attempts = settings.max_repair_attempts
-        self.skill_registry = SubjectSkillRegistry()
+        self.skill_registry = SubjectSkillRegistry(
+            enabled_domains=settings.enabled_topic_domains
+        )
         self.planner = PlannerAgent()
         self.coder = CoderAgent()
         self.critic = CriticAgent()
+        self.preview_video_renderer = PreviewVideoRenderer(
+            output_root=settings.preview_media_root,
+            url_prefix=settings.preview_media_url_prefix,
+            enabled=settings.preview_video_enabled,
+            backend_mode=settings.preview_render_backend,
+            manim_python_path=settings.manim_python_path,
+            manim_cli_module=settings.manim_cli_module,
+            manim_quality=settings.manim_quality,
+            manim_format=settings.manim_format,
+            manim_disable_caching=settings.manim_disable_caching,
+            manim_render_timeout_s=settings.manim_render_timeout_s,
+        )
 
     def runtime_catalog(self) -> RuntimeCatalog:
         return RuntimeCatalog(
@@ -76,6 +102,7 @@ class PipelineOrchestrator:
                 effective_domain, route_trace = router_provider.route(
                     request.prompt,
                     source_image=request.source_image,
+                    source_code=request.source_code,
                 )
             except Exception:
                 effective_domain = infer_domain(request.prompt, request.source_image)
@@ -95,13 +122,21 @@ class PipelineOrchestrator:
         )
         repair_actions: list[str] = []
         repair_count = 0
+        request_id = str(uuid4())
+        agent_traces: list[AgentTrace] = [route_trace]
+        preview_video_url: str | None = None
+        preview_video_backend: str | None = None
+        render_error_message: str | None = None
 
         planning_hints, planning_trace = generation_provider.plan(
             prompt=effective_request.prompt,
             domain=effective_domain.value,
             skill_brief=skill.planning_brief(has_image=bool(request.source_image)),
             source_image=request.source_image,
+            source_code=request.source_code,
+            source_code_language=request.source_code_language,
         )
+        agent_traces.append(planning_trace)
         cir = self.planner.run(effective_request, skill=skill, hints=planning_hints)
         validation_report = self.validator.validate(cir)
 
@@ -114,17 +149,92 @@ class PipelineOrchestrator:
             repair_count += 1
             validation_report = self.validator.validate(cir)
 
-        coding_hints, coding_trace = generation_provider.code(
-            title=cir.title, step_count=len(cir.steps)
-        )
-        renderer_script = self.coder.run(cir, hints=coding_hints)
+        coding_hints, coding_trace = generation_provider.code(cir)
+        agent_traces.append(coding_trace)
+        if coding_hints.renderer_script:
+            prepared_script, prepare_error = self._prepare_provider_script(
+                coding_hints.renderer_script
+            )
+            if prepared_script is not None:
+                renderer_script = prepared_script.code
+                detail = (
+                    f"；{prepared_script.diagnostics[0]}"
+                    if prepared_script.diagnostics
+                    else ""
+                )
+                renderer_diagnostic_message = (
+                    f"{generation_provider.descriptor.label} 已返回 Python Manim 脚本，"
+                    f"并完成脚本化清洗与补全{detail}"
+                )
+            else:
+                renderer_script = coding_hints.renderer_script
+                renderer_diagnostic_message = (
+                    "generation provider 返回的脚本未通过脚本化适配，"
+                    f"准备按错误反馈继续修复：{prepare_error}"
+                )
+                if repair_count < self.max_repair_attempts:
+                    repaired_script, repair_message = self._attempt_remote_script_repair(
+                        generation_provider=generation_provider,
+                        cir=cir,
+                        renderer_script=renderer_script,
+                        issues=[f"脚本化适配失败：{prepare_error}"],
+                        agent_traces=agent_traces,
+                        repair_actions=repair_actions,
+                        stage_label="script-prepare",
+                    )
+                    repair_count += 1
+                    if repaired_script is not None:
+                        renderer_script = repaired_script
+                        renderer_diagnostic_message = repair_message
+                    else:
+                        renderer_script = self.coder.run(cir, hints=coding_hints)
+                        renderer_diagnostic_message = (
+                            "generation provider 返回的脚本未通过脚本化适配，"
+                            f"且远程修复失败，已回退到本地 Python Manim 模板：{prepare_error}"
+                        )
+                else:
+                    renderer_script = self.coder.run(cir, hints=coding_hints)
+                    renderer_diagnostic_message = (
+                        "generation provider 返回的脚本未通过脚本化适配，"
+                        f"已回退到本地 Python Manim 模板：{prepare_error}"
+                    )
+        else:
+            renderer_script = self.coder.run(cir, hints=coding_hints)
+            renderer_diagnostic_message = (
+                "generation provider 未直接返回脚本；"
+                "当前系统直接使用本地 Python Manim 模板和后端视频预览。"
+            )
 
-        critique_hints, critique_trace = generation_provider.critique(
-            title=cir.title, renderer_script=renderer_script
+        critique_hints, critique_trace, diagnostics = self._run_provider_critique(
+            generation_provider=generation_provider,
+            cir=cir,
+            renderer_script=renderer_script,
         )
-        diagnostics = self.critic.run(cir, hints=critique_hints)
-        diagnostics.extend(self._validation_diagnostics(validation_report))
-
+        agent_traces.append(critique_trace)
+        blocking_issues = self.repair_service.collect_blocking_script_issues(
+            renderer_script=renderer_script,
+            critique_hints=critique_hints,
+        )
+        if blocking_issues and repair_count < self.max_repair_attempts:
+            repaired_script, repair_message = self._attempt_remote_script_repair(
+                generation_provider=generation_provider,
+                cir=cir,
+                renderer_script=renderer_script,
+                issues=blocking_issues,
+                agent_traces=agent_traces,
+                repair_actions=repair_actions,
+                stage_label="critic-review",
+            )
+            repair_count += 1
+            if repaired_script is not None:
+                renderer_script = repaired_script
+                renderer_diagnostic_message = repair_message
+                critique_hints, critique_trace, diagnostics = self._run_provider_critique(
+                    generation_provider=generation_provider,
+                    cir=cir,
+                    renderer_script=renderer_script,
+                )
+                agent_traces.append(critique_trace)
         sandbox_report = self.sandbox.run(
             script=renderer_script, cir=cir, mode=request.sandbox_mode
         )
@@ -135,18 +245,95 @@ class PipelineOrchestrator:
             and request.sandbox_mode != SandboxMode.OFF
         ):
             repair_actions.extend(self.repair_service.repair_script(cir, sandbox_report))
-            repair_count += 1
-            renderer_script = self.coder.run(cir, hints=coding_hints)
-            sandbox_report = self.sandbox.run(
-                script=renderer_script, cir=cir, mode=request.sandbox_mode
+            repaired_script, repair_message = self._attempt_remote_script_repair(
+                generation_provider=generation_provider,
+                cir=cir,
+                renderer_script=renderer_script,
+                issues=self.repair_service.collect_blocking_script_issues(
+                    renderer_script=renderer_script,
+                    critique_hints=critique_hints,
+                    extra_issues=sandbox_report.errors,
+                ),
+                agent_traces=agent_traces,
+                repair_actions=repair_actions,
+                stage_label="sandbox",
             )
+            repair_count += 1
+            if repaired_script is not None:
+                renderer_script = repaired_script
+                renderer_diagnostic_message = repair_message
+                critique_hints, critique_trace, diagnostics = self._run_provider_critique(
+                    generation_provider=generation_provider,
+                    cir=cir,
+                    renderer_script=renderer_script,
+                )
+                agent_traces.append(critique_trace)
+                sandbox_report = self.sandbox.run(
+                    script=renderer_script, cir=cir, mode=request.sandbox_mode
+                )
+            elif coding_hints.renderer_script:
+                renderer_script = self.coder.run(cir, hints=coding_hints)
+                renderer_diagnostic_message = (
+                    "generation provider 已返回原始脚本，但其结果未通过 dry-run；"
+                    "远程修复失败后已回退到本地 Python Manim 模板。"
+                )
+                sandbox_report = self.sandbox.run(
+                    script=renderer_script, cir=cir, mode=request.sandbox_mode
+                )
 
-        diagnostics.extend(self._sandbox_diagnostics(sandbox_report))
-        diagnostics.extend(self._repair_diagnostics(repair_actions))
+        try:
+            preview_video = self.preview_video_renderer.render(
+                script=renderer_script,
+                request_id=request_id,
+                cir=cir,
+            )
+            preview_video_url = preview_video.url
+            preview_video_backend = preview_video.backend
+        except PreviewVideoRenderError as exc:
+            render_error_message = str(exc)
+            if repair_count < self.max_repair_attempts:
+                repaired_script, repair_message = self._attempt_remote_script_repair(
+                    generation_provider=generation_provider,
+                    cir=cir,
+                    renderer_script=renderer_script,
+                    issues=self.repair_service.collect_blocking_script_issues(
+                        renderer_script=renderer_script,
+                        critique_hints=critique_hints,
+                        extra_issues=[render_error_message],
+                    ),
+                    agent_traces=agent_traces,
+                    repair_actions=repair_actions,
+                    stage_label="real-render",
+                )
+                repair_count += 1
+                if repaired_script is not None:
+                    renderer_script = repaired_script
+                    renderer_diagnostic_message = repair_message
+                    critique_hints, critique_trace, diagnostics = self._run_provider_critique(
+                        generation_provider=generation_provider,
+                        cir=cir,
+                        renderer_script=renderer_script,
+                    )
+                    agent_traces.append(critique_trace)
+                    sandbox_report = self.sandbox.run(
+                        script=renderer_script, cir=cir, mode=request.sandbox_mode
+                    )
+                    try:
+                        preview_video = self.preview_video_renderer.render(
+                            script=renderer_script,
+                            request_id=request_id,
+                            cir=cir,
+                        )
+                        preview_video_url = preview_video.url
+                        preview_video_backend = preview_video.backend
+                    except PreviewVideoRenderError as retry_exc:
+                        render_error_message = str(retry_exc)
 
         response = PipelineResponse(
+            request_id=request_id,
             cir=cir,
             renderer_script=renderer_script,
+            preview_video_url=preview_video_url,
             diagnostics=[
                 AgentDiagnostic(
                     agent="router",
@@ -157,7 +344,33 @@ class PipelineOrchestrator:
                     ),
                 )
             ]
-            + diagnostics,
+            + [AgentDiagnostic(agent="coder", message=renderer_diagnostic_message)]
+            + self._validation_diagnostics(validation_report)
+            + diagnostics
+            + self._sandbox_diagnostics(sandbox_report)
+            + self._repair_diagnostics(repair_actions)
+            + (
+                [
+                    AgentDiagnostic(
+                        agent="video",
+                        message=(
+                            f"已在后端完成 {preview_video_backend} 渲染，主页将优先播放该视频。"
+                        ),
+                    )
+                ]
+                if preview_video_url and preview_video_backend
+                else []
+            )
+            + (
+                [
+                    AgentDiagnostic(
+                        agent="video",
+                        message=f"后端视频渲染失败：{render_error_message}",
+                    )
+                ]
+                if not preview_video_url and render_error_message
+                else []
+            ),
             runtime=PipelineRuntime(
                 skill=skill.descriptor,
                 provider=generation_provider.descriptor,
@@ -165,7 +378,7 @@ class PipelineOrchestrator:
                 generation_provider=generation_provider.descriptor,
                 sandbox=sandbox_report,
                 validation=validation_report,
-                agent_traces=[route_trace, planning_trace, coding_trace, critique_trace],
+                agent_traces=agent_traces,
                 repair_count=repair_count,
                 repair_actions=repair_actions,
             ),
@@ -175,6 +388,86 @@ class PipelineOrchestrator:
             self.repository.save_run(request=effective_request, response=response)
 
         return response
+
+    def _prepare_provider_script(
+        self,
+        renderer_script: str,
+    ) -> tuple[object | None, str | None]:
+        try:
+            return prepare_manim_script(renderer_script), None
+        except ManimScriptError as exc:
+            return None, str(exc)
+
+    def _run_provider_critique(
+        self,
+        *,
+        generation_provider,
+        cir,
+        renderer_script: str,
+    ):
+        critique_hints, critique_trace = generation_provider.critique(
+            title=cir.title,
+            renderer_script=renderer_script,
+            domain=cir.domain,
+        )
+        diagnostics = self.critic.run(cir, hints=critique_hints)
+        return critique_hints, critique_trace, diagnostics
+
+    def _attempt_remote_script_repair(
+        self,
+        *,
+        generation_provider,
+        cir,
+        renderer_script: str,
+        issues: list[str],
+        agent_traces: list[AgentTrace],
+        repair_actions: list[str],
+        stage_label: str,
+    ) -> tuple[str | None, str]:
+        if not issues:
+            return None, "未收集到可用于修复的错误信息。"
+        if not hasattr(generation_provider, "repair_code"):
+            return None, "当前 provider 不支持脚本修复。"
+
+        repair_actions.append(
+            f"已将 {stage_label} 阶段发现的 {len(issues)} 条问题回传给 generation provider 修复。"
+        )
+        try:
+            repair_hints, repair_trace = generation_provider.repair_code(
+                cir=cir,
+                renderer_script=renderer_script,
+                issues=issues,
+            )
+        except Exception as exc:
+            message = f"远程修复调用失败：{exc}"
+            repair_actions.append(message)
+            return None, message
+
+        agent_traces.append(repair_trace)
+        if not repair_hints.renderer_script:
+            message = "远程修复未返回可执行脚本。"
+            repair_actions.append(message)
+            return None, message
+
+        prepared_script, prepare_error = self._prepare_provider_script(
+            repair_hints.renderer_script
+        )
+        if prepared_script is None:
+            message = f"远程修复返回的脚本仍不可执行：{prepare_error}"
+            repair_actions.append(message)
+            return None, message
+
+        detail = (
+            f"；{prepared_script.diagnostics[0]}"
+            if prepared_script.diagnostics
+            else ""
+        )
+        message = (
+            f"{generation_provider.descriptor.label} 已根据 {stage_label} 阶段的错误反馈修复脚本"
+            f"{detail}"
+        )
+        repair_actions.append(f"{stage_label} 阶段脚本修复成功。")
+        return prepared_script.code, message
 
     def list_runs(self, limit: int = 20) -> list[PipelineRunSummary]:
         return self.repository.list_runs(limit=limit)
@@ -186,6 +479,9 @@ class PipelineOrchestrator:
         self, payload: CustomProviderUpsertRequest
     ) -> ProviderDescriptor:
         return self.provider_registry.upsert_custom_provider(payload)
+
+    def test_custom_provider(self, payload: CustomProviderUpsertRequest):
+        return self.provider_registry.test_custom_provider(payload)
 
     def delete_custom_provider(self, name: str) -> bool:
         return self.provider_registry.delete_custom_provider(name)
