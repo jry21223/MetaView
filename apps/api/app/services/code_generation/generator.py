@@ -9,7 +9,12 @@ ManimCat 风格的代码生成服务
 
 from dataclasses import dataclass, field
 from typing import Optional
-from .concept_design import ConceptDesign, SceneDesign
+import sys
+from pathlib import Path
+
+# 添加父目录到路径以便导入 concept_design
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from concept_design import ConceptDesign, SceneDesign
 
 
 @dataclass
