@@ -17,14 +17,19 @@ from app.schemas import (
     ValidationStatus,
 )
 from app.services.agents import CoderAgent, CriticAgent, PlannerAgent
+from app.services.concept_design import ConceptDesigner
+from app.services.code_generation import CodeGenerator
 from app.services.domain_router import infer_domain
 from app.services.history import CustomProviderRepository, RunRepository
+from app.services.manim_executor import ManimExecutor, ExecutionConfig
 from app.services.manim_script import ManimScriptError, prepare_manim_script
 from app.services.preview_video_renderer import (
     PreviewVideoRenderer,
     PreviewVideoRenderError,
 )
+from app.services.process_registry import ProcessRegistry
 from app.services.providers.registry import ProviderRegistry
+from app.services.queue_processors import QueueProcessor, ProcessorConfig
 from app.services.repair import PipelineRepairService
 from app.services.sandbox import PreviewDryRunSandbox
 from app.services.skill_catalog import SubjectSkillRegistry
@@ -77,6 +82,29 @@ class PipelineOrchestrator:
             manim_format=settings.manim_format,
             manim_disable_caching=settings.manim_disable_caching,
             manim_render_timeout_s=settings.manim_render_timeout_s,
+        )
+        
+        # ManimCat 风格架构模块
+        self.concept_designer = ConceptDesigner()
+        self.code_generator = CodeGenerator()
+        self.manim_executor = ManimExecutor(
+            config=ExecutionConfig(
+                python_path=settings.manim_python_path,
+                quality=settings.manim_quality,
+                format=settings.manim_format,
+                disable_caching=settings.manim_disable_caching,
+                timeout_seconds=int(settings.manim_render_timeout_s or 180)
+            )
+        )
+        self.process_registry = ProcessRegistry(
+            storage_path=settings.process_storage_path
+        )
+        self.queue_processor = QueueProcessor(
+            config=ProcessorConfig(
+                max_concurrent_tasks=settings.max_concurrent_tasks,
+                max_queue_size=settings.max_queue_size,
+                task_timeout_seconds=settings.task_timeout_s
+            )
         )
 
     def runtime_catalog(self) -> RuntimeCatalog:

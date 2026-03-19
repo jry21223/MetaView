@@ -40,6 +40,17 @@ class Settings(BaseSettings):
     openai_test_model: str | None = None
     openai_supports_vision: bool = False
     openai_timeout_s: float | None = None
+    
+    # ManimCat 风格架构配置
+    concept_model: str = "gpt-5.3-codex"
+    concept_temperature: float = 0.7
+    codegen_model: str = "gpt-5.3-codex-high"
+    codegen_temperature: float = 0.3
+    max_concurrent_tasks: int = 3
+    max_queue_size: int = 100
+    task_timeout_s: int = 300
+    process_storage_path: str = "data/processes"
+    manim_quality: str = "h"  # 从 l 提升到 h
 
     @property
     def enabled_topic_domains(self) -> tuple[TopicDomain, ...]:
