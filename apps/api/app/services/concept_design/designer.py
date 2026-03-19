@@ -223,7 +223,7 @@ class ConceptDesigner:
         
         elif domain == "math":
             constraints.append("数学严谨性")
-            constraints.append "公式推导连续")
+            constraints.append("公式推导连续")
         
         return constraints
     
