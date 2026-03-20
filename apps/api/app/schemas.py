@@ -239,6 +239,7 @@ class PipelineRunSummary(BaseModel):
     router_provider: str | None = None
     generation_provider: str | None = None
     sandbox_status: SandboxStatus
+    preview_video_url: str | None = None  # 新增字段：视频预览 URL
 
     @model_validator(mode="after")
     def apply_provider_aliases(self) -> "PipelineRunSummary":

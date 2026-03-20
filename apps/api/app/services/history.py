@@ -158,7 +158,8 @@ class RunRepository:
                     provider,
                     COALESCE(router_provider, provider) AS router_provider,
                     COALESCE(generation_provider, provider) AS generation_provider,
-                    sandbox_status
+                    sandbox_status,
+                    response_payload
                 FROM pipeline_runs
                 ORDER BY created_at DESC
                 LIMIT ?
@@ -166,20 +167,31 @@ class RunRepository:
                 (limit,),
             ).fetchall()
 
-        return [
-            PipelineRunSummary(
-                request_id=row["request_id"],
-                created_at=row["created_at"],
-                prompt=row["prompt"],
-                title=row["title"],
-                domain=TopicDomain(row["domain"]),
-                provider=row["provider"],
-                router_provider=row["router_provider"],
-                generation_provider=row["generation_provider"],
-                sandbox_status=SandboxStatus(row["sandbox_status"]),
+        runs = []
+        for row in rows:
+            # 从 response_payload 中提取 preview_video_url
+            preview_video_url = None
+            try:
+                response_data = json.loads(row["response_payload"])
+                preview_video_url = response_data.get("preview_video_url")
+            except (json.JSONDecodeError, KeyError):
+                pass
+            
+            runs.append(
+                PipelineRunSummary(
+                    request_id=row["request_id"],
+                    created_at=row["created_at"],
+                    prompt=row["prompt"],
+                    title=row["title"],
+                    domain=TopicDomain(row["domain"]),
+                    provider=row["provider"],
+                    router_provider=row["router_provider"],
+                    generation_provider=row["generation_provider"],
+                    sandbox_status=SandboxStatus(row["sandbox_status"]),
+                    preview_video_url=preview_video_url,
+                )
             )
-            for row in rows
-        ]
+        return runs
 
     def get_run(self, request_id: str) -> PipelineRunDetail | None:
         with closing(self._connect()) as connection:
