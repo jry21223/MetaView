@@ -208,7 +208,7 @@ class ManimExecutor:
     def _ensure_output_dir(self):
         """确保输出目录存在"""
         Path(self.config.output_dir).mkdir(parents=True, exist_ok=True)
-        Path(self.config.output_dir) / "requests".mkdir(parents=True, exist_ok=True)
+        (Path(self.config.output_dir) / "requests").mkdir(parents=True, exist_ok=True)
     
     def test_connection(self) -> bool:
         """测试 Manim 连接"""
