@@ -2,8 +2,11 @@ import { useEffect, useState } from "react";
 
 export interface Process {
   process_id: string;
+  request_id?: string;
   prompt: string;
-  states: Array<{
+  title?: string;
+  domain?: string;
+  states?: Array<{
     stage: string;
     status: string;
     data: Record<string, any>;
@@ -13,6 +16,8 @@ export interface Process {
   error?: string;
   created_at: string;
   completed_at?: string;
+  provider?: string;
+  sandbox_status?: string;
 }
 
 export interface TaskQueueStats {
@@ -42,9 +47,9 @@ export function TaskQueuePanel({ apiBaseUrl }: TaskQueuePanelProps) {
 
   async function loadTasks() {
     try {
-      const [statsRes, processesRes] = await Promise.all([
+      const [statsRes, runsRes] = await Promise.all([
         fetch(`${apiBaseUrl}/api/v1/tasks`),
-        fetch(`${apiBaseUrl}/api/v1/process?limit=50`),
+        fetch(`${apiBaseUrl}/api/v1/runs`),
       ]);
       
       if (statsRes.ok) {
@@ -52,8 +57,22 @@ export function TaskQueuePanel({ apiBaseUrl }: TaskQueuePanelProps) {
         setStats(statsData);
       }
       
-      if (processesRes.ok) {
-        const processesData = await processesRes.json();
+      if (runsRes.ok) {
+        const runsData = await runsRes.json();
+        // 将 runs 数据转换为 Process 格式
+        const processesData: Process[] = runsData.map((run: any) => ({
+          process_id: run.request_id,
+          request_id: run.request_id,
+          prompt: run.prompt,
+          title: run.title,
+          domain: run.domain,
+          created_at: run.created_at,
+          provider: run.provider,
+          sandbox_status: run.sandbox_status,
+          states: run.sandbox_status === 'passed' 
+            ? [{ stage: 'completed', status: 'completed', data: {}, timestamp: run.created_at }]
+            : [{ stage: 'failed', status: 'failed', data: {}, timestamp: run.created_at }]
+        }));
         setProcesses(processesData);
       }
     } catch (error) {
@@ -65,10 +84,41 @@ export function TaskQueuePanel({ apiBaseUrl }: TaskQueuePanelProps) {
 
   async function replayProcess(processId: string) {
     try {
-      const res = await fetch(`${apiBaseUrl}/api/v1/process/${processId}/replay`);
+      // 优先尝试 process replay 接口
+      let res = await fetch(`${apiBaseUrl}/api/v1/process/${processId}/replay`);
       if (res.ok) {
         const replay = await res.json();
         setSelectedProcess(replay);
+        return;
+      }
+      
+      // 如果 process 不存在，尝试获取 run detail
+      res = await fetch(`${apiBaseUrl}/api/v1/runs/${processId}`);
+      if (res.ok) {
+        const runDetail = await res.json();
+        // 转换为 Process 格式
+        const process: Process = {
+          process_id: runDetail.request_id,
+          request_id: runDetail.request_id,
+          prompt: runDetail.request.prompt,
+          title: runDetail.response?.cir?.title,
+          domain: runDetail.response?.cir?.domain,
+          created_at: runDetail.created_at,
+          provider: runDetail.request.provider,
+          sandbox_status: runDetail.request.sandbox_mode,
+          states: [{
+            stage: 'completed',
+            status: runDetail.response?.runtime?.sandbox?.status || 'completed',
+            data: {
+              cir: runDetail.response?.cir,
+              runtime: runDetail.response?.runtime
+            },
+            timestamp: runDetail.created_at
+          }],
+          result: runDetail.response,
+          completed_at: runDetail.created_at
+        };
+        setSelectedProcess(process);
       }
     } catch (error) {
       console.error("回放失败:", error);
@@ -138,7 +188,7 @@ export function TaskQueuePanel({ apiBaseUrl }: TaskQueuePanelProps) {
                   background: "rgba(10, 14, 26, 0.8)",
                   borderRadius: "8px",
                   padding: "15px",
-                  border: `1px solid ${getStatusColor(process.states[process.states.length - 1]?.status)}`,
+                  border: `1px solid ${getStatusColor(process.states?.[0]?.status || process.sandbox_status || 'completed')}`,
                   cursor: "pointer",
                   transition: "all 0.3s",
                 }}
@@ -146,23 +196,23 @@ export function TaskQueuePanel({ apiBaseUrl }: TaskQueuePanelProps) {
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
                   <div style={{ color: "#ffffff", fontWeight: "bold" }}>
-                    {process.prompt.slice(0, 80)}{process.prompt.length > 80 ? "..." : ""}
+                    {process.title || process.prompt.slice(0, 80)}{process.prompt.length > 80 ? "..." : ""}
                   </div>
                   <div style={{
-                    color: getStatusColor(process.states[process.states.length - 1]?.status),
+                    color: getStatusColor(process.states?.[0]?.status || process.sandbox_status || 'completed'),
                     padding: "4px 12px",
                     borderRadius: "12px",
                     background: "rgba(0, 0, 0, 0.3)",
                     fontSize: "12px",
                   }}>
-                    {process.states[process.states.length - 1]?.status}
+                    {process.domain || 'algorithm'}
                   </div>
                 </div>
                 
                 <div style={{ display: "flex", gap: "10px", fontSize: "12px", color: "#a0aec0" }}>
                   <span>ID: {process.process_id.slice(0, 8)}...</span>
-                  <span>阶段：{process.states.length}</span>
-                  <span>创建：{new Date(process.created_at).toLocaleString()}</span>
+                  <span>{process.sandbox_status || 'completed'}</span>
+                  <span>{new Date(process.created_at).toLocaleString()}</span>
                 </div>
               </div>
             ))}
@@ -187,15 +237,16 @@ export function TaskQueuePanel({ apiBaseUrl }: TaskQueuePanelProps) {
             <strong>提示词:</strong> {selectedProcess.prompt}
           </div>
           
-          <div style={{ marginBottom: "20px" }}>
-            <strong style={{ color: "#00f0ff" }}>执行阶段:</strong>
-            <div style={{
-              marginTop: "10px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "8px",
-            }}>
-              {selectedProcess.stages.map((stage, index) => (
+          {selectedProcess.states && selectedProcess.states.length > 0 && (
+            <div style={{ marginBottom: "20px" }}>
+              <strong style={{ color: "#00f0ff" }}>执行阶段:</strong>
+              <div style={{
+                marginTop: "10px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px",
+              }}>
+                {selectedProcess.states.map((stage: any, index: number) => (
                 <div
                   key={index}
                   style={{
@@ -229,6 +280,7 @@ export function TaskQueuePanel({ apiBaseUrl }: TaskQueuePanelProps) {
               ))}
             </div>
           </div>
+          )}
           
           {selectedProcess.result && (
             <div style={{
