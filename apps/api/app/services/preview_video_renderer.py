@@ -164,7 +164,8 @@ class StoryboardFallbackPreviewBackend:
         cir: CirDocument | None = None,
     ) -> None:
         if not self.ffmpeg_binary:
-            raise PreviewVideoRenderError("未检测到 ffmpeg，无法生成 fallback 视频。")
+            # 如果没有 ffmpeg，生成一个简单的占位图片
+            return self._generate_placeholder_image(output_path, title)
 
         with tempfile.TemporaryDirectory(prefix="preview-video-") as temp_dir_name:
             temp_dir = Path(temp_dir_name)
@@ -564,6 +565,45 @@ class StoryboardFallbackPreviewBackend:
         stderr = result.stderr.strip()
         stdout = result.stdout.strip()
         raise PreviewVideoRenderError(stderr or stdout or "ffmpeg 渲染 fallback 视频失败。")
+
+    def _generate_placeholder_image(self, output_path: Path, title: str = "MetaView") -> None:
+        """生成一个简单的占位图片（当没有 ffmpeg 时）"""
+        # 创建一个简单的蓝色背景图片
+        img = Image.new('RGB', (1280, 720), color='#1a2035')
+        draw = ImageDraw.Draw(img)
+        
+        # 绘制标题
+        try:
+            # 尝试使用系统字体
+            title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 48)
+            text_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 24)
+        except:
+            title_font = ImageFont.load_default()
+            text_font = ImageFont.load_default()
+        
+        # 居中绘制文本
+        title_text = "MetaView - 视频预览"
+        bbox = draw.textbbox((0, 0), title_text, font=title_font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+        x = (1280 - text_width) // 2
+        y = (720 - text_height) // 2 - 30
+        draw.text((x, y), title_text, font=title_font, fill="#00f0ff")
+        
+        # 添加说明文字
+        info_text = "Manim 环境未配置完成，无法生成真实视频"
+        bbox = draw.textbbox((0, 0), info_text, font=text_font)
+        text_width = bbox[2] - bbox[0]
+        x = (1280 - text_width) // 2
+        draw.text((x, y + 60), info_text, font=text_font, fill="#a0aec0")
+        
+        # 保存为 PNG（因为无法生成视频）
+        img.save(output_path.with_suffix('.png'))
+        
+        # 创建一个假的 mp4 文件（实际上是一个文本说明）
+        mp4_path = output_path.with_suffix('.mp4')
+        with open(mp4_path, 'w') as f:
+            f.write(f"# 视频渲染不可用\n# 请查看 PNG 预览：{output_path.with_suffix('.png').name}\n")
 
 
 class PreviewVideoRenderer:
