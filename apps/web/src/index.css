@@ -591,6 +591,131 @@ select {
   }
 }
 
+/* Code Highlight Panel */
+.code-highlight-panel {
+  background: rgba(10, 14, 26, 0.8);
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #2d3748;
+  color: #e2e8f0;
+}
+
+.code-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.code-kicker {
+  font-size: 12px;
+  color: #00f0ff;
+  text-transform: uppercase;
+  font-weight: bold;
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.code-header h3 {
+  color: #ffffff;
+  font-size: 18px;
+  margin: 0;
+}
+
+.step-indicator {
+  margin-left: auto;
+  color: #a0aec0;
+  font-size: 14px;
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.step-info {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: rgba(0, 240, 255, 0.1);
+  border-radius: 8px;
+  border-left: 3px solid #00f0ff;
+}
+
+.step-info strong {
+  color: #00f0ff;
+  display: block;
+  margin-bottom: 8px;
+  font-size: 16px;
+}
+
+.step-narration {
+  color: #a0aec0;
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.code-container {
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 8px;
+  padding: 16px;
+  max-height: 400px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.code-block {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.code-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.code-line {
+  display: flex;
+  padding: 2px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.code-line.highlighted {
+  background: rgba(0, 240, 255, 0.2);
+  border-left: 3px solid #00f0ff;
+}
+
+.line-number {
+  color: #4a5568;
+  width: 40px;
+  text-align: right;
+  padding-right: 12px;
+  user-select: none;
+  flex-shrink: 0;
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.line-content {
+  color: #e2e8f0;
+  white-space: pre;
+}
+
+.code-controls {
+  margin-top: 16px;
+}
+
+.progress-bar {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00f0ff, #0aff0a);
+  transition: width 0.3s ease;
+}
+
 @media (max-width: 640px) {
   .app-shell {
     width: min(100vw - 20px, 1380px);
@@ -619,5 +744,13 @@ select {
   .preview-video-shell,
   .preview-empty {
     min-height: 420px;
+  }
+  
+  .code-container {
+    max-height: 300px;
+  }
+  
+  .code-block {
+    font-size: 12px;
   }
 }

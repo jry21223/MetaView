@@ -81,6 +81,11 @@ class CirStep(BaseModel):
     layout: LayoutInstruction = Field(default_factory=LayoutInstruction)
     tokens: list[VisualToken] = Field(default_factory=list)
     annotations: list[str] = Field(default_factory=list)
+    # 代码同步高亮相关字段
+    code_snippet: str | None = Field(default=None, description="该步骤对应的代码片段")
+    code_start_line: int | None = Field(default=None, description="代码起始行号")
+    code_end_line: int | None = Field(default=None, description="代码结束行号")
+    estimated_duration: float = Field(default=3.0, description="该步骤预计持续时间（秒）")
 
 
 class CirDocument(BaseModel):

@@ -10,6 +10,7 @@ import {
   upsertCustomProvider,
 } from "./api/client";
 import { CodeAdapterPanel } from "./components/CodeAdapterPanel";
+import { CodeHighlightPanel } from "./components/CodeHighlightPanel";
 import { ControlPanel } from "./components/ControlPanel";
 import { HistoryPanel } from "./components/HistoryPanel";
 import { ProviderManager } from "./components/ProviderManager";
@@ -113,6 +114,7 @@ export default function App() {
   const [runs, setRuns] = useState<PipelineRunSummary[]>([]);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [videoCurrentTime, setVideoCurrentTime] = useState(0);
   const activeSkill = result?.runtime.skill ?? null;
   const previewVideoUrl = resolvePreviewVideoUrl(result?.preview_video_url);
   const hasRawProviderOutput = Boolean(
@@ -374,6 +376,7 @@ export default function App() {
                 autoPlay
                 muted
                 loop
+                onTimeUpdate={(e) => setVideoCurrentTime(e.currentTarget.currentTime)}
               />
             </div>
           ) : (
@@ -551,6 +554,27 @@ export default function App() {
           </section>
         </div>
       </details>
+
+      {result?.cir && (
+        <details className="panel panel-advanced workspace-grid-bottom" open>
+          <summary className="advanced-summary">📝 代码同步高亮</summary>
+          <div className="advanced-grid advanced-grid-single">
+            <CodeHighlightPanel
+              steps={result.cir.steps.map((step) => ({
+                id: step.id,
+                title: step.title,
+                codeSnippet: step.annotations?.find((a) => a.includes("code:"))?.replace("code:", "") || null,
+                codeStartLine: step.code_start_line,
+                codeEndLine: step.code_end_line,
+                estimatedDuration: step.estimated_duration || 3.0,
+                narration: step.narration,
+              }))}
+              currentTime={videoCurrentTime}
+              fullCode={sourceCode || undefined}
+            />
+          </div>
+        </details>
+      )}
 
       <details className="panel panel-advanced workspace-grid-bottom">
         <summary className="advanced-summary">代码转换测试</summary>
