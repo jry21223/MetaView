@@ -301,7 +301,7 @@ def list_processes(
     return [p.to_dict() for p in processes]
 
 
-@app.get(f"{settings.api_prefix}/process/{process_id}", response_model=dict)
+@app.get(settings.api_prefix + "/process/{process_id}", response_model=dict)
 def get_process(process_id: str) -> dict:
     """获取过程详情"""
     process = orchestrator.process_registry.get_process(process_id)
@@ -310,7 +310,7 @@ def get_process(process_id: str) -> dict:
     return process.to_dict()
 
 
-@app.get(f"{settings.api_prefix}/process/{process_id}/replay", response_model=ProcessReplayResponse)
+@app.get(settings.api_prefix + "/process/{process_id}/replay", response_model=ProcessReplayResponse)
 def replay_process(process_id: str) -> ProcessReplayResponse:
     """回放过程历史"""
     replay = orchestrator.process_registry.replay_process(process_id)
