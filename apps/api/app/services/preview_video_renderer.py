@@ -13,6 +13,8 @@ from PIL import Image, ImageDraw, ImageFont
 
 from app.schemas import CirDocument, VisualToken
 from app.services.manim_script import inspect_manim_script
+from app.services.tts_service import SystemTTS, generate_narration_audio
+from app.services.video_enhancer import VideoEnhancer, enhance_preview_video
 
 
 class PreviewVideoRenderError(RuntimeError):
@@ -191,6 +193,10 @@ class StoryboardFallbackPreviewBackend:
 
             input_pattern = temp_dir / "frame_%05d.png"
             self._run_ffmpeg(input_pattern=input_pattern, output_path=output_path)
+            
+            # 生成配音并嵌入到视频中
+            if cir is not None and output_path.exists():
+                self._add_narration_to_video(output_path, cir)
 
     def _build_slides(self, cir: CirDocument) -> list[tuple[Image.Image, int]]:
         slides: list[tuple[Image.Image, int]] = []
@@ -604,6 +610,56 @@ class StoryboardFallbackPreviewBackend:
         mp4_path = output_path.with_suffix('.mp4')
         with open(mp4_path, 'w') as f:
             f.write(f"# 视频渲染不可用\n# 请查看 PNG 预览：{output_path.with_suffix('.png').name}\n")
+    
+    def _add_narration_to_video(self, video_path: Path, cir: CirDocument) -> None:
+        """
+        为视频添加配音
+        
+        Args:
+            video_path: 视频文件路径
+            cir: CIR 文档（包含讲解文本）
+        """
+        try:
+            # 1. 生成配音
+            tts = SystemTTS()
+            audio_output = video_path.parent / "narration.wav"
+            
+            narration_text = cir.summary
+            if not narration_text:
+                return  # 没有讲解文本，跳过配音
+            
+            audio_result = generate_narration_audio(
+                {'summary': narration_text},
+                str(video_path.parent),
+                tts
+            )
+            
+            if not audio_result.get('success'):
+                print(f"⚠️  TTS 失败：{audio_result.get('error')}")
+                return
+            
+            audio_path = audio_result['audio_path']
+            
+            # 2. 将配音嵌入视频
+            enhancer = VideoEnhancer()
+            enhanced_output = video_path.parent / f"{video_path.stem}_enhanced.mp4"
+            
+            result = enhancer.add_narration(
+                video_path=str(video_path),
+                audio_path=audio_path,
+                output_path=str(enhanced_output),
+                volume=0.8
+            )
+            
+            if result.success:
+                # 替换原视频
+                enhanced_output.replace(video_path)
+                print(f"✅ 已为视频添加配音：{video_path.name}")
+            else:
+                print(f"⚠️  视频增强失败：{result.error}")
+                
+        except Exception as e:
+            print(f"⚠️  添加配音时出错：{e}")
 
 
 class PreviewVideoRenderer:
