@@ -67,6 +67,48 @@ class ManimCliPreviewBackend:
         self.disable_caching = disable_caching
         self.timeout_s = timeout_s
 
+    def _add_narration_to_video(self, video_path: Path, cir: CirDocument) -> None:
+        """为视频添加配音"""
+        try:
+            from app.services.tts_service import SystemTTS, generate_narration_audio
+            from app.services.video_enhancer import VideoEnhancer
+            
+            tts = SystemTTS()
+            audio_output = video_path.parent / "narration.wav"
+            
+            narration_text = cir.summary
+            if not narration_text:
+                return
+            
+            audio_result = generate_narration_audio(
+                {'summary': narration_text},
+                str(video_path.parent),
+                tts
+            )
+            
+            if not audio_result.get('success'):
+                print(f"⚠️  TTS 失败：{audio_result.get('error')}")
+                return
+            
+            audio_path = audio_result['audio_path']
+            enhancer = VideoEnhancer()
+            enhanced_output = video_path.parent / f"{video_path.stem}_enhanced.mp4"
+            
+            result = enhancer.add_narration(
+                video_path=str(video_path),
+                audio_path=audio_path,
+                output_path=str(enhanced_output),
+                volume=0.8
+            )
+            
+            if result.success:
+                enhanced_output.replace(video_path)
+                print(f"✅ 已为视频添加配音：{video_path.name}")
+            else:
+                print(f"⚠️  视频增强失败：{result.error}")
+        except Exception as e:
+            print(f"⚠️  添加配音时出错：{e}")
+
     def is_available(self) -> bool:
         if not self.python_path.exists():
             return False
@@ -144,6 +186,10 @@ class ManimCliPreviewBackend:
 
             output_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(rendered_files[0], output_path)
+            
+            # 为 Manim 渲染的视频添加配音
+            if cir is not None and output_path.exists():
+                self._add_narration_to_video(output_path, cir)
 
 
 class StoryboardFallbackPreviewBackend:
