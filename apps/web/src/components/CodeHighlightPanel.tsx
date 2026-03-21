@@ -17,25 +17,20 @@ interface CodeHighlightPanelProps {
 }
 
 export function CodeHighlightPanel({ steps, currentTime, fullCode }: CodeHighlightPanelProps) {
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const codeContainerRef = useRef<HTMLDivElement>(null);
   const highlightedLineRef = useRef<HTMLDivElement>(null);
 
   // 根据当前视频时间计算应该在哪个步骤
-  useEffect(() => {
+  const currentStepIndex = useMemo(() => {
     let accumulatedTime = 0;
-    let stepIndex = 0;
 
     for (let i = 0; i < steps.length; i++) {
       accumulatedTime += steps[i].estimatedDuration;
       if (currentTime < accumulatedTime) {
-        stepIndex = i;
-        return; // 提前返回，避免 setState 在 effect 末尾调用
+        return i;
       }
-      stepIndex = i;
     }
-
-    setCurrentStepIndex(stepIndex);
+    return steps.length - 1;
   }, [currentTime, steps]);
 
   // 滚动到 highlighted 代码行
@@ -107,6 +102,18 @@ export function CodeHighlightPanel({ steps, currentTime, fullCode }: CodeHighlig
 
       <div className="code-controls">
         <div className="progress-bar">
+          <div 
+            className="progress-fill"
+            style={{ 
+              width: `${((currentStepIndex + 1) / steps.length) * 100}%` 
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+assName="progress-bar">
           <div 
             className="progress-fill"
             style={{ 

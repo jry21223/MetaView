@@ -246,22 +246,22 @@ export function TaskQueuePanel({ apiBaseUrl }: TaskQueuePanelProps) {
                 flexDirection: "column",
                 gap: "8px",
               }}>
-                {selectedProcess.states.map((stage: unknown, index: number) => (
+                {selectedProcess.states.map((stage: { stage?: string; status?: string; timestamp?: string; data?: Record<string, unknown> }, index: number) => (
                 <div
                   key={index}
                   style={{
                     background: "rgba(10, 14, 26, 0.8)",
                     borderRadius: "6px",
                     padding: "12px",
-                    borderLeft: `3px solid ${getStatusColor(stage.status)}`,
+                    borderLeft: `3px solid ${getStatusColor(stage.status ?? '')}`,
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px" }}>
                     <span style={{ color: "#00f0ff", fontWeight: "bold" }}>{stage.stage}</span>
-                    <span style={{ color: getStatusColor(stage.status) }}>{stage.status}</span>
+                    <span style={{ color: getStatusColor(stage.status ?? '') }}>{stage.status}</span>
                   </div>
                   <div style={{ fontSize: "12px", color: "#a0aec0" }}>
-                    {new Date(stage.timestamp).toLocaleString()}
+                    {new Date(stage.timestamp ?? '').toLocaleString()}
                   </div>
                   {stage.data && Object.keys(stage.data).length > 0 && (
                     <pre style={{
