@@ -60,7 +60,7 @@ export function TaskQueuePanel({ apiBaseUrl }: TaskQueuePanelProps) {
       if (runsRes.ok) {
         const runsData = await runsRes.json();
         // 将 runs 数据转换为 Process 格式
-        const processesData: Process[] = runsData.map((run: any) => ({
+        const processesData: Process[] = runsData.map((run: unknown) => ({
           process_id: run.request_id,
           request_id: run.request_id,
           prompt: run.prompt,

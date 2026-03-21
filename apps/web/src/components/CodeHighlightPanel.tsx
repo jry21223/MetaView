@@ -30,7 +30,7 @@ export function CodeHighlightPanel({ steps, currentTime, fullCode }: CodeHighlig
       accumulatedTime += steps[i].estimatedDuration;
       if (currentTime < accumulatedTime) {
         stepIndex = i;
-        break;
+        return; // 提前返回，避免 setState 在 effect 末尾调用
       }
       stepIndex = i;
     }
