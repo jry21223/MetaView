@@ -203,7 +203,7 @@ export interface ConceptDesignResponse {
   scenes_count: number;
   complexity_score: number;
   duration_estimate: number;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 
 export interface CodeGenerationRequest {
@@ -217,7 +217,7 @@ export interface CodeGenerationResponse {
   scene_class_name: string;
   lines_of_code: number;
   diagnostics: string[];
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 
 export interface Process {
@@ -226,10 +226,10 @@ export interface Process {
   states: Array<{
     stage: string;
     status: string;
-    data: Record<string, any>;
+    data: Record<string, unknown>;
     timestamp: string;
   }>;
-  result?: Record<string, any>;
+  result?: Record<string, unknown>;
   error?: string;
   created_at: string;
   completed_at?: string;

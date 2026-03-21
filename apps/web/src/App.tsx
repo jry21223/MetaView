@@ -564,9 +564,9 @@ export default function App() {
                 id: step.id,
                 title: step.title,
                 codeSnippet: step.annotations?.find((a) => a.includes("code:"))?.replace("code:", "") || null,
-                codeStartLine: step.code_start_line,
-                codeEndLine: step.code_end_line,
-                estimatedDuration: step.estimated_duration || 3.0,
+                codeStartLine: step.code_start_line ?? null,
+                codeEndLine: step.code_end_line ?? null,
+                estimatedDuration: step.estimated_duration ?? 3.0,
                 narration: step.narration,
               }))}
               currentTime={videoCurrentTime}

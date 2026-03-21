@@ -60,18 +60,18 @@ export function TaskQueuePanel({ apiBaseUrl }: TaskQueuePanelProps) {
       if (runsRes.ok) {
         const runsData = await runsRes.json();
         // 将 runs 数据转换为 Process 格式
-        const processesData: Process[] = runsData.map((run: unknown) => ({
-          process_id: run.request_id,
-          request_id: run.request_id,
-          prompt: run.prompt,
-          title: run.title,
-          domain: run.domain,
-          created_at: run.created_at,
-          provider: run.provider,
-          sandbox_status: run.sandbox_status,
+        const processesData: Process[] = runsData.map((run: Record<string, unknown>) => ({
+          process_id: String(run.request_id ?? ''),
+          request_id: String(run.request_id ?? ''),
+          prompt: String(run.prompt ?? ''),
+          title: run.title as string | undefined,
+          domain: run.domain as string | undefined,
+          created_at: String(run.created_at ?? ''),
+          provider: run.provider as string | undefined,
+          sandbox_status: run.sandbox_status as string | undefined,
           states: run.sandbox_status === 'passed' 
-            ? [{ stage: 'completed', status: 'completed', data: {}, timestamp: run.created_at }]
-            : [{ stage: 'failed', status: 'failed', data: {}, timestamp: run.created_at }]
+            ? [{ stage: 'completed', status: 'completed', data: {}, timestamp: String(run.created_at ?? '') }]
+            : [{ stage: 'failed', status: 'failed', data: {}, timestamp: String(run.created_at ?? '') }]
         }));
         setProcesses(processesData);
       }
