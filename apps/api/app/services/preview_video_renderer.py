@@ -249,7 +249,7 @@ class StoryboardFallbackPreviewBackend:
         slides.append((self._render_intro_slide(cir), 36))
         for index, _step in enumerate(cir.steps, start=1):
             slides.append((self._render_step_slide(cir, index), 52))
-        slides.append((self._render_outro_slide(cir), 40))
+        slides.append((self._render_outro_slide(cir), 72))
         return slides
 
     def _build_script_slides(

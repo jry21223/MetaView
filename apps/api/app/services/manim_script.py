@@ -96,7 +96,7 @@ def build_manim_script_from_cir(
             "        summary_text.scale_to_fit_width(10.6)",
             "        summary_text.move_to(ORIGIN)",
             "        self.play(Write(summary_text))",
-            "        self.wait(1.0)",
+            "        self.wait(2.0)",
         ]
     )
     return "\n".join(lines).rstrip() + "\n"

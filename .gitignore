@@ -4,6 +4,7 @@
 .vscode/
 .env
 .venv/
+venv/
 .venv-manim/
 node_modules/
 dist/
@@ -23,3 +24,4 @@ apps/api/data/
 *.log
 apps/web/dev.log
 apps/api/tests/.tmp/
+venv/

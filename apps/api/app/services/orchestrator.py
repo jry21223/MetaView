@@ -1,4 +1,6 @@
 from uuid import uuid4
+from typing import Optional, Dict, Any
+from pathlib import Path
 
 from app.config import Settings
 from app.schemas import (
@@ -34,6 +36,7 @@ from app.services.repair import PipelineRepairService
 from app.services.sandbox import PreviewDryRunSandbox
 from app.services.skill_catalog import SubjectSkillRegistry
 from app.services.validation import CirValidator
+from app.services.video_narration import VideoNarrationService
 
 
 class PipelineOrchestrator:
@@ -83,6 +86,8 @@ class PipelineOrchestrator:
             manim_disable_caching=settings.manim_disable_caching,
             manim_render_timeout_s=settings.manim_render_timeout_s,
         )
+        # ⚠️ 配音功能已禁用（皇上旨意 2026-03-21）
+        self.video_narration_service = None  # 原：VideoNarrationService()
         
         # ManimCat 风格架构模块
         self.concept_designer = ConceptDesigner()
@@ -106,6 +111,9 @@ class PipelineOrchestrator:
                 task_timeout_seconds=settings.task_timeout_s
             )
         )
+        
+        # 语音讲解服务
+        self.video_narration_service = VideoNarrationService()
 
     def runtime_catalog(self) -> RuntimeCatalog:
         return RuntimeCatalog(
@@ -317,6 +325,29 @@ class PipelineOrchestrator:
             )
             preview_video_url = preview_video.url
             preview_video_backend = preview_video.backend
+            
+            # ✅ TTS 已启用 - 视频渲染正常，现在可以添加配音
+            # 使用新的分段解说词生成功能
+            if preview_video.file_path and cir:
+                try:
+                    import logging
+                    # 检查视频时长
+                    import subprocess
+                    result = subprocess.run(
+                        ['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+                         '-of', 'default=noprint_wrappers=1:nokey=1', str(preview_video.file_path)],
+                        capture_output=True, text=True
+                    )
+                    video_duration = float(result.stdout.strip()) if result.stdout.strip() else 0
+                    logging.info(f"视频时长：{video_duration}秒")
+                    
+                    # ⚠️ 配音功能已禁用（皇上旨意 2026-03-21）
+                    # if video_duration >= 5:  # 视频至少 5 秒才添加配音
+                    #     narration_result = self.video_narration_service.add_segmented_narration_to_video(...)
+                    logging.info("⚠️ 配音功能已禁用，跳过 TTS 配音")
+                except Exception as e:
+                    import logging
+                    logging.error(f"TTS 配音失败：{e}")
         except PreviewVideoRenderError as exc:
             render_error_message = str(exc)
             if repair_count < self.max_repair_attempts:
@@ -513,6 +544,38 @@ class PipelineOrchestrator:
 
     def delete_custom_provider(self, name: str) -> bool:
         return self.provider_registry.delete_custom_provider(name)
+    
+    def generate_video_with_narration(
+        self,
+        video_path: str,
+        narration_text: str,
+        output_dir: str,
+        voice: str = "female",
+        bgm_path: Optional[str] = None,
+        bgm_volume: float = 0.3
+    ) -> Dict[str, Any]:
+        """
+        为视频生成语音讲解并合成
+        
+        Args:
+            video_path: 输入视频路径
+            narration_text: 讲解文本
+            output_dir: 输出目录
+            voice: 音色（female/male）
+            bgm_path: 背景音乐路径
+            bgm_volume: 背景音乐音量
+        
+        Returns:
+            dict: 结果字典
+        """
+        return self.video_narration_service.add_narration_to_video(
+            video_path=video_path,
+            narration_text=narration_text,
+            output_dir=output_dir,
+            voice=voice,
+            bgm_path=bgm_path,
+            bgm_volume=bgm_volume
+        )
 
     def _sandbox_diagnostics(self, sandbox_report) -> list[AgentDiagnostic]:
         diagnostics: list[AgentDiagnostic] = []

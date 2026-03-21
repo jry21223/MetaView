@@ -6,7 +6,12 @@ from app.schemas import TopicDomain
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="ALGO_VIS_", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="ALGO_VIS_",
+        extra="ignore",
+        env_file="../../.env",
+        env_file_encoding="utf-8",
+    )
 
     app_name: str = "MetaView API"
     app_version: str = "0.1.0"
@@ -26,7 +31,6 @@ class Settings(BaseSettings):
     preview_render_backend: str = "auto"
     manim_python_path: str = ".venv-manim/bin/python"
     manim_cli_module: str = "manim"
-    manim_quality: str = "l"
     manim_format: str = "mp4"
     manim_disable_caching: bool = True
     manim_render_timeout_s: float | None = 180.0

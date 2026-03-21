@@ -152,7 +152,7 @@ class GeneratedScene(Scene):
         for action in scene.actions:
             code += f'''        # TODO: 实现动作 - {action}
         self.play({objects_var}_group.animate.scale(1.1))
-        self.wait(0.5)
+        self.wait(1.2)
         
 '''
         

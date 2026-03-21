@@ -27,7 +27,27 @@ from app.services.providers.openai import ProviderInvocationError
 from app.services.providers.registry import ProviderRegistrationError, ProviderUnavailableError
 from app.services.skill_catalog import SubjectSkillUnavailableError
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Dict, Any
+
+
+class VideoNarrationRequest(BaseModel):
+    """视频配音请求"""
+    video_path: str = Field(..., description="输入视频路径")
+    narration_text: str = Field(..., description="讲解文本", max_length=2000)
+    voice: str = Field(default="female", description="音色：female（女声）, male（男声）")
+    bgm_path: Optional[str] = Field(default=None, description="背景音乐路径")
+    bgm_volume: float = Field(default=0.3, ge=0, le=1, description="背景音乐音量（0-1）")
+
+
+class VideoNarrationResponse(BaseModel):
+    """视频配音响应"""
+    success: bool
+    video_path: Optional[str] = None
+    audio_path: Optional[str] = None
+    video_url: Optional[str] = None
+    audio_url: Optional[str] = None
+    duration_ms: int = 0
+    error: Optional[str] = None
 
 settings = get_settings()
 orchestrator = PipelineOrchestrator(settings=settings)
@@ -323,3 +343,59 @@ def replay_process(process_id: str) -> ProcessReplayResponse:
 def get_task_queue_stats() -> dict:
     """获取任务队列统计"""
     return orchestrator.queue_processor.get_queue_stats()
+
+
+@app.post(
+    f"{settings.api_prefix}/video/narration",
+    response_model=VideoNarrationResponse,
+    summary="生成视频语音讲解",
+    description="为视频生成 TTS 语音讲解并合成到视频中"
+)
+def generate_video_narration(
+    payload: VideoNarrationRequest
+) -> VideoNarrationResponse:
+    """
+    生成视频语音讲解
+    
+    - **video_path**: 输入视频路径
+    - **narration_text**: 讲解文本（最多 2000 字符）
+    - **voice**: 音色（female=女声，male=男声）
+    - **bgm_path**: 背景音乐路径（可选）
+    - **bgm_volume**: 背景音乐音量（0-1，默认 0.3）
+    """
+    try:
+        output_dir = str(Path(payload.video_path).parent / "narrated")
+        
+        result = orchestrator.generate_video_with_narration(
+            video_path=payload.video_path,
+            narration_text=payload.narration_text,
+            output_dir=output_dir,
+            voice=payload.voice,
+            bgm_path=payload.bgm_path,
+            bgm_volume=payload.bgm_volume
+        )
+        
+        response = VideoNarrationResponse(
+            success=result["success"],
+            video_path=result.get("video_path"),
+            audio_path=result.get("audio_path"),
+            duration_ms=result.get("duration_ms", 0),
+            error=result.get("error")
+        )
+        
+        # 生成 URL
+        if result["success"] and result.get("video_path"):
+            video_url_path = Path(result["video_path"]).relative_to(settings.preview_media_root)
+            response.video_url = f"{settings.preview_media_url_prefix}/{video_url_path}"
+        
+        if result["success"] and result.get("audio_path"):
+            audio_url_path = Path(result["audio_path"]).relative_to(settings.preview_media_root)
+            response.audio_url = f"{settings.preview_media_url_prefix}/{audio_url_path}"
+        
+        return response
+        
+    except Exception as e:
+        return VideoNarrationResponse(
+            success=False,
+            error=f"生成失败：{str(e)}"
+        )
