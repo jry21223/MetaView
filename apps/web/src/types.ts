@@ -38,6 +38,10 @@ export interface CirStep {
   visual_kind: VisualKind;
   tokens: VisualToken[];
   annotations: string[];
+  // 新增字段 (用于代码高亮和时间估算)
+  code_start_line?: number;
+  code_end_line?: number;
+  estimated_duration?: number;
 }
 
 export interface CirDocument {

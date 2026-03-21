@@ -246,7 +246,7 @@ export function TaskQueuePanel({ apiBaseUrl }: TaskQueuePanelProps) {
                 flexDirection: "column",
                 gap: "8px",
               }}>
-                {selectedProcess.states.map((stage: any, index: number) => (
+                {selectedProcess.states.map((stage: unknown, index: number) => (
                 <div
                   key={index}
                   style={{
