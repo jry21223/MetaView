@@ -1,4 +1,8 @@
+.SHELLFLAGS := -eu -o pipefail -c
+
 .PHONY: bootstrap bootstrap-manim setup-hooks dev-web dev-api dev start stop lint test build check docker-build docker-up docker-down
+
+DOCKER_COMPOSE_CMD := $(shell sh -lc 'if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then printf "%s" "docker compose"; elif command -v docker-compose >/dev/null 2>&1; then printf "%s" "docker-compose"; fi')
 
 bootstrap:
 	npm install
@@ -33,14 +37,20 @@ build:
 
 check: lint test build
 
-docker-build:
-	docker compose build
+docker-check:
+	@if [ -z "$(DOCKER_COMPOSE_CMD)" ]; then \
+		echo "Docker Compose 未安装。请安装 Docker Compose v2（docker compose）或 docker-compose。"; \
+		exit 127; \
+	fi
 
-docker-up:
-	docker compose up --build
+docker-build: docker-check
+	$(DOCKER_COMPOSE_CMD) build
 
-docker-down:
-	docker compose down
+docker-up: docker-check
+	$(DOCKER_COMPOSE_CMD) up --build
+
+docker-down: docker-check
+	$(DOCKER_COMPOSE_CMD) down
 
 start: docker-up
 
