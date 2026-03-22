@@ -28,11 +28,14 @@ def test_code_planner_prompt_selects_cpp_array_board() -> None:
     )
 
     assert "source=code.md" in prompt
-    assert "Manim 代码转动画生成提示词" in prompt
-    assert "Learning objective" in prompt
+    assert "### Common" in prompt
+    assert "### Planner" in prompt
+    assert "Return JSON with:" in prompt
     assert "Support both Python and C++ inputs" in prompt
     assert "Array And Index Driven Processes" in prompt
+    assert "对每个 scene 标注当前代码范围、当前调用层级和当前关注变量。" in prompt
     assert "language=cpp" in prompt
+    assert "### Critic" not in prompt
     assert "Linked List And Pointer Rewiring" not in prompt
 
 
@@ -42,13 +45,20 @@ def test_code_coder_prompt_uses_text_for_source_panel() -> None:
         title="Binary search source walkthrough",
         summary="Highlight left right mid updates and result convergence.",
         cir_json='{"steps":[{"title":"state","annotations":["left","right","mid"]}]}',
+        ui_theme="dark",
     )
 
     assert "source=code.md" in prompt
     assert "Implement the approved plan below as one Manim scene." in prompt
     assert "real Manim rendering, not a frontend py2ts flow" in prompt
     assert "Use `Text` for raw source code" in prompt
+    assert "### Coder" in prompt
+    assert "代码区、状态区、数据结构区、调用栈区保持固定分区" in prompt
     assert "Array And Index Driven Processes" in prompt
+    assert "Simplified Chinese" in prompt
+    assert "Never allow explanatory text" in prompt
+    assert "#0f1113" in prompt
+    assert "### Planner" not in prompt
     assert "Recursion, Divide And Conquer, And DP" not in prompt
 
 
@@ -56,8 +66,12 @@ def test_code_critic_prompt_covers_all_subboards_without_context() -> None:
     prompt = build_critic_system_prompt(TopicDomain.CODE)
 
     assert "source=code.md" in prompt
+    assert "Return JSON with:" in prompt
     assert "Do not return repaired code" in prompt
     assert "Fix the following Manim script." not in prompt
+    assert "### Critic" in prompt
+    assert "### Planner" not in prompt
+    assert "检查是否有任何动画行为无法在源码中找到对应语句。" in prompt
     assert "Array And Index Driven Processes" in prompt
     assert "Linked List And Pointer Rewiring" in prompt
     assert "Tree And Graph Traversals" in prompt
@@ -74,8 +88,27 @@ def test_code_repair_prompt_uses_repair_template() -> None:
 
     assert "source=code.md" in prompt
     assert "Fix the following Manim script." in prompt
-    assert "Keep the current script using the observed failures" not in prompt
+    assert "### Repair" in prompt
+    assert "Explain the root cause briefly" not in prompt
+    assert "若高亮顺序错了，只重排相关语句的高亮与更新顺序。" in prompt
     assert "Array And Index Driven Processes" in prompt
+
+
+def test_math_coder_prompt_uses_stage_specific_reference_only() -> None:
+    prompt = build_coder_system_prompt(
+        TopicDomain.MATH,
+        title="Integral area walkthrough",
+        summary="Show how partition width shrinks and the area approximation converges.",
+        cir_json='{"steps":[{"title":"partition"},{"title":"limit"}]}',
+        ui_theme="light",
+    )
+
+    assert "source=math.md" in prompt
+    assert "### Coder" in prompt
+    assert "### Planner" not in prompt
+    assert "图像更新必须与对应变量或参数标签同步，不能先变图后补解释。" in prompt
+    assert "#f8fafb" in prompt
+    assert "#43625b" in prompt
 
 
 def test_code_repair_user_prompt_includes_full_issues_and_script() -> None:
@@ -126,9 +159,11 @@ def test_code_planner_user_prompt_keeps_full_source_code() -> None:
         skill_brief="skill=source-code-algorithm-viz",
         source_code=long_source,
         source_code_language="python",
+        ui_theme="dark",
     )
 
     assert "sentinel_marker = 42" in prompt
+    assert "ui_theme=dark" in prompt
 
 
 def test_code_critic_user_prompt_keeps_full_renderer_script() -> None:

@@ -25,16 +25,16 @@
 - `ControlPanel`: 输入题目、上传可选题图并发起生成。
 - `App`: 主页优先播放后端生成的 MP4 预览视频，并展示任务状态、原始 LLM 返回与历史记录。
 - `ProviderManager`: 管理自定义 OpenAI 兼容 Provider。
+- `PromptReferenceTool`: 在网页底部直接生成或写回学科 reference prompt。
 - `api/client.ts`: 与后端 API 通信。
 
 ### `skills`
 
-- `algorithm-process-viz`
-- `math-theorem-walkthrough`
-- `physics-simulation-viz`
-- `molecular-structure-viz`
-- `biology-process-viz`
-- `geospatial-process-viz`
+- `generate-subject-manim-prompts/references/*.md`: 运行时实际读取的 staged 学科 guidance。
+- `generate-subject-manim-prompts/scripts/generate_reference_with_llm.py`: 用 LLM 生成或重写学科 guidance 的脚本。
+
+顶层 legacy skill 目录已移除。运行时真正使用的学科元数据定义在
+[skill_catalog.py](/Users/jerry/Desktop/demoo/apps/api/app/services/skill_catalog.py)。
 
 ## CIR 设计
 
@@ -48,6 +48,7 @@ CIR 当前采用轻量结构：
 - `tokens[]`: 每一步中需要上屏的核心实体
 
 `PipelineRequest` 允许省略 `domain`，由系统自动判断；也允许附带静态题图，供路由和规划阶段提取对象与约束。
+同一请求还支持 `enable_narration`，用于按任务决定是否在视频渲染完成后嵌入 `mimotts-v2` 中文旁白。
 
 当前请求还支持两类模型角色：
 
@@ -72,7 +73,7 @@ CIR 当前采用轻量结构：
 - FastAPI 编排层
 - 自动学科判断
 - 双模型编排
-- 学科技能路由与 skill 文件沉淀
+- 学科技能路由与 staged prompt reference 沉淀
 - Mock / OpenAI 兼容 Provider 抽象
 - 自定义 Provider 持久化、视觉能力配置与运行时目录
 - 物理题图输入与图片辅助建模

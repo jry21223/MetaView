@@ -40,6 +40,7 @@ class PreviewRenderBackend(Protocol):
         output_path: Path,
         scene_class_name: str | None = None,
         cir: CirDocument | None = None,
+        ui_theme: str | None = None,
     ) -> None:
         ...
 
@@ -88,6 +89,7 @@ class ManimCliPreviewBackend:
         output_path: Path,
         scene_class_name: str | None = None,
         cir: CirDocument | None = None,
+        ui_theme: str | None = None,
     ) -> None:
         inspection = inspect_manim_script(script)
         if inspection.errors:
@@ -162,6 +164,7 @@ class StoryboardFallbackPreviewBackend:
         output_path: Path,
         scene_class_name: str | None = None,
         cir: CirDocument | None = None,
+        ui_theme: str | None = None,
     ) -> None:
         if not self.ffmpeg_binary:
             raise PreviewVideoRenderError("未检测到 ffmpeg，无法生成 fallback 视频。")
@@ -170,11 +173,12 @@ class StoryboardFallbackPreviewBackend:
             temp_dir = Path(temp_dir_name)
             frame_index = 0
             if cir is not None:
-                slides = self._build_slides(cir)
+                slides = self._build_slides(cir, ui_theme=ui_theme)
             else:
                 slides = self._build_script_slides(
                     script=script,
                     scene_class_name=scene_class_name,
+                    ui_theme=ui_theme,
                 )
 
             for slide_number, (image, frame_count) in enumerate(slides):
@@ -191,12 +195,17 @@ class StoryboardFallbackPreviewBackend:
             input_pattern = temp_dir / "frame_%05d.png"
             self._run_ffmpeg(input_pattern=input_pattern, output_path=output_path)
 
-    def _build_slides(self, cir: CirDocument) -> list[tuple[Image.Image, int]]:
+    def _build_slides(
+        self,
+        cir: CirDocument,
+        *,
+        ui_theme: str | None = None,
+    ) -> list[tuple[Image.Image, int]]:
         slides: list[tuple[Image.Image, int]] = []
-        slides.append((self._render_intro_slide(cir), 36))
+        slides.append((self._render_intro_slide(cir, ui_theme=ui_theme), 36))
         for index, _step in enumerate(cir.steps, start=1):
-            slides.append((self._render_step_slide(cir, index), 52))
-        slides.append((self._render_outro_slide(cir), 40))
+            slides.append((self._render_step_slide(cir, index, ui_theme=ui_theme), 52))
+        slides.append((self._render_outro_slide(cir, ui_theme=ui_theme), 40))
         return slides
 
     def _build_script_slides(
@@ -204,30 +213,32 @@ class StoryboardFallbackPreviewBackend:
         *,
         script: str,
         scene_class_name: str | None,
+        ui_theme: str | None = None,
     ) -> list[tuple[Image.Image, int]]:
         inspection = inspect_manim_script(script)
         resolved_scene = scene_class_name or (
             inspection.scene_class_names[0] if inspection.scene_class_names else "UnknownScene"
         )
         return [
-            (self._render_script_intro_slide(resolved_scene), 36),
-            (self._render_script_body_slide(script), 60),
-            (self._render_script_outro_slide(resolved_scene), 40),
+            (self._render_script_intro_slide(resolved_scene, ui_theme=ui_theme), 36),
+            (self._render_script_body_slide(script, ui_theme=ui_theme), 60),
+            (self._render_script_outro_slide(resolved_scene, ui_theme=ui_theme), 40),
         ]
 
-    def _render_intro_slide(self, cir: CirDocument) -> Image.Image:
-        image, draw = self._create_canvas()
+    def _render_intro_slide(self, cir: CirDocument, *, ui_theme: str | None = None) -> Image.Image:
+        palette = self._palette(ui_theme)
+        image, draw = self._create_canvas(ui_theme=ui_theme)
         title_font = self._load_font(54)
         subtitle_font = self._load_font(24)
         body_font = self._load_font(28)
 
-        self._draw_badge(draw, (72, 58, 302, 104), f"{cir.domain.value.upper()} FALLBACK")
-        draw.text((72, 138), cir.title, font=title_font, fill="#f8fafc")
+        self._draw_badge(draw, (72, 58, 302, 104), f"{cir.domain.value.upper()} FALLBACK", palette)
+        draw.text((72, 138), cir.title, font=title_font, fill=palette["title"])
         self._draw_wrapped_text(
             draw=draw,
             text=cir.summary,
             font=body_font,
-            fill="#dbeafe",
+            fill=palette["body"],
             box=(72, 236, 1208, 430),
             line_spacing=14,
         )
@@ -235,34 +246,41 @@ class StoryboardFallbackPreviewBackend:
             (72, 620),
             f"{len(cir.steps)} steps · fallback preview · install manim for real rendering",
             font=subtitle_font,
-            fill="#94a3b8",
+            fill=palette["muted"],
         )
         return image
 
-    def _render_step_slide(self, cir: CirDocument, index: int) -> Image.Image:
+    def _render_step_slide(
+        self,
+        cir: CirDocument,
+        index: int,
+        *,
+        ui_theme: str | None = None,
+    ) -> Image.Image:
         step = cir.steps[index - 1]
-        image, draw = self._create_canvas()
+        palette = self._palette(ui_theme)
+        image, draw = self._create_canvas(ui_theme=ui_theme)
         title_font = self._load_font(40)
         body_font = self._load_font(24)
         meta_font = self._load_font(20)
 
-        self._draw_badge(draw, (72, 56, 232, 100), f"STEP {index}")
-        draw.text((72, 130), step.title, font=title_font, fill="#f8fafc")
-        draw.text((72, 184), step.visual_kind.value, font=meta_font, fill="#38bdf8")
+        self._draw_badge(draw, (72, 56, 232, 100), f"STEP {index}", palette)
+        draw.text((72, 130), step.title, font=title_font, fill=palette["title"])
+        draw.text((72, 184), step.visual_kind.value, font=meta_font, fill=palette["accent"])
 
         panel_box = (72, 226, 1208, 548)
         draw.rounded_rectangle(
             panel_box,
             radius=26,
-            fill="#0f172acc",
-            outline="#334155",
+            fill=palette["panel_fill"],
+            outline=palette["panel_outline"],
             width=2,
         )
         self._draw_wrapped_text(
             draw=draw,
             text=step.narration,
             font=body_font,
-            fill="#e2e8f0",
+            fill=palette["body"],
             box=(104, 258, 1176, 392),
             line_spacing=12,
         )
@@ -287,7 +305,7 @@ class StoryboardFallbackPreviewBackend:
                 draw=draw,
                 text=annotation_text,
                 font=meta_font,
-                fill="#94a3b8",
+                fill=palette["muted"],
                 box=(104, 500, 1176, 586),
                 line_spacing=10,
                 max_lines=2,
@@ -295,13 +313,14 @@ class StoryboardFallbackPreviewBackend:
 
         return image
 
-    def _render_outro_slide(self, cir: CirDocument) -> Image.Image:
-        image, draw = self._create_canvas()
+    def _render_outro_slide(self, cir: CirDocument, *, ui_theme: str | None = None) -> Image.Image:
+        palette = self._palette(ui_theme)
+        image, draw = self._create_canvas(ui_theme=ui_theme)
         title_font = self._load_font(44)
         body_font = self._load_font(26)
 
-        self._draw_badge(draw, (72, 58, 282, 104), "PREVIEW READY")
-        draw.text((72, 150), "当前使用 fallback 预览", font=title_font, fill="#f8fafc")
+        self._draw_badge(draw, (72, 58, 282, 104), "PREVIEW READY", palette)
+        draw.text((72, 150), "当前使用 fallback 预览", font=title_font, fill=palette["title"])
         self._draw_wrapped_text(
             draw=draw,
             text=(
@@ -309,19 +328,25 @@ class StoryboardFallbackPreviewBackend:
                 "安装 manim 并配置渲染环境后，系统会自动切换到真实渲染。"
             ),
             font=body_font,
-            fill="#dbeafe",
+            fill=palette["body"],
             box=(72, 246, 1208, 420),
             line_spacing=14,
         )
-        draw.text((72, 622), f"Title: {cir.title}", font=self._load_font(22), fill="#94a3b8")
+        draw.text((72, 622), f"Title: {cir.title}", font=self._load_font(22), fill=palette["muted"])
         return image
 
-    def _render_script_intro_slide(self, scene_class_name: str) -> Image.Image:
-        image, draw = self._create_canvas()
+    def _render_script_intro_slide(
+        self,
+        scene_class_name: str,
+        *,
+        ui_theme: str | None = None,
+    ) -> Image.Image:
+        palette = self._palette(ui_theme)
+        image, draw = self._create_canvas(ui_theme=ui_theme)
         title_font = self._load_font(48)
         body_font = self._load_font(26)
-        self._draw_badge(draw, (72, 58, 322, 104), "SCRIPT FALLBACK")
-        draw.text((72, 150), "真实渲染后端不可用", font=title_font, fill="#f8fafc")
+        self._draw_badge(draw, (72, 58, 322, 104), "SCRIPT FALLBACK", palette)
+        draw.text((72, 150), "真实渲染后端不可用", font=title_font, fill=palette["title"])
         self._draw_wrapped_text(
             draw=draw,
             text=(
@@ -329,43 +354,50 @@ class StoryboardFallbackPreviewBackend:
                 "本次视频为 fallback 占位预览，不代表真实 Manim 画面。"
             ),
             font=body_font,
-            fill="#dbeafe",
+            fill=palette["body"],
             box=(72, 246, 1208, 420),
             line_spacing=14,
         )
         return image
 
-    def _render_script_body_slide(self, script: str) -> Image.Image:
-        image, draw = self._create_canvas()
+    def _render_script_body_slide(self, script: str, *, ui_theme: str | None = None) -> Image.Image:
+        palette = self._palette(ui_theme)
+        image, draw = self._create_canvas(ui_theme=ui_theme)
         title_font = self._load_font(38)
         code_font = self._load_font(20)
-        self._draw_badge(draw, (72, 58, 262, 104), "SCRIPT")
-        draw.text((72, 140), "脚本摘要", font=title_font, fill="#f8fafc")
+        self._draw_badge(draw, (72, 58, 262, 104), "SCRIPT", palette)
+        draw.text((72, 140), "脚本摘要", font=title_font, fill=palette["title"])
         code_excerpt = "\n".join(script.strip().splitlines()[:16])
         draw.rounded_rectangle(
             (72, 214, 1208, 612),
             radius=24,
-            fill="#020617",
-            outline="#334155",
+            fill=palette["code_fill"],
+            outline=palette["panel_outline"],
             width=2,
         )
         self._draw_wrapped_text(
             draw=draw,
             text=code_excerpt,
             font=code_font,
-            fill="#dbeafe",
+            fill=palette["code_text"],
             box=(100, 244, 1180, 584),
             line_spacing=8,
             max_lines=14,
         )
         return image
 
-    def _render_script_outro_slide(self, scene_class_name: str) -> Image.Image:
-        image, draw = self._create_canvas()
+    def _render_script_outro_slide(
+        self,
+        scene_class_name: str,
+        *,
+        ui_theme: str | None = None,
+    ) -> Image.Image:
+        palette = self._palette(ui_theme)
+        image, draw = self._create_canvas(ui_theme=ui_theme)
         title_font = self._load_font(40)
         body_font = self._load_font(24)
-        self._draw_badge(draw, (72, 58, 282, 104), "NEXT STEP")
-        draw.text((72, 150), "安装 Manim 后可切换真实渲染", font=title_font, fill="#f8fafc")
+        self._draw_badge(draw, (72, 58, 282, 104), "NEXT STEP", palette)
+        draw.text((72, 150), "安装 Manim 后可切换真实渲染", font=title_font, fill=palette["title"])
         self._draw_wrapped_text(
             draw=draw,
             text=(
@@ -373,21 +405,26 @@ class StoryboardFallbackPreviewBackend:
                 "完成后系统会优先走 manim-cli 真渲染并输出实际动画视频。"
             ),
             font=body_font,
-            fill="#dbeafe",
+            fill=palette["body"],
             box=(72, 246, 1208, 420),
             line_spacing=14,
         )
         return image
 
-    def _create_canvas(self) -> tuple[Image.Image, ImageDraw.ImageDraw]:
+    def _create_canvas(
+        self,
+        *,
+        ui_theme: str | None = None,
+    ) -> tuple[Image.Image, ImageDraw.ImageDraw]:
+        palette = self._palette(ui_theme)
         width = 1280
         height = 720
-        image = Image.new("RGBA", (width, height), "#0f172a")
+        image = Image.new("RGBA", (width, height), palette["bg"])
         draw = ImageDraw.Draw(image)
-        draw.rectangle((0, 0, width, height), fill="#0b1120")
-        draw.ellipse((-180, -120, 420, 360), fill="#11324d")
-        draw.ellipse((860, -160, 1420, 280), fill="#3b2b17")
-        draw.rectangle((48, 40, 1232, 680), outline="#1e293b", width=2)
+        draw.rectangle((0, 0, width, height), fill=palette["bg_overlay"])
+        draw.ellipse((-180, -120, 420, 360), fill=palette["orb_a"])
+        draw.ellipse((860, -160, 1420, 280), fill=palette["orb_b"])
+        draw.rectangle((48, 40, 1232, 680), outline=palette["frame"], width=2)
         return image, draw
 
     def _draw_badge(
@@ -395,12 +432,13 @@ class StoryboardFallbackPreviewBackend:
         draw: ImageDraw.ImageDraw,
         box: tuple[int, int, int, int],
         text: str,
+        palette: dict[str, str],
     ) -> None:
         draw.rounded_rectangle(
             box,
             radius=18,
-            fill="#134e4a",
-            outline="#14b8a6",
+            fill=palette["badge_fill"],
+            outline=palette["badge_outline"],
             width=2,
         )
         badge_font = self._load_font(18)
@@ -416,8 +454,47 @@ class StoryboardFallbackPreviewBackend:
             ),
             text,
             font=badge_font,
-            fill="#ecfeff",
+            fill=palette["badge_text"],
         )
+
+    def _palette(self, ui_theme: str | None = None) -> dict[str, str]:
+        if (ui_theme or "dark").strip().lower() == "light":
+            return {
+                "bg": "#f8fafb",
+                "bg_overlay": "#f2f5f6",
+                "orb_a": "#d6ebe5",
+                "orb_b": "#e4eee8",
+                "frame": "#cbd5d1",
+                "title": "#191c1d",
+                "body": "#31403c",
+                "muted": "#5f6c67",
+                "accent": "#43625b",
+                "panel_fill": "#ffffff",
+                "panel_outline": "#c8d1cd",
+                "code_fill": "#eef3f1",
+                "code_text": "#23312d",
+                "badge_fill": "#d7ebe4",
+                "badge_outline": "#43625b",
+                "badge_text": "#1f312d",
+            }
+        return {
+            "bg": "#0f1113",
+            "bg_overlay": "#121518",
+            "orb_a": "#17332c",
+            "orb_b": "#1e2d2a",
+            "frame": "#27302d",
+            "title": "#e2e8f0",
+            "body": "#d6e1dc",
+            "muted": "#94a3b8",
+            "accent": "#45a081",
+            "panel_fill": "#171b1ecc",
+            "panel_outline": "#31413c",
+            "code_fill": "#0e1317",
+            "code_text": "#dce8e4",
+            "badge_fill": "#163b33",
+            "badge_outline": "#45a081",
+            "badge_text": "#eefcf8",
+        }
 
     def _draw_wrapped_text(
         self,
@@ -606,6 +683,7 @@ class PreviewVideoRenderer:
         cir: CirDocument | None = None,
         scene_class_name: str | None = None,
         require_real: bool = False,
+        ui_theme: str | None = None,
     ) -> PreviewVideoArtifacts:
         if not self.enabled:
             raise PreviewVideoRenderError("后端视频渲染已禁用。")
@@ -617,6 +695,7 @@ class PreviewVideoRenderer:
             output_path=output_path,
             scene_class_name=scene_class_name,
             cir=cir,
+            ui_theme=ui_theme,
         )
         return PreviewVideoArtifacts(
             file_path=output_path,

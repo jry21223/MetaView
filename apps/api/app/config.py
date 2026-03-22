@@ -4,9 +4,16 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.schemas import TopicDomain
 
+DEFAULT_ENABLED_DOMAINS = ",".join(domain.value for domain in TopicDomain)
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="ALGO_VIS_", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="ALGO_VIS_",
+        extra="ignore",
+        env_file=".env",
+        env_file_encoding="utf-8",
+    )
 
     app_name: str = "MetaView API"
     app_version: str = "0.1.0"
@@ -16,7 +23,7 @@ class Settings(BaseSettings):
     default_provider: str = "mock"
     default_router_provider: str | None = None
     default_generation_provider: str | None = None
-    enabled_domains: str = "algorithm,math,code"
+    enabled_domains: str = DEFAULT_ENABLED_DOMAINS
     sandbox_timeout_ms: int = 1500
     max_repair_attempts: int = 2
     history_db_path: str = "data/pipeline_runs.db"
@@ -24,6 +31,16 @@ class Settings(BaseSettings):
     preview_media_url_prefix: str = "/media"
     preview_video_enabled: bool = True
     preview_render_backend: str = "auto"
+    preview_tts_enabled: bool = True
+    preview_tts_backend: str = "openai_compatible"
+    preview_tts_model: str = "mimotts-v2"
+    preview_tts_base_url: str | None = None
+    preview_tts_api_key: str | None = None
+    preview_tts_voice: str = "default"
+    preview_tts_rate_wpm: int = 150
+    preview_tts_speed: float = 0.88
+    preview_tts_max_chars: int = 1500
+    preview_tts_timeout_s: float | None = 120.0
     manim_python_path: str = ".venv-manim/bin/python"
     manim_cli_module: str = "manim"
     manim_quality: str = "l"

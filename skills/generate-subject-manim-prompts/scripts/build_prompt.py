@@ -1,183 +1,120 @@
 #!/usr/bin/env python3
-"""Build subject-specific prompt bundles for Python Manim generation."""
+"""Inspect staged subject references for Manim prompt authoring."""
 
 from __future__ import annotations
 
 import argparse
 import json
-import textwrap
+import re
+from pathlib import Path
 
 
-SUBJECT_GUIDANCE = {
-    "math": (
-        "Separate concept design from code, preserve MathTex continuity, "
-        "define notation and diagrams before transformations, and pace the "
-        "scene like a lesson rather than a demo reel."
-    ),
-    "algorithm": (
-        "Define state, invariants, and transition events before code. Keep "
-        "logical state and visual state synchronized after every update."
-    ),
-    "physics": (
-        "State the physical model, units, and assumptions before animation. "
-        "Keep vectors, equations, and motion consistent with the model."
-    ),
-    "chemistry": (
-        "Define species, representation style, and reaction conditions first. "
-        "Keep atom identity, bond changes, and labels consistent."
-    ),
-    "biology": (
-        "Make biological scale and stage order explicit. Prefer stepwise "
-        "process explanation over dense all-at-once diagrams."
-    ),
-    "geography": (
-        "Establish map scope, scale, legend, and time markers first. Reveal "
-        "spatial patterns one at a time with stable encoding."
-    ),
+SUBJECT_FILES = {
+    "algorithm": "algorithm.md",
+    "math": "math.md",
+    "code": "code.md",
+    "physics": "physics.md",
+    "chemistry": "chemistry.md",
+    "biology": "biology.md",
+    "geography": "geography.md",
 }
+
+TEMPLATE_SECTIONS = {
+    "planner": "Concept Design",
+    "coder": "Code Generation",
+    "critic": "Review",
+    "repair": "Repair",
+}
+
+REFERENCE_SECTIONS = {
+    "common": "Common",
+    "planner": "Planner",
+    "coder": "Coder",
+    "critic": "Critic",
+    "repair": "Repair",
+}
+
+
+def reference_root() -> Path:
+    return Path(__file__).resolve().parents[1] / "references"
+
+
+def load_text(path: Path) -> str:
+    return path.read_text(encoding="utf-8").strip()
+
+
+def extract_markdown_section(text: str, title: str) -> str:
+    pattern = re.compile(
+        rf"^## {re.escape(title)}\s*$\n(?P<body>.*?)(?=^## |\Z)",
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    match = pattern.search(text)
+    return match.group("body").strip() if match else ""
+
+
+def load_subject_stage(subject: str, stage: str) -> dict[str, str]:
+    body = load_text(reference_root() / SUBJECT_FILES[subject])
+    return {
+        "common": extract_markdown_section(body, REFERENCE_SECTIONS["common"]),
+        stage: extract_markdown_section(body, REFERENCE_SECTIONS[stage]),
+    }
+
+
+def load_template_stage(stage: str) -> str:
+    template_body = load_text(reference_root() / "prompt-templates.md")
+    return extract_markdown_section(template_body, TEMPLATE_SECTIONS[stage])
 
 
 def build_prompts(
     subject: str,
     topic: str,
-    goal: str,
-    audience: str,
-    style: str,
-    runtime_seconds: int,
+    content: str,
+    ui_theme: str,
 ) -> dict[str, object]:
-    guidance = SUBJECT_GUIDANCE[subject]
-
-    concept_system = (
-        "You are a subject-specialized animation planner. Design a teaching-first "
-        "Manim scene plan before any code is written. Keep the plan executable, "
-        "visually concrete, and aligned with the target audience."
-    )
-    concept_user = textwrap.dedent(
-        f"""
-        Topic: {topic}
-        Goal: {goal}
-        Audience: {audience}
-        Target runtime: {runtime_seconds} seconds
-        Style: {style}
-
-        Subject constraints:
-        {guidance}
-
-        Return:
-        1. Learning objective
-        2. Visual storyline in 4-8 beats
-        3. Object list with labels, formulas or state variables, colors, and layout
-        4. Timing notes per beat
-        5. Risks that could make the final Manim code invalid or visually confusing
-        """
-    ).strip()
-
-    code_system = (
-        "You are a Python Manim CE engineer. Write executable code from an "
-        "approved animation plan. Output exactly one Python code block and "
-        "nothing else."
-    )
-    code_user = textwrap.dedent(
-        f"""
-        Implement the approved plan below as one Manim scene.
-
-        Topic: {topic}
-        Goal: {goal}
-        Audience: {audience}
-        Style: {style}
-
-        Approved plan:
-        [PASTE_APPROVED_PLAN_HERE]
-
-        Subject constraints:
-        {guidance}
-
-        Constraints:
-        - Use from manim import *
-        - Use standard Manim CE classes unless helpers are explicitly supplied
-        - No placeholder comments, pseudo-code, or missing variables
-        - Keep coordinates, colors, labels, durations, and data concrete
-        - Favor reliability and clarity over flashy but fragile effects
-        """
-    ).strip()
-
-    repair_system = (
-        "You are repairing an existing Python Manim CE script. Keep working "
-        "parts intact and make the smallest change set that restores correctness "
-        "and execution."
-    )
-    repair_user = textwrap.dedent(
-        f"""
-        Fix the following Python Manim scene.
-
-        Topic: {topic}
-        Goal: {goal}
-        Intended audience: {audience}
-        Subject constraints:
-        {guidance}
-
-        Original intent:
-        [PASTE_INTENT_OR_STORYBOARD_HERE]
-
-        Current code:
-        [PASTE_CODE_HERE]
-
-        Observed error or visual mismatch:
-        [PASTE_ERROR_LOG_OR_ISSUE_HERE]
-
-        Requirements:
-        - Explain the root cause briefly
-        - Return one corrected Python code block
-        - Preserve scene structure unless it directly causes the failure
-        """
-    ).strip()
-
     return {
         "subject": subject,
         "topic": topic,
-        "goal": goal,
-        "concept_design": {
-            "system": concept_system,
-            "user": concept_user,
-        },
-        "code_generation": {
-            "system": code_system,
-            "user": code_user,
-        },
-        "repair": {
-            "system": repair_system,
-            "user": repair_user,
+        "content": content,
+        "ui_theme": ui_theme,
+        "how_to_use": [
+            "planner 用于先产出分镜和风险，不直接写代码",
+            "coder 只在拿到已确认的 plan 后生成 Manim 代码",
+            "critic 只做审查，不返回修复代码",
+            "repair 只做最小修复，不推翻原场景",
+        ],
+        "stages": {
+            stage: {
+                "subject_reference": load_subject_stage(subject, stage),
+                "template_reference": load_template_stage(stage),
+                "user_seed": {
+                    "subject": subject,
+                    "topic": topic,
+                    "content": content,
+                    "ui_theme": ui_theme,
+                },
+            }
+            for stage in ("planner", "coder", "critic", "repair")
         },
     }
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Build subject-specific prompt bundles for Python Manim.",
+        description="Inspect staged subject references for Manim prompt authoring.",
     )
     parser.add_argument(
         "--subject",
         required=True,
-        choices=sorted(SUBJECT_GUIDANCE),
+        choices=sorted(SUBJECT_FILES),
         help="Primary subject domain.",
     )
     parser.add_argument("--topic", required=True, help="Topic to animate.")
-    parser.add_argument("--goal", required=True, help="Main teaching goal.")
+    parser.add_argument("--content", required=True, help="Teaching content or problem statement.")
     parser.add_argument(
-        "--audience",
-        default="general learners",
-        help="Target audience or grade level.",
-    )
-    parser.add_argument(
-        "--style",
-        default="clean educational animation",
-        help="Desired visual or teaching style.",
-    )
-    parser.add_argument(
-        "--runtime-seconds",
-        type=int,
-        default=45,
-        help="Target runtime for the scene.",
+        "--ui-theme",
+        default="dark",
+        choices=["dark", "light"],
+        help="Target product theme that the scene should visually match.",
     )
     return parser.parse_args()
 
@@ -187,10 +124,8 @@ def main() -> None:
     prompts = build_prompts(
         subject=args.subject,
         topic=args.topic,
-        goal=args.goal,
-        audience=args.audience,
-        style=args.style,
-        runtime_seconds=args.runtime_seconds,
+        content=args.content,
+        ui_theme=args.ui_theme,
     )
     print(json.dumps(prompts, ensure_ascii=False, indent=2))
 

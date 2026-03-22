@@ -4,29 +4,34 @@ from app.schemas import TopicDomain
 
 DOMAIN_PROMPT_GUIDANCE: dict[TopicDomain, str] = {
     TopicDomain.ALGORITHM: (
-        "Focus on state variables, invariants, pointer movement, array changes, "
-        "and the exact event that advances the algorithm."
+        "Focus on concrete state transitions: active variables, invariants, advancing events, "
+        "termination conditions, and why the algorithm can move to the next step."
     ),
     TopicDomain.MATH: (
-        "Preserve symbolic continuity, define notation before transforming it, "
-        "and keep formulas numerically consistent with any plotted object."
+        "Preserve symbolic continuity, define notation before using it, and keep formulas, "
+        "diagrams, and plotted values mutually consistent."
     ),
     TopicDomain.CODE: (
-        "Treat the source code as the ground truth. Extract data structures, control flow, "
-        "state updates, and termination conditions directly from the code before planning visuals."
+        "Treat the source code as ground truth. Extract structure, control flow, state updates, "
+        "and termination directly from the code before choosing visuals."
     ),
     TopicDomain.PHYSICS: (
-        "Model first: objects, forces, constraints, units, and governing laws must be explicit."
+        "Model first: objects, reference frame, known quantities, constraints, units, "
+        "and governing "
+        "laws must be explicit before motion or equations appear."
     ),
     TopicDomain.CHEMISTRY: (
-        "Track atom identity, bond changes, and reaction conditions with consistent labels."
+        "Track species identity, bond changes, charge, phase, and reaction conditions "
+        "with stable labels."
     ),
     TopicDomain.BIOLOGY: (
-        "Make scale, stage order, and causal flow explicit. "
-        "Avoid collapsing multiple levels at once."
+        "Make biological scale, stage order, and causal flow explicit, and avoid mixing multiple "
+        "levels of organization in one unexplained jump."
     ),
     TopicDomain.GEOGRAPHY: (
-        "Fix map scope, direction, and legend first, then reveal one spatial pattern at a time."
+        "Fix map scope, orientation, legend, and time anchor first, then reveal one "
+        "spatial pattern "
+        "or regional contrast at a time."
     ),
 }
 

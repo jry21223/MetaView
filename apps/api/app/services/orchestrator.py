@@ -1,3 +1,4 @@
+import inspect
 from uuid import uuid4
 
 from app.config import Settings
@@ -11,7 +12,10 @@ from app.schemas import (
     PipelineRunDetail,
     PipelineRunSummary,
     PipelineRuntime,
+    PromptReferenceRequest,
+    PromptReferenceResponse,
     ProviderDescriptor,
+    ProviderKind,
     RuntimeCatalog,
     SandboxMode,
     ValidationStatus,
@@ -24,11 +28,14 @@ from app.services.preview_video_renderer import (
     PreviewVideoRenderer,
     PreviewVideoRenderError,
 )
+from app.services.prompt_authoring import generate_reference_artifact
 from app.services.providers.registry import ProviderRegistry
 from app.services.repair import PipelineRepairService
 from app.services.sandbox import PreviewDryRunSandbox
 from app.services.skill_catalog import SubjectSkillRegistry
+from app.services.tts_service import build_tts_service
 from app.services.validation import CirValidator
+from app.services.video_narration import VideoNarrationError, VideoNarrationService
 
 
 class PipelineOrchestrator:
@@ -56,6 +63,20 @@ class PipelineOrchestrator:
         self.default_generation_provider = (
             settings.default_generation_provider or settings.default_provider
         )
+        self.preview_tts_enabled = settings.preview_tts_enabled
+        self.preview_tts_backend = settings.preview_tts_backend
+        self.preview_tts_model = settings.preview_tts_model
+        self.preview_tts_base_url = settings.preview_tts_base_url
+        self.preview_tts_api_key = settings.preview_tts_api_key
+        self.preview_tts_voice = settings.preview_tts_voice
+        self.preview_tts_rate_wpm = settings.preview_tts_rate_wpm
+        self.preview_tts_speed = settings.preview_tts_speed
+        self.preview_tts_max_chars = settings.preview_tts_max_chars
+        self.preview_tts_timeout_s = settings.preview_tts_timeout_s
+        self.preview_media_root = settings.preview_media_root
+        self.openai_base_url = settings.openai_base_url
+        self.openai_api_key = settings.openai_api_key
+        self.openai_timeout_s = settings.openai_timeout_s
         self.sandbox = PreviewDryRunSandbox(timeout_ms=settings.sandbox_timeout_ms)
         self.validator = CirValidator()
         self.repair_service = PipelineRepairService()
@@ -78,6 +99,27 @@ class PipelineOrchestrator:
             manim_disable_caching=settings.manim_disable_caching,
             manim_render_timeout_s=settings.manim_render_timeout_s,
         )
+        self.video_narration_service = VideoNarrationService(
+            output_root=settings.preview_media_root,
+            enabled=settings.preview_tts_enabled,
+            default_voice=settings.preview_tts_voice,
+            default_rate_wpm=settings.preview_tts_rate_wpm,
+            max_chars=settings.preview_tts_max_chars,
+            tts_service=build_tts_service(
+                backend=settings.preview_tts_backend,
+                default_voice=settings.preview_tts_voice,
+                default_rate_wpm=settings.preview_tts_rate_wpm,
+                remote_base_url=settings.preview_tts_base_url,
+                remote_api_key=settings.preview_tts_api_key,
+                remote_model=settings.preview_tts_model,
+                remote_timeout_s=settings.preview_tts_timeout_s
+                if settings.preview_tts_timeout_s is not None
+                else settings.openai_timeout_s,
+                remote_speed=settings.preview_tts_speed,
+                fallback_base_url=settings.openai_base_url,
+                fallback_api_key=settings.openai_api_key,
+            ),
+        )
 
     def runtime_catalog(self) -> RuntimeCatalog:
         return RuntimeCatalog(
@@ -88,6 +130,34 @@ class PipelineOrchestrator:
             providers=self.provider_registry.list_descriptors(),
             skills=self.skill_registry.list_descriptors(),
             sandbox_modes=[SandboxMode.DRY_RUN, SandboxMode.OFF],
+        )
+
+    def generate_prompt_reference(
+        self, request: PromptReferenceRequest
+    ) -> PromptReferenceResponse:
+        provider_name = request.provider or self.default_generation_provider
+        provider = self.provider_registry.get(provider_name)
+        if (
+            provider.descriptor.kind != ProviderKind.OPENAI_COMPATIBLE
+            or not hasattr(provider, "complete_text")
+            or not hasattr(provider, "model_for_stage")
+        ):
+            raise ValueError("Prompt 参考文件生成仅支持 OpenAI 兼容 provider。")
+
+        artifact = generate_reference_artifact(
+            provider,
+            domain=request.subject,
+            notes=request.notes,
+            write=request.write,
+        )
+        return PromptReferenceResponse(
+            subject=request.subject,
+            provider=provider.descriptor.name,
+            model=provider.model_for_stage("planning"),
+            output_path=str(artifact.output_path),
+            markdown=artifact.markdown,
+            wrote_file=artifact.wrote_file,
+            raw_output=artifact.raw_output,
         )
 
     def run(self, request: PipelineRequest) -> PipelineResponse:
@@ -127,17 +197,23 @@ class PipelineOrchestrator:
         preview_video_url: str | None = None
         preview_video_backend: str | None = None
         render_error_message: str | None = None
+        audio_diagnostics: list[AgentDiagnostic] = []
 
-        planning_hints, planning_trace = generation_provider.plan(
+        planning_hints, planning_trace = self._call_provider_method(
+            generation_provider.plan,
             prompt=effective_request.prompt,
             domain=effective_domain.value,
             skill_brief=skill.planning_brief(has_image=bool(request.source_image)),
             source_image=request.source_image,
             source_code=request.source_code,
             source_code_language=request.source_code_language,
+            ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
         )
         agent_traces.append(planning_trace)
         cir = self.planner.run(effective_request, skill=skill, hints=planning_hints)
+        preview_narration_text = (
+            self.build_pipeline_narration(cir) if request.enable_narration else None
+        )
         validation_report = self.validator.validate(cir)
 
         if (
@@ -149,7 +225,11 @@ class PipelineOrchestrator:
             repair_count += 1
             validation_report = self.validator.validate(cir)
 
-        coding_hints, coding_trace = generation_provider.code(cir)
+        coding_hints, coding_trace = self._call_provider_method(
+            generation_provider.code,
+            cir,
+            ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
+        )
         agent_traces.append(coding_trace)
         if coding_hints.renderer_script:
             prepared_script, prepare_error = self._prepare_provider_script(
@@ -181,6 +261,7 @@ class PipelineOrchestrator:
                         agent_traces=agent_traces,
                         repair_actions=repair_actions,
                         stage_label="script-prepare",
+                        ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
                     )
                     repair_count += 1
                     if repaired_script is not None:
@@ -209,6 +290,7 @@ class PipelineOrchestrator:
             generation_provider=generation_provider,
             cir=cir,
             renderer_script=renderer_script,
+            ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
         )
         agent_traces.append(critique_trace)
         blocking_issues = self.repair_service.collect_blocking_script_issues(
@@ -224,6 +306,7 @@ class PipelineOrchestrator:
                 agent_traces=agent_traces,
                 repair_actions=repair_actions,
                 stage_label="critic-review",
+                ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
             )
             repair_count += 1
             if repaired_script is not None:
@@ -233,6 +316,7 @@ class PipelineOrchestrator:
                     generation_provider=generation_provider,
                     cir=cir,
                     renderer_script=renderer_script,
+                    ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
                 )
                 agent_traces.append(critique_trace)
         sandbox_report = self.sandbox.run(
@@ -257,6 +341,7 @@ class PipelineOrchestrator:
                 agent_traces=agent_traces,
                 repair_actions=repair_actions,
                 stage_label="sandbox",
+                ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
             )
             repair_count += 1
             if repaired_script is not None:
@@ -266,6 +351,7 @@ class PipelineOrchestrator:
                     generation_provider=generation_provider,
                     cir=cir,
                     renderer_script=renderer_script,
+                    ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
                 )
                 agent_traces.append(critique_trace)
                 sandbox_report = self.sandbox.run(
@@ -286,9 +372,17 @@ class PipelineOrchestrator:
                 script=renderer_script,
                 request_id=request_id,
                 cir=cir,
+                ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
             )
             preview_video_url = preview_video.url
             preview_video_backend = preview_video.backend
+            for message in self.maybe_embed_preview_narration(
+                request_id=request_id,
+                preview_video_path=preview_video.file_path,
+                narration_text=preview_narration_text,
+                generation_provider=generation_provider,
+            ):
+                audio_diagnostics.append(AgentDiagnostic(agent="audio", message=message))
         except PreviewVideoRenderError as exc:
             render_error_message = str(exc)
             if repair_count < self.max_repair_attempts:
@@ -304,6 +398,7 @@ class PipelineOrchestrator:
                     agent_traces=agent_traces,
                     repair_actions=repair_actions,
                     stage_label="real-render",
+                    ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
                 )
                 repair_count += 1
                 if repaired_script is not None:
@@ -313,6 +408,7 @@ class PipelineOrchestrator:
                         generation_provider=generation_provider,
                         cir=cir,
                         renderer_script=renderer_script,
+                        ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
                     )
                     agent_traces.append(critique_trace)
                     sandbox_report = self.sandbox.run(
@@ -323,9 +419,23 @@ class PipelineOrchestrator:
                             script=renderer_script,
                             request_id=request_id,
                             cir=cir,
+                            ui_theme=(
+                                request.ui_theme.value
+                                if request.ui_theme is not None
+                                else None
+                            ),
                         )
                         preview_video_url = preview_video.url
                         preview_video_backend = preview_video.backend
+                        for message in self.maybe_embed_preview_narration(
+                            request_id=request_id,
+                            preview_video_path=preview_video.file_path,
+                            narration_text=preview_narration_text,
+                            generation_provider=generation_provider,
+                        ):
+                            audio_diagnostics.append(
+                                AgentDiagnostic(agent="audio", message=message)
+                            )
                     except PreviewVideoRenderError as retry_exc:
                         render_error_message = str(retry_exc)
 
@@ -349,6 +459,7 @@ class PipelineOrchestrator:
             + diagnostics
             + self._sandbox_diagnostics(sandbox_report)
             + self._repair_diagnostics(repair_actions)
+            + audio_diagnostics
             + (
                 [
                     AgentDiagnostic(
@@ -404,11 +515,14 @@ class PipelineOrchestrator:
         generation_provider,
         cir,
         renderer_script: str,
+        ui_theme: str | None = None,
     ):
-        critique_hints, critique_trace = generation_provider.critique(
+        critique_hints, critique_trace = self._call_provider_method(
+            generation_provider.critique,
             title=cir.title,
             renderer_script=renderer_script,
             domain=cir.domain,
+            ui_theme=ui_theme,
         )
         diagnostics = self.critic.run(cir, hints=critique_hints)
         return critique_hints, critique_trace, diagnostics
@@ -423,6 +537,7 @@ class PipelineOrchestrator:
         agent_traces: list[AgentTrace],
         repair_actions: list[str],
         stage_label: str,
+        ui_theme: str | None = None,
     ) -> tuple[str | None, str]:
         if not issues:
             return None, "未收集到可用于修复的错误信息。"
@@ -433,10 +548,12 @@ class PipelineOrchestrator:
             f"已将 {stage_label} 阶段发现的 {len(issues)} 条问题回传给 generation provider 修复。"
         )
         try:
-            repair_hints, repair_trace = generation_provider.repair_code(
+            repair_hints, repair_trace = self._call_provider_method(
+                generation_provider.repair_code,
                 cir=cir,
                 renderer_script=renderer_script,
                 issues=issues,
+                ui_theme=ui_theme,
             )
         except Exception as exc:
             message = f"远程修复调用失败：{exc}"
@@ -485,6 +602,96 @@ class PipelineOrchestrator:
 
     def delete_custom_provider(self, name: str) -> bool:
         return self.provider_registry.delete_custom_provider(name)
+
+    def _call_provider_method(self, method, *args, **kwargs):
+        signature = inspect.signature(method)
+        accepts_kwargs = any(
+            parameter.kind == inspect.Parameter.VAR_KEYWORD
+            for parameter in signature.parameters.values()
+        )
+        if accepts_kwargs:
+            return method(*args, **kwargs)
+
+        filtered_kwargs = {
+            key: value
+            for key, value in kwargs.items()
+            if key in signature.parameters
+        }
+        return method(*args, **filtered_kwargs)
+
+    def build_pipeline_narration(self, cir) -> str:
+        return self.video_narration_service.build_pipeline_narration(cir)
+
+    def maybe_embed_preview_narration(
+        self,
+        *,
+        request_id: str,
+        preview_video_path,
+        narration_text: str | None,
+        generation_provider=None,
+    ) -> list[str]:
+        if not narration_text or not narration_text.strip():
+            return []
+        narration_service = self._narration_service_for_provider(generation_provider)
+        if not narration_service.enabled:
+            return []
+        if not narration_service.is_available():
+            return [
+                (
+                    f"{self.preview_tts_model} 或 ffmpeg 不可用，已跳过旁白嵌入。"
+                    "请检查 TTS Base URL、API Key 或 generation provider 的兼容音频接口。"
+                )
+            ]
+
+        try:
+            artifacts = narration_service.embed_narration(
+                request_id=request_id,
+                video_path=preview_video_path,
+                narration_text=narration_text,
+            )
+        except VideoNarrationError as exc:
+            return [f"旁白嵌入失败：{exc}"]
+
+        return [
+            (
+                f"已使用 {artifacts.tts_backend} 为预览视频嵌入旁白，"
+                f"音轨文件已输出到 {artifacts.audio_path.name}。"
+            )
+        ]
+
+    def _narration_service_for_provider(self, generation_provider):
+        provider_base_url = getattr(generation_provider, "base_url", None)
+        provider_api_key = getattr(generation_provider, "api_key", None)
+
+        if (
+            not provider_base_url
+            and not provider_api_key
+            and not self.preview_tts_base_url
+            and not self.preview_tts_api_key
+        ):
+            return self.video_narration_service
+
+        return VideoNarrationService(
+            output_root=self.preview_media_root,
+            enabled=self.preview_tts_enabled,
+            default_voice=self.preview_tts_voice,
+            default_rate_wpm=self.preview_tts_rate_wpm,
+            max_chars=self.preview_tts_max_chars,
+            tts_service=build_tts_service(
+                backend=self.preview_tts_backend,
+                default_voice=self.preview_tts_voice,
+                default_rate_wpm=self.preview_tts_rate_wpm,
+                remote_base_url=self.preview_tts_base_url or provider_base_url,
+                remote_api_key=self.preview_tts_api_key or provider_api_key,
+                remote_model=self.preview_tts_model,
+                remote_timeout_s=self.preview_tts_timeout_s
+                if self.preview_tts_timeout_s is not None
+                else self.openai_timeout_s,
+                remote_speed=self.preview_tts_speed,
+                fallback_base_url=self.openai_base_url,
+                fallback_api_key=self.openai_api_key,
+            ),
+        )
 
     def _sandbox_diagnostics(self, sandbox_report) -> list[AgentDiagnostic]:
         diagnostics: list[AgentDiagnostic] = []

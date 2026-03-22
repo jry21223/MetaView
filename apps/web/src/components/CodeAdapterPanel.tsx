@@ -1,6 +1,8 @@
 import { useState } from "react";
 
 import { prepareManimScript, renderManimScript } from "../api/client";
+import { HighlightedCode } from "./HighlightedCode";
+import { VideoPreview } from "./VideoPreview";
 import type {
   ManimScriptPrepareResponse,
   ManimScriptRenderResponse,
@@ -15,6 +17,7 @@ def construct(self):
 export function CodeAdapterPanel() {
   const [source, setSource] = useState(defaultSource);
   const [sceneClassName, setSceneClassName] = useState("GeneratedScene");
+  const [narrationText, setNarrationText] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ManimScriptPrepareResponse | null>(null);
@@ -55,7 +58,12 @@ export function CodeAdapterPanel() {
     setError(null);
 
     try {
-      const rendered = await renderManimScript(source, sceneClassName, true);
+      const rendered = await renderManimScript(
+        source,
+        sceneClassName,
+        true,
+        narrationText || null,
+      );
       setResult(rendered);
       setRenderResult(rendered);
     } catch (requestError) {
@@ -92,6 +100,16 @@ export function CodeAdapterPanel() {
           <input
             value={sceneClassName}
             onChange={(event) => setSceneClassName(event.target.value)}
+          />
+        </label>
+
+        <label>
+          <span>旁白文本（可选）</span>
+          <textarea
+            rows={4}
+            value={narrationText}
+            onChange={(event) => setNarrationText(event.target.value)}
+            placeholder="填写后，后端会在渲染完成后尝试把旁白嵌入视频。"
           />
         </label>
 
@@ -133,16 +151,15 @@ export function CodeAdapterPanel() {
             ))}
           </ul>
           {renderResult ? (
-            <div className="preview-video-shell preview-video-shell-compact">
-              <video
-                className="preview-video"
-                src={resolveMediaUrl(renderResult.preview_video_url)}
-                controls
-                playsInline
-              />
-            </div>
+            <VideoPreview
+              src={resolveMediaUrl(renderResult.preview_video_url)}
+              title="转换测试视频"
+              meta={renderResult.scene_class_name}
+              compact
+              downloadName={`${renderResult.request_id}.mp4`}
+            />
           ) : null}
-          <pre>{result.code}</pre>
+          <HighlightedCode code={result.code} language="python" className="highlighted-code-surface" />
         </div>
       ) : null}
     </section>

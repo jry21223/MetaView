@@ -8,7 +8,7 @@
 
 - `apps/api`: FastAPI 后端，提供 CIR 规划、多智能体编排、验证修复、历史持久化和运行时目录。
 - `apps/web`: React + Vite 前端，提供多学科题目输入、物理题图上传、历史回看、视频预览、自定义代码转换测试和模型提供商管理。
-- `skills`: 按学科拆分的 skill 模块，沉淀算法、数学、物理、化学、生物、地理的领域规则。
+- `skills`: 仅保留运行时实际使用的 prompt 参考资料与生成脚本，供多学科 staged prompt 组装使用。
 - `docs`: 架构说明、研发路线和 Git 协作规范。
 - `docker-compose.yml`: API + Web 联调与部署入口。
 
@@ -19,14 +19,17 @@
 3. 后端先由路由模型自动判断题目所属学科，再把已启用的 subject skill 注入规划/编码模型，生成结构化 CIR，执行验证与自动修复。
 4. 后端执行脚本级 dry-run 校验，并持久化任务到 SQLite。
 5. 后端输出 Python Manim 脚本并生成 MP4 预览，前端负责播放视频、查看调试信息和回看历史结果。
+6. 若已配置 `mimotts-v2`，后端会在视频渲染完成后自动合成中文旁白并嵌入 MP4。
 
-当前默认启用三个模块：
+当前默认启用全部七个学科模块：
 
 - `algorithm`
 - `math`
 - `code`
-
-其他学科规则仍保留在代码里，但默认不加载。可通过环境变量 `ALGO_VIS_ENABLED_DOMAINS` 开启。
+- `physics`
+- `chemistry`
+- `biology`
+- `geography`
 
 ## 快速开始
 
@@ -52,6 +55,7 @@ make dev-api
 - `GET /health`
 - `GET /api/v1/runtime`
 - `POST /api/v1/pipeline`
+- `POST /api/v1/prompts/reference`
 - `GET /api/v1/runs`
 - `GET /api/v1/runs/{request_id}`
 - `POST /api/v1/providers/custom`
@@ -93,7 +97,7 @@ make docker-up
 
 ## 环境变量
 
-- `ALGO_VIS_ENABLED_DOMAINS`: 当前启用的学科模块，逗号分隔，默认 `algorithm,math`
+- `ALGO_VIS_ENABLED_DOMAINS`: 当前启用的学科模块，逗号分隔，默认 `algorithm,math,code,physics,chemistry,biology,geography`
 - `ALGO_VIS_HISTORY_DB_PATH`: SQLite 历史库路径
 - `ALGO_VIS_CORS_ORIGIN_REGEX`: 本地联调默认允许的浏览器来源规则
 - `ALGO_VIS_DEFAULT_ROUTER_PROVIDER`: 默认路由模型
@@ -101,6 +105,15 @@ make docker-up
 - `ALGO_VIS_PREVIEW_RENDER_BACKEND`: `auto`、`manim` 或 `fallback`
 - `ALGO_VIS_MANIM_PYTHON_PATH`: 真实渲染时使用的 Python 环境，默认 `.venv-manim/bin/python`
 - `ALGO_VIS_MANIM_RENDER_TIMEOUT_S`: 单次 `manim` 渲染超时，默认 180 秒
+- `ALGO_VIS_PREVIEW_TTS_ENABLED`: 是否启用预览视频自动配音，默认 `true`
+- `ALGO_VIS_PREVIEW_TTS_BACKEND`: TTS 后端，当前默认 `openai_compatible`
+- `ALGO_VIS_PREVIEW_TTS_MODEL`: 旁白模型名，默认 `mimotts-v2`
+- `ALGO_VIS_PREVIEW_TTS_BASE_URL`: `mimotts-v2` 所在的 OpenAI 兼容 `/v1` 根地址；留空时会优先复用 generation provider 的地址
+- `ALGO_VIS_PREVIEW_TTS_API_KEY`: `mimotts-v2` API Key；留空时会优先复用 generation provider 或内置 `openai` provider 的 key
+- `ALGO_VIS_PREVIEW_TTS_VOICE`: 远程 TTS 的 voice 参数，默认 `default`
+- `ALGO_VIS_PREVIEW_TTS_RATE_WPM`: 目标语速，默认 `150`
+- `ALGO_VIS_PREVIEW_TTS_SPEED`: 远程 TTS 的基础 speed，默认 `0.88`
+- `ALGO_VIS_PREVIEW_TTS_TIMEOUT_S`: 单次远程配音超时，默认 `120`
 - `ALGO_VIS_OPENAI_API_KEY`: 启用内置 OpenAI 兼容 Provider
 - `ALGO_VIS_OPENAI_BASE_URL`: OpenAI 兼容 API 地址
 - `ALGO_VIS_OPENAI_MODEL`: 使用的模型名
@@ -115,19 +128,15 @@ make docker-up
 
 ## 学科技能层
 
-当前默认启用 skill：
+运行时真正生效的学科描述符定义在 [skill_catalog.py](/Users/jerry/Desktop/demoo/apps/api/app/services/skill_catalog.py)，用于：
 
-- `algorithm-process-viz`
-- `math-theorem-walkthrough`
-- `source-code-algorithm-viz`
-- `physics-simulation-viz`
-- `molecular-structure-viz`
-- `biology-process-viz`
-- `geospatial-process-viz`
+- 控制智能模式 / 专家模式下的学科路由信息
+- 向 Planner / Coder / Critic 注入学科聚焦说明
+- 告知前端当前学科是否支持题图输入
 
-这些 skill 会作为显式约束注入 Planner / Coder / Critic；仓库中的实现位于 [skills](/Users/jerry/Desktop/demoo/skills)。
+运行时真正读取的学科参考提示词位于 [skills/generate-subject-manim-prompts/references](/Users/jerry/Desktop/demoo/skills/generate-subject-manim-prompts/references)，按 `Common / Planner / Coder / Critic / Repair` 分段装配。仓库里原先那些顶层 legacy skill 目录已经移除，不再参与运行时。
 
-其中物理 skill 已支持“静态题目图片 -> 物理建模 -> 动图草案”的首版链路：前端可上传题图，后端会先把对象、约束、已知量和目标量提取成建模提示，再生成符合物理定律的预览流程。
+其中物理链路已支持“静态题目图片 -> 物理建模 -> 动图草案”：前端可上传题图，后端会先提取对象、约束、已知量和目标量，再生成符合物理定律的预览流程。
 
 ## Manim 特化模型接入
 
@@ -166,6 +175,20 @@ make docker-up
 
 新增学科或模块时，优先扩展这里，而不是回到 `openai.py` 里写硬编码字符串。
 
+如果你要让模型直接帮你重写某个学科的 reference 文件，可用：
+
+```bash
+python skills/generate-subject-manim-prompts/scripts/generate_reference_with_llm.py \
+  --subject algorithm \
+  --notes "强调二分、滑窗、图搜索的状态同步与终止条件" \
+  --write
+```
+
+默认会复用 `.env` 中的 `ALGO_VIS_OPENAI_BASE_URL`、`ALGO_VIS_OPENAI_API_KEY`、`ALGO_VIS_OPENAI_MODEL`
+或 `ALGO_VIS_OPENAI_PLANNING_MODEL`。先检查请求内容可加 `--dry-run`。
+
+现在前端底部也内置了同一套工具，可以直接在网页里为任意学科生成或写回对应的 reference 文件。
+
 ## 自定义 Provider
 
 前端 Provider 面板现已支持：
@@ -180,6 +203,20 @@ make docker-up
 ## 渲染层说明
 
 当前主链路统一产出 Python Manim 脚本，并由后端生成 MP4 预览视频。前端不再承担 `py2ts` 或 `manim-web` 的实时转换职责，而是提供视频播放、原始返回查看和脚本转换测试入口。
+
+### TTS 配音
+
+当前默认按 `mimotts-v2` 作为预览视频的旁白模型。只要后端能拿到一组可用的 OpenAI 兼容音频接口配置，渲染完成后就会自动把中文旁白嵌进 MP4。
+
+前端“高级设置”里提供了请求级开关，可按单次任务决定是否嵌入旁白，而不是只能依赖全局环境变量。
+
+配置优先级：
+
+1. `ALGO_VIS_PREVIEW_TTS_BASE_URL` + `ALGO_VIS_PREVIEW_TTS_API_KEY`
+2. 当前 generation provider 的 `base_url` + `api_key`
+3. 内置 `openai` provider 的 `ALGO_VIS_OPENAI_BASE_URL` + `ALGO_VIS_OPENAI_API_KEY`
+
+如果这三层都没有可用配置，后端会跳过配音，并在 diagnostics 里明确提示 `mimotts-v2` 或 `ffmpeg` 不可用。
 
 真实渲染默认走 `auto` 模式：
 

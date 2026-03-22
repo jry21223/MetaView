@@ -17,6 +17,8 @@ from app.schemas import (
     PipelineResponse,
     PipelineRunDetail,
     PipelineRunSummary,
+    PromptReferenceRequest,
+    PromptReferenceResponse,
     ProviderDescriptor,
     RuntimeCatalog,
 )
@@ -112,11 +114,20 @@ def render_manim_endpoint(
     except PreviewVideoRenderError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
+    diagnostics = list(prepared.diagnostics)
+    diagnostics.extend(
+        orchestrator.maybe_embed_preview_narration(
+            request_id=request_id,
+            preview_video_path=preview_video.file_path,
+            narration_text=payload.narration_text,
+        )
+    )
+
     return ManimScriptRenderResponse(
         request_id=request_id,
         code=prepared.code,
         scene_class_name=prepared.scene_class_name,
-        diagnostics=prepared.diagnostics,
+        diagnostics=diagnostics,
         is_runnable=True,
         preview_video_url=preview_video.url,
         render_backend=preview_video.backend,
@@ -126,6 +137,21 @@ def render_manim_endpoint(
 @app.get(f"{settings.api_prefix}/runtime", response_model=RuntimeCatalog)
 def get_runtime_catalog() -> RuntimeCatalog:
     return orchestrator.runtime_catalog()
+
+
+@app.post(
+    f"{settings.api_prefix}/prompts/reference",
+    response_model=PromptReferenceResponse,
+)
+def generate_prompt_reference(
+    payload: PromptReferenceRequest,
+) -> PromptReferenceResponse:
+    try:
+        return orchestrator.generate_prompt_reference(payload)
+    except (ProviderUnavailableError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ProviderInvocationError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @app.get(f"{settings.api_prefix}/runs", response_model=list[PipelineRunSummary])

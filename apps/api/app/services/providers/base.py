@@ -46,10 +46,11 @@ class ModelProvider(Protocol):
         source_image: str | None = None,
         source_code: str | None = None,
         source_code_language: str | None = None,
+        ui_theme: str | None = None,
     ) -> tuple[PlanningHints, AgentTrace]:
         ...
 
-    def code(self, cir: CirDocument) -> tuple[CodingHints, AgentTrace]:
+    def code(self, cir: CirDocument, ui_theme: str | None = None) -> tuple[CodingHints, AgentTrace]:
         ...
 
     def critique(
@@ -57,6 +58,7 @@ class ModelProvider(Protocol):
         title: str,
         renderer_script: str,
         domain: TopicDomain,
+        ui_theme: str | None = None,
     ) -> tuple[CritiqueHints, AgentTrace]:
         ...
 
@@ -65,5 +67,6 @@ class ModelProvider(Protocol):
         cir: CirDocument,
         renderer_script: str,
         issues: list[str],
+        ui_theme: str | None = None,
     ) -> tuple[CodingHints, AgentTrace]:
         ...

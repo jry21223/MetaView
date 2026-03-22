@@ -11,8 +11,33 @@ from app.schemas import (
 from app.services.preview_video_renderer import PreviewVideoArtifacts
 from app.services.providers.base import CodingHints, CritiqueHints, PlanningHints
 from app.services.providers.openai import ProviderInvocationError
+from app.services.skill_catalog import SubjectSkillRegistry
 
 client = TestClient(app)
+
+
+def _stub_preview_renderer(monkeypatch, tmp_path) -> None:
+    def fake_render(**kwargs):
+        request_id = kwargs["request_id"]
+        output = tmp_path / f"{request_id}.mp4"
+        output.write_bytes(b"fake")
+        return PreviewVideoArtifacts(
+            file_path=output,
+            url=f"/media/{output.name}",
+            backend="storyboard-fallback",
+        )
+
+    monkeypatch.setattr(orchestrator.preview_video_renderer, "render", fake_render)
+    monkeypatch.setattr(orchestrator.video_narration_service, "is_available", lambda: False)
+
+
+def _run_pipeline(payload: dict, monkeypatch, tmp_path) -> dict:
+    _stub_preview_renderer(monkeypatch, tmp_path)
+    response = client.post("/api/v1/pipeline", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["preview_video_url"]
+    return data
 
 
 def test_healthcheck() -> None:
@@ -64,7 +89,9 @@ def test_runtime_catalog() -> None:
     assert payload["providers"][0]["label"] == "Mock Provider"
     assert payload["providers"][1]["name"] == "openai"
     assert payload["providers"][1]["configured"] is False
-    assert [skill["domain"] for skill in payload["skills"]] == ["algorithm", "math", "code"]
+    assert [skill["domain"] for skill in payload["skills"]] == [
+        domain.value for domain in TopicDomain
+    ]
 
 
 def test_runtime_catalog_allows_local_dev_cors_origin() -> None:
@@ -74,6 +101,98 @@ def test_runtime_catalog_allows_local_dev_cors_origin() -> None:
     )
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:4174"
+
+
+def test_generate_prompt_reference_endpoint(monkeypatch) -> None:
+    class PromptStubProvider:
+        descriptor = ProviderDescriptor(
+            name="prompt-stub",
+            label="Prompt Stub",
+            kind=ProviderKind.OPENAI_COMPATIBLE,
+            model="prompt-model-v1",
+            description="stub prompt authoring provider",
+            configured=True,
+        )
+
+        def model_for_stage(self, stage: str) -> str:
+            assert stage == "planning"
+            return "prompt-model-v1"
+
+        def complete_text(
+            self,
+            *,
+            stage: str,
+            system_prompt: str,
+            user_prompt: str,
+            source_image: str | None = None,
+        ) -> tuple[str, str]:
+            assert stage == "planning"
+            assert "router -> planner -> coder -> critic -> repair" in user_prompt
+            return (
+                """
+# Algorithm Prompt Guidance
+
+## Common
+- one
+- two
+- three
+- four
+
+## Planner
+- one
+- two
+- three
+- four
+
+## Coder
+- one
+- two
+- three
+- four
+
+## Critic
+- one
+- two
+- three
+- four
+
+## Repair
+- one
+- two
+- three
+- four
+                """.strip(),
+                "raw markdown output",
+            )
+
+    original_get = orchestrator.provider_registry.get
+
+    def fake_get(name: str):
+        if name == "prompt-stub":
+            return PromptStubProvider()
+        return original_get(name)
+
+    monkeypatch.setattr(orchestrator.provider_registry, "get", fake_get)
+
+    response = client.post(
+        "/api/v1/prompts/reference",
+        json={
+            "subject": "algorithm",
+            "provider": "prompt-stub",
+            "notes": "强调循环不变量和边界同步。",
+            "write": False,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["subject"] == "algorithm"
+    assert payload["provider"] == "prompt-stub"
+    assert payload["model"] == "prompt-model-v1"
+    assert payload["wrote_file"] is False
+    assert payload["output_path"].endswith(
+        "skills/generate-subject-manim-prompts/references/algorithm.md"
+    )
+    assert payload["markdown"].startswith("# Algorithm Prompt Guidance")
 
 
 def test_prepare_manim_endpoint_extracts_and_wraps_code() -> None:
@@ -125,6 +244,66 @@ class Demo(Scene):
     payload = response.json()
     assert payload["preview_video_url"]
     assert payload["render_backend"] in {"manim-cli", "storyboard-fallback"}
+
+
+def test_render_manim_endpoint_can_embed_narration(monkeypatch, tmp_path) -> None:
+    def fake_render(
+        *,
+        script: str,
+        request_id: str,
+        scene_class_name: str,
+        require_real: bool,
+        ui_theme: str | None = None,
+    ):
+        output = tmp_path / f"{request_id}.mp4"
+        output.write_bytes(b"fake")
+        return PreviewVideoArtifacts(
+            file_path=output,
+            url="/media/fake-render.mp4",
+            backend="storyboard-fallback",
+        )
+
+    recorded: dict[str, str] = {}
+
+    def fake_embed(*, request_id: str, video_path, narration_text: str):
+        recorded["request_id"] = request_id
+        recorded["text"] = narration_text
+        return type(
+            "NarrationArtifacts",
+            (),
+            {
+                "tts_backend": "say",
+                "audio_path": tmp_path / f"{request_id}.m4a",
+            },
+        )()
+
+    monkeypatch.setattr(orchestrator.preview_video_renderer, "render", fake_render)
+    monkeypatch.setattr(orchestrator.video_narration_service, "is_available", lambda: True)
+    monkeypatch.setattr(orchestrator.video_narration_service, "embed_narration", fake_embed)
+
+    response = client.post(
+        "/api/v1/manim/render",
+        json={
+            "source": """
+```python
+from manim import *
+
+class Demo(Scene):
+    def construct(self):
+        title = Text("hello render")
+        self.play(Write(title))
+        self.wait(0.5)
+```
+            """.strip(),
+            "require_real": False,
+            "narration_text": "这是一个测试旁白。",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["preview_video_url"] == "/media/fake-render.mp4"
+    assert any("嵌入旁白" in diagnostic for diagnostic in payload["diagnostics"])
+    assert recorded["text"] == "这是一个测试旁白。"
 
 
 def test_pipeline_runs_history_endpoints() -> None:
@@ -187,7 +366,102 @@ int binarySearch(vector<int>& nums, int target) {
     assert "binary search" in payload["cir"]["summary"].lower()
 
 
-def test_pipeline_rejects_disabled_domain() -> None:
+def test_pipeline_routes_physics_prompt_to_physics_domain(monkeypatch, tmp_path) -> None:
+    payload = _run_pipeline(
+        {
+            "prompt": "请根据题图讲解斜面上小球的受力、加速度与运动轨迹。",
+            "provider": "mock",
+            "source_image": "data:image/png;base64,ZmFrZS1pbWFnZS1ieXRlcw==",
+            "source_image_name": "inclined-plane.png",
+            "sandbox_mode": "dry_run",
+            "persist_run": False,
+        },
+        monkeypatch,
+        tmp_path,
+    )
+    assert payload["cir"]["domain"] == "physics"
+    assert payload["runtime"]["skill"]["id"] == "physics-simulation-viz"
+    assert payload["runtime"]["skill"]["supports_image_input"] is True
+    assert payload["cir"]["steps"][0]["title"] == "题图解析"
+    assert payload["cir"]["steps"][1]["title"] == "受力建模"
+    assert "静态题图" in payload["cir"]["summary"]
+
+
+def test_pipeline_routes_chemistry_prompt_to_chemistry_domain(monkeypatch, tmp_path) -> None:
+    payload = _run_pipeline(
+        {
+            "prompt": "请可视化讲解分子结构中化学键的变化以及反应过程。",
+            "provider": "mock",
+            "sandbox_mode": "dry_run",
+            "persist_run": False,
+        },
+        monkeypatch,
+        tmp_path,
+    )
+    assert payload["cir"]["domain"] == "chemistry"
+    assert payload["runtime"]["skill"]["id"] == "molecular-structure-viz"
+    assert [step["title"] for step in payload["cir"]["steps"]] == [
+        "结构识别",
+        "反应推进",
+        "结果解释",
+    ]
+    assert "化学题" in payload["cir"]["summary"]
+
+
+def test_pipeline_routes_biology_prompt_to_biology_domain(monkeypatch, tmp_path) -> None:
+    payload = _run_pipeline(
+        {
+            "prompt": "请可视化讲解细胞有丝分裂各阶段的结构变化和调控过程。",
+            "provider": "mock",
+            "sandbox_mode": "dry_run",
+            "persist_run": False,
+        },
+        monkeypatch,
+        tmp_path,
+    )
+    assert payload["cir"]["domain"] == "biology"
+    assert payload["runtime"]["skill"]["id"] == "biology-process-viz"
+    assert [step["title"] for step in payload["cir"]["steps"]] == [
+        "结构定位",
+        "过程流转",
+        "功能结论",
+    ]
+    assert "生物题" in payload["cir"]["summary"]
+
+
+def test_pipeline_routes_geography_prompt_to_geography_domain(monkeypatch, tmp_path) -> None:
+    payload = _run_pipeline(
+        {
+            "prompt": "请可视化讲解水循环中的蒸发、降水与径流如何在区域内演化。",
+            "provider": "mock",
+            "sandbox_mode": "dry_run",
+            "persist_run": False,
+        },
+        monkeypatch,
+        tmp_path,
+    )
+    assert payload["cir"]["domain"] == "geography"
+    assert payload["runtime"]["skill"]["id"] == "geospatial-process-viz"
+    assert [step["title"] for step in payload["cir"]["steps"]] == [
+        "空间底图",
+        "时空演化",
+        "区域解释",
+    ]
+    assert "地理题" in payload["cir"]["summary"]
+
+
+def test_pipeline_rejects_disabled_domain(monkeypatch) -> None:
+    monkeypatch.setattr(
+        orchestrator,
+        "skill_registry",
+        SubjectSkillRegistry(
+            enabled_domains=(
+                TopicDomain.ALGORITHM,
+                TopicDomain.MATH,
+                TopicDomain.CODE,
+            )
+        ),
+    )
     response = client.post(
         "/api/v1/pipeline",
         json={
@@ -710,7 +984,13 @@ class FixedScene(Scene):
             return RepairingProvider()
         return original_get(name)
 
-    def fake_render(*, script: str, request_id: str, cir: CirDocument):
+    def fake_render(
+        *,
+        script: str,
+        request_id: str,
+        cir: CirDocument,
+        ui_theme: str | None = None,
+    ):
         assert "self.play(move_pointer())" not in script
         assert "move_pointer()" in script
         output = tmp_path / f"{request_id}.mp4"
@@ -740,3 +1020,130 @@ class FixedScene(Scene):
     assert payload["preview_video_url"] == "/media/fake.mp4"
     assert any(trace["agent"] == "repair" for trace in payload["runtime"]["agent_traces"])
     assert any("critic-review" in action for action in payload["runtime"]["repair_actions"])
+
+
+def test_pipeline_embeds_preview_narration_when_available(monkeypatch, tmp_path) -> None:
+    def fake_render(
+        *,
+        script: str,
+        request_id: str,
+        cir: CirDocument,
+        ui_theme: str | None = None,
+    ):
+        captured["ui_theme"] = ui_theme or ""
+        output = tmp_path / f"{request_id}.mp4"
+        output.write_bytes(b"fake")
+        return PreviewVideoArtifacts(
+            file_path=output,
+            url="/media/fake-narrated.mp4",
+            backend="storyboard-fallback",
+        )
+
+    captured: dict[str, str] = {}
+
+    def fake_build_pipeline_narration(cir: CirDocument) -> str:
+        return f"{cir.title} 的自动旁白"
+
+    def fake_embed(*, request_id: str, video_path, narration_text: str):
+        captured["request_id"] = request_id
+        captured["text"] = narration_text
+        return type(
+            "NarrationArtifacts",
+            (),
+            {
+                "tts_backend": "say",
+                "audio_path": tmp_path / f"{request_id}.m4a",
+            },
+        )()
+
+    monkeypatch.setattr(orchestrator.preview_video_renderer, "render", fake_render)
+    monkeypatch.setattr(
+        orchestrator.video_narration_service,
+        "build_pipeline_narration",
+        fake_build_pipeline_narration,
+    )
+    monkeypatch.setattr(orchestrator.video_narration_service, "is_available", lambda: True)
+    monkeypatch.setattr(orchestrator.video_narration_service, "embed_narration", fake_embed)
+
+    response = client.post(
+        "/api/v1/pipeline",
+        json={
+            "prompt": "请可视化讲解二分查找为什么能在有序数组中快速定位答案。",
+            "provider": "mock",
+            "ui_theme": "light",
+            "sandbox_mode": "dry_run",
+            "persist_run": False,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["preview_video_url"] == "/media/fake-narrated.mp4"
+    assert any(
+        diagnostic["agent"] == "audio" and "嵌入旁白" in diagnostic["message"]
+        for diagnostic in payload["diagnostics"]
+    )
+    assert captured["text"].endswith("自动旁白")
+    assert captured["ui_theme"] == "light"
+
+
+def test_pipeline_skips_preview_narration_when_disabled(monkeypatch, tmp_path) -> None:
+    def fake_render(
+        *,
+        script: str,
+        request_id: str,
+        cir: CirDocument,
+        ui_theme: str | None = None,
+    ):
+        output = tmp_path / f"{request_id}.mp4"
+        output.write_bytes(b"fake")
+        return PreviewVideoArtifacts(
+            file_path=output,
+            url="/media/fake-muted.mp4",
+            backend="storyboard-fallback",
+        )
+
+    monkeypatch.setattr(orchestrator.preview_video_renderer, "render", fake_render)
+    monkeypatch.setattr(
+        orchestrator.video_narration_service,
+        "build_pipeline_narration",
+        lambda cir: (_ for _ in ()).throw(AssertionError("should not build narration")),
+    )
+    monkeypatch.setattr(
+        orchestrator.video_narration_service,
+        "embed_narration",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("should not embed narration")),
+    )
+
+    response = client.post(
+        "/api/v1/pipeline",
+        json={
+            "prompt": "请讲解二分查找边界收缩。",
+            "provider": "mock",
+            "enable_narration": False,
+            "sandbox_mode": "dry_run",
+            "persist_run": False,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["preview_video_url"] == "/media/fake-muted.mp4"
+    assert not any(diagnostic["agent"] == "audio" for diagnostic in payload["diagnostics"])
+
+
+def test_maybe_embed_preview_narration_mentions_mimotts_when_unavailable(
+    monkeypatch, tmp_path
+) -> None:
+    preview_video = tmp_path / "preview.mp4"
+    preview_video.write_bytes(b"fake")
+
+    monkeypatch.setattr(orchestrator.video_narration_service, "is_available", lambda: False)
+
+    messages = orchestrator.maybe_embed_preview_narration(
+        request_id="demo-request",
+        preview_video_path=preview_video,
+        narration_text="这是测试旁白。",
+    )
+
+    assert len(messages) == 1
+    assert "mimotts-v2" in messages[0]
+    assert "跳过旁白嵌入" in messages[0]

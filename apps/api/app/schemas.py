@@ -29,6 +29,11 @@ class SandboxMode(str, Enum):
     OFF = "off"
 
 
+class UITheme(str, Enum):
+    DARK = "dark"
+    LIGHT = "light"
+
+
 class SandboxStatus(str, Enum):
     PASSED = "passed"
     FAILED = "failed"
@@ -101,6 +106,8 @@ class PipelineRequest(BaseModel):
     source_code_language: str | None = Field(default=None, max_length=20)
     source_image: str | None = Field(default=None, max_length=3_500_000)
     source_image_name: str | None = Field(default=None, max_length=200)
+    ui_theme: UITheme | None = None
+    enable_narration: bool = True
     sandbox_mode: SandboxMode = SandboxMode.DRY_RUN
     persist_run: bool = True
 
@@ -251,6 +258,23 @@ class PipelineRunDetail(BaseModel):
     response: PipelineResponse
 
 
+class PromptReferenceRequest(BaseModel):
+    subject: TopicDomain
+    provider: str | None = None
+    notes: str | None = Field(default=None, max_length=6000)
+    write: bool = False
+
+
+class PromptReferenceResponse(BaseModel):
+    subject: TopicDomain
+    provider: str
+    model: str
+    output_path: str
+    markdown: str
+    wrote_file: bool
+    raw_output: str | None = None
+
+
 class CustomProviderUpsertRequest(BaseModel):
     name: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]{1,30}$")
     label: str = Field(min_length=2, max_length=40)
@@ -311,6 +335,7 @@ class ManimScriptPrepareResponse(BaseModel):
 
 class ManimScriptRenderRequest(ManimScriptPrepareRequest):
     require_real: bool = True
+    narration_text: str | None = Field(default=None, max_length=4000)
 
 
 class ManimScriptRenderResponse(ManimScriptPrepareResponse):

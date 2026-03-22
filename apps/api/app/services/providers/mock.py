@@ -86,6 +86,7 @@ class MockModelProvider:
         source_image: str | None = None,
         source_code: str | None = None,
         source_code_language: str | None = None,
+        ui_theme: str | None = None,
     ) -> tuple[PlanningHints, AgentTrace]:
         concepts = _concepts_from_prompt(prompt, domain)
         focus = f"突出 {' / '.join(concepts[:2])} 的教学主线"
@@ -108,11 +109,13 @@ class MockModelProvider:
         )
         return PlanningHints(focus=focus, concepts=concepts, warnings=warnings), trace
 
-    def code(self, cir: CirDocument) -> tuple[CodingHints, AgentTrace]:
+    def code(self, cir: CirDocument, ui_theme: str | None = None) -> tuple[CodingHints, AgentTrace]:
         style_notes = [
             "输出本地 Python Manim 模板，供 dry-run 沙盒和后端视频预览使用。",
             "主页实际预览以后端渲染的视频为准。",
         ]
+        if ui_theme:
+            style_notes.append(f"当前 UI 主题={ui_theme}，生成脚本时应尽量保持背景与强调色统一。")
         trace = AgentTrace(
             agent="coder",
             provider=self.descriptor.name,
@@ -126,6 +129,7 @@ class MockModelProvider:
         title: str,
         renderer_script: str,
         domain: TopicDomain,
+        ui_theme: str | None = None,
     ) -> tuple[CritiqueHints, AgentTrace]:
         warnings = []
         if "class " not in renderer_script or "Scene" not in renderer_script:
@@ -147,6 +151,7 @@ class MockModelProvider:
         cir: CirDocument,
         renderer_script: str,
         issues: list[str],
+        ui_theme: str | None = None,
     ) -> tuple[CodingHints, AgentTrace]:
         trace = AgentTrace(
             agent="repair",

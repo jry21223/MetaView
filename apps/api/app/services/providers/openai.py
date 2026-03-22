@@ -124,6 +124,7 @@ class OpenAICompatibleProvider:
         source_image: str | None = None,
         source_code: str | None = None,
         source_code_language: str | None = None,
+        ui_theme: str | None = None,
     ) -> tuple[PlanningHints, AgentTrace]:
         payload, raw_output = self._chat(
             stage="planning",
@@ -131,6 +132,7 @@ class OpenAICompatibleProvider:
                 domain,
                 source_code=source_code,
                 source_code_language=source_code_language,
+                ui_theme=ui_theme,
             ),
             user_prompt=build_planner_user_prompt(
                 prompt=prompt,
@@ -138,6 +140,7 @@ class OpenAICompatibleProvider:
                 skill_brief=skill_brief,
                 source_code=source_code,
                 source_code_language=source_code_language,
+                ui_theme=ui_theme,
             ),
             source_image=source_image if self.supports_vision else None,
         )
@@ -159,7 +162,7 @@ class OpenAICompatibleProvider:
         )
         return hints, trace
 
-    def code(self, cir: CirDocument) -> tuple[CodingHints, AgentTrace]:
+    def code(self, cir: CirDocument, ui_theme: str | None = None) -> tuple[CodingHints, AgentTrace]:
         content, raw_output = self._chat_text(
             stage="coding",
             system_prompt=build_coder_system_prompt(
@@ -167,12 +170,14 @@ class OpenAICompatibleProvider:
                 title=cir.title,
                 summary=cir.summary,
                 cir_json=cir.model_dump_json(indent=2),
+                ui_theme=ui_theme,
             ),
             user_prompt=build_coder_user_prompt(
                 title=cir.title,
                 domain=cir.domain.value,
                 summary=cir.summary,
                 cir_json=cir.model_dump_json(indent=2),
+                ui_theme=ui_theme,
             ),
         )
         hints = CodingHints(
@@ -194,13 +199,15 @@ class OpenAICompatibleProvider:
         title: str,
         renderer_script: str,
         domain: TopicDomain,
+        ui_theme: str | None = None,
     ) -> tuple[CritiqueHints, AgentTrace]:
         payload, raw_output = self._chat(
             stage="critic",
-            system_prompt=build_critic_system_prompt(domain),
+            system_prompt=build_critic_system_prompt(domain, ui_theme=ui_theme),
             user_prompt=build_critic_user_prompt(
                 title=title,
                 renderer_script=renderer_script,
+                ui_theme=ui_theme,
             ),
         )
         check_messages, check_blocking_issues = self._normalize_feedback_messages(
@@ -228,6 +235,7 @@ class OpenAICompatibleProvider:
         cir: CirDocument,
         renderer_script: str,
         issues: list[str],
+        ui_theme: str | None = None,
     ) -> tuple[CodingHints, AgentTrace]:
         content, raw_output = self._chat_text(
             stage="repair",
@@ -236,6 +244,7 @@ class OpenAICompatibleProvider:
                 title=cir.title,
                 summary=cir.summary,
                 cir_json=cir.model_dump_json(indent=2),
+                ui_theme=ui_theme,
             ),
             user_prompt=build_repair_user_prompt(
                 title=cir.title,
@@ -244,6 +253,7 @@ class OpenAICompatibleProvider:
                 cir_json=cir.model_dump_json(indent=2),
                 renderer_script=renderer_script,
                 issues=issues,
+                ui_theme=ui_theme,
             ),
         )
         hints = CodingHints(
@@ -270,6 +280,21 @@ class OpenAICompatibleProvider:
             user_prompt="ping",
         )
         return content.strip(), raw_output
+
+    def complete_text(
+        self,
+        *,
+        stage: str,
+        system_prompt: str,
+        user_prompt: str,
+        source_image: str | None = None,
+    ) -> tuple[str, str]:
+        return self._chat_text(
+            stage=stage,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            source_image=source_image,
+        )
 
     def _chat(
         self,

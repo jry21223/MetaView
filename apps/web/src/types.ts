@@ -6,6 +6,7 @@ export type TopicDomain =
   | "chemistry"
   | "biology"
   | "geography";
+export type UITheme = "dark" | "light";
 export type ModelProvider = string;
 export type SandboxMode = "dry_run" | "off";
 export type SandboxStatus = "passed" | "failed" | "skipped";
@@ -166,10 +167,29 @@ export interface PipelineRunDetail {
     source_code_language?: string | null;
     source_image?: string | null;
     source_image_name?: string | null;
+    ui_theme?: UITheme | null;
+    enable_narration: boolean;
     sandbox_mode: SandboxMode;
     persist_run: boolean;
   };
   response: PipelineResponse;
+}
+
+export interface PromptReferenceRequest {
+  subject: TopicDomain;
+  provider?: ModelProvider | null;
+  notes?: string | null;
+  write: boolean;
+}
+
+export interface PromptReferenceResponse {
+  subject: TopicDomain;
+  provider: ModelProvider;
+  model: string;
+  output_path: string;
+  markdown: string;
+  wrote_file: boolean;
+  raw_output?: string | null;
 }
 
 export interface CustomProviderUpsertRequest {

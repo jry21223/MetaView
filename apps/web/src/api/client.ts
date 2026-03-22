@@ -7,9 +7,13 @@ import type {
   PipelineResponse,
   PipelineRunDetail,
   PipelineRunSummary,
+  PromptReferenceRequest,
+  PromptReferenceResponse,
   ProviderDescriptor,
   RuntimeCatalog,
   SandboxMode,
+  TopicDomain,
+  UITheme,
 } from "../types";
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
@@ -108,10 +112,13 @@ export async function runPipeline(
   routerProvider: ModelProvider,
   generationProvider: ModelProvider,
   sandboxMode: SandboxMode,
+  domain?: TopicDomain | null,
   sourceCode?: string | null,
   sourceCodeLanguage?: string | null,
   sourceImage?: string | null,
   sourceImageName?: string | null,
+  uiTheme?: UITheme | null,
+  enableNarration = true,
 ): Promise<PipelineResponse> {
   const response = await fetch(`${API_BASE_URL}/api/v1/pipeline`, {
     method: "POST",
@@ -120,6 +127,7 @@ export async function runPipeline(
     },
     body: JSON.stringify({
       prompt,
+      domain: domain ?? null,
       provider: generationProvider,
       router_provider: routerProvider,
       generation_provider: generationProvider,
@@ -127,6 +135,8 @@ export async function runPipeline(
       source_code_language: sourceCodeLanguage ?? null,
       source_image: sourceImage ?? null,
       source_image_name: sourceImageName ?? null,
+      ui_theme: uiTheme ?? null,
+      enable_narration: enableNarration,
       sandbox_mode: sandboxMode,
     }),
   });
@@ -136,6 +146,24 @@ export async function runPipeline(
   }
 
   return (await response.json()) as PipelineResponse;
+}
+
+export async function generatePromptReference(
+  payload: PromptReferenceRequest,
+): Promise<PromptReferenceResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/prompts/reference`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, "Prompt reference request failed"));
+  }
+
+  return (await response.json()) as PromptReferenceResponse;
 }
 
 export async function prepareManimScript(
@@ -164,6 +192,7 @@ export async function renderManimScript(
   source: string,
   sceneClassName = "GeneratedScene",
   requireReal = true,
+  narrationText?: string | null,
 ): Promise<ManimScriptRenderResponse> {
   const response = await fetch(`${API_BASE_URL}/api/v1/manim/render`, {
     method: "POST",
@@ -174,6 +203,7 @@ export async function renderManimScript(
       source,
       scene_class_name: sceneClassName,
       require_real: requireReal,
+      narration_text: narrationText ?? null,
     }),
   });
 

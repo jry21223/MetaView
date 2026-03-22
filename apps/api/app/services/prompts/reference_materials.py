@@ -20,6 +20,15 @@ _DOMAIN_REFERENCE_FILES: dict[TopicDomain, str] = {
 _STAGE_TEMPLATE_TITLES: dict[str, str] = {
     "planner": "Concept Design",
     "coder": "Code Generation",
+    "critic": "Review",
+    "repair": "Repair",
+}
+
+_STAGE_REFERENCE_TITLES: dict[str, str] = {
+    "common": "Common",
+    "planner": "Planner",
+    "coder": "Coder",
+    "critic": "Critic",
     "repair": "Repair",
 }
 
@@ -35,12 +44,15 @@ def prompt_reference_root() -> Path:
 
 
 @lru_cache(maxsize=None)
-def load_subject_reference(domain: TopicDomain | str) -> str:
+def load_subject_reference(domain: TopicDomain | str, stage: str | None = None) -> str:
     domain_value = TopicDomain(domain) if isinstance(domain, str) else domain
     filename = _DOMAIN_REFERENCE_FILES.get(domain_value)
     if not filename:
         return ""
-    return _load_reference_file(filename)
+    body = _load_reference_file(filename)
+    if not body or not stage:
+        return body
+    return _extract_subject_reference_for_stage(body, stage) or body
 
 
 @lru_cache(maxsize=None)
@@ -64,7 +76,7 @@ def load_template_reference(stage: str) -> str:
 
 
 def render_reference_sections(domain: TopicDomain | str, stage: str) -> str:
-    subject_reference = load_subject_reference(domain)
+    subject_reference = load_subject_reference(domain, stage)
     template_reference = load_template_reference(stage)
     domain_value = TopicDomain(domain) if isinstance(domain, str) else domain
     reference_label = _DOMAIN_REFERENCE_FILES.get(domain_value, "")
@@ -124,3 +136,28 @@ def _normalize_reference_text(text: str) -> str:
         stripped = fenced.group("body").strip()
 
     return stripped
+
+
+def _extract_subject_reference_for_stage(text: str, stage: str) -> str:
+    common = _extract_markdown_section(text, _STAGE_REFERENCE_TITLES["common"])
+    stage_body = _extract_markdown_section(text, _STAGE_REFERENCE_TITLES.get(stage, ""))
+
+    blocks: list[str] = []
+    if common:
+        blocks.append(f"### Common\n{common}")
+    if stage_body:
+        blocks.append(f"### {stage.title()}\n{stage_body}")
+    return "\n\n".join(blocks).strip()
+
+
+def _extract_markdown_section(text: str, title: str) -> str:
+    if not title:
+        return ""
+    pattern = re.compile(
+        rf"^## {re.escape(title)}\s*$\n(?P<body>.*?)(?=^## |\Z)",
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    match = pattern.search(text)
+    if not match:
+        return ""
+    return match.group("body").strip()

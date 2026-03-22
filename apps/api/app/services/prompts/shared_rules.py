@@ -3,6 +3,45 @@ from __future__ import annotations
 from app.services.prompts.sections import join_sections, render_section
 
 
+def shared_visual_contract(ui_theme: str | None = None) -> str:
+    normalized_theme = (ui_theme or "dark").strip().lower()
+    if normalized_theme == "light":
+        theme_guidance = """
+        The requested UI theme is light.
+        Prefer an off-white or pale grey-green background close to #f8fafb or #f2f5f6.
+        Use dark text close to #191c1d and restrained green accents close to #43625b or #006c51.
+        Keep the scene bright, calm, and high-contrast rather than using a dark fallback palette.
+        """
+    else:
+        theme_guidance = """
+        The requested UI theme is dark.
+        Prefer a charcoal background close to #0f1113, dark surfaces close to #121518 or #1a1d1f,
+        light text close to #e2e8f0, and restrained mint accents close to #45a081.
+        Keep the scene dark, clean, and high-contrast instead of drifting to unrelated
+        blue or purple palettes.
+        """
+
+    return render_section(
+        "Universal Visual Contract",
+        f"""
+        All explanatory narration, titles, subtitles, legends, and non-code labels
+        must default to Simplified Chinese.
+        Preserve source-code identifiers, formulas, operators, and standard scientific
+        symbols unchanged when needed.
+
+        Never allow explanatory text, labels, legends, or source panels to overlap
+        active animated objects.
+        If the frame gets crowded, split the content into multiple beats,
+        move text into a reserved side panel,
+        or delay labels until the animated motion settles.
+
+        Explicitly set or preserve a scene background palette that matches
+        the current product theme rather than using an arbitrary default background.
+        {theme_guidance.strip()}
+        """,
+    )
+
+
 def planner_runtime_rules() -> str:
     return join_sections(
         render_section(
@@ -99,6 +138,9 @@ def critic_runtime_rules() -> str:
             Focus on runtime stability, synchronization between narration and visuals,
             layout overflow, text rendering safety, and whether the scene stays faithful
             to the intended process instead of only showing the final answer.
+            Treat non-code explanatory English text, text-object overlap,
+            and background palettes that clearly conflict with the requested UI theme
+            as review failures or high-priority warnings.
             Treat helper misuse such as `self.play(move_pointer(...))` when the helper
             already calls `self.play` as a hard failure.
             Treat long Chinese `Tex`/`MathTex` content or `TexTemplateLibrary.ctex`

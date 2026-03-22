@@ -1,30 +1,56 @@
 # Math Prompt Guidance
 
-Use this file for proofs, derivations, function graphs, geometry, matrices, and probability visuals.
+## Common
 
-## Priorities
+- 符号正确性优先，任何公式变形都必须与前一步保持数学关系成立。
+- 同一符号在同一段推导中只能保留一个含义，重定义必须显式声明。
+- 坐标系、几何对象、阴影区域先建立静态参照，再展示变化。
+- 变量依赖关系必须可追踪，图像变化只能由已声明的变量变化驱动。
+- 函数、方程、区域、几何约束一旦定义，后续不能悄悄换条件或换对象。
+- 不等式范围、积分区域、极限过程、几何关系都必须与图像严格对应。
+- 若变形依赖前提条件、定义域或参数范围，必须在使用前出现。
+- 视觉上的连续变化不能暗示数学上不存在的连续性或等价性。
 
-- Ask the model to separate concept design from code generation.
-- Keep symbolic continuity with `MathTex`: each expression should visibly evolve from the previous one.
-- Define axes, geometric objects, variables, and notation before transforming them.
-- Tie every visual change to a mathematical reason, not just a visual effect.
-- Pace the scene like a lesson: setup, key transition, conclusion, short hold on the final result.
+## Planner
 
-## Prompt Additions
+- 先拆成定义对象、建立关系、核心变形或推导、结论回收几个阶段。
+- 优先选择能显露定义、依赖和边界的表达形式，不选只利于计算但不利于理解的写法。
+- 若 topic 同时含符号推导和图像变化，先确定哪一条是主线，另一条只做同步验证。
+- 对每个 scene 标明当前使用的定义、定理或已知条件。
+- 提前识别最易失真的位置，如换元、约分、移项、开方、取绝对值、区域边界切换。
+- 若涉及几何构造，先规划依赖顺序，避免先出现结论后出现构造原因。
+- 若涉及参数变化，优先挑选代表性参数值或连续滑动区间，不要混合多个变化源。
+- 证明类内容按“已知—推导—结论”切分，避免一屏堆叠过多等式。
 
-- Ask for a notation registry before code: symbols, meanings, colors, and units if any.
-- Ask for a beat-by-beat derivation plan that avoids meaning-changing jumps.
-- Require the diagram and the formulas to stay numerically consistent.
-- Require readable spacing for formulas and deliberate camera or layout changes.
-- Ask for a final verification checklist covering notation, algebra, and diagram consistency.
+## Coder
 
-## Failure Patterns To Prevent
+- 将主公式链固定在稳定区域，局部变形尽量用逐步替换而不是整行重写。
+- 坐标轴、几何图形和阴影区域保持参考系稳定，更新只作用于依赖对象。
+- 公式变形时先高亮参与变化的局部，再执行替换，避免全式同时闪动。
+- 图像更新必须与对应变量或参数标签同步，不能先变图后补解释。
+- 几何对象的点、线、角、垂足、切点等要绑定名称，保持前后同一身份。
+- 阴影区域变化要紧跟边界变化，避免区域先变而边界未说明。
+- 多行推导时保留足够的上一步痕迹，让观众能核对等价关系。
+- 结论出现前给出短暂停顿，确保观众完成从对象到关系的对应。
 
-- Skipping algebraic steps that change meaning
-- Replacing one coordinate system with another without explanation
-- Showing equations that do not match the plotted objects
-- Overcrowding a frame with too many formulas at once
+## Critic
 
-## ManimCat-Inspired Direction
+- 检查是否有任何公式变形与前一步不等价或缺失条件。
+- 检查符号、下标、函数名、参数名是否前后不一致。
+- 检查图像变化是否由已声明变量驱动，是否存在无因变化。
+- 检查几何关系是否在动画中被破坏，如垂直、平行、相切、共线。
+- 检查阴影区域是否与不等式、积分域、可行域严格匹配。
+- 检查是否跳过关键中间步骤，导致推导断层。
+- 检查画面中旧公式、新公式、图像标记是否互相遮挡而影响核对。
+- 检查连续动画是否误导为数学连续、等价或可逆。
 
-Public ManimCat materials emphasize a two-stage process, strong LaTeX output, visual continuity for derivations, and retrying after invalid code. Use those ideas as method, not as text to copy.
+## Repair
+
+- 若变形跳步，补一个中间等式或条件标注，不重写整条推导。
+- 若符号冲突，局部改名并补显式定义，不改其余分镜。
+- 若图像更新失去依赖，补参数标签或变量箭头绑定。
+- 若几何约束失真，只修正相关点线位置与依赖关系。
+- 若阴影区域错误，只重画边界和区域，不动其他对象。
+- 若旧步骤被覆盖太快，延长保留时间或下移保存一行。
+- 若条件遗漏，补在首次使用该条件的前一小步。
+- 若结论来得过快，补一帧汇总“由何得何”。
