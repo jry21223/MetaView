@@ -246,6 +246,36 @@ class Demo(Scene):
     assert payload["render_backend"] in {"manim-cli", "storyboard-fallback"}
 
 
+def test_render_manim_endpoint_uses_embedded_fallback_without_ffmpeg(monkeypatch) -> None:
+    fallback_backend = orchestrator.preview_video_renderer.backends["fallback"]
+    monkeypatch.setattr(fallback_backend, "ffmpeg_binary", None)
+
+    response = client.post(
+        "/api/v1/manim/render",
+        json={
+            "source": """
+```python
+from manim import *
+
+class Demo(Scene):
+    def construct(self):
+        title = Text("hello render")
+        self.play(Write(title))
+        self.wait(0.5)
+```
+            """.strip(),
+            "require_real": False,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["render_backend"] == "storyboard-fallback"
+
+    video_response = client.get(payload["preview_video_url"])
+    assert video_response.status_code == 200
+    assert video_response.content
+
+
 def test_render_manim_endpoint_can_embed_narration(monkeypatch, tmp_path) -> None:
     def fake_render(
         *,
