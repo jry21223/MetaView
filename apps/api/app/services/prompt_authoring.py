@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from hashlib import sha1
 from pathlib import Path
 from textwrap import dedent
 from typing import Final
@@ -99,6 +100,16 @@ class GeneratedReferenceArtifact:
     wrote_file: bool
 
 
+@dataclass(frozen=True)
+class GeneratedCustomSubjectArtifact:
+    subject_name: str
+    slug: str
+    markdown: str
+    raw_output: str
+    output_path: Path
+    wrote_file: bool
+
+
 def build_reference_authoring_system_prompt() -> str:
     return dedent(
         """
@@ -145,6 +156,55 @@ def build_reference_authoring_system_prompt() -> str:
     ).strip()
 
 
+def build_custom_subject_authoring_system_prompt() -> str:
+    return dedent(
+        """
+        You are a senior prompt engineer for a staged educational animation runtime.
+
+        Your job is to write one complete markdown reference file for a brand-new subject.
+        This file will be used by a user who wants to bootstrap a new subject-specific
+        prompt pack for Python Manim generation. It must stand on its own.
+
+        Return only markdown.
+        Do not wrap the file in code fences.
+        Do not add explanations before or after the file.
+
+        The file must use exactly this top-level structure:
+        # <Subject> Prompt Guidance
+
+        ## Common
+        - ...
+
+        ## Planner
+        - ...
+
+        ## Coder
+        - ...
+
+        ## Critic
+        - ...
+
+        ## Repair
+        - ...
+
+        Writing rules:
+        - Keep each section to 4-8 bullet points.
+        - Keep bullets short, specific, and operational.
+        - Infer the subject's core objects, causal relations, and common teaching failures
+          from the provided subject description.
+        - `Common` contains domain truths that must not be violated.
+        - `Planner` contains scene decomposition, example choice, and risk discovery rules.
+        - `Coder` contains layout, object identity, pacing, and synchronization rules.
+        - `Critic` contains failure checks and regression checks.
+        - `Repair` contains minimum-change repair strategy.
+        - Do not treat the new subject as a rewrite of an existing built-in subject file.
+        - Remove redundant generic advice that belongs in shared runtime rules.
+        - Prefer domain truth over style language.
+        - Do not mention JSON keys, API protocols, provider names, or chat formatting.
+        """
+    ).strip()
+
+
 def build_reference_authoring_runtime_context() -> str:
     return dedent(
         """
@@ -158,6 +218,22 @@ def build_reference_authoring_runtime_context() -> str:
           or broad Manim boilerplate.
         - The goal of this file is subject truth and stage-specific guidance,
           not provider protocol instructions.
+        """
+    ).strip()
+
+
+def build_custom_subject_authoring_runtime_context() -> str:
+    return dedent(
+        """
+        Runtime context you must respect:
+        - The production pipeline is staged: router -> planner -> coder -> critic -> repair.
+        - Subject reference files are loaded by stage and only inject `## Common`
+          plus the active stage section.
+        - Global runtime rules already cover output contracts, Simplified Chinese explanatory text,
+          no text/object overlap, and theme-aligned backgrounds.
+        - Do not duplicate generic JSON-output requirements, markdown-fence rules,
+          or broad Manim boilerplate.
+        - The user is creating a new subject tool, not editing any built-in subject reference file.
         """
     ).strip()
 
@@ -198,6 +274,72 @@ def build_reference_authoring_user_prompt(
     ).strip()
 
 
+def normalize_custom_subject_name(subject_name: str) -> str:
+    normalized = re.sub(r"\s+", " ", subject_name).strip()
+    if not normalized:
+        raise ValueError("学科名称不能为空。")
+    return normalized
+
+
+def slugify_custom_subject_name(subject_name: str) -> str:
+    normalized = normalize_custom_subject_name(subject_name)
+    ascii_slug = re.sub(r"[^a-z0-9]+", "-", normalized.lower()).strip("-")
+    digest = sha1(normalized.encode("utf-8")).hexdigest()[:8]
+    if ascii_slug:
+        compact = ascii_slug[:48].strip("-")
+        return f"{compact}-{digest}"
+    return f"subject-{digest}"
+
+
+def build_custom_subject_authoring_user_prompt(
+    subject_name: str,
+    *,
+    summary: str | None = None,
+    notes: str | None = None,
+) -> str:
+    normalized_subject_name = normalize_custom_subject_name(subject_name)
+    subject_summary = (
+        summary.strip()
+        if summary and summary.strip()
+        else "Not provided. Infer a conservative academic baseline from the subject name."
+    )
+    extra_notes = notes.strip() if notes and notes.strip() else "None"
+    return "\n".join(
+        [
+            f"Subject name: {normalized_subject_name}",
+            f"File title: {normalized_subject_name} Prompt Guidance",
+            "",
+            "Subject brief:",
+            subject_summary,
+            "",
+            "Built-in subjects for context only:",
+            "- algorithm",
+            "- math",
+            "- code",
+            "- physics",
+            "- chemistry",
+            "- biology",
+            "- geography",
+            "",
+            build_custom_subject_authoring_runtime_context(),
+            "",
+            "You must infer and encode:",
+            "- likely core teaching objects",
+            "- key relations or invariants",
+            "- non-negotiable domain truths",
+            "- critical transitions that animation must expose",
+            "- the most likely domain-logic errors that a generic animation model would make",
+            "",
+            "Additional authoring notes:",
+            extra_notes,
+            "",
+            "Produce a new standalone prompt pack for this subject.",
+            "Do not rewrite or mention any existing built-in reference file.",
+            "Keep it concise and directly usable.",
+        ]
+    ).strip()
+
+
 def strip_markdown_code_fences(text: str) -> str:
     stripped = dedent(text).strip()
     fenced = re.search(r"```(?:markdown|md)?\s*\n(?P<body>.*)\n```", stripped, re.DOTALL)
@@ -217,9 +359,8 @@ def extract_reference_markdown_section(text: str, title: str) -> str:
     return match.group("body").strip()
 
 
-def validate_reference_markdown(domain: TopicDomain, markdown: str) -> str:
+def validate_guidance_markdown(expected_title: str, markdown: str) -> str:
     normalized = strip_markdown_code_fences(markdown).strip()
-    expected_title = f"# {SUBJECT_REFERENCE_SEEDS[domain].title}"
     if not normalized.startswith(expected_title):
         raise ValueError(f"输出缺少正确标题，预期以 `{expected_title}` 开头。")
 
@@ -236,6 +377,21 @@ def validate_reference_markdown(domain: TopicDomain, markdown: str) -> str:
         if len(bullets) < 4:
             raise ValueError(f"`## {section}` 至少需要 4 条 bullet。")
     return normalized
+
+
+def validate_reference_markdown(domain: TopicDomain, markdown: str) -> str:
+    return validate_guidance_markdown(
+        expected_title=f"# {SUBJECT_REFERENCE_SEEDS[domain].title}",
+        markdown=markdown,
+    )
+
+
+def validate_custom_subject_markdown(subject_name: str, markdown: str) -> str:
+    normalized_subject_name = normalize_custom_subject_name(subject_name)
+    return validate_guidance_markdown(
+        expected_title=f"# {normalized_subject_name} Prompt Guidance",
+        markdown=markdown,
+    )
 
 
 def generate_reference_markdown(
@@ -265,8 +421,16 @@ def references_root() -> Path:
     return repo_root() / "skills" / "generate-subject-manim-prompts" / "references"
 
 
+def custom_subjects_root() -> Path:
+    return repo_root() / "skills" / "generated-subject-prompts"
+
+
 def reference_output_path(domain: TopicDomain) -> Path:
     return references_root() / f"{domain.value}.md"
+
+
+def custom_subject_output_path(subject_name: str) -> Path:
+    return custom_subjects_root() / f"{slugify_custom_subject_name(subject_name)}.md"
 
 
 def load_current_reference(domain: TopicDomain) -> str:
@@ -278,6 +442,13 @@ def load_current_reference(domain: TopicDomain) -> str:
 
 def write_reference_markdown(domain: TopicDomain, markdown: str) -> Path:
     output_path = reference_output_path(domain)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(f"{markdown.rstrip()}\n", encoding="utf-8")
+    return output_path
+
+
+def write_custom_subject_markdown(subject_name: str, markdown: str) -> Path:
+    output_path = custom_subject_output_path(subject_name)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(f"{markdown.rstrip()}\n", encoding="utf-8")
     return output_path
@@ -300,6 +471,55 @@ def generate_reference_artifact(
     if write:
         output_path = write_reference_markdown(domain, markdown)
     return GeneratedReferenceArtifact(
+        markdown=markdown,
+        raw_output=raw_output,
+        output_path=output_path,
+        wrote_file=write,
+    )
+
+
+def generate_custom_subject_markdown(
+    provider: OpenAICompatibleProvider,
+    *,
+    subject_name: str,
+    summary: str | None = None,
+    notes: str | None = None,
+) -> tuple[str, str]:
+    normalized_subject_name = normalize_custom_subject_name(subject_name)
+    content, raw_output = provider.complete_text(
+        stage="planning",
+        system_prompt=build_custom_subject_authoring_system_prompt(),
+        user_prompt=build_custom_subject_authoring_user_prompt(
+            normalized_subject_name,
+            summary=summary,
+            notes=notes,
+        ),
+    )
+    return validate_custom_subject_markdown(normalized_subject_name, content), raw_output
+
+
+def generate_custom_subject_artifact(
+    provider: OpenAICompatibleProvider,
+    *,
+    subject_name: str,
+    summary: str | None = None,
+    notes: str | None = None,
+    write: bool = False,
+) -> GeneratedCustomSubjectArtifact:
+    normalized_subject_name = normalize_custom_subject_name(subject_name)
+    slug = slugify_custom_subject_name(normalized_subject_name)
+    markdown, raw_output = generate_custom_subject_markdown(
+        provider,
+        subject_name=normalized_subject_name,
+        summary=summary,
+        notes=notes,
+    )
+    output_path = custom_subject_output_path(normalized_subject_name)
+    if write:
+        output_path = write_custom_subject_markdown(normalized_subject_name, markdown)
+    return GeneratedCustomSubjectArtifact(
+        subject_name=normalized_subject_name,
+        slug=slug,
         markdown=markdown,
         raw_output=raw_output,
         output_path=output_path,

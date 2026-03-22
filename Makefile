@@ -1,4 +1,4 @@
-.PHONY: bootstrap bootstrap-manim setup-hooks dev-web dev-api lint test build check docker-build docker-up
+.PHONY: bootstrap bootstrap-manim setup-hooks dev-web dev-api dev start stop lint test build check docker-build docker-up docker-down
 
 bootstrap:
 	npm install
@@ -18,6 +18,9 @@ dev-web:
 dev-api:
 	.venv/bin/uvicorn app.main:app --app-dir apps/api --reload --host 0.0.0.0 --port 8000
 
+dev:
+	@trap 'kill 0' INT TERM EXIT; $(MAKE) dev-api & $(MAKE) dev-web & wait
+
 lint:
 	npm --workspace apps/web run lint
 	.venv/bin/ruff check apps/api/app apps/api/tests
@@ -35,3 +38,10 @@ docker-build:
 
 docker-up:
 	docker compose up --build
+
+docker-down:
+	docker compose down
+
+start: docker-up
+
+stop: docker-down

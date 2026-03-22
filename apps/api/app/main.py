@@ -9,6 +9,8 @@ from app.config import get_settings
 from app.schemas import (
     CustomProviderTestResponse,
     CustomProviderUpsertRequest,
+    CustomSubjectPromptRequest,
+    CustomSubjectPromptResponse,
     ManimScriptPrepareRequest,
     ManimScriptPrepareResponse,
     ManimScriptRenderRequest,
@@ -21,6 +23,8 @@ from app.schemas import (
     PromptReferenceResponse,
     ProviderDescriptor,
     RuntimeCatalog,
+    RuntimeSettingsRequest,
+    RuntimeSettingsResponse,
 )
 from app.services.manim_script import ManimScriptError, prepare_manim_script
 from app.services.orchestrator import PipelineOrchestrator
@@ -139,6 +143,24 @@ def get_runtime_catalog() -> RuntimeCatalog:
     return orchestrator.runtime_catalog()
 
 
+@app.get(
+    f"{settings.api_prefix}/runtime/settings",
+    response_model=RuntimeSettingsResponse,
+)
+def get_runtime_settings() -> RuntimeSettingsResponse:
+    return orchestrator.get_runtime_settings()
+
+
+@app.put(
+    f"{settings.api_prefix}/runtime/settings",
+    response_model=RuntimeSettingsResponse,
+)
+def update_runtime_settings(
+    payload: RuntimeSettingsRequest,
+) -> RuntimeSettingsResponse:
+    return orchestrator.update_runtime_settings(payload)
+
+
 @app.post(
     f"{settings.api_prefix}/prompts/reference",
     response_model=PromptReferenceResponse,
@@ -148,6 +170,21 @@ def generate_prompt_reference(
 ) -> PromptReferenceResponse:
     try:
         return orchestrator.generate_prompt_reference(payload)
+    except (ProviderUnavailableError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ProviderInvocationError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@app.post(
+    f"{settings.api_prefix}/prompts/custom-subject",
+    response_model=CustomSubjectPromptResponse,
+)
+def generate_custom_subject_prompt(
+    payload: CustomSubjectPromptRequest,
+) -> CustomSubjectPromptResponse:
+    try:
+        return orchestrator.generate_custom_subject_prompt(payload)
     except (ProviderUnavailableError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except ProviderInvocationError as exc:

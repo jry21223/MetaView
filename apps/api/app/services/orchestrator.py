@@ -7,6 +7,8 @@ from app.schemas import (
     AgentTrace,
     CirValidationReport,
     CustomProviderUpsertRequest,
+    CustomSubjectPromptRequest,
+    CustomSubjectPromptResponse,
     PipelineRequest,
     PipelineResponse,
     PipelineRunDetail,
@@ -16,19 +18,30 @@ from app.schemas import (
     PromptReferenceResponse,
     ProviderDescriptor,
     ProviderKind,
+    ProviderName,
     RuntimeCatalog,
+    RuntimeSettingsRequest,
+    RuntimeSettingsResponse,
     SandboxMode,
+    TTSSettingsRequest,
     ValidationStatus,
 )
 from app.services.agents import CoderAgent, CriticAgent, PlannerAgent
 from app.services.domain_router import infer_domain
-from app.services.history import CustomProviderRepository, RunRepository
+from app.services.history import (
+    CustomProviderRepository,
+    RunRepository,
+    RuntimeSettingsRepository,
+)
 from app.services.manim_script import ManimScriptError, prepare_manim_script
 from app.services.preview_video_renderer import (
     PreviewVideoRenderer,
     PreviewVideoRenderError,
 )
-from app.services.prompt_authoring import generate_reference_artifact
+from app.services.prompt_authoring import (
+    generate_custom_subject_artifact,
+    generate_reference_artifact,
+)
 from app.services.providers.registry import ProviderRegistry
 from app.services.repair import PipelineRepairService
 from app.services.sandbox import PreviewDryRunSandbox
@@ -44,39 +57,41 @@ class PipelineOrchestrator:
         self.custom_provider_repository = CustomProviderRepository(
             db_path=settings.history_db_path
         )
-        self.provider_registry = ProviderRegistry(
-            custom_provider_repository=self.custom_provider_repository,
-            openai_api_key=settings.openai_api_key,
-            openai_base_url=settings.openai_base_url,
-            openai_model=settings.openai_model,
-            openai_router_model=settings.openai_router_model,
-            openai_planning_model=settings.openai_planning_model,
-            openai_coding_model=settings.openai_coding_model,
-            openai_critic_model=settings.openai_critic_model,
-            openai_test_model=settings.openai_test_model,
-            openai_supports_vision=settings.openai_supports_vision,
-            openai_timeout_s=settings.openai_timeout_s,
-        )
-        self.default_router_provider = (
-            settings.default_router_provider or settings.default_provider
-        )
-        self.default_generation_provider = (
-            settings.default_generation_provider or settings.default_provider
-        )
-        self.preview_tts_enabled = settings.preview_tts_enabled
-        self.preview_tts_backend = settings.preview_tts_backend
-        self.preview_tts_model = settings.preview_tts_model
-        self.preview_tts_base_url = settings.preview_tts_base_url
-        self.preview_tts_api_key = settings.preview_tts_api_key
-        self.preview_tts_voice = settings.preview_tts_voice
-        self.preview_tts_rate_wpm = settings.preview_tts_rate_wpm
-        self.preview_tts_speed = settings.preview_tts_speed
-        self.preview_tts_max_chars = settings.preview_tts_max_chars
-        self.preview_tts_timeout_s = settings.preview_tts_timeout_s
         self.preview_media_root = settings.preview_media_root
         self.openai_base_url = settings.openai_base_url
         self.openai_api_key = settings.openai_api_key
+        self.openai_model = settings.openai_model
+        self.openai_router_model = settings.openai_router_model
+        self.openai_planning_model = settings.openai_planning_model
+        self.openai_coding_model = settings.openai_coding_model
+        self.openai_critic_model = settings.openai_critic_model
+        self.openai_test_model = settings.openai_test_model
+        self.openai_supports_vision = settings.openai_supports_vision
         self.openai_timeout_s = settings.openai_timeout_s
+        self.config_default_provider = settings.default_provider
+        self.config_default_router_provider = settings.default_router_provider
+        self.config_default_generation_provider = settings.default_generation_provider
+        self.runtime_settings_defaults = RuntimeSettingsRequest(
+            mock_provider_enabled=settings.mock_provider_enabled,
+            tts=TTSSettingsRequest(
+                enabled=settings.preview_tts_enabled,
+                backend=settings.preview_tts_backend,
+                model=settings.preview_tts_model,
+                base_url=settings.preview_tts_base_url,
+                api_key=settings.preview_tts_api_key,
+                voice=settings.preview_tts_voice,
+                rate_wpm=settings.preview_tts_rate_wpm,
+                speed=settings.preview_tts_speed,
+                max_chars=settings.preview_tts_max_chars,
+                timeout_s=settings.preview_tts_timeout_s,
+            ),
+        )
+        self.runtime_settings_repository = RuntimeSettingsRepository(
+            db_path=settings.history_db_path
+        )
+        self.runtime_settings = self.runtime_settings_repository.get_runtime_settings(
+            defaults=self.runtime_settings_defaults
+        )
         self.sandbox = PreviewDryRunSandbox(timeout_ms=settings.sandbox_timeout_ms)
         self.validator = CirValidator()
         self.repair_service = PipelineRepairService()
@@ -99,37 +114,100 @@ class PipelineOrchestrator:
             manim_disable_caching=settings.manim_disable_caching,
             manim_render_timeout_s=settings.manim_render_timeout_s,
         )
+        self._refresh_runtime_dependencies()
+
+    def get_runtime_settings(self) -> RuntimeSettingsResponse:
+        return RuntimeSettingsResponse.model_validate(
+            self.runtime_settings.to_response_payload()
+        )
+
+    def update_runtime_settings(
+        self,
+        payload: RuntimeSettingsRequest,
+    ) -> RuntimeSettingsResponse:
+        self.runtime_settings = self.runtime_settings_repository.save_runtime_settings(
+            payload,
+            defaults=self.runtime_settings_defaults,
+        )
+        self._refresh_runtime_dependencies()
+        return self.get_runtime_settings()
+
+    def _refresh_runtime_dependencies(self) -> None:
+        self._apply_runtime_settings()
+        self.provider_registry = ProviderRegistry(
+            custom_provider_repository=self.custom_provider_repository,
+            mock_enabled=self.runtime_settings.mock_provider_enabled,
+            openai_api_key=self.openai_api_key,
+            openai_base_url=self.openai_base_url,
+            openai_model=self.openai_model,
+            openai_router_model=self.openai_router_model,
+            openai_planning_model=self.openai_planning_model,
+            openai_coding_model=self.openai_coding_model,
+            openai_critic_model=self.openai_critic_model,
+            openai_test_model=self.openai_test_model,
+            openai_supports_vision=self.openai_supports_vision,
+            openai_timeout_s=self.openai_timeout_s,
+        )
+        default_provider = self.provider_registry.resolve_default_provider(
+            self.config_default_provider
+        ) or ProviderName.OPENAI.value
+        self.default_provider = default_provider
+        self.default_router_provider = (
+            self.provider_registry.resolve_default_provider(
+                self.config_default_router_provider or default_provider
+            )
+            or default_provider
+        )
+        self.default_generation_provider = (
+            self.provider_registry.resolve_default_provider(
+                self.config_default_generation_provider or default_provider
+            )
+            or default_provider
+        )
         self.video_narration_service = VideoNarrationService(
-            output_root=settings.preview_media_root,
-            enabled=settings.preview_tts_enabled,
-            default_voice=settings.preview_tts_voice,
-            default_rate_wpm=settings.preview_tts_rate_wpm,
-            max_chars=settings.preview_tts_max_chars,
+            output_root=self.preview_media_root,
+            enabled=self.preview_tts_enabled,
+            default_voice=self.preview_tts_voice,
+            default_rate_wpm=self.preview_tts_rate_wpm,
+            max_chars=self.preview_tts_max_chars,
             tts_service=build_tts_service(
-                backend=settings.preview_tts_backend,
-                default_voice=settings.preview_tts_voice,
-                default_rate_wpm=settings.preview_tts_rate_wpm,
-                remote_base_url=settings.preview_tts_base_url,
-                remote_api_key=settings.preview_tts_api_key,
-                remote_model=settings.preview_tts_model,
-                remote_timeout_s=settings.preview_tts_timeout_s
-                if settings.preview_tts_timeout_s is not None
-                else settings.openai_timeout_s,
-                remote_speed=settings.preview_tts_speed,
-                fallback_base_url=settings.openai_base_url,
-                fallback_api_key=settings.openai_api_key,
+                backend=self.preview_tts_backend,
+                default_voice=self.preview_tts_voice,
+                default_rate_wpm=self.preview_tts_rate_wpm,
+                remote_base_url=self.preview_tts_base_url,
+                remote_api_key=self.preview_tts_api_key,
+                remote_model=self.preview_tts_model,
+                remote_timeout_s=self.preview_tts_timeout_s
+                if self.preview_tts_timeout_s is not None
+                else self.openai_timeout_s,
+                remote_speed=self.preview_tts_speed,
+                fallback_base_url=self.openai_base_url,
+                fallback_api_key=self.openai_api_key,
             ),
         )
 
+    def _apply_runtime_settings(self) -> None:
+        self.preview_tts_enabled = self.runtime_settings.tts.enabled
+        self.preview_tts_backend = self.runtime_settings.tts.backend
+        self.preview_tts_model = self.runtime_settings.tts.model
+        self.preview_tts_base_url = self.runtime_settings.tts.base_url
+        self.preview_tts_api_key = self.runtime_settings.tts.api_key
+        self.preview_tts_voice = self.runtime_settings.tts.voice
+        self.preview_tts_rate_wpm = self.runtime_settings.tts.rate_wpm
+        self.preview_tts_speed = self.runtime_settings.tts.speed
+        self.preview_tts_max_chars = self.runtime_settings.tts.max_chars
+        self.preview_tts_timeout_s = self.runtime_settings.tts.timeout_s
+
     def runtime_catalog(self) -> RuntimeCatalog:
         return RuntimeCatalog(
-            default_provider=self.default_generation_provider,
+            default_provider=self.default_provider,
             default_router_provider=self.default_router_provider,
             default_generation_provider=self.default_generation_provider,
             sandbox_engine=self.sandbox.engine_name,
             providers=self.provider_registry.list_descriptors(),
             skills=self.skill_registry.list_descriptors(),
             sandbox_modes=[SandboxMode.DRY_RUN, SandboxMode.OFF],
+            settings=self.get_runtime_settings(),
         )
 
     def generate_prompt_reference(
@@ -152,6 +230,36 @@ class PipelineOrchestrator:
         )
         return PromptReferenceResponse(
             subject=request.subject,
+            provider=provider.descriptor.name,
+            model=provider.model_for_stage("planning"),
+            output_path=str(artifact.output_path),
+            markdown=artifact.markdown,
+            wrote_file=artifact.wrote_file,
+            raw_output=artifact.raw_output,
+        )
+
+    def generate_custom_subject_prompt(
+        self, request: CustomSubjectPromptRequest
+    ) -> CustomSubjectPromptResponse:
+        provider_name = request.provider or self.default_generation_provider
+        provider = self.provider_registry.get(provider_name)
+        if (
+            provider.descriptor.kind != ProviderKind.OPENAI_COMPATIBLE
+            or not hasattr(provider, "complete_text")
+            or not hasattr(provider, "model_for_stage")
+        ):
+            raise ValueError("自定义学科 Prompt 生成仅支持 OpenAI 兼容 provider。")
+
+        artifact = generate_custom_subject_artifact(
+            provider,
+            subject_name=request.subject_name,
+            summary=request.summary,
+            notes=request.notes,
+            write=request.write,
+        )
+        return CustomSubjectPromptResponse(
+            subject_name=artifact.subject_name,
+            slug=artifact.slug,
             provider=provider.descriptor.name,
             model=provider.model_for_stage("planning"),
             output_path=str(artifact.output_path),

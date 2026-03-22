@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Literal
 from uuid import uuid4
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -115,6 +116,8 @@ class PipelineRequest(BaseModel):
     def apply_provider_aliases(self) -> "PipelineRequest":
         generation_provider = self.generation_provider or self.provider
         self.generation_provider = generation_provider
+        if self.router_provider is None:
+            self.router_provider = generation_provider
         if self.provider is None:
             self.provider = generation_provider
         return self
@@ -137,6 +140,53 @@ class ProviderDescriptor(BaseModel):
     supports_vision: bool = False
     base_url: str | None = None
     temperature: float | None = None
+
+
+TTSBackend = Literal["auto", "system", "openai_compatible"]
+
+
+class TTSSettingsRequest(BaseModel):
+    enabled: bool = True
+    backend: TTSBackend = "openai_compatible"
+    model: str = Field(default="mimotts-v2", min_length=1, max_length=100)
+    base_url: str | None = Field(default=None, max_length=300)
+    api_key: str | None = Field(default=None, max_length=300)
+    voice: str = Field(default="default", min_length=1, max_length=100)
+    rate_wpm: int = Field(default=150, ge=60, le=320)
+    speed: float = Field(default=0.88, ge=0.5, le=1.5)
+    max_chars: int = Field(default=1500, ge=100, le=20_000)
+    timeout_s: float | None = Field(default=120.0, ge=1.0, le=600.0)
+
+    @field_validator("base_url", "api_key", "voice", mode="before")
+    @classmethod
+    def normalize_optional_string(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+
+class TTSSettingsResponse(BaseModel):
+    enabled: bool = True
+    backend: TTSBackend = "openai_compatible"
+    model: str = "mimotts-v2"
+    base_url: str | None = None
+    api_key_configured: bool = False
+    voice: str = "default"
+    rate_wpm: int = 150
+    speed: float = 0.88
+    max_chars: int = 1500
+    timeout_s: float | None = 120.0
+
+
+class RuntimeSettingsRequest(BaseModel):
+    mock_provider_enabled: bool = True
+    tts: TTSSettingsRequest = Field(default_factory=TTSSettingsRequest)
+
+
+class RuntimeSettingsResponse(BaseModel):
+    mock_provider_enabled: bool = True
+    tts: TTSSettingsResponse = Field(default_factory=TTSSettingsResponse)
 
 
 class SkillDescriptor(BaseModel):
@@ -209,11 +259,14 @@ class RuntimeCatalog(BaseModel):
     providers: list[ProviderDescriptor] = Field(default_factory=list)
     skills: list[SkillDescriptor] = Field(default_factory=list)
     sandbox_modes: list[SandboxMode] = Field(default_factory=list)
+    settings: RuntimeSettingsResponse = Field(default_factory=RuntimeSettingsResponse)
 
     @model_validator(mode="after")
     def apply_provider_aliases(self) -> "RuntimeCatalog":
         default_generation_provider = (
-            self.default_generation_provider or self.default_provider or ProviderName.MOCK.value
+            self.default_generation_provider
+            or self.default_provider
+            or (self.providers[0].name if self.providers else None)
         )
         default_router_provider = self.default_router_provider or default_generation_provider
         self.default_generation_provider = default_generation_provider
@@ -267,6 +320,33 @@ class PromptReferenceRequest(BaseModel):
 
 class PromptReferenceResponse(BaseModel):
     subject: TopicDomain
+    provider: str
+    model: str
+    output_path: str
+    markdown: str
+    wrote_file: bool
+    raw_output: str | None = None
+
+
+class CustomSubjectPromptRequest(BaseModel):
+    subject_name: str = Field(min_length=2, max_length=80)
+    provider: str | None = None
+    summary: str | None = Field(default=None, max_length=2000)
+    notes: str | None = Field(default=None, max_length=6000)
+    write: bool = False
+
+    @field_validator("subject_name", "summary", "notes", mode="before")
+    @classmethod
+    def normalize_prompt_strings(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+
+class CustomSubjectPromptResponse(BaseModel):
+    subject_name: str
+    slug: str
     provider: str
     model: str
     output_path: str

@@ -7,12 +7,14 @@ import {
   getPipelineRuns,
   getRuntimeCatalog,
   runPipeline,
+  updateRuntimeSettings,
   upsertCustomProvider,
 } from "./api/client";
 import { CodeAdapterPanel } from "./components/CodeAdapterPanel";
 import { ControlPanel } from "./components/ControlPanel";
 import { HighlightedCode } from "./components/HighlightedCode";
 import { PromptReferenceTool } from "./components/PromptReferenceTool";
+import { TTSSettingsPanel } from "./components/TTSSettingsPanel";
 import {
   domainPresets,
   getDomainPresentation,
@@ -38,23 +40,11 @@ type ThemeMode = "dark" | "light";
 type DeckMode = "smart" | "expert";
 
 const fallbackRuntimeCatalog: RuntimeCatalog = {
-  default_provider: "mock",
-  default_router_provider: "mock",
-  default_generation_provider: "mock",
+  default_provider: "openai",
+  default_router_provider: "openai",
+  default_generation_provider: "openai",
   sandbox_engine: "python-manim-static",
   providers: [
-    {
-      name: "mock",
-      label: "Mock Provider",
-      kind: "mock",
-      model: "mock-cir-studio-001",
-      stage_models: {},
-      description: "本地确定性规则提供者，用于 MVP 阶段替代真实大模型。",
-      configured: true,
-      is_custom: false,
-      supports_vision: false,
-      base_url: null,
-    },
     {
       name: "openai",
       label: "OpenAI Compatible",
@@ -70,6 +60,21 @@ const fallbackRuntimeCatalog: RuntimeCatalog = {
   ],
   skills: [],
   sandbox_modes: ["dry_run", "off"],
+  settings: {
+    mock_provider_enabled: false,
+    tts: {
+      enabled: true,
+      backend: "openai_compatible",
+      model: "mimotts-v2",
+      base_url: null,
+      api_key_configured: false,
+      voice: "default",
+      rate_wpm: 150,
+      speed: 0.88,
+      max_chars: 1500,
+      timeout_s: 120,
+    },
+  },
 };
 
 function resolvePreviewVideoUrl(url: string | null | undefined): string | null {
@@ -96,6 +101,7 @@ function resolveConfiguredProvider(
   requestedProvider: ModelProvider | null | undefined,
   fallbackProvider: ModelProvider,
 ): ModelProvider {
+  const availableProviders = catalog.providers;
   const configuredProviders = catalog.providers.filter((candidate) => candidate.configured);
   if (configuredProviders.some((candidate) => candidate.name === requestedProvider)) {
     return requestedProvider as ModelProvider;
@@ -103,7 +109,16 @@ function resolveConfiguredProvider(
   if (configuredProviders.some((candidate) => candidate.name === fallbackProvider)) {
     return fallbackProvider;
   }
-  return configuredProviders[0]?.name ?? fallbackProvider;
+  if (configuredProviders[0]?.name) {
+    return configuredProviders[0].name;
+  }
+  if (availableProviders.some((candidate) => candidate.name === requestedProvider)) {
+    return requestedProvider as ModelProvider;
+  }
+  if (availableProviders.some((candidate) => candidate.name === fallbackProvider)) {
+    return fallbackProvider;
+  }
+  return availableProviders[0]?.name ?? fallbackProvider;
 }
 
 function getInitialTheme(): ThemeMode {
@@ -431,6 +446,25 @@ export default function App() {
     if (generationProvider === name) {
       setGenerationProvider(catalog.default_generation_provider);
     }
+  }
+
+  async function handleUpdateRuntimeSettings(payload: {
+    mock_provider_enabled: boolean;
+    tts: {
+      enabled: boolean;
+      backend: "auto" | "system" | "openai_compatible";
+      model: string;
+      base_url?: string | null;
+      api_key?: string | null;
+      voice: string;
+      rate_wpm: number;
+      speed: number;
+      max_chars: number;
+      timeout_s?: number | null;
+    };
+  }) {
+    await updateRuntimeSettings(payload);
+    await refreshRuntimeCatalog();
   }
 
   function handleSelectDomain(domain: TopicDomain) {
@@ -823,6 +857,11 @@ export default function App() {
                 providers={runtimeCatalog.providers}
                 onCreateProvider={handleCreateProvider}
                 onDeleteProvider={handleDeleteProvider}
+              />
+
+              <TTSSettingsPanel
+                settings={runtimeCatalog.settings}
+                onSave={handleUpdateRuntimeSettings}
               />
 
               <section className="panel panel-history-detail panel-nested">

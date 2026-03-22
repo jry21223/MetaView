@@ -39,7 +39,7 @@
 
 ```bash
 cp .env.example .env
-docker compose up --build
+make start
 ```
 
 启动后：
@@ -50,13 +50,14 @@ docker compose up --build
 停止：
 
 ```bash
-docker compose down
+make stop
 ```
 
 说明：
 
 - 这条路径默认使用 Docker 内的 fallback 预览渲染
-- 如果你还没配置 OpenAI 兼容模型，系统也可以先用 `mock` provider 跑通界面
+- 如果你已经配置 OpenAI 兼容模型，运行时会默认优先选用已配置 API
+- 若还没配真实模型，也可以保留 `mock` provider 先跑通界面；现在也支持在运行时面板里直接禁用
 - 如果只想先验证前后端联通，这是推荐方式
 
 ### 方式 B：本地开发启动
@@ -77,20 +78,40 @@ cp .env.example .env
 make bootstrap-manim
 ```
 
-#### 2. 启动后端
+#### 2. 一键启动本地开发
+
+```bash
+make dev
+```
+
+这条命令会同时拉起：
+
+- API: `http://127.0.0.1:8000`
+- Web: `http://127.0.0.1:5173`
+
+如果你想拆成两个终端单独调试，也可以继续使用：
+
+终端 1：
 
 ```bash
 make dev-api
 ```
 
-默认地址：`http://127.0.0.1:8000`
+终端 2：
+
+```bash
+make dev-web
+```
 
 可用接口：
 
 - `GET /health`
 - `GET /api/v1/runtime`
+- `GET /api/v1/runtime/settings`
+- `PUT /api/v1/runtime/settings`
 - `POST /api/v1/pipeline`
 - `POST /api/v1/prompts/reference`
+- `POST /api/v1/prompts/custom-subject`
 - `GET /api/v1/runs`
 - `GET /api/v1/runs/{request_id}`
 - `POST /api/v1/providers/custom`
@@ -99,22 +120,18 @@ make dev-api
 - `POST /api/v1/manim/prepare`
 - `POST /api/v1/manim/render`
 
-#### 3. 启动前端
-
-另开一个终端：
-
-```bash
-make dev-web
-```
-
-默认地址：`http://127.0.0.1:5173`
-
 ## 快速命令
 
 ### 最短可用命令
 
 ```bash
-cp .env.example .env && docker compose up --build
+cp .env.example .env && make start
+```
+
+### 本地开发一键启动
+
+```bash
+make bootstrap && cp .env.example .env && make dev
 ```
 
 ### 本地开发双终端
@@ -146,7 +163,7 @@ make check
 
 ```bash
 cp .env.example .env
-make docker-up
+make start
 ```
 
 ## 环境变量
@@ -154,8 +171,10 @@ make docker-up
 - `ALGO_VIS_ENABLED_DOMAINS`: 当前启用的学科模块，逗号分隔，默认 `algorithm,math,code,physics,chemistry,biology,geography`
 - `ALGO_VIS_HISTORY_DB_PATH`: SQLite 历史库路径
 - `ALGO_VIS_CORS_ORIGIN_REGEX`: 本地联调默认允许的浏览器来源规则
-- `ALGO_VIS_DEFAULT_ROUTER_PROVIDER`: 默认路由模型
-- `ALGO_VIS_DEFAULT_GENERATION_PROVIDER`: 默认规划/编码模型
+- `ALGO_VIS_DEFAULT_PROVIDER`: 显式指定统一默认 provider；留空时自动挑选已配置 API
+- `ALGO_VIS_DEFAULT_ROUTER_PROVIDER`: 显式指定默认路由模型；留空时自动挑选已配置 API
+- `ALGO_VIS_DEFAULT_GENERATION_PROVIDER`: 显式指定默认规划/编码模型；留空时自动挑选已配置 API
+- `ALGO_VIS_MOCK_PROVIDER_ENABLED`: 是否暴露内置 `mock` provider，默认 `true`
 - `ALGO_VIS_PREVIEW_RENDER_BACKEND`: `auto`、`manim` 或 `fallback`
 - `ALGO_VIS_MANIM_PYTHON_PATH`: 真实渲染时使用的 Python 环境，默认 `.venv-manim/bin/python`
 - `ALGO_VIS_MANIM_RENDER_TIMEOUT_S`: 单次 `manim` 渲染超时，默认 180 秒
@@ -167,6 +186,7 @@ make docker-up
 - `ALGO_VIS_PREVIEW_TTS_VOICE`: 远程 TTS 的 voice 参数，默认 `default`
 - `ALGO_VIS_PREVIEW_TTS_RATE_WPM`: 目标语速，默认 `150`
 - `ALGO_VIS_PREVIEW_TTS_SPEED`: 远程 TTS 的基础 speed，默认 `0.88`
+- `ALGO_VIS_PREVIEW_TTS_MAX_CHARS`: 单次旁白允许的最大字符数，默认 `1500`
 - `ALGO_VIS_PREVIEW_TTS_TIMEOUT_S`: 单次远程配音超时，默认 `120`
 - `ALGO_VIS_OPENAI_API_KEY`: 启用内置 OpenAI 兼容 Provider
 - `ALGO_VIS_OPENAI_BASE_URL`: OpenAI 兼容 API 地址
@@ -179,6 +199,11 @@ make docker-up
 当前版本支持通过前端面板或 HTTP API 注册自定义 OpenAI 兼容模型提供商，例如本地 `Ollama`、`vLLM` 网关或第三方代理服务。自定义 Provider 会持久化到 SQLite，并自动出现在运行时目录中。
 
 内置 `openai` Provider 继续走环境变量配置；自定义 Provider 则通过 `POST /api/v1/providers/custom` 动态注册。当前 Provider 配置还允许显式声明是否支持视觉输入，这会影响题图是否发送给路由模型和规划模型。
+
+如果你不希望开发阶段继续暴露 `mock`，可以：
+
+- 在 `.env` 里把 `ALGO_VIS_MOCK_PROVIDER_ENABLED=false`
+- 或直接在前端底部的 `TTS 与默认行为` 面板里关闭 `mock provider`
 
 ## 学科技能层
 
@@ -241,7 +266,19 @@ python skills/generate-subject-manim-prompts/scripts/generate_reference_with_llm
 默认会复用 `.env` 中的 `ALGO_VIS_OPENAI_BASE_URL`、`ALGO_VIS_OPENAI_API_KEY`、`ALGO_VIS_OPENAI_MODEL`
 或 `ALGO_VIS_OPENAI_PLANNING_MODEL`。先检查请求内容可加 `--dry-run`。
 
-现在前端底部也内置了同一套工具，可以直接在网页里为任意学科生成或写回对应的 reference 文件。
+上面这条脚本仍然是给仓库维护者使用的，用来微调内置学科 reference。
+
+如果你要为用户生成一个“全新的学科工具 Prompt 包”，不要改内置 reference，而是使用：
+
+```bash
+python skills/generate-subject-manim-prompts/scripts/generate_custom_subject_prompt_with_llm.py \
+  --subject-name "Transport Phenomena" \
+  --summary "面向传热、传质、动量传递的教学动画提示词" \
+  --notes "强调守恒量、边界条件、通量方向与常见误解" \
+  --write
+```
+
+默认会写到 `skills/generated-subject-prompts/<slug>.md`。这套脚本和网页底部工具都只生成新的独立 Prompt 包，不会覆盖现有 `algorithm / math / code / physics / chemistry / biology / geography` 的运行时 reference。
 
 ## 自定义 Provider
 
@@ -262,7 +299,10 @@ python skills/generate-subject-manim-prompts/scripts/generate_reference_with_llm
 
 当前默认按 `mimotts-v2` 作为预览视频的旁白模型。只要后端能拿到一组可用的 OpenAI 兼容音频接口配置，渲染完成后就会自动把中文旁白嵌进 MP4。
 
-前端“高级设置”里提供了请求级开关，可按单次任务决定是否嵌入旁白，而不是只能依赖全局环境变量。
+前端现在有两层控制：
+
+- “高级设置”里的请求级开关：决定本次任务是否嵌入旁白
+- 底部 `TTS 与默认行为` 面板：管理 `mimotts-v2` 的 Base URL、API Key、voice、rate、speed，以及是否允许 `mock` provider
 
 配置优先级：
 

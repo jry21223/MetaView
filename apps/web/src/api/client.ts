@@ -1,4 +1,6 @@
 import type {
+  CustomSubjectPromptRequest,
+  CustomSubjectPromptResponse,
   CustomProviderTestResponse,
   CustomProviderUpsertRequest,
   ManimScriptPrepareResponse,
@@ -11,6 +13,8 @@ import type {
   PromptReferenceResponse,
   ProviderDescriptor,
   RuntimeCatalog,
+  RuntimeSettings,
+  RuntimeSettingsUpdateRequest,
   SandboxMode,
   TopicDomain,
   UITheme,
@@ -39,6 +43,24 @@ export async function getRuntimeCatalog(): Promise<RuntimeCatalog> {
   }
 
   return (await response.json()) as RuntimeCatalog;
+}
+
+export async function updateRuntimeSettings(
+  payload: RuntimeSettingsUpdateRequest,
+): Promise<RuntimeSettings> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/runtime/settings`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, "Runtime settings request failed"));
+  }
+
+  return (await response.json()) as RuntimeSettings;
 }
 
 export async function getPipelineRuns(): Promise<PipelineRunSummary[]> {
@@ -164,6 +186,24 @@ export async function generatePromptReference(
   }
 
   return (await response.json()) as PromptReferenceResponse;
+}
+
+export async function generateCustomSubjectPrompt(
+  payload: CustomSubjectPromptRequest,
+): Promise<CustomSubjectPromptResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/prompts/custom-subject`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, "Custom subject prompt request failed"));
+  }
+
+  return (await response.json()) as CustomSubjectPromptResponse;
 }
 
 export async function prepareManimScript(

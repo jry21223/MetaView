@@ -6,7 +6,9 @@ from app.schemas import (
     CirDocument,
     ProviderDescriptor,
     ProviderKind,
+    RuntimeSettingsRequest,
     TopicDomain,
+    TTSSettingsRequest,
 )
 from app.services.preview_video_renderer import PreviewVideoArtifacts
 from app.services.providers.base import CodingHints, CritiqueHints, PlanningHints
@@ -103,6 +105,63 @@ def test_runtime_catalog_allows_local_dev_cors_origin() -> None:
     assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:4174"
 
 
+def test_runtime_settings_endpoint_updates_tts_configuration() -> None:
+    previous_settings = orchestrator.runtime_settings
+    restore_payload = RuntimeSettingsRequest(
+        mock_provider_enabled=previous_settings.mock_provider_enabled,
+        tts=TTSSettingsRequest(
+            enabled=previous_settings.tts.enabled,
+            backend=previous_settings.tts.backend,
+            model=previous_settings.tts.model,
+            base_url=previous_settings.tts.base_url,
+            api_key=previous_settings.tts.api_key,
+            voice=previous_settings.tts.voice,
+            rate_wpm=previous_settings.tts.rate_wpm,
+            speed=previous_settings.tts.speed,
+            max_chars=previous_settings.tts.max_chars,
+            timeout_s=previous_settings.tts.timeout_s,
+        ),
+    )
+
+    try:
+        response = client.put(
+            "/api/v1/runtime/settings",
+            json={
+                "mock_provider_enabled": False,
+                "tts": {
+                    "enabled": True,
+                    "backend": "openai_compatible",
+                    "model": "mimotts-v2",
+                    "base_url": "https://tts.example.com/v1",
+                    "api_key": "secret-tts-key",
+                    "voice": "calm_female",
+                    "rate_wpm": 136,
+                    "speed": 0.82,
+                    "max_chars": 1800,
+                    "timeout_s": 90,
+                },
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["mock_provider_enabled"] is False
+        assert payload["tts"]["backend"] == "openai_compatible"
+        assert payload["tts"]["model"] == "mimotts-v2"
+        assert payload["tts"]["base_url"] == "https://tts.example.com/v1"
+        assert payload["tts"]["api_key_configured"] is True
+        assert payload["tts"]["voice"] == "calm_female"
+
+        runtime_response = client.get("/api/v1/runtime")
+        assert runtime_response.status_code == 200
+        runtime_payload = runtime_response.json()
+        assert runtime_payload["settings"]["mock_provider_enabled"] is False
+        assert runtime_payload["settings"]["tts"]["api_key_configured"] is True
+        assert all(provider["name"] != "mock" for provider in runtime_payload["providers"])
+        assert runtime_payload["default_generation_provider"] == "openai"
+    finally:
+        orchestrator.update_runtime_settings(restore_payload)
+
+
 def test_generate_prompt_reference_endpoint(monkeypatch) -> None:
     class PromptStubProvider:
         descriptor = ProviderDescriptor(
@@ -193,6 +252,101 @@ def test_generate_prompt_reference_endpoint(monkeypatch) -> None:
         "skills/generate-subject-manim-prompts/references/algorithm.md"
     )
     assert payload["markdown"].startswith("# Algorithm Prompt Guidance")
+
+
+def test_generate_custom_subject_prompt_endpoint(monkeypatch) -> None:
+    class PromptStubProvider:
+        descriptor = ProviderDescriptor(
+            name="prompt-stub",
+            label="Prompt Stub",
+            kind=ProviderKind.OPENAI_COMPATIBLE,
+            model="prompt-model-v1",
+            description="stub prompt authoring provider",
+            configured=True,
+        )
+
+        def model_for_stage(self, stage: str) -> str:
+            assert stage == "planning"
+            return "prompt-model-v1"
+
+        def complete_text(
+            self,
+            *,
+            stage: str,
+            system_prompt: str,
+            user_prompt: str,
+            source_image: str | None = None,
+        ) -> tuple[str, str]:
+            assert stage == "planning"
+            assert "new subject tool" in user_prompt.lower()
+            assert "transport phenomena" in user_prompt.lower()
+            return (
+                """
+# Transport Phenomena Prompt Guidance
+
+## Common
+- one
+- two
+- three
+- four
+
+## Planner
+- one
+- two
+- three
+- four
+
+## Coder
+- one
+- two
+- three
+- four
+
+## Critic
+- one
+- two
+- three
+- four
+
+## Repair
+- one
+- two
+- three
+- four
+                """.strip(),
+                "raw markdown output",
+            )
+
+    original_get = orchestrator.provider_registry.get
+
+    def fake_get(name: str):
+        if name == "prompt-stub":
+            return PromptStubProvider()
+        return original_get(name)
+
+    monkeypatch.setattr(orchestrator.provider_registry, "get", fake_get)
+
+    response = client.post(
+        "/api/v1/prompts/custom-subject",
+        json={
+            "subject_name": "Transport Phenomena",
+            "provider": "prompt-stub",
+            "summary": "面向传热、传质、动量传递的教学动画提示词。",
+            "notes": "强调守恒量、通量方向与边界条件。",
+            "write": False,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["subject_name"] == "Transport Phenomena"
+    assert payload["provider"] == "prompt-stub"
+    assert payload["model"] == "prompt-model-v1"
+    assert payload["slug"].startswith("transport-phenomena-")
+    assert payload["wrote_file"] is False
+    assert payload["output_path"].endswith(
+        f"skills/generated-subject-prompts/{payload['slug']}.md"
+    )
+    assert payload["markdown"].startswith("# Transport Phenomena Prompt Guidance")
 
 
 def test_prepare_manim_endpoint_extracts_and_wraps_code() -> None:
@@ -543,6 +697,64 @@ def test_custom_provider_crud() -> None:
 
     delete_response = client.delete("/api/v1/providers/custom/local-ollama")
     assert delete_response.status_code == 200
+
+
+def test_runtime_catalog_prefers_configured_provider_when_mock_disabled() -> None:
+    previous_settings = orchestrator.runtime_settings
+    restore_payload = RuntimeSettingsRequest(
+        mock_provider_enabled=previous_settings.mock_provider_enabled,
+        tts=TTSSettingsRequest(
+            enabled=previous_settings.tts.enabled,
+            backend=previous_settings.tts.backend,
+            model=previous_settings.tts.model,
+            base_url=previous_settings.tts.base_url,
+            api_key=previous_settings.tts.api_key,
+            voice=previous_settings.tts.voice,
+            rate_wpm=previous_settings.tts.rate_wpm,
+            speed=previous_settings.tts.speed,
+            max_chars=previous_settings.tts.max_chars,
+            timeout_s=previous_settings.tts.timeout_s,
+        ),
+    )
+
+    create_response = client.post(
+        "/api/v1/providers/custom",
+        json={
+            "name": "primary-ollama",
+            "label": "Primary Ollama",
+            "base_url": "http://127.0.0.1:11434/v1",
+            "model": "qwen2.5-coder:14b",
+            "router_model": "qwen2.5-coder:3b",
+            "description": "默认主 provider",
+            "api_key": "",
+            "temperature": 0.2,
+            "supports_vision": False,
+            "enabled": True,
+        },
+    )
+    assert create_response.status_code == 200
+
+    try:
+        update_response = client.put(
+            "/api/v1/runtime/settings",
+            json={
+                "mock_provider_enabled": False,
+                "tts": restore_payload.tts.model_dump(mode="json"),
+            },
+        )
+        assert update_response.status_code == 200
+
+        runtime_response = client.get("/api/v1/runtime")
+        assert runtime_response.status_code == 200
+        payload = runtime_response.json()
+        assert payload["default_provider"] == "primary-ollama"
+        assert payload["default_router_provider"] == "primary-ollama"
+        assert payload["default_generation_provider"] == "primary-ollama"
+        assert all(provider["name"] != "mock" for provider in payload["providers"])
+    finally:
+        orchestrator.update_runtime_settings(restore_payload)
+        delete_response = client.delete("/api/v1/providers/custom/primary-ollama")
+        assert delete_response.status_code == 200
     assert delete_response.json()["deleted"] is True
 
 

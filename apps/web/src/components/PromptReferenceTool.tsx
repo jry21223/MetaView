@@ -1,13 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { generatePromptReference } from "../api/client";
+import { generateCustomSubjectPrompt } from "../api/client";
 import type {
+  CustomSubjectPromptResponse,
   ModelProvider,
-  PromptReferenceResponse,
   ProviderDescriptor,
-  TopicDomain,
 } from "../types";
-import { domainLabels } from "../domainPresentation";
 
 interface PromptReferenceToolProps {
   providers: ProviderDescriptor[];
@@ -24,13 +22,14 @@ export function PromptReferenceTool({
 }: PromptReferenceToolProps) {
   const availableProviders = providers.filter(canUseForPromptAuthoring);
   const firstProvider = availableProviders[0]?.name ?? defaultProvider;
-  const [subject, setSubject] = useState<TopicDomain>("algorithm");
+  const [subjectName, setSubjectName] = useState("");
+  const [summary, setSummary] = useState("");
   const [provider, setProvider] = useState<ModelProvider>(firstProvider);
   const [notes, setNotes] = useState("");
   const [write, setWrite] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<PromptReferenceResponse | null>(null);
+  const [result, setResult] = useState<CustomSubjectPromptResponse | null>(null);
 
   useEffect(() => {
     if (!availableProviders.length) {
@@ -41,18 +40,34 @@ export function PromptReferenceTool({
     }
   }, [availableProviders, firstProvider, provider]);
 
+  const normalizedSubjectName = subjectName.trim();
+  const canSubmit = normalizedSubjectName.length >= 2 && availableProviders.length > 0;
+  const projectedOutputPath = useMemo(() => {
+    if (result?.output_path) {
+      return result.output_path;
+    }
+    return write
+      ? "skills/generated-subject-prompts/<slug>.md"
+      : "preview only";
+  }, [result?.output_path, write]);
+
   async function handleGenerate() {
     if (!availableProviders.length) {
-      setError("当前没有可用的 OpenAI 兼容 provider，无法生成 reference prompt。");
+      setError("当前没有可用的 OpenAI 兼容 provider，无法生成自定义学科 prompt。");
+      return;
+    }
+    if (normalizedSubjectName.length < 2) {
+      setError("请先填写学科名称。");
       return;
     }
 
     setLoading(true);
     setError(null);
     try {
-      const response = await generatePromptReference({
-        subject,
+      const response = await generateCustomSubjectPrompt({
+        subject_name: normalizedSubjectName,
         provider,
+        summary: summary.trim() || null,
         notes: notes.trim() || null,
         write,
       });
@@ -75,26 +90,23 @@ export function PromptReferenceTool({
     <section className="panel panel-nested prompt-tool-panel">
       <div className="panel-header">
         <span className="panel-kicker">Prompt Tool</span>
-        <h3>学科 Prompt 生成器</h3>
-        <p>在网页里直接为 `skills/.../references/*.md` 生成或重写分阶段学科提示词。</p>
+        <h3>自定义学科 Prompt 工具</h3>
+        <p>
+          这里用于为用户生成一个全新的学科 Prompt 包，不会改动内置
+          `algorithm / math / code / physics / chemistry / biology / geography`
+          的运行时 reference。
+        </p>
       </div>
 
       <div className="prompt-form prompt-tool-form">
         <div className="select-grid">
           <label>
-            <span>学科</span>
-            <select
-              value={subject}
-              onChange={(event) => setSubject(event.target.value as TopicDomain)}
-            >
-              {(["algorithm", "math", "code", "physics", "chemistry", "biology", "geography"] as TopicDomain[]).map(
-                (item) => (
-                  <option key={item} value={item}>
-                    {domainLabels[item]}
-                  </option>
-                ),
-              )}
-            </select>
+            <span>学科名称</span>
+            <input
+              value={subjectName}
+              onChange={(event) => setSubjectName(event.target.value)}
+              placeholder="例如：Economics / 历史学 / Transport Phenomena"
+            />
           </label>
 
           <label>
@@ -114,12 +126,22 @@ export function PromptReferenceTool({
         </div>
 
         <label>
+          <span>学科说明</span>
+          <textarea
+            value={summary}
+            onChange={(event) => setSummary(event.target.value)}
+            rows={5}
+            placeholder="说明这个新学科要覆盖什么内容、主要对象是什么、希望动画强调哪些关系。"
+          />
+        </label>
+
+        <label>
           <span>补充要求</span>
           <textarea
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
-            rows={6}
-            placeholder="例如：强调终止条件、状态同步、不要写泛化空话；更适合本项目当前 staged runtime。"
+            rows={5}
+            placeholder="例如：强调因果链、边界条件、常见误解；避免泛化空话；更适合教学动画。"
           />
         </label>
 
@@ -129,12 +151,12 @@ export function PromptReferenceTool({
             checked={write}
             onChange={(event) => setWrite(event.target.checked)}
           />
-          <span>直接写回对应学科的 reference 文件</span>
+          <span>写入独立目录 `skills/generated-subject-prompts/`</span>
         </label>
 
         <div className="form-actions">
-          <button type="button" onClick={handleGenerate} disabled={loading || !availableProviders.length}>
-            {loading ? "生成中..." : write ? "生成并写回" : "生成预览"}
+          <button type="button" onClick={handleGenerate} disabled={loading || !canSubmit}>
+            {loading ? "生成中..." : write ? "生成并写入" : "生成新学科 Prompt"}
           </button>
           <button
             type="button"
@@ -156,6 +178,7 @@ export function PromptReferenceTool({
         <div className="prompt-tool-result">
           <div className="panel-toolbar">
             <div className="history-item-meta">
+              <span>{result.subject_name}</span>
               <span>{result.provider}</span>
               <span>{result.model}</span>
               <span>{result.wrote_file ? "written" : "preview only"}</span>
@@ -166,7 +189,8 @@ export function PromptReferenceTool({
         </div>
       ) : (
         <div className="history-empty">
-          选择学科并填写补充要求后，这里会显示生成后的 reference markdown。
+          输入新学科名称后，这里会生成一个可直接复制或写入文件的独立 prompt 包。
+          目标路径：{projectedOutputPath}
         </div>
       )}
     </section>

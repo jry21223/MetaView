@@ -25,13 +25,14 @@
 - `ControlPanel`: 输入题目、上传可选题图并发起生成。
 - `App`: 主页优先播放后端生成的 MP4 预览视频，并展示任务状态、原始 LLM 返回与历史记录。
 - `ProviderManager`: 管理自定义 OpenAI 兼容 Provider。
-- `PromptReferenceTool`: 在网页底部直接生成或写回学科 reference prompt。
+- `PromptReferenceTool`: 在网页底部为用户生成新的独立学科 prompt 包，不改写内置 reference。
 - `api/client.ts`: 与后端 API 通信。
 
 ### `skills`
 
 - `generate-subject-manim-prompts/references/*.md`: 运行时实际读取的 staged 学科 guidance。
 - `generate-subject-manim-prompts/scripts/generate_reference_with_llm.py`: 用 LLM 生成或重写学科 guidance 的脚本。
+- `generate-subject-manim-prompts/scripts/generate_custom_subject_prompt_with_llm.py`: 用 LLM 为新学科生成独立 prompt 包。
 
 顶层 legacy skill 目录已移除。运行时真正使用的学科元数据定义在
 [skill_catalog.py](/Users/jerry/Desktop/demoo/apps/api/app/services/skill_catalog.py)。

@@ -20,9 +20,10 @@ class Settings(BaseSettings):
     api_prefix: str = "/api/v1"
     cors_origins: list[str] = ["http://127.0.0.1:5173", "http://localhost:5173"]
     cors_origin_regex: str = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
-    default_provider: str = "mock"
+    default_provider: str | None = None
     default_router_provider: str | None = None
     default_generation_provider: str | None = None
+    mock_provider_enabled: bool = True
     enabled_domains: str = DEFAULT_ENABLED_DOMAINS
     sandbox_timeout_ms: int = 1500
     max_repair_attempts: int = 2

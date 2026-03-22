@@ -14,8 +14,10 @@ from app.schemas import (
     PipelineRunDetail,
     PipelineRunSummary,
     ProviderKind,
+    RuntimeSettingsRequest,
     SandboxStatus,
     TopicDomain,
+    TTSSettingsRequest,
 )
 
 
@@ -51,6 +53,46 @@ class StoredCustomProvider:
         if self.test_model:
             stage_models["test"] = self.test_model
         return stage_models
+
+
+@dataclass(frozen=True)
+class StoredTTSSettings:
+    enabled: bool
+    backend: str
+    model: str
+    base_url: str | None
+    api_key: str | None
+    voice: str
+    rate_wpm: int
+    speed: float
+    max_chars: int
+    timeout_s: float | None
+
+    def to_response_payload(self) -> dict[str, object]:
+        return {
+            "enabled": self.enabled,
+            "backend": self.backend,
+            "model": self.model,
+            "base_url": self.base_url,
+            "api_key_configured": bool(self.api_key),
+            "voice": self.voice,
+            "rate_wpm": self.rate_wpm,
+            "speed": self.speed,
+            "max_chars": self.max_chars,
+            "timeout_s": self.timeout_s,
+        }
+
+
+@dataclass(frozen=True)
+class StoredRuntimeSettings:
+    mock_provider_enabled: bool
+    tts: StoredTTSSettings
+
+    def to_response_payload(self) -> dict[str, object]:
+        return {
+            "mock_provider_enabled": self.mock_provider_enabled,
+            "tts": self.tts.to_response_payload(),
+        }
 
 
 class RunRepository:
@@ -396,3 +438,121 @@ class CustomProviderRepository:
             )
 
         return cursor.rowcount > 0
+
+
+class RuntimeSettingsRepository:
+    def __init__(self, db_path: str) -> None:
+        self.db_path = Path(db_path)
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._initialize()
+
+    def _connect(self) -> sqlite3.Connection:
+        connection = sqlite3.connect(self.db_path)
+        connection.row_factory = sqlite3.Row
+        return connection
+
+    def _initialize(self) -> None:
+        with closing(self._connect()) as connection, connection:
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS app_settings (
+                    name TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+                """
+            )
+
+    def get_runtime_settings(
+        self,
+        *,
+        defaults: RuntimeSettingsRequest,
+    ) -> StoredRuntimeSettings:
+        payload = defaults.model_dump(mode="json")
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                """
+                SELECT value
+                FROM app_settings
+                WHERE name = ?
+                """,
+                ("runtime_settings",),
+            ).fetchone()
+
+        if row is not None:
+            stored_payload = json.loads(row["value"])
+            payload = self._merge_runtime_payload(payload, stored_payload)
+
+        return self._build_runtime_settings(payload)
+
+    def save_runtime_settings(
+        self,
+        payload: RuntimeSettingsRequest,
+        *,
+        defaults: RuntimeSettingsRequest,
+    ) -> StoredRuntimeSettings:
+        stored_payload = {
+            "mock_provider_enabled": payload.mock_provider_enabled,
+            "tts": {
+                "enabled": payload.tts.enabled,
+                "backend": payload.tts.backend,
+                "model": payload.tts.model,
+                "base_url": payload.tts.base_url,
+                "api_key": payload.tts.api_key,
+                "voice": payload.tts.voice,
+                "rate_wpm": payload.tts.rate_wpm,
+                "speed": payload.tts.speed,
+                "max_chars": payload.tts.max_chars,
+                "timeout_s": payload.tts.timeout_s,
+            },
+        }
+
+        with closing(self._connect()) as connection, connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO app_settings (name, value)
+                VALUES (?, ?)
+                """,
+                (
+                    "runtime_settings",
+                    json.dumps(stored_payload, ensure_ascii=False),
+                ),
+            )
+
+        return self._build_runtime_settings(stored_payload)
+
+    def _merge_runtime_payload(
+        self,
+        default_payload: dict[str, object],
+        stored_payload: dict[str, object],
+    ) -> dict[str, object]:
+        merged = dict(default_payload)
+        merged["mock_provider_enabled"] = stored_payload.get(
+            "mock_provider_enabled",
+            default_payload["mock_provider_enabled"],
+        )
+        merged_tts = dict(default_payload.get("tts", {}))
+        merged_tts.update(stored_payload.get("tts", {}))
+        merged["tts"] = merged_tts
+        return merged
+
+    def _build_runtime_settings(
+        self,
+        payload: dict[str, object],
+    ) -> StoredRuntimeSettings:
+        validated = RuntimeSettingsRequest.model_validate(payload)
+        tts_request = TTSSettingsRequest.model_validate(validated.tts.model_dump(mode="json"))
+        return StoredRuntimeSettings(
+            mock_provider_enabled=validated.mock_provider_enabled,
+            tts=StoredTTSSettings(
+                enabled=tts_request.enabled,
+                backend=tts_request.backend,
+                model=tts_request.model,
+                base_url=tts_request.base_url,
+                api_key=tts_request.api_key,
+                voice=tts_request.voice,
+                rate_wpm=tts_request.rate_wpm,
+                speed=tts_request.speed,
+                max_chars=tts_request.max_chars,
+                timeout_s=tts_request.timeout_s,
+            ),
+        )

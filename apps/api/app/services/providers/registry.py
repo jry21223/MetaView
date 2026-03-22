@@ -26,6 +26,7 @@ class ProviderRegistry:
         self,
         *,
         custom_provider_repository: CustomProviderRepository,
+        mock_enabled: bool,
         openai_api_key: str | None,
         openai_base_url: str,
         openai_model: str | None,
@@ -38,6 +39,7 @@ class ProviderRegistry:
         openai_timeout_s: float | None,
     ) -> None:
         self.custom_provider_repository = custom_provider_repository
+        self.mock_enabled = mock_enabled
         self.openai_api_key = openai_api_key
         self.openai_base_url = openai_base_url
         self.openai_model = openai_model
@@ -53,6 +55,8 @@ class ProviderRegistry:
 
     def get(self, name: str) -> ModelProvider:
         if name == ProviderName.MOCK.value:
+            if not self.mock_enabled:
+                raise ProviderUnavailableError("Provider mock 已禁用。")
             return MockModelProvider()
 
         if name == ProviderName.OPENAI.value:
@@ -77,15 +81,39 @@ class ProviderRegistry:
         return self._build_custom_provider(custom_provider)
 
     def list_descriptors(self) -> list[ProviderDescriptor]:
-        descriptors = [
-            MockModelProvider().descriptor,
-            self._openai_descriptor(),
-        ]
+        descriptors: list[ProviderDescriptor] = []
+        if self.mock_enabled:
+            descriptors.append(MockModelProvider().descriptor)
+        descriptors.append(self._openai_descriptor())
         descriptors.extend(
             self._custom_descriptor(provider)
             for provider in self.custom_provider_repository.list_all()
         )
         return descriptors
+
+    def resolve_default_provider(self, preferred_name: str | None = None) -> str | None:
+        candidates: list[str] = []
+        if preferred_name and preferred_name.strip():
+            candidates.append(preferred_name.strip())
+
+        if self._is_provider_available(ProviderName.OPENAI.value):
+            candidates.append(ProviderName.OPENAI.value)
+
+        candidates.extend(
+            provider.name
+            for provider in self.custom_provider_repository.list_all()
+            if provider.enabled
+        )
+
+        if self.mock_enabled:
+            candidates.append(ProviderName.MOCK.value)
+
+        for candidate in candidates:
+            if self._is_provider_available(candidate):
+                return candidate
+
+        descriptors = self.list_descriptors()
+        return descriptors[0].name if descriptors else None
 
     def upsert_custom_provider(
         self, payload: CustomProviderUpsertRequest
@@ -135,6 +163,14 @@ class ProviderRegistry:
         if name in {ProviderName.MOCK.value, ProviderName.OPENAI.value}:
             raise ProviderRegistrationError("不能删除内置 provider。")
         return self.custom_provider_repository.delete(name)
+
+    def _is_provider_available(self, name: str) -> bool:
+        if name == ProviderName.MOCK.value:
+            return self.mock_enabled
+        if name == ProviderName.OPENAI.value:
+            return bool(self.openai_api_key and self.openai_model)
+        custom_provider = self.custom_provider_repository.get(name)
+        return custom_provider is not None and custom_provider.enabled
 
     def _openai_descriptor(self) -> ProviderDescriptor:
         return ProviderDescriptor(

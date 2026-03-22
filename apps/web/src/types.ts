@@ -12,6 +12,7 @@ export type SandboxMode = "dry_run" | "off";
 export type SandboxStatus = "passed" | "failed" | "skipped";
 export type ProviderKind = "mock" | "openai_compatible";
 export type ProviderStage = "router" | "planning" | "coding" | "critic" | "test";
+export type TTSBackend = "auto" | "system" | "openai_compatible";
 
 export type VisualKind =
   | "array"
@@ -66,6 +67,40 @@ export interface ProviderDescriptor {
   supports_vision: boolean;
   base_url?: string | null;
   temperature?: number | null;
+}
+
+export interface TTSSettings {
+  enabled: boolean;
+  backend: TTSBackend;
+  model: string;
+  base_url?: string | null;
+  api_key_configured: boolean;
+  voice: string;
+  rate_wpm: number;
+  speed: number;
+  max_chars: number;
+  timeout_s?: number | null;
+}
+
+export interface RuntimeSettings {
+  mock_provider_enabled: boolean;
+  tts: TTSSettings;
+}
+
+export interface RuntimeSettingsUpdateRequest {
+  mock_provider_enabled: boolean;
+  tts: {
+    enabled: boolean;
+    backend: TTSBackend;
+    model: string;
+    base_url?: string | null;
+    api_key?: string | null;
+    voice: string;
+    rate_wpm: number;
+    speed: number;
+    max_chars: number;
+    timeout_s?: number | null;
+  };
 }
 
 export interface SkillDescriptor {
@@ -132,6 +167,7 @@ export interface RuntimeCatalog {
   providers: ProviderDescriptor[];
   skills: SkillDescriptor[];
   sandbox_modes: SandboxMode[];
+  settings: RuntimeSettings;
 }
 
 export interface PipelineResponse {
@@ -184,6 +220,25 @@ export interface PromptReferenceRequest {
 
 export interface PromptReferenceResponse {
   subject: TopicDomain;
+  provider: ModelProvider;
+  model: string;
+  output_path: string;
+  markdown: string;
+  wrote_file: boolean;
+  raw_output?: string | null;
+}
+
+export interface CustomSubjectPromptRequest {
+  subject_name: string;
+  provider?: ModelProvider | null;
+  summary?: string | null;
+  notes?: string | null;
+  write: boolean;
+}
+
+export interface CustomSubjectPromptResponse {
+  subject_name: string;
+  slug: string;
   provider: ModelProvider;
   model: string;
   output_path: string;
