@@ -4,6 +4,9 @@
   "workspaces": [
     "apps/web"
   ],
+  "overrides": {
+    "flatted": "^3.4.2"
+  },
   "scripts": {
     "build:web": "npm --workspace apps/web run build",
     "lint:web": "npm --workspace apps/web run lint",
