@@ -31,18 +31,53 @@
 - `biology`
 - `geography`
 
-## 快速开始
+## 简化启动
 
-### 1. 初始化环境
+### 方式 A：直接启动成品环境
+
+这是最简单的启动方式，适合先把整套页面和 API 跑起来：
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+启动后：
+
+- Web: `http://127.0.0.1:5173`
+- API: `http://127.0.0.1:8000`
+
+停止：
+
+```bash
+docker compose down
+```
+
+说明：
+
+- 这条路径默认使用 Docker 内的 fallback 预览渲染
+- 如果你还没配置 OpenAI 兼容模型，系统也可以先用 `mock` provider 跑通界面
+- 如果只想先验证前后端联通，这是推荐方式
+
+### 方式 B：本地开发启动
+
+适合需要改前端、后端或调试测试的场景。
+
+#### 1. 初始化环境
 
 ```bash
 make bootstrap
-make bootstrap-manim
 npm run setup:git-hooks
 cp .env.example .env
 ```
 
-### 2. 启动后端
+如果你需要真实 `manim-cli` 渲染，再额外执行：
+
+```bash
+make bootstrap-manim
+```
+
+#### 2. 启动后端
 
 ```bash
 make dev-api
@@ -64,7 +99,7 @@ make dev-api
 - `POST /api/v1/manim/prepare`
 - `POST /api/v1/manim/render`
 
-### 3. 启动前端
+#### 3. 启动前端
 
 另开一个终端：
 
@@ -73,6 +108,28 @@ make dev-web
 ```
 
 默认地址：`http://127.0.0.1:5173`
+
+## 快速命令
+
+### 最短可用命令
+
+```bash
+cp .env.example .env && docker compose up --build
+```
+
+### 本地开发双终端
+
+终端 1：
+
+```bash
+make dev-api
+```
+
+终端 2：
+
+```bash
+make dev-web
+```
 
 ## 常用命令
 
@@ -85,15 +142,12 @@ make check
 
 ## Docker
 
+也可以继续使用 Make 包装命令：
+
 ```bash
 cp .env.example .env
 make docker-up
 ```
-
-启动后：
-
-- Web: `http://127.0.0.1:5173`
-- API: `http://127.0.0.1:8000`
 
 ## 环境变量
 
