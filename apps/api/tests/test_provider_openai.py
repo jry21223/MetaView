@@ -271,3 +271,24 @@ def test_openai_provider_uses_stage_specific_models(monkeypatch) -> None:
         "critic-medium",
         "probe-mini",
     ]
+
+
+def test_openai_provider_treats_overlap_and_theme_keywords_as_blocking() -> None:
+    provider = OpenAICompatibleProvider(
+        api_key="test-key",
+        model="test-model",
+        base_url="https://example.com/v1",
+    )
+
+    messages, blocking = provider._normalize_feedback_messages(
+        [
+            "layout_overlap: 标题遮挡了活动对象",
+            "theme_mismatch: 浅色主题下出现大面积黑底",
+            "普通提醒",
+        ]
+    )
+
+    assert "layout_overlap: 标题遮挡了活动对象" in messages
+    assert "theme_mismatch: 浅色主题下出现大面积黑底" in messages
+    assert "layout_overlap: 标题遮挡了活动对象" in blocking
+    assert "theme_mismatch: 浅色主题下出现大面积黑底" in blocking

@@ -607,6 +607,9 @@ class OpenAICompatibleProvider:
                 "import_error",
                 "latex_fragility",
                 "text_rendering",
+                "layout_overlap",
+                "theme_mismatch",
+                "language_mismatch",
             }:
                 return details or name or None
             return None
@@ -619,8 +622,21 @@ class OpenAICompatibleProvider:
                     "render_error",
                     "syntax_error",
                     "import_error",
+                    "layout_overlap",
+                    "theme_mismatch",
+                    "language_mismatch",
+                    "text-object overlap",
+                    "text/object overlap",
+                    "overlap with active object",
+                    "theme conflict",
+                    "english explanatory text",
                     "self.play(move_pointer",
                     "textemplatelibrary.ctex",
+                    "遮挡",
+                    "重叠",
+                    "英文讲解",
+                    "英文说明",
+                    "主题失配",
                     "无法执行",
                     "会变成 self.play(none)",
                 )

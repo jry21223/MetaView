@@ -33,13 +33,16 @@ export function VideoPreview({
       </div>
 
       <div className="preview-video-shell">
-        <video
-          key={src}
-          className="preview-video"
-          src={src}
-          controls
-          playsInline
-        />
+        <div className="preview-video-frame">
+          <video
+            key={src}
+            className="preview-video"
+            src={src}
+            controls
+            playsInline
+            preload="metadata"
+          />
+        </div>
       </div>
     </div>
   );

@@ -43,6 +43,9 @@ Constraints:
 - No placeholder comments, pseudo-code, or missing variables
 - Keep all values concrete: coordinates, colors, durations, labels, and data
 - Favor reliability and readability over flashy effects
+- Reserve stable title / explanation / legend lanes before motion starts
+- Do not let explanatory text, labels, or code panels overlap active animated objects
+- If one frame is crowded, split it into multiple beats instead of shrinking everything
 
 ## Review
 
@@ -63,6 +66,8 @@ Current code:
 Return JSON with:
 - `checks`: concrete pass/fail checks tied to runtime safety, visual synchronization, and domain correctness
 - `warnings`: high-priority risks or likely regressions
+- Use explicit tokens such as `layout_overlap`, `theme_mismatch`, or `language_mismatch`
+  when those problems are present
 
 ## Repair
 
@@ -87,3 +92,4 @@ Requirements:
 - Return one corrected Python code block
 - Preserve scene structure unless it directly causes the failure
 - Prefer robust text and layout choices over fragile styling
+- When text overlaps motion, move text into a reserved lane or split the scene into separate beats

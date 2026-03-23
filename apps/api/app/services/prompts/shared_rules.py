@@ -29,14 +29,21 @@ def shared_visual_contract(ui_theme: str | None = None) -> str:
         Preserve source-code identifiers, formulas, operators, and standard scientific
         symbols unchanged when needed.
 
-        Never allow explanatory text, labels, legends, or source panels to overlap
-        active animated objects.
+        Never allow explanatory text, labels, legends, subtitles, or source panels
+        to overlap active animated objects.
+        Reserve stable safe zones before animating:
+        top band for short titles,
+        side band or bottom band for explanations,
+        center lane for the moving subject.
         If the frame gets crowded, split the content into multiple beats,
         move text into a reserved side panel,
+        freeze motion before showing a label,
         or delay labels until the animated motion settles.
+        Do not place long explanatory paragraphs directly on top of motion.
 
         Explicitly set or preserve a scene background palette that matches
         the current product theme rather than using an arbitrary default background.
+        In light theme, do not fall back to a large black matte or black empty frame.
         {theme_guidance.strip()}
         """,
     )
@@ -108,6 +115,10 @@ def coder_runtime_rules() -> str:
             the same content more reliably.
             Adapt scale, truncation, and panel size to fit the frame instead of relying
             on one rigid absolute layout.
+            Establish a text-safe lane and an animation-safe lane before the main motion starts.
+            Keep active objects away from title, subtitle, and narration bands.
+            When a step needs both a label and motion, show the motion first or pin the label
+            outside the motion lane with `to_edge`, `next_to`, or a reserved side panel.
             """,
         ),
     )
@@ -141,6 +152,9 @@ def critic_runtime_rules() -> str:
             Treat non-code explanatory English text, text-object overlap,
             and background palettes that clearly conflict with the requested UI theme
             as review failures or high-priority warnings.
+            When overlap, language mismatch, or theme mismatch is detected, report it
+            with explicit keywords such as `layout_overlap`, `language_mismatch`,
+            or `theme_mismatch` so downstream repair can act on it reliably.
             Treat helper misuse such as `self.play(move_pointer(...))` when the helper
             already calls `self.play` as a hard failure.
             Treat long Chinese `Tex`/`MathTex` content or `TexTemplateLibrary.ctex`
@@ -173,6 +187,11 @@ def repair_runtime_rules() -> str:
             Make the smallest reliable fix that restores execution.
             Prefer `Text` for Chinese narration, titles, and source-code strings.
             Reserve `Tex`/`MathTex` for mathematics or short symbolic labels.
+            If text overlaps motion, create a stable text lane, move labels out of the
+            active motion area, or split the scene into multiple beats instead of shrinking
+            everything into one crowded frame.
+            If the requested UI theme is light, remove large black backdrops and align the
+            camera background with the light surface palette.
             Remove wrapper mistakes such as `self.play(move_pointer(...))` when the helper
             already runs its own animation.
             Keep data, scene structure, and pacing close to the original unless they directly

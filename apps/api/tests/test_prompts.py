@@ -57,6 +57,7 @@ def test_code_coder_prompt_uses_text_for_source_panel() -> None:
     assert "Array And Index Driven Processes" in prompt
     assert "Simplified Chinese" in prompt
     assert "Never allow explanatory text" in prompt
+    assert "text-safe lane and an animation-safe lane" in prompt
     assert "#0f1113" in prompt
     assert "### Planner" not in prompt
     assert "Recursion, Divide And Conquer, And DP" not in prompt
@@ -71,6 +72,8 @@ def test_code_critic_prompt_covers_all_subboards_without_context() -> None:
     assert "Fix the following Manim script." not in prompt
     assert "### Critic" in prompt
     assert "### Planner" not in prompt
+    assert "layout_overlap" in prompt
+    assert "theme_mismatch" in prompt
     assert "检查是否有任何动画行为无法在源码中找到对应语句。" in prompt
     assert "Array And Index Driven Processes" in prompt
     assert "Linked List And Pointer Rewiring" in prompt

@@ -30,6 +30,7 @@ def test_custom_subject_script_build_user_prompt_contains_runtime_context() -> N
 
     assert "router -> planner -> coder -> critic -> repair" in prompt
     assert "new subject tool" in prompt.lower()
+    assert "reserved text lanes" in prompt
     assert "Transport Phenomena" in prompt
     assert "守恒量" in prompt
 

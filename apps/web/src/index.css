@@ -19,7 +19,13 @@
   --primary-strong: #006c51;
   --secondary: #78d7b8;
   --danger: #ff7870;
-  --video-shell: linear-gradient(180deg, #060a10 0%, #03060b 100%);
+  --video-shell:
+    radial-gradient(circle at top center, rgba(69, 160, 129, 0.14), transparent 42%),
+    linear-gradient(180deg, rgba(13, 18, 21, 0.96) 0%, rgba(10, 14, 17, 0.98) 100%);
+  --video-shell-border: rgba(69, 160, 129, 0.14);
+  --video-frame: linear-gradient(180deg, #0a1015 0%, #070b10 100%);
+  --video-frame-border: rgba(226, 232, 240, 0.08);
+  --video-frame-shadow: 0 24px 48px rgba(0, 0, 0, 0.32);
   --console-shell: linear-gradient(180deg, #091019 0%, #06090f 100%);
   --shadow: 0 28px 60px rgba(0, 0, 0, 0.24);
   --mono: "JetBrains Mono", monospace;
@@ -45,7 +51,13 @@
   --primary-strong: #006c51;
   --secondary: #006c51;
   --danger: #b42318;
-  --video-shell: linear-gradient(180deg, #091019 0%, #04070d 100%);
+  --video-shell:
+    radial-gradient(circle at top center, rgba(67, 98, 91, 0.12), transparent 42%),
+    linear-gradient(180deg, rgba(249, 250, 251, 0.98) 0%, rgba(239, 243, 244, 0.98) 100%);
+  --video-shell-border: rgba(67, 98, 91, 0.1);
+  --video-frame: linear-gradient(180deg, #ffffff 0%, #f2f5f6 100%);
+  --video-frame-border: rgba(67, 98, 91, 0.12);
+  --video-frame-shadow: 0 18px 36px rgba(25, 28, 29, 0.08);
   --console-shell: linear-gradient(180deg, #f8fbff 0%, #eef4f8 100%);
   --shadow: 0 26px 48px rgba(25, 28, 29, 0.06);
 }
@@ -224,7 +236,7 @@ button:active {
 
 .studio-layout.is-resolved {
   display: grid;
-  grid-template-columns: minmax(0, 0.94fr) minmax(0, 1.06fr);
+  grid-template-columns: minmax(0, 0.88fr) minmax(0, 1.12fr);
   align-items: start;
   gap: 24px;
   padding-top: 24px;
@@ -881,11 +893,13 @@ button:active {
 
 .preview-stage {
   margin-top: 18px;
-  padding: 18px;
-  border: 1px solid color-mix(in srgb, var(--primary) 12%, transparent);
+  padding: 14px;
+  border: 1px solid var(--video-shell-border);
   border-radius: 20px;
-  background: var(--video-shell);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--surface-high) 88%, var(--bg));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 16px 34px rgba(0, 0, 0, 0.08);
 }
 
 .video-surface {
@@ -969,13 +983,41 @@ button:active {
 .preview-empty {
   overflow: hidden;
   min-height: 520px;
-  border: 1px solid color-mix(in srgb, var(--primary) 10%, transparent);
+  border: 1px solid var(--video-shell-border);
   border-radius: 18px;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--video-frame-shadow);
 }
 
 .preview-video-shell {
-  background: #02060d;
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: clamp(10px, 1.5vw, 18px);
+  background: var(--video-shell);
+}
+
+.preview-video-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 24%),
+    radial-gradient(circle at 16% 18%, color-mix(in srgb, var(--primary) 18%, transparent), transparent 26%);
+  pointer-events: none;
+}
+
+.preview-video-frame {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--video-frame-border);
+  border-radius: 16px;
+  background: var(--video-frame);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 18px 34px rgba(0, 0, 0, 0.12);
 }
 
 .preview-video {
@@ -984,7 +1026,7 @@ button:active {
   min-height: 520px;
   aspect-ratio: 16 / 9;
   object-fit: contain;
-  background: #04070d;
+  background: var(--video-frame);
 }
 
 .preview-empty {
@@ -1363,12 +1405,12 @@ button.history-item {
 }
 
 .stage-panel-compact {
-  padding: 18px;
+  padding: 16px;
 }
 
 .stage-panel-compact .preview-stage {
-  margin-top: 10px;
-  padding: 12px;
+  margin-top: 8px;
+  padding: 10px;
 }
 
 .stage-panel-compact .video-surface-toolbar {
@@ -1388,8 +1430,16 @@ button.history-item {
   min-height: 460px;
 }
 
+.stage-panel-compact .preview-video-frame {
+  min-height: 460px;
+}
+
 .video-surface.is-compact .preview-video-shell,
 .video-surface.is-compact .preview-video {
+  min-height: 320px;
+}
+
+.video-surface.is-compact .preview-video-frame {
   min-height: 320px;
 }
 
@@ -1427,13 +1477,15 @@ button.history-item {
 
   .preview-video-shell,
   .preview-video,
+  .preview-video-frame,
   .preview-empty,
   .console-content {
     min-height: 420px;
   }
 
   .stage-panel-compact .preview-video-shell,
-  .stage-panel-compact .preview-video {
+  .stage-panel-compact .preview-video,
+  .stage-panel-compact .preview-video-frame {
     min-height: 420px;
   }
 
@@ -1500,5 +1552,94 @@ button.history-item {
   .panel-provider,
   .panel-advanced {
     padding: 18px;
+  }
+
+  .studio-layout.is-resolved {
+    gap: 14px;
+    padding-top: 16px;
+  }
+
+  .studio-layout.is-resolved > .studio-column {
+    display: contents;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split {
+    order: 1;
+    gap: 12px;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split .composer-copy {
+    gap: 6px;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split .composer-copy h1 {
+    font-size: 1.28rem;
+    line-height: 1.06;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split .composer-copy p {
+    font-size: 0.88rem;
+    line-height: 1.55;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split .composer-form {
+    gap: 12px;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split .composer-search-shell {
+    gap: 10px;
+    padding: 10px;
+    border-radius: 18px;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split .composer-input {
+    min-height: 64px;
+    padding: 8px 10px;
+    font-size: 0.94rem;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split .composer-meta {
+    gap: 6px;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split .composer-meta span {
+    font-size: 0.72rem;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split .composer-toggle {
+    margin: 0;
+    justify-self: start;
+  }
+
+  .studio-layout.is-resolved .stage-panel-compact {
+    order: 2;
+    padding: 12px;
+  }
+
+  .studio-layout.is-resolved .stage-panel-compact .preview-stage {
+    margin-top: 6px;
+    padding: 8px;
+  }
+
+  .studio-layout.is-resolved .stage-panel-compact .video-surface-toolbar {
+    gap: 8px;
+  }
+
+  .studio-layout.is-resolved .stage-panel-compact .video-surface-copy strong {
+    font-size: 0.84rem;
+  }
+
+  .studio-layout.is-resolved .stage-panel-compact .video-surface-copy small {
+    display: none;
+  }
+
+  .studio-layout.is-resolved .stage-panel-compact .preview-video-shell,
+  .studio-layout.is-resolved .stage-panel-compact .preview-video,
+  .studio-layout.is-resolved .stage-panel-compact .preview-video-frame {
+    min-height: clamp(360px, 58svh, 560px);
+  }
+
+  .studio-layout.is-resolved .studio-source-panel {
+    order: 3;
   }
 }

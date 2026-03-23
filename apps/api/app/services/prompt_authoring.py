@@ -231,6 +231,8 @@ def build_custom_subject_authoring_runtime_context() -> str:
           plus the active stage section.
         - Global runtime rules already cover output contracts, Simplified Chinese explanatory text,
           no text/object overlap, and theme-aligned backgrounds.
+        - New subject guidance must not weaken those shared rules; it should reinforce
+          reserved text lanes, motion-safe areas, and scene splitting when the frame gets crowded.
         - Do not duplicate generic JSON-output requirements, markdown-fence rules,
           or broad Manim boilerplate.
         - The user is creating a new subject tool, not editing any built-in subject reference file.
