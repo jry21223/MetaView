@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+SC:wght@400;500;700&display=swap");
 
 :root,
 :root[data-theme="dark"] {
@@ -29,8 +29,18 @@
   --console-shell: linear-gradient(180deg, #091019 0%, #06090f 100%);
   --shadow: 0 28px 60px rgba(0, 0, 0, 0.24);
   --mono: "JetBrains Mono", monospace;
-  --body: "Manrope", "PingFang SC", "Noto Sans SC", sans-serif;
-  --headline: "Space Grotesk", "Manrope", sans-serif;
+  --cjk-sans:
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Noto Sans SC",
+    "Noto Sans CJK SC",
+    "Source Han Sans SC",
+    "Source Han Sans CN",
+    "Microsoft YaHei UI",
+    "Microsoft YaHei",
+    sans-serif;
+  --body: "Manrope", var(--cjk-sans);
+  --headline: "Space Grotesk", "Manrope", var(--cjk-sans);
 }
 
 :root[data-theme="light"] {

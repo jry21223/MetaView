@@ -56,6 +56,8 @@ EMBEDDED_PLACEHOLDER_MP4_BASE64 = (
     "jYyLjEuMTAz"
 )
 _CJK_FONT_FAMILY_CANDIDATES = (
+    "PingFang SC",
+    "Hiragino Sans GB",
     "Noto Sans CJK SC",
     "Noto Serif CJK SC",
     "Noto Sans SC",
@@ -66,8 +68,6 @@ _CJK_FONT_FAMILY_CANDIDATES = (
     "Sarasa Gothic SC",
     "WenQuanYi Zen Hei",
     "Microsoft YaHei",
-    "PingFang SC",
-    "Hiragino Sans GB",
     "SimHei",
 )
 _CJK_FONT_FAMILY_MARKERS = (

@@ -112,6 +112,8 @@ def _algo_vis_pick_cjk_font():
             return (resolved_family, explicit_path)
 
     candidates = (
+        "PingFang SC",
+        "Hiragino Sans GB",
         "Noto Sans CJK SC",
         "Noto Serif CJK SC",
         "Noto Sans SC",
@@ -122,8 +124,6 @@ def _algo_vis_pick_cjk_font():
         "Sarasa Gothic SC",
         "WenQuanYi Zen Hei",
         "Microsoft YaHei",
-        "PingFang SC",
-        "Hiragino Sans GB",
         "SimHei",
     )
     try:
