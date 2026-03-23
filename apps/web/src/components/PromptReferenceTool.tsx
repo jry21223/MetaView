@@ -98,6 +98,20 @@ export function PromptReferenceTool({
         </p>
       </div>
 
+      <div className="skill-card prompt-tool-guide">
+        <strong>推荐输入方式</strong>
+        <p>
+          最好把学科范围、核心对象、阶段顺序、关键过渡、常见误解和想保留的讲解风格一起写清。
+          工具会更偏向生成能支撑“分析 → 分镜 → 校验 → 实现 → 修复”的生产级 Prompt，而不是空泛学科描述。
+        </p>
+        <div className="history-item-meta">
+          <span>core objects</span>
+          <span>storyboard beats</span>
+          <span>timing risks</span>
+          <span>validator checks</span>
+        </div>
+      </div>
+
       <div className="prompt-form prompt-tool-form">
         <div className="select-grid">
           <label>
@@ -131,7 +145,7 @@ export function PromptReferenceTool({
             value={summary}
             onChange={(event) => setSummary(event.target.value)}
             rows={5}
-            placeholder="说明这个新学科要覆盖什么内容、主要对象是什么、希望动画强调哪些关系。"
+            placeholder="说明这个新学科覆盖什么内容、主要对象是什么、讲解通常按什么阶段推进、动画应该强调哪些关系或守恒量。"
           />
         </label>
 
@@ -141,7 +155,7 @@ export function PromptReferenceTool({
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
             rows={5}
-            placeholder="例如：强调因果链、边界条件、常见误解；避免泛化空话；更适合教学动画。"
+            placeholder="例如：强调分镜节拍、先静态建模再动态变化、保留中间状态、检查遮挡与时序、避免泛化空话。"
           />
         </label>
 

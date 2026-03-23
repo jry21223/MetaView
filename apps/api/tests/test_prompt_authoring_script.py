@@ -96,6 +96,7 @@ def test_build_user_prompt_contains_runtime_context_and_seed() -> None:
     prompt = module.build_user_prompt("algorithm", "更强调循环不变量。")
 
     assert "router -> planner -> coder -> critic -> repair" in prompt
+    assert "storyboard beats" in prompt
     assert "Non-negotiable domain truth" in prompt
     assert "exact control flow and update order" in prompt
     assert "更强调循环不变量" in prompt

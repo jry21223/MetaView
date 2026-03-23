@@ -4,6 +4,7 @@ interface VideoPreviewProps {
   meta?: string;
   compact?: boolean;
   downloadName?: string;
+  headerless?: boolean;
 }
 
 export function VideoPreview({
@@ -12,25 +13,32 @@ export function VideoPreview({
   meta,
   compact = false,
   downloadName,
+  headerless = false,
 }: VideoPreviewProps) {
   return (
-    <div className={`video-surface ${compact ? "is-compact" : ""}`.trim()}>
-      <div className="video-surface-toolbar">
-        <div className="video-surface-copy">
-          <strong>{title}</strong>
-          {meta ? <small>{meta}</small> : null}
-        </div>
+    <div
+      className={`video-surface ${compact ? "is-compact" : ""} ${
+        headerless ? "is-headerless" : ""
+      }`.trim()}
+    >
+      {!headerless ? (
+        <div className="video-surface-toolbar">
+          <div className="video-surface-copy">
+            <strong>{title}</strong>
+            {meta ? <small>{meta}</small> : null}
+          </div>
 
-        <div className="video-surface-actions">
-          <a
-            className="video-action"
-            href={src}
-            download={downloadName}
-          >
-            下载视频
-          </a>
+          <div className="video-surface-actions">
+            <a
+              className="video-action"
+              href={src}
+              download={downloadName}
+            >
+              下载视频
+            </a>
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <div className="preview-video-shell">
         <div className="preview-video-frame">
@@ -44,6 +52,18 @@ export function VideoPreview({
           />
         </div>
       </div>
+
+      {headerless ? (
+        <div className="video-surface-footer">
+          <a
+            className="video-action"
+            href={src}
+            download={downloadName}
+          >
+            下载视频
+          </a>
+        </div>
+      ) : null}
     </div>
   );
 }

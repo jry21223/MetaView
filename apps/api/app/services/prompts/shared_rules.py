@@ -71,7 +71,11 @@ def planner_runtime_rules() -> str:
             """
             Keep the plan concrete enough to animate.
             Prefer 3 to 6 concepts.
+            Treat each concept as one storyboard beat with one dominant causal change.
+            Start from static setup, reference-frame establishment, or object introduction
+            before showing dynamic updates, transformations, or conclusions.
             Call out risks such as ambiguous control flow, missing example data,
+            missing intermediate states, timing pressure from narration,
             layout overflow, unsafe text rendering, or excessive scene length.
             """,
         ),
@@ -101,6 +105,9 @@ def coder_runtime_rules() -> str:
             """
             Keep the script self-contained and runnable with standard Manim CE.
             Prefer simple, explicit animations and deterministic example data.
+            Treat the approved plan as an ordered storyboard and implement it beat by beat.
+            Establish or preserve a stable scene scaffold first: static reference frame,
+            persistent objects, then local transitions.
             Avoid extra third-party libraries and nonstandard helper classes unless
             they are fully defined inside the script.
             """,
@@ -117,6 +124,8 @@ def coder_runtime_rules() -> str:
             on one rigid absolute layout.
             Establish a text-safe lane and an animation-safe lane before the main motion starts.
             Keep active objects away from title, subtitle, and narration bands.
+            Leave enough hold time, pause budget, or visual slack that narration timing can
+            be extended without collapsing the composition.
             When a step needs both a label and motion, show the motion first or pin the label
             outside the motion lane with `to_edge`, `next_to`, or a reserved side panel.
             """,
@@ -149,12 +158,16 @@ def critic_runtime_rules() -> str:
             Focus on runtime stability, synchronization between narration and visuals,
             layout overflow, text rendering safety, and whether the scene stays faithful
             to the intended process instead of only showing the final answer.
+            Check that the scene establishes setup beats before motion, does not skip
+            intermediate state changes, and preserves object identity across connected beats.
             Treat non-code explanatory English text, text-object overlap,
             and background palettes that clearly conflict with the requested UI theme
             as review failures or high-priority warnings.
             When overlap, language mismatch, or theme mismatch is detected, report it
             with explicit keywords such as `layout_overlap`, `language_mismatch`,
             or `theme_mismatch` so downstream repair can act on it reliably.
+            If the pacing leaves no room for real narration or would require every action
+            to happen at once, report that as a timing or beat-density failure.
             Treat helper misuse such as `self.play(move_pointer(...))` when the helper
             already calls `self.play` as a hard failure.
             Treat long Chinese `Tex`/`MathTex` content or `TexTemplateLibrary.ctex`
@@ -190,6 +203,11 @@ def repair_runtime_rules() -> str:
             If text overlaps motion, create a stable text lane, move labels out of the
             active motion area, or split the scene into multiple beats instead of shrinking
             everything into one crowded frame.
+            Preserve beat order and any working scene scaffold unless they directly cause
+            the failure.
+            If pacing is too tight for narration or visual comprehension, add local waits,
+            create an extra beat, or freeze motion before labels instead of rewriting
+            the whole scene.
             If the requested UI theme is light, remove large black backdrops and align the
             camera background with the light surface palette.
             Remove wrapper mistakes such as `self.play(move_pointer(...))` when the helper

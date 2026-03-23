@@ -38,9 +38,11 @@ import type {
 const defaultPrompt = "输入一个题目、源码或题图，生成对应的 Manim 讲解动画视频。";
 const themeStorageKey = "metaview-theme";
 const activeRunStorageKey = "metaview-active-run-id";
+const selectedRunStorageKey = "metaview-selected-run-id";
 
 type ThemeMode = "dark" | "light";
 type DeckMode = "smart" | "expert";
+type AppPage = "studio" | "history" | "tools";
 
 const fallbackRuntimeCatalog: RuntimeCatalog = {
   default_provider: "openai",
@@ -143,6 +145,34 @@ function getInitialActiveRunId(): string | null {
   return storedRunId ? storedRunId : null;
 }
 
+function getInitialSelectedRunId(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const activeRunId = getInitialActiveRunId();
+  if (activeRunId) {
+    return activeRunId;
+  }
+  const storedRunId = window.localStorage.getItem(selectedRunStorageKey)?.trim();
+  return storedRunId ? storedRunId : null;
+}
+
+function getInitialPage(): AppPage {
+  if (typeof window === "undefined") {
+    return "studio";
+  }
+
+  if (getInitialActiveRunId()) {
+    return "studio";
+  }
+
+  const hash = window.location.hash.replace(/^#/, "").trim().toLowerCase();
+  if (hash === "history" || hash === "tools" || hash === "studio") {
+    return hash;
+  }
+  return "studio";
+}
+
 function isRunningStatus(status: PipelineRunStatus): boolean {
   return status === "queued" || status === "running";
 }
@@ -218,9 +248,12 @@ export default function App() {
   const [runtimeCatalog, setRuntimeCatalog] = useState<RuntimeCatalog>(fallbackRuntimeCatalog);
   const [runs, setRuns] = useState<PipelineRunSummary[]>([]);
   const [historyError, setHistoryError] = useState<string | null>(null);
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(getInitialSelectedRunId);
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
   const [activeRunId, setActiveRunId] = useState<string | null>(getInitialActiveRunId);
+  const [debugToolsOpen, setDebugToolsOpen] = useState(false);
+  const [activePage, setActivePage] = useState<AppPage>(getInitialPage);
+  const [editorDirty, setEditorDirty] = useState(false);
 
   const activeSkill = result?.runtime.skill ?? null;
   const previewVideoUrl = resolvePreviewVideoUrl(result?.preview_video_url);
@@ -250,7 +283,8 @@ export default function App() {
   const showPreviewPanel = loading || Boolean(result) || Boolean(error);
   const showSourcePanel = sourceCode.trim().length > 0;
   const showDualResults = showPreviewPanel && showSourcePanel;
-  const showHistoryPanel = runs.length > 0 || Boolean(historyError);
+  const selectedHistoryRun =
+    runs.find((run) => run.request_id === selectedRunId) ?? null;
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -268,6 +302,42 @@ export default function App() {
     }
     window.localStorage.removeItem(activeRunStorageKey);
   }, [activeRunId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    if (selectedRunId) {
+      window.localStorage.setItem(selectedRunStorageKey, selectedRunId);
+      return;
+    }
+    window.localStorage.removeItem(selectedRunStorageKey);
+  }, [selectedRunId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const targetHash = `#${activePage}`;
+    if (window.location.hash !== targetHash) {
+      window.history.replaceState(null, "", targetHash);
+    }
+  }, [activePage]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    function handleHashChange() {
+      const nextPage = getInitialPage();
+      setActivePage(nextPage);
+    }
+
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
 
   async function refreshRuntimeCatalog(): Promise<RuntimeCatalog> {
     try {
@@ -346,17 +416,6 @@ export default function App() {
         startTransition(() => {
           setRuns(historyRuns);
           setHistoryError(null);
-
-          if (getInitialActiveRunId()) {
-            return;
-          }
-          const inflightRun = historyRuns.find((run) => isRunningStatus(run.status));
-          if (!inflightRun) {
-            return;
-          }
-          setActiveRunId(inflightRun.request_id);
-          setSelectedRunId(inflightRun.request_id);
-          setLoading(true);
         });
       })
       .catch((loadError) => {
@@ -409,40 +468,82 @@ export default function App() {
     setEnableNarration(run.request.enable_narration ?? true);
     setDeckMode(run.request.domain ? "expert" : "smart");
     setSelectedDomain(run.response?.runtime.skill.domain ?? run.request.domain ?? null);
+    setEditorDirty(false);
+  }
+
+  function syncRunSummary(run: PipelineRunDetail, requestId: string) {
+    startTransition(() => {
+      setRuns((current) =>
+        current.map((item) =>
+          item.request_id === requestId
+            ? {
+                ...item,
+                status: run.status,
+                updated_at: run.updated_at,
+                title: run.response?.cir.title ?? item.title,
+                domain: run.response?.runtime.skill.domain ?? run.request.domain ?? item.domain,
+                sandbox_status:
+                  run.response?.runtime.sandbox.status ??
+                  (run.status === "failed" ? null : item.sandbox_status),
+                error_message: run.error_message ?? null,
+              }
+            : item,
+        ),
+      );
+    });
   }
 
   const syncPolledRun = useEffectEvent(async (requestId: string) => {
-    const run = await getPipelineRun(requestId);
-    syncRunIntoEditor(run);
-    startTransition(() => {
-      setSelectedRunId(requestId);
+    const run = await getPipelineRun(requestId, {
+      includeRawOutput: debugToolsOpen,
     });
+    if (selectedRunId !== requestId) {
+      startTransition(() => {
+        setSelectedRunId(requestId);
+      });
+    }
+    const shouldSyncViewedRun =
+      selectedRunId === requestId ||
+      activeRunId === requestId ||
+      (selectedRunId === null && activePage === "studio");
+
+    if (shouldSyncViewedRun && !editorDirty && !result) {
+      startTransition(() => {
+        syncRunIntoEditor(run);
+      });
+    }
+    syncRunSummary(run, requestId);
 
     if (run.status === "succeeded" && run.response) {
       const response = run.response;
-      startTransition(() => {
-        setResult(response);
-      });
-      setLoading(false);
-      setError(null);
+      if (shouldSyncViewedRun) {
+        startTransition(() => {
+          setResult(response);
+        });
+        setLoading(false);
+        setError(null);
+      }
       setActiveRunId((current) => (current === requestId ? null : current));
       await loadRuns();
       return true;
     }
 
     if (run.status === "failed") {
-      setResult(null);
-      setLoading(false);
-      setError(run.error_message ?? "请求失败");
+      if (shouldSyncViewedRun) {
+        setResult(null);
+        setLoading(false);
+        setError(run.error_message ?? "请求失败");
+      }
       setActiveRunId((current) => (current === requestId ? null : current));
       await loadRuns();
       return true;
     }
 
-    setResult(null);
-    setLoading(true);
-    setError(null);
-    await loadRuns();
+    if (shouldSyncViewedRun) {
+      setResult(null);
+      setLoading(true);
+      setError(null);
+    }
     return false;
   });
 
@@ -453,10 +554,12 @@ export default function App() {
 
     let cancelled = false;
     let timer: number | undefined;
+    let consecutiveErrors = 0;
 
     const poll = async () => {
       try {
         const finished = await syncPolledRun(activeRunId);
+        consecutiveErrors = 0;
         if (cancelled || finished) {
           return;
         }
@@ -464,7 +567,20 @@ export default function App() {
         if (cancelled) {
           return;
         }
-        setHistoryError(pollError instanceof Error ? pollError.message : "任务状态刷新失败");
+        const message =
+          pollError instanceof Error ? pollError.message : "任务状态刷新失败";
+        consecutiveErrors += 1;
+        setHistoryError(message);
+
+        if (
+          message.includes("Pipeline run not found") ||
+          consecutiveErrors >= 3
+        ) {
+          setLoading(false);
+          setError(message);
+          setActiveRunId((current) => (current === activeRunId ? null : current));
+          return;
+        }
       }
 
       if (cancelled) {
@@ -486,8 +602,44 @@ export default function App() {
   }, [activeRunId]);
 
   function handleSourceImageChange(value: string | null, name: string | null) {
+    setEditorDirty(true);
     setSourceImage(value);
     setSourceImageName(name);
+  }
+
+  function handlePromptChange(value: string) {
+    setEditorDirty(true);
+    setPrompt(value);
+  }
+
+  function handleSourceCodeChange(value: string) {
+    setEditorDirty(true);
+    setSourceCode(value);
+  }
+
+  function handleSourceCodeLanguageChange(value: string) {
+    setEditorDirty(true);
+    setSourceCodeLanguage(value);
+  }
+
+  function handleRouterProviderChange(value: ModelProvider) {
+    setEditorDirty(true);
+    setRouterProvider(value);
+  }
+
+  function handleGenerationProviderChange(value: ModelProvider) {
+    setEditorDirty(true);
+    setGenerationProvider(value);
+  }
+
+  function handleSandboxModeChange(value: SandboxMode) {
+    setEditorDirty(true);
+    setSandboxMode(value);
+  }
+
+  function handleEnableNarrationChange(value: boolean) {
+    setEditorDirty(true);
+    setEnableNarration(value);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -495,6 +647,7 @@ export default function App() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setEditorDirty(false);
 
     try {
       const submittedRun = await submitPipeline(
@@ -513,6 +666,7 @@ export default function App() {
       startTransition(() => {
         setSelectedRunId(submittedRun.request_id);
       });
+      setActivePage("studio");
       setActiveRunId(submittedRun.request_id);
       await loadRuns();
     } catch (submitError) {
@@ -523,15 +677,23 @@ export default function App() {
 
   async function handleSelectRun(requestId: string) {
     try {
-      const run = await getPipelineRun(requestId);
-      syncRunIntoEditor(run);
       startTransition(() => {
+        setHistoryError(null);
         setSelectedRunId(requestId);
+      });
+      const run = await getPipelineRun(requestId, {
+        includeRawOutput: debugToolsOpen,
+      });
+      startTransition(() => {
+        syncRunIntoEditor(run);
         setResult(run.status === "succeeded" ? (run.response ?? null) : null);
       });
+      syncRunSummary(run, requestId);
       if (isRunningStatus(run.status)) {
         setLoading(true);
         setError(null);
+        setActivePage("studio");
+        setSelectedRunId(requestId);
         setActiveRunId(requestId);
       } else {
         setLoading(false);
@@ -542,6 +704,33 @@ export default function App() {
       setHistoryError(loadError instanceof Error ? loadError.message : "任务详情加载失败");
     }
   }
+
+  useEffect(() => {
+    if (!debugToolsOpen || !selectedRunId || !result) {
+      return;
+    }
+    if (result.runtime.agent_traces.some((trace) => Boolean(trace.raw_output))) {
+      return;
+    }
+
+    let active = true;
+    void getPipelineRun(selectedRunId, { includeRawOutput: true })
+      .then((run) => {
+        if (!active || run.status !== "succeeded" || !run.response) {
+          return;
+        }
+        startTransition(() => {
+          setResult(run.response ?? null);
+        });
+      })
+      .catch(() => {
+        // Keep the lightweight result if debug hydration fails.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [debugToolsOpen, result, selectedRunId]);
 
   function handleExportCurrent() {
     if (!result) {
@@ -617,6 +806,7 @@ export default function App() {
   }
 
   function handleSelectDomain(domain: TopicDomain) {
+    setEditorDirty(true);
     setSelectedDomain(domain);
     setPrompt(domainPresets[domain] ?? defaultPrompt);
     if (domain === "code" && !sourceCodeLanguage) {
@@ -625,6 +815,7 @@ export default function App() {
   }
 
   function handleSetDeckMode(mode: DeckMode) {
+    setEditorDirty(true);
     setDeckMode(mode);
     if (mode === "expert" && !selectedDomain) {
       setSelectedDomain(runtimeCatalog.skills[0]?.domain ?? null);
@@ -642,10 +833,28 @@ export default function App() {
           </div>
         </div>
 
-        <nav className="topbar-nav">
-          <a href="#studio">Studio</a>
-          <a href="#history">History</a>
-          <a href="#tools">Tools</a>
+        <nav className="topbar-nav" aria-label="Primary">
+          <button
+            type="button"
+            className={activePage === "studio" ? "is-active" : ""}
+            onClick={() => setActivePage("studio")}
+          >
+            Studio
+          </button>
+          <button
+            type="button"
+            className={activePage === "history" ? "is-active" : ""}
+            onClick={() => setActivePage("history")}
+          >
+            History
+          </button>
+          <button
+            type="button"
+            className={activePage === "tools" ? "is-active" : ""}
+            onClick={() => setActivePage("tools")}
+          >
+            Tools
+          </button>
         </nav>
 
         <div className="topbar-actions">
@@ -661,6 +870,7 @@ export default function App() {
 
       <div className="workspace">
         <main className="canvas">
+          {activePage === "studio" ? (
           <section
             className={`studio-layout ${hasCompletedPreview ? "is-resolved" : "hero-shell"}`}
             id="studio"
@@ -688,13 +898,13 @@ export default function App() {
                 generationProviderSupportsVision={generationProviderSupportsVision}
                 onDeckModeChange={handleSetDeckMode}
                 onSelectDomain={handleSelectDomain}
-                onPromptChange={setPrompt}
-                onSourceCodeChange={setSourceCode}
-                onSourceCodeLanguageChange={setSourceCodeLanguage}
-                onRouterProviderChange={setRouterProvider}
-                onGenerationProviderChange={setGenerationProvider}
-                onSandboxModeChange={setSandboxMode}
-                onEnableNarrationChange={setEnableNarration}
+                onPromptChange={handlePromptChange}
+                onSourceCodeChange={handleSourceCodeChange}
+                onSourceCodeLanguageChange={handleSourceCodeLanguageChange}
+                onRouterProviderChange={handleRouterProviderChange}
+                onGenerationProviderChange={handleGenerationProviderChange}
+                onSandboxModeChange={handleSandboxModeChange}
+                onEnableNarrationChange={handleEnableNarrationChange}
                 onSourceImageChange={handleSourceImageChange}
                 onSubmit={handleSubmit}
               />
@@ -729,15 +939,6 @@ export default function App() {
 
             {hasCompletedPreview ? (
               <section className="panel stage-panel stage-panel-sticky stage-panel-compact">
-                <div className="split-stage-meta">
-                  <span className="panel-kicker">Video</span>
-                  <div className="preview-runtime-badges">
-                    <span>{subjectSkill?.domain ?? effectiveSelectedDomain ?? "auto"}</span>
-                    <span>video ready</span>
-                    <span>{result?.runtime.sandbox.status ?? sandboxMode}</span>
-                  </div>
-                </div>
-
                 <div className="preview-stage">
                   <VideoPreview
                     src={previewVideoUrl!}
@@ -750,13 +951,15 @@ export default function App() {
                     downloadName={
                       result ? `${result.request_id}.mp4` : "metaview-preview.mp4"
                     }
+                    headerless
                   />
                 </div>
               </section>
             ) : null}
           </section>
+          ) : null}
 
-          {!hasCompletedPreview && (showPreviewPanel || showSourcePanel) ? (
+          {activePage === "studio" && !hasCompletedPreview && (showPreviewPanel || showSourcePanel) ? (
             <section
               className={`results-layout ${showDualResults ? "has-source" : ""}`}
               id="results"
@@ -864,132 +1067,228 @@ export default function App() {
             </section>
           ) : null}
 
-          {showHistoryPanel ? (
-            <section className="history-layout" id="history">
+          {activePage === "history" ? (
+            <section className="page-shell" id="history">
+              <div className="page-header">
+                <span className="panel-kicker">History</span>
+                <h2>任务历史</h2>
+                <p>历史任务集中放在这里查看。选择记录后，右侧会显示当前结果摘要，并可一键切回 Studio 继续编辑或复用。</p>
+              </div>
+
+              <div className="history-page-layout">
               <HistoryPanel
                 error={historyError}
                 runs={runs}
                 selectedRunId={selectedRunId}
                 onSelectRun={handleSelectRun}
               />
+                <section className="panel panel-history-detail history-detail-panel">
+                  <div className="panel-header">
+                    <span className="panel-kicker">Selected Run</span>
+                    <h3>{result?.cir.title ?? selectedHistoryRun?.title ?? "选择一条历史任务"}</h3>
+                    <p>
+                      {selectedHistoryRun
+                        ? selectedHistoryRun.prompt
+                        : "点击左侧历史记录后，这里会显示该任务的视频、状态与诊断摘要。"}
+                    </p>
+                  </div>
+
+                  {selectedHistoryRun ? (
+                    <>
+                      <div className="history-item-meta">
+                        <span>{selectedHistoryRun.request_id.slice(0, 8)}</span>
+                        <span>{selectedHistoryRun.status}</span>
+                        <span>{selectedHistoryRun.domain ?? "auto"}</span>
+                        <span>{selectedHistoryRun.generation_provider ?? "-"}</span>
+                      </div>
+
+                      {previewVideoUrl && result?.request_id === selectedHistoryRun.request_id ? (
+                        <div className="preview-stage">
+                          <VideoPreview
+                            src={previewVideoUrl}
+                            title="历史视频"
+                            downloadName={`${selectedHistoryRun.request_id}.mp4`}
+                            headerless
+                          />
+                        </div>
+                      ) : (
+                        <div className={`preview-empty ${loading ? "is-loading" : ""}`}>
+                          <strong>
+                            {selectedHistoryRun.status === "failed"
+                              ? "该任务执行失败"
+                              : isRunningStatus(selectedHistoryRun.status)
+                                ? "该任务仍在执行中"
+                                : "该任务暂无可展示视频"}
+                          </strong>
+                          <span>
+                            {selectedHistoryRun.error_message ??
+                              (isRunningStatus(selectedHistoryRun.status)
+                                ? "后台会继续执行，完成后可在这里直接查看。"
+                                : "如果任务成功但未加载出视频，可切回 Studio 重新拉取详情。")}
+                          </span>
+                        </div>
+                      )}
+
+                      <ul className="diagnostic-list">
+                        {(result?.request_id === selectedHistoryRun.request_id
+                          ? result.diagnostics.slice(0, 4)
+                          : []
+                        ).map((diagnostic, index) => (
+                          <li key={`${diagnostic.agent}-${index}`}>
+                            <strong>{diagnostic.agent}</strong>
+                            <span>{diagnostic.message}</span>
+                          </li>
+                        ))}
+                      </ul>
+
+                      <div className="panel-toolbar">
+                        <button
+                          type="button"
+                          className="ghost-button"
+                          onClick={() => setActivePage("studio")}
+                        >
+                          在 Studio 打开
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="history-empty">还没有选中任务。</div>
+                  )}
+                </section>
+              </div>
             </section>
           ) : null}
 
-          <details className="panel panel-advanced" id="tools">
+          {activePage === "tools" ? (
+            <section className="page-shell" id="tools">
+              <div className="page-header">
+                <span className="panel-kicker">Tools</span>
+                <h2>工具与调试</h2>
+                <p>生成脚本、原始返回、Provider 管理、Prompt 工具等都集中在这里，不再堆在主页面下方。</p>
+              </div>
+
+          <details
+            className="panel panel-advanced"
+            onToggle={(event) => {
+              setDebugToolsOpen((event.currentTarget as HTMLDetailsElement).open);
+            }}
+          >
             <summary className="advanced-summary">调试与生成脚本</summary>
-            <div className="advanced-grid">
-              <section className="panel panel-history-detail panel-nested">
-                <div className="panel-header">
-                  <span className="panel-kicker">Diagnostics</span>
-                  <h3>运行诊断</h3>
-                </div>
-                {result ? (
-                  <ul className="trace-list">
-                    {result.runtime.agent_traces.map((trace) => (
-                      <li key={`${trace.agent}-${trace.summary}`}>
-                        <strong>{trace.agent}</strong>
-                        <span>{trace.summary}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-                <ul className="diagnostic-list">
-                  {(result?.diagnostics ?? []).map((diagnostic, index) => (
-                    <li key={`${diagnostic.agent}-${index}`}>
-                      <strong>{diagnostic.agent}</strong>
-                      <span>{diagnostic.message}</span>
-                    </li>
-                  ))}
-                </ul>
-                <div className="panel-toolbar">
-                  <button
-                    type="button"
-                    className="ghost-button"
-                    onClick={handleExportCurrent}
-                    disabled={!result}
-                  >
-                    导出当前任务 JSON
-                  </button>
-                </div>
-              </section>
-
-              <section className="panel panel-code panel-nested">
-                <div className="panel-header">
-                  <span className="panel-kicker">Generated Script</span>
-                  <h3>生成的 Manim 脚本</h3>
-                  <p>这里仅用于排查，不参与主页中的源码高亮。</p>
-                </div>
-                {result?.renderer_script ? (
-                  <div className="console-content generated-console">
-                    <HighlightedCode
-                      code={result.renderer_script}
-                      language="python"
-                      className="highlighted-code-surface"
-                    />
+            {debugToolsOpen ? (
+              <div className="advanced-grid">
+                <section className="panel panel-history-detail panel-nested">
+                  <div className="panel-header">
+                    <span className="panel-kicker">Diagnostics</span>
+                    <h3>运行诊断</h3>
                   </div>
-                ) : (
-                  <div className="history-empty">生成任务后，这里会显示最终 Python Manim 脚本。</div>
-                )}
-              </section>
-
-              <section className="panel panel-code panel-nested">
-                <div className="panel-header">
-                  <span className="panel-kicker">LLM Raw Output</span>
-                  <h3>模型原始返回</h3>
-                  <p>只在需要排查 provider 返回或提示词遵循时查看。</p>
-                </div>
-                {hasRawProviderOutput ? (
-                  <div className="raw-output-list">
-                    {result?.runtime.agent_traces
-                      .filter((trace) => Boolean(trace.raw_output))
-                      .map((trace) => (
-                        <article className="raw-output-card" key={`${trace.agent}-${trace.model}`}>
-                          <div className="raw-output-head">
-                            <strong>{trace.agent}</strong>
-                            <span>
-                              {trace.provider} / {trace.model}
-                            </span>
-                          </div>
-                          <p>{trace.summary}</p>
-                          <pre>{trace.raw_output}</pre>
-                        </article>
+                  {result ? (
+                    <ul className="trace-list">
+                      {result.runtime.agent_traces.map((trace) => (
+                        <li key={`${trace.agent}-${trace.summary}`}>
+                          <strong>{trace.agent}</strong>
+                          <span>{trace.summary}</span>
+                        </li>
                       ))}
-                  </div>
-                ) : (
-                  <div className="history-empty">当前结果没有记录可展示的原始返回。</div>
-                )}
-              </section>
-
-              <section className="panel panel-history-detail panel-nested">
-                <div className="panel-header">
-                  <span className="panel-kicker">Repair Loop</span>
-                  <h3>验证与修复</h3>
-                </div>
-                {historyError ? <p className="error-text">{historyError}</p> : null}
-                {result ? (
+                    </ul>
+                  ) : null}
                   <ul className="diagnostic-list">
-                    {result.runtime.validation.issues.map((issue, index) => (
-                      <li key={`${issue.code}-${index}`}>
-                        <strong>{issue.severity}</strong>
-                        <span>{issue.message}</span>
+                    {(result?.diagnostics ?? []).map((diagnostic, index) => (
+                      <li key={`${diagnostic.agent}-${index}`}>
+                        <strong>{diagnostic.agent}</strong>
+                        <span>{diagnostic.message}</span>
                       </li>
                     ))}
-                    {result.runtime.repair_actions.map((action, index) => (
-                      <li key={`repair-${index}`}>
-                        <strong>repair</strong>
-                        <span>{action}</span>
-                      </li>
-                    ))}
-                    {result.runtime.validation.issues.length === 0 &&
-                    result.runtime.repair_actions.length === 0 ? (
-                      <li className="empty-state">当前任务未触发额外修复动作。</li>
-                    ) : null}
                   </ul>
-                ) : (
-                  <div className="history-empty">生成任务后，这里会展示验证与修复细节。</div>
-                )}
-              </section>
-            </div>
+                  <div className="panel-toolbar">
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      onClick={handleExportCurrent}
+                      disabled={!result}
+                    >
+                      导出当前任务 JSON
+                    </button>
+                  </div>
+                </section>
+
+                <section className="panel panel-code panel-nested">
+                  <div className="panel-header">
+                    <span className="panel-kicker">Generated Script</span>
+                    <h3>生成的 Manim 脚本</h3>
+                    <p>这里仅用于排查，不参与主页中的源码高亮。</p>
+                  </div>
+                  {result?.renderer_script ? (
+                    <div className="console-content generated-console">
+                      <HighlightedCode
+                        code={result.renderer_script}
+                        language="python"
+                        className="highlighted-code-surface"
+                      />
+                    </div>
+                  ) : (
+                    <div className="history-empty">生成任务后，这里会显示最终 Python Manim 脚本。</div>
+                  )}
+                </section>
+
+                <section className="panel panel-code panel-nested">
+                  <div className="panel-header">
+                    <span className="panel-kicker">LLM Raw Output</span>
+                    <h3>模型原始返回</h3>
+                    <p>只在需要排查 provider 返回或提示词遵循时查看。</p>
+                  </div>
+                  {hasRawProviderOutput ? (
+                    <div className="raw-output-list">
+                      {result?.runtime.agent_traces
+                        .filter((trace) => Boolean(trace.raw_output))
+                        .map((trace) => (
+                          <article className="raw-output-card" key={`${trace.agent}-${trace.model}`}>
+                            <div className="raw-output-head">
+                              <strong>{trace.agent}</strong>
+                              <span>
+                                {trace.provider} / {trace.model}
+                              </span>
+                            </div>
+                            <p>{trace.summary}</p>
+                            <pre>{trace.raw_output}</pre>
+                          </article>
+                        ))}
+                    </div>
+                  ) : (
+                    <div className="history-empty">当前结果没有记录可展示的原始返回。</div>
+                  )}
+                </section>
+
+                <section className="panel panel-history-detail panel-nested">
+                  <div className="panel-header">
+                    <span className="panel-kicker">Repair Loop</span>
+                    <h3>验证与修复</h3>
+                  </div>
+                  {historyError ? <p className="error-text">{historyError}</p> : null}
+                  {result ? (
+                    <ul className="diagnostic-list">
+                      {result.runtime.validation.issues.map((issue, index) => (
+                        <li key={`${issue.code}-${index}`}>
+                          <strong>{issue.severity}</strong>
+                          <span>{issue.message}</span>
+                        </li>
+                      ))}
+                      {result.runtime.repair_actions.map((action, index) => (
+                        <li key={`repair-${index}`}>
+                          <strong>repair</strong>
+                          <span>{action}</span>
+                        </li>
+                      ))}
+                      {result.runtime.validation.issues.length === 0 &&
+                      result.runtime.repair_actions.length === 0 ? (
+                        <li className="empty-state">当前任务未触发额外修复动作。</li>
+                      ) : null}
+                    </ul>
+                  ) : (
+                    <div className="history-empty">生成任务后，这里会展示验证与修复细节。</div>
+                  )}
+                </section>
+              </div>
+            ) : null}
           </details>
 
           <details className="panel panel-advanced">
@@ -1051,6 +1350,8 @@ export default function App() {
               />
             </div>
           </details>
+            </section>
+          ) : null}
         </main>
       </div>
     </div>

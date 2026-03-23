@@ -14,7 +14,7 @@ from app.schemas import (
     ProviderName,
     TopicDomain,
 )
-from app.services.domain_router import infer_domain
+from app.services.domain_router import infer_domain_with_scores
 from app.services.prompts import (
     build_coder_system_prompt,
     build_coder_user_prompt,
@@ -44,6 +44,25 @@ def _extract_json_object(content: str) -> dict:
         return json.loads(content[start : end + 1])
     except json.JSONDecodeError as exc:
         raise ProviderInvocationError("Provider 返回的 JSON 无法解析。") from exc
+
+
+def _should_override_router_domain(
+    *,
+    remote_domain: TopicDomain,
+    heuristic_domain: TopicDomain,
+    heuristic_scores: dict[TopicDomain, int],
+) -> bool:
+    if remote_domain == heuristic_domain:
+        return False
+
+    heuristic_score = heuristic_scores.get(heuristic_domain, 0)
+    remote_score = heuristic_scores.get(remote_domain, 0)
+
+    if heuristic_score > 0 and remote_score == 0:
+        return True
+    if heuristic_score >= remote_score + 2:
+        return True
+    return False
 
 
 @dataclass
@@ -88,25 +107,60 @@ class OpenAICompatibleProvider:
         source_image: str | None = None,
         source_code: str | None = None,
     ) -> tuple[TopicDomain, AgentTrace]:
-        payload, raw_output = self._chat(
+        heuristic_domain, heuristic_scores = infer_domain_with_scores(
+            prompt,
+            source_image if self.supports_vision else None,
+            source_code=source_code,
+        )
+        remote_domain: TopicDomain | None = None
+        content, raw_output = self._request_chat_content(
             stage="router",
             system_prompt=build_router_system_prompt(
                 ["algorithm", "math", "code", "physics", "chemistry", "biology", "geography"]
             ),
-            user_prompt=build_router_user_prompt(prompt=prompt, source_code=source_code),
-            source_image=source_image if self.supports_vision else None,
+            user_content=(
+                [
+                    {
+                        "type": "text",
+                        "text": build_router_user_prompt(prompt=prompt, source_code=source_code),
+                    },
+                    {"type": "image_url", "image_url": {"url": source_image}},
+                ]
+                if source_image and self.supports_vision
+                else build_router_user_prompt(prompt=prompt, source_code=source_code)
+            ),
         )
+        try:
+            payload = _extract_json_object(content)
+        except ProviderInvocationError:
+            reason = f"远程 router 输出无法解析，已回退到本地关键词路由：{heuristic_domain.value}"
+            trace = AgentTrace(
+                agent="router",
+                provider=self.descriptor.name,
+                model=self.model_for_stage("router"),
+                summary=reason,
+                raw_output=raw_output,
+            )
+            return heuristic_domain, trace
         domain_value = str(payload.get("domain", "")).strip().lower()
         try:
-            domain = TopicDomain(domain_value)
+            remote_domain = TopicDomain(domain_value)
+            domain = remote_domain
         except ValueError:
-            domain = infer_domain(
-                prompt,
-                source_image if self.supports_vision else None,
-                source_code=source_code,
-            )
+            domain = heuristic_domain
+        else:
+            if _should_override_router_domain(
+                remote_domain=remote_domain,
+                heuristic_domain=heuristic_domain,
+                heuristic_scores=heuristic_scores,
+            ):
+                domain = heuristic_domain
 
         reason = str(payload.get("reason", "")).strip() or f"自动路由到 {domain.value}"
+        if remote_domain is not None and domain != remote_domain:
+            reason = (
+                f"{reason}；本地关键词校验将结果修正为 {domain.value}"
+            )
         trace = AgentTrace(
             agent="router",
             provider=self.descriptor.name,

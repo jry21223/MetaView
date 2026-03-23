@@ -58,7 +58,7 @@ class Settings(BaseSettings):
     openai_critic_model: str | None = None
     openai_test_model: str | None = None
     openai_supports_vision: bool = False
-    openai_timeout_s: float | None = None
+    openai_timeout_s: float | None = 300.0
 
     @field_validator(
         "preview_tts_timeout_s",

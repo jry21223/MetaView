@@ -255,7 +255,7 @@ docker compose up -d --build
 - `ALGO_VIS_OPENAI_BASE_URL`: OpenAI 兼容 API 地址
 - `ALGO_VIS_OPENAI_MODEL`: 使用的模型名
 - `ALGO_VIS_OPENAI_SUPPORTS_VISION`: 内置 OpenAI 兼容 Provider 是否支持图片输入
-- `ALGO_VIS_OPENAI_TIMEOUT_S`: Provider 请求超时秒数；留空表示不限制，默认留空
+- `ALGO_VIS_OPENAI_TIMEOUT_S`: Provider 请求超时秒数；默认 `300`，只有在你明确希望无限等待时才建议手动留空
 - `VITE_API_BASE_URL`: 前端构建时 API 基地址，默认同源
 
 ## 自定义 Provider

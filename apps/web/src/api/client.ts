@@ -24,6 +24,10 @@ import type {
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 
 async function readErrorMessage(response: Response, fallback: string): Promise<string> {
+  if (response.status === 413) {
+    return "提交内容过大，已被网关拒绝。请缩小图片体积，或联系管理员提高请求体限制。";
+  }
+
   try {
     const payload = (await response.json()) as { detail?: string };
     if (typeof payload.detail === "string" && payload.detail.length > 0) {
@@ -74,8 +78,22 @@ export async function getPipelineRuns(): Promise<PipelineRunSummary[]> {
   return (await response.json()) as PipelineRunSummary[];
 }
 
-export async function getPipelineRun(requestId: string): Promise<PipelineRunDetail> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/runs/${requestId}`);
+export async function getPipelineRun(
+  requestId: string,
+  options?: {
+    includeSourceImage?: boolean;
+    includeRawOutput?: boolean;
+  },
+): Promise<PipelineRunDetail> {
+  const params = new URLSearchParams();
+  if (options?.includeSourceImage) {
+    params.set("include_source_image", "true");
+  }
+  if (options?.includeRawOutput) {
+    params.set("include_raw_output", "true");
+  }
+  const query = params.size > 0 ? `?${params.toString()}` : "";
+  const response = await fetch(`${API_BASE_URL}/api/v1/runs/${requestId}${query}`);
 
   if (!response.ok) {
     throw new Error(await readErrorMessage(response, "Run detail request failed"));

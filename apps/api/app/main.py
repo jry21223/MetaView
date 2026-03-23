@@ -213,8 +213,16 @@ def list_pipeline_runs(limit: int = Query(default=20, ge=1, le=100)) -> list[Pip
 
 
 @app.get(f"{settings.api_prefix}/runs/{{request_id}}", response_model=PipelineRunDetail)
-def get_pipeline_run(request_id: str) -> PipelineRunDetail:
-    run = orchestrator.get_run(request_id=request_id)
+def get_pipeline_run(
+    request_id: str,
+    include_source_image: bool = Query(default=False),
+    include_raw_output: bool = Query(default=False),
+) -> PipelineRunDetail:
+    run = orchestrator.get_run(
+        request_id=request_id,
+        include_source_image=include_source_image,
+        include_raw_output=include_raw_output,
+    )
     if run is None:
         raise HTTPException(status_code=404, detail="Pipeline run not found")
     return run

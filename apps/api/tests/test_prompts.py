@@ -32,6 +32,7 @@ def test_code_planner_prompt_selects_cpp_array_board() -> None:
     assert "### Planner" in prompt
     assert "Return JSON with:" in prompt
     assert "Support both Python and C++ inputs" in prompt
+    assert "storyboard beats" in prompt
     assert "Array And Index Driven Processes" in prompt
     assert "对每个 scene 标注当前代码范围、当前调用层级和当前关注变量。" in prompt
     assert "language=cpp" in prompt
@@ -51,6 +52,7 @@ def test_code_coder_prompt_uses_text_for_source_panel() -> None:
     assert "source=code.md" in prompt
     assert "Implement the approved plan below as one Manim scene." in prompt
     assert "real Manim rendering, not a frontend py2ts flow" in prompt
+    assert "ordered storyboard" in prompt
     assert "Use `Text` for raw source code" in prompt
     assert "### Coder" in prompt
     assert "代码区、状态区、数据结构区、调用栈区保持固定分区" in prompt
@@ -74,6 +76,7 @@ def test_code_critic_prompt_covers_all_subboards_without_context() -> None:
     assert "### Planner" not in prompt
     assert "layout_overlap" in prompt
     assert "theme_mismatch" in prompt
+    assert "intermediate state changes" in prompt
     assert "检查是否有任何动画行为无法在源码中找到对应语句。" in prompt
     assert "Array And Index Driven Processes" in prompt
     assert "Linked List And Pointer Rewiring" in prompt
@@ -93,6 +96,7 @@ def test_code_repair_prompt_uses_repair_template() -> None:
     assert "Fix the following Manim script." in prompt
     assert "### Repair" in prompt
     assert "Explain the root cause briefly" not in prompt
+    assert "Preserve beat order" in prompt
     assert "若高亮顺序错了，只重排相关语句的高亮与更新顺序。" in prompt
     assert "Array And Index Driven Processes" in prompt
 

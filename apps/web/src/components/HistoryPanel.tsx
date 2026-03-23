@@ -1,3 +1,5 @@
+import { memo } from "react";
+
 import type { PipelineRunSummary } from "../types";
 
 interface HistoryPanelProps {
@@ -7,7 +9,15 @@ interface HistoryPanelProps {
   onSelectRun: (requestId: string) => void;
 }
 
-export function HistoryPanel({
+function truncatePrompt(prompt: string, maxLength = 120): string {
+  const normalized = prompt.trim();
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+  return `${normalized.slice(0, maxLength).trimEnd()}...`;
+}
+
+export const HistoryPanel = memo(function HistoryPanel({
   error,
   runs,
   selectedRunId,
@@ -37,7 +47,7 @@ export function HistoryPanel({
               <strong>{run.title}</strong>
               <span>{run.status}</span>
             </div>
-            <p>{run.prompt}</p>
+            <p>{truncatePrompt(run.prompt)}</p>
             <div className="history-item-meta">
               <span>route:{run.router_provider ?? "-"}</span>
               <span>gen:{run.generation_provider ?? "-"}</span>
@@ -51,4 +61,4 @@ export function HistoryPanel({
       </div>
     </section>
   );
-}
+});

@@ -102,6 +102,10 @@ def load_runtime_context() -> str:
     - Subject reference files are loaded by stage and only inject `## Common` plus the active stage section.
     - Global runtime rules already cover output contracts, Simplified Chinese explanatory text,
       no text/object overlap, and theme-aligned backgrounds.
+    - Strong subject references should still help the model think through an internal
+      artifact chain such as domain analysis -> storyboard beats -> timing/sync risks
+      -> scene scaffold -> critique and repair, even though those artifacts are not
+      emitted as separate files in the production API.
     - Do not duplicate generic JSON-output requirements, markdown-fence rules, or broad Manim boilerplate.
     - The goal of this file is subject truth and stage-specific guidance, not provider protocol instructions.
         """
@@ -143,10 +147,14 @@ def build_system_prompt() -> str:
     - Keep each section to 4-8 bullet points.
     - Keep bullets short, specific, and operational.
     - `Common` contains domain truths that must not be violated.
-    - `Planner` contains scene decomposition, example choice, and risk discovery rules.
-    - `Coder` contains layout, object identity, pacing, and synchronization rules.
-    - `Critic` contains failure checks and regression checks.
-    - `Repair` contains minimum-change repair strategy.
+    - `Planner` contains storyboard-beat decomposition, representative example choice,
+      setup-before-motion ordering, and risk discovery rules.
+    - `Coder` contains scene scaffold, object identity, pacing, timing slack,
+      and synchronization rules.
+    - `Critic` contains failure checks, missing-intermediate-state checks,
+      and regression checks.
+    - `Repair` contains minimum-change repair strategy that preserves beat order
+      and working scene scaffolds.
     - Remove redundant generic advice that belongs in shared runtime rules.
     - Prefer domain truth over style language.
     - Do not mention JSON keys, API protocols, provider names, or chat formatting.
@@ -180,6 +188,7 @@ def build_user_prompt(subject: str, notes: str | None = None) -> str:
             "",
             "Produce a stronger replacement file for this subject.",
             "Focus on subject fidelity and stage-specific usefulness.",
+            "Favor guidance that helps an LLM move from analysis to storyboard, then to implementation, validation, and minimal repair.",
             "Keep it concise.",
         ]
     ).strip()

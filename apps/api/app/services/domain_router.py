@@ -9,38 +9,25 @@ def infer_domain(
     source_image: str | None = None,
     source_code: str | None = None,
 ) -> TopicDomain:
+    domain, _ = infer_domain_with_scores(
+        prompt,
+        source_image=source_image,
+        source_code=source_code,
+    )
+    return domain
+
+
+def infer_domain_with_scores(
+    prompt: str,
+    source_image: str | None = None,
+    source_code: str | None = None,
+) -> tuple[TopicDomain, dict[TopicDomain, int]]:
     prompt_lower = prompt.lower()
 
     if should_route_to_code(prompt, source_code):
-        return TopicDomain.CODE
-
-    if source_image:
-        physics_score = _keyword_score(
-            prompt_lower,
-            [
-                "受力",
-                "加速度",
-                "速度",
-                "斜面",
-                "小球",
-                "碰撞",
-                "抛体",
-                "电路",
-                "电场",
-                "磁场",
-                "physics",
-                "force",
-                "velocity",
-                "acceleration",
-                "circuit",
-            ],
-        )
-        math_score = _keyword_score(
-            prompt_lower,
-            ["几何", "图形", "角度", "triangle", "geometry", "解析几何"],
-        )
-        if physics_score >= math_score:
-            return TopicDomain.PHYSICS
+        scores = {domain: 0 for domain in TopicDomain}
+        scores[TopicDomain.CODE] = 100
+        return TopicDomain.CODE, scores
 
     scores: dict[TopicDomain, int] = {
         TopicDomain.CODE: _keyword_score(
@@ -168,10 +155,40 @@ def infer_domain(
         ),
     }
 
+    if source_image:
+        physics_score = _keyword_score(
+            prompt_lower,
+            [
+                "受力",
+                "加速度",
+                "速度",
+                "斜面",
+                "小球",
+                "碰撞",
+                "抛体",
+                "电路",
+                "电场",
+                "磁场",
+                "physics",
+                "force",
+                "velocity",
+                "acceleration",
+                "circuit",
+            ],
+        )
+        math_score = _keyword_score(
+            prompt_lower,
+            ["几何", "图形", "角度", "triangle", "geometry", "解析几何"],
+        )
+        if physics_score >= math_score:
+            scores[TopicDomain.PHYSICS] += 100
+        else:
+            scores[TopicDomain.MATH] += 100
+
     best_domain = max(scores, key=scores.get)
     if scores[best_domain] == 0:
-        return TopicDomain.ALGORITHM
-    return best_domain
+        return TopicDomain.ALGORITHM, scores
+    return best_domain, scores
 
 
 def _keyword_score(prompt_lower: str, keywords: list[str]) -> int:

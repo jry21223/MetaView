@@ -57,6 +57,9 @@ from app.services.video_narration import VideoNarrationError, VideoNarrationServ
 class PipelineOrchestrator:
     def __init__(self, settings: Settings) -> None:
         self.repository = RunRepository(db_path=settings.history_db_path)
+        self.repository.mark_inflight_runs_failed(
+            "检测到服务重启，未完成的生成任务已标记为失败，请重新提交。"
+        )
         self.custom_provider_repository = CustomProviderRepository(
             db_path=settings.history_db_path
         )
@@ -739,8 +742,18 @@ class PipelineOrchestrator:
     def list_runs(self, limit: int = 20) -> list[PipelineRunSummary]:
         return self.repository.list_runs(limit=limit)
 
-    def get_run(self, request_id: str) -> PipelineRunDetail | None:
-        return self.repository.get_run(request_id=request_id)
+    def get_run(
+        self,
+        request_id: str,
+        *,
+        include_source_image: bool = False,
+        include_raw_output: bool = False,
+    ) -> PipelineRunDetail | None:
+        return self.repository.get_run(
+            request_id=request_id,
+            include_source_image=include_source_image,
+            include_raw_output=include_raw_output,
+        )
 
     def upsert_custom_provider(
         self, payload: CustomProviderUpsertRequest

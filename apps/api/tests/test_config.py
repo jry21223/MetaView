@@ -13,6 +13,15 @@ def test_settings_load_dotenv_from_project_root(tmp_path, monkeypatch) -> None:
     assert settings.preview_tts_model == "mimotts-v2-from-dotenv"
 
 
+def test_settings_use_bounded_default_openai_timeout(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("ALGO_VIS_OPENAI_TIMEOUT_S", raising=False)
+
+    settings = Settings()
+
+    assert settings.openai_timeout_s == 300.0
+
+
 def test_settings_allow_blank_openai_timeout(tmp_path, monkeypatch) -> None:
     env_file = tmp_path / ".env"
     env_file.write_text("ALGO_VIS_OPENAI_TIMEOUT_S=\n", encoding="utf-8")

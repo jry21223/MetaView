@@ -145,10 +145,14 @@ def build_reference_authoring_system_prompt() -> str:
         - Keep each section to 4-8 bullet points.
         - Keep bullets short, specific, and operational.
         - `Common` contains domain truths that must not be violated.
-        - `Planner` contains scene decomposition, example choice, and risk discovery rules.
-        - `Coder` contains layout, object identity, pacing, and synchronization rules.
-        - `Critic` contains failure checks and regression checks.
-        - `Repair` contains minimum-change repair strategy.
+        - `Planner` contains storyboard-beat decomposition, representative example choice,
+          setup-before-motion ordering, and risk discovery rules.
+        - `Coder` contains scene scaffold, object identity, pacing, timing slack,
+          and synchronization rules.
+        - `Critic` contains failure checks, missing-intermediate-state checks,
+          and regression checks.
+        - `Repair` contains minimum-change repair strategy that preserves beat order
+          and working scene scaffolds.
         - Remove redundant generic advice that belongs in shared runtime rules.
         - Prefer domain truth over style language.
         - Do not mention JSON keys, API protocols, provider names, or chat formatting.
@@ -193,10 +197,14 @@ def build_custom_subject_authoring_system_prompt() -> str:
         - Infer the subject's core objects, causal relations, and common teaching failures
           from the provided subject description.
         - `Common` contains domain truths that must not be violated.
-        - `Planner` contains scene decomposition, example choice, and risk discovery rules.
-        - `Coder` contains layout, object identity, pacing, and synchronization rules.
-        - `Critic` contains failure checks and regression checks.
-        - `Repair` contains minimum-change repair strategy.
+        - `Planner` contains storyboard-beat decomposition, representative example choice,
+          setup-before-motion ordering, and risk discovery rules.
+        - `Coder` contains scene scaffold, object identity, pacing, timing slack,
+          and synchronization rules.
+        - `Critic` contains failure checks, missing-intermediate-state checks,
+          and regression checks.
+        - `Repair` contains minimum-change repair strategy that preserves beat order
+          and working scene scaffolds.
         - Do not treat the new subject as a rewrite of an existing built-in subject file.
         - Remove redundant generic advice that belongs in shared runtime rules.
         - Prefer domain truth over style language.
@@ -214,6 +222,10 @@ def build_reference_authoring_runtime_context() -> str:
           plus the active stage section.
         - Global runtime rules already cover output contracts, Simplified Chinese explanatory text,
           no text/object overlap, and theme-aligned backgrounds.
+        - Strong subject references should still help the model think through an internal
+          artifact chain such as domain analysis -> storyboard beats -> timing/sync risks
+          -> scene scaffold -> critique and repair, even though those artifacts are not
+          emitted as separate files in the production API.
         - Do not duplicate generic JSON-output requirements, markdown-fence rules,
           or broad Manim boilerplate.
         - The goal of this file is subject truth and stage-specific guidance,
@@ -233,6 +245,9 @@ def build_custom_subject_authoring_runtime_context() -> str:
           no text/object overlap, and theme-aligned backgrounds.
         - New subject guidance must not weaken those shared rules; it should reinforce
           reserved text lanes, motion-safe areas, and scene splitting when the frame gets crowded.
+        - A good subject pack should also make the model think in a lightweight production chain:
+          domain analysis -> storyboard beats -> timing/sync risks -> scene scaffold
+          -> code review -> minimal repair.
         - Do not duplicate generic JSON-output requirements, markdown-fence rules,
           or broad Manim boilerplate.
         - The user is creating a new subject tool, not editing any built-in subject reference file.
@@ -331,12 +346,22 @@ def build_custom_subject_authoring_user_prompt(
             "- non-negotiable domain truths",
             "- critical transitions that animation must expose",
             "- the most likely domain-logic errors that a generic animation model would make",
+            "- how to split the subject into storyboard beats and stable setup-before-motion steps",
+            "- how coder / critic / repair should preserve timing slack and scene scaffolds",
             "",
             "Additional authoring notes:",
             extra_notes,
             "",
             "Produce a new standalone prompt pack for this subject.",
             "Do not rewrite or mention any existing built-in reference file.",
+            (
+                "Favor production-safe guidance that would help an LLM move from "
+                "analysis to storyboard,"
+            ),
+            (
+                "then to implementation, validation, and minimal repair without "
+                "skipping key intermediate states."
+            ),
             "Keep it concise and directly usable.",
         ]
     ).strip()

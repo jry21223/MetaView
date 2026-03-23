@@ -246,6 +246,34 @@ class RunRepository:
                 (PipelineRunStatus.RUNNING.value, updated_at, request_id),
             )
 
+    def mark_inflight_runs_failed(self, error_message: str) -> int:
+        updated_at = self._timestamp()
+        with closing(self._connect()) as connection, connection:
+            cursor = connection.execute(
+                """
+                UPDATE pipeline_runs
+                SET
+                    updated_at = ?,
+                    status = ?,
+                    title = ?,
+                    sandbox_status = ?,
+                    response_payload = ?,
+                    error_message = ?
+                WHERE status IN (?, ?)
+                """,
+                (
+                    updated_at,
+                    PipelineRunStatus.FAILED.value,
+                    "生成失败",
+                    "",
+                    "",
+                    error_message,
+                    PipelineRunStatus.QUEUED.value,
+                    PipelineRunStatus.RUNNING.value,
+                ),
+            )
+            return int(cursor.rowcount or 0)
+
     def save_run(self, request: PipelineRequest, response: PipelineResponse) -> str:
         created_at = self._timestamp()
         updated_at = created_at
@@ -465,7 +493,13 @@ class RunRepository:
             for row in rows
         ]
 
-    def get_run(self, request_id: str) -> PipelineRunDetail | None:
+    def get_run(
+        self,
+        request_id: str,
+        *,
+        include_source_image: bool = False,
+        include_raw_output: bool = False,
+    ) -> PipelineRunDetail | None:
         with closing(self._connect()) as connection:
             row = connection.execute(
                 """
@@ -485,18 +519,69 @@ class RunRepository:
         if row is None:
             return None
 
+        request_payload = json.loads(row["request_payload"])
+        if not include_source_image:
+            request_payload = self._strip_request_source_image(request_payload)
+
+        response_payload = None
+        if row["response_payload"]:
+            response_payload = json.loads(row["response_payload"])
+            if not include_raw_output:
+                response_payload = self._strip_response_raw_output(response_payload)
+
         return PipelineRunDetail(
             created_at=row["created_at"],
             updated_at=row["updated_at"] or row["created_at"],
             status=PipelineRunStatus(row["status"] or PipelineRunStatus.SUCCEEDED.value),
             error_message=row["error_message"],
-            request=PipelineRequest.model_validate(json.loads(row["request_payload"])),
+            request=PipelineRequest.model_validate(request_payload),
             response=(
-                PipelineResponse.model_validate(json.loads(row["response_payload"]))
-                if row["response_payload"]
+                PipelineResponse.model_validate(response_payload)
+                if response_payload is not None
                 else None
             ),
         )
+
+    @staticmethod
+    def _strip_request_source_image(payload: dict) -> dict:
+        if "source_image" not in payload:
+            return payload
+        sanitized = dict(payload)
+        sanitized["source_image"] = None
+        return sanitized
+
+    @staticmethod
+    def _strip_response_raw_output(payload: dict) -> dict:
+        runtime = payload.get("runtime")
+        if not isinstance(runtime, dict):
+            return payload
+
+        traces = runtime.get("agent_traces")
+        if not isinstance(traces, list):
+            return payload
+
+        sanitized_traces: list[dict] = []
+        changed = False
+        for trace in traces:
+            if not isinstance(trace, dict):
+                sanitized_traces.append(trace)
+                continue
+            if trace.get("raw_output") is None:
+                sanitized_traces.append(trace)
+                continue
+            changed = True
+            sanitized_trace = dict(trace)
+            sanitized_trace["raw_output"] = None
+            sanitized_traces.append(sanitized_trace)
+
+        if not changed:
+            return payload
+
+        sanitized_runtime = dict(runtime)
+        sanitized_runtime["agent_traces"] = sanitized_traces
+        sanitized_payload = dict(payload)
+        sanitized_payload["runtime"] = sanitized_runtime
+        return sanitized_payload
 
 
 class CustomProviderRepository:

@@ -1,7 +1,14 @@
-import type { FormEvent } from "react";
+import {
+  useEffect,
+  useEffectEvent,
+  useId,
+  useState,
+  type ChangeEvent,
+  type DragEvent as ReactDragEvent,
+  type FormEvent,
+} from "react";
 
 import { domainLabels } from "../domainPresentation";
-import { ImageUploadField } from "./ImageUploadField";
 import type { ModelProvider, ProviderDescriptor, SandboxMode } from "../types";
 import type { SkillDescriptor, TopicDomain } from "../types";
 
@@ -39,6 +46,45 @@ interface ControlPanelProps {
 
 const genericPlaceholder =
   "例如：请讲解二分查找边界收缩；或说明定积分如何逼近面积；或根据题图分析斜面小球受力。";
+const maxImageSizeBytes = 2_500_000;
+
+function extractImageFile(items: DataTransferItemList | null | undefined): File | null {
+  if (!items) {
+    return null;
+  }
+
+  for (const item of Array.from(items)) {
+    if (item.kind !== "file") {
+      continue;
+    }
+
+    const file = item.getAsFile();
+    if (file?.type.startsWith("image/")) {
+      return file;
+    }
+  }
+
+  return null;
+}
+
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error("图片读取失败"));
+    };
+    reader.onerror = () => reject(new Error("图片读取失败"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function resolveDisplayName(file: File): string {
+  return file.name || `pasted-image-${Date.now()}.png`;
+}
 
 function routerModelLabel(provider: ProviderDescriptor): string {
   return provider.stage_models.router ?? provider.model;
@@ -84,12 +130,93 @@ export function ControlPanel({
   onSourceImageChange,
   onSubmit,
 }: ControlPanelProps) {
+  const imageInputId = useId();
   const configuredProvidersCount = providers.filter((provider) => provider.configured).length;
   const hasSourceCode = sourceCode.trim().length > 0;
   const canSubmit =
     !loading &&
     prompt.trim().length >= 5 &&
     (deckMode === "smart" || selectedDomain !== null);
+  const [dragActive, setDragActive] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+
+  async function handleFile(file: File | null) {
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setImageError("仅支持图片文件。");
+      return;
+    }
+
+    if (file.size > maxImageSizeBytes) {
+      setImageError("图片请控制在 2.5 MB 以内，避免请求体过大。");
+      return;
+    }
+
+    try {
+      const dataUrl = await readAsDataUrl(file);
+      onSourceImageChange(dataUrl, resolveDisplayName(file));
+      setImageError(null);
+    } catch (loadError) {
+      setImageError(loadError instanceof Error ? loadError.message : "图片读取失败");
+    }
+  }
+
+  function handleInputFileChange(event: ChangeEvent<HTMLInputElement>) {
+    void handleFile(event.target.files?.[0] ?? null);
+    event.target.value = "";
+  }
+
+  function handleDragOver(event: ReactDragEvent<HTMLElement>) {
+    const hasImage = Array.from(event.dataTransfer.items).some(
+      (item) => item.kind === "file" && item.type.startsWith("image/"),
+    );
+    if (!hasImage) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    setDragActive(true);
+  }
+
+  function handleDragLeave(event: ReactDragEvent<HTMLElement>) {
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      return;
+    }
+
+    setDragActive(false);
+  }
+
+  function handleDrop(event: ReactDragEvent<HTMLElement>) {
+    event.preventDefault();
+    setDragActive(false);
+    const file = Array.from(event.dataTransfer.files).find((item) =>
+      item.type.startsWith("image/"),
+    );
+    void handleFile(file ?? null);
+  }
+
+  const handleWindowPasteFile = useEffectEvent((file: File | null) => {
+    void handleFile(file);
+  });
+
+  useEffect(() => {
+    function handleWindowPaste(event: ClipboardEvent) {
+      const file = extractImageFile(event.clipboardData?.items);
+      if (!file) {
+        return;
+      }
+
+      event.preventDefault();
+      handleWindowPasteFile(file);
+    }
+
+    window.addEventListener("paste", handleWindowPaste);
+    return () => window.removeEventListener("paste", handleWindowPaste);
+  }, []);
 
   return (
     <section className={`composer-panel ${layoutMode === "split" ? "is-split" : ""}`.trim()}>
@@ -106,7 +233,14 @@ export function ControlPanel({
       </div>
 
       <form className="composer-form" onSubmit={onSubmit}>
-        <div className="composer-search-shell">
+        <div
+          className={`composer-search-shell ${dragActive ? "is-drag-active" : ""} ${
+            sourceImage ? "has-attachment" : ""
+          }`.trim()}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
           <textarea
             className="composer-input"
             value={prompt}
@@ -114,14 +248,67 @@ export function ControlPanel({
             placeholder={genericPlaceholder}
             rows={3}
           />
-          <button
-            type="submit"
-            className="composer-submit"
-            disabled={!canSubmit}
-          >
-            {loading ? "生成中..." : "生成视频"}
-          </button>
+
+          {sourceImage ? (
+            <div className="composer-attachment">
+              <img
+                className="composer-attachment-image"
+                src={sourceImage}
+                alt={sourceImageName ?? "题图预览"}
+              />
+              <div className="composer-attachment-copy">
+                <strong>{sourceImageName ?? "已附带题图"}</strong>
+                <span>题图会随请求发送到支持视觉的阶段，用于识别题面与图形关系。</span>
+              </div>
+              <button
+                type="button"
+                className="ghost-button composer-attachment-clear"
+                onClick={() => {
+                  onSourceImageChange(null, null);
+                  setImageError(null);
+                }}
+              >
+                移除图片
+              </button>
+            </div>
+          ) : null}
+
+          <div className="composer-search-actions">
+            <div className="composer-inline-tools">
+              <label className="composer-attach-button" htmlFor={imageInputId}>
+                上传图片
+              </label>
+              {dragActive ? <span className="composer-inline-hint">松开即可附带题图</span> : null}
+              <input
+                id={imageInputId}
+                type="file"
+                accept="image/*"
+                className="composer-upload-input"
+                onChange={handleInputFileChange}
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="composer-submit"
+              disabled={!canSubmit}
+            >
+              {loading ? "生成中..." : "生成视频"}
+            </button>
+          </div>
         </div>
+
+        {imageError ? <p className="error-text composer-upload-feedback">{imageError}</p> : null}
+        {!routerProviderSupportsVision && sourceImageName ? (
+          <p className="field-hint composer-upload-feedback">
+            当前路由模型未声明视觉能力，题图不会发送给路由阶段。
+          </p>
+        ) : null}
+        {!generationProviderSupportsVision && sourceImageName ? (
+          <p className="field-hint composer-upload-feedback">
+            当前规划/编码模型未声明视觉能力，题图不会发送给远程模型。
+          </p>
+        ) : null}
 
         <div className="composer-toggle">
           <button
@@ -169,14 +356,6 @@ export function ControlPanel({
           {hasSourceCode ? <span>已附带源码</span> : null}
           {sourceImageName ? <span>已附带题图</span> : null}
         </div>
-
-        <ImageUploadField
-          imageDataUrl={sourceImage}
-          imageName={sourceImageName}
-          routerProviderSupportsVision={routerProviderSupportsVision}
-          generationProviderSupportsVision={generationProviderSupportsVision}
-          onChange={onSourceImageChange}
-        />
 
         <details className="composer-advanced">
           <summary className="composer-advanced-summary">高级设置</summary>

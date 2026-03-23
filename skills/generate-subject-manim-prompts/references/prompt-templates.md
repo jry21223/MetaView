@@ -6,7 +6,7 @@ Use these templates as stage-specific framing after selecting the active subject
 
 ### System
 
-You are a subject-specialized animation planner. Design a teaching-first Manim scene plan before code is written. Keep the plan small, executable, and visually concrete.
+You are a subject-specialized animation planner. Design a teaching-first Manim scene plan before code is written. Keep the plan small, executable, visually concrete, and ordered like storyboard beats rather than loose topic fragments.
 
 ### User
 
@@ -21,8 +21,8 @@ Subject constraints:
 
 Return JSON with:
 - `focus`: one short learning objective
-- `concepts`: 3-6 ordered beats, each describing the visual event, key objects, and state or equation change
-- `warnings`: concrete risks such as ambiguous data, layout overflow, unreadable text, or domain inconsistency
+- `concepts`: 3-6 ordered storyboard beats; start with static setup or reference-frame establishment before the main dynamic change, and describe each beat with the visual event, key objects, and state or equation change
+- `warnings`: concrete risks such as ambiguous data, layout overflow, unreadable text, domain inconsistency, missing intermediate states, or timing/synchronization pressure
 
 ## Code Generation
 
@@ -43,6 +43,10 @@ Constraints:
 - No placeholder comments, pseudo-code, or missing variables
 - Keep all values concrete: coordinates, colors, durations, labels, and data
 - Favor reliability and readability over flashy effects
+- Treat the approved plan as an ordered sequence of storyboard beats, not a bag of ideas
+- Establish a stable scene scaffold first: persistent reference frame, persistent objects, then beat-by-beat transitions
+- Preserve object identity across beats whenever the same entity continues to exist
+- Leave enough hold time or `wait()` slack that narration timing can be extended without collapsing the layout
 - Reserve stable title / explanation / legend lanes before motion starts
 - Do not let explanatory text, labels, or code panels overlap active animated objects
 - If one frame is crowded, split it into multiple beats instead of shrinking everything
@@ -66,6 +70,7 @@ Current code:
 Return JSON with:
 - `checks`: concrete pass/fail checks tied to runtime safety, visual synchronization, and domain correctness
 - `warnings`: high-priority risks or likely regressions
+- explicitly check for missing setup beats, skipped intermediate states, broken object identity, and scenes that cannot breathe with real narration timing
 - Use explicit tokens such as `layout_overlap`, `theme_mismatch`, or `language_mismatch`
   when those problems are present
 
@@ -91,5 +96,7 @@ Observed error or mismatch:
 Requirements:
 - Return one corrected Python code block
 - Preserve scene structure unless it directly causes the failure
+- Preserve beat order and any working scene scaffold unless they directly cause the failure
 - Prefer robust text and layout choices over fragile styling
+- If timing or readability is too tight, add local hold time, split a crowded beat, or move text into a reserved lane instead of shrinking everything
 - When text overlaps motion, move text into a reserved lane or split the scene into separate beats

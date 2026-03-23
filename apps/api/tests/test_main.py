@@ -579,9 +579,12 @@ def test_pipeline_runs_history_endpoints() -> None:
         "/api/v1/pipeline",
         json={
             "prompt": "请讲解动态规划中的状态定义与转移。",
+            "domain": "algorithm",
             "provider": "mock",
             "sandbox_mode": "dry_run",
             "persist_run": True,
+            "source_image": "data:image/png;base64,ZmFrZS1pbWFnZS1ieXRlcw==",
+            "source_image_name": "dp.png",
         },
     )
     assert pipeline_response.status_code == 200
@@ -599,9 +602,21 @@ def test_pipeline_runs_history_endpoints() -> None:
     assert detail["status"] == "succeeded"
     assert detail["request"]["prompt"] == "请讲解动态规划中的状态定义与转移。"
     assert detail["request"]["domain"] == "algorithm"
+    assert detail["request"]["source_image"] is None
+    assert detail["request"]["source_image_name"] == "dp.png"
     assert detail["request"]["router_provider"] == "mock"
     assert detail["request"]["generation_provider"] == "mock"
     assert detail["response"]["request_id"] == request_id
+
+    hydrated_detail_response = client.get(
+        f"/api/v1/runs/{request_id}?include_source_image=true"
+    )
+    assert hydrated_detail_response.status_code == 200
+    hydrated_detail = hydrated_detail_response.json()
+    assert (
+        hydrated_detail["request"]["source_image"]
+        == "data:image/png;base64,ZmFrZS1pbWFnZS1ieXRlcw=="
+    )
 
 
 def test_pipeline_submit_runs_in_background(monkeypatch, tmp_path) -> None:

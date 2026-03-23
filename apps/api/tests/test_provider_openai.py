@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from app.schemas import CirDocument
+from app.schemas import CirDocument, TopicDomain
 from app.services.providers.openai import (
     OpenAICompatibleProvider,
     ProviderInvocationError,
@@ -271,6 +271,75 @@ def test_openai_provider_uses_stage_specific_models(monkeypatch) -> None:
         "critic-medium",
         "probe-mini",
     ]
+
+
+def test_openai_provider_overrides_obvious_router_misclassification(monkeypatch) -> None:
+    provider = OpenAICompatibleProvider(
+        api_key="test-key",
+        model="test-model",
+        base_url="https://example.com/v1",
+    )
+
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": '{"domain":"algorithm","reason":"误判为算法过程"}'
+                        }
+                    }
+                ]
+            }
+
+    def fake_post(*args, **kwargs):
+        return FakeResponse()
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+
+    domain, trace = provider.route("请讲解二重积分如何表示体积")
+
+    assert domain == TopicDomain.MATH
+    assert "修正为 math" in trace.summary
+
+
+def test_openai_provider_falls_back_to_heuristic_when_router_json_is_invalid(
+    monkeypatch,
+) -> None:
+    provider = OpenAICompatibleProvider(
+        api_key="test-key",
+        model="test-model",
+        base_url="https://example.com/v1",
+    )
+
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": "<think>reasoning</think>\nnot-json-at-all"
+                        }
+                    }
+                ]
+            }
+
+    def fake_post(*args, **kwargs):
+        return FakeResponse()
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+
+    domain, trace = provider.route("请讲解二重积分的几何意义")
+
+    assert domain == TopicDomain.MATH
+    assert "回退到本地关键词路由：math" in trace.summary
+    assert "not-json-at-all" in (trace.raw_output or "")
 
 
 def test_openai_provider_treats_overlap_and_theme_keywords_as_blocking() -> None:
