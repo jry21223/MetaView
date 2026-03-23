@@ -697,6 +697,16 @@ def test_pipeline_unhandled_error_returns_detail_and_error_id(
     assert "journalctl -u metaview-api" in payload["log_hint"]
 
 
+def test_pipeline_run_not_found_returns_error_metadata() -> None:
+    response = client.get("/api/v1/runs/not-a-real-run")
+
+    assert response.status_code == 404
+    payload = response.json()
+    assert payload["detail"] == "Pipeline run not found"
+    assert payload["status_code"] == 404
+    assert len(payload["error_id"]) >= 8
+
+
 def test_pipeline_routes_source_code_to_code_domain() -> None:
     response = client.post(
         "/api/v1/pipeline",
