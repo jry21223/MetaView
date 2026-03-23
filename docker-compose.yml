@@ -3,6 +3,10 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+      args:
+        APT_MIRROR: ${APT_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn/debian}
+        APT_SECURITY_MIRROR: ${APT_SECURITY_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn/debian-security}
+        APT_PIPELINE_DEPTH: ${APT_PIPELINE_DEPTH:-0}
     environment:
       ALGO_VIS_DEFAULT_PROVIDER: ${ALGO_VIS_DEFAULT_PROVIDER:-mock}
       ALGO_VIS_DEFAULT_ROUTER_PROVIDER: ${ALGO_VIS_DEFAULT_ROUTER_PROVIDER:-mock}

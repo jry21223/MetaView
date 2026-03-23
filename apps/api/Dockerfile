@@ -2,12 +2,17 @@ FROM python:3.11-slim AS base
 
 WORKDIR /app
 
+ARG APT_MIRROR=https://deb.debian.org/debian
+ARG APT_SECURITY_MIRROR=https://deb.debian.org/debian-security
+ARG APT_PIPELINE_DEPTH=0
+
+ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources \
-    && apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 update \
-    && apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends \
+RUN sed -i "s|http://deb.debian.org/debian|${APT_MIRROR}|g; s|https://deb.debian.org/debian|${APT_MIRROR}|g; s|http://deb.debian.org/debian-security|${APT_SECURITY_MIRROR}|g; s|https://deb.debian.org/debian-security|${APT_SECURITY_MIRROR}|g" /etc/apt/sources.list.d/debian.sources \
+    && apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::http::Pipeline-Depth=${APT_PIPELINE_DEPTH} -o Acquire::https::Pipeline-Depth=${APT_PIPELINE_DEPTH} update \
+    && apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::http::Pipeline-Depth=${APT_PIPELINE_DEPTH} -o Acquire::https::Pipeline-Depth=${APT_PIPELINE_DEPTH} install -y --no-install-recommends \
         build-essential \
         pkg-config \
         libcairo2-dev \

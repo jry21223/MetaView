@@ -203,6 +203,14 @@ make start
 
 这样历史记录、媒体文件，以及运行时生成的新学科 prompt 都会落在宿主机，不会因为容器重建而丢失。
 
+如果部署机位于中国大陆，当前 compose 默认会把 API 镜像构建阶段的 Debian 源切到清华 TUNA：
+
+- `APT_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/debian`
+- `APT_SECURITY_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/debian-security`
+- `APT_PIPELINE_DEPTH=0`
+
+这三个变量只影响 Docker build，不影响应用运行时。若你的机房对其他镜像站更快，可以在 `.env` 中覆盖。
+
 ### 远端 SSH / Docker 部署
 
 如果目标机已经装好 Docker 和 Docker Compose，最稳的方式是直接在远端项目目录执行：
