@@ -13,7 +13,7 @@ from app.schemas import (
     VisualKind,
     VisualToken,
 )
-from app.services.manim_script import build_manim_script_from_cir
+from app.services.manim_script import build_manim_script_from_cir, prepare_manim_script
 from app.services.providers.base import CodingHints, CritiqueHints, PlanningHints
 from app.services.skill_catalog import SubjectSkill
 from app.services.source_code_module import inspect_source_code
@@ -588,7 +588,7 @@ class CoderAgent:
     name: str = "coder"
 
     def run(self, cir: CirDocument, hints: CodingHints | None = None) -> str:
-        script = build_manim_script_from_cir(cir)
+        script = prepare_manim_script(build_manim_script_from_cir(cir)).code
         if hints and hints.style_notes:
             style_notes = " | ".join(hints.style_notes)
             script = f"{script.rstrip()}\n\n# style-notes: {style_notes}\n"

@@ -19,6 +19,7 @@ from app.schemas import (
     PipelineResponse,
     PipelineRunDetail,
     PipelineRunSummary,
+    PipelineSubmitResponse,
     PromptReferenceRequest,
     PromptReferenceResponse,
     ProviderDescriptor,
@@ -63,6 +64,21 @@ def healthcheck() -> dict[str, str]:
 def run_pipeline(request: PipelineRequest) -> PipelineResponse:
     try:
         return orchestrator.run(request)
+    except ProviderUnavailableError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SubjectSkillUnavailableError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ProviderInvocationError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@app.post(
+    f"{settings.api_prefix}/pipeline/submit",
+    response_model=PipelineSubmitResponse,
+)
+def submit_pipeline(request: PipelineRequest) -> PipelineSubmitResponse:
+    try:
+        return orchestrator.submit_run(request)
     except ProviderUnavailableError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except SubjectSkillUnavailableError as exc:

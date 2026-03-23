@@ -72,11 +72,25 @@ npm run setup:git-hooks
 cp .env.example .env
 ```
 
+这一步现在也会安装多学科学习链路的扩展依赖，包括 `numpy`、`sympy`、`matplotlib`、`geopandas` 和 `rdkit`，避免新机器只装基础 API 包后出现学科技能依赖缺失。
+
 如果你需要真实 `manim-cli` 渲染，再额外执行：
 
 ```bash
 make bootstrap-manim
 ```
+
+这条命令会把真实渲染环境和同一套学科扩展依赖一起装进 `.venv-manim`，这样真实渲染时不会因为数学、化学或地理场景缺包而回退。
+
+如果你是在 Linux/SSH 主机上跑真实渲染或 fallback 预览，中文字体也要单独准备好。Debian/Ubuntu 最小可用组合是：
+
+```bash
+sudo apt-get update
+sudo apt-get install -y fontconfig fonts-noto-cjk
+fc-match "Noto Sans CJK SC"
+```
+
+容器镜像已经内置这组字体；裸机部署如果要强制指定 fallback 预览字体，也可以额外设置 `ALGO_VIS_PREVIEW_FONT_PATH=/absolute/path/to/font.ttc`。
 
 #### 2. 一键启动本地开发
 
@@ -192,6 +206,7 @@ make start
 - `ALGO_VIS_OPENAI_BASE_URL`: OpenAI 兼容 API 地址
 - `ALGO_VIS_OPENAI_MODEL`: 使用的模型名
 - `ALGO_VIS_OPENAI_SUPPORTS_VISION`: 内置 OpenAI 兼容 Provider 是否支持图片输入
+- `ALGO_VIS_OPENAI_TIMEOUT_S`: Provider 请求超时秒数；留空表示不限制，默认留空
 - `VITE_API_BASE_URL`: 前端构建时 API 基地址，默认同源
 
 ## 自定义 Provider
@@ -214,6 +229,8 @@ make start
 - 告知前端当前学科是否支持题图输入
 
 运行时真正读取的学科参考提示词位于 [skills/generate-subject-manim-prompts/references](/Users/jerry/Desktop/demoo/skills/generate-subject-manim-prompts/references)，按 `Common / Planner / Coder / Critic / Repair` 分段装配。仓库里原先那些顶层 legacy skill 目录已经移除，不再参与运行时。
+
+与这些学科技能对应的科学计算依赖统一声明在 [apps/api/requirements-subjects.txt](/Users/jerry/Desktop/demoo/apps/api/requirements-subjects.txt)，`make bootstrap` 和 `make bootstrap-manim` 都会自动安装，避免依赖声明和实际部署漂移。
 
 其中物理链路已支持“静态题目图片 -> 物理建模 -> 动图草案”：前端可上传题图，后端会先提取对象、约束、已知量和目标量，再生成符合物理定律的预览流程。
 

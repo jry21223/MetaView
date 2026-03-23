@@ -10,6 +10,7 @@ export type UITheme = "dark" | "light";
 export type ModelProvider = string;
 export type SandboxMode = "dry_run" | "off";
 export type SandboxStatus = "passed" | "failed" | "skipped";
+export type PipelineRunStatus = "queued" | "running" | "succeeded" | "failed";
 export type ProviderKind = "mock" | "openai_compatible";
 export type ProviderStage = "router" | "planning" | "coding" | "critic" | "test";
 export type TTSBackend = "auto" | "system" | "openai_compatible";
@@ -179,20 +180,32 @@ export interface PipelineResponse {
   runtime: PipelineRuntime;
 }
 
+export interface PipelineSubmitResponse {
+  request_id: string;
+  created_at: string;
+  status: PipelineRunStatus;
+}
+
 export interface PipelineRunSummary {
   request_id: string;
   created_at: string;
+  updated_at: string;
+  status: PipelineRunStatus;
   prompt: string;
   title: string;
-  domain: TopicDomain;
+  domain?: TopicDomain | null;
   provider?: ModelProvider | null;
-  router_provider: ModelProvider;
-  generation_provider: ModelProvider;
-  sandbox_status: SandboxStatus;
+  router_provider?: ModelProvider | null;
+  generation_provider?: ModelProvider | null;
+  sandbox_status?: SandboxStatus | null;
+  error_message?: string | null;
 }
 
 export interface PipelineRunDetail {
   created_at: string;
+  updated_at: string;
+  status: PipelineRunStatus;
+  error_message?: string | null;
   request: {
     prompt: string;
     domain?: TopicDomain | null;
@@ -208,7 +221,7 @@ export interface PipelineRunDetail {
     sandbox_mode: SandboxMode;
     persist_run: boolean;
   };
-  response: PipelineResponse;
+  response?: PipelineResponse | null;
 }
 
 export interface PromptReferenceRequest {

@@ -12,6 +12,7 @@ from app.schemas import (
     PipelineRequest,
     PipelineResponse,
     PipelineRunDetail,
+    PipelineRunStatus,
     PipelineRunSummary,
     ProviderKind,
     RuntimeSettingsRequest,
@@ -113,6 +114,8 @@ class RunRepository:
                 CREATE TABLE IF NOT EXISTS pipeline_runs (
                     request_id TEXT PRIMARY KEY,
                     created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    status TEXT NOT NULL,
                     prompt TEXT NOT NULL,
                     title TEXT NOT NULL,
                     domain TEXT NOT NULL,
@@ -121,7 +124,8 @@ class RunRepository:
                     generation_provider TEXT,
                     sandbox_status TEXT NOT NULL,
                     request_payload TEXT NOT NULL,
-                    response_payload TEXT NOT NULL
+                    response_payload TEXT NOT NULL,
+                    error_message TEXT
                 )
                 """
             )
@@ -129,6 +133,35 @@ class RunRepository:
                 row["name"]
                 for row in connection.execute("PRAGMA table_info(pipeline_runs)").fetchall()
             }
+            if "updated_at" not in columns:
+                connection.execute(
+                    """
+                    ALTER TABLE pipeline_runs
+                    ADD COLUMN updated_at TEXT
+                    """
+                )
+                connection.execute(
+                    """
+                    UPDATE pipeline_runs
+                    SET updated_at = created_at
+                    WHERE updated_at IS NULL OR updated_at = ''
+                    """
+                )
+            if "status" not in columns:
+                connection.execute(
+                    """
+                    ALTER TABLE pipeline_runs
+                    ADD COLUMN status TEXT
+                    """
+                )
+                connection.execute(
+                    """
+                    UPDATE pipeline_runs
+                    SET status = ?
+                    WHERE status IS NULL OR status = ''
+                    """,
+                    (PipelineRunStatus.SUCCEEDED.value,),
+                )
             if "router_provider" not in columns:
                 connection.execute(
                     """
@@ -143,17 +176,32 @@ class RunRepository:
                     ADD COLUMN generation_provider TEXT
                     """
                 )
+            if "error_message" not in columns:
+                connection.execute(
+                    """
+                    ALTER TABLE pipeline_runs
+                    ADD COLUMN error_message TEXT
+                    """
+                )
 
-    def save_run(self, request: PipelineRequest, response: PipelineResponse) -> str:
-        created_at = datetime.now(timezone.utc).isoformat()
-        effective_request = request.model_copy(update={"domain": response.cir.domain})
+    def _timestamp(self) -> str:
+        return datetime.now(timezone.utc).isoformat()
 
+    def create_submitted_run(
+        self,
+        *,
+        request_id: str,
+        request: PipelineRequest,
+    ) -> str:
+        created_at = self._timestamp()
         with closing(self._connect()) as connection, connection:
             connection.execute(
                 """
                 INSERT OR REPLACE INTO pipeline_runs (
                     request_id,
                     created_at,
+                    updated_at,
+                    status,
                     prompt,
                     title,
                     domain,
@@ -162,13 +210,69 @@ class RunRepository:
                     generation_provider,
                     sandbox_status,
                     request_payload,
-                    response_payload
+                    response_payload,
+                    error_message
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    response.request_id,
+                    request_id,
                     created_at,
+                    created_at,
+                    PipelineRunStatus.QUEUED.value,
+                    request.prompt,
+                    "正在生成",
+                    request.domain.value if request.domain is not None else "",
+                    request.provider or "",
+                    request.router_provider or "",
+                    request.generation_provider or request.provider or "",
+                    "",
+                    json.dumps(request.model_dump(mode="json"), ensure_ascii=False),
+                    "",
+                    None,
+                ),
+            )
+        return created_at
+
+    def mark_run_running(self, request_id: str) -> None:
+        updated_at = self._timestamp()
+        with closing(self._connect()) as connection, connection:
+            connection.execute(
+                """
+                UPDATE pipeline_runs
+                SET status = ?, updated_at = ?, error_message = NULL
+                WHERE request_id = ?
+                """,
+                (PipelineRunStatus.RUNNING.value, updated_at, request_id),
+            )
+
+    def save_run(self, request: PipelineRequest, response: PipelineResponse) -> str:
+        created_at = self._timestamp()
+        updated_at = created_at
+        effective_request = request.model_copy(update={"domain": response.cir.domain})
+
+        with closing(self._connect()) as connection, connection:
+            cursor = connection.execute(
+                """
+                UPDATE pipeline_runs
+                SET
+                    updated_at = ?,
+                    status = ?,
+                    prompt = ?,
+                    title = ?,
+                    domain = ?,
+                    provider = ?,
+                    router_provider = ?,
+                    generation_provider = ?,
+                    sandbox_status = ?,
+                    request_payload = ?,
+                    response_payload = ?,
+                    error_message = NULL
+                WHERE request_id = ?
+                """,
+                (
+                    updated_at,
+                    PipelineRunStatus.SUCCEEDED.value,
                     effective_request.prompt,
                     response.cir.title,
                     response.cir.domain.value,
@@ -182,10 +286,140 @@ class RunRepository:
                     response.runtime.sandbox.status.value,
                     json.dumps(effective_request.model_dump(mode="json"), ensure_ascii=False),
                     json.dumps(response.model_dump(mode="json"), ensure_ascii=False),
+                    response.request_id,
+                ),
+            )
+            if cursor.rowcount:
+                return created_at
+
+            connection.execute(
+                """
+                INSERT INTO pipeline_runs (
+                    request_id,
+                    created_at,
+                    updated_at,
+                    status,
+                    prompt,
+                    title,
+                    domain,
+                    provider,
+                    router_provider,
+                    generation_provider,
+                    sandbox_status,
+                    request_payload,
+                    response_payload,
+                    error_message
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    response.request_id,
+                    created_at,
+                    updated_at,
+                    PipelineRunStatus.SUCCEEDED.value,
+                    effective_request.prompt,
+                    response.cir.title,
+                    response.cir.domain.value,
+                    response.runtime.provider.name if response.runtime.provider else "",
+                    response.runtime.router_provider.name
+                    if response.runtime.router_provider
+                    else response.runtime.provider.name if response.runtime.provider else "",
+                    response.runtime.generation_provider.name
+                    if response.runtime.generation_provider
+                    else response.runtime.provider.name if response.runtime.provider else "",
+                    response.runtime.sandbox.status.value,
+                    json.dumps(effective_request.model_dump(mode="json"), ensure_ascii=False),
+                    json.dumps(response.model_dump(mode="json"), ensure_ascii=False),
+                    None,
                 ),
             )
 
         return created_at
+
+    def mark_run_failed(
+        self,
+        *,
+        request_id: str,
+        request: PipelineRequest,
+        error_message: str,
+    ) -> None:
+        updated_at = self._timestamp()
+        payload = json.dumps(request.model_dump(mode="json"), ensure_ascii=False)
+        with closing(self._connect()) as connection, connection:
+            cursor = connection.execute(
+                """
+                UPDATE pipeline_runs
+                SET
+                    updated_at = ?,
+                    status = ?,
+                    prompt = ?,
+                    title = ?,
+                    domain = ?,
+                    provider = ?,
+                    router_provider = ?,
+                    generation_provider = ?,
+                    sandbox_status = ?,
+                    request_payload = ?,
+                    response_payload = ?,
+                    error_message = ?
+                WHERE request_id = ?
+                """,
+                (
+                    updated_at,
+                    PipelineRunStatus.FAILED.value,
+                    request.prompt,
+                    "生成失败",
+                    request.domain.value if request.domain is not None else "",
+                    request.provider or "",
+                    request.router_provider or "",
+                    request.generation_provider or request.provider or "",
+                    "",
+                    payload,
+                    "",
+                    error_message,
+                    request_id,
+                ),
+            )
+            if cursor.rowcount:
+                return
+
+            connection.execute(
+                """
+                INSERT INTO pipeline_runs (
+                    request_id,
+                    created_at,
+                    updated_at,
+                    status,
+                    prompt,
+                    title,
+                    domain,
+                    provider,
+                    router_provider,
+                    generation_provider,
+                    sandbox_status,
+                    request_payload,
+                    response_payload,
+                    error_message
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    request_id,
+                    updated_at,
+                    updated_at,
+                    PipelineRunStatus.FAILED.value,
+                    request.prompt,
+                    "生成失败",
+                    request.domain.value if request.domain is not None else "",
+                    request.provider or "",
+                    request.router_provider or "",
+                    request.generation_provider or request.provider or "",
+                    "",
+                    payload,
+                    "",
+                    error_message,
+                ),
+            )
 
     def list_runs(self, limit: int = 20) -> list[PipelineRunSummary]:
         with closing(self._connect()) as connection:
@@ -194,13 +428,16 @@ class RunRepository:
                 SELECT
                     request_id,
                     created_at,
+                    updated_at,
+                    status,
                     prompt,
                     title,
                     domain,
                     provider,
                     COALESCE(router_provider, provider) AS router_provider,
                     COALESCE(generation_provider, provider) AS generation_provider,
-                    sandbox_status
+                    sandbox_status,
+                    error_message
                 FROM pipeline_runs
                 ORDER BY created_at DESC
                 LIMIT ?
@@ -212,13 +449,18 @@ class RunRepository:
             PipelineRunSummary(
                 request_id=row["request_id"],
                 created_at=row["created_at"],
+                updated_at=row["updated_at"] or row["created_at"],
+                status=PipelineRunStatus(row["status"] or PipelineRunStatus.SUCCEEDED.value),
                 prompt=row["prompt"],
                 title=row["title"],
-                domain=TopicDomain(row["domain"]),
-                provider=row["provider"],
-                router_provider=row["router_provider"],
-                generation_provider=row["generation_provider"],
-                sandbox_status=SandboxStatus(row["sandbox_status"]),
+                domain=TopicDomain(row["domain"]) if row["domain"] else None,
+                provider=row["provider"] or None,
+                router_provider=row["router_provider"] or None,
+                generation_provider=row["generation_provider"] or None,
+                sandbox_status=SandboxStatus(row["sandbox_status"])
+                if row["sandbox_status"]
+                else None,
+                error_message=row["error_message"],
             )
             for row in rows
         ]
@@ -227,7 +469,13 @@ class RunRepository:
         with closing(self._connect()) as connection:
             row = connection.execute(
                 """
-                SELECT created_at, request_payload, response_payload
+                SELECT
+                    created_at,
+                    updated_at,
+                    status,
+                    error_message,
+                    request_payload,
+                    response_payload
                 FROM pipeline_runs
                 WHERE request_id = ?
                 """,
@@ -239,8 +487,15 @@ class RunRepository:
 
         return PipelineRunDetail(
             created_at=row["created_at"],
+            updated_at=row["updated_at"] or row["created_at"],
+            status=PipelineRunStatus(row["status"] or PipelineRunStatus.SUCCEEDED.value),
+            error_message=row["error_message"],
             request=PipelineRequest.model_validate(json.loads(row["request_payload"])),
-            response=PipelineResponse.model_validate(json.loads(row["response_payload"])),
+            response=(
+                PipelineResponse.model_validate(json.loads(row["response_payload"]))
+                if row["response_payload"]
+                else None
+            ),
         )
 
 

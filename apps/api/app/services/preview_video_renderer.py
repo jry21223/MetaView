@@ -55,6 +55,29 @@ EMBEDDED_PLACEHOLDER_MP4_BASE64 = (
     "CFoZGxyAAAAAAAAAABtZGlyYXBwbAAAAAAAAAAAAAAAACxpbHN0AAAAJKl0b28AAAAcZGF0YQAAAAEAAAAATGF2Z"
     "jYyLjEuMTAz"
 )
+_CJK_FONT_FAMILY_CANDIDATES = (
+    "Noto Sans CJK SC",
+    "Noto Serif CJK SC",
+    "Source Han Sans SC",
+    "Source Han Sans CN",
+    "WenQuanYi Zen Hei",
+    "Microsoft YaHei",
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "SimHei",
+)
+_CJK_FONT_FAMILY_MARKERS = (
+    "noto sans cjk",
+    "noto serif cjk",
+    "source han sans",
+    "source han serif",
+    "wenquanyi",
+    "pingfang",
+    "hiragino sans gb",
+    "microsoft yahei",
+    "simhei",
+    "sarasa",
+)
 
 
 class PreviewVideoRenderError(RuntimeError):
@@ -639,7 +662,22 @@ class StoryboardFallbackPreviewBackend:
         return ImageFont.truetype(str(self._font_path), size=size)
 
     def _resolve_font_path(self) -> Path | None:
+        override_path = os.getenv("ALGO_VIS_PREVIEW_FONT_PATH")
+        if override_path:
+            candidate = Path(override_path).expanduser()
+            if candidate.exists():
+                return candidate
+
+        fontconfig_match = self._resolve_font_path_with_fontconfig()
+        if fontconfig_match is not None:
+            return fontconfig_match
+
         candidates = [
+            Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
+            Path("/usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc"),
+            Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"),
+            Path("/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"),
+            Path("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc"),
             Path("/System/Library/Fonts/Hiragino Sans GB.ttc"),
             Path("/System/Library/Fonts/PingFang.ttc"),
             Path("/System/Library/Fonts/Helvetica.ttc"),
@@ -649,6 +687,35 @@ class StoryboardFallbackPreviewBackend:
             if candidate.exists():
                 return candidate
         return None
+
+    def _resolve_font_path_with_fontconfig(self) -> Path | None:
+        fc_match = shutil.which("fc-match")
+        if not fc_match:
+            return None
+
+        for family in _CJK_FONT_FAMILY_CANDIDATES:
+            result = subprocess.run(
+                [fc_match, family, "--format=%{family[0]}|%{file}\n"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if result.returncode != 0:
+                continue
+            resolved_family, _, font_path = result.stdout.strip().partition("|")
+            candidate = Path(font_path) if font_path else None
+            if (
+                resolved_family
+                and candidate is not None
+                and candidate.exists()
+                and self._looks_like_cjk_font_family(resolved_family)
+            ):
+                return candidate
+        return None
+
+    def _looks_like_cjk_font_family(self, family_name: str) -> bool:
+        normalized = family_name.casefold()
+        return any(marker in normalized for marker in _CJK_FONT_FAMILY_MARKERS)
 
     def _link_or_copy(self, source: Path, destination: Path) -> None:
         try:

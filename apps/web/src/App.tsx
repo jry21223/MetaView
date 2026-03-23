@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useEffect, useEffectEvent, useState } from "react";
 import type { FormEvent } from "react";
 
 import {
@@ -6,7 +6,7 @@ import {
   getPipelineRun,
   getPipelineRuns,
   getRuntimeCatalog,
-  runPipeline,
+  submitPipeline,
   updateRuntimeSettings,
   upsertCustomProvider,
 } from "./api/client";
@@ -26,7 +26,9 @@ import type {
   CustomProviderUpsertRequest,
   ModelProvider,
   PipelineResponse,
+  PipelineRunDetail,
   PipelineRunSummary,
+  PipelineRunStatus,
   RuntimeCatalog,
   SandboxMode,
   SkillDescriptor,
@@ -35,6 +37,7 @@ import type {
 
 const defaultPrompt = "输入一个题目、源码或题图，生成对应的 Manim 讲解动画视频。";
 const themeStorageKey = "metaview-theme";
+const activeRunStorageKey = "metaview-active-run-id";
 
 type ThemeMode = "dark" | "light";
 type DeckMode = "smart" | "expert";
@@ -132,6 +135,18 @@ function getInitialTheme(): ThemeMode {
   return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
 }
 
+function getInitialActiveRunId(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const storedRunId = window.localStorage.getItem(activeRunStorageKey)?.trim();
+  return storedRunId ? storedRunId : null;
+}
+
+function isRunningStatus(status: PipelineRunStatus): boolean {
+  return status === "queued" || status === "running";
+}
+
 function resolveSourceEditorName(sourceCode: string, sourceCodeLanguage: string): string {
   if (!sourceCode.trim()) {
     return "source input";
@@ -205,6 +220,7 @@ export default function App() {
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
+  const [activeRunId, setActiveRunId] = useState<string | null>(getInitialActiveRunId);
 
   const activeSkill = result?.runtime.skill ?? null;
   const previewVideoUrl = resolvePreviewVideoUrl(result?.preview_video_url);
@@ -242,6 +258,17 @@ export default function App() {
     window.localStorage.setItem(themeStorageKey, theme);
   }, [theme]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    if (activeRunId) {
+      window.localStorage.setItem(activeRunStorageKey, activeRunId);
+      return;
+    }
+    window.localStorage.removeItem(activeRunStorageKey);
+  }, [activeRunId]);
+
   async function refreshRuntimeCatalog(): Promise<RuntimeCatalog> {
     try {
       const catalog = await getRuntimeCatalog();
@@ -259,13 +286,15 @@ export default function App() {
     }
   }
 
-  async function loadRuns() {
+  async function loadRuns(): Promise<PipelineRunSummary[]> {
     try {
       const historyRuns = await getPipelineRuns();
       setRuns(historyRuns);
       setHistoryError(null);
+      return historyRuns;
     } catch (loadError) {
       setHistoryError(loadError instanceof Error ? loadError.message : "历史记录加载失败");
+      return [];
     }
   }
 
@@ -306,15 +335,155 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    void loadRuns();
+    let active = true;
+
+    void getPipelineRuns()
+      .then((historyRuns) => {
+        if (!active) {
+          return;
+        }
+
+        startTransition(() => {
+          setRuns(historyRuns);
+          setHistoryError(null);
+
+          if (getInitialActiveRunId()) {
+            return;
+          }
+          const inflightRun = historyRuns.find((run) => isRunningStatus(run.status));
+          if (!inflightRun) {
+            return;
+          }
+          setActiveRunId(inflightRun.request_id);
+          setSelectedRunId(inflightRun.request_id);
+          setLoading(true);
+        });
+      })
+      .catch((loadError) => {
+        if (!active) {
+          return;
+        }
+        startTransition(() => {
+          setHistoryError(loadError instanceof Error ? loadError.message : "历史记录加载失败");
+        });
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
     if (deckMode === "expert" || runtimeCatalog.skills.length === 0 || selectedDomain) {
       return;
     }
-    setSelectedDomain(runtimeCatalog.skills[0]?.domain ?? null);
+    startTransition(() => {
+      setSelectedDomain(runtimeCatalog.skills[0]?.domain ?? null);
+    });
   }, [deckMode, runtimeCatalog.skills, selectedDomain]);
+
+  function syncRunIntoEditor(run: PipelineRunDetail) {
+    setPrompt(run.request.prompt);
+    setSourceCode(run.request.source_code ?? "");
+    setSourceCodeLanguage(run.request.source_code_language ?? "");
+    setRouterProvider(
+      resolveConfiguredProvider(
+        runtimeCatalog,
+        run.request.router_provider ?? run.response?.runtime.router_provider?.name,
+        runtimeCatalog.default_router_provider,
+      ),
+    );
+    setGenerationProvider(
+      resolveConfiguredProvider(
+        runtimeCatalog,
+        run.request.generation_provider ??
+          run.request.provider ??
+          run.response?.runtime.generation_provider?.name ??
+          run.response?.runtime.provider?.name,
+        runtimeCatalog.default_generation_provider,
+      ),
+    );
+    setSandboxMode(run.request.sandbox_mode);
+    setSourceImage(run.request.source_image ?? null);
+    setSourceImageName(run.request.source_image_name ?? null);
+    setEnableNarration(run.request.enable_narration ?? true);
+    setDeckMode(run.request.domain ? "expert" : "smart");
+    setSelectedDomain(run.response?.runtime.skill.domain ?? run.request.domain ?? null);
+  }
+
+  const syncPolledRun = useEffectEvent(async (requestId: string) => {
+    const run = await getPipelineRun(requestId);
+    syncRunIntoEditor(run);
+    startTransition(() => {
+      setSelectedRunId(requestId);
+    });
+
+    if (run.status === "succeeded" && run.response) {
+      const response = run.response;
+      startTransition(() => {
+        setResult(response);
+      });
+      setLoading(false);
+      setError(null);
+      setActiveRunId((current) => (current === requestId ? null : current));
+      await loadRuns();
+      return true;
+    }
+
+    if (run.status === "failed") {
+      setResult(null);
+      setLoading(false);
+      setError(run.error_message ?? "请求失败");
+      setActiveRunId((current) => (current === requestId ? null : current));
+      await loadRuns();
+      return true;
+    }
+
+    setResult(null);
+    setLoading(true);
+    setError(null);
+    await loadRuns();
+    return false;
+  });
+
+  useEffect(() => {
+    if (!activeRunId) {
+      return;
+    }
+
+    let cancelled = false;
+    let timer: number | undefined;
+
+    const poll = async () => {
+      try {
+        const finished = await syncPolledRun(activeRunId);
+        if (cancelled || finished) {
+          return;
+        }
+      } catch (pollError) {
+        if (cancelled) {
+          return;
+        }
+        setHistoryError(pollError instanceof Error ? pollError.message : "任务状态刷新失败");
+      }
+
+      if (cancelled) {
+        return;
+      }
+      timer = window.setTimeout(() => {
+        void poll();
+      }, 2000);
+    };
+
+    void poll();
+
+    return () => {
+      cancelled = true;
+      if (timer) {
+        window.clearTimeout(timer);
+      }
+    };
+  }, [activeRunId]);
 
   function handleSourceImageChange(value: string | null, name: string | null) {
     setSourceImage(value);
@@ -325,9 +494,10 @@ export default function App() {
     event.preventDefault();
     setLoading(true);
     setError(null);
+    setResult(null);
 
     try {
-      const response = await runPipeline(
+      const submittedRun = await submitPipeline(
         prompt,
         routerProvider,
         generationProvider,
@@ -341,16 +511,12 @@ export default function App() {
         enableNarration,
       );
       startTransition(() => {
-        setResult(response);
-        setSelectedRunId(response.request_id);
+        setSelectedRunId(submittedRun.request_id);
       });
-      if (deckMode === "smart") {
-        setSelectedDomain(response.runtime.skill.domain);
-      }
+      setActiveRunId(submittedRun.request_id);
       await loadRuns();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "请求失败");
-    } finally {
       setLoading(false);
     }
   }
@@ -358,37 +524,20 @@ export default function App() {
   async function handleSelectRun(requestId: string) {
     try {
       const run = await getPipelineRun(requestId);
+      syncRunIntoEditor(run);
       startTransition(() => {
-        setResult(run.response);
         setSelectedRunId(requestId);
+        setResult(run.status === "succeeded" ? (run.response ?? null) : null);
       });
-      setPrompt(run.request.prompt);
-      setSourceCode(run.request.source_code ?? "");
-      setSourceCodeLanguage(run.request.source_code_language ?? "");
-      setRouterProvider(
-        resolveConfiguredProvider(
-          runtimeCatalog,
-          run.request.router_provider ?? run.response.runtime.router_provider?.name,
-          runtimeCatalog.default_router_provider,
-        ),
-      );
-      setGenerationProvider(
-        resolveConfiguredProvider(
-          runtimeCatalog,
-          run.request.generation_provider ??
-            run.request.provider ??
-            run.response.runtime.generation_provider?.name ??
-            run.response.runtime.provider?.name,
-          runtimeCatalog.default_generation_provider,
-        ),
-      );
-      setSandboxMode(run.request.sandbox_mode);
-      setSourceImage(run.request.source_image ?? null);
-      setSourceImageName(run.request.source_image_name ?? null);
-      setEnableNarration(run.request.enable_narration ?? true);
-      setDeckMode(run.request.domain ? "expert" : "smart");
-      setSelectedDomain(run.response.runtime.skill.domain);
-      setError(null);
+      if (isRunningStatus(run.status)) {
+        setLoading(true);
+        setError(null);
+        setActiveRunId(requestId);
+      } else {
+        setLoading(false);
+        setActiveRunId((current) => (current === requestId ? null : current));
+        setError(run.status === "failed" ? (run.error_message ?? "任务详情加载失败") : null);
+      }
     } catch (loadError) {
       setHistoryError(loadError instanceof Error ? loadError.message : "任务详情加载失败");
     }

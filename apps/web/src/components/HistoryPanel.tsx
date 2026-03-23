@@ -18,7 +18,7 @@ export function HistoryPanel({
       <div className="panel-header">
         <span className="panel-kicker">History</span>
         <h3>任务历史</h3>
-        <p>最近的生成任务会保存在本地，可直接回放和继续排查。</p>
+        <p>任务提交后会在后台继续执行，关页后重新打开也能继续查看。</p>
       </div>
 
       {error ? <p className="error-text">{error}</p> : null}
@@ -35,15 +35,17 @@ export function HistoryPanel({
           >
             <div className="history-item-head">
               <strong>{run.title}</strong>
-              <span>{run.sandbox_status}</span>
+              <span>{run.status}</span>
             </div>
             <p>{run.prompt}</p>
             <div className="history-item-meta">
-              <span>route:{run.router_provider}</span>
-              <span>gen:{run.generation_provider}</span>
-              <span>{run.domain}</span>
+              <span>route:{run.router_provider ?? "-"}</span>
+              <span>gen:{run.generation_provider ?? "-"}</span>
+              <span>{run.domain ?? "auto"}</span>
+              <span>{run.sandbox_status ?? "-"}</span>
               <span>{new Date(run.created_at).toLocaleString()}</span>
             </div>
+            {run.error_message ? <p>{run.error_message}</p> : null}
           </button>
         ))}
       </div>

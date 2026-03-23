@@ -41,6 +41,13 @@ class SandboxStatus(str, Enum):
     SKIPPED = "skipped"
 
 
+class PipelineRunStatus(str, Enum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
 class ValidationSeverity(str, Enum):
     INFO = "info"
     WARNING = "warning"
@@ -284,16 +291,25 @@ class PipelineResponse(BaseModel):
     runtime: PipelineRuntime
 
 
+class PipelineSubmitResponse(BaseModel):
+    request_id: str
+    created_at: str
+    status: PipelineRunStatus
+
+
 class PipelineRunSummary(BaseModel):
     request_id: str
     created_at: str
+    updated_at: str
+    status: PipelineRunStatus
     prompt: str
     title: str
-    domain: TopicDomain
+    domain: TopicDomain | None = None
     provider: str | None = None
     router_provider: str | None = None
     generation_provider: str | None = None
-    sandbox_status: SandboxStatus
+    sandbox_status: SandboxStatus | None = None
+    error_message: str | None = None
 
     @model_validator(mode="after")
     def apply_provider_aliases(self) -> "PipelineRunSummary":
@@ -307,8 +323,11 @@ class PipelineRunSummary(BaseModel):
 
 class PipelineRunDetail(BaseModel):
     created_at: str
+    updated_at: str
+    status: PipelineRunStatus
+    error_message: str | None = None
     request: PipelineRequest
-    response: PipelineResponse
+    response: PipelineResponse | None = None
 
 
 class PromptReferenceRequest(BaseModel):

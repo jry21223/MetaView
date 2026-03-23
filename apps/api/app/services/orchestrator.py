@@ -1,4 +1,5 @@
 import inspect
+from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
 
 from app.config import Settings
@@ -12,8 +13,10 @@ from app.schemas import (
     PipelineRequest,
     PipelineResponse,
     PipelineRunDetail,
+    PipelineRunStatus,
     PipelineRunSummary,
     PipelineRuntime,
+    PipelineSubmitResponse,
     PromptReferenceRequest,
     PromptReferenceResponse,
     ProviderDescriptor,
@@ -113,6 +116,10 @@ class PipelineOrchestrator:
             manim_format=settings.manim_format,
             manim_disable_caching=settings.manim_disable_caching,
             manim_render_timeout_s=settings.manim_render_timeout_s,
+        )
+        self.background_executor = ThreadPoolExecutor(
+            max_workers=4,
+            thread_name_prefix="pipeline-run",
         )
         self._refresh_runtime_dependencies()
 
@@ -268,7 +275,42 @@ class PipelineOrchestrator:
             raw_output=artifact.raw_output,
         )
 
-    def run(self, request: PipelineRequest) -> PipelineResponse:
+    def submit_run(self, request: PipelineRequest) -> PipelineSubmitResponse:
+        submitted_request = request.model_copy(update={"persist_run": True}, deep=True)
+        request_id = str(uuid4())
+        created_at = self.repository.create_submitted_run(
+            request_id=request_id,
+            request=submitted_request,
+        )
+        self.background_executor.submit(
+            self._run_submitted_pipeline,
+            submitted_request,
+            request_id,
+        )
+        return PipelineSubmitResponse(
+            request_id=request_id,
+            created_at=created_at,
+            status=PipelineRunStatus.QUEUED,
+        )
+
+    def _run_submitted_pipeline(self, request: PipelineRequest, request_id: str) -> None:
+        self.repository.mark_run_running(request_id)
+        try:
+            self.run(request, request_id=request_id)
+        except Exception as exc:
+            message = str(exc).strip() or exc.__class__.__name__
+            self.repository.mark_run_failed(
+                request_id=request_id,
+                request=request,
+                error_message=message,
+            )
+
+    def run(
+        self,
+        request: PipelineRequest,
+        *,
+        request_id: str | None = None,
+    ) -> PipelineResponse:
         router_provider_name = request.router_provider or self.default_router_provider
         generation_provider_name = (
             request.generation_provider or request.provider or self.default_generation_provider
@@ -300,7 +342,7 @@ class PipelineOrchestrator:
         )
         repair_actions: list[str] = []
         repair_count = 0
-        request_id = str(uuid4())
+        request_id = request_id or str(uuid4())
         agent_traces: list[AgentTrace] = [route_trace]
         preview_video_url: str | None = None
         preview_video_backend: str | None = None
@@ -703,13 +745,18 @@ class PipelineOrchestrator:
     def upsert_custom_provider(
         self, payload: CustomProviderUpsertRequest
     ) -> ProviderDescriptor:
-        return self.provider_registry.upsert_custom_provider(payload)
+        descriptor = self.provider_registry.upsert_custom_provider(payload)
+        self._refresh_runtime_dependencies()
+        return descriptor
 
     def test_custom_provider(self, payload: CustomProviderUpsertRequest):
         return self.provider_registry.test_custom_provider(payload)
 
     def delete_custom_provider(self, name: str) -> bool:
-        return self.provider_registry.delete_custom_provider(name)
+        deleted = self.provider_registry.delete_custom_provider(name)
+        if deleted:
+            self._refresh_runtime_dependencies()
+        return deleted
 
     def _call_provider_method(self, method, *args, **kwargs):
         signature = inspect.signature(method)

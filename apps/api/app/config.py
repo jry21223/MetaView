@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.schemas import TopicDomain
@@ -58,6 +59,21 @@ class Settings(BaseSettings):
     openai_test_model: str | None = None
     openai_supports_vision: bool = False
     openai_timeout_s: float | None = None
+
+    @field_validator(
+        "preview_tts_timeout_s",
+        "manim_render_timeout_s",
+        "openai_timeout_s",
+        mode="before",
+    )
+    @classmethod
+    def normalize_optional_timeout(cls, value: float | str | None) -> float | str | None:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            normalized = value.strip()
+            return normalized or None
+        return value
 
     @property
     def enabled_topic_domains(self) -> tuple[TopicDomain, ...]:

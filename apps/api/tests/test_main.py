@@ -1,9 +1,13 @@
+import time
+
 from fastapi.testclient import TestClient
 
 from app.main import app, orchestrator
 from app.schemas import (
     AgentTrace,
     CirDocument,
+    CustomProviderUpsertRequest,
+    PipelineRunStatus,
     ProviderDescriptor,
     ProviderKind,
     RuntimeSettingsRequest,
@@ -42,6 +46,27 @@ def _run_pipeline(payload: dict, monkeypatch, tmp_path) -> dict:
     return data
 
 
+def _wait_for_run_status(
+    request_id: str,
+    *,
+    timeout_s: float = 5.0,
+    poll_interval_s: float = 0.05,
+) -> dict:
+    deadline = time.time() + timeout_s
+    last_payload: dict | None = None
+    while time.time() < deadline:
+        response = client.get(f"/api/v1/runs/{request_id}")
+        assert response.status_code == 200
+        last_payload = response.json()
+        if last_payload["status"] in {
+            PipelineRunStatus.SUCCEEDED.value,
+            PipelineRunStatus.FAILED.value,
+        }:
+            return last_payload
+        time.sleep(poll_interval_s)
+    raise AssertionError(f"Timed out waiting for run {request_id}: {last_payload}")
+
+
 def test_healthcheck() -> None:
     response = client.get("/health")
     assert response.status_code == 200
@@ -64,6 +89,7 @@ def test_pipeline_returns_cir() -> None:
     assert len(payload["cir"]["steps"]) == 3
     assert "from manim import *" in payload["renderer_script"]
     assert "class GeneratedPreviewScene(Scene):" in payload["renderer_script"]
+    assert "_algo_vis_pick_cjk_font" in payload["renderer_script"]
     assert payload["preview_video_url"]
     assert payload["runtime"]["skill"]["id"] == "algorithm-process-viz"
     assert payload["runtime"]["router_provider"]["name"] == "mock"
@@ -160,6 +186,64 @@ def test_runtime_settings_endpoint_updates_tts_configuration() -> None:
         assert runtime_payload["default_generation_provider"] == "openai"
     finally:
         orchestrator.update_runtime_settings(restore_payload)
+
+
+def test_upsert_custom_provider_refreshes_runtime_dependencies(monkeypatch) -> None:
+    payload = CustomProviderUpsertRequest(
+        name="refresh-stub",
+        label="Refresh Stub",
+        base_url="https://example.com/v1",
+        model="refresh-model",
+        api_key="secret",
+    )
+    descriptor = ProviderDescriptor(
+        name="refresh-stub",
+        label="Refresh Stub",
+        kind=ProviderKind.OPENAI_COMPATIBLE,
+        model="refresh-model",
+        description="refresh test",
+        configured=True,
+        is_custom=True,
+    )
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        orchestrator.provider_registry,
+        "upsert_custom_provider",
+        lambda value: descriptor,
+    )
+    monkeypatch.setattr(
+        orchestrator,
+        "_refresh_runtime_dependencies",
+        lambda: calls.append("refreshed"),
+    )
+
+    returned = orchestrator.upsert_custom_provider(payload)
+
+    assert returned == descriptor
+    assert calls == ["refreshed"]
+
+
+def test_delete_custom_provider_refreshes_runtime_dependencies_when_deleted(
+    monkeypatch,
+) -> None:
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        orchestrator.provider_registry,
+        "delete_custom_provider",
+        lambda name: True,
+    )
+    monkeypatch.setattr(
+        orchestrator,
+        "_refresh_runtime_dependencies",
+        lambda: calls.append("refreshed"),
+    )
+
+    deleted = orchestrator.delete_custom_provider("refresh-stub")
+
+    assert deleted is True
+    assert calls == ["refreshed"]
 
 
 def test_generate_prompt_reference_endpoint(monkeypatch) -> None:
@@ -506,16 +590,69 @@ def test_pipeline_runs_history_endpoints() -> None:
     list_response = client.get("/api/v1/runs")
     assert list_response.status_code == 200
     runs = list_response.json()
-    assert any(item["request_id"] == request_id for item in runs)
+    run_summary = next(item for item in runs if item["request_id"] == request_id)
+    assert run_summary["status"] == "succeeded"
 
     detail_response = client.get(f"/api/v1/runs/{request_id}")
     assert detail_response.status_code == 200
     detail = detail_response.json()
+    assert detail["status"] == "succeeded"
     assert detail["request"]["prompt"] == "请讲解动态规划中的状态定义与转移。"
     assert detail["request"]["domain"] == "algorithm"
     assert detail["request"]["router_provider"] == "mock"
     assert detail["request"]["generation_provider"] == "mock"
     assert detail["response"]["request_id"] == request_id
+
+
+def test_pipeline_submit_runs_in_background(monkeypatch, tmp_path) -> None:
+    _stub_preview_renderer(monkeypatch, tmp_path)
+
+    submit_response = client.post(
+        "/api/v1/pipeline/submit",
+        json={
+            "prompt": "请讲解快速排序的分区过程。",
+            "provider": "mock",
+            "sandbox_mode": "dry_run",
+        },
+    )
+    assert submit_response.status_code == 200
+    payload = submit_response.json()
+    assert payload["status"] == "queued"
+
+    request_id = payload["request_id"]
+    detail = _wait_for_run_status(request_id)
+    assert detail["status"] == "succeeded"
+    assert detail["response"]["request_id"] == request_id
+    assert detail["response"]["preview_video_url"]
+
+    list_response = client.get("/api/v1/runs")
+    assert list_response.status_code == 200
+    runs = list_response.json()
+    run_summary = next(item for item in runs if item["request_id"] == request_id)
+    assert run_summary["status"] == "succeeded"
+
+
+def test_pipeline_submit_persists_failure(monkeypatch) -> None:
+    def raise_invoke_error(*args, **kwargs):
+        raise RuntimeError("provider exploded")
+
+    monkeypatch.setattr(orchestrator.coder, "run", raise_invoke_error)
+
+    submit_response = client.post(
+        "/api/v1/pipeline/submit",
+        json={
+            "prompt": "请讲解哈希表的冲突处理。",
+            "provider": "mock",
+            "sandbox_mode": "dry_run",
+        },
+    )
+    assert submit_response.status_code == 200
+    request_id = submit_response.json()["request_id"]
+
+    detail = _wait_for_run_status(request_id)
+    assert detail["status"] == "failed"
+    assert detail["error_message"] == "provider exploded"
+    assert detail["response"] is None
 
 
 def test_pipeline_routes_source_code_to_code_domain() -> None:

@@ -144,7 +144,10 @@ export function ProviderManager({
       <div className="panel-header">
         <span className="panel-kicker">Providers</span>
         <h3>自定义模型提供商</h3>
-        <p>支持注册 OpenAI 兼容接口，例如本地 Ollama、vLLM 网关或第三方代理服务。</p>
+        <p>
+          支持注册 OpenAI 兼容接口，例如本地 Ollama、vLLM 网关或第三方代理服务。Provider
+          请求默认不设超时限制；如果上游网关另有限制，以网关设置为准。
+        </p>
       </div>
 
       <form className="prompt-form" onSubmit={handleSubmit}>

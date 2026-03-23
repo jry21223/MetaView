@@ -16,6 +16,81 @@ _SCENE_BASE_NAMES = {
     "ZoomedScene",
     "LinearTransformationScene",
 }
+_TEXT_MOBJECT_NAMES = {
+    "Text": "_algo_vis_text",
+    "MarkupText": "_algo_vis_markup_text",
+    "Paragraph": "_algo_vis_paragraph",
+}
+_CJK_FONT_HELPER_SOURCE = """
+def _algo_vis_is_cjk_font_family(family_name):
+    normalized = family_name.casefold()
+    return any(
+        token in normalized
+        for token in (
+            "noto sans cjk",
+            "noto serif cjk",
+            "source han sans",
+            "source han serif",
+            "wenquanyi",
+            "pingfang",
+            "hiragino sans gb",
+            "microsoft yahei",
+            "simhei",
+            "sarasa",
+        )
+    )
+
+def _algo_vis_pick_cjk_font():
+    candidates = (
+        "Noto Sans CJK SC",
+        "Source Han Sans SC",
+        "Source Han Sans CN",
+        "WenQuanYi Zen Hei",
+        "Microsoft YaHei",
+        "PingFang SC",
+        "Hiragino Sans GB",
+        "SimHei",
+    )
+    try:
+        import shutil
+        import subprocess
+    except Exception:
+        return None
+
+    fc_match = shutil.which("fc-match")
+    if not fc_match:
+        return None
+
+    for family in candidates:
+        result = subprocess.run(
+            [fc_match, family, "--format=%{family[0]}|%{file}\\n"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            continue
+        resolved_family, _, _resolved_path = result.stdout.strip().partition("|")
+        if resolved_family and _algo_vis_is_cjk_font_family(resolved_family):
+            return resolved_family
+    return None
+
+def _algo_vis_with_cjk_font(factory, *args, **kwargs):
+    if not kwargs.get("font"):
+        font_name = _algo_vis_pick_cjk_font()
+        if font_name:
+            kwargs["font"] = font_name
+    return factory(*args, **kwargs)
+
+def _algo_vis_text(*args, **kwargs):
+    return _algo_vis_with_cjk_font(Text, *args, **kwargs)
+
+def _algo_vis_markup_text(*args, **kwargs):
+    return _algo_vis_with_cjk_font(MarkupText, *args, **kwargs)
+
+def _algo_vis_paragraph(*args, **kwargs):
+    return _algo_vis_with_cjk_font(Paragraph, *args, **kwargs)
+"""
 
 
 class ManimScriptError(ValueError):
@@ -132,6 +207,7 @@ def prepare_manim_script(
         module.body.insert(0, _manim_import_node())
         diagnostics.append("已自动补充 from manim import *。")
 
+    module = _inject_cjk_font_fallback(module, diagnostics)
     module = ast.fix_missing_locations(module)
     code = ast.unparse(module).strip() + "\n"
     inspection = inspect_manim_script(code)
@@ -331,6 +407,38 @@ def _has_manim_import(module: ast.Module) -> bool:
 
 def _manim_import_node() -> ast.ImportFrom:
     return ast.ImportFrom(module="manim", names=[ast.alias(name="*", asname=None)], level=0)
+
+
+class _TextCallFontFallbackTransformer(ast.NodeTransformer):
+    def __init__(self) -> None:
+        self.rewritten = False
+
+    def visit_Call(self, node: ast.Call) -> ast.AST:
+        self.generic_visit(node)
+        if not isinstance(node.func, ast.Name):
+            return node
+        replacement = _TEXT_MOBJECT_NAMES.get(node.func.id)
+        if replacement is None:
+            return node
+        if any(keyword.arg == "font" for keyword in node.keywords if keyword.arg is not None):
+            return node
+        node.func = ast.Name(id=replacement, ctx=ast.Load())
+        self.rewritten = True
+        return node
+
+
+def _inject_cjk_font_fallback(module: ast.Module, diagnostics: list[str]) -> ast.Module:
+    transformer = _TextCallFontFallbackTransformer()
+    rewritten = transformer.visit(module)
+    if not isinstance(rewritten, ast.Module) or not transformer.rewritten:
+        return module
+
+    helper_module = ast.parse(_CJK_FONT_HELPER_SOURCE)
+    diagnostics.append("已为 Text/MarkupText/Paragraph 注入 CJK 字体回退。")
+    return ast.Module(
+        body=[*helper_module.body, *rewritten.body],
+        type_ignores=rewritten.type_ignores,
+    )
 
 
 def _find_scene_class_name(module: ast.Module) -> str | None:
