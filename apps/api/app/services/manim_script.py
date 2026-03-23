@@ -22,6 +22,10 @@ _TEXT_MOBJECT_NAMES = {
     "Paragraph": "_algo_vis_paragraph",
 }
 _CJK_FONT_HELPER_SOURCE = """
+import os
+from functools import lru_cache
+from pathlib import Path
+
 def _algo_vis_is_cjk_font_family(family_name):
     normalized = family_name.casefold()
     return any(
@@ -37,14 +41,85 @@ def _algo_vis_is_cjk_font_family(family_name):
             "microsoft yahei",
             "simhei",
             "sarasa",
+            "noto sans sc",
+            "noto serif sc",
         )
     )
 
+def _algo_vis_find_cjk_font_path():
+    override = (
+        os.getenv("ALGO_VIS_CJK_FONT_PATH", "").strip()
+        or os.getenv("ALGO_VIS_PREVIEW_FONT_PATH", "").strip()
+    )
+    if override:
+        candidate = Path(override).expanduser()
+        if candidate.exists():
+            return str(candidate)
+
+    candidates = (
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansSC-Regular.otf",
+        "/usr/share/fonts/opentype/noto/NotoSerifSC-Regular.otf",
+        "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/truetype/sarasa-gothic/Sarasa-Regular.ttc",
+        "/System/Library/Fonts/PingFang.ttc",
+        "/System/Library/Fonts/Hiragino Sans GB.ttc",
+    )
+    for raw_path in candidates:
+        candidate = Path(raw_path)
+        if candidate.exists():
+            return str(candidate)
+    return None
+
+def _algo_vis_resolve_font_family_from_path(font_path):
+    try:
+        import shutil
+        import subprocess
+    except Exception:
+        shutil = None
+        subprocess = None
+
+    if shutil is not None and subprocess is not None:
+        fc_scan = shutil.which("fc-scan")
+        if fc_scan:
+            result = subprocess.run(
+                [fc_scan, "--format=%{family[0]}\\n", font_path],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if result.returncode == 0:
+                family = result.stdout.strip()
+                if family:
+                    return family
+
+    stem = Path(font_path).stem.replace("_", " ").replace("-", " ")
+    return stem if _algo_vis_is_cjk_font_family(stem) else None
+
+@lru_cache(maxsize=1)
 def _algo_vis_pick_cjk_font():
+    explicit_family = os.getenv("ALGO_VIS_CJK_FONT_FAMILY", "").strip()
+    explicit_path = _algo_vis_find_cjk_font_path()
+    if explicit_family:
+        return (explicit_family, explicit_path)
+
+    if explicit_path:
+        resolved_family = _algo_vis_resolve_font_family_from_path(explicit_path)
+        if resolved_family:
+            return (resolved_family, explicit_path)
+
     candidates = (
         "Noto Sans CJK SC",
+        "Noto Serif CJK SC",
+        "Noto Sans SC",
+        "Noto Serif SC",
         "Source Han Sans SC",
         "Source Han Sans CN",
+        "Source Han Serif SC",
+        "Sarasa Gothic SC",
         "WenQuanYi Zen Hei",
         "Microsoft YaHei",
         "PingFang SC",
@@ -70,15 +145,24 @@ def _algo_vis_pick_cjk_font():
         )
         if result.returncode != 0:
             continue
-        resolved_family, _, _resolved_path = result.stdout.strip().partition("|")
+        resolved_family, _, resolved_path = result.stdout.strip().partition("|")
         if resolved_family and _algo_vis_is_cjk_font_family(resolved_family):
-            return resolved_family
+            return (resolved_family, resolved_path or explicit_path)
     return None
 
 def _algo_vis_with_cjk_font(factory, *args, **kwargs):
     if not kwargs.get("font"):
-        font_name = _algo_vis_pick_cjk_font()
-        if font_name:
+        font_spec = _algo_vis_pick_cjk_font()
+        if font_spec:
+            font_name, font_path = font_spec
+            register_font_fn = globals().get("register_font")
+            if font_path and register_font_fn is not None:
+                try:
+                    with register_font_fn(font_path):
+                        kwargs["font"] = font_name
+                        return factory(*args, **kwargs)
+                except Exception:
+                    pass
             kwargs["font"] = font_name
     return factory(*args, **kwargs)
 

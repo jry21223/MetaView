@@ -12,7 +12,10 @@ services:
       ALGO_VIS_SANDBOX_TIMEOUT_MS: ${ALGO_VIS_SANDBOX_TIMEOUT_MS:-1500}
       ALGO_VIS_MAX_REPAIR_ATTEMPTS: ${ALGO_VIS_MAX_REPAIR_ATTEMPTS:-2}
       ALGO_VIS_HISTORY_DB_PATH: ${ALGO_VIS_HISTORY_DB_PATH:-data/pipeline_runs.db}
-      ALGO_VIS_PREVIEW_RENDER_BACKEND: ${ALGO_VIS_PREVIEW_RENDER_BACKEND:-fallback}
+      ALGO_VIS_PREVIEW_RENDER_BACKEND: ${ALGO_VIS_PREVIEW_RENDER_BACKEND:-auto}
+      ALGO_VIS_MANIM_PYTHON_PATH: ${ALGO_VIS_MANIM_PYTHON_PATH:-/usr/local/bin/python}
+      ALGO_VIS_CJK_FONT_FAMILY: ${ALGO_VIS_CJK_FONT_FAMILY:-Noto Sans CJK SC}
+      ALGO_VIS_CJK_FONT_PATH: ${ALGO_VIS_CJK_FONT_PATH:-/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc}
       ALGO_VIS_PREVIEW_TTS_ENABLED: ${ALGO_VIS_PREVIEW_TTS_ENABLED:-true}
       ALGO_VIS_PREVIEW_TTS_BACKEND: ${ALGO_VIS_PREVIEW_TTS_BACKEND:-openai_compatible}
       ALGO_VIS_PREVIEW_TTS_MODEL: ${ALGO_VIS_PREVIEW_TTS_MODEL:-mimotts-v2}
@@ -32,6 +35,7 @@ services:
       - "8000:8000"
     volumes:
       - ./data:/app/data
+      - ./skills:/app/skills
 
   web:
     build:

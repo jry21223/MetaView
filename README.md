@@ -55,7 +55,7 @@ make stop
 
 说明：
 
-- 这条路径默认使用 Docker 内的 fallback 预览渲染
+- 这条路径默认优先使用 Docker 内真实 `manim-cli` 渲染；只有真实渲染不可用时才回退到 fallback 预览
 - 如果你已经配置 OpenAI 兼容模型，运行时会默认优先选用已配置 API
 - 若还没配真实模型，也可以保留 `mock` provider 先跑通界面；现在也支持在运行时面板里直接禁用
 - 如果只想先验证前后端联通，这是推荐方式
@@ -90,7 +90,23 @@ sudo apt-get install -y fontconfig fonts-noto-cjk
 fc-match "Noto Sans CJK SC"
 ```
 
-容器镜像已经内置这组字体；裸机部署如果要强制指定 fallback 预览字体，也可以额外设置 `ALGO_VIS_PREVIEW_FONT_PATH=/absolute/path/to/font.ttc`。
+推荐直接使用开源的 `Noto Sans CJK SC` 或 `Sarasa Gothic SC` 作为跨平台平替，不要依赖 macOS 自带的 `PingFang` / `Hiragino`。当前版本会优先读取：
+
+- `ALGO_VIS_CJK_FONT_FAMILY`
+- `ALGO_VIS_CJK_FONT_PATH`
+
+在真实 `manim` 渲染路径里，后端会把 `ALGO_VIS_CJK_FONT_PATH` 对应的字体文件通过 `register_font(...)` 注册给 Pango，再把 `Text / MarkupText / Paragraph` 绑定到该字体；在 fallback 预览里也会复用同一字体文件路径。这样 Docker、Linux 裸机和 macOS 会走同一套中文字体策略。
+
+容器镜像已经内置这组字体；`docker-compose.yml` 默认会注入：
+
+```bash
+ALGO_VIS_PREVIEW_RENDER_BACKEND=auto
+ALGO_VIS_MANIM_PYTHON_PATH=/usr/local/bin/python
+ALGO_VIS_CJK_FONT_FAMILY=Noto Sans CJK SC
+ALGO_VIS_CJK_FONT_PATH=/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc
+```
+
+裸机部署如果要强制指定其他字体，也可以把这两个变量改成你自己的字体族名和字体文件路径。旧配置 `ALGO_VIS_PREVIEW_FONT_PATH` 仍然兼容，但已不再推荐。
 
 #### 2. 一键启动本地开发
 
@@ -180,10 +196,34 @@ cp .env.example .env
 make start
 ```
 
+当前 compose 部署会同时挂载：
+
+- `./data -> /app/data`
+- `./skills -> /app/skills`
+
+这样历史记录、媒体文件，以及运行时生成的新学科 prompt 都会落在宿主机，不会因为容器重建而丢失。
+
+### 远端 SSH / Docker 部署
+
+如果目标机已经装好 Docker 和 Docker Compose，最稳的方式是直接在远端项目目录执行：
+
+```bash
+git pull
+cp .env.example .env
+docker compose up -d --build
+```
+
+默认端口：
+
+- Web: `http://<server>:5173`
+- API: `http://<server>:8000`
+
 ## 环境变量
 
 - `ALGO_VIS_ENABLED_DOMAINS`: 当前启用的学科模块，逗号分隔，默认 `algorithm,math,code,physics,chemistry,biology,geography`
 - `ALGO_VIS_HISTORY_DB_PATH`: SQLite 历史库路径
+- `ALGO_VIS_CJK_FONT_FAMILY`: 真实 `manim` 与 fallback 预览统一使用的中文字体族名，默认 `Noto Sans CJK SC`
+- `ALGO_VIS_CJK_FONT_PATH`: 真实 `manim` 与 fallback 预览统一使用的中文字体文件路径，默认 `/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc`
 - `ALGO_VIS_CORS_ORIGIN_REGEX`: 本地联调默认允许的浏览器来源规则
 - `ALGO_VIS_DEFAULT_PROVIDER`: 显式指定统一默认 provider；留空时自动挑选已配置 API
 - `ALGO_VIS_DEFAULT_ROUTER_PROVIDER`: 显式指定默认路由模型；留空时自动挑选已配置 API
@@ -192,6 +232,7 @@ make start
 - `ALGO_VIS_PREVIEW_RENDER_BACKEND`: `auto`、`manim` 或 `fallback`
 - `ALGO_VIS_MANIM_PYTHON_PATH`: 真实渲染时使用的 Python 环境，默认 `.venv-manim/bin/python`
 - `ALGO_VIS_MANIM_RENDER_TIMEOUT_S`: 单次 `manim` 渲染超时，默认 180 秒
+- `ALGO_VIS_PREVIEW_FONT_PATH`: 仅为兼容旧配置保留；如无特殊原因请改用 `ALGO_VIS_CJK_FONT_PATH`
 - `ALGO_VIS_PREVIEW_TTS_ENABLED`: 是否启用预览视频自动配音，默认 `true`
 - `ALGO_VIS_PREVIEW_TTS_BACKEND`: TTS 后端，当前默认 `openai_compatible`
 - `ALGO_VIS_PREVIEW_TTS_MODEL`: 旁白模型名，默认 `mimotts-v2`
@@ -331,8 +372,9 @@ python skills/generate-subject-manim-prompts/scripts/generate_custom_subject_pro
 
 真实渲染默认走 `auto` 模式：
 
-- 若 `.venv-manim` 中可用 `manim`，优先使用 `manim-cli` 真渲染。
+- 若 `ALGO_VIS_MANIM_PYTHON_PATH` 指向的 Python 环境中可用 `manim`，优先使用 `manim-cli` 真渲染。
 - 若 `manim` 不可用，则自动降级到 fallback 预览视频。
+- `docker compose` 默认把该路径指向容器内的 `/usr/local/bin/python`，因此容器启动后就具备真实 Manim 渲染能力。
 - 自定义代码测试面板可直接触发“转换并真实渲染”接口。
 
 ## 已完成范围

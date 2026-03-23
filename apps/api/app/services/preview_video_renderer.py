@@ -58,8 +58,12 @@ EMBEDDED_PLACEHOLDER_MP4_BASE64 = (
 _CJK_FONT_FAMILY_CANDIDATES = (
     "Noto Sans CJK SC",
     "Noto Serif CJK SC",
+    "Noto Sans SC",
+    "Noto Serif SC",
     "Source Han Sans SC",
     "Source Han Sans CN",
+    "Source Han Serif SC",
+    "Sarasa Gothic SC",
     "WenQuanYi Zen Hei",
     "Microsoft YaHei",
     "PingFang SC",
@@ -77,6 +81,20 @@ _CJK_FONT_FAMILY_MARKERS = (
     "microsoft yahei",
     "simhei",
     "sarasa",
+    "noto sans sc",
+    "noto serif sc",
+)
+_CJK_FONT_PATH_CANDIDATES = (
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc",
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+    "/usr/share/fonts/opentype/noto/NotoSansSC-Regular.otf",
+    "/usr/share/fonts/opentype/noto/NotoSerifSC-Regular.otf",
+    "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+    "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+    "/usr/share/fonts/truetype/sarasa-gothic/Sarasa-Regular.ttc",
+    "/System/Library/Fonts/Hiragino Sans GB.ttc",
+    "/System/Library/Fonts/PingFang.ttc",
 )
 
 
@@ -391,7 +409,7 @@ class StoryboardFallbackPreviewBackend:
             draw=draw,
             text=(
                 "真实 Manim 渲染后端当前不可用，因此回退到 storyboard 视频。"
-                "安装 manim 并配置渲染环境后，系统会自动切换到真实渲染。"
+                "只要补齐 manim-cli、字体和 LaTeX 渲染环境，系统会自动切换到真实渲染。"
             ),
             font=body_font,
             fill=palette["body"],
@@ -467,7 +485,7 @@ class StoryboardFallbackPreviewBackend:
         self._draw_wrapped_text(
             draw=draw,
             text=(
-                f"建议为 Scene {scene_class_name} 配置 .venv-manim 环境。"
+                f"建议为 Scene {scene_class_name} 启用可用的 manim-cli 运行环境。"
                 "完成后系统会优先走 manim-cli 真渲染并输出实际动画视频。"
             ),
             font=body_font,
@@ -662,7 +680,10 @@ class StoryboardFallbackPreviewBackend:
         return ImageFont.truetype(str(self._font_path), size=size)
 
     def _resolve_font_path(self) -> Path | None:
-        override_path = os.getenv("ALGO_VIS_PREVIEW_FONT_PATH")
+        override_path = (
+            os.getenv("ALGO_VIS_CJK_FONT_PATH")
+            or os.getenv("ALGO_VIS_PREVIEW_FONT_PATH")
+        )
         if override_path:
             candidate = Path(override_path).expanduser()
             if candidate.exists():
@@ -672,18 +693,8 @@ class StoryboardFallbackPreviewBackend:
         if fontconfig_match is not None:
             return fontconfig_match
 
-        candidates = [
-            Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
-            Path("/usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc"),
-            Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"),
-            Path("/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"),
-            Path("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc"),
-            Path("/System/Library/Fonts/Hiragino Sans GB.ttc"),
-            Path("/System/Library/Fonts/PingFang.ttc"),
-            Path("/System/Library/Fonts/Helvetica.ttc"),
-            Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
-        ]
-        for candidate in candidates:
+        for raw_path in _CJK_FONT_PATH_CANDIDATES:
+            candidate = Path(raw_path)
             if candidate.exists():
                 return candidate
         return None

@@ -5,14 +5,33 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg fontconfig fonts-noto-cjk \
+RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources \
+    && apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 update \
+    && apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends \
+        build-essential \
+        pkg-config \
+        libcairo2-dev \
+        libpango1.0-dev \
+        libffi-dev \
+        ffmpeg \
+        fontconfig \
+        fonts-noto-cjk \
+        texlive-latex-base \
+        texlive-latex-extra \
+        texlive-fonts-recommended \
+        texlive-science \
+        dvisvgm \
+        ghostscript \
+        cm-super \
     && rm -rf /var/lib/apt/lists/*
 
 COPY apps/api/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+COPY apps/api/requirements-subjects.txt ./requirements-subjects.txt
+COPY apps/api/requirements-manim.txt ./requirements-manim.txt
+RUN pip install --no-cache-dir -r requirements.txt -r requirements-manim.txt
 
 COPY apps/api ./apps/api
+COPY skills ./skills
 COPY data ./data
 
 EXPOSE 8000

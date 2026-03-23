@@ -22,6 +22,8 @@ class Demo(Scene):
     assert "title = _algo_vis_text(" in prepared.code
     assert "subtitle = _algo_vis_markup_text(" in prepared.code
     assert "caption = _algo_vis_paragraph(" in prepared.code
+    assert "ALGO_VIS_CJK_FONT_PATH" in prepared.code
+    assert "register_font_fn = globals().get('register_font')" in prepared.code
     assert "已为 Text/MarkupText/Paragraph 注入 CJK 字体回退。" in prepared.diagnostics
 
 
@@ -69,6 +71,20 @@ def test_storyboard_fallback_prefers_cjk_font_from_fontconfig(
         )()
 
     monkeypatch.setattr(renderer_module.subprocess, "run", fake_run)
+
+    backend = StoryboardFallbackPreviewBackend()
+
+    assert backend._font_path == font_path
+
+
+def test_storyboard_fallback_prefers_explicit_cjk_font_path_env(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    font_path = tmp_path / "NotoSansCJK-Regular.ttc"
+    font_path.write_bytes(b"font")
+
+    monkeypatch.setenv("ALGO_VIS_CJK_FONT_PATH", str(font_path))
 
     backend = StoryboardFallbackPreviewBackend()
 
