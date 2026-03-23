@@ -1,4 +1,5 @@
 import inspect
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
 
@@ -52,6 +53,8 @@ from app.services.skill_catalog import SubjectSkillRegistry
 from app.services.tts_service import build_tts_service
 from app.services.validation import CirValidator
 from app.services.video_narration import VideoNarrationError, VideoNarrationService
+
+logger = logging.getLogger(__name__)
 
 
 class PipelineOrchestrator:
@@ -301,11 +304,20 @@ class PipelineOrchestrator:
         try:
             self.run(request, request_id=request_id)
         except Exception as exc:
+            error_id = uuid4().hex[:12]
             message = str(exc).strip() or exc.__class__.__name__
+            if exc.__class__.__name__ not in message:
+                message = f"{exc.__class__.__name__}: {message}"
+            logger.exception(
+                "Background pipeline run failed [error_id=%s request_id=%s prompt=%r]",
+                error_id,
+                request_id,
+                request.prompt[:120],
+            )
             self.repository.mark_run_failed(
                 request_id=request_id,
                 request=request,
-                error_message=message,
+                error_message=f"{message} [error_id={error_id}]",
             )
 
     def run(

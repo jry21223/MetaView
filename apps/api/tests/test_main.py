@@ -666,8 +666,35 @@ def test_pipeline_submit_persists_failure(monkeypatch) -> None:
 
     detail = _wait_for_run_status(request_id)
     assert detail["status"] == "failed"
-    assert detail["error_message"] == "provider exploded"
+    assert "RuntimeError: provider exploded" in detail["error_message"]
+    assert "error_id=" in detail["error_message"]
     assert detail["response"] is None
+
+
+def test_pipeline_unhandled_error_returns_detail_and_error_id(
+    monkeypatch,
+) -> None:
+    def raise_unhandled(*args, **kwargs):
+        raise RuntimeError("unexpected renderer failure")
+
+    error_client = TestClient(app, raise_server_exceptions=False)
+    monkeypatch.setattr(orchestrator, "run", raise_unhandled)
+
+    response = error_client.post(
+        "/api/v1/pipeline",
+        json={
+            "prompt": "请讲解最短路算法。",
+            "provider": "mock",
+            "sandbox_mode": "dry_run",
+        },
+    )
+
+    assert response.status_code == 500
+    payload = response.json()
+    assert payload["detail"] == "RuntimeError: unexpected renderer failure"
+    assert payload["error_type"] == "RuntimeError"
+    assert len(payload["error_id"]) >= 8
+    assert "journalctl -u metaview-api" in payload["log_hint"]
 
 
 def test_pipeline_routes_source_code_to_code_domain() -> None:

@@ -1,8 +1,10 @@
+import logging
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
@@ -36,6 +38,7 @@ from app.services.skill_catalog import SubjectSkillUnavailableError
 
 settings = get_settings()
 orchestrator = PipelineOrchestrator(settings=settings)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
 media_root = Path(settings.preview_media_root)
@@ -53,6 +56,79 @@ app.mount(
     StaticFiles(directory=media_root),
     name="preview-media",
 )
+
+
+def _stringify_error_detail(detail: object) -> str:
+    if isinstance(detail, str):
+        text = detail.strip()
+        return text or "Unknown error"
+    text = str(detail).strip()
+    return text or "Unknown error"
+
+
+def _log_hint(error_id: str) -> str:
+    return (
+        "服务器日志可执行："
+        f"journalctl -u metaview-api -n 200 --no-pager | grep {error_id}"
+    )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    error_id = uuid4().hex[:12]
+    detail = _stringify_error_detail(exc.detail)
+    payload = {
+        "detail": detail,
+        "error_id": error_id,
+        "status_code": exc.status_code,
+    }
+
+    if exc.status_code >= 500:
+        payload["log_hint"] = _log_hint(error_id)
+        logger.error(
+            "HTTP error [error_id=%s] %s %s -> %s: %s",
+            error_id,
+            request.method,
+            request.url.path,
+            exc.status_code,
+            detail,
+        )
+    elif exc.status_code >= 400:
+        logger.warning(
+            "Client error [error_id=%s] %s %s -> %s: %s",
+            error_id,
+            request.method,
+            request.url.path,
+            exc.status_code,
+            detail,
+        )
+
+    return JSONResponse(status_code=exc.status_code, content=payload)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    error_id = uuid4().hex[:12]
+    detail = str(exc).strip() or exc.__class__.__name__
+    if exc.__class__.__name__ not in detail:
+        detail = f"{exc.__class__.__name__}: {detail}"
+
+    logger.exception(
+        "Unhandled error [error_id=%s] %s %s",
+        error_id,
+        request.method,
+        request.url.path,
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": detail,
+            "error_id": error_id,
+            "error_type": exc.__class__.__name__,
+            "status_code": 500,
+            "log_hint": _log_hint(error_id),
+        },
+    )
 
 
 @app.get("/health")
