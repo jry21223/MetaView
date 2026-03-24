@@ -5,7 +5,7 @@ import json
 import re
 from dataclasses import dataclass, field
 
-from app.schemas import CirDocument
+from app.schemas import CirDocument, VisualKind
 
 _PYTHON_LANG_TAGS = frozenset({"python", "py", "python3", "py3", "manim"})
 _REASONING_TAGS = ("think", "analysis", "reasoning", "reflection")
@@ -199,6 +199,140 @@ class ManimScriptInspection:
         return not self.errors
 
 
+def get_text_position(visual_kind: VisualKind) -> tuple[float, float]:
+    """根据视觉类型返回文本位置偏移 (x_offset, y_offset)。
+
+    位置说明：
+    - x_offset: 水平偏移，正值向右，负值向左
+    - y_offset: 垂直偏移，正值向上，负值向下
+
+    布局策略：
+    - 数组、文本、运动、地图：底部安全区（避免遮挡中心动画）
+    - 流程图、分子、细胞：左侧面板（为右侧动画留空间）
+    - 公式：顶部（公式通常在上方展示）
+    - 图、电路：右侧面板（为左侧动画留空间）
+    """
+    positions = {
+        VisualKind.ARRAY: (0, -2.8),      # 数组：底部
+        VisualKind.FLOW: (-4.0, 0),       # 流程图：左侧
+        VisualKind.FORMULA: (0, 2.8),     # 公式：顶部
+        VisualKind.GRAPH: (4.0, 0),       # 图：右侧
+        VisualKind.TEXT: (0, -2.8),       # 文本：底部
+        VisualKind.MOTION: (0, -2.8),     # 运动：底部
+        VisualKind.CIRCUIT: (4.0, 0),     # 电路：右侧
+        VisualKind.MOLECULE: (-4.0, 0),   # 分子：左侧
+        VisualKind.MAP: (0, -2.8),        # 地图：底部
+        VisualKind.CELL: (-4.0, 0),       # 细胞：左侧
+    }
+    return positions.get(visual_kind, (0, -2.8))  # 默认底部
+
+
+def extract_step_line_ranges(
+    renderer_script: str, cir: CirDocument
+) -> list[dict]:
+    """从渲染脚本中提取每个 CIR 步骤对应的代码行范围。
+
+    返回格式：[{"step_id": str, "start_line": int, "end_line": int}, ...]
+    行号为 0-indexed。
+    """
+    if not renderer_script or not cir.steps:
+        return []
+
+    lines = renderer_script.splitlines()
+    total_lines = len(lines)
+    step_count = len(cir.steps)
+    step_starts: list[tuple[str, int]] = []
+
+    for index, step in enumerate(cir.steps, start=1):
+        found_line = None
+        # 尝试匹配 step_card_{index} 或 step_group_{index}（来自 build_manim_script_from_cir）
+        pattern = re.compile(rf"\bstep_(?:card|group|title)_{index}\b")
+        for line_no, line in enumerate(lines):
+            if pattern.search(line):
+                found_line = line_no
+                break
+
+        # 尝试匹配步骤标题字符串
+        if found_line is None and step.title:
+            escaped_title = re.escape(step.title[:30])
+            for line_no, line in enumerate(lines):
+                if re.search(escaped_title, line):
+                    found_line = line_no
+                    break
+
+        if found_line is not None:
+            step_starts.append((step.id, found_line))
+
+    # 如果找到了匹配，用相邻步骤的起始行计算范围
+    if step_starts:
+        result = []
+        for i, (step_id, start_line) in enumerate(step_starts):
+            if i + 1 < len(step_starts):
+                end_line = step_starts[i + 1][1] - 1
+            else:
+                end_line = total_lines - 1
+            result.append({
+                "step_id": step_id,
+                "start_line": start_line,
+                "end_line": end_line,
+            })
+        return result
+
+    # 回退：按步骤数均分代码行
+    chunk = max(1, total_lines // step_count)
+    return [
+        {
+            "step_id": step.id,
+            "start_line": i * chunk,
+            "end_line": min((i + 1) * chunk - 1, total_lines - 1),
+        }
+        for i, step in enumerate(cir.steps)
+    ]
+
+
+def calculate_step_timing(
+    cir: CirDocument, *, renderer_script: str = ""
+) -> list[dict]:
+    """计算每个 CIR 步骤的时间范围和代码行范围。
+
+    返回格式：[{"step_id": str, "start_time": float, "end_time": float,
+                "start_line": int, "end_line": int}, ...]
+
+    时间估算规则：
+    - 标题动画：FadeIn(0.3s) + wait(0.2s) = 0.5s
+    - 每个 step：FadeIn(0.3s) + wait(0.6s) + FadeOut(0.3s) = 1.2s
+    - 总结：Write(1.0s) + wait(1.0s) = 2.0s
+    """
+    timing = []
+    current_time = 0.0
+
+    # 标题动画
+    current_time += 0.5  # FadeIn + wait
+
+    # 提取代码行范围
+    line_ranges = extract_step_line_ranges(renderer_script, cir)
+    line_map = {lr["step_id"]: lr for lr in line_ranges}
+
+    # 每个 step 的动画
+    for step in cir.steps:
+        start_time = current_time
+        # FadeIn(0.3s) + wait(0.6s) + FadeOut(0.3s) = 1.2s
+        duration = 1.2
+        end_time = start_time + duration
+        entry: dict = {
+            "step_id": step.id,
+            "start_time": round(start_time, 2),
+            "end_time": round(end_time, 2),
+        }
+        if step.id in line_map:
+            entry["start_line"] = line_map[step.id]["start_line"]
+            entry["end_line"] = line_map[step.id]["end_line"]
+        timing.append(entry)
+        current_time = end_time
+
+    return timing
+
+
 def build_manim_script_from_cir(
     cir: CirDocument,
     scene_class_name: str = "GeneratedPreviewScene",
@@ -220,6 +354,22 @@ def build_manim_script_from_cir(
         tokens_text = " | ".join(
             f"{token.label}: {token.value or token.label}" for token in step.tokens
         )
+        # 动态获取文本位置，避免与动画元素重叠
+        x_offset, y_offset = get_text_position(step.visual_kind)
+        # 构建 move_to 表达式
+        if x_offset == 0:
+            body_move = f"DOWN * {abs(y_offset)}"
+        elif y_offset == 0:
+            body_move = f"RIGHT * {x_offset}" if x_offset > 0 else f"LEFT * {abs(x_offset)}"
+        else:
+            direction = "DOWN" if y_offset < 0 else "UP"
+            body_move = f"RIGHT * {x_offset} + {direction} * {abs(y_offset)}"
+        # tokens 位置在 body 下方 0.7 单位
+        if y_offset < 0:
+            tokens_y = abs(y_offset) + 0.7
+            tokens_move = f"DOWN * {tokens_y}"
+        else:
+            tokens_move = "DOWN * 0.7"
         lines.extend(
             [
                 f"        step_card_{index} = RoundedRectangle("
@@ -233,11 +383,11 @@ def build_manim_script_from_cir(
                 ").move_to(UP * 0.85)",
                 f"        step_body_{index} = Text("
                 f"{json.dumps(step.narration)}, font_size=24, color=GRAY_A, line_spacing=1.1"
-                ").move_to(ORIGIN)",
+                f").move_to({body_move})",
                 f"        step_body_{index}.scale_to_fit_width(10.2)",
                 f"        step_tokens_{index} = Text("
                 f"{json.dumps(tokens_text or 'No tokens')}, font_size=20, color=YELLOW_E"
-                ").move_to(DOWN * 1.45)",
+                f").move_to({tokens_move})",
                 f"        step_tokens_{index}.scale_to_fit_width(10.1)",
                 f"        step_group_{index} = VGroup("
                 f"step_card_{index}, step_title_{index}, step_kind_{index}, "

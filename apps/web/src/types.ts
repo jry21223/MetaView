@@ -41,6 +41,8 @@ export interface CirStep {
   visual_kind: VisualKind;
   tokens: VisualToken[];
   annotations: string[];
+  start_time?: number | null;
+  end_time?: number | null;
 }
 
 export interface CirDocument {
@@ -178,6 +180,13 @@ export interface PipelineResponse {
   preview_video_url?: string | null;
   diagnostics: AgentDiagnostic[];
   runtime: PipelineRuntime;
+  step_timing: Array<{
+    step_id: string;
+    start_time: number;
+    end_time: number;
+    start_line?: number;
+    end_line?: number;
+  }>;
 }
 
 export interface PipelineSubmitResponse {

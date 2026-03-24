@@ -8,6 +8,10 @@ interface HighlightedCodeProps {
   language?: CodeLanguage;
   maxLines?: number;
   emphasizeLine?: (line: string, index: number) => boolean;
+  /** 高亮指定的行号列表（0-indexed） */
+  highlightedLines?: number[];
+  /** 点击行时的回调 */
+  onLineClick?: (lineIndex: number) => void;
   className?: string;
 }
 
@@ -135,11 +139,15 @@ export function HighlightedCode({
   language,
   maxLines,
   emphasizeLine,
+  highlightedLines = [],
+  onLineClick,
   className,
 }: HighlightedCodeProps) {
   const resolvedLanguage = detectLanguage(code, language);
   const lines = code.replace(/\t/g, "    ").split("\n");
   const visibleLines = maxLines ? lines.slice(0, maxLines) : lines;
+
+  const isHighlighted = (index: number) => highlightedLines.includes(index);
 
   return (
     <div className={`highlighted-code ${className ?? ""}`.trim()}>
@@ -148,7 +156,9 @@ export function HighlightedCode({
           key={`${index}-${line}`}
           className={`highlighted-code-line ${
             emphasizeLine?.(line, index) ? "is-emphasized" : ""
-          }`}
+          } ${isHighlighted(index) ? "is-synced" : ""}`}
+          onClick={() => onLineClick?.(index)}
+          style={onLineClick ? { cursor: "pointer" } : undefined}
         >
           <span className="highlighted-code-line-no">{index + 1}</span>
           <code>

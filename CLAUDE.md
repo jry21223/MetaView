@@ -17,12 +17,16 @@ Educational visualization platform (数智化学科可视化平台) — a full-s
 
 ```bash
 make bootstrap          # npm install + create .venv + pip install dev deps
+make bootstrap-manim    # create .venv-manim + install manim rendering deps
+make dev                # start both API (:8000) and web (:5173) in parallel
 make dev-api            # uvicorn on :8000 with --reload
 make dev-web            # vite dev on :5173 (proxies /api to :8000)
 make lint               # eslint (web) + ruff (api)
 make test               # pytest apps/api/tests -q
 make build              # vite build (web)
 make check              # lint + test + build
+make start              # docker compose up (production-like)
+make stop               # docker compose down
 ```
 
 Run a single backend test:
@@ -45,6 +49,7 @@ Prompt + optional image
   → Python Manim → TypeScript conversion (py2ts)
   → PreviewDryRunSandbox (static + node validation)
   → CriticAgent → quality check
+  → PreviewVideoRenderer → MP4 with optional TTS narration
   → PipelineResponse (CIR + scripts + diagnostics)
 ```
 
@@ -66,6 +71,17 @@ Defined in `schemas.py` as `CirDocument`: `title`, `domain`, `summary`, `steps[]
 - Vite dev proxy: `/api` and `/health` → `http://127.0.0.1:8000`
 - Production: `VITE_API_BASE_URL` env var
 - Animation rendering: manim-web + three.js in `PreviewCanvas`
+
+### Prompt modules
+
+Runtime prompts are in `apps/api/app/services/prompts/`:
+- `router.py` — domain classification prompts
+- `planner.py` — CIR generation prompts
+- `coder.py` — Manim script generation prompts
+- `critic.py` — quality check prompts
+- `domain_guidance.py` — per-domain skill injection
+
+Reference materials for each domain are in `skills/generate-subject-manim-prompts/references/` (Common/Planner/Coder/Critic/Repair sections).
 
 ## Configuration
 

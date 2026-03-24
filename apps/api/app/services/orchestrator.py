@@ -37,7 +37,7 @@ from app.services.history import (
     RunRepository,
     RuntimeSettingsRepository,
 )
-from app.services.manim_script import ManimScriptError, prepare_manim_script
+from app.services.manim_script import ManimScriptError, calculate_step_timing, prepare_manim_script
 from app.services.preview_video_renderer import (
     PreviewVideoRenderer,
     PreviewVideoRenderError,
@@ -657,6 +657,9 @@ class PipelineOrchestrator:
                 agent_traces=agent_traces,
                 repair_count=repair_count,
                 repair_actions=repair_actions,
+            ),
+            step_timing=calculate_step_timing(
+                cir, renderer_script=renderer_script
             ),
         )
 

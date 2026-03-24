@@ -254,6 +254,9 @@ export default function App() {
   const [debugToolsOpen, setDebugToolsOpen] = useState(false);
   const [activePage, setActivePage] = useState<AppPage>(getInitialPage);
   const [editorDirty, setEditorDirty] = useState(false);
+  // 动画-代码联动状态
+  const [activeStepIndex, setActiveStepIndex] = useState<number | null>(null);
+  const [seekToTime, setSeekToTime] = useState<number | null>(null);
 
   const activeSkill = result?.runtime.skill ?? null;
   const previewVideoUrl = resolvePreviewVideoUrl(result?.preview_video_url);
@@ -285,6 +288,49 @@ export default function App() {
   const showDualResults = showPreviewPanel && showSourcePanel;
   const selectedHistoryRun =
     runs.find((run) => run.request_id === selectedRunId) ?? null;
+
+  // 动画-代码联动：根据视频时间确定当前步骤
+  const stepTiming = result?.step_timing ?? [];
+  const handleVideoTimeUpdate = (currentTime: number) => {
+    if (stepTiming.length === 0) return;
+    // 找到当前时间对应的步骤
+    for (let i = 0; i < stepTiming.length; i++) {
+      const step = stepTiming[i];
+      if (currentTime >= step.start_time && currentTime < step.end_time) {
+        setActiveStepIndex(i);
+        return;
+      }
+    }
+    // 如果不在任何步骤范围内，清除高亮
+    setActiveStepIndex(null);
+  };
+
+  // 动画-代码联动：点击代码行跳转到对应步骤
+  const handleSourceLineClick = (lineIndex: number) => {
+    const match = stepTiming.find(
+      (s) => s.start_line != null && s.end_line != null
+        && lineIndex >= s.start_line && lineIndex <= s.end_line,
+    );
+    if (match) {
+      setSeekToTime(match.start_time);
+    }
+  };
+
+  // 计算当前高亮的源码行号
+  const highlightedSourceLines =
+    activeStepIndex !== null && stepTiming[activeStepIndex]
+      && stepTiming[activeStepIndex].start_line != null
+      && stepTiming[activeStepIndex].end_line != null
+      ? Array.from(
+          {
+            length:
+              stepTiming[activeStepIndex].end_line! -
+              stepTiming[activeStepIndex].start_line! +
+              1,
+          },
+          (_, i) => stepTiming[activeStepIndex].start_line! + i,
+        )
+      : [];
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -931,6 +977,8 @@ export default function App() {
                       language={sourcePreviewLanguage}
                       maxLines={24}
                       emphasizeLine={shouldEmphasizeSourceLine}
+                      highlightedLines={highlightedSourceLines}
+                      onLineClick={handleSourceLineClick}
                     />
                   </div>
                 </section>
@@ -952,6 +1000,8 @@ export default function App() {
                       result ? `${result.request_id}.mp4` : "metaview-preview.mp4"
                     }
                     headerless
+                    onTimeUpdate={handleVideoTimeUpdate}
+                    seekTo={seekToTime}
                   />
                 </div>
               </section>
@@ -1060,6 +1110,8 @@ export default function App() {
                       language={sourcePreviewLanguage}
                       maxLines={24}
                       emphasizeLine={shouldEmphasizeSourceLine}
+                      highlightedLines={highlightedSourceLines}
+                      onLineClick={handleSourceLineClick}
                     />
                   </div>
                 </section>
@@ -1353,6 +1405,30 @@ export default function App() {
             </section>
           ) : null}
         </main>
+
+        <nav className="mobile-nav" aria-label="Mobile navigation">
+          <button
+            type="button"
+            className={activePage === "studio" ? "is-active" : ""}
+            onClick={() => setActivePage("studio")}
+          >
+            Studio
+          </button>
+          <button
+            type="button"
+            className={activePage === "history" ? "is-active" : ""}
+            onClick={() => setActivePage("history")}
+          >
+            History
+          </button>
+          <button
+            type="button"
+            className={activePage === "tools" ? "is-active" : ""}
+            onClick={() => setActivePage("tools")}
+          >
+            Tools
+          </button>
+        </nav>
       </div>
     </div>
   );

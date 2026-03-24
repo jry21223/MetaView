@@ -8,6 +8,7 @@ from app.services.manim_script import inspect_manim_script
 
 class PreviewDryRunSandbox:
     def __init__(self, timeout_ms: int = 1500) -> None:
+        # timeout_ms 保留用于未来扩展，当前实现仅做静态 AST 检查，无实际超时控制
         self.timeout_ms = timeout_ms
         self.engine_name = "python-manim-static"
 

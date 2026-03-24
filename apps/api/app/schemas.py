@@ -94,6 +94,9 @@ class CirStep(BaseModel):
     layout: LayoutInstruction = Field(default_factory=LayoutInstruction)
     tokens: list[VisualToken] = Field(default_factory=list)
     annotations: list[str] = Field(default_factory=list)
+    # 时间元数据（用于动画-代码联动）
+    start_time: float | None = None  # 步骤开始时间（秒）
+    end_time: float | None = None    # 步骤结束时间（秒）
 
 
 class CirDocument(BaseModel):
@@ -289,6 +292,8 @@ class PipelineResponse(BaseModel):
     preview_video_url: str | None = None
     diagnostics: list[AgentDiagnostic] = Field(default_factory=list)
     runtime: PipelineRuntime
+    # 步骤时间元数据（用于动画-代码联动）
+    step_timing: list[dict] = Field(default_factory=list)
 
 
 class PipelineSubmitResponse(BaseModel):

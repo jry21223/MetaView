@@ -147,7 +147,8 @@ class ManimCliPreviewBackend:
         self.quality = quality
         self.output_format = output_format
         self.disable_caching = disable_caching
-        self.timeout_s = timeout_s
+        # 默认超时 180 秒，避免 None 导致无限等待
+        self.timeout_s = timeout_s if timeout_s is not None else 180.0
 
     def is_available(self) -> bool:
         if not self.python_path.exists():
@@ -749,6 +750,7 @@ class StoryboardFallbackPreviewBackend:
             "-movflags",
             "+faststart",
         ]
+        errors: list[str] = []
         for codec in ("libx264", "mpeg4"):
             result = subprocess.run(
                 [*base_command, "-c:v", codec, str(output_path)],
@@ -758,10 +760,15 @@ class StoryboardFallbackPreviewBackend:
             )
             if result.returncode == 0:
                 return
+            # 收集每个 codec 的错误信息
+            stderr = result.stderr.strip()
+            stdout = result.stdout.strip()
+            errors.append(f"{codec}: {stderr or stdout or '未知错误'}")
 
-        stderr = result.stderr.strip()
-        stdout = result.stdout.strip()
-        raise PreviewVideoRenderError(stderr or stdout or "ffmpeg 渲染 fallback 视频失败。")
+        # 汇总所有错误
+        raise PreviewVideoRenderError(
+            f"ffmpeg 渲染 fallback 视频失败：{'; '.join(errors)}"
+        )
 
     def _write_embedded_placeholder_video(self, output_path: Path) -> None:
         output_path.parent.mkdir(parents=True, exist_ok=True)

@@ -41,6 +41,7 @@
     sans-serif;
   --body: "Manrope", var(--cjk-sans);
   --headline: "Space Grotesk", "Manrope", var(--cjk-sans);
+  --accent: #45a081;
 }
 
 :root[data-theme="light"] {
@@ -70,6 +71,7 @@
   --video-frame-shadow: 0 18px 36px rgba(25, 28, 29, 0.08);
   --console-shell: linear-gradient(180deg, #f8fbff 0%, #eef4f8 100%);
   --shadow: 0 26px 48px rgba(25, 28, 29, 0.06);
+  --accent: #006c51;
 }
 
 * {
@@ -213,6 +215,11 @@ button:active {
   text-decoration: underline;
   text-decoration-thickness: 2px;
   text-underline-offset: 8px;
+}
+
+/* Mobile navigation - hidden by default, shown on small screens */
+.mobile-nav {
+  display: none;
 }
 
 .topbar-actions {
@@ -1095,6 +1102,57 @@ button:active {
   background: var(--video-frame);
 }
 
+/* Video loading and error overlays */
+.video-loading-overlay,
+.video-error-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--video-frame);
+  z-index: 10;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.video-loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.video-error-icon {
+  font-size: 32px;
+}
+
+.video-retry-button {
+  margin-top: 8px;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.video-retry-button:hover {
+  background: var(--surface-hover);
+}
+
 .preview-empty {
   position: relative;
   display: grid;
@@ -1297,6 +1355,17 @@ button:active {
 .highlighted-code-line.is-emphasized {
   background: color-mix(in srgb, var(--primary) 10%, transparent);
   border-left: 2px solid color-mix(in srgb, var(--primary) 70%, transparent);
+}
+
+/* 动画-代码联动高亮 */
+.highlighted-code-line.is-synced {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border-left: 3px solid var(--accent);
+  transition: background-color 0.3s, border-left-color 0.3s;
+}
+
+.highlighted-code-line:hover {
+  background: color-mix(in srgb, var(--text) 5%, transparent);
 }
 
 .highlighted-code-line-no,
@@ -1753,5 +1822,46 @@ button.history-item {
 
   .studio-layout.is-resolved .studio-source-panel {
     order: 3;
+  }
+
+  /* Mobile bottom navigation */
+  .mobile-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--surface-solid);
+    border-top: 1px solid var(--border);
+    padding: 8px 16px;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    z-index: 100;
+    gap: 8px;
+  }
+
+  .mobile-nav button {
+    flex: 1;
+    padding: 12px 8px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background-color 0.2s, color 0.2s;
+  }
+
+  .mobile-nav button.is-active {
+    background: var(--accent);
+    color: white;
+  }
+
+  .mobile-nav button:hover:not(.is-active) {
+    background: var(--surface-hover);
+  }
+
+  .workspace {
+    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
   }
 }
