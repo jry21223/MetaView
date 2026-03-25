@@ -3,14 +3,14 @@
 :root,
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0f1113;
+  --bg: #181b21;
   --bg-overlay:
-    radial-gradient(circle at top center, rgba(69, 160, 129, 0.08), transparent 30%),
-    linear-gradient(180deg, #0f1113 0%, #131618 100%);
-  --surface: rgba(18, 21, 24, 0.88);
-  --surface-high: rgba(24, 28, 31, 0.94);
-  --surface-highest: rgba(34, 39, 42, 0.98);
-  --panel-border: rgba(255, 255, 255, 0.08);
+    radial-gradient(circle at top center, rgba(69, 160, 129, 0.06), transparent 35%),
+    linear-gradient(180deg, #181b21 0%, #1a1d24 100%);
+  --surface: rgba(30, 34, 42, 0.92);
+  --surface-high: rgba(38, 43, 52, 0.95);
+  --surface-highest: rgba(48, 54, 65, 0.98);
+  --panel-border: rgba(255, 255, 255, 0.10);
   --panel-border-strong: rgba(69, 160, 129, 0.34);
   --text: #e2e8f0;
   --text-secondary: #b7c2ce;
@@ -20,17 +20,17 @@
   --primary-strong: #006c51;
   --secondary: #78d7b8;
   --danger: #ff7870;
-  --border: rgba(255, 255, 255, 0.12);
-  --surface-hover: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.14);
+  --surface-hover: rgba(255, 255, 255, 0.08);
   --video-shell:
-    radial-gradient(circle at top center, rgba(69, 160, 129, 0.14), transparent 42%),
-    linear-gradient(180deg, rgba(13, 18, 21, 0.96) 0%, rgba(10, 14, 17, 0.98) 100%);
-  --video-shell-border: rgba(69, 160, 129, 0.14);
-  --video-frame: linear-gradient(180deg, #0a1015 0%, #070b10 100%);
-  --video-frame-border: rgba(226, 232, 240, 0.08);
-  --video-frame-shadow: 0 24px 48px rgba(0, 0, 0, 0.32);
-  --console-shell: linear-gradient(180deg, #091019 0%, #06090f 100%);
-  --shadow: 0 28px 60px rgba(0, 0, 0, 0.24);
+    radial-gradient(circle at top center, rgba(69, 160, 129, 0.12), transparent 42%),
+    linear-gradient(180deg, rgba(22, 26, 32, 0.96) 0%, rgba(18, 22, 28, 0.98) 100%);
+  --video-shell-border: rgba(69, 160, 129, 0.16);
+  --video-frame: linear-gradient(180deg, #12171d 0%, #0e1318 100%);
+  --video-frame-border: rgba(226, 232, 240, 0.10);
+  --video-frame-shadow: 0 24px 48px rgba(0, 0, 0, 0.36);
+  --console-shell: linear-gradient(180deg, #141a22 0%, #10151b 100%);
+  --shadow: 0 28px 60px rgba(0, 0, 0, 0.35);
   --mono: "JetBrains Mono", monospace;
   --cjk-sans:
     "PingFang SC",
@@ -2089,6 +2089,8 @@ button.history-item {
   .topbar {
     grid-template-columns: minmax(0, 1fr) auto;
     padding: 0 16px;
+    background: color-mix(in srgb, var(--surface-solid) 96%, transparent);
+    backdrop-filter: none;
   }
 
   .topbar-nav {
@@ -2107,6 +2109,45 @@ button.history-item {
   .hero-shell {
     min-height: auto;
     padding-top: 28px;
+  }
+
+  .hero-glow {
+    width: min(440px, 82vw);
+    height: min(440px, 82vw);
+    filter: blur(72px);
+    opacity: 0.34;
+  }
+
+  .panel,
+  .composer-search-shell,
+  .prompt-form-advanced {
+    backdrop-filter: none;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.14);
+  }
+
+  .preview-video-shell,
+  .preview-empty {
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.14);
+  }
+
+  .preview-video-shell::before {
+    display: none;
+  }
+
+  .preview-video-frame {
+    box-shadow: none;
+  }
+
+  .preview-video-shell,
+  .preview-video,
+  .preview-video-frame,
+  .preview-empty,
+  .console-content {
+    min-height: 320px;
+  }
+
+  .interactive-source-console {
+    min-height: 360px;
   }
 
   .composer-submit,
@@ -2307,6 +2348,7 @@ button.history-item {
     left: 0;
     right: 0;
     background: var(--surface-solid);
+    backdrop-filter: none;
     border-top: 1px solid var(--border);
     padding: 8px 16px;
     padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
