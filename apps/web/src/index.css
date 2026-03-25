@@ -237,16 +237,16 @@ button:active {
 
 .topbar-secondary-button,
 .theme-toggle {
-  min-height: 40px;
-  padding: 0 14px;
+  min-height: 36px;
+  padding: 0 12px;
   border: 1px solid var(--panel-border);
   border-radius: 999px;
   background: color-mix(in srgb, var(--surface-high) 88%, transparent);
   color: var(--text);
   font-family: var(--headline);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
 }
@@ -535,14 +535,14 @@ button:active {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 40px;
-  padding: 0 14px;
+  min-height: 36px;
+  padding: 0 12px;
   border: 1px solid color-mix(in srgb, var(--primary) 18%, transparent);
   border-radius: 999px;
   background: color-mix(in srgb, var(--surface-highest) 72%, transparent);
   color: var(--text);
   font-family: var(--headline);
-  font-size: 0.74rem;
+  font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -613,16 +613,16 @@ button:active {
 
 .composer-submit,
 .form-actions button {
-  min-height: 52px;
-  padding: 0 24px;
+  min-height: 44px;
+  padding: 0 20px;
   border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent);
-  border-radius: 16px;
+  border-radius: 12px;
   background: var(--primary);
   color: #0f1113;
   font-family: var(--headline);
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   cursor: pointer;
 }
@@ -662,13 +662,13 @@ button:active {
 }
 
 .composer-toggle-button {
-  min-height: 38px;
-  padding: 0 18px;
+  min-height: 34px;
+  padding: 0 16px;
   border-radius: 999px;
   font-family: var(--headline);
-  font-size: 0.74rem;
+  font-size: 0.7rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
@@ -690,13 +690,13 @@ button:active {
 }
 
 .composer-chip {
-  min-height: 38px;
-  padding: 0 16px;
+  min-height: 34px;
+  padding: 0 14px;
   border: 1px solid var(--panel-border);
   border-radius: 999px;
   background: color-mix(in srgb, var(--surface-high) 90%, transparent);
   font-family: var(--headline);
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.08em;
 }
@@ -866,9 +866,9 @@ button:active {
 .switch-button {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  min-height: 42px;
-  padding: 0 12px 0 10px;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 10px 0 8px;
   border: 1px solid var(--panel-border);
   border-radius: 999px;
   background: color-mix(in srgb, var(--surface-high) 90%, transparent);
@@ -877,8 +877,8 @@ button:active {
 }
 
 .switch-button span {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--surface-highest) 96%, transparent);
   box-shadow: inset 0 0 0 1px var(--panel-border);
@@ -886,8 +886,8 @@ button:active {
 
 .switch-button strong {
   font-family: var(--headline);
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
@@ -910,16 +910,16 @@ button:active {
 }
 
 .ghost-button {
-  min-height: 46px;
-  padding: 0 18px;
+  min-height: 40px;
+  padding: 0 16px;
   border: 1px solid var(--panel-border);
-  border-radius: 14px;
+  border-radius: 12px;
   background: color-mix(in srgb, var(--surface-high) 90%, transparent);
   color: var(--primary);
   font-family: var(--headline);
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
 }
@@ -1051,16 +1051,16 @@ button:active {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 38px;
-  padding: 0 14px;
+  min-height: 34px;
+  padding: 0 12px;
   border: 1px solid color-mix(in srgb, var(--primary) 18%, transparent);
-  border-radius: 14px;
+  border-radius: 12px;
   background: color-mix(in srgb, var(--surface-highest) 72%, transparent);
   color: var(--text);
   font-family: var(--headline);
-  font-size: 0.74rem;
+  font-size: 0.7rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-decoration: none;
   text-transform: uppercase;
 }
@@ -2086,10 +2086,14 @@ button.history-item {
 }
 
 @media (max-width: 760px) {
+  body {
+    background: var(--bg);
+  }
+
   .topbar {
     grid-template-columns: minmax(0, 1fr) auto;
     padding: 0 16px;
-    background: color-mix(in srgb, var(--surface-solid) 96%, transparent);
+    background: var(--surface);
     backdrop-filter: none;
   }
 
@@ -2112,22 +2116,19 @@ button.history-item {
   }
 
   .hero-glow {
-    width: min(440px, 82vw);
-    height: min(440px, 82vw);
-    filter: blur(72px);
-    opacity: 0.34;
+    display: none;
   }
 
   .panel,
   .composer-search-shell,
   .prompt-form-advanced {
     backdrop-filter: none;
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.14);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
   }
 
   .preview-video-shell,
   .preview-empty {
-    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.14);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
   }
 
   .preview-video-shell::before {
@@ -2136,6 +2137,22 @@ button.history-item {
 
   .preview-video-frame {
     box-shadow: none;
+  }
+
+  /* 移动端禁用大面积模糊和渐变 */
+  .video-surface,
+  .preview-stage {
+    background: var(--surface);
+  }
+
+  .video-loading-overlay,
+  .video-error-overlay {
+    backdrop-filter: none;
+  }
+
+  .execution-array-overlay {
+    backdrop-filter: none;
+    background: var(--surface);
   }
 
   .preview-video-shell,
@@ -2148,6 +2165,48 @@ button.history-item {
 
   .interactive-source-console {
     min-height: 360px;
+  }
+
+  .console-content,
+  .source-console {
+    background: var(--surface);
+  }
+
+  .preview-empty {
+    background: var(--surface);
+  }
+
+  .preview-empty.is-loading::after {
+    display: none;
+  }
+
+  /* 移动端禁用过渡动画，减少 GPU 负载 */
+  .execution-array-cell {
+    transition: none;
+  }
+
+  .execution-array-cell.is-focused {
+    animation: none;
+  }
+
+  .execution-hotspot {
+    transition: none;
+  }
+
+  .execution-marker {
+    transition: none;
+  }
+
+  .execution-checkpoint {
+    transition: none;
+  }
+
+  .execution-timeline-progress {
+    transition: none;
+  }
+
+  .video-retry-button {
+    transition: none;
   }
 
   .composer-submit,

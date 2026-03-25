@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useEffectEvent, useState } from "react";
+import { startTransition, useEffect, useEffectEvent, useRef, useState } from "react";
 import type { FormEvent } from "react";
 
 import {
@@ -282,6 +282,9 @@ export default function App() {
   const [activeStepIndex, setActiveStepIndex] = useState<number | null>(null);
   const [seekToTime, setSeekToTime] = useState<number | null>(null);
 
+  // Throttle time update ref for mobile performance
+  const lastVideoUpdateTimeRef = useRef<number>(0);
+
   const activeSkill = result?.runtime.skill ?? null;
   const previewVideoUrl = resolvePreviewVideoUrl(result?.preview_video_url);
   const hasRawProviderOutput = Boolean(
@@ -323,6 +326,17 @@ export default function App() {
   const stepTiming = result?.step_timing ?? [];
   const handleVideoTimeUpdate = (currentTime: number) => {
     if (stepTiming.length === 0) return;
+
+    // Throttle updates for mobile performance (~15fps on mobile, ~30fps on desktop)
+    const now = Date.now();
+    const throttleMs = typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches
+      ? 66
+      : 33;
+    if (now - lastVideoUpdateTimeRef.current < throttleMs) {
+      return;
+    }
+    lastVideoUpdateTimeRef.current = now;
+
     // 找到当前时间对应的步骤
     for (let i = 0; i < stepTiming.length; i++) {
       const step = stepTiming[i];

@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef, useMemo } from "react";
 
 type CodeLanguage = "python" | "cpp" | "text";
 type TokenKind = "plain" | "keyword" | "string" | "comment" | "number" | "type" | "call";
@@ -153,6 +153,12 @@ export function HighlightedCode({
   const isHighlighted = (index: number) =>
     highlightedLines.includes(lineNumberBase === 1 ? index + 1 : index);
 
+  // Detect mobile for scroll behavior optimization
+  const isMobile = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(max-width: 760px)").matches;
+  }, []);
+
   useEffect(() => {
     if (!autoScrollToHighlight) {
       return;
@@ -165,9 +171,9 @@ export function HighlightedCode({
     }
     lineRefs.current[targetIndex]?.scrollIntoView({
       block: "nearest",
-      behavior: "smooth",
+      behavior: isMobile ? "instant" : "smooth",
     });
-  }, [autoScrollToHighlight, highlightedLines, lineNumberBase, visibleLines]);
+  }, [autoScrollToHighlight, highlightedLines, lineNumberBase, visibleLines, isMobile]);
 
   return (
     <div className={`highlighted-code ${className ?? ""}`.trim()}>

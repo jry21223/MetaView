@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 
 import type { ExecutionCheckpoint, ExecutionMap } from "../types";
 import { HighlightedCode } from "./HighlightedCode";
@@ -78,6 +78,21 @@ export function InteractiveExecutionExplorer({
       executionMap.parameter_controls.map((control) => [control.id, control.value]),
     ),
   );
+
+  // Throttle time updates to reduce re-renders on mobile
+  const lastUpdateTimeRef = useRef(0);
+  const handleTimeUpdate = useCallback((time: number) => {
+    const now = Date.now();
+    // Throttle to ~15fps on mobile, ~30fps on desktop
+    const throttleMs = typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches
+      ? 66
+      : 33;
+    if (now - lastUpdateTimeRef.current < throttleMs) {
+      return;
+    }
+    lastUpdateTimeRef.current = now;
+    setCurrentTime(time);
+  }, []);
 
   const effectiveDuration = videoDuration && Number.isFinite(videoDuration)
     ? videoDuration
@@ -264,7 +279,7 @@ export function InteractiveExecutionExplorer({
             downloadName={downloadName}
             headerless
             seekRequest={seekRequest}
-            onTimeUpdate={setCurrentTime}
+            onTimeUpdate={handleTimeUpdate}
             onDurationChange={setVideoDuration}
             overlay={overlay}
             videoRef={videoRef}
