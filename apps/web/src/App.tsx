@@ -950,8 +950,23 @@ export default function App() {
 
   return (
     <div className="theory-shell">
-      <header className="topbar">
-        <div className="brand-block">
+      <aside className="left-sidebar" style={{
+        position: 'fixed' as const,
+        top: 0,
+        left: 0,
+        bottom: 0,
+        width: '260px',
+        padding: '24px 20px',
+        borderRight: '1px solid var(--panel-border)',
+        display: 'flex',
+        flexDirection: 'column' as const,
+        zIndex: 100,
+        background: 'var(--surface)',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.01)',
+        gap: '10px',
+        borderRadius: '0 10px 10px 0'
+      }}>
+        <div className="brand-block" style={{ marginBottom: '20px' }}>
           <span className="brand-mark" />
           <div>
             <strong>MetaView</strong>
@@ -959,49 +974,125 @@ export default function App() {
           </div>
         </div>
 
-        <nav className="topbar-nav" aria-label="Primary">
+        <nav aria-label="Primary" style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr',
+          gap: '10px'
+        }}>
           <button
             type="button"
-            className={activePage === "studio" ? "is-active" : ""}
+            className={activePage === "studio" ? "is-active topbar-nav-button" : "topbar-nav-button"}
             onClick={() => setActivePage("studio")}
+            style={{ textAlign: 'left', padding: '10px 16px', borderRadius: '10px', border: 'none', background: activePage === "studio" ? 'var(--primary)' : 'transparent', color: activePage === "studio" ? '#ffffff' : 'var(--text-muted)' }}
           >
             Studio
           </button>
           <button
             type="button"
-            className={activePage === "history" ? "is-active" : ""}
+            className={activePage === "history" ? "is-active topbar-nav-button" : "topbar-nav-button"}
             onClick={() => setActivePage("history")}
+            style={{ textAlign: 'left', padding: '10px 16px', borderRadius: '10px', border: 'none', background: activePage === "history" ? 'var(--primary)' : 'transparent', color: activePage === "history" ? '#ffffff' : 'var(--text-muted)' }}
           >
             History
           </button>
           <button
             type="button"
-            className={activePage === "tools" ? "is-active" : ""}
+            className={activePage === "tools" ? "is-active topbar-nav-button" : "topbar-nav-button"}
             onClick={() => setActivePage("tools")}
+            style={{ textAlign: 'left', padding: '10px 16px', borderRadius: '10px', border: 'none', background: activePage === "tools" ? 'var(--primary)' : 'transparent', color: activePage === "tools" ? '#ffffff' : 'var(--text-muted)' }}
           >
             Tools
           </button>
         </nav>
 
-        <div className="topbar-actions">
-          <button
-            type="button"
-            className="topbar-secondary-button"
-            onClick={handleStartNewConversation}
-          >
-            新对话
-          </button>
-          <button
-            type="button"
-            className="theme-toggle"
-            onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
-          >
-            {theme === "dark" ? "Light Mode" : "Dark Mode"}
-          </button>
+        <div className="advanced-settings" style={{ marginTop: 'auto', marginBottom: '10px' }}>
+          <details className="composer-advanced" style={{ textAlign: 'left', width: '100%' }}>
+            <summary className="composer-advanced-summary" style={{ cursor: 'pointer', padding: '10px' }}>高级设置</summary>
+            {/* 点击高级设置后，所有设置选项都改为grid竖向一列排列，间距10px */}
+            <div className="prompt-form-advanced" style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr',
+              gap: '10px',
+              padding: '16px',
+              borderRadius: '10px',
+              border: '1px solid var(--panel-border)',
+              background: 'color-mix(in srgb, var(--surface-high) 92%, transparent)',
+              marginTop: '10px',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.01)'
+            }}>
+              <label className="toggle-field" style={{ display: 'grid', gap: '8px', cursor: 'pointer' }}>
+                <span style={{ fontSize: '14px', fontWeight: 'bold' }}>视频配音</span>
+                <button
+                  type="button"
+                  className={`switch-button ${enableNarration ? "is-active" : ""}`}
+                  onClick={() => setEnableNarration(!enableNarration)}
+                  aria-pressed={enableNarration}
+                  style={{ width: '100%', height: '36px', borderRadius: '10px' }}
+                >
+                  <span />
+                  <strong>{enableNarration ? "开启" : "关闭"}</strong>
+                </button>
+              </label>
+              <label style={{ display: 'grid', gap: '8px' }}>
+                <span style={{ fontSize: '14px', fontWeight: 'bold' }}>路由模型</span>
+                <select
+                  value={routerProvider}
+                  onChange={(event) => setRouterProvider(event.target.value as ModelProvider)}
+                  style={{ width: '100%', padding: '8px', borderRadius: '10px', background: 'var(--surface-high)', border: '1px solid var(--panel-border)', color: 'var(--text)' }}
+                >
+                  {runtimeCatalog.providers.map((item) => (
+                    <option key={item.name} value={item.name} disabled={!item.configured}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label style={{ display: 'grid', gap: '8px' }}>
+                <span style={{ fontSize: '14px', fontWeight: 'bold' }}>规划/编码模型</span>
+                <select
+                  value={generationProvider}
+                  onChange={(event) => setGenerationProvider(event.target.value as ModelProvider)}
+                  style={{ width: '100%', padding: '8px', borderRadius: '10px', background: 'var(--surface-high)', border: '1px solid var(--panel-border)', color: 'var(--text)' }}
+                >
+                  {runtimeCatalog.providers.map((item) => (
+                    <option key={item.name} value={item.name} disabled={!item.configured}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label style={{ display: 'grid', gap: '8px' }}>
+                <span style={{ fontSize: '14px', fontWeight: 'bold' }}>沙盒模式</span>
+                <select
+                  value={sandboxMode}
+                  onChange={(event) => setSandboxMode(event.target.value as SandboxMode)}
+                  style={{ width: '100%', padding: '8px', borderRadius: '10px', background: 'var(--surface-high)', border: '1px solid var(--panel-border)', color: 'var(--text)' }}
+                >
+                  {runtimeCatalog.sandbox_modes.map((mode) => (
+                    <option key={mode} value={mode}>
+                      {mode}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </details>
         </div>
-      </header>
+      </aside>
 
-      <div className="workspace">
+      {/* Light Mode Button on top right */}
+      <div style={{ position: 'fixed', top: '24px', right: '24px', zIndex: 50 }}>
+        <button
+          type="button"
+          className="theme-toggle"
+          onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
+          style={{ padding: '8px 16px', borderRadius: '10px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.01)' }}
+        >
+          {theme === "dark" ? "Light Mode" : "Dark Mode"}
+        </button>
+      </div>
+
+      <div className="workspace" style={{ marginLeft: '260px' }}>
         <main className="canvas">
           {activePage === "studio" ? (
           <section
