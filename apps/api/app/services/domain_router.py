@@ -187,7 +187,9 @@ def infer_domain_with_scores(
 
     best_domain = max(scores, key=scores.get)
     if scores[best_domain] == 0:
-        return TopicDomain.ALGORITHM, scores
+        # 默认回退到 math 而非 algorithm，因为数学是最通用的教育可视化领域
+        # 对于纯文本描述没有明确关键词的问题，通常更适合数学解释
+        return TopicDomain.MATH, scores
     return best_domain, scores
 
 

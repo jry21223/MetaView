@@ -53,6 +53,44 @@ export interface CirDocument {
   steps: CirStep[];
 }
 
+export interface ExecutionParameterControl {
+  id: string;
+  label: string;
+  value: string;
+  description?: string | null;
+  placeholder?: string | null;
+}
+
+export interface ExecutionArrayTrack {
+  id: string;
+  label: string;
+  values: string[];
+  target_value?: string | null;
+}
+
+export interface ExecutionCheckpoint {
+  id: string;
+  step_id: string;
+  title: string;
+  summary: string;
+  start_s: number;
+  end_s: number;
+  code_lines: number[];
+  focus_tokens: string[];
+  array_focus_indices: number[];
+  array_reference_indices: number[];
+  breakpoint: boolean;
+  guiding_question?: string | null;
+}
+
+export interface ExecutionMap {
+  duration_s: number;
+  interaction_hint?: string | null;
+  checkpoints: ExecutionCheckpoint[];
+  parameter_controls: ExecutionParameterControl[];
+  array_track?: ExecutionArrayTrack | null;
+}
+
 export interface AgentDiagnostic {
   agent: string;
   message: string;
@@ -70,6 +108,7 @@ export interface ProviderDescriptor {
   supports_vision: boolean;
   base_url?: string | null;
   temperature?: number | null;
+  api_key_configured: boolean;
 }
 
 export interface TTSSettings {
@@ -178,6 +217,7 @@ export interface PipelineResponse {
   cir: CirDocument;
   renderer_script: string;
   preview_video_url?: string | null;
+  execution_map?: ExecutionMap | null;
   diagnostics: AgentDiagnostic[];
   runtime: PipelineRuntime;
   step_timing: Array<{

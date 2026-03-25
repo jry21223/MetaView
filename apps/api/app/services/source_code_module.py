@@ -66,20 +66,36 @@ def should_route_to_code(
     prompt: str,
     source_code: str | None,
 ) -> bool:
-    if source_code and source_code.strip():
-        return True
+    """判断是否应该路由到 CODE 域。
+
+    注意：此函数仅在 LLM 路由失败时作为后备使用。
+    主要逻辑：
+    - 如果用户明确想"解释代码"、"代码讲解"等，返回 True
+    - 如果只是提供了源码但没有明确想理解代码本身，返回 False（让其他关键词判断决定）
+    """
     prompt_lower = prompt.lower()
-    code_signals = [
-        "cpp",
-        "c++",
-        "python 代码",
-        "源码",
-        "source code",
-        "class solution",
-        "def ",
-        "#include",
+    # 只有当用户明确想理解代码本身时才强制路由到 CODE
+    code_intent_signals = [
+        "代码解释",
+        "代码讲解",
+        "解释代码",
+        "讲解代码",
+        "代码是什么",
+        "代码做了什么",
+        "这段代码",
+        "代码执行过程",
+        "代码分析",
+        "explain the code",
+        "code explanation",
+        "walk through the code",
+        "what does this code",
     ]
-    return any(signal in prompt_lower for signal in code_signals)
+    if any(signal in prompt_lower for signal in code_intent_signals):
+        return True
+
+    # 如果只是提供了源码但不明确意图，不强制路由到 CODE
+    # 让 LLM 或关键词匹配来决定
+    return False
 
 
 def _detect_algorithm_name(source_code: str) -> str:

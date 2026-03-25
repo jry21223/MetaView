@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ReactNode, RefObject } from "react";
 
 interface VideoPreviewProps {
   src: string;
@@ -7,10 +8,12 @@ interface VideoPreviewProps {
   compact?: boolean;
   downloadName?: string;
   headerless?: boolean;
-  /** 视频时间更新回调，返回当前播放时间（秒） */
   onTimeUpdate?: (currentTime: number) => void;
-  /** 跳转到指定时间（秒），由外部控制 */
+  onDurationChange?: (duration: number) => void;
   seekTo?: number | null;
+  seekRequest?: { time: number; token: number } | null;
+  overlay?: ReactNode;
+  videoRef?: RefObject<HTMLVideoElement | null>;
 }
 
 export function VideoPreview({
@@ -21,18 +24,29 @@ export function VideoPreview({
   downloadName,
   headerless = false,
   onTimeUpdate,
+  onDurationChange,
   seekTo,
+  seekRequest,
+  overlay,
+  videoRef,
 }: VideoPreviewProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const internalVideoRef = useRef<HTMLVideoElement>(null);
+  const resolvedVideoRef = videoRef ?? internalVideoRef;
 
-  // 处理外部 seekTo 请求
   useEffect(() => {
-    if (videoRef.current && seekTo !== null && seekTo !== undefined) {
-      videoRef.current.currentTime = seekTo;
+    if (resolvedVideoRef.current && seekTo !== null && seekTo !== undefined) {
+      resolvedVideoRef.current.currentTime = seekTo;
     }
-  }, [seekTo]);
+  }, [resolvedVideoRef, seekTo]);
+
+  useEffect(() => {
+    if (!resolvedVideoRef.current || !seekRequest) {
+      return;
+    }
+    resolvedVideoRef.current.currentTime = seekRequest.time;
+  }, [resolvedVideoRef, seekRequest]);
 
   const handleLoadStart = () => {
     setIsLoading(true);
@@ -41,6 +55,9 @@ export function VideoPreview({
 
   const handleCanPlay = () => {
     setIsLoading(false);
+    if (resolvedVideoRef.current?.duration && Number.isFinite(resolvedVideoRef.current.duration)) {
+      onDurationChange?.(resolvedVideoRef.current.duration);
+    }
   };
 
   const handleError = () => {
@@ -49,8 +66,14 @@ export function VideoPreview({
   };
 
   const handleTimeUpdate = () => {
-    if (videoRef.current && onTimeUpdate) {
-      onTimeUpdate(videoRef.current.currentTime);
+    if (resolvedVideoRef.current && onTimeUpdate) {
+      onTimeUpdate(resolvedVideoRef.current.currentTime);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (resolvedVideoRef.current?.duration && Number.isFinite(resolvedVideoRef.current.duration)) {
+      onDurationChange?.(resolvedVideoRef.current.duration);
     }
   };
 
@@ -104,7 +127,7 @@ export function VideoPreview({
             </div>
           )}
           <video
-            ref={videoRef}
+            ref={resolvedVideoRef}
             key={src}
             className="preview-video"
             src={src}
@@ -114,8 +137,10 @@ export function VideoPreview({
             onLoadStart={handleLoadStart}
             onCanPlay={handleCanPlay}
             onError={handleError}
+            onLoadedMetadata={handleLoadedMetadata}
             onTimeUpdate={handleTimeUpdate}
           />
+          {overlay ? <div className="preview-video-overlay">{overlay}</div> : null}
         </div>
       </div>
 

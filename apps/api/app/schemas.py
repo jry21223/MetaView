@@ -107,6 +107,44 @@ class CirDocument(BaseModel):
     steps: list[CirStep] = Field(default_factory=list)
 
 
+class ExecutionParameterControl(BaseModel):
+    id: str
+    label: str
+    value: str
+    description: str | None = None
+    placeholder: str | None = None
+
+
+class ExecutionArrayTrack(BaseModel):
+    id: str
+    label: str
+    values: list[str] = Field(default_factory=list)
+    target_value: str | None = None
+
+
+class ExecutionCheckpoint(BaseModel):
+    id: str
+    step_id: str
+    title: str
+    summary: str
+    start_s: float = Field(ge=0)
+    end_s: float = Field(ge=0)
+    code_lines: list[int] = Field(default_factory=list)
+    focus_tokens: list[str] = Field(default_factory=list)
+    array_focus_indices: list[int] = Field(default_factory=list)
+    array_reference_indices: list[int] = Field(default_factory=list)
+    breakpoint: bool = False
+    guiding_question: str | None = None
+
+
+class ExecutionMap(BaseModel):
+    duration_s: float = Field(gt=0)
+    interaction_hint: str | None = None
+    checkpoints: list[ExecutionCheckpoint] = Field(default_factory=list)
+    parameter_controls: list[ExecutionParameterControl] = Field(default_factory=list)
+    array_track: ExecutionArrayTrack | None = None
+
+
 class PipelineRequest(BaseModel):
     prompt: str = Field(min_length=5, max_length=1200)
     domain: TopicDomain | None = None
@@ -150,6 +188,7 @@ class ProviderDescriptor(BaseModel):
     supports_vision: bool = False
     base_url: str | None = None
     temperature: float | None = None
+    api_key_configured: bool = False
 
 
 TTSBackend = Literal["auto", "system", "openai_compatible"]
@@ -290,6 +329,7 @@ class PipelineResponse(BaseModel):
     cir: CirDocument
     renderer_script: str
     preview_video_url: str | None = None
+    execution_map: ExecutionMap | None = None
     diagnostics: list[AgentDiagnostic] = Field(default_factory=list)
     runtime: PipelineRuntime
     # 步骤时间元数据（用于动画-代码联动）

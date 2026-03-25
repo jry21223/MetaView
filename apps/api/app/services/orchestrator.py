@@ -32,6 +32,7 @@ from app.schemas import (
 )
 from app.services.agents import CoderAgent, CriticAgent, PlannerAgent
 from app.services.domain_router import infer_domain
+from app.services.execution_map import build_execution_map
 from app.services.history import (
     CustomProviderRepository,
     RunRepository,
@@ -609,6 +610,11 @@ class PipelineOrchestrator:
             cir=cir,
             renderer_script=renderer_script,
             preview_video_url=preview_video_url,
+            execution_map=build_execution_map(
+                request=effective_request,
+                cir=cir,
+                render_backend=preview_video_backend,
+            ),
             diagnostics=[
                 AgentDiagnostic(
                     agent="router",
@@ -659,7 +665,8 @@ class PipelineOrchestrator:
                 repair_actions=repair_actions,
             ),
             step_timing=calculate_step_timing(
-                cir, renderer_script=renderer_script
+                cir, renderer_script=renderer_script,
+                source_code=effective_request.source_code or "",
             ),
         )
 

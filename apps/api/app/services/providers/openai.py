@@ -52,15 +52,20 @@ def _should_override_router_domain(
     heuristic_domain: TopicDomain,
     heuristic_scores: dict[TopicDomain, int],
 ) -> bool:
+    """决定是否用本地关键词路由覆盖远程 LLM 的路由结果。
+
+    覆盖条件：
+    - 当本地关键词明确匹配（分数 >= 1）且远程域完全不匹配（分数 = 0）时覆盖
+    - 这可以纠正 LLM 对某些专业术语的误判
+    """
     if remote_domain == heuristic_domain:
         return False
 
     heuristic_score = heuristic_scores.get(heuristic_domain, 0)
     remote_score = heuristic_scores.get(remote_domain, 0)
 
-    if heuristic_score > 0 and remote_score == 0:
-        return True
-    if heuristic_score >= remote_score + 2:
+    # 当本地有关键词证据且远程域完全无关键词支持时，覆盖远程判断
+    if heuristic_score >= 1 and remote_score == 0:
         return True
     return False
 

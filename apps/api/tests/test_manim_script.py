@@ -1,5 +1,6 @@
+from app.schemas import CirDocument, CirStep, TopicDomain, VisualKind
 from app.services import preview_video_renderer as renderer_module
-from app.services.manim_script import prepare_manim_script
+from app.services.manim_script import calculate_step_timing, prepare_manim_script
 from app.services.preview_video_renderer import StoryboardFallbackPreviewBackend
 
 
@@ -89,3 +90,111 @@ def test_storyboard_fallback_prefers_explicit_cjk_font_path_env(
     backend = StoryboardFallbackPreviewBackend()
 
     assert backend._font_path == font_path
+
+
+def test_calculate_step_timing_with_source_code() -> None:
+    """Test that step_timing uses source_code for line ranges when provided."""
+    source_code = """
+def binary_search(arr, target):
+    left, right = 0, len(arr) - 1
+    while left <= right:
+        mid = (left + right) // 2
+        if arr[mid] == target:
+            return mid
+        elif arr[mid] < target:
+            left = mid + 1
+        else:
+            right = mid - 1
+    return -1
+""".strip()
+
+    cir = CirDocument(
+        title="Binary Search",
+        domain=TopicDomain.ALGORITHM,
+        summary="Binary search implementation",
+        steps=[
+            CirStep(
+                id="step-1",
+                title="初始化指针",
+                narration="初始化 left 和 right 指针",
+                visual_kind=VisualKind.ARRAY,
+            ),
+            CirStep(
+                id="step-2",
+                title="循环条件",
+                narration="当 left <= right 时继续循环",
+                visual_kind=VisualKind.ARRAY,
+            ),
+            CirStep(
+                id="step-3",
+                title="计算中点",
+                narration="计算 mid 中点位置",
+                visual_kind=VisualKind.ARRAY,
+            ),
+            CirStep(
+                id="step-4",
+                title="比较判断",
+                narration="如果找到目标则返回",
+                visual_kind=VisualKind.ARRAY,
+            ),
+        ],
+    )
+
+    timing = calculate_step_timing(cir, renderer_script="", source_code=source_code)
+
+    assert len(timing) == 4
+    # All steps should have line ranges from source code
+    for entry in timing:
+        assert "step_id" in entry
+        assert "start_time" in entry
+        assert "end_time" in entry
+        assert "start_line" in entry
+        assert "end_line" in entry
+        # Lines should be 1-indexed
+        assert entry["start_line"] >= 1
+        assert entry["end_line"] >= entry["start_line"]
+
+
+def test_calculate_step_timing_fallback_to_renderer_script() -> None:
+    """Test that step_timing uses renderer_script when source_code is empty."""
+    renderer_script = """
+from manim import *
+
+class Demo(Scene):
+    def construct(self):
+        step_card_1 = RoundedRectangle()
+        step_title_1 = Text("Step 1")
+        self.play(FadeIn(step_card_1))
+        step_card_2 = RoundedRectangle()
+        step_title_2 = Text("Step 2")
+        self.play(FadeIn(step_card_2))
+""".strip()
+
+    cir = CirDocument(
+        title="Demo",
+        domain=TopicDomain.MATH,
+        summary="Demo",
+        steps=[
+            CirStep(
+                id="step-1",
+                title="Step 1",
+                narration="First step",
+                visual_kind=VisualKind.TEXT,
+            ),
+            CirStep(
+                id="step-2",
+                title="Step 2",
+                narration="Second step",
+                visual_kind=VisualKind.TEXT,
+            ),
+        ],
+    )
+
+    timing = calculate_step_timing(cir, renderer_script=renderer_script, source_code="")
+
+    assert len(timing) == 2
+    # When source_code is empty, should use renderer_script line ranges
+    for entry in timing:
+        assert "step_id" in entry
+        assert "start_time" in entry
+        assert "end_time" in entry

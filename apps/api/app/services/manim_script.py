@@ -213,23 +213,213 @@ def get_text_position(visual_kind: VisualKind) -> tuple[float, float]:
     - 图、电路：右侧面板（为左侧动画留空间）
     """
     positions = {
-        VisualKind.ARRAY: (0, -2.8),      # 数组：底部
-        VisualKind.FLOW: (-4.0, 0),       # 流程图：左侧
-        VisualKind.FORMULA: (0, 2.8),     # 公式：顶部
-        VisualKind.GRAPH: (4.0, 0),       # 图：右侧
-        VisualKind.TEXT: (0, -2.8),       # 文本：底部
-        VisualKind.MOTION: (0, -2.8),     # 运动：底部
-        VisualKind.CIRCUIT: (4.0, 0),     # 电路：右侧
-        VisualKind.MOLECULE: (-4.0, 0),   # 分子：左侧
-        VisualKind.MAP: (0, -2.8),        # 地图：底部
-        VisualKind.CELL: (-4.0, 0),       # 细胞：左侧
+        VisualKind.ARRAY: (0, -2.8),  # 数组：底部
+        VisualKind.FLOW: (-4.0, 0),  # 流程图：左侧
+        VisualKind.FORMULA: (0, 2.8),  # 公式：顶部
+        VisualKind.GRAPH: (4.0, 0),  # 图：右侧
+        VisualKind.TEXT: (0, -2.8),  # 文本：底部
+        VisualKind.MOTION: (0, -2.8),  # 运动：底部
+        VisualKind.CIRCUIT: (4.0, 0),  # 电路：右侧
+        VisualKind.MOLECULE: (-4.0, 0),  # 分子：左侧
+        VisualKind.MAP: (0, -2.8),  # 地图：底部
+        VisualKind.CELL: (-4.0, 0),  # 细胞：左侧
     }
     return positions.get(visual_kind, (0, -2.8))  # 默认底部
 
 
-def extract_step_line_ranges(
-    renderer_script: str, cir: CirDocument
-) -> list[dict]:
+def _extract_source_code_line_ranges(source_code: str, cir: CirDocument) -> list[dict]:
+    """从用户源码中提取每个 CIR 步骤对应的代码行范围。
+
+    使用语义关键词匹配，将 CIR 步骤映射到源码中的相关行。
+    返回格式：[{"step_id": str, "start_line": int, "end_line": int}, ...]
+    行号为 1-indexed（与 execution_map 保持一致）。
+    """
+    if not source_code.strip() or not cir.steps:
+        return []
+
+    lines = source_code.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    total_lines = len(lines)
+
+    # 收集代码锚点：函数、循环、分支、返回等关键行
+    anchors: list[tuple[int, str, list[str]]] = []  # (line_no, text, kinds)
+    for index, raw_line in enumerate(lines, start=1):
+        stripped = raw_line.strip()
+        if not stripped or stripped.startswith(("#", "//")):
+            continue
+
+        kinds: list[str] = []
+        lower = stripped.lower()
+
+        # 函数/类定义
+        if re.match(r"^\s*(def |class |void |int |bool |float |auto |template\s*<)", stripped):
+            kinds.append("function")
+        # 循环
+        if re.match(r"^\s*(for |while )", stripped):
+            kinds.append("loop")
+        # 分支
+        if re.match(r"^\s*(if |elif |else|switch |case )", stripped):
+            kinds.append("branch")
+        # 返回
+        if stripped.startswith("return ") or stripped == "return" or " return " in lower:
+            kinds.append("return")
+        # 指针/索引
+        if any(
+            token in lower for token in ("left", "right", "mid", "pivot", "lo", "hi", "l ", "r ")
+        ):
+            kinds.append("pointer")
+        # 交换
+        if "swap" in lower or "exchange" in lower:
+            kinds.append("swap")
+        # 赋值/状态变更
+        if "=" in stripped and "==" not in stripped:
+            kinds.append("state")
+        # 比较
+        if any(token in lower for token in ("<", ">", "==", "!=", "<=", ">=")):
+            kinds.append("compare")
+        # 函数调用
+        if re.search(r"\b[a-zA-Z_][a-zA-Z0-9_]*\s*\(", stripped):
+            kinds.append("call")
+
+        if kinds:
+            anchors.append((index, stripped, kinds))
+
+    if not anchors:
+        # 回退：均分
+        chunk = max(1, total_lines // max(len(cir.steps), 1))
+        return [
+            {
+                "step_id": step.id,
+                "start_line": i * chunk + 1,
+                "end_line": min((i + 1) * chunk, total_lines),
+            }
+            for i, step in enumerate(cir.steps)
+        ]
+
+    result: list[dict] = []
+    cursor_line = 1
+    used_lines: set[int] = set()
+
+    for step_index, step in enumerate(cir.steps):
+        step_blob = " ".join(
+            [
+                step.title,
+                step.narration,
+                *step.annotations,
+                *[token.label for token in step.tokens],
+                *[token.value or "" for token in step.tokens],
+            ]
+        ).lower()
+
+        preferred_kinds = _preferred_anchor_kinds_for_step(step_blob, step_index, len(cir.steps))
+        best_anchor_line = _select_best_anchor_line(
+            anchors, preferred_kinds, cursor_line, step_blob, used_lines
+        )
+
+        # 扩展到相邻行（形成代码块）
+        active_lines = [best_anchor_line]
+        for offset in (1, 2):
+            candidate = best_anchor_line + offset
+            if candidate <= total_lines and candidate not in used_lines:
+                active_lines.append(candidate)
+            candidate = best_anchor_line - offset
+            if candidate >= 1 and candidate not in used_lines:
+                active_lines.insert(0, candidate)
+
+        active_lines = sorted(set(active_lines))
+        used_lines.update(active_lines)
+        cursor_line = best_anchor_line
+
+        result.append(
+            {
+                "step_id": step.id,
+                "start_line": active_lines[0],
+                "end_line": active_lines[-1],
+            }
+        )
+
+    return result
+
+
+def _preferred_anchor_kinds_for_step(step_blob: str, index: int, total: int) -> list[str]:
+    """根据步骤内容推断应匹配的代码锚点类型。"""
+    preferred: list[str] = []
+    if index == 0:
+        preferred.extend(["function", "state"])
+    if any(
+        token in step_blob for token in ("初始化", "准备", "输入", "起点", "start", "setup", "load")
+    ):
+        preferred.extend(["state", "function"])
+    if any(
+        token in step_blob for token in ("循环", "遍历", "扫描", "迭代", "枚举", "search", "walk")
+    ):
+        preferred.extend(["loop", "compare"])
+    if any(
+        token in step_blob
+        for token in ("判断", "条件", "比较", "分支", "命中", "检查", "if", "else")
+    ):
+        preferred.extend(["branch", "compare"])
+    if any(
+        token in step_blob
+        for token in ("left", "right", "mid", "pivot", "指针", "移动", "更新", "缩小", "扩大")
+    ):
+        preferred.extend(["pointer", "state"])
+    if any(token in step_blob for token in ("swap", "交换")):
+        preferred.extend(["swap", "state"])
+    if any(token in step_blob for token in ("返回", "结束", "终止", "答案", "result", "return")):
+        preferred.extend(["return", "branch"])
+    if any(token in step_blob for token in ("递归", "回溯", "展开")):
+        preferred.extend(["call", "function"])
+    if index == total - 1:
+        preferred.extend(["return", "state"])
+    preferred.extend(["loop", "branch", "state", "call"])
+    return list(dict.fromkeys(preferred))
+
+
+def _select_best_anchor_line(
+    anchors: list[tuple[int, str, list[str]]],
+    preferred_kinds: list[str],
+    cursor_line: int,
+    step_blob: str,
+    used_lines: set[int],
+) -> int:
+    """选择最佳匹配的锚点行号。"""
+    best_line = anchors[0][0]
+    best_score = float("-inf")
+
+    for line_no, text, kinds in anchors:
+        score = 0.0
+        # 类型匹配
+        for rank, kind in enumerate(preferred_kinds):
+            if kind in kinds:
+                score += 28 - rank * 2
+        # 位置偏好
+        distance = abs(line_no - cursor_line)
+        if line_no >= cursor_line:
+            score += max(0, 12 - distance * 0.7)
+        else:
+            score += max(0, 8 - distance * 0.9)
+        # 未使用加分
+        if line_no not in used_lines:
+            score += 4
+        # 语义匹配加分
+        lower_text = text.lower()
+        if any(token in step_blob for token in ("left", "right", "mid")) and any(
+            token in lower_text for token in ("left", "right", "mid")
+        ):
+            score += 6
+        if "return" in step_blob and "return" in lower_text:
+            score += 8
+        if "if" in step_blob and text.strip().startswith(("if", "elif")):
+            score += 5
+
+        if score > best_score:
+            best_line = line_no
+            best_score = score
+
+    return best_line
+
+
+def extract_step_line_ranges(renderer_script: str, cir: CirDocument) -> list[dict]:
     """从渲染脚本中提取每个 CIR 步骤对应的代码行范围。
 
     返回格式：[{"step_id": str, "start_line": int, "end_line": int}, ...]
@@ -271,11 +461,13 @@ def extract_step_line_ranges(
                 end_line = step_starts[i + 1][1] - 1
             else:
                 end_line = total_lines - 1
-            result.append({
-                "step_id": step_id,
-                "start_line": start_line,
-                "end_line": end_line,
-            })
+            result.append(
+                {
+                    "step_id": step_id,
+                    "start_line": start_line,
+                    "end_line": end_line,
+                }
+            )
         return result
 
     # 回退：按步骤数均分代码行
@@ -291,7 +483,7 @@ def extract_step_line_ranges(
 
 
 def calculate_step_timing(
-    cir: CirDocument, *, renderer_script: str = ""
+    cir: CirDocument, *, renderer_script: str = "", source_code: str = ""
 ) -> list[dict]:
     """计算每个 CIR 步骤的时间范围和代码行范围。
 
@@ -302,6 +494,10 @@ def calculate_step_timing(
     - 标题动画：FadeIn(0.3s) + wait(0.2s) = 0.5s
     - 每个 step：FadeIn(0.3s) + wait(0.6s) + FadeOut(0.3s) = 1.2s
     - 总结：Write(1.0s) + wait(1.0s) = 2.0s
+
+    行号映射优先级：
+    1. 如果提供了 source_code，使用语义匹配映射到用户源码
+    2. 否则使用 renderer_script 的代码行范围
     """
     timing = []
     current_time = 0.0
@@ -309,8 +505,11 @@ def calculate_step_timing(
     # 标题动画
     current_time += 0.5  # FadeIn + wait
 
-    # 提取代码行范围
-    line_ranges = extract_step_line_ranges(renderer_script, cir)
+    # 提取代码行范围：优先使用用户源码，否则使用生成脚本
+    if source_code.strip():
+        line_ranges = _extract_source_code_line_ranges(source_code, cir)
+    else:
+        line_ranges = extract_step_line_ranges(renderer_script, cir)
     line_map = {lr["step_id"]: lr for lr in line_ranges}
 
     # 每个 step 的动画
@@ -536,9 +735,7 @@ def _parse_module(source: str) -> ast.Module:
     try:
         return ast.parse(source)
     except SyntaxError as exc:
-        raise ManimScriptError(
-            f"Python 代码语法错误：{exc.msg} (line {exc.lineno})"
-        ) from exc
+        raise ManimScriptError(f"Python 代码语法错误：{exc.msg} (line {exc.lineno})") from exc
 
 
 def _remove_main_guard(module: ast.Module, diagnostics: list[str]) -> ast.Module:

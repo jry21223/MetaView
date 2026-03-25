@@ -15,6 +15,7 @@ import { ControlPanel } from "./components/ControlPanel";
 import { HighlightedCode } from "./components/HighlightedCode";
 import { PromptReferenceTool } from "./components/PromptReferenceTool";
 import { TTSSettingsPanel } from "./components/TTSSettingsPanel";
+import { InteractiveExecutionExplorer } from "./components/InteractiveExecutionExplorer";
 import {
   domainPresets,
   getDomainPresentation,
@@ -61,6 +62,7 @@ const fallbackRuntimeCatalog: RuntimeCatalog = {
       is_custom: false,
       supports_vision: false,
       base_url: null,
+      api_key_configured: false,
     },
   ],
   skills: [],
@@ -226,6 +228,28 @@ function resolveSubjectSkill(
   return catalog.skills.find((skill) => skill.domain === selectedDomain) ?? null;
 }
 
+function mergePromptScenario(prompt: string, scenario: string): string {
+  const scenarioPrefix = "请用这组输入重新解释算法边界条件：";
+  const lines = prompt
+    .split("\n")
+    .filter((line) => !line.trim().startsWith(scenarioPrefix));
+  const trimmed = lines.join("\n").trim();
+  if (!trimmed) {
+    return scenario;
+  }
+  return `${trimmed}\n\n${scenario}`.trim();
+}
+
+function resolveFreshPrompt(
+  deckMode: DeckMode,
+  selectedDomain: TopicDomain | null,
+): string {
+  if (deckMode === "expert" && selectedDomain) {
+    return domainPresets[selectedDomain] ?? defaultPrompt;
+  }
+  return defaultPrompt;
+}
+
 export default function App() {
   const [prompt, setPrompt] = useState(defaultPrompt);
   const [deckMode, setDeckMode] = useState<DeckMode>("smart");
@@ -286,6 +310,12 @@ export default function App() {
   const showPreviewPanel = loading || Boolean(result) || Boolean(error);
   const showSourcePanel = sourceCode.trim().length > 0;
   const showDualResults = showPreviewPanel && showSourcePanel;
+  const hasInteractiveExplorer = Boolean(
+    previewVideoUrl
+      && result?.execution_map
+      && result.execution_map.checkpoints.length > 0
+      && showSourcePanel,
+  );
   const selectedHistoryRun =
     runs.find((run) => run.request_id === selectedRunId) ?? null;
 
@@ -297,26 +327,36 @@ export default function App() {
     for (let i = 0; i < stepTiming.length; i++) {
       const step = stepTiming[i];
       if (currentTime >= step.start_time && currentTime < step.end_time) {
-        setActiveStepIndex(i);
+        // Only update if step changed
+        if (activeStepIndex !== i) {
+          setActiveStepIndex(i);
+        }
         return;
       }
     }
     // 如果不在任何步骤范围内，清除高亮
-    setActiveStepIndex(null);
-  };
-
-  // 动画-代码联动：点击代码行跳转到对应步骤
-  const handleSourceLineClick = (lineIndex: number) => {
-    const match = stepTiming.find(
-      (s) => s.start_line != null && s.end_line != null
-        && lineIndex >= s.start_line && lineIndex <= s.end_line,
-    );
-    if (match) {
-      setSeekToTime(match.start_time);
+    if (activeStepIndex !== null) {
+      setActiveStepIndex(null);
     }
   };
 
-  // 计算当前高亮的源码行号
+  // 动画-代码联动：点击代码行跳转到对应步骤
+  // lineIndex is 0-indexed from HighlightedCode, step_timing uses 1-indexed lines
+  const handleSourceLineClick = (lineIndex: number) => {
+    const lineNumber = lineIndex + 1; // Convert to 1-indexed
+    const match = stepTiming.find(
+      (s) => s.start_line != null && s.end_line != null
+        && lineNumber >= s.start_line && lineNumber <= s.end_line,
+    );
+    if (match) {
+      // Use a unique token to force re-seek even if time is the same
+      setSeekToTime(match.start_time);
+      // Clear seekToTime after a short delay to allow re-seeking to the same time
+      setTimeout(() => setSeekToTime(null), 100);
+    }
+  };
+
+  // 计算当前高亮的源码行号（step_timing 使用 1-indexed，需转换为 0-indexed 供 HighlightedCode 使用）
   const highlightedSourceLines =
     activeStepIndex !== null && stepTiming[activeStepIndex]
       && stepTiming[activeStepIndex].start_line != null
@@ -328,7 +368,7 @@ export default function App() {
               stepTiming[activeStepIndex].start_line! +
               1,
           },
-          (_, i) => stepTiming[activeStepIndex].start_line! + i,
+          (_, i) => stepTiming[activeStepIndex].start_line! + i - 1, // Convert to 0-indexed
         )
       : [];
 
@@ -694,6 +734,8 @@ export default function App() {
     setError(null);
     setResult(null);
     setEditorDirty(false);
+    setActiveStepIndex(null);
+    setSeekToTime(null);
 
     try {
       const submittedRun = await submitPipeline(
@@ -727,6 +769,10 @@ export default function App() {
         setHistoryError(null);
         setSelectedRunId(requestId);
       });
+      // Reset video-code sync state when switching runs
+      setActiveStepIndex(null);
+      setSeekToTime(null);
+
       const run = await getPipelineRun(requestId, {
         includeRawOutput: debugToolsOpen,
       });
@@ -868,6 +914,26 @@ export default function App() {
     }
   }
 
+  function handleStartNewConversation() {
+    startTransition(() => {
+      setActivePage("studio");
+      setSelectedRunId(null);
+    });
+    setPrompt(resolveFreshPrompt(deckMode, selectedDomain));
+    setSourceCode("");
+    setSourceImage(null);
+    setSourceImageName(null);
+    setResult(null);
+    setError(null);
+    setLoading(false);
+    setHistoryError(null);
+    setActiveRunId(null);
+    setEditorDirty(false);
+    setActiveStepIndex(null);
+    setSeekToTime(null);
+    setDebugToolsOpen(false);
+  }
+
   return (
     <div className="theory-shell">
       <header className="topbar">
@@ -904,6 +970,13 @@ export default function App() {
         </nav>
 
         <div className="topbar-actions">
+          <button
+            type="button"
+            className="topbar-secondary-button"
+            onClick={handleStartNewConversation}
+          >
+            新对话
+          </button>
           <button
             type="button"
             className="theme-toggle"
@@ -952,16 +1025,31 @@ export default function App() {
                 onSandboxModeChange={handleSandboxModeChange}
                 onEnableNarrationChange={handleEnableNarrationChange}
                 onSourceImageChange={handleSourceImageChange}
+                onStartNewQuestion={handleStartNewConversation}
                 onSubmit={handleSubmit}
               />
 
-              {hasCompletedPreview && showSourcePanel ? (
+              {hasCompletedPreview && showSourcePanel && !hasInteractiveExplorer ? (
                 <section className="panel source-panel studio-source-panel">
                   <div className="panel-header">
                     <span className="panel-kicker">Source</span>
                     <h3>算法源码</h3>
                     <p>这里只高亮你输入的 Python / C++ 源码，不展示生成的 Manim 脚本。</p>
                   </div>
+
+                  {activeStepIndex !== null && stepTiming[activeStepIndex] ? (
+                    <div className="execution-code-summary">
+                      <div>
+                        <span className="panel-kicker">Active Step</span>
+                        <strong>步骤 {activeStepIndex + 1}</strong>
+                      </div>
+                      <p>
+                        当前播放时间对应源码第 {stepTiming[activeStepIndex].start_line}
+                        {stepTiming[activeStepIndex].end_line !== stepTiming[activeStepIndex].start_line
+                          ? ` - ${stepTiming[activeStepIndex].end_line}` : ''} 行
+                      </p>
+                    </div>
+                  ) : null}
 
                   <div className="console-toolbar">
                     <div className="console-dots">
@@ -986,12 +1074,13 @@ export default function App() {
             </div>
 
             {hasCompletedPreview ? (
-              <section className="panel stage-panel stage-panel-sticky stage-panel-compact">
-                <div className="preview-stage">
-                  <VideoPreview
-                    src={previewVideoUrl!}
-                    title="当前渲染视频"
-                    meta={
+              hasInteractiveExplorer && result?.execution_map ? (
+                <section className="panel stage-panel interactive-explorer-panel">
+                  <InteractiveExecutionExplorer
+                    key={result.request_id}
+                    videoSrc={previewVideoUrl!}
+                    videoTitle="当前渲染视频"
+                    videoMeta={
                       result
                         ? `${result.request_id.slice(0, 8)} · ${result.runtime.generation_provider?.label ?? generationProvider}`
                         : undefined
@@ -999,12 +1088,37 @@ export default function App() {
                     downloadName={
                       result ? `${result.request_id}.mp4` : "metaview-preview.mp4"
                     }
-                    headerless
-                    onTimeUpdate={handleVideoTimeUpdate}
-                    seekTo={seekToTime}
+                    sourceCode={sourceCode}
+                    sourceLanguage={sourcePreviewLanguage}
+                    editorName={editorName}
+                    executionMap={result.execution_map}
+                    onApplyParameterScenario={(scenario) => {
+                      setEditorDirty(true);
+                      setPrompt((current) => mergePromptScenario(current, scenario));
+                    }}
                   />
-                </div>
-              </section>
+                </section>
+              ) : (
+                <section className="panel stage-panel stage-panel-sticky stage-panel-compact">
+                  <div className="preview-stage">
+                    <VideoPreview
+                      src={previewVideoUrl!}
+                      title="当前渲染视频"
+                      meta={
+                        result
+                          ? `${result.request_id.slice(0, 8)} · ${result.runtime.generation_provider?.label ?? generationProvider}`
+                          : undefined
+                      }
+                      downloadName={
+                        result ? `${result.request_id}.mp4` : "metaview-preview.mp4"
+                      }
+                      headerless
+                      onTimeUpdate={handleVideoTimeUpdate}
+                      seekTo={seekToTime}
+                    />
+                  </div>
+                </section>
+              )
             ) : null}
           </section>
           ) : null}
@@ -1407,6 +1521,9 @@ export default function App() {
         </main>
 
         <nav className="mobile-nav" aria-label="Mobile navigation">
+          <button type="button" onClick={handleStartNewConversation}>
+            新对话
+          </button>
           <button
             type="button"
             className={activePage === "studio" ? "is-active" : ""}

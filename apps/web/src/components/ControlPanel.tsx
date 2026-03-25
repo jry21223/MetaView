@@ -41,6 +41,7 @@ interface ControlPanelProps {
   onSandboxModeChange: (value: SandboxMode) => void;
   onEnableNarrationChange: (value: boolean) => void;
   onSourceImageChange: (value: string | null, name: string | null) => void;
+  onStartNewQuestion: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }
 
@@ -128,6 +129,7 @@ export function ControlPanel({
   onSandboxModeChange,
   onEnableNarrationChange,
   onSourceImageChange,
+  onStartNewQuestion,
   onSubmit,
 }: ControlPanelProps) {
   const imageInputId = useId();
@@ -288,13 +290,22 @@ export function ControlPanel({
               />
             </div>
 
-            <button
-              type="submit"
-              className="composer-submit"
-              disabled={!canSubmit}
-            >
-              {loading ? "生成中..." : "生成视频"}
-            </button>
+            <div className="composer-primary-actions">
+              <button
+                type="button"
+                className="ghost-button composer-reset-button"
+                onClick={onStartNewQuestion}
+              >
+                新建问题
+              </button>
+              <button
+                type="submit"
+                className="composer-submit"
+                disabled={!canSubmit}
+              >
+                {loading ? "生成中..." : "生成视频"}
+              </button>
+            </div>
           </div>
         </div>
 

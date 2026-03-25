@@ -298,9 +298,12 @@ export function ProviderManager({
             type="password"
             value={form.api_key ?? ""}
             onChange={(event) => setForm((current) => ({ ...current, api_key: event.target.value }))}
-            placeholder="本地 provider 可留空"
+            placeholder={editingName ? "留空则保留原有密钥，输入新值则覆盖" : "本地 provider 可留空"}
           />
         </label>
+        {editingName ? (
+          <p className="form-hint">编辑时 API Key 字段为空表示保留原有密钥，输入新值则会覆盖。</p>
+        ) : null}
 
         <label>
           <span>描述</span>
@@ -363,6 +366,7 @@ export function ProviderManager({
               <span>{provider.kind}</span>
               <span>{provider.supports_vision ? "vision" : "text"}</span>
               <span>{provider.configured ? "enabled" : "disabled"}</span>
+              <span>{provider.api_key_configured ? "🔑" : "no-key"}</span>
               <button
                 type="button"
                 className="inline-action"

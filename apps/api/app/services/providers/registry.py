@@ -185,6 +185,7 @@ class ProviderRegistry:
             supports_vision=self.openai_supports_vision,
             base_url=self.openai_base_url,
             temperature=None,
+            api_key_configured=bool(self.openai_api_key),
         )
 
     def _custom_descriptor(self, provider: StoredCustomProvider) -> ProviderDescriptor:
@@ -200,6 +201,7 @@ class ProviderRegistry:
             supports_vision=provider.supports_vision,
             base_url=provider.base_url,
             temperature=provider.temperature,
+            api_key_configured=bool(provider.api_key),
         )
 
     def _build_custom_provider(
