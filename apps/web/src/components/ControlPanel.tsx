@@ -221,20 +221,21 @@ export function ControlPanel({
   }, []);
 
   return (
-    <section className={`composer-panel ${layoutMode === "split" ? "is-split" : ""}`.trim()}>
-      <div className="composer-copy">
-        <span className="panel-kicker">
-          {deckMode === "smart" ? "Smart Mode" : "Expert Mode"}
-        </span>
-        <h1>{deckMode === "smart" ? "想问什么直接问" : "指定学科后再提问"}</h1>
-        <p>
-          {deckMode === "smart"
-            ? "题目、源码、题图都可以。系统会自动判断模块并直接生成视频。"
-            : "先选定学科，再把问题交给对应模块处理。"}
-        </p>
-      </div>
+    <section className={`composer-panel ${layoutMode === "split" ? "is-split" : ""}`.trim()} style={{ display: 'flex', flexDirection: 'column', marginTop: '100px', alignItems: 'center' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '640px' }}>
+        <div className="composer-copy" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '16px' }}>
+          <span className="panel-kicker">
+            {deckMode === "smart" ? "Smart Mode" : "Expert Mode"}
+          </span>
+          <h1>{deckMode === "smart" ? "想问什么直接问" : "指定学科后再提问"}</h1>
+          <p>
+            {deckMode === "smart"
+              ? "题目、源码、题图都可以。系统会自动判断模块并直接生成视频。"
+              : "先选定学科，再把问题交给对应模块处理。"}
+          </p>
+        </div>
 
-      <form className="composer-form" onSubmit={onSubmit}>
+        <form className="composer-form" onSubmit={onSubmit}>
         <div
           className={`composer-search-shell ${dragActive ? "is-drag-active" : ""} ${
             sourceImage ? "has-attachment" : ""
@@ -242,6 +243,7 @@ export function ControlPanel({
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
+          style={{ display: 'flex', flexDirection: 'column', padding: '10px', borderRadius: '10px' }}
         >
           <textarea
             className="composer-input"
@@ -275,10 +277,31 @@ export function ControlPanel({
             </div>
           ) : null}
 
-          <div className="composer-search-actions">
-            <div className="composer-inline-tools">
-              <label className="composer-attach-button" htmlFor={imageInputId}>
-                上传图片
+          <div className="composer-search-actions" style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginTop: 'auto' }}>
+            <div className="composer-inline-tools" style={{ gap: '10px' }}>
+              <label 
+                className="composer-attach-button" 
+                htmlFor={imageInputId}
+                style={{ 
+                  borderRadius: '10px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  width: '40px',
+                  minWidth: '40px', 
+                  height: '40px',
+                  minHeight: '40px', 
+                  padding: 0, 
+                  cursor: 'pointer',
+                  boxSizing: 'border-box',
+                  border: '1px solid var(--panel-border)',
+                  background: 'var(--surface)',
+                  flexShrink: 0
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 5v14M5 12h14"/>
+                </svg>
               </label>
               {dragActive ? <span className="composer-inline-hint">松开即可附带题图</span> : null}
               <input
@@ -290,20 +313,37 @@ export function ControlPanel({
               />
             </div>
 
-            <div className="composer-primary-actions">
-              <button
-                type="button"
-                className="ghost-button composer-reset-button"
-                onClick={onStartNewQuestion}
-              >
-                新建问题
-              </button>
+            <div className="composer-primary-actions" style={{ display: 'flex', gap: '10px' }}>
               <button
                 type="submit"
                 className="composer-submit"
                 disabled={!canSubmit}
+                style={{ 
+                  borderRadius: '50%', 
+                  width: '40px',
+                  minWidth: '40px', 
+                  height: '40px',
+                  minHeight: '40px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  padding: 0,
+                  boxSizing: 'border-box',
+                  border: 'none',
+                  background: 'var(--primary)',
+                  color: '#ffffff',
+                  flexShrink: 0
+                }}
               >
-                {loading ? "生成中..." : "生成视频"}
+                {loading ? (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                  </svg>
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                     <path d="M5 12h14M12 5l7 7-7 7"/>
+                  </svg>
+                )}
               </button>
             </div>
           </div>
@@ -357,40 +397,11 @@ export function ControlPanel({
           )
         ) : null}
 
-        <div className="composer-meta">
-          <span>
-            {deckMode === "smart"
-              ? "自动判断学科与镜头结构"
-              : `当前学科：${selectedDomain ? domainLabels[selectedDomain] : "未选择"}`}
-          </span>
-          <span>{configuredProvidersCount} 个 provider 可用</span>
-          {hasSourceCode ? <span>已附带源码</span> : null}
-          {sourceImageName ? <span>已附带题图</span> : null}
-        </div>
-
-        <details className="composer-advanced">
-          <summary className="composer-advanced-summary">高级设置</summary>
+        <details className="composer-advanced" style={{ marginTop: '10px' }}>
+          <summary className="composer-advanced-summary">源码设置</summary>
 
           <div className="prompt-form prompt-form-advanced">
-            <label className="toggle-field">
-              <div>
-                <span>视频配音</span>
-                <p className="field-hint">
-                  开启后会在渲染完成时尝试用 `mimotts-v2` 生成中文旁白并嵌入视频。
-                </p>
-              </div>
-              <button
-                type="button"
-                className={`switch-button ${enableNarration ? "is-active" : ""}`}
-                onClick={() => onEnableNarrationChange(!enableNarration)}
-                aria-pressed={enableNarration}
-              >
-                <span />
-                <strong>{enableNarration ? "开启" : "关闭"}</strong>
-              </button>
-            </label>
-
-            <div className="select-grid">
+            <div className="select-grid" style={{ gridTemplateColumns: '1fr' }}>
               <label>
                 <span>源码语言</span>
                 <select
@@ -404,64 +415,27 @@ export function ControlPanel({
               </label>
 
               <label>
-                <span>路由模型</span>
-                <select
-                  value={routerProvider}
-                  onChange={(event) => onRouterProviderChange(event.target.value as ModelProvider)}
-                >
-                  {providers.map((item) => (
-                    <option key={item.name} value={item.name} disabled={!item.configured}>
-                      {item.label} / {routerModelLabel(item)}
-                    </option>
-                  ))}
-                </select>
+                <span>源码输入</span>
+                <textarea
+                  value={sourceCode}
+                  onChange={(event) => onSourceCodeChange(event.target.value)}
+                  placeholder="可选。粘贴 Python 或 C++ 源码后，系统会尽量按真实代码执行顺序生成动画。"
+                  rows={8}
+                  style={{
+                    fontFamily: 'var(--mono)',
+                    color: 'var(--primary)',
+                    background: 'color-mix(in srgb, var(--surface-highest) 50%, transparent)',
+                    borderRadius: '10px',
+                    padding: '10px',
+                    border: '1px solid var(--panel-border)'
+                  }}
+                />
               </label>
             </div>
-
-            <div className="select-grid">
-              <label>
-                <span>规划/编码模型</span>
-                <select
-                  value={generationProvider}
-                  onChange={(event) =>
-                    onGenerationProviderChange(event.target.value as ModelProvider)
-                  }
-                >
-                  {providers.map((item) => (
-                    <option key={item.name} value={item.name} disabled={!item.configured}>
-                      {item.label} / {generationModelLabel(item)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                <span>沙盒模式</span>
-                <select
-                  value={sandboxMode}
-                  onChange={(event) => onSandboxModeChange(event.target.value as SandboxMode)}
-                >
-                  {sandboxModes.map((mode) => (
-                    <option key={mode} value={mode}>
-                      {mode}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            <label>
-              <span>源码输入</span>
-              <textarea
-                value={sourceCode}
-                onChange={(event) => onSourceCodeChange(event.target.value)}
-                placeholder="可选。粘贴 Python 或 C++ 源码后，系统会尽量按真实代码执行顺序生成动画。"
-                rows={8}
-              />
-            </label>
           </div>
         </details>
       </form>
+      </div>
     </section>
   );
 }

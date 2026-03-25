@@ -348,9 +348,9 @@ button:active {
 .panel {
   min-width: 0;
   border: 1px solid var(--panel-border);
-  border-radius: 24px;
+  border-radius: 10px;
   background: var(--surface);
-  box-shadow: var(--shadow);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.01);
   backdrop-filter: blur(18px);
 }
 
@@ -360,7 +360,8 @@ button:active {
 .panel-code,
 .panel-code-adapter,
 .panel-provider {
-  padding: 24px;
+  padding: 10px;
+  gap: 10px;
 }
 
 .panel-nested {
