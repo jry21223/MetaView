@@ -1,6 +1,7 @@
 import { startTransition, useEffect, useEffectEvent, useState } from "react";
 import type { FormEvent } from "react";
-
+// 1. 导入魔法光标组件
+import { MagicCursor } from './components/MagicCursor';
 import {
   deleteCustomProvider,
   getPipelineRun,
@@ -312,9 +313,9 @@ export default function App() {
   const showDualResults = showPreviewPanel && showSourcePanel;
   const hasInteractiveExplorer = Boolean(
     previewVideoUrl
-      && result?.execution_map
-      && result.execution_map.checkpoints.length > 0
-      && showSourcePanel,
+    && result?.execution_map
+    && result.execution_map.checkpoints.length > 0
+    && showSourcePanel,
   );
   const selectedHistoryRun =
     runs.find((run) => run.request_id === selectedRunId) ?? null;
@@ -359,17 +360,17 @@ export default function App() {
   // 计算当前高亮的源码行号（step_timing 使用 1-indexed，需转换为 0-indexed 供 HighlightedCode 使用）
   const highlightedSourceLines =
     activeStepIndex !== null && stepTiming[activeStepIndex]
-      && stepTiming[activeStepIndex].start_line != null
-      && stepTiming[activeStepIndex].end_line != null
+    && stepTiming[activeStepIndex].start_line != null
+    && stepTiming[activeStepIndex].end_line != null
       ? Array.from(
-          {
-            length:
-              stepTiming[activeStepIndex].end_line! -
-              stepTiming[activeStepIndex].start_line! +
-              1,
-          },
-          (_, i) => stepTiming[activeStepIndex].start_line! + i - 1, // Convert to 0-indexed
-        )
+        {
+          length:
+            stepTiming[activeStepIndex].end_line! -
+            stepTiming[activeStepIndex].start_line! +
+            1,
+        },
+        (_, i) => stepTiming[activeStepIndex].start_line! + i - 1, // Convert to 0-indexed
+      )
       : [];
 
   useEffect(() => {
@@ -542,9 +543,9 @@ export default function App() {
       resolveConfiguredProvider(
         runtimeCatalog,
         run.request.generation_provider ??
-          run.request.provider ??
-          run.response?.runtime.generation_provider?.name ??
-          run.response?.runtime.provider?.name,
+        run.request.provider ??
+        run.response?.runtime.generation_provider?.name ??
+        run.response?.runtime.provider?.name,
         runtimeCatalog.default_generation_provider,
       ),
     );
@@ -563,16 +564,16 @@ export default function App() {
         current.map((item) =>
           item.request_id === requestId
             ? {
-                ...item,
-                status: run.status,
-                updated_at: run.updated_at,
-                title: run.response?.cir.title ?? item.title,
-                domain: run.response?.runtime.skill.domain ?? run.request.domain ?? item.domain,
-                sandbox_status:
-                  run.response?.runtime.sandbox.status ??
-                  (run.status === "failed" ? null : item.sandbox_status),
-                error_message: run.error_message ?? null,
-              }
+              ...item,
+              status: run.status,
+              updated_at: run.updated_at,
+              title: run.response?.cir.title ?? item.title,
+              domain: run.response?.runtime.skill.domain ?? run.request.domain ?? item.domain,
+              sandbox_status:
+                run.response?.runtime.sandbox.status ??
+                (run.status === "failed" ? null : item.sandbox_status),
+              error_message: run.error_message ?? null,
+            }
             : item,
         ),
       );
@@ -936,6 +937,9 @@ export default function App() {
 
   return (
     <div className="theory-shell">
+      {/* 2. 挂载魔法光标 */}
+      <MagicCursor />
+
       <header className="topbar">
         <div className="brand-block">
           <span className="brand-mark" />
@@ -977,10 +981,24 @@ export default function App() {
           >
             新对话
           </button>
+
+          {/* 核心修改：主题切换按钮，带有从鼠标位置扩散的动画 */}
           <button
             type="button"
             className="theme-toggle"
-            onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
+            onClick={() => {
+              // 如果浏览器不支持动画 API (Firefox/Safari)
+              if (!(document as any).startViewTransition) {
+                setTheme((current) => (current === "dark" ? "light" : "dark"));
+                return;
+              }
+
+              // 开启扩散动画
+              (document as any).startViewTransition(() => {
+                // 在这里更新主题，动画会自动识别前后差异并执行 CSS 定义的 circle-expand
+                setTheme((current) => (current === "dark" ? "light" : "dark"));
+              });
+            }}
           >
             {theme === "dark" ? "Light Mode" : "Dark Mode"}
           </button>
@@ -990,121 +1008,97 @@ export default function App() {
       <div className="workspace">
         <main className="canvas">
           {activePage === "studio" ? (
-          <section
-            className={`studio-layout ${hasCompletedPreview ? "is-resolved" : "hero-shell"}`}
-            id="studio"
-          >
-            <div className="hero-glow" />
-            <div className="studio-column">
-              <ControlPanel
-                deckMode={deckMode}
-                layoutMode={hasCompletedPreview ? "split" : "hero"}
-                selectedDomain={selectedDomain}
-                prompt={prompt}
-                sourceImage={sourceImage}
-                sourceCode={sourceCode}
-                sourceCodeLanguage={sourceCodeLanguage}
-                routerProvider={routerProvider}
-                generationProvider={generationProvider}
-                sandboxMode={sandboxMode}
-                enableNarration={enableNarration}
-                skills={runtimeCatalog.skills}
-                providers={runtimeCatalog.providers}
-                sandboxModes={runtimeCatalog.sandbox_modes}
-                loading={loading}
-                sourceImageName={sourceImageName}
-                routerProviderSupportsVision={routerProviderSupportsVision}
-                generationProviderSupportsVision={generationProviderSupportsVision}
-                onDeckModeChange={handleSetDeckMode}
-                onSelectDomain={handleSelectDomain}
-                onPromptChange={handlePromptChange}
-                onSourceCodeChange={handleSourceCodeChange}
-                onSourceCodeLanguageChange={handleSourceCodeLanguageChange}
-                onRouterProviderChange={handleRouterProviderChange}
-                onGenerationProviderChange={handleGenerationProviderChange}
-                onSandboxModeChange={handleSandboxModeChange}
-                onEnableNarrationChange={handleEnableNarrationChange}
-                onSourceImageChange={handleSourceImageChange}
-                onStartNewQuestion={handleStartNewConversation}
-                onSubmit={handleSubmit}
-              />
+            <section
+              className={`studio-layout ${hasCompletedPreview ? "is-resolved" : "hero-shell"}`}
+              id="studio"
+            >
+              <div className="hero-glow" />
+              <div className="studio-column">
+                <ControlPanel
+                  deckMode={deckMode}
+                  layoutMode={hasCompletedPreview ? "split" : "hero"}
+                  selectedDomain={selectedDomain}
+                  prompt={prompt}
+                  sourceImage={sourceImage}
+                  sourceCode={sourceCode}
+                  sourceCodeLanguage={sourceCodeLanguage}
+                  routerProvider={routerProvider}
+                  generationProvider={generationProvider}
+                  sandboxMode={sandboxMode}
+                  enableNarration={enableNarration}
+                  skills={runtimeCatalog.skills}
+                  providers={runtimeCatalog.providers}
+                  sandboxModes={runtimeCatalog.sandbox_modes}
+                  loading={loading}
+                  sourceImageName={sourceImageName}
+                  routerProviderSupportsVision={routerProviderSupportsVision}
+                  generationProviderSupportsVision={generationProviderSupportsVision}
+                  onDeckModeChange={handleSetDeckMode}
+                  onSelectDomain={handleSelectDomain}
+                  onPromptChange={handlePromptChange}
+                  onSourceCodeChange={handleSourceCodeChange}
+                  onSourceCodeLanguageChange={handleSourceCodeLanguageChange}
+                  onRouterProviderChange={handleRouterProviderChange}
+                  onGenerationProviderChange={handleGenerationProviderChange}
+                  onSandboxModeChange={handleSandboxModeChange}
+                  onEnableNarrationChange={handleEnableNarrationChange}
+                  onSourceImageChange={handleSourceImageChange}
+                  onStartNewQuestion={handleStartNewConversation}
+                  onSubmit={handleSubmit}
+                />
 
-              {hasCompletedPreview && showSourcePanel && !hasInteractiveExplorer ? (
-                <section className="panel source-panel studio-source-panel">
-                  <div className="panel-header">
-                    <span className="panel-kicker">Source</span>
-                    <h3>算法源码</h3>
-                    <p>这里只高亮你输入的 Python / C++ 源码，不展示生成的 Manim 脚本。</p>
-                  </div>
+                {hasCompletedPreview && showSourcePanel && !hasInteractiveExplorer ? (
+                  <section className="panel source-panel studio-source-panel">
+                    <div className="panel-header">
+                      <span className="panel-kicker">Source</span>
+                      <h3>算法源码</h3>
+                      <p>这里只高亮你输入的 Python / C++ 源码，不展示生成的 Manim 脚本。</p>
+                    </div>
 
-                  {activeStepIndex !== null && stepTiming[activeStepIndex] ? (
-                    <div className="execution-code-summary">
-                      <div>
-                        <span className="panel-kicker">Active Step</span>
-                        <strong>步骤 {activeStepIndex + 1}</strong>
+                    {activeStepIndex !== null && stepTiming[activeStepIndex] ? (
+                      <div className="execution-code-summary">
+                        <div>
+                          <span className="panel-kicker">Active Step</span>
+                          <strong>步骤 {activeStepIndex + 1}</strong>
+                        </div>
+                        <p>
+                          当前播放时间对应源码第 {stepTiming[activeStepIndex].start_line}
+                          {stepTiming[activeStepIndex].end_line !== stepTiming[activeStepIndex].start_line
+                            ? ` - ${stepTiming[activeStepIndex].end_line}` : ''} 行
+                        </p>
                       </div>
-                      <p>
-                        当前播放时间对应源码第 {stepTiming[activeStepIndex].start_line}
-                        {stepTiming[activeStepIndex].end_line !== stepTiming[activeStepIndex].start_line
-                          ? ` - ${stepTiming[activeStepIndex].end_line}` : ''} 行
-                      </p>
-                    </div>
-                  ) : null}
+                    ) : null}
 
-                  <div className="console-toolbar">
-                    <div className="console-dots">
-                      <span />
-                      <span />
-                      <span />
+                    <div className="console-toolbar">
+                      <div className="console-dots">
+                        <span />
+                        <span />
+                        <span />
+                      </div>
+                      <strong>{editorName}</strong>
                     </div>
-                    <strong>{editorName}</strong>
-                  </div>
-                  <div className="console-content source-console">
-                    <HighlightedCode
-                      code={sourceCode}
-                      language={sourcePreviewLanguage}
-                      maxLines={24}
-                      emphasizeLine={shouldEmphasizeSourceLine}
-                      highlightedLines={highlightedSourceLines}
-                      onLineClick={handleSourceLineClick}
-                    />
-                  </div>
-                </section>
-              ) : null}
-            </div>
+                    <div className="console-content source-console">
+                      <HighlightedCode
+                        code={sourceCode}
+                        language={sourcePreviewLanguage}
+                        maxLines={24}
+                        emphasizeLine={shouldEmphasizeSourceLine}
+                        highlightedLines={highlightedSourceLines}
+                        onLineClick={handleSourceLineClick}
+                      />
+                    </div>
+                  </section>
+                ) : null}
+              </div>
 
-            {hasCompletedPreview ? (
-              hasInteractiveExplorer && result?.execution_map ? (
-                <section className="panel stage-panel interactive-explorer-panel">
-                  <InteractiveExecutionExplorer
-                    key={result.request_id}
-                    videoSrc={previewVideoUrl!}
-                    videoTitle="当前渲染视频"
-                    videoMeta={
-                      result
-                        ? `${result.request_id.slice(0, 8)} · ${result.runtime.generation_provider?.label ?? generationProvider}`
-                        : undefined
-                    }
-                    downloadName={
-                      result ? `${result.request_id}.mp4` : "metaview-preview.mp4"
-                    }
-                    sourceCode={sourceCode}
-                    sourceLanguage={sourcePreviewLanguage}
-                    editorName={editorName}
-                    executionMap={result.execution_map}
-                    onApplyParameterScenario={(scenario) => {
-                      setEditorDirty(true);
-                      setPrompt((current) => mergePromptScenario(current, scenario));
-                    }}
-                  />
-                </section>
-              ) : (
-                <section className="panel stage-panel stage-panel-sticky stage-panel-compact">
-                  <div className="preview-stage">
-                    <VideoPreview
-                      src={previewVideoUrl!}
-                      title="当前渲染视频"
-                      meta={
+              {hasCompletedPreview ? (
+                hasInteractiveExplorer && result?.execution_map ? (
+                  <section className="panel stage-panel interactive-explorer-panel">
+                    <InteractiveExecutionExplorer
+                      key={result.request_id}
+                      videoSrc={previewVideoUrl!}
+                      videoTitle="当前渲染视频"
+                      videoMeta={
                         result
                           ? `${result.request_id.slice(0, 8)} · ${result.runtime.generation_provider?.label ?? generationProvider}`
                           : undefined
@@ -1112,15 +1106,39 @@ export default function App() {
                       downloadName={
                         result ? `${result.request_id}.mp4` : "metaview-preview.mp4"
                       }
-                      headerless
-                      onTimeUpdate={handleVideoTimeUpdate}
-                      seekTo={seekToTime}
+                      sourceCode={sourceCode}
+                      sourceLanguage={sourcePreviewLanguage}
+                      editorName={editorName}
+                      executionMap={result.execution_map}
+                      onApplyParameterScenario={(scenario) => {
+                        setEditorDirty(true);
+                        setPrompt((current) => mergePromptScenario(current, scenario));
+                      }}
                     />
-                  </div>
-                </section>
-              )
-            ) : null}
-          </section>
+                  </section>
+                ) : (
+                  <section className="panel stage-panel stage-panel-sticky stage-panel-compact">
+                    <div className="preview-stage">
+                      <VideoPreview
+                        src={previewVideoUrl!}
+                        title="当前渲染视频"
+                        meta={
+                          result
+                            ? `${result.request_id.slice(0, 8)} · ${result.runtime.generation_provider?.label ?? generationProvider}`
+                            : undefined
+                        }
+                        downloadName={
+                          result ? `${result.request_id}.mp4` : "metaview-preview.mp4"
+                        }
+                        headerless
+                        onTimeUpdate={handleVideoTimeUpdate}
+                        seekTo={seekToTime}
+                      />
+                    </div>
+                  </section>
+                )
+              ) : null}
+            </section>
           ) : null}
 
           {activePage === "studio" && !hasCompletedPreview && (showPreviewPanel || showSourcePanel) ? (
@@ -1184,14 +1202,14 @@ export default function App() {
                             : loading
                               ? "后端正在进行镜头规划、脚本生成和视频输出。"
                               : presentation?.emptyDescription ??
-                                "提交题目后，这里会直接显示最终 MP4 预览。"}
+                              "提交题目后，这里会直接显示最终 MP4 预览。"}
                         </span>
                         <ul className="preview-checklist">
                           {(error
-                            ? ["检查 provider 连通性", "确认提示词与源码输入", "重新提交生成任务"]
-                            : result?.cir.steps.length
-                              ? result.cir.steps.slice(0, 4).map((step) => step.title)
-                              : presentation?.sceneNodes ?? ["Input", "Plan", "Render", "Result"]
+                              ? ["检查 provider 连通性", "确认提示词与源码输入", "重新提交生成任务"]
+                              : result?.cir.steps.length
+                                ? result.cir.steps.slice(0, 4).map((step) => step.title)
+                                : presentation?.sceneNodes ?? ["Input", "Plan", "Render", "Result"]
                           ).map((item) => (
                             <li key={item}>{item}</li>
                           ))}
@@ -1242,12 +1260,12 @@ export default function App() {
               </div>
 
               <div className="history-page-layout">
-              <HistoryPanel
-                error={historyError}
-                runs={runs}
-                selectedRunId={selectedRunId}
-                onSelectRun={handleSelectRun}
-              />
+                <HistoryPanel
+                  error={historyError}
+                  runs={runs}
+                  selectedRunId={selectedRunId}
+                  onSelectRun={handleSelectRun}
+                />
                 <section className="panel panel-history-detail history-detail-panel">
                   <div className="panel-header">
                     <span className="panel-kicker">Selected Run</span>
@@ -1297,8 +1315,8 @@ export default function App() {
 
                       <ul className="diagnostic-list">
                         {(result?.request_id === selectedHistoryRun.request_id
-                          ? result.diagnostics.slice(0, 4)
-                          : []
+                            ? result.diagnostics.slice(0, 4)
+                            : []
                         ).map((diagnostic, index) => (
                           <li key={`${diagnostic.agent}-${index}`}>
                             <strong>{diagnostic.agent}</strong>
@@ -1333,189 +1351,189 @@ export default function App() {
                 <p>生成脚本、原始返回、Provider 管理、Prompt 工具等都集中在这里，不再堆在主页面下方。</p>
               </div>
 
-          <details
-            className="panel panel-advanced"
-            onToggle={(event) => {
-              setDebugToolsOpen((event.currentTarget as HTMLDetailsElement).open);
-            }}
-          >
-            <summary className="advanced-summary">调试与生成脚本</summary>
-            {debugToolsOpen ? (
-              <div className="advanced-grid">
-                <section className="panel panel-history-detail panel-nested">
-                  <div className="panel-header">
-                    <span className="panel-kicker">Diagnostics</span>
-                    <h3>运行诊断</h3>
-                  </div>
-                  {result ? (
-                    <ul className="trace-list">
-                      {result.runtime.agent_traces.map((trace) => (
-                        <li key={`${trace.agent}-${trace.summary}`}>
-                          <strong>{trace.agent}</strong>
-                          <span>{trace.summary}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                  <ul className="diagnostic-list">
-                    {(result?.diagnostics ?? []).map((diagnostic, index) => (
-                      <li key={`${diagnostic.agent}-${index}`}>
-                        <strong>{diagnostic.agent}</strong>
-                        <span>{diagnostic.message}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="panel-toolbar">
-                    <button
-                      type="button"
-                      className="ghost-button"
-                      onClick={handleExportCurrent}
-                      disabled={!result}
-                    >
-                      导出当前任务 JSON
-                    </button>
-                  </div>
-                </section>
-
-                <section className="panel panel-code panel-nested">
-                  <div className="panel-header">
-                    <span className="panel-kicker">Generated Script</span>
-                    <h3>生成的 Manim 脚本</h3>
-                    <p>这里仅用于排查，不参与主页中的源码高亮。</p>
-                  </div>
-                  {result?.renderer_script ? (
-                    <div className="console-content generated-console">
-                      <HighlightedCode
-                        code={result.renderer_script}
-                        language="python"
-                        className="highlighted-code-surface"
-                      />
-                    </div>
-                  ) : (
-                    <div className="history-empty">生成任务后，这里会显示最终 Python Manim 脚本。</div>
-                  )}
-                </section>
-
-                <section className="panel panel-code panel-nested">
-                  <div className="panel-header">
-                    <span className="panel-kicker">LLM Raw Output</span>
-                    <h3>模型原始返回</h3>
-                    <p>只在需要排查 provider 返回或提示词遵循时查看。</p>
-                  </div>
-                  {hasRawProviderOutput ? (
-                    <div className="raw-output-list">
-                      {result?.runtime.agent_traces
-                        .filter((trace) => Boolean(trace.raw_output))
-                        .map((trace) => (
-                          <article className="raw-output-card" key={`${trace.agent}-${trace.model}`}>
-                            <div className="raw-output-head">
+              <details
+                className="panel panel-advanced"
+                onToggle={(event) => {
+                  setDebugToolsOpen((event.currentTarget as HTMLDetailsElement).open);
+                }}
+              >
+                <summary className="advanced-summary">调试与生成脚本</summary>
+                {debugToolsOpen ? (
+                  <div className="advanced-grid">
+                    <section className="panel panel-history-detail panel-nested">
+                      <div className="panel-header">
+                        <span className="panel-kicker">Diagnostics</span>
+                        <h3>运行诊断</h3>
+                      </div>
+                      {result ? (
+                        <ul className="trace-list">
+                          {result.runtime.agent_traces.map((trace) => (
+                            <li key={`${trace.agent}-${trace.summary}`}>
                               <strong>{trace.agent}</strong>
-                              <span>
+                              <span>{trace.summary}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                      <ul className="diagnostic-list">
+                        {(result?.diagnostics ?? []).map((diagnostic, index) => (
+                          <li key={`${diagnostic.agent}-${index}`}>
+                            <strong>{diagnostic.agent}</strong>
+                            <span>{diagnostic.message}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="panel-toolbar">
+                        <button
+                          type="button"
+                          className="ghost-button"
+                          onClick={handleExportCurrent}
+                          disabled={!result}
+                        >
+                          导出当前任务 JSON
+                        </button>
+                      </div>
+                    </section>
+
+                    <section className="panel panel-code panel-nested">
+                      <div className="panel-header">
+                        <span className="panel-kicker">Generated Script</span>
+                        <h3>生成的 Manim 脚本</h3>
+                        <p>这里仅用于排查，不参与主页中的源码高亮。</p>
+                      </div>
+                      {result?.renderer_script ? (
+                        <div className="console-content generated-console">
+                          <HighlightedCode
+                            code={result.renderer_script}
+                            language="python"
+                            className="highlighted-code-surface"
+                          />
+                        </div>
+                      ) : (
+                        <div className="history-empty">生成任务后，这里会显示最终 Python Manim 脚本。</div>
+                      )}
+                    </section>
+
+                    <section className="panel panel-code panel-nested">
+                      <div className="panel-header">
+                        <span className="panel-kicker">LLM Raw Output</span>
+                        <h3>模型原始返回</h3>
+                        <p>只在需要排查 provider 返回或提示词遵循时查看。</p>
+                      </div>
+                      {hasRawProviderOutput ? (
+                        <div className="raw-output-list">
+                          {result?.runtime.agent_traces
+                            .filter((trace) => Boolean(trace.raw_output))
+                            .map((trace) => (
+                              <article className="raw-output-card" key={`${trace.agent}-${trace.model}`}>
+                                <div className="raw-output-head">
+                                  <strong>{trace.agent}</strong>
+                                  <span>
                                 {trace.provider} / {trace.model}
                               </span>
-                            </div>
-                            <p>{trace.summary}</p>
-                            <pre>{trace.raw_output}</pre>
-                          </article>
-                        ))}
+                                </div>
+                                <p>{trace.summary}</p>
+                                <pre>{trace.raw_output}</pre>
+                              </article>
+                            ))}
+                        </div>
+                      ) : (
+                        <div className="history-empty">当前结果没有记录可展示的原始返回。</div>
+                      )}
+                    </section>
+
+                    <section className="panel panel-history-detail panel-nested">
+                      <div className="panel-header">
+                        <span className="panel-kicker">Repair Loop</span>
+                        <h3>验证与修复</h3>
+                      </div>
+                      {historyError ? <p className="error-text">{historyError}</p> : null}
+                      {result ? (
+                        <ul className="diagnostic-list">
+                          {result.runtime.validation.issues.map((issue, index) => (
+                            <li key={`${issue.code}-${index}`}>
+                              <strong>{issue.severity}</strong>
+                              <span>{issue.message}</span>
+                            </li>
+                          ))}
+                          {result.runtime.repair_actions.map((action, index) => (
+                            <li key={`repair-${index}`}>
+                              <strong>repair</strong>
+                              <span>{action}</span>
+                            </li>
+                          ))}
+                          {result.runtime.validation.issues.length === 0 &&
+                          result.runtime.repair_actions.length === 0 ? (
+                            <li className="empty-state">当前任务未触发额外修复动作。</li>
+                          ) : null}
+                        </ul>
+                      ) : (
+                        <div className="history-empty">生成任务后，这里会展示验证与修复细节。</div>
+                      )}
+                    </section>
+                  </div>
+                ) : null}
+              </details>
+
+              <details className="panel panel-advanced">
+                <summary className="advanced-summary">代码转换测试</summary>
+                <div className="advanced-grid advanced-grid-single">
+                  <CodeAdapterPanel />
+                </div>
+              </details>
+
+              <details className="panel panel-advanced">
+                <summary className="advanced-summary">Provider 管理</summary>
+                <div className="advanced-grid">
+                  <ProviderManager
+                    providers={runtimeCatalog.providers}
+                    onCreateProvider={handleCreateProvider}
+                    onDeleteProvider={handleDeleteProvider}
+                  />
+
+                  <TTSSettingsPanel
+                    settings={runtimeCatalog.settings}
+                    onSave={handleUpdateRuntimeSettings}
+                  />
+
+                  <section className="panel panel-history-detail panel-nested">
+                    <div className="panel-header">
+                      <span className="panel-kicker">Skill Routing</span>
+                      <h3>当前路由状态</h3>
+                      <p>主界面简化后，这里作为学科模块和版本的检查面板保留。</p>
                     </div>
-                  ) : (
-                    <div className="history-empty">当前结果没有记录可展示的原始返回。</div>
-                  )}
-                </section>
-
-                <section className="panel panel-history-detail panel-nested">
-                  <div className="panel-header">
-                    <span className="panel-kicker">Repair Loop</span>
-                    <h3>验证与修复</h3>
-                  </div>
-                  {historyError ? <p className="error-text">{historyError}</p> : null}
-                  {result ? (
+                    <div className="skill-card">
+                      <strong>{activeSkill?.label ?? "等待模型判断"}</strong>
+                      <p>{activeSkill?.description ?? "提交题目后，这里会显示当前 skill。"}</p>
+                      <div className="history-item-meta">
+                        <span>{activeSkill?.id ?? "auto-routing"}</span>
+                        <span>{activeSkill?.domain ?? "unknown"}</span>
+                        <span>{activeSkill?.supports_image_input ? "image-aware" : "text-first"}</span>
+                      </div>
+                    </div>
                     <ul className="diagnostic-list">
-                      {result.runtime.validation.issues.map((issue, index) => (
-                        <li key={`${issue.code}-${index}`}>
-                          <strong>{issue.severity}</strong>
-                          <span>{issue.message}</span>
-                        </li>
-                      ))}
-                      {result.runtime.repair_actions.map((action, index) => (
-                        <li key={`repair-${index}`}>
-                          <strong>repair</strong>
-                          <span>{action}</span>
-                        </li>
-                      ))}
-                      {result.runtime.validation.issues.length === 0 &&
-                      result.runtime.repair_actions.length === 0 ? (
-                        <li className="empty-state">当前任务未触发额外修复动作。</li>
-                      ) : null}
-                    </ul>
-                  ) : (
-                    <div className="history-empty">生成任务后，这里会展示验证与修复细节。</div>
-                  )}
-                </section>
-              </div>
-            ) : null}
-          </details>
-
-          <details className="panel panel-advanced">
-            <summary className="advanced-summary">代码转换测试</summary>
-            <div className="advanced-grid advanced-grid-single">
-              <CodeAdapterPanel />
-            </div>
-          </details>
-
-          <details className="panel panel-advanced">
-            <summary className="advanced-summary">Provider 管理</summary>
-            <div className="advanced-grid">
-              <ProviderManager
-                providers={runtimeCatalog.providers}
-                onCreateProvider={handleCreateProvider}
-                onDeleteProvider={handleDeleteProvider}
-              />
-
-              <TTSSettingsPanel
-                settings={runtimeCatalog.settings}
-                onSave={handleUpdateRuntimeSettings}
-              />
-
-              <section className="panel panel-history-detail panel-nested">
-                <div className="panel-header">
-                  <span className="panel-kicker">Skill Routing</span>
-                  <h3>当前路由状态</h3>
-                  <p>主界面简化后，这里作为学科模块和版本的检查面板保留。</p>
-                </div>
-                <div className="skill-card">
-                  <strong>{activeSkill?.label ?? "等待模型判断"}</strong>
-                  <p>{activeSkill?.description ?? "提交题目后，这里会显示当前 skill。"}</p>
-                  <div className="history-item-meta">
-                    <span>{activeSkill?.id ?? "auto-routing"}</span>
-                    <span>{activeSkill?.domain ?? "unknown"}</span>
-                    <span>{activeSkill?.supports_image_input ? "image-aware" : "text-first"}</span>
-                  </div>
-                </div>
-                <ul className="diagnostic-list">
-                  {runtimeCatalog.skills.map((skill) => (
-                    <li key={skill.id}>
-                      <strong>{skill.label}</strong>
-                      <span>
+                      {runtimeCatalog.skills.map((skill) => (
+                        <li key={skill.id}>
+                          <strong>{skill.label}</strong>
+                          <span>
                         {skill.domain} / {skill.version} / {skill.supports_image_input ? "image" : "text"}
                       </span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            </div>
-          </details>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                </div>
+              </details>
 
-          <details className="panel panel-advanced">
-            <summary className="advanced-summary">Prompt 工具</summary>
-            <div className="advanced-grid advanced-grid-single">
-              <PromptReferenceTool
-                providers={runtimeCatalog.providers}
-                defaultProvider={runtimeCatalog.default_generation_provider}
-              />
-            </div>
-          </details>
+              <details className="panel panel-advanced">
+                <summary className="advanced-summary">Prompt 工具</summary>
+                <div className="advanced-grid advanced-grid-single">
+                  <PromptReferenceTool
+                    providers={runtimeCatalog.providers}
+                    defaultProvider={runtimeCatalog.default_generation_provider}
+                  />
+                </div>
+              </details>
             </section>
           ) : null}
         </main>
