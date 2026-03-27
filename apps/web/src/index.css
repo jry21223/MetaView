@@ -24,6 +24,49 @@
 /* 3. 黑夜模式变量 (Geek Forest) - 补充所有缺失属性 */
 :root,
 :root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #181b21;
+  --bg-overlay:
+    radial-gradient(circle at top center, rgba(69, 160, 129, 0.06), transparent 35%),
+    linear-gradient(180deg, #181b21 0%, #1a1d24 100%);
+  --surface: rgba(30, 34, 42, 0.92);
+  --surface-high: rgba(38, 43, 52, 0.95);
+  --surface-highest: rgba(48, 54, 65, 0.98);
+  --panel-border: rgba(255, 255, 255, 0.10);
+  --panel-border-strong: rgba(69, 160, 129, 0.34);
+  --text: #e2e8f0;
+  --text-secondary: #b7c2ce;
+  --text-muted: #94a3b8;
+  --text-subtle: #6b7280;
+  --primary: #45a081;
+  --primary-strong: #006c51;
+  --secondary: #78d7b8;
+  --danger: #ff7870;
+  --border: rgba(255, 255, 255, 0.14);
+  --surface-hover: rgba(255, 255, 255, 0.08);
+  --video-shell:
+    radial-gradient(circle at top center, rgba(69, 160, 129, 0.12), transparent 42%),
+    linear-gradient(180deg, rgba(22, 26, 32, 0.96) 0%, rgba(18, 22, 28, 0.98) 100%);
+  --video-shell-border: rgba(69, 160, 129, 0.16);
+  --video-frame: linear-gradient(180deg, #12171d 0%, #0e1318 100%);
+  --video-frame-border: rgba(226, 232, 240, 0.10);
+  --video-frame-shadow: 0 24px 48px rgba(0, 0, 0, 0.36);
+  --console-shell: linear-gradient(180deg, #141a22 0%, #10151b 100%);
+  --shadow: 0 28px 60px rgba(0, 0, 0, 0.35);
+  --mono: "JetBrains Mono", monospace;
+  --cjk-sans:
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Noto Sans SC",
+    "Noto Sans CJK SC",
+    "Source Han Sans SC",
+    "Source Han Sans CN",
+    "Microsoft YaHei UI",
+    "Microsoft YaHei",
+    sans-serif;
+  --body: "Manrope", var(--cjk-sans);
+  --headline: "Space Grotesk", "Manrope", var(--cjk-sans);
+  --accent: #45a081;
     color-scheme: dark;
     --bg: #050505;
     --bg-overlay: radial-gradient(circle at top center, rgba(16, 185, 129, 0.12), transparent 45%), linear-gradient(180deg, #050505 0%, #0a0c0b 100%);
@@ -244,18 +287,18 @@ button:active {
 
 .topbar-secondary-button,
 .theme-toggle {
-    min-height: 40px;
-    padding: 0 14px;
-    border: 1px solid var(--panel-border);
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--surface-high) 88%, transparent);
-    color: var(--text);
-    font-family: var(--headline);
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    cursor: pointer;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-high) 88%, transparent);
+  color: var(--text);
+  font-family: var(--headline);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
 }
 
 .topbar-secondary-button {
@@ -353,12 +396,12 @@ button:active {
 }
 
 .panel {
-    min-width: 0;
-    border: 1px solid var(--panel-border);
-    border-radius: 24px;
-    background: var(--surface);
-    box-shadow: var(--shadow);
-    backdrop-filter: blur(18px);
+  min-width: 0;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.01);
+  backdrop-filter: blur(18px);
 }
 
 .stage-panel,
@@ -367,7 +410,8 @@ button:active {
 .panel-code,
 .panel-code-adapter,
 .panel-provider {
-    padding: 24px;
+  padding: 10px;
+  gap: 10px;
 }
 
 .panel-nested {
@@ -539,21 +583,21 @@ button:active {
 }
 
 .composer-attach-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 40px;
-    padding: 0 14px;
-    border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--surface-highest) 72%, transparent);
-    color: var(--text);
-    font-family: var(--headline);
-    font-size: 0.74rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--primary) 18%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-highest) 72%, transparent);
+  color: var(--text);
+  font-family: var(--headline);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
 }
 
 .composer-attach-button:hover {
@@ -620,19 +664,23 @@ button:active {
 
 .composer-submit,
 .form-actions button {
-    min-height: 52px;
-    padding: 0 24px;
-    border: none;
-    border-radius: 16px;
-    background: var(--primary);
-    color: #ffffff;
-    font-family: var(--headline);
-    font-size: 0.8rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    cursor: pointer;
-    box-shadow: 0 12px 24px color-mix(in srgb, var(--primary) 28%, transparent);
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent);
+  border-radius: 12px;
+  background: var(--primary);
+  color: #0f1113;
+  font-family: var(--headline);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+:root[data-theme="light"] .composer-submit,
+:root[data-theme="light"] .form-actions button {
+  color: #ffffff;
 }
 
 .composer-submit:disabled,
@@ -666,14 +714,14 @@ button:active {
 }
 
 .composer-toggle-button {
-    min-height: 38px;
-    padding: 0 18px;
-    border-radius: 999px;
-    font-family: var(--headline);
-    font-size: 0.74rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
+  min-height: 34px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-family: var(--headline);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .composer-toggle-button.is-active {
@@ -690,15 +738,15 @@ button:active {
 }
 
 .composer-chip {
-    min-height: 38px;
-    padding: 0 16px;
-    border: 1px solid var(--panel-border);
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--surface-high) 90%, transparent);
-    font-family: var(--headline);
-    font-size: 0.76rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-high) 90%, transparent);
+  font-family: var(--headline);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
 }
 
 .composer-chip.is-active,
@@ -864,31 +912,31 @@ button:active {
 }
 
 .switch-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    min-height: 42px;
-    padding: 0 12px 0 10px;
-    border: 1px solid var(--panel-border);
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--surface-high) 90%, transparent);
-    color: var(--text-muted);
-    cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 10px 0 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-high) 90%, transparent);
+  color: var(--text-muted);
+  cursor: pointer;
 }
 
 .switch-button span {
-    width: 28px;
-    height: 28px;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--surface-highest) 96%, transparent);
-    box-shadow: inset 0 0 0 1px var(--panel-border);
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-highest) 96%, transparent);
+  box-shadow: inset 0 0 0 1px var(--panel-border);
 }
 
 .switch-button strong {
-    font-family: var(--headline);
-    font-size: 0.72rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
+  font-family: var(--headline);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .switch-button.is-active {
@@ -910,18 +958,18 @@ button:active {
 }
 
 .ghost-button {
-    min-height: 46px;
-    padding: 0 18px;
-    border: 1px solid var(--panel-border);
-    border-radius: 14px;
-    background: color-mix(in srgb, var(--surface-high) 90%, transparent);
-    color: var(--primary);
-    font-family: var(--headline);
-    font-size: 0.78rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    cursor: pointer;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-high) 90%, transparent);
+  color: var(--primary);
+  font-family: var(--headline);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
 }
 
 .inline-action {
@@ -1048,21 +1096,21 @@ button:active {
 }
 
 .video-action {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 38px;
-    padding: 0 14px;
-    border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
-    border-radius: 14px;
-    background: color-mix(in srgb, var(--surface-highest) 72%, transparent);
-    color: var(--text);
-    font-family: var(--headline);
-    font-size: 0.74rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-decoration: none;
-    text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--primary) 18%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-highest) 72%, transparent);
+  color: var(--text);
+  font-family: var(--headline);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-decoration: none;
+  text-transform: uppercase;
 }
 
 .video-action:hover {
@@ -1371,13 +1419,403 @@ button:active {
 ::-webkit-scrollbar-thumb { background: var(--panel-border-strong); border-radius: 999px; }
 
 @media (max-width: 980px) {
-    .workspace { width: calc(100vw - 24px); }
-    .studio-layout.is-resolved { grid-template-columns: 1fr; }
+  .workspace {
+    width: min(100vw - 24px, 960px);
+    padding-top: 88px;
+  }
+
+  .history-page-layout,
+  .studio-layout.is-resolved,
+  .results-layout.has-source,
+  .interactive-explorer-grid,
+  .advanced-grid,
+  .runtime-summary,
+  .panel-header-row,
+  .select-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-video-shell,
+  .preview-video,
+  .preview-video-frame,
+  .preview-empty,
+  .console-content {
+    min-height: 420px;
+  }
+
+  .stage-panel-compact .preview-video-shell,
+  .stage-panel-compact .preview-video,
+  .stage-panel-compact .preview-video-frame {
+    min-height: 420px;
+  }
+
+  .stage-panel-sticky {
+    position: static;
+  }
+
+  .interactive-source-console {
+    min-height: 480px;
+  }
+
+  .toggle-field {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
-/* 在 index.css 末尾添加 */
-.interactive-element:hover ~ .magic-cursor-wrapper .magic-cursor-ring {
-    width: 60px;
-    height: 60px;
-    background: rgba(16, 185, 129, 0.2);
-    border-width: 1px;
+
+@media (max-width: 760px) {
+  body {
+    background: var(--bg);
+  }
+
+  .topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 0 16px;
+    background: var(--surface);
+    backdrop-filter: none;
+  }
+
+  .topbar-nav {
+    display: none;
+  }
+
+  .workspace {
+    width: calc(100vw - 20px);
+    padding-top: 84px;
+  }
+
+  .page-header h2 {
+    font-size: 1.5rem;
+  }
+
+  .hero-shell {
+    min-height: auto;
+    padding-top: 28px;
+  }
+
+  .hero-glow {
+    display: none;
+  }
+
+  .panel,
+  .composer-search-shell,
+  .prompt-form-advanced {
+    backdrop-filter: none;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+  }
+
+  .preview-video-shell,
+  .preview-empty {
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  }
+
+  .preview-video-shell::before {
+    display: none;
+  }
+
+  .preview-video-frame {
+    box-shadow: none;
+  }
+
+  /* 移动端禁用大面积模糊和渐变 */
+  .video-surface,
+  .preview-stage {
+    background: var(--surface);
+  }
+
+  .video-loading-overlay,
+  .video-error-overlay {
+    backdrop-filter: none;
+  }
+
+  .execution-array-overlay {
+    backdrop-filter: none;
+    background: var(--surface);
+  }
+
+  .preview-video-shell,
+  .preview-video,
+  .preview-video-frame,
+  .preview-empty,
+  .console-content {
+    min-height: 320px;
+  }
+
+  .interactive-source-console {
+    min-height: 360px;
+  }
+
+  .console-content,
+  .source-console {
+    background: var(--surface);
+  }
+
+  .preview-empty {
+    background: var(--surface);
+  }
+
+  .preview-empty.is-loading::after {
+    display: none;
+  }
+
+  /* 移动端禁用过渡动画，减少 GPU 负载 */
+  .execution-array-cell {
+    transition: none;
+  }
+
+  .execution-array-cell.is-focused {
+    animation: none;
+  }
+
+  .execution-hotspot {
+    transition: none;
+  }
+
+  .execution-marker {
+    transition: none;
+  }
+
+  .execution-checkpoint {
+    transition: none;
+  }
+
+  .execution-timeline-progress {
+    transition: none;
+  }
+
+  .video-retry-button {
+    transition: none;
+  }
+
+  .composer-submit,
+  .theme-toggle,
+  .topbar-secondary-button,
+  .form-actions button,
+  .ghost-button,
+  .video-action {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .topbar-actions {
+    gap: 8px;
+  }
+
+  .topbar-secondary-button,
+  .theme-toggle {
+    width: auto;
+    min-height: 36px;
+    padding: 0 10px;
+    font-size: 0.66rem;
+    letter-spacing: 0.08em;
+  }
+
+  .form-actions {
+    align-items: stretch;
+  }
+
+  .composer-search-actions {
+    align-items: stretch;
+  }
+
+  .composer-inline-tools {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .composer-inline-hint {
+    width: 100%;
+  }
+
+  .composer-attachment {
+    grid-template-columns: 1fr;
+  }
+
+  .composer-attachment-image {
+    width: 100%;
+    height: 180px;
+  }
+
+  .stage-panel,
+  .panel-history,
+  .panel-history-detail,
+  .panel-code,
+  .panel-code-adapter,
+  .panel-provider,
+  .panel-advanced {
+    padding: 18px;
+  }
+
+  .studio-layout.is-resolved {
+    gap: 14px;
+    padding-top: 16px;
+  }
+
+  .studio-layout.is-resolved > .studio-column {
+    display: contents;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split {
+    order: 1;
+    gap: 12px;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split .composer-copy {
+    gap: 6px;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split .composer-copy h1 {
+    font-size: 1.28rem;
+    line-height: 1.06;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split .composer-copy p {
+    font-size: 0.88rem;
+    line-height: 1.55;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split .composer-form {
+    gap: 12px;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split .composer-search-shell {
+    gap: 10px;
+    padding: 10px;
+    border-radius: 18px;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split .composer-input {
+    min-height: 64px;
+    padding: 8px 10px;
+    font-size: 0.94rem;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split .composer-inline-tools {
+    gap: 8px;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split .composer-attach-button {
+    min-height: 36px;
+    padding: 0 12px;
+    font-size: 0.68rem;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split .composer-inline-hint {
+    font-size: 0.76rem;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split .composer-attachment {
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split .composer-attachment-image {
+    height: 132px;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split .composer-attachment-copy strong {
+    font-size: 0.9rem;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split .composer-attachment-copy span {
+    font-size: 0.82rem;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split .composer-meta {
+    gap: 6px;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split .composer-meta span {
+    font-size: 0.72rem;
+  }
+
+  .studio-layout.is-resolved .composer-panel.is-split .composer-toggle {
+    margin: 0;
+    justify-self: start;
+  }
+
+  .studio-layout.is-resolved .stage-panel-compact {
+    order: 2;
+    padding: 12px;
+  }
+
+  .studio-layout.is-resolved .interactive-explorer-panel {
+    order: 2;
+    padding: 12px;
+  }
+
+  .studio-layout.is-resolved .stage-panel-compact .preview-stage {
+    margin-top: 0;
+    padding: 8px;
+  }
+
+  .studio-layout.is-resolved .stage-panel-compact .video-surface-toolbar {
+    gap: 8px;
+  }
+
+  .studio-layout.is-resolved .stage-panel-compact .video-surface-copy strong {
+    font-size: 0.84rem;
+  }
+
+  .studio-layout.is-resolved .stage-panel-compact .video-surface-copy small {
+    display: none;
+  }
+
+  .studio-layout.is-resolved .stage-panel-compact .preview-video-shell,
+  .studio-layout.is-resolved .stage-panel-compact .preview-video,
+  .studio-layout.is-resolved .stage-panel-compact .preview-video-frame {
+    min-height: clamp(360px, 58svh, 560px);
+  }
+
+  .studio-layout.is-resolved .studio-source-panel {
+    order: 3;
+  }
+
+  .interactive-explorer-meta,
+  .execution-breakpoint-actions,
+  .execution-parameter-actions {
+    align-items: stretch;
+  }
+
+  /* Mobile bottom navigation */
+  .mobile-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--surface-solid);
+    backdrop-filter: none;
+    border-top: 1px solid var(--border);
+    padding: 8px 16px;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    z-index: 100;
+    gap: 8px;
+  }
+
+  .mobile-nav button {
+    flex: 1;
+    padding: 12px 8px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background-color 0.2s, color 0.2s;
+  }
+
+  .mobile-nav button.is-active {
+    background: var(--accent);
+    color: white;
+  }
+
+  .mobile-nav button:hover:not(.is-active) {
+    background: var(--surface-hover);
+  }
+
+  .workspace {
+    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+  }
 }
