@@ -1,0 +1,36 @@
+:root {
+    --mx: 0px;
+    --my: 0px;
+}
+/* ... 剩下的代码 ... */
+.magic-cursor-wrapper {
+    position: fixed;
+    /* 这里的变量必须和 index.tsx 对应 */
+    left: var(--mx);
+    top: var(--my);
+    /* 确保不挡点击 */
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+    display: block !important; /* 强制显示 */
+}
+
+.magic-cursor-dot {
+    width: 10px;
+    height: 10px;
+    background: #6366f1; /* 换成方案二的靛青色 */
+    border-radius: 50%;
+    box-shadow: 0 0 15px rgba(99, 102, 241, 0.6);
+}
+
+.magic-cursor-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 32px;
+    height: 32px;
+    border: 2px solid rgba(99, 102, 241, 0.4);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.2s ease, height 0.2s ease;
+}
