@@ -41,6 +41,7 @@
   --primary: #45a081;
   --primary-strong: #006c51;
   --secondary: #78d7b8;
+    --surface-solid: #0c0e0d; /* 定义黑夜模式下的实色表面 */
   --danger: #ff7870;
   --border: rgba(255, 255, 255, 0.14);
   --surface-hover: rgba(255, 255, 255, 0.08);
@@ -115,6 +116,7 @@
     --text-muted: #5c6763;
     --text-subtle: #7b8581;
     --primary: #059669;
+    --surface-solid: #ffffff; /* 定义白天模式下的实色表面 */
     --primary-strong: #047857;
     --secondary: #10b981;
     --accent: #059669;
@@ -1818,4 +1820,44 @@ button:active {
   .workspace {
     padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
   }
+}
+/* --- 修正导航位置补丁 --- */
+
+/* 1. 隐藏原来顶栏里残留的导航容器 */
+.topbar .topbar-nav {
+    display: none !important;
+}
+
+/* 2. 定义侧边栏导航样式 */
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 30px;
+    padding: 0 16px;
+}
+
+.sidebar-nav button {
+    text-align: left;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-muted);
+    font-family: var(--headline);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.sidebar-nav button:hover {
+    background: var(--surface-hover);
+    color: var(--primary);
+}
+
+.sidebar-nav button.is-active {
+    background: color-mix(in srgb, var(--primary) 12%, transparent);
+    color: var(--primary);
+    border-color: color-mix(in srgb, var(--primary) 20%, transparent);
 }
