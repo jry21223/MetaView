@@ -950,8 +950,9 @@ export default function App() {
 
   return (
     <div className="theory-shell">
-      <header className="topbar">
-        <div className="brand-block">
+      {/* 侧边栏 */}
+      <aside className="sidebar">
+        <div className="sidebar-brand">
           <span className="brand-mark" />
           <div>
             <strong>MetaView</strong>
@@ -959,7 +960,7 @@ export default function App() {
           </div>
         </div>
 
-        <nav className="topbar-nav" aria-label="Primary">
+        <nav className="sidebar-nav">
           <button
             type="button"
             className={activePage === "studio" ? "is-active" : ""}
@@ -983,14 +984,7 @@ export default function App() {
           </button>
         </nav>
 
-        <div className="topbar-actions">
-          <button
-            type="button"
-            className="topbar-secondary-button"
-            onClick={handleStartNewConversation}
-          >
-            新对话
-          </button>
+        <div className="sidebar-footer">
           <button
             type="button"
             className="theme-toggle"
@@ -999,10 +993,24 @@ export default function App() {
             {theme === "dark" ? "Light Mode" : "Dark Mode"}
           </button>
         </div>
-      </header>
+      </aside>
 
-      <div className="workspace">
-        <main className="canvas">
+      {/* 主内容区 */}
+      <div className="main-wrapper">
+        <header className="topbar">
+          <div className="topbar-actions">
+            <button
+              type="button"
+              className="topbar-secondary-button"
+              onClick={handleStartNewConversation}
+            >
+              新对话
+            </button>
+          </div>
+        </header>
+
+        <div className="workspace">
+          <main className="canvas">
           {activePage === "studio" ? (
           <section
             className={`studio-layout ${hasCompletedPreview ? "is-resolved" : "hero-shell"}`}
@@ -1533,8 +1541,10 @@ export default function App() {
             </section>
           ) : null}
         </main>
+      </div>
 
-        <nav className="mobile-nav" aria-label="Mobile navigation">
+      {/* 移动端底部导航 */}
+      <nav className="mobile-nav" aria-label="Mobile navigation">
           <button type="button" onClick={handleStartNewConversation}>
             新对话
           </button>
