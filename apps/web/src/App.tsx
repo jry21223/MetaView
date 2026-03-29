@@ -1,6 +1,7 @@
 import { startTransition, useEffect, useEffectEvent, useRef, useState } from "react";
 import type { FormEvent } from "react";
 
+import { MagicCursor } from "./components/MagicCursor";
 import {
   deleteCustomProvider,
   getPipelineRun,
@@ -950,6 +951,8 @@ export default function App() {
 
   return (
     <div className="theory-shell">
+      {/* 魔法光标演示 */}
+      <MagicCursor />
       <header className="topbar">
         <div className="brand-block">
           <span className="brand-mark" />

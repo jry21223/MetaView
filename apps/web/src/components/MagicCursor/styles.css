@@ -1,0 +1,42 @@
+/* 魔法光标样式 - 演示版本 */
+:root {
+  --mx: 0px;
+  --my: 0px;
+}
+
+.magic-cursor-wrapper {
+  position: fixed;
+  left: var(--mx);
+  top: var(--my);
+  /* 确保不阻挡点击 */
+  pointer-events: none;
+  z-index: 9999;
+  transform: translate(-50%, -50%);
+  display: block !important;
+}
+
+.magic-cursor-dot {
+  width: 10px;
+  height: 10px;
+  background: var(--primary, #6366f1);
+  border-radius: 50%;
+  box-shadow: 0 0 15px color-mix(in srgb, var(--primary, #6366f1) 60%, transparent);
+}
+
+.magic-cursor-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 32px;
+  height: 32px;
+  border: 2px solid color-mix(in srgb, var(--primary, #6366f1) 40%, transparent);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.2s ease, height 0.2s ease;
+}
+
+/* Hover 效果 - 可选增强 */
+.magic-cursor-wrapper:hover .magic-cursor-ring {
+  width: 40px;
+  height: 40px;
+}
