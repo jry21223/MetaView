@@ -1,0 +1,33 @@
+---
+id: demoo-test-file-naming
+trigger: "when creating test files"
+confidence: 0.95
+domain: testing
+source: local-repo-analysis
+---
+
+# Mirror Service Structure in Tests
+
+## Action
+Test files must:
+- Use `test_*.py` naming
+- Be located in `apps/api/tests/`
+- Mirror the service being tested
+
+## Evidence
+- 14 test files in `apps/api/tests/`
+- All use `test_*.py` format
+- Pattern: `test_main.py`, `test_history.py`, `test_manim_script.py`, etc.
+
+## Examples
+```
+apps/api/app/services/orchestrator.py  → tests/test_main.py
+apps/api/app/services/history.py       → tests/test_history.py
+apps/api/app/services/providers/openai.py → tests/test_provider_openai.py
+apps/api/app/services/prompts/*.py     → tests/test_prompts.py
+```
+
+## Workflow
+1. Create `apps/api/tests/test_<service>.py`
+2. Import from conftest.py for env setup
+3. Run: `.venv/bin/pytest apps/api/tests -q`

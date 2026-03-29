@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background-color: #f7f9fb;
+        }
+        .glass-panel {
+            backdrop-filter: blur(16px);
+            background-color: rgba(224, 227, 229, 0.7);
+        }
+        .custom-shadow {
+            box-shadow: 0px 12px 32px -4px rgba(25, 28, 30, 0.06);
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-primary-fixed": "#002018",
+                        "tertiary-fixed": "#ffdad5",
+                        "background": "#f7f9fb",
+                        "on-secondary-container": "#486b5f",
+                        "on-primary-fixed-variant": "#005140",
+                        "on-error-container": "#93000a",
+                        "surface-container-low": "#f2f4f6",
+                        "surface-container": "#eceef0",
+                        "on-surface": "#191c1e",
+                        "on-secondary-fixed": "#002018",
+                        "on-tertiary-fixed-variant": "#783027",
+                        "surface-variant": "#e0e3e5",
+                        "primary-fixed": "#92f5d6",
+                        "primary-container": "#50b498",
+                        "primary-fixed-dim": "#76d8bb",
+                        "outline": "#6e7a74",
+                        "on-tertiary-fixed": "#3e0503",
+                        "outline-variant": "#bdc9c3",
+                        "error": "#ba1a1a",
+                        "on-secondary-fixed-variant": "#2b4d42",
+                        "surface": "#f7f9fb",
+                        "on-primary-container": "#004234",
+                        "surface-container-highest": "#e0e3e5",
+                        "secondary": "#42655a",
+                        "secondary-fixed-dim": "#a9cfc0",
+                        "inverse-primary": "#76d8bb",
+                        "on-surface-variant": "#3e4945",
+                        "tertiary-container": "#ea897c",
+                        "surface-bright": "#f7f9fb",
+                        "surface-dim": "#d8dadc",
+                        "on-tertiary": "#ffffff",
+                        "on-tertiary-container": "#67231b",
+                        "on-primary": "#ffffff",
+                        "on-background": "#191c1e",
+                        "surface-container-high": "#e6e8ea",
+                        "tertiary": "#96463c",
+                        "inverse-surface": "#2d3133",
+                        "on-secondary": "#ffffff",
+                        "primary": "#006b56",
+                        "error-container": "#ffdad6",
+                        "on-error": "#ffffff",
+                        "secondary-container": "#c4ebdc",
+                        "surface-tint": "#006b56",
+                        "surface-container-lowest": "#ffffff",
+                        "inverse-on-surface": "#eff1f3",
+                        "tertiary-fixed-dim": "#ffb4a9",
+                        "secondary-fixed": "#c4ebdc"
+                    },
+                    fontFamily: {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Space Grotesk"],
+                        "label": ["Space Grotesk"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface antialiased">
+<!-- TopNavBar Navigation Shell -->
+<header class="bg-slate-50/80 backdrop-blur-xl dark:bg-slate-900/80 docked full-width top-0 z-50 border-b border-slate-200/20 dark:border-slate-800/20 shadow-sm shadow-slate-200/50 dark:shadow-none">
+<div class="flex justify-between items-center w-full px-6 py-3">
+<div class="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-50">MetaView</div>
+<nav class="hidden md:flex items-center gap-8">
+<a class="font-['Space_Grotesk'] text-sm tracking-wide font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors duration-200" href="#">工作室</a>
+<a class="font-['Space_Grotesk'] text-sm tracking-wide font-medium text-[#006b56] dark:text-[#50b498] border-b-2 border-[#006b56] pb-1" href="#">历史记录</a>
+<a class="font-['Space_Grotesk'] text-sm tracking-wide font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors duration-200" href="#">工具</a>
+</nav>
+<div class="flex items-center gap-4">
+<button class="p-2 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-colors duration-200 scale-95 active:opacity-80 transition-all">
+<span class="material-symbols-outlined text-slate-500 dark:text-slate-400">dark_mode</span>
+</button>
+</div>
+</div>
+</header>
+<!-- SideNavBar shell -->
+<aside class="h-screen w-64 fixed left-0 top-0 pt-16 bg-slate-100 dark:bg-slate-950 flex flex-col gap-4 py-8 px-4 hidden lg:flex">
+<div class="px-4 mb-6">
+<div class="text-lg font-black text-slate-900 dark:text-slate-50">MetaView 实验室</div>
+<div class="text-[10px] uppercase tracking-widest font-semibold text-[#006b56] dark:text-[#50b498]">临床策划员</div>
+</div>
+<nav class="flex flex-col gap-2">
+<div class="flex items-center gap-3 px-4 py-3 text-slate-500 dark:text-slate-400 hover:translate-x-1 transition-transform duration-200 cursor-pointer">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-['Space_Grotesk'] text-sm uppercase tracking-widest font-semibold">控制面板</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 text-slate-500 dark:text-slate-400 hover:translate-x-1 transition-transform duration-200 cursor-pointer">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="font-['Space_Grotesk'] text-sm uppercase tracking-widest font-semibold">项目管理</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 bg-white dark:bg-slate-900 text-[#006b56] dark:text-[#50b498] rounded-l-lg ml-2 shadow-sm transition-transform duration-200 cursor-pointer">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-['Space_Grotesk'] text-sm uppercase tracking-widest font-semibold">分析统计</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 text-slate-500 dark:text-slate-400 hover:translate-x-1 transition-transform duration-200 cursor-pointer">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-['Space_Grotesk'] text-sm uppercase tracking-widest font-semibold">系统设置</span>
+</div>
+</nav>
+<div class="mt-auto px-4 pb-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary-container/20 overflow-hidden">
+<img alt="User profile" data-alt="professional portrait of a senior research scientist in a minimalist laboratory setting with soft focus" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAwor_cZLKM9vq3KAIWzzIFJa_50H3lUcvE42wUkzxaPMME9liif_MaWxahY3uUy8JkUtzr3TYRTyV6Qen_y7C98KpyqaDD0HzIEshXnkTcKsHz4uoQBtbxJPT01wNZDhFadFjz_YmPJfSs_2QYPA4fdf_vsoYqnboiUWiPzyHsvR8lWpaingqqGGSFRR3GQqxLURIU0StC-06rRHBX1fqbslRhv0_rK-TxGr3pk8BtopPM6VGOPzTzbhG6vpir5eIduanRntr-gwI"/>
+</div>
+<div>
+<div class="text-xs font-bold text-on-surface">Dr. Aris Thorne</div>
+<div class="text-[10px] text-on-surface-variant uppercase">高级分析师</div>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="lg:ml-64 pt-16 min-h-screen">
+<div class="flex flex-col md:flex-row h-[calc(100vh-4rem)]">
+<!-- Left Panel: Task History List -->
+<section class="w-full md:w-[420px] bg-surface-container-low flex flex-col overflow-hidden">
+<div class="p-6 border-b border-outline-variant/20 bg-surface">
+<h1 class="text-2xl font-bold tracking-tight text-on-surface">任务历史</h1>
+<p class="text-sm text-on-surface-variant mt-1">查看临床策划日志和系统输出。</p>
+<div class="mt-6 flex gap-2">
+<span class="px-3 py-1 bg-primary text-on-primary text-[10px] font-bold tracking-wider uppercase rounded-full">全部运行</span>
+<span class="px-3 py-1 bg-surface-container-highest text-on-surface-variant text-[10px] font-bold tracking-wider uppercase rounded-full">失败</span>
+<span class="px-3 py-1 bg-surface-container-highest text-on-surface-variant text-[10px] font-bold tracking-wider uppercase rounded-full">已完成</span>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-4 space-y-4">
+<!-- Failed Task Card -->
+<div class="bg-surface-container-lowest p-5 rounded-xl custom-shadow border-l-4 border-error cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="text-[10px] font-bold tracking-tighter text-error uppercase">失败 · 日志 #8821</span>
+<span class="text-[10px] font-medium text-on-surface-variant">2m ago</span>
+</div>
+<h3 class="text-md font-bold text-on-surface mt-2">布局组件引擎</h3>
+<p class="text-sm text-on-surface-variant mt-1 leading-relaxed">视觉锚点渲染阶段发生系统级崩溃。</p>
+<div class="mt-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm text-error">error</span>
+<span class="text-[11px] font-mono text-error">ERR_NULL_POINTER_REF</span>
+</div>
+</div>
+<!-- Success Task Card -->
+<div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/10 hover:bg-surface-container hover:transition-colors duration-200 cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="text-[10px] font-bold tracking-tighter text-primary uppercase">成功 · 日志 #8819</span>
+<span class="text-[10px] font-medium text-on-surface-variant">14m ago</span>
+</div>
+<h3 class="text-md font-bold text-on-surface mt-2">数据可视化层</h3>
+<p class="text-sm text-on-surface-variant mt-1 leading-relaxed">汇总 2024 策划面板的临床数据点。</p>
+<div class="mt-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm text-primary">check_circle</span>
+<span class="text-[11px] font-mono text-on-surface-variant">SYNC_COMPLETED_124ms</span>
+</div>
+</div>
+<!-- Failed Task Card -->
+<div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/10 hover:bg-surface-container hover:transition-colors duration-200 cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="text-[10px] font-bold tracking-tighter text-error uppercase">失败 · 日志 #8815</span>
+<span class="text-[10px] font-medium text-on-surface-variant">1h ago</span>
+</div>
+<h3 class="text-md font-bold text-on-surface mt-2">神经网络优化</h3>
+<p class="text-sm text-on-surface-variant mt-1 leading-relaxed">交叉引用数据结构的异步映射失败。</p>
+<div class="mt-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm text-error">warning</span>
+<span class="text-[11px] font-mono text-error">TIMEOUT_EXCEEDED</span>
+</div>
+</div>
+<!-- Success Task Card -->
+<div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/10 hover:bg-surface-container hover:transition-colors duration-200 cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="text-[10px] font-bold tracking-tighter text-primary uppercase">成功 · 日志 #8812</span>
+<span class="text-[10px] font-medium text-on-surface-variant">3h ago</span>
+</div>
+<h3 class="text-md font-bold text-on-surface mt-2">权限模块加固</h3>
+<p class="text-sm text-on-surface-variant mt-1 leading-relaxed">为主临床存储库部署安全补丁。</p>
+<div class="mt-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm text-primary">verified_user</span>
+<span class="text-[11px] font-mono text-on-surface-variant">VERIFIED_SECURE</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Right Panel: Run Details -->
+<section class="flex-1 bg-surface flex flex-col overflow-hidden">
+<div class="p-8 lg:p-12 h-full overflow-y-auto">
+<div class="max-w-4xl mx-auto">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+<div>
+<div class="flex items-center gap-3 mb-2">
+<span class="text-[11px] font-bold text-error bg-error-container px-2 py-0.5 rounded uppercase tracking-widest">事件报告</span>
+<span class="text-on-surface-variant text-sm font-mono">ID: 4492-AXL</span>
+</div>
+<h2 class="text-4xl font-extrabold text-on-surface tracking-tighter leading-none">布局组件引擎</h2>
+</div>
+<div class="flex gap-3">
+<button class="px-6 py-2.5 bg-surface-container-lowest border border-outline-variant/30 text-primary font-bold text-sm rounded-md hover:bg-surface-container-low transition-colors">导出日志</button>
+<button class="px-6 py-2.5 bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold text-sm rounded-md shadow-lg shadow-primary/20">重试执行</button>
+</div>
+</div>
+<!-- Bento Grid for details -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+<div class="md:col-span-2 bg-error-container/20 rounded-xl p-8 border border-error/10">
+<h4 class="text-[10px] font-bold uppercase tracking-widest text-error mb-4">错误诊断</h4>
+<p class="text-lg font-medium text-on-error-container leading-relaxed">
+                                    Critical failure detected at <span class="font-mono bg-error-container/40 px-1">src/render/LayoutAnchor.ts:142</span>. 
+                                    The engine attempted to access an immutable visual state during a write operation, causing a memory protection fault.
+                                </p>
+<div class="mt-8 font-mono text-[12px] text-on-surface-variant/80 bg-surface-container-lowest p-6 rounded-lg border border-outline-variant/20 overflow-x-auto">
+<div class="flex gap-4">
+<span class="text-outline">140</span>
+<span class="text-on-surface-variant">function renderNode(node: VNode) {</span>
+</div>
+<div class="flex gap-4">
+<span class="text-outline">141</span>
+<span class="text-on-surface-variant">  const context = node.getSharedContext();</span>
+</div>
+<div class="flex gap-4 bg-error-container/30 border-l-2 border-error -mx-2 px-2">
+<span class="text-error">142</span>
+<span class="text-on-error-container">  context.writeVisualState(node.id, { opacity: 1 });</span>
+</div>
+<div class="flex gap-4">
+<span class="text-outline">143</span>
+<span class="text-on-surface-variant">  return context.flush();</span>
+</div>
+<div class="flex gap-4">
+<span class="text-outline">144</span>
+<span class="text-on-surface-variant">}</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-6">
+<div class="bg-surface-container-low rounded-xl p-6">
+<h4 class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-4">执行规格</h4>
+<div class="space-y-4">
+<div class="flex justify-between items-center">
+<span class="text-sm text-on-surface-variant">集群</span>
+<span class="text-sm font-bold text-on-surface">LAB-NODE-04</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="text-sm text-on-surface-variant">运行时</span>
+<span class="text-sm font-bold text-on-surface">V8 Laboratory Core</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="text-sm text-on-surface-variant">耗时</span>
+<span class="text-sm font-bold text-on-surface">42.8ms</span>
+</div>
+</div>
+</div>
+<div class="bg-primary-container/10 rounded-xl p-6 border border-primary-container/20">
+<h4 class="text-[10px] font-bold uppercase tracking-widest text-primary mb-4">资源占用</h4>
+<div class="h-2 w-full bg-surface-container rounded-full overflow-hidden mb-2">
+<div class="h-full bg-primary w-[74%]"></div>
+</div>
+<p class="text-[10px] text-on-surface-variant">崩溃前内存压力达到 <span class="font-bold">74%</span>。</p>
+</div>
+</div>
+</div>
+<!-- Technical Timeline (Asymmetric) -->
+<div class="relative pl-12 border-l border-outline-variant/30 ml-4">
+<h4 class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-8 -ml-16 rotate-90 origin-top-left absolute left-4">时间轴</h4>
+<div class="mb-12 relative">
+<div class="absolute -left-[54px] top-0 w-3 h-3 rounded-full bg-primary border-4 border-surface"></div>
+<div class="flex flex-col md:flex-row gap-4 items-start">
+<div class="w-24 text-[10px] font-mono text-on-surface-variant pt-1">14:22:01.002</div>
+<div class="flex-1">
+<h5 class="font-bold text-on-surface">系统初始化</h5>
+<p class="text-sm text-on-surface-variant mt-1">引导虚拟容器环境并挂载临床共享卷。</p>
+</div>
+</div>
+</div>
+<div class="mb-12 relative">
+<div class="absolute -left-[54px] top-0 w-3 h-3 rounded-full bg-primary border-4 border-surface"></div>
+<div class="flex flex-col md:flex-row gap-4 items-start">
+<div class="w-24 text-[10px] font-mono text-on-surface-variant pt-1">14:22:02.450</div>
+<div class="flex-1">
+<h5 class="font-bold text-on-surface">清单验证</h5>
+<p class="text-sm text-on-surface-variant mt-1">解析布局组件 JSON。识别出 244 个视觉锚点并进入处理队列。</p>
+</div>
+</div>
+</div>
+<div class="mb-0 relative">
+<div class="absolute -left-[54px] top-0 w-3 h-3 rounded-full bg-error border-4 border-surface"></div>
+<div class="flex flex-col md:flex-row gap-4 items-start">
+<div class="w-24 text-[10px] font-mono text-error pt-1">14:22:03.011</div>
+<div class="flex-1">
+<h5 class="font-bold text-error">进程中断</h5>
+<p class="text-sm text-on-error-container mt-1 bg-error-container/10 p-4 rounded-lg">生成锚点时发生严重内存故障。堆栈跟踪已记录在本地实验室存储库中。</p>
+<div class="mt-4 flex gap-4">
+<img alt="Snapshot" class="w-32 h-20 rounded object-cover grayscale opacity-50" data-alt="extreme close-up of a high-resolution silicon microchip with glowing circuit pathways in clinical laboratory lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBGGRlgLl_N7btgJepq9-_ufDoEGSfe7llhAJ3YP7irXjY-cWiDYu36_xWwoGDMM2yhXEzhXUKwD9Zetw0_VPkEYDC8s3tm5JeNWdIBzcPjcNABCQPnGfrRr_y2KyLtxIlCng1wiOFiOOpzoA1bUnlE6OfjhV6F_GbkCddcW6tENNF9PbBZzy71VgK2_NvtJfLxqEinb3i3KP1MkRopHbUGoaCLlepV_v32Ng0guGPXwMo8o3ACz5FQUHMNl4ApjnXGIYp2sg5VWwA"/>
+<img alt="Dump" class="w-32 h-20 rounded object-cover grayscale opacity-50" data-alt="microscopic view of data clusters represented as glowing crystalline structures in a cold blue light" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCADJYsSEBxRkVjYzaA7Za8PgREUvOepDmXNFpC89ZVVgdtqTvK9zEb1VSuRE16pMiAWp6pkQQf5UH3uw2mQIqEiEs3Ojg_kBwlbpNFy84efFIoZBnNz4HrP1LgbfNIwIJCD2KXKQVlVxfQTXui6Bc0u0lc3eVPYgTgC081XvaJszDyOGR8MmIdP45aFAJSStN9oAZfqudZQljvxqn1dDBHdYUegPiik3-PXIE2c55yeCUYPQmz5lsCkyrY0neteqAaTLPBOIX58Cw"/>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- BottomNavBar for Mobile -->
+<nav class="md:hidden fixed bottom-0 left-0 right-0 bg-slate-50/80 backdrop-blur-xl border-t border-slate-200/20 px-6 py-3 flex justify-around items-center z-50">
+<div class="flex flex-col items-center text-slate-500">
+<span class="material-symbols-outlined">workspaces</span>
+<span class="text-[10px] font-bold uppercase mt-1">工作室</span>
+</div>
+<div class="flex flex-col items-center text-[#006b56]">
+<span class="material-symbols-outlined">history</span>
+<span class="text-[10px] font-bold uppercase mt-1">历史记录</span>
+</div>
+<div class="flex flex-col items-center text-slate-500">
+<span class="material-symbols-outlined">construction</span>
+<span class="text-[10px] font-bold uppercase mt-1">工具</span>
+</div>
+</nav>
+</body></html>

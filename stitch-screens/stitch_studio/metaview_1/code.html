@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+
+<html class="light" lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MetaView - 任务历史</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-tertiary": "#ffffff",
+              "surface-dim": "#d8dadc",
+              "inverse-surface": "#2d3133",
+              "surface-variant": "#e0e3e5",
+              "on-primary-fixed-variant": "#005140",
+              "secondary": "#42655a",
+              "surface-bright": "#f7f9fb",
+              "on-secondary-container": "#486b5f",
+              "on-primary": "#ffffff",
+              "on-error-container": "#93000a",
+              "surface-container-low": "#f2f4f6",
+              "surface": "#f7f9fb",
+              "on-secondary": "#ffffff",
+              "inverse-primary": "#76d8bb",
+              "secondary-container": "#c4ebdc",
+              "surface-container-lowest": "#ffffff",
+              "surface-container": "#eceef0",
+              "on-tertiary-fixed": "#3e0503",
+              "error-container": "#ffdad6",
+              "error": "#ba1a1a",
+              "tertiary-fixed": "#ffdad5",
+              "outline": "#6e7a74",
+              "on-surface-variant": "#3e4945",
+              "on-secondary-fixed": "#002018",
+              "primary-fixed-dim": "#76d8bb",
+              "on-primary-container": "#004234",
+              "secondary-fixed-dim": "#a9cfc0",
+              "on-tertiary-container": "#67231b",
+              "on-primary-fixed": "#002018",
+              "surface-container-highest": "#e0e3e5",
+              "secondary-fixed": "#c4ebdc",
+              "outline-variant": "#bdc9c3",
+              "surface-tint": "#006b56",
+              "background": "#f7f9fb",
+              "primary-fixed": "#92f5d6",
+              "on-secondary-fixed-variant": "#2b4d42",
+              "tertiary-fixed-dim": "#ffb4a9",
+              "on-error": "#ffffff",
+              "on-surface": "#191c1e",
+              "primary-container": "#50b498",
+              "tertiary": "#96463c",
+              "surface-container-high": "#e6e8ea",
+              "tertiary-container": "#ea897c",
+              "on-background": "#191c1e",
+              "on-tertiary-fixed-variant": "#783027",
+              "inverse-on-surface": "#eff1f3",
+              "primary": "#006b56"
+            },
+            fontFamily: {
+              "headline": ["Space Grotesk"],
+              "body": ["Space Grotesk"],
+              "label": ["Space Grotesk"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Space Grotesk', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-surface text-on-surface antialiased pb-24">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-slate-50/70 backdrop-blur-xl shadow-sm shadow-emerald-900/5">
+<div class="flex justify-between items-center px-6 py-4 max-w-full">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-emerald-700 text-xl" data-icon="biotech">biotech</span>
+<h1 class="font-['Space_Grotesk'] tracking-tight font-bold text-lg text-slate-900">MetaView</h1>
+</div>
+<div class="w-8 h-8 rounded-full overflow-hidden bg-surface-container border border-outline-variant/20">
+<img class="w-full h-full object-cover" data-alt="Professional laboratory researcher portrait with clean sterile background and medical attire" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBrKviLpbfgZx0Mz-0iuQzVygy7DwPctkOWXtSNxnVbyaqOGh6sdNFmMXP1CC3kxHWAgYIEr36N5N54-wWSmD1XV4exhVlSfyo-KbtlT64csmhDSJ2xtQ74DBaQ_z0CSsrEjf9n3Z8gIw1-IClK1ixrZWea8ohblEYM2_8XdubGaX5UyWBMv9f3-0yQPSbgnZOmLn_l7att8aixgo75Q9RkLS_GGzY-8Oi5jdhtuyhtNpTXYIuwG-3ZJ82zN4wqkxQD-1zqPWKlxgs"/>
+</div>
+</div>
+<div class="bg-slate-200/20 h-[1px] w-full absolute bottom-0"></div>
+</header>
+<main class="mt-20 px-4 space-y-6">
+<!-- Filter Header -->
+<section class="flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<h2 class="text-2xl font-bold tracking-tight text-on-surface">任务历史</h2>
+<button class="flex items-center gap-2 px-3 py-1.5 bg-surface-container-lowest text-primary text-sm font-medium rounded-xl border border-outline-variant/30 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-sm" data-icon="download">download</span>
+                    导出日志
+                </button>
+</div>
+<div class="flex gap-2 overflow-x-auto hide-scrollbar pb-2">
+<button class="px-4 py-2 bg-primary text-on-primary rounded-full text-sm font-medium shrink-0">全部任务</button>
+<button class="px-4 py-2 bg-surface-container-low text-on-surface-variant rounded-full text-sm font-medium shrink-0 border border-outline-variant/10">成功</button>
+<button class="px-4 py-2 bg-surface-container-low text-on-surface-variant rounded-full text-sm font-medium shrink-0 border border-outline-variant/10">失败</button>
+<button class="px-4 py-2 bg-surface-container-low text-on-surface-variant rounded-full text-sm font-medium shrink-0 border border-outline-variant/10">正在进行</button>
+</div>
+</section>
+<!-- Task List - Bento Inspired Layout -->
+<section class="grid grid-cols-1 gap-4">
+<!-- Active/Selected Task Detail Card -->
+<div class="bg-surface-container-lowest rounded-full p-6 shadow-[0px_12px_32px_-4px_rgba(25,28,30,0.06)] border border-outline-variant/10">
+<div class="flex justify-between items-start mb-6">
+<div>
+<div class="flex items-center gap-2 mb-1">
+<span class="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold">任务 ID: CLIN-8829-X</span>
+<span class="flex items-center gap-1 px-2 py-0.5 bg-error-container text-on-error-container text-[10px] font-bold rounded-full">
+<span class="material-symbols-outlined text-[10px]" data-icon="error" data-weight="fill" style="font-variation-settings: 'FILL' 1;">error</span>
+                                关键失败
+                            </span>
+</div>
+<h3 class="text-xl font-bold text-on-surface">临床数据序列化诊断</h3>
+</div>
+<span class="text-xs text-outline font-medium">14:20:05</span>
+</div>
+<!-- Performance Metrics -->
+<div class="space-y-4 mb-6">
+<div>
+<div class="flex justify-between text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1.5">
+<span>执行规格 (Execute Specs)</span>
+<span class="text-primary">85%</span>
+</div>
+<div class="h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-primary-container w-[85%] rounded-full"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1.5">
+<span>资源占用 (Resource Usage)</span>
+<span class="text-tertiary">92%</span>
+</div>
+<div class="h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-tertiary-container w-[92%] rounded-full"></div>
+</div>
+</div>
+</div>
+<!-- Code Snippet / Diagnostics -->
+<div class="bg-slate-900 rounded-xl p-4 font-mono text-xs overflow-x-auto border-l-4 border-error">
+<div class="flex justify-between items-center mb-2 text-slate-500 border-b border-slate-800 pb-2">
+<span>main.rs:244</span>
+<span class="material-symbols-outlined text-sm" data-icon="content_copy">content_copy</span>
+</div>
+<pre class="text-slate-300"><code><span class="text-pink-400">let</span> result = <span class="text-emerald-400">process_sequence</span>(batch_id)<span class="text-slate-500">?</span>;
+<span class="text-slate-500">// CRITICAL FAILURE: Memory alignment error</span>
+<span class="text-pink-400">match</span> result {
+    <span class="text-emerald-400">Ok</span>(data) =&gt; <span class="text-blue-400">return</span> <span class="text-emerald-400">Success</span>(data),
+    <span class="text-emerald-400">Err</span>(e) =&gt; <span class="text-red-400 font-bold">panic!</span>(<span class="text-amber-200">"Fatal: {}"</span>, e),
+}</code></pre>
+</div>
+<div class="mt-4 p-3 bg-error-container/30 rounded-lg flex items-start gap-3">
+<span class="material-symbols-outlined text-error" data-icon="priority_high">priority_high</span>
+<p class="text-sm text-on-error-container font-medium">堆栈跟踪：非法内存地址访问。请检查 GPU 缓冲区分配逻辑。</p>
+</div>
+</div>
+<!-- List of Previous Tasks -->
+<div class="space-y-3">
+<div class="bg-surface-container-low rounded-xl p-4 flex items-center justify-between active:bg-surface-container transition-colors">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700">
+<span class="material-symbols-outlined" data-icon="check_circle" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<div>
+<p class="font-bold text-on-surface">基因组拼接任务</p>
+<p class="text-[10px] text-on-surface-variant uppercase tracking-wider">ID: GEN-4412-S • 12:05</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline" data-icon="chevron_right">chevron_right</span>
+</div>
+<div class="bg-surface-container-low rounded-xl p-4 flex items-center justify-between opacity-80">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700">
+<span class="material-symbols-outlined" data-icon="check_circle" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<div>
+<p class="font-bold text-on-surface">蛋白质结构预测</p>
+<p class="text-[10px] text-on-surface-variant uppercase tracking-wider">ID: PRT-9921-A • 10:45</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline" data-icon="chevron_right">chevron_right</span>
+</div>
+<div class="bg-surface-container-low rounded-xl p-4 flex items-center justify-between opacity-80">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-error-container/50 flex items-center justify-center text-error">
+<span class="material-symbols-outlined" data-icon="cancel" data-weight="fill" style="font-variation-settings: 'FILL' 1;">cancel</span>
+</div>
+<div>
+<p class="font-bold text-on-surface">多组学整合分析</p>
+<p class="text-[10px] text-on-surface-variant uppercase tracking-wider">ID: MUL-3320-F • 09:15</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 bg-white/80 backdrop-blur-2xl border-t border-slate-100 shadow-[0px_-4px_20px_rgba(0,0,0,0.03)]">
+<div class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-3">
+<div class="flex flex-col items-center justify-center text-slate-400 px-4 py-1.5 hover:text-emerald-600 transition-all active:scale-90 duration-200">
+<span class="material-symbols-outlined mb-1" data-icon="science">science</span>
+<span class="font-['Space_Grotesk'] text-[11px] uppercase tracking-[0.05em] font-medium">Studio</span>
+</div>
+<div class="flex flex-col items-center justify-center text-emerald-700 bg-emerald-50/50 rounded-xl px-4 py-1.5 active:scale-90 duration-200">
+<span class="material-symbols-outlined mb-1" data-icon="history" data-weight="fill" style="font-variation-settings: 'FILL' 1;">history</span>
+<span class="font-['Space_Grotesk'] text-[11px] uppercase tracking-[0.05em] font-bold">History</span>
+</div>
+<div class="flex flex-col items-center justify-center text-slate-400 px-4 py-1.5 hover:text-emerald-600 transition-all active:scale-90 duration-200">
+<span class="material-symbols-outlined mb-1" data-icon="architecture">architecture</span>
+<span class="font-['Space_Grotesk'] text-[11px] uppercase tracking-[0.05em] font-medium">Tools</span>
+</div>
+</div>
+</nav>
+</body></html>

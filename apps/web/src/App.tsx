@@ -18,7 +18,6 @@ import { TTSSettingsPanel } from "./components/TTSSettingsPanel";
 import { InteractiveExecutionExplorer } from "./components/InteractiveExecutionExplorer";
 import {
   domainPresets,
-  getDomainPresentation,
 } from "./domainPresentation";
 import { HistoryPanel } from "./components/HistoryPanel";
 import { ProviderManager } from "./components/ProviderManager";
@@ -32,7 +31,6 @@ import type {
   PipelineRunStatus,
   RuntimeCatalog,
   SandboxMode,
-  SkillDescriptor,
   TopicDomain,
 } from "./types";
 
@@ -214,20 +212,6 @@ function shouldEmphasizeSourceLine(line: string): boolean {
   );
 }
 
-function resolveSubjectSkill(
-  catalog: RuntimeCatalog,
-  selectedDomain: TopicDomain | null,
-  activeSkill: SkillDescriptor | null,
-): SkillDescriptor | null {
-  if (activeSkill) {
-    return activeSkill;
-  }
-  if (!selectedDomain) {
-    return null;
-  }
-  return catalog.skills.find((skill) => skill.domain === selectedDomain) ?? null;
-}
-
 function mergePromptScenario(prompt: string, scenario: string): string {
   const scenarioPrefix = "请用这组输入重新解释算法边界条件：";
   const lines = prompt
@@ -298,10 +282,6 @@ export default function App() {
     runtimeCatalog,
     generationProvider,
   );
-  const effectiveSelectedDomain =
-    deckMode === "expert" ? selectedDomain : (activeSkill?.domain ?? null);
-  const subjectSkill = resolveSubjectSkill(runtimeCatalog, effectiveSelectedDomain, activeSkill);
-  const presentation = getDomainPresentation(subjectSkill?.domain ?? effectiveSelectedDomain);
   const editorName = resolveSourceEditorName(sourceCode, sourceCodeLanguage);
   const sourcePreviewLanguage =
     sourceCodeLanguage === "cpp"
@@ -310,9 +290,7 @@ export default function App() {
         ? "python"
         : undefined;
   const hasCompletedPreview = Boolean(previewVideoUrl);
-  const showPreviewPanel = loading || Boolean(result) || Boolean(error);
   const showSourcePanel = sourceCode.trim().length > 0;
-  const showDualResults = showPreviewPanel && showSourcePanel;
   const hasInteractiveExplorer = Boolean(
     previewVideoUrl
       && result?.execution_map
@@ -949,184 +927,197 @@ export default function App() {
   }
 
   return (
-    <div className="theory-shell">
-      {/* 侧边栏 */}
+    <div className="app-shell">
+      {/* Top Navigation Bar - Full Width */}
+      <header className="topbar">
+        <div className="topbar-brand">MetaView</div>
+        <nav className="topbar-nav">
+          <a
+            href="#studio"
+            className={activePage === "studio" ? "is-active" : ""}
+            onClick={(e) => { e.preventDefault(); setActivePage("studio"); }}
+          >
+            工作台
+          </a>
+          <a
+            href="#history"
+            className={activePage === "history" ? "is-active" : ""}
+            onClick={(e) => { e.preventDefault(); setActivePage("history"); }}
+          >
+            历史记录
+          </a>
+          <a
+            href="#tools"
+            className={activePage === "tools" ? "is-active" : ""}
+            onClick={(e) => { e.preventDefault(); setActivePage("tools"); }}
+          >
+            工具
+          </a>
+        </nav>
+        <div className="topbar-actions">
+          <button
+            type="button"
+            className="topbar-icon-btn"
+            onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
+            title={theme === "dark" ? "切换到浅色模式" : "切换到深色模式"}
+          >
+            <span className="material-symbols-outlined">
+              {theme === "dark" ? "light_mode" : "dark_mode"}
+            </span>
+          </button>
+          <div className="topbar-avatar">MV</div>
+        </div>
+      </header>
+
+      {/* Side Navigation Bar - Below Topbar */}
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <span className="brand-mark" />
-          <div>
-            <strong>MetaView</strong>
-            <small>Theoretical Canvas</small>
-          </div>
+          <div className="sidebar-brand-title">MetaView Lab</div>
+          <div className="sidebar-brand-subtitle">Clinical Curator</div>
         </div>
 
         <nav className="sidebar-nav">
           <button
             type="button"
-            className={activePage === "studio" ? "is-active" : ""}
+            className={`sidebar-nav-item ${activePage === "studio" ? "is-active" : ""}`}
             onClick={() => setActivePage("studio")}
           >
-            Studio
+            <span className="material-symbols-outlined">dashboard</span>
+            Dashboard
           </button>
           <button
             type="button"
-            className={activePage === "history" ? "is-active" : ""}
+            className={`sidebar-nav-item ${activePage === "history" ? "is-active" : ""}`}
             onClick={() => setActivePage("history")}
           >
-            History
+            <span className="material-symbols-outlined">inventory_2</span>
+            Projects
           </button>
           <button
             type="button"
-            className={activePage === "tools" ? "is-active" : ""}
+            className={`sidebar-nav-item ${activePage === "tools" ? "is-active" : ""}`}
             onClick={() => setActivePage("tools")}
           >
-            Tools
+            <span className="material-symbols-outlined">analytics</span>
+            Analytics
           </button>
         </nav>
 
         <div className="sidebar-footer">
-          <button
-            type="button"
-            className="theme-toggle"
-            onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
-          >
-            {theme === "dark" ? "Light Mode" : "Dark Mode"}
-          </button>
+          <div className="sidebar-status">
+            <span className="sidebar-status-dot" />
+            <span className="sidebar-status-text">Core Nodes Online</span>
+          </div>
+          <div className="sidebar-progress">
+            <div className="sidebar-progress-bar" style={{ width: "88%" }} />
+          </div>
         </div>
       </aside>
 
-      {/* 主内容区 */}
-      <div className="main-wrapper">
-        <header className="topbar">
-          <div className="topbar-actions">
-            <button
-              type="button"
-              className="topbar-secondary-button"
-              onClick={handleStartNewConversation}
-            >
-              新对话
-            </button>
-          </div>
-        </header>
-
-        <div className="workspace">
-          <main className="canvas">
+      {/* Main Content Area */}
+      <main className="main-content">
+        <div className="page-container">
+          {/* Studio Page */}
           {activePage === "studio" ? (
-          <section
-            className={`studio-layout ${hasCompletedPreview ? "is-resolved" : "hero-shell"}`}
-            id="studio"
-          >
-            <div className="hero-glow" />
-            <div className="studio-column">
-              <ControlPanel
-                deckMode={deckMode}
-                layoutMode={hasCompletedPreview ? "split" : "hero"}
-                selectedDomain={selectedDomain}
-                prompt={prompt}
-                sourceImage={sourceImage}
-                sourceCode={sourceCode}
-                sourceCodeLanguage={sourceCodeLanguage}
-                routerProvider={routerProvider}
-                generationProvider={generationProvider}
-                sandboxMode={sandboxMode}
-                enableNarration={enableNarration}
-                skills={runtimeCatalog.skills}
-                providers={runtimeCatalog.providers}
-                sandboxModes={runtimeCatalog.sandbox_modes}
-                loading={loading}
-                sourceImageName={sourceImageName}
-                routerProviderSupportsVision={routerProviderSupportsVision}
-                generationProviderSupportsVision={generationProviderSupportsVision}
-                onDeckModeChange={handleSetDeckMode}
-                onSelectDomain={handleSelectDomain}
-                onPromptChange={handlePromptChange}
-                onSourceCodeChange={handleSourceCodeChange}
-                onSourceCodeLanguageChange={handleSourceCodeLanguageChange}
-                onRouterProviderChange={handleRouterProviderChange}
-                onGenerationProviderChange={handleGenerationProviderChange}
-                onSandboxModeChange={handleSandboxModeChange}
-                onEnableNarrationChange={handleEnableNarrationChange}
-                onSourceImageChange={handleSourceImageChange}
-                onStartNewQuestion={handleStartNewConversation}
-                onSubmit={handleSubmit}
-              />
+            <div id="studio">
+              {/* Page Header */}
+              <div className="page-header">
+                <span className="page-kicker">AI Powered</span>
+                <h1 className="page-title">想问什么直接问</h1>
+                <p className="page-description">AI 辅助可视化生成引擎</p>
+              </div>
 
-              {hasCompletedPreview && showSourcePanel && !hasInteractiveExplorer ? (
-                <section className="panel source-panel studio-source-panel">
-                  <div className="panel-header">
-                    <span className="panel-kicker">Source</span>
-                    <h3>算法源码</h3>
-                    <p>这里只高亮你输入的 Python / C++ 源码，不展示生成的 Manim 脚本。</p>
+              {/* Bento Grid Layout */}
+              <div className="bento-grid" style={{ marginTop: "32px" }}>
+                {/* Main Input Panel - 8 columns */}
+                <div className="bento-card bento-card-xl">
+                  <div className="bento-card-header">
+                    <span className="bento-card-kicker">
+                      <span style={{ color: "var(--primary)" }}>● </span>
+                      等待输入
+                    </span>
                   </div>
-
-                  {activeStepIndex !== null && stepTiming[activeStepIndex] ? (
-                    <div className="execution-code-summary">
-                      <div>
-                        <span className="panel-kicker">Active Step</span>
-                        <strong>步骤 {activeStepIndex + 1}</strong>
-                      </div>
-                      <p>
-                        当前播放时间对应源码第 {stepTiming[activeStepIndex].start_line}
-                        {stepTiming[activeStepIndex].end_line !== stepTiming[activeStepIndex].start_line
-                          ? ` - ${stepTiming[activeStepIndex].end_line}` : ''} 行
-                      </p>
-                    </div>
-                  ) : null}
-
-                  <div className="console-toolbar">
-                    <div className="console-dots">
-                      <span />
-                      <span />
-                      <span />
-                    </div>
-                    <strong>{editorName}</strong>
-                  </div>
-                  <div className="console-content source-console">
-                    <HighlightedCode
-                      code={sourceCode}
-                      language={sourcePreviewLanguage}
-                      maxLines={24}
-                      emphasizeLine={shouldEmphasizeSourceLine}
-                      highlightedLines={highlightedSourceLines}
-                      onLineClick={handleSourceLineClick}
+                  <div className="bento-card-body">
+                    <ControlPanel
+                      deckMode={deckMode}
+                      layoutMode={hasCompletedPreview ? "split" : "hero"}
+                      selectedDomain={selectedDomain}
+                      prompt={prompt}
+                      sourceImage={sourceImage}
+                      sourceCode={sourceCode}
+                      sourceCodeLanguage={sourceCodeLanguage}
+                      routerProvider={routerProvider}
+                      generationProvider={generationProvider}
+                      sandboxMode={sandboxMode}
+                      enableNarration={enableNarration}
+                      skills={runtimeCatalog.skills}
+                      providers={runtimeCatalog.providers}
+                      sandboxModes={runtimeCatalog.sandbox_modes}
+                      loading={loading}
+                      sourceImageName={sourceImageName}
+                      routerProviderSupportsVision={routerProviderSupportsVision}
+                      generationProviderSupportsVision={generationProviderSupportsVision}
+                      onDeckModeChange={handleSetDeckMode}
+                      onSelectDomain={handleSelectDomain}
+                      onPromptChange={handlePromptChange}
+                      onSourceCodeChange={handleSourceCodeChange}
+                      onSourceCodeLanguageChange={handleSourceCodeLanguageChange}
+                      onRouterProviderChange={handleRouterProviderChange}
+                      onGenerationProviderChange={handleGenerationProviderChange}
+                      onSandboxModeChange={handleSandboxModeChange}
+                      onEnableNarrationChange={handleEnableNarrationChange}
+                      onSourceImageChange={handleSourceImageChange}
+                      onStartNewQuestion={handleStartNewConversation}
+                      onSubmit={handleSubmit}
                     />
                   </div>
-                </section>
-              ) : null}
-            </div>
+                </div>
 
-            {hasCompletedPreview ? (
-              hasInteractiveExplorer && result?.execution_map ? (
-                <section className="panel stage-panel interactive-explorer-panel">
-                  <InteractiveExecutionExplorer
-                    key={result.request_id}
-                    videoSrc={previewVideoUrl!}
-                    videoTitle="当前渲染视频"
-                    videoMeta={
-                      result
-                        ? `${result.request_id.slice(0, 8)} · ${result.runtime.generation_provider?.label ?? generationProvider}`
-                        : undefined
-                    }
-                    downloadName={
-                      result ? `${result.request_id}.mp4` : "metaview-preview.mp4"
-                    }
-                    sourceCode={sourceCode}
-                    sourceLanguage={sourcePreviewLanguage}
-                    editorName={editorName}
-                    executionMap={result.execution_map}
-                    onApplyParameterScenario={(scenario) => {
-                      setEditorDirty(true);
-                      setPrompt((current) => mergePromptScenario(current, scenario));
-                    }}
-                  />
-                </section>
-              ) : (
-                <section className="panel stage-panel stage-panel-sticky stage-panel-compact">
-                  <div className="preview-stage">
-                    <VideoPreview
-                      src={previewVideoUrl!}
-                      title="当前渲染视频"
-                      meta={
+                {/* Mode Selection - 4 columns */}
+                <div className="bento-card bento-card-md">
+                  <div className="bento-card-header">
+                    <span className="bento-card-kicker">处理模式</span>
+                  </div>
+                  <div className="bento-card-body">
+                    <div className="mode-toggle">
+                      <div
+                        className={`mode-option ${deckMode === "smart" ? "is-selected" : ""}`}
+                        onClick={() => handleSetDeckMode("smart")}
+                      >
+                        <div className="mode-option-left">
+                          <span className="material-symbols-outlined mode-option-icon">psychology</span>
+                          <div>
+                            <div className="mode-option-label">智能模式</div>
+                            <div className="mode-option-hint">优化速度与清晰度</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div
+                        className={`mode-option ${deckMode === "expert" ? "is-selected" : ""}`}
+                        onClick={() => handleSetDeckMode("expert")}
+                      >
+                        <div className="mode-option-left">
+                          <span className="material-symbols-outlined mode-option-icon">science</span>
+                          <div>
+                            <div className="mode-option-label">专家模式</div>
+                            <div className="mode-option-hint">高精度输出</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Video Preview Section */}
+              {hasCompletedPreview ? (
+                hasInteractiveExplorer && result?.execution_map ? (
+                  <div style={{ marginTop: "24px" }}>
+                    <InteractiveExecutionExplorer
+                      key={result.request_id}
+                      videoSrc={previewVideoUrl!}
+                      videoTitle="当前渲染视频"
+                      videoMeta={
                         result
                           ? `${result.request_id.slice(0, 8)} · ${result.runtime.generation_provider?.label ?? generationProvider}`
                           : undefined
@@ -1134,127 +1125,98 @@ export default function App() {
                       downloadName={
                         result ? `${result.request_id}.mp4` : "metaview-preview.mp4"
                       }
-                      headerless
-                      onTimeUpdate={handleVideoTimeUpdate}
-                      seekTo={seekToTime}
+                      sourceCode={sourceCode}
+                      sourceLanguage={sourcePreviewLanguage}
+                      editorName={editorName}
+                      executionMap={result.execution_map}
+                      onApplyParameterScenario={(scenario) => {
+                        setEditorDirty(true);
+                        setPrompt((current) => mergePromptScenario(current, scenario));
+                      }}
                     />
                   </div>
-                </section>
-              )
-            ) : null}
-          </section>
-          ) : null}
-
-          {activePage === "studio" && !hasCompletedPreview && (showPreviewPanel || showSourcePanel) ? (
-            <section
-              className={`results-layout ${showDualResults ? "has-source" : ""}`}
-              id="results"
-            >
-              {showPreviewPanel ? (
-                <section className="panel stage-panel">
-                  <div className="panel-header panel-header-row">
-                    <div>
-                      <span className="panel-kicker">Result</span>
-                      <h3>{result?.cir.title ?? "正在生成预览"}</h3>
-                      <p>
-                        {result?.cir.summary ??
-                          "后端正在渲染视频，完成后会自动显示在这里。"}
-                      </p>
-                    </div>
-                    <div className="preview-runtime-badges">
-                      <span>{subjectSkill?.domain ?? effectiveSelectedDomain ?? "auto"}</span>
-                      <span>{previewVideoUrl ? "video ready" : loading ? "rendering" : "idle"}</span>
-                      <span>{result?.runtime.sandbox.status ?? sandboxMode}</span>
-                    </div>
-                  </div>
-
-                  {error ? <p className="error-text">{error}</p> : null}
-                  {result ? (
-                    <p className="panel-note">
-                      当前任务已路由到 <strong>{result.runtime.skill.label}</strong>。
-                    </p>
-                  ) : null}
-
-                  {previewVideoUrl ? (
-                    <div className="preview-stage">
-                      <VideoPreview
-                        src={previewVideoUrl}
-                        title="当前渲染视频"
-                        meta={
-                          result
-                            ? `${result.request_id.slice(0, 8)} · ${result.runtime.generation_provider?.label ?? generationProvider}`
-                            : undefined
-                        }
-                        downloadName={
-                          result ? `${result.request_id}.mp4` : "metaview-preview.mp4"
-                        }
-                      />
-                    </div>
-                  ) : (
-                    <div className="preview-stage">
-                      <div className={`preview-empty ${loading ? "is-loading" : ""}`}>
-                        <strong>
-                          {error
-                            ? "本次生成失败"
-                            : loading
-                              ? "正在渲染视频"
-                              : presentation?.emptyTitle ?? "等待下一次渲染"}
-                        </strong>
-                        <span>
-                          {error
-                            ? error
-                            : loading
-                              ? "后端正在进行镜头规划、脚本生成和视频输出。"
-                              : presentation?.emptyDescription ??
-                                "提交题目后，这里会直接显示最终 MP4 预览。"}
-                        </span>
-                        <ul className="preview-checklist">
-                          {(error
-                            ? ["检查 provider 连通性", "确认提示词与源码输入", "重新提交生成任务"]
-                            : result?.cir.steps.length
-                              ? result.cir.steps.slice(0, 4).map((step) => step.title)
-                              : presentation?.sceneNodes ?? ["Input", "Plan", "Render", "Result"]
-                          ).map((item) => (
-                            <li key={item}>{item}</li>
-                          ))}
-                        </ul>
+                ) : (
+                  <div className="bento-grid" style={{ marginTop: "24px" }}>
+                    <div className="bento-card bento-card-xl">
+                      <div className="video-preview">
+                        <div className="video-preview-header">
+                          <div>
+                            <div className="video-preview-title">当前渲染视频</div>
+                            <div className="video-preview-meta">
+                              {result
+                                ? `${result.request_id.slice(0, 8)} · ${result.runtime.generation_provider?.label ?? generationProvider}`
+                                : "等待渲染"}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="video-container">
+                          <VideoPreview
+                            src={previewVideoUrl!}
+                            title="当前渲染视频"
+                            downloadName={
+                              result ? `${result.request_id}.mp4` : "metaview-preview.mp4"
+                            }
+                            headerless
+                            onTimeUpdate={handleVideoTimeUpdate}
+                            seekTo={seekToTime}
+                          />
+                        </div>
                       </div>
                     </div>
-                  )}
-                </section>
+                    {showSourcePanel ? (
+                      <div className="bento-card bento-card-md">
+                        <div className="code-block">
+                          <div className="code-header">
+                            <div className="code-dots">
+                              <span className="code-dot" />
+                              <span className="code-dot" />
+                              <span className="code-dot" />
+                            </div>
+                            <span className="code-title">{editorName}</span>
+                          </div>
+                          <div className="code-content">
+                            <HighlightedCode
+                              code={sourceCode}
+                              language={sourcePreviewLanguage}
+                              maxLines={24}
+                              emphasizeLine={shouldEmphasizeSourceLine}
+                              highlightedLines={highlightedSourceLines}
+                              onLineClick={handleSourceLineClick}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                )
               ) : null}
 
-              {showSourcePanel ? (
-                <section className="panel source-panel">
-                  <div className="panel-header">
-                    <span className="panel-kicker">Source</span>
-                    <h3>算法源码</h3>
-                    <p>这里只高亮你输入的 Python / C++ 源码，不展示生成的 Manim 脚本。</p>
+              {/* Loading/Error State */}
+              {(loading || error) && !hasCompletedPreview ? (
+                <div className="bento-card bento-card-full" style={{ marginTop: "24px" }}>
+                  <div className="bento-card-body">
+                    {error ? (
+                      <div style={{ color: "var(--error)" }}>
+                        <strong>生成失败</strong>
+                        <p>{error}</p>
+                      </div>
+                    ) : loading ? (
+                      <div style={{ textAlign: "center", padding: "40px" }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: "48px", color: "var(--primary)" }}>
+                          progress_activity
+                        </span>
+                        <p style={{ marginTop: "16px", color: "var(--on-surface-variant)" }}>
+                          正在渲染视频...
+                        </p>
+                      </div>
+                    ) : null}
                   </div>
-
-                  <div className="console-toolbar">
-                    <div className="console-dots">
-                      <span />
-                      <span />
-                      <span />
-                    </div>
-                    <strong>{editorName}</strong>
-                  </div>
-                  <div className="console-content source-console">
-                    <HighlightedCode
-                      code={sourceCode}
-                      language={sourcePreviewLanguage}
-                      maxLines={24}
-                      emphasizeLine={shouldEmphasizeSourceLine}
-                      highlightedLines={highlightedSourceLines}
-                      onLineClick={handleSourceLineClick}
-                    />
-                  </div>
-                </section>
+                </div>
               ) : null}
-            </section>
+            </div>
           ) : null}
 
+          {/* History Page */}
           {activePage === "history" ? (
             <section className="page-shell" id="history">
               <div className="page-header">
@@ -1540,37 +1502,36 @@ export default function App() {
           </details>
             </section>
           ) : null}
-        </main>
-      </div>
+        </div>
+      </main>
 
-      {/* 移动端底部导航 */}
-      <nav className="mobile-nav" aria-label="Mobile navigation">
-          <button type="button" onClick={handleStartNewConversation}>
-            新对话
-          </button>
+      {/* Mobile Bottom Navigation */}
+      <nav className="mobile-nav">
           <button
             type="button"
-            className={activePage === "studio" ? "is-active" : ""}
+            className={`mobile-nav-item ${activePage === "studio" ? "is-active" : ""}`}
             onClick={() => setActivePage("studio")}
           >
-            Studio
+            <span className="material-symbols-outlined">workspaces</span>
+            工作台
           </button>
           <button
             type="button"
-            className={activePage === "history" ? "is-active" : ""}
+            className={`mobile-nav-item ${activePage === "history" ? "is-active" : ""}`}
             onClick={() => setActivePage("history")}
           >
-            History
+            <span className="material-symbols-outlined">history</span>
+            历史
           </button>
           <button
             type="button"
-            className={activePage === "tools" ? "is-active" : ""}
+            className={`mobile-nav-item ${activePage === "tools" ? "is-active" : ""}`}
             onClick={() => setActivePage("tools")}
           >
-            Tools
+            <span className="material-symbols-outlined">extension</span>
+            工具
           </button>
         </nav>
-      </div>
     </div>
   );
 }
