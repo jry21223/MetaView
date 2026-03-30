@@ -17,7 +17,9 @@ import { PromptReferenceTool } from "./components/PromptReferenceTool";
 import { TTSSettingsPanel } from "./components/TTSSettingsPanel";
 import { InteractiveExecutionExplorer } from "./components/InteractiveExecutionExplorer";
 import {
+  domainLabels,
   domainPresets,
+  getDomainPresentation,
 } from "./domainPresentation";
 import { HistoryPanel } from "./components/HistoryPanel";
 import { ProviderManager } from "./components/ProviderManager";
@@ -128,13 +130,13 @@ function resolveConfiguredProvider(
 
 function getInitialTheme(): ThemeMode {
   if (typeof window === "undefined") {
-    return "dark";
+    return "light";
   }
   const storedTheme = window.localStorage.getItem(themeStorageKey);
   if (storedTheme === "dark" || storedTheme === "light") {
     return storedTheme;
   }
-  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  return "light";
 }
 
 function getInitialActiveRunId(): string | null {
@@ -271,9 +273,6 @@ export default function App() {
 
   const activeSkill = result?.runtime.skill ?? null;
   const previewVideoUrl = resolvePreviewVideoUrl(result?.preview_video_url);
-  const hasRawProviderOutput = Boolean(
-    result?.runtime.agent_traces.some((trace) => Boolean(trace.raw_output)),
-  );
   const routerProviderSupportsVision = activeProviderSupportsVision(
     runtimeCatalog,
     routerProvider,
@@ -299,6 +298,20 @@ export default function App() {
   );
   const selectedHistoryRun =
     runs.find((run) => run.request_id === selectedRunId) ?? null;
+  const selectedDomainLabel = selectedDomain ? domainLabels[selectedDomain] : "自动路由";
+  const selectedPresentation = getDomainPresentation(selectedDomain);
+  const selectedMetrics = selectedPresentation?.metrics ?? [
+    {
+      label: "输入方式",
+      value: "题目 / 源码 / 题图",
+      description: "一个主入口统一组织问题、源码与题图。",
+    },
+    {
+      label: "输出目标",
+      value: "教学视频",
+      description: "生成讲解结构、脚本和可直接预览的动画结果。",
+    },
+  ];
 
   // 动画-代码联动：根据视频时间确定当前步骤
   const stepTiming = result?.step_timing ?? [];
@@ -930,30 +943,10 @@ export default function App() {
     <div className="app-shell">
       {/* Top Navigation Bar - Full Width */}
       <header className="topbar">
-        <div className="topbar-brand">MetaView</div>
-        <nav className="topbar-nav">
-          <a
-            href="#studio"
-            className={activePage === "studio" ? "is-active" : ""}
-            onClick={(e) => { e.preventDefault(); setActivePage("studio"); }}
-          >
-            工作台
-          </a>
-          <a
-            href="#history"
-            className={activePage === "history" ? "is-active" : ""}
-            onClick={(e) => { e.preventDefault(); setActivePage("history"); }}
-          >
-            历史记录
-          </a>
-          <a
-            href="#tools"
-            className={activePage === "tools" ? "is-active" : ""}
-            onClick={(e) => { e.preventDefault(); setActivePage("tools"); }}
-          >
-            工具
-          </a>
-        </nav>
+        <div className="topbar-brand">
+          <span className="topbar-neon-strip" />
+          <span className="topbar-brand-text">MetaView</span>
+        </div>
         <div className="topbar-actions">
           <button
             type="button"
@@ -972,8 +965,8 @@ export default function App() {
       {/* Side Navigation Bar - Below Topbar */}
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <div className="sidebar-brand-title">MetaView Lab</div>
-          <div className="sidebar-brand-subtitle">Clinical Curator</div>
+          <div className="sidebar-brand-title">MetaView</div>
+          <div className="sidebar-brand-subtitle">AI Visualization Studio</div>
         </div>
 
         <nav className="sidebar-nav">
@@ -983,7 +976,7 @@ export default function App() {
             onClick={() => setActivePage("studio")}
           >
             <span className="material-symbols-outlined">dashboard</span>
-            Dashboard
+            工作台
           </button>
           <button
             type="button"
@@ -991,7 +984,7 @@ export default function App() {
             onClick={() => setActivePage("history")}
           >
             <span className="material-symbols-outlined">inventory_2</span>
-            Projects
+            任务历史
           </button>
           <button
             type="button"
@@ -999,7 +992,7 @@ export default function App() {
             onClick={() => setActivePage("tools")}
           >
             <span className="material-symbols-outlined">analytics</span>
-            Analytics
+            工具
           </button>
         </nav>
 
@@ -1020,16 +1013,13 @@ export default function App() {
           {/* Studio Page */}
           {activePage === "studio" ? (
             <div id="studio">
-              {/* Page Header */}
               <div className="page-header">
-                <span className="page-kicker">AI Powered</span>
+                <span className="page-kicker">Workspace</span>
                 <h1 className="page-title">想问什么直接问</h1>
-                <p className="page-description">AI 辅助可视化生成引擎</p>
+                <p className="page-description">AI 辅助生成引擎，统一管理题目、源码与题图输入。</p>
               </div>
 
-              {/* Bento Grid Layout */}
               <div className="bento-grid" style={{ marginTop: "32px" }}>
-                {/* Main Input Panel - 8 columns */}
                 <div className="bento-card bento-card-xl">
                   <div className="bento-card-header">
                     <span className="bento-card-kicker">
@@ -1073,7 +1063,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Mode Selection - 4 columns */}
                 <div className="bento-card bento-card-md">
                   <div className="bento-card-header">
                     <span className="bento-card-kicker">处理模式</span>
@@ -1107,9 +1096,29 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+
+                <div className="bento-card bento-card-md">
+                  <div className="bento-card-header">
+                    <span className="bento-card-kicker">当前聚焦</span>
+                  </div>
+                  <div className="bento-card-body">
+                    <h3 className="bento-card-title" style={{ marginBottom: "12px" }}>{selectedDomainLabel}</h3>
+                    <p className="page-description" style={{ fontSize: "0.95rem" }}>
+                      {selectedPresentation?.studioDescription ?? "系统会根据当前输入自动路由学科模块，并生成对应的讲解路径。"}
+                    </p>
+                    <div style={{ display: "grid", gap: "12px", marginTop: "20px" }}>
+                      {selectedMetrics.map((metric) => (
+                        <div key={metric.label} style={{ padding: "14px 16px", background: "var(--surface-container-low)", borderRadius: "12px" }}>
+                          <div className="page-kicker" style={{ marginBottom: "6px" }}>{metric.label}</div>
+                          <div style={{ fontWeight: 700, marginBottom: "4px" }}>{metric.value}</div>
+                          <div style={{ color: "var(--on-surface-variant)", fontSize: "0.85rem", lineHeight: 1.5 }}>{metric.description}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* Video Preview Section */}
               {hasCompletedPreview ? (
                 hasInteractiveExplorer && result?.execution_map ? (
                   <div style={{ marginTop: "24px" }}>
@@ -1191,7 +1200,6 @@ export default function App() {
                 )
               ) : null}
 
-              {/* Loading/Error State */}
               {(loading || error) && !hasCompletedPreview ? (
                 <div className="bento-card bento-card-full" style={{ marginTop: "24px" }}>
                   <div className="bento-card-body">
@@ -1222,16 +1230,17 @@ export default function App() {
               <div className="page-header">
                 <span className="panel-kicker">History</span>
                 <h2>任务历史</h2>
-                <p>历史任务集中放在这里查看。选择记录后，右侧会显示当前结果摘要，并可一键切回 Studio 继续编辑或复用。</p>
+                <p>历史任务集中放在这里查看。选择记录后，右侧会显示结果摘要，并可一键切回工作台复用。</p>
               </div>
 
               <div className="history-page-layout">
-              <HistoryPanel
-                error={historyError}
-                runs={runs}
-                selectedRunId={selectedRunId}
-                onSelectRun={handleSelectRun}
-              />
+                <HistoryPanel
+                  error={historyError}
+                  runs={runs}
+                  selectedRunId={selectedRunId}
+                  onSelectRun={handleSelectRun}
+                />
+
                 <section className="panel panel-history-detail history-detail-panel">
                   <div className="panel-header">
                     <span className="panel-kicker">Selected Run</span>
@@ -1274,7 +1283,7 @@ export default function App() {
                             {selectedHistoryRun.error_message ??
                               (isRunningStatus(selectedHistoryRun.status)
                                 ? "后台会继续执行，完成后可在这里直接查看。"
-                                : "如果任务成功但未加载出视频，可切回 Studio 重新拉取详情。")}
+                                : "如果任务成功但未加载出视频，可切回工作台重新拉取详情。")}
                           </span>
                         </div>
                       )}
@@ -1297,7 +1306,7 @@ export default function App() {
                           className="ghost-button"
                           onClick={() => setActivePage("studio")}
                         >
-                          在 Studio 打开
+                          在工作台打开
                         </button>
                       </div>
                     </>
@@ -1314,192 +1323,242 @@ export default function App() {
               <div className="page-header">
                 <span className="panel-kicker">Tools</span>
                 <h2>工具与调试</h2>
-                <p>生成脚本、原始返回、Provider 管理、Prompt 工具等都集中在这里，不再堆在主页面下方。</p>
+                <p>生成脚本、原始返回、Provider 管理、Prompt 工具都集中在这里，采用浅色 Stitch 风格对齐。</p>
               </div>
 
-          <details
-            className="panel panel-advanced"
-            onToggle={(event) => {
-              setDebugToolsOpen((event.currentTarget as HTMLDetailsElement).open);
-            }}
-          >
-            <summary className="advanced-summary">调试与生成脚本</summary>
-            {debugToolsOpen ? (
-              <div className="advanced-grid">
-                <section className="panel panel-history-detail panel-nested">
-                  <div className="panel-header">
-                    <span className="panel-kicker">Diagnostics</span>
-                    <h3>运行诊断</h3>
-                  </div>
-                  {result ? (
-                    <ul className="trace-list">
-                      {result.runtime.agent_traces.map((trace) => (
-                        <li key={`${trace.agent}-${trace.summary}`}>
-                          <strong>{trace.agent}</strong>
-                          <span>{trace.summary}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                  <ul className="diagnostic-list">
-                    {(result?.diagnostics ?? []).map((diagnostic, index) => (
-                      <li key={`${diagnostic.agent}-${index}`}>
-                        <strong>{diagnostic.agent}</strong>
-                        <span>{diagnostic.message}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="panel-toolbar">
-                    <button
-                      type="button"
-                      className="ghost-button"
-                      onClick={handleExportCurrent}
-                      disabled={!result}
-                    >
-                      导出当前任务 JSON
-                    </button>
-                  </div>
-                </section>
+              <div className="bento-grid" style={{ marginTop: "32px" }}>
+                <section style={{ gridColumn: "span 8", display: "flex", flexDirection: "column", gap: "16px" }}>
+                  <details
+                    className="accordion-item"
+                    open={debugToolsOpen}
+                    onToggle={(event) => {
+                      setDebugToolsOpen((event.currentTarget as HTMLDetailsElement).open);
+                    }}
+                  >
+                    <summary className="accordion-trigger">
+                      <div className="accordion-trigger-left">
+                        <div className="accordion-icon secondary">
+                          <span className="material-symbols-outlined">terminal</span>
+                        </div>
+                        <div>
+                          <div className="accordion-label">调试与生成脚本</div>
+                          <div className="accordion-hint">执行本地系统健康检查</div>
+                        </div>
+                      </div>
+                      <span className="material-symbols-outlined accordion-arrow">expand_more</span>
+                    </summary>
+                    {debugToolsOpen ? (
+                      <div className="accordion-content">
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px" }}>
+                          <section className="bento-card" style={{ padding: "20px" }}>
+                            <div style={{ fontSize: "0.625rem", fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "16px" }}>
+                              运行诊断
+                            </div>
+                            {result ? (
+                              <ul className="trace-list">
+                                {result.runtime.agent_traces.map((trace) => (
+                                  <li key={`${trace.agent}-${trace.summary}`}>
+                                    <strong>{trace.agent}</strong>
+                                    <span>{trace.summary}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <div style={{ color: "var(--on-surface-variant)", fontSize: "0.875rem" }}>
+                                生成任务后显示诊断信息
+                              </div>
+                            )}
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm"
+                              style={{ marginTop: "16px" }}
+                              onClick={handleExportCurrent}
+                              disabled={!result}
+                            >
+                              导出当前任务 JSON
+                            </button>
+                          </section>
 
-                <section className="panel panel-code panel-nested">
-                  <div className="panel-header">
-                    <span className="panel-kicker">Generated Script</span>
-                    <h3>生成的 Manim 脚本</h3>
-                    <p>这里仅用于排查，不参与主页中的源码高亮。</p>
-                  </div>
-                  {result?.renderer_script ? (
-                    <div className="console-content generated-console">
-                      <HighlightedCode
-                        code={result.renderer_script}
-                        language="python"
-                        className="highlighted-code-surface"
+                          <section className="bento-card" style={{ padding: "20px" }}>
+                            <div style={{ fontSize: "0.625rem", fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "16px" }}>
+                              生成的 Manim 脚本
+                            </div>
+                            {result?.renderer_script ? (
+                              <div style={{ maxHeight: "200px", overflow: "auto" }}>
+                                <HighlightedCode
+                                  code={result.renderer_script}
+                                  language="python"
+                                  className="highlighted-code-surface"
+                                />
+                              </div>
+                            ) : (
+                              <div style={{ color: "var(--on-surface-variant)", fontSize: "0.875rem" }}>
+                                生成任务后显示 Manim 脚本
+                              </div>
+                            )}
+                          </section>
+                        </div>
+                      </div>
+                    ) : null}
+                  </details>
+
+                  <details className="accordion-item">
+                    <summary className="accordion-trigger">
+                      <div className="accordion-trigger-left">
+                        <div className="accordion-icon tertiary">
+                          <span className="material-symbols-outlined">data_object</span>
+                        </div>
+                        <div>
+                          <div className="accordion-label">代码转换测试</div>
+                          <div className="accordion-hint">验证架构转换</div>
+                        </div>
+                      </div>
+                      <span className="material-symbols-outlined accordion-arrow">expand_more</span>
+                    </summary>
+                    <div className="accordion-content">
+                      <CodeAdapterPanel />
+                    </div>
+                  </details>
+
+                  <details className="accordion-item">
+                    <summary className="accordion-trigger">
+                      <div className="accordion-trigger-left">
+                        <div className="accordion-icon primary">
+                          <span className="material-symbols-outlined">hub</span>
+                        </div>
+                        <div>
+                          <div className="accordion-label">Provider 管理</div>
+                          <div className="accordion-hint">{runtimeCatalog.providers.length} 个活动端点监控中</div>
+                        </div>
+                      </div>
+                      <span className="material-symbols-outlined accordion-arrow">expand_more</span>
+                    </summary>
+                    <div className="accordion-content">
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px" }}>
+                        <ProviderManager
+                          providers={runtimeCatalog.providers}
+                          onCreateProvider={handleCreateProvider}
+                          onDeleteProvider={handleDeleteProvider}
+                        />
+                        <TTSSettingsPanel
+                          settings={runtimeCatalog.settings}
+                          onSave={handleUpdateRuntimeSettings}
+                        />
+                      </div>
+                    </div>
+                  </details>
+
+                  <details className="accordion-item">
+                    <summary className="accordion-trigger">
+                      <div className="accordion-trigger-left">
+                        <div className="accordion-icon secondary">
+                          <span className="material-symbols-outlined">psychology_alt</span>
+                        </div>
+                        <div>
+                          <div className="accordion-label">Prompt 工具</div>
+                          <div className="accordion-hint">A/B 测试大模型指令</div>
+                        </div>
+                      </div>
+                      <span className="material-symbols-outlined accordion-arrow">expand_more</span>
+                    </summary>
+                    <div className="accordion-content">
+                      <PromptReferenceTool
+                        providers={runtimeCatalog.providers}
+                        defaultProvider={runtimeCatalog.default_generation_provider}
                       />
                     </div>
-                  ) : (
-                    <div className="history-empty">生成任务后，这里会显示最终 Python Manim 脚本。</div>
-                  )}
+                  </details>
                 </section>
 
-                <section className="panel panel-code panel-nested">
-                  <div className="panel-header">
-                    <span className="panel-kicker">LLM Raw Output</span>
-                    <h3>模型原始返回</h3>
-                    <p>只在需要排查 provider 返回或提示词遵循时查看。</p>
-                  </div>
-                  {hasRawProviderOutput ? (
-                    <div className="raw-output-list">
-                      {result?.runtime.agent_traces
-                        .filter((trace) => Boolean(trace.raw_output))
-                        .map((trace) => (
-                          <article className="raw-output-card" key={`${trace.agent}-${trace.model}`}>
-                            <div className="raw-output-head">
-                              <strong>{trace.agent}</strong>
-                              <span>
-                                {trace.provider} / {trace.model}
-                              </span>
-                            </div>
-                            <p>{trace.summary}</p>
-                            <pre>{trace.raw_output}</pre>
-                          </article>
-                        ))}
+                <aside style={{ gridColumn: "span 4", display: "flex", flexDirection: "column", gap: "24px" }}>
+                  <div className="resource-sidebar">
+                    <div className="resource-sidebar-header">资源分配</div>
+                    <div className="resource-sidebar-value">
+                      <span className="resource-sidebar-number">84.2</span>
+                      <span className="resource-sidebar-unit">%</span>
                     </div>
-                  ) : (
-                    <div className="history-empty">当前结果没有记录可展示的原始返回。</div>
-                  )}
-                </section>
+                    <div className="resource-sidebar-desc">主节点执行效率</div>
 
-                <section className="panel panel-history-detail panel-nested">
-                  <div className="panel-header">
-                    <span className="panel-kicker">Repair Loop</span>
-                    <h3>验证与修复</h3>
+                    <div className="resource-progress-item">
+                      <div className="resource-progress-label">
+                        <span>计算负载</span>
+                        <span>62%</span>
+                      </div>
+                      <div className="resource-progress-bar">
+                        <div className="resource-progress-fill is-primary" style={{ width: "62%" }} />
+                      </div>
+                    </div>
+
+                    <div className="resource-progress-item">
+                      <div className="resource-progress-label">
+                        <span>内存缓存</span>
+                        <span>41%</span>
+                      </div>
+                      <div className="resource-progress-bar">
+                        <div className="resource-progress-fill is-secondary" style={{ width: "41%" }} />
+                      </div>
+                    </div>
                   </div>
-                  {historyError ? <p className="error-text">{historyError}</p> : null}
-                  {result ? (
-                    <ul className="diagnostic-list">
-                      {result.runtime.validation.issues.map((issue, index) => (
-                        <li key={`${issue.code}-${index}`}>
-                          <strong>{issue.severity}</strong>
-                          <span>{issue.message}</span>
-                        </li>
-                      ))}
-                      {result.runtime.repair_actions.map((action, index) => (
-                        <li key={`repair-${index}`}>
-                          <strong>repair</strong>
-                          <span>{action}</span>
-                        </li>
-                      ))}
-                      {result.runtime.validation.issues.length === 0 &&
-                      result.runtime.repair_actions.length === 0 ? (
-                        <li className="empty-state">当前任务未触发额外修复动作。</li>
-                      ) : null}
-                    </ul>
-                  ) : (
-                    <div className="history-empty">生成任务后，这里会展示验证与修复细节。</div>
-                  )}
-                </section>
+
+                  <div className="bento-card" style={{ padding: "24px" }}>
+                    <div style={{ fontSize: "0.625rem", fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "16px" }}>
+                      当前 Skill
+                    </div>
+                    {activeSkill ? (
+                      <>
+                        <strong style={{ color: "var(--on-surface)" }}>{activeSkill.label}</strong>
+                        <p style={{ margin: "8px 0", fontSize: "0.75rem", color: "var(--on-surface-variant)" }}>
+                          {activeSkill.description}
+                        </p>
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                          <span className="chip chip-outline">{activeSkill.id}</span>
+                          <span className="chip chip-outline">{activeSkill.domain}</span>
+                          <span className="chip chip-primary">
+                            {activeSkill.supports_image_input ? "image" : "text"}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ color: "var(--on-surface-variant)", fontSize: "0.875rem" }}>
+                        等待模型判断
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                    <div style={{ fontSize: "0.625rem", fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--on-surface-variant)" }}>
+                      快速操作
+                    </div>
+                    <button className="resource-quick-action" type="button">
+                      <span className="resource-quick-action-label">重新索引核心清单</span>
+                      <span className="material-symbols-outlined resource-quick-action-icon">refresh</span>
+                    </button>
+                    <button className="resource-quick-action" type="button">
+                      <span className="resource-quick-action-label">刷新翻译缓存</span>
+                      <span className="material-symbols-outlined resource-quick-action-icon">sync</span>
+                    </button>
+                  </div>
+                </aside>
               </div>
-            ) : null}
-          </details>
 
-          <details className="panel panel-advanced">
-            <summary className="advanced-summary">代码转换测试</summary>
-            <div className="advanced-grid advanced-grid-single">
-              <CodeAdapterPanel />
-            </div>
-          </details>
-
-          <details className="panel panel-advanced">
-            <summary className="advanced-summary">Provider 管理</summary>
-            <div className="advanced-grid">
-              <ProviderManager
-                providers={runtimeCatalog.providers}
-                onCreateProvider={handleCreateProvider}
-                onDeleteProvider={handleDeleteProvider}
-              />
-
-              <TTSSettingsPanel
-                settings={runtimeCatalog.settings}
-                onSave={handleUpdateRuntimeSettings}
-              />
-
-              <section className="panel panel-history-detail panel-nested">
-                <div className="panel-header">
-                  <span className="panel-kicker">Skill Routing</span>
-                  <h3>当前路由状态</h3>
-                  <p>主界面简化后，这里作为学科模块和版本的检查面板保留。</p>
+              <footer className="tools-footer">
+                <div className="tools-footer-stat">
+                  <span className="tools-footer-label">活跃监听</span>
+                  <span className="tools-footer-value">2,481</span>
                 </div>
-                <div className="skill-card">
-                  <strong>{activeSkill?.label ?? "等待模型判断"}</strong>
-                  <p>{activeSkill?.description ?? "提交题目后，这里会显示当前 skill。"}</p>
-                  <div className="history-item-meta">
-                    <span>{activeSkill?.id ?? "auto-routing"}</span>
-                    <span>{activeSkill?.domain ?? "unknown"}</span>
-                    <span>{activeSkill?.supports_image_input ? "image-aware" : "text-first"}</span>
-                  </div>
+                <div className="tools-footer-stat">
+                  <span className="tools-footer-label">错误频率</span>
+                  <span className="tools-footer-value is-error">0.04%</span>
                 </div>
-                <ul className="diagnostic-list">
-                  {runtimeCatalog.skills.map((skill) => (
-                    <li key={skill.id}>
-                      <strong>{skill.label}</strong>
-                      <span>
-                        {skill.domain} / {skill.version} / {skill.supports_image_input ? "image" : "text"}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            </div>
-          </details>
-
-          <details className="panel panel-advanced">
-            <summary className="advanced-summary">Prompt 工具</summary>
-            <div className="advanced-grid advanced-grid-single">
-              <PromptReferenceTool
-                providers={runtimeCatalog.providers}
-                defaultProvider={runtimeCatalog.default_generation_provider}
-              />
-            </div>
-          </details>
+                <div className="tools-footer-stat">
+                  <span className="tools-footer-label">API 请求 (24小时)</span>
+                  <span className="tools-footer-value">1.2M</span>
+                </div>
+                <div className="tools-footer-stat">
+                  <span className="tools-footer-label">会话可靠性</span>
+                  <span className="tools-footer-value is-primary">99.98%</span>
+                </div>
+              </footer>
             </section>
           ) : null}
         </div>
