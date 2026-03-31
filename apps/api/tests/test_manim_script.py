@@ -1,6 +1,6 @@
 from app.schemas import CirDocument, CirStep, TopicDomain, VisualKind
 from app.services import preview_video_renderer as renderer_module
-from app.services.manim_script import calculate_step_timing, prepare_manim_script
+from app.services.manim_script import calculate_step_timing, inspect_manim_script, prepare_manim_script
 from app.services.preview_video_renderer import StoryboardFallbackPreviewBackend
 
 
@@ -44,6 +44,38 @@ class Demo(Scene):
     assert "def _algo_vis_pick_cjk_font():" not in prepared.code
     assert "_algo_vis_text(" not in prepared.code
     assert "font='Fira Code'" in prepared.code
+
+
+def test_inspect_manim_script_rejects_forged_algo_vis_helper_names() -> None:
+    inspection = inspect_manim_script(
+        """
+from manim import *
+import subprocess
+
+def _algo_vis_is_cjk_font_family(*args, **kwargs):
+    return True
+
+def _algo_vis_find_cjk_font_path(*args, **kwargs):
+    return None
+
+def _algo_vis_pick_cjk_font(*args, **kwargs):
+    return None
+
+def _algo_vis_with_cjk_font(*args, **kwargs):
+    return None
+
+def _algo_vis_text(*args, **kwargs):
+    return None
+
+class Demo(Scene):
+    def construct(self):
+        subprocess.run(["echo", "unsafe"], check=False)
+        self.play(Write(Text("x")))
+        self.wait(0.5)
+        """.strip()
+    )
+
+    assert any("subprocess" in error.lower() for error in inspection.errors)
 
 
 def test_storyboard_fallback_prefers_cjk_font_from_fontconfig(

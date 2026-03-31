@@ -32,3 +32,16 @@ def test_settings_allow_blank_openai_timeout(tmp_path, monkeypatch) -> None:
     settings = Settings()
 
     assert settings.openai_timeout_s is None
+
+
+def test_settings_default_gvisor_render_config(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    settings = Settings()
+
+    assert settings.render_runner == "local"
+    assert settings.gvisor_runtime == "runsc"
+    assert settings.gvisor_network_enabled is False
+    assert settings.gvisor_memory_limit_mb == 512
+    assert settings.gvisor_cpu_limit == "1.0"
+    assert settings.gvisor_pids_limit == 64

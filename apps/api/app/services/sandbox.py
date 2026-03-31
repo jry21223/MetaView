@@ -12,7 +12,12 @@ class PreviewDryRunSandbox:
         self.timeout_ms = timeout_ms
         self.engine_name = "python-manim-static"
 
-    def run(self, script: str, cir: CirDocument, mode: SandboxMode) -> SandboxReport:
+    def run(
+        self,
+        script: str,
+        cir: CirDocument | None,
+        mode: SandboxMode,
+    ) -> SandboxReport:
         if mode == SandboxMode.OFF:
             return SandboxReport(
                 mode=mode,
@@ -29,8 +34,9 @@ class PreviewDryRunSandbox:
         elapsed_ms = int((time.perf_counter() - started_at) * 1000)
         status = SandboxStatus.FAILED if errors else SandboxStatus.PASSED
 
-        if not cir.steps:
+        if cir is not None and not cir.steps:
             errors.append("CIR 为空，无法执行 dry-run。")
+            status = SandboxStatus.FAILED
 
         return SandboxReport(
             mode=mode,

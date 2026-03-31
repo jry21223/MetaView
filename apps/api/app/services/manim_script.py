@@ -21,6 +21,35 @@ _TEXT_MOBJECT_NAMES = {
     "MarkupText": "_algo_vis_markup_text",
     "Paragraph": "_algo_vis_paragraph",
 }
+_DANGEROUS_IMPORT_NAMES = {
+    "os",
+    "subprocess",
+    "socket",
+    "requests",
+    "httpx",
+    "urllib",
+    "pathlib",
+    "tempfile",
+    "shutil",
+    "importlib",
+}
+_DANGEROUS_CALL_NAMES = {
+    "eval",
+    "exec",
+    "compile",
+    "open",
+    "__import__",
+}
+_DANGEROUS_ATTRIBUTE_CALLS = {
+    ("os", "system"),
+    ("os", "popen"),
+    ("subprocess", "run"),
+    ("subprocess", "Popen"),
+    ("socket", "socket"),
+    ("pathlib", "Path"),
+}
+
+
 _CJK_FONT_HELPER_SOURCE = """
 import os
 from functools import lru_cache
@@ -640,12 +669,14 @@ def prepare_manim_script(
         module.body.insert(0, _manim_import_node())
         diagnostics.append("已自动补充 from manim import *。")
 
+    security_checked_module = ast.fix_missing_locations(module)
+    inspection = inspect_manim_script(ast.unparse(security_checked_module).strip() + "\n")
+    if inspection.errors:
+        raise ManimScriptError("；".join(inspection.errors))
+
     module = _inject_cjk_font_fallback(module, diagnostics)
     module = ast.fix_missing_locations(module)
     code = ast.unparse(module).strip() + "\n"
-    inspection = inspect_manim_script(code)
-    if inspection.errors:
-        raise ManimScriptError("；".join(inspection.errors))
     diagnostics.extend(inspection.warnings)
     return PreparedManimScript(
         code=code,
@@ -671,6 +702,8 @@ def inspect_manim_script(script: str) -> ManimScriptInspection:
     if not scene_class_names:
         errors.append("脚本缺少 Scene 子类。")
 
+    errors.extend(_collect_dangerous_usage_errors(module))
+
     if "self.play(" not in script:
         warnings.append("脚本未检测到 self.play()，动画可能只有静态画面。")
     if "self.wait(" not in script:
@@ -681,6 +714,58 @@ def inspect_manim_script(script: str) -> ManimScriptInspection:
         warnings=warnings,
         errors=errors,
     )
+
+
+def _collect_dangerous_usage_errors(module: ast.Module) -> list[str]:
+    errors: list[str] = []
+    helper_line_range = _internal_helper_line_range(module)
+    for node in ast.walk(module):
+        if helper_line_range is not None and _node_within_line_range(node, helper_line_range):
+            continue
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                root_name = alias.name.split(".", 1)[0]
+                if root_name in _DANGEROUS_IMPORT_NAMES:
+                    errors.append(f"脚本包含危险导入：{root_name}。")
+        elif isinstance(node, ast.ImportFrom):
+            module_name = (node.module or "").split(".", 1)[0]
+            if module_name in _DANGEROUS_IMPORT_NAMES:
+                errors.append(f"脚本包含危险导入：{module_name}。")
+        elif isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Name) and node.func.id in _DANGEROUS_CALL_NAMES:
+                errors.append(f"脚本包含危险调用：{node.func.id}。")
+            elif isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name):
+                pair = (node.func.value.id, node.func.attr)
+                if pair in _DANGEROUS_ATTRIBUTE_CALLS:
+                    errors.append(f"脚本包含危险调用：{pair[0]}.{pair[1]}。")
+    return errors
+
+
+def _internal_helper_line_range(module: ast.Module) -> tuple[int, int] | None:
+    helper_module = ast.parse(_CJK_FONT_HELPER_SOURCE)
+    helper_body = helper_module.body
+    if len(module.body) < len(helper_body):
+        return None
+
+    actual_prefix = module.body[: len(helper_body)]
+    for expected, actual in zip(helper_body, actual_prefix):
+        if ast.dump(expected, include_attributes=False) != ast.dump(actual, include_attributes=False):
+            return None
+
+    start_line = getattr(actual_prefix[0], "lineno", None)
+    end_line = getattr(actual_prefix[-1], "end_lineno", None)
+    if start_line is None or end_line is None:
+        return None
+    return (start_line, end_line)
+
+
+def _node_within_line_range(node: ast.AST, line_range: tuple[int, int]) -> bool:
+    lineno = getattr(node, "lineno", None)
+    end_lineno = getattr(node, "end_lineno", lineno)
+    if lineno is None or end_lineno is None:
+        return False
+    start_line, end_line_limit = line_range
+    return start_line <= lineno and end_lineno <= end_line_limit
 
 
 def strip_reasoning_artifacts(text: str) -> str:

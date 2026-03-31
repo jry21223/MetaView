@@ -122,6 +122,29 @@ def test_runtime_catalog() -> None:
     ]
 
 
+def test_render_manim_endpoint_rejects_unsafe_script(monkeypatch) -> None:
+    called: list[str] = []
+
+    def fake_render(**kwargs):
+        called.append("rendered")
+        raise AssertionError("render should not be called")
+
+    monkeypatch.setattr(orchestrator.preview_video_renderer, "render", fake_render)
+
+    response = client.post(
+        "/api/v1/manim/render",
+        json={
+            "source": "from manim import *\nimport os\n\nclass Demo(Scene):\n    def construct(self):\n        self.play(Write(Text('unsafe')))\n        self.wait(0.5)\n",
+            "scene_class_name": "Demo",
+            "require_real": True,
+        },
+    )
+
+    assert response.status_code == 400
+    assert "os" in response.json()["detail"].lower()
+    assert called == []
+
+
 def test_runtime_catalog_allows_local_dev_cors_origin() -> None:
     response = client.get(
         "/api/v1/runtime",

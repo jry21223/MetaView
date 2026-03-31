@@ -109,6 +109,67 @@ class PreviewVideoArtifacts:
     backend: str
 
 
+@dataclass(frozen=True)
+class GVisorCommandBuilder:
+    docker_binary: str
+    runtime: str
+    image: str
+    network_enabled: bool
+    memory_limit_mb: int
+    cpu_limit: str
+    pids_limit: int
+
+    def build(
+        self,
+        *,
+        script_path: Path,
+        output_dir: Path,
+        scene_class_name: str,
+        cli_module: str,
+        quality: str,
+        output_format: str,
+        disable_caching: bool,
+    ) -> list[str]:
+        command = [
+            self.docker_binary,
+            "run",
+            "--rm",
+            f"--runtime={self.runtime}",
+            "--read-only",
+            "--tmpfs",
+            "/tmp:size=128m",
+            "-v",
+            f"{script_path}:{script_path}:ro",
+            "-v",
+            f"{output_dir}:{output_dir}",
+            "-w",
+            str(output_dir.parent),
+            f"--memory={self.memory_limit_mb}m",
+            f"--cpus={self.cpu_limit}",
+            f"--pids-limit={self.pids_limit}",
+        ]
+        if not self.network_enabled:
+            command.append("--network=none")
+        command.extend(
+            [
+                self.image,
+                "python",
+                "-m",
+                cli_module,
+                "--media_dir",
+                str(output_dir),
+                "--format",
+                output_format,
+                "-q",
+                quality,
+            ]
+        )
+        if disable_caching:
+            command.append("--disable_caching")
+        command.extend([str(script_path), scene_class_name])
+        return command
+
+
 class PreviewRenderBackend(Protocol):
     name: str
     is_real: bool
@@ -141,16 +202,26 @@ class ManimCliPreviewBackend:
         output_format: str,
         disable_caching: bool,
         timeout_s: float | None,
+        gvisor_command_builder: GVisorCommandBuilder | None = None,
+        render_runner: str = "local",
     ) -> None:
         self.python_path = Path(python_path)
         self.cli_module = cli_module
         self.quality = quality
         self.output_format = output_format
         self.disable_caching = disable_caching
+        self.gvisor_command_builder = gvisor_command_builder
+        self.render_runner = render_runner
         # 默认超时 180 秒，避免 None 导致无限等待
         self.timeout_s = timeout_s if timeout_s is not None else 180.0
 
     def is_available(self) -> bool:
+        if self.render_runner == "gvisor":
+            if self.gvisor_command_builder is None:
+                return False
+            return shutil.which(self.gvisor_command_builder.docker_binary) is not None
+        if self.render_runner != "local":
+            return False
         if not self.python_path.exists():
             return False
 
@@ -165,6 +236,43 @@ class ManimCliPreviewBackend:
             check=False,
         )
         return result.returncode == 0
+
+    def build_render_command(
+        self,
+        *,
+        script_path: Path,
+        media_dir: Path,
+        target_scene: str,
+    ) -> list[str]:
+        if self.render_runner == "gvisor":
+            if self.gvisor_command_builder is None:
+                raise PreviewVideoRenderError("gVisor 渲染命令构造器未配置。")
+            return self.gvisor_command_builder.build(
+                script_path=script_path,
+                output_dir=media_dir,
+                scene_class_name=target_scene,
+                cli_module=self.cli_module,
+                quality=self.quality,
+                output_format=self.output_format,
+                disable_caching=self.disable_caching,
+            )
+        if self.render_runner != "local":
+            raise PreviewVideoRenderError(f"未知 render_runner：{self.render_runner}")
+        command = [
+            str(self.python_path),
+            "-m",
+            self.cli_module,
+            "--media_dir",
+            str(media_dir),
+            "--format",
+            self.output_format,
+            "-q",
+            self.quality,
+        ]
+        if self.disable_caching:
+            command.append("--disable_caching")
+        command.extend([str(script_path), target_scene])
+        return command
 
     def render(
         self,
@@ -186,20 +294,11 @@ class ManimCliPreviewBackend:
             media_dir = temp_dir / "media"
             script_path.write_text(script, encoding="utf-8")
 
-            command = [
-                str(self.python_path),
-                "-m",
-                self.cli_module,
-                "--media_dir",
-                str(media_dir),
-                "--format",
-                self.output_format,
-                "-q",
-                self.quality,
-            ]
-            if self.disable_caching:
-                command.append("--disable_caching")
-            command.extend([str(script_path), target_scene])
+            command = self.build_render_command(
+                script_path=script_path,
+                media_dir=media_dir,
+                target_scene=target_scene,
+            )
 
             try:
                 result = subprocess.run(
@@ -790,22 +889,43 @@ class PreviewVideoRenderer:
         manim_format: str = "mp4",
         manim_disable_caching: bool = True,
         manim_render_timeout_s: float | None = 180.0,
+        render_runner: str = "local",
+        gvisor_docker_binary: str = "docker",
+        gvisor_runtime: str = "runsc",
+        gvisor_image: str = "metaview-manim:latest",
+        gvisor_network_enabled: bool = False,
+        gvisor_memory_limit_mb: int = 512,
+        gvisor_cpu_limit: str = "1.0",
+        gvisor_pids_limit: int = 64,
     ) -> None:
         self.enabled = enabled
         self.output_root = Path(output_root)
         self.url_prefix = url_prefix.rstrip("/")
         self.backend_mode = backend_mode
+        self.render_runner = render_runner
         self.previews_dir = self.output_root / "previews"
         self.previews_dir.mkdir(parents=True, exist_ok=True)
+        self.gvisor_command_builder = GVisorCommandBuilder(
+            docker_binary=gvisor_docker_binary,
+            runtime=gvisor_runtime,
+            image=gvisor_image,
+            network_enabled=gvisor_network_enabled,
+            memory_limit_mb=gvisor_memory_limit_mb,
+            cpu_limit=gvisor_cpu_limit,
+            pids_limit=gvisor_pids_limit,
+        )
+        self.manim_backend = ManimCliPreviewBackend(
+            python_path=manim_python_path,
+            cli_module=manim_cli_module,
+            quality=manim_quality,
+            output_format=manim_format,
+            disable_caching=manim_disable_caching,
+            timeout_s=manim_render_timeout_s,
+            gvisor_command_builder=self.gvisor_command_builder,
+            render_runner=render_runner,
+        )
         self.backends: dict[str, PreviewRenderBackend] = {
-            "manim": ManimCliPreviewBackend(
-                python_path=manim_python_path,
-                cli_module=manim_cli_module,
-                quality=manim_quality,
-                output_format=manim_format,
-                disable_caching=manim_disable_caching,
-                timeout_s=manim_render_timeout_s,
-            ),
+            "manim": self.manim_backend,
             "fallback": StoryboardFallbackPreviewBackend(),
         }
 
@@ -841,6 +961,8 @@ class PreviewVideoRenderer:
         mode = self.backend_mode.lower()
         if mode not in {"auto", "manim", "fallback"}:
             raise PreviewVideoRenderError(f"未知预览渲染后端模式：{self.backend_mode}")
+        if self.render_runner not in {"local", "gvisor"}:
+            raise PreviewVideoRenderError(f"未知 render_runner：{self.render_runner}")
 
         candidate_names: list[str]
         if mode == "manim":

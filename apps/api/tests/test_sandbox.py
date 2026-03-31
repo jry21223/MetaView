@@ -56,3 +56,43 @@ def test_sandbox_fails_invalid_script() -> None:
 
     assert report.status == "failed"
     assert report.errors
+
+
+def test_sandbox_rejects_dangerous_imports() -> None:
+    sandbox = PreviewDryRunSandbox(timeout_ms=500)
+    report = sandbox.run(
+        script="""
+from manim import *
+import os
+
+class Demo(Scene):
+    def construct(self):
+        self.play(Write(Text("unsafe")))
+        self.wait(0.5)
+        """.strip(),
+        cir=build_cir(),
+        mode=SandboxMode.DRY_RUN,
+    )
+
+    assert report.status == "failed"
+    assert any("os" in error.lower() for error in report.errors)
+
+
+def test_sandbox_rejects_dangerous_calls() -> None:
+    sandbox = PreviewDryRunSandbox(timeout_ms=500)
+    report = sandbox.run(
+        script="""
+from manim import *
+
+class Demo(Scene):
+    def construct(self):
+        eval("print(1)")
+        self.play(Write(Text("unsafe")))
+        self.wait(0.5)
+        """.strip(),
+        cir=build_cir(),
+        mode=SandboxMode.DRY_RUN,
+    )
+
+    assert report.status == "failed"
+    assert any("eval" in error.lower() for error in report.errors)

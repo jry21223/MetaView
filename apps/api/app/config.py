@@ -33,6 +33,14 @@ class Settings(BaseSettings):
     preview_media_url_prefix: str = "/media"
     preview_video_enabled: bool = True
     preview_render_backend: str = "auto"
+    render_runner: str = "local"
+    gvisor_docker_binary: str = "docker"
+    gvisor_runtime: str = "runsc"
+    gvisor_image: str = "metaview-manim:latest"
+    gvisor_network_enabled: bool = False
+    gvisor_memory_limit_mb: int = 512
+    gvisor_cpu_limit: str = "1.0"
+    gvisor_pids_limit: int = 64
     preview_tts_enabled: bool = True
     preview_tts_backend: str = "openai_compatible"
     preview_tts_model: str = "mimotts-v2"

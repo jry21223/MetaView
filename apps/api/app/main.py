@@ -35,6 +35,7 @@ from app.services.orchestrator import PipelineOrchestrator
 from app.services.preview_video_renderer import PreviewVideoRenderError
 from app.services.providers.openai import ProviderInvocationError
 from app.services.providers.registry import ProviderRegistrationError, ProviderUnavailableError
+from app.services.request_security import SafetyVerdict, inspect_manim_source, inspect_pipeline_request
 from app.services.skill_catalog import SubjectSkillUnavailableError
 
 settings = get_settings()
@@ -72,6 +73,11 @@ def _log_hint(error_id: str) -> str:
         "服务器日志可执行："
         f"journalctl -u metaview-api -n 200 --no-pager | grep {error_id}"
     )
+
+
+def _reject_blocked_request(reasons: list[str]) -> None:
+    if reasons:
+        raise HTTPException(status_code=400, detail="；".join(reasons))
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -142,6 +148,13 @@ def healthcheck() -> dict[str, str]:
 
 @app.post(f"{settings.api_prefix}/pipeline", response_model=PipelineResponse)
 def run_pipeline(request: PipelineRequest) -> PipelineResponse:
+    inspection = inspect_pipeline_request(
+        prompt=request.prompt,
+        source_code=request.source_code,
+        source_image_name=request.source_image_name,
+    )
+    if inspection.decision == SafetyVerdict.BLOCK:
+        _reject_blocked_request(inspection.reasons)
     try:
         return orchestrator.run(request)
     except ProviderUnavailableError as exc:
@@ -157,6 +170,13 @@ def run_pipeline(request: PipelineRequest) -> PipelineResponse:
     response_model=PipelineSubmitResponse,
 )
 def submit_pipeline(request: PipelineRequest) -> PipelineSubmitResponse:
+    inspection = inspect_pipeline_request(
+        prompt=request.prompt,
+        source_code=request.source_code,
+        source_image_name=request.source_image_name,
+    )
+    if inspection.decision == SafetyVerdict.BLOCK:
+        _reject_blocked_request(inspection.reasons)
     try:
         return orchestrator.submit_run(request)
     except ProviderUnavailableError as exc:
@@ -174,6 +194,9 @@ def submit_pipeline(request: PipelineRequest) -> PipelineSubmitResponse:
 def prepare_manim_endpoint(
     payload: ManimScriptPrepareRequest,
 ) -> ManimScriptPrepareResponse:
+    inspection = inspect_manim_source(payload.source)
+    if inspection.decision == SafetyVerdict.BLOCK:
+        _reject_blocked_request(inspection.reasons)
     try:
         prepared = prepare_manim_script(
             payload.source,
@@ -197,6 +220,9 @@ def prepare_manim_endpoint(
 def render_manim_endpoint(
     payload: ManimScriptRenderRequest,
 ) -> ManimScriptRenderResponse:
+    inspection = inspect_manim_source(payload.source)
+    if inspection.decision == SafetyVerdict.BLOCK:
+        _reject_blocked_request(inspection.reasons)
     try:
         prepared = prepare_manim_script(
             payload.source,

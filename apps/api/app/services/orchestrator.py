@@ -123,6 +123,14 @@ class PipelineOrchestrator:
             manim_format=settings.manim_format,
             manim_disable_caching=settings.manim_disable_caching,
             manim_render_timeout_s=settings.manim_render_timeout_s,
+            render_runner=settings.render_runner,
+            gvisor_docker_binary=settings.gvisor_docker_binary,
+            gvisor_runtime=settings.gvisor_runtime,
+            gvisor_image=settings.gvisor_image,
+            gvisor_network_enabled=settings.gvisor_network_enabled,
+            gvisor_memory_limit_mb=settings.gvisor_memory_limit_mb,
+            gvisor_cpu_limit=settings.gvisor_cpu_limit,
+            gvisor_pids_limit=settings.gvisor_pids_limit,
         )
         self.background_executor = ThreadPoolExecutor(
             max_workers=4,
