@@ -229,6 +229,7 @@ export interface PipelineResponse {
   cir: CirDocument;
   renderer_script: string;
   preview_video_url?: string | null;
+  preview_html_url?: string | null;
   execution_map?: ExecutionMap | null;
   diagnostics: AgentDiagnostic[];
   runtime: PipelineRuntime;

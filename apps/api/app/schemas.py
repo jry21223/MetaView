@@ -30,6 +30,13 @@ class SandboxMode(str, Enum):
     OFF = "off"
 
 
+class OutputMode(str, Enum):
+    """Rendering output mode. VIDEO produces Manim MP4; HTML produces interactive web page."""
+
+    VIDEO = "video"
+    HTML = "html"
+
+
 class UITheme(str, Enum):
     DARK = "dark"
     LIGHT = "light"
@@ -158,6 +165,7 @@ class PipelineRequest(BaseModel):
     ui_theme: UITheme | None = None
     enable_narration: bool = True
     sandbox_mode: SandboxMode = SandboxMode.DRY_RUN
+    output_mode: OutputMode = OutputMode.VIDEO
     persist_run: bool = True
 
     @model_validator(mode="after")
@@ -329,6 +337,7 @@ class PipelineResponse(BaseModel):
     cir: CirDocument
     renderer_script: str
     preview_video_url: str | None = None
+    preview_html_url: str | None = None
     execution_map: ExecutionMap | None = None
     diagnostics: list[AgentDiagnostic] = Field(default_factory=list)
     runtime: PipelineRuntime

@@ -11,6 +11,7 @@ from app.schemas import (
     CustomProviderUpsertRequest,
     CustomSubjectPromptRequest,
     CustomSubjectPromptResponse,
+    OutputMode,
     PipelineRequest,
     PipelineResponse,
     PipelineRunDetail,
@@ -30,9 +31,10 @@ from app.schemas import (
     TTSSettingsRequest,
     ValidationStatus,
 )
-from app.services.agents import CoderAgent, CriticAgent, PlannerAgent
+from app.services.agents import CoderAgent, CriticAgent, HtmlCoderAgent, PlannerAgent
 from app.services.domain_router import infer_domain
 from app.services.execution_map import build_execution_map
+from app.services.html_renderer import HtmlRenderer
 from app.services.history import (
     CustomProviderRepository,
     RunRepository,
@@ -111,6 +113,8 @@ class PipelineOrchestrator:
         )
         self.planner = PlannerAgent()
         self.coder = CoderAgent()
+        self.html_coder = HtmlCoderAgent()
+        self.html_renderer = HtmlRenderer(output_dir=settings.preview_html_output_dir)
         self.critic = CriticAgent()
         self.preview_video_renderer = PreviewVideoRenderer(
             output_root=settings.preview_media_root,
@@ -541,83 +545,99 @@ class PipelineOrchestrator:
                     script=renderer_script, cir=cir, mode=request.sandbox_mode
                 )
 
-        try:
-            preview_video = self.preview_video_renderer.render(
-                script=renderer_script,
-                request_id=request_id,
+        # ── HTML output branch (independent from Manim) ──────────────
+        preview_html_url: str | None = None
+        if request.output_mode == OutputMode.HTML:
+            html_script = self.html_coder.run(
                 cir=cir,
                 ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
             )
-            preview_video_url = preview_video.url
-            preview_video_backend = preview_video.backend
-            for message in self.maybe_embed_preview_narration(
-                request_id=request_id,
-                preview_video_path=preview_video.file_path,
-                narration_text=preview_narration_text,
-                generation_provider=generation_provider,
-            ):
-                audio_diagnostics.append(AgentDiagnostic(agent="audio", message=message))
-        except PreviewVideoRenderError as exc:
-            render_error_message = str(exc)
-            if repair_count < self.max_repair_attempts:
-                repaired_script, repair_message = self._attempt_remote_script_repair(
-                    generation_provider=generation_provider,
+            renderer_script = html_script  # store in renderer_script for persistence
+            html_artifacts = self.html_renderer.render(html=html_script, request_id=request_id)
+            preview_html_url = html_artifacts.url
+
+        # ── Video output branch (existing Manim flow, untouched) ─────
+        _render_video = request.output_mode != OutputMode.HTML
+
+        if _render_video:
+            try:
+                preview_video = self.preview_video_renderer.render(
+                    script=renderer_script,
+                    request_id=request_id,
                     cir=cir,
-                    renderer_script=renderer_script,
-                    issues=self.repair_service.collect_blocking_script_issues(
-                        renderer_script=renderer_script,
-                        critique_hints=critique_hints,
-                        extra_issues=[render_error_message],
-                    ),
-                    agent_traces=agent_traces,
-                    repair_actions=repair_actions,
-                    stage_label="real-render",
                     ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
                 )
-                repair_count += 1
-                if repaired_script is not None:
-                    renderer_script = repaired_script
-                    renderer_diagnostic_message = repair_message
-                    critique_hints, critique_trace, diagnostics = self._run_provider_critique(
+                preview_video_url = preview_video.url
+                preview_video_backend = preview_video.backend
+                for message in self.maybe_embed_preview_narration(
+                    request_id=request_id,
+                    preview_video_path=preview_video.file_path,
+                    narration_text=preview_narration_text,
+                    generation_provider=generation_provider,
+                ):
+                    audio_diagnostics.append(AgentDiagnostic(agent="audio", message=message))
+            except PreviewVideoRenderError as exc:
+                render_error_message = str(exc)
+                if repair_count < self.max_repair_attempts:
+                    repaired_script, repair_message = self._attempt_remote_script_repair(
                         generation_provider=generation_provider,
                         cir=cir,
                         renderer_script=renderer_script,
+                        issues=self.repair_service.collect_blocking_script_issues(
+                            renderer_script=renderer_script,
+                            critique_hints=critique_hints,
+                            extra_issues=[render_error_message],
+                        ),
+                        agent_traces=agent_traces,
+                        repair_actions=repair_actions,
+                        stage_label="real-render",
                         ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
                     )
-                    agent_traces.append(critique_trace)
-                    sandbox_report = self.sandbox.run(
-                        script=renderer_script, cir=cir, mode=request.sandbox_mode
-                    )
-                    try:
-                        preview_video = self.preview_video_renderer.render(
-                            script=renderer_script,
-                            request_id=request_id,
-                            cir=cir,
-                            ui_theme=(
-                                request.ui_theme.value
-                                if request.ui_theme is not None
-                                else None
-                            ),
-                        )
-                        preview_video_url = preview_video.url
-                        preview_video_backend = preview_video.backend
-                        for message in self.maybe_embed_preview_narration(
-                            request_id=request_id,
-                            preview_video_path=preview_video.file_path,
-                            narration_text=preview_narration_text,
+                    repair_count += 1
+                    if repaired_script is not None:
+                        renderer_script = repaired_script
+                        renderer_diagnostic_message = repair_message
+                        critique_hints, critique_trace, diagnostics = self._run_provider_critique(
                             generation_provider=generation_provider,
-                        ):
-                            audio_diagnostics.append(
-                                AgentDiagnostic(agent="audio", message=message)
+                            cir=cir,
+                            renderer_script=renderer_script,
+                            ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
+                        )
+                        agent_traces.append(critique_trace)
+                        sandbox_report = self.sandbox.run(
+                            script=renderer_script, cir=cir, mode=request.sandbox_mode
+                        )
+                        try:
+                            preview_video = self.preview_video_renderer.render(
+                                script=renderer_script,
+                                request_id=request_id,
+                                cir=cir,
+                                ui_theme=(
+                                    request.ui_theme.value
+                                    if request.ui_theme is not None
+                                    else None
+                                ),
                             )
-                    except PreviewVideoRenderError as retry_exc:
-                        render_error_message = str(retry_exc)
+                            preview_video_url = preview_video.url
+                            preview_video_backend = preview_video.backend
+                            for message in self.maybe_embed_preview_narration(
+                                request_id=request_id,
+                                preview_video_path=preview_video.file_path,
+                                narration_text=preview_narration_text,
+                                generation_provider=generation_provider,
+                            ):
+                                audio_diagnostics.append(
+                                    AgentDiagnostic(agent="audio", message=message)
+                                )
+                        except PreviewVideoRenderError as retry_exc:
+                            render_error_message = str(retry_exc)
 
         response = PipelineResponse(
             request_id=request_id,
             cir=cir,
             renderer_script=renderer_script,
             preview_video_url=preview_video_url,
+            preview_html_url=preview_html_url,
             execution_map=build_execution_map(
                 request=effective_request,
                 cir=cir,

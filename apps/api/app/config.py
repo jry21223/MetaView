@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     preview_media_root: str = "data/media"
     preview_media_url_prefix: str = "/media"
     preview_video_enabled: bool = True
+    preview_html_output_dir: str = "data/html_previews"
     preview_render_backend: str = "auto"
     render_runner: str = "local"
     gvisor_docker_binary: str = "docker"

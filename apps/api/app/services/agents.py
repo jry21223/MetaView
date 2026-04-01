@@ -596,6 +596,157 @@ class CoderAgent:
 
 
 @dataclass
+class HtmlCoderAgent:
+    """Generate a self-contained HTML visualization from a CIR document.
+
+    Completely independent from CoderAgent (Manim).  Uses its own prompt module
+    ``prompts.html_coder`` and its own extraction logic.
+    """
+
+    name: str = "html_coder"
+
+    def run(self, cir: CirDocument, ui_theme: str | None = None) -> str:
+        """Return a self-contained HTML string for interactive CIR rendering."""
+        from .prompts.html_coder import (
+            build_html_coder_system_prompt,
+            build_html_coder_user_prompt,
+        )
+
+        cir_json = cir.model_dump_json(indent=2)
+
+        system_prompt = build_html_coder_system_prompt(
+            domain=cir.domain.value,
+            title=cir.title,
+            summary=cir.summary,
+            cir_json=cir_json,
+            ui_theme=ui_theme,
+        )
+        user_prompt = build_html_coder_user_prompt(
+            title=cir.title,
+            domain=cir.domain.value,
+            summary=cir.summary,
+            cir_json=cir_json,
+            ui_theme=ui_theme,
+        )
+
+        # Build a minimal HTML fallback from CIR data so that the pipeline
+        # works even without a remote LLM call (local / mock provider).
+        html = _build_fallback_html(cir, ui_theme)
+
+        # Store prompts for later tracing (the orchestrator may override
+        # this result with an LLM-generated script when a real provider
+        # is configured).
+        self._last_system_prompt = system_prompt
+        self._last_user_prompt = user_prompt
+
+        return html
+
+
+def _build_fallback_html(cir: CirDocument, ui_theme: str | None = None) -> str:
+    """Build a basic but functional HTML visualization directly from CIR data.
+
+    This is used when no remote LLM is available, or as the initial template
+    that a provider can improve upon.
+    """
+    theme = ui_theme or "dark"
+    steps_js = cir.model_dump_json()
+
+    return f"""\
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{cir.title}</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{font-family:system-ui,-apple-system,sans-serif;min-height:100vh;
+  transition:background .3s,color .3s}}
+body[data-theme="dark"]{{background:#0a0c10;color:#e8ecf4}}
+body[data-theme="light"]{{background:#f5f7fa;color:#141820}}
+.container{{max-width:800px;margin:0 auto;padding:24px}}
+h1{{font-size:1.5rem;margin-bottom:8px}}
+.summary{{opacity:.7;margin-bottom:24px;font-size:.9rem}}
+.step{{padding:20px;border-radius:12px;margin-bottom:16px;
+  transition:all .3s ease}}
+body[data-theme="dark"] .step{{background:#12151a;border:1px solid rgba(255,255,255,.06)}}
+body[data-theme="light"] .step{{background:#fff;border:1px solid rgba(0,0,0,.06);
+  box-shadow:0 2px 8px rgba(0,0,0,.04)}}
+.step.is-active{{border-color:#4de8b0}}
+.step-title{{font-weight:700;margin-bottom:6px}}
+.step-narration{{font-size:.875rem;opacity:.8;margin-bottom:10px;line-height:1.6}}
+.step-kind{{display:inline-block;padding:2px 10px;border-radius:999px;
+  font-size:.7rem;font-weight:600;text-transform:uppercase;margin-bottom:8px}}
+body[data-theme="dark"] .step-kind{{background:rgba(77,232,176,.12);color:#4de8b0}}
+body[data-theme="light"] .step-kind{{background:rgba(0,137,110,.1);color:#00896e}}
+.tokens{{display:flex;flex-wrap:wrap;gap:6px}}
+.token{{padding:4px 10px;border-radius:999px;font-size:.75rem;font-weight:600}}
+.token-primary{{background:rgba(77,232,176,.18);color:#4de8b0}}
+.token-secondary{{background:rgba(255,255,255,.06);color:inherit;opacity:.7}}
+.token-accent{{background:rgba(255,158,138,.15);color:#ff9e8a}}
+body[data-theme="light"] .token-primary{{background:rgba(0,137,110,.12);color:#00896e}}
+body[data-theme="light"] .token-secondary{{background:rgba(0,0,0,.05)}}
+body[data-theme="light"] .token-accent{{background:rgba(150,70,60,.1);color:#96463c}}
+.nav{{position:fixed;bottom:0;left:0;right:0;display:flex;gap:8px;
+  padding:12px 24px;justify-content:center}}
+.nav button{{padding:8px 20px;border:none;border-radius:8px;cursor:pointer;
+  font-weight:600;font-size:.8rem}}
+body[data-theme="dark"] .nav button{{background:#1e2128;color:#e8ecf4}}
+body[data-theme="light"] .nav button{{background:#e8eaee;color:#141820}}
+.nav button:hover{{opacity:.8}}
+.nav .current{{font-size:.75rem;display:flex;align-items:center;opacity:.6}}
+</style>
+</head>
+<body data-theme="{theme}">
+<div class="container" id="app">
+  <h1>{cir.title}</h1>
+  <p class="summary">{cir.summary}</p>
+  <div id="steps"></div>
+</div>
+<div class="nav">
+  <button onclick="prev()">上一步</button>
+  <span class="current" id="counter"></span>
+  <button onclick="next()">下一步</button>
+</div>
+<script>
+const data={steps_js};
+const steps=data.steps||[];
+let cur=0;
+function render(){{
+  const el=document.getElementById("steps");
+  el.innerHTML="";
+  steps.forEach((s,i)=>{{
+    const d=document.createElement("div");
+    d.className="step"+(i===cur?" is-active":"");
+    d.style.display=i===cur?"block":"none";
+    d.innerHTML=`<div class="step-kind">${{s.visual_kind}}</div>
+      <div class="step-title">${{s.title}}</div>
+      <div class="step-narration">${{s.narration}}</div>
+      <div class="tokens">${{(s.tokens||[]).map(t=>
+        `<span class="token token-${{t.emphasis||'secondary'}}">${{t.label}}${{t.value?' = '+t.value:''}}</span>`
+      ).join("")}}</div>`;
+    el.appendChild(d);
+  }});
+  document.getElementById("counter").textContent=(cur+1)+"/"+steps.length;
+  window.parent.postMessage({{type:"step",index:cur}},"*");
+}}
+function next(){{if(cur<steps.length-1){{cur++;render()}}}}
+function prev(){{if(cur>0){{cur--;render()}}}}
+window.addEventListener("message",e=>{{
+  if(e.data&&e.data.type==="goToStep"){{
+    cur=Math.max(0,Math.min(e.data.index,steps.length-1));render();
+  }}
+}});
+document.addEventListener("DOMContentLoaded",()=>{{
+  render();
+  window.parent.postMessage({{type:"ready",totalSteps:steps.length}},"*");
+}});
+</script>
+</body>
+</html>"""
+
+
+@dataclass
 class CriticAgent:
     name: str = "critic"
 

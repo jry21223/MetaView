@@ -240,6 +240,7 @@ export async function submitPipeline(
   sourceImageName?: string | null,
   uiTheme?: UITheme | null,
   enableNarration = true,
+  outputMode: "video" | "html" = "video",
 ): Promise<PipelineSubmitResponse> {
   const response = await fetch(`${API_BASE_URL}/api/v1/pipeline/submit`, {
     method: "POST",
@@ -259,6 +260,7 @@ export async function submitPipeline(
       ui_theme: uiTheme ?? null,
       enable_narration: enableNarration,
       sandbox_mode: sandboxMode,
+      output_mode: outputMode,
     }),
   });
 

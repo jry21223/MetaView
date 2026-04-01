@@ -1,6 +1,7 @@
 import type { FormEvent } from "react";
 import { ControlPanel } from "../../components/ControlPanel";
 import { TaskProgressCard } from "../../components/TaskProgressCard";
+import { HtmlPreviewPanel } from "../../components/HtmlPreviewPanel";
 import { HighlightedCode } from "../../components/HighlightedCode";
 import { InteractiveExecutionExplorer } from "../../components/InteractiveExecutionExplorer";
 import { VideoPreview } from "../../components/VideoPreview";
@@ -257,8 +258,20 @@ export function StudioPage({
               )}
             </div>
 
-            {/* Video content */}
-            {hasInteractiveExplorer && result?.execution_map ? (
+            {/* Preview content — HTML or Video */}
+            {result?.preview_html_url ? (
+              <div style={{ marginTop: "20px" }}>
+                <HtmlPreviewPanel
+                  src={result.preview_html_url}
+                  cir={result.cir}
+                  meta={
+                    result
+                      ? `${result.request_id.slice(0, 8)} · ${result.runtime.generation_provider?.label ?? generationProvider}`
+                      : undefined
+                  }
+                />
+              </div>
+            ) : hasInteractiveExplorer && result?.execution_map ? (
               <div style={{ marginTop: "20px" }}>
                 <InteractiveExecutionExplorer
                   key={result.request_id}

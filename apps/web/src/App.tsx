@@ -177,7 +177,7 @@ export default function App() {
       : sourceCodeLanguage === "python"
         ? "python"
         : undefined;
-  const hasCompletedPreview = Boolean(previewVideoUrl);
+  const hasCompletedPreview = Boolean(previewVideoUrl) || Boolean(result?.preview_html_url);
   const showSourcePanel = sourceCode.trim().length > 0;
   const hasInteractiveExplorer = Boolean(
     previewVideoUrl
@@ -465,6 +465,7 @@ export default function App() {
         sourceImageName,
         theme,
         enableNarration,
+        outputMode === "html" ? "html" : "video",
       );
       startTransition(() => {
         setSelectedRunId(submittedRun.request_id);
