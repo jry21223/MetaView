@@ -243,70 +243,119 @@ export function ControlPanel({
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
+          <div className={`composer-container ${prompt.trim() ? "is-active" : ""}`}>
           <textarea
             className="composer-input"
             value={prompt}
             onChange={(event) => onPromptChange(event.target.value)}
-            placeholder={genericPlaceholder}
-            rows={3}
+            placeholder="描述您想要生成的可视化场景..."
+            rows={4}
+            style={{ 
+              paddingBottom: "56px", 
+              width: "100%",
+              resize: "vertical",
+              minHeight: "140px"
+            }}
           />
 
-          {sourceImage ? (
-            <div className="composer-attachment">
-              <img
-                className="composer-attachment-image"
-                src={sourceImage}
-                alt={sourceImageName ?? "题图预览"}
-              />
-              <div className="composer-attachment-copy">
-                <strong>{sourceImageName ?? "已附带题图"}</strong>
-                <span>题图会随请求发送到支持视觉的阶段，用于识别题面与图形关系。</span>
-              </div>
+          {sourceImage && (
+            <div style={{ 
+              position: "absolute", 
+              left: "16px", 
+              bottom: "56px", 
+              display: "flex", 
+              alignItems: "center", 
+              gap: "8px", 
+              padding: "4px 8px", 
+              background: "var(--surface-container-high)", 
+              borderRadius: "8px",
+              boxShadow: "var(--shadow-sm)"
+            }}>
+              <span className="material-symbols-outlined" style={{ fontSize: "16px", color: "var(--primary)" }}>image</span>
+              <span style={{ fontSize: "0.75rem", color: "var(--on-surface-variant)", maxWidth: "160px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {sourceImageName ?? "已附带题图"}
+              </span>
               <button
                 type="button"
-                className="ghost-button composer-attachment-clear"
-                onClick={() => {
-                  onSourceImageChange(null, null);
-                  setImageError(null);
-                }}
+                className="icon-button"
+                style={{ width: "20px", height: "20px", padding: 0 }}
+                onClick={() => onSourceImageChange(null, null)}
               >
-                移除图片
+                <span className="material-symbols-outlined" style={{ fontSize: "14px" }}>close</span>
               </button>
             </div>
-          ) : null}
+          )}
 
-          <div className="composer-search-actions">
-            <div className="composer-inline-tools">
-              <label className="composer-attach-button" htmlFor={imageInputId}>
-                上传图片
-              </label>
-              {dragActive ? <span className="composer-inline-hint">松开即可附带题图</span> : null}
-              <input
-                id={imageInputId}
-                type="file"
-                accept="image/*"
-                className="composer-upload-input"
-                onChange={handleInputFileChange}
-              />
-            </div>
-
-            <div className="composer-primary-actions">
-              <button
-                type="button"
-                className="ghost-button composer-reset-button"
-                onClick={onStartNewQuestion}
-              >
-                新建问题
-              </button>
-              <button
-                type="submit"
-                className="composer-submit"
-                disabled={!canSubmit}
-              >
-                {loading ? "生成中..." : "生成视频"}
-              </button>
-            </div>
+          <div style={{ 
+            position: "absolute", 
+            bottom: "12px", 
+            right: "12px", 
+            display: "flex", 
+            alignItems: "center", 
+            gap: "8px" 
+          }}>
+            <button
+              type="button"
+              className="icon-button"
+              title="上传参考图片"
+              style={{
+                width: "36px",
+                height: "36px",
+                borderRadius: "8px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--on-surface-variant)",
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                transition: "all var(--transition-fast)"
+              }}
+              onClick={() => {
+                const input = document.createElement("input");
+                input.type = "file";
+                input.accept = "image/*";
+                input.onchange = async (e) => {
+                  const file = (e.target as HTMLInputElement).files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => onSourceImageChange(e.target?.result as string, file.name);
+                    reader.readAsDataURL(file);
+                  }
+                };
+                input.click();
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: "20px" }}>attach_file</span>
+            </button>
+            
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={loading || !prompt.trim()}
+              style={{ 
+                height: "36px", 
+                padding: "0 16px",
+                borderRadius: "8px",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px"
+              }}
+            >
+              {loading ? (
+                <>
+                  <span className="material-symbols-outlined rotating" style={{ fontSize: "18px" }}>progress_activity</span>
+                  生成中
+                </>
+              ) : (
+                <>
+                  生成视频
+                  <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>magic_button</span>
+                </>
+              )}
+            </button>
           </div>
+        </div>
         </div>
 
         {imageError ? <p className="error-text composer-upload-feedback">{imageError}</p> : null}

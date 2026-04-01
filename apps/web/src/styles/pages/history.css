@@ -1,0 +1,302 @@
+/* ============================================
+
+   HISTORY PAGE STYLES v2
+   ============================================ */
+
+/* Two-column layout */
+.history-layout {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 0;
+  min-height: calc(100vh - 56px - 64px);
+}
+
+.history-page-layout {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 20px;
+  min-height: calc(100vh - 56px - 64px);
+}
+
+/* List panel */
+.history-list-panel {
+  background: var(--surface-container-low);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--glass-border);
+}
+
+.history-list-header {
+  padding: 22px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.history-list-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* History items */
+.history-item {
+  padding: 14px 16px;
+  background: transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: 1px solid transparent;
+  position: relative;
+}
+
+.history-item:hover {
+  background: var(--surface-container);
+  transform: none;
+}
+
+.history-item.is-active,
+.history-item.is-selected {
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 15%, transparent);
+}
+
+.history-item.is-active::before,
+.history-item.is-selected::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 24px;
+  border-radius: 0 var(--radius-full) var(--radius-full) 0;
+  background: var(--primary);
+}
+
+.history-item.is-error {
+  border-left: 3px solid var(--error);
+}
+
+.history-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 6px;
+}
+
+.history-item-id {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--on-surface-variant);
+  font-family: var(--font-mono);
+}
+
+.history-item-time {
+  font-size: 0.625rem;
+  color: var(--outline);
+}
+
+.history-item-title {
+  font-family: var(--font-headline);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  margin-bottom: 3px;
+}
+
+.history-item-summary {
+  font-size: 0.8125rem;
+  color: var(--on-surface-variant);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.history-item-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--on-surface-variant);
+}
+
+/* Detail panel */
+.history-detail-panel {
+  background: var(--surface);
+  padding: 28px;
+  overflow-y: auto;
+}
+
+.history-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 28px;
+}
+
+.history-detail-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.history-detail-panel h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
+.history-detail-panel p {
+  margin-top: 0;
+  margin-bottom: 24px;
+}
+
+.history-detail-panel .panel-header h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
+.history-detail-panel .panel-header p {
+  margin-top: 0;
+  margin-bottom: 20px;
+}
+
+/* Meta tags */
+.history-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.history-item-meta span {
+  padding: 3px 10px;
+  background: var(--surface-container);
+  border-radius: var(--radius-full);
+  font-size: 0.6875rem;
+  color: var(--on-surface-variant);
+  font-weight: 500;
+}
+
+/* Preview empty state */
+.preview-empty {
+  padding: 32px 24px;
+  border-radius: var(--radius-md);
+  background: var(--surface-container-low);
+  color: var(--on-surface-variant);
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 20px;
+  font-size: 0.875rem;
+}
+
+.preview-empty strong {
+  display: block;
+  color: var(--on-surface);
+  margin-bottom: 6px;
+}
+
+.preview-empty.is-loading {
+  background: linear-gradient(
+    -45deg,
+    var(--surface-container-low) 25%,
+    var(--surface-container) 50%,
+    var(--surface-container-low) 75%
+  );
+  background-size: 200% 200%;
+  animation: shimmer-bg 1.5s ease-in-out infinite;
+}
+
+@keyframes shimmer-bg {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+/* Status badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.badge-outline {
+  background: transparent;
+  border: 1px solid var(--outline-variant);
+  color: var(--on-surface-variant);
+}
+
+.badge-ghost {
+  background: var(--surface-container-highest);
+  color: var(--on-surface);
+}
+
+.status-succeeded,
+.status-passed {
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  color: var(--primary);
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.status-failed {
+  background: color-mix(in srgb, var(--error) 10%, transparent);
+  color: var(--error);
+  border: 1px solid color-mix(in srgb, var(--error) 20%, transparent);
+}
+
+.status-running,
+.status-queued {
+  background: color-mix(in srgb, var(--secondary) 10%, transparent);
+  color: var(--secondary);
+  border: 1px solid color-mix(in srgb, var(--secondary) 20%, transparent);
+}
+
+/* Detail panel styling */
+.panel-history-detail {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--glass-border);
+  padding: 24px;
+}
+
+/* Diagnostics override for history page */
+.diagnostic-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px 0;
+}
+
+/* Panel toolbar */
+.panel-toolbar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .history-layout,
+  .history-page-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .history-list-panel {
+    max-height: 50vh;
+    border-right: none;
+    border-bottom: 1px solid var(--glass-border);
+  }
+}

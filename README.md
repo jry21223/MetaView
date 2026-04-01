@@ -31,6 +31,32 @@
 - `biology`
 - `geography`
 
+## 前端 UI 设计系统
+
+前端采用 Stitch Design System v2，基于 CSS Custom Properties 的自定义设计系统，无第三方 UI 框架依赖。
+
+### 设计特点
+
+- **深色/浅色主题**：完整的 dark/light 双主题支持，通过 `data-theme` 属性切换
+- **Glassmorphism 导航**：Topbar 采用毛玻璃效果 + 霓虹灯条品牌标识
+- **Bento Grid 布局**：12 列响应式网格，卡片支持 hover 发光效果
+- **生成加载动画**：视频生成时展示双环旋转动画 + 四步流水线进度
+- **自定义滚动条**：统一的极简滚动条样式
+- **页面入场动画**：fade-in 过渡效果
+
+### 样式文件结构
+
+```
+apps/web/src/styles/
+  tokens.css          # 设计令牌：颜色、字体、阴影、圆角、动效曲线
+  global.css          # 全局重置、滚动条、焦点环、共享关键帧
+  layout.css          # 应用外壳：Topbar、Sidebar、Bento Grid、按钮系统
+  pages/
+    studio.css        # 工作台：编辑器、视频预览、执行探索器、加载动画
+    history.css       # 历史页：列表/详情双栏布局、状态标签
+    tools.css         # 工具页：手风琴面板、资源卡片、进度条
+```
+
 ## 简化启动
 
 ### 方式 A：直接启动成品环境
