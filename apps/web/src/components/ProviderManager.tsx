@@ -31,6 +31,80 @@ const initialState: CustomProviderUpsertRequest = {
   enabled: true,
 };
 
+interface ProviderPreset {
+  key: string;
+  icon: string;
+  data: CustomProviderUpsertRequest;
+}
+
+const PROVIDER_PRESETS: ProviderPreset[] = [
+  {
+    key: "deepseek",
+    icon: "neurology",
+    data: {
+      name: "deepseek",
+      label: "DeepSeek",
+      base_url: "https://api.deepseek.com/v1",
+      model: "deepseek-chat",
+      router_model: "deepseek-chat",
+      planning_model: "deepseek-reasoner",
+      coding_model: "deepseek-chat",
+      critic_model: "deepseek-chat",
+      test_model: "deepseek-chat",
+      api_key: "",
+      description: "DeepSeek 官方 API（兼容 OpenAI 协议）",
+      temperature: 0.2,
+      supports_vision: false,
+      enabled: true,
+    },
+  },
+  {
+    key: "kimi",
+    icon: "auto_awesome",
+    data: {
+      name: "kimi",
+      label: "Kimi (Moonshot)",
+      base_url: "https://api.moonshot.cn/v1",
+      model: "moonshot-v1-auto",
+      router_model: "moonshot-v1-8k",
+      planning_model: "moonshot-v1-auto",
+      coding_model: "moonshot-v1-auto",
+      critic_model: "moonshot-v1-8k",
+      test_model: "moonshot-v1-8k",
+      api_key: "",
+      description: "Moonshot AI Kimi 官方 API",
+      temperature: 0.2,
+      supports_vision: false,
+      enabled: true,
+    },
+  },
+  {
+    key: "openai",
+    icon: "psychology",
+    data: {
+      name: "openai-official",
+      label: "OpenAI",
+      base_url: "https://api.openai.com/v1",
+      model: "gpt-4o",
+      router_model: "gpt-4o-mini",
+      planning_model: "gpt-4o",
+      coding_model: "gpt-4o",
+      critic_model: "gpt-4o-mini",
+      test_model: "gpt-4o-mini",
+      api_key: "",
+      description: "OpenAI 官方 API",
+      temperature: 0.2,
+      supports_vision: true,
+      enabled: true,
+    },
+  },
+  {
+    key: "ollama",
+    icon: "dns",
+    data: { ...initialState },
+  },
+];
+
 function stageModelSummary(provider: ProviderDescriptor): string[] {
   const items: string[] = [];
   if (provider.stage_models.router) {
@@ -148,6 +222,29 @@ export function ProviderManager({
           支持注册 OpenAI 兼容接口，例如本地 Ollama、vLLM 网关或第三方代理服务。Provider
           请求默认不设超时限制；如果上游网关另有限制，以网关设置为准。
         </p>
+      </div>
+
+      {/* Preset quick-fill buttons */}
+      <div className="provider-presets">
+        <span className="provider-presets-label">快速填入</span>
+        <div className="provider-presets-grid">
+          {PROVIDER_PRESETS.map((preset) => (
+            <button
+              key={preset.key}
+              type="button"
+              className={`provider-preset-btn ${form.name === preset.data.name && !editingName ? "is-active" : ""}`}
+              onClick={() => {
+                setForm({ ...preset.data });
+                setEditingName(null);
+                setError(null);
+                setTestResult(null);
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{preset.icon}</span>
+              {preset.data.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <form className="prompt-form" onSubmit={handleSubmit}>
