@@ -41,7 +41,7 @@
 .topbar-neon-strip {
   display: inline-block;
   width: 8px;
-  height: 32px;
+  height: 36px;
   border-radius: var(--radius-full);
   background: linear-gradient(180deg, var(--primary) 0%, var(--primary-dim) 60%, transparent 100%);
   box-shadow: 0 0 18px color-mix(in srgb, var(--primary) 28%, transparent);
@@ -60,12 +60,28 @@
   }
 }
 
+.brand-text-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
 .topbar-brand-text {
   font-family: var(--font-headline);
   font-size: 1.2rem;
   font-weight: 700;
   letter-spacing: -0.05em;
   color: var(--on-surface);
+  line-height: 1.2;
+}
+
+.topbar-brand-subtitle {
+  font-size: 0.55rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--on-surface-variant);
+  line-height: 1;
 }
 
 .topbar-actions {
@@ -339,11 +355,13 @@
 }
 
 .bento-card {
+  --mouse-x: 50%;
+  --mouse-y: 50%;
   background: var(--surface);
   border-radius: var(--radius-xl);
   border: 1px solid var(--glass-border);
   overflow: hidden;
-  transition: all var(--transition-normal);
+  transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
   position: relative;
 }
 
@@ -352,10 +370,15 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: var(--gradient-glow);
+  background: radial-gradient(
+    600px circle at var(--mouse-x) var(--mouse-y),
+    color-mix(in srgb, var(--primary) 8%, transparent),
+    transparent 40%
+  );
   opacity: 0;
-  transition: opacity var(--transition-slow);
+  transition: opacity var(--transition-normal);
   pointer-events: none;
+  z-index: 0;
 }
 
 .bento-card:hover {

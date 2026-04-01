@@ -1,6 +1,7 @@
 import { startTransition, useEffect, useEffectEvent, useState } from "react";
 import { useTheme } from "./hooks/core/useTheme";
 import { useRuntimeCatalog, resolveConfiguredProvider, activeProviderSupportsVision } from "./hooks/core/useRuntimeCatalog";
+import { useMouseGlow } from "./hooks/core/useMouseGlow";
 import { useHistoryRuns } from "./hooks/features/useHistoryRuns";
 
 import type { FormEvent } from "react";
@@ -168,6 +169,7 @@ export default function App() {
   const { runs, setRuns, historyError, setHistoryError, loadRuns } = useHistoryRuns();
   const [selectedRunId, setSelectedRunId] = useState<string | null>(getInitialSelectedRunId);
   const { theme, setTheme } = useTheme();
+  const glowRef = useMouseGlow();
   const [activeRunId, setActiveRunId] = useState<string | null>(getInitialActiveRunId);
   const [debugToolsOpen, setDebugToolsOpen] = useState(false);
   const [activePage, setActivePage] = useState<AppPage>(getInitialPage);
@@ -698,9 +700,11 @@ export default function App() {
         <div className="sidebar-brand">
           <div className="topbar-brand" style={{ padding: 0 }}>
             <span className="topbar-neon-strip" />
-            <span className="topbar-brand-text">MetaView</span>
+            <div className="brand-text-group">
+              <span className="topbar-brand-text">MetaView</span>
+              <span className="topbar-brand-subtitle">THEORETICAL CANVAS</span>
+            </div>
           </div>
-          <div className="sidebar-brand-subtitle">AI Visualization Studio</div>
         </div>
 
         <nav className="sidebar-nav">
@@ -742,7 +746,7 @@ export default function App() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="main-content">
+      <main className="main-content" ref={glowRef}>
         <div className="page-container">
           {/* Studio Page */}
           {activePage === "studio" ? (
