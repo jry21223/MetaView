@@ -13,11 +13,6 @@ import {
   updateRuntimeSettings,
   upsertCustomProvider,
 } from "./api/client";
-import {
-  domainLabels,
-  domainPresets,
-  getDomainPresentation,
-} from "./domainPresentation";
 
 import { StudioPage } from "./pages/Studio/StudioPage";
 import { HistoryPage } from "./pages/History/HistoryPage";
@@ -26,6 +21,7 @@ import { ToolsPage } from "./pages/Tools/ToolsPage";
 import type {
   CustomProviderUpsertRequest,
   ModelProvider,
+  OutputMode,
   PipelineResponse,
   PipelineRunDetail,
   SandboxMode,
@@ -34,7 +30,6 @@ import type {
 
 const defaultPrompt = "输入一个题目、源码或题图，生成对应的 Manim 讲解动画视频。";
 
-type DeckMode = "smart" | "expert";
 type AppPage = "studio" | "history" | "tools";
 
 const activeRunStorageKey = "metaview-active-run-id";
@@ -142,20 +137,10 @@ function mergePromptScenario(prompt: string, scenario: string): string {
   return `${trimmed}\n\n${scenario}`.trim();
 }
 
-function resolveFreshPrompt(
-  deckMode: DeckMode,
-  selectedDomain: TopicDomain | null,
-): string {
-  if (deckMode === "expert" && selectedDomain) {
-    return domainPresets[selectedDomain] ?? defaultPrompt;
-  }
-  return defaultPrompt;
-}
-
 export default function App() {
   const [prompt, setPrompt] = useState(defaultPrompt);
-  const [deckMode, setDeckMode] = useState<DeckMode>("smart");
   const [selectedDomain, setSelectedDomain] = useState<TopicDomain | null>(null);
+  const [outputMode, setOutputMode] = useState<OutputMode>("manim");
   const [sourceCode, setSourceCode] = useState("");
   const [sourceCodeLanguage, setSourceCodeLanguage] = useState("");
   const [sandboxMode, setSandboxMode] = useState<SandboxMode>("dry_run");
@@ -202,21 +187,6 @@ export default function App() {
   );
   const selectedHistoryRun =
     runs.find((run) => run.request_id === selectedRunId) ?? null;
-  const selectedDomainLabel = selectedDomain ? domainLabels[selectedDomain] : "自动路由";
-  const selectedPresentation = getDomainPresentation(selectedDomain);
-  const selectedMetrics = selectedPresentation?.metrics ?? [
-    {
-      label: "输入方式",
-      value: "题目 / 源码 / 题图",
-      description: "一个主入口统一组织问题、源码与题图。",
-    },
-    {
-      label: "输出目标",
-      value: "教学视频",
-      description: "生成讲解结构、脚本和可直接预览的动画结果。",
-    },
-  ];
-
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -265,14 +235,15 @@ export default function App() {
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
 
+  // Auto-select first domain when catalog loads (smart mode auto-routing)
   useEffect(() => {
-    if (deckMode === "expert" || runtimeCatalog.skills.length === 0 || selectedDomain) {
+    if (runtimeCatalog.skills.length === 0 || selectedDomain) {
       return;
     }
     startTransition(() => {
       setSelectedDomain(runtimeCatalog.skills[0]?.domain ?? null);
     });
-  }, [deckMode, runtimeCatalog.skills, selectedDomain]);
+  }, [runtimeCatalog.skills, selectedDomain]);
 
   function syncRunIntoEditor(run: PipelineRunDetail) {
     setPrompt(run.request.prompt);
@@ -299,7 +270,6 @@ export default function App() {
     setSourceImage(run.request.source_image ?? null);
     setSourceImageName(run.request.source_image_name ?? null);
     setEnableNarration(run.request.enable_narration ?? true);
-    setDeckMode(run.request.domain ? "expert" : "smart");
     setSelectedDomain(run.response?.runtime.skill.domain ?? run.request.domain ?? null);
     setEditorDirty(false);
   }
@@ -481,14 +451,14 @@ export default function App() {
     setError(null);
     setResult(null);
     setEditorDirty(false);
-        
+
     try {
       const submittedRun = await submitPipeline(
         prompt,
         routerProvider,
         generationProvider,
         sandboxMode,
-        deckMode === "expert" ? selectedDomain : null,
+        null, // always auto-route domain (smart mode)
         sourceCode,
         sourceCodeLanguage || null,
         sourceImage,
@@ -514,8 +484,7 @@ export default function App() {
         setHistoryError(null);
         setSelectedRunId(requestId);
       });
-      // Reset video-code sync state when switching runs
-            
+
       const run = await getPipelineRun(requestId, {
         includeRawOutput: debugToolsOpen,
       });
@@ -640,29 +609,12 @@ export default function App() {
     await refreshRuntimeCatalog();
   }
 
-  function handleSelectDomain(domain: TopicDomain) {
-    setEditorDirty(true);
-    setSelectedDomain(domain);
-    setPrompt(domainPresets[domain] ?? defaultPrompt);
-    if (domain === "code" && !sourceCodeLanguage) {
-      setSourceCodeLanguage("python");
-    }
-  }
-
-  function handleSetDeckMode(mode: DeckMode) {
-    setEditorDirty(true);
-    setDeckMode(mode);
-    if (mode === "expert" && !selectedDomain) {
-      setSelectedDomain(runtimeCatalog.skills[0]?.domain ?? null);
-    }
-  }
-
   function handleStartNewConversation() {
     startTransition(() => {
       setActivePage("studio");
       setSelectedRunId(null);
     });
-    setPrompt(resolveFreshPrompt(deckMode, selectedDomain));
+    setPrompt(defaultPrompt);
     setSourceCode("");
     setSourceImage(null);
     setSourceImageName(null);
@@ -672,30 +624,12 @@ export default function App() {
     setHistoryError(null);
     setActiveRunId(null);
     setEditorDirty(false);
-            setDebugToolsOpen(false);
+    setDebugToolsOpen(false);
   }
 
   return (
     <div className="app-shell">
-      {/* Top Navigation Bar - Full Width */}
-      <header className="topbar">
-        <div className="topbar-brand" style={{ width: '256px' }}></div>
-        <div className="topbar-actions">
-          <button
-            type="button"
-            className="topbar-icon-btn"
-            onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
-            title={theme === "dark" ? "切换到浅色模式" : "切换到深色模式"}
-          >
-            <span className="material-symbols-outlined">
-              {theme === "dark" ? "light_mode" : "dark_mode"}
-            </span>
-          </button>
-          <div className="topbar-avatar">MV</div>
-        </div>
-      </header>
-
-      {/* Side Navigation Bar - Below Topbar */}
+      {/* Side Navigation Bar */}
       <aside className="sidebar">
         <div className="sidebar-brand">
           <div className="topbar-brand" style={{ padding: 0 }}>
@@ -745,15 +679,28 @@ export default function App() {
         </div>
       </aside>
 
+      {/* Floating Actions (theme + avatar) */}
+      <div className="floating-actions">
+        <button
+          type="button"
+          className="topbar-icon-btn"
+          onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
+          title={theme === "dark" ? "切换到浅色模式" : "切换到深色模式"}
+        >
+          <span className="material-symbols-outlined">
+            {theme === "dark" ? "light_mode" : "dark_mode"}
+          </span>
+        </button>
+        <div className="topbar-avatar">MV</div>
+      </div>
+
       {/* Main Content Area */}
       <main className="main-content" ref={glowRef}>
         <div className="page-container">
-          {/* Studio Page */}
           {activePage === "studio" ? (
             <StudioPage
-              deckMode={deckMode}
-              selectedDomain={selectedDomain}
               prompt={prompt}
+              outputMode={outputMode}
               sourceImage={sourceImage}
               sourceCode={sourceCode}
               sourceCodeLanguage={sourceCodeLanguage}
@@ -774,14 +721,10 @@ export default function App() {
               editorName={editorName}
               sourcePreviewLanguage={sourcePreviewLanguage}
               result={result}
-              selectedDomainLabel={selectedDomainLabel}
-              selectedMetrics={selectedMetrics}
-              selectedPresentation={selectedPresentation}
               shouldEmphasizeSourceLine={shouldEmphasizeSourceLine}
               mergePromptScenario={mergePromptScenario}
-              
-              onDeckModeChange={handleSetDeckMode}
-              onSelectDomain={handleSelectDomain}
+
+              onOutputModeChange={setOutputMode}
               onPromptChange={handlePromptChange}
               onSourceCodeChange={handleSourceCodeChange}
               onSourceCodeLanguageChange={handleSourceCodeLanguageChange}
@@ -797,7 +740,6 @@ export default function App() {
             />
           ) : null}
 
-          {/* History Page */}
           {activePage === "history" ? (
             <HistoryPage
               historyError={historyError}
@@ -807,14 +749,13 @@ export default function App() {
               selectedHistoryRun={selectedHistoryRun}
               previewVideoUrl={previewVideoUrl}
               loading={loading}
-              
+
               onSelectRun={handleSelectRun}
               onOpenInStudio={() => setActivePage("studio")}
               isRunningStatus={isRunningStatus}
             />
           ) : null}
 
-          {/* Tools Page */}
           {activePage === "tools" ? (
             <ToolsPage
               debugToolsOpen={debugToolsOpen}
@@ -822,7 +763,7 @@ export default function App() {
               result={result}
               runtimeCatalog={runtimeCatalog}
               activeSkill={activeSkill}
-              
+
               handleExportCurrent={handleExportCurrent}
               handleCreateProvider={handleCreateProvider}
               handleDeleteProvider={handleDeleteProvider}
@@ -830,36 +771,36 @@ export default function App() {
             />
           ) : null}
 
-      </div>
+        </div>
       </main>
 
       {/* Mobile Bottom Navigation */}
       <nav className="mobile-nav">
-          <button
-            type="button"
-            className={`mobile-nav-item ${activePage === "studio" ? "is-active" : ""}`}
-            onClick={() => setActivePage("studio")}
-          >
-            <span className="material-symbols-outlined">workspaces</span>
-            工作台
-          </button>
-          <button
-            type="button"
-            className={`mobile-nav-item ${activePage === "history" ? "is-active" : ""}`}
-            onClick={() => setActivePage("history")}
-          >
-            <span className="material-symbols-outlined">history</span>
-            历史
-          </button>
-          <button
-            type="button"
-            className={`mobile-nav-item ${activePage === "tools" ? "is-active" : ""}`}
-            onClick={() => setActivePage("tools")}
-          >
-            <span className="material-symbols-outlined">extension</span>
-            工具
-          </button>
-        </nav>
+        <button
+          type="button"
+          className={`mobile-nav-item ${activePage === "studio" ? "is-active" : ""}`}
+          onClick={() => setActivePage("studio")}
+        >
+          <span className="material-symbols-outlined">workspaces</span>
+          工作台
+        </button>
+        <button
+          type="button"
+          className={`mobile-nav-item ${activePage === "history" ? "is-active" : ""}`}
+          onClick={() => setActivePage("history")}
+        >
+          <span className="material-symbols-outlined">history</span>
+          历史
+        </button>
+        <button
+          type="button"
+          className={`mobile-nav-item ${activePage === "tools" ? "is-active" : ""}`}
+          onClick={() => setActivePage("tools")}
+        >
+          <span className="material-symbols-outlined">extension</span>
+          工具
+        </button>
+      </nav>
     </div>
   );
 }

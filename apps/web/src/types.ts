@@ -13,6 +13,18 @@ export type SandboxStatus = "passed" | "failed" | "skipped";
 export type PipelineRunStatus = "queued" | "running" | "succeeded" | "failed";
 export type ProviderKind = "mock" | "openai_compatible";
 export type ProviderStage = "router" | "planning" | "coding" | "critic" | "test";
+
+/**
+ * Output rendering mode.
+ * - "manim": Renders a Manim animation video (MP4). Fully supported.
+ * - "html": Renders an interactive HTML visualization. **Frontend-only toggle**;
+ *   the backend does not yet accept this parameter. When backend support is added,
+ *   include `output_mode` in the submitPipeline request body. See api/client.ts.
+ */
+export type OutputMode = "manim" | "html";
+
+/** Pipeline processing stages for progress tracking. */
+export type PipelineStage = "domain_routing" | "cir_planning" | "script_coding" | "render_output";
 export type TTSBackend = "auto" | "system" | "openai_compatible";
 
 export type VisualKind =

@@ -219,6 +219,15 @@ export async function runPipeline(
   return (await response.json()) as PipelineResponse;
 }
 
+/**
+ * Submit a pipeline run.
+ *
+ * TODO(backend): The frontend now has an `OutputMode` toggle ("manim" | "html").
+ * Currently `output_mode` is NOT sent in the request body — all submissions
+ * render via Manim. When the backend adds HTML visualization support, include
+ * `output_mode` in the JSON body below. Default to "manim" if absent for
+ * backward compatibility. See `OutputMode` in types.ts for details.
+ */
 export async function submitPipeline(
   prompt: string,
   routerProvider: ModelProvider,

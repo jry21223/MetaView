@@ -1520,6 +1520,184 @@
 }
 
 /* ============================================
+   STUDIO LAYOUT TRANSITIONS
+   ============================================ */
+
+.studio-input-section {
+  transition: max-height 0.5s var(--ease-out-expo),
+              opacity 0.4s var(--ease-out-expo),
+              transform 0.4s var(--ease-out-expo);
+  max-height: 3000px;
+  opacity: 1;
+  transform: translateY(0);
+  overflow: hidden;
+}
+
+.studio-input-section.is-collapsed {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-20px);
+  pointer-events: none;
+}
+
+.studio-preview-section {
+  transition: opacity 0.5s var(--ease-out-expo) 0.15s,
+              transform 0.5s var(--ease-out-expo) 0.15s;
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.studio-preview-section.is-active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Input card focus glow */
+.studio-input-card {
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition-normal), border-color var(--transition-normal);
+}
+
+.studio-input-card:focus-within {
+  border-color: color-mix(in srgb, var(--primary) 25%, var(--glass-border));
+  box-shadow: var(--shadow-sm),
+              0 0 0 4px color-mix(in srgb, var(--primary) 8%, transparent),
+              0 8px 32px color-mix(in srgb, var(--primary) 6%, transparent);
+}
+
+/* Compact prompt summary bar */
+.studio-compact-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface-container-low);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  animation: fade-in 0.4s var(--ease-out-expo) 0.3s both;
+}
+
+.studio-compact-summary-text {
+  flex: 1;
+  min-width: 0;
+  color: var(--on-surface-variant);
+  font-size: 0.875rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ============================================
+   TASK PROGRESS CARD
+   ============================================ */
+
+.task-progress-idle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px 16px;
+  text-align: center;
+}
+
+.task-progress-idle-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--outline);
+  letter-spacing: 0.05em;
+}
+
+.task-progress-pipeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 8px 0;
+}
+
+.task-progress-stage-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.task-progress-stage {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.task-progress-stage.is-active {
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
+}
+
+.task-progress-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-container);
+  color: var(--outline);
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.task-progress-stage.is-completed .task-progress-dot {
+  background: color-mix(in srgb, var(--primary) 15%, transparent);
+  color: var(--primary);
+}
+
+.task-progress-stage.is-active .task-progress-dot {
+  background: color-mix(in srgb, var(--primary) 15%, transparent);
+  color: var(--primary);
+  animation: glow-pulse 1.5s ease-in-out infinite;
+}
+
+.task-progress-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.task-progress-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--on-surface-variant);
+}
+
+.task-progress-stage.is-active .task-progress-label,
+.task-progress-stage.is-completed .task-progress-label {
+  color: var(--on-surface);
+}
+
+.task-progress-status {
+  font-size: 0.6875rem;
+  color: var(--tertiary);
+  font-weight: 500;
+}
+
+.task-progress-status.is-done {
+  color: var(--primary);
+}
+
+.task-progress-connector {
+  width: 2px;
+  height: 12px;
+  margin-left: 27px;
+  background: var(--outline-variant);
+  transition: background var(--transition-fast);
+}
+
+.task-progress-connector.is-completed {
+  background: var(--primary);
+}
+
+/* ============================================
    GENERATION LOADING ANIMATION
    ============================================ */
 

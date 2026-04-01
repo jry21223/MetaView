@@ -11,31 +11,23 @@
 
 /* ============================================
 
-   TOP NAVIGATION BAR
+   FLOATING ACTIONS (theme toggle + avatar)
    ============================================ */
 
-.topbar {
+.floating-actions {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 56px;
-  z-index: 50;
+  top: 20px;
+  right: 32px;
+  z-index: 45;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 24px;
-  background: var(--glass-bg);
-  backdrop-filter: var(--backdrop-blur-heavy);
-  -webkit-backdrop-filter: var(--backdrop-blur-heavy);
-  border-bottom: 1px solid var(--glass-border);
+  gap: 8px;
 }
 
 .topbar-brand {
   display: flex;
   align-items: center;
   gap: 12px;
-  width: 240px;
 }
 
 .topbar-neon-strip {
@@ -136,7 +128,7 @@
 .sidebar {
   position: fixed;
   left: 0;
-  top: 56px;
+  top: 0;
   bottom: 0;
   width: 256px;
   padding: 20px 12px;
@@ -295,7 +287,7 @@
 .main-content {
   margin-left: 256px;
   min-height: 100vh;
-  padding-top: 56px;
+  padding-top: 0;
   transition: margin var(--transition-normal);
 }
 

@@ -8,14 +8,12 @@ import {
   type FormEvent,
 } from "react";
 
-import { domainLabels } from "../domainPresentation";
-import type { ModelProvider, ProviderDescriptor, SandboxMode } from "../types";
-import type { SkillDescriptor, TopicDomain } from "../types";
+import type { ModelProvider, OutputMode, ProviderDescriptor, SandboxMode } from "../types";
+import type { SkillDescriptor } from "../types";
 
 interface ControlPanelProps {
-  deckMode: "smart" | "expert";
+  outputMode: OutputMode;
   layoutMode?: "hero" | "split";
-  selectedDomain: TopicDomain | null;
   prompt: string;
   sourceImage: string | null;
   sourceCode: string;
@@ -31,8 +29,7 @@ interface ControlPanelProps {
   sourceImageName: string | null;
   routerProviderSupportsVision: boolean;
   generationProviderSupportsVision: boolean;
-  onDeckModeChange: (value: "smart" | "expert") => void;
-  onSelectDomain: (value: TopicDomain) => void;
+  onOutputModeChange: (value: OutputMode) => void;
   onPromptChange: (value: string) => void;
   onSourceCodeChange: (value: string) => void;
   onSourceCodeLanguageChange: (value: string) => void;
@@ -45,8 +42,6 @@ interface ControlPanelProps {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }
 
-const genericPlaceholder =
-  "例如：请讲解二分查找边界收缩；或说明定积分如何逼近面积；或根据题图分析斜面小球受力。";
 const maxImageSizeBytes = 2_500_000;
 
 function extractImageFile(items: DataTransferItemList | null | undefined): File | null {
@@ -101,9 +96,8 @@ function generationModelLabel(provider: ProviderDescriptor): string {
 }
 
 export function ControlPanel({
-  deckMode,
+  outputMode,
   layoutMode = "hero",
-  selectedDomain,
   prompt,
   sourceImage,
   sourceCode,
@@ -112,15 +106,13 @@ export function ControlPanel({
   generationProvider,
   sandboxMode,
   enableNarration,
-  skills,
   providers,
   sandboxModes,
   loading,
   sourceImageName,
   routerProviderSupportsVision,
   generationProviderSupportsVision,
-  onDeckModeChange,
-  onSelectDomain,
+  onOutputModeChange,
   onPromptChange,
   onSourceCodeChange,
   onSourceCodeLanguageChange,
@@ -129,16 +121,12 @@ export function ControlPanel({
   onSandboxModeChange,
   onEnableNarrationChange,
   onSourceImageChange,
-  onStartNewQuestion,
   onSubmit,
 }: ControlPanelProps) {
   const imageInputId = useId();
   const configuredProvidersCount = providers.filter((provider) => provider.configured).length;
   const hasSourceCode = sourceCode.trim().length > 0;
-  const canSubmit =
-    !loading &&
-    prompt.trim().length >= 5 &&
-    (deckMode === "smart" || selectedDomain !== null);
+  const canSubmit = !loading && prompt.trim().length >= 5;
   const [dragActive, setDragActive] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
 
@@ -223,15 +211,9 @@ export function ControlPanel({
   return (
     <section className={`composer-panel ${layoutMode === "split" ? "is-split" : ""}`.trim()}>
       <div className="composer-copy">
-        <span className="panel-kicker">
-          {deckMode === "smart" ? "Smart Mode" : "Expert Mode"}
-        </span>
-        <h1>{deckMode === "smart" ? "想问什么直接问" : "指定学科后再提问"}</h1>
-        <p>
-          {deckMode === "smart"
-            ? "题目、源码、题图都可以。系统会自动判断模块并直接生成视频。"
-            : "先选定学科，再把问题交给对应模块处理。"}
-        </p>
+        <span className="panel-kicker">Smart Mode</span>
+        <h1>想问什么直接问</h1>
+        <p>题目、源码、题图都可以。系统会自动判断模块并直接生成视频。</p>
       </div>
 
       <form className="composer-form" onSubmit={onSubmit}>
@@ -250,8 +232,8 @@ export function ControlPanel({
             onChange={(event) => onPromptChange(event.target.value)}
             placeholder="描述您想要生成的可视化场景..."
             rows={4}
-            style={{ 
-              paddingBottom: "56px", 
+            style={{
+              paddingBottom: "56px",
               width: "100%",
               resize: "vertical",
               minHeight: "140px"
@@ -259,15 +241,15 @@ export function ControlPanel({
           />
 
           {sourceImage && (
-            <div style={{ 
-              position: "absolute", 
-              left: "16px", 
-              bottom: "56px", 
-              display: "flex", 
-              alignItems: "center", 
-              gap: "8px", 
-              padding: "4px 8px", 
-              background: "var(--surface-container-high)", 
+            <div style={{
+              position: "absolute",
+              left: "16px",
+              bottom: "56px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "4px 8px",
+              background: "var(--surface-container-high)",
               borderRadius: "8px",
               boxShadow: "var(--shadow-sm)"
             }}>
@@ -286,13 +268,13 @@ export function ControlPanel({
             </div>
           )}
 
-          <div style={{ 
-            position: "absolute", 
-            bottom: "12px", 
-            right: "12px", 
-            display: "flex", 
-            alignItems: "center", 
-            gap: "8px" 
+          <div style={{
+            position: "absolute",
+            bottom: "12px",
+            right: "12px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
           }}>
             <button
               type="button"
@@ -328,13 +310,13 @@ export function ControlPanel({
             >
               <span className="material-symbols-outlined" style={{ fontSize: "20px" }}>attach_file</span>
             </button>
-            
+
             <button
               type="submit"
               className="btn btn-primary"
               disabled={loading || !prompt.trim()}
-              style={{ 
-                height: "36px", 
+              style={{
+                height: "36px",
                 padding: "0 16px",
                 borderRadius: "8px",
                 display: "flex",
@@ -370,48 +352,31 @@ export function ControlPanel({
           </p>
         ) : null}
 
+        {/* Output mode toggle: Manim / HTML */}
         <div className="composer-toggle">
           <button
             type="button"
-            className={`composer-toggle-button ${deckMode === "smart" ? "is-active" : ""}`}
-            onClick={() => onDeckModeChange("smart")}
+            className={`composer-toggle-button ${outputMode === "manim" ? "is-active" : ""}`}
+            onClick={() => onOutputModeChange("manim")}
           >
-            智能模式
+            Manim 视频
           </button>
           <button
             type="button"
-            className={`composer-toggle-button ${deckMode === "expert" ? "is-active" : ""}`}
-            onClick={() => onDeckModeChange("expert")}
+            className={`composer-toggle-button ${outputMode === "html" ? "is-active" : ""}`}
+            onClick={() => onOutputModeChange("html")}
           >
-            专家模式
+            HTML 交互
           </button>
         </div>
-
-        {deckMode === "expert" ? (
-          skills.length > 0 ? (
-            <div className="composer-chip-grid">
-              {skills.map((skill) => (
-                <button
-                  key={skill.id}
-                  type="button"
-                  className={`composer-chip ${selectedDomain === skill.domain ? "is-active" : ""}`}
-                  onClick={() => onSelectDomain(skill.domain)}
-                >
-                  {domainLabels[skill.domain] ?? skill.domain}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <p className="composer-chip-empty">当前还没有可用学科模块。</p>
-          )
-        ) : null}
+        {outputMode === "html" && (
+          <p className="field-hint" style={{ marginTop: "-8px" }}>
+            HTML 交互输出即将上线，当前提交仍以 Manim 视频渲染。
+          </p>
+        )}
 
         <div className="composer-meta">
-          <span>
-            {deckMode === "smart"
-              ? "自动判断学科与镜头结构"
-              : `当前学科：${selectedDomain ? domainLabels[selectedDomain] : "未选择"}`}
-          </span>
+          <span>自动判断学科与镜头结构</span>
           <span>{configuredProvidersCount} 个 provider 可用</span>
           {hasSourceCode ? <span>已附带源码</span> : null}
           {sourceImageName ? <span>已附带题图</span> : null}
