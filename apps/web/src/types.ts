@@ -82,11 +82,15 @@ export interface ExecutionArrayTrack {
 
 export interface ExecutionCheckpoint {
   id: string;
+  step_index: number;
   step_id: string;
+  visual_kind: VisualKind;
   title: string;
   summary: string;
   start_s: number;
+  start_progress?: number | null;
   end_s: number;
+  end_progress?: number | null;
   code_lines: number[];
   focus_tokens: string[];
   array_focus_indices: number[];
@@ -101,6 +105,8 @@ export interface ExecutionMap {
   checkpoints: ExecutionCheckpoint[];
   parameter_controls: ExecutionParameterControl[];
   array_track?: ExecutionArrayTrack | null;
+  step_to_checkpoint: Record<string, string>;
+  line_to_step_ids: Record<number, string[]>;
 }
 
 export interface AgentDiagnostic {

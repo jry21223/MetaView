@@ -49,6 +49,7 @@ from app.services.prompt_authoring import (
     generate_custom_subject_artifact,
     generate_reference_artifact,
 )
+from app.services.prompts.html_coder import HTML_CODER_PROMPT_VERSION
 from app.services.providers.registry import ProviderRegistry
 from app.services.repair import PipelineRepairService
 from app.services.sandbox import PreviewDryRunSandbox
@@ -553,7 +554,13 @@ class PipelineOrchestrator:
                 ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
             )
             renderer_script = html_script  # store in renderer_script for persistence
-            html_artifacts = self.html_renderer.render(html=html_script, request_id=request_id)
+            html_artifacts = self.html_renderer.render(
+                html=html_script,
+                request_id=request_id,
+                cir_json=cir.model_dump_json(exclude_none=True),
+                ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
+                prompt_version=HTML_CODER_PROMPT_VERSION,
+            )
             preview_html_url = html_artifacts.url
 
         # ── Video output branch (existing Manim flow, untouched) ─────

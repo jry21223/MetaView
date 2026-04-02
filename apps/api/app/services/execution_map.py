@@ -64,6 +64,9 @@ def build_execution_map(
     if not checkpoints:
         return None
 
+    step_to_checkpoint = {checkpoint.step_id: checkpoint.id for checkpoint in checkpoints}
+    line_to_step_ids = _build_line_to_step_ids(checkpoints)
+
     return ExecutionMap(
         duration_s=round(checkpoints[-1].end_s, 3),
         interaction_hint=(
@@ -81,6 +84,8 @@ def build_execution_map(
             if array_track is not None
             else None
         ),
+        step_to_checkpoint=step_to_checkpoint,
+        line_to_step_ids=line_to_step_ids,
     )
 
 
@@ -197,11 +202,15 @@ def _build_checkpoints(
         checkpoints.append(
             ExecutionCheckpoint(
                 id=f"checkpoint-{index + 1}",
+                step_index=index,
                 step_id=step.id,
+                visual_kind=step.visual_kind.value,
                 title=step.title,
                 summary=_summarize_step(step.narration, step.annotations),
                 start_s=round(start_s, 3),
+                start_progress=round(start_s / estimated_duration_s, 4),
                 end_s=round(end_s, 3),
+                end_progress=round(end_s / estimated_duration_s, 4),
                 code_lines=active_lines,
                 focus_tokens=focus_tokens,
                 array_focus_indices=array_focus_indices,
@@ -216,6 +225,18 @@ def _build_checkpoints(
     if checkpoints:
         checkpoints[-1].end_s = round(estimated_duration_s, 3)
     return checkpoints
+
+
+def _build_line_to_step_ids(checkpoints: list[ExecutionCheckpoint]) -> dict[int, list[str]]:
+    line_to_step_ids: dict[int, list[str]] = {}
+    for checkpoint in checkpoints:
+        for line_no in checkpoint.code_lines:
+            bucket = line_to_step_ids.setdefault(line_no, [])
+            if checkpoint.step_id not in bucket:
+                bucket.append(checkpoint.step_id)
+    return {
+        line_no: step_ids for line_no, step_ids in sorted(line_to_step_ids.items(), key=lambda item: item[0])
+    }
 
 
 def _estimate_duration_s(render_backend: str | None, step_count: int) -> float:

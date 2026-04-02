@@ -1,13 +1,28 @@
-import type { FormEvent } from "react";
+import { lazy, Suspense, type FormEvent } from "react";
 import { ControlPanel } from "../../components/ControlPanel";
 import { TaskProgressCard } from "../../components/TaskProgressCard";
-import { HtmlPreviewPanel } from "../../components/HtmlPreviewPanel";
 import { HighlightedCode } from "../../components/HighlightedCode";
-import { InteractiveExecutionExplorer } from "../../components/InteractiveExecutionExplorer";
-import { VideoPreview } from "../../components/VideoPreview";
 import { useVideoSync } from "../../hooks/features/useVideoSync";
 import { useTaskProgress } from "../../hooks/features/useTaskProgress";
 import type { ModelProvider, OutputMode, PipelineResponse, RuntimeCatalog, SandboxMode } from "../../types";
+
+// Lazy load heavy preview components (only needed when preview is ready)
+const HtmlPreviewPanel = lazy(() => import("../../components/HtmlPreviewPanel").then(m => ({ default: m.HtmlPreviewPanel })));
+const InteractiveExecutionExplorer = lazy(() => import("../../components/InteractiveExecutionExplorer").then(m => ({ default: m.InteractiveExecutionExplorer })));
+const VideoPreview = lazy(() => import("../../components/VideoPreview").then(m => ({ default: m.VideoPreview })));
+
+// Loading fallback for lazy components
+function PreviewLoadingFallback() {
+  return (
+    <div className="bento-card" style={{ padding: "40px", textAlign: "center" }}>
+      <div className="generation-spinner" style={{ margin: "0 auto 16px" }}>
+        <div className="generation-spinner-ring" />
+        <span className="material-symbols-outlined generation-spinner-icon" style={{ fontSize: 24 }}>loading</span>
+      </div>
+      <span style={{ color: "var(--on-surface-variant)" }}>加载预览组件...</span>
+    </div>
+  );
+}
 
 export interface StudioPageProps {
   prompt: string;
@@ -261,39 +276,44 @@ export function StudioPage({
             {/* Preview content — HTML or Video */}
             {result?.preview_html_url ? (
               <div style={{ marginTop: "20px" }}>
-                <HtmlPreviewPanel
-                  src={result.preview_html_url}
-                  cir={result.cir}
-                  meta={
-                    result
-                      ? `${result.request_id.slice(0, 8)} · ${result.runtime.generation_provider?.label ?? generationProvider}`
-                      : undefined
-                  }
-                />
+                <Suspense fallback={<PreviewLoadingFallback />}>
+                  <HtmlPreviewPanel
+                    src={result.preview_html_url}
+                    cir={result.cir}
+                    executionMap={result.execution_map}
+                    meta={
+                      result
+                        ? `${result.request_id.slice(0, 8)} · ${result.runtime.generation_provider?.label ?? generationProvider}`
+                        : undefined
+                    }
+                  />
+                </Suspense>
               </div>
             ) : hasInteractiveExplorer && result?.execution_map ? (
               <div style={{ marginTop: "20px" }}>
-                <InteractiveExecutionExplorer
-                  key={result.request_id}
-                  videoSrc={previewVideoUrl!}
-                  videoTitle="当前渲染视频"
-                  videoMeta={
-                    result
-                      ? `${result.request_id.slice(0, 8)} · ${result.runtime.generation_provider?.label ?? generationProvider}`
-                      : undefined
-                  }
-                  downloadName={
-                    result ? `${result.request_id}.mp4` : "metaview-preview.mp4"
-                  }
-                  sourceCode={sourceCode}
-                  sourceLanguage={sourcePreviewLanguage}
-                  editorName={editorName}
-                  executionMap={result.execution_map}
-                  onApplyParameterScenario={(scenario) => {
-                    setEditorDirty(true);
-                    setPrompt((current) => mergePromptScenario(current, scenario));
-                  }}
-                />
+                <Suspense fallback={<PreviewLoadingFallback />}>
+                  <InteractiveExecutionExplorer
+                    key={result.request_id}
+                    videoSrc={previewVideoUrl!}
+                    videoTitle="当前渲染视频"
+                    videoMeta={
+                      result
+                        ? `${result.request_id.slice(0, 8)} · ${result.runtime.generation_provider?.label ?? generationProvider}`
+                        : undefined
+                    }
+                    downloadName={
+                      result ? `${result.request_id}.mp4` : "metaview-preview.mp4"
+                    }
+                    sourceCode={sourceCode}
+                    sourceLanguage={sourcePreviewLanguage}
+                    editorName={editorName}
+                    executionMap={result.execution_map}
+                    onApplyParameterScenario={(scenario) => {
+                      setEditorDirty(true);
+                      setPrompt((current) => mergePromptScenario(current, scenario));
+                    }}
+                  />
+                </Suspense>
               </div>
             ) : (
               <div className="bento-grid" style={{ marginTop: "20px" }}>
@@ -310,16 +330,18 @@ export function StudioPage({
                       </div>
                     </div>
                     <div className="video-container">
-                      <VideoPreview
-                        src={previewVideoUrl!}
-                        title="当前渲染视频"
-                        downloadName={
-                          result ? `${result.request_id}.mp4` : "metaview-preview.mp4"
-                        }
-                        headerless
-                        onTimeUpdate={handleVideoTimeUpdate}
-                        seekTo={seekToTime}
-                      />
+                      <Suspense fallback={<PreviewLoadingFallback />}>
+                        <VideoPreview
+                          src={previewVideoUrl!}
+                          title="当前渲染视频"
+                          downloadName={
+                            result ? `${result.request_id}.mp4` : "metaview-preview.mp4"
+                          }
+                          headerless
+                          onTimeUpdate={handleVideoTimeUpdate}
+                          seekTo={seekToTime}
+                        />
+                      </Suspense>
                     </div>
                   </div>
                 </div>
