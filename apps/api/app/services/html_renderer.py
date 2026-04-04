@@ -1,11 +1,10 @@
 """
 HTML Renderer — saves a self-contained HTML string to disk and returns a
-serveable URL with content-addressable cache and manifest metadata.
+serveable URL with per-request artifact metadata.
 """
 
 from __future__ import annotations
 
-import hashlib
 import html as html_lib
 import json
 import re
@@ -18,27 +17,22 @@ from pathlib import Path
 class HtmlRenderArtifacts:
     file_path: Path
     url: str
-    cache_key: str
-    cache_hit: bool
+    request_id: str
     manifest_path: Path
 
 
 class HtmlRenderer:
-    """Persist generated HTML with content-addressable cache and manifest metadata."""
+    """Persist generated HTML as a request-specific artifact with manifest metadata."""
 
     def __init__(
         self,
         output_dir: str | Path = "data/html_previews",
         *,
-        ttl_seconds: int = 7 * 24 * 60 * 60,
-        max_entries: int = 128,
         prerender_steps: int = 2,
     ) -> None:
         self._output_dir = Path(output_dir)
-        self._ttl_seconds = ttl_seconds
-        self._max_entries = max_entries
-        self._prerender_steps = max(1, prerender_steps)
         self._manifest_path = self._output_dir / "manifest.json"
+        self._prerender_steps = max(1, prerender_steps)
 
     def render(
         self,
@@ -48,34 +42,27 @@ class HtmlRenderer:
         cir_json: str,
         ui_theme: str | None = None,
         prompt_version: str = "unknown",
+        inject_prerender: bool = False,
     ) -> HtmlRenderArtifacts:
         self._output_dir.mkdir(parents=True, exist_ok=True)
         manifest = self._load_manifest()
-        cache_key = self._build_cache_key(
-            cir_json=cir_json,
-            ui_theme=ui_theme,
-            prompt_version=prompt_version,
-        )
-        self._evict_entries(manifest)
 
-        path = self._output_dir / f"{cache_key}.html"
-        cache_hit = path.exists()
-        if not cache_hit:
+        if inject_prerender:
             html = self._inject_prerender_shell(
                 html=html,
                 cir_json=cir_json,
                 ui_theme=ui_theme,
             )
-            path.write_text(html, encoding="utf-8")
+
+        path = self._output_dir / f"{request_id}.html"
+        path.write_text(html, encoding="utf-8")
 
         now = self._utcnow()
-        size_bytes = path.stat().st_size if path.exists() else 0
-        manifest["entries"][cache_key] = {
-            "cache_key": cache_key,
+        manifest["entries"][request_id] = {
             "request_id": request_id,
-            "created_at": manifest["entries"].get(cache_key, {}).get("created_at", now),
+            "created_at": manifest["entries"].get(request_id, {}).get("created_at", now),
             "last_access_at": now,
-            "size_bytes": size_bytes,
+            "size_bytes": path.stat().st_size if path.exists() else 0,
             "ui_theme": ui_theme,
             "prompt_version": prompt_version,
             "file_name": path.name,
@@ -85,34 +72,9 @@ class HtmlRenderer:
         return HtmlRenderArtifacts(
             file_path=path,
             url=f"/api/v1/html_preview/{path.name}",
-            cache_key=cache_key,
-            cache_hit=cache_hit,
+            request_id=request_id,
             manifest_path=self._manifest_path,
         )
-
-    def _build_cache_key(
-        self,
-        *,
-        cir_json: str,
-        ui_theme: str | None,
-        prompt_version: str,
-    ) -> str:
-        try:
-            normalized_cir = json.dumps(
-                json.loads(cir_json),
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            )
-        except json.JSONDecodeError:
-            normalized_cir = cir_json.strip()
-        digest = hashlib.sha256()
-        digest.update(normalized_cir.encode("utf-8"))
-        digest.update(b"\x1f")
-        digest.update((ui_theme or "default").encode("utf-8"))
-        digest.update(b"\x1f")
-        digest.update(prompt_version.encode("utf-8"))
-        return digest.hexdigest()[:20]
 
     def _load_manifest(self) -> dict[str, object]:
         if not self._manifest_path.exists():
@@ -134,49 +96,6 @@ class HtmlRenderer:
             json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True),
             encoding="utf-8",
         )
-
-    def _evict_entries(self, manifest: dict[str, object]) -> None:
-        entries = manifest.setdefault("entries", {})
-        if not isinstance(entries, dict):
-            manifest["entries"] = {}
-            entries = manifest["entries"]
-
-        now = datetime.now(timezone.utc)
-        expired_keys: list[str] = []
-        normalized: list[tuple[str, dict[str, object], datetime]] = []
-        for key, raw_meta in list(entries.items()):
-            if not isinstance(raw_meta, dict):
-                expired_keys.append(key)
-                continue
-            access_at = self._parse_dt(raw_meta.get("last_access_at")) or self._parse_dt(
-                raw_meta.get("created_at")
-            )
-            if access_at is None:
-                access_at = now
-            if (now - access_at).total_seconds() > self._ttl_seconds:
-                expired_keys.append(key)
-                continue
-            normalized.append((key, raw_meta, access_at))
-
-        for key in expired_keys:
-            self._delete_entry(entries, key)
-
-        if len(normalized) <= self._max_entries:
-            return
-
-        normalized.sort(key=lambda item: item[2])
-        overflow = len(normalized) - self._max_entries
-        for key, _, _ in normalized[:overflow]:
-            self._delete_entry(entries, key)
-
-    def _delete_entry(self, entries: dict[str, object], key: str) -> None:
-        meta = entries.pop(key, None)
-        if isinstance(meta, dict):
-            file_name = meta.get("file_name")
-            if isinstance(file_name, str):
-                (self._output_dir / file_name).unlink(missing_ok=True)
-        else:
-            (self._output_dir / f"{key}.html").unlink(missing_ok=True)
 
     def _inject_prerender_shell(
         self,
@@ -223,11 +142,3 @@ class HtmlRenderer:
 
     def _utcnow(self) -> str:
         return datetime.now(timezone.utc).isoformat()
-
-    def _parse_dt(self, value: object) -> datetime | None:
-        if not isinstance(value, str) or not value:
-            return None
-        try:
-            return datetime.fromisoformat(value)
-        except ValueError:
-            return None

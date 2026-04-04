@@ -28,14 +28,14 @@ import type {
   TopicDomain,
 } from "./types";
 
-const defaultPrompt = "输入一个题目、源码或题图，生成对应的 Manim 讲解动画视频。";
+const defaultPrompt = "";
 
 type AppPage = "studio" | "history" | "tools";
 
 const activeRunStorageKey = "metaview-active-run-id";
 const selectedRunStorageKey = "metaview-selected-run-id";
 
-function resolvePreviewVideoUrl(url: string | null | undefined): string | null {
+function resolvePreviewAssetUrl(url: string | null | undefined): string | null {
   if (!url) {
     return null;
   }
@@ -160,8 +160,8 @@ export default function App() {
   const [activePage, setActivePage] = useState<AppPage>(getInitialPage);
   const [editorDirty, setEditorDirty] = useState(false);
 
-  const activeSkill = result?.runtime.skill ?? null;
-  const previewVideoUrl = resolvePreviewVideoUrl(result?.preview_video_url);
+  const previewVideoUrl = resolvePreviewAssetUrl(result?.preview_video_url);
+  const previewHtmlUrl = resolvePreviewAssetUrl(result?.preview_html_url);
   const routerProviderSupportsVision = activeProviderSupportsVision(
     runtimeCatalog,
     routerProvider,
@@ -177,7 +177,7 @@ export default function App() {
       : sourceCodeLanguage === "python"
         ? "python"
         : undefined;
-  const hasCompletedPreview = Boolean(previewVideoUrl) || Boolean(result?.preview_html_url);
+  const hasCompletedPreview = Boolean(previewVideoUrl) || Boolean(previewHtmlUrl);
   const showSourcePanel = sourceCode.trim().length > 0;
   const hasInteractiveExplorer = Boolean(
     previewVideoUrl
@@ -187,6 +187,7 @@ export default function App() {
   );
   const selectedHistoryRun =
     runs.find((run) => run.request_id === selectedRunId) ?? null;
+  const activeSkill = result?.runtime.skill ?? null;
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -267,6 +268,7 @@ export default function App() {
       ),
     );
     setSandboxMode(run.request.sandbox_mode);
+    setOutputMode(run.request.output_mode === "html" ? "html" : "manim");
     setSourceImage(run.request.source_image ?? null);
     setSourceImageName(run.request.source_image_name ?? null);
     setEnableNarration(run.request.enable_narration ?? true);
@@ -288,6 +290,7 @@ export default function App() {
                 sandbox_status:
                   run.response?.runtime.sandbox.status ??
                   (run.status === "failed" ? null : item.sandbox_status),
+                output_mode: run.request.output_mode ?? item.output_mode,
                 error_message: run.error_message ?? null,
               }
             : item,
@@ -402,7 +405,7 @@ export default function App() {
         window.clearTimeout(timer);
       }
     };
-  }, [activeRunId]);
+  }, [activeRunId, setHistoryError]);
 
   function handleSourceImageChange(value: string | null, name: string | null) {
     setEditorDirty(true);
@@ -697,9 +700,10 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="main-content" ref={glowRef}>
-        <div className="page-container">
+        <div className={`page-container ${activePage === "history" ? "page-container-history" : ""}`.trim()}>
           {activePage === "studio" ? (
             <StudioPage
+              activeRunId={activeRunId}
               prompt={prompt}
               outputMode={outputMode}
               sourceImage={sourceImage}
@@ -719,9 +723,11 @@ export default function App() {
               showSourcePanel={showSourcePanel}
               hasInteractiveExplorer={hasInteractiveExplorer}
               previewVideoUrl={previewVideoUrl}
+              previewHtmlUrl={previewHtmlUrl}
               editorName={editorName}
               sourcePreviewLanguage={sourcePreviewLanguage}
               result={result}
+              theme={theme}
               shouldEmphasizeSourceLine={shouldEmphasizeSourceLine}
               mergePromptScenario={mergePromptScenario}
 
@@ -749,6 +755,7 @@ export default function App() {
               result={result}
               selectedHistoryRun={selectedHistoryRun}
               previewVideoUrl={previewVideoUrl}
+              previewHtmlUrl={previewHtmlUrl}
               loading={loading}
 
               onSelectRun={handleSelectRun}
@@ -764,6 +771,7 @@ export default function App() {
               result={result}
               runtimeCatalog={runtimeCatalog}
               activeSkill={activeSkill}
+              runs={runs}
 
               handleExportCurrent={handleExportCurrent}
               handleCreateProvider={handleCreateProvider}

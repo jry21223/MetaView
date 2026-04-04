@@ -4,14 +4,12 @@ import { TaskProgressCard } from "../../components/TaskProgressCard";
 import { HighlightedCode } from "../../components/HighlightedCode";
 import { useVideoSync } from "../../hooks/features/useVideoSync";
 import { useTaskProgress } from "../../hooks/features/useTaskProgress";
-import type { ModelProvider, OutputMode, PipelineResponse, RuntimeCatalog, SandboxMode } from "../../types";
+import type { ModelProvider, OutputMode, PipelineResponse, RuntimeCatalog, SandboxMode, UITheme } from "../../types";
 
-// Lazy load heavy preview components (only needed when preview is ready)
 const HtmlPreviewPanel = lazy(() => import("../../components/HtmlPreviewPanel").then(m => ({ default: m.HtmlPreviewPanel })));
 const InteractiveExecutionExplorer = lazy(() => import("../../components/InteractiveExecutionExplorer").then(m => ({ default: m.InteractiveExecutionExplorer })));
 const VideoPreview = lazy(() => import("../../components/VideoPreview").then(m => ({ default: m.VideoPreview })));
 
-// Loading fallback for lazy components
 function PreviewLoadingFallback() {
   return (
     <div className="bento-card" style={{ padding: "40px", textAlign: "center" }}>
@@ -24,7 +22,22 @@ function PreviewLoadingFallback() {
   );
 }
 
+function PreviewCardAction({ onStartNewQuestion }: { onStartNewQuestion: () => void }) {
+  return (
+    <button
+      type="button"
+      className="btn btn-secondary"
+      onClick={onStartNewQuestion}
+      style={{ flexShrink: 0 }}
+    >
+      <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add</span>
+      新建任务
+    </button>
+  );
+}
+
 export interface StudioPageProps {
+  activeRunId: string | null;
   prompt: string;
   outputMode: OutputMode;
   sourceImage: string | null;
@@ -44,9 +57,11 @@ export interface StudioPageProps {
   showSourcePanel: boolean;
   hasInteractiveExplorer: boolean;
   previewVideoUrl: string | null;
+  previewHtmlUrl: string | null;
   editorName: string;
   sourcePreviewLanguage?: "cpp" | "python";
   result: PipelineResponse | null;
+  theme: UITheme;
   shouldEmphasizeSourceLine: (line: string) => boolean;
   mergePromptScenario: (prompt: string, scenario: string) => string;
 
@@ -66,6 +81,7 @@ export interface StudioPageProps {
 }
 
 export function StudioPage({
+  activeRunId,
   prompt,
   outputMode,
   sourceImage,
@@ -85,9 +101,11 @@ export function StudioPage({
   showSourcePanel,
   hasInteractiveExplorer,
   previewVideoUrl,
+  previewHtmlUrl,
   editorName,
   sourcePreviewLanguage,
   result,
+  theme,
   shouldEmphasizeSourceLine,
   mergePromptScenario,
   onOutputModeChange,
@@ -112,125 +130,117 @@ export function StudioPage({
     highlightedSourceLines,
   } = useVideoSync(result);
 
-  const taskProgress = useTaskProgress(loading, hasCompletedPreview);
+  const taskProgress = useTaskProgress(loading && activeRunId != null, hasCompletedPreview);
+  const isRendering = loading && !hasCompletedPreview && taskProgress.currentStageIndex >= 3;
 
   return (
     <div id="studio">
-      {/* Page Header */}
-      <div className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+      <div className="page-header studio-page-header">
         <div>
           <span className="page-kicker">Workspace</span>
           <h1 className="page-title">
-            {hasCompletedPreview ? "预览结果" : "想问什么直接问"}
+            {hasCompletedPreview ? "预览结果" : "工作台"}
           </h1>
           <p className="page-description">
             {hasCompletedPreview
-              ? result?.cir.title ?? "视频渲染完成"
-              : "AI 辅助生成引擎，统一管理题目、源码与题图输入。"}
+              ? result?.cir.title ?? (outputMode === "html" ? "交互动画已生成" : "视频渲染完成")
+              : "题目、源码、题图一处汇总，统一生成教学视频或 HTML 交互结果。"}
           </p>
         </div>
-        {hasCompletedPreview && (
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={onStartNewQuestion}
-            style={{ flexShrink: 0 }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add</span>
-            新建任务
-          </button>
-        )}
       </div>
 
-      {/* === INPUT SECTION (collapses when preview is ready) === */}
-      <div className={`studio-input-section ${hasCompletedPreview ? "is-collapsed" : ""}`}>
-        <div className="bento-grid" style={{ marginTop: "24px" }}>
-          {/* Main input card */}
-          <div className="bento-card bento-card-xl studio-input-card">
-            <div className="bento-card-header">
-              <span className="bento-card-kicker">
-                <span style={{ color: "var(--primary)" }}>● </span>
-                等待输入
-              </span>
-            </div>
-            <div className="bento-card-body">
-              <ControlPanel
-                outputMode={outputMode}
-                layoutMode={hasCompletedPreview ? "split" : "hero"}
-                prompt={prompt}
-                sourceImage={sourceImage}
-                sourceCode={sourceCode}
-                sourceCodeLanguage={sourceCodeLanguage}
-                routerProvider={routerProvider}
-                generationProvider={generationProvider}
-                sandboxMode={sandboxMode}
-                enableNarration={enableNarration}
-                skills={runtimeCatalog.skills}
-                providers={runtimeCatalog.providers}
-                sandboxModes={runtimeCatalog.sandbox_modes}
-                loading={loading}
-                sourceImageName={sourceImageName}
-                routerProviderSupportsVision={routerProviderSupportsVision}
-                generationProviderSupportsVision={generationProviderSupportsVision}
-                onOutputModeChange={onOutputModeChange}
-                onPromptChange={onPromptChange}
-                onSourceCodeChange={onSourceCodeChange}
-                onSourceCodeLanguageChange={onSourceCodeLanguageChange}
-                onRouterProviderChange={onRouterProviderChange}
-                onGenerationProviderChange={onGenerationProviderChange}
-                onSandboxModeChange={onSandboxModeChange}
-                onEnableNarrationChange={onEnableNarrationChange}
-                onSourceImageChange={onSourceImageChange}
-                onStartNewQuestion={onStartNewQuestion}
-                onSubmit={onSubmit}
-              />
-            </div>
-          </div>
-
-          {/* Task Progress Card (replaces "处理模式") */}
-          <div className="bento-card bento-card-md">
-            <div className="bento-card-header">
-              <span className="bento-card-kicker">任务进度</span>
-            </div>
-            <div className="bento-card-body">
-              <TaskProgressCard
-                currentStageIndex={taskProgress.currentStageIndex}
-                stages={taskProgress.stages}
-                isIdle={taskProgress.isIdle}
-                isComplete={taskProgress.isComplete}
-              />
+      <div className={`studio-input-section ${hasCompletedPreview || isRendering ? "is-collapsed" : ""}`}>
+        <div className="studio-dashboard-grid">
+          <div className="studio-main-column">
+            <div className="bento-card bento-card-xl studio-input-card">
+              <div className="bento-card-header">
+                <span className="bento-card-kicker">
+                  <span style={{ color: "var(--primary)" }}>● </span>
+                  等待输入
+                </span>
+              </div>
+              <div className="bento-card-body">
+                <ControlPanel
+                  outputMode={outputMode}
+                  layoutMode={hasCompletedPreview ? "split" : "hero"}
+                  prompt={prompt}
+                  sourceImage={sourceImage}
+                  sourceCode={sourceCode}
+                  sourceCodeLanguage={sourceCodeLanguage}
+                  routerProvider={routerProvider}
+                  generationProvider={generationProvider}
+                  sandboxMode={sandboxMode}
+                  enableNarration={enableNarration}
+                  skills={runtimeCatalog.skills}
+                  providers={runtimeCatalog.providers}
+                  sandboxModes={runtimeCatalog.sandbox_modes}
+                  loading={loading}
+                  sourceImageName={sourceImageName}
+                  routerProviderSupportsVision={routerProviderSupportsVision}
+                  generationProviderSupportsVision={generationProviderSupportsVision}
+                  onOutputModeChange={onOutputModeChange}
+                  onPromptChange={onPromptChange}
+                  onSourceCodeChange={onSourceCodeChange}
+                  onSourceCodeLanguageChange={onSourceCodeLanguageChange}
+                  onRouterProviderChange={onRouterProviderChange}
+                  onGenerationProviderChange={onGenerationProviderChange}
+                  onSandboxModeChange={onSandboxModeChange}
+                  onEnableNarrationChange={onEnableNarrationChange}
+                  onSourceImageChange={onSourceImageChange}
+                  onStartNewQuestion={onStartNewQuestion}
+                  onSubmit={onSubmit}
+                />
+              </div>
             </div>
           </div>
 
-          {/* Info card */}
-          <div className="bento-card bento-card-md">
-            <div className="bento-card-header">
-              <span className="bento-card-kicker">当前聚焦</span>
+          <div className="studio-side-column">
+            <div className="bento-card bento-card-md studio-side-card">
+              <div className="bento-card-header">
+                <span className="bento-card-kicker">任务进度</span>
+              </div>
+              <div className="bento-card-body">
+                <TaskProgressCard
+                  currentStageIndex={taskProgress.currentStageIndex}
+                  stages={taskProgress.stages}
+                  isIdle={taskProgress.isIdle}
+                  isComplete={taskProgress.isComplete}
+                />
+              </div>
             </div>
-            <div className="bento-card-body">
-              <h3 className="bento-card-title" style={{ marginBottom: "12px" }}>自动路由</h3>
-              <p className="page-description" style={{ fontSize: "0.95rem" }}>
-                系统会根据当前输入自动路由学科模块，并生成对应的讲解路径。
-              </p>
-              <div style={{ display: "grid", gap: "12px", marginTop: "20px" }}>
-                <div style={{ padding: "14px 16px", background: "var(--surface-container-low)", borderRadius: "var(--radius-md)" }}>
-                  <div className="page-kicker" style={{ marginBottom: "6px" }}>输入方式</div>
-                  <div style={{ fontWeight: 700, marginBottom: "4px" }}>题目 / 源码 / 题图</div>
-                  <div style={{ color: "var(--on-surface-variant)", fontSize: "0.85rem", lineHeight: 1.5 }}>一个主入口统一组织问题、源码与题图。</div>
-                </div>
-                <div style={{ padding: "14px 16px", background: "var(--surface-container-low)", borderRadius: "var(--radius-md)" }}>
-                  <div className="page-kicker" style={{ marginBottom: "6px" }}>输出目标</div>
-                  <div style={{ fontWeight: 700, marginBottom: "4px" }}>教学视频</div>
-                  <div style={{ color: "var(--on-surface-variant)", fontSize: "0.85rem", lineHeight: 1.5 }}>生成讲解结构、脚本和可直接预览的动画结果。</div>
+
+            <div className="bento-card bento-card-md studio-side-card">
+              <div className="bento-card-header">
+                <span className="bento-card-kicker">当前聚焦</span>
+              </div>
+              <div className="bento-card-body">
+                <h3 className="bento-card-title studio-side-title">自动路由</h3>
+                <p className="page-description studio-side-description">
+                  系统会自动路由学科模块，统一组织讲解结构、预览与回放入口。
+                </p>
+                <div className="studio-side-stack">
+                  <div className="studio-side-mini-card">
+                    <div className="page-kicker studio-side-mini-kicker">输入方式</div>
+                    <div className="studio-side-mini-title">题目 / 源码 / 题图</div>
+                    <div className="studio-side-mini-description">一个入口统一承接问题、源码与题图素材。</div>
+                  </div>
+                  <div className="studio-side-mini-card">
+                    <div className="page-kicker studio-side-mini-kicker">输出目标</div>
+                    <div className="studio-side-mini-title">{outputMode === "html" ? "HTML 交互" : "教学视频"}</div>
+                    <div className="studio-side-mini-description">
+                      {outputMode === "html"
+                        ? "生成可直接交互的 HTML 动画结果。"
+                        : "生成讲解脚本、渲染结果与可回放视频。"}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Loading/Error state */}
         {(loading || error) && !hasCompletedPreview ? (
-          <div className="bento-card bento-card-full" style={{ marginTop: "24px" }}>
+          <div className="bento-card bento-card-full studio-feedback-card">
             <div className="bento-card-body">
               {error ? (
                 <div className="generation-error">
@@ -258,36 +268,64 @@ export function StudioPage({
         ) : null}
       </div>
 
-      {/* === PREVIEW SECTION (slides up when video is ready) === */}
+      {isRendering && (
+        <div className="studio-rendering-section">
+          <div className="studio-rendering-center">
+            <div className="studio-prompt-tag">
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>description</span>
+              <span className="studio-prompt-tag-text">{prompt}</span>
+            </div>
+            <div className="studio-rendering-visual">
+              <div className="generation-spinner" style={{ width: 64, height: 64 }}>
+                <div className="generation-spinner-ring" style={{ width: 64, height: 64 }} />
+                <div className="generation-spinner-ring generation-spinner-ring-inner" style={{ width: 48, height: 48 }} />
+                <span className="material-symbols-outlined generation-spinner-icon" style={{ fontSize: 22 }}>
+                  {outputMode === "html" ? "code" : "movie"}
+                </span>
+              </div>
+            </div>
+            <div className="studio-rendering-status">
+              <strong>{outputMode === "html" ? "生成交互动画中" : "渲染视频中"}</strong>
+              <p>{outputMode === "html" ? "正在生成 HTML 交互动画..." : "动画脚本已完成，正在渲染画面..."}</p>
+            </div>
+            <div className="studio-rendering-stages">
+              {taskProgress.stages.map((stage, i) => (
+                <span
+                  key={stage}
+                  className={`studio-rendering-stage-dot ${i < taskProgress.currentStageIndex ? "is-done" : i === taskProgress.currentStageIndex ? "is-active" : ""}`}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className={`studio-preview-section ${hasCompletedPreview ? "is-active" : ""}`}>
         {hasCompletedPreview ? (
-          <>
-            {/* Compact prompt summary */}
-            <div className="studio-compact-summary">
-              <span className="material-symbols-outlined" style={{ fontSize: 18, color: "var(--primary)", flexShrink: 0 }}>description</span>
-              <span className="studio-compact-summary-text">{prompt}</span>
-              {result?.runtime.skill && (
-                <span className="chip chip-outline" style={{ flexShrink: 0 }}>
-                  {result.runtime.skill.label}
-                </span>
-              )}
-            </div>
-
-            {/* Preview content — HTML or Video */}
-            {result?.preview_html_url ? (
-              <div style={{ marginTop: "20px" }}>
-                <Suspense fallback={<PreviewLoadingFallback />}>
-                  <HtmlPreviewPanel
-                    src={result.preview_html_url}
-                    cir={result.cir}
-                    executionMap={result.execution_map}
-                    meta={
-                      result
-                        ? `${result.request_id.slice(0, 8)} · ${result.runtime.generation_provider?.label ?? generationProvider}`
-                        : undefined
-                    }
-                  />
-                </Suspense>
+          <div className="studio-preview-wrapper">
+            {previewHtmlUrl ? (
+              <div className="studio-preview-card-shell studio-preview-card-shell-html">
+                <div className="studio-prompt-tag studio-prompt-tag-inline">
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>description</span>
+                  <span className="studio-prompt-tag-text">{prompt}</span>
+                  {result?.runtime.skill ? (
+                    <span className="studio-prompt-tag-skill">{result.runtime.skill.label}</span>
+                  ) : null}
+                </div>
+                <div style={{ marginTop: "20px" }}>
+                  <Suspense fallback={<PreviewLoadingFallback />}>
+                    <HtmlPreviewPanel
+                      src={previewHtmlUrl}
+                      theme={theme}
+                      meta={
+                        result
+                          ? `${result.request_id.slice(0, 8)} · ${result.runtime.generation_provider?.label ?? generationProvider}`
+                          : undefined
+                      }
+                      headerAction={<PreviewCardAction onStartNewQuestion={onStartNewQuestion} />}
+                    />
+                  </Suspense>
+                </div>
               </div>
             ) : hasInteractiveExplorer && result?.execution_map ? (
               <div style={{ marginTop: "20px" }}>
@@ -314,6 +352,9 @@ export function StudioPage({
                     }}
                   />
                 </Suspense>
+                <div style={{ marginTop: "12px", display: "flex", justifyContent: "flex-end" }}>
+                  <PreviewCardAction onStartNewQuestion={onStartNewQuestion} />
+                </div>
               </div>
             ) : (
               <div className="bento-grid" style={{ marginTop: "20px" }}>
@@ -328,6 +369,7 @@ export function StudioPage({
                             : "等待渲染"}
                         </div>
                       </div>
+                      <PreviewCardAction onStartNewQuestion={onStartNewQuestion} />
                     </div>
                     <div className="video-container">
                       <Suspense fallback={<PreviewLoadingFallback />}>
@@ -371,7 +413,7 @@ export function StudioPage({
                 ) : null}
               </div>
             )}
-          </>
+          </div>
         ) : null}
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useMemo } from "react";
 
-type CodeLanguage = "python" | "cpp" | "text";
+type CodeLanguage = "python" | "cpp" | "text" | "html";
 type TokenKind = "plain" | "keyword" | "string" | "comment" | "number" | "type" | "call";
 
 interface HighlightedCodeProps {
@@ -75,7 +75,7 @@ const TOKEN_PATTERN =
   /(#.*$|\/\/.*$|"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|`(?:\\.|[^`])*`|\b\d+(?:\.\d+)?\b|\b[A-Za-z_]\w*\b|\s+|.)/g;
 
 function detectLanguage(code: string, language?: string): CodeLanguage {
-  if (language === "python" || language === "cpp" || language === "text") {
+  if (language === "python" || language === "cpp" || language === "text" || language === "html") {
     return language;
   }
   if (code.includes("#include") || code.includes("std::") || code.includes("vector<")) {

@@ -297,6 +297,11 @@
   margin: 0 auto;
 }
 
+.page-container-history {
+  max-width: none;
+  margin: 0;
+}
+
 /* ============================================
 
    PAGE HEADERS

@@ -28,18 +28,20 @@ from app.schemas import (
     RuntimeSettingsRequest,
     RuntimeSettingsResponse,
     SandboxMode,
+    SandboxReport,
+    SandboxStatus,
     TTSSettingsRequest,
     ValidationStatus,
 )
 from app.services.agents import CoderAgent, CriticAgent, HtmlCoderAgent, PlannerAgent
 from app.services.domain_router import infer_domain
 from app.services.execution_map import build_execution_map
-from app.services.html_renderer import HtmlRenderer
 from app.services.history import (
     CustomProviderRepository,
     RunRepository,
     RuntimeSettingsRepository,
 )
+from app.services.html_renderer import HtmlRenderer
 from app.services.manim_script import ManimScriptError, calculate_step_timing, prepare_manim_script
 from app.services.preview_video_renderer import (
     PreviewVideoRenderer,
@@ -378,18 +380,25 @@ class PipelineOrchestrator:
         render_error_message: str | None = None
         audio_diagnostics: list[AgentDiagnostic] = []
 
-        planning_hints, planning_trace = self._call_provider_method(
-            generation_provider.plan,
-            prompt=effective_request.prompt,
-            domain=effective_domain.value,
-            skill_brief=skill.planning_brief(has_image=bool(request.source_image)),
-            source_image=request.source_image,
-            source_code=request.source_code,
-            source_code_language=request.source_code_language,
-            ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
+        planning_hints = None
+        if request.output_mode != OutputMode.HTML:
+            planning_hints, planning_trace = self._call_provider_method(
+                generation_provider.plan,
+                prompt=effective_request.prompt,
+                domain=effective_domain.value,
+                skill_brief=skill.planning_brief(has_image=bool(request.source_image)),
+                source_image=request.source_image,
+                source_code=request.source_code,
+                source_code_language=request.source_code_language,
+                ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
+            )
+            agent_traces.append(planning_trace)
+        cir = self.planner.run(
+            effective_request,
+            skill=skill,
+            hints=planning_hints,
+            include_skill_metadata=request.output_mode != OutputMode.HTML,
         )
-        agent_traces.append(planning_trace)
-        cir = self.planner.run(effective_request, skill=skill, hints=planning_hints)
         preview_narration_text = (
             self.build_pipeline_narration(cir) if request.enable_narration else None
         )
@@ -404,13 +413,26 @@ class PipelineOrchestrator:
             repair_count += 1
             validation_report = self.validator.validate(cir)
 
-        coding_hints, coding_trace = self._call_provider_method(
-            generation_provider.code,
-            cir,
-            ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
-        )
-        agent_traces.append(coding_trace)
-        if coding_hints.renderer_script:
+        # Skip Manim coding pipeline entirely when output is HTML
+        _run_manim_coding = request.output_mode != OutputMode.HTML
+        if not _run_manim_coding:
+            # Provide defaults so response building doesn't fail
+            renderer_script = ""
+            renderer_diagnostic_message = ""
+            diagnostics = []
+            sandbox_report = SandboxReport(
+                mode=request.sandbox_mode,
+                engine="skipped",
+                status=SandboxStatus.SKIPPED,
+            )
+        if _run_manim_coding:
+            coding_hints, coding_trace = self._call_provider_method(
+                generation_provider.code,
+                cir,
+                ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
+            )
+            agent_traces.append(coding_trace)
+        if _run_manim_coding and coding_hints.renderer_script:
             prepared_script, prepare_error = self._prepare_provider_script(
                 coding_hints.renderer_script
             )
@@ -459,92 +481,94 @@ class PipelineOrchestrator:
                         f"已回退到本地 Python Manim 模板：{prepare_error}"
                     )
         else:
-            renderer_script = self.coder.run(cir, hints=coding_hints)
-            renderer_diagnostic_message = (
-                "generation provider 未直接返回脚本；"
-                "当前系统直接使用本地 Python Manim 模板和后端视频预览。"
-            )
-
-        critique_hints, critique_trace, diagnostics = self._run_provider_critique(
-            generation_provider=generation_provider,
-            cir=cir,
-            renderer_script=renderer_script,
-            ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
-        )
-        agent_traces.append(critique_trace)
-        blocking_issues = self.repair_service.collect_blocking_script_issues(
-            renderer_script=renderer_script,
-            critique_hints=critique_hints,
-        )
-        if blocking_issues and repair_count < self.max_repair_attempts:
-            repaired_script, repair_message = self._attempt_remote_script_repair(
-                generation_provider=generation_provider,
-                cir=cir,
-                renderer_script=renderer_script,
-                issues=blocking_issues,
-                agent_traces=agent_traces,
-                repair_actions=repair_actions,
-                stage_label="critic-review",
-                ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
-            )
-            repair_count += 1
-            if repaired_script is not None:
-                renderer_script = repaired_script
-                renderer_diagnostic_message = repair_message
-                critique_hints, critique_trace, diagnostics = self._run_provider_critique(
-                    generation_provider=generation_provider,
-                    cir=cir,
-                    renderer_script=renderer_script,
-                    ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
-                )
-                agent_traces.append(critique_trace)
-        sandbox_report = self.sandbox.run(
-            script=renderer_script, cir=cir, mode=request.sandbox_mode
-        )
-
-        if (
-            sandbox_report.status.value == "failed"
-            and repair_count < self.max_repair_attempts
-            and request.sandbox_mode != SandboxMode.OFF
-        ):
-            repair_actions.extend(self.repair_service.repair_script(cir, sandbox_report))
-            repaired_script, repair_message = self._attempt_remote_script_repair(
-                generation_provider=generation_provider,
-                cir=cir,
-                renderer_script=renderer_script,
-                issues=self.repair_service.collect_blocking_script_issues(
-                    renderer_script=renderer_script,
-                    critique_hints=critique_hints,
-                    extra_issues=sandbox_report.errors,
-                ),
-                agent_traces=agent_traces,
-                repair_actions=repair_actions,
-                stage_label="sandbox",
-                ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
-            )
-            repair_count += 1
-            if repaired_script is not None:
-                renderer_script = repaired_script
-                renderer_diagnostic_message = repair_message
-                critique_hints, critique_trace, diagnostics = self._run_provider_critique(
-                    generation_provider=generation_provider,
-                    cir=cir,
-                    renderer_script=renderer_script,
-                    ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
-                )
-                agent_traces.append(critique_trace)
-                sandbox_report = self.sandbox.run(
-                    script=renderer_script, cir=cir, mode=request.sandbox_mode
-                )
-            elif coding_hints.renderer_script:
+            if _run_manim_coding:
                 renderer_script = self.coder.run(cir, hints=coding_hints)
                 renderer_diagnostic_message = (
-                    "generation provider 已返回原始脚本，但其结果未通过 dry-run；"
-                    "远程修复失败后已回退到本地 Python Manim 模板。"
+                    "generation provider 未直接返回脚本；"
+                    "当前系统直接使用本地 Python Manim 模板和后端视频预览。"
                 )
-                sandbox_report = self.sandbox.run(
-                    script=renderer_script, cir=cir, mode=request.sandbox_mode
+
+        if _run_manim_coding:
+            critique_hints, critique_trace, diagnostics = self._run_provider_critique(
+                generation_provider=generation_provider,
+                cir=cir,
+                renderer_script=renderer_script,
+                ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
+            )
+            agent_traces.append(critique_trace)
+            blocking_issues = self.repair_service.collect_blocking_script_issues(
+                renderer_script=renderer_script,
+                critique_hints=critique_hints,
+            )
+            if blocking_issues and repair_count < self.max_repair_attempts:
+                repaired_script, repair_message = self._attempt_remote_script_repair(
+                    generation_provider=generation_provider,
+                    cir=cir,
+                    renderer_script=renderer_script,
+                    issues=blocking_issues,
+                    agent_traces=agent_traces,
+                    repair_actions=repair_actions,
+                    stage_label="critic-review",
+                    ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
                 )
+                repair_count += 1
+                if repaired_script is not None:
+                    renderer_script = repaired_script
+                    renderer_diagnostic_message = repair_message
+                    critique_hints, critique_trace, diagnostics = self._run_provider_critique(
+                        generation_provider=generation_provider,
+                        cir=cir,
+                        renderer_script=renderer_script,
+                        ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
+                    )
+                    agent_traces.append(critique_trace)
+            sandbox_report = self.sandbox.run(
+                script=renderer_script, cir=cir, mode=request.sandbox_mode
+            )
+
+            if (
+                sandbox_report.status.value == "failed"
+                and repair_count < self.max_repair_attempts
+                and request.sandbox_mode != SandboxMode.OFF
+            ):
+                repair_actions.extend(self.repair_service.repair_script(cir, sandbox_report))
+                repaired_script, repair_message = self._attempt_remote_script_repair(
+                    generation_provider=generation_provider,
+                    cir=cir,
+                    renderer_script=renderer_script,
+                    issues=self.repair_service.collect_blocking_script_issues(
+                        renderer_script=renderer_script,
+                        critique_hints=critique_hints,
+                        extra_issues=sandbox_report.errors,
+                    ),
+                    agent_traces=agent_traces,
+                    repair_actions=repair_actions,
+                    stage_label="sandbox",
+                    ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
+                )
+                repair_count += 1
+                if repaired_script is not None:
+                    renderer_script = repaired_script
+                    renderer_diagnostic_message = repair_message
+                    critique_hints, critique_trace, diagnostics = self._run_provider_critique(
+                        generation_provider=generation_provider,
+                        cir=cir,
+                        renderer_script=renderer_script,
+                        ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
+                    )
+                    agent_traces.append(critique_trace)
+                    sandbox_report = self.sandbox.run(
+                        script=renderer_script, cir=cir, mode=request.sandbox_mode
+                    )
+                elif coding_hints.renderer_script:
+                    renderer_script = self.coder.run(cir, hints=coding_hints)
+                    renderer_diagnostic_message = (
+                        "generation provider 已返回原始脚本，但其结果未通过 dry-run；"
+                        "远程修复失败后已回退到本地 Python Manim 模板。"
+                    )
+                    sandbox_report = self.sandbox.run(
+                        script=renderer_script, cir=cir, mode=request.sandbox_mode
+                    )
 
         # ── HTML output branch (independent from Manim) ──────────────
         preview_html_url: str | None = None
@@ -552,14 +576,37 @@ class PipelineOrchestrator:
             html_script = self.html_coder.run(
                 cir=cir,
                 ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
+                generation_provider=generation_provider,
             )
             renderer_script = html_script  # store in renderer_script for persistence
+            is_fallback = 'data-metaview-fallback="true"' in html_script[:500]
+            provider_label = (
+                generation_provider.descriptor.label
+                if generation_provider is not None and hasattr(generation_provider, "descriptor")
+                else "local"
+            )
+            model_label = (
+                generation_provider.model_for_stage("html_coding")
+                if generation_provider is not None and hasattr(generation_provider, "model_for_stage")
+                else "fallback"
+            )
+            agent_traces.append(AgentTrace(
+                agent="html_coder",
+                provider=provider_label,
+                model=model_label,
+                summary=(
+                    f"使用本地模板为《{cir.title}》生成 HTML 交互动画。"
+                    if is_fallback
+                    else f"远程 provider 已为《{cir.title}》生成 HTML 交互动画。"
+                ),
+            ))
             html_artifacts = self.html_renderer.render(
                 html=html_script,
                 request_id=request_id,
                 cir_json=cir.model_dump_json(exclude_none=True),
                 ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
                 prompt_version=HTML_CODER_PROMPT_VERSION,
+                inject_prerender=is_fallback,
             )
             preview_html_url = html_artifacts.url
 
@@ -660,10 +707,14 @@ class PipelineOrchestrator:
                     ),
                 )
             ]
-            + [AgentDiagnostic(agent="coder", message=renderer_diagnostic_message)]
+            + (
+                [AgentDiagnostic(agent="coder", message=renderer_diagnostic_message)]
+                if _run_manim_coding and renderer_diagnostic_message
+                else []
+            )
             + self._validation_diagnostics(validation_report)
-            + diagnostics
-            + self._sandbox_diagnostics(sandbox_report)
+            + (diagnostics if _run_manim_coding else [])
+            + (self._sandbox_diagnostics(sandbox_report) if _run_manim_coding else [])
             + self._repair_diagnostics(repair_actions)
             + audio_diagnostics
             + (

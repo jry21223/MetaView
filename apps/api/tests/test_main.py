@@ -6,6 +6,7 @@ from app.main import app, orchestrator
 from app.schemas import (
     AgentTrace,
     CirDocument,
+    CirStep,
     CustomProviderUpsertRequest,
     PipelineRunStatus,
     ProviderDescriptor,
@@ -13,6 +14,8 @@ from app.schemas import (
     RuntimeSettingsRequest,
     TopicDomain,
     TTSSettingsRequest,
+    VisualKind,
+    VisualToken,
 )
 from app.services.preview_video_renderer import PreviewVideoArtifacts
 from app.services.providers.base import CodingHints, CritiqueHints, PlanningHints
@@ -37,6 +40,14 @@ def _stub_preview_renderer(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(orchestrator.video_narration_service, "is_available", lambda: False)
 
 
+def _stub_html_preview_dir(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(orchestrator.html_renderer, "_output_dir", tmp_path)
+    monkeypatch.setattr(orchestrator.html_renderer, "_manifest_path", tmp_path / "manifest.json")
+    html_preview_route = next(route for route in app.routes if getattr(route, "name", None) == "html-preview")
+    monkeypatch.setattr(html_preview_route.app, "directory", str(tmp_path))
+    monkeypatch.setattr(html_preview_route.app, "all_directories", [tmp_path])
+
+
 def _run_pipeline(payload: dict, monkeypatch, tmp_path) -> dict:
     _stub_preview_renderer(monkeypatch, tmp_path)
     response = client.post("/api/v1/pipeline", json=payload)
@@ -44,6 +55,31 @@ def _run_pipeline(payload: dict, monkeypatch, tmp_path) -> dict:
     data = response.json()
     assert data["preview_video_url"]
     return data
+
+
+def _make_unsafe_math_cir() -> CirDocument:
+    return CirDocument(
+        title='<img src=x onerror=alert("prompt")>',
+        domain=TopicDomain.MATH,
+        summary='</script><script>alert(1)</script>',
+        steps=[
+            CirStep(
+                id="step-1",
+                title='<svg onload=alert(2)>',
+                narration='line <b>narration</b>',
+                visual_kind=VisualKind.FORMULA,
+                tokens=[
+                    VisualToken(
+                        id="token-1",
+                        label="<b>token</b>",
+                        value='<img src=x onerror=alert(3)>',
+                        emphasis="primary",
+                    )
+                ],
+                annotations=[],
+            )
+        ],
+    )
 
 
 def _wait_for_run_status(
@@ -104,7 +140,311 @@ def test_pipeline_returns_cir() -> None:
     assert "video/mp4" in video_response.headers["content-type"]
 
 
-def test_runtime_catalog() -> None:
+def test_pipeline_html_mode_saves_request_specific_preview(monkeypatch, tmp_path) -> None:
+    _stub_html_preview_dir(monkeypatch, tmp_path)
+
+    response_one = client.post(
+        "/api/v1/pipeline",
+        json={
+            "prompt": "请生成一个可交互的二分查找 HTML 动画。",
+            "provider": "mock",
+            "sandbox_mode": "dry_run",
+            "output_mode": "html",
+        },
+    )
+    assert response_one.status_code == 200
+    payload_one = response_one.json()
+    request_id_one = payload_one["request_id"]
+    html_url_one = payload_one["preview_html_url"]
+    assert html_url_one == f"/api/v1/html_preview/{request_id_one}.html"
+    assert payload_one["preview_video_url"] is None
+
+    response_two = client.post(
+        "/api/v1/pipeline",
+        json={
+            "prompt": "请生成一个可交互的二分查找 HTML 动画。",
+            "provider": "mock",
+            "sandbox_mode": "dry_run",
+            "output_mode": "html",
+        },
+    )
+    assert response_two.status_code == 200
+    payload_two = response_two.json()
+    request_id_two = payload_two["request_id"]
+    html_url_two = payload_two["preview_html_url"]
+    assert html_url_two == f"/api/v1/html_preview/{request_id_two}.html"
+    assert html_url_one != html_url_two
+
+    html_response_one = client.get(html_url_one)
+    assert html_response_one.status_code == 200
+    assert "text/html" in html_response_one.headers["content-type"]
+
+    html_response_two = client.get(html_url_two)
+    assert html_response_two.status_code == 200
+    assert "text/html" in html_response_two.headers["content-type"]
+
+    saved_file_one = tmp_path / f"{request_id_one}.html"
+    saved_file_two = tmp_path / f"{request_id_two}.html"
+    assert saved_file_one.exists()
+    assert saved_file_two.exists()
+    assert html_response_one.text == saved_file_one.read_text(encoding="utf-8")
+    assert html_response_two.text == saved_file_two.read_text(encoding="utf-8")
+    assert "window.addEventListener(\"message\"" in html_response_one.text
+    assert 'document.addEventListener("DOMContentLoaded"' in html_response_one.text
+    assert "window.addEventListener(\"message\"" in html_response_two.text
+    assert 'document.addEventListener("DOMContentLoaded"' in html_response_two.text
+def test_pipeline_html_mode_skips_planner_prompt_injection(monkeypatch, tmp_path) -> None:
+    _stub_html_preview_dir(monkeypatch, tmp_path)
+    captured_prompts: dict[str, str] = {}
+
+    class HtmlGenerationStubProvider:
+        descriptor = ProviderDescriptor(
+            name="html-generation-stub",
+            label="HTML Generation Stub",
+            kind=ProviderKind.OPENAI_COMPATIBLE,
+            model="html-generation-model",
+            description="stub html generation provider",
+            configured=True,
+        )
+
+        def _chat_text(self, **kwargs):
+            captured_prompts["system_prompt"] = kwargs["system_prompt"]
+            captured_prompts["user_prompt"] = kwargs["user_prompt"]
+            return (
+                """
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>HTML Stub</title>
+  </head>
+  <body>
+    <div id="app">stub html</div>
+    <script>
+      const runtime = {
+        state: { currentStep: 0, totalSteps: 1, autoplay: false, speed: 1, paused: true, params: {} },
+      };
+      window.addEventListener("message", () => {});
+      document.addEventListener("DOMContentLoaded", () => {
+        window.parent.postMessage({ type: "ready", totalSteps: 1, supportedParams: [], capabilities: {} }, "*");
+      });
+    </script>
+  </body>
+</html>
+                """.strip(),
+                {},
+            )
+
+        def model_for_stage(self, stage: str) -> str:
+            return "html-generation-model"
+
+        def route(self, *args, **kwargs):
+            raise AssertionError("generation provider should not handle routing")
+
+        def plan(self, *args, **kwargs):
+            raise AssertionError("HTML mode should skip provider planning")
+
+        def code(self, *args, **kwargs):
+            raise AssertionError("HTML mode should skip Manim coding")
+
+        def critique(self, *args, **kwargs):
+            raise AssertionError("HTML mode should skip Manim critique")
+
+    original_get = orchestrator.provider_registry.get
+
+    def fake_get(name: str):
+        if name == "html-generation-stub":
+            return HtmlGenerationStubProvider()
+        return original_get(name)
+
+    monkeypatch.setattr(orchestrator.provider_registry, "get", fake_get)
+
+    response = client.post(
+        "/api/v1/pipeline",
+        json={
+            "prompt": "请生成一个可交互的导数变化率 HTML 动画。",
+            "domain": "math",
+            "generation_provider": "html-generation-stub",
+            "sandbox_mode": "dry_run",
+            "output_mode": "html",
+            "persist_run": False,
+        },
+    )
+    assert response.status_code == 200
+
+    payload = response.json()
+    traces = {trace["agent"]: trace for trace in payload["runtime"]["agent_traces"]}
+    first_annotations = payload["cir"]["steps"][0]["annotations"]
+
+    assert payload["preview_html_url"] == f"/api/v1/html_preview/{payload['request_id']}.html"
+    assert "planner" not in traces
+    assert "html_coder" in traces
+    assert "当前规划焦点" not in payload["cir"]["summary"]
+    assert all("Skill 路由" not in annotation for annotation in first_annotations)
+    assert all("Provider 概念提示" not in annotation for annotation in first_annotations)
+    assert "当前规划焦点" not in captured_prompts["user_prompt"]
+    assert "Skill 路由" not in captured_prompts["user_prompt"]
+    assert "Provider 概念提示" not in captured_prompts["user_prompt"]
+
+
+
+def test_pipeline_html_mode_falls_back_when_provider_returns_incomplete_html(
+    monkeypatch, tmp_path
+) -> None:
+    _stub_html_preview_dir(monkeypatch, tmp_path)
+
+    original_get = orchestrator.provider_registry.get
+    mock_provider = original_get("mock")
+
+    class BrokenHtmlProvider:
+        descriptor = ProviderDescriptor(
+            name="broken-html",
+            label="Broken HTML Provider",
+            kind=ProviderKind.OPENAI_COMPATIBLE,
+            model="broken-html-model",
+            description="broken html provider",
+            configured=True,
+        )
+
+        def _chat_text(self, **kwargs):
+            return (
+                "```html\n<!DOCTYPE html><html><body><h1>broken</h1></body></html>\n```",
+                {},
+            )
+
+        def model_for_stage(self, stage: str) -> str:
+            return "broken-html-model"
+
+        def route(self, *args, **kwargs):
+            raise AssertionError("route should not be called")
+
+        def plan(self, *args, **kwargs):
+            return mock_provider.plan(*args, **kwargs)
+
+        def code(self, *args, **kwargs):
+            return mock_provider.code(*args, **kwargs)
+
+        def critique(self, *args, **kwargs):
+            return mock_provider.critique(*args, **kwargs)
+
+
+    monkeypatch.setattr(
+        orchestrator.provider_registry,
+        "get",
+        lambda name=None: BrokenHtmlProvider() if name == "broken-html" else original_get(name),
+    )
+
+    response = client.post(
+        "/api/v1/pipeline",
+        json={
+            "prompt": "请生成一个可交互的汉诺塔 HTML 动画。",
+            "provider": "broken-html",
+            "generation_provider": "broken-html",
+            "router_provider": "mock",
+            "sandbox_mode": "dry_run",
+            "output_mode": "html",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["preview_html_url"]
+
+    html_response = client.get(payload["preview_html_url"])
+    assert html_response.status_code == 200
+    assert 'data-metaview-fallback="true"' in html_response.text
+    assert "window.addEventListener(\"message\"" in html_response.text
+    assert 'document.addEventListener("DOMContentLoaded"' in html_response.text
+
+
+def test_pipeline_html_mode_rejects_unsafe_provider_runtime_html(monkeypatch, tmp_path) -> None:
+    _stub_html_preview_dir(monkeypatch, tmp_path)
+
+    original_get = orchestrator.provider_registry.get
+
+    class UnsafeHtmlProvider:
+        descriptor = ProviderDescriptor(
+            name="unsafe-html",
+            label="Unsafe HTML Provider",
+            kind=ProviderKind.OPENAI_COMPATIBLE,
+            model="unsafe-html-model",
+            description="unsafe html provider",
+            configured=True,
+        )
+
+        def _chat_text(self, **kwargs):
+            return (
+                """
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Unsafe HTML</title>
+  </head>
+  <body>
+    <div id="app">unsafe html</div>
+    <script>
+      const runtime = {
+        state: { currentStep: 0, totalSteps: 1, autoplay: false, speed: 1, paused: true, params: {} },
+      };
+      window.addEventListener("message", () => {});
+      document.addEventListener("DOMContentLoaded", () => {
+        document.body.setAttribute("onclick", "alert('xss')");
+        window.parent.postMessage({ type: "ready", totalSteps: 1, supportedParams: [], capabilities: {} }, "*");
+      });
+    </script>
+  </body>
+</html>
+                """.strip(),
+                {},
+            )
+
+        def model_for_stage(self, stage: str) -> str:
+            return "unsafe-html-model"
+
+        def route(self, *args, **kwargs):
+            raise AssertionError("route should not be called")
+
+        def plan(self, *args, **kwargs):
+            raise AssertionError("HTML mode should skip provider planning")
+
+        def code(self, *args, **kwargs):
+            raise AssertionError("HTML mode should skip Manim coding")
+
+        def critique(self, *args, **kwargs):
+            raise AssertionError("HTML mode should skip Manim critique")
+
+    def fake_get(name: str):
+        if name == "unsafe-html":
+            return UnsafeHtmlProvider()
+        return original_get(name)
+
+    monkeypatch.setattr(orchestrator.provider_registry, "get", fake_get)
+
+    response = client.post(
+        "/api/v1/pipeline",
+        json={
+            "prompt": "请生成一个可交互的导数变化率 HTML 动画。",
+            "domain": "math",
+            "generation_provider": "unsafe-html",
+            "sandbox_mode": "dry_run",
+            "output_mode": "html",
+            "persist_run": False,
+        },
+    )
+    assert response.status_code == 200
+
+    payload = response.json()
+    traces = {trace["agent"]: trace for trace in payload["runtime"]["agent_traces"]}
+    assert traces["html_coder"]["provider"] == "Unsafe HTML Provider"
+    assert "使用本地模板" in traces["html_coder"]["summary"]
+
+    html_response = client.get(payload["preview_html_url"])
+    assert html_response.status_code == 200
+    html = html_response.text
+
+    assert 'data-metaview-fallback="true"' in html
+    assert 'onclick="alert(\'xss\')"' not in html
+    assert "unsafe html" not in html
     response = client.get("/api/v1/runtime")
     assert response.status_code == 200
 
@@ -618,6 +958,7 @@ def test_pipeline_runs_history_endpoints() -> None:
     runs = list_response.json()
     run_summary = next(item for item in runs if item["request_id"] == request_id)
     assert run_summary["status"] == "succeeded"
+    assert run_summary["output_mode"] == "video"
 
     detail_response = client.get(f"/api/v1/runs/{request_id}")
     assert detail_response.status_code == 200
@@ -644,6 +985,7 @@ def test_pipeline_runs_history_endpoints() -> None:
 
 def test_pipeline_submit_runs_in_background(monkeypatch, tmp_path) -> None:
     _stub_preview_renderer(monkeypatch, tmp_path)
+    _stub_html_preview_dir(monkeypatch, tmp_path)
 
     submit_response = client.post(
         "/api/v1/pipeline/submit",
@@ -651,6 +993,7 @@ def test_pipeline_submit_runs_in_background(monkeypatch, tmp_path) -> None:
             "prompt": "请讲解快速排序的分区过程。",
             "provider": "mock",
             "sandbox_mode": "dry_run",
+            "output_mode": "html",
         },
     )
     assert submit_response.status_code == 200
@@ -661,13 +1004,23 @@ def test_pipeline_submit_runs_in_background(monkeypatch, tmp_path) -> None:
     detail = _wait_for_run_status(request_id)
     assert detail["status"] == "succeeded"
     assert detail["response"]["request_id"] == request_id
-    assert detail["response"]["preview_video_url"]
+    assert detail["response"]["preview_html_url"] == f"/api/v1/html_preview/{request_id}.html"
+    assert detail["response"]["preview_video_url"] is None
+
+    html_response = client.get(detail["response"]["preview_html_url"])
+    assert html_response.status_code == 200
+    assert "text/html" in html_response.headers["content-type"]
+    saved_file = tmp_path / f"{request_id}.html"
+    assert saved_file.exists()
+    assert html_response.text == saved_file.read_text(encoding="utf-8")
+    assert detail["response"]["renderer_script"] != html_response.text
 
     list_response = client.get("/api/v1/runs")
     assert list_response.status_code == 200
     runs = list_response.json()
     run_summary = next(item for item in runs if item["request_id"] == request_id)
     assert run_summary["status"] == "succeeded"
+    assert run_summary["output_mode"] == "html"
 
 
 def test_pipeline_submit_persists_failure(monkeypatch) -> None:

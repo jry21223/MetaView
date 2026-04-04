@@ -9,6 +9,7 @@ from pathlib import Path
 
 from app.schemas import (
     CustomProviderUpsertRequest,
+    OutputMode,
     PipelineRequest,
     PipelineResponse,
     PipelineRunDetail,
@@ -119,6 +120,7 @@ class RunRepository:
                     prompt TEXT NOT NULL,
                     title TEXT NOT NULL,
                     domain TEXT NOT NULL,
+                    output_mode TEXT NOT NULL,
                     provider TEXT NOT NULL,
                     router_provider TEXT,
                     generation_provider TEXT,
@@ -161,6 +163,13 @@ class RunRepository:
                     WHERE status IS NULL OR status = ''
                     """,
                     (PipelineRunStatus.SUCCEEDED.value,),
+                )
+            if "output_mode" not in columns:
+                connection.execute(
+                    """
+                    ALTER TABLE pipeline_runs
+                    ADD COLUMN output_mode TEXT NOT NULL DEFAULT 'video'
+                    """
                 )
             if "router_provider" not in columns:
                 connection.execute(
@@ -205,6 +214,7 @@ class RunRepository:
                     prompt,
                     title,
                     domain,
+                    output_mode,
                     provider,
                     router_provider,
                     generation_provider,
@@ -213,7 +223,7 @@ class RunRepository:
                     response_payload,
                     error_message
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     request_id,
@@ -223,6 +233,7 @@ class RunRepository:
                     request.prompt,
                     "正在生成",
                     request.domain.value if request.domain is not None else "",
+                    request.output_mode.value,
                     request.provider or "",
                     request.router_provider or "",
                     request.generation_provider or request.provider or "",
@@ -289,6 +300,7 @@ class RunRepository:
                     prompt = ?,
                     title = ?,
                     domain = ?,
+                    output_mode = ?,
                     provider = ?,
                     router_provider = ?,
                     generation_provider = ?,
@@ -304,6 +316,7 @@ class RunRepository:
                     effective_request.prompt,
                     response.cir.title,
                     response.cir.domain.value,
+                    effective_request.output_mode.value,
                     response.runtime.provider.name if response.runtime.provider else "",
                     response.runtime.router_provider.name
                     if response.runtime.router_provider
@@ -330,6 +343,7 @@ class RunRepository:
                     prompt,
                     title,
                     domain,
+                    output_mode,
                     provider,
                     router_provider,
                     generation_provider,
@@ -338,7 +352,7 @@ class RunRepository:
                     response_payload,
                     error_message
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     response.request_id,
@@ -348,6 +362,7 @@ class RunRepository:
                     effective_request.prompt,
                     response.cir.title,
                     response.cir.domain.value,
+                    effective_request.output_mode.value,
                     response.runtime.provider.name if response.runtime.provider else "",
                     response.runtime.router_provider.name
                     if response.runtime.router_provider
@@ -383,6 +398,7 @@ class RunRepository:
                     prompt = ?,
                     title = ?,
                     domain = ?,
+                    output_mode = ?,
                     provider = ?,
                     router_provider = ?,
                     generation_provider = ?,
@@ -398,6 +414,7 @@ class RunRepository:
                     request.prompt,
                     "生成失败",
                     request.domain.value if request.domain is not None else "",
+                    request.output_mode.value,
                     request.provider or "",
                     request.router_provider or "",
                     request.generation_provider or request.provider or "",
@@ -421,6 +438,7 @@ class RunRepository:
                     prompt,
                     title,
                     domain,
+                    output_mode,
                     provider,
                     router_provider,
                     generation_provider,
@@ -429,7 +447,7 @@ class RunRepository:
                     response_payload,
                     error_message
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     request_id,
@@ -439,6 +457,7 @@ class RunRepository:
                     request.prompt,
                     "生成失败",
                     request.domain.value if request.domain is not None else "",
+                    request.output_mode.value,
                     request.provider or "",
                     request.router_provider or "",
                     request.generation_provider or request.provider or "",
@@ -461,6 +480,7 @@ class RunRepository:
                     prompt,
                     title,
                     domain,
+                    output_mode,
                     provider,
                     COALESCE(router_provider, provider) AS router_provider,
                     COALESCE(generation_provider, provider) AS generation_provider,
@@ -482,6 +502,7 @@ class RunRepository:
                 prompt=row["prompt"],
                 title=row["title"],
                 domain=TopicDomain(row["domain"]) if row["domain"] else None,
+                output_mode=OutputMode(row["output_mode"] or OutputMode.VIDEO.value),
                 provider=row["provider"] or None,
                 router_provider=row["router_provider"] or None,
                 generation_provider=row["generation_provider"] or None,

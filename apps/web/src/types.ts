@@ -22,6 +22,7 @@ export type ProviderStage = "router" | "planning" | "coding" | "critic" | "test"
  *   include `output_mode` in the submitPipeline request body. See api/client.ts.
  */
 export type OutputMode = "manim" | "html";
+export type HistoryOutputMode = "video" | "html";
 
 /** Pipeline processing stages for progress tracking. */
 export type PipelineStage = "domain_routing" | "cir_planning" | "script_coding" | "render_output";
@@ -262,6 +263,7 @@ export interface PipelineRunSummary {
   prompt: string;
   title: string;
   domain?: TopicDomain | null;
+  output_mode: HistoryOutputMode;
   provider?: ModelProvider | null;
   router_provider?: ModelProvider | null;
   generation_provider?: ModelProvider | null;
@@ -287,6 +289,7 @@ export interface PipelineRunDetail {
     ui_theme?: UITheme | null;
     enable_narration: boolean;
     sandbox_mode: SandboxMode;
+    output_mode?: HistoryOutputMode;
     persist_run: boolean;
   };
   response?: PipelineResponse | null;

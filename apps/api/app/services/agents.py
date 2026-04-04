@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import json
+import logging
 import re
 from dataclasses import dataclass
+from html import escape
 
 from app.schemas import (
     AgentDiagnostic,
@@ -195,6 +198,7 @@ class PlannerAgent:
         *,
         skill: SubjectSkill,
         hints: PlanningHints | None = None,
+        include_skill_metadata: bool = True,
     ) -> CirDocument:
         code_insights = (
             inspect_source_code(request.source_code, request.source_code_language)
@@ -248,10 +252,11 @@ class PlannerAgent:
             steps = self._geography_steps(tokens)
             summary = "地理题会先固定空间底图，再展示时空演化与区域解释。"
 
-        steps[0].annotations.insert(
-            0,
-            f"Skill 路由：{skill.descriptor.id} / {skill.descriptor.label}。",
-        )
+        if include_skill_metadata:
+            steps[0].annotations.insert(
+                0,
+                f"Skill 路由：{skill.descriptor.id} / {skill.descriptor.label}。",
+            )
 
         if request.source_image and skill.descriptor.supports_image_input:
             summary = f"{summary} 已结合静态题图进行对象提取与建模。"
@@ -604,9 +609,23 @@ class HtmlCoderAgent:
     """
 
     name: str = "html_coder"
+    _log: logging.Logger = None  # type: ignore[assignment]
 
-    def run(self, cir: CirDocument, ui_theme: str | None = None) -> str:
-        """Return a self-contained HTML string for interactive CIR rendering."""
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_log", logging.getLogger(__name__))
+
+    def run(
+        self,
+        cir: CirDocument,
+        ui_theme: str | None = None,
+        generation_provider: object | None = None,
+    ) -> str:
+        """Return a self-contained HTML string for interactive CIR rendering.
+
+        When *generation_provider* is a real LLM-backed provider (i.e. has a
+        ``_chat_text`` method), the agent calls the LLM with the HTML coder
+        prompts.  Otherwise it falls back to a locally-built template.
+        """
         from .prompts.html_coder import (
             build_html_coder_system_prompt,
             build_html_coder_user_prompt,
@@ -629,17 +648,81 @@ class HtmlCoderAgent:
             ui_theme=ui_theme,
         )
 
-        # Build a minimal HTML fallback from CIR data so that the pipeline
-        # works even without a remote LLM call (local / mock provider).
-        html = _build_fallback_html(cir, ui_theme)
-
-        # Store prompts for later tracing (the orchestrator may override
-        # this result with an LLM-generated script when a real provider
-        # is configured).
+        # Store prompts for tracing
         self._last_system_prompt = system_prompt
         self._last_user_prompt = user_prompt
 
-        return html
+        # Try to call the LLM if the provider supports it
+        if generation_provider is not None and hasattr(generation_provider, "_chat_text"):
+            try:
+                content, _raw = generation_provider._chat_text(
+                    stage="html_coding",
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                )
+                html = self._extract_html(content)
+                if html and self._is_runtime_complete_html(html):
+                    safety_issue = self._runtime_html_safety_issue(html)
+                    if safety_issue is None:
+                        self._log.info("HtmlCoderAgent: LLM returned %d chars of HTML", len(html))
+                        return html
+                    self._log.warning(
+                        "HtmlCoderAgent: LLM HTML rejected by safety check (%s), using fallback",
+                        safety_issue,
+                    )
+                else:
+                    self._log.warning(
+                        "HtmlCoderAgent: LLM response did not contain valid runtime HTML, using fallback"
+                    )
+            except Exception:
+                self._log.exception("HtmlCoderAgent: LLM call failed, using fallback")
+
+        return _build_fallback_html(cir, ui_theme)
+
+    @staticmethod
+    def _extract_html(content: str) -> str:
+        match = re.search(r"```html\s*(.*?)```", content, flags=re.IGNORECASE | re.DOTALL)
+        if match:
+            return match.group(1).strip()
+        return content.strip()
+
+    @staticmethod
+    def _is_runtime_complete_html(html: str) -> bool:
+        required_markers = (
+            "<!DOCTYPE html",
+            "window.parent.postMessage",
+            "const runtime =",
+            'window.addEventListener("message"',
+            'document.addEventListener("DOMContentLoaded"',
+        )
+        normalized = html.strip()
+        return all(marker in normalized for marker in required_markers)
+
+    @staticmethod
+    def _runtime_html_safety_issue(html: str) -> str | None:
+        checks = (
+            (r"<script[^>]+\bsrc\s*=", "external-script"),
+            (r"<iframe\b", "nested-iframe"),
+            (r"<object\b", "embedded-object"),
+            (r"<embed\b", "embedded-plugin"),
+            (r"<base\b", "base-tag"),
+            (r"<meta\b[^>]+http-equiv\s*=\s*[\"']?refresh", "meta-refresh"),
+            (r"<form\b", "form-submission"),
+            (r"\bon[a-z]+\s*=", "inline-event-handler"),
+            (r"\.setAttribute\(\s*[\"']on[a-z]+[\"']", "dynamic-event-handler"),
+            (r"javascript\s*:", "javascript-url"),
+            (r"\b(?:fetch|XMLHttpRequest|WebSocket|EventSource)\b", "network-api"),
+            (r"navigator\.sendBeacon\b", "send-beacon"),
+            (r"\b(?:window\.)?open\s*\(", "popup"),
+            (r"\b(?:document\.)?cookie\b", "cookie-access"),
+            (r"\b(?:localStorage|sessionStorage|indexedDB)\b", "storage-access"),
+            (r"\b(?:top|parent)\.location\b", "frame-navigation"),
+            (r"\b(?:src|href|action)\s*=\s*[\"']?\s*(?:https?:)?//", "external-resource"),
+        )
+        for pattern, reason in checks:
+            if re.search(pattern, html, flags=re.IGNORECASE):
+                return reason
+        return None
 
 
 def _build_fallback_html(cir: CirDocument, ui_theme: str | None = None) -> str:
@@ -648,16 +731,25 @@ def _build_fallback_html(cir: CirDocument, ui_theme: str | None = None) -> str:
     This is used when no remote LLM is available, or as the initial template
     that a provider can improve upon.
     """
-    theme = ui_theme or "dark"
-    steps_js = cir.model_dump_json()
+    theme = escape(ui_theme or "dark", quote=True)
+    safe_title = escape(cir.title, quote=True)
+    safe_summary = escape(cir.summary, quote=True)
+    steps_js = (
+        json.dumps(cir.model_dump(mode="json"), ensure_ascii=False)
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("&", "\\u0026")
+        .replace("\u2028", "\\u2028")
+        .replace("\u2029", "\\u2029")
+    )
 
     return f"""\
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-metaview-fallback="true">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{cir.title}</title>
+<title>{safe_title}</title>
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
 body{{font-family:system-ui,-apple-system,sans-serif;min-height:100vh;
@@ -699,8 +791,8 @@ body[data-theme="light"] .nav button{{background:#e8eaee;color:#141820}}
 </head>
 <body data-theme="{theme}">
 <div class="container" id="app">
-  <h1>{cir.title}</h1>
-  <p class="summary">{cir.summary}</p>
+  <h1>{safe_title}</h1>
+  <p class="summary">{safe_summary}</p>
   <div id="steps"></div>
 </div>
 <div class="nav">
@@ -712,6 +804,18 @@ body[data-theme="light"] .nav button{{background:#e8eaee;color:#141820}}
 const data={steps_js};
 const steps=data.steps||[];
 let cur=0;
+function createTextElement(className,text){{
+  const element=document.createElement("div");
+  element.className=className;
+  element.textContent=text??"";
+  return element;
+}}
+function createToken(t){{
+  const token=document.createElement("span");
+  token.className=`token token-${{t.emphasis||"secondary"}}`;
+  token.textContent=t.value?`${{t.label}} = ${{t.value}}`:t.label;
+  return token;
+}}
 function render(){{
   const el=document.getElementById("steps");
   el.innerHTML="";
@@ -719,12 +823,15 @@ function render(){{
     const d=document.createElement("div");
     d.className="step"+(i===cur?" is-active":"");
     d.style.display=i===cur?"block":"none";
-    d.innerHTML=`<div class="step-kind">${{s.visual_kind}}</div>
-      <div class="step-title">${{s.title}}</div>
-      <div class="step-narration">${{s.narration}}</div>
-      <div class="tokens">${{(s.tokens||[]).map(t=>
-        `<span class="token token-${{t.emphasis||'secondary'}}">${{t.label}}${{t.value?' = '+t.value:''}}</span>`
-      ).join("")}}</div>`;
+    d.appendChild(createTextElement("step-kind",s.visual_kind));
+    d.appendChild(createTextElement("step-title",s.title));
+    d.appendChild(createTextElement("step-narration",s.narration));
+    const tokens=document.createElement("div");
+    tokens.className="tokens";
+    (s.tokens||[]).forEach((token)=>{{
+      tokens.appendChild(createToken(token));
+    }});
+    d.appendChild(tokens);
     el.appendChild(d);
   }});
   document.getElementById("counter").textContent=(cur+1)+"/"+steps.length;

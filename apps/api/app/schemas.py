@@ -365,6 +365,7 @@ class PipelineRunSummary(BaseModel):
     prompt: str
     title: str
     domain: TopicDomain | None = None
+    output_mode: OutputMode = OutputMode.VIDEO
     provider: str | None = None
     router_provider: str | None = None
     generation_provider: str | None = None

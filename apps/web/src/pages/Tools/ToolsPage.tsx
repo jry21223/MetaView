@@ -1,9 +1,11 @@
 import { CodeAdapterPanel } from "../../components/CodeAdapterPanel";
 import { HighlightedCode } from "../../components/HighlightedCode";
+import { HtmlDebugPanel } from "../../components/HtmlDebugPanel";
 import { PromptReferenceTool } from "../../components/PromptReferenceTool";
 import { ProviderManager } from "../../components/ProviderManager";
 import { TTSSettingsPanel } from "../../components/TTSSettingsPanel";
-import type { CustomProviderUpsertRequest, PipelineResponse, RuntimeCatalog } from "../../types";
+import { usePipelineStats } from "../../hooks/features/usePipelineStats";
+import type { CustomProviderUpsertRequest, PipelineResponse, PipelineRunSummary, RuntimeCatalog } from "../../types";
 
 export interface ToolsPageProps {
   debugToolsOpen: boolean;
@@ -12,6 +14,7 @@ export interface ToolsPageProps {
   runtimeCatalog: RuntimeCatalog;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   activeSkill: any | null;
+  runs: readonly PipelineRunSummary[];
 
   handleExportCurrent: () => void;
   handleCreateProvider: (payload: CustomProviderUpsertRequest) => Promise<void>;
@@ -25,11 +28,13 @@ export function ToolsPage({
   result,
   runtimeCatalog,
   activeSkill,
+  runs,
   handleExportCurrent,
   handleCreateProvider,
   handleDeleteProvider,
   handleUpdateRuntimeSettings,
 }: ToolsPageProps) {
+  const stats = usePipelineStats(runs);
   return (
     <section className="page-shell" id="tools">
       <div className="page-header">
@@ -61,8 +66,8 @@ export function ToolsPage({
             </summary>
             {debugToolsOpen ? (
               <div className="accordion-content">
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px" }}>
-                  <section className="bento-card" style={{ padding: "20px" }}>
+                <div className="tools-dual-panel-grid">
+                  <section className="bento-card tools-card-section">
                     <div style={{ fontSize: "0.625rem", fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "16px" }}>
                       运行诊断
                     </div>
@@ -91,27 +96,45 @@ export function ToolsPage({
                     </button>
                   </section>
 
-                  <section className="bento-card" style={{ padding: "20px" }}>
+                  <section className="bento-card tools-card-section">
                     <div style={{ fontSize: "0.625rem", fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "16px" }}>
-                      生成的 Manim 脚本
+                      {result?.preview_html_url ? "生成的 HTML 脚本" : "生成的 Manim 脚本"}
                     </div>
                     {result?.renderer_script ? (
                       <div style={{ maxHeight: "200px", overflow: "auto" }}>
                         <HighlightedCode
                           code={result.renderer_script}
-                          language="python"
+                          language={result.preview_html_url ? "html" : "python"}
                           className="highlighted-code-surface"
                         />
                       </div>
                     ) : (
                       <div style={{ color: "var(--on-surface-variant)", fontSize: "0.875rem" }}>
-                        生成任务后显示 Manim 脚本
+                        生成任务后显示脚本
                       </div>
                     )}
                   </section>
                 </div>
               </div>
             ) : null}
+          </details>
+
+          <details className="accordion-item" open>
+            <summary className="accordion-trigger">
+              <div className="accordion-trigger-left">
+                <div className="accordion-icon primary">
+                  <span className="material-symbols-outlined">code_blocks</span>
+                </div>
+                <div>
+                  <div className="accordion-label">HTML 调试面板</div>
+                  <div className="accordion-hint">直接输入 HTML 源码并在页内预览</div>
+                </div>
+              </div>
+              <span className="material-symbols-outlined accordion-arrow">expand_more</span>
+            </summary>
+            <div className="accordion-content">
+              <HtmlDebugPanel />
+            </div>
           </details>
 
           <details className="accordion-item">
@@ -146,7 +169,7 @@ export function ToolsPage({
               <span className="material-symbols-outlined accordion-arrow">expand_more</span>
             </summary>
             <div className="accordion-content">
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px" }}>
+              <div className="tools-dual-panel-grid">
                 <ProviderManager
                   providers={runtimeCatalog.providers}
                   onCreateProvider={handleCreateProvider}
@@ -182,7 +205,7 @@ export function ToolsPage({
           </details>
         </section>
 
-        <aside className="bento-card-md" style={{ display: "flex", flexDirection: "column", gap: "24px", boxShadow: "none", background: "transparent" }}>
+        <aside className="bento-card-md tools-side-column" style={{ boxShadow: "none", background: "transparent" }}>
           <div className="resource-sidebar">
             <div className="resource-sidebar-header">资源分配</div>
             <div className="resource-sidebar-value">
@@ -212,7 +235,7 @@ export function ToolsPage({
             </div>
           </div>
 
-          <div className="bento-card" style={{ padding: "24px" }}>
+          <div className="bento-card tools-skill-card">
             <div style={{ fontSize: "0.625rem", fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "16px" }}>
               当前 Skill
             </div>
@@ -236,39 +259,25 @@ export function ToolsPage({
               </div>
             )}
           </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            <div style={{ fontSize: "0.625rem", fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--on-surface-variant)" }}>
-              快速操作
-            </div>
-            <button className="resource-quick-action" type="button">
-              <span className="resource-quick-action-label">重新索引核心清单</span>
-              <span className="material-symbols-outlined resource-quick-action-icon">refresh</span>
-            </button>
-            <button className="resource-quick-action" type="button">
-              <span className="resource-quick-action-label">刷新翻译缓存</span>
-              <span className="material-symbols-outlined resource-quick-action-icon">sync</span>
-            </button>
-          </div>
         </aside>
       </div>
 
       <footer className="tools-footer">
         <div className="tools-footer-stat">
-          <span className="tools-footer-label">活跃监听</span>
-          <span className="tools-footer-value">2,481</span>
+          <span className="tools-footer-label">总运行数</span>
+          <span className="tools-footer-value">{stats.totalRuns.toLocaleString()}</span>
         </div>
         <div className="tools-footer-stat">
           <span className="tools-footer-label">错误频率</span>
-          <span className="tools-footer-value is-error">0.04%</span>
+          <span className="tools-footer-value is-error">{stats.errorRate}</span>
         </div>
         <div className="tools-footer-stat">
-          <span className="tools-footer-label">API 请求 (24小时)</span>
-          <span className="tools-footer-value">1.2M</span>
+          <span className="tools-footer-label">24h 运行数</span>
+          <span className="tools-footer-value">{stats.recentRuns}</span>
         </div>
         <div className="tools-footer-stat">
-          <span className="tools-footer-label">会话可靠性</span>
-          <span className="tools-footer-value is-primary">99.98%</span>
+          <span className="tools-footer-label">成功率</span>
+          <span className="tools-footer-value is-primary">{stats.successRate}</span>
         </div>
       </footer>
     </section>

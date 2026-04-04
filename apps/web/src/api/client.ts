@@ -222,11 +222,8 @@ export async function runPipeline(
 /**
  * Submit a pipeline run.
  *
- * TODO(backend): The frontend now has an `OutputMode` toggle ("manim" | "html").
- * Currently `output_mode` is NOT sent in the request body — all submissions
- * render via Manim. When the backend adds HTML visualization support, include
- * `output_mode` in the JSON body below. Default to "manim" if absent for
- * backward compatibility. See `OutputMode` in types.ts for details.
+ * The `output_mode` parameter controls whether the backend produces a
+ * Manim video ("video") or an in-page interactive HTML animation ("html").
  */
 export async function submitPipeline(
   prompt: string,

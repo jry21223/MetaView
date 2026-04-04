@@ -217,6 +217,14 @@ export function ControlPanel({
       </div>
 
       <form className="composer-form" onSubmit={onSubmit}>
+        <input
+          id={imageInputId}
+          className="composer-upload-input"
+          type="file"
+          accept="image/*"
+          onChange={handleInputFileChange}
+        />
+
         <div
           className={`composer-search-shell ${dragActive ? "is-drag-active" : ""} ${
             sourceImage ? "has-attachment" : ""
@@ -225,119 +233,82 @@ export function ControlPanel({
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-          <div className={`composer-container ${prompt.trim() ? "is-active" : ""}`}>
-          <textarea
-            className="composer-input"
-            value={prompt}
-            onChange={(event) => onPromptChange(event.target.value)}
-            placeholder="描述您想要生成的可视化场景..."
-            rows={4}
-            style={{
-              paddingBottom: "56px",
-              width: "100%",
-              resize: "vertical",
-              minHeight: "140px"
-            }}
-          />
+          <div className="composer-search-intro">
+            <span className="composer-search-kicker">统一输入入口</span>
+            <p className="composer-search-description">
+              支持自然语言、源码与题图联合提交，系统会自动选择讲解路径并生成结果。
+            </p>
+          </div>
 
-          {sourceImage && (
-            <div style={{
-              position: "absolute",
-              left: "16px",
-              bottom: "56px",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "4px 8px",
-              background: "var(--surface-container-high)",
-              borderRadius: "8px",
-              boxShadow: "var(--shadow-sm)"
-            }}>
-              <span className="material-symbols-outlined" style={{ fontSize: "16px", color: "var(--primary)" }}>image</span>
-              <span style={{ fontSize: "0.75rem", color: "var(--on-surface-variant)", maxWidth: "160px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {sourceImageName ?? "已附带题图"}
-              </span>
+          <div className={`composer-container ${prompt.trim() ? "is-active" : ""}`}>
+            <textarea
+              className="composer-input"
+              value={prompt}
+              onChange={(event) => onPromptChange(event.target.value)}
+              placeholder="描述您想生成的可视化场景..."
+              rows={4}
+            />
+
+            {sourceImage ? (
+              <div className="composer-inline-attachment">
+                <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>image</span>
+                <span className="composer-inline-attachment-name">
+                  {sourceImageName ?? "已附带题图"}
+                </span>
+                <button
+                  type="button"
+                  className="icon-button composer-inline-attachment-remove"
+                  onClick={() => onSourceImageChange(null, null)}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: "14px" }}>close</span>
+                </button>
+              </div>
+            ) : null}
+
+            <div className="composer-search-actions">
               <button
                 type="button"
-                className="icon-button"
-                style={{ width: "20px", height: "20px", padding: 0 }}
-                onClick={() => onSourceImageChange(null, null)}
+                className="composer-attach-button"
+                title="上传参考图片"
+                onClick={() => {
+                  const imageInput = document.getElementById(imageInputId) as HTMLInputElement | null;
+                  imageInput?.click();
+                }}
               >
-                <span className="material-symbols-outlined" style={{ fontSize: "14px" }}>close</span>
+                <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>attach_file</span>
+                题图
+              </button>
+
+              <button
+                type="submit"
+                className="btn btn-primary composer-submit"
+                disabled={!canSubmit}
+              >
+                {loading ? (
+                  <>
+                    <span className="material-symbols-outlined rotating" style={{ fontSize: "18px" }}>
+                      progress_activity
+                    </span>
+                    生成中
+                  </>
+                ) : (
+                  <>
+                    {outputMode === "html" ? "生成 HTML" : "生成视频"}
+                    <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>
+                      magic_button
+                    </span>
+                  </>
+                )}
               </button>
             </div>
-          )}
-
-          <div style={{
-            position: "absolute",
-            bottom: "12px",
-            right: "12px",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px"
-          }}>
-            <button
-              type="button"
-              className="icon-button"
-              title="上传参考图片"
-              style={{
-                width: "36px",
-                height: "36px",
-                borderRadius: "8px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--on-surface-variant)",
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                transition: "all var(--transition-fast)"
-              }}
-              onClick={() => {
-                const input = document.createElement("input");
-                input.type = "file";
-                input.accept = "image/*";
-                input.onchange = async (e) => {
-                  const file = (e.target as HTMLInputElement).files?.[0];
-                  if (file) {
-                    const reader = new FileReader();
-                    reader.onload = (e) => onSourceImageChange(e.target?.result as string, file.name);
-                    reader.readAsDataURL(file);
-                  }
-                };
-                input.click();
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: "20px" }}>attach_file</span>
-            </button>
-
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={loading || !prompt.trim()}
-              style={{
-                height: "36px",
-                padding: "0 16px",
-                borderRadius: "8px",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px"
-              }}
-            >
-              {loading ? (
-                <>
-                  <span className="material-symbols-outlined rotating" style={{ fontSize: "18px" }}>progress_activity</span>
-                  生成中
-                </>
-              ) : (
-                <>
-                  生成视频
-                  <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>magic_button</span>
-                </>
-              )}
-            </button>
           </div>
-        </div>
+
+          <div className="composer-meta">
+            <span>自动判断学科与镜头结构</span>
+            <span>{configuredProvidersCount} 个 provider 可用</span>
+            {hasSourceCode ? <span>已附带源码</span> : null}
+            {sourceImageName ? <span>已附带题图</span> : null}
+          </div>
         </div>
 
         {imageError ? <p className="error-text composer-upload-feedback">{imageError}</p> : null}
@@ -352,7 +323,6 @@ export function ControlPanel({
           </p>
         ) : null}
 
-        {/* Output mode toggle: Manim / HTML */}
         <div className="composer-toggle">
           <button
             type="button"
@@ -369,21 +339,12 @@ export function ControlPanel({
             HTML 交互
           </button>
         </div>
-        {outputMode === "html" && (
-          <p className="field-hint" style={{ marginTop: "-8px" }}>
-            HTML 交互输出即将上线，当前提交仍以 Manim 视频渲染。
-          </p>
-        )}
 
-        <div className="composer-meta">
-          <span>自动判断学科与镜头结构</span>
-          <span>{configuredProvidersCount} 个 provider 可用</span>
-          {hasSourceCode ? <span>已附带源码</span> : null}
-          {sourceImageName ? <span>已附带题图</span> : null}
-        </div>
-
-        <details className="composer-advanced">
-          <summary className="composer-advanced-summary">高级设置</summary>
+        <details className="composer-advanced composer-advanced-card">
+          <summary className="composer-advanced-summary">
+            <span>高级设置</span>
+            <span className="composer-advanced-summary-text">配音、模型、源码与沙盒配置</span>
+          </summary>
 
           <div className="prompt-form prompt-form-advanced">
             <label className="toggle-field">

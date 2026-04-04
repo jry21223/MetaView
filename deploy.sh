@@ -187,6 +187,7 @@ sync_code() {
         --exclude 'data/html_previews' \
         --exclude 'data/debug' \
         --exclude '*.sqlite3' \
+        --exclude '.env' \
         --exclude 'GEMINI.md' \
         --exclude 'fix_*.py' \
         --exclude 'test_*.py' \
@@ -294,7 +295,7 @@ quick_deploy() {
     preflight
     sync_code
 
-    ssh "$SERVER" "cd $REMOTE_DIR && docker compose restart"
+    ssh "$SERVER" "cd $REMOTE_DIR && $COMPOSE_CMD restart"
     ok "容器已重启"
 
     health_check
