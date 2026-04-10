@@ -447,6 +447,7 @@ class OpenAICompatibleProvider:
                 system_prompt=system_prompt,
                 user_content=user_content,
                 trust_env=True,
+                stage=stage,
             )
         except httpx.TimeoutException as exc:
             timeout_label = (
@@ -463,6 +464,7 @@ class OpenAICompatibleProvider:
                     system_prompt=system_prompt,
                     user_content=user_content,
                     trust_env=False,
+                    stage=stage,
                 )
             except httpx.ConnectError as retry_exc:
                 detail = self._connection_error_detail(
@@ -502,6 +504,7 @@ class OpenAICompatibleProvider:
                     system_prompt=system_prompt,
                     user_content=user_content,
                     trust_env=False,
+                    stage=stage,
                 )
             except httpx.RemoteProtocolError as retry_exc:
                 detail = self._connection_error_detail(
@@ -592,24 +595,45 @@ class OpenAICompatibleProvider:
         system_prompt: str,
         user_content: str | list[dict[str, Any]],
         trust_env: bool,
+        stage: str | None = None,
     ) -> httpx.Response:
+        payload: dict[str, Any] = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content},
+            ],
+            "temperature": self.temperature,
+        }
+        max_tokens = self._max_tokens_for_stage(stage)
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
         response = httpx.post(
             endpoint,
             headers=self._headers(),
-            json={
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_content},
-                ],
-                "temperature": self.temperature,
-            },
+            json=payload,
             timeout=self.timeout_s,
             follow_redirects=True,
             trust_env=trust_env,
         )
         response.raise_for_status()
         return response
+
+    @staticmethod
+    def _max_tokens_for_stage(stage: str | None) -> int | None:
+        """Return the completion max_tokens for a given pipeline stage.
+
+        HTML coding generates a full self-contained HTML page and needs a
+        much larger budget than other stages; providers like DeepSeek default
+        to 4096 which truncates the output mid-document and fails the
+        ``missing-html-close`` bootstrap check. We set HTML to 32768 to ensure
+        complete generation with ample breathing room.
+        """
+        if stage == "html_coding":
+            return 32768
+        if stage in {"coding", "repair"}:
+            return 16384
+        return None
 
     def _normalize_stage_models(self, stage_models: dict[str, str]) -> dict[str, str]:
         normalized: dict[str, str] = {}
