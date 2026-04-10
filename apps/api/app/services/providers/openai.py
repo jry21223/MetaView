@@ -624,15 +624,13 @@ class OpenAICompatibleProvider:
         """Return the completion max_tokens for a given pipeline stage.
 
         HTML coding generates a full self-contained HTML page and needs a
-        much larger budget than other stages; providers like DeepSeek default
-        to 4096 which truncates the output mid-document and fails the
-        ``missing-html-close`` bootstrap check. We set HTML to 32768 to ensure
-        complete generation with ample breathing room.
+        larger budget than other stages; providers like DeepSeek default to
+        4096 which truncates the output mid-document and fails the
+        ``missing-html-close`` bootstrap check. DeepSeek caps max_tokens at
+        8192, so we use that for html_coding / coding / repair stages.
         """
-        if stage == "html_coding":
-            return 32768
-        if stage in {"coding", "repair"}:
-            return 16384
+        if stage in {"html_coding", "coding", "repair"}:
+            return 8192
         return None
 
     def _normalize_stage_models(self, stage_models: dict[str, str]) -> dict[str, str]:
