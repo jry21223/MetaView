@@ -2499,3 +2499,34 @@
 .shadow-sm { box-shadow: var(--shadow-sm); }
 .cursor-pointer { cursor: pointer; }
 .transition-all { transition: all var(--transition-fast); }
+
+/* ============================================
+   MOBILE OVERRIDES (placed last so they win the cascade)
+   The base `.studio-dashboard-grid` rule lives farther down the file
+   than the first @media block, so it was overriding the single-column
+   collapse on phones. Keep these rules at the bottom of the file.
+   ============================================ */
+@media (max-width: 1024px) {
+  .studio-dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .studio-main-column,
+  .studio-side-column {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .studio-input-card,
+  .studio-side-card {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .studio-dashboard-grid {
+    gap: 10px;
+  }
+}
+
