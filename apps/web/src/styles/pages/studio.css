@@ -1624,7 +1624,7 @@
 
   .composer-container textarea.composer-input,
   .composer-input {
-    min-height: 260px;
+    min-height: 240px;
   }
 
   .composer-inline-attachment {
@@ -1639,6 +1639,13 @@
 
   #studio .html-preview-stage-browser {
     min-height: 58vh;
+    height: 58vh;
+  }
+
+  /* HTML sandbox fills the stage area properly */
+  #studio .html-sandbox-container {
+    height: 100%;
+    aspect-ratio: unset;
   }
 }
 
@@ -2064,13 +2071,18 @@
 
 @media (max-width: 640px) {
   .studio-page-header {
-    margin-bottom: 18px;
+    margin-bottom: 14px;
   }
 
   .studio-dashboard-grid,
   .studio-main-column,
   .studio-side-column {
-    gap: 12px;
+    gap: 10px;
+  }
+
+  /* Hide info-only side card on phones — task progress stays */
+  .studio-side-card-focus {
+    display: none;
   }
 
   .studio-rendering-section {
@@ -2078,8 +2090,8 @@
   }
 
   .studio-rendering-center {
-    padding: 24px 16px 20px;
-    gap: 12px;
+    padding: 20px 12px 16px;
+    gap: 10px;
   }
 
   .studio-prompt-tag {
@@ -2120,7 +2132,8 @@
   }
 
   .composer-container textarea.composer-input {
-    padding: 16px;
+    min-height: 180px;
+    padding: 14px;
   }
 
   .composer-toggle {
@@ -2133,32 +2146,51 @@
   }
 
   .html-preview-header {
-    padding: 12px 14px;
+    padding: 10px 14px;
     align-items: flex-start;
     flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .html-preview-title {
+    font-size: 0.95rem;
   }
 
   .html-preview-header-actions {
     width: 100%;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: 8px;
-    flex-wrap: wrap;
   }
 
   #studio .html-preview-stage-browser {
-    min-height: 46vh;
+    height: 56vh;
+    min-height: 280px;
+  }
+
+  #studio .html-sandbox-container {
+    height: 100%;
+    aspect-ratio: unset;
   }
 
   .html-preview-subtitle {
     width: calc(100% - 24px);
-    bottom: 12px;
-    padding: 10px 14px;
+    bottom: 10px;
+    padding: 8px 12px;
     border-radius: var(--radius-lg);
   }
 
-  .html-preview-body {
-    padding: 0 12px 12px;
+  .html-preview-subtitle-title {
+    font-size: 0.85rem;
   }
+
+  .html-preview-subtitle-text {
+    font-size: 0.78rem;
+  }
+
+  .html-preview-body {
+    padding: 0 10px 10px;
+  }
+
 }
 
 /* ============================================

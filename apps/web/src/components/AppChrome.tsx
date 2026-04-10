@@ -14,6 +14,30 @@ const navigationItems = [
 export function AppChrome({ activePage, theme, setTheme, onPageChange }: AppChromeProps) {
   return (
     <>
+      {/* Compact topbar — only shown when sidebar is hidden (≤1024px) */}
+      <header className="mobile-topbar">
+        <div className="topbar-brand" style={{ padding: 0 }}>
+          <span className="topbar-neon-strip" />
+          <div className="brand-text-group">
+            <span className="topbar-brand-text">MetaView</span>
+            <span className="topbar-brand-subtitle">THEORETICAL CANVAS</span>
+          </div>
+        </div>
+        <div className="topbar-actions">
+          <button
+            type="button"
+            className="topbar-icon-btn"
+            onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
+            title={theme === "dark" ? "切换到浅色模式" : "切换到深色模式"}
+          >
+            <span className="material-symbols-outlined">
+              {theme === "dark" ? "light_mode" : "dark_mode"}
+            </span>
+          </button>
+          <div className="topbar-avatar">MV</div>
+        </div>
+      </header>
+
       <aside className="sidebar">
         <div className="sidebar-brand">
           <div className="topbar-brand" style={{ padding: 0 }}>

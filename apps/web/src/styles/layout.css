@@ -701,6 +701,27 @@
   }
 }
 
+/* ============================================
+   MOBILE TOPBAR (replaces sidebar brand on small screens)
+   ============================================ */
+
+.mobile-topbar {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(52px + env(safe-area-inset-top, 0px));
+  padding: calc(6px + env(safe-area-inset-top, 0px)) 16px 6px;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--glass-bg);
+  backdrop-filter: var(--backdrop-blur-heavy);
+  -webkit-backdrop-filter: var(--backdrop-blur-heavy);
+  border-bottom: 1px solid var(--glass-border);
+  z-index: 45;
+}
+
 /* Mobile Bottom Navigation */
 .mobile-nav {
   display: none;
@@ -719,13 +740,48 @@
 }
 
 @media (max-width: 1024px) {
+  .mobile-topbar {
+    display: flex;
+  }
+
+  .floating-actions {
+    display: none;
+  }
+
   .mobile-nav {
     display: flex;
   }
 
   .main-content {
     margin-left: 0;
+    padding-top: calc(52px + env(safe-area-inset-top, 0px));
     padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .page-container {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .page-title {
+    font-size: 1.4rem;
+  }
+
+  .page-container {
+    padding: 12px 16px;
+  }
+
+  .bento-card {
+    border-radius: var(--radius-lg);
+  }
+
+  .bento-card-header {
+    padding: 14px 16px 10px;
+  }
+
+  .bento-card-body {
+    padding: 0 16px 16px;
   }
 }
 

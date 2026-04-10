@@ -209,7 +209,7 @@ export function StudioPage({
               </div>
             </div>
 
-            <div className="bento-card bento-card-md studio-side-card">
+            <div className="bento-card bento-card-md studio-side-card studio-side-card-focus">
               <div className="bento-card-header">
                 <span className="bento-card-kicker">当前聚焦</span>
               </div>
