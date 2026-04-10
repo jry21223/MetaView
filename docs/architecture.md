@@ -15,8 +15,8 @@
 - `SubjectSkillRegistry`: 统一管理算法、数学、物理、化学、生物、地理 skill。
 - `ProviderRegistry`: 统一管理内置 Provider 与自定义 OpenAI 兼容 Provider。
 - `PipelineOrchestrator`: 将 `router_provider` 与 `generation_provider` 分开编排。
-- `PreviewDryRunSandbox`: 对预览脚本执行静态校验与本地 node dry-run。
-- `CirValidator` / `PipelineRepairService`: 对 CIR 进行验证与自动修复。
+- `PreviewDryRunSandbox`: 对预览脚本执行静态校验与本地 node dry-run；HTML 预览现在先由后端把 payload 组装进固定 scaffold，再检查最小 bootstrap 契约（`ready` 信号、`window.parent.postMessage`、`message` 监听）。
+- `HtmlCoderAgent`: HTML 分支不再接收完整 HTML shell，而是要求 provider 返回最小 `HtmlAnimationPayload` JSON，再由本地 scaffold 统一组装最终 HTML；provider payload 非法时回退到同一 scaffold 的本地 payload。
 - `RunRepository` / `CustomProviderRepository`: 将任务历史与自定义 Provider 写入 SQLite。
 - `PlannerAgent` / `CoderAgent` / `CriticAgent`: 使用 generation provider 的提示结果生成 CIR 与脚本。
 
@@ -79,6 +79,10 @@ CIR 当前采用轻量结构：
 - 自定义 Provider 持久化、视觉能力配置与运行时目录
 - 物理题图输入与图片辅助建模
 - 本地 storyboard 级 dry-run 沙盒
+- HTML scaffold injection：provider 只生成 `HtmlAnimationPayload`，后端固定输出 HTML shell / GSAP+p5 依赖 / postMessage 协议 / theme 与 playback 逻辑，减少长 HTML 被截断的风险
+- HTML logic_flow DSL：当流程/判定类内容出现时，provider 与 fallback 都可以输出 `kind="logic_flow"` + `flow_nodes` / `flow_links` / `flow_steps`，由固定 scaffold 驱动 SVG + GSAP 的逐步流程动画
+- HTML payload parse / validate diagnostics：provider 输出非 JSON 或缺少 `steps` / `flow_nodes` / `flow_steps` 时会产生 `payload-parse:*` / `payload-validate:*` 诊断，并回退到同一 scaffold 的本地 payload
+- HTML fallback 文档会对嵌入的 payload JSON 做脚本安全转义，避免 `</script>` 之类内容破坏运行时启动脚本
 - CIR 验证与自动修复
 - SQLite 任务历史
 

@@ -26,7 +26,7 @@ function formatRunDomain(domain: PipelineRunSummary["domain"]): string {
 }
 
 function formatAnimationType(outputMode: PipelineRunSummary["output_mode"]): string {
-  return outputMode === "html" ? "html" : "manim";
+  return outputMode === "html" ? "html" : "video";
 }
 
 export const HistoryPanel = memo(function HistoryPanel({

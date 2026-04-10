@@ -3,17 +3,24 @@ import { HighlightedCode } from "../../components/HighlightedCode";
 import { HtmlDebugPanel } from "../../components/HtmlDebugPanel";
 import { PromptReferenceTool } from "../../components/PromptReferenceTool";
 import { ProviderManager } from "../../components/ProviderManager";
+import { ToolsDebugOverview } from "../../components/ToolsDebugOverview";
+import { ToolsSidebar } from "../../components/ToolsSidebar";
 import { TTSSettingsPanel } from "../../components/TTSSettingsPanel";
 import { usePipelineStats } from "../../hooks/features/usePipelineStats";
-import type { CustomProviderUpsertRequest, PipelineResponse, PipelineRunSummary, RuntimeCatalog } from "../../types";
+import type { CustomProviderUpsertRequest, PipelineResponse, PipelineRunSummary, RuntimeCatalog, SkillDescriptor } from "../../types";
 
 export interface ToolsPageProps {
   debugToolsOpen: boolean;
   setDebugToolsOpen: (open: boolean) => void;
   result: PipelineResponse | null;
   runtimeCatalog: RuntimeCatalog;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  activeSkill: any | null;
+  prompt: string;
+  sourceCode: string;
+  sourceCodeLanguage: string;
+  selectedRunId: string | null;
+  resolvedPreviewHtmlUrl: string | null;
+  resolvedPreviewVideoUrl: string | null;
+  activeSkill: SkillDescriptor | null;
   runs: readonly PipelineRunSummary[];
 
   handleExportCurrent: () => void;
@@ -27,6 +34,12 @@ export function ToolsPage({
   setDebugToolsOpen,
   result,
   runtimeCatalog,
+  prompt,
+  sourceCode,
+  sourceCodeLanguage,
+  selectedRunId,
+  resolvedPreviewHtmlUrl,
+  resolvedPreviewVideoUrl,
   activeSkill,
   runs,
   handleExportCurrent,
@@ -35,6 +48,7 @@ export function ToolsPage({
   handleUpdateRuntimeSettings,
 }: ToolsPageProps) {
   const stats = usePipelineStats(runs);
+
   return (
     <section className="page-shell" id="tools">
       <div className="page-header">
@@ -115,6 +129,16 @@ export function ToolsPage({
                     )}
                   </section>
                 </div>
+
+                <ToolsDebugOverview
+                  result={result}
+                  prompt={prompt}
+                  sourceCode={sourceCode}
+                  sourceCodeLanguage={sourceCodeLanguage}
+                  selectedRunId={selectedRunId}
+                  resolvedPreviewHtmlUrl={resolvedPreviewHtmlUrl}
+                  resolvedPreviewVideoUrl={resolvedPreviewVideoUrl}
+                />
               </div>
             ) : null}
           </details>
@@ -205,81 +229,8 @@ export function ToolsPage({
           </details>
         </section>
 
-        <aside className="bento-card-md tools-side-column" style={{ boxShadow: "none", background: "transparent" }}>
-          <div className="resource-sidebar">
-            <div className="resource-sidebar-header">资源分配</div>
-            <div className="resource-sidebar-value">
-              <span className="resource-sidebar-number">84.2</span>
-              <span className="resource-sidebar-unit">%</span>
-            </div>
-            <div className="resource-sidebar-desc">主节点执行效率</div>
-
-            <div className="resource-progress-item">
-              <div className="resource-progress-label">
-                <span>计算负载</span>
-                <span>62%</span>
-              </div>
-              <div className="resource-progress-bar">
-                <div className="resource-progress-fill is-primary" style={{ width: "62%" }} />
-              </div>
-            </div>
-
-            <div className="resource-progress-item">
-              <div className="resource-progress-label">
-                <span>内存缓存</span>
-                <span>41%</span>
-              </div>
-              <div className="resource-progress-bar">
-                <div className="resource-progress-fill is-secondary" style={{ width: "41%" }} />
-              </div>
-            </div>
-          </div>
-
-          <div className="bento-card tools-skill-card">
-            <div style={{ fontSize: "0.625rem", fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "16px" }}>
-              当前 Skill
-            </div>
-            {activeSkill ? (
-              <>
-                <strong style={{ color: "var(--on-surface)" }}>{activeSkill.label}</strong>
-                <p style={{ margin: "8px 0", fontSize: "0.75rem", color: "var(--on-surface-variant)" }}>
-                  {activeSkill.description}
-                </p>
-                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                  <span className="chip chip-outline">{activeSkill.id}</span>
-                  <span className="chip chip-outline">{activeSkill.domain}</span>
-                  <span className="chip chip-primary">
-                    {activeSkill.supports_image_input ? "image" : "text"}
-                  </span>
-                </div>
-              </>
-            ) : (
-              <div style={{ color: "var(--on-surface-variant)", fontSize: "0.875rem" }}>
-                等待模型判断
-              </div>
-            )}
-          </div>
-        </aside>
+        <ToolsSidebar activeSkill={activeSkill} stats={stats} />
       </div>
-
-      <footer className="tools-footer">
-        <div className="tools-footer-stat">
-          <span className="tools-footer-label">总运行数</span>
-          <span className="tools-footer-value">{stats.totalRuns.toLocaleString()}</span>
-        </div>
-        <div className="tools-footer-stat">
-          <span className="tools-footer-label">错误频率</span>
-          <span className="tools-footer-value is-error">{stats.errorRate}</span>
-        </div>
-        <div className="tools-footer-stat">
-          <span className="tools-footer-label">24h 运行数</span>
-          <span className="tools-footer-value">{stats.recentRuns}</span>
-        </div>
-        <div className="tools-footer-stat">
-          <span className="tools-footer-label">成功率</span>
-          <span className="tools-footer-value is-primary">{stats.successRate}</span>
-        </div>
-      </footer>
     </section>
   );
 }

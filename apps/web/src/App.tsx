@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useEffectEvent, useState } from "react";
+import { startTransition, useEffect, useEffectEvent, useRef, useState } from "react";
 import { useTheme } from "./hooks/core/useTheme";
 import { useRuntimeCatalog, resolveConfiguredProvider, activeProviderSupportsVision } from "./hooks/core/useRuntimeCatalog";
 import { useMouseGlow } from "./hooks/core/useMouseGlow";
@@ -14,6 +14,7 @@ import {
   upsertCustomProvider,
 } from "./api/client";
 
+import { AppChrome } from "./components/AppChrome";
 import { StudioPage } from "./pages/Studio/StudioPage";
 import { HistoryPage } from "./pages/History/HistoryPage";
 import { ToolsPage } from "./pages/Tools/ToolsPage";
@@ -140,7 +141,7 @@ function mergePromptScenario(prompt: string, scenario: string): string {
 export default function App() {
   const [prompt, setPrompt] = useState(defaultPrompt);
   const [selectedDomain, setSelectedDomain] = useState<TopicDomain | null>(null);
-  const [outputMode, setOutputMode] = useState<OutputMode>("manim");
+  const [outputMode, setOutputMode] = useState<OutputMode>("html");
   const [sourceCode, setSourceCode] = useState("");
   const [sourceCodeLanguage, setSourceCodeLanguage] = useState("");
   const [sandboxMode, setSandboxMode] = useState<SandboxMode>("dry_run");
@@ -156,6 +157,8 @@ export default function App() {
   const { theme, setTheme } = useTheme();
   const glowRef = useMouseGlow();
   const [activeRunId, setActiveRunId] = useState<string | null>(getInitialActiveRunId);
+  const activeRunIdRef = useRef(activeRunId);
+  const pollSessionRef = useRef(0);
   const [debugToolsOpen, setDebugToolsOpen] = useState(false);
   const [activePage, setActivePage] = useState<AppPage>(getInitialPage);
   const [editorDirty, setEditorDirty] = useState(false);
@@ -188,6 +191,10 @@ export default function App() {
   const selectedHistoryRun =
     runs.find((run) => run.request_id === selectedRunId) ?? null;
   const activeSkill = result?.runtime.skill ?? null;
+
+  useEffect(() => {
+    activeRunIdRef.current = activeRunId;
+  }, [activeRunId]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -268,7 +275,7 @@ export default function App() {
       ),
     );
     setSandboxMode(run.request.sandbox_mode);
-    setOutputMode(run.request.output_mode === "html" ? "html" : "manim");
+    setOutputMode(run.request.output_mode === "html" ? "html" : "video");
     setSourceImage(run.request.source_image ?? null);
     setSourceImageName(run.request.source_image_name ?? null);
     setEnableNarration(run.request.enable_narration ?? true);
@@ -299,10 +306,13 @@ export default function App() {
     });
   }
 
-  const syncPolledRun = useEffectEvent(async (requestId: string) => {
+  const syncPolledRun = useEffectEvent(async (requestId: string, pollSession: number) => {
     const run = await getPipelineRun(requestId, {
       includeRawOutput: debugToolsOpen,
     });
+    if (pollSessionRef.current !== pollSession || activeRunIdRef.current !== requestId) {
+      return false;
+    }
     if (selectedRunId !== requestId) {
       startTransition(() => {
         setSelectedRunId(requestId);
@@ -355,8 +365,13 @@ export default function App() {
 
   useEffect(() => {
     if (!activeRunId) {
+      pollSessionRef.current += 1;
       return;
     }
+
+    const requestId = activeRunId;
+    const pollSession = pollSessionRef.current + 1;
+    pollSessionRef.current = pollSession;
 
     let cancelled = false;
     let timer: number | undefined;
@@ -364,13 +379,13 @@ export default function App() {
 
     const poll = async () => {
       try {
-        const finished = await syncPolledRun(activeRunId);
+        const finished = await syncPolledRun(requestId, pollSession);
         consecutiveErrors = 0;
         if (cancelled || finished) {
           return;
         }
       } catch (pollError) {
-        if (cancelled) {
+        if (cancelled || pollSessionRef.current !== pollSession || activeRunIdRef.current !== requestId) {
           return;
         }
         const message =
@@ -384,12 +399,12 @@ export default function App() {
         ) {
           setLoading(false);
           setError(message);
-          setActiveRunId((current) => (current === activeRunId ? null : current));
+          setActiveRunId((current) => (current === requestId ? null : current));
           return;
         }
       }
 
-      if (cancelled) {
+      if (cancelled || pollSessionRef.current !== pollSession || activeRunIdRef.current !== requestId) {
         return;
       }
       timer = window.setTimeout(() => {
@@ -468,7 +483,7 @@ export default function App() {
         sourceImageName,
         theme,
         enableNarration,
-        outputMode === "html" ? "html" : "video",
+        outputMode,
       );
       startTransition(() => {
         setSelectedRunId(submittedRun.request_id);
@@ -618,8 +633,10 @@ export default function App() {
       setActivePage("studio");
       setSelectedRunId(null);
     });
+    setOutputMode("html");
     setPrompt(defaultPrompt);
     setSourceCode("");
+    setSourceCodeLanguage("");
     setSourceImage(null);
     setSourceImageName(null);
     setResult(null);
@@ -633,70 +650,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      {/* Side Navigation Bar */}
-      <aside className="sidebar">
-        <div className="sidebar-brand">
-          <div className="topbar-brand" style={{ padding: 0 }}>
-            <span className="topbar-neon-strip" />
-            <div className="brand-text-group">
-              <span className="topbar-brand-text">MetaView</span>
-              <span className="topbar-brand-subtitle">THEORETICAL CANVAS</span>
-            </div>
-          </div>
-        </div>
-
-        <nav className="sidebar-nav">
-          <button
-            type="button"
-            className={`sidebar-nav-item ${activePage === "studio" ? "is-active" : ""}`}
-            onClick={() => setActivePage("studio")}
-          >
-            <span className="material-symbols-outlined">dashboard</span>
-            工作台
-          </button>
-          <button
-            type="button"
-            className={`sidebar-nav-item ${activePage === "history" ? "is-active" : ""}`}
-            onClick={() => setActivePage("history")}
-          >
-            <span className="material-symbols-outlined">inventory_2</span>
-            任务历史
-          </button>
-          <button
-            type="button"
-            className={`sidebar-nav-item ${activePage === "tools" ? "is-active" : ""}`}
-            onClick={() => setActivePage("tools")}
-          >
-            <span className="material-symbols-outlined">analytics</span>
-            工具
-          </button>
-        </nav>
-
-        <div className="sidebar-footer">
-          <div className="sidebar-status">
-            <span className="sidebar-status-dot" />
-            <span className="sidebar-status-text">Core Nodes Online</span>
-          </div>
-          <div className="sidebar-progress">
-            <div className="sidebar-progress-bar" style={{ width: "88%" }} />
-          </div>
-        </div>
-      </aside>
-
-      {/* Floating Actions (theme + avatar) */}
-      <div className="floating-actions">
-        <button
-          type="button"
-          className="topbar-icon-btn"
-          onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
-          title={theme === "dark" ? "切换到浅色模式" : "切换到深色模式"}
-        >
-          <span className="material-symbols-outlined">
-            {theme === "dark" ? "light_mode" : "dark_mode"}
-          </span>
-        </button>
-        <div className="topbar-avatar">MV</div>
-      </div>
+      <AppChrome activePage={activePage} theme={theme} setTheme={setTheme} onPageChange={setActivePage} />
 
       {/* Main Content Area */}
       <main className="main-content" ref={glowRef}>
@@ -770,6 +724,12 @@ export default function App() {
               setDebugToolsOpen={setDebugToolsOpen}
               result={result}
               runtimeCatalog={runtimeCatalog}
+              prompt={prompt}
+              sourceCode={sourceCode}
+              sourceCodeLanguage={sourceCodeLanguage}
+              selectedRunId={selectedRunId}
+              resolvedPreviewHtmlUrl={previewHtmlUrl}
+              resolvedPreviewVideoUrl={previewVideoUrl}
               activeSkill={activeSkill}
               runs={runs}
 
@@ -782,34 +742,6 @@ export default function App() {
 
         </div>
       </main>
-
-      {/* Mobile Bottom Navigation */}
-      <nav className="mobile-nav">
-        <button
-          type="button"
-          className={`mobile-nav-item ${activePage === "studio" ? "is-active" : ""}`}
-          onClick={() => setActivePage("studio")}
-        >
-          <span className="material-symbols-outlined">workspaces</span>
-          工作台
-        </button>
-        <button
-          type="button"
-          className={`mobile-nav-item ${activePage === "history" ? "is-active" : ""}`}
-          onClick={() => setActivePage("history")}
-        >
-          <span className="material-symbols-outlined">history</span>
-          历史
-        </button>
-        <button
-          type="button"
-          className={`mobile-nav-item ${activePage === "tools" ? "is-active" : ""}`}
-          onClick={() => setActivePage("tools")}
-        >
-          <span className="material-symbols-outlined">extension</span>
-          工具
-        </button>
-      </nav>
     </div>
   );
 }

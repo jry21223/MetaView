@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useReducer } from "react";
 import type { PipelineStage } from "../../types";
 
 const STAGES: PipelineStage[] = [
@@ -18,45 +18,72 @@ export interface TaskProgressState {
   isComplete: boolean;
 }
 
+interface ProgressState {
+  autoStageIndex: number;
+  runId: string | null;
+}
+
+type ProgressAction =
+  | { type: "sync-run"; runId: string | null }
+  | { type: "advance-stage" };
+
+function reduceProgressState(state: ProgressState, action: ProgressAction): ProgressState {
+  switch (action.type) {
+    case "sync-run":
+      if (state.runId === action.runId) {
+        return state;
+      }
+      return {
+        runId: action.runId,
+        autoStageIndex: 0,
+      };
+    case "advance-stage":
+      if (state.autoStageIndex >= STAGES.length - 1) {
+        return state;
+      }
+      return {
+        ...state,
+        autoStageIndex: state.autoStageIndex + 1,
+      };
+  }
+}
+
 /**
  * Simulates pipeline stage progression while a task is running.
  * The backend only exposes queued/running/succeeded/failed — no per-stage
  * granularity — so we advance stages on a timer.
  */
 export function useTaskProgress(
+  runId: string | null,
   loading: boolean,
   hasCompletedPreview: boolean,
 ): TaskProgressState {
-  const [stageIndex, setStageIndex] = useState(-1);
+  const [{ autoStageIndex }, dispatch] = useReducer(reduceProgressState, {
+    runId,
+    autoStageIndex: 0,
+  });
 
-  // Reset when loading starts
   useEffect(() => {
-    if (loading) {
-      setStageIndex(0);
-    } else if (!hasCompletedPreview) {
-      setStageIndex(-1);
-    }
-  }, [loading, hasCompletedPreview]);
+    dispatch({ type: "sync-run", runId });
+  }, [runId]);
 
-  // Mark complete when preview is ready
   useEffect(() => {
-    if (hasCompletedPreview) {
-      setStageIndex(STAGES.length);
-    }
-  }, [hasCompletedPreview]);
-
-  // Auto-advance while loading
-  useEffect(() => {
-    if (!loading || stageIndex < 0 || stageIndex >= STAGES.length - 1) {
+    if (!loading || autoStageIndex >= STAGES.length - 1) {
       return;
     }
 
     const timer = window.setTimeout(() => {
-      setStageIndex((i) => Math.min(i + 1, STAGES.length - 1));
+      dispatch({ type: "advance-stage" });
     }, STAGE_ADVANCE_MS);
 
     return () => window.clearTimeout(timer);
-  }, [loading, stageIndex]);
+  }, [loading, autoStageIndex]);
+
+  const stageIndex = hasCompletedPreview
+    ? STAGES.length
+    : loading
+      ? autoStageIndex
+      : -1;
 
   return {
     currentStageIndex: stageIndex,

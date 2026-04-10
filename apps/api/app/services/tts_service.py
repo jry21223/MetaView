@@ -166,7 +166,7 @@ class OpenAICompatibleTTSService(BaseTTSService):
         default_voice: str = "default",
         default_rate_wpm: int = 150,
         default_speed: float = 0.88,
-        timeout_s: float | None = 120.0,
+        timeout_s: float | None = None,
         response_format: str = "mp3",
     ) -> None:
         self.base_url = base_url.rstrip("/")
@@ -267,18 +267,20 @@ def build_tts_service(
     remote_base_url: str | None = None,
     remote_api_key: str | None = None,
     remote_model: str = "mimotts-v2",
-    remote_timeout_s: float | None = 120.0,
+    remote_timeout_s: float | None = None,
     remote_speed: float = 0.88,
     fallback_base_url: str | None = None,
     fallback_api_key: str | None = None,
 ) -> BaseTTSService:
-    resolved_base_url = (remote_base_url or fallback_base_url or "").strip()
-    resolved_api_key = (remote_api_key or fallback_api_key or "").strip()
+    resolved_remote_base_url = (remote_base_url or "").strip()
+    resolved_remote_api_key = (remote_api_key or "").strip()
+    resolved_fallback_base_url = (fallback_base_url or "").strip()
+    resolved_fallback_api_key = (fallback_api_key or "").strip()
 
     if backend == "openai_compatible":
         return OpenAICompatibleTTSService(
-            base_url=resolved_base_url,
-            api_key=resolved_api_key,
+            base_url=resolved_remote_base_url,
+            api_key=resolved_remote_api_key,
             model=remote_model,
             default_voice=default_voice,
             default_rate_wpm=default_rate_wpm,
@@ -286,10 +288,21 @@ def build_tts_service(
             timeout_s=remote_timeout_s,
         )
 
-    if backend == "auto" and resolved_base_url and resolved_api_key:
+    if backend == "auto" and resolved_remote_base_url and resolved_remote_api_key:
         return OpenAICompatibleTTSService(
-            base_url=resolved_base_url,
-            api_key=resolved_api_key,
+            base_url=resolved_remote_base_url,
+            api_key=resolved_remote_api_key,
+            model=remote_model,
+            default_voice=default_voice,
+            default_rate_wpm=default_rate_wpm,
+            default_speed=remote_speed,
+            timeout_s=remote_timeout_s,
+        )
+
+    if backend == "auto" and resolved_fallback_base_url and resolved_fallback_api_key:
+        return OpenAICompatibleTTSService(
+            base_url=resolved_fallback_base_url,
+            api_key=resolved_fallback_api_key,
             model=remote_model,
             default_voice=default_voice,
             default_rate_wpm=default_rate_wpm,

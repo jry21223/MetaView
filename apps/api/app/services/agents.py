@@ -10,6 +10,7 @@ from app.schemas import (
     AgentDiagnostic,
     CirDocument,
     CirStep,
+    HtmlAnimationPayload,
     LayoutInstruction,
     PipelineRequest,
     TopicDomain,
@@ -600,6 +601,15 @@ class CoderAgent:
         return script
 
 
+@dataclass(frozen=True)
+class HtmlCoderResult:
+    html: str
+    used_fallback: bool
+    fallback_reason: str | None = None
+    provider_raw_output: str | None = None
+    payload: HtmlAnimationPayload | None = None
+
+
 @dataclass
 class HtmlCoderAgent:
     """Generate a self-contained HTML visualization from a CIR document.
@@ -619,65 +629,124 @@ class HtmlCoderAgent:
         cir: CirDocument,
         ui_theme: str | None = None,
         generation_provider: object | None = None,
-    ) -> str:
-        """Return a self-contained HTML string for interactive CIR rendering.
+        *,
+        original_prompt: str | None = None,
+        source_code: str | None = None,
+        source_code_language: str | None = None,
+        source_image: str | None = None,
+        source_image_name: str | None = None,
+        skill: object | None = None,
+    ) -> HtmlCoderResult:
+        """Return generated HTML plus fallback diagnostics for interactive CIR rendering.
 
-        When *generation_provider* is a real LLM-backed provider (i.e. has a
-        ``_chat_text`` method), the agent calls the LLM with the HTML coder
-        prompts.  Otherwise it falls back to a locally-built template.
+        Asks the LLM to generate a complete, self-contained HTML page (free-form).
+        Falls back to the local scaffold template when the provider is unavailable
+        or the generated HTML fails safety / bootstrap validation.
         """
         from .prompts.html_coder import (
-            build_html_coder_system_prompt,
-            build_html_coder_user_prompt,
+            build_free_html_system_prompt,
+            build_free_html_user_prompt,
         )
 
-        cir_json = cir.model_dump_json(indent=2)
-
-        system_prompt = build_html_coder_system_prompt(
-            domain=cir.domain.value,
-            title=cir.title,
-            summary=cir.summary,
-            cir_json=cir_json,
-            ui_theme=ui_theme,
-        )
-        user_prompt = build_html_coder_user_prompt(
-            title=cir.title,
-            domain=cir.domain.value,
-            summary=cir.summary,
-            cir_json=cir_json,
-            ui_theme=ui_theme,
-        )
-
-        # Store prompts for tracing
-        self._last_system_prompt = system_prompt
-        self._last_user_prompt = user_prompt
-
-        # Try to call the LLM if the provider supports it
         if generation_provider is not None and hasattr(generation_provider, "_chat_text"):
             try:
+                system_prompt = build_free_html_system_prompt()
+                user_prompt = build_free_html_user_prompt(
+                    title=cir.title,
+                    domain=cir.domain.value,
+                    ui_theme=ui_theme,
+                )
+                self._last_system_prompt = system_prompt
+                self._last_user_prompt = user_prompt
+
                 content, _raw = generation_provider._chat_text(
                     stage="html_coding",
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
                 )
-                html = self._extract_html(content)
-                if html and self._is_runtime_complete_html(html):
-                    safety_issue = self._runtime_html_safety_issue(html)
-                    if safety_issue is None:
-                        self._log.info("HtmlCoderAgent: LLM returned %d chars of HTML", len(html))
-                        return html
-                    self._log.warning(
-                        "HtmlCoderAgent: LLM HTML rejected by safety check (%s), using fallback",
-                        safety_issue,
-                    )
-                else:
-                    self._log.warning(
-                        "HtmlCoderAgent: LLM response did not contain valid runtime HTML, using fallback"
-                    )
-            except Exception:
-                self._log.exception("HtmlCoderAgent: LLM call failed, using fallback")
 
-        return _build_fallback_html(cir, ui_theme)
+                html = self._extract_html(content)
+                if html.strip().lower().startswith("<!doctype"):
+                    safety_issue = self._runtime_html_safety_issue(html)
+                    if safety_issue:
+                        self._log.warning(
+                            "HtmlCoderAgent: safety check failed (%s), using fallback",
+                            safety_issue,
+                        )
+                        return self._make_scaffold_fallback(
+                            cir, ui_theme, f"safety:{safety_issue}", content
+                        )
+                    bootstrap_issue = self._runtime_html_bootstrap_issue(html)
+                    if bootstrap_issue:
+                        self._log.warning(
+                            "HtmlCoderAgent: bootstrap check failed (%s), using fallback",
+                            bootstrap_issue,
+                        )
+                        return self._make_scaffold_fallback(
+                            cir, ui_theme, f"bootstrap:{bootstrap_issue}", content
+                        )
+                    self._log.info(
+                        "HtmlCoderAgent: LLM generated %d chars of free-form HTML",
+                        len(html),
+                    )
+                    return HtmlCoderResult(
+                        html=html,
+                        used_fallback=False,
+                        provider_raw_output=content,
+                    )
+
+                self._log.warning(
+                    "HtmlCoderAgent: response is not valid HTML, using fallback"
+                )
+                return self._make_scaffold_fallback(cir, ui_theme, "parse:not-html", content)
+
+            except Exception as exc:
+                self._log.exception("HtmlCoderAgent: LLM call failed, using fallback")
+                return self._make_scaffold_fallback(
+                    cir, ui_theme, f"provider-error:{exc.__class__.__name__}"
+                )
+
+        return self._make_scaffold_fallback(cir, ui_theme, "provider-unavailable")
+
+    def _make_scaffold_fallback(
+        self,
+        cir: CirDocument,
+        ui_theme: str | None,
+        reason: str,
+        provider_raw_output: str | None = None,
+    ) -> HtmlCoderResult:
+        from .prompts.html_coder import (
+            build_html_animation_payload_from_cir,
+            build_html_scaffold_document,
+        )
+
+        payload = build_html_animation_payload_from_cir(cir)
+        html = build_html_scaffold_document(payload, ui_theme, is_fallback=True)
+        return HtmlCoderResult(
+            html=html,
+            used_fallback=True,
+            fallback_reason=reason,
+            provider_raw_output=provider_raw_output,
+            payload=payload,
+        )
+
+    @staticmethod
+    def _extract_animation_payload(content: str) -> dict | None:
+        fenced_match = re.search(r"```json\s*(.*?)```", content, flags=re.IGNORECASE | re.DOTALL)
+        candidate = fenced_match.group(1).strip() if fenced_match else content.strip()
+        if not candidate:
+            return None
+        try:
+            parsed = json.loads(candidate)
+        except json.JSONDecodeError:
+            object_match = re.search(r"(\{[\s\S]*\})", candidate)
+            if not object_match:
+                return None
+            try:
+                parsed = json.loads(object_match.group(1))
+            except json.JSONDecodeError:
+                return None
+        return parsed if isinstance(parsed, dict) else None
 
     @staticmethod
     def _extract_html(content: str) -> str:
@@ -687,21 +756,48 @@ class HtmlCoderAgent:
         return content.strip()
 
     @staticmethod
-    def _is_runtime_complete_html(html: str) -> bool:
-        required_markers = (
-            "<!DOCTYPE html",
-            "window.parent.postMessage",
-            "const runtime =",
-            'window.addEventListener("message"',
-            'document.addEventListener("DOMContentLoaded"',
+    def _runtime_html_bootstrap_issue(html: str) -> str | None:
+        normalized = html.strip().lower()
+        if not normalized.endswith("</html>"):
+            return "missing-html-close"
+        if "</body>" not in normalized:
+            return "missing-body-close"
+        if "window.parent.postmessage" not in normalized:
+            return "missing-parent-postmessage"
+        ready_markers = (
+            'type: "ready"',
+            "type:'ready'",
+            'type = "ready"',
+            "type = 'ready'",
+            'notifyParent("ready"',
+            "notifyParent('ready'",
+            'notifyparent("ready"',
+            "notifyparent('ready'",
+            '"ready"',
+            "'ready'",
         )
-        normalized = html.strip()
-        return all(marker in normalized for marker in required_markers)
+        if not any(marker in html for marker in ready_markers):
+            return "missing-ready-signal"
+        message_listener_markers = (
+            'window.addEventListener("message"',
+            "window.addEventListener('message'",
+            "window.onmessage",
+        )
+        if not any(marker in html for marker in message_listener_markers):
+            return "missing-message-listener"
+        return None
 
     @staticmethod
     def _runtime_html_safety_issue(html: str) -> str | None:
+        allowed_cdn_pattern = (
+            r"https://cdn\.jsdelivr\.net/npm/"
+            r"(?:gsap@3\.13/dist/gsap\.min\.js|p5@1\.11\.8/lib/p5\.min\.js)"
+        )
         checks = (
-            (r"<script[^>]+\bsrc\s*=", "external-script"),
+            (
+                rf'<script[^>]+\bsrc\s*=\s*["\'](?!{allowed_cdn_pattern})[^"\']+["\']',
+                "external-script",
+            ),
             (r"<iframe\b", "nested-iframe"),
             (r"<object\b", "embedded-object"),
             (r"<embed\b", "embedded-plugin"),
@@ -717,7 +813,6 @@ class HtmlCoderAgent:
             (r"\b(?:document\.)?cookie\b", "cookie-access"),
             (r"\b(?:localStorage|sessionStorage|indexedDB)\b", "storage-access"),
             (r"\b(?:top|parent)\.location\b", "frame-navigation"),
-            (r"\b(?:src|href|action)\s*=\s*[\"']?\s*(?:https?:)?//", "external-resource"),
         )
         for pattern, reason in checks:
             if re.search(pattern, html, flags=re.IGNORECASE):

@@ -26,7 +26,6 @@ class Settings(BaseSettings):
     default_generation_provider: str | None = None
     mock_provider_enabled: bool = True
     enabled_domains: str = DEFAULT_ENABLED_DOMAINS
-    sandbox_timeout_ms: int = 1500
     max_repair_attempts: int = 2
     history_db_path: str = "data/pipeline_runs.db"
     preview_media_root: str = "data/media"
@@ -54,10 +53,10 @@ class Settings(BaseSettings):
     preview_tts_timeout_s: float | None = 120.0
     manim_python_path: str = ".venv-manim/bin/python"
     manim_cli_module: str = "manim"
-    manim_quality: str = "l"
+    manim_quality: str = "h"
     manim_format: str = "mp4"
     manim_disable_caching: bool = True
-    manim_render_timeout_s: float | None = 180.0
+    manim_render_timeout_s: float | None = None
     openai_api_key: str | None = None
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model: str | None = None

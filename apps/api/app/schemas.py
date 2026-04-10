@@ -79,6 +79,11 @@ class VisualKind(str, Enum):
     CELL = "cell"
 
 
+class HtmlAnimationKind(str, Enum):
+    GENERIC = "generic"
+    LOGIC_FLOW = "logic_flow"
+
+
 class LayoutInstruction(BaseModel):
     x: int = 64
     y: int = 96
@@ -112,6 +117,95 @@ class CirDocument(BaseModel):
     domain: TopicDomain
     summary: str
     steps: list[CirStep] = Field(default_factory=list)
+
+
+class HtmlAnimationParam(BaseModel):
+    key: str = Field(min_length=1, max_length=100)
+    label: str = Field(min_length=1, max_length=100)
+    value: str = Field(default="", max_length=500)
+
+
+class HtmlAnimationStepPayload(BaseModel):
+    id: str = Field(min_length=1, max_length=120)
+    title: str = Field(min_length=1, max_length=200)
+    narration: str = Field(min_length=1, max_length=2000)
+    visual_kind: VisualKind
+    tokens: list[VisualToken] = Field(default_factory=list)
+    duration_ms: int | None = Field(default=None, ge=120, le=8000)
+    emphasis_token_ids: list[str] = Field(default_factory=list, max_length=8)
+
+
+class HtmlFlowNodePayload(BaseModel):
+    id: str = Field(min_length=1, max_length=120)
+    x: int = Field(ge=0, le=800)
+    y: int = Field(ge=0, le=400)
+    label: str = Field(min_length=1, max_length=120)
+    kind: Literal["start", "process", "decision", "end"] = "process"
+
+    @field_validator("x", mode="before")
+    @classmethod
+    def clamp_x(cls, value: int | str) -> int | str:
+        if isinstance(value, int):
+            return min(max(value, 0), 800)
+        return value
+
+    @field_validator("y", mode="before")
+    @classmethod
+    def clamp_y(cls, value: int | str) -> int | str:
+        if isinstance(value, int):
+            return min(max(value, 0), 400)
+        return value
+
+
+class HtmlFlowLinkPayload(BaseModel):
+    id: str = Field(min_length=1, max_length=120)
+    from_node: str = Field(alias="from", min_length=1, max_length=120)
+    to_node: str = Field(alias="to", min_length=1, max_length=120)
+    label: str | None = Field(default=None, max_length=80)
+
+
+class HtmlFlowStepPayload(BaseModel):
+    id: str = Field(min_length=1, max_length=120)
+    message: str = Field(min_length=1, max_length=400)
+    highlight_node: str | None = Field(default=None, max_length=120)
+    pulse_link_ids: list[str] = Field(default_factory=list, max_length=8)
+    activate_node_ids: list[str] = Field(default_factory=list, max_length=8)
+    duration_ms: int = Field(default=700, ge=180, le=8000)
+
+
+class HtmlAnimationPayload(BaseModel):
+    kind: HtmlAnimationKind = HtmlAnimationKind.GENERIC
+    title: str = Field(min_length=1, max_length=200)
+    summary: str = Field(default="", max_length=2000)
+    steps: list[HtmlAnimationStepPayload] = Field(default_factory=list, max_length=24)
+    params: list[HtmlAnimationParam] = Field(default_factory=list, max_length=8)
+    flow_nodes: list[HtmlFlowNodePayload] = Field(default_factory=list, max_length=24)
+    flow_links: list[HtmlFlowLinkPayload] = Field(default_factory=list, max_length=32)
+    flow_steps: list[HtmlFlowStepPayload] = Field(default_factory=list, max_length=32)
+
+    @model_validator(mode="after")
+    def require_animation_content(self) -> "HtmlAnimationPayload":
+        if self.kind == HtmlAnimationKind.LOGIC_FLOW:
+            if not self.flow_nodes:
+                raise ValueError("Logic-flow payload must include at least one flow node")
+            if not self.flow_steps:
+                raise ValueError("Logic-flow payload must include at least one flow step")
+            node_ids = {node.id for node in self.flow_nodes}
+            for link in self.flow_links:
+                if link.from_node not in node_ids or link.to_node not in node_ids:
+                    raise ValueError("Logic-flow links must reference existing nodes")
+            link_ids = {link.id for link in self.flow_links}
+            for step in self.flow_steps:
+                if step.highlight_node and step.highlight_node not in node_ids:
+                    raise ValueError("Logic-flow step highlight must reference an existing node")
+                if any(node_id not in node_ids for node_id in step.activate_node_ids):
+                    raise ValueError("Logic-flow step active nodes must reference existing nodes")
+                if any(link_id not in link_ids for link_id in step.pulse_link_ids):
+                    raise ValueError("Logic-flow step pulse links must reference existing links")
+            return self
+        if not self.steps:
+            raise ValueError("HTML animation payload must include at least one step")
+        return self
 
 
 class ExecutionParameterControl(BaseModel):
@@ -218,7 +312,7 @@ class TTSSettingsRequest(BaseModel):
     rate_wpm: int = Field(default=150, ge=60, le=320)
     speed: float = Field(default=0.88, ge=0.5, le=1.5)
     max_chars: int = Field(default=1500, ge=100, le=20_000)
-    timeout_s: float | None = Field(default=120.0, ge=1.0, le=600.0)
+    timeout_s: float | None = Field(default=120.0, gt=0)
 
     @field_validator("base_url", "api_key", "voice", mode="before")
     @classmethod
@@ -227,6 +321,16 @@ class TTSSettingsRequest(BaseModel):
             return None
         normalized = value.strip()
         return normalized or None
+
+    @field_validator("timeout_s", mode="before")
+    @classmethod
+    def normalize_optional_timeout(cls, value: float | str | None) -> float | str | None:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            normalized = value.strip()
+            return normalized or None
+        return value
 
 
 class TTSSettingsResponse(BaseModel):

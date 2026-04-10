@@ -124,6 +124,14 @@ def test_storyboard_fallback_prefers_explicit_cjk_font_path_env(
     assert backend._font_path == font_path
 
 
+def test_storyboard_fallback_canvas_defaults_to_1080p() -> None:
+    backend = StoryboardFallbackPreviewBackend()
+
+    image, _draw = backend._create_canvas()
+
+    assert image.size == (1920, 1080)
+
+
 def test_calculate_step_timing_with_source_code() -> None:
     """Test that step_timing uses source_code for line ranges when provided."""
     source_code = """

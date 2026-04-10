@@ -382,7 +382,8 @@
 }
 
 .html-debug-panel__hint,
-.html-debug-panel__empty {
+.html-debug-panel__empty,
+.tools-debug-callout {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -395,7 +396,50 @@
 }
 
 .html-debug-panel__hint strong,
-.html-debug-panel__empty strong {
+.html-debug-panel__empty strong,
+.tools-debug-callout strong {
+  color: var(--on-surface);
+}
+
+.tools-debug-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tools-debug-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--outline-variant) 70%, transparent);
+  color: var(--on-surface-variant);
+  line-height: 1.6;
+}
+
+.tools-debug-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.tools-debug-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--on-surface);
+}
+
+.tools-debug-code {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
   color: var(--on-surface);
 }
 

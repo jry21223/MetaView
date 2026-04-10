@@ -32,8 +32,10 @@ export function VideoPreview({
 }: VideoPreviewProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const [retryToken, setRetryToken] = useState(0);
   const internalVideoRef = useRef<HTMLVideoElement>(null);
   const resolvedVideoRef = videoRef ?? internalVideoRef;
+  const lastReportedDurationRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (resolvedVideoRef.current && seekTo !== null && seekTo !== undefined) {
@@ -48,16 +50,35 @@ export function VideoPreview({
     resolvedVideoRef.current.currentTime = seekRequest.time;
   }, [resolvedVideoRef, seekRequest]);
 
+  const reportDuration = () => {
+    const duration = resolvedVideoRef.current?.duration;
+    if (duration === undefined || !Number.isFinite(duration)) {
+      return;
+    }
+    if (lastReportedDurationRef.current === duration) {
+      return;
+    }
+    lastReportedDurationRef.current = duration;
+    onDurationChange?.(duration);
+  };
+
+  const handleMediaReady = () => {
+    setIsLoading(false);
+    reportDuration();
+  };
+
   const handleLoadStart = () => {
+    lastReportedDurationRef.current = null;
     setIsLoading(true);
     setHasError(false);
   };
 
   const handleCanPlay = () => {
-    setIsLoading(false);
-    if (resolvedVideoRef.current?.duration && Number.isFinite(resolvedVideoRef.current.duration)) {
-      onDurationChange?.(resolvedVideoRef.current.duration);
-    }
+    handleMediaReady();
+  };
+
+  const handleLoadedData = () => {
+    handleMediaReady();
   };
 
   const handleError = () => {
@@ -72,9 +93,7 @@ export function VideoPreview({
   };
 
   const handleLoadedMetadata = () => {
-    if (resolvedVideoRef.current?.duration && Number.isFinite(resolvedVideoRef.current.duration)) {
-      onDurationChange?.(resolvedVideoRef.current.duration);
-    }
+    reportDuration();
   };
 
   return (
@@ -120,6 +139,7 @@ export function VideoPreview({
                 onClick={() => {
                   setHasError(false);
                   setIsLoading(true);
+                  setRetryToken((token) => token + 1);
                 }}
               >
                 重试
@@ -128,7 +148,7 @@ export function VideoPreview({
           )}
           <video
             ref={resolvedVideoRef}
-            key={src}
+            key={`${src}-${retryToken}`}
             className="preview-video"
             src={src}
             controls
@@ -136,6 +156,7 @@ export function VideoPreview({
             preload="metadata"
             onLoadStart={handleLoadStart}
             onCanPlay={handleCanPlay}
+            onLoadedData={handleLoadedData}
             onError={handleError}
             onLoadedMetadata={handleLoadedMetadata}
             onTimeUpdate={handleTimeUpdate}

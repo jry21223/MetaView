@@ -138,3 +138,9 @@ def test_preview_renderer_gvisor_availability_depends_on_docker(monkeypatch, tmp
     assert renderer.manim_backend.is_available() is False
 
 
+def test_preview_renderer_defaults_to_high_quality(tmp_path) -> None:
+    renderer = PreviewVideoRenderer(output_root=str(tmp_path / "media-root"))
+
+    assert renderer.manim_backend.quality == "h"
+
+

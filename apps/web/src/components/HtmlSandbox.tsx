@@ -51,6 +51,8 @@ export function HtmlSandbox({
 }: HtmlSandboxProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const readyTimeoutRef = useRef<number | null>(null);
+  // Tracks whether the ready signal arrived before onLoad armed the timeout
+  const readyBeforeLoadRef = useRef(false);
   const [readyPreviewKey, setReadyPreviewKey] = useState<string | null>(null);
   const [errorState, setErrorState] = useState<{ key: string; message: string } | null>(null);
 
@@ -59,10 +61,16 @@ export function HtmlSandbox({
     [src, srcDoc],
   );
   const isReady = readyPreviewKey === previewKey;
+
+  // Reset early-ready flag whenever the source changes
+  useEffect(() => {
+    readyBeforeLoadRef.current = false;
+  }, [previewKey]);
   const errorMessage = errorState?.key === previewKey ? errorState.message : null;
   const loading = !isReady && errorMessage == null;
 
   const locationLabel = srcDoc ? "inline HTML (srcDoc)" : src ?? "about:blank";
+  const runtimeSourceLabel = srcDoc ? "本地 srcDoc 调试内容" : "后端 preview_html_url 产物";
 
   const clearReadyTimeout = useCallback(() => {
     if (readyTimeoutRef.current != null) {
@@ -81,11 +89,11 @@ export function HtmlSandbox({
       setErrorState({
         key: previewKey,
         message:
-          "HTML 预览文件已加载，但没有完成运行时初始化。通常表示生成的 HTML 缺少必需脚本或启动逻辑。",
+          `${runtimeSourceLabel} 已加载，但没有完成运行时初始化或发出 ready 信号。通常表示生成的 HTML 缺少必需启动脚本，或脚本启动后未正确 postMessage。`,
       });
       onLoadStateChange?.("error");
-    }, 2500);
-  }, [clearReadyTimeout, onLoadStateChange, previewKey]);
+    }, 8000);
+  }, [clearReadyTimeout, onLoadStateChange, previewKey, runtimeSourceLabel]);
 
   const handleMessage = useCallback(
     (event: MessageEvent) => {
@@ -100,6 +108,7 @@ export function HtmlSandbox({
 
       switch (data.type) {
         case "ready": {
+          readyBeforeLoadRef.current = true;
           clearReadyTimeout();
           setReadyPreviewKey(previewKey);
           setErrorState(null);
@@ -215,6 +224,11 @@ export function HtmlSandbox({
         onLoad={() => {
           setErrorState(null);
           if (expectReadySignal) {
+            // If the ready signal already arrived before onLoad (DOMContentLoaded
+            // fired first), skip arming the timeout — the signal won't come again.
+            if (readyBeforeLoadRef.current) {
+              return;
+            }
             onLoadStateChange?.("loading");
             armReadyTimeout();
             postToIframe({ type: "theme", theme });

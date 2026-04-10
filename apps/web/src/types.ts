@@ -16,12 +16,10 @@ export type ProviderStage = "router" | "planning" | "coding" | "critic" | "test"
 
 /**
  * Output rendering mode.
- * - "manim": Renders a Manim animation video (MP4). Fully supported.
- * - "html": Renders an interactive HTML visualization. **Frontend-only toggle**;
- *   the backend does not yet accept this parameter. When backend support is added,
- *   include `output_mode` in the submitPipeline request body. See api/client.ts.
+ * - "video": Renders a video preview.
+ * - "html": Renders an interactive HTML visualization.
  */
-export type OutputMode = "manim" | "html";
+export type OutputMode = "video" | "html";
 export type HistoryOutputMode = "video" | "html";
 
 /** Pipeline processing stages for progress tracking. */

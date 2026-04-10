@@ -212,8 +212,7 @@ class ManimCliPreviewBackend:
         self.disable_caching = disable_caching
         self.gvisor_command_builder = gvisor_command_builder
         self.render_runner = render_runner
-        # 默认超时 180 秒，避免 None 导致无限等待
-        self.timeout_s = timeout_s if timeout_s is not None else 180.0
+        self.timeout_s = timeout_s
 
     def is_available(self) -> bool:
         if self.render_runner == "gvisor":
@@ -601,14 +600,14 @@ class StoryboardFallbackPreviewBackend:
         ui_theme: str | None = None,
     ) -> tuple[Image.Image, ImageDraw.ImageDraw]:
         palette = self._palette(ui_theme)
-        width = 1280
-        height = 720
+        width = 1920
+        height = 1080
         image = Image.new("RGBA", (width, height), palette["bg"])
         draw = ImageDraw.Draw(image)
         draw.rectangle((0, 0, width, height), fill=palette["bg_overlay"])
         draw.ellipse((-180, -120, 420, 360), fill=palette["orb_a"])
-        draw.ellipse((860, -160, 1420, 280), fill=palette["orb_b"])
-        draw.rectangle((48, 40, 1232, 680), outline=palette["frame"], width=2)
+        draw.ellipse((1460, -200, 2140, 360), fill=palette["orb_b"])
+        draw.rectangle((72, 56, 1848, 1024), outline=palette["frame"], width=2)
         return image, draw
 
     def _draw_badge(
@@ -885,10 +884,10 @@ class PreviewVideoRenderer:
         backend_mode: str = "auto",
         manim_python_path: str = ".venv-manim/bin/python",
         manim_cli_module: str = "manim",
-        manim_quality: str = "l",
+        manim_quality: str = "h",
         manim_format: str = "mp4",
         manim_disable_caching: bool = True,
-        manim_render_timeout_s: float | None = 180.0,
+        manim_render_timeout_s: float | None = None,
         render_runner: str = "local",
         gvisor_docker_binary: str = "docker",
         gvisor_runtime: str = "runsc",
@@ -951,11 +950,33 @@ class PreviewVideoRenderer:
             cir=cir,
             ui_theme=ui_theme,
         )
+        self._apply_faststart(output_path)
         return PreviewVideoArtifacts(
             file_path=output_path,
             url=f"{self.url_prefix}/previews/{output_path.name}",
             backend=backend.name,
         )
+
+    def _apply_faststart(self, path: Path) -> None:
+        """Remux MP4 to move moov atom to front, enabling browser progressive playback."""
+        ffmpeg = shutil.which("ffmpeg")
+        if not ffmpeg or not path.exists():
+            return
+        tmp = path.with_suffix(".tmp.mp4")
+        try:
+            result = subprocess.run(
+                [ffmpeg, "-y", "-i", str(path), "-c", "copy", "-movflags", "+faststart", str(tmp)],
+                capture_output=True,
+                check=False,
+                timeout=60,
+            )
+            if result.returncode == 0 and tmp.exists():
+                tmp.rename(path)
+        except Exception:
+            pass
+        finally:
+            if tmp.exists():
+                tmp.unlink(missing_ok=True)
 
     def _select_backend(self, *, require_real: bool) -> PreviewRenderBackend:
         mode = self.backend_mode.lower()

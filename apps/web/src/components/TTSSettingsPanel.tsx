@@ -51,7 +51,6 @@ export function TTSSettingsPanel({ settings, onSave }: TTSSettingsPanelProps) {
           ...form.tts,
           base_url: form.tts.base_url?.trim() || null,
           api_key: form.tts.api_key?.trim() || null,
-          timeout_s: form.tts.timeout_s ?? null,
         },
       });
       setSavedMessage("运行时配置已更新，后续生成将直接使用新设置。");
@@ -223,22 +222,26 @@ export function TTSSettingsPanel({ settings, onSave }: TTSSettingsPanelProps) {
           </label>
         </div>
 
-        <label>
-          <span>Timeout (s)</span>
-          <input
-            type="number"
-            min="1"
-            max="600"
-            step="1"
-            value={form.tts.timeout_s ?? 120}
-            onChange={(event) =>
-              setForm((current) => ({
-                ...current,
-                tts: { ...current.tts, timeout_s: Number(event.target.value) },
-              }))
-            }
-          />
-        </label>
+        <div className="select-grid">
+          <label>
+            <span>Timeout (s)</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={form.tts.timeout_s ?? ""}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  tts: {
+                    ...current.tts,
+                    timeout_s: event.target.value ? Number(event.target.value) : null,
+                  },
+                }))
+              }
+            />
+          </label>
+        </div>
 
         <label>
           <span>TTS Base URL</span>

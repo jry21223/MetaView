@@ -4,7 +4,7 @@ import { VideoPreview } from "../../components/VideoPreview";
 import type { PipelineResponse, PipelineRunStatus, PipelineRunSummary } from "../../types";
 
 function formatHistoryOutputMode(outputMode?: PipelineRunSummary["output_mode"]): string {
-  return outputMode === "html" ? "HTML 交互" : "Manim 视频";
+  return outputMode === "html" ? "HTML 交互" : "视频预览";
 }
 
 function formatHistoryDomain(domain?: PipelineRunSummary["domain"] | null): string {

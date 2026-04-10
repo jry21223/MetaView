@@ -131,8 +131,16 @@ class ProviderRegistry:
         if payload.name in {ProviderName.MOCK.value, ProviderName.OPENAI.value}:
             raise ProviderRegistrationError("该 provider 名称已被内置 provider 占用。")
 
+        # When editing an existing provider, api_key may be blank (user didn't re-enter it).
+        # Fall back to the stored key so connectivity testing works without re-entering the key.
+        api_key = payload.api_key or ""
+        if not api_key:
+            existing = self.custom_provider_repository.get(payload.name)
+            if existing is not None:
+                api_key = existing.api_key or ""
+
         provider = OpenAICompatibleProvider(
-            api_key=payload.api_key or "",
+            api_key=api_key,
             model=payload.model,
             stage_models=self._build_stage_models(
                 router_model=payload.router_model,

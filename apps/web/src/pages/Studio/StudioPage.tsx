@@ -130,7 +130,7 @@ export function StudioPage({
     highlightedSourceLines,
   } = useVideoSync(result);
 
-  const taskProgress = useTaskProgress(loading && activeRunId != null, hasCompletedPreview);
+  const taskProgress = useTaskProgress(activeRunId, loading && activeRunId != null, hasCompletedPreview);
   const isRendering = loading && !hasCompletedPreview && taskProgress.currentStageIndex >= 3;
 
   return (
@@ -144,7 +144,7 @@ export function StudioPage({
           <p className="page-description">
             {hasCompletedPreview
               ? result?.cir.title ?? (outputMode === "html" ? "交互动画已生成" : "视频渲染完成")
-              : "题目、源码、题图一处汇总，统一生成教学视频或 HTML 交互结果。"}
+              : "题目、源码、题图一处汇总，统一生成 HTML 交互或视频结果。"}
           </p>
         </div>
       </div>
@@ -226,7 +226,7 @@ export function StudioPage({
                   </div>
                   <div className="studio-side-mini-card">
                     <div className="page-kicker studio-side-mini-kicker">输出目标</div>
-                    <div className="studio-side-mini-title">{outputMode === "html" ? "HTML 交互" : "教学视频"}</div>
+                    <div className="studio-side-mini-title">{outputMode === "html" ? "HTML 交互" : "视频预览"}</div>
                     <div className="studio-side-mini-description">
                       {outputMode === "html"
                         ? "生成可直接交互的 HTML 动画结果。"
@@ -247,6 +247,7 @@ export function StudioPage({
                   <span className="material-symbols-outlined generation-error-icon">error</span>
                   <strong>生成失败</strong>
                   <p>{error}</p>
+                  <PreviewCardAction onStartNewQuestion={onStartNewQuestion} />
                 </div>
               ) : loading ? (
                 <div className="generation-loading">
@@ -258,8 +259,8 @@ export function StudioPage({
                     </div>
                   </div>
                   <div className="generation-loading-text">
-                    <strong>正在生成视频</strong>
-                    <p>AI 正在规划教学结构、编写动画脚本并渲染画面...</p>
+                    <strong>{outputMode === "html" ? "正在生成交互动画" : "正在生成视频"}</strong>
+                    <p>{outputMode === "html" ? "AI 正在构建 GSAP + p5.js 交互运行时..." : "AI 正在规划教学结构、编写动画脚本并渲染画面..."}</p>
                   </div>
                 </div>
               ) : null}
@@ -371,20 +372,18 @@ export function StudioPage({
                       </div>
                       <PreviewCardAction onStartNewQuestion={onStartNewQuestion} />
                     </div>
-                    <div className="video-container">
-                      <Suspense fallback={<PreviewLoadingFallback />}>
-                        <VideoPreview
-                          src={previewVideoUrl!}
-                          title="当前渲染视频"
-                          downloadName={
-                            result ? `${result.request_id}.mp4` : "metaview-preview.mp4"
-                          }
-                          headerless
-                          onTimeUpdate={handleVideoTimeUpdate}
-                          seekTo={seekToTime}
-                        />
-                      </Suspense>
-                    </div>
+                    <Suspense fallback={<PreviewLoadingFallback />}>
+                      <VideoPreview
+                        src={previewVideoUrl!}
+                        title="当前渲染视频"
+                        downloadName={
+                          result ? `${result.request_id}.mp4` : "metaview-preview.mp4"
+                        }
+                        headerless
+                        onTimeUpdate={handleVideoTimeUpdate}
+                        seekTo={seekToTime}
+                      />
+                    </Suspense>
                   </div>
                 </div>
                 {showSourcePanel ? (

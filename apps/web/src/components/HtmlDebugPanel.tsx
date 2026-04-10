@@ -170,7 +170,10 @@ export function HtmlDebugPanel() {
           <div className="html-debug-panel__hint">
             <strong>排查建议</strong>
             <span>
-              如果这里能正常显示，问题更可能在提示词生成或后端产物保存阶段；如果这里仍显示异常，问题更可能在 HTML 本身、外链依赖或运行时脚本。
+              这里不会读取共享编辑器 prompt、不会走 Agent，也不会请求后端 HTML 生成接口；右侧 iframe 只加载当前 textarea 里的 HTML（about:blank + srcDoc）。
+            </span>
+            <span>
+              如果这里能正常显示，而 Studio / History 里的 HTML 仍异常，优先检查 `preview_html_url` 指向的后端产物、运行时初始化脚本和 ready 信号。
             </span>
           </div>
 

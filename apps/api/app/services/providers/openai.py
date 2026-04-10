@@ -102,6 +102,8 @@ class OpenAICompatibleProvider:
         )
 
     def model_for_stage(self, stage: str) -> str:
+        if stage == "html_coding":
+            return self.stage_models.get("html_coding", self.stage_models.get("coding", self.model))
         if stage == "repair":
             return self.stage_models.get("repair", self.stage_models.get("coding", self.model))
         return self.stage_models.get(stage, self.model)

@@ -1,8 +1,18 @@
 import httpx
 
-from app.schemas import CirDocument, CirStep, LayoutInstruction, VisualKind
+from app.main import orchestrator
+from app.schemas import (
+    CirDocument,
+    CirStep,
+    LayoutInstruction,
+    RuntimeSettingsRequest,
+    TTSSettingsRequest,
+    VisualKind,
+)
+from app.services.providers.openai import OpenAICompatibleProvider
 from app.services.tts_service import (
     OpenAICompatibleTTSService,
+    SystemTTSService,
     build_tts_service,
 )
 from app.services.video_narration import VideoNarrationService
@@ -16,7 +26,93 @@ def test_build_tts_service_prefers_remote_backend_when_configured() -> None:
         remote_model="mimotts-v2",
     )
     assert isinstance(service, OpenAICompatibleTTSService)
+    assert service.base_url == "https://example.com/v1"
+    assert service.api_key == "secret"
     assert service.model == "mimotts-v2"
+
+
+def test_build_tts_service_falls_back_to_provider_backend_without_reusing_custom_remote_url() -> None:
+    service = build_tts_service(
+        backend="auto",
+        remote_base_url="https://tts.example.com/v1",
+        remote_api_key=None,
+        fallback_base_url="https://api.openai.com/v1",
+        fallback_api_key="fallback-secret",
+        remote_model="mimotts-v2",
+    )
+
+    assert isinstance(service, OpenAICompatibleTTSService)
+    assert service.base_url == "https://api.openai.com/v1"
+    assert service.api_key == "fallback-secret"
+
+
+def test_build_tts_service_uses_fallback_provider_when_remote_config_missing() -> None:
+    service = build_tts_service(
+        backend="auto",
+        remote_base_url=None,
+        remote_api_key=None,
+        fallback_base_url="https://api.openai.com/v1",
+        fallback_api_key="fallback-secret",
+        remote_model="mimotts-v2",
+    )
+
+    assert isinstance(service, OpenAICompatibleTTSService)
+    assert service.base_url == "https://api.openai.com/v1"
+    assert service.api_key == "fallback-secret"
+    assert service.model == "mimotts-v2"
+
+
+class _ProviderStub(OpenAICompatibleProvider):
+    def __init__(self, *, base_url: str | None, api_key: str | None) -> None:
+        self.base_url = base_url
+        self.api_key = api_key
+
+
+def test_orchestrator_narration_service_keeps_custom_tts_credentials_paired() -> None:
+    previous_settings = orchestrator.runtime_settings
+    restore_payload = RuntimeSettingsRequest(
+        mock_provider_enabled=previous_settings.mock_provider_enabled,
+        tts=TTSSettingsRequest(
+            enabled=previous_settings.tts.enabled,
+            backend=previous_settings.tts.backend,
+            model=previous_settings.tts.model,
+            base_url=previous_settings.tts.base_url,
+            api_key=previous_settings.tts.api_key,
+            voice=previous_settings.tts.voice,
+            rate_wpm=previous_settings.tts.rate_wpm,
+            speed=previous_settings.tts.speed,
+            max_chars=previous_settings.tts.max_chars,
+            timeout_s=previous_settings.tts.timeout_s,
+        ),
+    )
+
+    try:
+        orchestrator.update_runtime_settings(
+            RuntimeSettingsRequest(
+                mock_provider_enabled=previous_settings.mock_provider_enabled,
+                tts=TTSSettingsRequest(
+                    enabled=True,
+                    backend="auto",
+                    model="mimotts-v2",
+                    base_url="https://tts.example.com/v1",
+                    api_key=None,
+                    voice="default",
+                    rate_wpm=150,
+                    speed=0.88,
+                    max_chars=1500,
+                    timeout_s=120.0,
+                ),
+            )
+        )
+
+        service = orchestrator._narration_service_for_provider(
+            _ProviderStub(base_url="https://provider.example.com/v1", api_key="provider-secret")
+        )
+
+        remote_service = service.tts_service
+        assert isinstance(remote_service, SystemTTSService)
+    finally:
+        orchestrator.update_runtime_settings(restore_payload)
 
 
 def test_openai_compatible_tts_service_synthesize_audio(monkeypatch, tmp_path) -> None:

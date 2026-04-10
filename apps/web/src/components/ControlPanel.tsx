@@ -213,7 +213,7 @@ export function ControlPanel({
       <div className="composer-copy">
         <span className="panel-kicker">Smart Mode</span>
         <h1>想问什么直接问</h1>
-        <p>题目、源码、题图都可以。系统会自动判断模块并直接生成视频。</p>
+        <p>题目、源码、题图都可以。系统会自动判断模块并优先生成 HTML 交互，也可切换为视频。</p>
       </div>
 
       <form className="composer-form" onSubmit={onSubmit}>
@@ -326,10 +326,10 @@ export function ControlPanel({
         <div className="composer-toggle">
           <button
             type="button"
-            className={`composer-toggle-button ${outputMode === "manim" ? "is-active" : ""}`}
-            onClick={() => onOutputModeChange("manim")}
+            className={`composer-toggle-button ${outputMode === "video" ? "is-active" : ""}`}
+            onClick={() => onOutputModeChange("video")}
           >
-            Manim 视频
+            视频预览
           </button>
           <button
             type="button"

@@ -273,6 +273,20 @@ def test_openai_provider_uses_stage_specific_models(monkeypatch) -> None:
     ]
 
 
+def test_openai_provider_maps_html_coding_stage_to_coding_model() -> None:
+    provider = OpenAICompatibleProvider(
+        api_key="test-key",
+        model="default-model",
+        stage_models={
+            "coding": "coder-large",
+        },
+        base_url="https://example.com/v1",
+    )
+
+    assert provider.model_for_stage("html_coding") == "coder-large"
+    assert provider.model_for_stage("coding") == "coder-large"
+
+
 def test_openai_provider_overrides_obvious_router_misclassification(monkeypatch) -> None:
     provider = OpenAICompatibleProvider(
         api_key="test-key",

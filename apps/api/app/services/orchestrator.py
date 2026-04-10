@@ -107,7 +107,7 @@ class PipelineOrchestrator:
         self.runtime_settings = self.runtime_settings_repository.get_runtime_settings(
             defaults=self.runtime_settings_defaults
         )
-        self.sandbox = PreviewDryRunSandbox(timeout_ms=settings.sandbox_timeout_ms)
+        self.sandbox = PreviewDryRunSandbox()
         self.validator = CirValidator()
         self.repair_service = PipelineRepairService()
         self.max_repair_attempts = settings.max_repair_attempts
@@ -206,10 +206,8 @@ class PipelineOrchestrator:
                 remote_base_url=self.preview_tts_base_url,
                 remote_api_key=self.preview_tts_api_key,
                 remote_model=self.preview_tts_model,
-                remote_timeout_s=self.preview_tts_timeout_s
-                if self.preview_tts_timeout_s is not None
-                else self.openai_timeout_s,
                 remote_speed=self.preview_tts_speed,
+                remote_timeout_s=self.preview_tts_timeout_s,
                 fallback_base_url=self.openai_base_url,
                 fallback_api_key=self.openai_api_key,
             ),
@@ -379,6 +377,7 @@ class PipelineOrchestrator:
         preview_video_backend: str | None = None
         render_error_message: str | None = None
         audio_diagnostics: list[AgentDiagnostic] = []
+        html_fallback_diagnostics: list[AgentDiagnostic] = []
 
         planning_hints = None
         if request.output_mode != OutputMode.HTML:
@@ -422,7 +421,7 @@ class PipelineOrchestrator:
             diagnostics = []
             sandbox_report = SandboxReport(
                 mode=request.sandbox_mode,
-                engine="skipped",
+                engine=self.sandbox.engine_name,
                 status=SandboxStatus.SKIPPED,
             )
         if _run_manim_coding:
@@ -573,13 +572,25 @@ class PipelineOrchestrator:
         # ── HTML output branch (independent from Manim) ──────────────
         preview_html_url: str | None = None
         if request.output_mode == OutputMode.HTML:
-            html_script = self.html_coder.run(
+            html_result = self.html_coder.run(
                 cir=cir,
                 ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
                 generation_provider=generation_provider,
+                original_prompt=effective_request.prompt,
+                source_code=effective_request.source_code,
+                source_code_language=effective_request.source_code_language,
+                source_image=effective_request.source_image,
+                source_image_name=effective_request.source_image_name,
+                skill=skill,
             )
+            html_script = html_result.html
             renderer_script = html_script  # store in renderer_script for persistence
-            is_fallback = 'data-metaview-fallback="true"' in html_script[:500]
+            sandbox_report = self.sandbox.run(
+                script=html_script,
+                cir=cir,
+                mode=request.sandbox_mode,
+            )
+            is_fallback = html_result.used_fallback
             provider_label = (
                 generation_provider.descriptor.label
                 if generation_provider is not None and hasattr(generation_provider, "descriptor")
@@ -587,18 +598,24 @@ class PipelineOrchestrator:
             )
             model_label = (
                 generation_provider.model_for_stage("html_coding")
-                if generation_provider is not None and hasattr(generation_provider, "model_for_stage")
+                if generation_provider is not None
+                and hasattr(generation_provider, "model_for_stage")
                 else "fallback"
+            )
+            fallback_reason = html_result.fallback_reason
+            fallback_detail = (
+                f" 原因：{fallback_reason}。" if is_fallback and fallback_reason else ""
             )
             agent_traces.append(AgentTrace(
                 agent="html_coder",
                 provider=provider_label,
                 model=model_label,
                 summary=(
-                    f"使用本地模板为《{cir.title}》生成 HTML 交互动画。"
+                    f"使用本地模板为《{cir.title}》生成 HTML 交互动画。{fallback_detail}".strip()
                     if is_fallback
                     else f"远程 provider 已为《{cir.title}》生成 HTML 交互动画。"
                 ),
+                raw_output=html_result.provider_raw_output,
             ))
             html_artifacts = self.html_renderer.render(
                 html=html_script,
@@ -606,9 +623,16 @@ class PipelineOrchestrator:
                 cir_json=cir.model_dump_json(exclude_none=True),
                 ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
                 prompt_version=HTML_CODER_PROMPT_VERSION,
-                inject_prerender=is_fallback,
+                inject_prerender=False,
             )
             preview_html_url = html_artifacts.url
+            if is_fallback and fallback_reason:
+                html_fallback_diagnostics.append(
+                    AgentDiagnostic(
+                        agent="html_coder",
+                        message=f"HTML provider 输出已回退到本地模板：{fallback_reason}",
+                    )
+                )
 
         # ── Video output branch (existing Manim flow, untouched) ─────
         _render_video = request.output_mode != OutputMode.HTML
@@ -655,7 +679,11 @@ class PipelineOrchestrator:
                             generation_provider=generation_provider,
                             cir=cir,
                             renderer_script=renderer_script,
-                            ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
+                            ui_theme=(
+                                request.ui_theme.value
+                                if request.ui_theme is not None
+                                else None
+                            ),
                         )
                         agent_traces.append(critique_trace)
                         sandbox_report = self.sandbox.run(
@@ -714,8 +742,9 @@ class PipelineOrchestrator:
             )
             + self._validation_diagnostics(validation_report)
             + (diagnostics if _run_manim_coding else [])
-            + (self._sandbox_diagnostics(sandbox_report) if _run_manim_coding else [])
+            + self._sandbox_diagnostics(sandbox_report)
             + self._repair_diagnostics(repair_actions)
+            + html_fallback_diagnostics
             + audio_diagnostics
             + (
                 [
@@ -938,6 +967,9 @@ class PipelineOrchestrator:
     def _narration_service_for_provider(self, generation_provider):
         provider_base_url = getattr(generation_provider, "base_url", None)
         provider_api_key = getattr(generation_provider, "api_key", None)
+        has_custom_tts_config = bool(self.preview_tts_base_url or self.preview_tts_api_key)
+        remote_base_url = self.preview_tts_base_url if has_custom_tts_config else provider_base_url
+        remote_api_key = self.preview_tts_api_key if has_custom_tts_config else provider_api_key
 
         if (
             not provider_base_url
@@ -957,13 +989,11 @@ class PipelineOrchestrator:
                 backend=self.preview_tts_backend,
                 default_voice=self.preview_tts_voice,
                 default_rate_wpm=self.preview_tts_rate_wpm,
-                remote_base_url=self.preview_tts_base_url or provider_base_url,
-                remote_api_key=self.preview_tts_api_key or provider_api_key,
+                remote_base_url=remote_base_url,
+                remote_api_key=remote_api_key,
                 remote_model=self.preview_tts_model,
-                remote_timeout_s=self.preview_tts_timeout_s
-                if self.preview_tts_timeout_s is not None
-                else self.openai_timeout_s,
                 remote_speed=self.preview_tts_speed,
+                remote_timeout_s=self.preview_tts_timeout_s,
                 fallback_base_url=self.openai_base_url,
                 fallback_api_key=self.openai_api_key,
             ),

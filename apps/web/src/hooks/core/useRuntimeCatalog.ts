@@ -6,7 +6,7 @@ export const fallbackRuntimeCatalog: RuntimeCatalog = {
   default_provider: "openai",
   default_router_provider: "openai",
   default_generation_provider: "openai",
-  sandbox_engine: "python-manim-static",
+  sandbox_engine: "hybrid-runtime-dry-run",
   providers: [
     {
       name: "openai",

@@ -24,6 +24,9 @@ REMOTE_DIR="/opt/demoo"
 LOCAL_DIR="$(cd "$(dirname "$0")" && pwd)"
 VERSION_FILE="$REMOTE_DIR/.deploy_version"
 BACKUP_DIR="$REMOTE_DIR/backups"
+PUBLIC_HOST="${PUBLIC_HOST:-115.191.22.22}"
+NGINX_SITE_PATH="/etc/nginx/conf.d/demoo.conf"
+LEGACY_NGINX_SITE_PATH="/etc/nginx/sites-enabled/metaview.conf"
 
 # Docker Compose 命令（自动检测）
 COMPOSE_CMD=""
@@ -46,6 +49,167 @@ step()  { echo -e "\n${BOLD}── $* ──${NC}"; }
 # 远程执行命令
 remote_cmd() {
     ssh "$SERVER" "$@"
+}
+
+render_remote_nginx_config() {
+    cat <<EOF
+# managed-by=demoo
+server {
+    listen 80;
+    server_name ${PUBLIC_HOST};
+    client_max_body_size 32m;
+
+    location / {
+        proxy_pass http://127.0.0.1:5173;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location /media/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location /health {
+        proxy_pass http://127.0.0.1:8000/health;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+EOF
+}
+
+validate_public_host() {
+    if [[ ! "$PUBLIC_HOST" =~ ^[A-Za-z0-9.-]+$ ]]; then
+        fail "PUBLIC_HOST 包含非法字符: $PUBLIC_HOST"
+    fi
+}
+
+configure_remote_nginx_proxy() {
+    step "配置远程 Nginx 反向代理"
+
+    validate_public_host
+
+    # 若 sites-enabled 已有受管配置（如 Certbot HTTPS），仅更新该文件；
+    # 否则回落到 conf.d/demoo.conf（纯 HTTP）。
+    ssh "$SERVER" bash -s << ENDSSH
+set -e
+
+if ! command -v nginx >/dev/null 2>&1; then
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -qq
+    apt-get install -y -qq nginx
+fi
+
+SITES_CONF="$LEGACY_NGINX_SITE_PATH"
+CONFD_CONF="$NGINX_SITE_PATH"
+
+# 若 sites-enabled 已有受管配置，更新它（保留 SSL）
+if [ -f "\$SITES_CONF" ] && grep -Fq '# managed-by=demoo' "\$SITES_CONF"; then
+    echo "sites-enabled 受管配置已存在，保留 SSL，仅更新代理目标"
+    # 删除可能残留的 conf.d 冲突文件
+    rm -f "\$CONFD_CONF"
+    nginx -t
+    systemctl reload nginx 2>/dev/null || systemctl restart nginx
+    echo "Nginx 重载完成（sites-enabled 路径）"
+    exit 0
+fi
+
+# 无域名 Certbot 配置，写入普通 HTTP conf.d（IP 访问场景）
+mkdir -p "\$(dirname "\$CONFD_CONF")"
+config_tmp="\${CONFD_CONF}.tmp"
+backup_path="\${CONFD_CONF}.bak.\$(date +%Y%m%d-%H%M%S)"
+rollback_needed=0
+
+cleanup() {
+    rm -f "\$config_tmp"
+    if [ "\$rollback_needed" -eq 1 ] && [ -f "\$backup_path" ]; then
+        mv "\$backup_path" "\$CONFD_CONF"
+    fi
+}
+trap cleanup EXIT
+
+cat > "\$config_tmp" << 'NGINXEOF'
+# managed-by=demoo
+server {
+    listen 80;
+    server_name ${PUBLIC_HOST};
+    client_max_body_size 32m;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 75s;
+    }
+
+    location /media/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location /health {
+        proxy_pass http://127.0.0.1:8000/health;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:5173;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+NGINXEOF
+
+if [ -f "\$CONFD_CONF" ]; then
+    cp "\$CONFD_CONF" "\$backup_path"
+    rollback_needed=1
+fi
+
+mv "\$config_tmp" "\$CONFD_CONF"
+nginx -t
+rollback_needed=0
+rm -f "\$backup_path"
+systemctl enable nginx >/dev/null 2>&1 || true
+systemctl reload nginx 2>/dev/null || systemctl restart nginx
+echo "Nginx 重载完成（conf.d 路径）"
+ENDSSH
+
+    ok "远程 Nginx 反向代理已更新"
 }
 
 # 获取当前 git 信息
@@ -145,7 +309,7 @@ mkdir -p /opt/demoo/data
 mkdir -p /opt/demoo/backups
 
 echo "安装常用工具..."
-apt-get install -y -qq curl rsync vim >/dev/null 2>&1 || true
+apt-get install -y -qq curl rsync vim nginx >/dev/null 2>&1 || true
 
 echo "清理 apt 缓存..."
 apt-get clean
@@ -155,6 +319,7 @@ docker --version
 docker compose version
 ENDSSH
 
+    configure_remote_nginx_proxy
     ok "远程环境初始化完成"
 }
 
@@ -272,7 +437,13 @@ health_check() {
             if remote_cmd "curl -sf http://localhost:5173/ >/dev/null 2>&1"; then
                 ok "Web 健康检查通过"
             else
-                warn "Web 尚未就绪（nginx 可能还在启动）"
+                warn "Web 尚未就绪（容器可能还在启动）"
+            fi
+
+            if remote_cmd "curl -sf http://localhost/health >/dev/null 2>&1"; then
+                ok "Nginx 代理健康检查通过"
+            else
+                warn "Nginx 代理尚未就绪"
             fi
 
             # 显示版本信息
@@ -296,6 +467,7 @@ quick_deploy() {
     sync_code
 
     ssh "$SERVER" "cd $REMOTE_DIR && $COMPOSE_CMD restart"
+    configure_remote_nginx_proxy
     ok "容器已重启"
 
     health_check
@@ -442,6 +614,7 @@ full_deploy() {
     sync_code
     remote_build
     remote_start
+    configure_remote_nginx_proxy
     health_check
 
     local elapsed=$(( SECONDS - start_time ))
@@ -458,7 +631,7 @@ case "${1:-}" in
     init)     init_remote ;;
     quick)    quick_deploy ;;
     build)    preflight; sync_code; remote_build ;;
-    restart)  preflight; remote_cmd "cd $REMOTE_DIR && $COMPOSE_CMD restart" && ok "已重启" ;;
+    restart)  preflight; remote_cmd "cd $REMOTE_DIR && $COMPOSE_CMD restart" && configure_remote_nginx_proxy && ok "已重启" ;;
     logs)     remote_logs "$@" ;;
     status)   remote_status ;;
     stop)     remote_stop ;;

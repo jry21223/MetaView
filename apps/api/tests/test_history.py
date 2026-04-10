@@ -12,14 +12,16 @@ from app.schemas import (
     PipelineRuntime,
     ProviderDescriptor,
     ProviderKind,
+    RuntimeSettingsRequest,
     SandboxMode,
     SandboxReport,
     SandboxStatus,
     SkillDescriptor,
     TopicDomain,
+    TTSSettingsRequest,
     ValidationStatus,
 )
-from app.services.history import RunRepository
+from app.services.history import RunRepository, RuntimeSettingsRepository
 
 
 def test_run_repository_save_and_load(tmp_path) -> None:
@@ -105,7 +107,45 @@ def test_run_repository_save_and_load(tmp_path) -> None:
     assert full_detail.response.runtime.agent_traces[0].raw_output == '{"focus":"binary search"}'
 
 
-def test_run_repository_tracks_submitted_and_failed_run(tmp_path) -> None:
+def test_runtime_settings_repository_normalizes_blank_timeout_from_legacy_storage(tmp_path) -> None:
+    repository = RuntimeSettingsRepository(db_path=str(tmp_path / "runs.db"))
+    defaults = RuntimeSettingsRequest(tts=TTSSettingsRequest(timeout_s=120.0))
+
+    connection = sqlite3.connect(tmp_path / "runs.db")
+    try:
+        connection.execute(
+            "INSERT OR REPLACE INTO app_settings (name, value) VALUES (?, ?)",
+            (
+                "runtime_settings",
+                json.dumps(
+                    {
+                        "mock_provider_enabled": True,
+                        "tts": {
+                            "enabled": True,
+                            "backend": "openai_compatible",
+                            "model": "mimotts-v2",
+                            "base_url": None,
+                            "api_key": None,
+                            "voice": "default",
+                            "rate_wpm": 150,
+                            "speed": 0.88,
+                            "max_chars": 1500,
+                            "timeout_s": "",
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+            ),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    settings = repository.get_runtime_settings(defaults=defaults)
+
+    assert settings.tts.timeout_s is None
+
+
     repository = RunRepository(db_path=str(tmp_path / "runs.db"))
     request = PipelineRequest(
         prompt="请讲解 Dijkstra 算法。",
