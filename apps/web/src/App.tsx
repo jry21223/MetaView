@@ -15,6 +15,7 @@ import {
 } from "./api/client";
 
 import { AppChrome } from "./components/AppChrome";
+import { MagicCursor } from "./components/MagicCursor";
 import { StudioPage } from "./pages/Studio/StudioPage";
 import { HistoryPage } from "./pages/History/HistoryPage";
 import { ToolsPage } from "./pages/Tools/ToolsPage";
@@ -688,6 +689,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      <MagicCursor />
       <AppChrome activePage={activePage} theme={theme} setTheme={setTheme} onPageChange={setActivePage} />
 
       {/* Main Content Area */}
