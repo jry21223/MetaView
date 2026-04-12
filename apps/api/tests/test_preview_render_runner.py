@@ -1,7 +1,5 @@
 from pathlib import Path
 
-import pytest
-
 from app.services import preview_video_renderer as renderer_module
 from app.services.preview_video_renderer import GVisorCommandBuilder, PreviewVideoRenderer
 

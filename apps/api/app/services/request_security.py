@@ -28,11 +28,23 @@ _PROMPT_INJECTION_PATTERNS: tuple[tuple[str, str], ...] = (
     ("显示系统提示词", "命中提示词注入特征：显示系统提示词"),
 )
 _SOURCE_CODE_INJECTION_PATTERNS: tuple[tuple[str, str], ...] = (
-    ("ignore previous instructions", "源码中命中提示词注入特征：ignore previous instructions"),
-    ("ignore all previous instructions", "源码中命中提示词注入特征：ignore all previous instructions"),
+    (
+        "ignore previous instructions",
+        "源码中命中提示词注入特征：ignore previous instructions",
+    ),
+    (
+        "ignore all previous instructions",
+        "源码中命中提示词注入特征：ignore all previous instructions",
+    ),
     ("system prompt", "源码中命中提示词注入特征：system prompt"),
-    ("developer message", "源码中命中提示词注入特征：developer message"),
-    ("reveal hidden prompt", "源码中命中提示词注入特征：reveal hidden prompt"),
+    (
+        "developer message",
+        "源码中命中提示词注入特征：developer message",
+    ),
+    (
+        "reveal hidden prompt",
+        "源码中命中提示词注入特征：reveal hidden prompt",
+    ),
     ("忽略以上规则", "源码中命中提示词注入特征：忽略以上规则"),
 )
 

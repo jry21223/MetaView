@@ -35,7 +35,11 @@ from app.services.orchestrator import PipelineOrchestrator
 from app.services.preview_video_renderer import PreviewVideoRenderError
 from app.services.providers.openai import ProviderInvocationError
 from app.services.providers.registry import ProviderRegistrationError, ProviderUnavailableError
-from app.services.request_security import SafetyVerdict, inspect_manim_source, inspect_pipeline_request
+from app.services.request_security import (
+    SafetyVerdict,
+    inspect_manim_source,
+    inspect_pipeline_request,
+)
 from app.services.skill_catalog import SubjectSkillUnavailableError
 
 settings = get_settings()

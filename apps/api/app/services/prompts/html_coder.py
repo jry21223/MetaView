@@ -10,8 +10,8 @@ import re
 from app.schemas import (
     CirDocument,
     HtmlAnimationKind,
-    HtmlAnimationPayload,
     HtmlAnimationParam,
+    HtmlAnimationPayload,
 )
 
 HTML_CODER_PROMPT_VERSION = "5.0.0"
@@ -144,7 +144,6 @@ def _looks_recursive(cir: CirDocument) -> bool:
 
 
 def _build_hanoi_steps(cir: CirDocument) -> list[dict[str, object]]:
-    rod_names = ["A 柱", "B 柱", "C 柱"]
     parsed_moves: list[tuple[str, str, str]] = []
     for step in cir.steps:
         values = [str(token.value or token.label or "") for token in step.tokens]
@@ -582,7 +581,7 @@ def build_html_scaffold_document(
 ) -> str:
     animation_payload = HtmlAnimationPayload.model_validate(payload)
     theme = "light" if ui_theme == "light" else "dark"
-    template = """<!DOCTYPE html>
+    template = """<!DOCTYPE html
 <html lang="zh-CN" data-metaview-runtime="scaffold"__FALLBACK_ATTR__>
 <head>
 <meta charset="UTF-8">

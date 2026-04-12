@@ -1,6 +1,10 @@
 from app.schemas import CirDocument, CirStep, TopicDomain, VisualKind
 from app.services import preview_video_renderer as renderer_module
-from app.services.manim_script import calculate_step_timing, inspect_manim_script, prepare_manim_script
+from app.services.manim_script import (
+    calculate_step_timing,
+    inspect_manim_script,
+    prepare_manim_script,
+)
 from app.services.preview_video_renderer import StoryboardFallbackPreviewBackend
 
 

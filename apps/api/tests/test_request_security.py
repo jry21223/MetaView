@@ -1,4 +1,8 @@
-from app.services.request_security import SafetyVerdict, inspect_manim_source, inspect_pipeline_request
+from app.services.request_security import (
+    SafetyVerdict,
+    inspect_manim_source,
+    inspect_pipeline_request,
+)
 
 
 def test_request_security_blocks_prompt_injection() -> None:

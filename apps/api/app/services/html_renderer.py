@@ -123,13 +123,27 @@ class HtmlRenderer:
             title = html_lib.escape(str(step.get("title", f"步骤 {index}")))
             narration = html_lib.escape(str(step.get("narration", "")))
             visual_kind = html_lib.escape(str(step.get("visual_kind", "text")))
-            cards.append(
-                f'<article style="border:1px solid rgba(127,127,127,.14);border-radius:16px;padding:12px 14px;background:rgba(127,127,127,.06)">'
-                f'<div style="font-size:12px;font-weight:700;opacity:.72;text-transform:uppercase;">{visual_kind}</div>'
-                f'<div style="margin-top:6px;font-weight:700;">{title}</div>'
-                f'<p style="margin:8px 0 0;font-size:13px;line-height:1.6;opacity:.82;">{narration}</p>'
+            article_style = (
+                "border:1px solid rgba(127,127,127,.14);"
+                "border-radius:16px;padding:12px 14px;"
+                "background:rgba(127,127,127,.06)"
+            )
+            kind_style = (
+                "font-size:12px;font-weight:700;opacity:.72;"
+                "text-transform:uppercase"
+            )
+            title_style = "margin-top:6px;font-weight:700"
+            narration_style = (
+                "margin:8px 0 0;font-size:13px;line-height:1.6;opacity:.82"
+            )
+            card_html = (
+                f'<article style="{article_style}">'
+                f'<div style="{kind_style}">{visual_kind}</div>'
+                f'<div style="{title_style}">{title}</div>'
+                f'<p style="{narration_style}">{narration}</p>'
                 f'</article>'
             )
+            cards.append(card_html)
         if not cards:
             return html
 
