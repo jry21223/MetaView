@@ -235,7 +235,10 @@ def _build_line_to_step_ids(checkpoints: list[ExecutionCheckpoint]) -> dict[int,
             if checkpoint.step_id not in bucket:
                 bucket.append(checkpoint.step_id)
     return {
-        line_no: step_ids for line_no, step_ids in sorted(line_to_step_ids.items(), key=lambda item: item[0])
+        line_no: step_ids
+        for line_no, step_ids in sorted(
+            line_to_step_ids.items(), key=lambda item: item[0]
+        )
     }
 
 

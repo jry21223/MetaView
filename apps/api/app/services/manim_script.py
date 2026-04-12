@@ -748,8 +748,10 @@ def _internal_helper_line_range(module: ast.Module) -> tuple[int, int] | None:
         return None
 
     actual_prefix = module.body[: len(helper_body)]
-    for expected, actual in zip(helper_body, actual_prefix):
-        if ast.dump(expected, include_attributes=False) != ast.dump(actual, include_attributes=False):
+    for expected, actual in zip(helper_body, actual_prefix, strict=True):
+        expected_dump = ast.dump(expected, include_attributes=False)
+        actual_dump = ast.dump(actual, include_attributes=False)
+        if expected_dump != actual_dump:
             return None
 
     start_line = getattr(actual_prefix[0], "lineno", None)

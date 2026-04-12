@@ -1,5 +1,4 @@
 import json
-import re
 import time
 
 from fastapi.testclient import TestClient
@@ -11,7 +10,6 @@ from app.schemas import (
     CirStep,
     CustomProviderUpsertRequest,
     HtmlAnimationKind,
-    HtmlAnimationPayload,
     PipelineRunStatus,
     ProviderDescriptor,
     ProviderKind,
