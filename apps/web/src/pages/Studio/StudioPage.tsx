@@ -42,7 +42,7 @@ export interface StudioPageProps {
   outputMode: OutputMode;
   sourceImage: string | null;
   sourceCode: string;
-  sourceCodeLanguage: string;
+  detectedSourceLanguage: string;
   routerProvider: ModelProvider;
   generationProvider: ModelProvider;
   sandboxMode: SandboxMode;
@@ -67,8 +67,6 @@ export interface StudioPageProps {
 
   onOutputModeChange: (mode: OutputMode) => void;
   onPromptChange: (val: string) => void;
-  onSourceCodeChange: (val: string) => void;
-  onSourceCodeLanguageChange: (val: string) => void;
   onRouterProviderChange: (val: ModelProvider) => void;
   onGenerationProviderChange: (val: ModelProvider) => void;
   onSandboxModeChange: (val: SandboxMode) => void;
@@ -86,7 +84,7 @@ export function StudioPage({
   outputMode,
   sourceImage,
   sourceCode,
-  sourceCodeLanguage,
+  detectedSourceLanguage,
   routerProvider,
   generationProvider,
   sandboxMode,
@@ -110,8 +108,6 @@ export function StudioPage({
   mergePromptScenario,
   onOutputModeChange,
   onPromptChange,
-  onSourceCodeChange,
-  onSourceCodeLanguageChange,
   onRouterProviderChange,
   onGenerationProviderChange,
   onSandboxModeChange,
@@ -165,8 +161,7 @@ export function StudioPage({
                   layoutMode={hasCompletedPreview ? "split" : "hero"}
                   prompt={prompt}
                   sourceImage={sourceImage}
-                  sourceCode={sourceCode}
-                  sourceCodeLanguage={sourceCodeLanguage}
+                  detectedSourceLanguage={detectedSourceLanguage}
                   routerProvider={routerProvider}
                   generationProvider={generationProvider}
                   sandboxMode={sandboxMode}
@@ -180,8 +175,6 @@ export function StudioPage({
                   generationProviderSupportsVision={generationProviderSupportsVision}
                   onOutputModeChange={onOutputModeChange}
                   onPromptChange={onPromptChange}
-                  onSourceCodeChange={onSourceCodeChange}
-                  onSourceCodeLanguageChange={onSourceCodeLanguageChange}
                   onRouterProviderChange={onRouterProviderChange}
                   onGenerationProviderChange={onGenerationProviderChange}
                   onSandboxModeChange={onSandboxModeChange}

@@ -16,7 +16,7 @@ export interface ToolsPageProps {
   runtimeCatalog: RuntimeCatalog;
   prompt: string;
   sourceCode: string;
-  sourceCodeLanguage: string;
+  detectedSourceLanguage: string;
   selectedRunId: string | null;
   resolvedPreviewHtmlUrl: string | null;
   resolvedPreviewVideoUrl: string | null;
@@ -36,7 +36,7 @@ export function ToolsPage({
   runtimeCatalog,
   prompt,
   sourceCode,
-  sourceCodeLanguage,
+  detectedSourceLanguage,
   selectedRunId,
   resolvedPreviewHtmlUrl,
   resolvedPreviewVideoUrl,
@@ -134,7 +134,7 @@ export function ToolsPage({
                   result={result}
                   prompt={prompt}
                   sourceCode={sourceCode}
-                  sourceCodeLanguage={sourceCodeLanguage}
+                  sourceCodeLanguage={detectedSourceLanguage}
                   selectedRunId={selectedRunId}
                   resolvedPreviewHtmlUrl={resolvedPreviewHtmlUrl}
                   resolvedPreviewVideoUrl={resolvedPreviewVideoUrl}

@@ -24,3 +24,10 @@ apps/api/data/
 apps/web/dev.log
 apps/api/tests/.tmp/
 .ace-tool/
+# PPT 演示文稿
+*.pptx
+PPT版本对比说明.md
+# 竞赛提交和临时文件
+COMPETITION_SUBMISSION/
+data/html_previews/
+tools/

@@ -533,4 +533,84 @@
   .tools-footer-value {
     font-size: 1.2rem;
   }
+
+  /* Accordion mobile optimizations */
+  .accordion-item {
+    border-left-width: 2px;
+  }
+
+  .accordion-trigger {
+    padding: 14px 16px;
+  }
+
+  .accordion-trigger-left {
+    gap: 10px;
+  }
+
+  .accordion-icon {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+
+  .accordion-label {
+    font-size: 0.875rem;
+  }
+
+  .accordion-hint {
+    font-size: 0.7rem;
+  }
+
+  .accordion-content {
+    padding: 0 16px 16px;
+  }
+
+  /* Provider presets - horizontal scroll */
+  .provider-presets {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .provider-presets-grid {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    width: 100%;
+    padding: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .provider-presets-grid::-webkit-scrollbar {
+    display: none;
+  }
+
+  .provider-preset-btn {
+    flex-shrink: 0;
+    padding: 6px 12px;
+    font-size: 0.75rem;
+  }
+
+  /* Tools page header mobile */
+  #tools .page-header {
+    margin-bottom: 20px;
+  }
+
+  #tools .page-header h2 {
+    font-size: 1.5rem;
+  }
+
+  #tools .page-header p {
+    font-size: 0.85rem;
+    line-height: 1.6;
+  }
+
+  /* Resource progress items mobile */
+  .resource-progress-label {
+    font-size: 0.55rem;
+  }
+
+  .resource-progress-bar {
+    height: 4px;
+  }
 }

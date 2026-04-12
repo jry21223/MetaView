@@ -16,8 +16,7 @@ interface ControlPanelProps {
   layoutMode?: "hero" | "split";
   prompt: string;
   sourceImage: string | null;
-  sourceCode: string;
-  sourceCodeLanguage: string;
+  detectedSourceLanguage: string;
   routerProvider: ModelProvider;
   generationProvider: ModelProvider;
   sandboxMode: SandboxMode;
@@ -31,8 +30,6 @@ interface ControlPanelProps {
   generationProviderSupportsVision: boolean;
   onOutputModeChange: (value: OutputMode) => void;
   onPromptChange: (value: string) => void;
-  onSourceCodeChange: (value: string) => void;
-  onSourceCodeLanguageChange: (value: string) => void;
   onRouterProviderChange: (value: ModelProvider) => void;
   onGenerationProviderChange: (value: ModelProvider) => void;
   onSandboxModeChange: (value: SandboxMode) => void;
@@ -100,8 +97,7 @@ export function ControlPanel({
   layoutMode = "hero",
   prompt,
   sourceImage,
-  sourceCode,
-  sourceCodeLanguage,
+  detectedSourceLanguage,
   routerProvider,
   generationProvider,
   sandboxMode,
@@ -114,8 +110,6 @@ export function ControlPanel({
   generationProviderSupportsVision,
   onOutputModeChange,
   onPromptChange,
-  onSourceCodeChange,
-  onSourceCodeLanguageChange,
   onRouterProviderChange,
   onGenerationProviderChange,
   onSandboxModeChange,
@@ -125,7 +119,7 @@ export function ControlPanel({
 }: ControlPanelProps) {
   const imageInputId = useId();
   const configuredProvidersCount = providers.filter((provider) => provider.configured).length;
-  const hasSourceCode = sourceCode.trim().length > 0;
+  const hasDetectedSourceCode = detectedSourceLanguage.length > 0;
   const canSubmit = !loading && prompt.trim().length >= 5;
   const [dragActive, setDragActive] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
@@ -306,7 +300,7 @@ export function ControlPanel({
           <div className="composer-meta">
             <span>自动判断学科与镜头结构</span>
             <span>{configuredProvidersCount} 个 provider 可用</span>
-            {hasSourceCode ? <span>已附带源码</span> : null}
+            {hasDetectedSourceCode ? <span>已自动识别源码</span> : null}
             {sourceImageName ? <span>已附带题图</span> : null}
           </div>
         </div>
@@ -343,7 +337,7 @@ export function ControlPanel({
         <details className="composer-advanced composer-advanced-card">
           <summary className="composer-advanced-summary">
             <span>高级设置</span>
-            <span className="composer-advanced-summary-text">配音、模型、源码与沙盒配置</span>
+            <span className="composer-advanced-summary-text">配音、模型与沙盒配置</span>
           </summary>
 
           <div className="prompt-form prompt-form-advanced">
@@ -367,18 +361,6 @@ export function ControlPanel({
 
             <div className="select-grid">
               <label>
-                <span>源码语言</span>
-                <select
-                  value={sourceCodeLanguage}
-                  onChange={(event) => onSourceCodeLanguageChange(event.target.value)}
-                >
-                  <option value="">未指定</option>
-                  <option value="python">Python</option>
-                  <option value="cpp">C++</option>
-                </select>
-              </label>
-
-              <label>
                 <span>路由模型</span>
                 <select
                   value={routerProvider}
@@ -391,9 +373,7 @@ export function ControlPanel({
                   ))}
                 </select>
               </label>
-            </div>
 
-            <div className="select-grid">
               <label>
                 <span>规划/编码模型</span>
                 <select
@@ -409,7 +389,9 @@ export function ControlPanel({
                   ))}
                 </select>
               </label>
+            </div>
 
+            <div className="select-grid">
               <label>
                 <span>沙盒模式</span>
                 <select
@@ -423,17 +405,15 @@ export function ControlPanel({
                   ))}
                 </select>
               </label>
-            </div>
 
-            <label>
-              <span>源码输入</span>
-              <textarea
-                value={sourceCode}
-                onChange={(event) => onSourceCodeChange(event.target.value)}
-                placeholder="可选。粘贴 Python 或 C++ 源码后，系统会尽量按真实代码执行顺序生成动画。"
-                rows={8}
-              />
-            </label>
+              <label>
+                <span>源码识别</span>
+                <input
+                  value={hasDetectedSourceCode ? (detectedSourceLanguage === "cpp" ? "已识别为 C++" : "已识别为 Python") : "未识别到源码块"}
+                  readOnly
+                />
+              </label>
+            </div>
           </div>
         </details>
       </form>

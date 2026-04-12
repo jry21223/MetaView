@@ -772,6 +772,20 @@
     padding: 12px 16px;
   }
 
+  .page-header {
+    margin-bottom: 20px;
+  }
+
+  .page-kicker {
+    font-size: 0.55rem;
+    margin-bottom: 6px;
+  }
+
+  .page-description {
+    font-size: 0.85rem;
+    line-height: 1.6;
+  }
+
   .bento-card {
     border-radius: var(--radius-lg);
   }
@@ -782,6 +796,60 @@
 
   .bento-card-body {
     padding: 0 16px 16px;
+  }
+
+  /* Better touch targets on mobile */
+  button,
+  .btn,
+  .sidebar-nav-item,
+  .mobile-nav-item,
+  select,
+  input,
+  textarea {
+    min-height: 44px;
+  }
+
+  /* Mobile nav improvements */
+  .mobile-nav {
+    padding: 4px 8px;
+    padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .mobile-nav-item {
+    padding: 6px 4px;
+    gap: 2px;
+  }
+
+  .mobile-nav-item .material-symbols-outlined {
+    font-size: 20px;
+  }
+
+  /* Mobile topbar improvements */
+  .mobile-topbar {
+    height: calc(48px + env(safe-area-inset-top, 0px));
+    padding: calc(4px + env(safe-area-inset-top, 0px)) 12px 4px;
+  }
+
+  .topbar-brand-text {
+    font-size: 1rem;
+  }
+
+  .topbar-brand-subtitle {
+    font-size: 0.5rem;
+    letter-spacing: 0.18em;
+  }
+
+  .topbar-neon-strip {
+    width: 6px;
+    height: 28px;
+  }
+
+  /* Adjust main content for smaller topbar */
+  @media (max-width: 1024px) {
+    .main-content {
+      padding-top: calc(48px + env(safe-area-inset-top, 0px));
+      padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+    }
   }
 }
 

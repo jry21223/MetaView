@@ -2110,21 +2110,54 @@
     line-height: 1.5;
   }
 
+  /* Mobile-optimized composer layout */
+  .composer-panel {
+    gap: 14px;
+  }
+
+  .composer-copy h1 {
+    font-size: 1.5rem;
+  }
+
+  .composer-copy p {
+    font-size: 0.85rem;
+    line-height: 1.6;
+  }
+
+  .composer-form {
+    gap: 12px;
+  }
+
   .composer-search-actions {
     position: static;
     margin-top: 12px;
     justify-content: stretch;
     flex-direction: column;
+    gap: 10px;
+    padding: 0 4px;
   }
 
   .composer-search-actions > * {
     width: 100%;
   }
 
+  .composer-attach-button {
+    order: 2;
+    justify-content: center;
+    padding: 10px 14px;
+  }
+
+  .composer-submit {
+    order: 1;
+    min-height: 48px;
+    padding: 0 24px;
+    font-size: 0.85rem;
+  }
+
   .composer-inline-attachment {
     position: static;
     max-width: 100%;
-    margin: 12px 12px 0;
+    margin: 8px 12px 0;
   }
 
   .composer-search-shell.has-attachment .composer-container textarea.composer-input {
@@ -2132,17 +2165,194 @@
   }
 
   .composer-container textarea.composer-input {
-    min-height: 180px;
-    padding: 14px;
+    min-height: 160px;
+    padding: 14px 14px 16px;
+    font-size: 16px; /* Prevent iOS zoom on focus */
+    line-height: 1.6;
+  }
+
+  .composer-search-intro {
+    padding: 0 4px;
+  }
+
+  .composer-search-description {
+    font-size: 0.8rem;
   }
 
   .composer-toggle {
     width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 
   .composer-toggle-button {
     flex: 1 1 0;
     text-align: center;
+    padding: 10px 12px;
+    font-size: 0.8rem;
+  }
+
+  /* Mobile-optimized advanced settings */
+  .composer-advanced-card {
+    margin-top: 0;
+  }
+
+  .composer-advanced-summary {
+    padding: 12px 14px;
+    font-size: 0.85rem;
+  }
+
+  .composer-advanced-summary-text {
+    display: none; /* Hide subtitle on mobile to save space */
+  }
+
+  .prompt-form {
+    padding: 0 14px 14px;
+    gap: 12px;
+  }
+
+  .select-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .toggle-field {
+    padding: 10px 12px;
+  }
+
+  .toggle-field > div > span {
+    font-size: 0.9rem;
+  }
+
+  .toggle-field .field-hint {
+    font-size: 0.75rem;
+    margin-top: 2px;
+  }
+
+  /* Meta chips - horizontal scroll on mobile */
+  .composer-meta {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 4px;
+    gap: 8px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .composer-meta::-webkit-scrollbar {
+    display: none;
+  }
+
+  .composer-meta span {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  /* Task progress card - compact horizontal layout on mobile */
+  .task-progress-pipeline {
+    flex-direction: row;
+    gap: 4px;
+    padding: 8px 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .task-progress-pipeline::-webkit-scrollbar {
+    display: none;
+  }
+
+  .task-progress-stage-row {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .task-progress-stage {
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 10px;
+    min-width: 64px;
+  }
+
+  .task-progress-dot {
+    width: 28px;
+    height: 28px;
+  }
+
+  .task-progress-info {
+    align-items: center;
+    text-align: center;
+  }
+
+  .task-progress-label {
+    font-size: 0.7rem;
+  }
+
+  .task-progress-status {
+    font-size: 0.6rem;
+  }
+
+  .task-progress-connector {
+    width: 16px;
+    height: 2px;
+    margin: 0;
+    margin-top: -14px; /* Align with dots */
+  }
+
+  /* Generation loading - smaller on mobile */
+  .generation-loading {
+    padding: 32px 16px;
+    gap: 16px;
+  }
+
+  .generation-loading-visual {
+    width: 60px;
+    height: 60px;
+  }
+
+  .generation-spinner {
+    width: 60px;
+    height: 60px;
+  }
+
+  .generation-loading-text strong {
+    font-size: 1rem;
+  }
+
+  .generation-loading-text p {
+    font-size: 0.8rem;
+  }
+
+  /* Rendering section - smaller padding */
+  .studio-rendering-section {
+    padding: 16px 0;
+  }
+
+  .studio-rendering-center {
+    padding: 24px 16px;
+    gap: 16px;
+  }
+
+  .studio-rendering-visual .generation-spinner {
+    width: 56px;
+    height: 56px;
+  }
+
+  .studio-rendering-status strong {
+    font-size: 0.95rem;
+  }
+
+  .studio-rendering-status p {
+    font-size: 0.8rem;
+  }
+
+  /* Studio input section when collapsed */
+  .studio-input-section.is-collapsed {
+    max-height: 0;
+    opacity: 0;
+    margin: 0;
+    padding: 0;
   }
 
   .html-preview-header {

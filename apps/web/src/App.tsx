@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useEffectEvent, useRef, useState } from "react";
+import { startTransition, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { useTheme } from "./hooks/core/useTheme";
 import { useRuntimeCatalog, resolveConfiguredProvider, activeProviderSupportsVision } from "./hooks/core/useRuntimeCatalog";
 import { useMouseGlow } from "./hooks/core/useMouseGlow";
@@ -91,6 +91,48 @@ function isRunningStatus(status: string): boolean {
   return status === "queued" || status === "running";
 }
 
+function detectLangFromLabel(label: string): string {
+  const normalized = label.trim().toLowerCase();
+  if (normalized === "py" || normalized === "python") return "python";
+  if (normalized === "c++" || normalized === "cpp" || normalized === "cc" || normalized === "cxx") {
+    return "cpp";
+  }
+  return "";
+}
+
+function detectLangFromCode(text: string): string {
+  if (/#include\s*[<"]|\bstd::|\bint\s+main\s*\(|\bcout\s*<<|\bcin\s*>>/.test(text)) {
+    return "cpp";
+  }
+  if (/(^|\n)\s*(def|class|import|from)\s+\w|\bprint\s*\(|if\s+__name__\s*==/.test(text)) {
+    return "python";
+  }
+  return "";
+}
+
+interface DetectedSource {
+  sourceCode: string;
+  sourceCodeLanguage: string;
+}
+
+function detectSourceCode(prompt: string): DetectedSource {
+  const fence = prompt.match(/```([a-zA-Z0-9+#]*)\s*\n([\s\S]*?)```/);
+  if (fence) {
+    const code = fence[2].trim();
+    if (code) {
+      const lang = detectLangFromLabel(fence[1] ?? "") || detectLangFromCode(code);
+      if (lang) {
+        return { sourceCode: code, sourceCodeLanguage: lang };
+      }
+    }
+  }
+  const lang = detectLangFromCode(prompt);
+  if (lang) {
+    return { sourceCode: prompt.trim(), sourceCodeLanguage: lang };
+  }
+  return { sourceCode: "", sourceCodeLanguage: "" };
+}
+
 function resolveSourceEditorName(sourceCode: string, sourceCodeLanguage: string): string {
   if (!sourceCode.trim()) {
     return "source input";
@@ -142,8 +184,9 @@ export default function App() {
   const [prompt, setPrompt] = useState(defaultPrompt);
   const [selectedDomain, setSelectedDomain] = useState<TopicDomain | null>(null);
   const [outputMode, setOutputMode] = useState<OutputMode>("html");
-  const [sourceCode, setSourceCode] = useState("");
-  const [sourceCodeLanguage, setSourceCodeLanguage] = useState("");
+  const detectedSource = useMemo(() => detectSourceCode(prompt), [prompt]);
+  const sourceCode = detectedSource.sourceCode;
+  const sourceCodeLanguage = detectedSource.sourceCodeLanguage;
   const [sandboxMode, setSandboxMode] = useState<SandboxMode>("dry_run");
   const [enableNarration, setEnableNarration] = useState(true);
   const [sourceImage, setSourceImage] = useState<string | null>(null);
@@ -254,9 +297,16 @@ export default function App() {
   }, [runtimeCatalog.skills, selectedDomain]);
 
   function syncRunIntoEditor(run: PipelineRunDetail) {
-    setPrompt(run.request.prompt);
-    setSourceCode(run.request.source_code ?? "");
-    setSourceCodeLanguage(run.request.source_code_language ?? "");
+    const basePrompt = run.request.prompt ?? "";
+    const historicCode = (run.request.source_code ?? "").trim();
+    const historicLang = run.request.source_code_language ?? "";
+    if (historicCode && !basePrompt.includes(historicCode)) {
+      const label = historicLang === "cpp" || historicLang === "python" ? historicLang : "";
+      const fenced = "```" + label + "\n" + historicCode + "\n```";
+      setPrompt(basePrompt ? `${basePrompt}\n\n${fenced}` : fenced);
+    } else {
+      setPrompt(basePrompt);
+    }
     setRouterProvider(
       resolveConfiguredProvider(
         runtimeCatalog,
@@ -431,16 +481,6 @@ export default function App() {
   function handlePromptChange(value: string) {
     setEditorDirty(true);
     setPrompt(value);
-  }
-
-  function handleSourceCodeChange(value: string) {
-    setEditorDirty(true);
-    setSourceCode(value);
-  }
-
-  function handleSourceCodeLanguageChange(value: string) {
-    setEditorDirty(true);
-    setSourceCodeLanguage(value);
   }
 
   function handleRouterProviderChange(value: ModelProvider) {
@@ -635,8 +675,6 @@ export default function App() {
     });
     setOutputMode("html");
     setPrompt(defaultPrompt);
-    setSourceCode("");
-    setSourceCodeLanguage("");
     setSourceImage(null);
     setSourceImageName(null);
     setResult(null);
@@ -662,7 +700,7 @@ export default function App() {
               outputMode={outputMode}
               sourceImage={sourceImage}
               sourceCode={sourceCode}
-              sourceCodeLanguage={sourceCodeLanguage}
+              detectedSourceLanguage={sourceCodeLanguage}
               routerProvider={routerProvider}
               generationProvider={generationProvider}
               sandboxMode={sandboxMode}
@@ -687,8 +725,6 @@ export default function App() {
 
               onOutputModeChange={setOutputMode}
               onPromptChange={handlePromptChange}
-              onSourceCodeChange={handleSourceCodeChange}
-              onSourceCodeLanguageChange={handleSourceCodeLanguageChange}
               onRouterProviderChange={handleRouterProviderChange}
               onGenerationProviderChange={handleGenerationProviderChange}
               onSandboxModeChange={handleSandboxModeChange}
@@ -726,7 +762,7 @@ export default function App() {
               runtimeCatalog={runtimeCatalog}
               prompt={prompt}
               sourceCode={sourceCode}
-              sourceCodeLanguage={sourceCodeLanguage}
+              detectedSourceLanguage={sourceCodeLanguage}
               selectedRunId={selectedRunId}
               resolvedPreviewHtmlUrl={previewHtmlUrl}
               resolvedPreviewVideoUrl={previewVideoUrl}
