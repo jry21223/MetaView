@@ -1,42 +1,44 @@
-import type { SkillDescriptor } from "../types";
+import type { ProviderDescriptor, SkillDescriptor } from "../types";
 import type { PipelineStats } from "../hooks/features/usePipelineStats";
 
 interface ToolsSidebarProps {
   activeSkill: SkillDescriptor | null;
   stats: PipelineStats;
+  providers: ProviderDescriptor[];
 }
 
-export function ToolsSidebar({ activeSkill, stats }: ToolsSidebarProps) {
+export function ToolsSidebar({ activeSkill, stats, providers }: ToolsSidebarProps) {
+  const configuredProviders = providers.filter((p) => p.configured);
+
   return (
     <>
       <aside className="bento-card-md tools-side-column" style={{ boxShadow: "none", background: "transparent" }}>
         <div className="resource-sidebar">
-          <div className="resource-sidebar-header">资源分配</div>
-          <div className="resource-sidebar-value">
-            <span className="resource-sidebar-number">84.2</span>
-            <span className="resource-sidebar-unit">%</span>
-          </div>
-          <div className="resource-sidebar-desc">主节点执行效率</div>
-
-          <div className="resource-progress-item">
-            <div className="resource-progress-label">
-              <span>计算负载</span>
-              <span>62%</span>
+          <div className="resource-sidebar-header">Provider 状态</div>
+          {providers.length === 0 ? (
+            <div className="provider-empty-state">
+              <span className="material-symbols-outlined" style={{ fontSize: 32, color: "var(--outline)" }}>hub</span>
+              <div className="provider-empty-state-text">尚未配置任何 Provider</div>
+              <div className="provider-empty-state-hint">请在下方 Provider 管理中添加至少一个模型端点。</div>
             </div>
-            <div className="resource-progress-bar">
-              <div className="resource-progress-fill is-primary" style={{ width: "62%" }} />
-            </div>
-          </div>
-
-          <div className="resource-progress-item">
-            <div className="resource-progress-label">
-              <span>内存缓存</span>
-              <span>41%</span>
-            </div>
-            <div className="resource-progress-bar">
-              <div className="resource-progress-fill is-secondary" style={{ width: "41%" }} />
-            </div>
-          </div>
+          ) : (
+            <>
+              <div className="resource-sidebar-value">
+                <span className="resource-sidebar-number">{configuredProviders.length}</span>
+                <span className="resource-sidebar-unit"> / {providers.length}</span>
+              </div>
+              <div className="resource-sidebar-desc">已配置</div>
+              <div className="provider-status-list">
+                {providers.map((provider) => (
+                  <div key={provider.name} className="provider-status-item">
+                    <span className={`provider-status-dot ${provider.configured ? "is-active" : ""}`} />
+                    <span className="provider-status-label">{provider.label}</span>
+                    <span className="provider-status-model">{provider.model}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         <div className="bento-card tools-skill-card">

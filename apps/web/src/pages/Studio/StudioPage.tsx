@@ -4,6 +4,7 @@ import { TaskProgressCard } from "../../components/TaskProgressCard";
 import { HighlightedCode } from "../../components/HighlightedCode";
 import { useVideoSync } from "../../hooks/features/useVideoSync";
 import { useTaskProgress } from "../../hooks/features/useTaskProgress";
+import type { TtsAvailability } from "../../utils/tts";
 import type { ModelProvider, OutputMode, PipelineResponse, RuntimeCatalog, SandboxMode, UITheme } from "../../types";
 
 const HtmlPreviewPanel = lazy(() => import("../../components/HtmlPreviewPanel").then(m => ({ default: m.HtmlPreviewPanel })));
@@ -56,6 +57,7 @@ export interface StudioPageProps {
   hasCompletedPreview: boolean;
   showSourcePanel: boolean;
   hasInteractiveExplorer: boolean;
+  ttsAvailability: TtsAvailability;
   previewVideoUrl: string | null;
   previewHtmlUrl: string | null;
   editorName: string;
@@ -98,6 +100,7 @@ export function StudioPage({
   hasCompletedPreview,
   showSourcePanel,
   hasInteractiveExplorer,
+  ttsAvailability,
   previewVideoUrl,
   previewHtmlUrl,
   editorName,
@@ -166,6 +169,7 @@ export function StudioPage({
                   generationProvider={generationProvider}
                   sandboxMode={sandboxMode}
                   enableNarration={enableNarration}
+                  ttsAvailability={ttsAvailability}
                   skills={runtimeCatalog.skills}
                   providers={runtimeCatalog.providers}
                   sandboxModes={runtimeCatalog.sandbox_modes}

@@ -15,6 +15,7 @@ import {
 } from "./api/client";
 
 import { AppChrome } from "./components/AppChrome";
+import { computeTtsAvailability } from "./utils/tts";
 import { StudioPage } from "./pages/Studio/StudioPage";
 import { HistoryPage } from "./pages/History/HistoryPage";
 import { ToolsPage } from "./pages/Tools/ToolsPage";
@@ -225,6 +226,8 @@ export default function App() {
         : undefined;
   const hasCompletedPreview = Boolean(previewVideoUrl) || Boolean(previewHtmlUrl);
   const showSourcePanel = sourceCode.trim().length > 0;
+
+  const ttsAvailability = computeTtsAvailability(runtimeCatalog.settings);
   const hasInteractiveExplorer = Boolean(
     previewVideoUrl
       && result?.execution_map
@@ -595,38 +598,6 @@ export default function App() {
     };
   }, [debugToolsOpen, result, selectedRunId]);
 
-  function handleExportCurrent() {
-    if (!result) {
-      return;
-    }
-
-    const exportedPayload = {
-      exported_at: new Date().toISOString(),
-      request: {
-        prompt,
-        source_code: sourceCode || null,
-        source_code_language: sourceCodeLanguage || null,
-        provider: generationProvider,
-        router_provider: routerProvider,
-        generation_provider: generationProvider,
-        source_image_name: sourceImageName,
-        enable_narration: enableNarration,
-        sandbox_mode: sandboxMode,
-      },
-      response: result,
-    };
-
-    const blob = new Blob([JSON.stringify(exportedPayload, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${result.request_id}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-  }
-
   async function handleCreateProvider(payload: CustomProviderUpsertRequest) {
     await upsertCustomProvider(payload);
     const catalog = await refreshRuntimeCatalog();
@@ -714,6 +685,7 @@ export default function App() {
               hasCompletedPreview={hasCompletedPreview}
               showSourcePanel={showSourcePanel}
               hasInteractiveExplorer={hasInteractiveExplorer}
+              ttsAvailability={ttsAvailability}
               previewVideoUrl={previewVideoUrl}
               previewHtmlUrl={previewHtmlUrl}
               editorName={editorName}
@@ -756,20 +728,9 @@ export default function App() {
 
           {activePage === "tools" ? (
             <ToolsPage
-              debugToolsOpen={debugToolsOpen}
-              setDebugToolsOpen={setDebugToolsOpen}
-              result={result}
               runtimeCatalog={runtimeCatalog}
-              prompt={prompt}
-              sourceCode={sourceCode}
-              detectedSourceLanguage={sourceCodeLanguage}
-              selectedRunId={selectedRunId}
-              resolvedPreviewHtmlUrl={previewHtmlUrl}
-              resolvedPreviewVideoUrl={previewVideoUrl}
               activeSkill={activeSkill}
               runs={runs}
-
-              handleExportCurrent={handleExportCurrent}
               handleCreateProvider={handleCreateProvider}
               handleDeleteProvider={handleDeleteProvider}
               handleUpdateRuntimeSettings={handleUpdateRuntimeSettings}

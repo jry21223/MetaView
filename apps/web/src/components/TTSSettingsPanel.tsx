@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
 import type { RuntimeSettings, RuntimeSettingsUpdateRequest } from "../types";
+import { computeTtsAvailability } from "../utils/tts";
 
 interface TTSSettingsPanelProps {
   settings: RuntimeSettings;
@@ -37,6 +38,8 @@ export function TTSSettingsPanel({ settings, onSave }: TTSSettingsPanelProps) {
   }, [settings]);
 
   const usesRemoteBackend = form.tts.backend !== "system";
+  const ttsAvailability = computeTtsAvailability(settings);
+  const ttsUnavailable = !ttsAvailability.available;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -72,53 +75,21 @@ export function TTSSettingsPanel({ settings, onSave }: TTSSettingsPanelProps) {
     <section className="panel panel-provider">
       <div className="panel-header">
         <span className="panel-kicker">Narration</span>
-        <h3>TTS 与默认行为</h3>
-        <p>这里控制 `mimotts-v2` 配音接口，以及是否允许系统继续暴露 `mock` provider。</p>
+        <h3>TTS 配音服务</h3>
+        <p>配置 TTS 配音接口参数。视频模式下开启配音后，渲染完成时会自动生成中文旁白并嵌入视频。</p>
       </div>
 
+      {ttsUnavailable && (
+        <div className="tools-debug-callout" style={{ marginBottom: "16px", borderColor: "var(--error)" }}>
+          <strong style={{ color: "var(--error)", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>warning</span>
+            TTS 服务不可用
+          </strong>
+          <p>{ttsAvailability.reason}。视频配音将跳过，仅渲染纯视频。请先配置 Base URL 和 API Key。</p>
+        </div>
+      )}
+
       <form className="prompt-form" onSubmit={handleSubmit}>
-        <label className="toggle-field">
-          <div>
-            <span>启用视频配音</span>
-            <p className="field-hint">关闭后会跳过旁白生成，只保留纯视频渲染。</p>
-          </div>
-          <button
-            type="button"
-            className={`switch-button ${form.tts.enabled ? "is-active" : ""}`}
-            onClick={() =>
-              setForm((current) => ({
-                ...current,
-                tts: { ...current.tts, enabled: !current.tts.enabled },
-              }))
-            }
-            aria-pressed={form.tts.enabled}
-          >
-            <span />
-            <strong>{form.tts.enabled ? "开启" : "关闭"}</strong>
-          </button>
-        </label>
-
-        <label className="toggle-field">
-          <div>
-            <span>允许 mock provider</span>
-            <p className="field-hint">关闭后，前端和后端默认都会优先走已配置的真实 API。</p>
-          </div>
-          <button
-            type="button"
-            className={`switch-button ${form.mock_provider_enabled ? "is-active" : ""}`}
-            onClick={() =>
-              setForm((current) => ({
-                ...current,
-                mock_provider_enabled: !current.mock_provider_enabled,
-              }))
-            }
-            aria-pressed={form.mock_provider_enabled}
-          >
-            <span />
-            <strong>{form.mock_provider_enabled ? "启用" : "禁用"}</strong>
-          </button>
-        </label>
-
         <div className="select-grid">
           <label>
             <span>TTS Backend</span>

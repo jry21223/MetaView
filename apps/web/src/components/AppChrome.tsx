@@ -8,7 +8,7 @@ interface AppChromeProps {
 const navigationItems = [
   { page: "studio", icon: "dashboard", mobileIcon: "workspaces", label: "工作台" },
   { page: "history", icon: "inventory_2", mobileIcon: "history", label: "任务历史" },
-  { page: "tools", icon: "analytics", mobileIcon: "extension", label: "工具" },
+  { page: "tools", icon: "settings", mobileIcon: "tune", label: "设置" },
 ] as const;
 
 export function AppChrome({ activePage, theme, setTheme, onPageChange }: AppChromeProps) {

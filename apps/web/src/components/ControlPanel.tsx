@@ -10,6 +10,7 @@ import {
 
 import type { ModelProvider, OutputMode, ProviderDescriptor, SandboxMode } from "../types";
 import type { SkillDescriptor } from "../types";
+import type { TtsAvailability } from "../utils/tts";
 
 interface ControlPanelProps {
   outputMode: OutputMode;
@@ -21,6 +22,7 @@ interface ControlPanelProps {
   generationProvider: ModelProvider;
   sandboxMode: SandboxMode;
   enableNarration: boolean;
+  ttsAvailability: TtsAvailability;
   skills: SkillDescriptor[];
   providers: ProviderDescriptor[];
   sandboxModes: SandboxMode[];
@@ -102,6 +104,7 @@ export function ControlPanel({
   generationProvider,
   sandboxMode,
   enableNarration,
+  ttsAvailability,
   providers,
   sandboxModes,
   loading,
@@ -120,7 +123,7 @@ export function ControlPanel({
   const imageInputId = useId();
   const configuredProvidersCount = providers.filter((provider) => provider.configured).length;
   const hasDetectedSourceCode = detectedSourceLanguage.length > 0;
-  const canSubmit = !loading && prompt.trim().length >= 5;
+  const canSubmit = !loading && prompt.trim().length >= 5 && configuredProvidersCount > 0;
   const [dragActive, setDragActive] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
 
@@ -285,6 +288,13 @@ export function ControlPanel({
                     </span>
                     生成中
                   </>
+                ) : configuredProvidersCount === 0 ? (
+                  <>
+                    请先配置 Provider
+                    <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>
+                      settings
+                    </span>
+                  </>
                 ) : (
                   <>
                     {outputMode === "html" ? "生成 HTML" : "生成视频"}
@@ -299,7 +309,15 @@ export function ControlPanel({
 
           <div className="composer-meta">
             <span>自动判断学科与镜头结构</span>
-            <span>{configuredProvidersCount} 个 provider 可用</span>
+            {configuredProvidersCount > 0 ? (
+              <span>{configuredProvidersCount} 个 provider 可用</span>
+            ) : (
+              <span className="composer-meta-warning">
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>warning</span>
+                尚未配置 Provider —
+                <a href="#tools" className="composer-meta-link">前往设置</a>
+              </span>
+            )}
             {hasDetectedSourceCode ? <span>已自动识别源码</span> : null}
             {sourceImageName ? <span>已附带题图</span> : null}
           </div>
@@ -345,17 +363,21 @@ export function ControlPanel({
               <div>
                 <span>视频配音</span>
                 <p className="field-hint">
-                  开启后会在渲染完成时尝试用 `mimotts-v2` 生成中文旁白并嵌入视频。
+                  {ttsAvailability.available
+                    ? "开启后会在渲染完成时自动生成中文旁白并嵌入视频。"
+                    : `${ttsAvailability.reason}。请先在设置页配置 TTS 服务。`}
                 </p>
               </div>
               <button
                 type="button"
-                className={`switch-button ${enableNarration ? "is-active" : ""}`}
+                className={`switch-button ${enableNarration && ttsAvailability.available ? "is-active" : ""}`}
                 onClick={() => onEnableNarrationChange(!enableNarration)}
                 aria-pressed={enableNarration}
+                disabled={!ttsAvailability.available}
+                style={{ opacity: ttsAvailability.available ? 1 : 0.5, cursor: ttsAvailability.available ? "pointer" : "not-allowed" }}
               >
                 <span />
-                <strong>{enableNarration ? "开启" : "关闭"}</strong>
+                <strong>{!ttsAvailability.available ? "不可用" : enableNarration ? "开启" : "关闭"}</strong>
               </button>
             </label>
 

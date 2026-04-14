@@ -37,12 +37,6 @@ export const HistoryPanel = memo(function HistoryPanel({
 }: HistoryPanelProps) {
   return (
     <section className="panel panel-history history-list-panel">
-      <div className="panel-header history-list-header">
-        <span className="panel-kicker">History</span>
-        <h3>任务历史</h3>
-        <p>任务提交后会在后台继续执行，关页后重新打开也能继续查看。</p>
-      </div>
-
       {error ? <p className="error-text history-panel-error">{error}</p> : null}
       <div className="history-list history-list-content">
         {runs.length === 0 && !error ? (
