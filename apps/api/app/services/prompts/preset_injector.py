@@ -39,9 +39,9 @@ def apply_preset_patches(
 
     try:
         # Late import to avoid circular dependencies
-        from tools.prompt_optimizer.preset_matcher import _load_presets
-        from tools.prompt_optimizer.optimizer.variant_manager import apply_patch_to_text
         from tools.prompt_optimizer.models import PromptPatch
+        from tools.prompt_optimizer.optimizer.variant_manager import apply_patch_to_text
+        from tools.prompt_optimizer.preset_matcher import _load_presets
 
         presets = _load_presets()
         entry = next(
