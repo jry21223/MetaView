@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     preview_video_enabled: bool = True
     preview_html_output_dir: str = "data/html_previews"
     preview_render_backend: str = "auto"
-    render_runner: str = "local"
+    render_runner: str = "gvisor"
     gvisor_docker_binary: str = "docker"
     gvisor_runtime: str = "runsc"
     gvisor_image: str = "metaview-manim:latest"
@@ -57,6 +57,8 @@ class Settings(BaseSettings):
     manim_format: str = "mp4"
     manim_disable_caching: bool = True
     manim_render_timeout_s: float | None = None
+    cjk_font_family: str = "Noto Sans CJK SC"
+    cjk_font_path: str | None = None
     openai_api_key: str | None = None
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model: str | None = None

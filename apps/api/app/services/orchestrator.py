@@ -8,9 +8,13 @@ from app.schemas import (
     AgentDiagnostic,
     AgentTrace,
     CirValidationReport,
+    CJKFontSettingsRequest,
+    CorsSettingsRequest,
     CustomProviderUpsertRequest,
     CustomSubjectPromptRequest,
     CustomSubjectPromptResponse,
+    ManimSettingsRequest,
+    OpenAIProviderSettingsRequest,
     OutputMode,
     PipelineRequest,
     PipelineResponse,
@@ -21,6 +25,7 @@ from app.schemas import (
     PipelineSubmitResponse,
     PromptReferenceRequest,
     PromptReferenceResponse,
+    ProviderDefaultsRequest,
     ProviderDescriptor,
     ProviderKind,
     ProviderName,
@@ -69,9 +74,7 @@ class PipelineOrchestrator:
         self.repository.mark_inflight_runs_failed(
             "检测到服务重启，未完成的生成任务已标记为失败，请重新提交。"
         )
-        self.custom_provider_repository = CustomProviderRepository(
-            db_path=settings.history_db_path
-        )
+        self.custom_provider_repository = CustomProviderRepository(db_path=settings.history_db_path)
         self.preview_media_root = settings.preview_media_root
         self.openai_base_url = settings.openai_base_url
         self.openai_api_key = settings.openai_api_key
@@ -88,6 +91,40 @@ class PipelineOrchestrator:
         self.config_default_generation_provider = settings.default_generation_provider
         self.runtime_settings_defaults = RuntimeSettingsRequest(
             mock_provider_enabled=settings.mock_provider_enabled,
+            enabled_domains=settings.enabled_domains,
+            render_backend=settings.preview_render_backend,
+            manim=ManimSettingsRequest(
+                python_path=settings.manim_python_path,
+                cli_module=settings.manim_cli_module,
+                quality=settings.manim_quality,
+                format=settings.manim_format,
+                disable_caching=settings.manim_disable_caching,
+                render_timeout_s=settings.manim_render_timeout_s,
+            ),
+            cjk_font=CJKFontSettingsRequest(
+                family=settings.cjk_font_family,
+                path=settings.cjk_font_path,
+            ),
+            openai=OpenAIProviderSettingsRequest(
+                api_key=settings.openai_api_key,
+                base_url=settings.openai_base_url,
+                model=settings.openai_model,
+                router_model=settings.openai_router_model,
+                planning_model=settings.openai_planning_model,
+                coding_model=settings.openai_coding_model,
+                critic_model=settings.openai_critic_model,
+                test_model=settings.openai_test_model,
+                supports_vision=settings.openai_supports_vision,
+                timeout_s=settings.openai_timeout_s,
+            ),
+            default_providers=ProviderDefaultsRequest(
+                default_provider=settings.default_provider,
+                default_router_provider=settings.default_router_provider,
+                default_generation_provider=settings.default_generation_provider,
+            ),
+            cors=CorsSettingsRequest(
+                origin_regex=settings.cors_origin_regex,
+            ),
             tts=TTSSettingsRequest(
                 enabled=settings.preview_tts_enabled,
                 backend=settings.preview_tts_backend,
@@ -111,9 +148,7 @@ class PipelineOrchestrator:
         self.validator = CirValidator()
         self.repair_service = PipelineRepairService()
         self.max_repair_attempts = settings.max_repair_attempts
-        self.skill_registry = SubjectSkillRegistry(
-            enabled_domains=settings.enabled_topic_domains
-        )
+        self.skill_registry = SubjectSkillRegistry(enabled_domains=settings.enabled_topic_domains)
         self.planner = PlannerAgent()
         self.coder = CoderAgent()
         self.html_coder = HtmlCoderAgent()
@@ -146,9 +181,7 @@ class PipelineOrchestrator:
         self._refresh_runtime_dependencies()
 
     def get_runtime_settings(self) -> RuntimeSettingsResponse:
-        return RuntimeSettingsResponse.model_validate(
-            self.runtime_settings.to_response_payload()
-        )
+        return RuntimeSettingsResponse.model_validate(self.runtime_settings.to_response_payload())
 
     def update_runtime_settings(
         self,
@@ -177,9 +210,10 @@ class PipelineOrchestrator:
             openai_supports_vision=self.openai_supports_vision,
             openai_timeout_s=self.openai_timeout_s,
         )
-        default_provider = self.provider_registry.resolve_default_provider(
-            self.config_default_provider
-        ) or ProviderName.OPENAI.value
+        default_provider = (
+            self.provider_registry.resolve_default_provider(self.config_default_provider)
+            or ProviderName.OPENAI.value
+        )
         self.default_provider = default_provider
         self.default_router_provider = (
             self.provider_registry.resolve_default_provider(
@@ -237,9 +271,7 @@ class PipelineOrchestrator:
             settings=self.get_runtime_settings(),
         )
 
-    def generate_prompt_reference(
-        self, request: PromptReferenceRequest
-    ) -> PromptReferenceResponse:
+    def generate_prompt_reference(self, request: PromptReferenceRequest) -> PromptReferenceResponse:
         provider_name = request.provider or self.default_generation_provider
         provider = self.provider_registry.get(provider_name)
         if (
@@ -398,6 +430,20 @@ class PipelineOrchestrator:
             hints=planning_hints,
             include_skill_metadata=request.output_mode != OutputMode.HTML,
         )
+
+        try:
+            from tools.prompt_optimizer.preset_matcher import find_preset_by_cir_title
+
+            match = find_preset_by_cir_title(
+                cir_title=cir.title,
+                domain=cir.domain,
+            )
+            if match:
+                cir = cir.model_copy(update={"preset_id": match.entry_id})
+                logger.debug("CIR 命中预设: %s (score=%.1f)", match.name, match.score)
+        except Exception as exc:
+            logger.warning("预设打标失败（静默降级）: %s", exc)
+
         preview_narration_text = (
             self.build_pipeline_narration(cir) if request.enable_narration else None
         )
@@ -438,9 +484,7 @@ class PipelineOrchestrator:
             if prepared_script is not None:
                 renderer_script = prepared_script.code
                 detail = (
-                    f"；{prepared_script.diagnostics[0]}"
-                    if prepared_script.diagnostics
-                    else ""
+                    f"；{prepared_script.diagnostics[0]}" if prepared_script.diagnostics else ""
                 )
                 renderer_diagnostic_message = (
                     f"{generation_provider.descriptor.label} 已返回 Python Manim 脚本，"
@@ -526,7 +570,7 @@ class PipelineOrchestrator:
             )
 
             if (
-                sandbox_report.status.value == "failed"
+                sandbox_report.status == SandboxStatus.FAILED
                 and repair_count < self.max_repair_attempts
                 and request.sandbox_mode != SandboxMode.OFF
             ):
@@ -606,17 +650,22 @@ class PipelineOrchestrator:
             fallback_detail = (
                 f" 原因：{fallback_reason}。" if is_fallback and fallback_reason else ""
             )
-            agent_traces.append(AgentTrace(
-                agent="html_coder",
-                provider=provider_label,
-                model=model_label,
-                summary=(
-                    f"使用本地模板为《{cir.title}》生成 HTML 交互动画。{fallback_detail}".strip()
-                    if is_fallback
-                    else f"远程 provider 已为《{cir.title}》生成 HTML 交互动画。"
-                ),
-                raw_output=html_result.provider_raw_output,
-            ))
+            agent_traces.append(
+                AgentTrace(
+                    agent="html_coder",
+                    provider=provider_label,
+                    model=model_label,
+                    summary=(
+                        (
+                            f"使用本地模板为《{cir.title}》生成 HTML 交互动画。"
+                            f"{fallback_detail}".strip()
+                        )
+                        if is_fallback
+                        else f"远程 provider 已为《{cir.title}》生成 HTML 交互动画。"
+                    ),
+                    raw_output=html_result.provider_raw_output,
+                )
+            )
             html_artifacts = self.html_renderer.render(
                 html=html_script,
                 request_id=request_id,
@@ -680,9 +729,7 @@ class PipelineOrchestrator:
                             cir=cir,
                             renderer_script=renderer_script,
                             ui_theme=(
-                                request.ui_theme.value
-                                if request.ui_theme is not None
-                                else None
+                                request.ui_theme.value if request.ui_theme is not None else None
                             ),
                         )
                         agent_traces.append(critique_trace)
@@ -695,9 +742,7 @@ class PipelineOrchestrator:
                                 request_id=request_id,
                                 cir=cir,
                                 ui_theme=(
-                                    request.ui_theme.value
-                                    if request.ui_theme is not None
-                                    else None
+                                    request.ui_theme.value if request.ui_theme is not None else None
                                 ),
                             )
                             preview_video_url = preview_video.url
@@ -780,7 +825,8 @@ class PipelineOrchestrator:
                 repair_actions=repair_actions,
             ),
             step_timing=calculate_step_timing(
-                cir, renderer_script=renderer_script,
+                cir,
+                renderer_script=renderer_script,
                 source_code=effective_request.source_code or "",
             ),
         )
@@ -856,19 +902,13 @@ class PipelineOrchestrator:
             repair_actions.append(message)
             return None, message
 
-        prepared_script, prepare_error = self._prepare_provider_script(
-            repair_hints.renderer_script
-        )
+        prepared_script, prepare_error = self._prepare_provider_script(repair_hints.renderer_script)
         if prepared_script is None:
             message = f"远程修复返回的脚本仍不可执行：{prepare_error}"
             repair_actions.append(message)
             return None, message
 
-        detail = (
-            f"；{prepared_script.diagnostics[0]}"
-            if prepared_script.diagnostics
-            else ""
-        )
+        detail = f"；{prepared_script.diagnostics[0]}" if prepared_script.diagnostics else ""
         message = (
             f"{generation_provider.descriptor.label} 已根据 {stage_label} 阶段的错误反馈修复脚本"
             f"{detail}"
@@ -892,9 +932,14 @@ class PipelineOrchestrator:
             include_raw_output=include_raw_output,
         )
 
-    def upsert_custom_provider(
-        self, payload: CustomProviderUpsertRequest
-    ) -> ProviderDescriptor:
+    def delete_run(self, request_id: str) -> bool:
+        """Delete a pipeline run by request_id.
+
+        Returns True if a row was deleted, False otherwise.
+        """
+        return self.repository.delete_run(request_id)
+
+    def upsert_custom_provider(self, payload: CustomProviderUpsertRequest) -> ProviderDescriptor:
         descriptor = self.provider_registry.upsert_custom_provider(payload)
         self._refresh_runtime_dependencies()
         return descriptor
@@ -918,9 +963,7 @@ class PipelineOrchestrator:
             return method(*args, **kwargs)
 
         filtered_kwargs = {
-            key: value
-            for key, value in kwargs.items()
-            if key in signature.parameters
+            key: value for key, value in kwargs.items() if key in signature.parameters
         }
         return method(*args, **filtered_kwargs)
 

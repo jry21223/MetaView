@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { useTheme } from "./hooks/core/useTheme";
 import { useRuntimeCatalog, resolveConfiguredProvider, activeProviderSupportsVision } from "./hooks/core/useRuntimeCatalog";
 import { useMouseGlow } from "./hooks/core/useMouseGlow";
@@ -196,7 +196,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<PipelineResponse | null>(null);
   const { runtimeCatalog, routerProvider, setRouterProvider, generationProvider, setGenerationProvider, refreshRuntimeCatalog } = useRuntimeCatalog();
-  const { runs, setRuns, historyError, setHistoryError, loadRuns } = useHistoryRuns();
+  const { runs, setRuns, historyError, setHistoryError, loadRuns, deleteRun } = useHistoryRuns();
   const [selectedRunId, setSelectedRunId] = useState<string | null>(getInitialSelectedRunId);
   const { theme, setTheme } = useTheme();
   const glowRef = useMouseGlow();
@@ -571,6 +571,14 @@ export default function App() {
     }
   }
 
+  const handleDeleteRun = useCallback(async (requestId: string) => {
+    const success = await deleteRun(requestId);
+    if (success && selectedRunId === requestId) {
+      setSelectedRunId(null);
+      setResult(null);
+    }
+  }, [deleteRun, selectedRunId]);
+
   useEffect(() => {
     if (!debugToolsOpen || !selectedRunId || !result) {
       return;
@@ -721,6 +729,7 @@ export default function App() {
               loading={loading}
 
               onSelectRun={handleSelectRun}
+              onDeleteRun={handleDeleteRun}
               onOpenInStudio={() => setActivePage("studio")}
               isRunningStatus={isRunningStatus}
             />

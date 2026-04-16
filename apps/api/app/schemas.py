@@ -108,7 +108,7 @@ class CirStep(BaseModel):
     annotations: list[str] = Field(default_factory=list)
     # 时间元数据（用于动画-代码联动）
     start_time: float | None = None  # 步骤开始时间（秒）
-    end_time: float | None = None    # 步骤结束时间（秒）
+    end_time: float | None = None  # 步骤结束时间（秒）
 
 
 class CirDocument(BaseModel):
@@ -117,6 +117,7 @@ class CirDocument(BaseModel):
     domain: TopicDomain
     summary: str
     steps: list[CirStep] = Field(default_factory=list)
+    preset_id: str | None = Field(default=None, description="命中的知识点预设 ID")
 
 
 class HtmlAnimationParam(BaseModel):
@@ -300,6 +301,162 @@ class ProviderDescriptor(BaseModel):
 
 
 TTSBackend = Literal["auto", "system", "openai_compatible"]
+RenderBackend = Literal["auto", "manim", "fallback"]
+ManimQuality = Literal["l", "m", "h", "p", "k"]
+ManimFormat = Literal["mp4", "webm", "gif"]
+
+
+def _strip_or_none(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    return normalized or None
+
+
+def _coerce_optional_float(value: float | str | None) -> float | str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        normalized = value.strip()
+        return normalized or None
+    return value
+
+
+class ManimSettingsRequest(BaseModel):
+    """Manim 渲染引擎配置"""
+
+    python_path: str = Field(default=".venv-manim/bin/python", max_length=300)
+    cli_module: str = Field(default="manim", max_length=100)
+    quality: ManimQuality = "h"
+    format: ManimFormat = "mp4"
+    disable_caching: bool = True
+    render_timeout_s: float | None = Field(default=None, gt=0)
+
+    @field_validator("python_path", "cli_module", mode="before")
+    @classmethod
+    def normalize_paths(cls, value: str | None) -> str | None:
+        return _strip_or_none(value)
+
+    @field_validator("render_timeout_s", mode="before")
+    @classmethod
+    def normalize_optional_timeout(cls, value: float | str | None) -> float | str | None:
+        return _coerce_optional_float(value)
+
+
+class ManimSettingsResponse(BaseModel):
+    python_path: str = ".venv-manim/bin/python"
+    cli_module: str = "manim"
+    quality: ManimQuality = "h"
+    format: ManimFormat = "mp4"
+    disable_caching: bool = True
+    render_timeout_s: float | None = None
+
+
+class CJKFontSettingsRequest(BaseModel):
+    """中文字体配置（统一用于真实 Manim 与 Fallback 预览）"""
+
+    family: str = Field(default="Noto Sans CJK SC", max_length=100)
+    path: str | None = Field(default=None, max_length=300)
+
+    @field_validator("family", "path", mode="before")
+    @classmethod
+    def normalize_strings(cls, value: str | None) -> str | None:
+        return _strip_or_none(value)
+
+
+class CJKFontSettingsResponse(BaseModel):
+    family: str = "Noto Sans CJK SC"
+    path: str | None = None
+
+
+class OpenAIProviderSettingsRequest(BaseModel):
+    """内置 OpenAI 兼容 Provider 配置"""
+
+    api_key: str | None = Field(default=None, max_length=300)
+    base_url: str = Field(default="https://api.openai.com/v1", max_length=300)
+    model: str | None = Field(default=None, max_length=100)
+    router_model: str | None = Field(default=None, max_length=100)
+    planning_model: str | None = Field(default=None, max_length=100)
+    coding_model: str | None = Field(default=None, max_length=100)
+    critic_model: str | None = Field(default=None, max_length=100)
+    test_model: str | None = Field(default=None, max_length=100)
+    supports_vision: bool = False
+    timeout_s: float | None = Field(default=300.0, gt=0)
+
+    @field_validator(
+        "api_key",
+        "base_url",
+        "model",
+        "router_model",
+        "planning_model",
+        "coding_model",
+        "critic_model",
+        "test_model",
+        mode="before",
+    )
+    @classmethod
+    def normalize_optional_strings(cls, value: str | None) -> str | None:
+        return _strip_or_none(value)
+
+    @field_validator("timeout_s", mode="before")
+    @classmethod
+    def normalize_optional_timeout(cls, value: float | str | None) -> float | str | None:
+        return _coerce_optional_float(value)
+
+
+class OpenAIProviderSettingsResponse(BaseModel):
+    api_key_configured: bool = False
+    base_url: str = "https://api.openai.com/v1"
+    model: str | None = None
+    router_model: str | None = None
+    planning_model: str | None = None
+    coding_model: str | None = None
+    critic_model: str | None = None
+    test_model: str | None = None
+    supports_vision: bool = False
+    timeout_s: float | None = 300.0
+
+
+class ProviderDefaultsRequest(BaseModel):
+    """默认 Provider 选择"""
+
+    default_provider: str | None = Field(default=None, max_length=100)
+    default_router_provider: str | None = Field(default=None, max_length=100)
+    default_generation_provider: str | None = Field(default=None, max_length=100)
+
+    @field_validator(
+        "default_provider",
+        "default_router_provider",
+        "default_generation_provider",
+        mode="before",
+    )
+    @classmethod
+    def normalize_optional_strings(cls, value: str | None) -> str | None:
+        return _strip_or_none(value)
+
+
+class ProviderDefaultsResponse(BaseModel):
+    default_provider: str | None = None
+    default_router_provider: str | None = None
+    default_generation_provider: str | None = None
+
+
+class CorsSettingsRequest(BaseModel):
+    """CORS 跨域配置"""
+
+    origin_regex: str = Field(
+        default=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+        max_length=500,
+    )
+
+    @field_validator("origin_regex", mode="before")
+    @classmethod
+    def normalize_regex(cls, value: str | None) -> str | None:
+        return _strip_or_none(value)
+
+
+class CorsSettingsResponse(BaseModel):
+    origin_regex: str = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
 
 
 class TTSSettingsRequest(BaseModel):
@@ -317,20 +474,12 @@ class TTSSettingsRequest(BaseModel):
     @field_validator("base_url", "api_key", "voice", mode="before")
     @classmethod
     def normalize_optional_string(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
-        normalized = value.strip()
-        return normalized or None
+        return _strip_or_none(value)
 
     @field_validator("timeout_s", mode="before")
     @classmethod
     def normalize_optional_timeout(cls, value: float | str | None) -> float | str | None:
-        if value is None:
-            return None
-        if isinstance(value, str):
-            normalized = value.strip()
-            return normalized or None
-        return value
+        return _coerce_optional_float(value)
 
 
 class TTSSettingsResponse(BaseModel):
@@ -347,12 +496,36 @@ class TTSSettingsResponse(BaseModel):
 
 
 class RuntimeSettingsRequest(BaseModel):
+    """运行时可编辑配置（存 SQLite，不依赖环境变量）"""
+
     mock_provider_enabled: bool = True
+    enabled_domains: str = "algorithm,math,code,physics,chemistry,biology,geography"
+    render_backend: RenderBackend = "auto"
+    manim: ManimSettingsRequest = Field(default_factory=ManimSettingsRequest)
+    cjk_font: CJKFontSettingsRequest = Field(default_factory=CJKFontSettingsRequest)
+    openai: OpenAIProviderSettingsRequest = Field(default_factory=OpenAIProviderSettingsRequest)
+    default_providers: ProviderDefaultsRequest = Field(default_factory=ProviderDefaultsRequest)
+    cors: CorsSettingsRequest = Field(default_factory=CorsSettingsRequest)
     tts: TTSSettingsRequest = Field(default_factory=TTSSettingsRequest)
+
+    @field_validator("enabled_domains", mode="before")
+    @classmethod
+    def normalize_domains(cls, value: str | None) -> str:
+        if value is None:
+            return "algorithm,math,code,physics,chemistry,biology,geography"
+        normalized = value.strip()
+        return normalized or "algorithm,math,code,physics,chemistry,biology,geography"
 
 
 class RuntimeSettingsResponse(BaseModel):
     mock_provider_enabled: bool = True
+    enabled_domains: str = "algorithm,math,code,physics,chemistry,biology,geography"
+    render_backend: RenderBackend = "auto"
+    manim: ManimSettingsResponse = Field(default_factory=ManimSettingsResponse)
+    cjk_font: CJKFontSettingsResponse = Field(default_factory=CJKFontSettingsResponse)
+    openai: OpenAIProviderSettingsResponse = Field(default_factory=OpenAIProviderSettingsResponse)
+    default_providers: ProviderDefaultsResponse = Field(default_factory=ProviderDefaultsResponse)
+    cors: CorsSettingsResponse = Field(default_factory=CorsSettingsResponse)
     tts: TTSSettingsResponse = Field(default_factory=TTSSettingsResponse)
 
 

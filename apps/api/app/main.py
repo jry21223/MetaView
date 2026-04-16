@@ -18,6 +18,7 @@ from app.schemas import (
     ManimScriptPrepareResponse,
     ManimScriptRenderRequest,
     ManimScriptRenderResponse,
+    OutputMode,
     PipelineRequest,
     PipelineResponse,
     PipelineRunDetail,
@@ -29,6 +30,7 @@ from app.schemas import (
     RuntimeCatalog,
     RuntimeSettingsRequest,
     RuntimeSettingsResponse,
+    SandboxMode,
 )
 from app.services.manim_script import ManimScriptError, prepare_manim_script
 from app.services.orchestrator import PipelineOrchestrator
@@ -90,6 +92,13 @@ def _log_hint(error_id: str) -> str:
 def _reject_blocked_request(reasons: list[str]) -> None:
     if reasons:
         raise HTTPException(status_code=400, detail="；".join(reasons))
+
+
+def _apply_safety_review(request: PipelineRequest) -> PipelineRequest:
+    return request.model_copy(update={
+        "sandbox_mode": SandboxMode.DRY_RUN,
+        "output_mode": OutputMode.HTML,
+    })
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -166,7 +175,10 @@ def run_pipeline(request: PipelineRequest) -> PipelineResponse:
         source_image_name=request.source_image_name,
     )
     if inspection.decision == SafetyVerdict.BLOCK:
-        _reject_blocked_request(inspection.reasons)
+        _reject_blocked_request(inspection.reasons or ["高风险请求已拦截"])
+    elif inspection.decision == SafetyVerdict.REVIEW:
+        request = _apply_safety_review(request)
+
     try:
         return orchestrator.run(request)
     except ProviderUnavailableError as exc:
@@ -188,7 +200,10 @@ def submit_pipeline(request: PipelineRequest) -> PipelineSubmitResponse:
         source_image_name=request.source_image_name,
     )
     if inspection.decision == SafetyVerdict.BLOCK:
-        _reject_blocked_request(inspection.reasons)
+        _reject_blocked_request(inspection.reasons or ["高风险请求已拦截"])
+    elif inspection.decision == SafetyVerdict.REVIEW:
+        request = _apply_safety_review(request)
+
     try:
         return orchestrator.submit_run(request)
     except ProviderUnavailableError as exc:
@@ -233,8 +248,8 @@ def render_manim_endpoint(
     payload: ManimScriptRenderRequest,
 ) -> ManimScriptRenderResponse:
     inspection = inspect_manim_source(payload.source)
-    if inspection.decision == SafetyVerdict.BLOCK:
-        _reject_blocked_request(inspection.reasons)
+    if inspection.decision in (SafetyVerdict.BLOCK, SafetyVerdict.REVIEW):
+        _reject_blocked_request(inspection.reasons or ["高风险渲染请求已拦截"])
     try:
         prepared = prepare_manim_script(
             payload.source,
@@ -344,6 +359,14 @@ def get_pipeline_run(
     if run is None:
         raise HTTPException(status_code=404, detail="Pipeline run not found")
     return run
+
+
+@app.delete(f"{settings.api_prefix}/runs/{{request_id}}")
+def delete_pipeline_run(request_id: str) -> dict[str, bool]:
+    deleted = orchestrator.delete_run(request_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Pipeline run not found")
+    return {"deleted": True}
 
 
 @app.post(f"{settings.api_prefix}/providers/custom", response_model=ProviderDescriptor)

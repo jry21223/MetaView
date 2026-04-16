@@ -224,15 +224,20 @@ class OpenAICompatibleProvider:
         return hints, trace
 
     def code(self, cir: CirDocument, ui_theme: str | None = None) -> tuple[CodingHints, AgentTrace]:
+        from app.services.prompts.preset_injector import apply_preset_patches
+
+        system_prompt = build_coder_system_prompt(
+            cir.domain,
+            title=cir.title,
+            summary=cir.summary,
+            cir_json=cir.model_dump_json(indent=2),
+            ui_theme=ui_theme,
+        )
+        system_prompt = apply_preset_patches(cir.preset_id, system_prompt)
+
         content, raw_output = self._chat_text(
             stage="coding",
-            system_prompt=build_coder_system_prompt(
-                cir.domain,
-                title=cir.title,
-                summary=cir.summary,
-                cir_json=cir.model_dump_json(indent=2),
-                ui_theme=ui_theme,
-            ),
+            system_prompt=system_prompt,
             user_prompt=build_coder_user_prompt(
                 title=cir.title,
                 domain=cir.domain.value,
@@ -624,13 +629,12 @@ class OpenAICompatibleProvider:
         """Return the completion max_tokens for a given pipeline stage.
 
         HTML coding generates a full self-contained HTML page and needs a
-        larger budget than other stages; providers like DeepSeek default to
-        4096 which truncates the output mid-document and fails the
-        ``missing-html-close`` bootstrap check. DeepSeek caps max_tokens at
-        8192, so we use that for html_coding / coding / repair stages.
+        larger budget than other stages.  16384 is safe for all major
+        providers (GLM, GPT-4, Claude); DeepSeek will silently clamp to
+        its own 8192 server-side.
         """
         if stage in {"html_coding", "coding", "repair"}:
-            return 8192
+            return 16384
         return None
 
     def _normalize_stage_models(self, stage_models: dict[str, str]) -> dict[str, str]:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from contextlib import closing
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -19,7 +19,6 @@ from app.schemas import (
     RuntimeSettingsRequest,
     SandboxStatus,
     TopicDomain,
-    TTSSettingsRequest,
 )
 
 
@@ -58,6 +57,74 @@ class StoredCustomProvider:
 
 
 @dataclass(frozen=True)
+class StoredManimSettings:
+    python_path: str
+    cli_module: str
+    quality: str
+    format: str
+    disable_caching: bool
+    render_timeout_s: float | None
+
+    def to_response_payload(self) -> dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class StoredCJKFontSettings:
+    family: str
+    path: str | None
+
+    def to_response_payload(self) -> dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class StoredOpenAIProviderSettings:
+    api_key: str | None
+    base_url: str
+    model: str | None
+    router_model: str | None
+    planning_model: str | None
+    coding_model: str | None
+    critic_model: str | None
+    test_model: str | None
+    supports_vision: bool
+    timeout_s: float | None
+
+    def to_response_payload(self) -> dict[str, object]:
+        return {
+            "api_key_configured": bool(self.api_key),
+            "base_url": self.base_url,
+            "model": self.model,
+            "router_model": self.router_model,
+            "planning_model": self.planning_model,
+            "coding_model": self.coding_model,
+            "critic_model": self.critic_model,
+            "test_model": self.test_model,
+            "supports_vision": self.supports_vision,
+            "timeout_s": self.timeout_s,
+        }
+
+
+@dataclass(frozen=True)
+class StoredProviderDefaults:
+    default_provider: str | None
+    default_router_provider: str | None
+    default_generation_provider: str | None
+
+    def to_response_payload(self) -> dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class StoredCorsSettings:
+    origin_regex: str
+
+    def to_response_payload(self) -> dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class StoredTTSSettings:
     enabled: bool
     backend: str
@@ -88,11 +155,25 @@ class StoredTTSSettings:
 @dataclass(frozen=True)
 class StoredRuntimeSettings:
     mock_provider_enabled: bool
+    enabled_domains: str
+    render_backend: str
+    manim: StoredManimSettings
+    cjk_font: StoredCJKFontSettings
+    openai: StoredOpenAIProviderSettings
+    default_providers: StoredProviderDefaults
+    cors: StoredCorsSettings
     tts: StoredTTSSettings
 
     def to_response_payload(self) -> dict[str, object]:
         return {
             "mock_provider_enabled": self.mock_provider_enabled,
+            "enabled_domains": self.enabled_domains,
+            "render_backend": self.render_backend,
+            "manim": self.manim.to_response_payload(),
+            "cjk_font": self.cjk_font.to_response_payload(),
+            "openai": self.openai.to_response_payload(),
+            "default_providers": self.default_providers.to_response_payload(),
+            "cors": self.cors.to_response_payload(),
             "tts": self.tts.to_response_payload(),
         }
 
@@ -320,10 +401,14 @@ class RunRepository:
                     response.runtime.provider.name if response.runtime.provider else "",
                     response.runtime.router_provider.name
                     if response.runtime.router_provider
-                    else response.runtime.provider.name if response.runtime.provider else "",
+                    else response.runtime.provider.name
+                    if response.runtime.provider
+                    else "",
                     response.runtime.generation_provider.name
                     if response.runtime.generation_provider
-                    else response.runtime.provider.name if response.runtime.provider else "",
+                    else response.runtime.provider.name
+                    if response.runtime.provider
+                    else "",
                     response.runtime.sandbox.status.value,
                     json.dumps(effective_request.model_dump(mode="json"), ensure_ascii=False),
                     json.dumps(response.model_dump(mode="json"), ensure_ascii=False),
@@ -366,10 +451,14 @@ class RunRepository:
                     response.runtime.provider.name if response.runtime.provider else "",
                     response.runtime.router_provider.name
                     if response.runtime.router_provider
-                    else response.runtime.provider.name if response.runtime.provider else "",
+                    else response.runtime.provider.name
+                    if response.runtime.provider
+                    else "",
                     response.runtime.generation_provider.name
                     if response.runtime.generation_provider
-                    else response.runtime.provider.name if response.runtime.provider else "",
+                    else response.runtime.provider.name
+                    if response.runtime.provider
+                    else "",
                     response.runtime.sandbox.status.value,
                     json.dumps(effective_request.model_dump(mode="json"), ensure_ascii=False),
                     json.dumps(response.model_dump(mode="json"), ensure_ascii=False),
@@ -603,6 +692,21 @@ class RunRepository:
         sanitized_payload = dict(payload)
         sanitized_payload["runtime"] = sanitized_runtime
         return sanitized_payload
+
+    def delete_run(self, request_id: str) -> bool:
+        """Delete a pipeline run by request_id.
+
+        Returns True if a row was deleted, False otherwise.
+        """
+        with closing(self._connect()) as connection, connection:
+            cursor = connection.execute(
+                """
+                DELETE FROM pipeline_runs
+                WHERE request_id = ?
+                """,
+                (request_id,),
+            )
+            return cursor.rowcount > 0
 
 
 class CustomProviderRepository:
@@ -851,21 +955,7 @@ class RuntimeSettingsRepository:
         *,
         defaults: RuntimeSettingsRequest,
     ) -> StoredRuntimeSettings:
-        stored_payload = {
-            "mock_provider_enabled": payload.mock_provider_enabled,
-            "tts": {
-                "enabled": payload.tts.enabled,
-                "backend": payload.tts.backend,
-                "model": payload.tts.model,
-                "base_url": payload.tts.base_url,
-                "api_key": payload.tts.api_key,
-                "voice": payload.tts.voice,
-                "rate_wpm": payload.tts.rate_wpm,
-                "speed": payload.tts.speed,
-                "max_chars": payload.tts.max_chars,
-                "timeout_s": payload.tts.timeout_s,
-            },
-        }
+        stored_payload = payload.model_dump(mode="json")
 
         with closing(self._connect()) as connection, connection:
             connection.execute(
@@ -887,13 +977,24 @@ class RuntimeSettingsRepository:
         stored_payload: dict[str, object],
     ) -> dict[str, object]:
         merged = dict(default_payload)
+        # 顶层字段
         merged["mock_provider_enabled"] = stored_payload.get(
             "mock_provider_enabled",
             default_payload["mock_provider_enabled"],
         )
-        merged_tts = dict(default_payload.get("tts", {}))
-        merged_tts.update(stored_payload.get("tts", {}))
-        merged["tts"] = merged_tts
+        merged["enabled_domains"] = stored_payload.get(
+            "enabled_domains",
+            default_payload["enabled_domains"],
+        )
+        merged["render_backend"] = stored_payload.get(
+            "render_backend",
+            default_payload["render_backend"],
+        )
+        # 嵌套对象逐层合并
+        for key in ("manim", "cjk_font", "openai", "default_providers", "cors", "tts"):
+            merged_nested = dict(default_payload.get(key, {}))
+            merged_nested.update(stored_payload.get(key, {}))
+            merged[key] = merged_nested
         return merged
 
     def _build_runtime_settings(
@@ -901,19 +1002,14 @@ class RuntimeSettingsRepository:
         payload: dict[str, object],
     ) -> StoredRuntimeSettings:
         validated = RuntimeSettingsRequest.model_validate(payload)
-        tts_request = TTSSettingsRequest.model_validate(validated.tts.model_dump(mode="json"))
         return StoredRuntimeSettings(
             mock_provider_enabled=validated.mock_provider_enabled,
-            tts=StoredTTSSettings(
-                enabled=tts_request.enabled,
-                backend=tts_request.backend,
-                model=tts_request.model,
-                base_url=tts_request.base_url,
-                api_key=tts_request.api_key,
-                voice=tts_request.voice,
-                rate_wpm=tts_request.rate_wpm,
-                speed=tts_request.speed,
-                max_chars=tts_request.max_chars,
-                timeout_s=tts_request.timeout_s,
-            ),
+            enabled_domains=validated.enabled_domains,
+            render_backend=validated.render_backend,
+            manim=StoredManimSettings(**validated.manim.model_dump()),
+            cjk_font=StoredCJKFontSettings(**validated.cjk_font.model_dump()),
+            openai=StoredOpenAIProviderSettings(**validated.openai.model_dump()),
+            default_providers=StoredProviderDefaults(**validated.default_providers.model_dump()),
+            cors=StoredCorsSettings(**validated.cors.model_dump()),
+            tts=StoredTTSSettings(**validated.tts.model_dump()),
         )

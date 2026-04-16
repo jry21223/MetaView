@@ -135,6 +135,37 @@
   line-height: 1.5;
 }
 
+.history-item-delete {
+  margin-top: 10px;
+  margin-left: auto;
+  padding: 4px 10px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--on-surface-variant);
+  opacity: 0;
+  transition: all var(--transition-fast);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+}
+
+.history-item-delete-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.history-item:hover .history-item-delete {
+  opacity: 1;
+}
+
+.history-item-delete:hover {
+  background: color-mix(in srgb, var(--error) 10%, transparent);
+  color: var(--error);
+}
+
 .history-empty {
   padding: 32px 24px;
   color: var(--on-surface-variant);

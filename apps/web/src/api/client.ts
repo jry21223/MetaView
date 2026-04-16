@@ -132,6 +132,16 @@ export async function getPipelineRun(
   return (await response.json()) as PipelineRunDetail;
 }
 
+export async function deletePipelineRun(requestId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/runs/${requestId}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, "Delete run request failed"));
+  }
+}
+
 export async function upsertCustomProvider(
   payload: CustomProviderUpsertRequest,
 ): Promise<ProviderDescriptor> {

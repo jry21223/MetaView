@@ -1,5 +1,5 @@
 import { useState, useEffect, startTransition } from "react";
-import { getPipelineRuns } from "../../api/client";
+import { getPipelineRuns, deletePipelineRun } from "../../api/client";
 import type { PipelineRunSummary } from "../../types";
 
 export function useHistoryRuns() {
@@ -15,6 +15,18 @@ export function useHistoryRuns() {
     } catch (loadError) {
       setHistoryError(loadError instanceof Error ? loadError.message : "历史记录加载失败");
       return [];
+    }
+  }
+
+  async function deleteRun(requestId: string): Promise<boolean> {
+    try {
+      await deletePipelineRun(requestId);
+      setRuns((prevRuns) => prevRuns.filter((run) => run.request_id !== requestId));
+      if (historyError !== null) setHistoryError(null);
+      return true;
+    } catch (deleteError) {
+      setHistoryError(deleteError instanceof Error ? deleteError.message : "删除失败");
+      return false;
     }
   }
 
@@ -46,5 +58,5 @@ export function useHistoryRuns() {
     };
   }, []);
 
-  return { runs, setRuns, historyError, setHistoryError, loadRuns };
+  return { runs, setRuns, historyError, setHistoryError, loadRuns, deleteRun };
 }

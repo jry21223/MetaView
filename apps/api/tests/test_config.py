@@ -60,7 +60,7 @@ def test_settings_default_gvisor_render_config(tmp_path, monkeypatch) -> None:
 
     settings = Settings()
 
-    assert settings.render_runner == "local"
+    assert settings.render_runner == "gvisor"
     assert settings.gvisor_runtime == "runsc"
     assert settings.gvisor_network_enabled is False
     assert settings.gvisor_memory_limit_mb == 512

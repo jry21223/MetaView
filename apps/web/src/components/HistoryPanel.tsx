@@ -7,6 +7,7 @@ interface HistoryPanelProps {
   runs: PipelineRunSummary[];
   selectedRunId: string | null;
   onSelectRun: (requestId: string) => void;
+  onDeleteRun?: (requestId: string) => void;
 }
 
 function truncatePrompt(prompt: string, maxLength = 120): string {
@@ -34,6 +35,7 @@ export const HistoryPanel = memo(function HistoryPanel({
   runs,
   selectedRunId,
   onSelectRun,
+  onDeleteRun,
 }: HistoryPanelProps) {
   return (
     <section className="panel panel-history history-list-panel">
@@ -62,6 +64,23 @@ export const HistoryPanel = memo(function HistoryPanel({
               <span>{formatRunTime(run.created_at)}</span>
             </div>
             {run.error_message ? <p className="history-item-error">{run.error_message}</p> : null}
+            {onDeleteRun && (
+              <button
+                type="button"
+                className="history-item-delete"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (window.confirm("确定要删除此任务吗？")) {
+                    onDeleteRun(run.request_id);
+                  }
+                }}
+                title="删除此任务"
+                aria-label="删除此任务"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>delete</span>
+                <span className="history-item-delete-label">删除</span>
+              </button>
+            )}
           </button>
         ))}
       </div>

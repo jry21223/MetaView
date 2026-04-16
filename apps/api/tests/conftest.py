@@ -16,3 +16,8 @@ if TEST_DB_PATH.exists():
 os.environ["ALGO_VIS_HISTORY_DB_PATH"] = str(TEST_DB_PATH)
 os.environ["ALGO_VIS_ENABLED_DOMAINS"] = ENABLED_TEST_DOMAINS
 os.environ["ALGO_VIS_PREVIEW_RENDER_BACKEND"] = "fallback"
+os.environ["ALGO_VIS_MOCK_PROVIDER_ENABLED"] = "true"
+
+# Clear OpenAI API keys to ensure tests use mock/fallback behavior
+os.environ["ALGO_VIS_OPENAI_API_KEY"] = ""
+os.environ["OPENAI_API_KEY"] = ""

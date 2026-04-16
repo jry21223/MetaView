@@ -22,6 +22,7 @@ export interface HistoryPageProps {
   loading: boolean;
 
   onSelectRun: (requestId: string) => void;
+  onDeleteRun?: (requestId: string) => void;
   onOpenInStudio: () => void;
   isRunningStatus: (status: PipelineRunStatus) => boolean;
 }
@@ -36,6 +37,7 @@ export function HistoryPage({
   previewHtmlUrl,
   loading,
   onSelectRun,
+  onDeleteRun,
   onOpenInStudio,
   isRunningStatus
 }: HistoryPageProps) {
@@ -56,6 +58,7 @@ export function HistoryPage({
           runs={runs}
           selectedRunId={selectedRunId}
           onSelectRun={onSelectRun}
+          onDeleteRun={onDeleteRun}
         />
 
         <section className="panel panel-history-detail history-detail-panel">

@@ -32,6 +32,10 @@ _DANGEROUS_IMPORT_NAMES = {
     "tempfile",
     "shutil",
     "importlib",
+    "sys",
+    "ctypes",
+    "builtins",
+    "pty",
 }
 _DANGEROUS_CALL_NAMES = {
     "eval",
@@ -39,6 +43,12 @@ _DANGEROUS_CALL_NAMES = {
     "compile",
     "open",
     "__import__",
+    "globals",
+    "locals",
+    "getattr",
+    "setattr",
+    "delattr",
+    "type",
 }
 _DANGEROUS_ATTRIBUTE_CALLS = {
     ("os", "system"),

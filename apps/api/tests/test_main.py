@@ -11,6 +11,7 @@ from app.schemas import (
     CustomProviderUpsertRequest,
     HtmlAnimationKind,
     PipelineRunStatus,
+    ProviderDefaultsRequest,
     ProviderDescriptor,
     ProviderKind,
     RuntimeSettingsRequest,
@@ -1393,6 +1394,18 @@ def test_pipeline_html_mode_rejects_unsafe_provider_runtime_html(monkeypatch, tm
 
 
 def test_runtime_catalog() -> None:
+    # Ensure mock provider is enabled and default providers are cleared for this test
+    orchestrator.update_runtime_settings(
+        RuntimeSettingsRequest(
+            mock_provider_enabled=True,
+            default_providers=ProviderDefaultsRequest(
+                default_provider=None,
+                default_router_provider=None,
+                default_generation_provider=None,
+            ),
+        )
+    )
+
     response = client.get("/api/v1/runtime")
     assert response.status_code == 200
 
@@ -2346,6 +2359,11 @@ def test_runtime_catalog_prefers_configured_provider_when_mock_disabled() -> Non
             "/api/v1/runtime/settings",
             json={
                 "mock_provider_enabled": False,
+                "default_providers": {
+                    "default_provider": None,
+                    "default_router_provider": None,
+                    "default_generation_provider": None,
+                },
                 "tts": restore_payload.tts.model_dump(mode="json"),
             },
         )
