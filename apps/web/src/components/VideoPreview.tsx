@@ -93,6 +93,7 @@ export function VideoPreview({
   };
 
   const handleLoadedMetadata = () => {
+    setIsLoading(false);
     reportDuration();
   };
 

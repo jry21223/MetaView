@@ -356,7 +356,7 @@ export function StudioPage({
               </div>
             ) : (
               <div className="bento-grid" style={{ marginTop: "20px" }}>
-                <div className="bento-card bento-card-xl">
+                <div className={`bento-card ${showSourcePanel ? "bento-card-xl" : "bento-card-full"}`}>
                   <div className="video-preview">
                     <div className="video-preview-header">
                       <div>

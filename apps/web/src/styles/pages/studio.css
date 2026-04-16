@@ -1190,6 +1190,7 @@
 
 .preview-video-shell {
   aspect-ratio: 16 / 9;
+  max-height: 70vh;
   background: var(--background);
   display: flex;
   align-items: center;
