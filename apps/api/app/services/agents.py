@@ -655,6 +655,8 @@ class HtmlCoderAgent:
                     title=cir.title,
                     domain=cir.domain.value,
                     ui_theme=ui_theme,
+                    cir=cir,
+                    original_prompt=original_prompt,
                 )
                 self._last_system_prompt = system_prompt
                 self._last_user_prompt = user_prompt

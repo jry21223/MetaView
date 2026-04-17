@@ -2,8 +2,31 @@ from app.schemas import TopicDomain, VisualKind
 from app.services.prompts.coder import build_coder_system_prompt
 from app.services.prompts.critic import build_critic_system_prompt, build_critic_user_prompt
 from app.services.prompts.planner import build_planner_system_prompt, build_planner_user_prompt
+from app.services.prompts.preset_injector import apply_preset_patches, find_preset_by_cir_title
 from app.services.prompts.repair import build_repair_system_prompt, build_repair_user_prompt
 from app.services.source_code_module import inspect_source_code
+
+
+def test_preset_injector_matches_binary_tree_without_tools_import_path_hack() -> None:
+    match = find_preset_by_cir_title("二叉树中序遍历", TopicDomain.ALGORITHM)
+
+    assert match is not None
+    assert match.entry_id == "binary_tree"
+
+
+
+def test_preset_injector_applies_binary_tree_patch_content() -> None:
+    base_prompt = "## Rendering Constraints\n原始内容\n\n## Universal Visual Contract\n基础规则\n"
+
+    patched = apply_preset_patches("binary_tree", base_prompt)
+
+    assert "Pacing and Scene Setup" in patched
+    assert "Algorithmic Highlighting Contract" in patched
+    assert "## ##" not in patched
+    assert patched.count("## Rendering Constraints") == 1
+    assert patched.count("## Universal Visual Contract") == 1
+    assert patched != base_prompt
+
 
 
 def test_code_planner_prompt_selects_cpp_array_board() -> None:

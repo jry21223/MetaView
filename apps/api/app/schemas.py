@@ -129,17 +129,20 @@ class HtmlAnimationParam(BaseModel):
 class HtmlAnimationStepPayload(BaseModel):
     id: str = Field(min_length=1, max_length=120)
     title: str = Field(min_length=1, max_length=200)
-    narration: str = Field(min_length=1, max_length=2000)
+    narration: str = Field(min_length=1, max_length=3000)
     visual_kind: VisualKind
     tokens: list[VisualToken] = Field(default_factory=list)
-    duration_ms: int | None = Field(default=None, ge=120, le=8000)
-    emphasis_token_ids: list[str] = Field(default_factory=list, max_length=8)
+    duration_ms: int | None = Field(default=None, ge=120, le=10000)
+    emphasis_token_ids: list[str] = Field(default_factory=list, max_length=12)
+    # 动画意图提示，帮助 scaffold runtime 选择过渡类型
+    # 可选值: "enter" | "exit" | "highlight" | "swap" | "compare" | "reveal" | "transform"
+    animation_hint: str | None = Field(default=None, max_length=64)
 
 
 class HtmlFlowNodePayload(BaseModel):
     id: str = Field(min_length=1, max_length=120)
-    x: int = Field(ge=0, le=800)
-    y: int = Field(ge=0, le=400)
+    x: int = Field(ge=0, le=1000)
+    y: int = Field(ge=0, le=600)
     label: str = Field(min_length=1, max_length=120)
     kind: Literal["start", "process", "decision", "end"] = "process"
 
@@ -147,14 +150,14 @@ class HtmlFlowNodePayload(BaseModel):
     @classmethod
     def clamp_x(cls, value: int | str) -> int | str:
         if isinstance(value, int):
-            return min(max(value, 0), 800)
+            return min(max(value, 0), 1000)
         return value
 
     @field_validator("y", mode="before")
     @classmethod
     def clamp_y(cls, value: int | str) -> int | str:
         if isinstance(value, int):
-            return min(max(value, 0), 400)
+            return min(max(value, 0), 600)
         return value
 
 
@@ -178,9 +181,9 @@ class HtmlAnimationPayload(BaseModel):
     kind: HtmlAnimationKind = HtmlAnimationKind.GENERIC
     title: str = Field(min_length=1, max_length=200)
     summary: str = Field(default="", max_length=2000)
-    steps: list[HtmlAnimationStepPayload] = Field(default_factory=list, max_length=24)
-    params: list[HtmlAnimationParam] = Field(default_factory=list, max_length=8)
-    flow_nodes: list[HtmlFlowNodePayload] = Field(default_factory=list, max_length=24)
+    steps: list[HtmlAnimationStepPayload] = Field(default_factory=list, max_length=36)
+    params: list[HtmlAnimationParam] = Field(default_factory=list, max_length=12)
+    flow_nodes: list[HtmlFlowNodePayload] = Field(default_factory=list, max_length=32)
     flow_links: list[HtmlFlowLinkPayload] = Field(default_factory=list, max_length=32)
     flow_steps: list[HtmlFlowStepPayload] = Field(default_factory=list, max_length=32)
 

@@ -610,7 +610,7 @@ class OpenAICompatibleProvider:
             ],
             "temperature": self.temperature,
         }
-        max_tokens = self._max_tokens_for_stage(stage)
+        max_tokens = self._max_tokens_for_stage(stage, endpoint=endpoint)
         if max_tokens is not None:
             payload["max_tokens"] = max_tokens
         response = httpx.post(
@@ -625,17 +625,13 @@ class OpenAICompatibleProvider:
         return response
 
     @staticmethod
-    def _max_tokens_for_stage(stage: str | None) -> int | None:
-        """Return the completion max_tokens for a given pipeline stage.
-
-        HTML coding generates a full self-contained HTML page and needs a
-        larger budget than other stages.  16384 is safe for all major
-        providers (GLM, GPT-4, Claude); DeepSeek will silently clamp to
-        its own 8192 server-side.
-        """
-        if stage in {"html_coding", "coding", "repair"}:
-            return 16384
-        return None
+    def _max_tokens_for_stage(stage: str | None, *, endpoint: str | None = None) -> int | None:
+        """Return the completion max_tokens for a given pipeline stage."""
+        if stage not in {"html_coding", "coding", "repair"}:
+            return None
+        if endpoint and "api.deepseek.com" in endpoint.lower():
+            return 8192
+        return 16384
 
     def _normalize_stage_models(self, stage_models: dict[str, str]) -> dict[str, str]:
         normalized: dict[str, str] = {}

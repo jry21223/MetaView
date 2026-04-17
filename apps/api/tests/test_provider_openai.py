@@ -185,6 +185,125 @@ def test_openai_provider_retries_connect_error_without_env_proxy(monkeypatch) ->
     assert calls == [True, False]
 
 
+def test_openai_provider_uses_deepseek_compatible_max_tokens(monkeypatch) -> None:
+    for stage in ("html_coding", "coding", "repair"):
+        provider = OpenAICompatibleProvider(
+            api_key="test-key",
+            model="deepseek-chat",
+            base_url="https://api.deepseek.com/v1",
+        )
+
+        seen_payloads: list[dict] = []
+
+        class FakeResponse:
+            def raise_for_status(self) -> None:
+                return None
+
+            def json(self) -> dict:
+                return {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": "<!doctype html><html><body></body></html>"
+                            }
+                        }
+                    ]
+                }
+
+        def fake_post(*args, seen_payloads: list[dict] = seen_payloads, **kwargs):
+            seen_payloads.append(kwargs["json"])
+            return FakeResponse()
+
+        monkeypatch.setattr(httpx, "post", fake_post)
+
+        provider._chat_text(
+            stage=stage,
+            system_prompt="system",
+            user_prompt="user",
+        )
+
+        assert seen_payloads[0]["max_tokens"] == 8192
+
+
+def test_openai_provider_uses_default_large_max_tokens_for_other_compatible_apis(monkeypatch) -> None:
+    for stage in ("html_coding", "coding", "repair"):
+        provider = OpenAICompatibleProvider(
+            api_key="test-key",
+            model="test-model",
+            base_url="https://example.com/v1",
+        )
+
+        seen_payloads: list[dict] = []
+
+        class FakeResponse:
+            def raise_for_status(self) -> None:
+                return None
+
+            def json(self) -> dict:
+                return {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": "<!doctype html><html><body></body></html>"
+                            }
+                        }
+                    ]
+                }
+
+        def fake_post(*args, seen_payloads: list[dict] = seen_payloads, **kwargs):
+            seen_payloads.append(kwargs["json"])
+            return FakeResponse()
+
+        monkeypatch.setattr(httpx, "post", fake_post)
+
+        provider._chat_text(
+            stage=stage,
+            system_prompt="system",
+            user_prompt="user",
+        )
+
+        assert seen_payloads[0]["max_tokens"] == 16384
+
+
+def test_openai_provider_omits_max_tokens_for_non_render_stages(monkeypatch) -> None:
+    provider = OpenAICompatibleProvider(
+        api_key="test-key",
+        model="test-model",
+        base_url="https://api.deepseek.com/v1",
+    )
+
+    seen_payloads: list[dict] = []
+
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": '{"focus":"plan","concepts":[],"warnings":[]}'
+                        }
+                    }
+                ]
+            }
+
+    def fake_post(*args, **kwargs):
+        seen_payloads.append(kwargs["json"])
+        return FakeResponse()
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+
+    provider._chat_text(
+        stage="planning",
+        system_prompt="system",
+        user_prompt="user",
+    )
+
+    assert "max_tokens" not in seen_payloads[0]
+
+
 def test_openai_provider_uses_stage_specific_models(monkeypatch) -> None:
     provider = OpenAICompatibleProvider(
         api_key="test-key",

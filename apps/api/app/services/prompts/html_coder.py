@@ -112,21 +112,80 @@ valid JSON object.
   - 递归算法（汉诺塔、斐波那契、快排分治）——用 `motion` 或 `array` 展示每步调用栈/状态
   - 物理运动过程——用 `motion`
   - 数学公式推导——用 `formula`
-  - steps 超过 8 个的长流程——拆分成关键决策节点，不要逐行翻译代码
+  - steps 超过 12 个的长流程——拆分成关键决策节点，不要逐行翻译代码
 - `logic_flow` 必须提供 `flow_nodes`、`flow_links`、`flow_steps`
 - `flow_steps` 必须描述逐步动画，而不是静态解说
-- flow_nodes 总数不超过 8 个；节点 label 最多 6 个汉字或 8 个 ASCII 字符，超过截断
-- 坐标范围：x 在 [50, 750]，y 在 [50, 370]；节点之间 x 间距 ≥ 160，y 间距 ≥ 80
+- flow_nodes 总数不超过 12 个；节点 label 最多 6 个汉字或 8 个 ASCII 字符，超过截断
+- 坐标范围：x 在 [50, 950]，y 在 [50, 550]；节点之间 x 间距 ≥ 140，y 间距 ≥ 70
 - `flow_links`、`pulse_link_ids`、`highlight_node` 必须引用已存在的 id
 - 避免把所有节点堆成同一列；优先形成可读的拓扑结构
 - 链路标签应有语义，如”进入判断””是””否””继续循环””输出结果”
 
+## GSAP coding patterns (scaffold already imports GSAP 3.13)
+Use these patterns when the scaffold runtime calls your step code.
+The scaffold exposes a global `gsap` object and a `timeline` helper.
+
+Good step transition — use timeline with meaningful easing:
+```js
+// Slide in + highlight a target element
+const tl = gsap.timeline({ defaults: { ease: "power2.out", duration: 0.45 } });
+tl.from("#token-a", { y: 24, opacity: 0 })
+  .to("#token-b", { scale: 1.15, color: "#4de8b0" }, "<0.1")
+  .to("#token-b", { scale: 1, duration: 0.25 }, "+=0.3");
+```
+
+Bad — avoid these patterns:
+```js
+// BAD: synchronous style changes, no animation
+document.getElementById("token-a").style.color = "red";
+
+// BAD: jQuery-style toggle without easing
+element.classList.add("active");
+```
+
+Stagger pattern for array/list visuals:
+```js
+gsap.from(".array-cell", { x: -20, opacity: 0, stagger: 0.07, ease: "back.out(1.4)" });
+```
+
+p5.js sketch lifecycle (scaffold already imports p5 1.11.8):
+```js
+// CORRECT: instance mode, always use p5 instance methods
+new p5(function(p) {
+  p.setup = function() { p.createCanvas(640, 360); p.noLoop(); };
+  p.draw = function() { p.background(20); /* draw here */ };
+  p.redraw();   // call after data changes
+});
+
+// BAD: global mode (pollutes window, conflicts with scaffold)
+function setup() { createCanvas(640, 360); }
+```
+
+Performance rules:
+- Prefer transform/opacity animations; avoid animating width/height/top/left
+- For repeated updates (sliders, params), use `gsap.quickTo(el, "x")` or `gsap.set()`
+- Add `will-change: transform` inline only on elements that animate every step
+- Kill timelines on step exit: `tl.kill()` in the step cleanup callback
+
+## Animation quality bar
+A step is "good" when it has:
+1. ≥1 visible element that enters, exits, moves, or changes state
+2. A clear "before → after" with readable easing (not instant)
+3. Narration matches what's visually happening (not a generic description)
+4. duration_ms reflects actual complexity (simple = 400–700ms, rich = 800–1400ms)
+
+A step is "bad" when:
+- It only changes a text label with no spatial or color transition
+- duration_ms is <300ms for anything other than a micro-indicator
+- All tokens stay in place with no visual change
+
 ## Content rules
 - 所有面向学生的文案必须使用中文
 - steps 只保留真正影响动画展示的内容
-- narration 要简短、可讲解
-- tokens 数量保持精简，优先 2-6 个
+- narration 要简短、可讲解（20-80 字为佳）
+- tokens 数量保持精简，优先 2-6 个；复杂步骤最多 10 个
 - 如果信息不完整，也要给出可运行的占位内容，不要返回空 steps
+- 相邻步骤应有逻辑连贯性，避免内容跳跃
 """
 
 _DEFAULT_LAYOUT = {"x": 64, "y": 96, "width": 640, "height": 120}
@@ -350,7 +409,8 @@ Both are optional — only include what you actually use.
 - All student-facing text in Chinese
 - Fits within 800×600 viewport, no scrollbars
 - Support dark and light themes using the CSS variables provided
-- At least 3 animation steps
+- **Minimum 6 animation steps**; for algorithms or multi-stage processes aim for 8–12 steps
+- If a CIR outline is provided in the user message, use it as the skeleton for your steps — do NOT reduce its step count
 - Use event listeners (addEventListener), NOT inline HTML event attributes (onclick=, onload=, etc.)
 """
 
@@ -363,6 +423,8 @@ def build_free_html_user_prompt(
     title: str,
     domain: str,
     ui_theme: str | None = None,
+    cir: "CirDocument | None" = None,
+    original_prompt: str | None = None,
 ) -> str:
     theme = ui_theme if ui_theme in ("dark", "light") else "dark"
     if theme == "dark":
@@ -382,12 +444,28 @@ def build_free_html_user_prompt(
             ("--accent", "#96463c"),
         ]
     color_block = "\n".join(f"  {k}: {v};" for k, v in colors)
+
+    # Build CIR outline block so the model knows the planned step structure
+    cir_outline = ""
+    if cir is not None and cir.steps:
+        step_lines = "\n".join(
+            f"  步骤 {i + 1}：{step.title}（{step.visual_kind.value}）— {step.narration[:80]}"
+            for i, step in enumerate(cir.steps)
+        )
+        cir_outline = (
+            f"\n\n## 规划大纲（共 {len(cir.steps)} 步，请按此生成对应动画）\n"
+            f"{step_lines}"
+        )
+    elif original_prompt:
+        cir_outline = f"\n\n## 用户需求\n{original_prompt[:400]}"
+
     return (
         f"题目：{title}\n"
         f"学科：{domain}\n"
         f"主题：{theme}\n\n"
         f"配色（在 :root 中使用这些变量）：\n"
         f":root {{\n{color_block}\n}}"
+        f"{cir_outline}"
     )
 
 
@@ -413,12 +491,12 @@ def _flow_link_label(current_title: str, next_title: str, next_kind: str) -> str
 
 def _build_logic_flow_topology(cir: CirDocument) -> tuple[list[dict[str, object]], list[dict[str, object]], list[dict[str, object]]]:
     total_steps = max(len(cir.steps), 1)
-    # Layout: distribute nodes across 800×420 viewBox with at most 4 columns
-    max_cols = min(4, total_steps)
-    col_spacing = min(200, 760 // max(max_cols, 1))
-    row_spacing = min(100, 380 // max(math.ceil(total_steps / max_cols), 1))
-    margin_x = (800 - col_spacing * (max_cols - 1)) // 2
-    top_y = 60
+    # Layout: distribute nodes across 1000×600 viewBox with at most 5 columns
+    max_cols = min(5, total_steps)
+    col_spacing = min(200, 920 // max(max_cols, 1))
+    row_spacing = min(110, 520 // max(math.ceil(total_steps / max_cols), 1))
+    margin_x = (1000 - col_spacing * (max_cols - 1)) // 2
+    top_y = 70
     flow_nodes: list[dict[str, object]] = []
     flow_links: list[dict[str, object]] = []
     flow_steps: list[dict[str, object]] = []
@@ -610,7 +688,8 @@ def build_html_scaffold_document(
   --flow-link-active: rgba(77,232,176,0.92);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; overflow: hidden; }
+html { height: 100%; overflow: hidden; }
+body { min-height: 100%; overflow-y: auto; overflow-x: hidden; }
 body {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
   transition: background 0.25s ease, color 0.25s ease;
@@ -648,7 +727,7 @@ body[data-theme="light"] {
   --panel-shadow: 0 20px 44px rgba(31, 48, 78, 0.12);
 }
 .shell {
-  height: 100vh;
+  min-height: 100vh;
   display: grid;
   grid-template-rows: auto 1fr auto;
   gap: 14px;
@@ -672,13 +751,13 @@ body[data-theme="light"] {
   margin: 0 auto;
   line-height: 1.7;
 }
-.panel { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; min-height: 0; }
+.panel { display: grid; grid-template-columns: minmax(0, 1fr) clamp(240px, 26%, 320px); gap: 18px; min-height: 0; }
 .stage-wrap {
   position: relative;
   background: linear-gradient(180deg, var(--surface-elevated) 0%, var(--surface) 100%);
   border-radius: 24px;
   padding: 18px;
-  overflow: hidden;
+  overflow: clip;
   border: 1px solid var(--panel-outline);
   box-shadow: var(--panel-shadow);
 }
@@ -690,10 +769,10 @@ body[data-theme="light"] {
   pointer-events: none;
 }
 .stage {
-  min-height: 100%;
+  min-height: 320px;
   position: relative;
   border-radius: 20px;
-  overflow: hidden;
+  overflow: clip;
   isolation: isolate;
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--surface) 72%, transparent), color-mix(in srgb, var(--bg) 80%, transparent)),
@@ -801,7 +880,7 @@ body[data-theme="light"] {
 #canvas-flow {
   width: 100%;
   height: 100%;
-  min-height: 360px;
+  min-height: 420px;
   overflow: visible;
 }
 .flow-canvas-shell {
@@ -1302,7 +1381,7 @@ function renderLogicFlow(step) {
   const progressPercent = Math.max(16, Math.round((0.18 + progressRatio * 0.82) * 100));
   const activeCount = Array.isArray(step?.activate_node_ids) ? step.activate_node_ids.length : 0;
   const pulseCount = Array.isArray(step?.pulse_link_ids) ? step.pulse_link_ids.length : 0;
-  return `<div class="viz-flow-runtime" data-logic-flow="true"><div class="flow-runtime-top"><div class="flow-step-chip"><span class="flow-step-dot"></span><span>${escapeHtml(progressLabel)}</span></div><div class="flow-progress-stack"><div class="flow-progress-meta"><span>演示进度</span><span>${escapeHtml(`${progressPercent}%`)}</span></div><div class="flow-progress-track" aria-hidden="true"><div class="flow-progress-bar" style="width:${progressPercent}%;"></div></div></div></div><div class="flow-canvas-shell"><svg id="canvas-flow" viewBox="0 0 800 420" role="img" aria-label="算法流程图"><g id="flow-links">${linksMarkup}</g><g id="flow-nodes">${nodesMarkup}</g></svg></div><div class="flow-message-card"><div class="flow-message-label">流程提示</div><p class="flow-desc">${safeMessage}</p><div class="flow-message-caption"><span>活跃节点 ${escapeHtml(String(activeCount || 1))}</span><span>激活连线 ${escapeHtml(String(pulseCount))}</span><span>${escapeHtml(`节奏 ${currentStepNumber}/${totalSteps}`)}</span></div></div></div>`;
+  return `<div class="viz-flow-runtime" data-logic-flow="true"><div class="flow-runtime-top"><div class="flow-step-chip"><span class="flow-step-dot"></span><span>${escapeHtml(progressLabel)}</span></div><div class="flow-progress-stack"><div class="flow-progress-meta"><span>演示进度</span><span>${escapeHtml(`${progressPercent}%`)}</span></div><div class="flow-progress-track" aria-hidden="true"><div class="flow-progress-bar" style="width:${progressPercent}%;"></div></div></div></div><div class="flow-canvas-shell"><svg id="canvas-flow" viewBox="0 0 1000 600" role="img" aria-label="算法流程图"><g id="flow-links">${linksMarkup}</g><g id="flow-nodes">${nodesMarkup}</g></svg></div><div class="flow-message-card"><div class="flow-message-label">流程提示</div><p class="flow-desc">${safeMessage}</p><div class="flow-message-caption"><span>活跃节点 ${escapeHtml(String(activeCount || 1))}</span><span>激活连线 ${escapeHtml(String(pulseCount))}</span><span>${escapeHtml(`节奏 ${currentStepNumber}/${totalSteps}`)}</span></div></div></div>`;
 }
 
 function animateLogicFlowStep(step, baseDuration) {

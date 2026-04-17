@@ -42,6 +42,9 @@ interface ControlPanelProps {
 }
 
 const maxImageSizeBytes = 2_500_000;
+const minPromptLength = 5;
+const softPromptLimit = 800;
+const hardPromptLimit = 2000;
 
 function extractImageFile(items: DataTransferItemList | null | undefined): File | null {
   if (!items) {
@@ -126,6 +129,8 @@ export function ControlPanel({
   const canSubmit = !loading && prompt.trim().length >= 5 && configuredProvidersCount > 0;
   const [dragActive, setDragActive] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
+  const [imageThumbnail, setImageThumbnail] = useState<string | null>(null);
+  const [hasInteracted, setHasInteracted] = useState(false);
 
   async function handleFile(file: File | null) {
     if (!file) {
@@ -145,6 +150,7 @@ export function ControlPanel({
     try {
       const dataUrl = await readAsDataUrl(file);
       onSourceImageChange(dataUrl, resolveDisplayName(file));
+      setImageThumbnail(dataUrl);
       setImageError(null);
     } catch (loadError) {
       setImageError(loadError instanceof Error ? loadError.message : "图片读取失败");
@@ -237,25 +243,65 @@ export function ControlPanel({
             </p>
           </div>
 
+          {/* prompt 字数提示条 */}
+          {hasInteracted && (
+            <div className="composer-char-bar-wrap">
+              <div
+                className={`composer-char-bar ${
+                  prompt.length > hardPromptLimit
+                    ? "is-over"
+                    : prompt.length > softPromptLimit
+                      ? "is-soft"
+                      : prompt.trim().length < minPromptLength && prompt.length > 0
+                        ? "is-too-short"
+                        : ""
+                }`}
+                style={{ width: `${Math.min((prompt.length / hardPromptLimit) * 100, 100)}%` }}
+              />
+              <span className={`composer-char-count ${prompt.length > hardPromptLimit ? "is-over" : ""}`}>
+                {prompt.length} / {hardPromptLimit}
+              </span>
+            </div>
+          )}
+
           <div className={`composer-container ${prompt.trim() ? "is-active" : ""}`}>
             <textarea
               className="composer-input"
               value={prompt}
-              onChange={(event) => onPromptChange(event.target.value)}
+              onChange={(event) => {
+                onPromptChange(event.target.value);
+                if (!hasInteracted && event.target.value.length > 0) setHasInteracted(true);
+              }}
               placeholder="描述您想生成的可视化场景..."
               rows={4}
+              maxLength={hardPromptLimit}
             />
+            {/* 输入过短内联提示 */}
+            {hasInteracted && prompt.trim().length > 0 && prompt.trim().length < minPromptLength && (
+              <p className="composer-inline-hint">至少需要 {minPromptLength} 个字符</p>
+            )}
 
             {sourceImage ? (
               <div className="composer-inline-attachment">
-                <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>image</span>
+                {imageThumbnail ? (
+                  <img
+                    src={imageThumbnail}
+                    alt="题图预览"
+                    className="composer-attachment-thumb"
+                  />
+                ) : (
+                  <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>image</span>
+                )}
                 <span className="composer-inline-attachment-name">
                   {sourceImageName ?? "已附带题图"}
                 </span>
                 <button
                   type="button"
                   className="icon-button composer-inline-attachment-remove"
-                  onClick={() => onSourceImageChange(null, null)}
+                  onClick={() => {
+                    onSourceImageChange(null, null);
+                    setImageThumbnail(null);
+                  }}
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: "14px" }}>close</span>
                 </button>

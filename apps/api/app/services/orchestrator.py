@@ -57,6 +57,7 @@ from app.services.prompt_authoring import (
     generate_reference_artifact,
 )
 from app.services.prompts.html_coder import HTML_CODER_PROMPT_VERSION
+from app.services.prompts.preset_injector import find_preset_by_cir_title
 from app.services.providers.registry import ProviderRegistry
 from app.services.repair import PipelineRepairService
 from app.services.sandbox import PreviewDryRunSandbox
@@ -432,8 +433,6 @@ class PipelineOrchestrator:
         )
 
         try:
-            from tools.prompt_optimizer.preset_matcher import find_preset_by_cir_title
-
             match = find_preset_by_cir_title(
                 cir_title=cir.title,
                 domain=cir.domain,

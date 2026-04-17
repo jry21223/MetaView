@@ -196,7 +196,7 @@
   border: 1px solid var(--outline-variant);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
 
 .mode-option:hover {
@@ -280,7 +280,7 @@
   background: var(--surface-container-lowest);
   border: 1px solid var(--outline-variant);
   border-radius: var(--radius-md);
-  transition: all var(--transition-normal);
+  transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
   box-shadow: var(--shadow-xs);
 }
 
@@ -313,7 +313,7 @@
   background: transparent;
   border: none;
   border-radius: 0;
-  transition: all var(--transition-normal);
+  transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
 }
 
 .composer-search-shell.has-attachment .composer-container textarea.composer-input {
@@ -323,6 +323,92 @@
 .composer-search-shell.is-drag-active .composer-container {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+/* ── Prompt character count bar ─────────────────────────── */
+.composer-char-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.composer-char-bar-wrap::before {
+  content: "";
+  flex: 1;
+  height: 3px;
+  border-radius: 99px;
+  background: var(--outline-variant);
+  overflow: hidden;
+  position: relative;
+}
+
+.composer-char-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--primary);
+  transition: width 0.15s ease, background-color 0.2s ease;
+}
+
+/* Wrap trick: we use a real element approach instead */
+.composer-char-bar-wrap {
+  position: relative;
+  background: var(--outline-variant);
+  height: 3px;
+  border-radius: 99px;
+  margin-bottom: 8px;
+  overflow: visible;
+}
+
+.composer-char-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 3px;
+  border-radius: 99px;
+  background: var(--primary);
+  transition: width 0.12s ease, background-color 0.2s ease;
+  pointer-events: none;
+}
+
+.composer-char-bar.is-soft    { background: var(--warning, #f5a623); }
+.composer-char-bar.is-over    { background: var(--error); }
+.composer-char-bar.is-too-short { background: var(--outline); }
+
+.composer-char-count {
+  position: absolute;
+  right: 0;
+  top: 8px;
+  font-size: 0.7rem;
+  color: var(--on-surface-variant);
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+.composer-char-count.is-over {
+  color: var(--error);
+  opacity: 1;
+}
+
+/* ── Inline hint (too short) ─────────────────────────────── */
+.composer-inline-hint {
+  margin: 4px 12px 0;
+  font-size: 0.75rem;
+  color: var(--on-surface-variant);
+  opacity: 0.8;
+}
+
+/* ── Image attachment thumbnail ───────────────────────────── */
+.composer-attachment-thumb {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border);
+  flex-shrink: 0;
 }
 
 .composer-search-intro {
@@ -467,7 +553,7 @@
   border: 1px solid var(--glass-border);
   font-size: 0.8125rem;
   font-weight: 500;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
 }
 
 .composer-attach-button:hover,
@@ -498,7 +584,7 @@
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  transition: all var(--transition-fast);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), filter var(--transition-fast), opacity var(--transition-fast);
 }
 
 .composer-submit:hover {
@@ -537,7 +623,7 @@
   color: var(--on-surface-variant);
   font-size: 0.8125rem;
   font-weight: 500;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .composer-toggle-button:hover {
@@ -566,7 +652,7 @@
   font-size: 0.8125rem;
   font-weight: 500;
   border: 1px solid transparent;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
 }
 
 .composer-chip:hover {
@@ -687,7 +773,7 @@
   background: var(--surface-container);
   color: var(--on-surface-variant);
   font-size: 0.8125rem;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
 .switch-button span {
@@ -695,7 +781,8 @@
   height: 8px;
   border-radius: var(--radius-full);
   background: var(--outline);
-  transition: all var(--transition-fast);
+  transition: transform var(--transition-fast), background-color var(--transition-fast);
+  will-change: transform;
 }
 
 .switch-button:hover {
@@ -744,7 +831,7 @@
   line-height: 1.5;
   appearance: none;
   -webkit-appearance: none;
-  transition: all var(--transition-fast);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-fast);
 }
 
 .prompt-form select,
@@ -1330,7 +1417,7 @@
   border: 1px solid var(--outline-variant);
   color: var(--on-surface);
   font-size: 0.8125rem;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
 
 .execution-array-cell {
@@ -1384,7 +1471,8 @@
   border-radius: var(--radius-full);
   background: var(--secondary);
   transform: translateX(-50%);
-  transition: all var(--transition-fast);
+  transition: transform var(--transition-fast), background-color var(--transition-fast);
+  will-change: transform;
 }
 
 .execution-marker.is-active {
@@ -1559,7 +1647,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: all var(--transition-fast);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), filter var(--transition-fast), opacity var(--transition-fast);
   background: var(--primary);
   border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent);
   font-family: var(--font-headline);
@@ -1643,15 +1731,16 @@
   }
 
   #studio .html-preview-stage-browser {
-    min-height: 58vh;
-    height: 58vh;
+    width: 100%;
+    min-height: 460px;
+    height: clamp(460px, 65vh, 860px);
   }
 
   /* HTML sandbox fills the stage area properly */
   #studio .html-sandbox-container {
-    height: 450px;
-    max-height: 58vh;
-    min-height: 320px;
+    height: 100%;
+    min-height: 100%;
+    max-height: none;
     aspect-ratio: unset;
   }
 }
@@ -1762,20 +1851,35 @@
 
 .studio-input-card:focus-within {
   border-color: color-mix(in srgb, var(--primary) 25%, var(--glass-border));
+  box-shadow: var(--shadow-sm),
+              0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+/* Glow overlay via pseudo-element — avoids repainting box-shadow every frame */
+.studio-input-card::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at 50% 0%,
+    color-mix(in srgb, var(--primary) 12%, transparent) 0%,
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+  will-change: opacity;
+}
+
+.studio-input-card:focus-within::after {
+  opacity: 1;
   animation: composer-breathe 2.5s ease-in-out infinite;
 }
 
 @keyframes composer-breathe {
-  0%, 100% {
-    box-shadow: var(--shadow-sm),
-                0 0 0 2px color-mix(in srgb, var(--primary) 8%, transparent),
-                0 4px 16px color-mix(in srgb, var(--primary) 4%, transparent);
-  }
-  50% {
-    box-shadow: var(--shadow-sm),
-                0 0 0 6px color-mix(in srgb, var(--primary) 12%, transparent),
-                0 8px 40px color-mix(in srgb, var(--primary) 8%, transparent);
-  }
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 1;   }
 }
 
 /* Rendering center view (video-centric during render stage) */
@@ -1827,7 +1931,7 @@
   height: 8px;
   border-radius: 50%;
   background: var(--outline-variant);
-  transition: all var(--transition-normal);
+  transition: background-color var(--transition-normal), transform var(--transition-normal);
 }
 
 .studio-rendering-stage-dot.is-done {
@@ -1872,6 +1976,8 @@
 }
 
 .studio-preview-card-shell-html {
+  width: 100%;
+  min-width: 0;
   padding-bottom: 28px;
 }
 
@@ -1939,6 +2045,17 @@
   overflow: hidden;
 }
 
+#studio .html-sandbox-container {
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  min-height: 100%;
+  max-height: none;
+  margin: 0;
+  border-radius: 0;
+}
+
 .html-sandbox-iframe {
   width: 100%;
   height: 100%;
@@ -2004,6 +2121,13 @@
   overflow: hidden;
 }
 
+#studio .html-preview-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+}
+
 .html-preview-header {
   display: flex;
   align-items: center;
@@ -2032,13 +2156,20 @@
   overflow: hidden;
 }
 
+#studio .html-preview-stage {
+  display: flex;
+  min-width: 0;
+}
+
 .html-preview-stage-browser {
   min-height: 72vh;
   aspect-ratio: auto;
 }
 
 #studio .html-preview-stage-browser {
-  min-height: 72vh;
+  width: 100%;
+  min-height: 520px;
+  height: clamp(520px, 82vh, 1080px);
 }
 
 .html-preview-subtitle {
@@ -2383,12 +2514,14 @@
   }
 
   #studio .html-preview-stage-browser {
-    height: 56vh;
+    width: 100%;
+    height: clamp(280px, 56vh, 560px);
     min-height: 280px;
   }
 
   #studio .html-sandbox-container {
     height: 100%;
+    min-height: 100%;
     aspect-ratio: unset;
   }
 
@@ -2453,7 +2586,7 @@
   gap: 12px;
   padding: 10px 12px;
   border-radius: var(--radius-sm);
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast);
 }
 
 .task-progress-stage.is-active {
@@ -2470,7 +2603,7 @@
   background: var(--surface-container);
   color: var(--outline);
   flex-shrink: 0;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
 .task-progress-stage.is-completed .task-progress-dot {
@@ -2558,6 +2691,7 @@
   border: 3px solid color-mix(in srgb, var(--primary) 12%, transparent);
   border-top-color: var(--primary);
   animation: spin 1.2s linear infinite;
+  will-change: transform;
 }
 
 .generation-spinner-ring-inner {
@@ -2605,7 +2739,7 @@
   font-size: 0.6875rem;
   font-weight: 600;
   color: var(--outline);
-  transition: all 0.4s var(--ease-out-expo);
+  transition: color 0.4s var(--ease-out-expo), background-color 0.4s var(--ease-out-expo);
 }
 
 .generation-step.is-active {
@@ -2618,7 +2752,7 @@
   height: 6px;
   border-radius: var(--radius-full);
   background: var(--outline);
-  transition: all 0.4s var(--ease-out-expo);
+  transition: background-color 0.4s var(--ease-out-expo), box-shadow 0.4s var(--ease-out-expo);
 }
 
 .generation-step.is-active .generation-step-dot {
@@ -2666,6 +2800,7 @@
 /* Rotating icon (for button spinner) */
 .rotating {
   animation: spin 1s linear infinite;
+  will-change: transform;
 }
 
 /* ============================================
@@ -2754,6 +2889,16 @@
     height: 320px;
     max-width: 100%;
     min-height: 280px;
+  }
+
+  #studio .html-preview-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  #studio .html-preview-header-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 }
 
