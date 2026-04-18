@@ -1,4 +1,7 @@
+import { useState, useCallback } from "react";
 import { HtmlSandbox, type HtmlSandboxLoadState } from "./HtmlSandbox";
+import { HtmlPlaybackControls } from "./HtmlPlaybackControls";
+import type { PlaybackState } from "../hooks/useHtmlPreviewSync";
 import type { UITheme } from "../types";
 import type { ReactNode } from "react";
 
@@ -21,6 +24,46 @@ export function HtmlPreviewPanel({
   expectReadySignal = true,
   onLoadStateChange,
 }: HtmlPreviewPanelProps) {
+  const [totalSteps, setTotalSteps] = useState(0);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [goToStep, setGoToStep] = useState<number | null>(null);
+  const [playback, setPlayback] = useState<PlaybackState>({
+    autoplay: false,
+    paused: true,
+    speed: 1,
+  });
+
+  const handleReady = useCallback((steps: number) => {
+    setTotalSteps(steps);
+    setCurrentStep(0);
+    setGoToStep(null);
+  }, []);
+
+  const handleStepChange = useCallback((index: number) => {
+    setCurrentStep(index);
+    setGoToStep(null);
+  }, []);
+
+  const handlePrev = useCallback(() => {
+    setCurrentStep((s) => {
+      const next = Math.max(0, s - 1);
+      setGoToStep(next);
+      return s;
+    });
+  }, []);
+
+  const handleNext = useCallback(() => {
+    setCurrentStep((s) => {
+      const next = Math.min(totalSteps - 1, s + 1);
+      setGoToStep(next);
+      return s;
+    });
+  }, [totalSteps]);
+
+  const handleSeek = useCallback((step: number) => {
+    setGoToStep(step);
+  }, []);
+
   return (
     <div className="html-preview-panel">
       <div className="html-preview-header">
@@ -37,10 +80,26 @@ export function HtmlPreviewPanel({
           src={src}
           srcDoc={srcDoc}
           theme={theme}
+          goToStep={goToStep}
+          playback={playback}
           expectReadySignal={expectReadySignal}
+          onReady={handleReady}
+          onStepChange={handleStepChange}
           onLoadStateChange={onLoadStateChange}
         />
       </div>
+
+      {totalSteps > 1 && (
+        <HtmlPlaybackControls
+          currentStep={currentStep}
+          totalSteps={totalSteps}
+          playback={playback}
+          onPlaybackChange={setPlayback}
+          onPrev={handlePrev}
+          onNext={handleNext}
+          onSeek={handleSeek}
+        />
+      )}
     </div>
   );
 }

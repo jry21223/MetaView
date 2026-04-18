@@ -512,17 +512,41 @@ class OpenAICompatibleProvider:
                     stage=stage,
                 )
             except httpx.RemoteProtocolError as retry_exc:
-                detail = self._connection_error_detail(
-                    retry_exc,
-                    endpoint=endpoint,
-                    protocol_hint=(
-                        "服务端在返回完整 HTTP 响应前中断了连接。"
-                        " 常见原因：base_url 配置错误、反向代理异常、"
-                        "上游服务不兼容 OpenAI `/chat/completions` 协议，"
-                        "或环境代理劫持了请求。"
-                    ),
-                )
-                raise ProviderInvocationError(detail) from retry_exc
+                if stage == "html_coding":
+                    reduced = (self._max_tokens_for_stage(stage) or 8192) // 2
+                    try:
+                        response = self._send_chat_completion_request(
+                            endpoint=endpoint,
+                            model=model,
+                            system_prompt=system_prompt,
+                            user_content=user_content,
+                            trust_env=False,
+                            stage=stage,
+                            max_tokens=reduced,
+                        )
+                    except (httpx.RemoteProtocolError, httpx.HTTPError) as final_exc:
+                        raise ProviderInvocationError(
+                            self._connection_error_detail(
+                                final_exc,
+                                endpoint=endpoint,
+                                protocol_hint=(
+                                    f"服务端两次断开连接，降低 max_tokens 至 {reduced} 后仍失败。"
+                                    "建议检查代理端输出限制。"
+                                ),
+                            )
+                        ) from final_exc
+                else:
+                    detail = self._connection_error_detail(
+                        retry_exc,
+                        endpoint=endpoint,
+                        protocol_hint=(
+                            "服务端在返回完整 HTTP 响应前中断了连接。"
+                            " 常见原因：base_url 配置错误、反向代理异常、"
+                            "上游服务不兼容 OpenAI `/chat/completions` 协议，"
+                            "或环境代理劫持了请求。"
+                        ),
+                    )
+                    raise ProviderInvocationError(detail) from retry_exc
             except httpx.TimeoutException as retry_exc:
                 timeout_label = (
                     f"{self.timeout_s:g}s" if self.timeout_s is not None else "未设置超时限制"
@@ -601,6 +625,7 @@ class OpenAICompatibleProvider:
         user_content: str | list[dict[str, Any]],
         trust_env: bool,
         stage: str | None = None,
+        max_tokens: int | None = None,
     ) -> httpx.Response:
         payload: dict[str, Any] = {
             "model": model,
@@ -610,9 +635,9 @@ class OpenAICompatibleProvider:
             ],
             "temperature": self.temperature,
         }
-        max_tokens = self._max_tokens_for_stage(stage, endpoint=endpoint)
-        if max_tokens is not None:
-            payload["max_tokens"] = max_tokens
+        effective_max_tokens = max_tokens if max_tokens is not None else self._max_tokens_for_stage(stage, endpoint=endpoint)
+        if effective_max_tokens is not None:
+            payload["max_tokens"] = effective_max_tokens
         response = httpx.post(
             endpoint,
             headers=self._headers(),
@@ -629,9 +654,7 @@ class OpenAICompatibleProvider:
         """Return the completion max_tokens for a given pipeline stage."""
         if stage not in {"html_coding", "coding", "repair"}:
             return None
-        if endpoint and "api.deepseek.com" in endpoint.lower():
-            return 8192
-        return 16384
+        return 8192
 
     def _normalize_stage_models(self, stage_models: dict[str, str]) -> dict[str, str]:
         normalized: dict[str, str] = {}

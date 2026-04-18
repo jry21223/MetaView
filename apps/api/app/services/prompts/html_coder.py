@@ -393,21 +393,50 @@ window.parent.postMessage({ type: "ready", totalSteps: N }, "*");
 window.addEventListener("message", function(e) {
   var d = e.data;
   if (!d || !d.type) return;
-  if (d.type === "goToStep")  { /* jump to animation step d.index (0-based) */ }
-  if (d.type === "theme")     { /* switch to d.theme: "dark" or "light" */ }
+  if (d.type === "goToStep")  { goToStep(d.index); }
+  if (d.type === "theme")     { applyTheme(d.theme); }   // "dark" | "light"
   if (d.type === "playback")  { /* d.autoplay: bool, d.speed: number */ }
 });
+
+### goToStep — MANDATORY implementation pattern
+Define all steps as an array of complete-state render functions (NOT GSAP timeline labels):
+
+  const STEPS = [
+    function() { /* render complete visual state for step 0 */ },
+    function() { /* render complete visual state for step 1 */ },
+    // … one entry per step
+  ];
+  let currentStep = 0;
+  function goToStep(index) {
+    if (index < 0 || index >= STEPS.length) return;
+    currentStep = index;
+    STEPS[index]();   // must set the FULL visual state; no incremental deltas
+    window.parent.postMessage({ type: "step", index: currentStep }, "*");
+  }
+
+  // Initialize first step, THEN announce ready:
+  goToStep(0);
+  window.parent.postMessage({ type: "ready", totalSteps: STEPS.length }, "*");
+
+⚠ DO NOT use GSAP animationTimeline.seek('labelName') for step navigation unless
+  you call animationTimeline.addLabel('labelName', position) first.
+  Label-based seeking without prior addLabel silently no-ops.
 
 ## Allowed external libraries (no other external URLs allowed)
 - GSAP 3.13: https://cdn.jsdelivr.net/npm/gsap@3.13/dist/gsap.min.js
 - p5.js 1.11.8: https://cdn.jsdelivr.net/npm/p5@1.11.8/lib/p5.min.js
 Both are optional — only include what you actually use.
 
+## Viewport & sizing (MANDATORY)
+- html, body MUST have: margin:0; padding:0; width:100%; height:100%; overflow:hidden
+- Root canvas/container MUST use: width:100vw; height:100vh  (or width:100%; height:100%)
+- NO fixed pixel values (e.g. 800px, 600px) on html, body, or any root container
+- All top-level layout must use percentage or viewport units so it fills any iframe size
+
 ## Design requirements
 - Rich, fluid animations — not static text boxes or placeholder diagrams
 - Every step must show a meaningful visual transition or state change
 - All student-facing text in Chinese
-- Fits within 800×600 viewport, no scrollbars
 - Support dark and light themes using the CSS variables provided
 - **Minimum 6 animation steps**; for algorithms or multi-stage processes aim for 8–12 steps
 - If a CIR outline is provided in the user message, use it as the skeleton for your steps — do NOT reduce its step count
