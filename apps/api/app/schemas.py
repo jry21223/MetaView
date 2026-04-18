@@ -268,7 +268,7 @@ class PipelineRequest(BaseModel):
     source_image_name: str | None = Field(default=None, max_length=200)
     ui_theme: UITheme | None = None
     enable_narration: bool = True
-    sandbox_mode: SandboxMode = SandboxMode.DRY_RUN
+    sandbox_mode: SandboxMode = SandboxMode.OFF
     output_mode: OutputMode = OutputMode.VIDEO
     persist_run: bool = True
 

@@ -512,7 +512,7 @@ class OpenAICompatibleProvider:
                     stage=stage,
                 )
             except httpx.RemoteProtocolError as retry_exc:
-                if stage == "html_coding":
+                if stage in {"html_coding", "coding", "repair"}:
                     reduced = (self._max_tokens_for_stage(stage) or 8192) // 2
                     try:
                         response = self._send_chat_completion_request(
