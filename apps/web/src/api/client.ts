@@ -98,8 +98,8 @@ export async function updateRuntimeSettings(
   return (await response.json()) as RuntimeSettings;
 }
 
-export async function getPipelineRuns(): Promise<PipelineRunSummary[]> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/runs`);
+export async function getPipelineRuns(limit = 100): Promise<PipelineRunSummary[]> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/runs?limit=${limit}`);
 
   if (!response.ok) {
     throw new Error(await readErrorMessage(response, "Runs request failed"));

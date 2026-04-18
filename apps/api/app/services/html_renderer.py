@@ -97,6 +97,20 @@ class HtmlRenderer:
             encoding="utf-8",
         )
 
+    def delete(self, request_id: str) -> bool:
+        """Remove the HTML preview file and its manifest entry for a given request_id."""
+        path = self._output_dir / f"{request_id}.html"
+        deleted = False
+        if path.exists():
+            path.unlink()
+            deleted = True
+        manifest = self._load_manifest()
+        if request_id in manifest.get("entries", {}):
+            manifest["entries"].pop(request_id)
+            self._save_manifest(manifest)
+            deleted = True
+        return deleted
+
     def _inject_prerender_shell(
         self,
         *,

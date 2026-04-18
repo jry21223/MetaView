@@ -752,15 +752,27 @@ class HtmlCoderAgent:
 
     @staticmethod
     def _extract_html(content: str) -> str:
+        # Strategy 1: ```html ... ``` fence
         match = re.search(r"```html\s*(.*?)```", content, flags=re.IGNORECASE | re.DOTALL)
         if match:
             return match.group(1).strip()
+        # Strategy 2: any code fence that contains <!doctype
+        match = re.search(r"```\w*\s*(<!doctype\s+html.*?)```", content, flags=re.IGNORECASE | re.DOTALL)
+        if match:
+            return match.group(1).strip()
+        # Strategy 3: extract from first <!doctype to last </html>
+        lower = content.lower()
+        start = lower.find("<!doctype html")
+        if start != -1:
+            end = lower.rfind("</html>")
+            if end != -1:
+                return content[start : end + len("</html>")].strip()
         return content.strip()
 
     @staticmethod
     def _runtime_html_bootstrap_issue(html: str) -> str | None:
         normalized = html.strip().lower()
-        if not normalized.endswith("</html>"):
+        if "</html>" not in normalized:
             return "missing-html-close"
         if "</body>" not in normalized:
             return "missing-body-close"
@@ -790,12 +802,22 @@ class HtmlCoderAgent:
         return None
 
     @staticmethod
+    def _strip_comments(html: str) -> str:
+        """Remove HTML and JS single-line comments to avoid false-positive safety matches."""
+        # Remove HTML comments <!-- ... -->
+        stripped = re.sub(r"<!--.*?-->", "", html, flags=re.DOTALL)
+        # Remove JS single-line comments // ...
+        stripped = re.sub(r"//[^\n]*", "", stripped)
+        return stripped
+
+    @staticmethod
     def _runtime_html_safety_issue(html: str) -> str | None:
         allowed_cdn_pattern = (
             r"https://cdn\.jsdelivr\.net/npm/"
             r"(?:gsap@3\.13/dist/gsap\.min\.js|p5@1\.11\.8/lib/p5\.min\.js)"
         )
-        checks = (
+        # Structural HTML checks run on the full document
+        structural_checks = (
             (
                 rf'<script[^>]+\bsrc\s*=\s*["\'](?!{allowed_cdn_pattern})[^"\']+["\']',
                 "external-script",
@@ -807,6 +829,13 @@ class HtmlCoderAgent:
             (r"<meta\b[^>]+http-equiv\s*=\s*[\"']?refresh", "meta-refresh"),
             (r"<form\b", "form-submission"),
             (r"\bon[a-z]+\s*=", "inline-event-handler"),
+        )
+        for pattern, reason in structural_checks:
+            if re.search(pattern, html, flags=re.IGNORECASE):
+                return reason
+
+        # JS-level checks run on comment-stripped content to avoid false positives
+        js_checks = (
             (r"\.setAttribute\(\s*[\"']on[a-z]+[\"']", "dynamic-event-handler"),
             (r"javascript\s*:", "javascript-url"),
             (r"\b(?:fetch|XMLHttpRequest|WebSocket|EventSource)\b", "network-api"),
@@ -816,8 +845,9 @@ class HtmlCoderAgent:
             (r"\b(?:localStorage|sessionStorage|indexedDB)\b", "storage-access"),
             (r"\b(?:top|parent)\.location\b", "frame-navigation"),
         )
-        for pattern, reason in checks:
-            if re.search(pattern, html, flags=re.IGNORECASE):
+        stripped = HtmlCoderAgent._strip_comments(html)
+        for pattern, reason in js_checks:
+            if re.search(pattern, stripped, flags=re.IGNORECASE):
                 return reason
         return None
 

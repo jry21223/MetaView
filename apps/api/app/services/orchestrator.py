@@ -932,11 +932,14 @@ class PipelineOrchestrator:
         )
 
     def delete_run(self, request_id: str) -> bool:
-        """Delete a pipeline run by request_id.
-
-        Returns True if a row was deleted, False otherwise.
-        """
-        return self.repository.delete_run(request_id)
+        """Delete a pipeline run and clean up associated preview files."""
+        deleted = self.repository.delete_run(request_id)
+        if deleted:
+            self.html_renderer.delete(request_id)
+            video_path = self.preview_video_renderer.previews_dir / f"{request_id}.mp4"
+            if video_path.exists():
+                video_path.unlink()
+        return deleted
 
     def upsert_custom_provider(self, payload: CustomProviderUpsertRequest) -> ProviderDescriptor:
         descriptor = self.provider_registry.upsert_custom_provider(payload)
