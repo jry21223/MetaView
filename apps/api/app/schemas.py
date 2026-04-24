@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Literal
+from typing import Annotated, Literal, Union
 from uuid import uuid4
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -254,6 +254,54 @@ class ExecutionMap(BaseModel):
     array_track: ExecutionArrayTrack | None = None
     step_to_checkpoint: dict[str, str] = Field(default_factory=dict)
     line_to_step_ids: dict[int, list[str]] = Field(default_factory=dict)
+
+
+class SnapshotKind(str, Enum):
+    ALGORITHM_ARRAY = "algorithm_array"
+    ALGORITHM_TREE = "algorithm_tree"
+
+
+class AlgorithmArraySnapshot(BaseModel):
+    kind: Literal["algorithm_array"] = "algorithm_array"
+    array_values: list[str] = Field(default_factory=list)
+    active_indices: list[int] = Field(default_factory=list)
+    swap_indices: list[int] = Field(default_factory=list)
+    sorted_indices: list[int] = Field(default_factory=list)
+    pointers: dict[str, int] = Field(default_factory=dict)
+
+
+class AlgorithmTreeSnapshot(BaseModel):
+    kind: Literal["algorithm_tree"] = "algorithm_tree"
+    nodes: list[dict] = Field(default_factory=list)
+    edges: list[dict] = Field(default_factory=list)
+    active_node_ids: list[str] = Field(default_factory=list)
+    visited_node_ids: list[str] = Field(default_factory=list)
+    path_edge_ids: list[str] = Field(default_factory=list)
+
+
+AnySnapshot = Annotated[
+    Union[AlgorithmArraySnapshot, AlgorithmTreeSnapshot],
+    Field(discriminator="kind"),
+]
+
+
+class MetaStep(BaseModel):
+    step_id: str
+    end_frame: int = Field(ge=1)
+    title: str
+    voiceover_text: str
+    animation_hint: str | None = None
+    snapshot: AnySnapshot
+
+
+class PlaybookScript(BaseModel):
+    fps: int = Field(default=30, ge=1)
+    total_frames: int = Field(ge=1)
+    domain: TopicDomain
+    title: str
+    summary: str
+    steps: list[MetaStep] = Field(default_factory=list)
+    parameter_controls: list[ExecutionParameterControl] = Field(default_factory=list)
 
 
 class PipelineRequest(BaseModel):
@@ -625,6 +673,7 @@ class PipelineResponse(BaseModel):
     preview_video_url: str | None = None
     preview_html_url: str | None = None
     execution_map: ExecutionMap | None = None
+    playbook: PlaybookScript | None = None
     diagnostics: list[AgentDiagnostic] = Field(default_factory=list)
     runtime: PipelineRuntime
     # 步骤时间元数据（用于动画-代码联动）

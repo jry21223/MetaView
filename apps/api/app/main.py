@@ -65,13 +65,6 @@ app.mount(
     name="preview-media",
 )
 
-html_preview_root = Path(settings.preview_html_output_dir)
-html_preview_root.mkdir(parents=True, exist_ok=True)
-app.mount(
-    "/api/v1/html_preview",
-    StaticFiles(directory=html_preview_root),
-    name="html-preview",
-)
 
 
 def _stringify_error_detail(detail: object) -> str:

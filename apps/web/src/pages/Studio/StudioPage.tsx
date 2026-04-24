@@ -2,12 +2,12 @@ import { lazy, Suspense, type FormEvent } from "react";
 import { ControlPanel } from "../../components/ControlPanel";
 import { TaskProgressCard } from "../../components/TaskProgressCard";
 import { HighlightedCode } from "../../components/HighlightedCode";
+import { PlaybookPlayer } from "../../engine/player/PlaybookPlayer";
 import { useVideoSync } from "../../hooks/features/useVideoSync";
 import { useTaskProgress } from "../../hooks/features/useTaskProgress";
 import type { TtsAvailability } from "../../utils/tts";
 import type { ModelProvider, OutputMode, PipelineResponse, RuntimeCatalog, SandboxMode, UITheme } from "../../types";
 
-const HtmlPreviewPanel = lazy(() => import("../../components/HtmlPreviewPanel").then(m => ({ default: m.HtmlPreviewPanel })));
 const InteractiveExecutionExplorer = lazy(() => import("../../components/InteractiveExecutionExplorer").then(m => ({ default: m.InteractiveExecutionExplorer })));
 const VideoPreview = lazy(() => import("../../components/VideoPreview").then(m => ({ default: m.VideoPreview })));
 
@@ -301,28 +301,20 @@ export function StudioPage({
       <div className={`studio-preview-section ${hasCompletedPreview ? "is-active" : ""}`}>
         {hasCompletedPreview ? (
           <div className="studio-preview-wrapper">
-            {previewHtmlUrl ? (
-              <div className="studio-preview-card-shell studio-preview-card-shell-html">
+            {result?.playbook ? (
+              <div className="studio-preview-card-shell studio-preview-card-shell-playbook">
                 <div className="studio-prompt-tag studio-prompt-tag-inline">
-                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>description</span>
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>play_circle</span>
                   <span className="studio-prompt-tag-text">{prompt}</span>
                   {result?.runtime.skill ? (
                     <span className="studio-prompt-tag-skill">{result.runtime.skill.label}</span>
                   ) : null}
                 </div>
                 <div style={{ marginTop: "20px" }}>
-                  <Suspense fallback={<PreviewLoadingFallback />}>
-                    <HtmlPreviewPanel
-                      src={previewHtmlUrl}
-                      theme={theme}
-                      meta={
-                        result
-                          ? `${result.request_id.slice(0, 8)} · ${result.runtime.generation_provider?.label ?? generationProvider}`
-                          : undefined
-                      }
-                      headerAction={<PreviewCardAction onStartNewQuestion={onStartNewQuestion} />}
-                    />
-                  </Suspense>
+                  <PlaybookPlayer script={result.playbook} theme={theme} />
+                </div>
+                <div style={{ marginTop: "12px", display: "flex", justifyContent: "flex-end" }}>
+                  <PreviewCardAction onStartNewQuestion={onStartNewQuestion} />
                 </div>
               </div>
             ) : hasInteractiveExplorer && result?.execution_map ? (

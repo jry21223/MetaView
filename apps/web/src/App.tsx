@@ -224,7 +224,7 @@ export default function App() {
       : sourceCodeLanguage === "python"
         ? "python"
         : undefined;
-  const hasCompletedPreview = Boolean(previewVideoUrl) || Boolean(previewHtmlUrl);
+  const hasCompletedPreview = Boolean(previewVideoUrl) || Boolean(previewHtmlUrl) || Boolean(result?.playbook);
   const showSourcePanel = sourceCode.trim().length > 0;
 
   const ttsAvailability = computeTtsAvailability(runtimeCatalog.settings);
