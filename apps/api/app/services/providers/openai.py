@@ -635,7 +635,10 @@ class OpenAICompatibleProvider:
             ],
             "temperature": self.temperature,
         }
-        effective_max_tokens = max_tokens if max_tokens is not None else self._max_tokens_for_stage(stage, endpoint=endpoint)
+        effective_max_tokens = (
+            max_tokens if max_tokens is not None
+            else self._max_tokens_for_stage(stage, endpoint=endpoint)
+        )
         if effective_max_tokens is not None:
             payload["max_tokens"] = effective_max_tokens
         response = httpx.post(
