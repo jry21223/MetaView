@@ -1,5 +1,5 @@
 import { HistoryPanel } from "../../components/HistoryPanel";
-import { HtmlPreviewPanel } from "../../components/HtmlPreviewPanel";
+import { PlaybookPlayer } from "../../engine/player/PlaybookPlayer";
 import { VideoPreview } from "../../components/VideoPreview";
 import type { PipelineResponse, PipelineRunStatus, PipelineRunSummary } from "../../types";
 
@@ -34,7 +34,6 @@ export function HistoryPage({
   result,
   selectedHistoryRun,
   previewVideoUrl,
-  previewHtmlUrl,
   loading,
   onSelectRun,
   onDeleteRun,
@@ -94,9 +93,9 @@ export function HistoryPage({
                 <span className="badge badge-outline">{selectedHistoryRun.generation_provider ?? "-"}</span>
               </div>
 
-              {previewHtmlUrl && selectedResultMatches ? (
+              {result?.playbook && selectedResultMatches ? (
                 <div className="preview-stage history-preview-stage">
-                  <HtmlPreviewPanel src={previewHtmlUrl} />
+                  <PlaybookPlayer script={result.playbook} />
                 </div>
               ) : previewVideoUrl && selectedResultMatches ? (
                 <div className="preview-stage history-preview-stage">
@@ -114,8 +113,8 @@ export function HistoryPage({
                       ? "该任务执行失败"
                       : isRunningStatus(selectedHistoryRun.status)
                         ? "该任务仍在执行中"
-                        : previewHtmlUrl
-                          ? "该任务暂无可展示交互动画"
+                        : result?.playbook
+                          ? "该任务暂无可展示 Playbook 动画"
                           : "该任务暂无可展示视频"}
                   </strong>
                   <span>

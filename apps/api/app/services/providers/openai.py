@@ -635,7 +635,10 @@ class OpenAICompatibleProvider:
             ],
             "temperature": self.temperature,
         }
-        effective_max_tokens = max_tokens if max_tokens is not None else self._max_tokens_for_stage(stage, endpoint=endpoint)
+        effective_max_tokens = (
+            max_tokens if max_tokens is not None
+            else self._max_tokens_for_stage(stage, endpoint=endpoint)
+        )
         if effective_max_tokens is not None:
             payload["max_tokens"] = effective_max_tokens
         response = httpx.post(
@@ -654,6 +657,11 @@ class OpenAICompatibleProvider:
         """Return the completion max_tokens for a given pipeline stage."""
         if stage not in {"html_coding", "coding", "repair"}:
             return None
+        # DeepSeek's API has a lower practical limit; all other compatible endpoints get 16 K
+        if endpoint and "deepseek.com" in endpoint:
+            return 8192
+        if endpoint and "openai.com" not in endpoint:
+            return 16384
         return 8192
 
     def _normalize_stage_models(self, stage_models: dict[str, str]) -> dict[str, str]:

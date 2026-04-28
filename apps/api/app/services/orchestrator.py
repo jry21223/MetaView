@@ -38,7 +38,7 @@ from app.schemas import (
     TTSSettingsRequest,
     ValidationStatus,
 )
-from app.services.agents import CoderAgent, CriticAgent, HtmlCoderAgent, PlannerAgent
+from app.services.agents import CoderAgent, CriticAgent, PlannerAgent
 from app.services.domain_router import infer_domain
 from app.services.execution_map import build_execution_map
 from app.services.history import (
@@ -46,8 +46,8 @@ from app.services.history import (
     RunRepository,
     RuntimeSettingsRepository,
 )
-from app.services.html_renderer import HtmlRenderer
 from app.services.manim_script import ManimScriptError, calculate_step_timing, prepare_manim_script
+from app.services.playbook_builder import build_playbook
 from app.services.preview_video_renderer import (
     PreviewVideoRenderer,
     PreviewVideoRenderError,
@@ -56,7 +56,6 @@ from app.services.prompt_authoring import (
     generate_custom_subject_artifact,
     generate_reference_artifact,
 )
-from app.services.prompts.html_coder import HTML_CODER_PROMPT_VERSION
 from app.services.prompts.preset_injector import find_preset_by_cir_title
 from app.services.providers.registry import ProviderRegistry
 from app.services.repair import PipelineRepairService
@@ -152,8 +151,6 @@ class PipelineOrchestrator:
         self.skill_registry = SubjectSkillRegistry(enabled_domains=settings.enabled_topic_domains)
         self.planner = PlannerAgent()
         self.coder = CoderAgent()
-        self.html_coder = HtmlCoderAgent()
-        self.html_renderer = HtmlRenderer(output_dir=settings.preview_html_output_dir)
         self.critic = CriticAgent()
         self.preview_video_renderer = PreviewVideoRenderer(
             output_root=settings.preview_media_root,
@@ -410,7 +407,6 @@ class PipelineOrchestrator:
         preview_video_backend: str | None = None
         render_error_message: str | None = None
         audio_diagnostics: list[AgentDiagnostic] = []
-        html_fallback_diagnostics: list[AgentDiagnostic] = []
 
         planning_hints = None
         if request.output_mode != OutputMode.HTML:
@@ -612,75 +608,8 @@ class PipelineOrchestrator:
                         script=renderer_script, cir=cir, mode=request.sandbox_mode
                     )
 
-        # ── HTML output branch (independent from Manim) ──────────────
+        # ── Playbook output branch (replaces HTML iframe path) ───────
         preview_html_url: str | None = None
-        if request.output_mode == OutputMode.HTML:
-            html_result = self.html_coder.run(
-                cir=cir,
-                ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
-                generation_provider=generation_provider,
-                original_prompt=effective_request.prompt,
-                source_code=effective_request.source_code,
-                source_code_language=effective_request.source_code_language,
-                source_image=effective_request.source_image,
-                source_image_name=effective_request.source_image_name,
-                skill=skill,
-            )
-            html_script = html_result.html
-            renderer_script = html_script  # store in renderer_script for persistence
-            sandbox_report = self.sandbox.run(
-                script=html_script,
-                cir=cir,
-                mode=request.sandbox_mode,
-            )
-            is_fallback = html_result.used_fallback
-            provider_label = (
-                generation_provider.descriptor.label
-                if generation_provider is not None and hasattr(generation_provider, "descriptor")
-                else "local"
-            )
-            model_label = (
-                generation_provider.model_for_stage("html_coding")
-                if generation_provider is not None
-                and hasattr(generation_provider, "model_for_stage")
-                else "fallback"
-            )
-            fallback_reason = html_result.fallback_reason
-            fallback_detail = (
-                f" 原因：{fallback_reason}。" if is_fallback and fallback_reason else ""
-            )
-            agent_traces.append(
-                AgentTrace(
-                    agent="html_coder",
-                    provider=provider_label,
-                    model=model_label,
-                    summary=(
-                        (
-                            f"使用本地模板为《{cir.title}》生成 HTML 交互动画。"
-                            f"{fallback_detail}".strip()
-                        )
-                        if is_fallback
-                        else f"远程 provider 已为《{cir.title}》生成 HTML 交互动画。"
-                    ),
-                    raw_output=html_result.provider_raw_output,
-                )
-            )
-            html_artifacts = self.html_renderer.render(
-                html=html_script,
-                request_id=request_id,
-                cir_json=cir.model_dump_json(exclude_none=True),
-                ui_theme=request.ui_theme.value if request.ui_theme is not None else None,
-                prompt_version=HTML_CODER_PROMPT_VERSION,
-                inject_prerender=False,
-            )
-            preview_html_url = html_artifacts.url
-            if is_fallback and fallback_reason:
-                html_fallback_diagnostics.append(
-                    AgentDiagnostic(
-                        agent="html_coder",
-                        message=f"HTML provider 输出已回退到本地模板：{fallback_reason}",
-                    )
-                )
 
         # ── Video output branch (existing Manim flow, untouched) ─────
         _render_video = request.output_mode != OutputMode.HTML
@@ -764,10 +693,15 @@ class PipelineOrchestrator:
             renderer_script=renderer_script,
             preview_video_url=preview_video_url,
             preview_html_url=preview_html_url,
-            execution_map=build_execution_map(
+            execution_map=(_execution_map := build_execution_map(
                 request=effective_request,
                 cir=cir,
                 render_backend=preview_video_backend,
+            )),
+            playbook=(
+                build_playbook(cir=cir, execution_map=_execution_map)
+                if request.output_mode == OutputMode.HTML
+                else None
             ),
             diagnostics=[
                 AgentDiagnostic(
@@ -788,7 +722,6 @@ class PipelineOrchestrator:
             + (diagnostics if _run_manim_coding else [])
             + self._sandbox_diagnostics(sandbox_report)
             + self._repair_diagnostics(repair_actions)
-            + html_fallback_diagnostics
             + audio_diagnostics
             + (
                 [
@@ -935,7 +868,6 @@ class PipelineOrchestrator:
         """Delete a pipeline run and clean up associated preview files."""
         deleted = self.repository.delete_run(request_id)
         if deleted:
-            self.html_renderer.delete(request_id)
             video_path = self.preview_video_renderer.previews_dir / f"{request_id}.mp4"
             if video_path.exists():
                 video_path.unlink()

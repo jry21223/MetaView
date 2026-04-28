@@ -236,6 +236,7 @@ export interface PipelineResponse {
   preview_video_url?: string | null;
   preview_html_url?: string | null;
   execution_map?: ExecutionMap | null;
+  playbook?: import("./engine/types").PlaybookScript | null;
   diagnostics: AgentDiagnostic[];
   runtime: PipelineRuntime;
   step_timing: Array<{

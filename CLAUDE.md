@@ -89,7 +89,7 @@ npm --workspace apps/web run lint
 - `POST /api/v1/prompts/reference` — generate domain guidance markdown
 - `POST /api/v1/prompts/custom-subject` — generate a custom subject prompt pack
 
-**Static mounts:** `/media` (generated videos) and `/api/v1/html_preview` (iframe HTML artifacts).
+**Static mounts:** `/media` (generated videos). Note: `/api/v1/html_preview` static mount has been removed on branch `claude/metaview-engine-architecture-ppdCR` (HTML iframe path retired, replaced by Remotion engine).
 
 **Safety inspection:** Every pipeline request goes through `inspect_pipeline_request()` (from `services/request_security.py`), which returns a `SafetyVerdict` of BLOCK, REVIEW, or ALLOW. REVIEW downgrades the run to `DRY_RUN` + `HTML` output mode.
 
@@ -104,40 +104,39 @@ The shared data contract between planner, coder, and critic. Key fields:
 
 `domain` is optional in `PipelineRequest`; `DomainRouter` (`services/domain_router.py`) classifies it automatically. The legacy `provider` field on requests is a backward-compat alias for `generation_provider`.
 
-In HTML mode the pipeline also produces an `HtmlAnimationPayload` (defined in `schemas.py`) — a union of `GENERIC` (step-by-step) or `LOGIC_FLOW` (nodes + links + steps) animation kinds. This is separate from the CIR but co-produced by the orchestrator.
+In HTML mode the pipeline now produces a `PlaybookScript` (defined in `schemas.py`) instead of `HtmlAnimationPayload`. `PlaybookScript` contains `MetaStep[]`, each with an `end_frame`, `snapshot` (discriminated union: `AlgorithmArraySnapshot` | `AlgorithmTreeSnapshot`), and `voiceover_text`. This drives the Remotion player on the frontend. See `docs/metaview-engine-architecture.md` for the full engine architecture.
 
 ### Pipeline orchestrator
 
 `apps/api/app/services/orchestrator.py` is the main integration point. It owns:
 
 - provider registry and runtime provider selection
-- `PlannerAgent`, `CoderAgent`, `HtmlCoderAgent`, `CriticAgent`
+- `PlannerAgent`, `CoderAgent`, `CriticAgent` (HtmlCoderAgent retired on this branch)
 - CIR validation / repair (multi-trigger: CIR validation failure, sandbox failure, critic feedback, render failure)
-- HTML renderer, preview video renderer, sandbox, and TTS service
+- PlaybookBuilder (HTML mode), preview video renderer, sandbox, and TTS service
 - history persistence and background run coordination (thread pool executor, status tracking)
 - stage-specific model dispatch: `openai_router_model`, `openai_planning_model`, `openai_coding_model`, `openai_critic_model` can differ
 
 The important split is by `request.output_mode`:
 
-#### HTML mode
+#### HTML mode (Remotion Playbook Engine — active on branch `claude/metaview-engine-architecture-ppdCR`)
 
-HTML generation supports two paths: free-form LLM output and local scaffold fallback.
+**Retired:** `HtmlCoderAgent`, `HtmlRenderer`, `html_coder.py` prompts, iframe sandbox, `/api/v1/html_preview` static mount.
 
-Primary flow:
-1. `HtmlCoderAgent` requests a JSON `HtmlAnimationPayload` (or raw HTML) from the provider
-2. 9 safety checks validate the output (blocks external scripts, iframes, network APIs, event handlers, etc.)
-3. 5 bootstrap checks verify the output (doctype, closing tags, postMessage, message listener, ready signal)
-4. On failure or safety violation, falls back to local scaffold template; `fallback_reason` is tracked in the response
-5. `HtmlRenderer` writes the final HTML asset to `preview_html_output_dir`
-6. Frontend loads the asset in an iframe sandbox
+**Replaced by:** deterministic `CIR + ExecutionMap → PlaybookScript` mapping.
 
-The scaffold owns the runtime shell when used as fallback: document structure, message bridge, theme/playback/step/param handling, and ready signaling. See `docs/architecture.md` for the scaffold-injection design.
+Flow:
+1. `PlannerAgent` → `CirDocument` (unchanged)
+2. `ExecutionMapBuilder` → `ExecutionMap` with checkpoint timing (unchanged for ALGORITHM/CODE domains)
+3. `PlaybookBuilder` (`services/playbook_builder.py`) maps CIR steps to `MetaStep[]` with `end_frame` and `snapshot`
+4. `PlaybookScript` is returned inline in `PipelineResponse.playbook` (no file written to disk)
+5. Frontend `PlaybookPlayer` renders via `@remotion/player` with `AlgorithmRenderer` / `BinaryTreeRenderer`
 
 Key files:
 
-- `apps/api/app/services/agents.py` — `HtmlCoderAgent` execution, safety/bootstrap checks, fallback logic
-- `apps/api/app/services/prompts/html_coder.py` — HTML payload prompt, fallback payload generation, scaffold assembly
-- `apps/api/app/schemas.py` — `HtmlAnimationPayload` and related HTML payload models
+- `apps/api/app/services/playbook_builder.py` — deterministic CIR → PlaybookScript mapping
+- `apps/api/app/schemas.py` — `PlaybookScript`, `MetaStep`, `AlgorithmArraySnapshot`, `AlgorithmTreeSnapshot`
+- `apps/web/src/engine/` — full Remotion engine (see `docs/metaview-engine-architecture.md`)
 
 #### Video / Manim mode
 
@@ -351,9 +350,9 @@ In Docker, `docker-compose.yml` mounts `./data` and `./skills` into the API cont
 
 ## Notes for Future Changes
 
-- HTML generation now has two paths: free-form LLM output (primary) and local scaffold (fallback). When working on `HtmlCoderAgent`, keep the safety/bootstrap validation logic intact — it gates which path is taken. Do not revert to scaffold-only by default unless the free-form path is intentionally disabled.
-- Preserve the distinction between HTML preview generation and Manim/video generation; they share request plumbing but diverge inside the orchestrator.
-- When debugging a "HTML loaded but never became ready" issue, check both backend safety/bootstrap checks (in `agents.py`) and the `HtmlSandbox` message contract before changing prompt text.
+- **Remotion engine (this branch):** HTML mode now produces a `PlaybookScript` via `services/playbook_builder.py` and renders via `apps/web/src/engine/`. The iframe sandbox path is fully retired. See `docs/metaview-engine-architecture.md` for the full engine spec.
+- When adding a new `SnapshotKind`, update `schemas.py` (backend), `engine/types.ts` (frontend), `playbook_builder.py` (`_build_snapshot` dispatch), and register a new renderer in `engine/renderers/registry.ts`.
+- Preserve the distinction between Playbook (HTML mode) and Manim/video generation; they share CIR plumbing but diverge inside the orchestrator. Playbook gets `build_playbook()`; video gets `CoderAgent` + `PreviewVideoRenderer`.
 - When updating request/response fields, inspect both `apps/api/app/schemas.py` and `apps/web/src/api/client.ts` / `apps/web/src/types.ts` together.
 - `InteractiveExecutionExplorer` depends on the `ExecutionMap` structure produced by `services/execution_map.py`. If checkpoint or parameter control shapes change, update both files together.
 - Stage-specific models may differ across router/planning/coding/critic stages. Never assume a single model applies to all agents — check `openai_*_model` config fields.
