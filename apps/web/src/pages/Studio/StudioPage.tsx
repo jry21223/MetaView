@@ -102,7 +102,6 @@ export function StudioPage({
   hasInteractiveExplorer,
   ttsAvailability,
   previewVideoUrl,
-  previewHtmlUrl,
   editorName,
   sourcePreviewLanguage,
   result,

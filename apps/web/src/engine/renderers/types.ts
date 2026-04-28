@@ -1,4 +1,4 @@
-import type { MetaStep, AnySnapshot } from "../types";
+import type { MetaStep } from "../types";
 
 export interface RendererProps {
   step: MetaStep;

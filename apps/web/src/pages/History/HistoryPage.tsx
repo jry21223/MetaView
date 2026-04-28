@@ -34,7 +34,6 @@ export function HistoryPage({
   result,
   selectedHistoryRun,
   previewVideoUrl,
-  previewHtmlUrl,
   loading,
   onSelectRun,
   onDeleteRun,

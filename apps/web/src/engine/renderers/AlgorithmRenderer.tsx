@@ -1,5 +1,5 @@
 import React from "react";
-import { spring, useCurrentFrame } from "remotion";
+import { spring } from "remotion";
 import type { AlgorithmArraySnapshot } from "../types";
 import type { RendererProps } from "./types";
 
@@ -30,7 +30,6 @@ const PALETTE = {
 
 export const AlgorithmRenderer: React.FC<RendererProps> = ({
   step,
-  prevStep,
   frame,
   stepStartFrame,
   theme,
@@ -51,7 +50,6 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
 
   const cellW = Math.min(80, Math.floor(880 / snap.array_values.length));
   const cellH = 64;
-  const totalW = cellW * snap.array_values.length;
 
   return (
     <div

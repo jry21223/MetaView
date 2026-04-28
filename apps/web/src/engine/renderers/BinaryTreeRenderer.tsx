@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { spring, useCurrentFrame } from "remotion";
+import { spring } from "remotion";
 import { hierarchy, tree } from "d3-hierarchy";
 import type { AlgorithmTreeSnapshot } from "../types";
 import type { RendererProps } from "./types";

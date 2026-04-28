@@ -1,23 +1,26 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { PlayerRef } from "@remotion/player";
 import type { MetaStep, PlaybookScript } from "../types";
 
 export interface PlaybookController {
-  playerRef: React.RefObject<PlayerRef | null>;
   currentStepIndex: number;
-  isPlaying: boolean;
   canGoPrev: boolean;
   canGoNext: boolean;
   goToStep: (index: number) => void;
   prev: () => void;
   next: () => void;
-  onFrameUpdate: (frame: number) => void;
 }
 
-export function usePlaybookController(script: PlaybookScript): PlaybookController {
-  const playerRef = useRef<PlayerRef | null>(null);
+export function usePlaybookController(
+  script: PlaybookScript,
+  playerRef: React.RefObject<PlayerRef | null>,
+): PlaybookController {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
+
+  const currentStepIndexRef = useRef(currentStepIndex);
+  useLayoutEffect(() => {
+    currentStepIndexRef.current = currentStepIndex;
+  });
 
   const stepStartFrame = useCallback(
     (index: number): number => {
@@ -34,9 +37,8 @@ export function usePlaybookController(script: PlaybookScript): PlaybookControlle
       const startFrame = stepStartFrame(clamped);
       playerRef.current?.seekTo(startFrame);
       playerRef.current?.play();
-      setIsPlaying(true);
     },
-    [script.steps.length, stepStartFrame]
+    [script.steps.length, stepStartFrame, playerRef]
   );
 
   const prev = useCallback(() => {
@@ -47,31 +49,19 @@ export function usePlaybookController(script: PlaybookScript): PlaybookControlle
     goToStep(currentStepIndex + 1);
   }, [currentStepIndex, goToStep]);
 
-  const currentStepIndexRef = useRef(currentStepIndex);
-  currentStepIndexRef.current = currentStepIndex;
-
-  const onFrameUpdate = useCallback(
-    (frame: number) => {
-      const idx = currentStepIndexRef.current;
-      const step = script.steps[idx] as MetaStep | undefined;
-      if (!step) return;
-      if (frame >= step.end_frame) {
-        playerRef.current?.pause();
-        setIsPlaying(false);
-        if (idx < script.steps.length - 1) {
-          setCurrentStepIndex(idx + 1);
-        }
-      }
-    },
-    [script.steps]
-  );
-
-  // Wire frame-update interception via playerRef event listener
   useEffect(() => {
     const player = playerRef.current;
     if (!player) return;
     const handler = ({ detail }: { detail: { frame: number } }) => {
-      onFrameUpdate(detail.frame);
+      const idx = currentStepIndexRef.current;
+      const step = script.steps[idx] as MetaStep | undefined;
+      if (!step) return;
+      if (detail.frame >= step.end_frame) {
+        player.pause();
+        if (idx < script.steps.length - 1) {
+          setCurrentStepIndex(idx + 1);
+        }
+      }
     };
     player.addEventListener("timeupdate", handler);
     return () => {
@@ -80,14 +70,11 @@ export function usePlaybookController(script: PlaybookScript): PlaybookControlle
   });
 
   return {
-    playerRef,
     currentStepIndex,
-    isPlaying,
     canGoPrev: currentStepIndex > 0,
     canGoNext: currentStepIndex < script.steps.length - 1,
     goToStep,
     prev,
     next,
-    onFrameUpdate,
   };
 }

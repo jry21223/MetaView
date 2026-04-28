@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useRef } from "react";
 import { Player } from "@remotion/player";
+import type { PlayerRef } from "@remotion/player";
 import type { PlaybookScript } from "../types";
 import { usePlaybookController } from "./usePlaybookController";
 import { PlaybookComposition } from "../composition/PlaybookComposition";
@@ -10,7 +11,8 @@ interface PlaybookPlayerProps {
 }
 
 export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script, theme = "dark" }) => {
-  const ctrl = usePlaybookController(script);
+  const playerRef = useRef<PlayerRef | null>(null);
+  const { currentStepIndex, canGoPrev, canGoNext, prev, next } = usePlaybookController(script, playerRef);
 
   if (!script.steps.length) {
     return (
@@ -20,11 +22,13 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script, theme = 
     );
   }
 
+  const currentStep = script.steps[currentStepIndex];
+
   return (
     <div className="playbook-player" data-theme={theme}>
       <div className="playbook-player__stage">
         <Player
-          ref={ctrl.playerRef}
+          ref={playerRef}
           component={PlaybookComposition}
           inputProps={{ script, theme }}
           durationInFrames={script.total_frames}
@@ -39,34 +43,34 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script, theme = 
       <div className="playbook-player__controls">
         <button
           className="playbook-ctrl-btn"
-          onClick={ctrl.prev}
-          disabled={!ctrl.canGoPrev}
+          onClick={prev}
+          disabled={!canGoPrev}
           aria-label="Previous step"
         >
           &#8249;
         </button>
 
         <span className="playbook-step-indicator">
-          {ctrl.currentStepIndex + 1} / {script.steps.length}
+          {currentStepIndex + 1} / {script.steps.length}
         </span>
 
         <span className="playbook-step-title">
-          {script.steps[ctrl.currentStepIndex]?.title ?? ""}
+          {currentStep?.title ?? ""}
         </span>
 
         <button
           className="playbook-ctrl-btn"
-          onClick={ctrl.next}
-          disabled={!ctrl.canGoNext}
+          onClick={next}
+          disabled={!canGoNext}
           aria-label="Next step"
         >
           &#8250;
         </button>
       </div>
 
-      {script.steps[ctrl.currentStepIndex]?.voiceover_text && (
+      {currentStep?.voiceover_text && (
         <div className="playbook-player__narration">
-          {script.steps[ctrl.currentStepIndex].voiceover_text}
+          {currentStep.voiceover_text}
         </div>
       )}
     </div>
