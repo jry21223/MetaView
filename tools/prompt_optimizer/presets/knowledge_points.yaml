@@ -1,0 +1,26 @@
+knowledge_points:
+  - id: binary_tree
+    name: 二叉树算法
+    domain: algorithm
+    score: 95.0
+    run_id: v1-algorithm-binary-tree
+    title_keywords:
+      - 二叉树
+      - binary tree
+      - bst
+      - avl
+    patches:
+      - section_key: "Pacing and Scene Setup"
+        action: append
+        content: |
+          Binary tree traversals highlight one node per step. Use a coloured ring on the
+          current node (teal active, grey visited). Show left-subtree before right-subtree
+          for inorder/preorder; reverse for postorder. Edges animate in opacity when the
+          traversal first reaches them.
+      - section_key: "Algorithmic Highlighting Contract"
+        action: append
+        content: |
+          Active node: teal fill (#4de8b0 dark / #00896e light).
+          Visited nodes: 40 % opacity grey. Unvisited nodes: default cell colour.
+          Path edges: purple stroke (#c8a8f8 dark / #6030c0 light) at 2 px width.
+          Show the call-stack depth as a small counter in the top-right corner.
