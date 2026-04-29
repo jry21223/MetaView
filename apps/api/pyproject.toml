@@ -1,0 +1,11 @@
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+"app/services/prompts/html_coder.py" = ["E501"]
+"tests/*" = ["E501"]
+

@@ -1,0 +1,19 @@
+{
+  "name": "metaview",
+  "private": true,
+  "workspaces": [
+    "apps/web"
+  ],
+  "overrides": {
+    "flatted": "^3.4.2"
+  },
+  "scripts": {
+    "build:web": "npm --workspace apps/web run build",
+    "lint:web": "npm --workspace apps/web run lint",
+    "setup:git-hooks": "git config core.hooksPath .githooks"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.4.4",
+    "@commitlint/config-conventional": "^20.4.4"
+  }
+}

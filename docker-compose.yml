@@ -1,0 +1,50 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      args:
+        APT_MIRROR: ${APT_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn/debian}
+        APT_SECURITY_MIRROR: ${APT_SECURITY_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn/debian-security}
+        APT_PIPELINE_DEPTH: ${APT_PIPELINE_DEPTH:-0}
+    environment:
+      ALGO_VIS_DEFAULT_PROVIDER: ${ALGO_VIS_DEFAULT_PROVIDER:-mock}
+      ALGO_VIS_DEFAULT_ROUTER_PROVIDER: ${ALGO_VIS_DEFAULT_ROUTER_PROVIDER:-mock}
+      ALGO_VIS_DEFAULT_GENERATION_PROVIDER: ${ALGO_VIS_DEFAULT_GENERATION_PROVIDER:-mock}
+      ALGO_VIS_MOCK_PROVIDER_ENABLED: ${ALGO_VIS_MOCK_PROVIDER_ENABLED:-true}
+      ALGO_VIS_ENABLED_DOMAINS: ${ALGO_VIS_ENABLED_DOMAINS:-algorithm,math,code,physics,chemistry,biology,geography}
+      ALGO_VIS_MAX_REPAIR_ATTEMPTS: ${ALGO_VIS_MAX_REPAIR_ATTEMPTS:-2}
+      ALGO_VIS_HISTORY_DB_PATH: ${ALGO_VIS_HISTORY_DB_PATH:-data/pipeline_runs.db}
+      ALGO_VIS_PREVIEW_RENDER_BACKEND: ${ALGO_VIS_PREVIEW_RENDER_BACKEND:-auto}
+      ALGO_VIS_MANIM_PYTHON_PATH: ${ALGO_VIS_MANIM_PYTHON_PATH:-/usr/local/bin/python}
+      ALGO_VIS_CJK_FONT_FAMILY: ${ALGO_VIS_CJK_FONT_FAMILY:-Noto Sans CJK SC}
+      ALGO_VIS_CJK_FONT_PATH: ${ALGO_VIS_CJK_FONT_PATH:-/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc}
+      ALGO_VIS_PREVIEW_TTS_ENABLED: ${ALGO_VIS_PREVIEW_TTS_ENABLED:-true}
+      ALGO_VIS_PREVIEW_TTS_BACKEND: ${ALGO_VIS_PREVIEW_TTS_BACKEND:-openai_compatible}
+      ALGO_VIS_PREVIEW_TTS_MODEL: ${ALGO_VIS_PREVIEW_TTS_MODEL:-mimotts-v2}
+      ALGO_VIS_PREVIEW_TTS_BASE_URL: ${ALGO_VIS_PREVIEW_TTS_BASE_URL:-}
+      ALGO_VIS_PREVIEW_TTS_API_KEY: ${ALGO_VIS_PREVIEW_TTS_API_KEY:-}
+      ALGO_VIS_PREVIEW_TTS_VOICE: ${ALGO_VIS_PREVIEW_TTS_VOICE:-default}
+      ALGO_VIS_PREVIEW_TTS_RATE_WPM: ${ALGO_VIS_PREVIEW_TTS_RATE_WPM:-150}
+      ALGO_VIS_PREVIEW_TTS_SPEED: ${ALGO_VIS_PREVIEW_TTS_SPEED:-0.88}
+      ALGO_VIS_PREVIEW_TTS_MAX_CHARS: ${ALGO_VIS_PREVIEW_TTS_MAX_CHARS:-1500}
+      ALGO_VIS_OPENAI_API_KEY: ${ALGO_VIS_OPENAI_API_KEY:-}
+      ALGO_VIS_OPENAI_BASE_URL: ${ALGO_VIS_OPENAI_BASE_URL:-https://api.openai.com/v1}
+      ALGO_VIS_OPENAI_MODEL: ${ALGO_VIS_OPENAI_MODEL:-}
+      ALGO_VIS_OPENAI_SUPPORTS_VISION: ${ALGO_VIS_OPENAI_SUPPORTS_VISION:-false}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./skills:/app/skills
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+    depends_on:
+      - api
+    ports:
+      - "5173:80"

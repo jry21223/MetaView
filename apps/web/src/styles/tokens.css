@@ -1,0 +1,153 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+SC:wght@400;500;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap");
+
+/* ============================================
+
+   STITCH DESIGN SYSTEM v2 — Refined Clinical Curator
+   ============================================ */
+
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Base surfaces — deeper, richer layering */
+  --background: #0a0c10;
+  --surface: #12151a;
+  --surface-container-low: #181b22;
+  --surface-container: #1e2128;
+  --surface-container-high: #252830;
+  --surface-container-highest: #2c3038;
+  --surface-container-lowest: #0f1115;
+
+  /* Primary palette — vibrant teal */
+  --primary: #4de8b0;
+  --primary-dim: #3bba8e;
+  --primary-container: #1a5d48;
+  --on-primary: #00291e;
+  --on-primary-container: #a8f5d8;
+
+  /* Secondary palette */
+  --secondary: #78d7b8;
+  --secondary-container: #1e3d34;
+  --on-secondary-container: #a9cfc0;
+
+  /* Tertiary palette — warm coral */
+  --tertiary: #ff9e8a;
+  --tertiary-container: #5a2018;
+  --on-tertiary-container: #ffb4a9;
+
+  /* Error palette */
+  --error: #ff7870;
+  --error-container: #4a1210;
+  --on-error-container: #ffdad6;
+
+  /* Text colors */
+  --on-surface: #e8ecf4;
+  --on-surface-variant: #9aa5b4;
+  --outline: #5a6570;
+  --outline-variant: #2e3540;
+
+  /* Glassmorphism */
+  --glass-bg: rgba(18, 21, 26, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --glass-highlight: rgba(255, 255, 255, 0.03);
+
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #4de8b0, #38c99a, #2aa07a);
+  --gradient-accent: linear-gradient(135deg, #4de8b0 0%, #78d7b8 50%, #4de8b0 100%);
+  --gradient-surface: linear-gradient(180deg, var(--surface-container-low) 0%, var(--surface) 100%);
+  --gradient-glow: radial-gradient(ellipse at 50% 0%, rgba(77, 232, 176, 0.08) 0%, transparent 60%);
+
+  /* Shadows — refined depth */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.15);
+  --shadow: 0 8px 32px -4px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 16px 48px -8px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.25);
+  --shadow-glow: 0 0 20px rgba(77, 232, 176, 0.15), 0 0 60px rgba(77, 232, 176, 0.05);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+
+  /* Blur */
+  --backdrop-blur: blur(20px);
+  --backdrop-blur-heavy: blur(40px);
+
+  /* Typography */
+  --font-headline: "Space Grotesk", "Noto Sans SC", sans-serif;
+  --font-body: "Space Grotesk", "Noto Sans SC", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  /* Animation & Easing */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-spring: cubic-bezier(0.37, 0, 0.63, 1);
+  --transition-fast: 150ms var(--ease-out-expo);
+  --transition-normal: 250ms var(--ease-out-expo);
+  --transition-slow: 400ms var(--ease-out-expo);
+
+  /* Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-full: 999px;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  /* Base surfaces */
+  --background: #f5f7fa;
+  --surface: #ffffff;
+  --surface-container-low: #f0f2f5;
+  --surface-container: #e8eaee;
+  --surface-container-high: #dfe2e6;
+  --surface-container-highest: #d6d9de;
+  --surface-container-lowest: #ffffff;
+
+  /* Primary palette */
+  --primary: #00896e;
+  --primary-dim: #006b56;
+  --primary-container: #4de8b0;
+  --on-primary: #ffffff;
+  --on-primary-container: #002018;
+
+  /* Secondary palette */
+  --secondary: #42655a;
+  --secondary-container: #c4ebdc;
+  --on-secondary-container: #486b5f;
+
+  /* Tertiary palette */
+  --tertiary: #96463c;
+  --tertiary-container: #ea897c;
+  --on-tertiary-container: #67231b;
+
+  /* Error palette */
+  --error: #ba1a1a;
+  --error-container: #ffdad6;
+  --on-error-container: #93000a;
+
+  /* Text colors */
+  --on-surface: #141820;
+  --on-surface-variant: #5c6773;
+  --outline: #6e7a84;
+  --outline-variant: #c8ced6;
+
+  /* Glassmorphism - light */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(0, 0, 0, 0.06);
+  --glass-highlight: rgba(255, 255, 255, 0.5);
+
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #00896e, #006b56, #005545);
+  --gradient-accent: linear-gradient(135deg, #00896e 0%, #42655a 50%, #00896e 100%);
+  --gradient-surface: linear-gradient(180deg, var(--surface-container-low) 0%, var(--surface) 100%);
+  --gradient-glow: radial-gradient(ellipse at 50% 0%, rgba(0, 137, 110, 0.06) 0%, transparent 60%);
+
+  /* Shadows — light mode */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow: 0 8px 32px -4px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 16px 48px -8px rgba(0, 0, 0, 0.1), 0 4px 16px rgba(0, 0, 0, 0.06);
+  --shadow-glow: 0 0 20px rgba(0, 137, 110, 0.1), 0 0 60px rgba(0, 137, 110, 0.03);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}

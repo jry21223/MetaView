@@ -1,0 +1,41 @@
+---
+id: demoo-frontend-types-centralized
+trigger: "when adding new frontend data structures"
+confidence: 0.9
+domain: frontend
+source: local-repo-analysis
+---
+
+# Centralize Types in types.ts
+
+## Action
+All shared TypeScript types should be defined in `apps/web/src/types.ts`.
+
+## Evidence
+- `types.ts` modified in 15+ commits
+- Components import from `types.ts` via `import { ... } from './types'`
+- Pattern: API response types, component props, shared interfaces
+
+## Examples
+```typescript
+// types.ts
+export interface PipelineRequest {
+  prompt: string;
+  source_image?: string;
+  ...
+}
+
+export interface PipelineResponse {
+  cir: CirDocument;
+  scripts: { renderer_ts: string; ... };
+  ...
+}
+
+// App.tsx
+import { PipelineRequest, PipelineResponse } from './types';
+```
+
+## Workflow
+1. Add type to `src/types.ts`
+2. Export from file
+3. Import in components as needed

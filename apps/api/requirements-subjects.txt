@@ -1,0 +1,5 @@
+numpy>=2.4,<3.0
+sympy>=1.14,<2.0
+matplotlib>=3.10,<4.0
+geopandas>=1.1,<2.0
+rdkit>=2025.9,<2026.0

@@ -1,0 +1,33 @@
+.DS_Store
+.claude/
+.idea/
+.vscode/
+.env
+.venv/
+.venv-manim/
+node_modules/
+dist/
+coverage/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+apps/web/node_modules/
+apps/web/dist/
+*.tsbuildinfo
+data/*.db
+data/*.sqlite3
+data/media/
+data/debug/
+apps/api/data/
+*.log
+apps/web/dev.log
+apps/api/tests/.tmp/
+.ace-tool/
+# PPT 演示文稿
+*.pptx
+PPT版本对比说明.md
+# 竞赛提交和临时文件
+COMPETITION_SUBMISSION/
+data/html_previews/
+tools/
