@@ -2,10 +2,17 @@ from __future__ import annotations
 
 import re
 
-from app.domain.models.cir import CirDocument, CirStep, ExecutionCheckpoint, ExecutionMap, VisualKind
+from app.domain.models.cir import (
+    CirDocument,
+    CirStep,
+    ExecutionCheckpoint,
+    ExecutionMap,
+    VisualKind,
+)
 from app.domain.models.playbook import (
     AlgorithmArraySnapshot,
     AlgorithmTreeSnapshot,
+    CodeHighlightOverlay,
     MetaStep,
     PlaybookScript,
 )
@@ -18,18 +25,24 @@ def build_playbook(
     cir: CirDocument,
     execution_map: ExecutionMap | None,
     fps: int = _DEFAULT_FPS,
+    source_code: str | None = None,
+    source_language: str = "python",
 ) -> PlaybookScript:
     checkpoint_by_step: dict[str, ExecutionCheckpoint] = {}
     if execution_map:
         for cp in execution_map.checkpoints:
             checkpoint_by_step[cp.step_id] = cp
 
+    source_lines = source_code.splitlines() if source_code else []
+
     steps: list[MetaStep] = []
     cumulative = 0
     for i, cir_step in enumerate(cir.steps):
-        duration = _step_duration_frames(cir_step, checkpoint_by_step.get(cir_step.id), fps)
+        checkpoint = checkpoint_by_step.get(cir_step.id)
+        duration = _step_duration_frames(cir_step, checkpoint, fps)
         cumulative += duration
-        snapshot = _build_snapshot(cir_step, checkpoint_by_step.get(cir_step.id), execution_map)
+        snapshot = _build_snapshot(cir_step, checkpoint, execution_map)
+        code_highlight = _build_code_highlight(checkpoint, source_lines, source_language)
         steps.append(
             MetaStep(
                 step_id=cir_step.id,
@@ -38,6 +51,7 @@ def build_playbook(
                 voiceover_text=cir_step.narration,
                 animation_hint=_infer_hint(cir_step, i, len(cir.steps)),
                 snapshot=snapshot,
+                code_highlight=code_highlight,
             )
         )
 
@@ -50,6 +64,22 @@ def build_playbook(
         summary=cir.summary,
         steps=steps,
         parameter_controls=execution_map.parameter_controls if execution_map else [],
+    )
+
+
+def _build_code_highlight(
+    checkpoint: ExecutionCheckpoint | None,
+    source_lines: list[str],
+    language: str,
+) -> CodeHighlightOverlay | None:
+    if not checkpoint or not checkpoint.code_lines or not source_lines:
+        return None
+    active_lines = sorted(set(checkpoint.code_lines))
+    return CodeHighlightOverlay(
+        language=language,
+        lines=source_lines,
+        active_lines=active_lines,
+        active_line=active_lines[0],
     )
 
 

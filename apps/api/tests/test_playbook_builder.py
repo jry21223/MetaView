@@ -216,7 +216,7 @@ class TestBuildPlaybook:
         assert playbook.steps[1].voiceover_text == "比较 5 和 3，5 > 3，发生交换"
 
     def test_parameter_controls_passed_through(self):
-        from app.schemas import ExecutionParameterControl
+        from app.domain.models.cir import ExecutionParameterControl
         cir = _make_array_cir()
         em = _make_execution_map(cir)
         em.parameter_controls = [

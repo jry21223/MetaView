@@ -38,6 +38,16 @@ AnySnapshot = Annotated[
 ]
 
 
+class CodeHighlightOverlay(BaseModel):
+    """Parallel code-sync track — sits alongside the visual snapshot, not inside it."""
+
+    language: str  # "python" | "cpp" | "javascript"
+    lines: list[str]  # full source split by line
+    active_lines: list[int]  # 0-indexed lines to highlight in this step
+    active_line: int  # primary scroll anchor (min of active_lines)
+    variables: dict[str, str] = Field(default_factory=dict)
+
+
 class MetaStep(BaseModel):
     step_id: str
     end_frame: int = Field(ge=1)
@@ -45,6 +55,7 @@ class MetaStep(BaseModel):
     voiceover_text: str
     animation_hint: str | None = None
     snapshot: AnySnapshot
+    code_highlight: CodeHighlightOverlay | None = None
 
 
 class PlaybookScript(BaseModel):
