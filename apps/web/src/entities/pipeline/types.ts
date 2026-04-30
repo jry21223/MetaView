@@ -2,6 +2,14 @@ import type { CirDocument, ExecutionMap } from "../cir/types";
 import type { ProviderDescriptor, SkillDescriptor } from "../provider/types";
 import type { PlaybookScript } from "../playbook/types";
 
+export interface PipelineRunResult {
+  run_id: string;
+  status: "queued" | "running" | "succeeded" | "failed";
+  playbook?: PlaybookScript | null;
+  error?: string | null;
+  created_at: string;
+}
+
 export type UITheme = "dark" | "light";
 export type SandboxMode = "dry_run" | "off";
 export type SandboxStatus = "passed" | "failed" | "skipped";

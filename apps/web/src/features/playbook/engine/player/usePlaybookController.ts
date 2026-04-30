@@ -6,6 +6,8 @@ export interface PlaybookController {
   currentStepIndex: number;
   canGoPrev: boolean;
   canGoNext: boolean;
+  stepThrough: boolean;
+  setStepThrough: (v: boolean) => void;
   goToStep: (index: number) => void;
   prev: () => void;
   next: () => void;
@@ -16,10 +18,13 @@ export function usePlaybookController(
   playerRef: React.RefObject<PlayerRef | null>,
 ): PlaybookController {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [stepThrough, setStepThrough] = useState(true);
 
   const currentStepIndexRef = useRef(currentStepIndex);
+  const stepThroughRef = useRef(stepThrough);
   useLayoutEffect(() => {
     currentStepIndexRef.current = currentStepIndex;
+    stepThroughRef.current = stepThrough;
   });
 
   const stepStartFrame = useCallback(
@@ -57,9 +62,13 @@ export function usePlaybookController(
       const step = script.steps[idx] as MetaStep | undefined;
       if (!step) return;
       if (detail.frame >= step.end_frame) {
-        player.pause();
+        // Always advance the step index for display purposes
         if (idx < script.steps.length - 1) {
           setCurrentStepIndex(idx + 1);
+        }
+        // Only pause when step-through mode is on
+        if (stepThroughRef.current) {
+          player.pause();
         }
       }
     };
@@ -73,6 +82,8 @@ export function usePlaybookController(
     currentStepIndex,
     canGoPrev: currentStepIndex > 0,
     canGoNext: currentStepIndex < script.steps.length - 1,
+    stepThrough,
+    setStepThrough,
     goToStep,
     prev,
     next,

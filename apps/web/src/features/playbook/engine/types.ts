@@ -22,6 +22,14 @@ export interface AlgorithmTreeSnapshot {
 
 export type AnySnapshot = AlgorithmArraySnapshot | AlgorithmTreeSnapshot;
 
+export interface CodeHighlightOverlay {
+  language: string;
+  lines: string[];
+  active_lines: number[];
+  active_line: number;
+  variables?: Record<string, string>;
+}
+
 export interface MetaStep<T extends AnySnapshot = AnySnapshot> {
   step_id: string;
   end_frame: number;
@@ -29,6 +37,7 @@ export interface MetaStep<T extends AnySnapshot = AnySnapshot> {
   voiceover_text: string;
   animation_hint?: string | null;
   snapshot: T;
+  code_highlight?: CodeHighlightOverlay | null;
 }
 
 export interface PlaybookScript {

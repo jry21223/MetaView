@@ -1,73 +1,40 @@
 import { API_BASE_URL, readErrorMessage } from "../../../shared/api/httpClient";
-import type { PipelineResponse, PipelineSubmitResponse } from "../../../entities/pipeline/types";
-import type { ModelProvider, SandboxMode, TopicDomain, UITheme } from "../../../shared/types";
+import type { PipelineRunResult } from "../../../entities/pipeline/types";
 
-export async function runPipeline(
-  prompt: string,
-  routerProvider: ModelProvider,
-  generationProvider: ModelProvider,
-  sandboxMode: SandboxMode,
-  domain?: TopicDomain | null,
-  sourceCode?: string | null,
-  sourceCodeLanguage?: string | null,
-  sourceImage?: string | null,
-  sourceImageName?: string | null,
-  uiTheme?: UITheme | null,
-  enableNarration = true,
-): Promise<PipelineResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/pipeline`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      prompt,
-      domain: domain ?? null,
-      provider: generationProvider,
-      router_provider: routerProvider,
-      generation_provider: generationProvider,
-      source_code: sourceCode ?? null,
-      source_code_language: sourceCodeLanguage ?? null,
-      source_image: sourceImage ?? null,
-      source_image_name: sourceImageName ?? null,
-      ui_theme: uiTheme ?? null,
-      enable_narration: enableNarration,
-      sandbox_mode: sandboxMode,
-    }),
-  });
-  if (!response.ok) throw new Error(await readErrorMessage(response, "Pipeline request failed"));
-  return (await response.json()) as PipelineResponse;
+export interface SubmitPipelineRequest {
+  prompt: string;
+  domain?: string | null;
+  source_code?: string | null;
+  language?: string;
+  provider_api_key?: string | null;
+  provider_base_url?: string | null;
+  provider_model?: string | null;
+}
+
+export interface SubmitPipelineResponse {
+  run_id: string;
+  status: string;
+  created_at: string;
 }
 
 export async function submitPipeline(
-  prompt: string,
-  routerProvider: ModelProvider,
-  generationProvider: ModelProvider,
-  sandboxMode: SandboxMode,
-  domain?: TopicDomain | null,
-  sourceCode?: string | null,
-  sourceCodeLanguage?: string | null,
-  sourceImage?: string | null,
-  sourceImageName?: string | null,
-  uiTheme?: UITheme | null,
-  enableNarration = true,
-): Promise<PipelineSubmitResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/pipeline/submit`, {
+  req: SubmitPipelineRequest,
+): Promise<SubmitPipelineResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/pipeline`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      prompt,
-      domain: domain ?? null,
-      provider: generationProvider,
-      router_provider: routerProvider,
-      generation_provider: generationProvider,
-      source_code: sourceCode ?? null,
-      source_code_language: sourceCodeLanguage ?? null,
-      source_image: sourceImage ?? null,
-      source_image_name: sourceImageName ?? null,
-      ui_theme: uiTheme ?? null,
-      enable_narration: enableNarration,
-      sandbox_mode: sandboxMode,
-    }),
+    body: JSON.stringify(req),
   });
-  if (!response.ok) throw new Error(await readErrorMessage(response, "Pipeline submit failed"));
-  return (await response.json()) as PipelineSubmitResponse;
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, "Pipeline submit failed"));
+  }
+  return (await response.json()) as SubmitPipelineResponse;
+}
+
+export async function getPipelineRun(runId: string): Promise<PipelineRunResult> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/runs/${runId}`);
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, "Failed to fetch run"));
+  }
+  return (await response.json()) as PipelineRunResult;
 }
