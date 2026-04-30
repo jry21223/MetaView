@@ -1,7 +1,7 @@
 /* MetaView v2 — Global Base Styles */
 
 * { box-sizing: border-box; }
-html, body, #root { height: 100%; margin: 0; }
+html, body, #root { min-height: 100%; margin: 0; }
 
 body {
   font-family: 'Inter', -apple-system, system-ui, 'PingFang SC', 'Noto Sans SC', sans-serif;
@@ -23,7 +23,7 @@ body {
 }
 
 .mv-root {
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   background: var(--bg);

@@ -16,51 +16,106 @@ export interface IntakeContext {
   title: string;
   raw: string;
   files: Array<{ name: string; size: number }>;
+  sourceCode?: string;
 }
 
 interface IntakeScreenProps {
-  onSubmit: (ctx: IntakeContext) => void;
+  onSubmit: (ctx: IntakeContext) => void | Promise<void>;
   t: TweakValues;
+  isSubmitting?: boolean;
+  submitError?: string | null;
+  isProviderConfigured?: boolean;
+  onOpenProviderSettings?: () => void;
+  onHistory?: () => void;
 }
 
-export function IntakeScreen({ onSubmit, t }: IntakeScreenProps) {
+function readFileAsText(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file);
+  });
+}
+
+const CODE_EXTENSIONS = new Set([
+  '.py', '.js', '.ts', '.tsx', '.jsx', '.java', '.cpp', '.c', '.cs',
+  '.go', '.rs', '.rb', '.swift', '.kt', '.php', '.r', '.m', '.sh',
+]);
+
+function isCodeFile(name: string): boolean {
+  const ext = name.slice(name.lastIndexOf('.')).toLowerCase();
+  return CODE_EXTENSIONS.has(ext);
+}
+
+export function IntakeScreen({ onSubmit, t, isSubmitting = false, submitError = null, isProviderConfigured = false, onOpenProviderSettings, onHistory }: IntakeScreenProps) {
   const [input, setInput] = useState('');
   const [files, setFiles] = useState<Array<{ name: string; size: number }>>([]);
-  const [pending, setPending] = useState(false);
+  const [fileObjects, setFileObjects] = useState<File[]>([]);
   const [thinking, setThinking] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const css = useMemo(() => themeVars(t), [t]);
 
   const handleFiles = (list: FileList | null) => {
     if (!list) return;
-    const arr = Array.from(list).map((f) => ({ name: f.name, size: f.size }));
-    setFiles((prev) => [...prev, ...arr]);
+    const arr = Array.from(list);
+    setFileObjects((prev) => [...prev, ...arr]);
+    setFiles((prev) => [...prev, ...arr.map((f) => ({ name: f.name, size: f.size }))]);
+  };
+
+  const removeFile = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+    setFileObjects((prev) => prev.filter((_, i) => i !== index));
   };
 
   const submit = async () => {
     if (!input.trim() && files.length === 0) return;
-    setPending(true);
+
     setThinking('正在理解你的需求…');
-    try {
-      await new Promise((r) => setTimeout(r, 600));
-      const subject = input.toLowerCase().includes('排序') || input.toLowerCase().includes('算法') || input.toLowerCase().includes('search')
-        ? 'algo'
-        : input.includes('微分') || input.includes('积分') || input.includes('傅里叶')
-        ? 'math'
-        : input.includes('斜面') || input.includes('物理') || input.includes('力')
-        ? 'phys'
-        : 'algo';
-      setThinking(`已识别为 ${subject.toUpperCase()} · merge-sort → 进入工作台`);
-      await new Promise((r) => setTimeout(r, 500));
-      onSubmit({ subject, template: 'merge-sort', title: input.slice(0, 40) || '未命名', raw: input, files });
-    } finally {
-      setPending(false);
+
+    const subject = input.toLowerCase().includes('排序') || input.toLowerCase().includes('算法') || input.toLowerCase().includes('search')
+      ? 'algo'
+      : input.includes('微分') || input.includes('积分') || input.includes('傅里叶')
+      ? 'math'
+      : input.includes('斜面') || input.includes('物理') || input.includes('力')
+      ? 'phys'
+      : 'algo';
+
+    let sourceCode: string | undefined;
+    const codeFile = fileObjects.find((f) => isCodeFile(f.name));
+    if (codeFile) {
+      try {
+        sourceCode = await readFileAsText(codeFile);
+      } catch {
+        // ignore read error, proceed without source code
+      }
     }
+
+    setThinking('提交中…');
+
+    await onSubmit({
+      subject,
+      template: 'merge-sort',
+      title: input.slice(0, 40) || '未命名',
+      raw: input,
+      files,
+      sourceCode,
+    });
+
+    setThinking('');
   };
 
   const pickTemplate = (tpl: typeof TEMPLATE_GALLERY[number]) => {
-    onSubmit({ subject: tpl.subject as IntakeContext['subject'], template: tpl.id, title: tpl.title, raw: '', files: [] });
+    onSubmit({
+      subject: tpl.subject as IntakeContext['subject'],
+      template: tpl.id,
+      title: tpl.title,
+      raw: tpl.title,
+      files: [],
+    });
   };
+
+  const pending = isSubmitting;
 
   return (
     <div className="mv-intake" style={css}>
@@ -70,15 +125,38 @@ export function IntakeScreen({ onSubmit, t }: IntakeScreenProps) {
           <span className="mv-brand-name">MetaView</span>
           <span className="mv-brand-meta">/ Concept Studio · v0.3</span>
         </div>
-        <div className="mv-intake-status">
-          <span className="mv-pulse" />
-          CORE NODES ONLINE
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {onHistory && (
+            <button className="mv-chip" onClick={onHistory}>
+              任务历史
+            </button>
+          )}
+          {onOpenProviderSettings && (
+            <button
+              className="mv-chip"
+              onClick={onOpenProviderSettings}
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              <span style={{ opacity: isProviderConfigured ? 1 : 0.5 }}>⚙</span>
+              <span>Provider</span>
+              {isProviderConfigured && (
+                <span style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: 'var(--accent)', display: 'inline-block',
+                }} />
+              )}
+            </button>
+          )}
+          <div className="mv-intake-status">
+            <span className="mv-pulse" />
+            CORE NODES ONLINE
+          </div>
         </div>
       </div>
 
       <div className="mv-intake-body">
         <div className="mv-intake-hero">
-          <div className="mv-eyebrow-mini">为一道题生成可解释的动画</div>
+          <div className="mv-eyebrow-mini">为每道题，生成可解释的动画</div>
           <h1 className="mv-intake-title">
             把题目<span className="mv-accent-text">交给我</span>，
             <br />
@@ -96,7 +174,7 @@ export function IntakeScreen({ onSubmit, t }: IntakeScreenProps) {
                 <div key={i} className="mv-intake-file">
                   <span className="mv-file-icon">📎</span>
                   <span className="mv-file-name">{f.name}</span>
-                  <button onClick={() => setFiles(files.filter((_, j) => j !== i))}>✕</button>
+                  <button onClick={() => removeFile(i)}>✕</button>
                 </div>
               ))}
             </div>
@@ -116,7 +194,7 @@ export function IntakeScreen({ onSubmit, t }: IntakeScreenProps) {
           />
           <div className="mv-intake-actions">
             <button className="mv-chip" onClick={() => fileRef.current?.click()}>
-              ＋ 附件 (题图 / PDF / 源码)
+              ＋ 附件
             </button>
             <input
               ref={fileRef}
@@ -127,7 +205,11 @@ export function IntakeScreen({ onSubmit, t }: IntakeScreenProps) {
             />
             <span className="mv-intake-hint">⌘ + ↵ 提交</span>
             <div className="mv-spacer" />
-            {thinking && <span className="mv-intake-thinking">{thinking}</span>}
+            {(thinking || submitError) && (
+              <span className={`mv-intake-thinking${submitError ? ' mv-intake-error' : ''}`}>
+                {submitError ?? thinking}
+              </span>
+            )}
             <button
               className="mv-send mv-intake-send"
               onClick={submit}
