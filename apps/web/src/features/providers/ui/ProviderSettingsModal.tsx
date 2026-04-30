@@ -22,15 +22,17 @@ export function ProviderSettingsModal({ initial, onSave, onClose }: ProviderSett
     <div
       style={{
         position: 'fixed', inset: 0, zIndex: 1000,
-        background: 'rgba(0,0,0,0.6)',
+        background: 'rgba(0,0,0,0.78)',
+        backdropFilter: 'blur(4px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div style={{
-        background: 'var(--surface)',
+        background: 'var(--surface-2)',
         border: '1px solid var(--line)',
         borderRadius: 12,
+        boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
         padding: '28px 32px',
         width: 480,
         maxWidth: '90vw',
