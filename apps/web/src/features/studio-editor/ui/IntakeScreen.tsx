@@ -148,8 +148,17 @@ export function IntakeScreen({ onSubmit, t, isSubmitting = false, submitError = 
             </button>
           )}
           <div className="mv-intake-status">
-            <span className="mv-pulse" />
-            CORE NODES ONLINE
+            {isProviderConfigured ? (
+              <>
+                <span className="mv-pulse" />
+                CORE NODES ONLINE
+              </>
+            ) : (
+              <>
+                <span className="mv-pulse-offline" />
+                NO PROVIDER SET
+              </>
+            )}
           </div>
         </div>
       </div>

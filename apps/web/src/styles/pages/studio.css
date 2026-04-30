@@ -612,6 +612,11 @@
   box-shadow: 0 0 0 3px var(--accent-soft);
   animation: pulse 2s ease-in-out infinite;
 }
+.mv-pulse-offline {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--ink-3); display: inline-block;
+  opacity: 0.45;
+}
 .mv-intake-body {
   flex: 1; display: flex; flex-direction: column;
   align-items: center; justify-content: center;
