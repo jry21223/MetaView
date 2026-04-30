@@ -30,6 +30,26 @@ export interface CodeHighlightOverlay {
   variables?: Record<string, string>;
 }
 
+export type NarrationSegment =
+  | string
+  | { t: string }
+  | [NarrationBranch, ...NarrationBranch[]];
+
+export type NarrationBranch = [NarrationCondition, NarrationSegment[]];
+
+export type NarrationCondition =
+  | Record<string, never>
+  | { a: string; op: "lt" | "gt" | "eq" | "lte" | "gte" | "neq"; b?: string; v?: number | string };
+
+export type NarrationTemplate = NarrationSegment[];
+
+export interface NarrationToken {
+  id: string;
+  label: string;
+  value?: string | null;
+  emphasis?: string;
+}
+
 export interface MetaStep<T extends AnySnapshot = AnySnapshot> {
   step_id: string;
   end_frame: number;
@@ -38,6 +58,8 @@ export interface MetaStep<T extends AnySnapshot = AnySnapshot> {
   animation_hint?: string | null;
   snapshot: T;
   code_highlight?: CodeHighlightOverlay | null;
+  narration_template?: NarrationTemplate | null;
+  tokens: NarrationToken[];
 }
 
 export interface PlaybookScript {
