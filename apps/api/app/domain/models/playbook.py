@@ -56,6 +56,8 @@ class MetaStep(BaseModel):
     animation_hint: str | None = None
     snapshot: AnySnapshot
     code_highlight: CodeHighlightOverlay | None = None
+    narration_template: list | None = None
+    tokens: list[dict] = Field(default_factory=list)
 
 
 class PlaybookScript(BaseModel):

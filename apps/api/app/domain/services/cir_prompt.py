@@ -111,9 +111,24 @@ Keyword analysis suggests: **{domain_hint.value}**
 You may change this if the topic clearly belongs to a different domain.
 {domain_guidance}
 
+## Narration Output Format
+Output the "narration" field as a JSON array (NOT a plain string):
+- String elements are literal text.
+- {{"t":"tokenId"}} inserts that token's label at runtime.
+- A conditional branch is a nested array: [ [condition, segments], ..., [{{}}, segments] ]
+  where condition is {{"a":"t0","op":"lt","b":"t1"}} (token vs token) or \
+{{"a":"t0","op":"gt","v":5}} (token vs fixed value).
+  Supported ops: lt gt eq lte gte neq. The LAST branch MUST use {{}} as the default fallback.
+- Only reference token ids from the SAME step's tokens list.
+Example (bubble sort compare step):
+["Compare ",{{"t":"t0"}}," and ",{{"t":"t1"}},". ",
+  [[{{"a":"t0","op":"lt","b":"t1"}},[{{"t":"t0"}}," < ",{{"t":"t1"}},", no swap."]],
+   [{{"a":"t0","op":"gt","b":"t1"}},[{{"t":"t0"}}," > ",{{"t":"t1"}},", swap them."]],
+   [{{}},[{{"t":"t0"}}," equals ",{{"t":"t1"}},", no swap."]]]]
+
 ## Narration Quality Rules
-- Write narration as if speaking directly to a student: clear, friendly, educational.
-- Each narration must explain WHY this step matters, not just WHAT it shows.
+- Narration must explain WHY this step matters, not just WHAT it shows.
+- Write as if speaking directly to a student: clear, friendly, educational.
 - Vary sentence length. Avoid starting every sentence the same way.
 
 ## Token Quality Rules

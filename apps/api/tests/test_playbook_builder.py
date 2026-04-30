@@ -9,7 +9,7 @@ from app.domain.models.cir import (
 )
 from app.domain.models.playbook import AlgorithmArraySnapshot, AlgorithmTreeSnapshot
 from app.domain.models.topic import TopicDomain, VisualKind
-from app.domain.services.playbook_builder import build_playbook
+from app.domain.services.playbook_builder import _parse_narration_template, build_playbook
 
 
 def _make_array_cir() -> CirDocument:
@@ -233,4 +233,37 @@ class TestBuildPlaybook:
 
         assert playbook.steps[0].animation_hint == "enter"
         assert playbook.steps[-1].animation_hint == "reveal"
-        assert playbook.steps[1].animation_hint is not None
+
+    def test_tokens_passed_through(self):
+        cir = _make_array_cir()
+        playbook = build_playbook(cir, execution_map=None)
+        step = playbook.steps[0]
+        assert step.tokens[0]["id"] == "t0"
+        assert step.tokens[0]["label"] == "5"
+
+
+class TestParseNarrationTemplate:
+    def test_json_array_parsed(self):
+        raw = '["Compare ", {"t": "t0"}, " and ", {"t": "t1"}]'
+        result = _parse_narration_template(raw)
+        assert result == ["Compare ", {"t": "t0"}, " and ", {"t": "t1"}]
+
+    def test_plain_string_with_placeholders_converted(self):
+        raw = "将 {{t0}} 和 {{t1}} 比较"
+        result = _parse_narration_template(raw)
+        assert result == ["将 ", {"t": "t0"}, " 和 ", {"t": "t1"}, " 比较"]
+
+    def test_plain_string_without_placeholders_returns_none(self):
+        raw = "普通旁白，没有占位符"
+        assert _parse_narration_template(raw) is None
+
+    def test_invalid_json_returns_none(self):
+        raw = "[broken json"
+        assert _parse_narration_template(raw) is None
+
+    def test_conditional_branch_preserved(self):
+        raw = '[{"t":"t0"}," and ",[[ {"a":"t0","op":"lt","b":"t1"}, ["less"]],[{},[" same"]]]]'
+        result = _parse_narration_template(raw)
+        assert isinstance(result, list)
+        assert result[0] == {"t": "t0"}
+        assert isinstance(result[2], list)

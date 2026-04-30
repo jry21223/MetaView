@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import logging
 import re
 
 from app.domain.models.cir import (
@@ -16,6 +18,8 @@ from app.domain.models.playbook import (
     MetaStep,
     PlaybookScript,
 )
+
+logger = logging.getLogger(__name__)
 
 _DEFAULT_FPS = 30
 _DEFAULT_STEP_FRAMES = 60  # 2 s at 30 fps
@@ -52,6 +56,8 @@ def build_playbook(
                 animation_hint=_infer_hint(cir_step, i, len(cir.steps)),
                 snapshot=snapshot,
                 code_highlight=code_highlight,
+                narration_template=_parse_narration_template(cir_step.narration),
+                tokens=[t.model_dump() for t in cir_step.tokens],
             )
         )
 
@@ -211,3 +217,37 @@ def _infer_hint(cir_step: CirStep, index: int, total: int) -> str:
     if index == total - 1:
         return "reveal"
     return _HINT_MAP.get(cir_step.visual_kind, "highlight")
+
+
+def _parse_narration_template(raw: str) -> list | None:
+    """Parse LLM narration into a structured template array for dynamic resolution.
+
+    Accepts two input formats:
+    1. JSON array with string literals, {"t":"id"} placeholders, and conditional branches.
+    2. Plain string with {{token_id}} placeholders → converted to simplified template.
+
+    Returns None if parsing fails, so callers fall back to voiceover_text.
+    """
+    stripped = raw.strip()
+    if stripped.startswith("["):
+        try:
+            result = json.loads(stripped)
+            if isinstance(result, list):
+                return result
+        except json.JSONDecodeError:
+            pass
+        logger.warning("narration looks like JSON array but failed to parse; falling back")
+        return None
+
+    # Plain string with {{id}} placeholders → convert to simplified template
+    if "{{" in stripped:
+        parts: list = []
+        for segment in re.split(r"(\{\{[^}]+\}\})", stripped):
+            m = re.match(r"\{\{([^}]+)\}\}", segment)
+            if m:
+                parts.append({"t": m.group(1)})
+            elif segment:
+                parts.append(segment)
+        return parts if parts else None
+
+    return None
