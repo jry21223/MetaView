@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 interface ShortcutHandlers {
   onPlayPause?: () => void;
@@ -16,31 +16,36 @@ function isInputFocused(): boolean {
 }
 
 export function useKeyboardShortcuts(handlers: ShortcutHandlers): void {
+  // Keep a ref so the listener never needs to be re-registered when callbacks change identity.
+  const handlersRef = useRef(handlers);
+  useLayoutEffect(() => {
+    handlersRef.current = handlers;
+  });
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (isInputFocused()) return;
-
       switch (e.key) {
         case " ":
           e.preventDefault();
-          handlers.onPlayPause?.();
+          handlersRef.current.onPlayPause?.();
           break;
         case "ArrowLeft":
           e.preventDefault();
-          handlers.onPrev?.();
+          handlersRef.current.onPrev?.();
           break;
         case "ArrowRight":
           e.preventDefault();
-          handlers.onNext?.();
+          handlersRef.current.onNext?.();
           break;
         case "t":
         case "T":
-          handlers.onToggleTTS?.();
+          handlersRef.current.onToggleTTS?.();
           break;
       }
     };
 
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [handlers]);
+  }, []); // registered once; handlersRef always holds the latest callbacks
 }

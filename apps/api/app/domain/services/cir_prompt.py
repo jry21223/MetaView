@@ -64,7 +64,7 @@ _CIRDOCUMENT_SCHEMA = """{
     {
       "id": "step_01",
       "title": "string — step title (≤ 30 chars)",
-      "narration": "string — voiceover text (2–4 sentences, spoken to a student)",
+      "narration": "JSON array — see Narration Output Format section below",
       "visual_kind": "array | graph",
       "tokens": [
         {

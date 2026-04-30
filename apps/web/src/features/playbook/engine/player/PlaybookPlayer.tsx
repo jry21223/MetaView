@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Player } from "@remotion/player";
 import type { PlayerRef } from "@remotion/player";
 import type { PlaybookScript } from "../types";
@@ -205,6 +205,9 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script, theme = 
   const [isPlaying, setIsPlaying] = useState(false);
   const [showTTSConfig, setShowTTSConfig] = useState(false);
   const tts = useTTS();
+  // Ref so auto-narrate effect always calls the latest speak function without re-registering.
+  const ttsRef = useRef(tts);
+  useLayoutEffect(() => { ttsRef.current = tts; });
 
   const handlePlayPause = useCallback(() => {
     if (isPlaying) {
@@ -222,17 +225,18 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script, theme = 
     onToggleTTS: tts.toggle,
   });
 
-  // Auto-narrate on step change
+  // Auto-narrate on step change.
+  // ttsRef always holds the latest tts object, so no stale-closure risk on speak/backend changes.
   useEffect(() => {
-    if (!tts.enabled) return;
+    if (!ttsRef.current.enabled) return;
     const step = script.steps[currentStepIndex];
     if (!step) return;
     const text =
       step.narration_template && step.tokens.length > 0
         ? resolveNarrationTemplate(step.narration_template, step.tokens)
         : step.voiceover_text;
-    if (text.trim()) tts.speak(text);
-  }, [currentStepIndex, tts.enabled]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (text.trim()) ttsRef.current.speak(text);
+  }, [currentStepIndex, script]); // script included so step data is never stale
 
   if (!script.steps.length) {
     return (

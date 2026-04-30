@@ -25,9 +25,14 @@ const DEFAULT_CONFIG: TTSConfig = {
 function loadConfig(): TTSConfig {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
+    if (raw) {
+      const parsed: unknown = JSON.parse(raw);
+      if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+        return { ...DEFAULT_CONFIG, ...(parsed as Partial<TTSConfig>) };
+      }
+    }
   } catch {
-    // ignore
+    // ignore corrupt storage
   }
   return { ...DEFAULT_CONFIG };
 }
@@ -36,7 +41,7 @@ function saveConfig(cfg: TTSConfig): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
   } catch {
-    // ignore
+    // ignore quota errors
   }
 }
 
@@ -56,17 +61,28 @@ export function useTTS(): UseTTSResult {
   const [speaking, setSpeaking] = useState(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const audioSrcRef = useRef<AudioBufferSourceNode | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  const supported = typeof window !== "undefined" && (
-    Boolean(window.speechSynthesis) || Boolean(window.AudioContext ?? (window as unknown as { webkitAudioContext: unknown }).webkitAudioContext)
-  );
+  const supported =
+    typeof window !== "undefined" &&
+    (Boolean(window.speechSynthesis) ||
+      Boolean(
+        window.AudioContext ??
+          (window as unknown as { webkitAudioContext: unknown }).webkitAudioContext,
+      ));
 
   const stopSystem = useCallback(() => {
     window.speechSynthesis?.cancel();
   }, []);
 
   const stopOpenAI = useCallback(() => {
-    audioSrcRef.current?.stop();
+    abortRef.current?.abort();
+    abortRef.current = null;
+    try {
+      audioSrcRef.current?.stop();
+    } catch {
+      // stop() throws if source never started
+    }
     audioSrcRef.current = null;
     setSpeaking(false);
   }, []);
@@ -94,19 +110,36 @@ export function useTTS(): UseTTSResult {
   const speakOpenAI = useCallback(
     async (text: string) => {
       if (!config.apiKey.trim()) return;
-      stopOpenAI();
+
+      // Cancel any in-flight request before starting a new one.
+      abortRef.current?.abort();
+      const ac = new AbortController();
+      abortRef.current = ac;
+
+      try {
+        audioSrcRef.current?.stop();
+      } catch {
+        // ignore
+      }
+      audioSrcRef.current = null;
       setSpeaking(true);
+
       try {
         const res = await fetch(`${config.baseUrl}/audio/speech`, {
           method: "POST",
+          signal: ac.signal,
           headers: {
             Authorization: `Bearer ${config.apiKey}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ model: config.model, input: text, voice: config.voice }),
         });
+        if (ac.signal.aborted) return;
         if (!res.ok) throw new Error(`TTS API ${res.status}`);
+
         const buf = await res.arrayBuffer();
+        if (ac.signal.aborted) return;
+
         const ActxCtor =
           window.AudioContext ??
           (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -114,17 +147,20 @@ export function useTTS(): UseTTSResult {
           audioCtxRef.current = new ActxCtor();
         }
         const decoded = await audioCtxRef.current.decodeAudioData(buf);
+        if (ac.signal.aborted) return;
+
         const src = audioCtxRef.current.createBufferSource();
         src.buffer = decoded;
         src.connect(audioCtxRef.current.destination);
         src.onended = () => setSpeaking(false);
         audioSrcRef.current = src;
         src.start();
-      } catch {
+      } catch (err) {
+        if ((err as DOMException).name === "AbortError") return;
         setSpeaking(false);
       }
     },
-    [config.apiKey, config.baseUrl, config.model, config.voice, stopOpenAI],
+    [config.apiKey, config.baseUrl, config.model, config.voice],
   );
 
   const speak = useCallback(
@@ -144,7 +180,12 @@ export function useTTS(): UseTTSResult {
       const next = { ...prev, enabled: !prev.enabled };
       if (prev.enabled) {
         window.speechSynthesis?.cancel();
-        audioSrcRef.current?.stop();
+        abortRef.current?.abort();
+        try {
+          audioSrcRef.current?.stop();
+        } catch {
+          // ignore
+        }
         setSpeaking(false);
       }
       saveConfig(next);
@@ -160,10 +201,18 @@ export function useTTS(): UseTTSResult {
     });
   }, []);
 
+  // Cleanup on unmount: release all audio resources.
   useEffect(() => {
     return () => {
       window.speechSynthesis?.cancel();
-      audioSrcRef.current?.stop();
+      abortRef.current?.abort();
+      try {
+        audioSrcRef.current?.stop();
+      } catch {
+        // ignore
+      }
+      void audioCtxRef.current?.close();
+      audioCtxRef.current = null;
     };
   }, []);
 

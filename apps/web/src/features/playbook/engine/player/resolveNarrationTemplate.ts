@@ -27,6 +27,7 @@ function resolveSegment(seg: NarrationSegment, tokens: NarrationToken[]): string
   if (Array.isArray(seg)) {
     for (const branch of seg as NarrationBranch[]) {
       const [condition, result] = branch;
+      if (!result) continue; // guard: malformed branch missing result segments
       if (isDefaultCondition(condition) || evaluateCondition(condition, tokens)) {
         return resolveSegments(result, tokens);
       }
