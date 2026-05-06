@@ -22,7 +22,7 @@ class VisualToken(BaseModel):
 class CirStep(BaseModel):
     id: str
     title: str
-    narration: str
+    narration: str | list  # LLM may output a JSON array despite schema hint
     visual_kind: VisualKind
     layout: LayoutInstruction = Field(default_factory=LayoutInstruction)
     tokens: list[VisualToken] = Field(default_factory=list)

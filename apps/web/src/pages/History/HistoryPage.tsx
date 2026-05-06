@@ -4,6 +4,7 @@ import { useHistoryRuns } from '../../features/history/hooks/useHistoryRuns';
 import { PlaybookPlayer } from '../../features/playbook/engine/player/PlaybookPlayer';
 import type { PipelineRunResult } from '../../entities/pipeline/types';
 import type { PlaybookScript } from '../../entities/playbook/types';
+import { GlobalTopbar, Stage } from '../../shared/ui/GlobalTopbar';
 
 // ── Status badge ──────────────────────────────────────────────────────────
 
@@ -113,10 +114,12 @@ function CenterHint({ children }: { children: React.ReactNode }) {
 export interface HistoryPageProps {
   t: TweakValues;
   setTweak: (key: keyof TweakValues, value: TweakValues[keyof TweakValues]) => void;
-  onHome: () => void;
+  onNavigate: (stage: Stage) => void;
+  isProviderConfigured: boolean;
+  onOpenProviderSettings?: () => void;
 }
 
-export function HistoryPage({ t, setTweak, onHome }: HistoryPageProps) {
+export function HistoryPage({ t, setTweak, onNavigate, isProviderConfigured, onOpenProviderSettings }: HistoryPageProps) {
   const isDark = t.theme === 'dark';
   const { runs, isLoading, error, refresh } = useHistoryRuns();
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
@@ -126,35 +129,14 @@ export function HistoryPage({ t, setTweak, onHome }: HistoryPageProps) {
 
   return (
     <>
-      {/* Topbar */}
-      <header className="mv-top">
-        <div className="mv-brand">
-          <span className="mv-pulse" />
-          <span className="mv-brand-name">MetaView</span>
-          <span className="mv-brand-meta">/ 任务历史</span>
-        </div>
-
-        <nav className="mv-nav">
-          <button className="mv-nav-item" onClick={onHome}>工作台</button>
-          <button className="mv-nav-item is-active">任务历史</button>
-          <button className="mv-nav-item">模板</button>
-          <button className="mv-nav-item">设置</button>
-        </nav>
-
-        <div className="mv-top-right">
-          <div className="mv-status">
-            <span className="mv-dot" />
-            <span>CORE NODES ONLINE</span>
-          </div>
-          <button className="mv-icon-btn" title="切换主题"
-            onClick={() => setTweak('theme', isDark ? 'light' : 'dark')}>
-            {isDark ? '☀' : '☾'}
-          </button>
-          <div className="mv-avatar">MV</div>
-        </div>
-      </header>
-
-      {/* Body */}
+      <GlobalTopbar
+        stage="history"
+        isProviderConfigured={isProviderConfigured}
+        onNavigate={onNavigate}
+        isDark={isDark}
+        onToggleTheme={() => setTweak('theme', isDark ? 'light' : 'dark')}
+        onOpenProviderSettings={onOpenProviderSettings}
+      />
       <main style={{
         flex: 1,
         display: 'grid',

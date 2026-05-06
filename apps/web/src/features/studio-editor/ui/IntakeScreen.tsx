@@ -1,5 +1,6 @@
-import React, { useState, useRef, useMemo } from 'react';
-import { TweakValues, themeVars } from '../hooks/useTweaks';
+import React, { useState, useRef } from 'react';
+import { TweakValues } from '../hooks/useTweaks';
+import { GlobalTopbar, Stage } from '../../../shared/ui/GlobalTopbar';
 
 const TEMPLATE_GALLERY = [
   { id: 'merge-sort', subject: 'algo', title: '归并排序', desc: '数组分治 → 合并', tag: '算法' },
@@ -17,6 +18,7 @@ export interface IntakeContext {
   raw: string;
   files: Array<{ name: string; size: number }>;
   sourceCode?: string;
+  language?: string;
 }
 
 interface IntakeScreenProps {
@@ -26,7 +28,8 @@ interface IntakeScreenProps {
   submitError?: string | null;
   isProviderConfigured?: boolean;
   onOpenProviderSettings?: () => void;
-  onHistory?: () => void;
+  onNavigate: (stage: Stage) => void;
+  onToggleTheme: () => void;
 }
 
 function readFileAsText(file: File): Promise<string> {
@@ -38,23 +41,26 @@ function readFileAsText(file: File): Promise<string> {
   });
 }
 
-const CODE_EXTENSIONS = new Set([
-  '.py', '.js', '.ts', '.tsx', '.jsx', '.java', '.cpp', '.c', '.cs',
-  '.go', '.rs', '.rb', '.swift', '.kt', '.php', '.r', '.m', '.sh',
-]);
+const EXT_TO_LANGUAGE: Record<string, string> = {
+  '.py': 'python', '.js': 'javascript', '.ts': 'typescript',
+  '.tsx': 'typescript', '.jsx': 'javascript', '.java': 'java',
+  '.cpp': 'cpp', '.c': 'c', '.cs': 'csharp', '.go': 'go',
+  '.rs': 'rust', '.rb': 'ruby', '.swift': 'swift', '.kt': 'kotlin',
+  '.php': 'php', '.r': 'r', '.m': 'objc', '.sh': 'bash',
+};
 
-function isCodeFile(name: string): boolean {
+function languageFromName(name: string): string | undefined {
   const ext = name.slice(name.lastIndexOf('.')).toLowerCase();
-  return CODE_EXTENSIONS.has(ext);
+  return EXT_TO_LANGUAGE[ext];
 }
 
-export function IntakeScreen({ onSubmit, t, isSubmitting = false, submitError = null, isProviderConfigured = false, onOpenProviderSettings, onHistory }: IntakeScreenProps) {
+export function IntakeScreen({ onSubmit, t, isSubmitting = false, submitError = null, isProviderConfigured = false, onOpenProviderSettings, onNavigate, onToggleTheme }: IntakeScreenProps) {
   const [input, setInput] = useState('');
   const [files, setFiles] = useState<Array<{ name: string; size: number }>>([]);
   const [fileObjects, setFileObjects] = useState<File[]>([]);
   const [thinking, setThinking] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
-  const css = useMemo(() => themeVars(t), [t]);
+  const isDark = t.theme === 'dark';
 
   const handleFiles = (list: FileList | null) => {
     if (!list) return;
@@ -82,10 +88,12 @@ export function IntakeScreen({ onSubmit, t, isSubmitting = false, submitError = 
       : 'algo';
 
     let sourceCode: string | undefined;
-    const codeFile = fileObjects.find((f) => isCodeFile(f.name));
+    let language: string | undefined;
+    const codeFile = fileObjects.find((f) => languageFromName(f.name));
     if (codeFile) {
       try {
         sourceCode = await readFileAsText(codeFile);
+        language = languageFromName(codeFile.name);
       } catch {
         // ignore read error, proceed without source code
       }
@@ -100,6 +108,7 @@ export function IntakeScreen({ onSubmit, t, isSubmitting = false, submitError = 
       raw: input,
       files,
       sourceCode,
+      language,
     });
 
     setThinking('');
@@ -118,51 +127,15 @@ export function IntakeScreen({ onSubmit, t, isSubmitting = false, submitError = 
   const pending = isSubmitting;
 
   return (
-    <div className="mv-intake" style={css}>
-      <div className="mv-intake-top">
-        <div className="mv-brand">
-          <span className="mv-pulse" />
-          <span className="mv-brand-name">MetaView</span>
-          <span className="mv-brand-meta">/ Concept Studio · v0.3</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {onHistory && (
-            <button className="mv-chip" onClick={onHistory}>
-              任务历史
-            </button>
-          )}
-          {onOpenProviderSettings && (
-            <button
-              className="mv-chip"
-              onClick={onOpenProviderSettings}
-              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-            >
-              <span style={{ opacity: isProviderConfigured ? 1 : 0.5 }}>⚙</span>
-              <span>Provider</span>
-              {isProviderConfigured && (
-                <span style={{
-                  width: 6, height: 6, borderRadius: '50%',
-                  background: 'var(--accent)', display: 'inline-block',
-                }} />
-              )}
-            </button>
-          )}
-          <div className="mv-intake-status">
-            {isProviderConfigured ? (
-              <>
-                <span className="mv-pulse" />
-                CORE NODES ONLINE
-              </>
-            ) : (
-              <>
-                <span className="mv-pulse-offline" />
-                NO PROVIDER SET
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
+    <>
+      <GlobalTopbar
+        stage="intake"
+        isProviderConfigured={isProviderConfigured}
+        onNavigate={onNavigate}
+        isDark={isDark}
+        onToggleTheme={onToggleTheme}
+        onOpenProviderSettings={onOpenProviderSettings}
+      />
       <div className="mv-intake-body">
         <div className="mv-intake-hero">
           <div className="mv-eyebrow-mini">为每道题，生成可解释的动画</div>
@@ -253,6 +226,6 @@ export function IntakeScreen({ onSubmit, t, isSubmitting = false, submitError = 
           </button>
         </div>
       </div>
-    </div>
+    </>
   );
 }

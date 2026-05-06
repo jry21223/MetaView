@@ -74,7 +74,7 @@ export function TweaksPanel({ t, setTweak }: TweaksPanelProps) {
             <div className="mv-tweak-row">
               <div className="mv-tweak-label">左栏宽度</div>
               <div className="mv-tweak-slider-row">
-                <input type="range" className="mv-tweak-slider" min={18} max={36}
+                <input type="range" className="mv-tweak-slider" min={12} max={50}
                   value={t.leftRatio} onChange={(e) => setTweak('leftRatio', Number(e.target.value))} />
                 <span className="mv-tweak-val">{t.leftRatio}%</span>
               </div>

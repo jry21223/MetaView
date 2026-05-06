@@ -38,6 +38,7 @@ body {
 
 /* Shared keyframes */
 @keyframes pulse { 50% { opacity: 0.5; } }
+@keyframes spin { to { transform: rotate(360deg); } }
 @keyframes dockIn {
   from { opacity: 0; transform: translateY(8px) scale(0.98); }
   to { opacity: 1; transform: none; }

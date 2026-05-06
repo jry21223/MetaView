@@ -26,9 +26,11 @@ export function ProviderSettingsModal({ initial, onSave, onClose }: ProviderSett
         backdropFilter: 'blur(4px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onMouseDown={onClose}
     >
-      <div style={{
+      <div
+        onMouseDown={(e) => e.stopPropagation()}
+        style={{
         background: 'var(--surface-2)',
         border: '1px solid var(--line)',
         borderRadius: 12,

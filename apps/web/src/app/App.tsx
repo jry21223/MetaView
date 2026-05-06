@@ -7,8 +7,7 @@ import { HistoryPage } from '../pages/History/HistoryPage';
 import { usePipelineSubmit } from '../features/pipeline/hooks/usePipelineSubmit';
 import { useProviderSettings } from '../features/providers/hooks/useProviderSettings';
 import { ProviderSettingsModal } from '../features/providers/ui/ProviderSettingsModal';
-
-type Stage = 'intake' | 'workbench' | 'history';
+import type { Stage } from '../shared/ui/GlobalTopbar';
 
 export function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
@@ -18,12 +17,13 @@ export function App() {
   const { settings: providerSettings, update: updateProvider, isConfigured } = useProviderSettings();
 
   const css = useMemo(() => themeVars(t), [t]);
+  const openProviderSettings = () => setProviderModalOpen(true);
 
   const handleSubmit = async (ctx: IntakeContext) => {
     await submit(
       ctx.raw || ctx.title,
       ctx.sourceCode,
-      undefined,
+      ctx.language,
       isConfigured ? providerSettings : undefined,
     );
     setStage('workbench');
@@ -41,8 +41,9 @@ export function App() {
           isSubmitting={isSubmitting}
           submitError={submitError}
           isProviderConfigured={isConfigured}
-          onOpenProviderSettings={() => setProviderModalOpen(true)}
-          onHistory={() => setStage('history')}
+          onOpenProviderSettings={openProviderSettings}
+          onNavigate={setStage}
+          onToggleTheme={() => setTweak('theme', t.theme === 'dark' ? 'light' : 'dark')}
         />
       )}
 
@@ -51,8 +52,9 @@ export function App() {
           runId={runId}
           t={t}
           setTweak={setTweak}
-          onHome={() => setStage('intake')}
-          onHistory={() => setStage('history')}
+          onNavigate={setStage}
+          isProviderConfigured={isConfigured}
+          onOpenProviderSettings={openProviderSettings}
         />
       )}
 
@@ -60,7 +62,9 @@ export function App() {
         <HistoryPage
           t={t}
           setTweak={setTweak}
-          onHome={() => setStage('intake')}
+          onNavigate={setStage}
+          isProviderConfigured={isConfigured}
+          onOpenProviderSettings={openProviderSettings}
         />
       )}
 
