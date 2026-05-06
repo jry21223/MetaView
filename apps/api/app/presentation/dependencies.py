@@ -6,10 +6,14 @@ from typing import Annotated
 
 from fastapi import Depends
 
+from app.application.ports.export_repository import IExportJobRepository
 from app.application.ports.llm_provider import ILLMProvider
 from app.application.ports.run_repository import IRunRepository
 from app.config import Settings, get_settings
 from app.infrastructure.llm.openai_provider import OpenAIProvider
+from app.infrastructure.persistence.in_memory_export_repository import (
+    InMemoryExportJobRepository,
+)
 from app.infrastructure.persistence.sqlite_run_repository import SqliteRunRepository
 
 logger = logging.getLogger(__name__)
@@ -27,6 +31,15 @@ def _get_openai_provider(api_key: str, base_url: str, model: str, timeout: float
 
 def get_run_repo(settings: Annotated[Settings, Depends(get_settings)]) -> IRunRepository:
     return _get_run_repo(settings.history_db_path)
+
+
+@lru_cache
+def _get_export_repo() -> InMemoryExportJobRepository:
+    return InMemoryExportJobRepository()
+
+
+def get_export_repo() -> IExportJobRepository:
+    return _get_export_repo()
 
 
 def get_llm_provider(settings: Annotated[Settings, Depends(get_settings)]) -> ILLMProvider:

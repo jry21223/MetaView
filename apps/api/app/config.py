@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     playbook_composition_width: int = 960
     playbook_composition_height: int = 540
 
+    # Export (Remotion render) — relative to repo root unless absolute
+    export_web_app_dir: str = "apps/web"
+    export_artifacts_dir: str = "data/exports"
+
     # OpenAI-compatible provider
     openai_api_key: str | None = None
     openai_base_url: str = "https://api.openai.com/v1"
