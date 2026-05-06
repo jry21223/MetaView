@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Player } from "@remotion/player";
 import type { PlayerRef } from "@remotion/player";
 import type { PlaybookScript } from "../types";
@@ -9,6 +9,11 @@ import { useTTS } from "./useTTS";
 import type { TTSConfig } from "./useTTS";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { resolveNarrationTemplate } from "./resolveNarrationTemplate";
+import { useResolvedScript, type ScriptOverrides } from "./useResolvedScript";
+import { resolveCodePanelOverlay } from "./resolveCodePanelOverlay";
+import { isReplaySupported } from "../replay/registry";
+import { CodeHighlightRenderer } from "../renderers/CodeHighlightRenderer";
+import { TweakStrip } from "./TweakStrip";
 
 // ── SVG icons ──────────────────────────────────────────────────────────────
 
@@ -189,8 +194,20 @@ interface PlaybookPlayerProps {
   theme?: "dark" | "light";
 }
 
-export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script, theme = "dark" }) => {
+export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScript, theme = "dark" }) => {
   const playerRef = useRef<PlayerRef | null>(null);
+
+  // ── Tweak state (frontend-only hot reload) ─────────────────────────────
+  const [overrides, setOverrides] = useState<ScriptOverrides>({});
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [showSubtitles, setShowSubtitles] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [codePanelOpen, setCodePanelOpen] = useState(true);
+  const script = useResolvedScript(baseScript, overrides);
+  const replaySupported = isReplaySupported(baseScript.algorithm_id);
+
+  const tts = useTTS();
+
   const {
     currentStepIndex,
     canGoPrev,
@@ -200,11 +217,18 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script, theme = 
     goToStep,
     prev,
     next,
-  } = usePlaybookController(script, playerRef);
+  } = usePlaybookController(script, playerRef, {
+    isSpeaking: tts.speaking,
+    ttsEnabled: tts.enabled,
+  });
+
+  const codeOverlay = useMemo(
+    () => resolveCodePanelOverlay(script, currentStepIndex),
+    [script, currentStepIndex],
+  );
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [showTTSConfig, setShowTTSConfig] = useState(false);
-  const tts = useTTS();
   // Ref so auto-narrate effect always calls the latest speak function without re-registering.
   const ttsRef = useRef(tts);
   useLayoutEffect(() => { ttsRef.current = tts; });
@@ -256,18 +280,63 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script, theme = 
 
   return (
     <div className="playbook-player" data-theme={theme} style={{ flexDirection: "row" }}>
-      {/* Step list sidebar */}
+      {/* Step list sidebar (collapsible) */}
       <aside
         style={{
-          width: 220,
+          width: sidebarOpen ? 220 : 36,
           flexShrink: 0,
           background: sidebarBg,
           borderRight: `1px solid ${isDark ? "#21262d" : "#d0d7de"}`,
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
+          transition: "width 0.2s",
+          position: "relative",
         }}
       >
+        <button
+          onClick={() => setSidebarOpen((v) => !v)}
+          title={sidebarOpen ? "折叠步骤栏" : "展开步骤栏"}
+          style={{
+            position: "absolute",
+            top: 8,
+            right: 4,
+            zIndex: 2,
+            border: "none",
+            background: "transparent",
+            color: sidebarMuted,
+            cursor: "pointer",
+            fontSize: 14,
+            padding: "2px 6px",
+            borderRadius: 4,
+          }}
+        >
+          {sidebarOpen ? "‹" : "›"}
+        </button>
+        {!sidebarOpen && (
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              fontFamily: "IBM Plex Mono, monospace",
+              fontSize: 11,
+              color: activeItemBorder,
+            }}
+          >
+            <span style={{ fontWeight: 700, fontSize: 14 }}>
+              {String(currentStepIndex + 1).padStart(2, "0")}
+            </span>
+            <span style={{ color: sidebarMuted, fontSize: 10 }}>
+              / {script.steps.length}
+            </span>
+          </div>
+        )}
+        {sidebarOpen && (
+        <>
         <div
           style={{
             padding: "14px 14px 10px",
@@ -347,22 +416,78 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script, theme = 
             );
           })}
         </div>
+        </>
+        )}
       </aside>
 
-      {/* Main content: stage + controls */}
+      {/* Main content: stage + code panel + controls + tweaks */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <div className="playbook-player__stage">
-          <Player
-            ref={playerRef}
-            component={PlaybookComposition}
-            inputProps={{ script, theme }}
-            durationInFrames={script.total_frames}
-            fps={script.fps}
-            compositionWidth={PLAYBOOK_DEFAULTS.COMPOSITION_WIDTH}
-            compositionHeight={PLAYBOOK_DEFAULTS.COMPOSITION_HEIGHT}
-            style={{ width: "100%", aspectRatio: "16/9" }}
-            clickToPlay={false}
-          />
+        <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
+          <div className="playbook-player__stage" style={{ flex: 1, minWidth: 0 }}>
+            <Player
+              ref={playerRef}
+              component={PlaybookComposition}
+              inputProps={{ script, theme, showSubtitles }}
+              durationInFrames={script.total_frames}
+              fps={script.fps}
+              compositionWidth={PLAYBOOK_DEFAULTS.COMPOSITION_WIDTH}
+              compositionHeight={PLAYBOOK_DEFAULTS.COMPOSITION_HEIGHT}
+              style={{ width: "100%", aspectRatio: "16/9" }}
+              playbackRate={playbackRate}
+              clickToPlay={false}
+            />
+          </div>
+          {codeOverlay && codePanelOpen && (
+            <div
+              style={{
+                width: 320,
+                flexShrink: 0,
+                borderLeft: `1px solid ${isDark ? "#21262d" : "#d0d7de"}`,
+                position: "relative",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              <button
+                onClick={() => setCodePanelOpen(false)}
+                title="折叠代码面板"
+                style={{
+                  position: "absolute",
+                  top: 4,
+                  left: 4,
+                  zIndex: 2,
+                  border: "none",
+                  background: "transparent",
+                  color: sidebarMuted,
+                  cursor: "pointer",
+                  fontSize: 14,
+                  padding: "2px 6px",
+                }}
+              >
+                ›
+              </button>
+              <CodeHighlightRenderer overlay={codeOverlay} theme={theme} />
+            </div>
+          )}
+          {codeOverlay && !codePanelOpen && (
+            <button
+              onClick={() => setCodePanelOpen(true)}
+              title="展开代码面板"
+              style={{
+                width: 24,
+                flexShrink: 0,
+                borderLeft: `1px solid ${isDark ? "#21262d" : "#d0d7de"}`,
+                background: "transparent",
+                color: sidebarMuted,
+                cursor: "pointer",
+                fontSize: 14,
+                writingMode: "vertical-rl",
+                padding: "8px 0",
+              }}
+            >
+              ‹ 代码
+            </button>
+          )}
         </div>
 
         <div className="playbook-player__controls">
@@ -437,6 +562,20 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script, theme = 
             &#8250;
           </button>
         </div>
+
+        <TweakStrip
+          initialArray={baseScript.initial_data?.array}
+          array={overrides.array}
+          onArrayChange={(next) => setOverrides((prev) => ({ ...prev, array: next }))}
+          onReset={() => setOverrides({})}
+          speed={playbackRate}
+          onSpeedChange={setPlaybackRate}
+          showSubtitles={showSubtitles}
+          onSubtitlesChange={setShowSubtitles}
+          replaySupported={replaySupported}
+          algorithmId={baseScript.algorithm_id}
+          isDark={isDark}
+        />
       </div>
     </div>
   );
