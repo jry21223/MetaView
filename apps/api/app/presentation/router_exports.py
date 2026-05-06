@@ -102,15 +102,21 @@ def get_export(
 def download_export(
     job_id: str,
     export_repo: Annotated[IExportJobRepository, Depends(get_export_repo)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> FileResponse:
     job = export_repo.get(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail=f"Export {job_id!r} not found")
     if job.status != ExportJobStatus.COMPLETED or not job.output_path:
         raise HTTPException(status_code=409, detail="export not finished")
-    path = Path(job.output_path)
-    if not path.exists():
-        raise HTTPException(status_code=410, detail="output file missing")
+    artifacts_root = _resolve_path(settings.export_artifacts_dir).resolve()
+    try:
+        path = Path(job.output_path).resolve(strict=True)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=410, detail="output file missing") from exc
+    # Reject paths that escape the artifacts root (symlink / traversal guard).
+    if not path.is_relative_to(artifacts_root):
+        raise HTTPException(status_code=403, detail="output path outside artifacts root")
     return FileResponse(
         path,
         media_type="video/mp4",

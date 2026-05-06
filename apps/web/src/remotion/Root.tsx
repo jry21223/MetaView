@@ -5,8 +5,8 @@ import { PLAYBOOK_DEFAULTS } from "../shared/config/constants";
 import { PlaybookExportComposition, type PlaybookExportProps } from "./PlaybookExportComposition";
 
 const FALLBACK_SCRIPT: PlaybookScript = {
-  fps: 30,
-  total_frames: 60,
+  fps: PLAYBOOK_DEFAULTS.FPS,
+  total_frames: PLAYBOOK_DEFAULTS.STEP_FRAMES,
   domain: "algorithm",
   title: "MetaView Export",
   summary: "",
@@ -27,8 +27,8 @@ export const RemotionRoot: React.FC = () => {
     <Composition
       id="playbook"
       component={PlaybookExportComposition}
-      durationInFrames={60}
-      fps={30}
+      durationInFrames={PLAYBOOK_DEFAULTS.STEP_FRAMES}
+      fps={PLAYBOOK_DEFAULTS.FPS}
       width={PLAYBOOK_DEFAULTS.COMPOSITION_WIDTH}
       height={PLAYBOOK_DEFAULTS.COMPOSITION_HEIGHT}
       defaultProps={{

@@ -30,6 +30,10 @@ from app.domain.models.export_job import ExportJobStatus, TtsConfig
 
 logger = logging.getLogger(__name__)
 
+# Cap per-step TTS audio download to prevent memory exhaustion from a
+# malicious or buggy TTS endpoint. 50 MB easily covers ~30 min of MP3.
+_MAX_TTS_AUDIO_BYTES = 50 * 1024 * 1024
+
 
 class ExportVideoUseCase:
     def __init__(
@@ -52,14 +56,17 @@ class ExportVideoUseCase:
         with_audio: bool,
         tts: TtsConfig | None,
     ) -> None:
+        job_dir = self._artifacts / job_id
+        succeeded = False
         try:
             run = self._runs.get(run_id)
             if run is None or run.playbook is None:
                 raise ValueError(f"Run {run_id!r} has no playbook to export")
 
             playbook = run.playbook.model_dump()
+            if not playbook.get("steps"):
+                raise ValueError("playbook has no steps to render")
 
-            job_dir = self._artifacts / job_id
             job_dir.mkdir(parents=True, exist_ok=True)
             audio_files: list[str] = []
 
@@ -104,6 +111,7 @@ class ExportVideoUseCase:
                 message="完成",
                 output_path=str(output_path),
             )
+            succeeded = True
         except Exception as exc:  # noqa: BLE001
             logger.exception("export job %s failed", job_id)
             self._exports.update(
@@ -111,6 +119,12 @@ class ExportVideoUseCase:
                 status=ExportJobStatus.FAILED,
                 error=str(exc),
             )
+        finally:
+            if not succeeded and job_dir.exists():
+                # Clean up partial artifacts on failure; keep on success so
+                # the user can download. TTL-based cleanup of completed jobs
+                # is the caller's responsibility.
+                shutil.rmtree(job_dir, ignore_errors=True)
 
     async def _generate_step_audio(
         self,
@@ -120,29 +134,41 @@ class ExportVideoUseCase:
     ) -> list[str]:
         steps = playbook.get("steps", [])
         files: list[str] = []
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        # Per-request timeout; total client budget is sum of per-step calls.
+        timeout = httpx.Timeout(connect=10.0, read=30.0, write=30.0, pool=10.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
             for i, step in enumerate(steps):
                 text = (step.get("voiceover_text") or "").strip()
                 if not text:
                     files.append("")
                     continue
                 audio_path = audio_dir / f"step_{i:03d}.mp3"
-                resp = await client.post(
-                    f"{tts.base_url.rstrip('/')}/audio/speech",
-                    headers={
-                        "Authorization": f"Bearer {tts.api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": tts.model,
-                        "voice": tts.voice,
-                        "input": text,
-                        "format": "mp3",
-                    },
-                )
+                try:
+                    resp = await client.post(
+                        f"{tts.base_url.rstrip('/')}/audio/speech",
+                        headers={
+                            "Authorization": f"Bearer {tts.api_key}",
+                            "Content-Type": "application/json",
+                        },
+                        json={
+                            "model": tts.model,
+                            "voice": tts.voice,
+                            "input": text,
+                            "format": "mp3",
+                        },
+                    )
+                except httpx.TimeoutException:
+                    logger.warning("TTS timeout for step %d; skipping audio", i)
+                    files.append("")
+                    continue
                 if resp.status_code >= 400:
                     raise RuntimeError(
                         f"TTS HTTP {resp.status_code} for step {i}: {resp.text[:200]}"
+                    )
+                if len(resp.content) > _MAX_TTS_AUDIO_BYTES:
+                    raise RuntimeError(
+                        f"TTS audio for step {i} too large: "
+                        f"{len(resp.content)} bytes > {_MAX_TTS_AUDIO_BYTES}"
                     )
                 audio_path.write_bytes(resp.content)
                 files.append(str(audio_path))
@@ -167,8 +193,18 @@ class ExportVideoUseCase:
             "--log",
             "info",
         ]
-        env = os.environ.copy()
-        env.setdefault("NODE_ENV", "production")
+        # Whitelist env vars passed to the render subprocess. Avoid leaking
+        # parent-process secrets (API keys, DB URLs, etc.) into Remotion/Node.
+        env = {
+            "NODE_ENV": "production",
+            "PATH": os.environ.get("PATH", ""),
+            "HOME": os.environ.get("HOME", ""),
+        }
+        # Preserve a few opt-in vars commonly required by Remotion/Chromium.
+        for key in ("LANG", "LC_ALL", "TMPDIR", "PUPPETEER_EXECUTABLE_PATH"):
+            value = os.environ.get(key)
+            if value is not None:
+                env[key] = value
 
         proc = await asyncio.create_subprocess_exec(
             *cmd,
@@ -263,8 +299,10 @@ def _probe_audio_duration_seconds(path: Path) -> float:
                 timeout=30,
             ).stdout.strip()
             return float(out)
-        except (subprocess.SubprocessError, ValueError):
-            pass
+        except (subprocess.SubprocessError, ValueError) as exc:
+            logger.warning("ffprobe failed for %s: %s; falling back", path, exc)
+    else:
+        logger.warning("ffprobe not on PATH; audio duration probe limited to .wav")
     if path.suffix.lower() == ".wav":
         try:
             with wave.open(str(path), "rb") as w:
@@ -272,6 +310,9 @@ def _probe_audio_duration_seconds(path: Path) -> float:
                 rate = w.getframerate()
                 if rate > 0:
                     return frames / rate
-        except wave.Error:
-            pass
+        except wave.Error as exc:
+            logger.warning("wave.open failed for %s: %s", path, exc)
+    logger.warning(
+        "audio duration unknown for %s; using animation duration as fallback", path
+    )
     return 0.0

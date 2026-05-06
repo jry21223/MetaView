@@ -37,8 +37,15 @@ _ALGORITHM_KEYWORDS: tuple[tuple[tuple[str, ...], str], ...] = (
 def _infer_algorithm_id(title: str) -> str | None:
     lowered = title.lower()
     for keywords, algo_id in _ALGORITHM_KEYWORDS:
-        if any(k in title or k in lowered for k in keywords):
-            return algo_id
+        for k in keywords:
+            # ASCII keywords use word boundaries so "bubble tea sort" does not
+            # match "bubble". CJK strings have no \b in regex, so fall back to
+            # plain containment for those.
+            if k.isascii():
+                if re.search(rf"\b{re.escape(k.lower())}\b", lowered):
+                    return algo_id
+            elif k in title:
+                return algo_id
     return None
 
 
