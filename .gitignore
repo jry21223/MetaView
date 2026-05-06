@@ -3,6 +3,8 @@
 .idea/
 .vscode/
 .env
+.env.local
+**/.env.local
 .venv/
 .venv-manim/
 node_modules/
