@@ -24,6 +24,23 @@ logger = logging.getLogger(__name__)
 _DEFAULT_FPS = 30
 _DEFAULT_STEP_FRAMES = 60  # 2 s at 30 fps
 
+# Maps title keywords → frontend replay registry id. None = no replay.
+_ALGORITHM_KEYWORDS: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("归并", "merge sort", "mergesort"), "merge_sort"),
+    (("快速排序", "quicksort", "quick sort"), "quick_sort"),
+    (("冒泡", "bubble"), "bubble_sort"),
+    (("插入排序", "insertion"), "insertion_sort"),
+    (("选择排序", "selection sort"), "selection_sort"),
+)
+
+
+def _infer_algorithm_id(title: str) -> str | None:
+    lowered = title.lower()
+    for keywords, algo_id in _ALGORITHM_KEYWORDS:
+        if any(k in title or k in lowered for k in keywords):
+            return algo_id
+    return None
+
 
 def build_playbook(
     cir: CirDocument,
@@ -47,21 +64,32 @@ def build_playbook(
         cumulative += duration
         snapshot = _build_snapshot(cir_step, checkpoint, execution_map)
         code_highlight = _build_code_highlight(checkpoint, source_lines, source_language)
+        narration_tpl = _parse_narration_template(cir_step.narration)
+        voiceover = (
+            _resolve_plain_text(narration_tpl, cir_step.tokens)
+            if narration_tpl
+            else (cir_step.narration if isinstance(cir_step.narration, str) else "")
+        )
         steps.append(
             MetaStep(
                 step_id=cir_step.id,
                 end_frame=cumulative,
                 title=cir_step.title,
-                voiceover_text=cir_step.narration,
+                voiceover_text=voiceover,
                 animation_hint=_infer_hint(cir_step, i, len(cir.steps)),
                 snapshot=snapshot,
                 code_highlight=code_highlight,
-                narration_template=_parse_narration_template(cir_step.narration),
+                narration_template=narration_tpl,
                 tokens=[t.model_dump() for t in cir_step.tokens],
             )
         )
 
     total_frames = max(cumulative, 1)
+    algorithm_id = _infer_algorithm_id(cir.title)
+    initial_data: dict[str, list[str]] = {}
+    if execution_map and execution_map.array_track and execution_map.array_track.values:
+        initial_data["array"] = list(execution_map.array_track.values)
+
     return PlaybookScript(
         fps=fps,
         total_frames=total_frames,
@@ -70,6 +98,8 @@ def build_playbook(
         summary=cir.summary,
         steps=steps,
         parameter_controls=execution_map.parameter_controls if execution_map else [],
+        algorithm_id=algorithm_id,
+        initial_data=initial_data,
     )
 
 
@@ -80,7 +110,11 @@ def _build_code_highlight(
 ) -> CodeHighlightOverlay | None:
     if not checkpoint or not checkpoint.code_lines or not source_lines:
         return None
-    active_lines = sorted(set(checkpoint.code_lines))
+    # Filter out-of-range indices (LLM may hallucinate line numbers)
+    max_line = len(source_lines) - 1
+    active_lines = sorted({i for i in checkpoint.code_lines if 0 <= i <= max_line})
+    if not active_lines:
+        return None
     return CodeHighlightOverlay(
         language=language,
         lines=source_lines,
@@ -219,15 +253,18 @@ def _infer_hint(cir_step: CirStep, index: int, total: int) -> str:
     return _HINT_MAP.get(cir_step.visual_kind, "highlight")
 
 
-def _parse_narration_template(raw: str) -> list | None:
+def _parse_narration_template(raw: str | list) -> list | None:
     """Parse LLM narration into a structured template array for dynamic resolution.
 
-    Accepts two input formats:
-    1. JSON array with string literals, {"t":"id"} placeholders, and conditional branches.
-    2. Plain string with {{token_id}} placeholders → converted to simplified template.
-
-    Returns None if parsing fails, so callers fall back to voiceover_text.
+    Accepts:
+    1. list — already parsed JSON array from LLM (real API often outputs array type directly)
+    2. str starting with '[' — JSON-encoded array embedded in a string
+    3. str with {{token_id}} placeholders — converted to simplified template
+    4. plain str — returns None (falls back to voiceover_text)
     """
+    if isinstance(raw, list):
+        return raw
+
     stripped = raw.strip()
     if stripped.startswith("["):
         try:
@@ -239,7 +276,6 @@ def _parse_narration_template(raw: str) -> list | None:
         logger.warning("narration looks like JSON array but failed to parse; falling back")
         return None
 
-    # Plain string with {{id}} placeholders → convert to simplified template
     if "{{" in stripped:
         parts: list = []
         for segment in re.split(r"(\{\{[^}]+\}\})", stripped):
@@ -251,3 +287,26 @@ def _parse_narration_template(raw: str) -> list | None:
         return parts if parts else None
 
     return None
+
+
+def _resolve_plain_text(template: list, tokens: list) -> str:
+    """Flatten a narration template into a readable plain-text string.
+
+    Token refs are substituted with their labels; conditional branches take
+    the first non-empty branch (default branch last).
+    """
+    token_map = {t.id: t.label for t in tokens}
+    parts: list[str] = []
+    for seg in template:
+        if isinstance(seg, str):
+            parts.append(seg)
+        elif isinstance(seg, dict) and "t" in seg:
+            parts.append(token_map.get(seg["t"], seg["t"]))
+        elif isinstance(seg, list):
+            for branch in seg:
+                if isinstance(branch, list) and len(branch) >= 2:
+                    text = _resolve_plain_text(branch[1], tokens)
+                    if text:
+                        parts.append(text)
+                        break
+    return "".join(parts)

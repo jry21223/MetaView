@@ -68,3 +68,5 @@ class PlaybookScript(BaseModel):
     summary: str
     steps: list[MetaStep] = Field(default_factory=list)
     parameter_controls: list[ExecutionParameterControl] = Field(default_factory=list)
+    algorithm_id: str | None = None
+    initial_data: dict[str, list[str]] = Field(default_factory=dict)

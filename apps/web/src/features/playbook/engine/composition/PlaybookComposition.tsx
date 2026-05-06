@@ -11,6 +11,8 @@ import { PLAYBOOK_LAYOUT } from "../../../../shared/config/constants";
 interface PlaybookCompositionProps {
   script: PlaybookScript;
   theme?: "dark" | "light";
+  showSubtitles?: boolean;
+  showInlineCode?: boolean;
 }
 
 function SnapshotRenderer(props: RendererProps) {
@@ -40,6 +42,8 @@ function SnapshotRenderer(props: RendererProps) {
 export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
   script,
   theme = "dark",
+  showSubtitles = true,
+  showInlineCode = false,
 }) => {
   const frame = useCurrentFrame();
 
@@ -54,7 +58,7 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
 
   if (!step) return null;
 
-  const hasCodeTrack = step.code_highlight != null;
+  const hasCodeTrack = showInlineCode && step.code_highlight != null;
   const subtitleHeight = PLAYBOOK_LAYOUT.SUBTITLE_HEIGHT;
   const vizRatio = PLAYBOOK_LAYOUT.VIZ_SPLIT_RATIO;
 
@@ -97,7 +101,8 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
         )}
       </div>
 
-      {/* Subtitle bar — full width, always rendered */}
+      {/* Subtitle bar — full width, toggleable */}
+      {showSubtitles && (
       <div
         style={{
           height: subtitleHeight,
@@ -124,6 +129,7 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
           {step.voiceover_text}
         </span>
       </div>
+      )}
     </div>
   );
 };

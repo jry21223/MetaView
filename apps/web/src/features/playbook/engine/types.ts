@@ -70,4 +70,6 @@ export interface PlaybookScript {
   summary: string;
   steps: MetaStep[];
   parameter_controls: ExecutionParameterControl[];
+  algorithm_id?: string | null;
+  initial_data?: Record<string, string[]>;
 }
