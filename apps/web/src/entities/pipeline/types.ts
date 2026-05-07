@@ -5,6 +5,7 @@ import type { PlaybookScript } from "../playbook/types";
 export interface PipelineRunResult {
   run_id: string;
   status: "queued" | "running" | "succeeded" | "failed";
+  prompt?: string;
   playbook?: PlaybookScript | null;
   error?: string | null;
   created_at: string;

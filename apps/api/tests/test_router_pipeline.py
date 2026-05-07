@@ -83,3 +83,30 @@ def test_list_runs_returns_array(client) -> None:
 def test_post_pipeline_rejects_empty_prompt(client) -> None:
     resp = client.post("/api/v1/pipeline", json={"prompt": ""})
     assert resp.status_code == 422
+
+
+def test_post_pipeline_returns_prompt_in_response(client) -> None:
+    prompt = "可视化归并排序"
+    resp = client.post("/api/v1/pipeline", json={"prompt": prompt})
+    assert resp.status_code == 202
+    assert resp.json()["prompt"] == prompt
+
+
+def test_get_run_returns_prompt(client) -> None:
+    prompt = "可视化冒泡排序"
+    post_resp = client.post("/api/v1/pipeline", json={"prompt": prompt})
+    run_id = post_resp.json()["run_id"]
+
+    get_resp = client.get(f"/api/v1/runs/{run_id}")
+    assert get_resp.status_code == 200
+    assert get_resp.json()["prompt"] == prompt
+
+
+def test_list_runs_includes_prompt(client) -> None:
+    prompt = "解释快速排序算法"
+    client.post("/api/v1/pipeline", json={"prompt": prompt})
+
+    resp = client.get("/api/v1/runs")
+    assert resp.status_code == 200
+    runs = resp.json()
+    assert any(r["prompt"] == prompt for r in runs)

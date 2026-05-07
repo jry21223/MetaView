@@ -43,5 +43,6 @@ async def submit_pipeline(
     return PipelineRunResponse(
         run_id=run_id,
         status=PipelineRunStatus.QUEUED,
+        prompt=request.prompt,
         created_at=created_at,
     )
