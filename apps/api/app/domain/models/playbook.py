@@ -46,6 +46,7 @@ class CodeHighlightOverlay(BaseModel):
     active_lines: list[int]  # 0-indexed lines to highlight in this step
     active_line: int  # primary scroll anchor (min of active_lines)
     variables: dict[str, str] = Field(default_factory=dict)
+    operation_label: str | None = None
 
 
 class MetaStep(BaseModel):

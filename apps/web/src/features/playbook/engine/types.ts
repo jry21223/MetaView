@@ -28,6 +28,7 @@ export interface CodeHighlightOverlay {
   active_lines: number[];
   active_line: number;
   variables?: Record<string, string>;
+  operation_label?: string;
 }
 
 export type NarrationSegment =

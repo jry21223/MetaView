@@ -36,7 +36,8 @@ export const TweakStrip: React.FC<TweakStripProps> = ({
   // Local draft so chip inputs don't lose focus on every keystroke commit.
   const [draft, setDraft] = useState<string[]>(effective);
   useEffect(() => {
-    setDraft(effective);
+    const id = setTimeout(() => setDraft(effective), 0);
+    return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [array, initialArray]);
 

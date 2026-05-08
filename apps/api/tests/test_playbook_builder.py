@@ -242,6 +242,34 @@ class TestBuildPlaybook:
         assert step.tokens[0]["label"] == "5"
 
 
+class TestCodeHighlightOverlay:
+    def _make_cir_with_source(self) -> CirDocument:
+        cir = _make_array_cir()
+        cir.steps[1].annotations = ["source:python\nfor i in range(n):\n    pass"]
+        return cir
+
+    def test_operation_label_equals_checkpoint_title(self):
+        cir = _make_array_cir()
+        execution_map = _make_execution_map(cir)
+        # Inject code_lines so _build_code_highlight activates
+        execution_map.checkpoints[0].code_lines = [0]
+        playbook = build_playbook(
+            cir,
+            execution_map=execution_map,
+            source_code="for i in range(n):\n    pass",
+            source_language="python",
+        )
+        step = playbook.steps[0]
+        assert step.code_highlight is not None
+        assert step.code_highlight.operation_label == cir.steps[0].title
+
+    def test_operation_label_none_when_no_checkpoint(self):
+        cir = _make_array_cir()
+        playbook = build_playbook(cir, execution_map=None)
+        for step in playbook.steps:
+            assert step.code_highlight is None
+
+
 class TestParseNarrationTemplate:
     def test_json_array_parsed(self):
         raw = '["Compare ", {"t": "t0"}, " and ", {"t": "t1"}]'

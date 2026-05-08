@@ -120,6 +120,7 @@ def _build_code_highlight(
         lines=source_lines,
         active_lines=active_lines,
         active_line=active_lines[0],
+        operation_label=checkpoint.title or None,
     )
 
 
