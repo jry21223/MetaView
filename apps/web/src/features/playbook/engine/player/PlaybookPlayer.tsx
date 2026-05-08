@@ -242,11 +242,35 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScri
     setIsPlaying((p) => !p);
   }, [isPlaying]);
 
+  const handleReset = useCallback(() => {
+    playerRef.current?.seekTo(0);
+    setIsPlaying(false);
+  }, []);
+
+  const SPEED_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+  const handleSpeedUp = useCallback(() => {
+    setPlaybackRate((r) => {
+      const idx = SPEED_STEPS.indexOf(r);
+      return idx < SPEED_STEPS.length - 1 ? SPEED_STEPS[idx + 1] : r;
+    });
+  }, []);
+  const handleSpeedDown = useCallback(() => {
+    setPlaybackRate((r) => {
+      const idx = SPEED_STEPS.indexOf(r);
+      return idx > 0 ? SPEED_STEPS[idx - 1] : r;
+    });
+  }, []);
+
   useKeyboardShortcuts({
     onPlayPause: handlePlayPause,
     onPrev: prev,
     onNext: next,
+    onReset: handleReset,
     onToggleTTS: tts.toggle,
+    onToggleSubtitles: () => setShowSubtitles((v) => !v),
+    onSpeedUp: handleSpeedUp,
+    onSpeedDown: handleSpeedDown,
+    onEscape: () => setShowTTSConfig(false),
   });
 
   // Auto-narrate on step change.

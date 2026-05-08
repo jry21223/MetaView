@@ -103,31 +103,86 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
 
       {/* Subtitle bar — full width, toggleable */}
       {showSubtitles && (
-      <div
-        style={{
-          height: subtitleHeight,
-          flexShrink: 0,
-          display: "flex",
-          alignItems: "center",
-          padding: "0 20px",
-          background: subtitleBg,
-          borderTop: `1px solid ${dividerColor}`,
-          opacity: fadeProgress,
-        }}
-      >
-        <span
+      <div style={{ flexShrink: 0, opacity: fadeProgress }}>
+        {/* Progress bar */}
+        <div
           style={{
-            color: subtitleColor,
-            fontFamily: "system-ui, -apple-system, sans-serif",
-            fontSize: 14,
-            lineHeight: 1.5,
-            whiteSpace: "nowrap",
+            height: 3,
+            background: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)",
+            position: "relative",
             overflow: "hidden",
-            textOverflow: "ellipsis",
           }}
         >
-          {step.voiceover_text}
-        </span>
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              height: "100%",
+              width: `${(frame / (script.total_frames || 1)) * 100}%`,
+              background: isDark ? "#4de8b0" : "#00896e",
+              borderRadius: "0 2px 2px 0",
+              transition: "width 0.016s linear",
+            }}
+          />
+          {/* Step segment markers */}
+          {script.steps.map((s, i) => {
+            if (i === 0) return null;
+            const pct = (s.end_frame / (script.total_frames || 1)) * 100;
+            return (
+              <div
+                key={i}
+                style={{
+                  position: "absolute",
+                  left: `${pct}%`,
+                  top: 0,
+                  width: 1,
+                  height: "100%",
+                  background: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.12)",
+                }}
+              />
+            );
+          })}
+        </div>
+
+        {/* Subtitle row */}
+        <div
+          style={{
+            height: subtitleHeight,
+            display: "flex",
+            alignItems: "center",
+            padding: "0 20px",
+            background: subtitleBg,
+            borderTop: `1px solid ${dividerColor}`,
+            gap: 12,
+          }}
+        >
+          <span
+            style={{
+              color: subtitleColor,
+              fontFamily: "system-ui, -apple-system, sans-serif",
+              fontSize: 14,
+              lineHeight: 1.5,
+              flex: 1,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {step.voiceover_text}
+          </span>
+          <span
+            style={{
+              flexShrink: 0,
+              fontFamily: "IBM Plex Mono, monospace",
+              fontSize: 11,
+              color: isDark ? "rgba(77,232,176,0.8)" : "rgba(0,120,90,0.8)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {activeIndex + 1} / {script.steps.length}
+          </span>
+        </div>
       </div>
       )}
     </div>

@@ -7,11 +7,14 @@ const PALETTE = {
   dark: {
     bg: "#0a0c10",
     cell: "#1a1e27",
+    cellGradient: "linear-gradient(145deg, #1e2330, #11151c)",
+    cellShadow: "0 2px 6px rgba(0,0,0,0.45)",
     border: "rgba(255,255,255,0.08)",
     text: "#e8ecf4",
     active: "#4de8b0",
     swap: "#ff9e8a",
     sorted: "#5be8b4",
+    sortedShadow: "rgba(91,232,180,0.35)",
     pointer: "#c8a8f8",
     narration: "rgba(232,236,244,0.6)",
     select: "#ffd84d",
@@ -20,11 +23,14 @@ const PALETTE = {
   light: {
     bg: "#f5f7fa",
     cell: "#ffffff",
+    cellGradient: "linear-gradient(145deg, #ffffff, #eef1f5)",
+    cellShadow: "0 2px 6px rgba(0,0,0,0.10)",
     border: "rgba(0,0,0,0.08)",
     text: "#141820",
     active: "#00896e",
     swap: "#c05030",
     sorted: "#1a7a5e",
+    sortedShadow: "rgba(26,122,94,0.30)",
     pointer: "#6030c0",
     narration: "rgba(20,24,32,0.6)",
     select: "#d4a017",
@@ -182,37 +188,56 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
             const partner = prevIndexMap.findIndex((p, k) => k !== i && p === i);
             const isPairedSwap = isSwap && partner >= 0 && swapSet.has(partner);
             if (isPairedSwap) {
-              // Even index goes up, odd goes down to avoid z-fighting
+              // Even index goes high arc, odd goes low arc for cross-over effect
+              const arcHeight = Math.min(40, Math.abs(dx) * 0.4 + 20);
               const dir = i % 2 === 0 ? -1 : 1;
-              translateY = interpolate(progressMove, [0, 0.5, 1], [0, dir * 16, 0]);
+              // Quadratic arc: peak at midpoint
+              const arcProgress = 1 - Math.pow(progressMove * 2 - 1, 2);
+              translateY = dir * arcHeight * arcProgress;
             }
           }
 
-          // ── Pop-in for newly written values ──
+          // ── Wave entry: each cell bounces up from bottom ──
+          const waveDelay = i * 1.5;
+          const waveElapsed = elapsed - waveDelay;
           let scale = 1;
-          if (prevIdx === -1 && !isSwap) {
-            scale = interpolate(elapsed, [0, POP_FRAMES], [0.7, 1], {
+          let entryY = 0;
+          if (prevIdx === -1) {
+            // Newly written values: pop-in scale
+            scale = interpolate(waveElapsed, [0, POP_FRAMES], [0.8, 1], {
+              easing: POP_BEZIER,
+              extrapolateLeft: "clamp",
+              extrapolateRight: "clamp",
+            });
+          } else if (prevIdx === i) {
+            // Unchanged cells: wave bounce from bottom
+            entryY = interpolate(waveElapsed, [0, 10], [20, 0], {
+              easing: Easing.out(Easing.quad),
+              extrapolateLeft: "clamp",
+              extrapolateRight: "clamp",
+            });
+            scale = interpolate(waveElapsed, [0, 10], [0.9, 1], {
               easing: POP_BEZIER,
               extrapolateLeft: "clamp",
               extrapolateRight: "clamp",
             });
           }
 
-          // ── Static enter opacity (replaces spring) ──
+          // ── Static enter opacity (wave-staggered) ──
           const cellOpacity = interpolate(
             elapsed,
-            [Math.max(0, i * 1.5), Math.max(0, i * 1.5) + 8],
+            [Math.max(0, waveDelay), Math.max(0, waveDelay) + 8],
             [0, 1],
             { easing: ENTER_BEZIER, extrapolateLeft: "clamp", extrapolateRight: "clamp" },
           );
 
           // ── Visual layer (priority: active > swap > sorted) ──
-          let bg: string = colors.cell;
+          let bg: string = colors.cellGradient;
           let border: string = colors.border;
           let borderWidth = 1.5;
           let textColor: string = colors.text;
           let liftY = 0;
-          let glow = "none";
+          let glow: string = colors.cellShadow;
           let breath = 1;
 
           if (isActive) {
@@ -224,14 +249,16 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
             liftY = -4;
             const phase = (elapsed * (Math.PI * 2)) / BREATH_PERIOD;
             breath = 0.65 + 0.35 * (0.5 + 0.5 * Math.sin(phase));
-            glow = `0 0 12px ${colors.selectShadow}`;
+            glow = `0 0 14px ${colors.selectShadow}, ${colors.cellShadow}`;
           } else if (isSwap) {
             bg = `${colors.swap}22`;
             border = colors.swap;
             textColor = colors.swap;
+            glow = `0 4px 12px rgba(0,0,0,0.3)`;
           } else if (isSorted) {
             bg = `${colors.sorted}18`;
             border = colors.sorted;
+            glow = `0 0 8px ${colors.sortedShadow}, ${colors.cellShadow}`;
           }
 
           return (
@@ -250,12 +277,28 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
                 fontWeight: 700,
                 fontSize: Math.max(12, Math.min(20, cellW * 0.3)),
                 opacity: cellOpacity * breath,
-                transform: `translate(${translateX}px, ${translateY + liftY}px) scale(${scale})`,
+                transform: `translate(${translateX}px, ${translateY + liftY + entryY}px) scale(${scale})`,
                 boxShadow: glow,
                 position: "relative",
               }}
             >
               {val}
+              {/* Sorted checkmark */}
+              {isSorted && !isActive && !isSwap && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: 2,
+                    right: 4,
+                    fontSize: 9,
+                    color: colors.sorted,
+                    fontWeight: 700,
+                    lineHeight: 1,
+                  }}
+                >
+                  ✓
+                </span>
+              )}
               {/* Index label */}
               <span
                 style={{
