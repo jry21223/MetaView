@@ -12,19 +12,19 @@ router = APIRouter(prefix="/runs", tags=["runs"])
 
 
 @router.get("", response_model=list[PipelineRunResponse])
-def list_runs(
+async def list_runs(
     run_repo: Annotated[IRunRepository, Depends(get_run_repo)],
     limit: int = 50,
 ) -> list[PipelineRunResponse]:
-    return run_repo.list(limit=limit)
+    return await run_repo.list(limit=limit)
 
 
 @router.get("/{run_id}", response_model=PipelineRunResponse)
-def get_run(
+async def get_run(
     run_id: str,
     run_repo: Annotated[IRunRepository, Depends(get_run_repo)],
 ) -> PipelineRunResponse:
-    run = run_repo.get(run_id)
+    run = await run_repo.get(run_id)
     if run is None:
         raise HTTPException(status_code=404, detail=f"Run {run_id!r} not found")
     return run

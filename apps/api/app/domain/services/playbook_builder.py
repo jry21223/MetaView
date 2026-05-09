@@ -188,7 +188,13 @@ def _build_array_snapshot(
 
     if checkpoint:
         active_indices = list(checkpoint.array_focus_indices)
-        if len(active_indices) == 2:
+        if checkpoint.swap_indices:
+            # LLM explicitly told us which indices are being swapped
+            swap_indices = list(checkpoint.swap_indices)
+        elif len(active_indices) == 2 and any(
+            kw in checkpoint.title.lower() for kw in ("swap", "exchange", "交换", "互换")
+        ):
+            # Fall back to heuristic only when the step title signals an actual swap
             swap_indices = list(active_indices)
         # Extract pointer names from token ids that look like "ptr_X" or "idx_X"
         for t in cir_step.tokens:

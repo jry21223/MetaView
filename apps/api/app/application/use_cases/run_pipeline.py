@@ -22,7 +22,7 @@ class RunPipelineUseCase:
         self._llm = llm
 
     async def execute(self, run_id: str, request: PipelineRequest) -> None:
-        self._repo.update(run_id, status=PipelineRunStatus.RUNNING)
+        await self._repo.update(run_id, status=PipelineRunStatus.RUNNING)
         try:
             domain_hint = _resolve_domain(request.domain, request.prompt)
             system, user = build_cir_prompt(
@@ -40,14 +40,14 @@ class RunPipelineUseCase:
                 source_code=request.source_code,
                 source_language=request.language,
             )
-            self._repo.update(
+            await self._repo.update(
                 run_id,
                 status=PipelineRunStatus.SUCCEEDED,
                 playbook_json=playbook.model_dump_json(),
             )
         except Exception as exc:
             logger.exception("Pipeline run %s failed", run_id)
-            self._repo.update(
+            await self._repo.update(
                 run_id,
                 status=PipelineRunStatus.FAILED,
                 error=str(exc),

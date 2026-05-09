@@ -57,10 +57,10 @@ def repo(tmp_path):
 @pytest.mark.asyncio
 async def test_successful_pipeline_run(repo) -> None:
     use_case = RunPipelineUseCase(repo, MockLLMSuccess())
-    repo.create("run-1", "test prompt", "2024-01-01T00:00:00+00:00")
+    await repo.create("run-1", "test prompt", "2024-01-01T00:00:00+00:00")
     await use_case.execute("run-1", PipelineRequest(prompt="test prompt"))
 
-    result = repo.get("run-1")
+    result = await repo.get("run-1")
     assert result is not None
     assert result.status == PipelineRunStatus.SUCCEEDED
     assert result.playbook is not None
@@ -71,10 +71,10 @@ async def test_successful_pipeline_run(repo) -> None:
 @pytest.mark.asyncio
 async def test_failed_pipeline_run_on_invalid_json(repo) -> None:
     use_case = RunPipelineUseCase(repo, MockLLMFailure())
-    repo.create("run-2", "test prompt", "2024-01-01T00:00:00+00:00")
+    await repo.create("run-2", "test prompt", "2024-01-01T00:00:00+00:00")
     await use_case.execute("run-2", PipelineRequest(prompt="test prompt"))
 
-    result = repo.get("run-2")
+    result = await repo.get("run-2")
     assert result is not None
     assert result.status == PipelineRunStatus.FAILED
     assert result.playbook is None
@@ -84,10 +84,10 @@ async def test_failed_pipeline_run_on_invalid_json(repo) -> None:
 @pytest.mark.asyncio
 async def test_markdown_fences_stripped_before_parsing(repo) -> None:
     use_case = RunPipelineUseCase(repo, MockLLMWithFences())
-    repo.create("run-3", "test prompt", "2024-01-01T00:00:00+00:00")
+    await repo.create("run-3", "test prompt", "2024-01-01T00:00:00+00:00")
     await use_case.execute("run-3", PipelineRequest(prompt="test prompt"))
 
-    result = repo.get("run-3")
+    result = await repo.get("run-3")
     assert result is not None
     assert result.status == PipelineRunStatus.SUCCEEDED
 

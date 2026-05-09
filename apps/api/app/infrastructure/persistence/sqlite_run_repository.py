@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import sqlite3
 
 from app.application.dto.pipeline_dto import PipelineRunResponse
@@ -16,16 +17,19 @@ class SqliteRunRepository:
         conn.row_factory = sqlite3.Row
         return conn
 
-    def create(self, run_id: str, prompt: str, created_at: str) -> None:
-        with self._connect() as conn:
-            conn.execute(
-                "INSERT INTO pipeline_runs"
-                " (run_id, status, prompt, created_at) VALUES (?, ?, ?, ?)",
-                (run_id, PipelineRunStatus.QUEUED.value, prompt, created_at),
-            )
-            conn.commit()
+    async def create(self, run_id: str, prompt: str, created_at: str) -> None:
+        def _sync() -> None:
+            with self._connect() as conn:
+                conn.execute(
+                    "INSERT INTO pipeline_runs"
+                    " (run_id, status, prompt, created_at) VALUES (?, ?, ?, ?)",
+                    (run_id, PipelineRunStatus.QUEUED.value, prompt, created_at),
+                )
+                conn.commit()
 
-    def update(
+        await asyncio.to_thread(_sync)
+
+    async def update(
         self,
         run_id: str,
         *,
@@ -33,27 +37,36 @@ class SqliteRunRepository:
         playbook_json: str | None = None,
         error: str | None = None,
     ) -> None:
-        with self._connect() as conn:
-            conn.execute(
-                "UPDATE pipeline_runs SET status=?, playbook_json=?, error=? WHERE run_id=?",
-                (status.value, playbook_json, error, run_id),
-            )
-            conn.commit()
+        def _sync() -> None:
+            with self._connect() as conn:
+                conn.execute(
+                    "UPDATE pipeline_runs SET status=?, playbook_json=?, error=? WHERE run_id=?",
+                    (status.value, playbook_json, error, run_id),
+                )
+                conn.commit()
 
-    def get(self, run_id: str) -> PipelineRunResponse | None:
-        with self._connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM pipeline_runs WHERE run_id=?", (run_id,)
-            ).fetchone()
+        await asyncio.to_thread(_sync)
+
+    async def get(self, run_id: str) -> PipelineRunResponse | None:
+        def _sync() -> sqlite3.Row | None:
+            with self._connect() as conn:
+                return conn.execute(
+                    "SELECT * FROM pipeline_runs WHERE run_id=?", (run_id,)
+                ).fetchone()
+
+        row = await asyncio.to_thread(_sync)
         if row is None:
             return None
         return _row_to_response(row)
 
-    def list(self, limit: int = 50) -> list[PipelineRunResponse]:
-        with self._connect() as conn:
-            rows = conn.execute(
-                "SELECT * FROM pipeline_runs ORDER BY created_at DESC LIMIT ?", (limit,)
-            ).fetchall()
+    async def list(self, limit: int = 50) -> list[PipelineRunResponse]:
+        def _sync() -> list[sqlite3.Row]:
+            with self._connect() as conn:
+                return conn.execute(
+                    "SELECT * FROM pipeline_runs ORDER BY created_at DESC LIMIT ?", (limit,)
+                ).fetchall()
+
+        rows = await asyncio.to_thread(_sync)
         return [_row_to_response(r) for r in rows]
 
 

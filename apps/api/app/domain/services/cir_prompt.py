@@ -96,8 +96,9 @@ _COMBINED_SCHEMA = """{
         "end_s": 3.0,
         "code_lines": "list[int] — 0-indexed lines into algorithm_code or user source",
         "focus_tokens": "list[str] — token ids emphasised this step",
-        "array_focus_indices": "list[int] — array indices currently active (compared/swapped)",
-        "array_reference_indices": "list[int] — secondary indices being referenced"
+        "array_focus_indices": "list[int] — array indices being compared this step",
+        "array_reference_indices": "list[int] — secondary indices being referenced",
+        "swap_indices": "list[int] — indices swapped this step (omit when only comparing)"
       }
     ]
   }

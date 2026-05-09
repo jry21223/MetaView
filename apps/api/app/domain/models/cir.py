@@ -70,6 +70,7 @@ class ExecutionCheckpoint(BaseModel):
     focus_tokens: list[str] = Field(default_factory=list)
     array_focus_indices: list[int] = Field(default_factory=list)
     array_reference_indices: list[int] = Field(default_factory=list)
+    swap_indices: list[int] = Field(default_factory=list)
     breakpoint: bool = False
     guiding_question: str | None = None
 

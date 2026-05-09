@@ -53,7 +53,7 @@ class ExportVideoUseCase:
         tts: TtsConfig | None,
     ) -> None:
         try:
-            run = self._runs.get(run_id)
+            run = await self._runs.get(run_id)
             if run is None or run.playbook is None:
                 raise ValueError(f"Run {run_id!r} has no playbook to export")
 

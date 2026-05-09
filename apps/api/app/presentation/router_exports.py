@@ -45,7 +45,7 @@ def _to_response(job: ExportJob, request: Request, api_prefix: str) -> ExportJob
 
 
 @router.post("", response_model=ExportJobResponse, status_code=202)
-def submit_export(
+async def submit_export(
     request: ExportRequest,
     http_request: Request,
     background_tasks: BackgroundTasks,
@@ -55,7 +55,7 @@ def submit_export(
 ) -> ExportJobResponse:
     if request.with_audio and request.tts is None:
         raise HTTPException(status_code=400, detail="with_audio=true requires a tts config")
-    run = run_repo.get(request.run_id)
+    run = await run_repo.get(request.run_id)
     if run is None or run.playbook is None:
         raise HTTPException(status_code=404, detail=f"Run {request.run_id!r} has no playbook")
 

@@ -26,7 +26,7 @@ async def submit_pipeline(
 ) -> PipelineRunResponse:
     run_id = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
-    run_repo.create(run_id, request.prompt, created_at)
+    await run_repo.create(run_id, request.prompt, created_at)
 
     # Per-request provider override takes precedence over the injected default
     effective_llm: ILLMProvider = llm
