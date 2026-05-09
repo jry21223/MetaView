@@ -18,28 +18,38 @@ from app.domain.models.playbook import (
     MetaStep,
     PlaybookScript,
 )
+from app.domain.services.algorithm_code_library import get_by_id, infer_id
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_FPS = 30
 _DEFAULT_STEP_FRAMES = 60  # 2 s at 30 fps
 
-# Maps title keywords → frontend replay registry id. None = no replay.
-_ALGORITHM_KEYWORDS: tuple[tuple[tuple[str, ...], str], ...] = (
-    (("归并", "merge sort", "mergesort"), "merge_sort"),
-    (("快速排序", "quicksort", "quick sort"), "quick_sort"),
-    (("冒泡", "bubble"), "bubble_sort"),
-    (("插入排序", "insertion"), "insertion_sort"),
-    (("选择排序", "selection sort"), "selection_sort"),
-)
+
+def _infer_algorithm_id(title: str, execution_map: ExecutionMap | None = None) -> str | None:
+    # Prefer explicit algorithm_id from execution_map (LLM declared it).
+    if execution_map and execution_map.algorithm_id:
+        return execution_map.algorithm_id
+    return infer_id(title)
 
 
-def _infer_algorithm_id(title: str) -> str | None:
-    lowered = title.lower()
-    for keywords, algo_id in _ALGORITHM_KEYWORDS:
-        if any(k in title or k in lowered for k in keywords):
-            return algo_id
-    return None
+def _resolve_source(
+    user_source: str | None,
+    user_language: str,
+    algorithm_id: str | None,
+    execution_map: ExecutionMap | None,
+) -> tuple[list[str], str]:
+    """Return (source_lines, language) using priority: user upload > library > LLM generated."""
+    if user_source and user_source.strip():
+        return user_source.splitlines(), user_language
+    if algorithm_id:
+        library_entry = get_by_id(algorithm_id)
+        if library_entry:
+            return list(library_entry.lines), library_entry.language
+    if execution_map and execution_map.algorithm_code:
+        lang = getattr(execution_map, "algorithm_language", "pseudocode") or "pseudocode"
+        return list(execution_map.algorithm_code), lang
+    return [], user_language
 
 
 def build_playbook(
@@ -54,7 +64,14 @@ def build_playbook(
         for cp in execution_map.checkpoints:
             checkpoint_by_step[cp.step_id] = cp
 
-    source_lines = source_code.splitlines() if source_code else []
+    # Resolve source lines and language using priority chain:
+    #   1. User-uploaded source_code (highest fidelity)
+    #   2. Pre-baked library code for known algorithms
+    #   3. LLM-generated algorithm_code from execution_map
+    algorithm_id = _infer_algorithm_id(cir.title, execution_map)
+    source_lines, source_language = _resolve_source(
+        source_code, source_language, algorithm_id, execution_map
+    )
 
     steps: list[MetaStep] = []
     cumulative = 0
@@ -85,7 +102,6 @@ def build_playbook(
         )
 
     total_frames = max(cumulative, 1)
-    algorithm_id = _infer_algorithm_id(cir.title)
     initial_data: dict[str, list[str]] = {}
     if execution_map and execution_map.array_track and execution_map.array_track.values:
         initial_data["array"] = list(execution_map.array_track.values)

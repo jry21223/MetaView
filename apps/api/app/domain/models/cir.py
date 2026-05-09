@@ -82,3 +82,5 @@ class ExecutionMap(BaseModel):
     array_track: ExecutionArrayTrack | None = None
     step_to_checkpoint: dict[str, str] = Field(default_factory=dict)
     line_to_step_ids: dict[int, list[str]] = Field(default_factory=dict)
+    algorithm_id: str | None = None
+    algorithm_code: list[str] | None = None

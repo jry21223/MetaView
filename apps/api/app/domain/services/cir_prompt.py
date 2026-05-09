@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.domain.models.topic import TopicDomain
+from app.domain.services.algorithm_code_library import infer_id, prompt_hint
 
 _DOMAIN_GUIDANCE: dict[TopicDomain, str] = {
     TopicDomain.ALGORITHM: """
@@ -81,6 +82,8 @@ _COMBINED_SCHEMA = """{
   },
   "execution_map": {
     "duration_s": "float — total animation duration in seconds (e.g. step_count × 3)",
+    "algorithm_id": "string | null — snake_case name, e.g. bubble_sort (algorithm domain only)",
+    "algorithm_code": "list[str] | null — pseudocode lines; code_lines indexes into this",
     "checkpoints": [
       {
         "id": "cp_01",
@@ -91,7 +94,7 @@ _COMBINED_SCHEMA = """{
         "summary": "string — single sentence for this checkpoint",
         "start_s": 0.0,
         "end_s": 3.0,
-        "code_lines": "list[int] — 0-indexed source lines (only when source code provided)",
+        "code_lines": "list[int] — 0-indexed lines into algorithm_code or user source",
         "focus_tokens": "list[str] — token ids emphasised this step",
         "array_focus_indices": "list[int] — array indices currently active (compared/swapped)",
         "array_reference_indices": "list[int] — secondary indices being referenced"
@@ -119,6 +122,23 @@ def _number_source(source: str) -> str:
     return "\n".join(f"{i:>3}  {line}" for i, line in enumerate(source.splitlines()))
 
 
+_ALGO_CODE_INSTRUCTION = """
+## Algorithm Pseudocode (REQUIRED for algorithm domain)
+You MUST populate execution_map with:
+- "algorithm_id": snake_case name of the algorithm (e.g. "bubble_sort", "binary_search")
+- "algorithm_code": list of concise pseudocode lines (8–15 lines, clear and educational)
+
+For EACH checkpoint, set "code_lines" to a list of 0-indexed positions in algorithm_code \
+that are executing in this step. Use [] only for setup/intro steps with no active code line.
+
+Rules for algorithm_code:
+- Write in language-neutral pseudocode (no language-specific syntax)
+- Each line should be a single logical operation (one comparison, one swap, one assignment)
+- Indent with 2 spaces to show structure
+- Keep each line ≤ 60 characters
+"""
+
+
 def build_cir_prompt(
     prompt: str,
     domain_hint: TopicDomain,
@@ -142,6 +162,13 @@ def build_cir_prompt(
             language=language or "python",
             numbered_source=_number_source(source_code),
         )
+    # For algorithm domain: add pseudocode generation instruction.
+    # If the prompt matches a pre-baked algorithm, inject the canonical pseudocode.
+    algo_code_track = ""
+    if domain_hint == TopicDomain.ALGORITHM and not source_code:
+        algo_id = infer_id(prompt)
+        canonical_hint = prompt_hint(algo_id) if algo_id else ""
+        algo_code_track = _ALGO_CODE_INSTRUCTION + canonical_hint
 
     system = f"""You are an expert educational animator. \
 Your job is to convert a student's question into a step-by-step visual teaching script.
@@ -204,5 +231,6 @@ Example (bubble sort compare step):
 - Empty arrays are fine when the step doesn't apply (e.g. intro step has no focus indices).
 {code_track}"""
 
+    system = system + algo_code_track
     user = prompt
     return system, user
