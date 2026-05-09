@@ -192,9 +192,10 @@ const TTSConfigPopover: React.FC<TTSPopoverProps> = ({ config, onUpdate, onClose
 interface PlaybookPlayerProps {
   script: PlaybookScript;
   theme?: "dark" | "light";
+  onOpenExport?: () => void;
 }
 
-export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScript, theme = "dark" }) => {
+export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScript, theme = "dark", onOpenExport }) => {
   const playerRef = useRef<PlayerRef | null>(null);
 
   // ── Tweak state (frontend-only hot reload) ─────────────────────────────
@@ -263,11 +264,19 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScri
     }
   }, [isPlaying]);
 
+  const handleReset = useCallback(() => {
+    playerRef.current?.seekTo(0);
+    goToStep(0);
+  }, [goToStep]);
+
   useKeyboardShortcuts({
     onPlayPause: handlePlayPause,
     onPrev: prev,
     onNext: next,
     onToggleTTS: tts.toggle,
+    onReset: handleReset,
+    onToggleSubtitles: () => setShowSubtitles((v) => !v),
+    onOpenExport: onOpenExport,
   });
 
   // Auto-narrate on step change.

@@ -402,7 +402,7 @@ export function StudioPage({
           </button>
 
           {playbook ? (
-            <PlaybookPlayer script={playbook} theme={isDark ? 'dark' : 'light'} />
+            <PlaybookPlayer script={playbook} theme={isDark ? 'dark' : 'light'} onOpenExport={() => setExportOpen(true)} />
           ) : isLoading ? (
             <PipelineSkeleton status={status} />
           ) : !error ? (

@@ -5,6 +5,9 @@ interface ShortcutHandlers {
   onPrev?: () => void;
   onNext?: () => void;
   onToggleTTS?: () => void;
+  onReset?: () => void;
+  onToggleSubtitles?: () => void;
+  onOpenExport?: () => void;
 }
 
 function isInputFocused(): boolean {
@@ -41,6 +44,18 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers): void {
         case "t":
         case "T":
           handlersRef.current.onToggleTTS?.();
+          break;
+        case "r":
+        case "R":
+          handlersRef.current.onReset?.();
+          break;
+        case "s":
+        case "S":
+          handlersRef.current.onToggleSubtitles?.();
+          break;
+        case "e":
+        case "E":
+          handlersRef.current.onOpenExport?.();
           break;
       }
     };

@@ -8,6 +8,8 @@ _DOMAIN_GUIDANCE: dict[TopicDomain, str] = {
 VISUAL RULES for algorithms:
 - Use visual_kind="array" for sorting, searching, two-pointer, sliding-window, DP table problems.
 - Use visual_kind="graph" ONLY for explicit tree/graph traversal (BFS, DFS, BST operations).
+- For graph steps, populate the "edges" array with explicit parent→child refs like
+  {"from_id": "node_root", "to_id": "node_left"}. Do NOT rely on token id naming conventions.
 - Each token represents ONE array element or tree node. Label = the actual value (number/char).
 - emphasis="primary"  → elements currently being compared or accessed
 - emphasis="accent"   → elements that are finalized/sorted
@@ -76,6 +78,7 @@ _COMBINED_SCHEMA = """{
             "emphasis": "primary | secondary | accent"
           }
         ],
+        "edges": [{"from_id": "node_root", "to_id": "node_left"}],
         "annotations": []
       }
     ]

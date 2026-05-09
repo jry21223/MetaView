@@ -19,6 +19,11 @@ class VisualToken(BaseModel):
     emphasis: str = "secondary"
 
 
+class EdgeRef(BaseModel):
+    from_id: str
+    to_id: str
+
+
 class CirStep(BaseModel):
     id: str
     title: str
@@ -26,6 +31,7 @@ class CirStep(BaseModel):
     visual_kind: VisualKind
     layout: LayoutInstruction = Field(default_factory=LayoutInstruction)
     tokens: list[VisualToken] = Field(default_factory=list)
+    edges: list[EdgeRef] | None = None
     annotations: list[str] = Field(default_factory=list)
     start_time: float | None = None
     end_time: float | None = None

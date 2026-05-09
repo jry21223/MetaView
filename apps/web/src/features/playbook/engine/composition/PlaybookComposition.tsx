@@ -105,29 +105,62 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
       {showSubtitles && (
       <div
         style={{
-          height: subtitleHeight,
           flexShrink: 0,
-          display: "flex",
-          alignItems: "center",
-          padding: "0 20px",
           background: subtitleBg,
           borderTop: `1px solid ${dividerColor}`,
           opacity: fadeProgress,
         }}
       >
-        <span
+        {/* Step progress bar */}
+        <div style={{ width: "100%", height: 2, background: dividerColor, position: "relative" }}>
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              height: "100%",
+              width: `${(frame / Math.max(1, script.total_frames)) * 100}%`,
+              background: isDark ? "#4de8b0" : "#00896e",
+            }}
+          />
+        </div>
+        {/* Subtitle text + step counter */}
+        <div
           style={{
-            color: subtitleColor,
-            fontFamily: "system-ui, -apple-system, sans-serif",
-            fontSize: 14,
-            lineHeight: 1.5,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
+            height: subtitleHeight - 2,
+            display: "flex",
+            alignItems: "center",
+            padding: "0 20px",
+            gap: 12,
           }}
         >
-          {step.voiceover_text}
-        </span>
+          <span
+            style={{
+              flex: 1,
+              color: subtitleColor,
+              fontFamily: "system-ui, -apple-system, sans-serif",
+              fontSize: 14,
+              lineHeight: 1.5,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {step.voiceover_text}
+          </span>
+          <span
+            style={{
+              flexShrink: 0,
+              fontSize: 11,
+              fontFamily: "IBM Plex Mono, monospace",
+              color: subtitleColor,
+              opacity: 0.5,
+              letterSpacing: "0.04em",
+            }}
+          >
+            {activeIndex + 1} / {script.steps.length}
+          </span>
+        </div>
       </div>
       )}
     </div>

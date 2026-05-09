@@ -221,21 +221,30 @@ def _build_tree_snapshot(
 
     for token in cir_step.tokens:
         nodes.append({"id": token.id, "label": token.label})
-        # Infer parent→child edges from token id patterns like "node_1_2" (parent 1, child 2)
-        m = re.match(r"^(.+)_child_(.+)$", token.id)
-        if m:
-            parent_id, child_id = m.group(1), token.id
-            key = (parent_id, child_id)
+
+    if cir_step.edges:
+        # Prefer explicit edges from the LLM over heuristic inference
+        for e in cir_step.edges:
+            key = (e.from_id, e.to_id)
             if key not in seen_edges:
                 seen_edges.add(key)
-                edges.append({"from_id": parent_id, "to_id": child_id})
-        # Also check value field like "parent:root_id"
-        if token.value and token.value.startswith("parent:"):
-            parent_id = token.value[7:]
-            key = (parent_id, token.id)
-            if key not in seen_edges:
-                seen_edges.add(key)
-                edges.append({"from_id": parent_id, "to_id": token.id})
+                edges.append({"from_id": e.from_id, "to_id": e.to_id})
+    else:
+        # Fallback heuristic: infer edges from token id naming conventions
+        for token in cir_step.tokens:
+            m = re.match(r"^(.+)_child_(.+)$", token.id)
+            if m:
+                parent_id = m.group(1)
+                key = (parent_id, token.id)
+                if key not in seen_edges:
+                    seen_edges.add(key)
+                    edges.append({"from_id": parent_id, "to_id": token.id})
+            if token.value and token.value.startswith("parent:"):
+                parent_id = token.value[7:]
+                key = (parent_id, token.id)
+                if key not in seen_edges:
+                    seen_edges.add(key)
+                    edges.append({"from_id": parent_id, "to_id": token.id})
 
     active_node_ids: list[str] = []
     visited_node_ids: list[str] = []

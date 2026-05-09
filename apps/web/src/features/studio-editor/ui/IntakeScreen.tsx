@@ -166,13 +166,19 @@ export function IntakeScreen({ onSubmit, t, isSubmitting = false, submitError = 
             rows={4}
             placeholder="例如：『把归并排序的过程画出来，数组是 [5,2,8,1,9,3,7,4]』 / 『高数：求 y'' + 2y' + y = 0 的解』"
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              setInput(e.target.value);
+              const el = e.target;
+              el.style.height = 'auto';
+              el.style.height = `${el.scrollHeight}px`;
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault();
                 submit();
               }
             }}
+            style={{ resize: 'none', overflow: 'hidden', minHeight: 96 }}
           />
           <div className="mv-intake-actions">
             <button className="mv-chip" onClick={() => fileRef.current?.click()}>
