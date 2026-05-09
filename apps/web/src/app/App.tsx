@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { ErrorBoundary } from '../shared/ui/ErrorBoundary';
 import { useTweaks, themeVars, TWEAK_DEFAULTS } from '../features/studio-editor/hooks/useTweaks';
 import { IntakeScreen, IntakeContext } from '../features/studio-editor/ui/IntakeScreen';
 import { TweaksPanel } from '../features/studio-editor/ui/TweaksPanel';
@@ -48,24 +49,28 @@ export function App() {
       )}
 
       {stage === 'workbench' && (
-        <StudioPage
-          runId={runId}
-          t={t}
-          setTweak={setTweak}
-          onNavigate={setStage}
-          isProviderConfigured={isConfigured}
-          onOpenProviderSettings={openProviderSettings}
-        />
+        <ErrorBoundary theme={t.theme}>
+          <StudioPage
+            runId={runId}
+            t={t}
+            setTweak={setTweak}
+            onNavigate={setStage}
+            isProviderConfigured={isConfigured}
+            onOpenProviderSettings={openProviderSettings}
+          />
+        </ErrorBoundary>
       )}
 
       {stage === 'history' && (
-        <HistoryPage
-          t={t}
-          setTweak={setTweak}
-          onNavigate={setStage}
-          isProviderConfigured={isConfigured}
-          onOpenProviderSettings={openProviderSettings}
-        />
+        <ErrorBoundary theme={t.theme}>
+          <HistoryPage
+            t={t}
+            setTweak={setTweak}
+            onNavigate={setStage}
+            isProviderConfigured={isConfigured}
+            onOpenProviderSettings={openProviderSettings}
+          />
+        </ErrorBoundary>
       )}
 
       <TweaksPanel t={t} setTweak={setTweak} />

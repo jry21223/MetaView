@@ -1,0 +1,41 @@
+name: Check
+
+on:
+  push:
+    branches: ["main", "dev"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            apps/api/requirements.txt
+            apps/api/requirements-dev.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          npm install
+          python3 -m venv .venv
+          .venv/bin/pip install -r apps/api/requirements-dev.txt
+
+      - name: Lint & test & build
+        env:
+          # Provide a dummy key so the mock LLM provider initialises without error.
+          # Real API calls are not made during `make check`.
+          METAVIEW_LLM_API_KEY: dummy
+        run: make check
