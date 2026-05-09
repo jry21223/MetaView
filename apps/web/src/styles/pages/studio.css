@@ -809,3 +809,72 @@
   border-top-color: var(--accent);
   animation: spin 0.8s linear infinite;
 }
+
+/* ── Pipeline skeleton loader ──────────────────────────────────────── */
+.mv-pipeline-skeleton {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 32px 40px;
+  gap: 32px;
+  overflow: hidden;
+}
+.mv-pipeline-stages {
+  display: flex; align-items: center; gap: 0;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px; letter-spacing: 0.06em;
+}
+.mv-stage {
+  display: flex; align-items: center; gap: 8px;
+  color: var(--ink-3);
+  transition: color 0.3s;
+}
+.mv-stage.is-active { color: var(--accent); }
+.mv-stage.is-done { color: var(--ink-2); }
+.mv-stage-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--line);
+  transition: background 0.3s;
+  flex-shrink: 0;
+}
+.mv-stage.is-active .mv-stage-dot {
+  background: var(--accent);
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+.mv-stage.is-done .mv-stage-dot { background: var(--ink-2); }
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.7); }
+}
+.mv-stage-line {
+  flex: 1; height: 1px;
+  background: var(--line);
+  margin: 0 12px;
+  min-width: 32px;
+}
+.mv-skeleton-area {
+  flex: 1; display: flex; flex-direction: column; gap: 20px;
+}
+.mv-skeleton-bar {
+  border-radius: 6px;
+  background: linear-gradient(90deg,
+    var(--line) 0%, var(--surface-2, color-mix(in srgb, var(--line) 60%, var(--surface))) 40%,
+    var(--line) 80%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+@keyframes shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+.mv-skeleton-title { height: 22px; width: 55%; }
+.mv-skeleton-cells {
+  display: flex; gap: 8px;
+}
+.mv-skeleton-cell {
+  height: 64px; flex: 1; border-radius: 8px;
+}
+.mv-skeleton-narration { height: 14px; }
+.mv-skeleton-narration-short { height: 14px; width: 70%; }

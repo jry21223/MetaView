@@ -265,6 +265,64 @@ function ChatPanel({ playbook, isProviderConfigured, onOpenProviderSettings, col
   );
 }
 
+// ── PipelineSkeleton ──────────────────────────────────────────────────────
+
+type PipelineStatus = 'queued' | 'running' | 'succeeded' | 'failed' | null;
+
+interface PipelineSkeletonProps {
+  status: PipelineStatus;
+}
+
+const STAGES: { key: PipelineStatus; label: string }[] = [
+  { key: 'queued', label: '排队中' },
+  { key: 'running', label: '脚本生成' },
+  { key: 'succeeded', label: '渲染完成' },
+];
+
+const STATUS_ORDER: Record<NonNullable<PipelineStatus>, number> = {
+  queued: 0, running: 1, succeeded: 2, failed: 2,
+};
+
+function PipelineSkeleton({ status }: PipelineSkeletonProps) {
+  const currentOrder = status !== null ? STATUS_ORDER[status] : -1;
+
+  return (
+    <div className="mv-pipeline-skeleton">
+      <div className="mv-pipeline-stages">
+        {STAGES.map((stage, i) => {
+          const stageOrder = STATUS_ORDER[stage.key!]!;
+          const isDone = currentOrder > stageOrder;
+          const isActive = currentOrder === stageOrder;
+          return (
+            <React.Fragment key={stage.key}>
+              <div className={`mv-stage${isActive ? ' is-active' : isDone ? ' is-done' : ''}`}>
+                <span className="mv-stage-dot" />
+                <span>{stage.label}</span>
+              </div>
+              {i < STAGES.length - 1 && <div className="mv-stage-line" />}
+            </React.Fragment>
+          );
+        })}
+      </div>
+
+      <div className="mv-skeleton-area">
+        <div className="mv-skeleton-bar mv-skeleton-title" />
+        <div className="mv-skeleton-cells">
+          {Array.from({ length: 8 }, (_, i) => (
+            <div
+              key={i}
+              className="mv-skeleton-bar mv-skeleton-cell"
+              style={{ animationDelay: `${i * 0.1}s` }}
+            />
+          ))}
+        </div>
+        <div className="mv-skeleton-bar mv-skeleton-narration" />
+        <div className="mv-skeleton-bar mv-skeleton-narration-short" />
+      </div>
+    </div>
+  );
+}
+
 // ── StudioPage ────────────────────────────────────────────────────────────
 
 export interface StudioPageProps {
@@ -346,10 +404,7 @@ export function StudioPage({
           {playbook ? (
             <PlaybookPlayer script={playbook} theme={isDark ? 'dark' : 'light'} />
           ) : isLoading ? (
-            <div className="mv-right-placeholder">
-              <div className="mv-spinner" />
-              <span>{status === 'running' ? '生成中…' : '排队中…'}</span>
-            </div>
+            <PipelineSkeleton status={status} />
           ) : !error ? (
             <div className="mv-right-placeholder">
               <span>提交一个题目开始生成</span>
