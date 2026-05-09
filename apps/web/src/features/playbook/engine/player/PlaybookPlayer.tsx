@@ -227,11 +227,33 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScri
     [script, currentStepIndex],
   );
 
+  // Show code panel slot for algorithm domain, or any script that has code highlights.
+  const isAlgorithmDomain = script.domain === "algorithm";
+  const hasAnyCode = useMemo(
+    () => script.steps.some((s) => s.code_highlight != null),
+    [script.steps],
+  );
+  const showCodePanelSlot = isAlgorithmDomain || hasAnyCode;
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [showTTSConfig, setShowTTSConfig] = useState(false);
   // Ref so auto-narrate effect always calls the latest speak function without re-registering.
   const ttsRef = useRef(tts);
   useLayoutEffect(() => { ttsRef.current = tts; });
+
+  // Keep isPlaying in sync with actual player state (controller may pause mid-step).
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player) return;
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
+    player.addEventListener("play", onPlay);
+    player.addEventListener("pause", onPause);
+    return () => {
+      player.removeEventListener("play", onPlay);
+      player.removeEventListener("pause", onPause);
+    };
+  });
 
   const handlePlayPause = useCallback(() => {
     if (isPlaying) {
@@ -239,7 +261,6 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScri
     } else {
       playerRef.current?.play();
     }
-    setIsPlaying((p) => !p);
   }, [isPlaying]);
 
   useKeyboardShortcuts({
@@ -437,7 +458,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScri
               clickToPlay={false}
             />
           </div>
-          {codeOverlay && codePanelOpen && (
+          {showCodePanelSlot && codePanelOpen && (
             <div
               style={{
                 width: 320,
@@ -466,10 +487,31 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScri
               >
                 ›
               </button>
-              <CodeHighlightRenderer overlay={codeOverlay} theme={theme} />
+              {codeOverlay ? (
+                <CodeHighlightRenderer overlay={codeOverlay} theme={theme} />
+              ) : (
+                <div
+                  style={{
+                    flex: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexDirection: "column",
+                    gap: 8,
+                    color: sidebarMuted,
+                    fontSize: 12,
+                    fontFamily: "system-ui, sans-serif",
+                    padding: 16,
+                    textAlign: "center",
+                  }}
+                >
+                  <span style={{ fontSize: 24 }}>{"</>"}</span>
+                  <span>上传代码文件后此处显示同步高亮</span>
+                </div>
+              )}
             </div>
           )}
-          {codeOverlay && !codePanelOpen && (
+          {showCodePanelSlot && !codePanelOpen && (
             <button
               onClick={() => setCodePanelOpen(true)}
               title="展开代码面板"
