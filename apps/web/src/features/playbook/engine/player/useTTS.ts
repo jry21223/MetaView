@@ -248,7 +248,10 @@ export function useTTS(): UseTTSResult {
       if (!trimmed) return;
       const normalized = isSSML(trimmed) ? normalizeSSML(trimmed) : trimmed;
       const rate = options?.rate ?? config.rate;
-      const voice = options?.voice ?? (config.voice === AUTO_VOICE ? "alloy" : config.voice);
+      // When caller doesn't pass a voice, defer to resolveVoice (without domain context,
+      // AUTO collapses to the default "alloy"). Callers that know the domain should
+      // resolve voice themselves via resolveVoice(config.voice, domain) and pass it in.
+      const voice = options?.voice ?? resolveVoice(config.voice, undefined);
       if (config.backend === "openai") {
         void speakOpenAI(normalized, rate, voice);
       } else {

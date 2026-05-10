@@ -6,7 +6,9 @@
  * plain text while preserving rough pause / emphasis hints via punctuation.
  */
 
-const BREAK_PATTERN = /<break\s+[^>]*\/?>/gi;
+// Match any of: <break/>, <break />, <break time="1s"/>, <break></break>
+// Paired form is matched as one unit first so it collapses to a single pause.
+const BREAK_PATTERN = /<break\b[^>]*>\s*<\/break>|<break\b[^>]*\/?>/gi;
 const TAG_PATTERN = /<\/?[^>]+>/g;
 
 export function isSSML(text: string): boolean {
