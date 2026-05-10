@@ -5,7 +5,7 @@ import type { PlaybookScript } from "../types";
 import { usePlaybookController } from "./usePlaybookController";
 import { PlaybookComposition } from "../composition/PlaybookComposition";
 import { PLAYBOOK_DEFAULTS } from "../../../../shared/config/constants";
-import { useTTS } from "./useTTS";
+import { useTTS, OPENAI_VOICES, AUTO_VOICE, resolveVoice } from "./useTTS";
 import type { TTSConfig } from "./useTTS";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { resolveNarrationTemplate } from "./resolveNarrationTemplate";
@@ -58,10 +58,14 @@ interface TTSPopoverProps {
   onUpdate: (patch: Partial<TTSConfig>) => void;
   onClose: () => void;
   isDark: boolean;
+  onPreview: (voice: string, sampleText: string) => void;
 }
 
-const TTSConfigPopover: React.FC<TTSPopoverProps> = ({ config, onUpdate, onClose, isDark }) => {
+const SAMPLE_TEXT_DEFAULT = "你好，这是一段试听文字。Hello, this is a preview.";
+
+const TTSConfigPopover: React.FC<TTSPopoverProps> = ({ config, onUpdate, onClose, isDark, onPreview }) => {
   const popoverRef = useRef<HTMLDivElement>(null);
+  const [sampleText, setSampleText] = useState(SAMPLE_TEXT_DEFAULT);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -137,7 +141,6 @@ const TTSConfigPopover: React.FC<TTSPopoverProps> = ({ config, onUpdate, onClose
               { key: "apiKey", label: "API Key", type: "password", placeholder: "sk-…" },
               { key: "baseUrl", label: "Base URL", type: "text", placeholder: "https://api.openai.com/v1" },
               { key: "model", label: "Model", type: "text", placeholder: "tts-1" },
-              { key: "voice", label: "Voice", type: "text", placeholder: "alloy" },
             ] as const
           ).map(({ key, label, type, placeholder }) => (
             <div key={key}>
@@ -162,6 +165,105 @@ const TTSConfigPopover: React.FC<TTSPopoverProps> = ({ config, onUpdate, onClose
             </div>
           ))}
         </>
+      )}
+
+      {/* Voice picker (OpenAI only) */}
+      {config.backend === "openai" && (
+        <div>
+          <div style={{ fontSize: 11, color: muted, marginBottom: 6 }}>
+            音色 <span style={{ color: text }}>{config.voice === AUTO_VOICE ? "跟随学科" : config.voice}</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 180, overflowY: "auto" }}>
+            <button
+              type="button"
+              onClick={() => onUpdate({ voice: AUTO_VOICE })}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "5px 8px",
+                borderRadius: 5,
+                border: `1px solid ${config.voice === AUTO_VOICE ? accent : border}`,
+                background: config.voice === AUTO_VOICE ? `${accent}18` : "transparent",
+                color: config.voice === AUTO_VOICE ? accent : text,
+                fontSize: 12,
+                cursor: "pointer",
+                textAlign: "left",
+              }}
+            >
+              <span>跟随学科自动推荐</span>
+            </button>
+            {OPENAI_VOICES.map((v) => (
+              <div
+                key={v.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "4px 8px",
+                  borderRadius: 5,
+                  border: `1px solid ${config.voice === v.id ? accent : border}`,
+                  background: config.voice === v.id ? `${accent}18` : "transparent",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => onUpdate({ voice: v.id })}
+                  style={{
+                    flex: 1,
+                    background: "transparent",
+                    border: "none",
+                    color: config.voice === v.id ? accent : text,
+                    fontSize: 12,
+                    fontWeight: config.voice === v.id ? 600 : 400,
+                    textAlign: "left",
+                    cursor: "pointer",
+                    padding: 0,
+                  }}
+                  title={v.description}
+                >
+                  {v.label}
+                  <span style={{ color: muted, fontWeight: 400, marginLeft: 6 }}>{v.description}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onPreview(v.id, sampleText)}
+                  style={{
+                    background: "transparent",
+                    border: `1px solid ${border}`,
+                    borderRadius: 4,
+                    color: muted,
+                    fontSize: 11,
+                    padding: "2px 6px",
+                    cursor: "pointer",
+                  }}
+                >
+                  ⏵ 试听
+                </button>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: 6 }}>
+            <div style={{ fontSize: 11, color: muted, marginBottom: 3 }}>试听文字</div>
+            <input
+              type="text"
+              value={sampleText}
+              onChange={(e) => setSampleText(e.target.value)}
+              placeholder={SAMPLE_TEXT_DEFAULT}
+              style={{
+                width: "100%",
+                padding: "5px 8px",
+                background: inputBg,
+                border: `1px solid ${border}`,
+                borderRadius: 5,
+                color: text,
+                fontSize: 12,
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+        </div>
       )}
 
       {/* Rate slider */}
@@ -289,8 +391,18 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScri
       step.narration_template && step.tokens.length > 0
         ? resolveNarrationTemplate(step.narration_template, step.tokens)
         : step.voiceover_text;
-    if (text.trim()) ttsRef.current.speak(text);
+    if (!text.trim()) return;
+    const voice = resolveVoice(ttsRef.current.config.voice, script.domain);
+    const rate = step.tts_rate ?? ttsRef.current.config.rate;
+    ttsRef.current.speak(text, { voice, rate });
   }, [currentStepIndex, script]); // script included so step data is never stale
+
+  const handleVoicePreview = useCallback(
+    (voice: string, sampleText: string) => {
+      tts.speak(sampleText, { voice });
+    },
+    [tts],
+  );
 
   if (!script.steps.length) {
     return (
@@ -600,6 +712,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScri
                 onUpdate={tts.updateConfig}
                 onClose={() => setShowTTSConfig(false)}
                 isDark={isDark}
+                onPreview={handleVoicePreview}
               />
             )}
           </div>

@@ -61,6 +61,8 @@ export interface MetaStep<T extends AnySnapshot = AnySnapshot> {
   code_highlight?: CodeHighlightOverlay | null;
   narration_template?: NarrationTemplate | null;
   tokens: NarrationToken[];
+  /** Per-step TTS rate override (0.5–2.0). Falls back to config.rate when null/undefined. */
+  tts_rate?: number | null;
 }
 
 export interface PlaybookScript {

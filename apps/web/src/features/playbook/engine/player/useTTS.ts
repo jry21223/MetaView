@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isSSML, normalizeSSML } from "./ssml";
 
 export interface TTSConfig {
   enabled: boolean;
@@ -6,11 +7,44 @@ export interface TTSConfig {
   apiKey: string;
   baseUrl: string;
   model: string;
+  /** "auto" = follow domain mapping; otherwise an explicit voice id */
   voice: string;
   rate: number;
 }
 
+export interface SpeakOptions {
+  /** Per-utterance rate override (else uses config.rate) */
+  rate?: number;
+  /** Per-utterance voice override (else uses config.voice or auto-mapped) */
+  voice?: string;
+}
+
 const STORAGE_KEY = "mv_tts_settings";
+
+export const OPENAI_VOICES = [
+  { id: "alloy", label: "Alloy", description: "中性、清晰" },
+  { id: "echo", label: "Echo", description: "沉稳、男声" },
+  { id: "fable", label: "Fable", description: "温和、英式" },
+  { id: "onyx", label: "Onyx", description: "有力、低沉" },
+  { id: "nova", label: "Nova", description: "温暖、女声" },
+  { id: "shimmer", label: "Shimmer", description: "明亮、女声" },
+] as const;
+
+export const DOMAIN_VOICE_MAP: Record<string, string> = {
+  algorithm: "alloy",
+  math: "echo",
+  code: "onyx",
+  physics: "nova",
+  chemistry: "shimmer",
+};
+
+export const AUTO_VOICE = "auto";
+
+export function resolveVoice(configVoice: string, domain: string | undefined): string {
+  if (configVoice !== AUTO_VOICE) return configVoice;
+  if (domain && DOMAIN_VOICE_MAP[domain]) return DOMAIN_VOICE_MAP[domain];
+  return "alloy";
+}
 
 const DEFAULT_CONFIG: TTSConfig = {
   enabled: false,
@@ -45,11 +79,41 @@ function saveConfig(cfg: TTSConfig): void {
   }
 }
 
+// ── In-memory LRU cache for OpenAI TTS audio ────────────────────────────────
+// Keyed by `${baseUrl}|${model}|${voice}|${rate}|${text}`. Bounded to 50 entries
+// to avoid unbounded memory growth on long sessions.
+const TTS_CACHE_MAX = 50;
+const ttsAudioCache = new Map<string, ArrayBuffer>();
+
+function cacheKey(baseUrl: string, model: string, voice: string, rate: number, text: string): string {
+  return `${baseUrl}|${model}|${voice}|${rate.toFixed(2)}|${text}`;
+}
+
+function cacheGet(key: string): ArrayBuffer | undefined {
+  const buf = ttsAudioCache.get(key);
+  if (buf) {
+    // re-insert to mark as recently used
+    ttsAudioCache.delete(key);
+    ttsAudioCache.set(key, buf);
+  }
+  return buf;
+}
+
+function cacheSet(key: string, buf: ArrayBuffer): void {
+  if (ttsAudioCache.has(key)) ttsAudioCache.delete(key);
+  ttsAudioCache.set(key, buf);
+  while (ttsAudioCache.size > TTS_CACHE_MAX) {
+    const oldest = ttsAudioCache.keys().next().value;
+    if (oldest === undefined) break;
+    ttsAudioCache.delete(oldest);
+  }
+}
+
 export interface UseTTSResult {
   enabled: boolean;
   toggle: () => void;
   speaking: boolean;
-  speak: (text: string) => void;
+  speak: (text: string, options?: SpeakOptions) => void;
   stop: () => void;
   supported: boolean;
   config: TTSConfig;
@@ -94,24 +158,42 @@ export function useTTS(): UseTTSResult {
   }, [stopSystem, stopOpenAI]);
 
   const speakSystem = useCallback(
-    (text: string) => {
+    (text: string, rate: number) => {
       if (!window.speechSynthesis) return;
       window.speechSynthesis.cancel();
       const utt = new SpeechSynthesisUtterance(text);
-      utt.rate = config.rate;
+      utt.rate = rate;
       utt.onstart = () => setSpeaking(true);
       utt.onend = () => setSpeaking(false);
       utt.onerror = () => setSpeaking(false);
       window.speechSynthesis.speak(utt);
     },
-    [config.rate],
+    [],
   );
 
+  const playArrayBuffer = useCallback(async (buf: ArrayBuffer, signal: AbortSignal): Promise<void> => {
+    const ActxCtor =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
+      audioCtxRef.current = new ActxCtor();
+    }
+    // decodeAudioData mutates the source buffer, so clone before decoding so cache stays usable
+    const decoded = await audioCtxRef.current.decodeAudioData(buf.slice(0));
+    if (signal.aborted) return;
+
+    const src = audioCtxRef.current.createBufferSource();
+    src.buffer = decoded;
+    src.connect(audioCtxRef.current.destination);
+    src.onended = () => setSpeaking(false);
+    audioSrcRef.current = src;
+    src.start();
+  }, []);
+
   const speakOpenAI = useCallback(
-    async (text: string) => {
+    async (text: string, rate: number, voice: string) => {
       if (!config.apiKey.trim()) return;
 
-      // Cancel any in-flight request before starting a new one.
       abortRef.current?.abort();
       const ac = new AbortController();
       abortRef.current = ac;
@@ -124,6 +206,17 @@ export function useTTS(): UseTTSResult {
       audioSrcRef.current = null;
       setSpeaking(true);
 
+      const key = cacheKey(config.baseUrl, config.model, voice, rate, text);
+      const cached = cacheGet(key);
+      if (cached) {
+        try {
+          await playArrayBuffer(cached, ac.signal);
+        } catch {
+          setSpeaking(false);
+        }
+        return;
+      }
+
       try {
         const res = await fetch(`${config.baseUrl}/audio/speech`, {
           method: "POST",
@@ -132,47 +225,37 @@ export function useTTS(): UseTTSResult {
             Authorization: `Bearer ${config.apiKey}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ model: config.model, input: text, voice: config.voice }),
+          body: JSON.stringify({ model: config.model, input: text, voice, speed: rate }),
         });
         if (ac.signal.aborted) return;
         if (!res.ok) throw new Error(`TTS API ${res.status}`);
 
         const buf = await res.arrayBuffer();
         if (ac.signal.aborted) return;
-
-        const ActxCtor =
-          window.AudioContext ??
-          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-        if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
-          audioCtxRef.current = new ActxCtor();
-        }
-        const decoded = await audioCtxRef.current.decodeAudioData(buf);
-        if (ac.signal.aborted) return;
-
-        const src = audioCtxRef.current.createBufferSource();
-        src.buffer = decoded;
-        src.connect(audioCtxRef.current.destination);
-        src.onended = () => setSpeaking(false);
-        audioSrcRef.current = src;
-        src.start();
+        cacheSet(key, buf);
+        await playArrayBuffer(buf, ac.signal);
       } catch (err) {
         if ((err as DOMException).name === "AbortError") return;
         setSpeaking(false);
       }
     },
-    [config.apiKey, config.baseUrl, config.model, config.voice],
+    [config.apiKey, config.baseUrl, config.model, playArrayBuffer],
   );
 
   const speak = useCallback(
-    (text: string) => {
-      if (!text.trim()) return;
+    (text: string, options?: SpeakOptions) => {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      const normalized = isSSML(trimmed) ? normalizeSSML(trimmed) : trimmed;
+      const rate = options?.rate ?? config.rate;
+      const voice = options?.voice ?? (config.voice === AUTO_VOICE ? "alloy" : config.voice);
       if (config.backend === "openai") {
-        void speakOpenAI(text);
+        void speakOpenAI(normalized, rate, voice);
       } else {
-        speakSystem(text);
+        speakSystem(normalized, rate);
       }
     },
-    [config.backend, speakOpenAI, speakSystem],
+    [config.backend, config.rate, config.voice, speakOpenAI, speakSystem],
   );
 
   const toggle = useCallback(() => {
@@ -201,7 +284,6 @@ export function useTTS(): UseTTSResult {
     });
   }, []);
 
-  // Cleanup on unmount: release all audio resources.
   useEffect(() => {
     return () => {
       window.speechSynthesis?.cancel();
