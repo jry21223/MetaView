@@ -1,3 +1,4 @@
+SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 
 .PHONY: bootstrap bootstrap-manim setup-hooks dev-web dev-api dev start stop lint test build check docker-build docker-up docker-down
