@@ -49,11 +49,13 @@ export function quickSort(input: string[]): ReplayedStep[] {
   };
 
   const recurse = (lo: number, hi: number): void => {
-    if (lo >= hi) {
-      if (lo === hi) sortedAccum.add(lo);
+    if (lo > hi) return;
+    if (lo === hi) {
+      sortedAccum.add(lo);
       return;
     }
     const p = partition(lo, hi);
+    // partition already marked p; recurse left/right halves which will mark their own singletons
     recurse(lo, p - 1);
     recurse(p + 1, hi);
   };

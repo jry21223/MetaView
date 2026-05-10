@@ -93,12 +93,15 @@ export function BinaryTreeRenderer({
   const nodes = layout.descendants();
   const links = layout.links();
 
-  // index nodes by id for stagger ordering (BFS by depth+x already from descendants)
+  // pre-order traversal: parent appears before children, ensuring grow-from-parent timing
   const nodeIndexById = new Map<string, number>();
   nodes.forEach((n, i) => nodeIndexById.set(n.data.id, i));
 
-  // pulse cycle (0..1..0) every 30 frames for active nodes
-  const pulse = (Math.sin((elapsed / 30) * Math.PI * 2) + 1) / 2;
+  // pulse cycle (0..1..0) every 30 frames; phase-shifted so it starts at 0 to avoid initial flash
+  const pulseRaw = (Math.sin((elapsed / 30) * Math.PI * 2 - Math.PI / 2) + 1) / 2;
+  // gate by a short fade-in so the halo is invisible during the first few frames
+  const pulseGate = Math.min(1, elapsed / 15);
+  const pulse = pulseRaw * pulseGate;
 
   return (
     <div

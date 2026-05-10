@@ -1,35 +1,5 @@
-import type { AlgorithmArraySnapshot } from "../types";
 import type { ReplayedStep } from "./types";
-
-function range(lo: number, hi: number): number[] {
-  const out: number[] = [];
-  for (let i = lo; i < hi; i++) out.push(i);
-  return out;
-}
-
-function compareValues(a: string, b: string): number {
-  const na = Number(a);
-  const nb = Number(b);
-  if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
-  return a < b ? -1 : a > b ? 1 : 0;
-}
-
-function snapshot(
-  arr: string[],
-  active: number[],
-  sorted: number[],
-  swap: number[] = [],
-  pointers: Record<string, number> = {},
-): AlgorithmArraySnapshot {
-  return {
-    kind: "algorithm_array",
-    array_values: [...arr],
-    active_indices: active,
-    swap_indices: swap,
-    sorted_indices: sorted,
-    pointers,
-  };
-}
+import { compareValues, range, snapshot } from "./algorithms/_helpers";
 
 export function mergeSort(input: string[]): ReplayedStep[] {
   const arr = [...input];
@@ -42,7 +12,6 @@ export function mergeSort(input: string[]): ReplayedStep[] {
     return steps;
   }
 
-  // Initial overall divide
   steps.push({
     snapshot: snapshot(arr, range(0, n), []),
     hint: "整体划分",
@@ -52,16 +21,14 @@ export function mergeSort(input: string[]): ReplayedStep[] {
     if (hi - lo <= 1) return;
     const mid = (lo + hi) >> 1;
 
-    // Divide step
     steps.push({
-      snapshot: snapshot(arr, range(lo, hi), Array.from(sortedAccum).sort((a, b) => a - b)),
+      snapshot: snapshot(arr, range(lo, hi), Array.from(sortedAccum)),
       hint: `划分 [${lo}, ${hi})`,
     });
 
     recurse(lo, mid);
     recurse(mid, hi);
 
-    // Merge: walk two pointers, emit a snapshot per assignment
     const left = arr.slice(lo, mid);
     const right = arr.slice(mid, hi);
     let i = 0;
@@ -80,7 +47,7 @@ export function mergeSort(input: string[]): ReplayedStep[] {
         snapshot: snapshot(
           arr,
           range(lo, hi),
-          Array.from(sortedAccum).sort((a, b) => a - b),
+          Array.from(sortedAccum),
           [k],
           { i: lo + i, j: mid + j, k: k + 1 },
         ),
@@ -92,12 +59,7 @@ export function mergeSort(input: string[]): ReplayedStep[] {
       arr[k] = left[i];
       sortedAccum.add(k);
       steps.push({
-        snapshot: snapshot(
-          arr,
-          range(lo, hi),
-          Array.from(sortedAccum).sort((a, b) => a - b),
-          [k],
-        ),
+        snapshot: snapshot(arr, range(lo, hi), Array.from(sortedAccum), [k]),
         hint: `合并 [${lo}, ${hi})`,
       });
       i += 1;
@@ -107,12 +69,7 @@ export function mergeSort(input: string[]): ReplayedStep[] {
       arr[k] = right[j];
       sortedAccum.add(k);
       steps.push({
-        snapshot: snapshot(
-          arr,
-          range(lo, hi),
-          Array.from(sortedAccum).sort((a, b) => a - b),
-          [k],
-        ),
+        snapshot: snapshot(arr, range(lo, hi), Array.from(sortedAccum), [k]),
         hint: `合并 [${lo}, ${hi})`,
       });
       j += 1;
@@ -122,7 +79,6 @@ export function mergeSort(input: string[]): ReplayedStep[] {
 
   recurse(0, n);
 
-  // Final sorted state
   steps.push({
     snapshot: snapshot(arr, [], range(0, n)),
     hint: "排序完成",
