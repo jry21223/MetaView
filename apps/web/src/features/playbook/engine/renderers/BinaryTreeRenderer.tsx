@@ -1,6 +1,6 @@
-import React, { useMemo } from "react";
-import { spring } from "remotion";
-import { hierarchy, tree } from "d3-hierarchy";
+import { useMemo } from "react";
+import { interpolate, spring } from "remotion";
+import { hierarchy, tree, type HierarchyPointNode } from "d3-hierarchy";
 import type { AlgorithmTreeSnapshot } from "../types";
 import type { RendererProps } from "./types";
 
@@ -34,6 +34,8 @@ const PALETTE = {
 const SVG_W = 880;
 const SVG_H = 380;
 const NODE_R = 22;
+const NODE_STAGGER = 4;
+const EDGE_STAGGER = 3;
 
 interface TreeNode {
   id: string;
@@ -60,12 +62,12 @@ function buildTree(snap: AlgorithmTreeSnapshot): TreeNode | null {
   return nodeMap.get(roots[0].id) ?? null;
 }
 
-export const BinaryTreeRenderer: React.FC<RendererProps> = ({
+export function BinaryTreeRenderer({
   step,
   frame,
   stepStartFrame,
   theme,
-}) => {
+}: RendererProps) {
   const snap = step.snapshot as AlgorithmTreeSnapshot;
   const colors = PALETTE[theme];
   const elapsed = Math.max(0, frame - stepStartFrame);
@@ -75,8 +77,7 @@ export const BinaryTreeRenderer: React.FC<RendererProps> = ({
     if (!root) return null;
     const h = hierarchy(root);
     const t = tree<TreeNode>().size([SVG_W - 80, SVG_H - 80]);
-    const laid = t(h);
-    return laid;
+    return t(h);
   }, [snap]);
 
   const titleOpacity = spring({ frame: elapsed, fps: 30, config: { stiffness: 80, damping: 20 } });
@@ -91,6 +92,13 @@ export const BinaryTreeRenderer: React.FC<RendererProps> = ({
 
   const nodes = layout.descendants();
   const links = layout.links();
+
+  // index nodes by id for stagger ordering (BFS by depth+x already from descendants)
+  const nodeIndexById = new Map<string, number>();
+  nodes.forEach((n, i) => nodeIndexById.set(n.data.id, i));
+
+  // pulse cycle (0..1..0) every 30 frames for active nodes
+  const pulse = (Math.sin((elapsed / 30) * Math.PI * 2) + 1) / 2;
 
   return (
     <div
@@ -112,15 +120,33 @@ export const BinaryTreeRenderer: React.FC<RendererProps> = ({
       </h2>
 
       <svg width={SVG_W} height={SVG_H} viewBox={`0 0 ${SVG_W} ${SVG_H}`}>
+        <defs>
+          <filter id="bt-glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2.5" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
         <g transform="translate(40,40)">
-          {/* Edges */}
-          {links.map((link, i) => {
+          {/* Edges — stroke-dasharray draw animation, parent index controls timing */}
+          {links.map((link) => {
             const edgeId = `${link.source.data.id}-${link.target.data.id}`;
             const isPath = snap.path_edge_ids.includes(edgeId);
-            const edgeOpacity = spring({
-              frame: Math.max(0, elapsed - i * 3),
+            const targetIdx = nodeIndexById.get(link.target.data.id) ?? 0;
+            // edge appears alongside its child node
+            const drawProgress = spring({
+              frame: Math.max(0, elapsed - targetIdx * EDGE_STAGGER),
               fps: 30,
-              config: { stiffness: 100, damping: 20 },
+              config: { stiffness: 100, damping: 22 },
+            });
+            const dx = link.target.x - link.source.x;
+            const dy = link.target.y - link.source.y;
+            const length = Math.sqrt(dx * dx + dy * dy);
+            const dashOffset = interpolate(drawProgress, [0, 1], [length, 0], {
+              extrapolateRight: "clamp",
             });
             return (
               <line
@@ -130,30 +156,62 @@ export const BinaryTreeRenderer: React.FC<RendererProps> = ({
                 x2={link.target.x}
                 y2={link.target.y}
                 stroke={isPath ? colors.path : colors.edge}
-                strokeWidth={isPath ? 2.5 : 1.5}
-                opacity={edgeOpacity}
+                strokeWidth={isPath ? 3 : 1.5}
+                strokeDasharray={length}
+                strokeDashoffset={dashOffset}
+                filter={isPath ? "url(#bt-glow)" : undefined}
+                opacity={drawProgress}
               />
             );
           })}
 
-          {/* Nodes */}
-          {nodes.map((node, i) => {
+          {/* Nodes — grow from parent position with scale + position interpolation */}
+          {nodes.map((node: HierarchyPointNode<TreeNode>, i) => {
             const isActive = snap.active_node_ids.includes(node.data.id);
             const isVisited = snap.visited_node_ids.includes(node.data.id);
-            const nodeOpacity = spring({
-              frame: Math.max(0, elapsed - i * 4),
+
+            const localFrame = Math.max(0, elapsed - i * NODE_STAGGER);
+            const progress = spring({
+              frame: localFrame,
               fps: 30,
               config: { stiffness: 110, damping: 18 },
             });
+
+            const startX = node.parent ? node.parent.x : node.x;
+            const startY = node.parent ? node.parent.y : node.y;
+            const cx = interpolate(progress, [0, 1], [startX, node.x]);
+            const cy = interpolate(progress, [0, 1], [startY, node.y]);
+            const scale = node.parent ? progress : interpolate(progress, [0, 1], [0.4, 1]);
+
             let fill: string = colors.nodeFill;
             let stroke: string = colors.nodeBorder;
             let textFill: string = colors.nodeText;
-            if (isActive) { fill = `${colors.active}22`; stroke = colors.active; textFill = colors.active; }
-            else if (isVisited) { stroke = colors.visited; }
+            if (isActive) {
+              fill = `${colors.active}22`;
+              stroke = colors.active;
+              textFill = colors.active;
+            } else if (isVisited) {
+              stroke = colors.visited;
+            }
 
             return (
-              <g key={node.data.id} transform={`translate(${node.x},${node.y})`} opacity={nodeOpacity}>
-                <circle r={NODE_R} fill={fill} stroke={stroke} strokeWidth={1.5} />
+              <g key={node.data.id} transform={`translate(${cx},${cy}) scale(${scale})`} opacity={progress}>
+                {isActive && (
+                  <circle
+                    r={NODE_R + 6 + pulse * 6}
+                    fill="none"
+                    stroke={colors.active}
+                    strokeWidth={2}
+                    opacity={0.5 - pulse * 0.35}
+                  />
+                )}
+                <circle
+                  r={NODE_R}
+                  fill={fill}
+                  stroke={stroke}
+                  strokeWidth={isActive ? 2 : 1.5}
+                  filter={isActive ? "url(#bt-glow)" : undefined}
+                />
                 <text
                   textAnchor="middle"
                   dominantBaseline="central"
@@ -184,4 +242,4 @@ export const BinaryTreeRenderer: React.FC<RendererProps> = ({
       </p>
     </div>
   );
-};
+}
