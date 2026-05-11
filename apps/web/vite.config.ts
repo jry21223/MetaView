@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
@@ -10,5 +11,10 @@ export default defineConfig({
       "/health": "http://127.0.0.1:8000",
       "/media": "http://127.0.0.1:8000",
     },
+  },
+  test: {
+    environment: "happy-dom",
+    globals: false,
+    include: ["src/**/*.test.{ts,tsx}"],
   },
 });

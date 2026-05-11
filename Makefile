@@ -32,6 +32,7 @@ lint:
 
 test:
 	.venv/bin/pytest apps/api/tests -q
+	npm --workspace apps/web run test
 
 build:
 	npm --workspace apps/web run build
