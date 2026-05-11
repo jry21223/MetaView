@@ -1,9 +1,8 @@
 import React from "react";
 import { useCurrentFrame } from "remotion";
 import type { PlaybookScript } from "../types";
-import { AlgorithmRenderer } from "../renderers/AlgorithmRenderer";
-import { BinaryTreeRenderer } from "../renderers/BinaryTreeRenderer";
 import { CodeHighlightRenderer } from "../renderers/CodeHighlightRenderer";
+import { rendererRegistry } from "../renderers/registry";
 import { useStepProgress } from "./useInterpolatedState";
 import type { RendererProps } from "../renderers/types";
 import { PLAYBOOK_LAYOUT } from "../../../../shared/config/constants";
@@ -16,27 +15,25 @@ interface PlaybookCompositionProps {
 }
 
 function SnapshotRenderer(props: RendererProps) {
-  switch (props.step.snapshot.kind) {
-    case "algorithm_array": return <AlgorithmRenderer {...props} />;
-    case "algorithm_tree": return <BinaryTreeRenderer {...props} />;
-    default: return (
-      <div
-        style={{
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: props.theme === "dark" ? "#0a0c10" : "#f5f7fa",
-          color: props.theme === "dark" ? "#e8ecf4" : "#141820",
-          fontFamily: "system-ui, sans-serif",
-          fontSize: 18,
-        }}
-      >
-        Unknown snapshot kind
-      </div>
-    );
-  }
+  const renderer = rendererRegistry.get(props.step.snapshot.kind);
+  if (renderer) return React.createElement(renderer, props);
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: props.theme === "dark" ? "#0a0c10" : "#f5f7fa",
+        color: props.theme === "dark" ? "#e8ecf4" : "#141820",
+        fontFamily: "system-ui, sans-serif",
+        fontSize: 18,
+      }}
+    >
+      Unknown snapshot kind
+    </div>
+  );
 }
 
 export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({

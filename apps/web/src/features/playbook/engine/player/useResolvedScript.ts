@@ -1,5 +1,10 @@
 import { useMemo } from "react";
-import type { AlgorithmArraySnapshot, MetaStep, PlaybookScript } from "../types";
+import type {
+  AlgorithmArraySnapshot,
+  AlgorithmBarsSnapshot,
+  MetaStep,
+  PlaybookScript,
+} from "../types";
 import { getReplay } from "../replay/registry";
 import type { ReplayedStep } from "../replay/types";
 
@@ -43,17 +48,28 @@ export function useResolvedScript(base: PlaybookScript, overrides: ScriptOverrid
 
     const newSteps: MetaStep[] = base.steps.map((step, i) => {
       const r = pickReplayed(replayed, i, base.steps.length);
-      // Only override array snapshots; preserve tree/other kinds untouched.
-      if (step.snapshot.kind !== "algorithm_array") return step;
-      const newSnapshot: AlgorithmArraySnapshot = {
-        ...step.snapshot,
+      const baseSnap = step.snapshot;
+      const common = {
         array_values: r.snapshot.array_values,
         active_indices: r.snapshot.active_indices,
         swap_indices: r.snapshot.swap_indices,
         sorted_indices: r.snapshot.sorted_indices,
         pointers: r.snapshot.pointers,
       };
-      return { ...step, snapshot: newSnapshot };
+      if (baseSnap.kind === "algorithm_array") {
+        const newSnapshot: AlgorithmArraySnapshot = { ...baseSnap, ...common };
+        return { ...step, snapshot: newSnapshot };
+      }
+      if (baseSnap.kind === "algorithm_bars") {
+        const numeric_values =
+          r.snapshot.kind === "algorithm_bars"
+            ? r.snapshot.numeric_values
+            : r.snapshot.array_values.map(Number);
+        const newSnapshot: AlgorithmBarsSnapshot = { ...baseSnap, ...common, numeric_values };
+        return { ...step, snapshot: newSnapshot };
+      }
+      // Preserve tree/other kinds untouched.
+      return step;
     });
 
     return {

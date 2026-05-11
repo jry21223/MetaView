@@ -13,6 +13,7 @@ from app.domain.models.cir import (
 )
 from app.domain.models.playbook import (
     AlgorithmArraySnapshot,
+    AlgorithmBarsSnapshot,
     AlgorithmTreeSnapshot,
     CodeHighlightOverlay,
     MetaStep,
@@ -156,11 +157,18 @@ def _step_duration_frames(
     return _DEFAULT_STEP_FRAMES
 
 
+def _try_parse_number(value: str) -> float | None:
+    try:
+        return float(value.strip())
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
 def _build_snapshot(
     cir_step: CirStep,
     checkpoint: ExecutionCheckpoint | None,
     execution_map: ExecutionMap | None,
-) -> AlgorithmArraySnapshot | AlgorithmTreeSnapshot:
+) -> AlgorithmArraySnapshot | AlgorithmBarsSnapshot | AlgorithmTreeSnapshot:
     if cir_step.visual_kind == VisualKind.GRAPH:
         return _build_tree_snapshot(cir_step, checkpoint)
     # ARRAY, FLOW, TEXT, FORMULA, MOTION, CIRCUIT, MOLECULE, MAP, CELL all fall through to array
@@ -171,7 +179,7 @@ def _build_array_snapshot(
     cir_step: CirStep,
     checkpoint: ExecutionCheckpoint | None,
     execution_map: ExecutionMap | None,
-) -> AlgorithmArraySnapshot:
+) -> AlgorithmArraySnapshot | AlgorithmBarsSnapshot:
     # Prefer array_track values when available
     array_values: list[str] = []
     if execution_map and execution_map.array_track:
@@ -201,6 +209,18 @@ def _build_array_snapshot(
             m = re.match(r"^(?:ptr|idx|pointer|index)_?(.+)$", t.id, re.IGNORECASE)
             if m and t.value and t.value.isdigit():
                 pointers[m.group(1)] = int(t.value)
+
+    # When every element is numeric, render as height-encoded bar blocks (issue #31).
+    parsed = [_try_parse_number(v) for v in array_values]
+    if array_values and all(n is not None for n in parsed):
+        return AlgorithmBarsSnapshot(
+            array_values=array_values,
+            numeric_values=[n for n in parsed if n is not None],
+            active_indices=active_indices,
+            swap_indices=swap_indices,
+            sorted_indices=sorted_indices,
+            pointers=pointers,
+        )
 
     return AlgorithmArraySnapshot(
         array_values=array_values,

@@ -18,6 +18,7 @@ from app.domain.models.pipeline_run import (
 )
 from app.domain.models.playbook import (
     AlgorithmArraySnapshot,
+    AlgorithmBarsSnapshot,
     AlgorithmTreeSnapshot,
     AnySnapshot,
     MetaStep,
@@ -32,6 +33,6 @@ __all__ = [
     "TopicDomain", "VisualKind",
     "PipelineRunStatus", "SandboxMode", "SandboxStatus", "UITheme",
     "ValidationSeverity", "ValidationStatus",
-    "PlaybookScript", "MetaStep", "AlgorithmArraySnapshot", "AlgorithmTreeSnapshot",
-    "AnySnapshot", "SnapshotKind",
+    "PlaybookScript", "MetaStep", "AlgorithmArraySnapshot", "AlgorithmBarsSnapshot",
+    "AlgorithmTreeSnapshot", "AnySnapshot", "SnapshotKind",
 ]

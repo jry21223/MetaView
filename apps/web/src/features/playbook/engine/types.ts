@@ -1,10 +1,23 @@
 import type { ExecutionParameterControl } from "../../../entities/cir/types";
 
-export type SnapshotKind = "algorithm_array" | "algorithm_tree";
+export type SnapshotKind = "algorithm_array" | "algorithm_bars" | "algorithm_tree";
 
 export interface AlgorithmArraySnapshot {
   kind: "algorithm_array";
   array_values: string[];
+  active_indices: number[];
+  swap_indices: number[];
+  sorted_indices: number[];
+  pointers: Record<string, number>;
+}
+
+/** Array elements drawn as height-encoded rectangular bars (bar block view). */
+export interface AlgorithmBarsSnapshot {
+  kind: "algorithm_bars";
+  /** Display labels shown on each bar. */
+  array_values: string[];
+  /** Parsed magnitudes driving each bar's height. */
+  numeric_values: number[];
   active_indices: number[];
   swap_indices: number[];
   sorted_indices: number[];
@@ -20,7 +33,10 @@ export interface AlgorithmTreeSnapshot {
   path_edge_ids: string[];
 }
 
-export type AnySnapshot = AlgorithmArraySnapshot | AlgorithmTreeSnapshot;
+export type AnySnapshot =
+  | AlgorithmArraySnapshot
+  | AlgorithmBarsSnapshot
+  | AlgorithmTreeSnapshot;
 
 export interface CodeHighlightOverlay {
   language: string;

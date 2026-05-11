@@ -7,7 +7,11 @@ from app.domain.models.cir import (
     ExecutionMap,
     VisualToken,
 )
-from app.domain.models.playbook import AlgorithmArraySnapshot, AlgorithmTreeSnapshot
+from app.domain.models.playbook import (
+    AlgorithmArraySnapshot,
+    AlgorithmBarsSnapshot,
+    AlgorithmTreeSnapshot,
+)
 from app.domain.models.topic import TopicDomain, VisualKind
 from app.domain.services.playbook_builder import _parse_narration_template, build_playbook
 
@@ -137,13 +141,40 @@ class TestBuildPlaybook:
 
         assert playbook.total_frames == playbook.steps[-1].end_frame
 
-    def test_array_snapshot_type(self):
+    def test_numeric_array_renders_as_bars(self):
         cir = _make_array_cir()
         playbook = build_playbook(cir, execution_map=None)
 
         for step in playbook.steps:
-            assert isinstance(step.snapshot, AlgorithmArraySnapshot)
-            assert step.snapshot.kind == "algorithm_array"
+            assert isinstance(step.snapshot, AlgorithmBarsSnapshot)
+            assert step.snapshot.kind == "algorithm_bars"
+
+        first = playbook.steps[0].snapshot
+        assert isinstance(first, AlgorithmBarsSnapshot)
+        assert first.numeric_values == [5.0, 3.0, 1.0, 4.0, 2.0]
+
+    def test_non_numeric_array_stays_as_cells(self):
+        cir = CirDocument(
+            title="字符串数组",
+            domain=TopicDomain.ALGORITHM,
+            summary="非数值元素",
+            steps=[
+                CirStep(
+                    id="s1",
+                    title="初始",
+                    narration="字符串数组",
+                    visual_kind=VisualKind.ARRAY,
+                    tokens=[
+                        VisualToken(id="t0", label="apple"),
+                        VisualToken(id="t1", label="banana"),
+                    ],
+                )
+            ],
+        )
+        playbook = build_playbook(cir, execution_map=None)
+        snap = playbook.steps[0].snapshot
+        assert isinstance(snap, AlgorithmArraySnapshot)
+        assert snap.kind == "algorithm_array"
 
     def test_array_values_from_tokens(self):
         cir = _make_array_cir()
@@ -156,7 +187,7 @@ class TestBuildPlaybook:
         playbook = build_playbook(cir, execution_map=None)
 
         final_snap = playbook.steps[2].snapshot
-        assert isinstance(final_snap, AlgorithmArraySnapshot)
+        assert isinstance(final_snap, AlgorithmBarsSnapshot)
         assert sorted(final_snap.sorted_indices) == [0, 1, 2, 3, 4]
 
     def test_execution_map_timing_used(self):
@@ -175,7 +206,7 @@ class TestBuildPlaybook:
         playbook = build_playbook(cir, execution_map=em)
 
         step2 = playbook.steps[1]
-        assert isinstance(step2.snapshot, AlgorithmArraySnapshot)
+        assert isinstance(step2.snapshot, AlgorithmBarsSnapshot)
         assert step2.snapshot.active_indices == [0, 1]
 
     def test_execution_map_array_track_values(self):
@@ -185,7 +216,7 @@ class TestBuildPlaybook:
 
         # array_track values should override token labels
         for step in playbook.steps:
-            assert isinstance(step.snapshot, AlgorithmArraySnapshot)
+            assert isinstance(step.snapshot, AlgorithmBarsSnapshot)
             assert step.snapshot.array_values == ["5", "3", "1", "4", "2"]
 
     def test_tree_snapshot_type(self):

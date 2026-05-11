@@ -11,12 +11,29 @@ from app.domain.models.topic import TopicDomain
 
 class SnapshotKind(str, Enum):
     ALGORITHM_ARRAY = "algorithm_array"
+    ALGORITHM_BARS = "algorithm_bars"
     ALGORITHM_TREE = "algorithm_tree"
 
 
 class AlgorithmArraySnapshot(BaseModel):
     kind: Literal["algorithm_array"] = "algorithm_array"
     array_values: list[str] = Field(default_factory=list)
+    active_indices: list[int] = Field(default_factory=list)
+    swap_indices: list[int] = Field(default_factory=list)
+    sorted_indices: list[int] = Field(default_factory=list)
+    pointers: dict[str, int] = Field(default_factory=dict)
+
+
+class AlgorithmBarsSnapshot(BaseModel):
+    """Array elements drawn as height-encoded rectangular bars (bar block view).
+
+    ``array_values`` carries the display labels; ``numeric_values`` carries the
+    parsed magnitudes that drive each bar's height.
+    """
+
+    kind: Literal["algorithm_bars"] = "algorithm_bars"
+    array_values: list[str] = Field(default_factory=list)
+    numeric_values: list[float] = Field(default_factory=list)
     active_indices: list[int] = Field(default_factory=list)
     swap_indices: list[int] = Field(default_factory=list)
     sorted_indices: list[int] = Field(default_factory=list)
@@ -33,7 +50,7 @@ class AlgorithmTreeSnapshot(BaseModel):
 
 
 AnySnapshot = Annotated[
-    Union[AlgorithmArraySnapshot, AlgorithmTreeSnapshot],
+    Union[AlgorithmArraySnapshot, AlgorithmBarsSnapshot, AlgorithmTreeSnapshot],
     Field(discriminator="kind"),
 ]
 

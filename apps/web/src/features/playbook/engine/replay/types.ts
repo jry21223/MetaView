@@ -1,7 +1,7 @@
-import type { AlgorithmArraySnapshot } from "../types";
+import type { AlgorithmArraySnapshot, AlgorithmBarsSnapshot } from "../types";
 
 export interface ReplayedStep {
-  snapshot: AlgorithmArraySnapshot;
+  snapshot: AlgorithmArraySnapshot | AlgorithmBarsSnapshot;
   hint?: string;
 }
 
