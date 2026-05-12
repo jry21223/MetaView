@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isSSML, normalizeSSML } from "./ssml";
+import { sharedTTSCache, ttsCacheKey, type TTSCacheStats } from "./ttsCache";
 
 export interface TTSConfig {
   enabled: boolean;
@@ -79,36 +80,6 @@ function saveConfig(cfg: TTSConfig): void {
   }
 }
 
-// ── In-memory LRU cache for OpenAI TTS audio ────────────────────────────────
-// Keyed by `${baseUrl}|${model}|${voice}|${rate}|${text}`. Bounded to 50 entries
-// to avoid unbounded memory growth on long sessions.
-const TTS_CACHE_MAX = 50;
-const ttsAudioCache = new Map<string, ArrayBuffer>();
-
-function cacheKey(baseUrl: string, model: string, voice: string, rate: number, text: string): string {
-  return `${baseUrl}|${model}|${voice}|${rate.toFixed(2)}|${text}`;
-}
-
-function cacheGet(key: string): ArrayBuffer | undefined {
-  const buf = ttsAudioCache.get(key);
-  if (buf) {
-    // re-insert to mark as recently used
-    ttsAudioCache.delete(key);
-    ttsAudioCache.set(key, buf);
-  }
-  return buf;
-}
-
-function cacheSet(key: string, buf: ArrayBuffer): void {
-  if (ttsAudioCache.has(key)) ttsAudioCache.delete(key);
-  ttsAudioCache.set(key, buf);
-  while (ttsAudioCache.size > TTS_CACHE_MAX) {
-    const oldest = ttsAudioCache.keys().next().value;
-    if (oldest === undefined) break;
-    ttsAudioCache.delete(oldest);
-  }
-}
-
 export interface UseTTSResult {
   enabled: boolean;
   toggle: () => void;
@@ -118,6 +89,10 @@ export interface UseTTSResult {
   supported: boolean;
   config: TTSConfig;
   updateConfig: (patch: Partial<TTSConfig>) => void;
+  /** Read current cache stats (hit/miss counts, byte usage). Useful for debugging. */
+  cacheStats: () => TTSCacheStats;
+  /** Manually clear the shared TTS audio cache. */
+  clearCache: () => void;
 }
 
 export function useTTS(): UseTTSResult {
@@ -206,12 +181,20 @@ export function useTTS(): UseTTSResult {
       audioSrcRef.current = null;
       setSpeaking(true);
 
-      const key = cacheKey(config.baseUrl, config.model, voice, rate, text);
-      const cached = cacheGet(key);
+      const key = ttsCacheKey({
+        baseUrl: config.baseUrl,
+        model: config.model,
+        voice,
+        rate,
+        text,
+      });
+      const cached = sharedTTSCache.get(key);
       if (cached) {
         try {
           await playArrayBuffer(cached, ac.signal);
         } catch {
+          // Likely a corrupted entry — drop it so the next call refetches.
+          sharedTTSCache.delete(key);
           setSpeaking(false);
         }
         return;
@@ -232,7 +215,7 @@ export function useTTS(): UseTTSResult {
 
         const buf = await res.arrayBuffer();
         if (ac.signal.aborted) return;
-        cacheSet(key, buf);
+        sharedTTSCache.set(key, buf);
         await playArrayBuffer(buf, ac.signal);
       } catch (err) {
         if ((err as DOMException).name === "AbortError") return;
@@ -301,5 +284,19 @@ export function useTTS(): UseTTSResult {
     };
   }, []);
 
-  return { enabled: config.enabled, toggle, speaking, speak, stop, supported, config, updateConfig };
+  const cacheStats = useCallback(() => sharedTTSCache.stats(), []);
+  const clearCache = useCallback(() => sharedTTSCache.clear(), []);
+
+  return {
+    enabled: config.enabled,
+    toggle,
+    speaking,
+    speak,
+    stop,
+    supported,
+    config,
+    updateConfig,
+    cacheStats,
+    clearCache,
+  };
 }
