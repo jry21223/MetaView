@@ -56,9 +56,14 @@ export function useResolvedScript(base: PlaybookScript, overrides: ScriptOverrid
         sorted_indices: r.snapshot.sorted_indices,
         pointers: r.snapshot.pointers,
       };
+      const overrides: Partial<MetaStep> = {};
+      if (r.tts_rate != null) overrides.tts_rate = r.tts_rate;
+      if (r.codeHighlight != null) overrides.code_highlight = r.codeHighlight;
+      if (r.narrationTemplate != null) overrides.narration_template = r.narrationTemplate;
+
       if (baseSnap.kind === "algorithm_array") {
         const newSnapshot: AlgorithmArraySnapshot = { ...baseSnap, ...common };
-        return { ...step, snapshot: newSnapshot };
+        return { ...step, ...overrides, snapshot: newSnapshot };
       }
       if (baseSnap.kind === "algorithm_bars") {
         const numeric_values =
@@ -66,7 +71,7 @@ export function useResolvedScript(base: PlaybookScript, overrides: ScriptOverrid
             ? r.snapshot.numeric_values
             : r.snapshot.array_values.map(Number);
         const newSnapshot: AlgorithmBarsSnapshot = { ...baseSnap, ...common, numeric_values };
-        return { ...step, snapshot: newSnapshot };
+        return { ...step, ...overrides, snapshot: newSnapshot };
       }
       // Preserve tree/other kinds untouched.
       return step;

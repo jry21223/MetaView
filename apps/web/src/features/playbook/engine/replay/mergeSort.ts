@@ -1,11 +1,11 @@
 import type { ReplayedStep } from "./types";
-import { compareValues, range, snapshot } from "./algorithms/_helpers";
+import { addSortedIndex, compareValues, range, snapshot } from "./algorithms/_helpers";
 
 export function mergeSort(input: string[]): ReplayedStep[] {
   const arr = [...input];
   const n = arr.length;
   const steps: ReplayedStep[] = [];
-  const sortedAccum = new Set<number>();
+  const sortedAccum: number[] = [];
 
   if (n <= 1) {
     steps.push({ snapshot: snapshot(arr, [], range(0, n)), hint: "已有序" });
@@ -22,7 +22,7 @@ export function mergeSort(input: string[]): ReplayedStep[] {
     const mid = (lo + hi) >> 1;
 
     steps.push({
-      snapshot: snapshot(arr, range(lo, hi), Array.from(sortedAccum)),
+      snapshot: snapshot(arr, range(lo, hi), [...sortedAccum]),
       hint: `划分 [${lo}, ${hi})`,
     });
 
@@ -42,12 +42,12 @@ export function mergeSort(input: string[]): ReplayedStep[] {
         arr[k] = right[j];
         j += 1;
       }
-      sortedAccum.add(k);
+      addSortedIndex(sortedAccum, k);
       steps.push({
         snapshot: snapshot(
           arr,
           range(lo, hi),
-          Array.from(sortedAccum),
+          [...sortedAccum],
           [k],
           { i: lo + i, j: mid + j, k: k + 1 },
         ),
@@ -57,9 +57,9 @@ export function mergeSort(input: string[]): ReplayedStep[] {
     }
     while (i < left.length) {
       arr[k] = left[i];
-      sortedAccum.add(k);
+      addSortedIndex(sortedAccum, k);
       steps.push({
-        snapshot: snapshot(arr, range(lo, hi), Array.from(sortedAccum), [k]),
+        snapshot: snapshot(arr, range(lo, hi), [...sortedAccum], [k]),
         hint: `合并 [${lo}, ${hi})`,
       });
       i += 1;
@@ -67,9 +67,9 @@ export function mergeSort(input: string[]): ReplayedStep[] {
     }
     while (j < right.length) {
       arr[k] = right[j];
-      sortedAccum.add(k);
+      addSortedIndex(sortedAccum, k);
       steps.push({
-        snapshot: snapshot(arr, range(lo, hi), Array.from(sortedAccum), [k]),
+        snapshot: snapshot(arr, range(lo, hi), [...sortedAccum], [k]),
         hint: `合并 [${lo}, ${hi})`,
       });
       j += 1;

@@ -1,5 +1,26 @@
 import type { AlgorithmArraySnapshot, AlgorithmBarsSnapshot } from "../../types";
 
+/**
+ * Insert `idx` into `sorted` keeping the array in ascending order (no duplicates).
+ * Mutates and returns `sorted` for ergonomic call-site chaining inside replay loops.
+ *
+ * Why: replay algorithms must emit `sorted_indices` in a deterministic ascending
+ * order. Using `Set<number>` and relying on insertion order is a latent bug — see
+ * issue #35. Callers should hold a `number[]` and use this helper.
+ */
+export function addSortedIndex(sorted: number[], idx: number): number[] {
+  let lo = 0;
+  let hi = sorted.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (sorted[mid] < idx) lo = mid + 1;
+    else hi = mid;
+  }
+  if (sorted[lo] === idx) return sorted;
+  sorted.splice(lo, 0, idx);
+  return sorted;
+}
+
 export function range(lo: number, hi: number): number[] {
   const out: number[] = [];
   for (let i = lo; i < hi; i++) out.push(i);

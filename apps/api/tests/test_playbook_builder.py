@@ -301,6 +301,266 @@ class TestCodeHighlightOverlay:
             assert step.code_highlight is None
 
 
+class TestEdgeCases:
+    """Edge cases for build_playbook (issue #36).
+
+    Covers branches that the happy-path tests above don't exercise.
+    """
+
+    def test_empty_cir_produces_empty_playbook(self):
+        cir = CirDocument(
+            title="空教学",
+            domain=TopicDomain.ALGORITHM,
+            summary="",
+            steps=[],
+        )
+        playbook = build_playbook(cir, execution_map=None)
+
+        assert playbook.steps == []
+        # Avoid div-by-zero / negative durations downstream
+        assert playbook.total_frames >= 1
+        assert playbook.fps == 30
+
+    def test_missing_execution_map_uses_default_duration(self):
+        cir = _make_array_cir()
+        playbook = build_playbook(cir, execution_map=None)
+
+        # Default _DEFAULT_STEP_FRAMES = 60 (2 s @ 30 fps)
+        assert playbook.steps[0].end_frame == 60
+        assert playbook.steps[1].end_frame == 120
+        assert playbook.steps[2].end_frame == 180
+        assert playbook.parameter_controls == []
+        assert playbook.initial_data == {}
+
+    def test_zero_duration_checkpoint_falls_back_to_default(self):
+        cir = _make_array_cir()
+        em = _make_execution_map(cir)
+        # Collapse the first checkpoint to zero duration
+        em.checkpoints[0].start_s = 0.0
+        em.checkpoints[0].end_s = 0.0
+        playbook = build_playbook(cir, execution_map=em)
+
+        # Zero-duration falls back to _DEFAULT_STEP_FRAMES (60), not 0
+        assert playbook.steps[0].end_frame == 60
+
+    def test_negative_duration_checkpoint_falls_back(self):
+        cir = _make_array_cir()
+        em = _make_execution_map(cir)
+        em.checkpoints[0].start_s = 5.0
+        em.checkpoints[0].end_s = 1.0  # negative span
+        playbook = build_playbook(cir, execution_map=em)
+
+        # Should not produce 0 or negative frame count
+        assert playbook.steps[0].end_frame >= 1
+
+    def test_user_source_overrides_library(self):
+        cir = _make_array_cir()  # title triggers bubble_sort library
+        em = _make_execution_map(cir)
+        em.checkpoints[0].code_lines = [0]
+        playbook = build_playbook(
+            cir,
+            execution_map=em,
+            source_code="custom_line_one\ncustom_line_two",
+            source_language="rust",
+        )
+        overlay = playbook.steps[0].code_highlight
+        assert overlay is not None
+        assert overlay.language == "rust"
+        assert overlay.lines == ["custom_line_one", "custom_line_two"]
+
+    def test_library_source_used_when_no_user_source(self):
+        cir = _make_array_cir()
+        em = _make_execution_map(cir)
+        em.checkpoints[0].code_lines = [0]
+        playbook = build_playbook(cir, execution_map=em)
+
+        overlay = playbook.steps[0].code_highlight
+        assert overlay is not None
+        # Library should win since title matches bubble_sort and no user source supplied
+        assert len(overlay.lines) > 0
+        # algorithm_id propagates back to script
+        assert playbook.algorithm_id == "bubble_sort"
+
+    def test_execution_map_algorithm_code_used_when_no_library_match(self):
+        cir = _make_array_cir()
+        cir.title = "未知教学题目-不匹配任何关键字"  # avoid library match
+        em = _make_execution_map(cir)
+        em.checkpoints[0].code_lines = [0]
+        em.algorithm_code = ["llm_generated_line_1", "llm_generated_line_2"]
+        playbook = build_playbook(cir, execution_map=em)
+
+        overlay = playbook.steps[0].code_highlight
+        assert overlay is not None
+        assert overlay.lines == ["llm_generated_line_1", "llm_generated_line_2"]
+        # Falls back to "pseudocode" because algorithm_language is opportunistic
+        assert overlay.language == "pseudocode"
+
+    def test_out_of_range_code_lines_filtered(self):
+        cir = _make_array_cir()
+        em = _make_execution_map(cir)
+        # source has 2 lines; checkpoint claims line 99 (LLM hallucination)
+        em.checkpoints[0].code_lines = [99, 100]
+        playbook = build_playbook(
+            cir,
+            execution_map=em,
+            source_code="line0\nline1",
+            source_language="python",
+        )
+        # All hallucinated lines filtered out → no overlay
+        assert playbook.steps[0].code_highlight is None
+
+    def test_out_of_range_mixed_with_valid_keeps_valid(self):
+        cir = _make_array_cir()
+        em = _make_execution_map(cir)
+        em.checkpoints[0].code_lines = [0, 99, 1]  # 99 out of range
+        playbook = build_playbook(
+            cir,
+            execution_map=em,
+            source_code="line0\nline1",
+            source_language="python",
+        )
+        overlay = playbook.steps[0].code_highlight
+        assert overlay is not None
+        assert overlay.active_lines == [0, 1]
+        assert overlay.active_line == 0
+
+    def test_negative_code_lines_filtered(self):
+        cir = _make_array_cir()
+        em = _make_execution_map(cir)
+        em.checkpoints[0].code_lines = [-1, -5]
+        playbook = build_playbook(
+            cir,
+            execution_map=em,
+            source_code="line0\nline1",
+            source_language="python",
+        )
+        assert playbook.steps[0].code_highlight is None
+
+    def test_algorithm_id_inference_fallback_unmatched(self):
+        cir = CirDocument(
+            title="某种无人知道的算法 zzzzz",
+            domain=TopicDomain.ALGORITHM,
+            summary="",
+            steps=[
+                CirStep(
+                    id="s1",
+                    title="t",
+                    narration="n",
+                    visual_kind=VisualKind.ARRAY,
+                    tokens=[VisualToken(id="t0", label="1")],
+                )
+            ],
+        )
+        playbook = build_playbook(cir, execution_map=None)
+        assert playbook.algorithm_id is None
+
+    def test_explicit_execution_map_algorithm_id_wins(self):
+        cir = _make_array_cir()  # title would otherwise match bubble_sort
+        em = _make_execution_map(cir)
+        em.algorithm_id = "quick_sort"
+        playbook = build_playbook(cir, execution_map=em)
+        assert playbook.algorithm_id == "quick_sort"
+
+    def test_edgeless_tree_produces_no_edges(self):
+        cir = CirDocument(
+            title="孤立节点",
+            domain=TopicDomain.ALGORITHM,
+            summary="",
+            steps=[
+                CirStep(
+                    id="s1",
+                    title="t",
+                    narration="n",
+                    visual_kind=VisualKind.GRAPH,
+                    tokens=[
+                        VisualToken(id="a", label="A"),
+                        VisualToken(id="b", label="B"),
+                        VisualToken(id="c", label="C"),
+                    ],
+                )
+            ],
+        )
+        playbook = build_playbook(cir, execution_map=None)
+        snap = playbook.steps[0].snapshot
+        assert isinstance(snap, AlgorithmTreeSnapshot)
+        assert len(snap.nodes) == 3
+        assert snap.edges == []
+
+    def test_explicit_edges_override_heuristic(self):
+        from app.domain.models.cir import EdgeRef as CirEdge
+        cir = CirDocument(
+            title="explicit-edge",
+            domain=TopicDomain.ALGORITHM,
+            summary="",
+            steps=[
+                CirStep(
+                    id="s1",
+                    title="t",
+                    narration="n",
+                    visual_kind=VisualKind.GRAPH,
+                    tokens=[
+                        VisualToken(id="a", label="A"),
+                        VisualToken(id="b", label="B", value="parent:a"),
+                    ],
+                    edges=[CirEdge(from_id="a", to_id="b")],
+                )
+            ],
+        )
+        playbook = build_playbook(cir, execution_map=None)
+        snap = playbook.steps[0].snapshot
+        assert isinstance(snap, AlgorithmTreeSnapshot)
+        # Even though token has parent: hint, explicit edge list is preferred & deduplicated
+        assert len(snap.edges) == 1
+        assert snap.edges[0]["from_id"] == "a"
+
+    def test_swap_inference_only_when_title_signals_swap(self):
+        cir = _make_array_cir()
+        em = _make_execution_map(cir)
+        # Step 1 has 2 active indices but title is "第一次比较" → no swap
+        em.checkpoints[1].title = "第一次比较"
+        playbook = build_playbook(cir, execution_map=em)
+        snap = playbook.steps[1].snapshot
+        assert isinstance(snap, AlgorithmBarsSnapshot)
+        assert snap.swap_indices == []
+
+        # Same setup but title contains "swap" → swap_indices populated
+        em.checkpoints[1].title = "swap A[0] and A[1]"
+        playbook2 = build_playbook(cir, execution_map=em)
+        snap2 = playbook2.steps[1].snapshot
+        assert isinstance(snap2, AlgorithmBarsSnapshot)
+        assert snap2.swap_indices == [0, 1]
+
+    def test_explicit_swap_indices_used_directly(self):
+        cir = _make_array_cir()
+        em = _make_execution_map(cir)
+        em.checkpoints[1].swap_indices = [2, 3]
+        em.checkpoints[1].title = "neutral title"  # no swap keyword
+        playbook = build_playbook(cir, execution_map=em)
+        snap = playbook.steps[1].snapshot
+        assert isinstance(snap, AlgorithmBarsSnapshot)
+        assert snap.swap_indices == [2, 3]
+
+    def test_single_step_animation_hint_is_reveal_not_enter(self):
+        # When total == 1, the loop hits both `index == 0` and `index == total - 1`.
+        # The first branch returns "enter" — verify the documented contract.
+        cir = CirDocument(
+            title="单步",
+            domain=TopicDomain.ALGORITHM,
+            summary="",
+            steps=[
+                CirStep(
+                    id="only",
+                    title="x",
+                    narration="y",
+                    visual_kind=VisualKind.ARRAY,
+                    tokens=[VisualToken(id="t0", label="1")],
+                )
+            ],
+        )
+        playbook = build_playbook(cir, execution_map=None)
+        assert playbook.steps[0].animation_hint == "enter"
+
+
 class TestParseNarrationTemplate:
     def test_json_array_parsed(self):
         raw = '["Compare ", {"t": "t0"}, " and ", {"t": "t1"}]'

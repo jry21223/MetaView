@@ -68,6 +68,16 @@ describe.each(ALGORITHMS)("%s replay", (name, sort) => {
     }
   });
 
+  it.each(CASES)("sorted_indices is always ascending — %s (#35)", (_label, input) => {
+    const steps = sort([...input]);
+    for (const step of steps) {
+      const idxs = step.snapshot.sorted_indices;
+      for (let i = 1; i < idxs.length; i++) {
+        expect(idxs[i]).toBeGreaterThan(idxs[i - 1]);
+      }
+    }
+  });
+
   it(`${name}: does not mutate the caller's input array`, () => {
     const input = ["3", "1", "2"];
     const snapshot = [...input];

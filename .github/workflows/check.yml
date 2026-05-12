@@ -2,9 +2,13 @@ name: Check
 
 on:
   push:
-    branches: ["main", "dev"]
+    branches: ["main", "dev", "feat/**", "fix/**", "claude/**"]
   pull_request:
     branches: ["main"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:

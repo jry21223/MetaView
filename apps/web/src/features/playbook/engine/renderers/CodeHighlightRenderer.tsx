@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { CodeHighlightOverlay } from "../types";
-import { tokenize, type TokenKind } from "./codeTokenizer";
+import { tokenizeLines, type TokenKind } from "./codeTokenizer";
 
 interface CodeHighlightRendererProps {
   overlay: CodeHighlightOverlay;
@@ -116,11 +116,16 @@ export const CodeHighlightRenderer: React.FC<CodeHighlightRendererProps> = ({
 
       {/* Code lines */}
       <div style={{ flex: 1, overflowY: "auto", overflowX: "auto" }}>
-        {overlay.lines.map((line, i) => {
-          const isActive = activeSet.has(i);
-          const isAnchor = i === overlay.active_line;
-          const showLabel = isAnchor && !!overlay.operation_label;
-          const tokens = tokenize(line || " ", overlay.language);
+        {(() => {
+          const allTokens = tokenizeLines(
+            overlay.lines.map((l) => l || " "),
+            overlay.language,
+          );
+          return overlay.lines.map((line, i) => {
+            const isActive = activeSet.has(i);
+            const isAnchor = i === overlay.active_line;
+            const showLabel = isAnchor && !!overlay.operation_label;
+            const tokens = allTokens[i];
 
           return (
             <div
@@ -190,7 +195,8 @@ export const CodeHighlightRenderer: React.FC<CodeHighlightRendererProps> = ({
               </pre>
             </div>
           );
-        })}
+          });
+        })()}
       </div>
 
       {/* Variable watch panel */}

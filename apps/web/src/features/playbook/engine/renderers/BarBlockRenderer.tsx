@@ -5,44 +5,62 @@ import type { RendererProps } from "./types";
 import { selectMotion, swapMotion, writeMotion } from "./animationTemplates";
 import { buildPrevIndexMap } from "./prevIndexMap";
 
-const PALETTE = {
+/**
+ * Theme-reactive palette built on the app's CSS variables (see
+ * `useTweaks.themeVars`). Bars consume `var(--ink-2)` / `var(--accent)` so
+ * switching theme or accent at the root re-styles the renderer instantly
+ * without a renderer re-render — the inline `var(...)` references resolve at
+ * paint time against the live root vars.
+ *
+ * Theme-specific fallbacks keep server-rendered markup (tests, exports) from
+ * collapsing to transparent when CSS vars aren't yet applied. Values are kept
+ * subdued and aligned with the rest of the studio surface.
+ */
+const FALLBACKS = {
   dark: {
-    bg: "#0a0c10",
-    floor: "rgba(255,255,255,0.06)",
-    floorLine: "rgba(255,255,255,0.10)",
-    text: "#e8ecf4",
-    label: "rgba(232,236,244,0.85)",
-    narration: "rgba(232,236,244,0.6)",
-    barShadow: "rgba(0,0,0,0.45)",
-    active: "#ffd84d",
-    activeGlow: "rgba(255,216,77,0.55)",
-    swap: "#ff9e8a",
-    swapGlow: "rgba(255,158,138,0.5)",
-    sorted: "#5be8b4",
-    pointer: "#c8a8f8",
-    // heatmap: low value → cool, high value → warm
-    heat: (t: number) => `hsl(${Math.round(210 - 210 * t)}, 68%, 56%)`,
-    heatTop: (t: number) => `hsl(${Math.round(210 - 210 * t)}, 72%, 68%)`,
-    heatSide: (t: number) => `hsl(${Math.round(210 - 210 * t)}, 62%, 40%)`,
+    bg: "#0e1412",
+    text: "#e8efe9",
+    label: "#9ba8a0",
+    narration: "#5b6862",
+    barBase: "#27332c",
+    barAccent: "#10b981",
+    barOutline: "rgba(255,255,255,0.06)",
+    floor: "#27332c",
+    warn: "#e9a23b",
+    swapShadow: "rgba(233,162,59,0.35)",
+    accentShadow: "rgba(16,185,129,0.30)",
+    barShadow: "rgba(0,0,0,0.35)",
   },
   light: {
-    bg: "#f5f7fa",
-    floor: "rgba(0,0,0,0.05)",
-    floorLine: "rgba(0,0,0,0.12)",
-    text: "#141820",
-    label: "rgba(20,24,32,0.85)",
-    narration: "rgba(20,24,32,0.6)",
-    barShadow: "rgba(0,0,0,0.18)",
-    active: "#d4a017",
-    activeGlow: "rgba(212,160,23,0.45)",
-    swap: "#c05030",
-    swapGlow: "rgba(192,80,48,0.4)",
-    sorted: "#1a7a5e",
-    pointer: "#6030c0",
-    heat: (t: number) => `hsl(${Math.round(210 - 210 * t)}, 64%, 50%)`,
-    heatTop: (t: number) => `hsl(${Math.round(210 - 210 * t)}, 68%, 62%)`,
-    heatSide: (t: number) => `hsl(${Math.round(210 - 210 * t)}, 58%, 36%)`,
+    bg: "#faf8f3",
+    text: "#161a18",
+    label: "#5d655f",
+    narration: "#9aa39d",
+    barBase: "#d6d1c2",
+    barAccent: "#10b981",
+    barOutline: "rgba(0,0,0,0.05)",
+    floor: "#d6d1c2",
+    warn: "#e9a23b",
+    swapShadow: "rgba(233,162,59,0.30)",
+    accentShadow: "rgba(16,185,129,0.25)",
+    barShadow: "rgba(0,0,0,0.12)",
   },
+} as const;
+
+const VAR = {
+  bg: (t: "dark" | "light") => `var(--surface-2, ${FALLBACKS[t].bg})`,
+  text: (t: "dark" | "light") => `var(--ink, ${FALLBACKS[t].text})`,
+  label: (t: "dark" | "light") => `var(--ink-2, ${FALLBACKS[t].label})`,
+  narration: (t: "dark" | "light") => `var(--ink-3, ${FALLBACKS[t].narration})`,
+  barBase: (t: "dark" | "light") => `var(--line-2, ${FALLBACKS[t].barBase})`,
+  accent: (t: "dark" | "light") => `var(--accent, ${FALLBACKS[t].barAccent})`,
+  accentSoft: (t: "dark" | "light") => `var(--accent-soft, ${FALLBACKS[t].accentShadow})`,
+  warn: (t: "dark" | "light") => `var(--warn, ${FALLBACKS[t].warn})`,
+  floor: (t: "dark" | "light") => `var(--line, ${FALLBACKS[t].floor})`,
+  barOutline: (t: "dark" | "light") => FALLBACKS[t].barOutline,
+  barShadow: (t: "dark" | "light") => FALLBACKS[t].barShadow,
+  swapShadow: (t: "dark" | "light") => FALLBACKS[t].swapShadow,
+  accentShadow: (t: "dark" | "light") => FALLBACKS[t].accentShadow,
 } as const;
 
 const ENTER_BEZIER = Easing.bezier(0.16, 1, 0.3, 1);
@@ -50,7 +68,6 @@ const MOVE_FRAMES = 22;
 const MAX_BAR_HEIGHT = 360;
 const MIN_BAR_HEIGHT = 6;
 const SWAP_LIFT_REFERENCE = 90;
-const DEPTH = 14; // px of fake 3-D depth (top + side faces)
 
 export const BarBlockRenderer: React.FC<RendererProps> = ({
   step,
@@ -64,7 +81,7 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
     prevStep && prevStep.snapshot.kind === "algorithm_bars"
       ? (prevStep.snapshot as AlgorithmBarsSnapshot)
       : null;
-  const colors = PALETTE[theme];
+  const c = VAR;
   const elapsed = Math.max(0, frame - stepStartFrame);
 
   const n = snap.numeric_values.length;
@@ -84,7 +101,7 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
     return (
       <div
         style={{
-          background: colors.bg,
+          background: c.bg(theme),
           width: "100%",
           height: "100%",
           display: "flex",
@@ -92,7 +109,7 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
           justifyContent: "center",
         }}
       >
-        <p style={{ color: colors.narration, fontFamily: "system-ui", fontSize: 16 }}>
+        <p style={{ color: c.narration(theme), fontFamily: "system-ui", fontSize: 16 }}>
           {step.voiceover_text}
         </p>
       </div>
@@ -116,7 +133,7 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
       style={{
         width: "100%",
         height: "100%",
-        background: colors.bg,
+        background: c.bg(theme),
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -128,9 +145,10 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
     >
       <h2
         style={{
-          color: colors.text,
+          color: c.text(theme),
           fontSize: 20,
-          fontWeight: 700,
+          fontWeight: 600,
+          letterSpacing: "0.01em",
           margin: 0,
           opacity: titleOpacity,
         }}
@@ -138,23 +156,27 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
         {step.title}
       </h2>
 
-      {/* Bar field — bars rise from a shared baseline */}
+      {/* Bar field — flat 2D bars on a single baseline */}
       <div
         style={{
           display: "flex",
           alignItems: "flex-end",
           gap: barGap,
           position: "relative",
-          height: MAX_BAR_HEIGHT + DEPTH + 8,
-          paddingTop: DEPTH + 24,
-          // half-transparent floor grid as a coordinate reference
-          borderBottom: `2px solid ${colors.floorLine}`,
+          height: MAX_BAR_HEIGHT + 8,
+          paddingTop: 24,
+          borderBottom: `1px solid ${c.floor(theme)}`,
         }}
       >
         {snap.numeric_values.map((val, i) => {
           const label = snap.array_values[i] ?? String(val);
-          const t = Math.abs(val) / heightRef; // 0..1 heatmap position
-          const barH = Math.max(MIN_BAR_HEIGHT, (Math.abs(val) / heightRef) * MAX_BAR_HEIGHT);
+          // value-driven fill strength: shorter bars lean toward the base
+          // line color, taller bars saturate toward the accent. Keeps the
+          // whole field in one hue family (theme accent) instead of a
+          // rainbow heatmap.
+          const t = Math.abs(val) / heightRef; // 0..1
+          const fillRatio = 0.35 + 0.65 * t; // 0.35..1
+          const barH = Math.max(MIN_BAR_HEIGHT, t * MAX_BAR_HEIGHT);
 
           const prevIdx = prevIndexMap[i];
           const isActive = activeSet.has(i);
@@ -166,7 +188,7 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
           let ty = 0;
           let scale = 1;
           let shadowOpacity = 0;
-          let shadowColor: string = colors.swapGlow;
+          let shadowColor: string = c.swapShadow(theme);
           let zIndex = 0;
           let writeOpacity = 1;
 
@@ -184,7 +206,7 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
             ty = m.translateY;
             scale = m.scale;
             shadowOpacity = m.shadowOpacity;
-            shadowColor = colors.swapGlow;
+            shadowColor = c.swapShadow(theme);
             zIndex = m.zIndex;
           } else if (prevIdx >= 0 && prevIdx !== i) {
             const progress = interpolate(elapsed, [0, MOVE_FRAMES], [0, 1], {
@@ -200,36 +222,42 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
           }
 
           // ── Fill colors ──
-          let face = colors.heat(t);
-          let faceTop = colors.heatTop(t);
-          let faceSide = colors.heatSide(t);
-          let outline = "rgba(0,0,0,0.18)";
-          let labelColor: string = colors.label;
+          // Default: line color (subtle) blended into accent based on height.
+          // We use a single solid color per bar (no top/side faces, no
+          // multi-stop gradient) so the visual is genuinely flat 2D.
+          let face: string = c.accent(theme);
+          let opacity = fillRatio;
+          let outline: string = c.barOutline(theme);
+          let labelColor: string = c.label(theme);
 
           if (isActive) {
             const s = selectMotion(elapsed);
             ty += s.translateY;
             scale = Math.max(scale, s.scale);
-            face = colors.active;
-            faceTop = colors.active;
-            faceSide = colors.active;
-            outline = colors.active;
-            labelColor = colors.text;
+            face = c.accent(theme);
+            opacity = 1;
+            outline = c.accent(theme);
+            labelColor = c.text(theme);
             shadowOpacity = Math.max(shadowOpacity, s.shadowOpacity);
-            shadowColor = colors.activeGlow;
+            shadowColor = c.accentShadow(theme);
           } else if (isSwap) {
-            face = colors.swap;
-            faceTop = colors.swap;
-            faceSide = colors.swap;
-            outline = colors.swap;
-            labelColor = colors.text;
+            face = c.warn(theme);
+            opacity = 1;
+            outline = c.warn(theme);
+            labelColor = c.text(theme);
             if (shadowOpacity === 0) shadowOpacity = 0.4;
-            shadowColor = colors.swapGlow;
+            shadowColor = c.swapShadow(theme);
           } else if (isSorted) {
-            face = colors.sorted;
-            faceTop = colors.sorted;
-            faceSide = colors.sorted;
-            outline = "rgba(0,0,0,0.18)";
+            // Sorted: same hue as accent, slightly lower opacity to read as
+            // "settled, no longer interactive".
+            face = c.accent(theme);
+            opacity = 0.55;
+            outline = c.barOutline(theme);
+            labelColor = c.label(theme);
+          } else {
+            // Idle bars: muted color so highlights pop.
+            face = c.barBase(theme);
+            opacity = Math.max(0.5, fillRatio);
           }
 
           // ── Staggered entry ──
@@ -251,10 +279,7 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
 
           const glow =
             shadowOpacity > 0
-              ? `, 0 0 ${12 + shadowOpacity * 16}px ${shadowColor.replace(
-                  /[\d.]+\)$/,
-                  `${shadowOpacity})`,
-                )}`
+              ? `, 0 0 ${10 + shadowOpacity * 12}px ${shadowColor}`
               : "";
 
           return (
@@ -279,7 +304,7 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
                   position: "absolute",
                   top: -22,
                   fontSize: labelFont,
-                  fontWeight: 700,
+                  fontWeight: 600,
                   color: labelColor,
                   lineHeight: 1,
                   whiteSpace: "nowrap",
@@ -287,51 +312,31 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
               >
                 {label}
                 {isSorted && (
-                  <span style={{ color: colors.sorted, marginLeft: 3, fontSize: labelFont * 0.9 }}>
+                  <span
+                    style={{
+                      color: c.accent(theme),
+                      marginLeft: 3,
+                      fontSize: labelFont * 0.9,
+                      opacity: 0.85,
+                    }}
+                  >
                     ✓
                   </span>
                 )}
               </span>
 
-              {/* top face (fake 3-D) */}
+              {/* flat 2D bar */}
               <div
                 style={{
-                  position: "absolute",
-                  bottom: renderedH,
                   width: barW,
-                  height: DEPTH,
-                  background: faceTop,
-                  transform: `skewX(-45deg) translateX(${DEPTH / 2}px)`,
-                  transformOrigin: "bottom left",
+                  height: renderedH,
+                  background: face,
+                  opacity,
+                  border: `1px solid ${outline}`,
+                  borderBottom: "none",
                   borderTopLeftRadius: 3,
                   borderTopRightRadius: 3,
-                  filter: "brightness(1.18)",
-                }}
-              />
-              {/* right side face (fake 3-D) */}
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: 0,
-                  left: barW,
-                  width: DEPTH,
-                  height: renderedH,
-                  background: faceSide,
-                  transform: "skewY(-45deg)",
-                  transformOrigin: "bottom left",
-                  filter: "brightness(0.78)",
-                }}
-              />
-              {/* front face */}
-              <div
-                style={{
-                  width: barW,
-                  height: renderedH,
-                  background: `linear-gradient(160deg, ${face} 0%, ${faceSide} 130%)`,
-                  border: `1.5px solid ${outline}`,
-                  borderTopLeftRadius: 4,
-                  borderTopRightRadius: 4,
-                  boxShadow: `0 4px 10px ${colors.barShadow}${glow}`,
+                  boxShadow: `0 1px 2px ${c.barShadow(theme)}${glow}`,
                 }}
               />
               {/* index label below the baseline */}
@@ -340,7 +345,7 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
                   position: "absolute",
                   bottom: -22,
                   fontSize: 11,
-                  color: colors.narration,
+                  color: c.narration(theme),
                   fontWeight: 400,
                 }}
               >
@@ -366,7 +371,7 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
-                  color: colors.pointer,
+                  color: c.accent(theme),
                   fontSize: 13,
                   fontWeight: 600,
                   opacity: pointerOpacity,
@@ -383,7 +388,7 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
 
       <p
         style={{
-          color: colors.narration,
+          color: c.narration(theme),
           fontSize: 15,
           maxWidth: 720,
           textAlign: "center",
