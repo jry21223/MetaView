@@ -9,6 +9,7 @@ import {
   type CompiledExpr,
   type SamplePoint,
 } from "../../../../shared/lib/mathExpr";
+import { autoYBounds, fmtNum, niceTicks, padRange } from "../../../../shared/lib/plotMath";
 
 // ── Theme ──────────────────────────────────────────────────────────────────
 
@@ -87,45 +88,6 @@ const SHADE_SAMPLES = 96;
 
 function clamp01(v: number): number {
   return v < 0 ? 0 : v > 1 ? 1 : v;
-}
-
-function fmtNum(v: number): string {
-  if (v === 0) return "0";
-  const a = Math.abs(v);
-  if (a >= 1e4 || a < 1e-3) return v.toExponential(1);
-  return String(Math.round(v * 1000) / 1000);
-}
-
-/** "Nice" round tick values across [lo, hi]. */
-function niceTicks(lo: number, hi: number, target = 8): number[] {
-  const span = hi - lo;
-  if (!(span > 0) || !Number.isFinite(span)) return [];
-  const rawStep = span / target;
-  const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
-  const norm = rawStep / mag;
-  const step = (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * mag;
-  const fuzz = step * 1e-6;
-  const out: number[] = [];
-  for (let v = Math.ceil(lo / step) * step; v <= hi + fuzz; v += step) {
-    out.push(Math.abs(v) < fuzz ? 0 : v);
-  }
-  return out;
-}
-
-/** Robust auto y-bounds: trim outliers (asymptotes) via 2nd/98th percentiles. */
-function autoYBounds(ys: number[]): [number, number] {
-  const finite = ys.filter((y) => Number.isFinite(y));
-  if (!finite.length) return [-10, 10];
-  const sorted = [...finite].sort((a, b) => a - b);
-  const at = (p: number) =>
-    sorted[Math.min(sorted.length - 1, Math.max(0, Math.round(p * (sorted.length - 1))))];
-  let lo = at(0.02);
-  let hi = at(0.98);
-  if (lo === hi) {
-    lo -= 1;
-    hi += 1;
-  }
-  return [lo, hi];
 }
 
 /** Split a sample list into contiguous runs of finite-y points (breaks at NaN). */
@@ -207,13 +169,7 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({ step, frame, stepSta
   if (yMin == null || yMax == null) {
     const ys: number[] = [];
     for (const c of drawable) for (const p of c.points) if (Number.isFinite(p.y)) ys.push(p.y);
-    let [lo, hi] = autoYBounds(ys);
-    // Bring the x-axis into frame when the curve sits entirely above/below it.
-    if (lo > 0) lo = 0;
-    if (hi < 0) hi = 0;
-    const pad = (hi - lo || 1) * 0.1;
-    lo -= pad;
-    hi += pad;
+    const [lo, hi] = padRange(...autoYBounds(ys));
     if (yMin == null) yMin = lo;
     if (yMax == null) yMax = hi;
   }

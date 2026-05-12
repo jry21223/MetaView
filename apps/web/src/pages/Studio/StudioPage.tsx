@@ -6,6 +6,7 @@ import { GlobalTopbar, Stage } from '../../shared/ui/GlobalTopbar';
 import { useProviderSettings, ProviderSettings } from '../../features/providers/hooks/useProviderSettings';
 import type { PlaybookScript } from '../../features/playbook/engine/types';
 import { ExportModal } from '../../features/export/ui/ExportModal';
+import { MathWidget } from '../../features/math-widget';
 
 // ── Domain mapping ────────────────────────────────────────────────────────
 
@@ -344,6 +345,7 @@ export function StudioPage({
   const [problemCollapsed, setProblemCollapsed] = useState(false);
   const [chatCollapsed, setChatCollapsed] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [mathWidgetOpen, setMathWidgetOpen] = useState(false);
 
   useEffect(() => {
     if (error) onNavigate('intake');
@@ -365,6 +367,7 @@ export function StudioPage({
         onOpenProviderSettings={onOpenProviderSettings}
         onOpenExport={() => setExportOpen(true)}
         exportEnabled={!!playbook && !!runId}
+        onOpenMathWidget={() => setMathWidgetOpen(true)}
       />
       {exportOpen && (
         <ExportModal
@@ -372,6 +375,9 @@ export function StudioPage({
           isDark={isDark}
           onClose={() => setExportOpen(false)}
         />
+      )}
+      {mathWidgetOpen && (
+        <MathWidget isDark={isDark} onClose={() => setMathWidgetOpen(false)} />
       )}
       <main className="mv-main" style={mainStyle}>
         {!leftCollapsed && (
