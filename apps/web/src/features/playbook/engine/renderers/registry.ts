@@ -3,11 +3,13 @@ import type { RendererComponent } from "./types";
 import { AlgorithmRenderer } from "./AlgorithmRenderer";
 import { BarBlockRenderer } from "./BarBlockRenderer";
 import { BinaryTreeRenderer } from "./BinaryTreeRenderer";
+import { MathPlotRenderer } from "./MathPlotRenderer";
 
 const registry = new Map<SnapshotKind, RendererComponent>([
   ["algorithm_array", AlgorithmRenderer],
   ["algorithm_bars", BarBlockRenderer],
   ["algorithm_tree", BinaryTreeRenderer],
+  ["math_plot", MathPlotRenderer],
 ]);
 
 export const rendererRegistry = registry;
