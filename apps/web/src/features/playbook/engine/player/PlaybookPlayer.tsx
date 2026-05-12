@@ -295,9 +295,11 @@ interface PlaybookPlayerProps {
   script: PlaybookScript;
   theme?: "dark" | "light";
   onOpenExport?: () => void;
+  /** Subject-agnostic slot rendered in the collapsible bottom panel; content is decided by the page. */
+  renderParamPanel?: (ctx: { isDark: boolean }) => React.ReactNode;
 }
 
-export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScript, theme = "dark", onOpenExport }) => {
+export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScript, theme = "dark", onOpenExport, renderParamPanel }) => {
   const playerRef = useRef<PlayerRef | null>(null);
 
   // ── Tweak state (frontend-only hot reload) ─────────────────────────────
@@ -306,6 +308,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScri
   const [showSubtitles, setShowSubtitles] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [codePanelOpen, setCodePanelOpen] = useState(true);
+  const [paramPanelOpen, setParamPanelOpen] = useState(false);
   const script = useResolvedScript(baseScript, overrides);
   const replaySupported = isReplaySupported(baseScript.algorithm_id);
 
@@ -740,6 +743,44 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScri
           algorithmId={baseScript.algorithm_id}
           isDark={isDark}
         />
+
+        {/* Subject-agnostic interactive parameter panel — content is supplied by the page. */}
+        {renderParamPanel && (
+          <div
+            className="playbook-parampanel"
+            style={{
+              flexShrink: 0,
+              borderTop: `1px solid ${isDark ? "#21262d" : "#d0d7de"}`,
+              background: isDark ? "#0f1117" : "#f7f9fc",
+            }}
+          >
+            <button
+              onClick={() => setParamPanelOpen((v) => !v)}
+              aria-expanded={paramPanelOpen}
+              style={{
+                width: "100%",
+                textAlign: "left",
+                padding: "7px 16px",
+                border: "none",
+                background: "transparent",
+                color: isDark ? "#c9d1d9" : "#24292f",
+                cursor: "pointer",
+                fontSize: 12,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <span>🎛 交互参数面板</span>
+              <span style={{ marginLeft: "auto", opacity: 0.7 }}>{paramPanelOpen ? "▾" : "▸"}</span>
+            </button>
+            {paramPanelOpen && (
+              <div style={{ maxHeight: "min(420px, 46vh)", overflowY: "auto" }}>
+                {renderParamPanel({ isDark })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

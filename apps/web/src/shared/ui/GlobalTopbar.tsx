@@ -11,7 +11,6 @@ interface GlobalTopbarProps {
   onOpenProviderSettings?: () => void;
   onOpenExport?: () => void;
   exportEnabled?: boolean;
-  onOpenMathWidget?: () => void;
 }
 
 export function GlobalTopbar({
@@ -23,7 +22,6 @@ export function GlobalTopbar({
   onOpenProviderSettings,
   onOpenExport,
   exportEnabled,
-  onOpenMathWidget,
 }: GlobalTopbarProps) {
   const isWorkbench = stage === 'intake' || stage === 'workbench';
   const isHistory = stage === 'history';
@@ -54,15 +52,6 @@ export function GlobalTopbar({
       </nav>
 
       <div className="mv-top-right">
-        {onOpenMathWidget && (
-          <button
-            className="mv-icon-btn"
-            onClick={onOpenMathWidget}
-            title="交互数学画板"
-          >
-            📐 数学画板
-          </button>
-        )}
         {onOpenExport && (
           <button
             className="mv-icon-btn"
