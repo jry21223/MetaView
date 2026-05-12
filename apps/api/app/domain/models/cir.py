@@ -24,6 +24,38 @@ class EdgeRef(BaseModel):
     to_id: str
 
 
+class PlotCurveSpec(BaseModel):
+    """One curve on a math function plot.
+
+    ``expression`` is a formula in ``x`` (plus any named parameters),
+    e.g. ``"x^2 - 2*x"`` or ``"sin(x)"``. Sampling happens in the renderer.
+    """
+
+    expression: str
+    label: str | None = None
+    emphasis: str = "primary"  # primary | secondary | accent
+
+
+class PlotSpec(BaseModel):
+    """Math function-plot specification attached to a CIR step.
+
+    Used when ``CirStep.visual_kind == VisualKind.FUNCTION``. The LLM supplies
+    expressions (not sampled points); the Remotion renderer evaluates them.
+    """
+
+    curves: list[PlotCurveSpec] = Field(default_factory=list)
+    x_min: float = -10.0
+    x_max: float = 10.0
+    y_min: float | None = None
+    y_max: float | None = None
+    marker_x: float | None = None  # a moving point marker rides the first curve
+    shade_from: float | None = None  # shaded region under the first curve [from, to]
+    shade_to: float | None = None
+    x_label: str = "x"
+    y_label: str = "y"
+    formula_latex: str | None = None  # optional KaTeX label, e.g. "f(x) = x^2"
+
+
 class CirStep(BaseModel):
     id: str
     title: str
@@ -32,6 +64,7 @@ class CirStep(BaseModel):
     layout: LayoutInstruction = Field(default_factory=LayoutInstruction)
     tokens: list[VisualToken] = Field(default_factory=list)
     edges: list[EdgeRef] | None = None
+    plot: PlotSpec | None = None
     annotations: list[str] = Field(default_factory=list)
     start_time: float | None = None
     end_time: float | None = None

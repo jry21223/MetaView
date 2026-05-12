@@ -11,6 +11,7 @@ export type VisualKind =
   | "array"
   | "flow"
   | "formula"
+  | "function"
   | "graph"
   | "text"
   | "motion"

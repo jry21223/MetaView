@@ -53,31 +53,123 @@ def get_llm_provider(settings: Annotated[Settings, Depends(get_settings)]) -> IL
     )
 
 
+_MOCK_NOTE = "Mock response — set METAVIEW_OPENAI_API_KEY to enable real generation."
+
+_MOCK_ALGORITHM_CIR: dict = {
+    "version": "0.1.0",
+    "title": "Mock Algorithm Demo",
+    "domain": "algorithm",
+    "summary": _MOCK_NOTE,
+    "steps": [
+        {
+            "id": "step_01",
+            "title": "Initial State",
+            "narration": (
+                "This is a mock response."
+                " Configure an API key to generate real content."
+            ),
+            "visual_kind": "array",
+            "tokens": [
+                {"id": "t0", "label": "1", "value": "1", "emphasis": "primary"},
+                {"id": "t1", "label": "2", "value": "2", "emphasis": "secondary"},
+                {"id": "t2", "label": "3", "value": "3", "emphasis": "secondary"},
+            ],
+            "annotations": [],
+        }
+    ],
+}
+
+# Domain-aware mock for math prompts — exercises the function-plot renderer.
+_MOCK_MATH_CIR: dict = {
+    "version": "0.1.0",
+    "title": "定积分与曲线下面积",
+    "domain": "math",
+    "summary": _MOCK_NOTE + " 这是一个数学函数图示例。",
+    "steps": [
+        {
+            "id": "step_01",
+            "title": "认识曲线 f(x) = x²",
+            "narration": ["先画出抛物线 f(x) = x²，它在 x ≥ 0 时单调上升。"],
+            "visual_kind": "function",
+            "tokens": [],
+            "plot": {
+                "curves": [{"expression": "x^2", "label": "f(x)", "emphasis": "primary"}],
+                "x_min": -1.0,
+                "x_max": 3.0,
+                "formula_latex": "f(x) = x^2",
+            },
+            "annotations": [],
+        },
+        {
+            "id": "step_02",
+            "title": "锁定区间 [0, 2]",
+            "narration": ["我们关心 x 从 0 到 2 这段曲线下方的面积。"],
+            "visual_kind": "function",
+            "tokens": [],
+            "plot": {
+                "curves": [{"expression": "x^2", "label": "f(x)", "emphasis": "primary"}],
+                "x_min": -1.0,
+                "x_max": 3.0,
+                "shade_from": 0.0,
+                "shade_to": 2.0,
+                "marker_x": 2.0,
+                "formula_latex": "\\int_0^2 x^2\\,dx",
+            },
+            "annotations": [],
+        },
+        {
+            "id": "step_03",
+            "title": "用矩形逼近",
+            "narration": ["把区间分成若干小段，每段用一个矩形近似——段越多越精确。"],
+            "visual_kind": "function",
+            "tokens": [],
+            "plot": {
+                "curves": [{"expression": "x^2", "label": "f(x)", "emphasis": "primary"}],
+                "x_min": -1.0,
+                "x_max": 3.0,
+                "shade_from": 0.0,
+                "shade_to": 2.0,
+                "formula_latex": "\\sum f(x_i)\\,\\Delta x",
+            },
+            "annotations": [],
+        },
+        {
+            "id": "step_04",
+            "title": "结论：面积 = 8/3",
+            "narration": ["取极限后，矩形面积之和收敛到 8/3 ≈ 2.667，这就是定积分的几何意义。"],
+            "visual_kind": "function",
+            "tokens": [],
+            "plot": {
+                "curves": [{"expression": "x^2", "label": "f(x)", "emphasis": "accent"}],
+                "x_min": -1.0,
+                "x_max": 3.0,
+                "shade_from": 0.0,
+                "shade_to": 2.0,
+                "formula_latex": "\\int_0^2 x^2\\,dx = \\tfrac{8}{3}",
+            },
+            "annotations": [],
+        },
+    ],
+}
+
+
 class _MockLLMProvider:
-    """Fallback when no API key is configured. Returns a minimal valid CIR."""
+    """Fallback when no API key is configured. Returns a minimal valid CIR.
+
+    The payload is domain-aware so that math prompts still demonstrate the
+    function-plot renderer even without a real LLM configured.
+    """
 
     async def complete(self, system: str, user: str) -> str:  # noqa: ARG002
         import json
-        return json.dumps({
-            "version": "0.1.0",
-            "title": "Mock Algorithm Demo",
-            "domain": "algorithm",
-            "summary": "Mock response — set METAVIEW_OPENAI_API_KEY to enable real generation.",
-            "steps": [
-                {
-                    "id": "step_01",
-                    "title": "Initial State",
-                    "narration": (
-                        "This is a mock response."
-                        " Configure an API key to generate real content."
-                    ),
-                    "visual_kind": "array",
-                    "tokens": [
-                        {"id": "t0", "label": "1", "value": "1", "emphasis": "primary"},
-                        {"id": "t1", "label": "2", "value": "2", "emphasis": "secondary"},
-                        {"id": "t2", "label": "3", "value": "3", "emphasis": "secondary"},
-                    ],
-                    "annotations": [],
-                }
-            ],
-        })
+
+        # Lazy import to keep this module free of domain-service import cycles.
+        from app.domain.models.topic import TopicDomain
+        from app.domain.services.domain_router import keyword_hint
+
+        payload = (
+            _MOCK_MATH_CIR
+            if keyword_hint(user or "") == TopicDomain.MATH
+            else _MOCK_ALGORITHM_CIR
+        )
+        return json.dumps(payload)

@@ -13,6 +13,7 @@ class SnapshotKind(str, Enum):
     ALGORITHM_ARRAY = "algorithm_array"
     ALGORITHM_BARS = "algorithm_bars"
     ALGORITHM_TREE = "algorithm_tree"
+    MATH_PLOT = "math_plot"
 
 
 class AlgorithmArraySnapshot(BaseModel):
@@ -49,8 +50,46 @@ class AlgorithmTreeSnapshot(BaseModel):
     path_edge_ids: list[str] = Field(default_factory=list)
 
 
+class MathPlotCurve(BaseModel):
+    """A single curve on a math function plot.
+
+    ``expression`` is a formula in ``x`` (plus named parameters); the Remotion
+    renderer evaluates and samples it client-side via ``shared/lib/mathExpr``.
+    """
+
+    expression: str
+    label: str | None = None
+    emphasis: str = "primary"  # primary | secondary | accent
+
+
+class MathPlotSnapshot(BaseModel):
+    """Cartesian function / curve plot (math domain).
+
+    Carries formula strings — not sampled points — so the renderer controls
+    resolution and can animate the curve being drawn from the step ``progress``.
+    """
+
+    kind: Literal["math_plot"] = "math_plot"
+    curves: list[MathPlotCurve] = Field(default_factory=list)
+    x_min: float = -10.0
+    x_max: float = 10.0
+    y_min: float | None = None
+    y_max: float | None = None
+    marker_x: float | None = None  # point marker riding the first curve
+    shade_from: float | None = None  # shaded region under the first curve [from, to]
+    shade_to: float | None = None
+    x_label: str = "x"
+    y_label: str = "y"
+    formula_latex: str | None = None  # optional KaTeX label, e.g. "f(x) = x^2"
+
+
 AnySnapshot = Annotated[
-    Union[AlgorithmArraySnapshot, AlgorithmBarsSnapshot, AlgorithmTreeSnapshot],
+    Union[
+        AlgorithmArraySnapshot,
+        AlgorithmBarsSnapshot,
+        AlgorithmTreeSnapshot,
+        MathPlotSnapshot,
+    ],
     Field(discriminator="kind"),
 ]
 

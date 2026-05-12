@@ -16,6 +16,8 @@ from app.domain.models.playbook import (
     AlgorithmBarsSnapshot,
     AlgorithmTreeSnapshot,
     CodeHighlightOverlay,
+    MathPlotCurve,
+    MathPlotSnapshot,
     MetaStep,
     PlaybookScript,
 )
@@ -25,6 +27,12 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_FPS = 30
 _DEFAULT_STEP_FRAMES = 60  # 2 s at 30 fps
+
+# Whitelist for math-plot expressions: digits, identifiers (variables/functions),
+# arithmetic operators, parentheses, comma and whitespace. Anything else is
+# treated as untrusted and the curve is dropped (defence against the LLM
+# emitting non-expression text into the plot field).
+_SAFE_EXPR_RE = re.compile(r"^[0-9A-Za-z_+\-*/^%(). ,]+$")
 
 
 def _infer_algorithm_id(title: str, execution_map: ExecutionMap | None = None) -> str | None:
@@ -168,11 +176,78 @@ def _build_snapshot(
     cir_step: CirStep,
     checkpoint: ExecutionCheckpoint | None,
     execution_map: ExecutionMap | None,
-) -> AlgorithmArraySnapshot | AlgorithmBarsSnapshot | AlgorithmTreeSnapshot:
+) -> (
+    AlgorithmArraySnapshot
+    | AlgorithmBarsSnapshot
+    | AlgorithmTreeSnapshot
+    | MathPlotSnapshot
+):
     if cir_step.visual_kind == VisualKind.GRAPH:
         return _build_tree_snapshot(cir_step, checkpoint)
-    # ARRAY, FLOW, TEXT, FORMULA, MOTION, CIRCUIT, MOLECULE, MAP, CELL all fall through to array
+    if cir_step.visual_kind == VisualKind.FUNCTION:
+        plot = _build_math_plot_snapshot(cir_step)
+        if plot is not None:
+            return plot
+        # No usable plot data → degrade to the array view rather than a blank.
+    # ARRAY, FLOW, TEXT, FORMULA, MOTION, CIRCUIT, MOLECULE, MAP, CELL fall through to array
     return _build_array_snapshot(cir_step, checkpoint, execution_map)
+
+
+def _sanitize_expression(expression: str | None) -> str | None:
+    """Return a trimmed expression if it passes the safe-character whitelist."""
+    if not expression:
+        return None
+    text = expression.strip()
+    if not text or len(text) > 200 or not _SAFE_EXPR_RE.match(text):
+        return None
+    return text
+
+
+def _build_math_plot_snapshot(cir_step: CirStep) -> MathPlotSnapshot | None:
+    spec = cir_step.plot
+    if spec is None:
+        return None
+
+    curves: list[MathPlotCurve] = []
+    for raw in spec.curves:
+        safe = _sanitize_expression(raw.expression)
+        if safe is None:
+            logger.warning("Dropping unsafe/empty plot expression in step %s", cir_step.id)
+            continue
+        emphasis = raw.emphasis if raw.emphasis in ("primary", "secondary", "accent") else "primary"
+        curves.append(MathPlotCurve(expression=safe, label=raw.label, emphasis=emphasis))
+
+    if not curves:
+        return None
+
+    x_min, x_max = spec.x_min, spec.x_max
+    if not (x_min < x_max):  # guard against degenerate / inverted ranges
+        x_min, x_max = -10.0, 10.0
+
+    marker_x = spec.marker_x
+    if marker_x is not None:
+        marker_x = max(x_min, min(x_max, marker_x))
+
+    shade_from, shade_to = spec.shade_from, spec.shade_to
+    if shade_from is not None and shade_to is not None:
+        shade_from = max(x_min, min(x_max, shade_from))
+        shade_to = max(x_min, min(x_max, shade_to))
+        if shade_from > shade_to:
+            shade_from, shade_to = shade_to, shade_from
+
+    return MathPlotSnapshot(
+        curves=curves,
+        x_min=x_min,
+        x_max=x_max,
+        y_min=spec.y_min,
+        y_max=spec.y_max,
+        marker_x=marker_x,
+        shade_from=shade_from,
+        shade_to=shade_to,
+        x_label=spec.x_label or "x",
+        y_label=spec.y_label or "y",
+        formula_latex=spec.formula_latex,
+    )
 
 
 def _build_array_snapshot(
@@ -288,6 +363,7 @@ _HINT_MAP: dict[VisualKind, str] = {
     VisualKind.GRAPH: "highlight",
     VisualKind.FLOW: "reveal",
     VisualKind.FORMULA: "reveal",
+    VisualKind.FUNCTION: "reveal",
     VisualKind.TEXT: "reveal",
     VisualKind.MOTION: "enter",
     VisualKind.CIRCUIT: "highlight",

@@ -27,11 +27,30 @@ VISUAL RULES for code explanation:
 """,
     TopicDomain.MATH: """
 VISUAL RULES for math:
-- Use visual_kind="array" to show equation terms, matrix rows, or sequence elements.
-- Each token label = one mathematical term (e.g. "3x²", "-2x", "+5", "=0").
-- Steps should show one transformation at a time: expand → simplify → factor → solve.
-- For sequences/series, show terms explicitly as tokens.
-- For geometry: describe shapes via tokens labeled with vertices or measurements.
+- Use visual_kind="function" for ANYTHING that lives on a coordinate plane:
+  graphing f(x), transformations (shifts/scales of a parent function), derivatives
+  and tangent lines, area under a curve (definite integrals), trigonometric waves,
+  exponential/log growth, families of curves driven by a parameter.
+  For each such step, fill the step's "plot" object (see schema):
+    - "curves": one or more {"expression": "...", "label": "...", "emphasis": "..."}.
+      The expression is a formula in the variable `x` using + - * / ^ %, parentheses,
+      and functions sin cos tan asin acos atan exp log ln log2 log10 sqrt cbrt abs
+      floor ceil round sign min max pow hypot, and constants pi tau e.
+      Examples: "x^2 - 2*x", "sin(x)", "0.5*x^3 - x", "exp(-x^2)", "1/x".
+      Do NOT pre-sample points and do NOT use programming syntax — just the math formula.
+    - "x_min"/"x_max": the visible domain (e.g. -6 to 6, or 0 to 2*pi ≈ 6.28).
+    - "marker_x" (optional): x of a point that should be highlighted on the FIRST curve
+      (e.g. the point where you evaluate the derivative).
+    - "shade_from"/"shade_to" (optional): shade the area under the FIRST curve between
+      these x values — use for definite-integral / Riemann-sum steps.
+    - "formula_latex" (optional): a short KaTeX label, e.g. "f(x) = x^2 - 2x".
+  Use emphasis="primary" for the curve currently in focus, "secondary" for context
+  curves (e.g. the original function while showing its derivative), "accent" for a
+  result/answer curve. Across steps, progressively reveal: parent → transform → analyse.
+- Use visual_kind="array" ONLY for non-graphable algebra: expanding/factoring an
+  expression term by term, matrix rows, or listing the elements of a sequence/series.
+  Then each token label = one mathematical term (e.g. "3x²", "-2x", "+5", "=0").
+- Pick "function" whenever a picture on axes would teach the idea better than text.
 """,
     TopicDomain.PHYSICS: """
 VISUAL RULES for physics:
@@ -69,7 +88,7 @@ _COMBINED_SCHEMA = """{
         "id": "step_01",
         "title": "string — step title (≤ 30 chars)",
         "narration": "JSON array — see Narration Output Format section",
-        "visual_kind": "array | graph",
+        "visual_kind": "array | graph | function",
         "tokens": [
           {
             "id": "string — unique id like t0, t1, node_root",
@@ -79,6 +98,22 @@ _COMBINED_SCHEMA = """{
           }
         ],
         "edges": [{"from_id": "node_root", "to_id": "node_left"}],
+        "plot": {
+          "_comment": "REQUIRED when visual_kind=function; omit otherwise",
+          "curves": [
+            {"expression": "x^2 - 2*x", "label": "f(x)", "emphasis": "primary"}
+          ],
+          "x_min": -6.0,
+          "x_max": 6.0,
+          "y_min": null,
+          "y_max": null,
+          "marker_x": null,
+          "shade_from": null,
+          "shade_to": null,
+          "x_label": "x",
+          "y_label": "y",
+          "formula_latex": "f(x) = x^2 - 2x"
+        },
         "annotations": []
       }
     ]
@@ -92,7 +127,7 @@ _COMBINED_SCHEMA = """{
         "id": "cp_01",
         "step_index": 0,
         "step_id": "must match a CIR step.id",
-        "visual_kind": "array | graph (mirror the step)",
+        "visual_kind": "array | graph | function (mirror the step)",
         "title": "string (mirror the step title)",
         "summary": "string — single sentence for this checkpoint",
         "start_s": 0.0,
@@ -193,9 +228,11 @@ The output is a SINGLE JSON object with two layers:
 {_COMBINED_SCHEMA}
 
 ## Allowed visual_kind values
-Only use: "array" or "graph"
-- "array" → for linear structures, formulas, processes (default for most topics)
+Only use: "array", "graph", or "function"
+- "array" → linear structures, term-by-term algebra, processes (default for most topics)
 - "graph" → ONLY for explicit tree or graph data structures
+- "function" → math content on a coordinate plane (curves, transformations,
+  derivatives/tangents, area under a curve, trig waves). Requires the step's "plot" object.
 
 ## Domain Classification
 Keyword analysis suggests: **{domain_hint.value}**
