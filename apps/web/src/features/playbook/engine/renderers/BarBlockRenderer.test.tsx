@@ -65,11 +65,11 @@ describe("BarBlockRenderer", () => {
     expect(hs).toContain(120);
   });
 
-  it("highlights active and sorted indices distinctly", () => {
+  it("highlights active and sorted indices via the theme accent variable", () => {
     const snap = makeBars([5, 2, 8], { active_indices: [0], sorted_indices: [2] });
     const markup = renderToStaticMarkup(BarBlockRenderer(props(barsStep(snap))));
-    // active highlight color (dark theme accent) and sorted checkmark present
-    expect(markup).toContain("#ffd84d");
+    // Colors flow through CSS vars so theme + accent changes take effect live
+    expect(markup).toContain("var(--accent");
     expect(markup).toContain("✓");
   });
 
@@ -78,11 +78,23 @@ describe("BarBlockRenderer", () => {
     expect(markup).toContain("比较相邻元素");
   });
 
-  it("uses the light-theme background when theme is light", () => {
-    const markup = renderToStaticMarkup(
+  it("uses CSS variables so theme switches re-style without re-rendering", () => {
+    const dark = renderToStaticMarkup(BarBlockRenderer(props(barsStep(makeBars([1, 2])))));
+    const light = renderToStaticMarkup(
       BarBlockRenderer(props(barsStep(makeBars([1, 2])), { theme: "light" })),
     );
-    expect(markup).toContain("#f5f7fa");
+    // Both themes resolve background through the same --surface-2 var
+    expect(dark).toContain("var(--surface-2");
+    expect(light).toContain("var(--surface-2");
+    // Theme-specific fallbacks are kept for SSR / no-CSS-var environments
+    expect(dark).toContain("#0e1412");
+    expect(light).toContain("#faf8f3");
+  });
+
+  it("renders flat 2D bars without fake 3D faces", () => {
+    const markup = renderToStaticMarkup(BarBlockRenderer(props(barsStep(makeBars([5, 2, 8])))));
+    // The old renderer used skewX/skewY to fake top + side faces.
+    expect(markup).not.toMatch(/skew[XY]\(/);
   });
 
   it("is registered for the algorithm_bars snapshot kind", () => {
