@@ -17,6 +17,10 @@
 
 学科默认全部启用：`algorithm`, `math`, `code`, `physics`, `chemistry`, `biology`, `geography`。
 
+数学学科除了逐项代数（数组视图）外，还支持 `visual_kind="function"` —— 在坐标系上画函数曲线、
+平移/缩放变换、导数与切线、定积分阴影、三角波等（渲染器 `MathPlotRenderer`，详见 [`docs/pipeline.md` §6](docs/pipeline.md)）。
+工作台顶栏的「📐 数学画板」还提供一个**交互式**画板：内置预设 + 参数滑块 + 实时 KaTeX 公式联动。
+
 ## 快速开始
 
 ### 本地开发
