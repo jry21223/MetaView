@@ -99,9 +99,6 @@ export const BinaryTreeRenderer: React.FC<RendererProps> = ({
   const nodes = layout.descendants();
   const links = layout.links();
 
-  // Pre-compute node index map for glow filter IDs
-  const nodeIndexMap = new Map(nodes.map((n, i) => [n.data.id, i]));
-
   return (
     <div
       style={{

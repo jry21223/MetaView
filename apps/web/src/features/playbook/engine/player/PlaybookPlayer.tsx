@@ -62,6 +62,7 @@ interface TTSPopoverProps {
 }
 
 const SAMPLE_TEXT_DEFAULT = "你好，这是一段试听文字。Hello, this is a preview.";
+const SPEED_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
 const TTSConfigPopover: React.FC<TTSPopoverProps> = ({ config, onUpdate, onClose, isDark, onPreview }) => {
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -375,7 +376,6 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScri
     setIsPlaying(false);
   }, [goToStep]);
 
-  const SPEED_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2];
   const handleSpeedUp = useCallback(() => {
     setPlaybackRate((r) => {
       const idx = SPEED_STEPS.indexOf(r);
