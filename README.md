@@ -19,8 +19,18 @@
 
 数学学科除了逐项代数（数组视图）外，还支持 `visual_kind="function"` —— 在坐标系上画函数曲线、
 平移/缩放变换、导数与切线、定积分阴影、三角波等（渲染器 `MathPlotRenderer`，详见 [`docs/pipeline.md` §6](docs/pipeline.md)）。
-数学播放器内嵌**交互式参数面板**（`MathWidgetPanel`）：内置预设 + 参数滑块 + 实时 KaTeX 公式联动，
-可在播放器底栏切换「▶ 播放」与「🔢 参数」两个视图。
+
+### 参数面板（ParamPanel）
+
+播放器底部的可折叠**参数面板**采用注册表模式，按 `script.domain` 自动匹配对应学科面板：
+
+| 学科 | 面板 | 功能 |
+|------|------|------|
+| `algorithm` | `AlgorithmParamPanel` | 可编辑演示数组，支持实时热加载排序回放 |
+| `math` | `MathParamPanel` | 预设曲线 + 参数滑块 + KaTeX 公式 + 函数图 |
+
+新增学科只需在 `engine/param-panels/registry.ts` 注册即可，无需修改播放器或页面代码。
+速度控制与字幕开关为播放器级共享控件，不属于各学科面板。
 
 算法渲染器新增**柱状视图**（`algorithm_bars`）：数值输入自动切换为高度编码的 2D 柱形图，
 颜色跟随系统主题 CSS 变量，支持冒泡 / 快排 / 插入 / 选择四种排序逐步回放。

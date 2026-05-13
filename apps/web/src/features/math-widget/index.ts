@@ -1,9 +1,9 @@
-// public API exports
-export { MathWidgetPanel } from "./ui/MathWidgetPanel";
-export { MATH_WIDGET_PRESETS, getPreset, initialParams } from "./lib/presets";
+export { MATH_PRESETS, getPreset, initialParams } from "./lib/presets";
 export type {
-  MathWidgetPreset,
-  MathWidgetParam,
-  MathWidgetCurve,
+  MathPreset,
+  MathParam,
+  MathCurve,
   CurveEmphasis,
 } from "./lib/presets";
+export { FunctionPlot } from "./ui/FunctionPlot";
+export type { PlotSeries, PlotMarker } from "./ui/FunctionPlot";

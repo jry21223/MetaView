@@ -5,18 +5,15 @@ import {
   compileExpr,
   sampleExpr,
   type CompiledExpr,
-} from "../../../shared/lib/mathExpr";
+} from "../../../../shared/lib/mathExpr";
 import {
-  MATH_WIDGET_PRESETS,
+  MATH_PRESETS,
   initialParams,
   type CurveEmphasis,
-  type MathWidgetPreset,
-} from "../lib/presets";
-import { FunctionPlot, type PlotMarker, type PlotSeries } from "./FunctionPlot";
-
-interface MathWidgetPanelProps {
-  isDark: boolean;
-}
+  type MathPreset,
+} from "../../../../features/math-widget/lib/presets";
+import { FunctionPlot, type PlotMarker, type PlotSeries } from "../../../../features/math-widget/ui/FunctionPlot";
+import type { ParamPanelProps } from "./types";
 
 const SAMPLES = 280;
 
@@ -26,12 +23,12 @@ const CURVE_COLORS: Record<"dark" | "light", Record<CurveEmphasis, string>> = {
 };
 
 interface CompiledPreset {
-  preset: MathWidgetPreset;
+  preset: MathPreset;
   curves: Array<{ fn: CompiledExpr | null; label: string; emphasis: CurveEmphasis }>;
   markerFn: CompiledExpr | null;
 }
 
-function compilePreset(preset: MathWidgetPreset): CompiledPreset {
+function compilePreset(preset: MathPreset): CompiledPreset {
   const curves = preset.curves.map((c) => {
     let fn: CompiledExpr | null = null;
     try {
@@ -60,19 +57,19 @@ function renderKatex(src: string, displayMode: boolean): string {
   }
 }
 
-export function MathWidgetPanel({ isDark }: MathWidgetPanelProps): React.JSX.Element {
+export function MathParamPanel({ isDark }: ParamPanelProps): React.JSX.Element {
   const theme = isDark ? "dark" : "light";
-  const [presetId, setPresetId] = useState<string>(MATH_WIDGET_PRESETS[0].id);
-  const [params, setParams] = useState<Record<string, number>>(() => initialParams(MATH_WIDGET_PRESETS[0]));
+  const [presetId, setPresetId] = useState<string>(MATH_PRESETS[0].id);
+  const [params, setParams] = useState<Record<string, number>>(() => initialParams(MATH_PRESETS[0]));
 
   const compiled = useMemo<CompiledPreset>(() => {
-    const preset = MATH_WIDGET_PRESETS.find((p) => p.id === presetId) ?? MATH_WIDGET_PRESETS[0];
+    const preset = MATH_PRESETS.find((p) => p.id === presetId) ?? MATH_PRESETS[0];
     return compilePreset(preset);
   }, [presetId]);
   const { preset } = compiled;
 
   const selectPreset = (id: string): void => {
-    const next = MATH_WIDGET_PRESETS.find((p) => p.id === id);
+    const next = MATH_PRESETS.find((p) => p.id === id);
     if (!next) return;
     setPresetId(id);
     setParams(initialParams(next));
@@ -137,11 +134,9 @@ export function MathWidgetPanel({ isDark }: MathWidgetPanelProps): React.JSX.Ele
         fontFamily: "system-ui, -apple-system, sans-serif",
       }}
     >
-      <strong style={{ fontSize: 14 }}>📐 数学画板</strong>
-
       {/* Preset chips */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-        {MATH_WIDGET_PRESETS.map((p) => {
+        {MATH_PRESETS.map((p) => {
           const active = p.id === presetId;
           return (
             <button

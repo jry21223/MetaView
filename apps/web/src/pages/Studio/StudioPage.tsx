@@ -6,7 +6,6 @@ import { GlobalTopbar, Stage } from '../../shared/ui/GlobalTopbar';
 import { useProviderSettings, ProviderSettings } from '../../features/providers/hooks/useProviderSettings';
 import type { PlaybookScript } from '../../features/playbook/engine/types';
 import { ExportModal } from '../../features/export/ui/ExportModal';
-import { MathWidgetPanel } from '../../features/math-widget';
 
 // ── Domain mapping ────────────────────────────────────────────────────────
 
@@ -324,34 +323,6 @@ function PipelineSkeleton({ status }: PipelineSkeletonProps) {
   );
 }
 
-// ── ParamPanelPlaceholder ─────────────────────────────────────────────────
-// Extension point: each subject will eventually get its own interactive parameter panel.
-
-function ParamPanelPlaceholder({ domain, isDark }: { domain: string; isDark: boolean }) {
-  const label = DOMAIN_LABEL[domain] ?? domain ?? '该学科';
-  const text = isDark ? '#c9d1d9' : '#24292f';
-  const muted = isDark ? '#8b949e' : '#6e7781';
-  return (
-    <div
-      style={{
-        padding: '22px 16px 26px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 6,
-        textAlign: 'center',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-      }}
-    >
-      <span style={{ fontSize: 22 }}>🎛</span>
-      <strong style={{ fontSize: 13, color: text }}>「{label}」交互参数面板即将上线</strong>
-      <span style={{ fontSize: 12, color: muted, lineHeight: 1.5 }}>
-        该学科的可调参数将在这里支持快捷调整与实时预览。
-      </span>
-    </div>
-  );
-}
-
 // ── StudioPage ────────────────────────────────────────────────────────────
 
 export interface StudioPageProps {
@@ -435,11 +406,6 @@ export function StudioPage({
               script={playbook}
               theme={isDark ? 'dark' : 'light'}
               onOpenExport={() => setExportOpen(true)}
-              renderParamPanel={({ isDark: dark }) =>
-                playbook.domain === 'math'
-                  ? <MathWidgetPanel isDark={dark} />
-                  : <ParamPanelPlaceholder domain={playbook.domain} isDark={dark} />
-              }
             />
           ) : isLoading ? (
             <PipelineSkeleton status={status} />

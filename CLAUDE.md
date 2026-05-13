@@ -65,6 +65,11 @@ make check  # ruff + eslint + pytest + tsc + vite build
 3. 在 `renderers/registry.ts` 注册
 4. 在 `domain/models/playbook.py` 对应扩展 Python 类型
 
+### 新增学科参数面板
+1. 在 `features/playbook/engine/param-panels/` 新增 `XxxParamPanel.tsx`
+2. 实现 `ParamPanelProps` 接口（`types.ts`）
+3. 在 `param-panels/registry.ts` 注册 domain → 组件映射
+
 ### 新增学科领域
 1. 在 `domain/models/topic.py` 添加 `TopicDomain` 枚举值
 2. 在 `domain/services/skill_catalog.py` 注册
@@ -81,3 +86,5 @@ make check  # ruff + eslint + pytest + tsc + vite build
 | `apps/web/src/features/playbook/engine/types.ts` | 前端 PlaybookScript TS 类型 |
 | `apps/web/src/features/playbook/engine/player/PlaybookPlayer.tsx` | Remotion 播放器入口 |
 | `apps/web/src/features/playbook/engine/renderers/registry.ts` | 渲染器注册表 |
+| `apps/web/src/features/playbook/engine/param-panels/registry.ts` | 参数面板注册表 |
+| `apps/web/src/features/playbook/engine/param-panels/types.ts` | ParamPanelProps 接口 |
