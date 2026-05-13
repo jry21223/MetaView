@@ -19,7 +19,14 @@
 
 数学学科除了逐项代数（数组视图）外，还支持 `visual_kind="function"` —— 在坐标系上画函数曲线、
 平移/缩放变换、导数与切线、定积分阴影、三角波等（渲染器 `MathPlotRenderer`，详见 [`docs/pipeline.md` §6](docs/pipeline.md)）。
-工作台顶栏的「📐 数学画板」还提供一个**交互式**画板：内置预设 + 参数滑块 + 实时 KaTeX 公式联动。
+数学播放器内嵌**交互式参数面板**（`MathWidgetPanel`）：内置预设 + 参数滑块 + 实时 KaTeX 公式联动，
+可在播放器底栏切换「▶ 播放」与「🔢 参数」两个视图。
+
+算法渲染器新增**柱状视图**（`algorithm_bars`）：数值输入自动切换为高度编码的 2D 柱形图，
+颜色跟随系统主题 CSS 变量，支持冒泡 / 快排 / 插入 / 选择四种排序逐步回放。
+代码高亮新增 Rust 语法支持（`/* */` 块注释 + 关键词着色）。
+
+历史记录页现在展示每次运行的**原始提示词**（`prompt` 字段），方便对比不同输入的输出差异。
 
 ## 快速开始
 
@@ -44,6 +51,20 @@ make start                # = docker compose up --build
 make stop                 # = docker compose down
 ```
 
+## 播放器键盘快捷键
+
+| 按键 | 功能 |
+|------|------|
+| `Space` | 播放 / 暂停 |
+| `←` / `→` | 上一步 / 下一步 |
+| `R` | 重置到第一步 |
+| `T` | 开启 / 关闭 TTS 朗读 |
+| `S` | 显示 / 隐藏字幕 |
+| `+` / `=` | 加速（0.5 × → 0.75 × → 1 × → 1.25 × → 1.5 × → 2 ×） |
+| `-` | 减速 |
+| `E` | 打开导出面板 |
+| `Esc` | 关闭 TTS 配置弹窗 |
+
 ## 检查
 
 ```bash
@@ -55,13 +76,11 @@ make check   # 上面三步串联
 
 ## API 端点
 
-后端只暴露三个端点：
-
 | Method | Path | 说明 |
 |--------|------|------|
 | `POST` | `/api/v1/pipeline` | 提交题目，返回 `run_id`（202） |
-| `GET`  | `/api/v1/runs` | 历史列表 |
-| `GET`  | `/api/v1/runs/{run_id}` | 单次运行结果（含 PlaybookScript） |
+| `GET`  | `/api/v1/runs` | 历史列表（含 `prompt` 字段） |
+| `GET`  | `/api/v1/runs/{run_id}` | 单次运行结果（含 PlaybookScript + `prompt`） |
 | `GET`  | `/health` | 健康检查 |
 
 提交后由前端 `usePipelinePoller` 轮询 `/runs/{run_id}` 直到 `succeeded` / `failed`。
