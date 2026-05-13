@@ -1,8 +1,9 @@
 import React from "react";
 import { useCurrentFrame } from "remotion";
 import type { PlaybookScript } from "../types";
+import { AlgorithmRenderer } from "../renderers/AlgorithmRenderer";
+import { BinaryTreeRenderer } from "../renderers/BinaryTreeRenderer";
 import { CodeHighlightRenderer } from "../renderers/CodeHighlightRenderer";
-import { rendererRegistry } from "../renderers/registry";
 import { useStepProgress } from "./useInterpolatedState";
 import type { RendererProps } from "../renderers/types";
 import { PLAYBOOK_LAYOUT } from "../../../../shared/config/constants";
@@ -15,25 +16,27 @@ interface PlaybookCompositionProps {
 }
 
 function SnapshotRenderer(props: RendererProps) {
-  const renderer = rendererRegistry.get(props.step.snapshot.kind);
-  if (renderer) return React.createElement(renderer, props);
-  return (
-    <div
-      style={{
-        width: "100%",
-        height: "100%",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: props.theme === "dark" ? "#0a0c10" : "#f5f7fa",
-        color: props.theme === "dark" ? "#e8ecf4" : "#141820",
-        fontFamily: "system-ui, sans-serif",
-        fontSize: 18,
-      }}
-    >
-      Unknown snapshot kind
-    </div>
-  );
+  switch (props.step.snapshot.kind) {
+    case "algorithm_array": return <AlgorithmRenderer {...props} />;
+    case "algorithm_tree": return <BinaryTreeRenderer {...props} />;
+    default: return (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: props.theme === "dark" ? "#0a0c10" : "#f5f7fa",
+          color: props.theme === "dark" ? "#e8ecf4" : "#141820",
+          fontFamily: "system-ui, sans-serif",
+          fontSize: 18,
+        }}
+      >
+        Unknown snapshot kind
+      </div>
+    );
+  }
 }
 
 export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
@@ -100,44 +103,67 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
 
       {/* Subtitle bar — full width, toggleable */}
       {showSubtitles && (
-      <div
-        style={{
-          flexShrink: 0,
-          background: subtitleBg,
-          borderTop: `1px solid ${dividerColor}`,
-          opacity: fadeProgress,
-        }}
-      >
-        {/* Step progress bar */}
-        <div style={{ width: "100%", height: 2, background: dividerColor, position: "relative" }}>
+      <div style={{ flexShrink: 0, opacity: fadeProgress }}>
+        {/* Progress bar */}
+        <div
+          style={{
+            height: 3,
+            background: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)",
+            position: "relative",
+            overflow: "hidden",
+          }}
+        >
           <div
             style={{
               position: "absolute",
               left: 0,
               top: 0,
               height: "100%",
-              width: `${(frame / Math.max(1, script.total_frames)) * 100}%`,
+              width: `${(frame / (script.total_frames || 1)) * 100}%`,
               background: isDark ? "#4de8b0" : "#00896e",
+              borderRadius: "0 2px 2px 0",
+              transition: "width 0.016s linear",
             }}
           />
+          {/* Step segment markers */}
+          {script.steps.map((s, i) => {
+            if (i === 0) return null;
+            const pct = (s.end_frame / (script.total_frames || 1)) * 100;
+            return (
+              <div
+                key={i}
+                style={{
+                  position: "absolute",
+                  left: `${pct}%`,
+                  top: 0,
+                  width: 1,
+                  height: "100%",
+                  background: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.12)",
+                }}
+              />
+            );
+          })}
         </div>
-        {/* Subtitle text + step counter */}
+
+        {/* Subtitle row */}
         <div
           style={{
-            height: subtitleHeight - 2,
+            height: subtitleHeight,
             display: "flex",
             alignItems: "center",
             padding: "0 20px",
+            background: subtitleBg,
+            borderTop: `1px solid ${dividerColor}`,
             gap: 12,
           }}
         >
           <span
             style={{
-              flex: 1,
               color: subtitleColor,
               fontFamily: "system-ui, -apple-system, sans-serif",
               fontSize: 14,
               lineHeight: 1.5,
+              flex: 1,
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -148,11 +174,10 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
           <span
             style={{
               flexShrink: 0,
-              fontSize: 11,
               fontFamily: "IBM Plex Mono, monospace",
-              color: subtitleColor,
-              opacity: 0.5,
-              letterSpacing: "0.04em",
+              fontSize: 11,
+              color: isDark ? "rgba(77,232,176,0.8)" : "rgba(0,120,90,0.8)",
+              whiteSpace: "nowrap",
             }}
           >
             {activeIndex + 1} / {script.steps.length}
