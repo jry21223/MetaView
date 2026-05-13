@@ -1,13 +1,14 @@
-import { spring, interpolate, useCurrentFrame } from "remotion";
+import { spring, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import type { AlgorithmArraySnapshot, AnySnapshot } from "../types";
 
 export function useStepProgress(stepStartFrame: number, stepEndFrame: number): number {
   const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
   const duration = Math.max(1, stepEndFrame - stepStartFrame);
   const elapsed = Math.max(0, frame - stepStartFrame);
   return spring({
     frame: elapsed,
-    fps: 30,
+    fps,
     config: { stiffness: 100, damping: 20, mass: 1 },
     durationInFrames: duration,
   });
@@ -18,9 +19,10 @@ export function interpolateNumber(from: number, to: number, progress: number): n
 }
 
 export function useArrayCellOpacity(frame: number, stepStartFrame: number, cellIndex: number): number {
+  const { fps } = useVideoConfig();
   return spring({
     frame: Math.max(0, frame - stepStartFrame - cellIndex * 2),
-    fps: 30,
+    fps,
     config: { stiffness: 120, damping: 18 },
   });
 }

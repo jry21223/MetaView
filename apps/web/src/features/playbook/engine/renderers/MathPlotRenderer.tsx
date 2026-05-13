@@ -140,26 +140,27 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({ step, frame, stepSta
   const xMin = snap.x_min;
   const xMax = snap.x_max;
 
-  // Compile + sample every curve once.
-  let primaryCount = 0;
-  const compiled: CompiledCurve[] = (snap.curves ?? []).map((c) => {
-    let fn: CompiledExpr | null = null;
-    try {
-      fn = compileExpr(c.expression);
-    } catch {
-      fn = null;
-    }
-    const isPrimary = c.emphasis !== "secondary" && c.emphasis !== "accent";
-    const primaryIndex = isPrimary ? primaryCount++ : 0;
-    return {
-      expression: c.expression,
-      label: c.label,
-      emphasis: c.emphasis,
-      fn,
-      points: fn ? sampleExpr(fn, xMin, xMax, SAMPLES, snap.params) : [],
-      primaryIndex,
-    };
-  });
+  const compiled = React.useMemo<CompiledCurve[]>(() => {
+    let primaryCount = 0;
+    return (snap.curves ?? []).map((c) => {
+      let fn: CompiledExpr | null = null;
+      try {
+        fn = compileExpr(c.expression);
+      } catch {
+        fn = null;
+      }
+      const isPrimary = c.emphasis !== "secondary" && c.emphasis !== "accent";
+      const primaryIndex = isPrimary ? primaryCount++ : 0;
+      return {
+        expression: c.expression,
+        label: c.label,
+        emphasis: c.emphasis,
+        fn,
+        points: fn ? sampleExpr(fn, xMin, xMax, SAMPLES, snap.params) : [],
+        primaryIndex,
+      };
+    });
+  }, [snap.curves, snap.params, xMin, xMax]);
 
   const drawable = compiled.filter((c) => c.points.length > 0);
 
@@ -208,7 +209,7 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({ step, frame, stepSta
     const shadeReveal = clamp01((reveal - 0.15) / 0.85);
     const right = snap.shade_from + (snap.shade_to - snap.shade_from) * shadeReveal;
     if (right > snap.shade_from + 1e-9) {
-      const top = sampleExpr(lead.fn, snap.shade_from, right, SHADE_SAMPLES).filter((p) =>
+      const top = sampleExpr(lead.fn, snap.shade_from, right, SHADE_SAMPLES, snap.params).filter((p) =>
         Number.isFinite(p.y),
       );
       if (top.length >= 2) {
@@ -225,7 +226,7 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({ step, frame, stepSta
   // Point marker on the lead curve.
   let marker: { px: number; py: number; mx: number; my: number; opacity: number } | null = null;
   if (lead?.fn && snap.marker_x != null) {
-        const my = lead.fn({ ...(snap.params ?? {}), x: snap.marker_x });
+    const my = lead.fn({ ...(snap.params ?? {}), x: snap.marker_x });
     if (Number.isFinite(my)) {
       const xFrac = (snap.marker_x - xMin) / (xMax - xMin);
       const opacity = clamp01((reveal - Math.min(0.85, xFrac)) * 6);
@@ -235,17 +236,17 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({ step, frame, stepSta
     }
   }
 
-  let formulaHtml: string | null = null;
-  if (snap.formula_latex && snap.formula_latex.trim()) {
+  const formulaHtml = React.useMemo(() => {
+    if (!snap.formula_latex || !snap.formula_latex.trim()) return null;
     try {
-      formulaHtml = katex.renderToString(snap.formula_latex, {
+      return katex.renderToString(snap.formula_latex, {
         throwOnError: false,
         displayMode: false,
       });
     } catch {
-      formulaHtml = null;
+      return null;
     }
-  }
+  }, [snap.formula_latex]);
 
   const empty = drawable.length === 0;
 

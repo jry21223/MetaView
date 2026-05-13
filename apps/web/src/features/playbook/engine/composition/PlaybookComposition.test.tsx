@@ -7,6 +7,7 @@ vi.mock("remotion", async () => {
   return {
     ...actual,
     useCurrentFrame: () => 0,
+    useVideoConfig: () => ({ fps: 30 }),
     spring: () => 1,
   };
 });

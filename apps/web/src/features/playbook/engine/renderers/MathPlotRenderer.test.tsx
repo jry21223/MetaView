@@ -43,7 +43,7 @@ function makeSnap(extra: Partial<MathPlotSnapshot> = {}): MathPlotSnapshot {
 }
 
 function render(snap: MathPlotSnapshot, overrides: Partial<RendererProps> = {}): string {
-  return renderToStaticMarkup(MathPlotRenderer(props(plotStep(snap), overrides)));
+  return renderToStaticMarkup(<MathPlotRenderer {...props(plotStep(snap), overrides)} />);
 }
 
 function firstPolylinePointCount(markup: string): number {
@@ -113,7 +113,7 @@ describe("MathPlotRenderer", () => {
 
   it("honours the light theme", () => {
     const markup = renderToStaticMarkup(
-      MathPlotRenderer(props(plotStep(makeSnap()), { theme: "light" })),
+      <MathPlotRenderer {...props(plotStep(makeSnap()), { theme: "light" })} />,
     );
     expect(markup).toContain("#f5f7fa");
   });

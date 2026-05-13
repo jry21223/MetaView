@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { interpolate, spring } from "remotion";
+import { interpolate, spring, useVideoConfig } from "remotion";
 import { hierarchy, tree } from "d3-hierarchy";
 import type { AlgorithmTreeSnapshot } from "../types";
 import type { RendererProps } from "./types";
@@ -77,6 +77,7 @@ export const BinaryTreeRenderer: React.FC<RendererProps> = ({
   const snap = step.snapshot as AlgorithmTreeSnapshot;
   const colors = PALETTE[theme];
   const elapsed = Math.max(0, frame - stepStartFrame);
+  const { fps } = useVideoConfig();
 
   const layout = useMemo(() => {
     const root = buildTree(snap);
@@ -86,7 +87,7 @@ export const BinaryTreeRenderer: React.FC<RendererProps> = ({
     return t(h);
   }, [snap]);
 
-  const titleOpacity = spring({ frame: elapsed, fps: 30, config: { stiffness: 80, damping: 20 } });
+  const titleOpacity = spring({ frame: elapsed, fps, config: { stiffness: 80, damping: 20 } });
 
   if (!layout) {
     return (
@@ -151,7 +152,7 @@ export const BinaryTreeRenderer: React.FC<RendererProps> = ({
 
             const drawProgress = spring({
               frame: edgeElapsed,
-              fps: 30,
+              fps,
               config: { stiffness: 120, damping: 20 },
             });
             const drawnLen = drawProgress * edgeLen;
@@ -180,7 +181,7 @@ export const BinaryTreeRenderer: React.FC<RendererProps> = ({
             const nodeElapsed = Math.max(0, elapsed - i * NODE_STAGGER);
             const nodeProgress = spring({
               frame: nodeElapsed,
-              fps: 30,
+              fps,
               config: { stiffness: 110, damping: 18 },
             });
 
@@ -264,7 +265,7 @@ export const BinaryTreeRenderer: React.FC<RendererProps> = ({
           textAlign: "center",
           lineHeight: 1.6,
           margin: 0,
-          opacity: spring({ frame: Math.max(0, elapsed - 10), fps: 30, config: { stiffness: 60, damping: 20 } }),
+          opacity: spring({ frame: Math.max(0, elapsed - 10), fps, config: { stiffness: 60, damping: 20 } }),
         }}
       >
         {step.voiceover_text}
