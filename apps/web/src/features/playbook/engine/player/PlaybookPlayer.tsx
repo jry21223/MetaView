@@ -308,7 +308,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScri
   const [codePanelOpen, setCodePanelOpen] = useState(true);
   const [paramPanelOpen, setParamPanelOpen] = useState(false);
   const script = useResolvedScript(baseScript, overrides);
-  const DomainParamPanel = getParamPanel(baseScript.domain);
+  const DomainParamPanel = useMemo(() => getParamPanel(baseScript.domain), [baseScript.domain]);
 
   const tts = useTTS();
 
