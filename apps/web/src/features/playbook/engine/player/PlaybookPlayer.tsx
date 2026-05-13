@@ -11,7 +11,6 @@ import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { resolveNarrationTemplate } from "./resolveNarrationTemplate";
 import { useResolvedScript, type ScriptOverrides } from "./useResolvedScript";
 import { resolveCodePanelOverlay } from "./resolveCodePanelOverlay";
-import { isReplaySupported } from "../replay/registry";
 import { CodeHighlightRenderer } from "../renderers/CodeHighlightRenderer";
 import { getParamPanel } from "../param-panels/registry";
 
@@ -309,7 +308,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScri
   const [codePanelOpen, setCodePanelOpen] = useState(true);
   const [paramPanelOpen, setParamPanelOpen] = useState(false);
   const script = useResolvedScript(baseScript, overrides);
-  const replaySupported = isReplaySupported(baseScript.algorithm_id);
+  const DomainParamPanel = getParamPanel(baseScript.domain);
 
   const tts = useTTS();
 
@@ -799,51 +798,47 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScri
         </div>
 
         {/* Domain-specific param panel — looked up from registry */}
-        {(() => {
-          const ParamPanel = getParamPanel(baseScript.domain);
-          if (!ParamPanel) return null;
-          return (
-            <div
-              className="playbook-parampanel"
+        {DomainParamPanel && (
+          <div
+            className="playbook-parampanel"
+            style={{
+              flexShrink: 0,
+              borderTop: `1px solid ${isDark ? "#21262d" : "#d0d7de"}`,
+              background: isDark ? "#0f1117" : "#f7f9fc",
+            }}
+          >
+            <button
+              onClick={() => setParamPanelOpen((v) => !v)}
+              aria-expanded={paramPanelOpen}
               style={{
-                flexShrink: 0,
-                borderTop: `1px solid ${isDark ? "#21262d" : "#d0d7de"}`,
-                background: isDark ? "#0f1117" : "#f7f9fc",
+                width: "100%",
+                textAlign: "left",
+                padding: "7px 16px",
+                border: "none",
+                background: "transparent",
+                color: isDark ? "#c9d1d9" : "#24292f",
+                cursor: "pointer",
+                fontSize: 12,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
               }}
             >
-              <button
-                onClick={() => setParamPanelOpen((v) => !v)}
-                aria-expanded={paramPanelOpen}
-                style={{
-                  width: "100%",
-                  textAlign: "left",
-                  padding: "7px 16px",
-                  border: "none",
-                  background: "transparent",
-                  color: isDark ? "#c9d1d9" : "#24292f",
-                  cursor: "pointer",
-                  fontSize: 12,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                <span>参数面板</span>
-                <span style={{ marginLeft: "auto", opacity: 0.7 }}>{paramPanelOpen ? "▾" : "▸"}</span>
-              </button>
-              {paramPanelOpen && (
-                <div style={{ maxHeight: "min(420px, 46vh)", overflowY: "auto" }}>
-                  <ParamPanel
-                    script={baseScript}
-                    overrides={overrides}
-                    onOverridesChange={setOverrides}
-                    isDark={isDark}
-                  />
-                </div>
-              )}
-            </div>
-          );
-        })()}
+              <span>参数面板</span>
+              <span style={{ marginLeft: "auto", opacity: 0.7 }}>{paramPanelOpen ? "▾" : "▸"}</span>
+            </button>
+            {paramPanelOpen && (
+              <div style={{ maxHeight: "min(420px, 46vh)", overflowY: "auto" }}>
+                <DomainParamPanel
+                  script={baseScript}
+                  overrides={overrides}
+                  onOverridesChange={setOverrides}
+                  isDark={isDark}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
