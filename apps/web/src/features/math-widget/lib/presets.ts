@@ -1,5 +1,5 @@
 /**
- * Preset scenarios for the interactive Math Widget.
+ * Preset scenarios for the interactive Math Param Panel.
  *
  * Each preset declares a set of parameters (mapped to draggable sliders), one or
  * more curve expressions in `x` plus those parameters (evaluated via
@@ -11,7 +11,7 @@ import { fmtNum } from "../../../shared/lib/plotMath";
 
 export type CurveEmphasis = "primary" | "secondary" | "accent";
 
-export interface MathWidgetParam {
+export interface MathParam {
   /** Variable name used inside curve / marker expressions — must be ASCII letters. */
   key: string;
   /** Human-facing label (may include unicode, e.g. "振幅 A"). */
@@ -23,19 +23,19 @@ export interface MathWidgetParam {
   initial: number;
 }
 
-export interface MathWidgetCurve {
+export interface MathCurve {
   /** Expression in `x` and the preset's parameter keys, e.g. `"a*sin(b*x + c)"`. */
   expression: string;
   label: string;
   emphasis?: CurveEmphasis;
 }
 
-export interface MathWidgetPreset {
+export interface MathPreset {
   id: string;
   name: string;
   description: string;
-  params: MathWidgetParam[];
-  curves: MathWidgetCurve[];
+  params: MathParam[];
+  curves: MathCurve[];
   xRange: [number, number];
   /** Fixed y-range; omit to auto-fit. */
   yRange?: [number, number];
@@ -71,7 +71,7 @@ function shifted(varStr: string, h: number): string {
 
 // ── presets ────────────────────────────────────────────────────────────────
 
-export const MATH_WIDGET_PRESETS: MathWidgetPreset[] = [
+export const MATH_PRESETS: MathPreset[] = [
   {
     id: "line",
     name: "一次函数",
@@ -159,11 +159,11 @@ export const MATH_WIDGET_PRESETS: MathWidgetPreset[] = [
   },
 ];
 
-export function getPreset(id: string): MathWidgetPreset | undefined {
-  return MATH_WIDGET_PRESETS.find((p) => p.id === id);
+export function getPreset(id: string): MathPreset | undefined {
+  return MATH_PRESETS.find((p) => p.id === id);
 }
 
 /** Build the initial parameter scope for a preset. */
-export function initialParams(preset: MathWidgetPreset): Record<string, number> {
+export function initialParams(preset: MathPreset): Record<string, number> {
   return Object.fromEntries(preset.params.map((p) => [p.key, p.initial]));
 }

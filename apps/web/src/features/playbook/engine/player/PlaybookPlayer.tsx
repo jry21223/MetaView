@@ -11,9 +11,17 @@ import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { resolveNarrationTemplate } from "./resolveNarrationTemplate";
 import { useResolvedScript, type ScriptOverrides } from "./useResolvedScript";
 import { resolveCodePanelOverlay } from "./resolveCodePanelOverlay";
-import { isReplaySupported } from "../replay/registry";
 import { CodeHighlightRenderer } from "../renderers/CodeHighlightRenderer";
-import { TweakStrip } from "./TweakStrip";
+import { getParamPanel } from "../param-panels/registry";
+import type { ParamPanelProps } from "../param-panels/types";
+
+// ── ParamPanelSlot (static component — resolves domain panel from registry) ──
+
+function ParamPanelSlot({ domain, ...props }: ParamPanelProps & { domain: string }) {
+  const Panel = getParamPanel(domain);
+  if (!Panel) return null;
+  return React.createElement(Panel, props);
+}
 
 // ── SVG icons ──────────────────────────────────────────────────────────────
 
@@ -296,11 +304,9 @@ interface PlaybookPlayerProps {
   script: PlaybookScript;
   theme?: "dark" | "light";
   onOpenExport?: () => void;
-  /** Subject-agnostic slot rendered in the collapsible bottom panel; content is decided by the page. */
-  renderParamPanel?: (ctx: { isDark: boolean }) => React.ReactNode;
 }
 
-export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScript, theme = "dark", onOpenExport, renderParamPanel }) => {
+export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScript, theme = "dark", onOpenExport }) => {
   const playerRef = useRef<PlayerRef | null>(null);
 
   // ── Tweak state (frontend-only hot reload) ─────────────────────────────
@@ -311,7 +317,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScri
   const [codePanelOpen, setCodePanelOpen] = useState(true);
   const [paramPanelOpen, setParamPanelOpen] = useState(false);
   const script = useResolvedScript(baseScript, overrides);
-  const replaySupported = isReplaySupported(baseScript.algorithm_id);
+  const hasDomainPanel = getParamPanel(baseScript.domain) !== null;
 
   const tts = useTTS();
 
@@ -748,22 +754,60 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScri
           </button>
         </div>
 
-        <TweakStrip
-          initialArray={baseScript.initial_data?.array}
-          array={overrides.array}
-          onArrayChange={(next) => setOverrides((prev) => ({ ...prev, array: next }))}
-          onReset={() => setOverrides({})}
-          speed={playbackRate}
-          onSpeedChange={setPlaybackRate}
-          showSubtitles={showSubtitles}
-          onSubtitlesChange={setShowSubtitles}
-          replaySupported={replaySupported}
-          algorithmId={baseScript.algorithm_id}
-          isDark={isDark}
-        />
+        {/* Player toolbar — speed + subtitles (shared across all domains) */}
+        <div
+          className="playbook-tweakstrip"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+            padding: "8px 14px",
+            borderTop: `1px solid ${isDark ? "#21262d" : "#d0d7de"}`,
+            background: isDark ? "rgba(15,17,22,0.7)" : "rgba(247,249,252,0.85)",
+            fontSize: 12,
+            color: isDark ? "#c9d1d9" : "#24292f",
+          }}
+        >
+          <div style={{ flex: 1 }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 11, color: isDark ? "#8b949e" : "#6e7781" }}>速度</span>
+            {SPEED_STEPS.map((s) => (
+              <button
+                key={s}
+                onClick={() => setPlaybackRate(s)}
+                style={{
+                  border: `1px solid ${playbackRate === s ? (isDark ? "#4de8b0" : "#00896e") : (isDark ? "#30363d" : "#d0d7de")}`,
+                  background: playbackRate === s ? `${isDark ? "#4de8b0" : "#00896e"}1a` : "transparent",
+                  color: playbackRate === s ? (isDark ? "#4de8b0" : "#00896e") : (isDark ? "#8b949e" : "#6e7781"),
+                  borderRadius: 5,
+                  padding: "2px 8px",
+                  cursor: "pointer",
+                  fontSize: 11,
+                  fontWeight: playbackRate === s ? 600 : 400,
+                }}
+              >
+                {s}×
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setShowSubtitles((v) => !v)}
+            style={{
+              border: `1px solid ${showSubtitles ? (isDark ? "#4de8b0" : "#00896e") : (isDark ? "#30363d" : "#d0d7de")}`,
+              background: showSubtitles ? `${isDark ? "#4de8b0" : "#00896e"}1a` : "transparent",
+              color: showSubtitles ? (isDark ? "#4de8b0" : "#00896e") : (isDark ? "#8b949e" : "#6e7781"),
+              borderRadius: 5,
+              padding: "2px 10px",
+              cursor: "pointer",
+              fontSize: 11,
+            }}
+          >
+            {showSubtitles ? "字幕开" : "字幕关"}
+          </button>
+        </div>
 
-        {/* Subject-agnostic interactive parameter panel — content is supplied by the page. */}
-        {renderParamPanel && (
+        {/* Domain-specific param panel — looked up from registry */}
+        {hasDomainPanel && (
           <div
             className="playbook-parampanel"
             style={{
@@ -789,12 +833,18 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScri
                 gap: 6,
               }}
             >
-              <span>🎛 交互参数面板</span>
+              <span>参数面板</span>
               <span style={{ marginLeft: "auto", opacity: 0.7 }}>{paramPanelOpen ? "▾" : "▸"}</span>
             </button>
             {paramPanelOpen && (
               <div style={{ maxHeight: "min(420px, 46vh)", overflowY: "auto" }}>
-                {renderParamPanel({ isDark })}
+                <ParamPanelSlot
+                  domain={baseScript.domain}
+                  script={baseScript}
+                  overrides={overrides}
+                  onOverridesChange={setOverrides}
+                  isDark={isDark}
+                />
               </div>
             )}
           </div>
