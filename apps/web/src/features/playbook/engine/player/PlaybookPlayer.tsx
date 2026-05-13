@@ -13,6 +13,15 @@ import { useResolvedScript, type ScriptOverrides } from "./useResolvedScript";
 import { resolveCodePanelOverlay } from "./resolveCodePanelOverlay";
 import { CodeHighlightRenderer } from "../renderers/CodeHighlightRenderer";
 import { getParamPanel } from "../param-panels/registry";
+import type { ParamPanelProps } from "../param-panels/types";
+
+// ── ParamPanelSlot (static component — resolves domain panel from registry) ──
+
+function ParamPanelSlot({ domain, ...props }: ParamPanelProps & { domain: string }) {
+  const Panel = getParamPanel(domain);
+  if (!Panel) return null;
+  return React.createElement(Panel, props);
+}
 
 // ── SVG icons ──────────────────────────────────────────────────────────────
 
@@ -308,7 +317,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScri
   const [codePanelOpen, setCodePanelOpen] = useState(true);
   const [paramPanelOpen, setParamPanelOpen] = useState(false);
   const script = useResolvedScript(baseScript, overrides);
-  const DomainParamPanel = useMemo(() => getParamPanel(baseScript.domain), [baseScript.domain]);
+  const hasDomainPanel = getParamPanel(baseScript.domain) !== null;
 
   const tts = useTTS();
 
@@ -798,7 +807,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScri
         </div>
 
         {/* Domain-specific param panel — looked up from registry */}
-        {DomainParamPanel && (
+        {hasDomainPanel && (
           <div
             className="playbook-parampanel"
             style={{
@@ -829,7 +838,8 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScri
             </button>
             {paramPanelOpen && (
               <div style={{ maxHeight: "min(420px, 46vh)", overflowY: "auto" }}>
-                <DomainParamPanel
+                <ParamPanelSlot
+                  domain={baseScript.domain}
                   script={baseScript}
                   overrides={overrides}
                   onOverridesChange={setOverrides}
