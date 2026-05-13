@@ -19,6 +19,11 @@ MetaView v2 是一个教育可视化平台，采用 React + Remotion 帧驱动�
 - `features/` 间禁止互相导入
 - `engine/` 内部：`renderers/` 不得导入 `player/` 或 `composition/`
 
+### 前端样式规则
+- 所有可复用/可维护的 UI 样式必须放在外部 CSS 文件（如 `apps/web/src/styles/**`），组件内只写 `className` / `data-*` / CSS 变量入口
+- 禁止在 React 组件里堆叠业务样式对象；主题色、间距、边框、布局等统一通过 CSS class 管理
+- `style` 仅允许用于真正运行时动态的值（如 Remotion 帧派生 transform/opacity、SVG 坐标、输入控件的动态尺寸/范围等），不得承载静态视觉样式
+
 ### 渲染管线
 - **唯一渲染路径**：CIR → PlaybookScript（后端）→ Remotion Player（前端）
 - 禁止引入 Manim、HTML iframe、任何服务端视频渲染
