@@ -10,51 +10,66 @@ const SETTLE_BEZIER = Easing.bezier(0.45, 0, 0.55, 1);
 const POP_BEZIER = Easing.bezier(0.34, 1.56, 0.64, 1);
 
 // ─────────────────────────────────────────────────────────────────
-// SWAP: lift → translate → drop
+// SWAP: horizontal slide with cross-fade (no vertical lift)
+//
+// Bars stay glued to the baseline since their height already encodes
+// the value; lifting them off would read as "the value changed".
+// Cross-fade (opacity → 0.7 mid-flight) keeps the shorter bar visible
+// while a taller bar slides over it.
 // ─────────────────────────────────────────────────────────────────
 
 export const SWAP_PHASES: readonly AnimPhase[] = [
-  { name: "lift", frames: 14, easing: ENTER_BEZIER },
-  { name: "translate", frames: 18, easing: SETTLE_BEZIER },
-  { name: "drop", frames: 14, easing: ENTER_BEZIER },
+  { name: "blendIn", frames: 4, easing: ENTER_BEZIER },
+  { name: "translate", frames: 16, easing: SETTLE_BEZIER },
+  { name: "blendOut", frames: 4, easing: ENTER_BEZIER },
 ] as const;
+
+// Total frames of the default SWAP_PHASES.
+// Mirrored by `TWEAK_DEFAULTS.swapFrames` in `useTweaks.ts` — keep in sync.
+export const DEFAULT_SWAP_FRAMES = 24;
 
 export interface SwapMotion {
   translateX: number;
-  translateY: number;
   scale: number;
+  opacity: number;
   shadowOpacity: number;
   zIndex: number;
+}
+
+/**
+ * Scale SWAP_PHASES proportionally to a target total-frame count.
+ * Lets the player feed a runtime-tweakable duration without changing the
+ * relative weight of blendIn / translate / blendOut.
+ */
+export function scaleSwapPhases(
+  totalFrames: number,
+  base: readonly AnimPhase[] = SWAP_PHASES,
+): readonly AnimPhase[] {
+  const baseSum = base.reduce((s, p) => s + p.frames, 0);
+  const ratio = totalFrames / baseSum;
+  return base.map((p) => ({
+    ...p,
+    frames: Math.max(1, Math.round(p.frames * ratio)),
+  }));
 }
 
 export function swapMotion(
   elapsed: number,
   dx: number,
-  cellHeight: number,
-  arcDirection: 1 | -1 = 1,
+  phases: readonly AnimPhase[] = SWAP_PHASES,
 ): SwapMotion {
-  // arcDirection = 1 → arcs upward (over); -1 → arcs downward (under)
-  const liftHeight = cellHeight * 0.55 * arcDirection;
-  // translateY: 0 → -liftHeight (lift) → -liftHeight (translate) → 0 (drop)
-  const translateY = interpolatePhases(elapsed, SWAP_PHASES, [
-    0,
-    -liftHeight,
-    -liftHeight,
-    0,
-  ]);
-  // translateX: dx → dx (lift) → 0 (translate) → 0 (drop)
-  const translateX = interpolatePhases(elapsed, SWAP_PHASES, [dx, dx, 0, 0]);
-  // scale: 1 → 1.08 (lift) → 1.08 (translate) → 1 (drop)
-  const scale = interpolatePhases(elapsed, SWAP_PHASES, [1, 1.08, 1.08, 1]);
-  // shadow: 0 → 0.45 → 0.45 → 0
-  const shadowOpacity = interpolatePhases(elapsed, SWAP_PHASES, [
-    0, 0.45, 0.45, 0,
-  ]);
-  // zIndex high while lifted; collapse back at end
-  const absLift = Math.abs(liftHeight);
-  const liftRatio = absLift > 0 ? -translateY / absLift : 0;
-  const zIndex = Math.round(Math.abs(liftRatio) * 10) * arcDirection;
-  return { translateX, translateY, scale, shadowOpacity, zIndex };
+  // translateX: dx → dx (blendIn) → 0 (translate) → 0 (blendOut)
+  const translateX = interpolatePhases(elapsed, phases, [dx, dx, 0, 0]);
+  // scale: 1 → 1.06 (blendIn) → 1.06 (translate) → 1 (blendOut)
+  const scale = interpolatePhases(elapsed, phases, [1, 1.06, 1.06, 1]);
+  // opacity: 1 → 0.7 (blendIn) → 0.7 (translate) → 1 (blendOut)
+  const opacity = interpolatePhases(elapsed, phases, [1, 0.7, 0.7, 1]);
+  // shadow: 0 → 0.35 → 0.35 → 0
+  const shadowOpacity = interpolatePhases(elapsed, phases, [0, 0.35, 0.35, 0]);
+  // zIndex bumped while sliding so swap pair sits above sorted / idle bars
+  const total = phases.reduce((s, p) => s + p.frames, 0);
+  const inFlight = elapsed > phases[0].frames && elapsed < total - phases[2].frames;
+  return { translateX, scale, opacity, shadowOpacity, zIndex: inFlight ? 5 : 0 };
 }
 
 // ─────────────────────────────────────────────────────────────────

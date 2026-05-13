@@ -405,6 +405,7 @@ export function StudioPage({
             <PlaybookPlayer
               script={playbook}
               theme={isDark ? 'dark' : 'light'}
+              swapDurationFrames={t.swapFrames}
               onOpenExport={() => setExportOpen(true)}
             />
           ) : isLoading ? (

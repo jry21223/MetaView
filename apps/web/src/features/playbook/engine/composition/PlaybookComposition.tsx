@@ -12,6 +12,8 @@ interface PlaybookCompositionProps {
   theme?: "dark" | "light";
   showSubtitles?: boolean;
   showInlineCode?: boolean;
+  /** Total frames for the bar-swap animation; forwarded to renderers. */
+  swapDurationFrames?: number;
 }
 
 function SnapshotRenderer(props: RendererProps) {
@@ -41,6 +43,7 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
   theme = "dark",
   showSubtitles = true,
   showInlineCode = false,
+  swapDurationFrames,
 }) => {
   const frame = useCurrentFrame();
 
@@ -76,6 +79,7 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
     stepEndFrame,
     progress,
     theme,
+    swapDurationFrames,
   };
 
   return (

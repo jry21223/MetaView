@@ -113,6 +113,24 @@ export function TweaksPanel({ t, setTweak }: TweaksPanelProps) {
               </div>
             </div>
 
+            <div className="mv-tweak-section">动画</div>
+
+            <div className="mv-tweak-row">
+              <div className="mv-tweak-label">交换时长</div>
+              <div className="mv-tweak-slider-row">
+                <input
+                  type="range"
+                  className="mv-tweak-slider"
+                  min={12}
+                  max={60}
+                  step={2}
+                  value={t.swapFrames}
+                  onChange={(e) => setTweak('swapFrames', Number(e.target.value))}
+                />
+                <span className="mv-tweak-val">{t.swapFrames}f</span>
+              </div>
+            </div>
+
             <label className="mv-tweak-toggle">
               <input
                 type="checkbox"

@@ -2,7 +2,13 @@ import React from "react";
 import { Easing, interpolate } from "remotion";
 import type { AlgorithmBarsSnapshot } from "../types";
 import type { RendererProps } from "./types";
-import { selectMotion, swapMotion, writeMotion } from "./animationTemplates";
+import {
+  selectMotion,
+  swapMotion,
+  writeMotion,
+  scaleSwapPhases,
+  DEFAULT_SWAP_FRAMES,
+} from "./animationTemplates";
 import { buildPrevIndexMap } from "./prevIndexMap";
 
 /**
@@ -67,7 +73,6 @@ const ENTER_BEZIER = Easing.bezier(0.16, 1, 0.3, 1);
 const MOVE_FRAMES = 22;
 const MAX_BAR_HEIGHT = 360;
 const MIN_BAR_HEIGHT = 6;
-const SWAP_LIFT_REFERENCE = 90;
 
 export const BarBlockRenderer: React.FC<RendererProps> = ({
   step,
@@ -75,7 +80,12 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
   frame,
   stepStartFrame,
   theme,
+  swapDurationFrames = DEFAULT_SWAP_FRAMES,
 }) => {
+  // Plain compute — this component is intentionally hook-free so tests can
+  // invoke it as a regular function (see BarBlockRenderer.test.tsx). The
+  // array.map cost on a 3-phase descriptor is negligible per frame.
+  const swapPhases = scaleSwapPhases(swapDurationFrames);
   const snap = step.snapshot as AlgorithmBarsSnapshot;
   const prevSnap =
     prevStep && prevStep.snapshot.kind === "algorithm_bars"
@@ -200,14 +210,14 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
 
           if (isPairedSwap && prevIdx >= 0) {
             const dx = (prevIdx - i) * pitch;
-            const arcDirection: 1 | -1 = i % 2 === 0 ? 1 : -1;
-            const m = swapMotion(elapsed, dx, SWAP_LIFT_REFERENCE, arcDirection);
+            const m = swapMotion(elapsed, dx, swapPhases);
             tx = m.translateX;
-            ty = m.translateY;
+            // ty stays 0 — bars slide horizontally without lifting off baseline
             scale = m.scale;
             shadowOpacity = m.shadowOpacity;
             shadowColor = c.swapShadow(theme);
             zIndex = m.zIndex;
+            writeOpacity = m.opacity; // reuse opacity channel for cross-fade
           } else if (prevIdx >= 0 && prevIdx !== i) {
             const progress = interpolate(elapsed, [0, MOVE_FRAMES], [0, 1], {
               easing: ENTER_BEZIER,

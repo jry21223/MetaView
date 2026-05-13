@@ -9,6 +9,8 @@ export interface TweakValues {
   chatHeight: number;
   density: 'compact' | 'regular' | 'comfy';
   showHistoryDock: boolean;
+  /** Total frames for the bar-swap animation. Range 12–60 (≈0.4–2.0s @ 30fps). */
+  swapFrames: number;
 }
 
 export const TWEAK_DEFAULTS: TweakValues = {
@@ -20,6 +22,8 @@ export const TWEAK_DEFAULTS: TweakValues = {
   chatHeight: 360,
   density: 'regular',
   showHistoryDock: true,
+  // Mirrors `DEFAULT_SWAP_FRAMES` in renderers/animationTemplates.ts — keep in sync.
+  swapFrames: 24,
 };
 
 export function themeVars(t: TweakValues): Record<string, string> {

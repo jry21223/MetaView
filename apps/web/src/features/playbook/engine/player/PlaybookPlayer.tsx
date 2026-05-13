@@ -303,10 +303,22 @@ const TTSConfigPopover: React.FC<TTSPopoverProps> = ({ config, onUpdate, onClose
 interface PlaybookPlayerProps {
   script: PlaybookScript;
   theme?: "dark" | "light";
+  /**
+   * Total frames for the bar-swap animation. Sourced from
+   * `TweakValues.swapFrames` so the design-tweaks panel controls it live.
+   * Defaults to 24 to match `TWEAK_DEFAULTS.swapFrames` /
+   * `DEFAULT_SWAP_FRAMES` when the prop is omitted.
+   */
+  swapDurationFrames?: number;
   onOpenExport?: () => void;
 }
 
-export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScript, theme = "dark", onOpenExport }) => {
+export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
+  script: baseScript,
+  theme = "dark",
+  swapDurationFrames = 24,
+  onOpenExport,
+}) => {
   const playerRef = useRef<PlayerRef | null>(null);
 
   // ── Tweak state (frontend-only hot reload) ─────────────────────────────
@@ -596,7 +608,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({ script: baseScri
             <Player
               ref={playerRef}
               component={PlaybookComposition}
-              inputProps={{ script, theme, showSubtitles }}
+              inputProps={{ script, theme, showSubtitles, swapDurationFrames }}
               durationInFrames={script.total_frames}
               fps={script.fps}
               compositionWidth={PLAYBOOK_DEFAULTS.COMPOSITION_WIDTH}
