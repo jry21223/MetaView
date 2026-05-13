@@ -8,13 +8,6 @@ import { GlobalTopbar, Stage } from '../../shared/ui/GlobalTopbar';
 
 // ── Status badge ──────────────────────────────────────────────────────────
 
-const STATUS_COLOR: Record<PipelineRunResult['status'], string> = {
-  queued: 'var(--ink-3)',
-  running: 'var(--accent)',
-  succeeded: '#5be8b4',
-  failed: '#ff9e8a',
-};
-
 const STATUS_LABEL: Record<PipelineRunResult['status'], string> = {
   queued: '排队',
   running: '生成中',
@@ -24,15 +17,7 @@ const STATUS_LABEL: Record<PipelineRunResult['status'], string> = {
 
 function StatusBadge({ status }: { status: PipelineRunResult['status'] }) {
   return (
-    <span style={{
-      fontSize: 10,
-      fontFamily: 'IBM Plex Mono, monospace',
-      color: STATUS_COLOR[status],
-      border: `1px solid ${STATUS_COLOR[status]}`,
-      borderRadius: 4,
-      padding: '1px 6px',
-      flexShrink: 0,
-    }}>
+    <span className="mv-history-badge" data-status={status}>
       {STATUS_LABEL[status]}
     </span>
   );
@@ -40,15 +25,13 @@ function StatusBadge({ status }: { status: PipelineRunResult['status'] }) {
 
 // ── Run list item ─────────────────────────────────────────────────────────
 
-function RunItem({
-  run,
-  isSelected,
-  onClick,
-}: {
+interface RunItemProps {
   run: PipelineRunResult;
   isSelected: boolean;
   onClick: () => void;
-}) {
+}
+
+function RunItem({ run, isSelected, onClick }: RunItemProps) {
   const title = run.playbook?.title ?? run.prompt ?? '未命名';
   const domain = run.playbook?.domain ?? '—';
   const date = new Date(run.created_at).toLocaleString('zh-CN', {
@@ -58,50 +41,21 @@ function RunItem({
 
   return (
     <button
+      type="button"
+      className="mv-history-item"
+      aria-pressed={isSelected}
       onClick={onClick}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 6,
-        padding: '12px 14px',
-        borderRadius: 8,
-        border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--line)'}`,
-        background: isSelected ? 'rgba(77,232,176,0.06)' : 'var(--surface)',
-        cursor: 'pointer',
-        textAlign: 'left',
-        width: '100%',
-        transition: 'border-color 0.15s, background 0.15s',
-      }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <span style={{
-          fontSize: 13,
-          fontWeight: 600,
-          color: 'var(--ink)',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}>
-          {title}
-        </span>
+      <div className="mv-history-item-head">
+        <span className="mv-history-item-title">{title}</span>
         <StatusBadge status={run.status} />
       </div>
       {showPromptSubtitle && (
-        <span style={{
-          fontSize: 11,
-          color: 'var(--ink-3)',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}>
-          {run.prompt}
-        </span>
+        <span className="mv-history-item-subtitle">{run.prompt}</span>
       )}
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-        <span style={{ fontSize: 11, color: 'var(--accent)', fontFamily: 'IBM Plex Mono, monospace' }}>
-          {domain.toUpperCase()}
-        </span>
-        <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{date}</span>
+      <div className="mv-history-item-meta">
+        <span className="mv-history-item-domain">{domain.toUpperCase()}</span>
+        <span className="mv-history-item-date">{date}</span>
       </div>
     </button>
   );
@@ -110,15 +64,7 @@ function RunItem({
 // ── Empty / loading / error states ────────────────────────────────────────
 
 function CenterHint({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      height: '100%', color: 'var(--ink-3)', fontSize: 13,
-      fontFamily: 'IBM Plex Mono, monospace',
-    }}>
-      {children}
-    </div>
-  );
+  return <div className="mv-history-hint">{children}</div>;
 }
 
 // ── HistoryPage ───────────────────────────────────────────────────────────
@@ -149,39 +95,20 @@ export function HistoryPage({ t, setTweak, onNavigate, isProviderConfigured, onO
         onToggleTheme={() => setTweak('theme', isDark ? 'light' : 'dark')}
         onOpenProviderSettings={onOpenProviderSettings}
       />
-      <main style={{
-        flex: 1,
-        display: 'grid',
-        gridTemplateColumns: '300px 1fr',
-        overflow: 'hidden',
-        minHeight: 0,
-      }}>
+      <main className="mv-history-main">
         {/* Left: run list */}
-        <aside style={{
-          borderRight: '1px solid var(--line)',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-        }}>
-          <div style={{
-            padding: '14px 16px',
-            borderBottom: '1px solid var(--line)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}>
-            <span style={{ fontSize: 12, fontFamily: 'IBM Plex Mono, monospace', color: 'var(--ink-3)' }}>
+        <aside className="mv-history-list">
+          <div className="mv-history-list-head">
+            <span className="mv-history-list-count">
               {isLoading ? '加载中…' : `${runs.length} 条记录`}
             </span>
-            <button className="mv-chip" onClick={refresh} style={{ padding: '3px 10px', fontSize: 12 }}>
+            <button type="button" className="mv-chip" onClick={refresh}>
               ↻ 刷新
             </button>
           </div>
 
-          <div style={{ flex: 1, overflowY: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {error && (
-              <div style={{ fontSize: 12, color: '#ff9e8a', padding: '8px 4px' }}>{error}</div>
-            )}
+          <div className="mv-history-list-body">
+            {error && <div className="mv-history-error">{error}</div>}
             {!isLoading && !error && runs.length === 0 && (
               <CenterHint>暂无历史记录</CenterHint>
             )}
@@ -197,7 +124,7 @@ export function HistoryPage({ t, setTweak, onNavigate, isProviderConfigured, onO
         </aside>
 
         {/* Right: playbook preview */}
-        <div style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div className="mv-history-detail">
           {!selectedRun && (
             <CenterHint>← 选择一条记录回放动画</CenterHint>
           )}
@@ -211,7 +138,11 @@ export function HistoryPage({ t, setTweak, onNavigate, isProviderConfigured, onO
             <CenterHint>该任务仍在生成中</CenterHint>
           )}
           {playbook && (
-            <PlaybookPlayer script={playbook} theme={isDark ? 'dark' : 'light'} />
+            <PlaybookPlayer
+              script={playbook}
+              theme={isDark ? 'dark' : 'light'}
+              swapDurationFrames={t.swapFrames}
+            />
           )}
         </div>
       </main>
