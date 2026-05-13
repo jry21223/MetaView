@@ -20,6 +20,7 @@ class PipelineRequest(BaseModel):
 class PipelineRunResponse(BaseModel):
     run_id: str
     status: PipelineRunStatus
+    prompt: str = ""
     playbook: PlaybookScript | None = None
     error: str | None = None
     created_at: str

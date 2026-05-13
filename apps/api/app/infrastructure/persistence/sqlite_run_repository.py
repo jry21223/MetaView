@@ -77,6 +77,7 @@ def _row_to_response(row: sqlite3.Row) -> PipelineRunResponse:
     return PipelineRunResponse(
         run_id=row["run_id"],
         status=PipelineRunStatus(row["status"]),
+        prompt=row["prompt"] or "",
         playbook=playbook,
         error=row["error"],
         created_at=row["created_at"],

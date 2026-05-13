@@ -49,11 +49,12 @@ function RunItem({
   isSelected: boolean;
   onClick: () => void;
 }) {
-  const title = run.playbook?.title ?? '未命名';
+  const title = run.playbook?.title ?? run.prompt ?? '未命名';
   const domain = run.playbook?.domain ?? '—';
   const date = new Date(run.created_at).toLocaleString('zh-CN', {
     month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
   });
+  const showPromptSubtitle = !!run.playbook?.title && !!run.prompt;
 
   return (
     <button
@@ -85,6 +86,17 @@ function RunItem({
         </span>
         <StatusBadge status={run.status} />
       </div>
+      {showPromptSubtitle && (
+        <span style={{
+          fontSize: 11,
+          color: 'var(--ink-3)',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}>
+          {run.prompt}
+        </span>
+      )}
       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
         <span style={{ fontSize: 11, color: 'var(--accent)', fontFamily: 'IBM Plex Mono, monospace' }}>
           {domain.toUpperCase()}
