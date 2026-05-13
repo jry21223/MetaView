@@ -93,6 +93,18 @@ describe("MathPlotRenderer", () => {
     expect(markup).toContain("(2, 4)");
   });
 
+  it("uses runtime params when sampling parameterized curves", () => {
+    const markup = render(
+      makeSnap({
+        curves: [{ expression: "a*x", label: "f(x)", emphasis: "primary" }],
+        marker_x: 2,
+        params: { a: 2 },
+      }),
+    );
+    expect(markup).toContain("<polyline");
+    expect(markup).toContain("(2, 4)");
+  });
+
   it("breaks the path at discontinuities (1/x has two branches)", () => {
     const markup = render(makeSnap({ curves: [{ expression: "1/x" }], x_min: -2, x_max: 2 }));
     const polylines = markup.match(/<polyline/g) ?? [];

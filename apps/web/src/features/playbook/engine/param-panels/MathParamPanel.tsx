@@ -16,6 +16,7 @@ import { FunctionPlot, type PlotMarker, type PlotSeries } from "../../../../feat
 import type { ParamPanelProps } from "./types";
 
 const SAMPLES = 280;
+const PARAM_ID_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 const CURVE_COLORS: Record<"dark" | "light", Record<CurveEmphasis, string>> = {
   dark: { primary: "#4de8b0", secondary: "#c8a8f8", accent: "#ff9e8a" },
@@ -26,6 +27,11 @@ interface CompiledPreset {
   preset: MathPreset;
   curves: Array<{ fn: CompiledExpr | null; label: string; emphasis: CurveEmphasis }>;
   markerFn: CompiledExpr | null;
+}
+
+interface NumericControl {
+  control: ParamPanelProps["script"]["parameter_controls"][number];
+  initial: number;
 }
 
 function compilePreset(preset: MathPreset): CompiledPreset {
@@ -57,8 +63,49 @@ function renderKatex(src: string, displayMode: boolean): string {
   }
 }
 
-export function MathParamPanel({ isDark }: ParamPanelProps): React.JSX.Element {
+function parseNumber(value: string): number | null {
+  const n = Number(value.trim());
+  return Number.isFinite(n) ? n : null;
+}
+
+function sliderRange(initial: number): { min: number; max: number; step: number } {
+  const span = Math.max(5, Math.abs(initial) * 2);
+  const min = initial - span;
+  const max = initial + span;
+  const step = span <= 5 ? 0.1 : 0.5;
+  return { min, max, step };
+}
+
+export function MathParamPanel({
+  script,
+  overrides,
+  onOverridesChange,
+  isDark,
+}: ParamPanelProps): React.JSX.Element {
   const theme = isDark ? "dark" : "light";
+  const numericControls = useMemo<NumericControl[]>(() => {
+    const controls: NumericControl[] = [];
+    for (const control of script.parameter_controls) {
+      const initial = parseNumber(control.value);
+      if (initial == null || !PARAM_ID_RE.test(control.id)) continue;
+      controls.push({ control, initial });
+    }
+    return controls;
+  }, [script.parameter_controls]);
+
+  const setScriptParam = (key: string, value: number): void => {
+    onOverridesChange({
+      ...overrides,
+      mathParams: { ...(overrides.mathParams ?? {}), [key]: value },
+    });
+  };
+
+  const resetScriptParams = (): void => {
+    const next = { ...overrides };
+    delete next.mathParams;
+    onOverridesChange(next);
+  };
+
   const [presetId, setPresetId] = useState<string>(MATH_PRESETS[0].id);
   const [params, setParams] = useState<Record<string, number>>(() => initialParams(MATH_PRESETS[0]));
 
@@ -79,15 +126,15 @@ export function MathParamPanel({ isDark }: ParamPanelProps): React.JSX.Element {
     setParams((prev) => ({ ...prev, [key]: value }));
   };
 
-  const series: PlotSeries[] = compiled.curves.map((c) => ({
-    points: c.fn ? sampleExpr(c.fn, preset.xRange[0], preset.xRange[1], SAMPLES, params) : [],
-    color: CURVE_COLORS[theme][c.emphasis],
-    label: c.label,
-    dashed: c.emphasis === "secondary" || c.emphasis === "accent",
+  const series: PlotSeries[] = compiled.curves.map((curve) => ({
+    points: curve.fn ? sampleExpr(curve.fn, preset.xRange[0], preset.xRange[1], SAMPLES, params) : [],
+    color: CURVE_COLORS[theme][curve.emphasis],
+    label: curve.label,
+    dashed: curve.emphasis === "secondary" || curve.emphasis === "accent",
   }));
 
   let marker: PlotMarker | null = null;
-  const leadFn = compiled.curves.find((c) => c.fn)?.fn ?? null;
+  const leadFn = compiled.curves.find((curve) => curve.fn)?.fn ?? null;
   if (compiled.markerFn && leadFn) {
     const mx = compiled.markerFn(params);
     const my = Number.isFinite(mx) ? leadFn({ ...params, x: mx }) : NaN;
@@ -98,60 +145,69 @@ export function MathParamPanel({ isDark }: ParamPanelProps): React.JSX.Element {
 
   const readouts = preset.readouts?.(params) ?? [];
 
-  const c = isDark
-    ? {
-        bg: "#0e1513",
-        panel: "rgba(255,255,255,0.04)",
-        border: "rgba(255,255,255,0.12)",
-        text: "#e8ecf4",
-        muted: "rgba(232,236,244,0.6)",
-        chipBg: "rgba(255,255,255,0.06)",
-        chipActive: "#4de8b0",
-        chipActiveText: "#06120d",
-        accent: "#4de8b0",
-      }
-    : {
-        bg: "#ffffff",
-        panel: "rgba(0,0,0,0.03)",
-        border: "#d0d7de",
-        text: "#24292f",
-        muted: "#6e7781",
-        chipBg: "#f0f2f5",
-        chipActive: "#00896e",
-        chipActiveText: "#ffffff",
-        accent: "#00896e",
-      };
+  if (numericControls.length > 0) {
+    const dirty = Object.keys(overrides.mathParams ?? {}).length > 0;
+    return (
+      <div className="math-param-panel" data-theme={theme}>
+        <div className="math-param-panel__control-list">
+          {numericControls.map(({ control, initial }) => {
+            const value = overrides.mathParams?.[control.id] ?? initial;
+            const range = sliderRange(initial);
+            return (
+              <div key={control.id} className="math-param-panel__control">
+                <div className="math-param-panel__control-row">
+                  <label htmlFor={`mvp-${control.id}`} className="math-param-panel__script-label">
+                    {control.label}
+                  </label>
+                  <input
+                    id={`mvp-${control.id}`}
+                    type="range"
+                    min={range.min}
+                    max={range.max}
+                    step={range.step}
+                    value={value}
+                    onChange={(e) => setScriptParam(control.id, Number(e.target.value))}
+                    className="math-param-panel__range"
+                  />
+                  <input
+                    type="number"
+                    value={Number.isInteger(value) ? value : Number(value.toFixed(3))}
+                    step={range.step}
+                    onChange={(e) => setScriptParam(control.id, Number(e.target.value))}
+                    className="math-param-panel__number"
+                  />
+                </div>
+                {control.description && (
+                  <span className="math-param-panel__description">
+                    {control.description}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {dirty && (
+          <div className="math-param-panel__actions">
+            <button onClick={resetScriptParams} className="math-param-panel__reset">
+              重置参数
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
-    <div
-      style={{
-        padding: "14px 16px 18px",
-        background: c.bg,
-        color: c.text,
-        display: "flex",
-        flexDirection: "column",
-        gap: 14,
-        fontFamily: "system-ui, -apple-system, sans-serif",
-      }}
-    >
+    <div className="math-param-panel" data-theme={theme}>
       {/* Preset chips */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+      <div className="math-param-panel__chips">
         {MATH_PRESETS.map((p) => {
           const active = p.id === presetId;
           return (
             <button
               key={p.id}
               onClick={() => selectPreset(p.id)}
-              style={{
-                border: `1px solid ${active ? c.chipActive : c.border}`,
-                background: active ? c.chipActive : c.chipBg,
-                color: active ? c.chipActiveText : c.text,
-                borderRadius: 999,
-                padding: "4px 12px",
-                fontSize: 12,
-                fontWeight: active ? 700 : 500,
-                cursor: "pointer",
-              }}
+              className={`math-param-panel__chip${active ? " is-active" : ""}`}
             >
               {p.name}
             </button>
@@ -159,29 +215,18 @@ export function MathParamPanel({ isDark }: ParamPanelProps): React.JSX.Element {
         })}
       </div>
 
-      <p style={{ margin: 0, fontSize: 12, lineHeight: 1.55, color: c.muted }}>{preset.description}</p>
+      <p className="math-param-panel__description-text">{preset.description}</p>
 
       {/* Live formula */}
-      <div
-        style={{
-          background: c.panel,
-          border: `1px solid ${c.border}`,
-          borderRadius: 8,
-          padding: "10px 14px",
-          display: "flex",
-          flexDirection: "column",
-          gap: 6,
-          alignItems: "center",
-        }}
-      >
+      <div className="math-param-panel__formula-card">
         <div
-          style={{ fontSize: 17, color: c.text }}
+          className="math-param-panel__formula"
           dangerouslySetInnerHTML={{ __html: renderKatex(preset.formula(params), true) }}
         />
         {readouts.length > 0 && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 14px", justifyContent: "center" }}>
+          <div className="math-param-panel__readouts">
             {readouts.map((r) => (
-              <span key={r} style={{ fontSize: 11.5, color: c.muted }}>
+              <span key={r} className="math-param-panel__readout">
                 {r}
               </span>
             ))}
@@ -190,26 +235,17 @@ export function MathParamPanel({ isDark }: ParamPanelProps): React.JSX.Element {
       </div>
 
       {/* Plot */}
-      <div style={{ maxWidth: 720, width: "100%", margin: "0 auto" }}>
-        <div
-          style={{
-            width: "100%",
-            aspectRatio: "760 / 460",
-            background: c.panel,
-            border: `1px solid ${c.border}`,
-            borderRadius: 8,
-            overflow: "hidden",
-          }}
-        >
+      <div className="math-param-panel__plot-wrap">
+        <div className="math-param-panel__plot">
           <FunctionPlot series={series} xRange={preset.xRange} yRange={preset.yRange} theme={theme} marker={marker} />
         </div>
       </div>
 
       {/* Parameter sliders */}
-      <div style={{ display: "grid", gap: 10 }}>
+      <div className="math-param-panel__control-list">
         {preset.params.map((p) => (
-          <div key={p.key} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <label htmlFor={`mvw-${p.key}`} style={{ fontSize: 12, width: 92, flexShrink: 0, color: c.text }}>
+          <div key={p.key} className="math-param-panel__preset-row">
+            <label htmlFor={`mvw-${p.key}`} className="math-param-panel__preset-label">
               {p.label}
             </label>
             <input
@@ -220,28 +256,17 @@ export function MathParamPanel({ isDark }: ParamPanelProps): React.JSX.Element {
               step={p.step}
               value={params[p.key] ?? p.initial}
               onChange={(e) => setParam(p.key, Number(e.target.value))}
-              style={{ flex: 1, accentColor: c.accent }}
+              className="math-param-panel__range"
             />
-            <span style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 12, width: 56, textAlign: "right", color: c.text }}>
+            <span className="math-param-panel__value">
               {(params[p.key] ?? p.initial).toFixed(2)}
             </span>
           </div>
         ))}
       </div>
 
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-        <button
-          onClick={() => setParams(initialParams(preset))}
-          style={{
-            border: `1px solid ${c.border}`,
-            background: "transparent",
-            color: c.text,
-            borderRadius: 6,
-            padding: "6px 14px",
-            fontSize: 12,
-            cursor: "pointer",
-          }}
-        >
+      <div className="math-param-panel__actions">
+        <button onClick={() => setParams(initialParams(preset))} className="math-param-panel__reset">
           重置参数
         </button>
       </div>

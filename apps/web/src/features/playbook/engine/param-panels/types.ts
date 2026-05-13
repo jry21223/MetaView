@@ -1,3 +1,4 @@
+import type React from "react";
 import type { PlaybookScript } from "../types";
 import type { ScriptOverrides } from "../player/useResolvedScript";
 

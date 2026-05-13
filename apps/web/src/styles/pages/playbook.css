@@ -117,3 +117,194 @@
 .playbook-ctrl-btn.is-speaking {
   animation: mv-tts-ring 1s ease-in-out infinite;
 }
+
+/* ── Math Parameter Panel ─────────────────────────────────────────────── */
+
+.math-param-panel {
+  --math-param-bg: #ffffff;
+  --math-param-panel: rgba(0, 0, 0, 0.03);
+  --math-param-border: #d0d7de;
+  --math-param-text: #24292f;
+  --math-param-muted: #6e7781;
+  --math-param-chip-bg: #f0f2f5;
+  --math-param-chip-active: #00896e;
+  --math-param-chip-active-text: #ffffff;
+  --math-param-accent: #00896e;
+
+  padding: 14px 16px 18px;
+  background: var(--math-param-bg);
+  color: var(--math-param-text);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.math-param-panel[data-theme='dark'] {
+  --math-param-bg: #0e1513;
+  --math-param-panel: rgba(255, 255, 255, 0.04);
+  --math-param-border: rgba(255, 255, 255, 0.12);
+  --math-param-text: #e8ecf4;
+  --math-param-muted: rgba(232, 236, 244, 0.6);
+  --math-param-chip-bg: rgba(255, 255, 255, 0.06);
+  --math-param-chip-active: #4de8b0;
+  --math-param-chip-active-text: #06120d;
+  --math-param-accent: #4de8b0;
+}
+
+.math-param-panel__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.math-param-panel__chip {
+  border: 1px solid var(--math-param-border);
+  background: var(--math-param-chip-bg);
+  color: var(--math-param-text);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.math-param-panel__chip.is-active {
+  border-color: var(--math-param-chip-active);
+  background: var(--math-param-chip-active);
+  color: var(--math-param-chip-active-text);
+  font-weight: 700;
+}
+
+.math-param-panel__description-text {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--math-param-muted);
+}
+
+.math-param-panel__formula-card {
+  background: var(--math-param-panel);
+  border: 1px solid var(--math-param-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+
+.math-param-panel__formula {
+  font-size: 17px;
+  color: var(--math-param-text);
+}
+
+.math-param-panel__readouts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  justify-content: center;
+}
+
+.math-param-panel__readout {
+  font-size: 11.5px;
+  color: var(--math-param-muted);
+}
+
+.math-param-panel__plot-wrap {
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.math-param-panel__plot {
+  width: 100%;
+  aspect-ratio: 760 / 460;
+  background: var(--math-param-panel);
+  border: 1px solid var(--math-param-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.math-param-panel__control-list {
+  display: grid;
+  gap: 10px;
+}
+
+.math-param-panel__control {
+  display: grid;
+  gap: 4px;
+}
+
+.math-param-panel__control-row,
+.math-param-panel__preset-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.math-param-panel__preset-row {
+  gap: 12px;
+}
+
+.math-param-panel__script-label,
+.math-param-panel__preset-label {
+  font-size: 12px;
+  flex-shrink: 0;
+  color: var(--math-param-text);
+}
+
+.math-param-panel__script-label {
+  width: 110px;
+}
+
+.math-param-panel__preset-label {
+  width: 92px;
+}
+
+.math-param-panel__range {
+  flex: 1;
+  accent-color: var(--math-param-accent);
+}
+
+.math-param-panel__number {
+  width: 76px;
+  border: 1px solid var(--math-param-border);
+  border-radius: 6px;
+  background: var(--math-param-panel);
+  color: var(--math-param-text);
+  padding: 4px 6px;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.math-param-panel__description {
+  padding-left: 120px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--math-param-muted);
+}
+
+.math-param-panel__value {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 12px;
+  width: 56px;
+  text-align: right;
+  color: var(--math-param-text);
+}
+
+.math-param-panel__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.math-param-panel__reset {
+  border: 1px solid var(--math-param-border);
+  background: transparent;
+  color: var(--math-param-text);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+}

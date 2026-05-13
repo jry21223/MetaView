@@ -50,6 +50,8 @@ export interface MathPlotCurve {
 export interface MathPlotSnapshot {
   kind: "math_plot";
   curves: MathPlotCurve[];
+  /** Runtime numeric parameter scope used by curve expressions, e.g. `{ a: 2 }` for `a*x`. */
+  params?: Record<string, number>;
   x_min: number;
   x_max: number;
   y_min?: number | null;

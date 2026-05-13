@@ -156,7 +156,7 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({ step, frame, stepSta
       label: c.label,
       emphasis: c.emphasis,
       fn,
-      points: fn ? sampleExpr(fn, xMin, xMax, SAMPLES) : [],
+      points: fn ? sampleExpr(fn, xMin, xMax, SAMPLES, snap.params) : [],
       primaryIndex,
     };
   });
@@ -225,7 +225,7 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({ step, frame, stepSta
   // Point marker on the lead curve.
   let marker: { px: number; py: number; mx: number; my: number; opacity: number } | null = null;
   if (lead?.fn && snap.marker_x != null) {
-    const my = lead.fn({ x: snap.marker_x });
+        const my = lead.fn({ ...(snap.params ?? {}), x: snap.marker_x });
     if (Number.isFinite(my)) {
       const xFrac = (snap.marker_x - xMin) / (xMax - xMin);
       const opacity = clamp01((reveal - Math.min(0.85, xFrac)) * 6);
