@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MathWidget } from "./MathWidget";
+import { MathWidgetPanel } from "./MathWidgetPanel";
 import { MATH_WIDGET_PRESETS } from "../lib/presets";
 
 function render(isDark = true): string {
-  return renderToStaticMarkup(<MathWidget isDark={isDark} onClose={() => {}} />);
+  return renderToStaticMarkup(<MathWidgetPanel isDark={isDark} />);
 }
 
-describe("MathWidget", () => {
+describe("MathWidgetPanel", () => {
   it("renders the plot, a chip per preset and one slider per first-preset param", () => {
     const markup = render();
     expect(markup).toContain("<svg");
