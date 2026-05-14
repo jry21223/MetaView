@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.domain.models.playbook import PlaybookScript
+from app.domain.models.review import CirReviewReport
 
 
 class PipelineRequest(BaseModel):
@@ -24,3 +25,4 @@ class PipelineRunResponse(BaseModel):
     playbook: PlaybookScript | None = None
     error: str | None = None
     created_at: str
+    review: CirReviewReport | None = None

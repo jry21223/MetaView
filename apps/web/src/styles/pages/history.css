@@ -160,3 +160,218 @@
   color: var(--mv-status-failed);
   padding: 8px 4px;
 }
+
+/* ───── Reviewer status badge (new "reviewing" state) ─────────────────── */
+.mv-history-badge[data-status="reviewing"] { color: var(--mv-status-running); }
+
+/* ───── Run Progress Stepper ──────────────────────────────────────────── */
+.mv-run-stepper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 10px);
+  font-size: 13px;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  color: var(--ink-2);
+}
+
+.mv-run-stepper__step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mv-run-stepper__step[data-state="active"] { color: var(--accent); }
+.mv-run-stepper__step[data-state="done"]   { color: var(--mv-status-succeeded, var(--accent)); }
+.mv-run-stepper__step[data-state="failed"] { color: var(--mv-status-failed, #ff9e8a); }
+.mv-run-stepper__step[data-state="pending"] { color: var(--ink-3); }
+
+.mv-run-stepper__icon {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  line-height: 14px;
+  text-align: center;
+  font-size: 11px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+}
+
+.mv-run-stepper__icon--spin {
+  border-color: currentColor;
+  border-top-color: transparent;
+  animation: mv-run-stepper-spin 0.9s linear infinite;
+}
+
+@keyframes mv-run-stepper-spin {
+  to { transform: rotate(360deg); }
+}
+
+.mv-run-stepper__line {
+  flex: 0 0 24px;
+  height: 1px;
+  background: var(--line);
+}
+
+/* ───── Auto-Refined badge ────────────────────────────────────────────── */
+.mv-auto-refined {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.mv-auto-refined__tooltip {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  min-width: 280px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 8px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  color: var(--ink-2);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 12px;
+}
+
+.mv-auto-refined__tooltip-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--ink);
+}
+
+.mv-auto-refined__tooltip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mv-auto-refined__tooltip-list li {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.mv-auto-refined__tooltip-code {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+/* ───── Prompt Doctor (failure UI) ────────────────────────────────────── */
+.mv-prompt-doctor {
+  max-width: 540px;
+  margin: 24px auto;
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 1px solid var(--mv-status-failed, #ff9e8a);
+  border-radius: var(--radius, 12px);
+  color: var(--ink-2);
+}
+
+.mv-prompt-doctor__header {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--mv-status-failed, #ff9e8a);
+  margin-bottom: 10px;
+}
+
+.mv-prompt-doctor__hint {
+  font-size: 13px;
+  color: var(--ink-2);
+  margin-bottom: 10px;
+}
+
+.mv-prompt-doctor__pills {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mv-prompt-doctor__pill {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink-2);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.mv-prompt-doctor__pill:hover {
+  border-color: var(--accent);
+  background: rgba(77, 232, 176, 0.06);
+}
+
+.mv-prompt-doctor__pill-code {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--accent);
+}
+
+.mv-prompt-doctor__pill-text {
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.mv-prompt-doctor__details {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.mv-prompt-doctor__details summary {
+  cursor: pointer;
+  user-select: none;
+}
+
+.mv-prompt-doctor__raw {
+  margin-top: 8px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ink-3);
+  max-height: 240px;
+  overflow: auto;
+}
+
+.mv-history-detail__stepper {
+  padding: 18px 24px;
+}
+
+.mv-history-detail__badge-row {
+  padding: 10px 24px 0;
+}

@@ -2,27 +2,59 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import dataclass
+from json import JSONDecodeError
+from typing import Any
+
+from pydantic import ValidationError
 
 from app.application.dto.pipeline_dto import PipelineRequest
 from app.application.ports.llm_provider import ILLMProvider
 from app.application.ports.run_repository import IRunRepository
 from app.domain.models.cir import CirDocument, ExecutionMap
 from app.domain.models.pipeline_run import PipelineRunStatus
+from app.domain.models.review import CirReviewIssue, CirReviewReport, ReviewSeverity
 from app.domain.models.topic import TopicDomain
 from app.domain.services.cir_prompt import build_cir_prompt
+from app.domain.services.cir_quality import validate_cir_quality
 from app.domain.services.domain_router import keyword_hint
 from app.domain.services.playbook_builder import build_playbook
+from app.domain.services.reviewer_prompt import (
+    PipelineValidationError,
+    ReviewResult,
+    build_reviewer_prompt,
+)
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class ParseResult:
+    ok: bool
+    raw_data: dict[str, Any] | None = None
+    cir: CirDocument | None = None
+    execution_map: ExecutionMap | None = None
+    issues: list[CirReviewIssue] | None = None
+
+
 class RunPipelineUseCase:
-    def __init__(self, run_repo: IRunRepository, llm: ILLMProvider) -> None:
+    def __init__(
+        self,
+        run_repo: IRunRepository,
+        llm: ILLMProvider,
+        reviewer_llm: ILLMProvider | None = None,
+        max_repair_attempts: int = 0,
+        reviewer_mode: str = "on_failure",
+    ) -> None:
         self._repo = run_repo
         self._llm = llm
+        self._reviewer_llm = reviewer_llm
+        self._max_repair_attempts = max(0, max_repair_attempts)
+        self._reviewer_mode = _normalize_reviewer_mode(reviewer_mode)
 
     async def execute(self, run_id: str, request: PipelineRequest) -> None:
         await self._repo.update(run_id, status=PipelineRunStatus.RUNNING)
+        review_report = CirReviewReport()
         try:
             domain_hint = _resolve_domain(request.domain, request.prompt)
             system, user = build_cir_prompt(
@@ -32,11 +64,20 @@ class RunPipelineUseCase:
                 language=request.language,
             )
             raw = await self._llm.complete(system, user)
-            raw = _strip_markdown_fences(raw)
-            cir, execution_map = _parse_combined_output(raw)
+            parsed, review_report = await self._review_output(
+                run_id=run_id,
+                request=request,
+                system=system,
+                user=user,
+                raw=raw,
+            )
+            if parsed.cir is None:
+                review_report.status = "failed"
+                raise PipelineValidationError(review_report)
+
             playbook = build_playbook(
-                cir,
-                execution_map=execution_map,
+                parsed.cir,
+                execution_map=parsed.execution_map,
                 source_code=request.source_code,
                 source_language=request.language,
             )
@@ -44,6 +85,15 @@ class RunPipelineUseCase:
                 run_id,
                 status=PipelineRunStatus.SUCCEEDED,
                 playbook_json=playbook.model_dump_json(),
+                review_json=review_report.model_dump_json(),
+            )
+        except PipelineValidationError as exc:
+            logger.exception("Pipeline run %s failed review", run_id)
+            await self._repo.update(
+                run_id,
+                status=PipelineRunStatus.FAILED,
+                error=humanize_issues(exc.report),
+                review_json=exc.report.model_dump_json(),
             )
         except Exception as exc:
             logger.exception("Pipeline run %s failed", run_id)
@@ -51,7 +101,110 @@ class RunPipelineUseCase:
                 run_id,
                 status=PipelineRunStatus.FAILED,
                 error=str(exc),
+                review_json=review_report.model_dump_json(),
             )
+
+    async def _review_output(
+        self,
+        *,
+        run_id: str,
+        request: PipelineRequest,
+        system: str,
+        user: str,
+        raw: str,
+    ) -> tuple[ParseResult, CirReviewReport]:
+        report = CirReviewReport()
+        parsed = try_parse_combined_output(_strip_markdown_fences(raw))
+        attempts_allowed = 0 if self._reviewer_mode == "off" else self._max_repair_attempts
+
+        for attempt in range(attempts_allowed + 1):
+            issues = _issues_for_parse_result(parsed, request.prompt)
+            blocking = [issue for issue in issues if issue.severity == ReviewSeverity.ERROR]
+
+            if not blocking:
+                report.issues.extend(issues)
+                if report.attempts > 0:
+                    report.status = "repaired"
+                elif any(issue.severity == ReviewSeverity.WARNING for issue in issues):
+                    report.status = "warnings"
+                else:
+                    report.status = "clean"
+                return parsed, report
+
+            if attempt >= attempts_allowed:
+                report.status = "failed"
+                report.issues.extend(blocking)
+                raise PipelineValidationError(report)
+
+            # Update bookkeeping BEFORE the long-running repair call so the
+            # frontend polling the run during REVIEWING sees a meaningful
+            # attempts count + the blocking issues (drives the stepper UI).
+            report.attempts += 1
+            report.issues.extend(blocking)
+            report.actions.append(f"repair_attempt_{attempt + 1}")
+            await self._repo.update(
+                run_id,
+                status=PipelineRunStatus.REVIEWING,
+                review_json=report.model_dump_json(),
+            )
+
+            raw = await self._repair_once(system, user, raw, blocking)
+            parsed = try_parse_combined_output(_strip_markdown_fences(raw))
+
+        report.status = "failed"
+        raise PipelineValidationError(report)
+
+    async def _repair_once(
+        self,
+        system: str,
+        user: str,
+        raw: str,
+        blocking: list[CirReviewIssue],
+    ) -> str:
+        if self._reviewer_llm is not None:
+            try:
+                reviewer_system, reviewer_user = build_reviewer_prompt(user, raw, blocking)
+                review_raw = await self._reviewer_llm.complete(reviewer_system, reviewer_user)
+                result = ReviewResult.model_validate_json(_strip_markdown_fences(review_raw))
+                if result.action == "correct" and result.corrected is not None:
+                    return json.dumps(result.corrected, ensure_ascii=False)
+                if result.action == "regenerate" and result.fix_instructions:
+                    return await self._regenerate(
+                        system, user, raw, blocking, result.fix_instructions
+                    )
+            except Exception as exc:  # noqa: BLE001 - reviewer fails → fall back to generator.
+                logger.warning("Reviewer LLM failed; falling back to generator repair: %s", exc)
+        return await self._regenerate(system, user, raw, blocking, None)
+
+    async def _regenerate(
+        self,
+        system: str,
+        user: str,
+        raw: str,
+        blocking: list[CirReviewIssue],
+        fix_instructions: str | None,
+    ) -> str:
+        issue_lines = "\n".join(
+            f"- {issue.code} at {issue.path}: {issue.message}"
+            for issue in blocking
+        )
+        instruction_text = fix_instructions or "Fix every listed issue and return valid JSON only."
+        repair_system = f"""{system}
+
+You are repairing your previous CIR JSON output. Return the complete corrected
+combined JSON object only. Do not include markdown fences or explanation."""
+        repair_user = f"""Original request:
+{user}
+
+Previous output:
+{raw}
+
+Blocking issues:
+{issue_lines}
+
+Repair instructions:
+{instruction_text}"""
+        return await self._llm.complete(repair_system, repair_user)
 
 
 def _parse_combined_output(raw: str) -> tuple[CirDocument, ExecutionMap | None]:
@@ -77,6 +230,109 @@ def _parse_combined_output(raw: str) -> tuple[CirDocument, ExecutionMap | None]:
     return CirDocument.model_validate(data), None
 
 
+def try_parse_combined_output(raw: str) -> ParseResult:
+    try:
+        data = json.loads(raw)
+    except JSONDecodeError as exc:
+        return ParseResult(
+            ok=False,
+            issues=[
+                CirReviewIssue(
+                    code="parse.invalid_json",
+                    severity=ReviewSeverity.ERROR,
+                    path="",
+                    message=f"Output is not valid JSON: {exc.msg}",
+                    suggestion="Return one JSON object with no markdown or prose.",
+                )
+            ],
+        )
+
+    if not isinstance(data, dict):
+        return ParseResult(
+            ok=False,
+            raw_data=None,
+            issues=[
+                CirReviewIssue(
+                    code="parse.invalid_shape",
+                    severity=ReviewSeverity.ERROR,
+                    path="",
+                    message="Output must be a JSON object.",
+                    suggestion="Return a combined JSON object or legacy CIR object.",
+                )
+            ],
+        )
+
+    try:
+        cir, execution_map = _parse_combined_output(raw)
+    except ValidationError as exc:
+        return ParseResult(
+            ok=False,
+            raw_data=data,
+            issues=_issues_from_validation_error(exc, "cir"),
+        )
+    return ParseResult(ok=True, raw_data=data, cir=cir, execution_map=execution_map, issues=[])
+
+
+def humanize_issues(report: CirReviewReport) -> str:
+    if not report.issues:
+        return "Pipeline output failed review."
+    shown = report.issues[:5]
+    parts = [
+        f"{issue.code} at {issue.path or '<root>'}: {issue.message}"
+        for issue in shown
+    ]
+    suffix = (
+        ""
+        if len(report.issues) <= len(shown)
+        else f" (+{len(report.issues) - len(shown)} more)"
+    )
+    prefix = f"Pipeline output failed review after {report.attempts} repair attempt(s): "
+    return prefix + "; ".join(parts) + suffix
+
+
+def _issues_for_parse_result(parsed: ParseResult, prompt: str) -> list[CirReviewIssue]:
+    if not parsed.ok:
+        return list(parsed.issues or [])
+    if parsed.cir is None:
+        return [
+            CirReviewIssue(
+                code="parse.missing_cir",
+                severity=ReviewSeverity.ERROR,
+                path="cir",
+                message="Parsed output did not contain a CIR document.",
+            )
+        ]
+    return validate_cir_quality(parsed.cir, parsed.execution_map, prompt)
+
+
+def _issues_from_validation_error(
+    exc: ValidationError,
+    root: str,
+) -> list[CirReviewIssue]:
+    issues: list[CirReviewIssue] = []
+    for error in exc.errors():
+        issues.append(
+            CirReviewIssue(
+                code="parse.validation_error",
+                severity=ReviewSeverity.ERROR,
+                path=_format_error_path((root, *error.get("loc", ()))),
+                message=str(error.get("msg", "Validation failed")),
+                suggestion="Correct this field to match the CIR schema.",
+            )
+        )
+    return issues
+
+
+def _format_error_path(loc: tuple[Any, ...]) -> str:
+    out = ""
+    for item in loc:
+        if isinstance(item, int):
+            out += f"[{item}]"
+        else:
+            out += f".{item}" if out else str(item)
+    return out
+
+
 def _resolve_domain(explicit: str | None, prompt: str) -> TopicDomain:
     if explicit:
         try:
@@ -95,3 +351,10 @@ def _strip_markdown_fences(text: str) -> str:
             lines = lines[:-1]  # drop closing ```
         text = "\n".join(lines).strip()
     return text
+
+
+def _normalize_reviewer_mode(value: str) -> str:
+    normalized = (value or "on_failure").strip().lower()
+    if normalized not in {"off", "on_failure", "math_always", "always"}:
+        return "on_failure"
+    return normalized

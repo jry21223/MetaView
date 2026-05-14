@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     enabled_domains: str = _ALL_DOMAINS
     max_repair_attempts: int = 2
     history_db_path: str = "data/pipeline_runs.db"
+    reviewer_mode: str = "on_failure"
 
     # Remotion playbook defaults — all configurable, no hardcoding in domain code
     playbook_default_fps: int = 30
@@ -59,6 +60,16 @@ class Settings(BaseSettings):
             normalized = value.strip()
             return normalized or None
         return value
+
+    @field_validator("reviewer_mode", mode="before")
+    @classmethod
+    def normalize_reviewer_mode(cls, value: str | None) -> str:
+        if value is None:
+            return "on_failure"
+        normalized = value.strip().lower()
+        if normalized not in {"off", "on_failure", "math_always", "always"}:
+            return "on_failure"
+        return normalized
 
     @property
     def enabled_topic_domains(self) -> tuple[str, ...]:

@@ -267,7 +267,13 @@ function ChatPanel({ playbook, isProviderConfigured, onOpenProviderSettings, col
 
 // ── PipelineSkeleton ──────────────────────────────────────────────────────
 
-type PipelineStatus = 'queued' | 'running' | 'succeeded' | 'failed' | null;
+type PipelineStatus =
+  | 'queued'
+  | 'running'
+  | 'reviewing'
+  | 'succeeded'
+  | 'failed'
+  | null;
 
 interface PipelineSkeletonProps {
   status: PipelineStatus;
@@ -276,11 +282,16 @@ interface PipelineSkeletonProps {
 const STAGES: { key: PipelineStatus; label: string }[] = [
   { key: 'queued', label: '排队中' },
   { key: 'running', label: '脚本生成' },
+  { key: 'reviewing', label: '审核与修正' },
   { key: 'succeeded', label: '渲染完成' },
 ];
 
 const STATUS_ORDER: Record<NonNullable<PipelineStatus>, number> = {
-  queued: 0, running: 1, succeeded: 2, failed: 2,
+  queued: 0,
+  running: 1,
+  reviewing: 2,
+  succeeded: 3,
+  failed: 3,
 };
 
 function PipelineSkeleton({ status }: PipelineSkeletonProps) {

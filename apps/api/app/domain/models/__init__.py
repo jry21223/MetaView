@@ -25,6 +25,7 @@ from app.domain.models.playbook import (
     PlaybookScript,
     SnapshotKind,
 )
+from app.domain.models.review import CirReviewIssue, CirReviewReport, ReviewSeverity
 from app.domain.models.topic import TopicDomain, VisualKind
 
 __all__ = [
@@ -35,4 +36,5 @@ __all__ = [
     "ValidationSeverity", "ValidationStatus",
     "PlaybookScript", "MetaStep", "AlgorithmArraySnapshot", "AlgorithmBarsSnapshot",
     "AlgorithmTreeSnapshot", "AnySnapshot", "SnapshotKind",
+    "ReviewSeverity", "CirReviewIssue", "CirReviewReport",
 ]

@@ -6,6 +6,7 @@ import sqlite3
 from app.application.dto.pipeline_dto import PipelineRunResponse
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.domain.models.playbook import PlaybookScript
+from app.domain.models.review import CirReviewReport
 
 
 class SqliteRunRepository:
@@ -36,12 +37,15 @@ class SqliteRunRepository:
         status: PipelineRunStatus,
         playbook_json: str | None = None,
         error: str | None = None,
+        review_json: str | None = None,
     ) -> None:
         def _sync() -> None:
             with self._connect() as conn:
                 conn.execute(
-                    "UPDATE pipeline_runs SET status=?, playbook_json=?, error=? WHERE run_id=?",
-                    (status.value, playbook_json, error, run_id),
+                    "UPDATE pipeline_runs"
+                    " SET status=?, playbook_json=?, error=?, review_json=?"
+                    " WHERE run_id=?",
+                    (status.value, playbook_json, error, review_json, run_id),
                 )
                 conn.commit()
 
@@ -74,6 +78,9 @@ def _row_to_response(row: sqlite3.Row) -> PipelineRunResponse:
     playbook = None
     if row["playbook_json"]:
         playbook = PlaybookScript.model_validate_json(row["playbook_json"])
+    review = None
+    if "review_json" in row.keys() and row["review_json"]:
+        review = CirReviewReport.model_validate_json(row["review_json"])
     return PipelineRunResponse(
         run_id=row["run_id"],
         status=PipelineRunStatus(row["status"]),
@@ -81,4 +88,5 @@ def _row_to_response(row: sqlite3.Row) -> PipelineRunResponse:
         playbook=playbook,
         error=row["error"],
         created_at=row["created_at"],
+        review=review,
     )

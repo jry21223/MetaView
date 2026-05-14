@@ -2,19 +2,40 @@ import type { CirDocument, ExecutionMap } from "../cir/types";
 import type { ProviderDescriptor, SkillDescriptor } from "../provider/types";
 import type { PlaybookScript } from "../playbook/types";
 
+export interface ReviewIssue {
+  code: string;
+  severity: "info" | "warning" | "error";
+  path: string;
+  message: string;
+  suggestion?: string | null;
+}
+
+export interface ReviewReport {
+  status: "clean" | "warnings" | "repaired" | "failed";
+  attempts: number;
+  issues: ReviewIssue[];
+  actions: string[];
+}
+
 export interface PipelineRunResult {
   run_id: string;
-  status: "queued" | "running" | "succeeded" | "failed";
+  status: "queued" | "running" | "reviewing" | "succeeded" | "failed";
   prompt?: string;
   playbook?: PlaybookScript | null;
   error?: string | null;
   created_at: string;
+  review?: ReviewReport | null;
 }
 
 export type UITheme = "dark" | "light";
 export type SandboxMode = "dry_run" | "off";
 export type SandboxStatus = "passed" | "failed" | "skipped";
-export type PipelineRunStatus = "queued" | "running" | "succeeded" | "failed";
+export type PipelineRunStatus =
+  | "queued"
+  | "running"
+  | "reviewing"
+  | "succeeded"
+  | "failed";
 export type PipelineStage = "domain_routing" | "cir_planning" | "script_coding" | "render_output";
 export type ValidationSeverity = "info" | "warning" | "error";
 export type ValidationStatus = "valid" | "invalid";

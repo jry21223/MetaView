@@ -53,6 +53,21 @@ def get_llm_provider(settings: Annotated[Settings, Depends(get_settings)]) -> IL
     )
 
 
+def get_reviewer_llm_provider(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> ILLMProvider | None:
+    """Return a separate provider for the reviewer/critic LLM, if configured."""
+    if not settings.openai_api_key or not settings.openai_critic_model:
+        return None
+    timeout = settings.openai_timeout_s or 300.0
+    return _get_openai_provider(
+        settings.openai_api_key,
+        settings.openai_base_url,
+        settings.openai_critic_model,
+        timeout,
+    )
+
+
 _MOCK_NOTE = "Mock response — set METAVIEW_OPENAI_API_KEY to enable real generation."
 
 _MOCK_ALGORITHM_CIR: dict = {

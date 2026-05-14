@@ -10,9 +10,14 @@ from app.application.dto.pipeline_dto import PipelineRequest, PipelineRunRespons
 from app.application.ports.llm_provider import ILLMProvider
 from app.application.ports.run_repository import IRunRepository
 from app.application.use_cases.run_pipeline import RunPipelineUseCase
+from app.config import Settings, get_settings
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.infrastructure.llm.openai_provider import OpenAIProvider
-from app.presentation.dependencies import get_llm_provider, get_run_repo
+from app.presentation.dependencies import (
+    get_llm_provider,
+    get_reviewer_llm_provider,
+    get_run_repo,
+)
 
 router = APIRouter(prefix="/pipeline", tags=["pipeline"])
 
@@ -21,23 +26,36 @@ router = APIRouter(prefix="/pipeline", tags=["pipeline"])
 async def submit_pipeline(
     request: PipelineRequest,
     background_tasks: BackgroundTasks,
+    settings: Annotated[Settings, Depends(get_settings)],
     run_repo: Annotated[IRunRepository, Depends(get_run_repo)],
     llm: Annotated[ILLMProvider, Depends(get_llm_provider)],
+    reviewer_llm: Annotated[ILLMProvider | None, Depends(get_reviewer_llm_provider)],
 ) -> PipelineRunResponse:
     run_id = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
     await run_repo.create(run_id, request.prompt, created_at)
 
-    # Per-request provider override takes precedence over the injected default
+    # Per-request provider override takes precedence over the injected default.
+    # When the caller supplies a custom api key, we cannot reuse the global
+    # reviewer provider (different account); drop the reviewer to avoid
+    # crossing credentials and let the generator self-repair.
     effective_llm: ILLMProvider = llm
+    effective_reviewer: ILLMProvider | None = reviewer_llm
     if request.provider_api_key:
         effective_llm = OpenAIProvider(
             api_key=request.provider_api_key,
             base_url=request.provider_base_url or "https://api.openai.com/v1",
             model=request.provider_model or "gpt-4o-mini",
         )
+        effective_reviewer = None
 
-    use_case = RunPipelineUseCase(run_repo, effective_llm)
+    use_case = RunPipelineUseCase(
+        run_repo,
+        effective_llm,
+        reviewer_llm=effective_reviewer,
+        max_repair_attempts=settings.max_repair_attempts,
+        reviewer_mode=settings.reviewer_mode,
+    )
     background_tasks.add_task(use_case.execute, run_id, request)
 
     return PipelineRunResponse(

@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { TweakValues } from '../../features/studio-editor/hooks/useTweaks';
 import { useHistoryRuns } from '../../features/history/hooks/useHistoryRuns';
 import { PlaybookPlayer } from '../../features/playbook/engine/player/PlaybookPlayer';
+import { AutoRefinedBadge } from '../../features/runs/AutoRefinedBadge';
+import { PromptDoctor } from '../../features/runs/PromptDoctor';
+import { RunProgressStepper } from '../../features/runs/RunProgressStepper';
 import type { PipelineRunResult } from '../../entities/pipeline/types';
 import type { PlaybookScript } from '../../entities/playbook/types';
 import { GlobalTopbar, Stage } from '../../shared/ui/GlobalTopbar';
@@ -11,6 +14,7 @@ import { GlobalTopbar, Stage } from '../../shared/ui/GlobalTopbar';
 const STATUS_LABEL: Record<PipelineRunResult['status'], string> = {
   queued: '排队',
   running: '生成中',
+  reviewing: '审核中',
   succeeded: '完成',
   failed: '失败',
 };
@@ -129,20 +133,36 @@ export function HistoryPage({ t, setTweak, onNavigate, isProviderConfigured, onO
             <CenterHint>← 选择一条记录回放动画</CenterHint>
           )}
           {selectedRun && selectedRun.status === 'failed' && (
-            <CenterHint>该任务生成失败：{selectedRun.error ?? '未知错误'}</CenterHint>
-          )}
-          {selectedRun && selectedRun.status === 'queued' && (
-            <CenterHint>该任务仍在排队</CenterHint>
-          )}
-          {selectedRun && selectedRun.status === 'running' && (
-            <CenterHint>该任务仍在生成中</CenterHint>
-          )}
-          {playbook && (
-            <PlaybookPlayer
-              script={playbook}
-              theme={isDark ? 'dark' : 'light'}
-              swapDurationFrames={t.swapFrames}
+            <PromptDoctor
+              report={selectedRun.review ?? null}
+              error={selectedRun.error}
             />
+          )}
+          {selectedRun &&
+            (selectedRun.status === 'queued' ||
+              selectedRun.status === 'running' ||
+              selectedRun.status === 'reviewing') && (
+              <div className="mv-history-detail__stepper">
+                <RunProgressStepper
+                  status={selectedRun.status}
+                  attempts={selectedRun.review?.attempts ?? 0}
+                  maxAttempts={2}
+                />
+              </div>
+            )}
+          {playbook && (
+            <>
+              {(selectedRun?.review?.attempts ?? 0) > 0 && (
+                <div className="mv-history-detail__badge-row">
+                  <AutoRefinedBadge report={selectedRun?.review ?? null} />
+                </div>
+              )}
+              <PlaybookPlayer
+                script={playbook}
+                theme={isDark ? 'dark' : 'light'}
+                swapDurationFrames={t.swapFrames}
+              />
+            </>
           )}
         </div>
       </main>

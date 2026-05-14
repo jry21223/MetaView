@@ -16,6 +16,7 @@ class IRunRepository(Protocol):
         status: PipelineRunStatus,
         playbook_json: str | None = None,
         error: str | None = None,
+        review_json: str | None = None,
     ) -> None: ...
 
     async def get(self, run_id: str) -> PipelineRunResponse | None: ...

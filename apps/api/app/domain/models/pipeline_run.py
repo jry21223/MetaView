@@ -4,6 +4,7 @@ from enum import Enum
 class PipelineRunStatus(str, Enum):
     QUEUED = "queued"
     RUNNING = "running"
+    REVIEWING = "reviewing"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
 
