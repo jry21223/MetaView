@@ -1,5 +1,8 @@
 /* MetaView v2 — Global Base Styles */
 
+@import 'mafs/core.css';
+@import 'mafs/font.css';
+
 * { box-sizing: border-box; }
 html, body, #root { min-height: 100%; margin: 0; }
 

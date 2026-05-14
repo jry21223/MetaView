@@ -5,7 +5,14 @@
     "apps/web"
   ],
   "overrides": {
-    "flatted": "^3.4.2"
+    "flatted": "^3.4.2",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "remotion": "4.0.459",
+    "@remotion/bundler": "4.0.459",
+    "@remotion/cli": "4.0.459",
+    "@remotion/player": "4.0.459",
+    "@remotion/renderer": "4.0.459"
   },
   "scripts": {
     "build:web": "npm --workspace apps/web run build",

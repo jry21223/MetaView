@@ -16,11 +16,20 @@ from app.domain.models.playbook import (
     AlgorithmBarsSnapshot,
     AlgorithmTreeSnapshot,
     CodeHighlightOverlay,
+    MathFormulaSnapshot,
     MathPlotCurve,
     MathPlotSnapshot,
+    MathSceneAnnotation,
+    MathSceneCurve,
+    MathScenePoint,
+    MathSceneRegion,
+    MathSceneSegment,
+    MathSceneSnapshot,
+    MathSceneVectorField,
     MetaStep,
     PlaybookScript,
 )
+from app.domain.models.topic import TopicDomain
 from app.domain.services.algorithm_code_library import get_by_id, infer_id
 
 logger = logging.getLogger(__name__)
@@ -88,7 +97,7 @@ def build_playbook(
         checkpoint = checkpoint_by_step.get(cir_step.id)
         duration = _step_duration_frames(cir_step, checkpoint, fps)
         cumulative += duration
-        snapshot = _build_snapshot(cir_step, checkpoint, execution_map)
+        snapshot = _build_snapshot(cir_step, checkpoint, execution_map, cir.domain)
         code_highlight = _build_code_highlight(checkpoint, source_lines, source_language)
         narration_tpl = _parse_narration_template(cir_step.narration)
         voiceover = (
@@ -176,20 +185,61 @@ def _build_snapshot(
     cir_step: CirStep,
     checkpoint: ExecutionCheckpoint | None,
     execution_map: ExecutionMap | None,
+    domain: TopicDomain,
 ) -> (
     AlgorithmArraySnapshot
     | AlgorithmBarsSnapshot
     | AlgorithmTreeSnapshot
     | MathPlotSnapshot
+    | MathFormulaSnapshot
+    | MathSceneSnapshot
 ):
     if cir_step.visual_kind == VisualKind.GRAPH:
         return _build_tree_snapshot(cir_step, checkpoint)
+    if cir_step.visual_kind == VisualKind.SCENE:
+        scene = _build_math_scene_snapshot(cir_step)
+        if scene is not None:
+            return scene
+        logger.info("Math scene empty for step %s; falling back to formula snapshot", cir_step.id)
+        return _build_math_formula_snapshot(cir_step)
     if cir_step.visual_kind == VisualKind.FUNCTION:
         plot = _build_math_plot_snapshot(cir_step)
         if plot is not None:
             return plot
-        # No usable plot data → degrade to the array view rather than a blank.
-    # ARRAY, FLOW, TEXT, FORMULA, MOTION, CIRCUIT, MOLECULE, MAP, CELL fall through to array
+        # Math curves were unusable. If the step carries a 2-D scene, prefer it.
+        if cir_step.scene is not None:
+            scene = _build_math_scene_snapshot(cir_step)
+            if scene is not None:
+                logger.info(
+                    "Math plot empty for step %s; using attached scene snapshot",
+                    cir_step.id,
+                )
+                return scene
+        logger.info("Math plot empty for step %s; falling back to formula snapshot", cir_step.id)
+        return _build_math_formula_snapshot(cir_step)
+    if cir_step.visual_kind == VisualKind.FORMULA:
+        return _build_math_formula_snapshot(cir_step)
+    # Math domain must never degrade to the algorithm array view. If the LLM
+    # ignored prompt guidance and emitted visual_kind=array for math, route to
+    # scene (when present) then formula so the user sees the topic's core
+    # idea instead of A/B/C/D.
+    if domain == TopicDomain.MATH:
+        if cir_step.scene is not None:
+            scene = _build_math_scene_snapshot(cir_step)
+            if scene is not None:
+                logger.warning(
+                    "Math step %s used visual_kind=%s; routing to scene snapshot",
+                    cir_step.id,
+                    cir_step.visual_kind,
+                )
+                return scene
+        logger.warning(
+            "Math step %s used visual_kind=%s; routing to formula snapshot",
+            cir_step.id,
+            cir_step.visual_kind,
+        )
+        return _build_math_formula_snapshot(cir_step)
+    # ARRAY, FLOW, TEXT, MOTION, CIRCUIT, MOLECULE, MAP, CELL fall through to array
     return _build_array_snapshot(cir_step, checkpoint, execution_map)
 
 
@@ -247,6 +297,175 @@ def _build_math_plot_snapshot(cir_step: CirStep) -> MathPlotSnapshot | None:
         x_label=spec.x_label or "x",
         y_label=spec.y_label or "y",
         formula_latex=spec.formula_latex,
+    )
+
+
+_SCENE_EMPHASIS = ("primary", "secondary", "accent")
+_SCENE_ALIGN = ("ne", "nw", "se", "sw", "center")
+
+
+def _normalize_emphasis(value: str, default: str = "primary") -> str:
+    return value if value in _SCENE_EMPHASIS else default
+
+
+def _normalize_align(value: str, default: str = "ne") -> str:
+    return value if value in _SCENE_ALIGN else default
+
+
+def _build_math_scene_snapshot(cir_step: CirStep) -> MathSceneSnapshot | None:
+    """Translate ``cir_step.scene`` into a renderer-ready snapshot.
+
+    Each expression is run through the safe-character whitelist; invalid
+    pieces are dropped, not allowed to crash the renderer. Returns ``None``
+    when the scene contains no usable visible element (the caller falls
+    back to a formula snapshot).
+    """
+
+    spec = cir_step.scene
+    if spec is None:
+        return None
+
+    x_min, x_max = spec.x_min, spec.x_max
+    if not (x_min < x_max):
+        x_min, x_max = -5.0, 5.0
+    y_min, y_max = spec.y_min, spec.y_max
+    if not (y_min < y_max):
+        y_min, y_max = -5.0, 5.0
+
+    points = [
+        MathScenePoint(
+            x=p.x,
+            y=p.y,
+            label=p.label,
+            emphasis=_normalize_emphasis(p.emphasis),
+        )
+        for p in spec.points
+    ]
+
+    curves: list[MathSceneCurve] = []
+    for raw in spec.curves:
+        safe_y = _sanitize_expression(raw.expression_y)
+        if safe_y is None:
+            logger.warning("Dropping unsafe scene curve y-expression in step %s", cir_step.id)
+            continue
+        safe_x: str | None = None
+        if raw.expression_x is not None:
+            safe_x = _sanitize_expression(raw.expression_x)
+            if safe_x is None:
+                logger.warning("Dropping unsafe scene curve x-expression in step %s", cir_step.id)
+                continue
+        curves.append(
+            MathSceneCurve(
+                expression_y=safe_y,
+                expression_x=safe_x,
+                t_min=raw.t_min,
+                t_max=raw.t_max,
+                label=raw.label,
+                emphasis=_normalize_emphasis(raw.emphasis),
+                arrows=bool(raw.arrows),
+            )
+        )
+
+    regions = [
+        MathSceneRegion(
+            vertices=[(float(vx), float(vy)) for vx, vy in r.vertices],
+            label=r.label,
+            emphasis=_normalize_emphasis(r.emphasis, default="secondary"),
+        )
+        for r in spec.regions
+        if r.vertices
+    ]
+
+    vector_field: MathSceneVectorField | None = None
+    if spec.vector_field is not None:
+        safe_px = _sanitize_expression(spec.vector_field.expression_px)
+        safe_py = _sanitize_expression(spec.vector_field.expression_py)
+        if safe_px and safe_py:
+            step = spec.vector_field.step
+            if step is not None and step <= 0:
+                step = None
+            vector_field = MathSceneVectorField(
+                expression_px=safe_px,
+                expression_py=safe_py,
+                step=step,
+                label=spec.vector_field.label,
+            )
+        else:
+            logger.warning(
+                "Dropping vector field with unsafe expressions in step %s", cir_step.id
+            )
+
+    segments = [
+        MathSceneSegment(
+            x0=s.x0,
+            y0=s.y0,
+            x1=s.x1,
+            y1=s.y1,
+            arrow=bool(s.arrow),
+            label=s.label,
+            emphasis=_normalize_emphasis(s.emphasis),
+        )
+        for s in spec.segments
+    ]
+
+    annotations = [
+        MathSceneAnnotation(
+            x=a.x,
+            y=a.y,
+            text=a.text,
+            align=_normalize_align(a.align),
+        )
+        for a in spec.annotations
+        if a.text and a.text.strip()
+    ]
+
+    has_visible_content = bool(
+        curves or regions or segments or points or annotations or vector_field or spec.formula_latex
+    )
+    if not has_visible_content:
+        return None
+
+    return MathSceneSnapshot(
+        x_min=x_min,
+        x_max=x_max,
+        y_min=y_min,
+        y_max=y_max,
+        x_label=spec.x_label or "x",
+        y_label=spec.y_label or "y",
+        points=points,
+        curves=curves,
+        regions=regions,
+        vector_field=vector_field,
+        segments=segments,
+        annotations=annotations,
+        formula_latex=spec.formula_latex,
+        caption=spec.caption,
+    )
+
+
+def _build_math_formula_snapshot(cir_step: CirStep) -> MathFormulaSnapshot:
+    """Build a static formula display for non-graphable math content.
+
+    Pulls ``formula_latex`` from ``cir_step.plot`` when available, otherwise
+    falls back to a ``\\text{...}`` block built from the step title so the
+    main viewport never shows mis-typed A/B/C/D boxes for math topics.
+    """
+
+    formula_latex: str | None = None
+    if cir_step.plot is not None and cir_step.plot.formula_latex:
+        formula_latex = cir_step.plot.formula_latex.strip() or None
+    if not formula_latex:
+        # Defensive placeholder — better than rendering wrong content.
+        safe_title = cir_step.title.replace("{", "").replace("}", "").replace("\\", "")
+        formula_latex = f"\\text{{{safe_title}}}"
+
+    caption = cir_step.title.strip() or None
+    annotations = [a.strip() for a in cir_step.annotations if a and a.strip()]
+    return MathFormulaSnapshot(
+        formula_latex=formula_latex,
+        caption=caption,
+        highlights=[],
+        annotations=annotations,
     )
 
 
@@ -364,6 +583,7 @@ _HINT_MAP: dict[VisualKind, str] = {
     VisualKind.FLOW: "reveal",
     VisualKind.FORMULA: "reveal",
     VisualKind.FUNCTION: "reveal",
+    VisualKind.SCENE: "reveal",
     VisualKind.TEXT: "reveal",
     VisualKind.MOTION: "enter",
     VisualKind.CIRCUIT: "highlight",

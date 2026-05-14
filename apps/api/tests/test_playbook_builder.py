@@ -586,3 +586,125 @@ class TestParseNarrationTemplate:
         assert isinstance(result, list)
         assert result[0] == {"t": "t0"}
         assert isinstance(result[2], list)
+
+
+class TestMathFallbackChain:
+    """Math domain must never degrade to A/B/C/D array boxes.
+
+    Regression suite for the issue where the LLM emitted ``visual_kind="array"``
+    (or an unusable plot) for math topics like Green's theorem and the
+    main viewport rendered the array snapshot's letter tokens.
+    """
+
+    from app.domain.models.cir import PlotCurveSpec, PlotSpec
+    from app.domain.models.playbook import MathFormulaSnapshot, MathPlotSnapshot
+
+    def _math_cir(self, step: CirStep) -> CirDocument:
+        return CirDocument(
+            title="格林公式简介",
+            domain=TopicDomain.MATH,
+            summary="演示格林公式",
+            steps=[step],
+        )
+
+    def test_function_with_valid_curves_renders_plot(self):
+        from app.domain.models.cir import PlotCurveSpec, PlotSpec
+        from app.domain.models.playbook import MathPlotSnapshot
+
+        step = CirStep(
+            id="s1",
+            title="先看 f(x) = x²",
+            narration="抛物线",
+            visual_kind=VisualKind.FUNCTION,
+            plot=PlotSpec(
+                curves=[PlotCurveSpec(expression="x^2", label="f", emphasis="primary")],
+                x_min=-4,
+                x_max=4,
+                formula_latex="f(x)=x^2",
+            ),
+        )
+        playbook = build_playbook(self._math_cir(step), execution_map=None)
+        snap = playbook.steps[0].snapshot
+        assert isinstance(snap, MathPlotSnapshot)
+        assert snap.kind == "math_plot"
+        assert snap.curves[0].expression == "x^2"
+
+    def test_function_with_invalid_plot_falls_back_to_formula(self):
+        """LLM picked visual_kind=function but curves are unparseable —
+        must produce MathFormulaSnapshot, NOT AlgorithmArraySnapshot."""
+        from app.domain.models.cir import PlotCurveSpec, PlotSpec
+        from app.domain.models.playbook import MathFormulaSnapshot
+
+        step = CirStep(
+            id="s1",
+            title="∮ Green's Theorem",
+            narration="向量场环路积分",
+            visual_kind=VisualKind.FUNCTION,
+            # Expression contains a `\` character → fails the safe regex.
+            plot=PlotSpec(
+                curves=[PlotCurveSpec(expression="\\oint", label="C")],
+                formula_latex=r"\oint_C P\,dx + Q\,dy",
+            ),
+            annotations=["P,Q 是分量函数"],
+        )
+        playbook = build_playbook(self._math_cir(step), execution_map=None)
+        snap = playbook.steps[0].snapshot
+        assert isinstance(snap, MathFormulaSnapshot)
+        assert snap.kind == "math_formula"
+        assert "oint" in snap.formula_latex
+        assert "P,Q" in snap.annotations[0]
+
+    def test_formula_visual_kind_builds_formula_snapshot(self):
+        from app.domain.models.cir import PlotSpec
+        from app.domain.models.playbook import MathFormulaSnapshot
+
+        step = CirStep(
+            id="s1",
+            title="格林公式",
+            narration="把曲线积分转为面积分",
+            visual_kind=VisualKind.FORMULA,
+            plot=PlotSpec(
+                formula_latex=r"\oint_C P\,dx + Q\,dy = \iint_R \left(\partial Q/\partial x - \partial P/\partial y\right) dA",
+            ),
+            annotations=["C 是 R 的边界", "P,Q 是分量函数"],
+        )
+        playbook = build_playbook(self._math_cir(step), execution_map=None)
+        snap = playbook.steps[0].snapshot
+        assert isinstance(snap, MathFormulaSnapshot)
+        assert snap.caption == "格林公式"
+        assert len(snap.annotations) == 2
+
+    def test_math_array_visual_kind_reroutes_to_formula(self):
+        """Math + visual_kind=array (LLM ignoring guidance) must NOT render
+        as A/B/C/D boxes — the builder reroutes to formula display."""
+        from app.domain.models.playbook import MathFormulaSnapshot
+
+        step = CirStep(
+            id="s1",
+            title="定义向量场",
+            narration="F = (P, Q)",
+            visual_kind=VisualKind.ARRAY,
+            tokens=[
+                VisualToken(id="t0", label="A"),
+                VisualToken(id="t1", label="B"),
+                VisualToken(id="t2", label="C"),
+                VisualToken(id="t3", label="D"),
+            ],
+        )
+        playbook = build_playbook(self._math_cir(step), execution_map=None)
+        snap = playbook.steps[0].snapshot
+        # Critical regression: NOT an array snapshot.
+        assert snap.kind == "math_formula"
+        assert isinstance(snap, MathFormulaSnapshot)
+        # Title-derived placeholder kicks in when no formula_latex provided.
+        assert "定义向量场" in snap.formula_latex
+
+    def test_algorithm_domain_array_still_uses_array_snapshot(self):
+        """Negative control: algorithm domain must keep its array path."""
+        from app.domain.models.playbook import AlgorithmArraySnapshot, AlgorithmBarsSnapshot
+
+        cir = _make_array_cir()  # algorithm domain
+        playbook = build_playbook(cir, execution_map=None)
+        snap = playbook.steps[0].snapshot
+        # Either flavour of array snapshot is fine; the point is it's NOT formula.
+        assert isinstance(snap, (AlgorithmArraySnapshot, AlgorithmBarsSnapshot))

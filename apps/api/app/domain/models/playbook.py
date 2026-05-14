@@ -14,6 +14,8 @@ class SnapshotKind(str, Enum):
     ALGORITHM_BARS = "algorithm_bars"
     ALGORITHM_TREE = "algorithm_tree"
     MATH_PLOT = "math_plot"
+    MATH_FORMULA = "math_formula"
+    MATH_SCENE = "math_scene"
 
 
 class AlgorithmArraySnapshot(BaseModel):
@@ -83,12 +85,101 @@ class MathPlotSnapshot(BaseModel):
     formula_latex: str | None = None  # optional KaTeX label, e.g. "f(x) = x^2"
 
 
+class MathFormulaSnapshot(BaseModel):
+    """Static math formula display (math domain — non-graphable content).
+
+    Used when the math step cannot be drawn on a 1-D coordinate plane: vector
+    fields, 2-D region integrals, abstract algebra, set theory, etc. The
+    renderer typesets ``formula_latex`` center-stage with optional caption and
+    side annotations — far more useful than the array fallback used to be.
+    """
+
+    kind: Literal["math_formula"] = "math_formula"
+    formula_latex: str
+    caption: str | None = None  # 1-sentence plain-language summary
+    highlights: list[str] = Field(default_factory=list)  # KaTeX sub-expressions to emphasise
+    annotations: list[str] = Field(default_factory=list)  # short side notes
+
+
+class MathScenePoint(BaseModel):
+    x: float
+    y: float
+    label: str | None = None
+    emphasis: str = "primary"
+
+
+class MathSceneCurve(BaseModel):
+    expression_y: str
+    expression_x: str | None = None
+    t_min: float | None = None
+    t_max: float | None = None
+    label: str | None = None
+    emphasis: str = "primary"
+    arrows: bool = False
+
+
+class MathSceneRegion(BaseModel):
+    vertices: list[tuple[float, float]] = Field(default_factory=list)
+    label: str | None = None
+    emphasis: str = "secondary"
+
+
+class MathSceneVectorField(BaseModel):
+    expression_px: str
+    expression_py: str
+    step: float | None = None
+    label: str | None = None
+
+
+class MathSceneSegment(BaseModel):
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+    arrow: bool = False
+    label: str | None = None
+    emphasis: str = "primary"
+
+
+class MathSceneAnnotation(BaseModel):
+    x: float
+    y: float
+    text: str
+    align: str = "ne"
+
+
+class MathSceneSnapshot(BaseModel):
+    """2D math scene: curves, regions, vector fields, segments, points.
+
+    Used when math content benefits from a coordinate system explanation
+    rather than a single formula or 1-D curve plot.
+    """
+
+    kind: Literal["math_scene"] = "math_scene"
+    x_min: float = -5.0
+    x_max: float = 5.0
+    y_min: float = -5.0
+    y_max: float = 5.0
+    x_label: str = "x"
+    y_label: str = "y"
+    points: list[MathScenePoint] = Field(default_factory=list)
+    curves: list[MathSceneCurve] = Field(default_factory=list)
+    regions: list[MathSceneRegion] = Field(default_factory=list)
+    vector_field: MathSceneVectorField | None = None
+    segments: list[MathSceneSegment] = Field(default_factory=list)
+    annotations: list[MathSceneAnnotation] = Field(default_factory=list)
+    formula_latex: str | None = None
+    caption: str | None = None
+
+
 AnySnapshot = Annotated[
     Union[
         AlgorithmArraySnapshot,
         AlgorithmBarsSnapshot,
         AlgorithmTreeSnapshot,
         MathPlotSnapshot,
+        MathFormulaSnapshot,
+        MathSceneSnapshot,
     ],
     Field(discriminator="kind"),
 ]

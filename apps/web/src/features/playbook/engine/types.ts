@@ -4,7 +4,9 @@ export type SnapshotKind =
   | "algorithm_array"
   | "algorithm_bars"
   | "algorithm_tree"
-  | "math_plot";
+  | "math_plot"
+  | "math_formula"
+  | "math_scene";
 
 export interface AlgorithmArraySnapshot {
   kind: "algorithm_array";
@@ -67,11 +69,106 @@ export interface MathPlotSnapshot {
   formula_latex?: string | null;
 }
 
+/** Static math formula display (math domain — non-graphable content). */
+export interface MathFormulaSnapshot {
+  kind: "math_formula";
+  /** Core equation as a KaTeX expression. Required. */
+  formula_latex: string;
+  /** Plain-language one-sentence summary shown below the formula. */
+  caption?: string | null;
+  /** KaTeX sub-expressions to emphasise (rendered with accent color). */
+  highlights?: string[];
+  /** Short side notes (e.g. variable meanings). */
+  annotations?: string[];
+}
+
+/** A labelled point in the math scene's coordinate space. */
+export interface MathScenePoint {
+  x: number;
+  y: number;
+  label?: string | null;
+  emphasis?: string;
+}
+
+/** A curve in the math scene: implicit `y = f(x)` or parametric `(x(t), y(t))`. */
+export interface MathSceneCurve {
+  /** y-component or `y = f(x)` expression. */
+  expression_y: string;
+  /** Parametric x-component; when present treat the curve as parametric in `t`. */
+  expression_x?: string | null;
+  t_min?: number | null;
+  t_max?: number | null;
+  label?: string | null;
+  emphasis?: string;
+  /** Render directional arrows along the curve. */
+  arrows?: boolean;
+}
+
+/** Filled polygonal region in scene coordinates. */
+export interface MathSceneRegion {
+  vertices: Array<[number, number]>;
+  label?: string | null;
+  emphasis?: string;
+}
+
+/** Vector field `F(x, y) = (P, Q)` sampled on a grid. */
+export interface MathSceneVectorField {
+  expression_px: string;
+  expression_py: string;
+  /** Grid step in scene units; renderer auto-picks when null. */
+  step?: number | null;
+  label?: string | null;
+}
+
+/** Straight segment / arrow between two scene points. */
+export interface MathSceneSegment {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  arrow?: boolean;
+  label?: string | null;
+  emphasis?: string;
+}
+
+/** Free-floating text label. `text` containing `$...$` is KaTeX-rendered. */
+export interface MathSceneAnnotation {
+  x: number;
+  y: number;
+  text: string;
+  align?: "ne" | "nw" | "se" | "sw" | "center";
+}
+
+/** 2-D math scene: curves, regions, vector fields, segments, points. */
+export interface MathSceneSnapshot {
+  kind: "math_scene";
+  x_min: number;
+  x_max: number;
+  y_min: number;
+  y_max: number;
+  x_label: string;
+  y_label: string;
+  points?: MathScenePoint[];
+  curves?: MathSceneCurve[];
+  regions?: MathSceneRegion[];
+  vector_field?: MathSceneVectorField | null;
+  segments?: MathSceneSegment[];
+  annotations?: MathSceneAnnotation[];
+  /** Optional KaTeX summary shown in a corner of the scene. */
+  formula_latex?: string | null;
+  /** Plain-language caption shown beneath the scene. */
+  caption?: string | null;
+  /** Runtime numeric parameter scope used by curve / vector-field expressions. */
+  params?: Record<string, number>;
+}
+
 export type AnySnapshot =
   | AlgorithmArraySnapshot
   | AlgorithmBarsSnapshot
   | AlgorithmTreeSnapshot
-  | MathPlotSnapshot;
+  | MathPlotSnapshot
+  | MathFormulaSnapshot
+  | MathSceneSnapshot;
 
 export interface CodeHighlightOverlay {
   language: string;

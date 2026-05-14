@@ -1,58 +1,58 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
-import {
-  compileExpr,
-  sampleExpr,
-  type CompiledExpr,
-} from "../../../../shared/lib/mathExpr";
+import { compileExpr } from "../../../../shared/lib/mathExpr";
 import {
   MATH_PRESETS,
   initialParams,
-  type CurveEmphasis,
   type MathPreset,
 } from "../../../../features/math-widget/lib/presets";
-import { FunctionPlot, type PlotMarker, type PlotSeries } from "../../../../features/math-widget/ui/FunctionPlot";
+import type { MathPlotOverride } from "../player/useResolvedScript";
+import type { MathPlotCurve } from "../types";
 import type { ParamPanelProps } from "./types";
 
-const SAMPLES = 280;
 const PARAM_ID_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
-
-const CURVE_COLORS: Record<"dark" | "light", Record<CurveEmphasis, string>> = {
-  dark: { primary: "#4de8b0", secondary: "#c8a8f8", accent: "#ff9e8a" },
-  light: { primary: "#0a8f6e", secondary: "#6030c0", accent: "#c05030" },
-};
-
-interface CompiledPreset {
-  preset: MathPreset;
-  curves: Array<{ fn: CompiledExpr | null; label: string; emphasis: CurveEmphasis }>;
-  markerFn: CompiledExpr | null;
-}
 
 interface NumericControl {
   control: ParamPanelProps["script"]["parameter_controls"][number];
   initial: number;
 }
 
-function compilePreset(preset: MathPreset): CompiledPreset {
-  const curves = preset.curves.map((c) => {
-    let fn: CompiledExpr | null = null;
-    try {
-      fn = compileExpr(c.expression);
-    } catch {
-      fn = null;
-    }
-    return { fn, label: c.label, emphasis: (c.emphasis ?? "primary") as CurveEmphasis };
-  });
-  let markerFn: CompiledExpr | null = null;
+/**
+ * Convert a preset definition into a {@link MathPlotOverride} that the main
+ * viewport's MathPlotRenderer can consume. The preset's curve expressions and
+ * marker expression are reused verbatim — we only evaluate the marker x at
+ * the current parameter values because MathPlotSnapshot.marker_x is numeric.
+ */
+function presetToOverride(
+  preset: MathPreset,
+  params: Record<string, number>,
+): MathPlotOverride {
+  const curves: MathPlotCurve[] = preset.curves.map((c) => ({
+    expression: c.expression,
+    label: c.label,
+    emphasis: c.emphasis ?? "primary",
+  }));
+  let markerX: number | null = null;
   if (preset.markerX) {
     try {
-      markerFn = compileExpr(preset.markerX);
+      const compiled = compileExpr(preset.markerX);
+      const v = compiled(params);
+      markerX = Number.isFinite(v) ? v : null;
     } catch {
-      markerFn = null;
+      markerX = null;
     }
   }
-  return { preset, curves, markerFn };
+  return {
+    curves,
+    params: { ...params },
+    x_min: preset.xRange[0],
+    x_max: preset.xRange[1],
+    y_min: preset.yRange ? preset.yRange[0] : null,
+    y_max: preset.yRange ? preset.yRange[1] : null,
+    marker_x: markerX,
+    formula_latex: preset.formula(params),
+  };
 }
 
 function renderKatex(src: string, displayMode: boolean): string {
@@ -83,6 +83,12 @@ export function MathParamPanel({
   isDark,
 }: ParamPanelProps): React.JSX.Element {
   const theme = isDark ? "dark" : "light";
+
+  // ─── All hooks must run unconditionally on every render. ────────────────
+  // The component renders one of two UIs (script-driven sliders vs. preset
+  // chips) depending on whether the LLM emitted parameter_controls, but the
+  // hook list must stay stable. We compute hook state for both modes here and
+  // pick the JSX branch at the bottom.
   const numericControls = useMemo<NumericControl[]>(() => {
     const controls: NumericControl[] = [];
     for (const control of script.parameter_controls) {
@@ -92,6 +98,32 @@ export function MathParamPanel({
     }
     return controls;
   }, [script.parameter_controls]);
+
+  // Preset-mode local state. Always declared, only consumed when we land in
+  // the preset branch. React state is cheap; conditional hooks are not.
+  const [presetId, setPresetId] = useState<string>(MATH_PRESETS[0].id);
+  const [params, setParams] = useState<Record<string, number>>(() => initialParams(MATH_PRESETS[0]));
+
+  const preset = useMemo<MathPreset>(
+    () => MATH_PRESETS.find((p) => p.id === presetId) ?? MATH_PRESETS[0],
+    [presetId],
+  );
+
+  const inPresetMode = numericControls.length === 0;
+
+  // Push every (preset, params) change into the script overrides so the main
+  // viewport reflects the panel state in real time. The effect is a no-op
+  // when the panel is in script-driven mode.
+  useEffect(() => {
+    if (!inPresetMode) return;
+    onOverridesChange({
+      ...overrides,
+      mathPlot: presetToOverride(preset, params),
+    });
+    // overrides / onOverridesChange intentionally omitted — including them
+    // would re-fire on every parent re-render, clobbering itself.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inPresetMode, preset, params]);
 
   const setScriptParam = (key: string, value: number): void => {
     onOverridesChange({
@@ -106,46 +138,8 @@ export function MathParamPanel({
     onOverridesChange(next);
   };
 
-  const [presetId, setPresetId] = useState<string>(MATH_PRESETS[0].id);
-  const [params, setParams] = useState<Record<string, number>>(() => initialParams(MATH_PRESETS[0]));
-
-  const compiled = useMemo<CompiledPreset>(() => {
-    const preset = MATH_PRESETS.find((p) => p.id === presetId) ?? MATH_PRESETS[0];
-    return compilePreset(preset);
-  }, [presetId]);
-  const { preset } = compiled;
-
-  const selectPreset = (id: string): void => {
-    const next = MATH_PRESETS.find((p) => p.id === id);
-    if (!next) return;
-    setPresetId(id);
-    setParams(initialParams(next));
-  };
-
-  const setParam = (key: string, value: number): void => {
-    setParams((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const series: PlotSeries[] = compiled.curves.map((curve) => ({
-    points: curve.fn ? sampleExpr(curve.fn, preset.xRange[0], preset.xRange[1], SAMPLES, params) : [],
-    color: CURVE_COLORS[theme][curve.emphasis],
-    label: curve.label,
-    dashed: curve.emphasis === "secondary" || curve.emphasis === "accent",
-  }));
-
-  let marker: PlotMarker | null = null;
-  const leadFn = compiled.curves.find((curve) => curve.fn)?.fn ?? null;
-  if (compiled.markerFn && leadFn) {
-    const mx = compiled.markerFn(params);
-    const my = Number.isFinite(mx) ? leadFn({ ...params, x: mx }) : NaN;
-    if (Number.isFinite(mx) && Number.isFinite(my)) {
-      marker = { x: mx, y: my, color: CURVE_COLORS[theme].primary };
-    }
-  }
-
-  const readouts = preset.readouts?.(params) ?? [];
-
-  if (numericControls.length > 0) {
+  // ─── Script-driven mode: sliders only, plot lives in the main viewport. ──
+  if (!inPresetMode) {
     const dirty = Object.keys(overrides.mathParams ?? {}).length > 0;
     return (
       <div className="math-param-panel" data-theme={theme}>
@@ -197,6 +191,23 @@ export function MathParamPanel({
     );
   }
 
+  // ─── Preset mode: chips + sliders drive overrides.mathPlot. No canvas here. ──
+  // The main viewport's MathPlotRenderer reads overrides.mathPlot and renders
+  // the curve. This avoids the duplicated-canvas problem.
+
+  const selectPreset = (id: string): void => {
+    const next = MATH_PRESETS.find((p) => p.id === id);
+    if (!next) return;
+    setPresetId(id);
+    setParams(initialParams(next));
+  };
+
+  const setParam = (key: string, value: number): void => {
+    setParams((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const readouts = preset.readouts?.(params) ?? [];
+
   return (
     <div className="math-param-panel" data-theme={theme}>
       {/* Preset chips */}
@@ -217,7 +228,7 @@ export function MathParamPanel({
 
       <p className="math-param-panel__description-text">{preset.description}</p>
 
-      {/* Live formula */}
+      {/* Live formula readout (no canvas — the canvas is the main viewport). */}
       <div className="math-param-panel__formula-card">
         <div
           className="math-param-panel__formula"
@@ -232,13 +243,6 @@ export function MathParamPanel({
             ))}
           </div>
         )}
-      </div>
-
-      {/* Plot */}
-      <div className="math-param-panel__plot-wrap">
-        <div className="math-param-panel__plot">
-          <FunctionPlot series={series} xRange={preset.xRange} yRange={preset.yRange} theme={theme} marker={marker} />
-        </div>
       </div>
 
       {/* Parameter sliders */}
@@ -266,7 +270,10 @@ export function MathParamPanel({
       </div>
 
       <div className="math-param-panel__actions">
-        <button onClick={() => setParams(initialParams(preset))} className="math-param-panel__reset">
+        <button
+          onClick={() => setParams(initialParams(preset))}
+          className="math-param-panel__reset"
+        >
           重置参数
         </button>
       </div>

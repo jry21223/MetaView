@@ -16,6 +16,7 @@ class VisualKind(str, Enum):
     FLOW = "flow"
     FORMULA = "formula"
     FUNCTION = "function"  # math: Cartesian function / curve plot
+    SCENE = "scene"  # math: coordinate scene (curves + regions + vectors)
     GRAPH = "graph"
     TEXT = "text"
     MOTION = "motion"

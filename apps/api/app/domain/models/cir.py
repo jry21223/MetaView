@@ -56,6 +56,87 @@ class PlotSpec(BaseModel):
     formula_latex: str | None = None  # optional KaTeX label, e.g. "f(x) = x^2"
 
 
+class ScenePoint(BaseModel):
+    x: float
+    y: float
+    label: str | None = None
+    emphasis: str = "primary"  # primary | secondary | accent
+
+
+class SceneCurve(BaseModel):
+    """A scene curve. Either implicit ``y = f(x)`` or parametric ``(fnX(t), fnY(t))``.
+
+    Provide ``expression_y`` for explicit form. Provide all of ``expression_x``,
+    ``t_min`` and ``t_max`` for the parametric form (``expression_y`` is then read
+    as the y-component ``fnY(t)``). Sampling happens in the renderer.
+    """
+
+    expression_y: str
+    expression_x: str | None = None  # if set, treat as parametric ``(x(t), y(t))``
+    t_min: float | None = None
+    t_max: float | None = None
+    label: str | None = None
+    emphasis: str = "primary"
+    arrows: bool = False  # render direction arrows along the curve
+
+
+class SceneRegion(BaseModel):
+    """Closed polygonal region filled and outlined; vertices in scene units."""
+
+    vertices: list[tuple[float, float]] = Field(default_factory=list)
+    label: str | None = None
+    emphasis: str = "secondary"
+
+
+class SceneVectorField(BaseModel):
+    """Vector field ``F(x, y) = (P(x, y), Q(x, y))`` sampled on a regular grid."""
+
+    expression_px: str
+    expression_py: str
+    step: float | None = None  # grid step in scene units; default = auto
+    label: str | None = None
+
+
+class SceneSegment(BaseModel):
+    """Straight segment / arrow from (x0, y0) to (x1, y1)."""
+
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+    arrow: bool = False
+    label: str | None = None
+    emphasis: str = "primary"
+
+
+class SceneAnnotation(BaseModel):
+    """Free-floating text label. If ``text`` contains ``$...$`` it's KaTeX-rendered."""
+
+    x: float
+    y: float
+    text: str
+    align: str = "ne"  # ne | nw | se | sw | center
+
+
+class SceneSpec(BaseModel):
+    """A 2D coordinate scene: curves, regions, vector fields, segments, points."""
+
+    x_min: float = -5.0
+    x_max: float = 5.0
+    y_min: float = -5.0
+    y_max: float = 5.0
+    x_label: str = "x"
+    y_label: str = "y"
+    points: list[ScenePoint] = Field(default_factory=list)
+    curves: list[SceneCurve] = Field(default_factory=list)
+    regions: list[SceneRegion] = Field(default_factory=list)
+    vector_field: SceneVectorField | None = None
+    segments: list[SceneSegment] = Field(default_factory=list)
+    annotations: list[SceneAnnotation] = Field(default_factory=list)
+    formula_latex: str | None = None  # corner KaTeX summary
+    caption: str | None = None
+
+
 class CirStep(BaseModel):
     id: str
     title: str
@@ -65,6 +146,7 @@ class CirStep(BaseModel):
     tokens: list[VisualToken] = Field(default_factory=list)
     edges: list[EdgeRef] | None = None
     plot: PlotSpec | None = None
+    scene: SceneSpec | None = None
     annotations: list[str] = Field(default_factory=list)
     start_time: float | None = None
     end_time: float | None = None

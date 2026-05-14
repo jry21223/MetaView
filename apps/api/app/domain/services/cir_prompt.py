@@ -5,7 +5,8 @@ from app.domain.services.algorithm_code_library import infer_id, prompt_hint
 
 _DOMAIN_GUIDANCE: dict[TopicDomain, str] = {
     TopicDomain.ALGORITHM: """
-VISUAL RULES for algorithms:
+VISUAL + PEDAGOGY RULES for algorithms:
+- Step template (use as the narrative spine): 直觉一句类比 → 伪代码思路 → 在样本数据上走一步 → 总结这一步学到了什么。
 - Use visual_kind="array" for sorting, searching, two-pointer, sliding-window, DP table problems.
 - Use visual_kind="graph" ONLY for explicit tree/graph traversal (BFS, DFS, BST operations).
 - For graph steps, populate the "edges" array with explicit parent→child refs like
@@ -16,64 +17,83 @@ VISUAL RULES for algorithms:
 - emphasis="secondary" → elements visited but not finalized
 - For multi-step algorithms, show every meaningful state change as a separate step.
   Example for [5,3,1]: step1=initial, step2=after first comparison, step3=after swap, ...
+- First time a term appears (e.g. "递归"、"分治"), give a one-line everyday analogy before formal use.
 """,
     TopicDomain.CODE: """
-VISUAL RULES for code explanation:
+VISUAL + PEDAGOGY RULES for code explanation:
+- Step template: 这段代码要解决的问题（一句话） → 关键数据结构是什么、为什么选它 → 逐步执行 → 输出验证。
 - Use visual_kind="array" to show data structures (stacks, queues, arrays, hash maps).
 - Represent each data structure slot as a token with label=value.
 - Steps should correspond to key execution moments: initialization, loop iteration,
   function call, return.
 - Use token value field for data structure keys when relevant.
+- Tie every step back to a specific source line and explain why that line is needed in plain language.
 """,
     TopicDomain.MATH: """
-VISUAL RULES for math:
-- Use visual_kind="function" for ANYTHING that lives on a coordinate plane:
-  graphing f(x), transformations (shifts/scales of a parent function), derivatives
-  and tangent lines, area under a curve (definite integrals), trigonometric waves,
-  exponential/log growth, families of curves driven by a parameter.
-  For each such step, fill the step's "plot" object (see schema):
-    - "curves": one or more {"expression": "...", "label": "...", "emphasis": "..."}.
-      The expression is a formula in the variable `x` using + - * / ^ %, parentheses,
-      and functions sin cos tan asin acos atan exp log ln log2 log10 sqrt cbrt abs
-      floor ceil round sign min max pow hypot, and constants pi tau e.
-      Examples: "x^2 - 2*x", "sin(x)", "0.5*x^3 - x", "exp(-x^2)", "1/x".
-      Do NOT pre-sample points and do NOT use programming syntax — just the math formula.
-    - "x_min"/"x_max": the visible domain (e.g. -6 to 6, or 0 to 2*pi ≈ 6.28).
-    - "marker_x" (optional): x of a point that should be highlighted on the FIRST curve
-      (e.g. the point where you evaluate the derivative).
-    - "shade_from"/"shade_to" (optional): shade the area under the FIRST curve between
-      these x values — use for definite-integral / Riemann-sum steps.
-    - "formula_latex" (optional): a short KaTeX label, e.g. "f(x) = x^2 - 2x".
-  Use emphasis="primary" for the curve currently in focus, "secondary" for context
-  curves (e.g. the original function while showing its derivative), "accent" for a
-  result/answer curve. Across steps, progressively reveal: parent → transform → analyse.
-- Use visual_kind="array" ONLY for non-graphable algebra: expanding/factoring an
-  expression term by term, matrix rows, or listing the elements of a sequence/series.
-  Then each token label = one mathematical term (e.g. "3x²", "-2x", "+5", "=0").
-- Pick "function" whenever a picture on axes would teach the idea better than text.
+VISUAL + PEDAGOGY RULES for math (audience: 零基础学生):
+- Step template (strict): 直觉（生活类比） → 形式（公式或定义） → 具体数字代入 → 推广到一般式。
+- 先给「为什么需要这个工具」再给公式。例：先讲「积分就是把一条曲线下面切成无数细条求面积」，再写积分号。
+- 永远先用具体数字举例（f(x)=x², x=2, 算出 f(2)=4），再泛化到符号。
+- HARD RULE: math 域的 visual_kind 只能是 "function" 或 "formula"。绝对不能用 "array"。
+  如果你想用 array 来排列代数项（如展开 (x+1)²），改用 "formula" 并把整个展开过程写进 formula_latex。
+
+A. WHEN TO USE visual_kind="function" (the default for graphable math):
+   - 任何能画在 1D 坐标轴上的函数：f(x) 作图、函数变换（平移/缩放）、导数与切线、
+     定积分下的面积、三角波、指数/对数增长、参数族曲线。
+   - REQUIRED: fill the step's "plot" object:
+     - "curves": one or more {"expression": "...", "label": "...", "emphasis": "..."}.
+       The expression is a formula in the variable `x` (plus named parameters such as `a`, `b`)
+       using + - * / ^ %, parentheses, and functions sin cos tan asin acos atan exp log ln
+       log2 log10 sqrt cbrt abs floor ceil round sign min max pow hypot, and constants pi tau e.
+       Examples: "x^2 - 2*x", "sin(x)", "a*x + b", "0.5*x^3 - x", "exp(-x^2)".
+       Do NOT pre-sample points and do NOT use programming syntax — just the math formula.
+     - "x_min"/"x_max": visible domain (e.g. -6 to 6, or 0 to 2*pi ≈ 6.28).
+     - "marker_x" (optional): x of a highlighted point on the FIRST curve.
+     - "shade_from"/"shade_to" (optional): shade the area under the FIRST curve.
+     - "formula_latex" (optional but recommended): a short KaTeX label, e.g. "f(x) = x^2 - 2x".
+   - When the curve uses parameters (e.g. `a*x + b`, `a*sin(b*x)`), expose each parameter
+     in execution_map.parameter_controls so the student can drag a slider. Do NOT hard-code
+     parameter values into the expression when the lesson is about how the parameter changes
+     the curve shape.
+
+B. WHEN TO USE visual_kind="formula" (when no 1D curve fits the topic):
+   - 题目涉及 2D 区域、向量场、曲面、抽象代数、集合论、群、概率分布表、矩阵代数等
+     无法用单 x-y 坐标平面表达的内容。
+   - REQUIRED: write the core equation in step.plot.formula_latex (KaTeX), and put 1–3 short
+     side notes into step.annotations (each ≤ 40 chars, e.g. "P,Q 是向量场的两个分量").
+     Example for Green's theorem:
+       plot.formula_latex = "\\\\oint_C P\\\\,dx + Q\\\\,dy = \\\\iint_R \\\\left(\\\\frac{\\\\partial Q}{\\\\partial x} - \\\\frac{\\\\partial P}{\\\\partial y}\\\\right) dA"
+       annotations = ["C 是 R 的边界（逆时针）", "P,Q 是向量场分量", "把曲线积分转成面积分"]
+   - Tokens may be empty for formula steps. Do NOT cram a 2D concept into an array of letter tokens.
+- Across all steps, reveal progressively: 直觉 → 例子 → 一般式 → 应用。
 """,
     TopicDomain.PHYSICS: """
-VISUAL RULES for physics:
+VISUAL + PEDAGOGY RULES for physics:
+- Step template: 现象（生活例子） → 受力分析或机制 → 列方程 → 代入数字解 → 验证单位。
 - Use visual_kind="array" to show forces, components, or quantities.
 - Token labels = physical quantities with units (e.g. "F=10N", "θ=30°", "a=5m/s²").
-- Steps: given → free-body diagram → apply law → solve → verify.
+- Always state units; never use bare numbers for physical quantities.
 - Use emphasis="primary" for the quantity being solved in each step.
+- First time a law appears (Newton 第二、能量守恒…), state it in one sentence in plain language.
 """,
     TopicDomain.CHEMISTRY: """
-VISUAL RULES for chemistry:
+VISUAL + PEDAGOGY RULES for chemistry:
+- Step template: 反应背景一句（为什么会发生） → 反应物结构 → 反应箭头与机制 → 产物 → 守恒检查（原子数/电荷）。
 - Use visual_kind="array" to show reactants, products, or molecular components.
 - Token labels = chemical symbols or compound formulas (e.g. "H₂O", "CO₂", "→").
-- Steps: reactants → reaction → products → balance.
+- Mention oxidation state changes when relevant, and explain in one line why electrons move.
 """,
     TopicDomain.BIOLOGY: """
-VISUAL RULES for biology:
+VISUAL + PEDAGOGY RULES for biology:
+- Step template: 结构（画一遍）→ 功能（结构如何实现功能）→ 过程（按时间走一遍）→ 结果（对整体生物的意义）。
 - Use visual_kind="array" to show biological components or process stages.
-- Steps should clearly separate: structure → function → process → outcome.
+- Avoid jargon stacking; explain each new term with one analogy before reusing it.
 """,
     TopicDomain.GEOGRAPHY: """
-VISUAL RULES for geography:
+VISUAL + PEDAGOGY RULES for geography:
+- Step template: 现象（先放一张「场景图」 token 列表） → 成因（自然/人文驱动力） → 影响 → 应对。
 - Use visual_kind="array" to show regions, factors, or process stages.
-- Steps should show temporal or causal progression.
+- Always state spatial/temporal scale up front (where, when).
 """,
 }
 
@@ -88,7 +108,7 @@ _COMBINED_SCHEMA = """{
         "id": "step_01",
         "title": "string — step title (≤ 30 chars)",
         "narration": "JSON array — see Narration Output Format section",
-        "visual_kind": "array | graph | function",
+        "visual_kind": "array | graph | function | formula",
         "tokens": [
           {
             "id": "string — unique id like t0, t1, node_root",
@@ -99,9 +119,9 @@ _COMBINED_SCHEMA = """{
         ],
         "edges": [{"from_id": "node_root", "to_id": "node_left"}],
         "plot": {
-          "_comment": "REQUIRED when visual_kind=function; omit otherwise",
+          "_comment": "REQUIRED when visual_kind=function. ALSO use plot.formula_latex when visual_kind=formula.",
           "curves": [
-            {"expression": "x^2 - 2*x", "label": "f(x)", "emphasis": "primary"}
+            {"expression": "a*x^2 - b", "label": "f(x)", "emphasis": "primary"}
           ],
           "x_min": -6.0,
           "x_max": 6.0,
@@ -112,9 +132,9 @@ _COMBINED_SCHEMA = """{
           "shade_to": null,
           "x_label": "x",
           "y_label": "y",
-          "formula_latex": "f(x) = x^2 - 2x"
+          "formula_latex": "f(x) = a x^2 - b"
         },
-        "annotations": []
+        "annotations": ["short side notes — REQUIRED when visual_kind=formula"]
       }
     ]
   },
@@ -122,12 +142,21 @@ _COMBINED_SCHEMA = """{
     "duration_s": "float — total animation duration in seconds (e.g. step_count × 3)",
     "algorithm_id": "string | null — snake_case name, e.g. bubble_sort (algorithm domain only)",
     "algorithm_code": "list[str] | null — pseudocode lines; code_lines indexes into this",
+    "parameter_controls": [
+      {
+        "_comment": "OPTIONAL — emit one entry per parameter the student should be able to drag. Required for math curves that contain free parameters (e.g. a, b in `a*x + b`). Do NOT hard-code such parameters into the expression.",
+        "id": "a",
+        "label": "斜率 a",
+        "value": "1.0",
+        "description": "拖动看 a 增大时直线如何变陡"
+      }
+    ],
     "checkpoints": [
       {
         "id": "cp_01",
         "step_index": 0,
         "step_id": "must match a CIR step.id",
-        "visual_kind": "array | graph | function (mirror the step)",
+        "visual_kind": "array | graph | function | formula (mirror the step)",
         "title": "string (mirror the step title)",
         "summary": "string — single sentence for this checkpoint",
         "start_s": 0.0,
@@ -216,6 +245,18 @@ The output is a SINGLE JSON object with two layers:
 1. **cir** — the descriptive script (what is shown, narration, tokens)
 2. **execution_map** — the execution semantics (timing, code lines, focus indices)
 
+## 教学风格铁律（PEDAGOGY — APPLIES TO ALL DOMAINS）
+- 受众：零基础学生。永远假设他们没听过任何术语。
+- 每一步只引入 **一个** 新概念；不要在同一步把定义、性质、应用一次塞完。
+- 第一次出现的术语必须先用一句日常类比，再给形式定义。
+  例：「导数就像测速仪——它告诉你函数在这一点变化得多快。形式上 f'(x) = …」
+- 每一步 narration 顺序：**先「为什么需要这一步」→ 再「这一步做什么」→ 最后「得到了什么」**。
+- 禁止术语堆砌：不允许连续出现两个未解释的专有名词。
+- 句子长度交替：短句用于强调，长句用于解释。
+- 用第二人称「你」「我们」，避免「该函数」「此变量」这种公文腔。
+- 永远先给具体数字举例（f(x)=x², x=2 → f(2)=4），再泛化到符号。
+- 标题（step.title）必须是动词或学习目标（如「先看一个简单的例子」「找出曲线的斜率」），不要是抽象名词。
+
 ## CRITICAL OUTPUT RULES
 1. Output ONLY valid JSON. No markdown fences, no explanations, no extra text.
 2. The JSON must match the schema exactly and be parseable by Python json.loads().
@@ -228,11 +269,15 @@ The output is a SINGLE JSON object with two layers:
 {_COMBINED_SCHEMA}
 
 ## Allowed visual_kind values
-Only use: "array", "graph", or "function"
-- "array" → linear structures, term-by-term algebra, processes (default for most topics)
-- "graph" → ONLY for explicit tree or graph data structures
-- "function" → math content on a coordinate plane (curves, transformations,
-  derivatives/tangents, area under a curve, trig waves). Requires the step's "plot" object.
+Only use: "array", "graph", "function", or "formula"
+- "array"    → 真正的线性数据结构、序列项、化学物种列表等。**不是默认值**——当内容
+               不是一串可枚举的并列项时，请改用 function 或 formula。
+- "graph"    → ONLY for explicit tree or graph data structures.
+- "function" → 1-D coordinate-plane math (curves, transformations, derivatives/tangents,
+               area under a curve, trig waves). Requires the step's "plot.curves".
+- "formula"  → 无法在 1-D 坐标平面表达的数学概念（向量场、2D 区域积分、抽象代数、
+               集合论、概率分布、矩阵代数等）。Requires the step's "plot.formula_latex"
+               plus 1–3 short "annotations".
 
 ## Domain Classification
 Keyword analysis suggests: **{domain_hint.value}**
@@ -263,6 +308,7 @@ Example (bubble sort compare step):
 - Labels must be concise (≤ 8 characters). Use actual values, not descriptions.
 - For arrays: each token = one element. Show ALL elements in EVERY step (tokens stay consistent).
 - Change emphasis per step to highlight what's happening, not the entire array.
+- For formula/function steps, tokens may be empty — don't manufacture A/B/C/D placeholders.
 
 ## ExecutionMap Quality Rules
 - duration_s: pick ~3 seconds per step (e.g. 6 steps → 18.0).
@@ -270,6 +316,20 @@ Example (bubble sort compare step):
 - array_focus_indices: 0-indexed positions of array elements currently active in the operation.
 - array_reference_indices: secondary indices being referenced but not the primary action.
 - Empty arrays are fine when the step doesn't apply (e.g. intro step has no focus indices).
+- parameter_controls: emit one entry per *free* parameter that the lesson is asking the
+  student to vary (e.g. `a` and `b` in `a*x + b`). The expression must reference these by
+  name; do NOT bake the parameter values into the expression. Skip this field when there
+  are no free parameters.
+
+## 输出前自检（SELF-CHECK before emitting JSON — fix any violation silently）
+1. 每一步 narration 是否先讲了「为什么」？
+2. 是否引入了未解释的术语？若有，回到上一步用一句类比补足。
+3. 如果 domain == math：visual_kind 仅在 "function" 与 "formula" 中二选一。
+   出现 "array" 视为错误——把它改写成 "formula" 并把表达式塞进 plot.formula_latex。
+4. visual_kind="function" 时 plot.curves 是否非空、表达式是否仅含允许的字符？
+5. visual_kind="formula" 时 plot.formula_latex 是否非空、annotations 是否 1–3 条？
+6. 涉及自由参数的 function 步骤是否在 execution_map.parameter_controls 列出了对应滑杆？
+7. 让一名零基础同学读你的 narration——他能复述出「这一步在干嘛、为什么」吗？
 {code_track}"""
 
     system = system + algo_code_track

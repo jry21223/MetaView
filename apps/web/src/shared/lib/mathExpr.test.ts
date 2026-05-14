@@ -4,7 +4,9 @@ import {
   evalExpr,
   isValidExpr,
   MathExprError,
+  sample2D,
   sampleExpr,
+  sampleVectorField,
 } from "./mathExpr";
 
 describe("mathExpr — evaluation", () => {
@@ -110,5 +112,46 @@ describe("mathExpr — sampling", () => {
     const pts = sampleExpr(compileExpr("x"), 10, 0, 5);
     expect(pts[0].x).toBe(0);
     expect(pts[pts.length - 1].x).toBe(10);
+  });
+});
+
+describe("mathExpr — 2D sampling", () => {
+  it("compileExpr binds free y just like x", () => {
+    const fn = compileExpr("x + y");
+    expect(fn({ x: 1, y: 2 })).toBe(3);
+    expect(fn({ x: 5, y: -3 })).toBe(2);
+  });
+
+  it("sample2D fills a regular grid covering the rectangle", () => {
+    const fn = compileExpr("x + y");
+    const grid = sample2D(fn, [0, 2], [0, 1], 1);
+    expect(grid).toHaveLength(3 * 2); // (nx+1)*(ny+1) = 3*2
+    const corners = grid.filter(
+      (p) => (p.x === 0 || p.x === 2) && (p.y === 0 || p.y === 1),
+    );
+    expect(corners).toHaveLength(4);
+    expect(grid.find((p) => p.x === 2 && p.y === 1)?.value).toBe(3);
+  });
+
+  it("sampleVectorField evaluates (-y, x) with the expected sign on each axis", () => {
+    const px = compileExpr("-y");
+    const py = compileExpr("x");
+    const field = sampleVectorField(px, py, [-1, 1], [-1, 1], 1);
+    // On the positive x-axis, vectors should point +y; on the positive y-axis they should point -x.
+    const onXAxis = field.find((v) => v.x === 1 && v.y === 0);
+    const onYAxis = field.find((v) => v.x === 0 && v.y === 1);
+    expect(onXAxis).toBeDefined();
+    expect(onYAxis).toBeDefined();
+    expect(onXAxis!.py).toBeGreaterThan(0);
+    expect(Math.abs(onXAxis!.px)).toBe(0);
+    expect(onYAxis!.px).toBeLessThan(0);
+    expect(Math.abs(onYAxis!.py)).toBe(0);
+  });
+
+  it("sampleVectorField drops non-finite samples", () => {
+    const px = compileExpr("1 / x");
+    const py = compileExpr("y");
+    const field = sampleVectorField(px, py, [-1, 1], [-1, 1], 1);
+    expect(field.every((v) => Number.isFinite(v.px) && Number.isFinite(v.py))).toBe(true);
   });
 });

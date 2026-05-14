@@ -308,3 +308,201 @@
   font-size: 12px;
   cursor: pointer;
 }
+
+/* ── MathFormulaRenderer ─────────────────────────────────────────────── */
+
+.math-formula-renderer {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  padding: 40px 56px;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--mfr-bg);
+  color: var(--mfr-text);
+  position: relative;
+}
+
+.math-formula-renderer[data-theme="dark"] {
+  --mfr-bg: #0a0c10;
+  --mfr-text: #e8ecf4;
+  --mfr-caption: rgba(232, 236, 244, 0.78);
+  --mfr-annotation: rgba(232, 236, 244, 0.55);
+  --mfr-accent: #ffd84d;
+  --mfr-divider: rgba(255, 255, 255, 0.08);
+  --mfr-title: rgba(232, 236, 244, 0.6);
+}
+
+.math-formula-renderer[data-theme="light"] {
+  --mfr-bg: #f5f7fa;
+  --mfr-text: #141820;
+  --mfr-caption: rgba(20, 24, 32, 0.78);
+  --mfr-annotation: rgba(20, 24, 32, 0.55);
+  --mfr-accent: #b07d00;
+  --mfr-divider: rgba(0, 0, 0, 0.08);
+  --mfr-title: rgba(20, 24, 32, 0.6);
+}
+
+.math-formula-renderer__title {
+  position: absolute;
+  top: 18px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--mfr-title);
+}
+
+.math-formula-renderer__formula {
+  font-size: 32px;
+  line-height: 1.35;
+  max-width: 100%;
+  overflow-x: auto;
+  text-align: center;
+}
+
+.math-formula-renderer__formula .katex {
+  font-size: 1em;
+}
+
+.math-formula-renderer__caption {
+  max-width: 720px;
+  text-align: center;
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--mfr-caption);
+}
+
+.math-formula-renderer__annotations {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--mfr-annotation);
+  border-top: 1px solid var(--mfr-divider);
+  padding-top: 14px;
+  align-self: stretch;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.math-formula-renderer__annotation {
+  padding-left: 16px;
+  position: relative;
+  line-height: 1.5;
+}
+
+.math-formula-renderer__annotation::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: var(--mfr-accent);
+}
+
+.math-formula-renderer__highlight {
+  color: var(--mfr-accent);
+}
+
+.math-formula-renderer__placeholder {
+  color: var(--mfr-annotation);
+  font-size: 16px;
+  font-style: italic;
+}
+
+/* ── MathSceneRenderer ───────────────────────────────────────────────── */
+
+.math-scene-renderer {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 28px 36px 24px;
+  gap: 12px;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--msr-bg);
+  color: var(--msr-text);
+  position: relative;
+  box-sizing: border-box;
+}
+
+.math-scene-renderer[data-theme="dark"] {
+  --msr-bg: #0a0c10;
+  --msr-text: #e8ecf4;
+  --msr-title: rgba(232, 236, 244, 0.62);
+  --msr-caption: rgba(232, 236, 244, 0.72);
+  --msr-legend: rgba(232, 236, 244, 0.5);
+  --msr-formula-bg: rgba(255, 255, 255, 0.06);
+  --msr-formula-border: rgba(255, 255, 255, 0.1);
+  --mafs-fg-color: rgba(232, 236, 244, 0.92);
+  --mafs-line-color: rgba(232, 236, 244, 0.16);
+}
+
+.math-scene-renderer[data-theme="light"] {
+  --msr-bg: #f5f7fa;
+  --msr-text: #141820;
+  --msr-title: rgba(20, 24, 32, 0.62);
+  --msr-caption: rgba(20, 24, 32, 0.78);
+  --msr-legend: rgba(20, 24, 32, 0.55);
+  --msr-formula-bg: rgba(0, 0, 0, 0.04);
+  --msr-formula-border: rgba(0, 0, 0, 0.08);
+  --mafs-fg-color: rgba(20, 24, 32, 0.85);
+  --mafs-line-color: rgba(20, 24, 32, 0.12);
+}
+
+.math-scene-renderer__title {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--msr-title);
+}
+
+.math-scene-renderer__stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.math-scene-renderer__stage .MafsView {
+  width: 100%;
+  height: 100%;
+}
+
+.math-scene-renderer__caption {
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--msr-caption);
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.math-scene-renderer__formula {
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  padding: 6px 12px;
+  background: var(--msr-formula-bg);
+  border: 1px solid var(--msr-formula-border);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--msr-text);
+}
+
+.math-scene-renderer__legend {
+  text-align: center;
+  font-size: 12px;
+  color: var(--msr-legend);
+  letter-spacing: 0.03em;
+}

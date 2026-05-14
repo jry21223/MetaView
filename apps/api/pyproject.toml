@@ -7,5 +7,6 @@ select = ["E", "F", "I", "B"]
 
 [tool.ruff.lint.per-file-ignores]
 "app/services/prompts/html_coder.py" = ["E501"]
+"app/domain/services/cir_prompt.py" = ["E501"]
 "tests/*" = ["E501"]
 

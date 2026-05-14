@@ -335,3 +335,94 @@ export function sampleExpr(
   }
   return out;
 }
+
+export interface Sample2DPoint {
+  x: number;
+  y: number;
+  value: number;
+}
+
+/**
+ * Sample a scalar field f(x, y, ...) on a regular grid covering
+ * `[xMin, xMax] × [yMin, yMax]`. `gridStep` is in domain units; defaults to
+ * 24 samples on the longer axis. Non-finite results carry `value: NaN`.
+ */
+export function sample2D(
+  fn: CompiledExpr,
+  xRange: readonly [number, number],
+  yRange: readonly [number, number],
+  gridStep?: number,
+  extraScope?: Scope,
+): Sample2DPoint[] {
+  const [xLo, xHi] = xRange[0] <= xRange[1] ? xRange : [xRange[1], xRange[0]];
+  const [yLo, yHi] = yRange[0] <= yRange[1] ? yRange : [yRange[1], yRange[0]];
+  const xSpan = xHi - xLo || 1;
+  const ySpan = yHi - yLo || 1;
+  const longer = Math.max(xSpan, ySpan);
+  const step = gridStep && gridStep > 0 ? gridStep : longer / 24;
+  const out: Sample2DPoint[] = [];
+  const nx = Math.max(1, Math.round(xSpan / step));
+  const ny = Math.max(1, Math.round(ySpan / step));
+  for (let iy = 0; iy <= ny; iy += 1) {
+    const y = yLo + (ySpan * iy) / ny;
+    for (let ix = 0; ix <= nx; ix += 1) {
+      const x = xLo + (xSpan * ix) / nx;
+      let value: number;
+      try {
+        value = fn({ ...extraScope, x, y });
+      } catch {
+        value = NaN;
+      }
+      out.push({ x, y, value: Number.isFinite(value) ? value : NaN });
+    }
+  }
+  return out;
+}
+
+export interface VectorSample {
+  x: number;
+  y: number;
+  px: number;
+  py: number;
+}
+
+/**
+ * Sample a 2D vector field `F(x, y) = (P, Q)` on a regular grid.
+ * Returns the base point and the vector components at each grid node.
+ * Non-finite components are dropped (the entire sample is skipped).
+ */
+export function sampleVectorField(
+  fnPx: CompiledExpr,
+  fnPy: CompiledExpr,
+  xRange: readonly [number, number],
+  yRange: readonly [number, number],
+  gridStep?: number,
+  extraScope?: Scope,
+): VectorSample[] {
+  const [xLo, xHi] = xRange[0] <= xRange[1] ? xRange : [xRange[1], xRange[0]];
+  const [yLo, yHi] = yRange[0] <= yRange[1] ? yRange : [yRange[1], yRange[0]];
+  const xSpan = xHi - xLo || 1;
+  const ySpan = yHi - yLo || 1;
+  const longer = Math.max(xSpan, ySpan);
+  const step = gridStep && gridStep > 0 ? gridStep : longer / 8;
+  const out: VectorSample[] = [];
+  const nx = Math.max(1, Math.round(xSpan / step));
+  const ny = Math.max(1, Math.round(ySpan / step));
+  for (let iy = 0; iy <= ny; iy += 1) {
+    const y = yLo + (ySpan * iy) / ny;
+    for (let ix = 0; ix <= nx; ix += 1) {
+      const x = xLo + (xSpan * ix) / nx;
+      let px: number;
+      let py: number;
+      try {
+        px = fnPx({ ...extraScope, x, y });
+        py = fnPy({ ...extraScope, x, y });
+      } catch {
+        continue;
+      }
+      if (!Number.isFinite(px) || !Number.isFinite(py)) continue;
+      out.push({ x, y, px, py });
+    }
+  }
+  return out;
+}

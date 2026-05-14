@@ -3,7 +3,7 @@ import pytest
 
 from app.domain.models.cir import CirDocument, CirStep, PlotCurveSpec, PlotSpec
 from app.domain.models.playbook import (
-    AlgorithmArraySnapshot,
+    MathFormulaSnapshot,
     MathPlotSnapshot,
 )
 from app.domain.models.topic import TopicDomain, VisualKind
@@ -85,8 +85,9 @@ class TestMathPlotSnapshot:
     def test_unsafe_expressions_are_dropped(self, bad_expr):
         cir = _math_cir(PlotSpec(curves=[PlotCurveSpec(expression=bad_expr)]))
         snap = build_playbook(cir, execution_map=None).steps[0].snapshot
-        # No safe curves left → degrade to the array view rather than render nothing.
-        assert isinstance(snap, AlgorithmArraySnapshot)
+        # No safe curves left → degrade to the formula view (NOT array) so the
+        # main viewport never shows misleading A/B/C/D boxes for math content.
+        assert isinstance(snap, MathFormulaSnapshot)
 
     def test_mixed_curves_keep_only_safe_ones(self):
         cir = _math_cir(
@@ -109,10 +110,14 @@ class TestMathPlotSnapshot:
         assert isinstance(snap, MathPlotSnapshot)
         assert snap.curves[0].emphasis == "primary"
 
-    def test_function_visual_kind_without_plot_degrades_to_array(self):
+    def test_function_visual_kind_without_plot_degrades_to_formula(self):
+        # When the LLM omits the plot entirely, math must still produce a
+        # formula display — never the algorithm array boxes.
         cir = _math_cir(None)
         snap = build_playbook(cir, execution_map=None).steps[0].snapshot
-        assert isinstance(snap, AlgorithmArraySnapshot)
+        assert isinstance(snap, MathFormulaSnapshot)
+        # Title-derived placeholder kicks in so the user sees something useful.
+        assert "画出曲线" in snap.formula_latex
 
     def test_function_supported_math_syntax_passes_whitelist(self):
         cir = _math_cir(
