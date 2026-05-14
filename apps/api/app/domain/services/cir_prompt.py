@@ -79,12 +79,18 @@ B. WHEN TO USE visual_kind="scene" (2D 几何场景 — 最重要的新能力！
        "formula_latex": "\\\\oint_C P\\\\,dx + Q\\\\,dy",
        "caption": "短旁白一句"
      }
-   - 字段使用规则：
-     - regions: 多边形区域，按顶点顺序逆时针连成闭合。label 是文字标签。
-     - segments: 线段或带箭头的有向边；arrow=true 表示画箭头。
+   - 字段使用规则（**严格遵守，不要发明字段**）：
+     - regions: 多边形区域，``vertices`` 是 [[x,y], ...] 顶点列表。label 文字标签。
+     - segments: 线段。**必须**用 ``{"x0":..,"y0":..,"x1":..,"y1":..,"arrow":bool}`` 形状；
+       **不要**用 ``{"points":[...]}`` 写 polyline。每条边写一条 segment。
+       矩形边界 = 4 条 segment（4 条边）。
      - vector_field: P, Q 都是 x, y 的表达式（同 function 允许的字符集）。step 是采样格距。
-     - curves: 1D 用 expression_y=f(x)；参数式用 expression_y+expression_x+t_min+t_max。
-     - points: 单个标记点，emphasis 控制颜色。
+     - curves: ``{"expression_y":"sin(x)"}`` (1D) 或
+       ``{"expression_y":"sin(t)","expression_x":"cos(t)","t_min":0,"t_max":6.28}`` (参数式)。
+       **不要**用 ``{"points":[...]}`` 输出预采样点；表达式让前端在帧时实时采样。
+     - points: 单个标记点 ``{"x":..,"y":..,"label":..,"emphasis":..}``；emphasis 三选一。
+     - 颜色用 ``"emphasis": "primary"|"secondary"|"accent"`` 表达，**不要**用
+       ``"color": "blue"`` 这种命名色字段（系统会接受但会失去深浅语义）。
    - Tokens 在 scene step 中应为空数组——几何信息全部走 scene 字段。
 
 C. WHEN TO USE visual_kind="formula" (兜底，仅用于无法画图的纯抽象内容):

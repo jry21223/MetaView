@@ -79,3 +79,16 @@ def test_math_prompt_forbids_formula_for_vector_field() -> None:
     assert "向量场" in system
     # And explicitly forbid duplicate layers (real LLM bug we observed).
     assert "math_scene 只能出现一次" in system
+
+
+def test_math_prompt_forbids_points_polyline_shape() -> None:
+    """Phase 5b: prompt must explicitly forbid the LLM's natural-but-wrong
+    output shapes (``{points: [...]}`` for segments and curves).
+
+    Real LLM failure observed: 17 pydantic validation errors because the
+    LLM emitted ``{"points": [[x,y], ...]}`` instead of ``{x0,y0,x1,y1}``."""
+    system, _ = build_cir_prompt("画格林公式", TopicDomain.MATH)
+    assert "不要" in system and "polyline" in system.lower() or "x0" in system
+    # Explicit guidance for segments and curves shapes.
+    assert "x0" in system and "x1" in system  # segment shape called out
+    assert "expression_y" in system  # curve shape called out

@@ -471,6 +471,22 @@ def _build_math_plot_snapshot(cir_step: CirStep) -> MathPlotSnapshot | None:
 _SCENE_EMPHASIS = ("primary", "secondary", "accent")
 _SCENE_ALIGN = ("ne", "nw", "se", "sw", "center")
 
+# Loose color → emphasis mapping for LLM-provided named colors. Anything not
+# listed falls through to the explicit `emphasis` field.
+_COLOR_TO_EMPHASIS: dict[str, str] = {
+    "red": "accent",
+    "orange": "accent",
+    "yellow": "accent",
+    "pink": "accent",
+    "purple": "secondary",
+    "violet": "secondary",
+    "magenta": "secondary",
+    "blue": "primary",
+    "green": "primary",
+    "cyan": "primary",
+    "teal": "primary",
+}
+
 
 def _normalize_emphasis(value: str, default: str = "primary") -> str:
     return value if value in _SCENE_EMPHASIS else default
@@ -478,6 +494,19 @@ def _normalize_emphasis(value: str, default: str = "primary") -> str:
 
 def _normalize_align(value: str, default: str = "ne") -> str:
     return value if value in _SCENE_ALIGN else default
+
+
+def _resolve_emphasis(emphasis_value: str, color: str | None, default: str = "primary") -> str:
+    """Pick the emphasis tier. Explicit ``emphasis`` wins; otherwise infer
+    from a named ``color`` string the LLM emitted (blue → primary, red →
+    accent, etc.). Unknown values fall back to the supplied default."""
+    if emphasis_value in _SCENE_EMPHASIS:
+        return emphasis_value
+    if color:
+        mapped = _COLOR_TO_EMPHASIS.get(color.strip().lower())
+        if mapped:
+            return mapped
+    return default
 
 
 def _build_math_scene_snapshot(cir_step: CirStep) -> MathSceneSnapshot | None:
@@ -511,27 +540,53 @@ def _build_math_scene_snapshot(cir_step: CirStep) -> MathSceneSnapshot | None:
     ]
 
     curves: list[MathSceneCurve] = []
+    polyline_segments: list[MathSceneSegment] = []
     for raw in spec.curves:
+        emphasis = _resolve_emphasis(raw.emphasis, raw.color)
+        # Prefer the structured (expression) form when present. Fall back to
+        # the LLM's pre-sampled `points` polyline otherwise — the renderer
+        # has no native pre-sampled curve type yet, so we fan the polyline
+        # into consecutive line segments. That preserves the visual shape
+        # while staying inside the existing snapshot schema.
         safe_y = _sanitize_expression(raw.expression_y)
-        if safe_y is None:
-            logger.warning("Dropping unsafe scene curve y-expression in step %s", cir_step.id)
-            continue
-        safe_x: str | None = None
-        if raw.expression_x is not None:
-            safe_x = _sanitize_expression(raw.expression_x)
-            if safe_x is None:
-                logger.warning("Dropping unsafe scene curve x-expression in step %s", cir_step.id)
-                continue
-        curves.append(
-            MathSceneCurve(
-                expression_y=safe_y,
-                expression_x=safe_x,
-                t_min=raw.t_min,
-                t_max=raw.t_max,
-                label=raw.label,
-                emphasis=_normalize_emphasis(raw.emphasis),
-                arrows=bool(raw.arrows),
+        if safe_y is not None:
+            safe_x: str | None = None
+            if raw.expression_x is not None:
+                safe_x = _sanitize_expression(raw.expression_x)
+                if safe_x is None:
+                    logger.warning(
+                        "Dropping unsafe scene curve x-expression in step %s", cir_step.id
+                    )
+                    continue
+            curves.append(
+                MathSceneCurve(
+                    expression_y=safe_y,
+                    expression_x=safe_x,
+                    t_min=raw.t_min,
+                    t_max=raw.t_max,
+                    label=raw.label,
+                    emphasis=emphasis,
+                    arrows=bool(raw.arrows),
+                )
             )
+            continue
+        # No expression — try the polyline form (LLM-friendly).
+        pts = [(float(x), float(y)) for x, y in raw.points if x is not None and y is not None]
+        if len(pts) >= 2:
+            for (x0, y0), (x1, y1) in zip(pts, pts[1:], strict=False):
+                polyline_segments.append(
+                    MathSceneSegment(
+                        x0=x0, y0=y0, x1=x1, y1=y1,
+                        arrow=False,
+                        label=None,  # label only on the curve as a whole, not each piece
+                        emphasis=emphasis,
+                    )
+                )
+            continue
+        logger.warning(
+            "Dropping scene curve in step %s: neither expression_y nor a "
+            "≥2-point polyline was provided",
+            cir_step.id,
         )
 
     regions = [
@@ -563,18 +618,41 @@ def _build_math_scene_snapshot(cir_step: CirStep) -> MathSceneSnapshot | None:
                 "Dropping vector field with unsafe expressions in step %s", cir_step.id
             )
 
-    segments = [
-        MathSceneSegment(
-            x0=s.x0,
-            y0=s.y0,
-            x1=s.x1,
-            y1=s.y1,
-            arrow=bool(s.arrow),
-            label=s.label,
-            emphasis=_normalize_emphasis(s.emphasis),
+    segments: list[MathSceneSegment] = list(polyline_segments)
+    for s in spec.segments:
+        emphasis = _resolve_emphasis(s.emphasis, s.color)
+        # Endpoint form: x0/y0/x1/y1 all provided.
+        if s.x0 is not None and s.y0 is not None and s.x1 is not None and s.y1 is not None:
+            segments.append(
+                MathSceneSegment(
+                    x0=s.x0, y0=s.y0, x1=s.x1, y1=s.y1,
+                    arrow=bool(s.arrow),
+                    label=s.label,
+                    emphasis=emphasis,
+                )
+            )
+            continue
+        # Polyline form: fan out consecutive points into segments. Only the
+        # last segment of the polyline carries the arrow flag (the natural
+        # place to draw a direction indicator).
+        pts = [(float(x), float(y)) for x, y in s.points if x is not None and y is not None]
+        if len(pts) >= 2:
+            last_idx = len(pts) - 2
+            for i, ((x0, y0), (x1, y1)) in enumerate(zip(pts, pts[1:], strict=False)):
+                segments.append(
+                    MathSceneSegment(
+                        x0=x0, y0=y0, x1=x1, y1=y1,
+                        arrow=bool(s.arrow) and i == last_idx,
+                        label=s.label if i == last_idx else None,
+                        emphasis=emphasis,
+                    )
+                )
+            continue
+        logger.warning(
+            "Dropping scene segment in step %s: neither (x0,y0,x1,y1) nor "
+            "a ≥2-point polyline was provided",
+            cir_step.id,
         )
-        for s in spec.segments
-    ]
 
     annotations = [
         MathSceneAnnotation(

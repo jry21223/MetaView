@@ -35,7 +35,7 @@ class PlotCurveSpec(BaseModel):
 
     expression: str
     label: str | None = None
-    emphasis: str = "primary"  # primary | secondary | accent
+    emphasis: str | None = None  # primary | secondary | accent (default primary)
 
 
 class PlotSpec(BaseModel):
@@ -62,23 +62,33 @@ class ScenePoint(BaseModel):
     x: float
     y: float
     label: str | None = None
-    emphasis: str = "primary"  # primary | secondary | accent
+    emphasis: str | None = None  # primary | secondary | accent (default primary)
 
 
 class SceneCurve(BaseModel):
-    """A scene curve. Either implicit ``y = f(x)`` or parametric ``(fnX(t), fnY(t))``.
+    """A scene curve in three forms:
 
-    Provide ``expression_y`` for explicit form. Provide all of ``expression_x``,
-    ``t_min`` and ``t_max`` for the parametric form (``expression_y`` is then read
-    as the y-component ``fnY(t)``). Sampling happens in the renderer.
+    1. Explicit ``y = f(x)`` — set ``expression_y``.
+    2. Parametric ``(fnX(t), fnY(t))`` — set ``expression_x`` + ``expression_y``
+       + ``t_min`` + ``t_max``.
+    3. Pre-sampled polyline — set ``points`` to a list of (x, y) pairs. Used
+       when the LLM prefers to spell the curve out rather than guess a
+       sympy-style expression (frequently happens for parametric circles,
+       irregular shapes, hand-drawn paths).
+
+    At least one of ``expression_y`` or ``points`` must be present; the
+    builder picks the first usable form.
     """
 
-    expression_y: str
+    expression_y: str | None = None
     expression_x: str | None = None  # if set, treat as parametric ``(x(t), y(t))``
     t_min: float | None = None
     t_max: float | None = None
+    # LLM-friendly polyline form: list of (x, y) pairs sampled along the curve.
+    points: list[tuple[float, float]] = Field(default_factory=list)
     label: str | None = None
-    emphasis: str = "primary"
+    emphasis: str | None = None  # explicit tier; falls back to color or default
+    color: str | None = None  # optional named color from LLM (blue/red/…); builder maps to emphasis
     arrows: bool = False  # render direction arrows along the curve
 
 
@@ -100,15 +110,30 @@ class SceneVectorField(BaseModel):
 
 
 class SceneSegment(BaseModel):
-    """Straight segment / arrow from (x0, y0) to (x1, y1)."""
+    """Straight segment / arrow.
 
-    x0: float
-    y0: float
-    x1: float
-    y1: float
+    Two shapes accepted:
+
+    1. Endpoint form: ``(x0, y0) → (x1, y1)``.
+    2. Polyline form: ``points = [[x, y], [x, y], …]`` (LLM-friendly; the
+       builder fans this out into one or many consecutive endpoint
+       segments). A common LLM output for a square's boundary is a
+       single segment record with a 5-point ``points`` array — we accept
+       that shape directly.
+
+    Either both ``x0/y0/x1/y1`` are set, or ``points`` has ≥ 2 entries.
+    """
+
+    x0: float | None = None
+    y0: float | None = None
+    x1: float | None = None
+    y1: float | None = None
+    # LLM-friendly polyline form.
+    points: list[tuple[float, float]] = Field(default_factory=list)
     arrow: bool = False
     label: str | None = None
-    emphasis: str = "primary"
+    emphasis: str | None = None  # explicit tier; falls back to color or default
+    color: str | None = None  # optional named color from LLM
 
 
 class SceneAnnotation(BaseModel):
@@ -185,7 +210,7 @@ class NarrationCardSpec(BaseModel):
 
     text: str
     position: str = "bottom"  # top | bottom | center
-    emphasis: str = "primary"  # primary | secondary | accent
+    emphasis: str | None = None  # primary | secondary | accent (default primary)
 
 
 class LayerSpec(BaseModel):

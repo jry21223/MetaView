@@ -859,3 +859,87 @@ class TestSceneUpgradeFallback:
         playbook = build_playbook(cir, execution_map=None)
         snap = playbook.steps[0].snapshot
         assert isinstance(snap, MathFormulaSnapshot)
+
+
+class TestSceneLLMShapeCompat:
+    """LLMs frequently emit segments/curves as ``{points: [...], color: ...}``
+    instead of the structured ``{x0, y0, x1, y1, ...}`` shape. The CIR
+    parser must accept both forms; the builder fans the polyline form out
+    into a chain of structured segments."""
+
+    def test_segment_with_4point_polyline_fans_out_to_3_segments(self):
+        from app.domain.models.cir import SceneSegment, SceneSpec
+        from app.domain.models.playbook import MathSceneSnapshot
+
+        step = CirStep(
+            id="s1", title="square boundary",
+            narration="边界 C 是矩形的四条边。",
+            visual_kind=VisualKind.SCENE,
+            scene=SceneSpec(
+                x_min=-1, x_max=5, y_min=-1, y_max=4,
+                segments=[SceneSegment(
+                    points=[(0, 0), (4, 0), (4, 3), (0, 3), (0, 0)],
+                    label="C", color="blue", arrow=True,
+                )],
+            ),
+        )
+        cir = CirDocument(title="边界 C", domain=TopicDomain.MATH, summary="边界",
+                          steps=[step])
+        pb = build_playbook(cir, execution_map=None)
+        snap = pb.steps[0].snapshot
+        assert isinstance(snap, MathSceneSnapshot)
+        # 5 points → 4 consecutive segments.
+        assert len(snap.segments) == 4
+        # Only the LAST segment carries the arrow.
+        assert [s.arrow for s in snap.segments] == [False, False, False, True]
+        # Color 'blue' → emphasis 'primary'.
+        assert all(s.emphasis == "primary" for s in snap.segments)
+
+    def test_curve_with_points_polyline_lands_as_segment_chain(self):
+        from app.domain.models.cir import SceneCurve, SceneSpec
+        from app.domain.models.playbook import MathSceneSnapshot
+
+        step = CirStep(
+            id="s1", title="参数圆",
+            narration="(cos θ, sin θ) 描点画圆。",
+            visual_kind=VisualKind.SCENE,
+            scene=SceneSpec(
+                x_min=-1.4, x_max=1.4, y_min=-1.4, y_max=1.4,
+                curves=[SceneCurve(
+                    points=[(1, 0), (0.7, 0.7), (0, 1), (-0.7, 0.7), (-1, 0)],
+                    label="圆", color="red",
+                )],
+            ),
+        )
+        cir = CirDocument(title="圆", domain=TopicDomain.MATH, summary="圆",
+                          steps=[step])
+        pb = build_playbook(cir, execution_map=None)
+        snap = pb.steps[0].snapshot
+        assert isinstance(snap, MathSceneSnapshot)
+        # No expression-based curves; polyline became segments.
+        assert len(snap.curves) == 0
+        assert len(snap.segments) == 4  # 5 points → 4 segments
+        # Color 'red' → emphasis 'accent'.
+        assert all(s.emphasis == "accent" for s in snap.segments)
+
+    def test_endpoint_form_still_works(self):
+        """Negative control: the structured (x0,y0,x1,y1) form keeps working."""
+        from app.domain.models.cir import SceneSegment, SceneSpec
+        from app.domain.models.playbook import MathSceneSnapshot
+
+        step = CirStep(
+            id="s1", title="一条边",
+            narration="边界 C₁。",
+            visual_kind=VisualKind.SCENE,
+            scene=SceneSpec(
+                x_min=-1, x_max=5, y_min=-1, y_max=4,
+                segments=[SceneSegment(x0=0, y0=0, x1=4, y1=0, arrow=True, label="C1")],
+            ),
+        )
+        cir = CirDocument(title="C", domain=TopicDomain.MATH, summary="x", steps=[step])
+        pb = build_playbook(cir, execution_map=None)
+        snap = pb.steps[0].snapshot
+        assert isinstance(snap, MathSceneSnapshot)
+        assert len(snap.segments) == 1
+        assert snap.segments[0].x0 == 0 and snap.segments[0].x1 == 4
+        assert snap.segments[0].arrow is True
