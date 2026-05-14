@@ -76,3 +76,50 @@ export function clipReveal(totalPoints: number, progress: number): number {
 export function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * clamp01(t);
 }
+
+export type AppearAnim = "fade" | "draw" | "slide" | "scale" | "none";
+
+export interface AppearTransform {
+  opacity: number;
+  /** Combined CSS transform string (translate + scale). */
+  transform: string;
+  /** Optional 0..1 value used by draw-style animations (e.g. clip-path width). */
+  drawProgress: number;
+}
+
+/**
+ * Convert a layer's normalised progress (0..1 inside its own visibility
+ * window) into render-ready opacity + transform pair for the appear_anim
+ * variant.
+ *
+ * Renderers use this so the Layer abstraction can express animation intent
+ * declaratively and not have each Layer renderer reinvent its own fade-in.
+ */
+export function appearTransform(anim: AppearAnim, progress: number): AppearTransform {
+  const t = clamp01(progress);
+  switch (anim) {
+    case "none":
+      return { opacity: 1, transform: "none", drawProgress: 1 };
+    case "draw":
+      // Caller is responsible for honouring drawProgress (e.g. clip-path /
+      // stroke-dashoffset). Opacity reveals over the first 20% so labels
+      // attached to the drawn shape don't pop in before the geometry exists.
+      return { opacity: easeOut(Math.min(1, t / 0.2)), transform: "none", drawProgress: t };
+    case "slide":
+      // Slide in from the bottom-right by 16px → 0.
+      return {
+        opacity: easeOut(Math.min(1, t / 0.3)),
+        transform: `translate(${(1 - t) * 16}px, ${(1 - t) * 16}px)`,
+        drawProgress: 1,
+      };
+    case "scale":
+      return {
+        opacity: easeOut(Math.min(1, t / 0.25)),
+        transform: `scale(${lerp(0.85, 1, t)})`,
+        drawProgress: 1,
+      };
+    case "fade":
+    default:
+      return { opacity: easeInOut(t), transform: "none", drawProgress: 1 };
+  }
+}

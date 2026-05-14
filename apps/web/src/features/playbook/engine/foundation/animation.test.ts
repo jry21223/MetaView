@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  appearTransform,
   clamp,
   clamp01,
   clipReveal,
@@ -95,5 +96,42 @@ describe("animation helpers", () => {
       expect(lerp(10, 20, -1)).toBe(10);
       expect(lerp(10, 20, 2)).toBe(20);
     });
+  });
+});
+
+describe("appearTransform", () => {
+  it("none returns identity", () => {
+    const r = appearTransform("none", 0);
+    expect(r.opacity).toBe(1);
+    expect(r.transform).toBe("none");
+  });
+
+  it("fade ramps opacity 0->1 across progress", () => {
+    const start = appearTransform("fade", 0);
+    const mid = appearTransform("fade", 0.5);
+    const end = appearTransform("fade", 1);
+    expect(start.opacity).toBe(0);
+    expect(end.opacity).toBe(1);
+    expect(mid.opacity).toBeGreaterThan(0);
+    expect(mid.opacity).toBeLessThan(1);
+  });
+
+  it("scale animates from 0.85 to 1", () => {
+    const start = appearTransform("scale", 0);
+    const end = appearTransform("scale", 1);
+    expect(start.transform).toContain("0.85");
+    expect(end.transform).toContain("1");
+  });
+
+  it("slide produces a translate transform that shrinks to 0", () => {
+    const start = appearTransform("slide", 0);
+    const end = appearTransform("slide", 1);
+    expect(start.transform).toContain("translate(16px, 16px)");
+    expect(end.transform).toContain("translate(0px, 0px)");
+  });
+
+  it("draw exposes a drawProgress value tracking the input", () => {
+    const half = appearTransform("draw", 0.5);
+    expect(half.drawProgress).toBeCloseTo(0.5, 5);
   });
 });

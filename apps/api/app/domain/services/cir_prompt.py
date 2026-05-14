@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.domain.models.topic import TopicDomain
 from app.domain.services.algorithm_code_library import infer_id, prompt_hint
+from app.domain.services.scene_examples import examples_for_domain
 
 _DOMAIN_GUIDANCE: dict[TopicDomain, str] = {
     TopicDomain.ALGORITHM: """
@@ -134,7 +135,18 @@ _COMBINED_SCHEMA = """{
           "y_label": "y",
           "formula_latex": "f(x) = a x^2 - b"
         },
-        "annotations": ["short side notes — REQUIRED when visual_kind=formula"]
+        "annotations": ["short side notes — REQUIRED when visual_kind=formula"],
+        "_layers_comment": "OPTIONAL layered output. When provided, the renderer stacks each layer in z_order within this step's progress window. Pick this when one visual element isn't enough to explain the step (e.g. region + vector field + corner formula together). See '多层 step 黄金范例' below.",
+        "layers": [
+          {
+            "kind": "math_scene | math_plot | math_formula | katex_overlay | array_boxes | bar_blocks | tree_graph | narration_card",
+            "timing": {"enter_at": 0.0, "exit_at": 1.0, "appear_anim": "fade | draw | slide | scale | none", "z_order": 0},
+            "scene": "OPTIONAL — only when kind=math_scene; same shape as the step-level scene field",
+            "plot":  "OPTIONAL — only when kind=math_plot or kind=math_formula",
+            "katex_overlay": {"x": 1.5, "y": 2.0, "latex": "F=(-y,x)", "align": "ne | nw | se | sw | center"},
+            "narration_card": {"text": "教学卡片正文", "position": "top | bottom | center", "emphasis": "primary | secondary | accent"}
+          }
+        ]
       }
     ]
   },
@@ -237,6 +249,7 @@ def build_cir_prompt(
         algo_id = infer_id(prompt)
         canonical_hint = prompt_hint(algo_id) if algo_id else ""
         algo_code_track = _ALGO_CODE_INSTRUCTION + canonical_hint
+    examples = examples_for_domain(domain_hint)
 
     system = f"""You are an expert educational animator. \
 Your job is to convert a student's question into a step-by-step visual teaching script.
@@ -321,6 +334,23 @@ Example (bubble sort compare step):
   name; do NOT bake the parameter values into the expression. Skip this field when there
   are no free parameters.
 
+## Multi-layer step（可选，进阶能力）
+- 当一个步骤需要叠加多种视觉（例如：底层画区域 + 中层叠加向量场 + 顶层写公式），
+  使用 step.layers 数组按时序与 z_order 叠合每一层。
+- 每个 layer 的 timing.enter_at/exit_at 都是 0..1 区间，归一化到当前 step 的进度。
+- 一个 step 可以只有 1 个 layer（等价于不写 layers），也可以最多 4 个 layer。
+- 推荐组合（按域）：
+  - 算法：array_boxes + narration_card（提示这一步要注意什么）
+  - math 2D 几何：math_scene(region) → math_scene(vector_field) → katex_overlay → math_formula
+  - math 1D：math_plot + katex_overlay（角落公式）
+  - math 抽象：math_formula + narration_card（强调要点）
+  - physics：array_boxes（量纲表）+ katex_overlay（公式）
+- appear_anim 可选值：fade（默认渐显） | draw（曲线/段沿进度延伸） | slide（侧向滑入）
+  | scale（缩放入场） | none（立即出现）。
+- 不需要在 layers 里重复 step 顶层的 tokens/scene/plot——同 kind 的 layer 不指定 scene/plot 时
+  自动继承 step 上的对应字段。
+{examples}
+
 ## 输出前自检（SELF-CHECK before emitting JSON — fix any violation silently）
 1. 每一步 narration 是否先讲了「为什么」？
 2. 是否引入了未解释的术语？若有，回到上一步用一句类比补足。
@@ -329,7 +359,9 @@ Example (bubble sort compare step):
 4. visual_kind="function" 时 plot.curves 是否非空、表达式是否仅含允许的字符？
 5. visual_kind="formula" 时 plot.formula_latex 是否非空、annotations 是否 1–3 条？
 6. 涉及自由参数的 function 步骤是否在 execution_map.parameter_controls 列出了对应滑杆？
-7. 让一名零基础同学读你的 narration——他能复述出「这一步在干嘛、为什么」吗？
+7. 如果使用了 layers：每个 layer.timing.enter_at <= exit_at，且都在 [0,1] 之内？
+   层之间的 z_order 是否反映正确的视觉前后关系？
+8. 让一名零基础同学读你的 narration——他能复述出「这一步在干嘛、为什么」吗？
 {code_track}"""
 
     system = system + algo_code_track

@@ -6,7 +6,7 @@ import { useStepProgress } from "./useInterpolatedState";
 import type { RendererProps } from "../renderers/types";
 import { PLAYBOOK_LAYOUT } from "../../../../shared/config/constants";
 import { rendererRegistry } from "../renderers/registry";
-import { useTimeline } from "../foundation";
+import { appearTransform, useTimeline } from "../foundation";
 
 interface PlaybookCompositionProps {
   script: PlaybookScript;
@@ -60,15 +60,19 @@ function LayerSlot({
   // Each layer renders against its body snapshot; clone the step so the
   // existing RendererProps contract works without changing every renderer.
   const layerStep = { ...baseProps.step, snapshot: layer.body };
+  const appear = appearTransform(slice.anim, slice.progress);
   return (
     <div
       className="scene-compositor__layer"
       data-layer-kind={layer.body.kind}
+      data-appear-anim={slice.anim}
       style={{
         position: "absolute",
         inset: 0,
         zIndex: layer.timing.z_order,
         pointerEvents: "none",
+        opacity: appear.opacity,
+        transform: appear.transform === "none" ? undefined : appear.transform,
       }}
     >
       {React.createElement(Renderer, {

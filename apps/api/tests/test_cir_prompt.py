@@ -34,3 +34,27 @@ def test_different_domains_produce_different_guidance() -> None:
 def test_system_prompt_instructs_json_only_output() -> None:
     system, _ = build_cir_prompt("test", TopicDomain.ALGORITHM)
     assert "JSON" in system
+
+
+def test_math_prompt_includes_layer_examples() -> None:
+    """Phase 4: math domain prompt must surface the multi-layer step examples
+    so the LLM can imitate the structure for Green's-theorem-style content."""
+    system, _ = build_cir_prompt("画格林公式", TopicDomain.MATH)
+    assert "多层 step 黄金范例" in system
+    assert "math_scene" in system
+    assert "katex_overlay" in system
+    assert "narration_card" in system
+
+
+def test_layers_schema_documented_in_prompt() -> None:
+    system, _ = build_cir_prompt("test", TopicDomain.MATH)
+    # The schema block lists each layer kind and the appear_anim values.
+    assert "appear_anim" in system
+    assert "z_order" in system
+    assert "enter_at" in system
+
+
+def test_self_check_includes_layer_validation() -> None:
+    system, _ = build_cir_prompt("test", TopicDomain.MATH)
+    # New self-check item: validate layer timing windows.
+    assert "enter_at <= exit_at" in system
