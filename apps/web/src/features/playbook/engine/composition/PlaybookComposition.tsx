@@ -1,11 +1,12 @@
 import React from "react";
 import { useCurrentFrame } from "remotion";
-import type { PlaybookScript } from "../types";
+import type { Layer, PlaybookScript } from "../types";
 import { CodeHighlightRenderer } from "../renderers/CodeHighlightRenderer";
 import { useStepProgress } from "./useInterpolatedState";
 import type { RendererProps } from "../renderers/types";
 import { PLAYBOOK_LAYOUT } from "../../../../shared/config/constants";
 import { rendererRegistry } from "../renderers/registry";
+import { useTimeline } from "../foundation";
 
 interface PlaybookCompositionProps {
   script: PlaybookScript;
@@ -34,6 +35,78 @@ function SnapshotRenderer(props: RendererProps) {
       }}
     >
       Unknown snapshot kind
+    </div>
+  );
+}
+
+/**
+ * Render a single layer using its body's snapshot kind through the renderer
+ * registry. The layer's timing controls visibility — when the current step
+ * progress is outside [enter_at, exit_at], the layer renders nothing.
+ */
+function LayerSlot({
+  layer,
+  baseProps,
+  stepProgress,
+}: {
+  layer: Layer;
+  baseProps: RendererProps;
+  stepProgress: number;
+}) {
+  const slice = useTimeline(layer.timing, stepProgress);
+  if (!slice.visible) return null;
+  const Renderer = rendererRegistry.get(layer.body.kind);
+  if (!Renderer) return null;
+  // Each layer renders against its body snapshot; clone the step so the
+  // existing RendererProps contract works without changing every renderer.
+  const layerStep = { ...baseProps.step, snapshot: layer.body };
+  return (
+    <div
+      className="scene-compositor__layer"
+      data-layer-kind={layer.body.kind}
+      style={{
+        position: "absolute",
+        inset: 0,
+        zIndex: layer.timing.z_order,
+        pointerEvents: "none",
+      }}
+    >
+      {React.createElement(Renderer, {
+        ...baseProps,
+        step: layerStep,
+        progress: slice.progress,
+      })}
+    </div>
+  );
+}
+
+/**
+ * Multi-layer scene composer. Renders each layer in z_order ascending into
+ * stacked absolute layers and falls back to the legacy single-snapshot path
+ * when a step has no layers field (older fixtures).
+ */
+function SceneCompositor({
+  baseProps,
+  stepProgress,
+}: {
+  baseProps: RendererProps;
+  stepProgress: number;
+}) {
+  const layers = baseProps.step.layers;
+  if (!layers || layers.length === 0) {
+    return <SnapshotRenderer {...baseProps} />;
+  }
+  const sorted = [...layers].sort((a, b) => a.timing.z_order - b.timing.z_order);
+  return (
+    <div className="scene-compositor" style={{ position: "relative", width: "100%", height: "100%" }}>
+      {sorted.map((layer, i) => (
+        <LayerSlot
+          key={`${layer.body.kind}-${i}`}
+          layer={layer}
+          baseProps={baseProps}
+          stepProgress={stepProgress}
+        />
+      ))}
     </div>
   );
 }
@@ -88,7 +161,7 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
         {/* Visual track */}
         <div style={{ width: hasCodeTrack ? `${vizRatio * 100}%` : "100%", height: "100%" }}>
-          <SnapshotRenderer {...rendererProps} />
+          <SceneCompositor baseProps={rendererProps} stepProgress={progress} />
         </div>
 
         {/* Code track */}

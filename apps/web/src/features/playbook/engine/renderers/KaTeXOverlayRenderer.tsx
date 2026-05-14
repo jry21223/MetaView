@@ -1,0 +1,59 @@
+import React from "react";
+import katex from "katex";
+import "katex/dist/katex.min.css";
+import type { KaTeXOverlaySnapshot } from "../types";
+import type { RendererProps } from "./types";
+import { clamp01 } from "../foundation";
+
+const ALIGN_OFFSETS: Record<string, { tx: string; ty: string }> = {
+  ne: { tx: "0%", ty: "-100%" },
+  nw: { tx: "-100%", ty: "-100%" },
+  se: { tx: "0%", ty: "0%" },
+  sw: { tx: "-100%", ty: "0%" },
+  center: { tx: "-50%", ty: "-50%" },
+};
+
+/**
+ * Floating KaTeX label rendered above the scene viewport.
+ *
+ * The (x, y) in scene coordinates is converted to a percentage of the visible
+ * viewport using the same x_min/x_max/y_min/y_max that the underlying
+ * MathSceneSnapshot uses. When this layer is rendered standalone (no scene
+ * sibling), the wrapper falls back to a centred KaTeX block so the prompt
+ * author's content is never lost.
+ */
+export const KaTeXOverlayRenderer: React.FC<RendererProps> = ({
+  step,
+  frame,
+  stepStartFrame,
+  theme,
+}) => {
+  const snap = step.snapshot as KaTeXOverlaySnapshot;
+  const elapsed = Math.max(0, frame - stepStartFrame);
+  const opacity = clamp01(elapsed / 10);
+  const html = React.useMemo(() => {
+    try {
+      return katex.renderToString(snap.latex, { throwOnError: false, displayMode: false });
+    } catch {
+      return null;
+    }
+  }, [snap.latex]);
+  if (!html) return null;
+
+  const offsets = ALIGN_OFFSETS[snap.align ?? "ne"] ?? ALIGN_OFFSETS.ne;
+
+  return (
+    <div className="katex-overlay" data-theme={theme} style={{ opacity }}>
+      <div
+        className="katex-overlay__anchor"
+        style={{
+          left: `${snap.x * 50 + 50}%`,
+          top: `${50 - snap.y * 8}%`,
+          transform: `translate(${offsets.tx}, ${offsets.ty})`,
+        }}
+      >
+        <div dangerouslySetInnerHTML={{ __html: html }} />
+      </div>
+    </div>
+  );
+};

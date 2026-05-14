@@ -6,7 +6,9 @@ export type SnapshotKind =
   | "algorithm_tree"
   | "math_plot"
   | "math_formula"
-  | "math_scene";
+  | "math_scene"
+  | "katex_overlay"
+  | "narration_card";
 
 export interface AlgorithmArraySnapshot {
   kind: "algorithm_array";
@@ -162,13 +164,46 @@ export interface MathSceneSnapshot {
   params?: Record<string, number>;
 }
 
+/** Free-floating KaTeX label anchored at scene coordinates. */
+export interface KaTeXOverlaySnapshot {
+  kind: "katex_overlay";
+  x: number;
+  y: number;
+  latex: string;
+  align?: "ne" | "nw" | "se" | "sw" | "center";
+}
+
+/** Floating narration card overlayed atop the main scene. */
+export interface NarrationCardSnapshot {
+  kind: "narration_card";
+  text: string;
+  position?: "top" | "bottom" | "center";
+  emphasis?: "primary" | "secondary" | "accent";
+}
+
 export type AnySnapshot =
   | AlgorithmArraySnapshot
   | AlgorithmBarsSnapshot
   | AlgorithmTreeSnapshot
   | MathPlotSnapshot
   | MathFormulaSnapshot
-  | MathSceneSnapshot;
+  | MathSceneSnapshot
+  | KaTeXOverlaySnapshot
+  | NarrationCardSnapshot;
+
+/** Window inside a step's [0,1] progress where a Layer is rendered. */
+export interface LayerTiming {
+  enter_at: number;
+  exit_at: number;
+  appear_anim: "fade" | "draw" | "slide" | "scale" | "none";
+  z_order: number;
+}
+
+/** Composable visual unit within a step. */
+export interface Layer {
+  timing: LayerTiming;
+  body: AnySnapshot;
+}
 
 export interface CodeHighlightOverlay {
   language: string;
@@ -205,7 +240,10 @@ export interface MetaStep<T extends AnySnapshot = AnySnapshot> {
   title: string;
   voiceover_text: string;
   animation_hint?: string | null;
+  /** Primary single-layer snapshot. For multi-layer steps this mirrors layers[0].body. */
   snapshot: T;
+  /** Optional layer stack — populated by the backend builder (Phase 3+). */
+  layers?: Layer[];
   code_highlight?: CodeHighlightOverlay | null;
   narration_template?: NarrationTemplate | null;
   tokens: NarrationToken[];

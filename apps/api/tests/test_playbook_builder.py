@@ -708,3 +708,104 @@ class TestMathFallbackChain:
         snap = playbook.steps[0].snapshot
         # Either flavour of array snapshot is fine; the point is it's NOT formula.
         assert isinstance(snap, (AlgorithmArraySnapshot, AlgorithmBarsSnapshot))
+
+
+class TestLayeredOutput:
+    """Phase 3: every MetaStep now carries a `layers` list alongside `snapshot`.
+
+    Legacy CIR (no `layers`) must produce a single-layer playbook so existing
+    fixtures keep rendering. New CIR (multi-layer step) must fan out into
+    multiple Playbook layers honouring timing + z_order.
+    """
+
+    def test_legacy_cir_wraps_snapshot_in_single_layer(self):
+        cir = _make_array_cir()
+        playbook = build_playbook(cir, execution_map=None)
+        for step in playbook.steps:
+            assert len(step.layers) == 1
+            assert step.layers[0].body == step.snapshot
+            # Default timing window covers the whole step.
+            assert step.layers[0].timing.enter_at == 0.0
+            assert step.layers[0].timing.exit_at == 1.0
+
+    def test_multi_layer_step_expands_into_multiple_layers(self):
+        from app.domain.models.cir import (
+            KaTeXOverlaySpec,
+            LayerKind,
+            LayerSpec,
+            LayerTimingSpec,
+            NarrationCardSpec,
+            ScenePoint,
+            SceneSegment,
+            SceneSpec,
+        )
+
+        step = CirStep(
+            id="green-1",
+            title="把环路积分翻成面积分",
+            narration="先看矩形区域",
+            visual_kind=VisualKind.SCENE,
+            scene=SceneSpec(
+                x_min=-1, x_max=5, y_min=-1, y_max=4,
+                segments=[SceneSegment(x0=0, y0=0, x1=4, y1=0, arrow=True)],
+                points=[ScenePoint(x=2, y=1.5, label="P")],
+            ),
+            layers=[
+                LayerSpec(
+                    kind=LayerKind.MATH_SCENE,
+                    timing=LayerTimingSpec(enter_at=0.0, exit_at=1.0, z_order=0),
+                ),
+                LayerSpec(
+                    kind=LayerKind.KATEX_OVERLAY,
+                    timing=LayerTimingSpec(enter_at=0.4, exit_at=1.0, z_order=2),
+                    katex_overlay=KaTeXOverlaySpec(x=2, y=3.5, latex="F=(-y,x)"),
+                ),
+                LayerSpec(
+                    kind=LayerKind.NARRATION_CARD,
+                    timing=LayerTimingSpec(enter_at=0.6, exit_at=1.0, z_order=3),
+                    narration_card=NarrationCardSpec(text="所以面积分 = 环路积分"),
+                ),
+            ],
+        )
+        cir = CirDocument(
+            title="格林公式",
+            domain=TopicDomain.MATH,
+            summary="演示格林公式",
+            steps=[step],
+        )
+        playbook = build_playbook(cir, execution_map=None)
+        playbook_step = playbook.steps[0]
+        kinds = [layer.body.kind for layer in playbook_step.layers]
+        assert kinds == ["math_scene", "katex_overlay", "narration_card"]
+        # Layers sorted by z_order ascending.
+        z = [layer.timing.z_order for layer in playbook_step.layers]
+        assert z == sorted(z)
+        # Snapshot (compat) mirrors the first layer's body for legacy renderers.
+        assert playbook_step.snapshot is not None
+
+    def test_unrenderable_layer_is_dropped_silently(self):
+        """A katex_overlay without latex text should not crash the build."""
+        from app.domain.models.cir import KaTeXOverlaySpec, LayerKind, LayerSpec
+
+        step = CirStep(
+            id="s1",
+            title="占位",
+            narration="...",
+            visual_kind=VisualKind.FORMULA,
+            layers=[
+                LayerSpec(
+                    kind=LayerKind.KATEX_OVERLAY,
+                    katex_overlay=KaTeXOverlaySpec(x=0, y=0, latex="   "),
+                ),
+            ],
+        )
+        cir = CirDocument(
+            title="格林公式",
+            domain=TopicDomain.MATH,
+            summary="演示",
+            steps=[step],
+        )
+        playbook = build_playbook(cir, execution_map=None)
+        # All layers were unrenderable → fallback single-layer wraps snapshot.
+        assert len(playbook.steps[0].layers) == 1
+        assert playbook.steps[0].layers[0].body == playbook.steps[0].snapshot

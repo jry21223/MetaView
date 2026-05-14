@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from enum import Enum
+
 from pydantic import BaseModel, Field
 
 from app.domain.models.topic import TopicDomain, VisualKind
@@ -137,6 +139,75 @@ class SceneSpec(BaseModel):
     caption: str | None = None
 
 
+class LayerKind(str, Enum):
+    """Discriminator for a single visual layer inside a CIR step.
+
+    A step may stack multiple layers (e.g. a math region + vector field + a
+    floating formula overlay). Layers are an additive evolution of the legacy
+    ``visual_kind`` field: when ``CirStep.layers`` is empty the builder
+    auto-wraps the existing single-snapshot path for backward compatibility.
+    """
+
+    MATH_SCENE = "math_scene"
+    MATH_PLOT = "math_plot"
+    MATH_FORMULA = "math_formula"
+    KATEX_OVERLAY = "katex_overlay"
+    ARRAY_BOXES = "array_boxes"
+    BAR_BLOCKS = "bar_blocks"
+    TREE_GRAPH = "tree_graph"
+    NARRATION_CARD = "narration_card"
+
+
+class LayerTimingSpec(BaseModel):
+    """Window inside a step's [0,1] progress where the layer is visible.
+
+    The LLM picks normalised positions instead of absolute frame counts so
+    the same prompt produces consistent timing across different frame rates.
+    """
+
+    enter_at: float = 0.0
+    exit_at: float = 1.0
+    appear_anim: str | None = "fade"  # fade | draw | slide | scale | none
+    z_order: int = 0  # higher draws on top
+
+
+class KaTeXOverlaySpec(BaseModel):
+    """Floating KaTeX label anchored in scene coordinates."""
+
+    x: float
+    y: float
+    latex: str
+    align: str = "ne"  # ne | nw | se | sw | center
+
+
+class NarrationCardSpec(BaseModel):
+    """Floating narration card overlaying the main scene."""
+
+    text: str
+    position: str = "bottom"  # top | bottom | center
+    emphasis: str = "primary"  # primary | secondary | accent
+
+
+class LayerSpec(BaseModel):
+    """A single layer of a CIR step.
+
+    Exactly one of the body fields (``scene`` / ``plot`` / ``katex_overlay`` /
+    ``narration_card``) should be populated; the builder validates this when
+    expanding the layer into a Playbook ``Layer``.
+    """
+
+    kind: LayerKind
+    timing: LayerTimingSpec = Field(default_factory=LayerTimingSpec)
+    scene: SceneSpec | None = None
+    plot: PlotSpec | None = None
+    katex_overlay: KaTeXOverlaySpec | None = None
+    narration_card: NarrationCardSpec | None = None
+    # Layers that consume the step's existing tokens/edges (array boxes, tree
+    # graph) read those from the parent CirStep so the LLM doesn't have to
+    # duplicate per-layer payloads. The kind discriminator picks which
+    # builder routine handles the payload.
+
+
 class CirStep(BaseModel):
     id: str
     title: str
@@ -150,6 +221,9 @@ class CirStep(BaseModel):
     annotations: list[str] = Field(default_factory=list)
     start_time: float | None = None
     end_time: float | None = None
+    # New layered output path. Empty list -> the builder synthesises a single
+    # layer from ``visual_kind`` + ``plot`` / ``scene`` / ``tokens`` (legacy).
+    layers: list[LayerSpec] = Field(default_factory=list)
 
 
 class CirDocument(BaseModel):

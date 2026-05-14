@@ -16,6 +16,9 @@ from app.domain.models.playbook import (
     AlgorithmBarsSnapshot,
     AlgorithmTreeSnapshot,
     CodeHighlightOverlay,
+    KaTeXOverlaySnapshot,
+    Layer,
+    LayerTiming,
     MathFormulaSnapshot,
     MathPlotCurve,
     MathPlotSnapshot,
@@ -27,6 +30,7 @@ from app.domain.models.playbook import (
     MathSceneSnapshot,
     MathSceneVectorField,
     MetaStep,
+    NarrationCardSnapshot,
     PlaybookScript,
 )
 from app.domain.models.topic import TopicDomain
@@ -98,6 +102,7 @@ def build_playbook(
         duration = _step_duration_frames(cir_step, checkpoint, fps)
         cumulative += duration
         snapshot = _build_snapshot(cir_step, checkpoint, execution_map, cir.domain)
+        layers = _build_layers(cir_step, snapshot, checkpoint, execution_map, cir.domain)
         code_highlight = _build_code_highlight(checkpoint, source_lines, source_language)
         narration_tpl = _parse_narration_template(cir_step.narration)
         voiceover = (
@@ -113,6 +118,7 @@ def build_playbook(
                 voiceover_text=voiceover,
                 animation_hint=_infer_hint(cir_step, i, len(cir.steps)),
                 snapshot=snapshot,
+                layers=layers,
                 code_highlight=code_highlight,
                 narration_template=narration_tpl,
                 tokens=[t.model_dump() for t in cir_step.tokens],
@@ -179,6 +185,121 @@ def _try_parse_number(value: str) -> float | None:
         return float(value.strip())
     except (AttributeError, TypeError, ValueError):
         return None
+
+
+def _build_layers(
+    cir_step: CirStep,
+    fallback_snapshot,
+    checkpoint: ExecutionCheckpoint | None,
+    execution_map: ExecutionMap | None,
+    domain: TopicDomain,
+) -> list[Layer]:
+    """Materialise the layered representation for ``cir_step``.
+
+    When the LLM emits ``cir_step.layers`` we expand each LayerSpec into a
+    Playbook ``Layer``. When ``layers`` is empty (legacy CIR) we wrap the
+    already-computed single ``fallback_snapshot`` as a one-element list so
+    downstream renderers can treat every step uniformly.
+    """
+
+    if not cir_step.layers:
+        return [Layer(timing=LayerTiming(), body=fallback_snapshot)]
+
+    out: list[Layer] = []
+    for spec in cir_step.layers:
+        body = _build_layer_body(spec, cir_step, checkpoint, execution_map, domain)
+        if body is None:
+            logger.info(
+                "Dropping unrenderable layer kind=%s in step %s", spec.kind, cir_step.id
+            )
+            continue
+        out.append(
+            Layer(
+                timing=LayerTiming(
+                    enter_at=max(0.0, min(1.0, spec.timing.enter_at)),
+                    exit_at=max(0.0, min(1.0, spec.timing.exit_at)),
+                    appear_anim=spec.timing.appear_anim or "fade",
+                    z_order=spec.timing.z_order,
+                ),
+                body=body,
+            )
+        )
+    if not out:
+        # All layers were unrenderable — keep the legacy snapshot so the step
+        # still produces visible output.
+        return [Layer(timing=LayerTiming(), body=fallback_snapshot)]
+    out.sort(key=lambda layer: layer.timing.z_order)
+    return out
+
+
+def _build_layer_body(
+    spec,
+    cir_step: CirStep,
+    checkpoint: ExecutionCheckpoint | None,
+    execution_map: ExecutionMap | None,
+    domain: TopicDomain,
+):
+    """Translate a LayerSpec into the appropriate snapshot body.
+
+    Returns ``None`` when the layer cannot be materialised (e.g. required
+    body field missing) so the caller can drop it without failing the whole
+    playbook build.
+    """
+
+    from app.domain.models.cir import LayerKind  # local import to avoid cycle at import-time
+
+    kind = spec.kind
+    if kind == LayerKind.MATH_SCENE:
+        if spec.scene is None:
+            # Borrow the step-level scene when the LLM forgot to fill the layer's slot.
+            scratch = cir_step.scene
+        else:
+            scratch = spec.scene
+        if scratch is None:
+            return _build_math_formula_snapshot(cir_step)
+        # Build a temporary CirStep view that points layer-builder at scratch.
+        shim = cir_step.model_copy(update={"scene": scratch})
+        scene = _build_math_scene_snapshot(shim)
+        return scene or _build_math_formula_snapshot(cir_step)
+    if kind == LayerKind.MATH_PLOT:
+        plot = spec.plot or cir_step.plot
+        if plot is None:
+            return None
+        shim = cir_step.model_copy(update={"plot": plot})
+        plot_snap = _build_math_plot_snapshot(shim)
+        return plot_snap or _build_math_formula_snapshot(cir_step)
+    if kind == LayerKind.MATH_FORMULA:
+        # Use any embedded formula spec; otherwise fall back to the step's
+        # plot.formula_latex / title placeholder via the existing helper.
+        plot = spec.plot or cir_step.plot
+        shim = cir_step if plot is None else cir_step.model_copy(update={"plot": plot})
+        return _build_math_formula_snapshot(shim)
+    if kind == LayerKind.KATEX_OVERLAY:
+        if spec.katex_overlay is None or not spec.katex_overlay.latex.strip():
+            return None
+        return KaTeXOverlaySnapshot(
+            x=spec.katex_overlay.x,
+            y=spec.katex_overlay.y,
+            latex=spec.katex_overlay.latex,
+            align=spec.katex_overlay.align or "ne",
+        )
+    if kind == LayerKind.NARRATION_CARD:
+        if spec.narration_card is None or not spec.narration_card.text.strip():
+            return None
+        return NarrationCardSnapshot(
+            text=spec.narration_card.text,
+            position=spec.narration_card.position or "bottom",
+            emphasis=spec.narration_card.emphasis or "primary",
+        )
+    if kind in (LayerKind.ARRAY_BOXES, LayerKind.BAR_BLOCKS):
+        # These layers always read the parent step's tokens + execution_map,
+        # so we just route through the legacy array builder. The renderer
+        # decides whether to draw bars or boxes based on the snapshot kind.
+        return _build_array_snapshot(cir_step, checkpoint, execution_map)
+    if kind == LayerKind.TREE_GRAPH:
+        return _build_tree_snapshot(cir_step, checkpoint)
+    logger.warning("Unknown layer kind=%s in step %s", kind, cir_step.id)
+    return None
 
 
 def _build_snapshot(

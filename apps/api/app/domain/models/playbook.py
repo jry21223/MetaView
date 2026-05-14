@@ -16,6 +16,8 @@ class SnapshotKind(str, Enum):
     MATH_PLOT = "math_plot"
     MATH_FORMULA = "math_formula"
     MATH_SCENE = "math_scene"
+    KATEX_OVERLAY = "katex_overlay"
+    NARRATION_CARD = "narration_card"
 
 
 class AlgorithmArraySnapshot(BaseModel):
@@ -172,6 +174,25 @@ class MathSceneSnapshot(BaseModel):
     caption: str | None = None
 
 
+class KaTeXOverlaySnapshot(BaseModel):
+    """A KaTeX label anchored at a (x, y) in the underlying scene coords."""
+
+    kind: Literal["katex_overlay"] = "katex_overlay"
+    x: float
+    y: float
+    latex: str
+    align: str = "ne"
+
+
+class NarrationCardSnapshot(BaseModel):
+    """Free-floating narration card body overlayed on the main scene."""
+
+    kind: Literal["narration_card"] = "narration_card"
+    text: str
+    position: str = "bottom"
+    emphasis: str = "primary"
+
+
 AnySnapshot = Annotated[
     Union[
         AlgorithmArraySnapshot,
@@ -180,9 +201,32 @@ AnySnapshot = Annotated[
         MathPlotSnapshot,
         MathFormulaSnapshot,
         MathSceneSnapshot,
+        KaTeXOverlaySnapshot,
+        NarrationCardSnapshot,
     ],
     Field(discriminator="kind"),
 ]
+
+
+class LayerTiming(BaseModel):
+    """Normalised [0,1] window inside a step's progress where a Layer renders."""
+
+    enter_at: float = 0.0
+    exit_at: float = 1.0
+    appear_anim: str = "fade"
+    z_order: int = 0
+
+
+class Layer(BaseModel):
+    """A renderer-ready layer: timing + body snapshot.
+
+    ``body.kind`` discriminates which renderer in the frontend ``layerRegistry``
+    handles it. Existing single-snapshot steps are wrapped as a 1-element
+    layers list during builder fan-out for backwards compatibility.
+    """
+
+    timing: LayerTiming = Field(default_factory=LayerTiming)
+    body: AnySnapshot
 
 
 class CodeHighlightOverlay(BaseModel):
@@ -202,7 +246,8 @@ class MetaStep(BaseModel):
     title: str
     voiceover_text: str
     animation_hint: str | None = None
-    snapshot: AnySnapshot
+    snapshot: AnySnapshot  # kept for backwards compat; mirrors layers[0].body
+    layers: list[Layer] = Field(default_factory=list)
     code_highlight: CodeHighlightOverlay | None = None
     narration_template: list | None = None
     tokens: list[dict] = Field(default_factory=list)

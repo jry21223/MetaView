@@ -506,3 +506,82 @@
   color: var(--msr-legend);
   letter-spacing: 0.03em;
 }
+
+/* ── Scene Compositor (Phase 3) ─────────────────────────────────────────── */
+.scene-compositor {
+  /* layers stack via absolute positioning; container provides the reference */
+}
+
+.scene-compositor__layer {
+  /* each layer overlays the full scene area */
+}
+
+/* ── KaTeX Overlay (Layer kind=katex_overlay) ──────────────────────────── */
+.katex-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.katex-overlay__anchor {
+  position: absolute;
+  font-size: 16px;
+  padding: 4px 10px;
+  background: rgba(10, 12, 16, 0.66);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 6px;
+  color: #e8ecf4;
+  white-space: nowrap;
+}
+
+.katex-overlay[data-theme="light"] .katex-overlay__anchor {
+  background: rgba(245, 247, 250, 0.92);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: #141820;
+}
+
+/* ── Narration Card (Layer kind=narration_card) ────────────────────────── */
+.narration-card {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 70%;
+  padding: 12px 18px;
+  border-radius: 10px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  pointer-events: none;
+  background: rgba(10, 12, 16, 0.72);
+  color: #e8ecf4;
+  border: 1px solid rgba(77, 232, 176, 0.32);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.narration-card[data-theme="light"] {
+  background: rgba(245, 247, 250, 0.96);
+  color: #141820;
+  border-color: rgba(0, 120, 90, 0.45);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+.narration-card[data-position="top"] {
+  top: 6%;
+}
+
+.narration-card[data-position="bottom"] {
+  bottom: 6%;
+}
+
+.narration-card[data-position="center"] {
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.narration-card[data-emphasis="accent"] {
+  border-color: rgba(255, 158, 138, 0.7);
+}
+
+.narration-card[data-emphasis="secondary"] {
+  border-color: rgba(200, 168, 248, 0.6);
+}
