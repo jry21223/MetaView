@@ -175,13 +175,23 @@ class MathSceneSnapshot(BaseModel):
 
 
 class KaTeXOverlaySnapshot(BaseModel):
-    """A KaTeX label anchored at a (x, y) in the underlying scene coords."""
+    """A KaTeX label anchored at a (x, y) in the underlying scene coords.
+
+    The optional ``x_min``/``x_max``/``y_min``/``y_max`` fields tell the
+    frontend renderer what viewport to convert (x, y) against. When the
+    overlay sits atop a math_scene layer, the builder copies the scene's
+    bounds in so the renderer doesn't drift on non-default viewports.
+    """
 
     kind: Literal["katex_overlay"] = "katex_overlay"
     x: float
     y: float
     latex: str
     align: str = "ne"
+    x_min: float | None = None
+    x_max: float | None = None
+    y_min: float | None = None
+    y_max: float | None = None
 
 
 class NarrationCardSnapshot(BaseModel):

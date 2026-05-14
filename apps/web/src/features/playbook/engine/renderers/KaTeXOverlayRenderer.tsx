@@ -42,13 +42,25 @@ export const KaTeXOverlayRenderer: React.FC<RendererProps> = ({
 
   const offsets = ALIGN_OFFSETS[snap.align ?? "ne"] ?? ALIGN_OFFSETS.ne;
 
+  // Convert scene-space (x, y) into percentages of the parent scene's
+  // viewport. The snapshot may carry its own bounds (set by the layer
+  // builder); otherwise fall back to the default ±5 box used by SceneSpec.
+  const xMin = snap.x_min ?? -5;
+  const xMax = snap.x_max ?? 5;
+  const yMin = snap.y_min ?? -5;
+  const yMax = snap.y_max ?? 5;
+  const xSpan = xMax - xMin || 1;
+  const ySpan = yMax - yMin || 1;
+  const leftPct = ((snap.x - xMin) / xSpan) * 100;
+  const topPct = 100 - ((snap.y - yMin) / ySpan) * 100;
+
   return (
     <div className="katex-overlay" data-theme={theme} style={{ opacity }}>
       <div
         className="katex-overlay__anchor"
         style={{
-          left: `${snap.x * 50 + 50}%`,
-          top: `${50 - snap.y * 8}%`,
+          left: `${leftPct}%`,
+          top: `${topPct}%`,
           transform: `translate(${offsets.tx}, ${offsets.ty})`,
         }}
       >

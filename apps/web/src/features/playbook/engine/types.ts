@@ -164,13 +164,22 @@ export interface MathSceneSnapshot {
   params?: Record<string, number>;
 }
 
-/** Free-floating KaTeX label anchored at scene coordinates. */
+/** Free-floating KaTeX label anchored at scene coordinates.
+ *
+ * `x_min/x_max/y_min/y_max` describe the parent scene's viewport so the
+ * overlay can position itself correctly. When missing, the renderer falls
+ * back to a symmetric ±5 box (the default scene bounds).
+ */
 export interface KaTeXOverlaySnapshot {
   kind: "katex_overlay";
   x: number;
   y: number;
   latex: string;
   align?: "ne" | "nw" | "se" | "sw" | "center";
+  x_min?: number;
+  x_max?: number;
+  y_min?: number;
+  y_max?: number;
 }
 
 /** Floating narration card overlayed atop the main scene. */

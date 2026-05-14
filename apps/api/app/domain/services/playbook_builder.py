@@ -277,11 +277,18 @@ def _build_layer_body(
     if kind == LayerKind.KATEX_OVERLAY:
         if spec.katex_overlay is None or not spec.katex_overlay.latex.strip():
             return None
+        # Inherit viewport bounds from the parent step's scene when present so
+        # the overlay positions itself correctly on non-default viewports.
+        scene = cir_step.scene
         return KaTeXOverlaySnapshot(
             x=spec.katex_overlay.x,
             y=spec.katex_overlay.y,
             latex=spec.katex_overlay.latex,
             align=spec.katex_overlay.align or "ne",
+            x_min=scene.x_min if scene else None,
+            x_max=scene.x_max if scene else None,
+            y_min=scene.y_min if scene else None,
+            y_max=scene.y_max if scene else None,
         )
     if kind == LayerKind.NARRATION_CARD:
         if spec.narration_card is None or not spec.narration_card.text.strip():
