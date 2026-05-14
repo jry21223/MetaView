@@ -120,6 +120,11 @@ export function appearTransform(anim: AppearAnim, progress: number): AppearTrans
       };
     case "fade":
     default:
-      return { opacity: easeInOut(t), transform: "none", drawProgress: 1 };
+      // Snap to full opacity inside the first 5% of the layer's window so the
+      // scene/coordinate system is visible essentially from frame 1. The
+      // outer wrapper-level fade exists only to mask a hard pop-in at layer
+      // entry; each renderer still owns its own internal title/element fade
+      // for finer animation.
+      return { opacity: easeInOut(Math.min(1, t / 0.05)), transform: "none", drawProgress: 1 };
   }
 }

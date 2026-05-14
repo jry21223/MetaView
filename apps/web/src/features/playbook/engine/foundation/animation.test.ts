@@ -106,14 +106,15 @@ describe("appearTransform", () => {
     expect(r.transform).toBe("none");
   });
 
-  it("fade ramps opacity 0->1 across progress", () => {
+  it("fade snaps to full opacity inside the first 5% of the window", () => {
     const start = appearTransform("fade", 0);
+    const fivePct = appearTransform("fade", 0.05);
     const mid = appearTransform("fade", 0.5);
     const end = appearTransform("fade", 1);
     expect(start.opacity).toBe(0);
+    expect(fivePct.opacity).toBe(1); // already saturated by 5% of window
+    expect(mid.opacity).toBe(1);
     expect(end.opacity).toBe(1);
-    expect(mid.opacity).toBeGreaterThan(0);
-    expect(mid.opacity).toBeLessThan(1);
   });
 
   it("scale animates from 0.85 to 1", () => {
