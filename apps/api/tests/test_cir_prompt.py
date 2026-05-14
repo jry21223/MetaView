@@ -58,3 +58,24 @@ def test_self_check_includes_layer_validation() -> None:
     system, _ = build_cir_prompt("test", TopicDomain.MATH)
     # New self-check item: validate layer timing windows.
     assert "enter_at <= exit_at" in system
+
+
+def test_math_prompt_advertises_scene_visual_kind() -> None:
+    """Phase 5 fix: prompt must tell LLM that `scene` exists as a math visual_kind.
+    Previously the prompt only listed function/formula, so the LLM never picked
+    scene even for vector fields and 2D regions."""
+    system, _ = build_cir_prompt("画格林公式", TopicDomain.MATH)
+    assert "function" in system and "scene" in system and "formula" in system
+    # The schema line listing valid visual_kind values must include scene.
+    assert "function | scene | formula" in system or "scene" in system
+    # The trigger-word list MUST mention vector field + region (otherwise LLM
+    # has no concrete cue to pick scene over formula).
+    assert "向量场" in system and "区域" in system
+
+
+def test_math_prompt_forbids_formula_for_vector_field() -> None:
+    system, _ = build_cir_prompt("test", TopicDomain.MATH)
+    # The self-check section must call out the formula-vs-scene failure mode.
+    assert "向量场" in system
+    # And explicitly forbid duplicate layers (real LLM bug we observed).
+    assert "math_scene 只能出现一次" in system

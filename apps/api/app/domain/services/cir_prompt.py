@@ -35,10 +35,15 @@ VISUAL + PEDAGOGY RULES for math (audience: 零基础学生):
 - Step template (strict): 直觉（生活类比） → 形式（公式或定义） → 具体数字代入 → 推广到一般式。
 - 先给「为什么需要这个工具」再给公式。例：先讲「积分就是把一条曲线下面切成无数细条求面积」，再写积分号。
 - 永远先用具体数字举例（f(x)=x², x=2, 算出 f(2)=4），再泛化到符号。
-- HARD RULE: math 域的 visual_kind 只能是 "function" 或 "formula"。绝对不能用 "array"。
-  如果你想用 array 来排列代数项（如展开 (x+1)²），改用 "formula" 并把整个展开过程写进 formula_latex。
+- HARD RULE: math 域的 visual_kind 只能在 "function" / "scene" / "formula" 中三选一。绝对不能用 "array"。
+  优先级（必须照此判断！）：
+    (1) 题目涉及 2D 几何对象（区域 / 边界 / 向量场 / 参数曲线 / 圆 / 多边形 / 环路 / 旋度 / 散度）→ "scene"。
+    (2) 1D 函数 y=f(x) 作图、导数、积分面积 → "function"。
+    (3) 既不是 1D 函数也不是 2D 几何（纯抽象代数 / 群 / 集合 / 矩阵 / 概率） → "formula" 兜底。
+  ⚠️ 反例（错误）：narration 出现「向量场 F=(-y,x)」却用 visual_kind="formula"——这是 BUG。
+  必须改为 "scene" 并填 step.scene.vector_field。
 
-A. WHEN TO USE visual_kind="function" (the default for graphable math):
+A. WHEN TO USE visual_kind="function" (1D 函数作图):
    - 任何能画在 1D 坐标轴上的函数：f(x) 作图、函数变换（平移/缩放）、导数与切线、
      定积分下的面积、三角波、指数/对数增长、参数族曲线。
    - REQUIRED: fill the step's "plot" object:
@@ -57,16 +62,46 @@ A. WHEN TO USE visual_kind="function" (the default for graphable math):
      parameter values into the expression when the lesson is about how the parameter changes
      the curve shape.
 
-B. WHEN TO USE visual_kind="formula" (when no 1D curve fits the topic):
-   - 题目涉及 2D 区域、向量场、曲面、抽象代数、集合论、群、概率分布表、矩阵代数等
-     无法用单 x-y 坐标平面表达的内容。
-   - REQUIRED: write the core equation in step.plot.formula_latex (KaTeX), and put 1–3 short
-     side notes into step.annotations (each ≤ 40 chars, e.g. "P,Q 是向量场的两个分量").
-     Example for Green's theorem:
-       plot.formula_latex = "\\\\oint_C P\\\\,dx + Q\\\\,dy = \\\\iint_R \\\\left(\\\\frac{\\\\partial Q}{\\\\partial x} - \\\\frac{\\\\partial P}{\\\\partial y}\\\\right) dA"
-       annotations = ["C 是 R 的边界（逆时针）", "P,Q 是向量场分量", "把曲线积分转成面积分"]
-   - Tokens may be empty for formula steps. Do NOT cram a 2D concept into an array of letter tokens.
+B. WHEN TO USE visual_kind="scene" (2D 几何场景 — 最重要的新能力！):
+   ★ 触发词：narration / title 一旦出现下列任何关键词，**必须**用 scene：
+     区域、边界、向量场、参数方程、圆、椭圆、多边形、环路、闭合曲线、
+     旋度、散度、通量、线积分、面积分、二重积分、格林公式、斯托克斯、高斯。
+   - REQUIRED: 填 step.scene（注意是直接挂在 step 上，**不是** step.plot.scene）:
+     {
+       "x_min": -1, "x_max": 5, "y_min": -1, "y_max": 4,
+       "x_label": "x", "y_label": "y",
+       "regions": [{"vertices": [[0,0],[4,0],[4,3],[0,3]], "label": "R", "emphasis": "secondary"}],
+       "segments": [{"x0":0,"y0":0,"x1":4,"y1":0,"arrow":true,"label":"C₁"}],
+       "vector_field": {"expression_px":"-y","expression_py":"x","step":0.8,"label":"F"},
+       "points": [{"x":2,"y":1.5,"label":"P","emphasis":"accent"}],
+       "curves": [{"expression_y":"sin(t)","expression_x":"cos(t)","t_min":0,"t_max":6.28,"label":"圆"}],
+       "annotations": [{"x":4.4,"y":3.4,"text":"$F$","align":"ne"}],
+       "formula_latex": "\\\\oint_C P\\\\,dx + Q\\\\,dy",
+       "caption": "短旁白一句"
+     }
+   - 字段使用规则：
+     - regions: 多边形区域，按顶点顺序逆时针连成闭合。label 是文字标签。
+     - segments: 线段或带箭头的有向边；arrow=true 表示画箭头。
+     - vector_field: P, Q 都是 x, y 的表达式（同 function 允许的字符集）。step 是采样格距。
+     - curves: 1D 用 expression_y=f(x)；参数式用 expression_y+expression_x+t_min+t_max。
+     - points: 单个标记点，emphasis 控制颜色。
+   - Tokens 在 scene step 中应为空数组——几何信息全部走 scene 字段。
+
+C. WHEN TO USE visual_kind="formula" (兜底，仅用于无法画图的纯抽象内容):
+   - 群论、集合论、抽象代数恒等式、概率分布表、矩阵代数等纯符号题。
+   - 注意：「向量场 F=(-y, x)」**不属于**这一类——它能在坐标系里画出来，必须用 scene。
+   - REQUIRED: 把核心方程写进 step.plot.formula_latex (KaTeX)。
+   - 例：「Z/nZ 的加法群」可以用 formula 兜底；「格林公式的几何含义」**绝对不能**。
+
 - Across all steps, reveal progressively: 直觉 → 例子 → 一般式 → 应用。
+
+D. 多层组合（高级）：
+   - 几何主图 + 公式角标：step.layers = [
+       {kind:"math_scene", timing:{enter_at:0,exit_at:1,z_order:0}},
+       {kind:"katex_overlay", timing:{enter_at:0.4,exit_at:1,z_order:2},
+        katex_overlay:{x:2,y:3.5,latex:"F=(-y,x)",align:"ne"}}
+     ]
+   - 不要把同一种 layer kind 写两次！如果都是 math_scene 就只写一个；不要复制粘贴层。
 """,
     TopicDomain.PHYSICS: """
 VISUAL + PEDAGOGY RULES for physics:
@@ -109,7 +144,7 @@ _COMBINED_SCHEMA = """{
         "id": "step_01",
         "title": "string — step title (≤ 30 chars)",
         "narration": "JSON array — see Narration Output Format section",
-        "visual_kind": "array | graph | function | formula",
+        "visual_kind": "array | graph | function | scene | formula",
         "tokens": [
           {
             "id": "string — unique id like t0, t1, node_root",
@@ -168,7 +203,7 @@ _COMBINED_SCHEMA = """{
         "id": "cp_01",
         "step_index": 0,
         "step_id": "must match a CIR step.id",
-        "visual_kind": "array | graph | function | formula (mirror the step)",
+        "visual_kind": "array | graph | function | scene | formula (mirror the step)",
         "title": "string (mirror the step title)",
         "summary": "string — single sentence for this checkpoint",
         "start_s": 0.0,
@@ -282,15 +317,18 @@ The output is a SINGLE JSON object with two layers:
 {_COMBINED_SCHEMA}
 
 ## Allowed visual_kind values
-Only use: "array", "graph", "function", or "formula"
+Only use: "array", "graph", "function", "scene", or "formula"
 - "array"    → 真正的线性数据结构、序列项、化学物种列表等。**不是默认值**——当内容
-               不是一串可枚举的并列项时，请改用 function 或 formula。
+               不是一串可枚举的并列项时，请改用 function / scene / formula。
 - "graph"    → ONLY for explicit tree or graph data structures.
-- "function" → 1-D coordinate-plane math (curves, transformations, derivatives/tangents,
-               area under a curve, trig waves). Requires the step's "plot.curves".
-- "formula"  → 无法在 1-D 坐标平面表达的数学概念（向量场、2D 区域积分、抽象代数、
-               集合论、概率分布、矩阵代数等）。Requires the step's "plot.formula_latex"
-               plus 1–3 short "annotations".
+- "function" → 1-D coordinate-plane math (1D 函数作图、导数、积分面积、三角波)。
+               Requires the step's "plot.curves".
+- "scene"    → ★ 2D 几何场景（区域、向量场、参数曲线、有向边界、环路、旋度/散度）。
+               **任何包含「区域 / 边界 / 向量场 / 参数方程 / 环路 / 旋度 / 散度 / 通量
+               / 线积分 / 面积分」的 math 题都必须用 scene，不能退到 formula。**
+               Requires the step's "scene" object（直接挂在 step 上）。
+- "formula"  → 纯抽象代数（群、集合、矩阵恒等式、概率分布表）——无法画出几何图形的兜底。
+               不能用于向量场或 2D 区域。Requires step.plot.formula_latex。
 
 ## Domain Classification
 Keyword analysis suggests: **{domain_hint.value}**
@@ -354,14 +392,23 @@ Example (bubble sort compare step):
 ## 输出前自检（SELF-CHECK before emitting JSON — fix any violation silently）
 1. 每一步 narration 是否先讲了「为什么」？
 2. 是否引入了未解释的术语？若有，回到上一步用一句类比补足。
-3. 如果 domain == math：visual_kind 仅在 "function" 与 "formula" 中二选一。
-   出现 "array" 视为错误——把它改写成 "formula" 并把表达式塞进 plot.formula_latex。
+3. 如果 domain == math：visual_kind 必须从 "function" / "scene" / "formula" 中选。
+   出现 "array" 视为错误。**关键规则**：扫描每一步的 narration / title——
+   - 出现「区域」「边界」「向量场」「参数方程」「环路」「闭合曲线」「旋度」「散度」
+     「通量」「线积分」「面积分」「二重积分」「格林公式」「斯托克斯」「高斯」「圆周」
+     「椭圆」「多边形」中任何一个 → **必须**用 "scene"，并填 step.scene；
+   - 1D 函数 y=f(x) 作图 / 导数 / 切线 / 积分面积 → "function"，填 step.plot.curves；
+   - 仅当题目是抽象代数 / 群 / 集合 / 概率分布表 等无几何对象时 → "formula"。
+   ⚠️ 反例：narration 提到「向量场 F=(-y,x)」却用 visual_kind="formula"——重写！
 4. visual_kind="function" 时 plot.curves 是否非空、表达式是否仅含允许的字符？
-5. visual_kind="formula" 时 plot.formula_latex 是否非空、annotations 是否 1–3 条？
-6. 涉及自由参数的 function 步骤是否在 execution_map.parameter_controls 列出了对应滑杆？
-7. 如果使用了 layers：每个 layer.timing.enter_at <= exit_at，且都在 [0,1] 之内？
+5. visual_kind="scene" 时 step.scene 是否非空？regions/segments/vector_field/curves 至少有一个？
+   vector_field.expression_px / expression_py 是否只用允许的字符？
+6. visual_kind="formula" 时 plot.formula_latex 是否非空、annotations 是否 1–3 条？
+7. 涉及自由参数的 function 步骤是否在 execution_map.parameter_controls 列出了对应滑杆？
+8. 如果使用了 layers：每个 layer.timing.enter_at <= exit_at，且都在 [0,1] 之内？
    层之间的 z_order 是否反映正确的视觉前后关系？
-8. 让一名零基础同学读你的 narration——他能复述出「这一步在干嘛、为什么」吗？
+   **不要把同一种 kind 的 layer 重复两次**——一个 step 里 math_scene 只能出现一次。
+9. 让一名零基础同学读你的 narration——他能复述出「这一步在干嘛、为什么」吗？
 {code_track}"""
 
     system = system + algo_code_track

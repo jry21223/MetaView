@@ -809,3 +809,53 @@ class TestLayeredOutput:
         # All layers were unrenderable → fallback single-layer wraps snapshot.
         assert len(playbook.steps[0].layers) == 1
         assert playbook.steps[0].layers[0].body == playbook.steps[0].snapshot
+
+
+class TestSceneUpgradeFallback:
+    """When the LLM picks visual_kind=formula for math content that obviously
+    needs a 2-D scene (vector fields, regions, etc.), the builder should
+    upgrade to a scene snapshot if the cir_step.scene field is populated."""
+
+    def test_formula_with_geometry_keywords_upgrades_to_scene(self):
+        from app.domain.models.cir import SceneRegion, SceneSpec
+        from app.domain.models.playbook import MathSceneSnapshot
+
+        step = CirStep(
+            id="s1",
+            title="向量场是什么",
+            narration="向量场就是每个点都有一个方向。",
+            visual_kind=VisualKind.FORMULA,
+            scene=SceneSpec(
+                x_min=-2, x_max=2, y_min=-2, y_max=2,
+                regions=[SceneRegion(vertices=[(-1, -1), (1, -1), (1, 1), (-1, 1)], label="R")],
+            ),
+        )
+        cir = CirDocument(
+            title="向量场入门",
+            domain=TopicDomain.MATH,
+            summary="向量场",
+            steps=[step],
+        )
+        playbook = build_playbook(cir, execution_map=None)
+        snap = playbook.steps[0].snapshot
+        # narration contains 向量场 → upgrade kicks in.
+        assert isinstance(snap, MathSceneSnapshot), f"expected MathSceneSnapshot, got {type(snap).__name__}"
+        assert snap.kind == "math_scene"
+
+    def test_formula_without_geometry_keywords_stays_formula(self):
+        """Negative control: pure abstract math (no geometry words) keeps formula."""
+        from app.domain.models.cir import PlotSpec
+        from app.domain.models.playbook import MathFormulaSnapshot
+
+        step = CirStep(
+            id="s1",
+            title="群的定义",
+            narration="一个群是一个集合配上一个满足结合律、有单位元、每个元素都有逆元的运算。",
+            visual_kind=VisualKind.FORMULA,
+            plot=PlotSpec(formula_latex=r"(G, \cdot) \text{ where } a \cdot e = a"),
+        )
+        cir = CirDocument(title="群论入门", domain=TopicDomain.MATH, summary="群",
+                          steps=[step])
+        playbook = build_playbook(cir, execution_map=None)
+        snap = playbook.steps[0].snapshot
+        assert isinstance(snap, MathFormulaSnapshot)

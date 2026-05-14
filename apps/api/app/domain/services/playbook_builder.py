@@ -187,6 +187,32 @@ def _try_parse_number(value: str) -> float | None:
         return None
 
 
+_GEOMETRY_HINT_KEYWORDS = (
+    "向量场", "区域", "边界", "环路", "闭合", "参数方程", "旋度", "散度",
+    "通量", "线积分", "面积分", "二重积分", "格林", "斯托克斯", "高斯",
+    "圆周", "椭圆", "多边形", "曲面",
+)
+
+
+def _looks_like_2d_geometry(cir_step: CirStep) -> bool:
+    """Heuristic: does the step's narration / title imply a 2-D scene?
+
+    Used to upgrade ``formula`` → ``scene`` when the LLM picks the safer
+    `formula` path despite the topic clearly involving 2-D geometry. Pure
+    string scan — no NLP, just a curated keyword list aligned with the
+    prompt's "scene trigger words" so the heuristic and the LLM hint stay
+    in lockstep.
+    """
+
+    haystack = (cir_step.title or "") + " "
+    narration = cir_step.narration
+    if isinstance(narration, str):
+        haystack += narration
+    elif isinstance(narration, list):
+        haystack += " ".join(seg for seg in narration if isinstance(seg, str))
+    return any(kw in haystack for kw in _GEOMETRY_HINT_KEYWORDS)
+
+
 def _build_layers(
     cir_step: CirStep,
     fallback_snapshot,
@@ -346,6 +372,20 @@ def _build_snapshot(
         logger.info("Math plot empty for step %s; falling back to formula snapshot", cir_step.id)
         return _build_math_formula_snapshot(cir_step)
     if cir_step.visual_kind == VisualKind.FORMULA:
+        # If the LLM emitted formula for math content that should obviously be
+        # a 2-D scene (vector fields, regions, integrals, ...), and the scene
+        # field was filled, upgrade. This catches the common failure mode
+        # where the LLM picks "formula" out of caution despite the prompt.
+        if domain == TopicDomain.MATH and _looks_like_2d_geometry(cir_step):
+            if cir_step.scene is not None:
+                scene = _build_math_scene_snapshot(cir_step)
+                if scene is not None:
+                    logger.warning(
+                        "Math step %s: LLM chose formula but narration implies 2D geometry; "
+                        "upgrading to scene snapshot",
+                        cir_step.id,
+                    )
+                    return scene
         return _build_math_formula_snapshot(cir_step)
     # Math domain must never degrade to the algorithm array view. If the LLM
     # ignored prompt guidance and emitted visual_kind=array for math, route to
