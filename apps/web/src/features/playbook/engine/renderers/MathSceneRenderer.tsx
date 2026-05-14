@@ -13,6 +13,7 @@ import type {
 } from "../types";
 import type { RendererProps } from "./types";
 import { compileExpr, type CompiledExpr } from "../../../../shared/lib/mathExpr";
+import { clamp01 } from "../foundation";
 
 type Emphasis = "primary" | "secondary" | "accent";
 
@@ -32,10 +33,6 @@ const EMPHASIS_COLORS: Record<"dark" | "light", Record<Emphasis, string>> = {
 function emphasisColor(theme: "dark" | "light", emphasis: string | undefined): string {
   const e = (emphasis ?? "primary") as Emphasis;
   return EMPHASIS_COLORS[theme][e] ?? EMPHASIS_COLORS[theme].primary;
-}
-
-function clamp01(v: number): number {
-  return v < 0 ? 0 : v > 1 ? 1 : v;
 }
 
 function safeCompile(source: string): CompiledExpr | null {

@@ -1,6 +1,7 @@
 import React from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
+import { clamp01 } from "../foundation";
 import type { MathFormulaSnapshot } from "../types";
 import type { RendererProps } from "./types";
 
@@ -94,7 +95,3 @@ export const MathFormulaRenderer: React.FC<RendererProps> = ({
     </div>
   );
 };
-
-function clamp01(v: number): number {
-  return v < 0 ? 0 : v > 1 ? 1 : v;
-}

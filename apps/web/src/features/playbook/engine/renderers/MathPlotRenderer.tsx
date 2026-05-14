@@ -10,6 +10,7 @@ import {
   type SamplePoint,
 } from "../../../../shared/lib/mathExpr";
 import { autoYBounds, fmtNum, niceTicks, padRange } from "../../../../shared/lib/plotMath";
+import { clamp01 } from "../foundation";
 
 // ── Theme ──────────────────────────────────────────────────────────────────
 
@@ -85,10 +86,6 @@ const SAMPLES = 360;
 const SHADE_SAMPLES = 96;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-
-function clamp01(v: number): number {
-  return v < 0 ? 0 : v > 1 ? 1 : v;
-}
 
 /** Split a sample list into contiguous runs of finite-y points (breaks at NaN). */
 function toSegments(pts: SamplePoint[]): SamplePoint[][] {
