@@ -29,6 +29,14 @@ class Settings(BaseSettings):
     history_db_path: str = "data/pipeline_runs.db"
     reviewer_mode: str = "on_failure"
 
+    # Request-shape guards (issue #39). Defaults protect against accidental
+    # large-body uploads and runaway LLM cost; production should tune via
+    # METAVIEW_* env vars.
+    max_body_bytes: int = 5_000_000  # 5 MB
+    rate_limit_enabled: bool = True
+    rate_limit_write: str = "10/minute"  # POST pipeline/exports — LLM cost path
+    rate_limit_read: str = "60/minute"  # GET runs/exports — cheap reads
+
     # Remotion playbook defaults — all configurable, no hardcoding in domain code
     playbook_default_fps: int = 30
     playbook_default_step_frames: int = 60

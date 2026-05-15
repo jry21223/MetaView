@@ -40,6 +40,9 @@ def client(tmp_path):
     repo = SqliteRunRepository(db)
 
     app = create_app()
+    # Existing router tests fire several POSTs back-to-back; disable per-IP
+    # rate limiting so they don't bump into the production threshold.
+    app.state.limiter.enabled = False
     app.dependency_overrides[get_run_repo] = lambda: repo
     app.dependency_overrides[get_llm_provider] = lambda: _MockLLM()
 

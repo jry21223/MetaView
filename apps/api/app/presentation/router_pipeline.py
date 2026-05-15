@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends
+from starlette.requests import Request
 
 from app.application.dto.pipeline_dto import PipelineRequest, PipelineRunResponse
 from app.application.ports.llm_provider import ILLMProvider
@@ -18,13 +19,16 @@ from app.presentation.dependencies import (
     get_reviewer_llm_provider,
     get_run_repo,
 )
+from app.presentation.rate_limit import write_limit
 
 router = APIRouter(prefix="/pipeline", tags=["pipeline"])
 
 
 @router.post("", response_model=PipelineRunResponse, status_code=202)
+@write_limit()
 async def submit_pipeline(
-    request: PipelineRequest,
+    request: Request,
+    payload: PipelineRequest,
     background_tasks: BackgroundTasks,
     settings: Annotated[Settings, Depends(get_settings)],
     run_repo: Annotated[IRunRepository, Depends(get_run_repo)],
@@ -33,7 +37,7 @@ async def submit_pipeline(
 ) -> PipelineRunResponse:
     run_id = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
-    await run_repo.create(run_id, request.prompt, created_at)
+    await run_repo.create(run_id, payload.prompt, created_at)
 
     # Per-request provider override takes precedence over the injected default.
     # When the caller supplies a custom api key, we cannot reuse the global
@@ -41,11 +45,11 @@ async def submit_pipeline(
     # crossing credentials and let the generator self-repair.
     effective_llm: ILLMProvider = llm
     effective_reviewer: ILLMProvider | None = reviewer_llm
-    if request.provider_api_key:
+    if payload.provider_api_key:
         effective_llm = OpenAIProvider(
-            api_key=request.provider_api_key,
-            base_url=request.provider_base_url or "https://api.openai.com/v1",
-            model=request.provider_model or "gpt-4o-mini",
+            api_key=payload.provider_api_key,
+            base_url=payload.provider_base_url or "https://api.openai.com/v1",
+            model=payload.provider_model or "gpt-4o-mini",
         )
         effective_reviewer = None
 
@@ -56,11 +60,11 @@ async def submit_pipeline(
         max_repair_attempts=settings.max_repair_attempts,
         reviewer_mode=settings.reviewer_mode,
     )
-    background_tasks.add_task(use_case.execute, run_id, request)
+    background_tasks.add_task(use_case.execute, run_id, payload)
 
     return PipelineRunResponse(
         run_id=run_id,
         status=PipelineRunStatus.QUEUED,
-        prompt=request.prompt,
+        prompt=payload.prompt,
         created_at=created_at,
     )
