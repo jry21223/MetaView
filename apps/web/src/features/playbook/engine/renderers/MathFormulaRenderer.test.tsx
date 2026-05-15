@@ -54,9 +54,11 @@ describe("MathFormulaRenderer", () => {
 
   it("renders the formula via KaTeX (mhchem markup present)", () => {
     const markup = render(makeSnap());
-    // KaTeX wraps everything in a .katex span.
+    // KaTeX wraps everything in a .katex span; assert on the visible glyph
+    // because the MathML annotation mirror is namespace-namespaced and
+    // therefore tossed by DOMPurify under happy-dom.
     expect(markup).toContain("katex");
-    expect(markup).toContain("oint");
+    expect(markup).toContain("∮");
   });
 
   it("shows the caption and every annotation", () => {

@@ -1,5 +1,4 @@
 import React from "react";
-import katex from "katex";
 import "katex/dist/katex.min.css";
 import type { MathPlotSnapshot } from "../types";
 import type { RendererProps } from "./types";
@@ -10,6 +9,7 @@ import {
   type SamplePoint,
 } from "../../../../shared/lib/mathExpr";
 import { autoYBounds, fmtNum, niceTicks, padRange } from "../../../../shared/lib/plotMath";
+import { sanitizeKatex } from "../../../../shared/lib/sanitizeKatex";
 import { clamp01 } from "../foundation";
 
 // ── Theme ──────────────────────────────────────────────────────────────────
@@ -235,14 +235,8 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({ step, frame, stepSta
 
   const formulaHtml = React.useMemo(() => {
     if (!snap.formula_latex || !snap.formula_latex.trim()) return null;
-    try {
-      return katex.renderToString(snap.formula_latex, {
-        throwOnError: false,
-        displayMode: false,
-      });
-    } catch {
-      return null;
-    }
+    const html = sanitizeKatex(snap.formula_latex);
+    return html || null;
   }, [snap.formula_latex]);
 
   const empty = drawable.length === 0;

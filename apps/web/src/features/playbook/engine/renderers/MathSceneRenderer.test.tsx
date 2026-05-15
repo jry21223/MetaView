@@ -105,7 +105,9 @@ describe("MathSceneRenderer", () => {
     const markup = render(makeScene());
     expect(markup).toContain("math-scene-renderer__formula");
     expect(markup).toContain("katex");
-    expect(markup).toContain("oint");
+    // Assert on the visible glyph rather than the MathML annotation mirror
+    // (DOMPurify drops namespaced MathML under happy-dom).
+    expect(markup).toContain("∮");
   });
 
   it("renders the caption verbatim", () => {

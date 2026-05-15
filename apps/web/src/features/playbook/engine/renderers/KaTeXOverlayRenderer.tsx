@@ -1,8 +1,8 @@
 import React from "react";
-import katex from "katex";
 import "katex/dist/katex.min.css";
 import type { KaTeXOverlaySnapshot } from "../types";
 import type { RendererProps } from "./types";
+import { sanitizeKatex } from "../../../../shared/lib/sanitizeKatex";
 import { clamp01 } from "../foundation";
 
 const ALIGN_OFFSETS: Record<string, { tx: string; ty: string }> = {
@@ -32,11 +32,8 @@ export const KaTeXOverlayRenderer: React.FC<RendererProps> = ({
   const elapsed = Math.max(0, frame - stepStartFrame);
   const opacity = clamp01(elapsed / 10);
   const html = React.useMemo(() => {
-    try {
-      return katex.renderToString(snap.latex, { throwOnError: false, displayMode: false });
-    } catch {
-      return null;
-    }
+    const rendered = sanitizeKatex(snap.latex);
+    return rendered || null;
   }, [snap.latex]);
   if (!html) return null;
 

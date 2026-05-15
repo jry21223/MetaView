@@ -1,5 +1,4 @@
 import React from "react";
-import katex from "katex";
 import "katex/dist/katex.min.css";
 import { Coordinates, LaTeX, Line, Mafs, Plot, Point, Polygon, Theme, Vector } from "mafs";
 import type {
@@ -13,6 +12,7 @@ import type {
 } from "../types";
 import type { RendererProps } from "./types";
 import { compileExpr, type CompiledExpr } from "../../../../shared/lib/mathExpr";
+import { sanitizeKatex } from "../../../../shared/lib/sanitizeKatex";
 import { clamp01 } from "../foundation";
 
 type Emphasis = "primary" | "secondary" | "accent";
@@ -264,11 +264,8 @@ function AnnotationsLayer({ annotations }: { annotations: MathSceneAnnotation[] 
 
 function FormulaCorner({ latex }: { latex: string }) {
   const html = React.useMemo(() => {
-    try {
-      return katex.renderToString(latex, { throwOnError: false, displayMode: false });
-    } catch {
-      return null;
-    }
+    const rendered = sanitizeKatex(latex);
+    return rendered || null;
   }, [latex]);
   if (!html) return null;
   return (

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
-import katex from "katex";
 import "katex/dist/katex.min.css";
 import { compileExpr } from "../../../../shared/lib/mathExpr";
+import { sanitizeKatex } from "../../../../shared/lib/sanitizeKatex";
 import {
   MATH_PRESETS,
   initialParams,
@@ -56,11 +56,7 @@ function presetToOverride(
 }
 
 function renderKatex(src: string, displayMode: boolean): string {
-  try {
-    return katex.renderToString(src, { throwOnError: false, displayMode });
-  } catch {
-    return src;
-  }
+  return sanitizeKatex(src, { displayMode });
 }
 
 function parseNumber(value: string): number | null {

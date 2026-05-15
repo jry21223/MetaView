@@ -1,7 +1,7 @@
 import React from "react";
-import katex from "katex";
 import "katex/dist/katex.min.css";
 import { clamp01 } from "../foundation";
+import { sanitizeKatex } from "../../../../shared/lib/sanitizeKatex";
 import type { MathFormulaSnapshot } from "../types";
 import type { RendererProps } from "./types";
 
@@ -38,14 +38,8 @@ export const MathFormulaRenderer: React.FC<RendererProps> = ({
   const formulaHtml = React.useMemo(() => {
     const src = snap.formula_latex ?? "";
     if (!src.trim()) return null;
-    try {
-      return katex.renderToString(src, {
-        throwOnError: false,
-        displayMode: true,
-      });
-    } catch {
-      return null;
-    }
+    const html = sanitizeKatex(src, { displayMode: true });
+    return html || null;
   }, [snap.formula_latex]);
 
   const annotations = (snap.annotations ?? []).filter((a) => a && a.trim().length > 0);
