@@ -115,7 +115,9 @@ describe("MathPlotRenderer", () => {
     const markup = renderToStaticMarkup(
       <MathPlotRenderer {...props(plotStep(makeSnap()), { theme: "light" })} />,
     );
-    expect(markup).toContain("#f5f7fa");
+    // Issue #61: the light background is now driven by THEME_PALETTE.light.surface2
+    // (= #faf8f3) instead of the renderer-local #f5f7fa constant.
+    expect(markup).toContain("#faf8f3");
   });
 
   it("falls back to a message when no curve is drawable", () => {
