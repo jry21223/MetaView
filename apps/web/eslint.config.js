@@ -29,6 +29,11 @@ export default tseslint.config([
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      // Issue #67 — promote exhaustive-deps to an error to catch the same
+      // closure trap (#50) at lint time rather than after a regression hits
+      // production. New code that legitimately wants a stable callback can
+      // disable the rule on the line in question and explain why.
+      "react-hooks/exhaustive-deps": "error",
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
     },
   },

@@ -21,9 +21,12 @@ export function PromptDoctor({
   onRetryWithSuggestion,
 }: PromptDoctorProps) {
   const attempts = report?.attempts ?? 0;
-  const issues = report?.issues ?? [];
 
   const suggestions = useMemo<SuggestionPill[]>(() => {
+    // Inline ``issues ?? []`` so the deps array tracks ``report?.issues``
+    // directly — the previous shape created a fresh array on every render
+    // and tripped exhaustive-deps (issue #67).
+    const issues = report?.issues ?? [];
     const seen = new Set<string>();
     const out: SuggestionPill[] = [];
     for (const issue of issues) {
@@ -38,7 +41,7 @@ export function PromptDoctor({
       });
     }
     return out;
-  }, [issues]);
+  }, [report?.issues]);
 
   return (
     <div className="mv-prompt-doctor" role="alert">
