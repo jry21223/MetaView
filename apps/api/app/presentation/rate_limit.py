@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
@@ -10,9 +8,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 from starlette.requests import Request
 
-if TYPE_CHECKING:
-    from app.config import Settings
-
+from app.config import Settings, get_settings
 
 _limiter: Limiter | None = None
 
@@ -30,7 +26,7 @@ def get_limiter() -> Limiter:
     return _limiter
 
 
-def install_rate_limiter(app: FastAPI, settings: "Settings") -> None:
+def install_rate_limiter(app: FastAPI, settings: Settings) -> None:
     """Wire the slowapi limiter and exception handler onto ``app``."""
     limiter = get_limiter()
     limiter.enabled = settings.rate_limit_enabled
@@ -49,14 +45,10 @@ async def _rate_limit_handler(request: Request, exc: Exception) -> JSONResponse:
 
 
 def _write_limit_value() -> str:
-    from app.config import get_settings
-
     return get_settings().rate_limit_write
 
 
 def _read_limit_value() -> str:
-    from app.config import get_settings
-
     return get_settings().rate_limit_read
 
 
