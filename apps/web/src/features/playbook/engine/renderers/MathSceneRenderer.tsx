@@ -14,6 +14,7 @@ import type { RendererProps } from "./types";
 import { compileExpr, type CompiledExpr } from "../../../../shared/lib/mathExpr";
 import { sanitizeKatex } from "../../../../shared/lib/sanitizeKatex";
 import { clamp01 } from "../foundation";
+import { revealRegionVertices } from "./regionReveal";
 
 type Emphasis = "primary" | "secondary" | "accent";
 
@@ -81,20 +82,31 @@ function evalSegmentTip(s: MathSceneSegment, progress: number): [number, number]
 
 const COMPACT_LABEL_RE = /^[A-Za-z0-9._\-+=\s,:'"]+$/;
 
-function RegionsLayer({ regions, theme, progress }: { regions: MathSceneRegion[]; theme: "dark" | "light"; progress: number }) {
-  const fadeIn = clamp01(progress * 1.5);
+function RegionsLayer({
+  regions,
+  theme,
+  progress,
+}: {
+  regions: MathSceneRegion[];
+  theme: "dark" | "light";
+  progress: number;
+}) {
   return (
     <>
       {regions.map((region, i) => {
         if (region.vertices.length < 3) return null;
         const color = emphasisColor(theme, region.emphasis);
+        const points = revealRegionVertices(
+          region.vertices as ReadonlyArray<readonly [number, number]>,
+          progress,
+        );
         return (
           <Polygon
             key={`region-${i}`}
-            points={region.vertices as Array<[number, number]>}
+            points={points}
             color={color}
-            fillOpacity={0.18 * fadeIn}
-            strokeOpacity={0.9 * fadeIn}
+            fillOpacity={0.18}
+            strokeOpacity={0.9}
           />
         );
       })}

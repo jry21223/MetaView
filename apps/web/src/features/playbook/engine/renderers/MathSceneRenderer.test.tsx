@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MathSceneRenderer } from "./MathSceneRenderer";
+import { revealRegionVertices } from "./regionReveal";
 import { rendererRegistry } from "./registry";
 import type { MathSceneSnapshot, MetaStep } from "../types";
 import type { RendererProps } from "./types";
@@ -125,5 +126,49 @@ describe("MathSceneRenderer", () => {
   it("omits the corner formula block when formula_latex is blank", () => {
     const markup = render(makeScene({ formula_latex: "" }));
     expect(markup).not.toContain("math-scene-renderer__formula");
+  });
+});
+
+describe("revealRegionVertices (issue #53)", () => {
+  const SQUARE: ReadonlyArray<readonly [number, number]> = [
+    [0, 0],
+    [4, 0],
+    [4, 4],
+    [0, 4],
+  ];
+
+  it("collapses every vertex onto the centroid at progress = 0", () => {
+    const result = revealRegionVertices(SQUARE, 0);
+    expect(result).toHaveLength(4);
+    for (const [x, y] of result) {
+      expect(x).toBeCloseTo(2, 6); // centroid of the unit-square-scaled-by-4
+      expect(y).toBeCloseTo(2, 6);
+    }
+  });
+
+  it("returns the original vertices at progress = 1", () => {
+    const result = revealRegionVertices(SQUARE, 1);
+    expect(result).toEqual(SQUARE.map((v) => [...v]));
+  });
+
+  it("interpolates linearly toward the target at progress = 0.5", () => {
+    const result = revealRegionVertices(SQUARE, 0.5);
+    expect(result[0][0]).toBeCloseTo(1, 6); // halfway from centroid(2) to (0)
+    expect(result[0][1]).toBeCloseTo(1, 6);
+    expect(result[2][0]).toBeCloseTo(3, 6); // halfway from centroid(2) to (4)
+    expect(result[2][1]).toBeCloseTo(3, 6);
+  });
+
+  it("clamps progress to [0, 1] so out-of-range frames don't overshoot", () => {
+    expect(revealRegionVertices(SQUARE, -1)).toEqual(
+      revealRegionVertices(SQUARE, 0),
+    );
+    expect(revealRegionVertices(SQUARE, 2)).toEqual(
+      revealRegionVertices(SQUARE, 1),
+    );
+  });
+
+  it("returns an empty array when given no vertices", () => {
+    expect(revealRegionVertices([], 0.5)).toEqual([]);
   });
 });
