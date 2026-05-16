@@ -24,7 +24,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
     this.setState({ error: null });
   };
 
-  render() {
+  override render() {
     const { error } = this.state;
     if (!error) return this.props.children;
 
