@@ -83,7 +83,6 @@ const MARGIN = { top: 20, right: 28, bottom: 40, left: 56 };
 const PLOT_W = SVG_W - MARGIN.left - MARGIN.right;
 const PLOT_H = SVG_H - MARGIN.top - MARGIN.bottom;
 const SAMPLES = 360;
-const SHADE_SAMPLES = 96;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -204,14 +203,29 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({ step, frame, stepSta
     snap.shade_to > snap.shade_from
   ) {
     const shadeReveal = clamp01((reveal - 0.15) / 0.85);
-    const right = snap.shade_from + (snap.shade_to - snap.shade_from) * shadeReveal;
-    if (right > snap.shade_from + 1e-9) {
-      const top = sampleExpr(lead.fn, snap.shade_from, right, SHADE_SAMPLES, snap.params).filter((p) =>
-        Number.isFinite(p.y),
+    const shadeFrom = snap.shade_from;
+    const right = shadeFrom + (snap.shade_to - shadeFrom) * shadeReveal;
+    if (right > shadeFrom + 1e-9) {
+      // Issue #44: reuse the lead curve's own samples (sampled at SAMPLES
+      // density across [xMin, xMax]) so the shade's top edge exactly tracks
+      // the curve path. Resampling at a lower density introduced a 2–3px
+      // seam at high zoom. We bracket the reused interior samples with
+      // exact endpoints at shade_from / right so the polygon closes flush
+      // against the baseline.
+      const params = snap.params ?? {};
+      const startY = lead.fn({ ...params, x: shadeFrom });
+      const endY = lead.fn({ ...params, x: right });
+      const interior = lead.points.filter(
+        (p) => p.x > shadeFrom && p.x < right && Number.isFinite(p.y),
       );
+      const top: SamplePoint[] = [
+        ...(Number.isFinite(startY) ? [{ x: shadeFrom, y: startY }] : []),
+        ...interior,
+        ...(Number.isFinite(endY) ? [{ x: right, y: endY }] : []),
+      ];
       if (top.length >= 2) {
         const coords = [
-          `${sx(snap.shade_from).toFixed(1)},${sy(baselineY).toFixed(1)}`,
+          `${sx(shadeFrom).toFixed(1)},${sy(baselineY).toFixed(1)}`,
           ...top.map((p) => `${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`),
           `${sx(right).toFixed(1)},${sy(baselineY).toFixed(1)}`,
         ];

@@ -144,4 +144,29 @@ describe("MathPlotRenderer", () => {
     expect(markup).toContain("#4de8b0");
     expect(markup).toContain("#7db8ff");
   });
+
+  it("shade top edge shares every interior x with the curve polyline (issue #44)", () => {
+    const markup = render(
+      makeSnap({
+        shade_from: -2,
+        shade_to: 2,
+      }),
+    );
+    const curveMatch = markup.match(/<polyline[^>]*points="([^"]*)"/);
+    const polyMatch = markup.match(/<polygon[^>]*points="([^"]*)"/);
+    expect(curveMatch, "expected a <polyline> for the curve").toBeTruthy();
+    expect(polyMatch, "expected a <polygon> for the shade").toBeTruthy();
+
+    const curvePts = new Set(curveMatch![1].trim().split(/\s+/).filter(Boolean));
+    const shadePts = polyMatch![1].trim().split(/\s+/).filter(Boolean);
+    // Trim baseline endpoints — first and last shade vertices sit on the
+    // x-axis baseline and are not on the curve.
+    const interior = shadePts.slice(1, -1);
+    // Every interior shade vertex MUST coincide with a curve sample; this is
+    // what eliminates the 2–3px seam. We allow a small remainder because the
+    // shade adds exact endpoints at shade_from / shade_to that the curve
+    // doesn't hit exactly (sampled on a different grid).
+    const sharedCount = interior.filter((p) => curvePts.has(p)).length;
+    expect(sharedCount).toBeGreaterThan(interior.length - 4);
+  });
 });
