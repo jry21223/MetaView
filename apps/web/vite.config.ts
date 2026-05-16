@@ -42,5 +42,28 @@ export default defineConfig({
     globals: false,
     include: ["src/**/*.test.{ts,tsx}"],
     setupFiles: ["src/mocks/setup.ts"],
+    coverage: {
+      // Issue #66 — opt-in (run via ``npm run test:coverage``) so day-to-day
+      // ``vitest run`` stays as quick as before. Numbers are intentionally
+      // modest first-pass thresholds; raise as new code lands.
+      provider: "v8",
+      reporter: ["text-summary", "html", "lcov"],
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: [
+        "src/**/*.test.{ts,tsx}",
+        "src/mocks/**",
+        "src/main.tsx",
+        "src/remotion/**",
+      ],
+      // Thresholds pinned at the current baseline (May 2026: ~50% lines,
+      // ~78% branches, ~76% functions) so any regression is loud; bump
+      // these up as new tests land. Issue #66.
+      thresholds: {
+        statements: 50,
+        branches: 70,
+        functions: 70,
+        lines: 50,
+      },
+    },
   },
 });

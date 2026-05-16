@@ -43,3 +43,20 @@ jobs:
           # Real API calls are not made during `make check`.
           METAVIEW_LLM_API_KEY: dummy
         run: make check
+
+      - name: Coverage (PR-only)
+        if: github.event_name == 'pull_request'
+        env:
+          METAVIEW_LLM_API_KEY: dummy
+        run: make test-coverage
+
+      - name: Upload coverage reports
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ github.run_id }}
+          path: |
+            coverage/
+            apps/web/coverage/
+          if-no-files-found: ignore
+          retention-days: 14

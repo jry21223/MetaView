@@ -33,3 +33,7 @@ PPT版本对比说明.md
 COMPETITION_SUBMISSION/
 data/html_previews/
 tools/
+coverage/
+apps/web/coverage/
+.coverage
+htmlcov/

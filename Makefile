@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 
-.PHONY: bootstrap bootstrap-manim setup-hooks dev-web dev-api dev start stop lint test build check docker-build docker-up docker-down
+.PHONY: bootstrap bootstrap-manim setup-hooks dev-web dev-api dev start stop lint test test-coverage build check docker-build docker-up docker-down
 
 DOCKER_COMPOSE_CMD := $(shell sh -lc 'if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then printf "%s" "docker compose"; elif command -v docker-compose >/dev/null 2>&1; then printf "%s" "docker-compose"; fi')
 
@@ -33,6 +33,17 @@ lint:
 test:
 	.venv/bin/pytest apps/api/tests -q
 	npm --workspace apps/web run test
+
+# Issue #66 — coverage reporting + per-side thresholds. Kept off the
+# default ``check`` target so CI fast path stays fast; opt in via
+# ``make test-coverage`` locally or in a dedicated CI job.
+test-coverage:
+	.venv/bin/pytest apps/api/tests \
+		--cov=apps/api/app \
+		--cov-report=term-missing \
+		--cov-report=html:coverage/api \
+		--cov-fail-under=60
+	npm --workspace apps/web run test:coverage
 
 build:
 	npm --workspace apps/web run build
