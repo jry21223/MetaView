@@ -18,10 +18,20 @@ export interface ExportTtsConfig {
   voice: string;
 }
 
+export type ExportQuality = "720p" | "1080p" | "2k";
+export type ExportFormat = "mp4" | "webm" | "gif";
+
+export interface ExportOptions {
+  quality?: ExportQuality;
+  fps?: number;
+  format?: ExportFormat;
+}
+
 export interface ExportRequestBody {
   run_id: string;
   with_audio: boolean;
   tts?: ExportTtsConfig;
+  options?: ExportOptions;
 }
 
 export interface ExportJobResponse {

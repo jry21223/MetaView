@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -12,6 +13,22 @@ class ExportJobStatus(str, Enum):
     RENDERING = "rendering"
     COMPLETED = "completed"
     FAILED = "failed"
+
+
+ExportQuality = Literal["720p", "1080p", "2k"]
+ExportFormat = Literal["mp4", "webm", "gif"]
+
+
+class ExportOptions(BaseModel):
+    """Render-pipeline knobs surfaced through ExportModal (issue #14).
+
+    Defaults match the historical behaviour so existing callers keep working
+    unchanged. The use-case maps these onto Remotion CLI flags.
+    """
+
+    quality: ExportQuality = "1080p"
+    fps: int = Field(default=30, ge=15, le=60)
+    format: ExportFormat = "mp4"
 
 
 class TtsConfig(BaseModel):

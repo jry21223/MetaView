@@ -26,7 +26,14 @@ import httpx
 
 from app.application.ports.export_repository import IExportJobRepository
 from app.application.ports.run_repository import IRunRepository
-from app.domain.models.export_job import ExportJobStatus, TtsConfig
+from app.domain.models.export_job import ExportJobStatus, ExportOptions, TtsConfig
+
+_QUALITY_TO_DIMENSIONS: dict[str, tuple[int, int]] = {
+    "720p": (1280, 720),
+    "1080p": (1920, 1080),
+    "2k": (2560, 1440),
+}
+_FORMAT_TO_EXTENSION: dict[str, str] = {"mp4": "mp4", "webm": "webm", "gif": "gif"}
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +58,7 @@ class ExportVideoUseCase:
         run_id: str,
         with_audio: bool,
         tts: TtsConfig | None,
+        options: ExportOptions | None = None,
     ) -> None:
         try:
             run = await self._runs.get(run_id)
@@ -87,15 +95,20 @@ class ExportVideoUseCase:
             props_path = job_dir / "inputProps.json"
             props_path.write_text(json.dumps(input_props), encoding="utf-8")
 
-            output_path = job_dir / "video.mp4"
+            # Resolve render options (issue #14). Defaults preserve historical
+            # 1080p/30fps/mp4 behavior so existing callers keep working.
+            opts = options or ExportOptions()
+            extension = _FORMAT_TO_EXTENSION.get(opts.format, "mp4")
+            output_path = job_dir / f"video.{extension}"
+
             self._exports.update(
                 job_id,
                 status=ExportJobStatus.RENDERING,
                 progress=0.15,
-                message="渲染中…",
+                message=f"渲染中…（{opts.quality} {opts.fps}fps {opts.format.upper()}）",
             )
 
-            await self._run_remotion_render(job_id, props_path, output_path)
+            await self._run_remotion_render(job_id, props_path, output_path, opts)
 
             self._exports.update(
                 job_id,
@@ -168,7 +181,11 @@ class ExportVideoUseCase:
         job_id: str,
         props_path: Path,
         output_path: Path,
+        options: ExportOptions,
     ) -> None:
+        # Codec is picked from the desired container; Remotion ships h264/vp8/gif.
+        codec = {"mp4": "h264", "webm": "vp8", "gif": "gif"}.get(options.format, "h264")
+        width, height = _QUALITY_TO_DIMENSIONS.get(options.quality, (1920, 1080))
         cmd = [
             "npx",
             "--yes",
@@ -181,6 +198,14 @@ class ExportVideoUseCase:
             str(props_path),
             "--log",
             "info",
+            "--codec",
+            codec,
+            "--width",
+            str(width),
+            "--height",
+            str(height),
+            "--frames-per-second",
+            str(options.fps),
         ]
         env = os.environ.copy()
         env.setdefault("NODE_ENV", "production")

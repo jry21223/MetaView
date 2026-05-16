@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from app.domain.models.export_job import ExportJobStatus, TtsConfig
+from app.domain.models.export_job import ExportJobStatus, ExportOptions, TtsConfig
 
 
 class ExportRequest(BaseModel):
     run_id: str
     with_audio: bool = False
     tts: TtsConfig | None = None
+    options: ExportOptions | None = None
 
 
 class ExportJobResponse(BaseModel):

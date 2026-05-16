@@ -82,6 +82,7 @@ async def submit_export(
         payload.run_id,
         payload.with_audio,
         payload.tts,
+        payload.options,
     )
 
     return _to_response(job, request, settings.api_prefix)

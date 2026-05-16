@@ -381,6 +381,8 @@ export function StudioPage({
         <ExportModal
           runId={runId}
           isDark={isDark}
+          previewTitle={playbook?.steps?.[0]?.title ?? playbook?.title ?? null}
+          accentColor={t.accent}
           onClose={() => setExportOpen(false)}
         />
       )}
