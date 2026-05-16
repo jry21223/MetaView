@@ -160,35 +160,56 @@ describe("uniqueDomains", () => {
 });
 
 describe("runsToCsv", () => {
-  it("emits a header row and one row per run", () => {
+  it("omits the prompt column by default (issue #64 PII guard)", () => {
     const csv = runsToCsv([
       run({
         run_id: "a",
         created_at: "2026-05-16T11:00:00Z",
         status: "succeeded",
-        prompt: "hello",
-        playbook: {
-          title: "Hi",
-          domain: "math",
-          steps: [{} as never, {} as never],
-        } as never,
+        prompt: "user@example.com leaked here",
+        playbook: { title: "Hi", domain: "math", steps: [] } as never,
       }),
     ]);
+    const lines = csv.split("\n");
+    expect(lines[0]).toBe("created_at,title,domain,status,steps");
+    expect(csv).not.toContain("user@example.com");
+  });
+
+  it("includes the prompt column when explicitly opted in", () => {
+    const csv = runsToCsv(
+      [
+        run({
+          run_id: "a",
+          created_at: "2026-05-16T11:00:00Z",
+          status: "succeeded",
+          prompt: "hello",
+          playbook: {
+            title: "Hi",
+            domain: "math",
+            steps: [{} as never, {} as never],
+          } as never,
+        }),
+      ],
+      { includePrompt: true },
+    );
     const lines = csv.split("\n");
     expect(lines[0]).toBe("created_at,title,domain,status,steps,prompt");
     expect(lines[1]).toBe("2026-05-16T11:00:00Z,Hi,math,succeeded,2,hello");
   });
 
   it("escapes fields that contain commas / quotes / newlines", () => {
-    const csv = runsToCsv([
-      run({
-        run_id: "a",
-        created_at: "2026-05-16T11:00:00Z",
-        status: "succeeded",
-        prompt: 'hello, "world"\nnext line',
-        playbook: { title: "T", domain: "math", steps: [] } as never,
-      }),
-    ]);
+    const csv = runsToCsv(
+      [
+        run({
+          run_id: "a",
+          created_at: "2026-05-16T11:00:00Z",
+          status: "succeeded",
+          prompt: 'hello, "world"\nnext line',
+          playbook: { title: "T", domain: "math", steps: [] } as never,
+        }),
+      ],
+      { includePrompt: true },
+    );
     const data = csv.split("\n").slice(1).join("\n");
     expect(data).toContain('"hello, ""world""');
   });

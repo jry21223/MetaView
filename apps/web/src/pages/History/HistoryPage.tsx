@@ -234,7 +234,12 @@ export function HistoryPage({
   };
 
   const handleExportCsv = () => {
-    const csv = runsToCsv(filtered);
+    // Issue #64: prompts may contain PII (pasted source, names, emails).
+    // Make sharing them an explicit confirmation step before we serialize.
+    const includePrompt = window.confirm(
+      "导出 CSV 时是否包含原始 prompt？\n勾选 “确定” 包含 prompt（可能含敏感信息），“取消” 仅导出元数据。",
+    );
+    const csv = runsToCsv(filtered, { includePrompt });
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

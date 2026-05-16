@@ -97,26 +97,38 @@ export function computeHistoryStats(runs: PipelineRunResult[]): HistoryStats {
   };
 }
 
+export interface RunsToCsvOptions {
+  /** When true the original prompt column is included — opt-in because the
+   *  prompt may contain PII (user-pasted source code, names, emails). Issue
+   *  #64. Defaults to false so a user has to explicitly enable export. */
+  includePrompt?: boolean;
+}
+
 /**
  * Build a CSV string from the given runs. Quotes any field that contains
  * comma / quote / newline; values use Excel-compatible RFC 4180 escaping.
+ *
+ * ``includePrompt`` defaults to false to avoid exporting potentially
+ * sensitive user prompts in a shareable file. Issue #64.
  */
-export function runsToCsv(runs: PipelineRunResult[]): string {
-  const header = ["created_at", "title", "domain", "status", "steps", "prompt"];
+export function runsToCsv(
+  runs: PipelineRunResult[],
+  options: RunsToCsvOptions = {},
+): string {
+  const includePrompt = options.includePrompt === true;
+  const header = ["created_at", "title", "domain", "status", "steps"];
+  if (includePrompt) header.push("prompt");
   const lines = [header.join(",")];
   for (const run of runs) {
-    lines.push(
-      [
-        run.created_at,
-        run.playbook?.title ?? "",
-        run.playbook?.domain ?? "",
-        run.status,
-        String(run.playbook?.steps?.length ?? ""),
-        run.prompt ?? "",
-      ]
-        .map(csvEscape)
-        .join(","),
-    );
+    const row = [
+      run.created_at,
+      run.playbook?.title ?? "",
+      run.playbook?.domain ?? "",
+      run.status,
+      String(run.playbook?.steps?.length ?? ""),
+    ];
+    if (includePrompt) row.push(run.prompt ?? "");
+    lines.push(row.map(csvEscape).join(","));
   }
   return lines.join("\n");
 }
