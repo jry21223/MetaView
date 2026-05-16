@@ -89,6 +89,9 @@ export interface UseTTSResult {
   supported: boolean;
   config: TTSConfig;
   updateConfig: (patch: Partial<TTSConfig>) => void;
+  /** Set the current playbook domain so AUTO-voice can resolve correctly when
+   *  ``speak`` is called without an explicit ``voice``. (Issue #52.) */
+  setDomain: (domain: string | undefined) => void;
   /** Read current cache stats (hit/miss counts, byte usage). Useful for debugging. */
   cacheStats: () => TTSCacheStats;
   /** Manually clear the shared TTS audio cache. */
@@ -101,6 +104,10 @@ export function useTTS(): UseTTSResult {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const audioSrcRef = useRef<AudioBufferSourceNode | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Latest playbook domain (e.g. "math", "algorithm"). Held in a ref so
+  // ``speak``'s callback identity stays stable across domain changes while
+  // still resolving voice with up-to-date context. (Issue #52.)
+  const domainRef = useRef<string | undefined>(undefined);
 
   const supported =
     typeof window !== "undefined" &&
@@ -231,10 +238,10 @@ export function useTTS(): UseTTSResult {
       if (!trimmed) return;
       const normalized = isSSML(trimmed) ? normalizeSSML(trimmed) : trimmed;
       const rate = options?.rate ?? config.rate;
-      // When caller doesn't pass a voice, defer to resolveVoice (without domain context,
-      // AUTO collapses to the default "alloy"). Callers that know the domain should
-      // resolve voice themselves via resolveVoice(config.voice, domain) and pass it in.
-      const voice = options?.voice ?? resolveVoice(config.voice, undefined);
+      // When caller doesn't pass a voice, resolve through the latest known
+      // domain so AUTO-voice picks the right per-subject mapping
+      // (e.g. math → echo, chemistry → shimmer). See issue #52.
+      const voice = options?.voice ?? resolveVoice(config.voice, domainRef.current);
       if (config.backend === "openai") {
         void speakOpenAI(normalized, rate, voice);
       } else {
@@ -243,6 +250,10 @@ export function useTTS(): UseTTSResult {
     },
     [config.backend, config.rate, config.voice, speakOpenAI, speakSystem],
   );
+
+  const setDomain = useCallback((domain: string | undefined) => {
+    domainRef.current = domain;
+  }, []);
 
   const toggle = useCallback(() => {
     setConfig((prev) => {
@@ -296,6 +307,7 @@ export function useTTS(): UseTTSResult {
     supported,
     config,
     updateConfig,
+    setDomain,
     cacheStats,
     clearCache,
   };

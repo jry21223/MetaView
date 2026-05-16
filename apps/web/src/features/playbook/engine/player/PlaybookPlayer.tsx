@@ -332,6 +332,11 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   const hasDomainPanel = getParamPanel(baseScript.domain) !== null;
 
   const tts = useTTS();
+  // Push the playbook domain into useTTS so AUTO-voice resolution still
+  // works when callers omit options.voice. See issue #52.
+  useEffect(() => {
+    tts.setDomain(script.domain);
+  }, [tts, script.domain]);
 
   const {
     currentStepIndex,
