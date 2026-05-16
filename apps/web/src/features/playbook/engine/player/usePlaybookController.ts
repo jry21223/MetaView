@@ -109,7 +109,12 @@ export function usePlaybookController(
     return () => {
       player.removeEventListener("timeupdate", handler);
     };
-  });
+    // Only re-register when the script timeline changes — previous/step/gate
+    // state already flows through refs (see useLayoutEffect above), so the
+    // handler closure stays valid across re-renders. Without these deps the
+    // effect re-fired every frame, churning addEventListener at 30+ fps.
+    // (Issue #50.)
+  }, [script.steps, playerRef]);
 
   // Resume playback when TTS finishes the previous step's voiceover.
   // Skipped in step-through mode (each step always pauses) and when there is
