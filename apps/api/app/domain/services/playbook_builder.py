@@ -42,10 +42,39 @@ _DEFAULT_FPS = 30
 _DEFAULT_STEP_FRAMES = 60  # 2 s at 30 fps
 
 # Whitelist for math-plot expressions: digits, identifiers (variables/functions),
-# arithmetic operators, parentheses, comma and whitespace. Anything else is
-# treated as untrusted and the curve is dropped (defence against the LLM
-# emitting non-expression text into the plot field).
-_SAFE_EXPR_RE = re.compile(r"^[0-9A-Za-z_+\-*/^%(). ,]+$")
+# arithmetic operators, parentheses, comma and whitespace, plus a curated set
+# of Unicode math glyphs and Greek letters that appear in real Chinese
+# coursework. Anything else is treated as untrusted and the curve is dropped
+# (defence against the LLM emitting non-expression text into the plot field).
+# Issues #48 / #55: the previous ASCII-only allowlist silently dropped legit
+# expressions like ``√(x^2+1)`` and ``∂y/∂x``, leaving the user staring at an
+# empty formula card.
+_UNICODE_MATH_CHARS = (
+    "√∫∂∑∏∞"  # radicals / calculus / sums / infinity
+    "πθαβγδεζηικλμνξορστυφχψω"  # Greek (lower)
+    "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ"  # Greek (upper)
+)
+_SAFE_EXPR_RE = re.compile(
+    rf"^[0-9A-Za-z_+\-*/^%(). ,{_UNICODE_MATH_CHARS}]+$"
+)
+
+# LLMs prompted in Chinese occasionally leak a stray full-width punctuation
+# character into the expression field (e.g. ``x^2）``). Normalize the common
+# offenders to their ASCII equivalents before the whitelist check so the
+# curve is salvaged instead of silently dropped.
+_FULL_WIDTH_NORMALIZE = str.maketrans({
+    "（": "(",
+    "）": ")",
+    "，": ",",
+    "．": ".",
+    "－": "-",
+    "＋": "+",
+    "×": "*",
+    "÷": "/",
+    "％": "%",
+    "＾": "^",
+    "　": " ",  # ideographic space
+})
 
 
 def _infer_algorithm_id(title: str, execution_map: ExecutionMap | None = None) -> str | None:
@@ -415,7 +444,7 @@ def _sanitize_expression(expression: str | None) -> str | None:
     """Return a trimmed expression if it passes the safe-character whitelist."""
     if not expression:
         return None
-    text = expression.strip()
+    text = expression.strip().translate(_FULL_WIDTH_NORMALIZE)
     if not text or len(text) > 200 or not _SAFE_EXPR_RE.match(text):
         return None
     return text

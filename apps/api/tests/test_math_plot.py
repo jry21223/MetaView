@@ -130,3 +130,45 @@ class TestMathPlotSnapshot:
         snap = build_playbook(cir, execution_map=None).steps[0].snapshot
         assert isinstance(snap, MathPlotSnapshot)
         assert snap.curves[0].expression == "0.5*exp(-x^2) + sin(x)/2 - abs(x)"
+
+
+class TestSanitizeExpression:
+    """Regression coverage for issues #48 / #55 — Unicode math symbols and
+    Chinese full-width punctuation must no longer cause silent curve drops."""
+
+    @pytest.mark.parametrize(
+        "expr",
+        [
+            "√(x^2 + 1)",         # √ (radical sign)
+            "∫ sin(x) dx",        # ∫ (integral)
+            "∂y/∂x",              # ∂ (partial derivative)
+            "θ + π/2",            # Greek lower-case
+            "Σ x_i",              # Greek upper-case sigma
+            "∞ - x",              # ∞ (infinity)
+        ],
+    )
+    def test_unicode_math_symbols_pass_whitelist(self, expr):
+        cir = _math_cir(PlotSpec(curves=[PlotCurveSpec(expression=expr)]))
+        snap = build_playbook(cir, execution_map=None).steps[0].snapshot
+        assert isinstance(snap, MathPlotSnapshot), f"expected MathPlot for {expr!r}"
+        assert snap.curves[0].expression == expr.strip()
+
+    def test_full_width_parens_normalized_to_ascii(self):
+        cir = _math_cir(PlotSpec(curves=[PlotCurveSpec(expression="x^2）")]))
+        snap = build_playbook(cir, execution_map=None).steps[0].snapshot
+        assert isinstance(snap, MathPlotSnapshot)
+        assert snap.curves[0].expression == "x^2)"
+
+    def test_mixed_full_width_punctuation_normalized(self):
+        cir = _math_cir(
+            PlotSpec(curves=[PlotCurveSpec(expression="（x，2）")])
+        )
+        snap = build_playbook(cir, execution_map=None).steps[0].snapshot
+        assert isinstance(snap, MathPlotSnapshot)
+        assert snap.curves[0].expression == "(x,2)"
+
+    def test_chinese_sentence_still_rejected(self):
+        cir = _math_cir(PlotSpec(curves=[PlotCurveSpec(expression="这是一个公式")]))
+        snap = build_playbook(cir, execution_map=None).steps[0].snapshot
+        # All curves dropped → degrade to MathFormulaSnapshot fallback.
+        assert isinstance(snap, MathFormulaSnapshot)
