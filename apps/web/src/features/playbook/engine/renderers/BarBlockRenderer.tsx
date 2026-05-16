@@ -10,6 +10,7 @@ import {
   DEFAULT_SWAP_FRAMES,
 } from "./animationTemplates";
 import { buildPrevIndexMap } from "./prevIndexMap";
+import { THEME_PALETTE } from "../../../../shared/config/themePalette";
 
 /**
  * Theme-reactive palette built on the app's CSS variables (see
@@ -19,38 +20,32 @@ import { buildPrevIndexMap } from "./prevIndexMap";
  * paint time against the live root vars.
  *
  * Theme-specific fallbacks keep server-rendered markup (tests, exports) from
- * collapsing to transparent when CSS vars aren't yet applied. Values are kept
- * subdued and aligned with the rest of the studio surface.
+ * collapsing to transparent when CSS vars aren't yet applied. Issue #56:
+ * values that map onto a CSS var read from the shared THEME_PALETTE so we
+ * can't drift away from the browser-resolved colors; renderer-only values
+ * (outline / shadow rgba) stay inline.
  */
+function buildFallbacks(theme: "dark" | "light") {
+  const p = THEME_PALETTE[theme];
+  return {
+    bg: p.surface2,
+    text: p.ink,
+    label: p.ink2,
+    narration: p.ink3,
+    barBase: p.line2,
+    barAccent: p.accent,
+    floor: p.line,
+    warn: p.warn,
+    accentShadow: p.accentSoft,
+    barOutline: theme === "dark" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
+    swapShadow: theme === "dark" ? "rgba(233,162,59,0.35)" : "rgba(233,162,59,0.30)",
+    barShadow: theme === "dark" ? "rgba(0,0,0,0.35)" : "rgba(0,0,0,0.12)",
+  } as const;
+}
+
 const FALLBACKS = {
-  dark: {
-    bg: "#0e1412",
-    text: "#e8efe9",
-    label: "#9ba8a0",
-    narration: "#5b6862",
-    barBase: "#27332c",
-    barAccent: "#10b981",
-    barOutline: "rgba(255,255,255,0.06)",
-    floor: "#27332c",
-    warn: "#e9a23b",
-    swapShadow: "rgba(233,162,59,0.35)",
-    accentShadow: "rgba(16,185,129,0.30)",
-    barShadow: "rgba(0,0,0,0.35)",
-  },
-  light: {
-    bg: "#faf8f3",
-    text: "#161a18",
-    label: "#5d655f",
-    narration: "#9aa39d",
-    barBase: "#d6d1c2",
-    barAccent: "#10b981",
-    barOutline: "rgba(0,0,0,0.05)",
-    floor: "#d6d1c2",
-    warn: "#e9a23b",
-    swapShadow: "rgba(233,162,59,0.30)",
-    accentShadow: "rgba(16,185,129,0.25)",
-    barShadow: "rgba(0,0,0,0.12)",
-  },
+  dark: buildFallbacks("dark"),
+  light: buildFallbacks("light"),
 } as const;
 
 const VAR = {

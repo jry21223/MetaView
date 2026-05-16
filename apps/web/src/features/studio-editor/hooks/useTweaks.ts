@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { THEME_PALETTE } from '../../../shared/config/themePalette';
 
 export interface TweakValues {
   theme: 'dark' | 'light';
@@ -15,7 +16,7 @@ export interface TweakValues {
 
 export const TWEAK_DEFAULTS: TweakValues = {
   theme: 'dark',
-  accent: '#10b981',
+  accent: THEME_PALETTE.dark.accent,
   layout: 'drawer',
   leftRatio: 22,
   paramsHeight: 32,
@@ -28,19 +29,20 @@ export const TWEAK_DEFAULTS: TweakValues = {
 
 export function themeVars(t: TweakValues): Record<string, string> {
   const dark = t.theme === 'dark';
+  const p = THEME_PALETTE[t.theme];
   return {
     '--bg': dark ? '#0b0f0d' : '#f4f1ea',
     '--bg-2': dark ? '#10161310' : '#ffffff',
     '--surface': dark ? '#11171580' : '#ffffff',
-    '--surface-2': dark ? '#0e1412' : '#faf8f3',
-    '--ink': dark ? '#e8efe9' : '#161a18',
-    '--ink-2': dark ? '#9ba8a0' : '#5d655f',
-    '--ink-3': dark ? '#5b6862' : '#9aa39d',
-    '--line': dark ? '#1d2a23' : '#e6e2d5',
-    '--line-2': dark ? '#27332c' : '#d6d1c2',
+    '--surface-2': p.surface2,
+    '--ink': p.ink,
+    '--ink-2': p.ink2,
+    '--ink-3': p.ink3,
+    '--line': p.line,
+    '--line-2': p.line2,
     '--accent': t.accent,
     '--accent-soft': t.accent + '26',
-    '--warn': '#e9a23b',
+    '--warn': p.warn,
     '--radius': '14px',
     '--radius-sm': '10px',
   };
