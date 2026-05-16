@@ -55,6 +55,21 @@ function cleanMathParams(params: Record<string, number> | undefined): Record<str
   return entries.length > 0 ? Object.fromEntries(entries) : null;
 }
 
+/**
+ * Convert a replay snapshot's array values to the ``number[]`` shape needed by
+ * an ``algorithm_bars`` step. Returns ``null`` when the replay carries string
+ * values that don't parse cleanly to numbers (e.g. ``"x"``, ``"N/A"``) — the
+ * caller must then keep the base snapshot, otherwise the bar chart silently
+ * collapses to zero-height bars. See issue #41.
+ */
+export function coerceToBarValues(
+  snap: AlgorithmArraySnapshot | AlgorithmBarsSnapshot,
+): number[] | null {
+  if (snap.kind === "algorithm_bars") return snap.numeric_values;
+  const mapped = snap.array_values.map(Number);
+  return mapped.some((value) => !Number.isFinite(value)) ? null : mapped;
+}
+
 function applyAlgorithmArrayOverride(base: PlaybookScript, newArray: string[] | undefined): PlaybookScript {
   const replay = getReplay(base.algorithm_id);
   if (!replay) return base;
@@ -92,10 +107,13 @@ function applyAlgorithmArrayOverride(base: PlaybookScript, newArray: string[] | 
       return { ...step, ...stepOverrides, snapshot: newSnapshot };
     }
     if (baseSnap.kind === "algorithm_bars") {
-      const numeric_values =
-        r.snapshot.kind === "algorithm_bars"
-          ? r.snapshot.numeric_values
-          : r.snapshot.array_values.map(Number);
+      const numeric_values = coerceToBarValues(r.snapshot);
+      if (numeric_values === null) {
+        // Replay returned non-numeric strings — keeping the base snapshot
+        // preserves the user's initial bar chart instead of collapsing every
+        // bar to NaN-driven zero height. See issue #41.
+        return step;
+      }
       const newSnapshot: AlgorithmBarsSnapshot = { ...baseSnap, ...common, numeric_values };
       return { ...step, ...stepOverrides, snapshot: newSnapshot };
     }

@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
-import type { MathPlotSnapshot, PlaybookScript } from "../types";
-import { applyMathPlotOverride, resolveScript } from "./useResolvedScript";
+import type {
+  AlgorithmArraySnapshot,
+  AlgorithmBarsSnapshot,
+  MathPlotSnapshot,
+  PlaybookScript,
+} from "../types";
+import {
+  applyMathPlotOverride,
+  coerceToBarValues,
+  resolveScript,
+} from "./useResolvedScript";
 
 function script(): PlaybookScript {
   return {
@@ -97,5 +106,52 @@ describe("applyMathPlotOverride", () => {
     });
     // Same reference because no math_plot step needed updating.
     expect(result).toBe(base);
+  });
+});
+
+describe("coerceToBarValues (issue #41)", () => {
+  function arraySnap(values: string[]): AlgorithmArraySnapshot {
+    return {
+      kind: "algorithm_array",
+      array_values: values,
+      active_indices: [],
+      swap_indices: [],
+      sorted_indices: [],
+      pointers: {},
+    };
+  }
+
+  function barsSnap(values: number[]): AlgorithmBarsSnapshot {
+    return {
+      kind: "algorithm_bars",
+      array_values: values.map(String),
+      numeric_values: values,
+      active_indices: [],
+      swap_indices: [],
+      sorted_indices: [],
+      pointers: {},
+    };
+  }
+
+  it("returns numeric_values verbatim when the snapshot is already algorithm_bars", () => {
+    expect(coerceToBarValues(barsSnap([3, 1, 4]))).toEqual([3, 1, 4]);
+  });
+
+  it("parses numeric strings to numbers for algorithm_array snapshots", () => {
+    expect(coerceToBarValues(arraySnap(["5", "3", "8", "1"]))).toEqual([5, 3, 8, 1]);
+  });
+
+  it("returns null when any element fails to parse (would have been NaN)", () => {
+    expect(coerceToBarValues(arraySnap(["5", "x", "8"]))).toBeNull();
+    expect(coerceToBarValues(arraySnap(["N/A", "1"]))).toBeNull();
+    expect(coerceToBarValues(arraySnap(["", "1"]))).toEqual([0, 1]); // "" → 0 is Number's well-defined behavior
+  });
+
+  it("treats Infinity-producing strings as invalid (Number.isFinite check)", () => {
+    expect(coerceToBarValues(arraySnap(["Infinity", "1"]))).toBeNull();
+  });
+
+  it("handles an empty array without producing NaN", () => {
+    expect(coerceToBarValues(arraySnap([]))).toEqual([]);
   });
 });
