@@ -77,9 +77,14 @@ export function interpolatePhases(
 ): number {
   if (phases.length === 0) return keyframes[0] ?? 0;
   if (keyframes.length !== phases.length + 1) {
-    throw new Error(
-      `interpolatePhases: keyframes.length (${keyframes.length}) must equal phases.length + 1 (${phases.length + 1})`,
+    // Don't crash the player when an animation template ships a mismatched
+    // (phases, keyframes) pair — log once and fall back to the first keyframe
+    // so the affected snapshot freezes on its initial value instead of
+    // taking the whole composition down. See issue #54.
+    console.warn(
+      `interpolatePhases: keyframes.length (${keyframes.length}) must equal phases.length + 1 (${phases.length + 1}); returning fallback`,
     );
+    return keyframes[0] ?? 0;
   }
   const totalFrames = phases.reduce((acc, p) => acc + p.frames, 0);
   if (elapsed <= 0) return keyframes[0];
