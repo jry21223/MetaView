@@ -9,6 +9,7 @@ from app.domain.models.cir import (
     CirStep,
     ExecutionCheckpoint,
     ExecutionMap,
+    LayerKind,
     VisualKind,
 )
 from app.domain.models.playbook import (
@@ -300,9 +301,6 @@ def _build_layer_body(
     body field missing) so the caller can drop it without failing the whole
     playbook build.
     """
-
-    from app.domain.models.cir import LayerKind  # local import to avoid cycle at import-time
-
     kind = spec.kind
     if kind == LayerKind.MATH_SCENE:
         if spec.scene is None:
