@@ -11,6 +11,7 @@ import {
 import { autoYBounds, fmtNum, niceTicks, padRange } from "../../../../shared/lib/plotMath";
 import { sanitizeKatex } from "../../../../shared/lib/sanitizeKatex";
 import { THEME_PALETTE } from "../../../../shared/config/themePalette";
+import { MATH_PLOT } from "../../../../shared/config/constants";
 import { clamp01 } from "../foundation";
 
 // ── Theme ──────────────────────────────────────────────────────────────────
@@ -97,7 +98,7 @@ const SVG_H = 560;
 const MARGIN = { top: 20, right: 28, bottom: 40, left: 56 };
 const PLOT_W = SVG_W - MARGIN.left - MARGIN.right;
 const PLOT_H = SVG_H - MARGIN.top - MARGIN.bottom;
-const SAMPLES = 360;
+const SAMPLES = MATH_PLOT.CURVE_SAMPLES;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 

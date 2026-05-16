@@ -15,3 +15,14 @@ export const PLAYBOOK_LAYOUT = {
   /** Frames for subtitle fade-in at the start of each step */
   SUBTITLE_FADE_FRAMES: 6,
 } as const;
+
+/**
+ * Math-plot rendering knobs. Pulled out of MathPlotRenderer (issue #63)
+ * so they're configurable from one place — bumping CURVE_SAMPLES sharpens
+ * curves at the cost of polyline size; the export pipeline can override
+ * these per-render in the future.
+ */
+export const MATH_PLOT = {
+  /** Points sampled along each curve across [x_min, x_max]. */
+  CURVE_SAMPLES: 360,
+} as const;
