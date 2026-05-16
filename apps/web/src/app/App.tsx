@@ -71,6 +71,15 @@ export function App() {
             onNavigate={setStage}
             isProviderConfigured={isConfigured}
             onOpenProviderSettings={openProviderSettings}
+            onRerun={async (prompt) => {
+              await submit(
+                prompt,
+                undefined,
+                undefined,
+                isConfigured ? providerSettings : undefined,
+              );
+              setStage('workbench');
+            }}
           />
         </ErrorBoundary>
       )}
