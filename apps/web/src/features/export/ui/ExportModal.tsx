@@ -43,6 +43,10 @@ const FORMAT_OPTIONS: Array<{ id: ExportFormat; label: string }> = [
 
 const FPS_OPTIONS = [15, 30, 60] as const;
 const POLL_INTERVAL_MS = 1500;
+/** Walk-away ceiling for the poll loop. A 10-minute render is a hard upper
+ *  bound for the studio use case; past that we stop polling and surface
+ *  a timeout error rather than burning network forever. Issue #59. */
+const POLL_TIMEOUT_MS = 10 * 60 * 1000;
 
 function formatElapsed(ms: number): string {
   const total = Math.max(0, Math.round(ms / 1000));
@@ -98,7 +102,14 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   }, [isWorking]);
 
   const pollUntilDone = (jobId: string): void => {
+    const deadline = Date.now() + POLL_TIMEOUT_MS;
     const tick = async () => {
+      // Issue #59: stop polling once the deadline passes — a server-side
+      // hang would otherwise have us hitting the proxy every 1.5s forever.
+      if (Date.now() > deadline) {
+        setError("导出超时（10 分钟）— 请稍后到历史页查看，或重试");
+        return;
+      }
       try {
         const next = await getExportStatus(jobId);
         setJob(next);
@@ -110,6 +121,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     };
     pollTimer.current = window.setTimeout(tick, POLL_INTERVAL_MS);
   };
+
 
   const handleSubmit = async () => {
     if (!runId) return;
