@@ -9,9 +9,12 @@ export type ExportJobStatus =
   | "failed";
 
 export interface ExportTtsConfig {
-  api_key: string;
-  base_url: string;
-  model: string;
+  // Issue #40: api_key / base_url / model are now server-side defaults; we
+  // only forward the user-chosen voice. The fields remain optional so
+  // long-lived deployments that still ship a key keep working.
+  api_key?: string;
+  base_url?: string;
+  model?: string;
   voice: string;
 }
 

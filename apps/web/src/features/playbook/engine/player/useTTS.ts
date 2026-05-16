@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { API_BASE_URL } from "../../../../shared/config/constants";
 import { isSSML, normalizeSSML } from "./ssml";
 import { sharedTTSCache, ttsCacheKey, type TTSCacheStats } from "./ttsCache";
 
 export interface TTSConfig {
   enabled: boolean;
+  /** ``system`` uses ``window.speechSynthesis``; ``openai`` routes through
+   *  the backend ``/api/v1/tts/speech`` proxy (issue #40) so we never store
+   *  third-party API keys in localStorage. */
   backend: "system" | "openai";
-  apiKey: string;
-  baseUrl: string;
-  model: string;
   /** "auto" = follow domain mapping; otherwise an explicit voice id */
   voice: string;
   rate: number;
@@ -50,21 +51,36 @@ export function resolveVoice(configVoice: string, domain: string | undefined): s
 const DEFAULT_CONFIG: TTSConfig = {
   enabled: false,
   backend: "system",
-  apiKey: "",
-  baseUrl: "https://api.openai.com/v1",
-  model: "tts-1",
   voice: "alloy",
   rate: 1.0,
 };
+
+const TTS_PROXY_ENDPOINT = `${API_BASE_URL}/api/v1/tts/speech`;
+
+/**
+ * Trim a parsed config object to the fields we currently persist. Older
+ * builds (pre-issue #40) stored ``apiKey`` / ``baseUrl`` / ``model``; this
+ * filter migrates those entries silently the next time we save. Issue #40.
+ */
+function sanitizeStoredConfig(parsed: unknown): Partial<TTSConfig> {
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return {};
+  }
+  const raw = parsed as Record<string, unknown>;
+  const out: Partial<TTSConfig> = {};
+  if (typeof raw.enabled === "boolean") out.enabled = raw.enabled;
+  if (raw.backend === "system" || raw.backend === "openai") out.backend = raw.backend;
+  if (typeof raw.voice === "string") out.voice = raw.voice;
+  if (typeof raw.rate === "number" && Number.isFinite(raw.rate)) out.rate = raw.rate;
+  return out;
+}
 
 function loadConfig(): TTSConfig {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed: unknown = JSON.parse(raw);
-      if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
-        return { ...DEFAULT_CONFIG, ...(parsed as Partial<TTSConfig>) };
-      }
+      return { ...DEFAULT_CONFIG, ...sanitizeStoredConfig(parsed) };
     }
   } catch {
     // ignore corrupt storage
@@ -74,11 +90,21 @@ function loadConfig(): TTSConfig {
 
 function saveConfig(cfg: TTSConfig): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
+    // Persist only the sanitized shape so we don't accidentally re-introduce
+    // legacy fields. Issue #40.
+    const safe: TTSConfig = {
+      enabled: cfg.enabled,
+      backend: cfg.backend,
+      voice: cfg.voice,
+      rate: cfg.rate,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(safe));
   } catch {
     // ignore quota errors
   }
 }
+
+export const __testing = { sanitizeStoredConfig, TTS_PROXY_ENDPOINT };
 
 export interface UseTTSResult {
   enabled: boolean;
@@ -174,8 +200,6 @@ export function useTTS(): UseTTSResult {
 
   const speakOpenAI = useCallback(
     async (text: string, rate: number, voice: string) => {
-      if (!config.apiKey.trim()) return;
-
       abortRef.current?.abort();
       const ac = new AbortController();
       abortRef.current = ac;
@@ -188,13 +212,10 @@ export function useTTS(): UseTTSResult {
       audioSrcRef.current = null;
       setSpeaking(true);
 
-      const key = ttsCacheKey({
-        baseUrl: config.baseUrl,
-        model: config.model,
-        voice,
-        rate,
-        text,
-      });
+      // Issue #40: cache key no longer mixes in user-supplied baseUrl/model —
+      // the backend proxy owns both — so the key fingerprints exactly the
+      // synthesis-shaping inputs the client controls.
+      const key = ttsCacheKey({ voice, rate, text });
       const cached = sharedTTSCache.get(key);
       if (cached) {
         try {
@@ -208,17 +229,14 @@ export function useTTS(): UseTTSResult {
       }
 
       try {
-        const res = await fetch(`${config.baseUrl}/audio/speech`, {
+        const res = await fetch(TTS_PROXY_ENDPOINT, {
           method: "POST",
           signal: ac.signal,
-          headers: {
-            Authorization: `Bearer ${config.apiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ model: config.model, input: text, voice, speed: rate }),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, voice, rate }),
         });
         if (ac.signal.aborted) return;
-        if (!res.ok) throw new Error(`TTS API ${res.status}`);
+        if (!res.ok) throw new Error(`TTS proxy ${res.status}`);
 
         const buf = await res.arrayBuffer();
         if (ac.signal.aborted) return;
@@ -229,7 +247,7 @@ export function useTTS(): UseTTSResult {
         setSpeaking(false);
       }
     },
-    [config.apiKey, config.baseUrl, config.model, playArrayBuffer],
+    [playArrayBuffer],
   );
 
   const speak = useCallback(

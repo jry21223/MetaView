@@ -142,38 +142,23 @@ const TTSConfigPopover: React.FC<TTSPopoverProps> = ({ config, onUpdate, onClose
         </div>
       </div>
 
-      {/* OpenAI-specific fields */}
+      {/* OpenAI backend now routes through the server-side proxy
+         (POST /api/v1/tts/speech) so the player never stores an API key.
+         The Base URL / Model / Key inputs that used to live here are gone
+         on purpose — issue #40. */}
       {config.backend === "openai" && (
-        <>
-          {(
-            [
-              { key: "apiKey", label: "API Key", type: "password", placeholder: "sk-…" },
-              { key: "baseUrl", label: "Base URL", type: "text", placeholder: "https://api.openai.com/v1" },
-              { key: "model", label: "Model", type: "text", placeholder: "tts-1" },
-            ] as const
-          ).map(({ key, label, type, placeholder }) => (
-            <div key={key}>
-              <div style={{ fontSize: 11, color: muted, marginBottom: 3 }}>{label}</div>
-              <input
-                type={type}
-                value={config[key]}
-                onChange={(e) => onUpdate({ [key]: e.target.value } as Partial<TTSConfig>)}
-                placeholder={placeholder}
-                style={{
-                  width: "100%",
-                  padding: "5px 8px",
-                  background: inputBg,
-                  border: `1px solid ${border}`,
-                  borderRadius: 5,
-                  color: text,
-                  fontSize: 12,
-                  outline: "none",
-                  boxSizing: "border-box",
-                }}
-              />
-            </div>
-          ))}
-        </>
+        <div
+          style={{
+            fontSize: 11,
+            color: muted,
+            padding: "6px 8px",
+            border: `1px dashed ${border}`,
+            borderRadius: 5,
+            lineHeight: 1.45,
+          }}
+        >
+          通过服务端代理调用，API Key 由管理员在后端配置（METAVIEW_TTS_API_KEY）。
+        </div>
       )}
 
       {/* Voice picker (OpenAI only) */}

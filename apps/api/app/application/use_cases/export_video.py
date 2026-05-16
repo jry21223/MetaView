@@ -118,6 +118,21 @@ class ExportVideoUseCase:
         tts: TtsConfig,
         audio_dir: Path,
     ) -> list[str]:
+        # Issue #40: fall back to server-side TTS settings when the caller
+        # omits api_key / base_url / model so the client never has to ship a
+        # secret. The playback path already routes through /api/v1/tts/speech
+        # for the same reason.
+        from app.config import get_settings
+
+        settings = get_settings()
+        api_key = (tts.api_key or settings.tts_api_key or settings.openai_api_key or "").strip()
+        if not api_key:
+            raise RuntimeError(
+                "TTS not configured: set METAVIEW_TTS_API_KEY (or pass tts.api_key)"
+            )
+        base_url = (tts.base_url or settings.tts_base_url).rstrip("/")
+        model = tts.model or settings.tts_model
+
         steps = playbook.get("steps", [])
         files: list[str] = []
         async with httpx.AsyncClient(timeout=120.0) as client:
@@ -128,13 +143,13 @@ class ExportVideoUseCase:
                     continue
                 audio_path = audio_dir / f"step_{i:03d}.mp3"
                 resp = await client.post(
-                    f"{tts.base_url.rstrip('/')}/audio/speech",
+                    f"{base_url}/audio/speech",
                     headers={
-                        "Authorization": f"Bearer {tts.api_key}",
+                        "Authorization": f"Bearer {api_key}",
                         "Content-Type": "application/json",
                     },
                     json={
-                        "model": tts.model,
+                        "model": model,
                         "voice": tts.voice,
                         "input": text,
                         "format": "mp3",

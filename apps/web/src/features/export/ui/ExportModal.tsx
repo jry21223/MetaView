@@ -56,21 +56,18 @@ export const ExportModal: React.FC<ExportModalProps> = ({ runId, isDark, onClose
     setError(null);
     setSubmitting(true);
     try {
-      if (withAudio && (tts.config.backend !== "openai" || !tts.config.apiKey)) {
+      if (withAudio && tts.config.backend !== "openai") {
         throw new Error(
-          "含配音导出需要在 TTS 设置中切换到 OpenAI 后端并填写 API Key（系统语音不支持服务端渲染）",
+          "含配音导出需要在 TTS 设置中切换到 OpenAI 后端（系统语音不支持服务端渲染）。API Key 由后端配置。",
         );
       }
       const body = {
         run_id: runId,
         with_audio: withAudio,
+        // Issue #40: api_key / base_url / model now come from server-side
+        // METAVIEW_TTS_* settings; we forward only the user-chosen voice.
         ...(withAudio && {
-          tts: {
-            api_key: tts.config.apiKey,
-            base_url: tts.config.baseUrl,
-            model: tts.config.model || "tts-1",
-            voice: tts.config.voice || "alloy",
-          },
+          tts: { voice: tts.config.voice || "alloy" },
         }),
       };
       const created = await submitExport(body);

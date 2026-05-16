@@ -47,6 +47,16 @@ class Settings(BaseSettings):
     export_web_app_dir: str = "apps/web"
     export_artifacts_dir: str = "data/exports"
 
+    # TTS proxy (issue #40) — the player no longer stores an OpenAI key in
+    # localStorage. ``tts_api_key`` falls back to ``openai_api_key`` so a
+    # single env var still works for hobby setups; production deployments can
+    # split them and apply tighter quotas to TTS.
+    tts_api_key: str | None = None
+    tts_base_url: str = "https://api.openai.com/v1"
+    tts_model: str = "tts-1"
+    tts_default_voice: str = "alloy"
+    tts_timeout_s: float = 60.0
+
     # OpenAI-compatible provider
     openai_api_key: str | None = None
     openai_base_url: str = "https://api.openai.com/v1"

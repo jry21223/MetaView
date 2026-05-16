@@ -7,17 +7,17 @@ function buf(size: number): ArrayBuffer {
 
 describe("ttsCacheKey", () => {
   it("normalizes rate to 2 decimals", () => {
-    const a = ttsCacheKey({ baseUrl: "u", model: "m", voice: "v", rate: 1, text: "t" });
-    const b = ttsCacheKey({ baseUrl: "u", model: "m", voice: "v", rate: 1.0, text: "t" });
-    const c = ttsCacheKey({ baseUrl: "u", model: "m", voice: "v", rate: 1.005, text: "t" });
+    const a = ttsCacheKey({ voice: "v", rate: 1, text: "t" });
+    const b = ttsCacheKey({ voice: "v", rate: 1.0, text: "t" });
+    const c = ttsCacheKey({ voice: "v", rate: 1.005, text: "t" });
     expect(a).toBe(b);
     expect(a).toBe(c);
   });
 
   it("distinguishes by voice and text", () => {
-    const a = ttsCacheKey({ baseUrl: "u", model: "m", voice: "alloy", rate: 1, text: "hi" });
-    const b = ttsCacheKey({ baseUrl: "u", model: "m", voice: "echo", rate: 1, text: "hi" });
-    const c = ttsCacheKey({ baseUrl: "u", model: "m", voice: "alloy", rate: 1, text: "hello" });
+    const a = ttsCacheKey({ voice: "alloy", rate: 1, text: "hi" });
+    const b = ttsCacheKey({ voice: "echo", rate: 1, text: "hi" });
+    const c = ttsCacheKey({ voice: "alloy", rate: 1, text: "hello" });
     expect(a).not.toBe(b);
     expect(a).not.toBe(c);
   });

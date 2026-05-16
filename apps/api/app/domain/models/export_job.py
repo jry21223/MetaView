@@ -17,14 +17,15 @@ class ExportJobStatus(str, Enum):
 class TtsConfig(BaseModel):
     """Caller-supplied TTS provider config (LLM provider config is unrelated).
 
-    Required when ``with_audio=True``. Backend uses an OpenAI-compatible TTS
-    endpoint (POST {base_url}/audio/speech). Voice/model defaults match the
-    OpenAI ``tts-1`` API.
+    Used when ``with_audio=True``. The export use case falls back to the
+    server-side ``METAVIEW_TTS_*`` settings when ``api_key`` is omitted, so
+    the front-end no longer needs to ship a secret in the request body —
+    that lines up with issue #40 (playback also runs through the server).
     """
 
-    api_key: str = Field(min_length=1)
-    base_url: str = "https://api.openai.com/v1"
-    model: str = "tts-1"
+    api_key: str | None = None
+    base_url: str | None = None
+    model: str | None = None
     voice: str = "alloy"
 
 
