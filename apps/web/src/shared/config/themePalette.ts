@@ -32,8 +32,45 @@ export interface ThemePalette {
 
 const DEFAULT_ACCENT = "#10b981";
 
-export const THEME_PALETTE: Record<"dark" | "light", ThemePalette> = {
+/**
+ * Identifier for every theme MetaView knows about. The pair "dark" / "light"
+ * remains the default neutral set; the named themes (Monokai, Nord, Solarized)
+ * are added in issue #12 to give users a richer choice without forcing every
+ * renderer to learn a full palette object.
+ */
+export type ThemeName =
+  | "dark"
+  | "light"
+  | "monokai"
+  | "nord"
+  | "solarized-dark"
+  | "solarized-light";
+
+/**
+ * Whether a theme uses a dark or light background, used by every renderer
+ * that gates colors on ``"dark" | "light"`` (Bar / Algorithm / Math). Keeps
+ * the named-theme expansion non-breaking — renderers still see a binary.
+ */
+export const THEME_TYPE: Record<ThemeName, "dark" | "light"> = {
+  dark: "dark",
+  light: "light",
+  monokai: "dark",
+  nord: "dark",
+  "solarized-dark": "dark",
+  "solarized-light": "light",
+};
+
+export interface ThemeDescriptor extends ThemePalette {
+  /** Human-readable display name. */
+  label: string;
+  /** Underlying ``"dark" | "light"`` mode for renderer color decisions. */
+  type: "dark" | "light";
+}
+
+export const THEME_PALETTE: Record<ThemeName, ThemeDescriptor> = {
   dark: {
+    label: "Dark",
+    type: "dark",
     surface2: "#0e1412",
     ink: "#e8efe9",
     ink2: "#9ba8a0",
@@ -41,10 +78,12 @@ export const THEME_PALETTE: Record<"dark" | "light", ThemePalette> = {
     line: "#1d2a23",
     line2: "#27332c",
     accent: DEFAULT_ACCENT,
-    accentSoft: `${DEFAULT_ACCENT}26`, // 15% alpha to match themeVars exactly
+    accentSoft: `${DEFAULT_ACCENT}26`,
     warn: "#e9a23b",
   },
   light: {
+    label: "Light",
+    type: "light",
     surface2: "#faf8f3",
     ink: "#161a18",
     ink2: "#5d655f",
@@ -54,6 +93,58 @@ export const THEME_PALETTE: Record<"dark" | "light", ThemePalette> = {
     accent: DEFAULT_ACCENT,
     accentSoft: `${DEFAULT_ACCENT}26`,
     warn: "#e9a23b",
+  },
+  monokai: {
+    label: "Monokai",
+    type: "dark",
+    surface2: "#272822",
+    ink: "#f8f8f2",
+    ink2: "#cfcfc2",
+    ink3: "#75715e",
+    line: "#3e3d32",
+    line2: "#49483e",
+    accent: "#f92672", // signature pink
+    accentSoft: "#f9267226",
+    warn: "#fd971f",
+  },
+  nord: {
+    label: "Nord",
+    type: "dark",
+    surface2: "#2e3440",
+    ink: "#eceff4",
+    ink2: "#d8dee9",
+    ink3: "#81a1c1",
+    line: "#3b4252",
+    line2: "#434c5e",
+    accent: "#88c0d0",
+    accentSoft: "#88c0d026",
+    warn: "#ebcb8b",
+  },
+  "solarized-dark": {
+    label: "Solarized Dark",
+    type: "dark",
+    surface2: "#002b36",
+    ink: "#fdf6e3",
+    ink2: "#93a1a1",
+    ink3: "#586e75",
+    line: "#073642",
+    line2: "#0d4956",
+    accent: "#268bd2",
+    accentSoft: "#268bd226",
+    warn: "#b58900",
+  },
+  "solarized-light": {
+    label: "Solarized Light",
+    type: "light",
+    surface2: "#fdf6e3",
+    ink: "#073642",
+    ink2: "#586e75",
+    ink3: "#93a1a1",
+    line: "#eee8d5",
+    line2: "#e1dbbf",
+    accent: "#268bd2",
+    accentSoft: "#268bd226",
+    warn: "#b58900",
   },
 };
 

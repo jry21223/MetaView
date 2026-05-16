@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ErrorBoundary } from '../shared/ui/ErrorBoundary';
-import { useTweaks, themeVars, TWEAK_DEFAULTS } from '../features/studio-editor/hooks/useTweaks';
+import { useTweaks, themeVars, themeMode, TWEAK_DEFAULTS } from '../features/studio-editor/hooks/useTweaks';
 import { IntakeScreen, IntakeContext } from '../features/studio-editor/ui/IntakeScreen';
 import { TweaksPanel } from '../features/studio-editor/ui/TweaksPanel';
 import { StudioPage } from '../pages/Studio/StudioPage';
@@ -18,6 +18,7 @@ export function App() {
   const { settings: providerSettings, update: updateProvider, isConfigured } = useProviderSettings();
 
   const css = useMemo(() => themeVars(t), [t]);
+  const mode = themeMode(t);
   const openProviderSettings = () => setProviderModalOpen(true);
 
   const handleSubmit = async (ctx: IntakeContext) => {
@@ -32,7 +33,8 @@ export function App() {
 
   return (
     <div
-      className={`mv-root mv-${t.theme} mv-density-${t.density} mv-layout-${t.layout}`}
+      className={`mv-root mv-${mode} mv-theme-${t.theme} mv-density-${t.density} mv-layout-${t.layout}`}
+      data-theme={t.theme}
       style={css}
     >
       {stage === 'intake' && (
@@ -44,12 +46,12 @@ export function App() {
           isProviderConfigured={isConfigured}
           onOpenProviderSettings={openProviderSettings}
           onNavigate={setStage}
-          onToggleTheme={() => setTweak('theme', t.theme === 'dark' ? 'light' : 'dark')}
+          onToggleTheme={() => setTweak('theme', mode === 'dark' ? 'light' : 'dark')}
         />
       )}
 
       {stage === 'workbench' && (
-        <ErrorBoundary theme={t.theme}>
+        <ErrorBoundary theme={mode}>
           <StudioPage
             runId={runId}
             t={t}
@@ -62,7 +64,7 @@ export function App() {
       )}
 
       {stage === 'history' && (
-        <ErrorBoundary theme={t.theme}>
+        <ErrorBoundary theme={mode}>
           <HistoryPage
             t={t}
             setTweak={setTweak}

@@ -1,18 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { PALETTE_TO_CSS_VAR, THEME_PALETTE, type ThemePalette } from "./themePalette";
-import { themeVars, TWEAK_DEFAULTS } from "../../features/studio-editor/hooks/useTweaks";
+import {
+  PALETTE_TO_CSS_VAR,
+  THEME_PALETTE,
+  THEME_TYPE,
+  type ThemeName,
+  type ThemePalette,
+} from "./themePalette";
+import { themeVars, themeMode, TWEAK_DEFAULTS } from "../../features/studio-editor/hooks/useTweaks";
+
+const THEME_NAMES = Object.keys(THEME_PALETTE) as ThemeName[];
 
 describe("THEME_PALETTE (issue #56)", () => {
-  it("provides matching keys for dark and light themes", () => {
-    expect(Object.keys(THEME_PALETTE.dark).sort()).toEqual(
-      Object.keys(THEME_PALETTE.light).sort(),
-    );
+  it("every theme exposes the same field set", () => {
+    const reference = Object.keys(THEME_PALETTE.dark).sort();
+    for (const name of THEME_NAMES) {
+      expect(Object.keys(THEME_PALETTE[name]).sort()).toEqual(reference);
+    }
   });
 
-  it.each(["dark", "light"] as const)(
+  it.each(THEME_NAMES)(
     "every PALETTE_TO_CSS_VAR entry matches themeVars(%s)",
     (theme) => {
-      const vars = themeVars({ ...TWEAK_DEFAULTS, theme });
+      const vars = themeVars({
+        ...TWEAK_DEFAULTS,
+        theme,
+        accent: THEME_PALETTE[theme].accent,
+      });
       const palette = THEME_PALETTE[theme];
       for (const [key, cssName] of Object.entries(PALETTE_TO_CSS_VAR)) {
         expect(vars[cssName], `themeVars(${theme})[${cssName}]`).toBe(
@@ -23,9 +36,34 @@ describe("THEME_PALETTE (issue #56)", () => {
   );
 
   it("uses an explicit hex+alpha format for accent-soft so SSR matches the browser", () => {
-    // Catches the previous drift: BarBlockRenderer used rgba(...,0.30) while
-    // themeVars set accent + '26' (~0.15 alpha). Both paths must now agree.
-    expect(THEME_PALETTE.dark.accentSoft).toMatch(/^#[0-9a-f]{8}$/i);
-    expect(THEME_PALETTE.light.accentSoft).toMatch(/^#[0-9a-f]{8}$/i);
+    for (const name of THEME_NAMES) {
+      expect(THEME_PALETTE[name].accentSoft, `${name}.accentSoft`).toMatch(
+        /^#[0-9a-f]{8}$/i,
+      );
+    }
+  });
+});
+
+describe("Named themes (issue #12)", () => {
+  it("ships at least the four required themes", () => {
+    for (const name of ["dark", "light", "monokai", "nord"] as const) {
+      expect(THEME_PALETTE[name], `theme ${name} should exist`).toBeDefined();
+    }
+  });
+
+  it("each theme declares a usable type", () => {
+    for (const name of THEME_NAMES) {
+      const mode = themeMode({ ...TWEAK_DEFAULTS, theme: name });
+      expect(mode === "dark" || mode === "light").toBe(true);
+      expect(mode).toBe(THEME_TYPE[name]);
+    }
+  });
+
+  it("monokai's signature pink is preserved", () => {
+    expect(THEME_PALETTE.monokai.accent.toLowerCase()).toBe("#f92672");
+  });
+
+  it("nord's primary blue is preserved", () => {
+    expect(THEME_PALETTE.nord.accent.toLowerCase()).toBe("#88c0d0");
   });
 });
