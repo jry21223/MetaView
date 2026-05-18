@@ -120,6 +120,52 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     if (elapsedTimer.current !== null) window.clearInterval(elapsedTimer.current);
   }, []);
 
+  const isWorking = job !== null && job.status !== "completed" && job.status !== "failed";
+
+  // Drive the elapsed-time counter while the job is running. Issue #14.
+  useEffect(() => {
+    if (!isWorking) {
+      if (elapsedTimer.current !== null) {
+        window.clearInterval(elapsedTimer.current);
+        elapsedTimer.current = null;
+      }
+      return;
+    }
+    if (startedAtRef.current === null) startedAtRef.current = Date.now();
+    elapsedTimer.current = window.setInterval(() => {
+      if (startedAtRef.current === null) return;
+      setElapsedMs(Date.now() - startedAtRef.current);
+    }, 500);
+    return () => {
+      if (elapsedTimer.current !== null) window.clearInterval(elapsedTimer.current);
+    };
+  }, [isWorking]);
+
+  // Declared *before* the resume-on-mount effect so react-hooks' immutability
+  // check can see the callback identity is stable across the effect's
+  // lifetime (the effect captures pollUntilDone by reference).
+  const pollUntilDone = (jobId: string): void => {
+    const deadline = Date.now() + POLL_TIMEOUT_MS;
+    const tick = async () => {
+      // Issue #59: stop polling once the deadline passes — a server-side
+      // hang would otherwise have us hitting the proxy every 1.5s forever.
+      if (Date.now() > deadline) {
+        setError("导出超时（10 分钟）— 请稍后到历史页查看，或重试");
+        return;
+      }
+      try {
+        const next = await getExportStatus(jobId);
+        setJob(next);
+        if (next.status === "completed" || next.status === "failed") return;
+        pollTimer.current = window.setTimeout(tick, POLL_INTERVAL_MS);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "轮询失败");
+        return;
+      }
+    };
+    pollTimer.current = window.setTimeout(tick, POLL_INTERVAL_MS);
+  };
+
   // Issue #70: on mount, rejoin any in-flight export for this run so closing
   // and reopening the modal does not strand the user in a "queueing" UI that
   // will never update.
@@ -146,49 +192,6 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       cancelled = true;
     };
   }, [runId]);
-
-  const isWorking = job !== null && job.status !== "completed" && job.status !== "failed";
-
-  // Drive the elapsed-time counter while the job is running. Issue #14.
-  useEffect(() => {
-    if (!isWorking) {
-      if (elapsedTimer.current !== null) {
-        window.clearInterval(elapsedTimer.current);
-        elapsedTimer.current = null;
-      }
-      return;
-    }
-    if (startedAtRef.current === null) startedAtRef.current = Date.now();
-    elapsedTimer.current = window.setInterval(() => {
-      if (startedAtRef.current === null) return;
-      setElapsedMs(Date.now() - startedAtRef.current);
-    }, 500);
-    return () => {
-      if (elapsedTimer.current !== null) window.clearInterval(elapsedTimer.current);
-    };
-  }, [isWorking]);
-
-  const pollUntilDone = (jobId: string): void => {
-    const deadline = Date.now() + POLL_TIMEOUT_MS;
-    const tick = async () => {
-      // Issue #59: stop polling once the deadline passes — a server-side
-      // hang would otherwise have us hitting the proxy every 1.5s forever.
-      if (Date.now() > deadline) {
-        setError("导出超时（10 分钟）— 请稍后到历史页查看，或重试");
-        return;
-      }
-      try {
-        const next = await getExportStatus(jobId);
-        setJob(next);
-        if (next.status === "completed" || next.status === "failed") return;
-        pollTimer.current = window.setTimeout(tick, POLL_INTERVAL_MS);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "轮询失败");
-        return;
-      }
-    };
-    pollTimer.current = window.setTimeout(tick, POLL_INTERVAL_MS);
-  };
 
 
   const handleSubmit = async () => {
