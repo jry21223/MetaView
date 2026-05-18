@@ -4,8 +4,10 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config([
+  // Global ignores (apply before any ``files`` matcher). Coverage / dist
+  // contain vendored scripts that should never be linted as project code.
+  { ignores: ["dist/**", "coverage/**"] },
   {
-    ignores: ["dist"],
     files: ["**/*.{ts,tsx}"],
     extends: [
       js.configs.recommended,

@@ -5,6 +5,8 @@ import { IntakeScreen, IntakeContext } from '../features/studio-editor/ui/Intake
 import { TweaksPanel } from '../features/studio-editor/ui/TweaksPanel';
 import { StudioPage } from '../pages/Studio/StudioPage';
 import { HistoryPage } from '../pages/History/HistoryPage';
+import { TemplatesPage } from '../pages/Templates/TemplatesPage';
+import { SettingsPage } from '../pages/Settings/SettingsPage';
 import { usePipelineSubmit } from '../features/pipeline/hooks/usePipelineSubmit';
 import { useProviderSettings } from '../features/providers/hooks/useProviderSettings';
 import { ProviderSettingsModal } from '../features/providers/ui/ProviderSettingsModal';
@@ -20,14 +22,24 @@ export function App() {
   const css = useMemo(() => themeVars(t), [t]);
   const mode = themeMode(t);
   const openProviderSettings = () => setProviderModalOpen(true);
+  const toggleTheme = () => setTweak('theme', mode === 'dark' ? 'light' : 'dark');
 
-  const handleSubmit = async (ctx: IntakeContext) => {
+  const submitWithProvider = async (prompt: string, sourceCode?: string, language?: string) => {
     await submit(
-      ctx.raw || ctx.title,
-      ctx.sourceCode,
-      ctx.language,
+      prompt,
+      sourceCode,
+      language,
       isConfigured ? providerSettings : undefined,
     );
+  };
+
+  const handleSubmit = async (ctx: IntakeContext) => {
+    await submitWithProvider(ctx.raw || ctx.title, ctx.sourceCode, ctx.language);
+    setStage('workbench');
+  };
+
+  const handleUseTemplate = async (prompt: string) => {
+    await submitWithProvider(prompt);
     setStage('workbench');
   };
 
@@ -46,7 +58,7 @@ export function App() {
           isProviderConfigured={isConfigured}
           onOpenProviderSettings={openProviderSettings}
           onNavigate={setStage}
-          onToggleTheme={() => setTweak('theme', mode === 'dark' ? 'light' : 'dark')}
+          onToggleTheme={toggleTheme}
         />
       )}
 
@@ -72,14 +84,38 @@ export function App() {
             isProviderConfigured={isConfigured}
             onOpenProviderSettings={openProviderSettings}
             onRerun={async (prompt) => {
-              await submit(
-                prompt,
-                undefined,
-                undefined,
-                isConfigured ? providerSettings : undefined,
-              );
+              await submitWithProvider(prompt);
               setStage('workbench');
             }}
+          />
+        </ErrorBoundary>
+      )}
+
+      {stage === 'templates' && (
+        <ErrorBoundary theme={mode}>
+          <TemplatesPage
+            isDark={mode === 'dark'}
+            isProviderConfigured={isConfigured}
+            onNavigate={setStage}
+            onToggleTheme={toggleTheme}
+            onOpenProviderSettings={openProviderSettings}
+            onUseTemplate={handleUseTemplate}
+          />
+        </ErrorBoundary>
+      )}
+
+      {stage === 'settings' && (
+        <ErrorBoundary theme={mode}>
+          <SettingsPage
+            isDark={mode === 'dark'}
+            isProviderConfigured={isConfigured}
+            onNavigate={setStage}
+            onToggleTheme={toggleTheme}
+            onOpenProviderSettings={openProviderSettings}
+            providerSettings={providerSettings}
+            onUpdateProvider={updateProvider}
+            tweaks={t}
+            setTweak={setTweak}
           />
         </ErrorBoundary>
       )}

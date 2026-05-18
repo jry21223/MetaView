@@ -1,0 +1,157 @@
+/* ───── Settings page ─────
+ * 设置页：标题区 + 多组卡片化分区（Provider / TTS / 外观 / 本地数据）。
+ * 卡片本体用 .mv-settings-section；表单字段 .mv-settings-field 配 grid 控制对齐。
+ */
+
+.mv-settings-body {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 48px 28px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.mv-settings-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mv-settings-title {
+  font-size: 26px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.25;
+}
+
+.mv-settings-sub {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  margin: 0;
+}
+
+.mv-settings-flash {
+  margin-top: 6px;
+  align-self: flex-start;
+  padding: 5px 12px;
+  background: color-mix(in oklab, var(--accent) 16%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in oklab, var(--accent) 35%, transparent);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.mv-settings-section {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mv-settings-section-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.mv-settings-section-hint {
+  margin: -6px 0 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+
+.mv-settings-section-hint code {
+  font-family: 'IBM Plex Mono', monospace;
+  background: var(--surface-2);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 11px;
+}
+
+.mv-settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mv-settings-field > label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+.mv-settings-field-inline {
+  display: flex;
+  gap: 8px;
+}
+
+.mv-settings-field-inline > .mv-text-input {
+  flex: 1;
+}
+
+.mv-settings-field-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mv-settings-field-row > label {
+  margin: 0;
+}
+
+.mv-settings-segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mv-settings-layout-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.mv-settings-layout-grid .mv-chip {
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  padding: 10px 12px;
+  gap: 2px;
+  height: auto;
+}
+
+.mv-settings-layout-label {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.mv-settings-layout-hint {
+  font-size: 10.5px;
+  color: var(--ink-3);
+  font-weight: 400;
+}
+
+.mv-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.mv-settings-slider {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.mv-settings-danger {
+  border-color: color-mix(in oklab, var(--warn) 40%, var(--line));
+}

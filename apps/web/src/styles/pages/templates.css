@@ -1,0 +1,101 @@
+/* ───── Templates page ─────
+ * 模板库页面：标题区 + 控件栏（搜索 / 学科筛选） + 卡片网格。
+ * 复用了 studio.css 里的 .mv-tpl-card 基础样式，这里只补「大卡片 + prompt 预览」
+ * 的差异化部分。 */
+
+.mv-templates-body {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 48px 28px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.mv-templates-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 720px;
+}
+
+.mv-templates-title {
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+  line-height: 1.25;
+}
+
+.mv-templates-sub {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  margin: 0;
+}
+
+.mv-templates-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mv-templates-search {
+  max-width: 420px;
+  font-size: 13px;
+}
+
+.mv-templates-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mv-templates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.mv-tpl-card-lg {
+  min-height: 140px;
+}
+
+.mv-tpl-prompt-preview {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ink-3);
+  background: var(--surface-2);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-top: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.mv-templates-empty {
+  text-align: center;
+  font-size: 13px;
+  color: var(--ink-3);
+  padding: 40px 0;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+}
+
+.mv-templates-foot {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.mv-templates-foot code {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  padding: 1px 5px;
+  background: var(--surface-2);
+  border-radius: 4px;
+}
