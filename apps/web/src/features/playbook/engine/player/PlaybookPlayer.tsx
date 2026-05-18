@@ -312,7 +312,10 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   const [showSubtitles, setShowSubtitles] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [codePanelOpen, setCodePanelOpen] = useState(true);
-  const [paramPanelOpen, setParamPanelOpen] = useState(false);
+  // Default expanded so users see their math sliders / array editor without
+  // having to know there's a hidden "参数面板 ▸" row tucked below the speed
+  // bar. Collapse remembers per-mount only — no persistence needed.
+  const [paramPanelOpen, setParamPanelOpen] = useState(true);
   const script = useResolvedScript(baseScript, overrides);
   const hasDomainPanel = getParamPanel(baseScript.domain) !== null;
 
@@ -603,7 +606,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
               fps={script.fps}
               compositionWidth={PLAYBOOK_DEFAULTS.COMPOSITION_WIDTH}
               compositionHeight={PLAYBOOK_DEFAULTS.COMPOSITION_HEIGHT}
-              style={{ width: "100%", aspectRatio: "16/9" }}
+              style={{ height: "100%", aspectRatio: "16/9", maxWidth: "100%" }}
               playbackRate={playbackRate}
               clickToPlay={false}
             />
