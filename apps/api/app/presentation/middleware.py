@@ -91,7 +91,10 @@ class BodySizeLimitMiddleware:
                 chunk, last = next(replay)
                 return {"type": "http.request", "body": chunk, "more_body": not last}
             except StopIteration:
-                return {"type": "http.request", "body": b"", "more_body": False}
+                # Body fully replayed. Per ASGI we now switch to the lifecycle
+                # channel and tell the downstream app the client disconnected,
+                # rather than dripping infinite empty-body chunks. Issue #74.
+                return {"type": "http.disconnect"}
 
         await self._app(scope, replay_receive, send)
 
