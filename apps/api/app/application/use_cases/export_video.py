@@ -25,11 +25,11 @@ from typing import Any
 
 import httpx
 
-_RENDER_TAIL_LINES = 40
-
 from app.application.ports.export_repository import IExportJobRepository
 from app.application.ports.run_repository import IRunRepository
 from app.domain.models.export_job import ExportJobStatus, ExportOptions, TtsConfig
+
+_RENDER_TAIL_LINES = 40
 
 _QUALITY_TO_DIMENSIONS: dict[str, tuple[int, int]] = {
     "720p": (1280, 720),
