@@ -54,10 +54,18 @@ LLM 必须输出**单一 JSON 对象**，包含两层：
 ```
 
 ### 强约束
-- `cir.steps` 长度 4–8，与 `execution_map.checkpoints` **一一对应**（共享 `step_id`）。
+- `cir.steps` 长度 **8–14**（典型 10–12 步；trivial 题最少 8 步，深度题最多 14 步），
+  与 `execution_map.checkpoints` **一一对应**（共享 `step_id`）。
+- 每步 narration 合并后 ≥ 3 句 / ≥ 80 中文字（≥ 50 英文 words），必须依次回答
+  「为什么 → 做什么 → 学到什么」。**短/水/重复** 的 narration 会在 reviewer 复检阶段触发再生。
+- `duration_s` 推荐 ~4–5s/step（10 步 → 45s；12 步 → 54s），关键讲解步可分配更多时间，
+  过渡步可以更短，但所有 checkpoint 区间长度之和必须等于 `duration_s`。
 - `checkpoint.start_s/end_s` 必须不重叠地分割 `[0, duration_s]`。
 - `code_lines` 仅在用户提供 `source_code` 时有意义，否则可全部为 `[]`。
 - `narration` 必须是 JSON 数组（不是裸字符串），见第 3 节。
+
+> 限制是写在 `cir_prompt.py` 的 system prompt 里的硬约束；触发 reviewer 复检的失败原因会
+> 通过 `RunPipelineUseCase._regenerate` 反馈给 LLM 再来一遍（最多 `METAVIEW_MAX_REPAIR_ATTEMPTS` 次）。
 
 ### 兼容旧契约
 `run_pipeline._parse_combined_output` 也接受裸 `CirDocument`（无 `cir`/`execution_map` 包装）。
@@ -135,7 +143,57 @@ end_frame_i = (i+1) * 60                               # 无 execution_map（兼
 
 > 交互版同源能力见 `apps/web/src/features/math-widget/`（顶栏「📐 数学画板」）：内置预设 + 参数滑块 + 实时 KaTeX 公式 + `FunctionPlot`，与渲染器共用 `mathExpr` / `plotMath`。
 
-## 7. 关键文件
+## 7. LLM 思考时长 / 长度调参
+
+`OpenAIProvider`（`apps/api/app/infrastructure/llm/openai_provider.py`）在 `chat/completions`
+请求体里**条件**写入两个可选字段：
+
+| 字段 | 来源 env 变量 | 默认 | 备注 |
+|------|------|------|------|
+| `max_tokens` | `METAVIEW_OPENAI_MAX_TOKENS` | `16000` | 太小会被截断；DeepSeek/vLLM/Ollama 都支持，可降到 8000 |
+| `reasoning_effort` | `METAVIEW_OPENAI_REASONING_EFFORT` | 未设 | 仅 OpenAI gpt-5 / o-series；允许值 `minimal / low / medium / high`，留空就不发字段 |
+
+未启用 reasoning_effort 的服务商（OpenRouter 上的 Anthropic / DeepSeek / 大多数本地推理）
+会忽略缺省字段，无 400 风险。需要让模型「想更久」时同时把这两个调大即可，不需要改代码。
+
+## 8. 视频导出（Remotion 渲染管线）
+
+入口 `POST /api/v1/exports` →
+`ExportVideoUseCase`（`apps/api/app/application/use_cases/export_video.py`）：
+
+1. 从 `IRunRepository` 取该 run 的 `PlaybookScript`，序列化为 `inputProps.json`。
+2. （可选 `with_audio`）调 TTS 代理 `POST {tts_base_url}/audio/speech` 逐步合成 mp3，
+   再用 `ffprobe`（缺失时回退到 wave / 动画时长）测每段时长，按 `fps` 重新拉伸
+   `step.end_frame` 让动画 ≥ 配音长度。
+3. spawn 子进程：
+
+   ```
+   npx --yes remotion render \
+       src/remotion/index.ts playbook <output> \
+       --props <inputProps.json> --codec h264|vp8|gif \
+       --width <W> --height <H> --frames-per-second <FPS>
+   ```
+
+   工作目录是 `apps/web/`（由 `METAVIEW_EXPORT_WEB_APP_DIR` 控制，默认相对仓库根）。
+   stdout/stderr 解析 `progress%` / `M/N frames`，按比例更新 ExportJob 进度（0.15 → 0.95）。
+4. 成功后把 `output_path` 写回 `IExportJobRepository`，前端通过
+   `GET /api/v1/exports/{job_id}/download` 拉取。
+
+| Method | Path | 说明 |
+|--------|------|------|
+| `POST` | `/exports` | 提交导出任务（202） |
+| `GET`  | `/exports/{job_id}` | 进度 + 状态 + `error` |
+| `GET`  | `/exports/{job_id}/download` | 下载 mp4 / webm / gif |
+
+### 失败诊断
+渲染失败时 `ExportJob.error` 会带最后 ~40 行 Remotion 子进程输出（包含 stack trace）。
+常见雷：
+- `apps/web/node_modules` 缺包或 `@remotion/cli`/`renderer` 版本错位 → 重装：
+  `rm -rf node_modules apps/web/node_modules && npm install`（仓库走 npm workspaces）。
+- 首次跑会拉 Chrome Headless Shell（约 80–150 MB），国内网络可能超时——重跑通常自愈。
+- `ffprobe` 缺失只影响 `with_audio` 的时长对齐，单纯导出无音轨不受影响。
+
+## 9. 关键文件
 
 | 文件 | 职责 |
 |------|------|
@@ -148,3 +206,7 @@ end_frame_i = (i+1) * 60                               # 无 execution_map（兼
 | `apps/web/src/features/playbook/engine/renderers/MathPlotRenderer.tsx` | 函数图渲染器 |
 | `apps/web/src/features/math-widget/` | 交互数学画板（预设 + 滑块 + KaTeX） |
 | `apps/web/src/features/playbook/engine/player/PlaybookPlayer.tsx` | Remotion 入口 |
+| `apps/api/app/infrastructure/llm/openai_provider.py` | OpenAI 兼容 HTTP 客户端（`max_tokens` / `reasoning_effort`） |
+| `apps/api/app/application/use_cases/export_video.py` | Remotion CLI subprocess + TTS 配音对齐 + stderr 回传 |
+| `apps/api/app/presentation/router_exports.py` | `/exports` 路由（提交 / 状态 / 下载） |
+| `apps/web/src/remotion/Root.tsx` & `PlaybookExportComposition.tsx` | Remotion `Composition`，导出时与播放器共用 `renderers/registry` |

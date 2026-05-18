@@ -106,6 +106,8 @@ make check   # 上面三步串联
 | `METAVIEW_OPENAI_MODEL` | – | 默认模型名 |
 | `METAVIEW_OPENAI_SUPPORTS_VISION` | `false` | 是否走多模态请求 |
 | `METAVIEW_OPENAI_TIMEOUT_S` | `300` | 请求超时秒数 |
+| `METAVIEW_OPENAI_MAX_TOKENS` | `16000` | chat/completions 的 `max_tokens`；CIR 长脚本需要这么大，被截断会触发 `_regenerate` |
+| `METAVIEW_OPENAI_REASONING_EFFORT` | – | gpt-5 / o-series 专用 (`minimal\|low\|medium\|high`)，其它服务商留空 |
 | `METAVIEW_DEFAULT_PROVIDER` | – | 显式指定默认 provider，留空自动 |
 | `METAVIEW_MOCK_PROVIDER_ENABLED` | `true` | 是否暴露 `mock` provider |
 | `METAVIEW_ENABLED_DOMAINS` | 全部七项 | 启用的学科 |
@@ -139,7 +141,8 @@ make check   # 上面三步串联
 
 ## 文档
 
-- [`docs/pipeline.md`](docs/pipeline.md) — LLM 输出契约、源码追踪、narration 模板、时间轴
+- [`docs/pipeline.md`](docs/pipeline.md) — LLM 输出契约（含 CIR 步数 / 思考时长调参）、源码追踪、narration 模板、时间轴、**视频导出管线**
 - [`docs/frontend-shell.md`](docs/frontend-shell.md) — Stage 路由、`GlobalTopbar`、Studio 布局、Provider 配置
+- [`docs/remotion-skills.md`](docs/remotion-skills.md) — Remotion 组件 / 渲染器 / 注册表约定
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — 分支策略、Conventional Commits、Hook
 - [`CLAUDE.md`](CLAUDE.md) — 架构约束与开发规范

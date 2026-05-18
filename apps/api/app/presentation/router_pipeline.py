@@ -50,6 +50,8 @@ async def submit_pipeline(
             api_key=payload.provider_api_key,
             base_url=payload.provider_base_url or "https://api.openai.com/v1",
             model=payload.provider_model or "gpt-4o-mini",
+            max_tokens=settings.openai_max_tokens,
+            reasoning_effort=settings.openai_reasoning_effort,
         )
         effective_reviewer = None
 

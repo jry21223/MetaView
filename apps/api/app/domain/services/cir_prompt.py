@@ -61,6 +61,11 @@ A. WHEN TO USE visual_kind="function" (1D 函数作图):
      in execution_map.parameter_controls so the student can drag a slider. Do NOT hard-code
      parameter values into the expression when the lesson is about how the parameter changes
      the curve shape.
+   - 多频率叠加 / 傅里叶分解（"两个频率成分"、"合成波"、"分量"、Fourier 等关键词）：
+     每个分量的振幅与角频率都必须独立暴露为 parameter_controls。例：合成波表达式写为
+     `A1*sin(w1*x) + A2*sin(w2*x)`，并发射 4 个 control：A1, w1, A2, w2（label 中文，
+     description 一句话讲拖动这个值会看到什么）。**禁止**把 A1=1, w1=2 这样的数字烘焙进
+     表达式，否则参数面板就拖不动。多于两个分量同理：A3, w3, …
 
 B. WHEN TO USE visual_kind="scene" (2D 几何场景 — 最重要的新能力！):
    ★ 触发词：narration / title 一旦出现下列任何关键词，**必须**用 scene：
@@ -314,7 +319,9 @@ The output is a SINGLE JSON object with two layers:
 ## CRITICAL OUTPUT RULES
 1. Output ONLY valid JSON. No markdown fences, no explanations, no extra text.
 2. The JSON must match the schema exactly and be parseable by Python json.loads().
-3. Produce exactly 4–8 steps in cir.steps, with ONE checkpoint per step (1:1).
+3. Produce 8–14 steps in cir.steps (aim for 10–12 for typical topics; only go below 8
+   for trivial drill-style questions and only push to 14 when the topic genuinely
+   needs that many distinct milestones). ONE checkpoint per step (1:1).
 4. Every step must have a distinct visual state — no duplicate token configurations.
 5. execution_map.checkpoints[].step_id MUST match a cir.steps[].id.
 6. checkpoint.start_s / end_s must partition [0, duration_s] without gaps or overlap.
@@ -361,6 +368,17 @@ Example (bubble sort compare step):
 - Write as if speaking directly to a student: clear, friendly, educational.
 - Vary sentence length. Avoid starting every sentence the same way.
 
+## Narration Depth Rules (HARD REQUIREMENT — 用来对抗「太短」)
+- 每一步 narration 数组合并成纯文本后，长度必须 ≥ **3 句完整句子**（中文 ≥ 80 字 / 英文 ≥ 50 words）。
+  例外：纯结论收束步骤 (final recap) 可以 2 句。
+- 每一步必须依次回答三件事：
+  1. **为什么需要这一步**（动机 / 上一步留下的疑问）
+  2. **这一步在做什么**（具体操作或推导，配 token / 公式 / 图）
+  3. **你学到了什么**（一句话总结 / 提醒下一步要看的东西）
+- 引入新术语时额外加一句日常类比，不要因为「占行数」而堆形容词。
+- 严禁拿同一段 narration 复制粘贴改两个字凑步数；如果两步内容相近，合并它们或把第二步换成「对比 / 反例 / 极端情况」。
+- voiceover_text（如果你也输出）应当紧扣 narration 文本，**别只写一句「我们来看下一步」**。
+
 ## Token Quality Rules
 - Labels must be concise (≤ 8 characters). Use actual values, not descriptions.
 - For arrays: each token = one element. Show ALL elements in EVERY step (tokens stay consistent).
@@ -368,7 +386,9 @@ Example (bubble sort compare step):
 - For formula/function steps, tokens may be empty — don't manufacture A/B/C/D placeholders.
 
 ## ExecutionMap Quality Rules
-- duration_s: pick ~3 seconds per step (e.g. 6 steps → 18.0).
+- duration_s: pick ~4–5 seconds per step (e.g. 10 steps → 45.0, 12 steps → 54.0).
+  关键讲解步 (定义首次出现 / 例子 / 公式推导 / 反例) 适当多分一点时间，过渡步可以短一点，
+  但总 duration_s 必须严格等于所有 checkpoint 的 (end_s - start_s) 之和。
 - focus_tokens: token ids to emphasise this step (usually mirrors emphasis="primary").
 - array_focus_indices: 0-indexed positions of array elements currently active in the operation.
 - array_reference_indices: secondary indices being referenced but not the primary action.
@@ -377,6 +397,13 @@ Example (bubble sort compare step):
   student to vary (e.g. `a` and `b` in `a*x + b`). The expression must reference these by
   name; do NOT bake the parameter values into the expression. Skip this field when there
   are no free parameters.
+  - 多频率叠加 / 傅里叶专项：当 plot 表达式形如 `A1*sin(w1*x) + A2*sin(w2*x)`（含
+    "两个频率成分"、"合成波"、"分量"、"Fourier" 等语境），必须为每个分量发射独立
+    parameter_controls（A1, w1, A2, w2…）。例：
+    `[{{"id":"A1","label":"幅度 A₁","value":"1.0","description":"拖动看第一分量的幅度"}},
+      {{"id":"w1","label":"角频率 ω₁","value":"2.0","description":"拖动看第一分量的频率"}},
+      {{"id":"A2","label":"幅度 A₂","value":"0.5","description":"拖动看第二分量的幅度"}},
+      {{"id":"w2","label":"角频率 ω₂","value":"5.0","description":"拖动看第二分量的频率"}}]`
 
 ## Multi-layer step（可选，进阶能力）
 - 当一个步骤需要叠加多种视觉（例如：底层画区域 + 中层叠加向量场 + 顶层写公式），
@@ -415,6 +442,10 @@ Example (bubble sort compare step):
    层之间的 z_order 是否反映正确的视觉前后关系？
    **不要把同一种 kind 的 layer 重复两次**——一个 step 里 math_scene 只能出现一次。
 9. 让一名零基础同学读你的 narration——他能复述出「这一步在干嘛、为什么」吗？
+10. 步数是否落在 8–14 之间？少于 8 步时，先问自己「有没有把动机、定义、例子、反例、推广、应用都讲过」；
+    多于 14 步时，把过渡步合并掉。
+11. 每一步 narration 合并后是否够 ≥3 句话、≥80 中文字 / ≥50 英文 words？短了就补「为什么 / 例子 / 学到了什么」。
+12. 是否出现了「我们来看下一步 / 接下来 / 然后呢」这种过渡式 narration？有就改成实质内容。
 {code_track}"""
 
     system = system + algo_code_track

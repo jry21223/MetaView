@@ -25,8 +25,22 @@ def _get_run_repo(db_path: str) -> SqliteRunRepository:
 
 
 @lru_cache
-def _get_openai_provider(api_key: str, base_url: str, model: str, timeout: float) -> OpenAIProvider:
-    return OpenAIProvider(api_key=api_key, base_url=base_url, model=model, timeout=timeout)
+def _get_openai_provider(
+    api_key: str,
+    base_url: str,
+    model: str,
+    timeout: float,
+    max_tokens: int | None,
+    reasoning_effort: str | None,
+) -> OpenAIProvider:
+    return OpenAIProvider(
+        api_key=api_key,
+        base_url=base_url,
+        model=model,
+        timeout=timeout,
+        max_tokens=max_tokens,
+        reasoning_effort=reasoning_effort,
+    )
 
 
 def get_run_repo(settings: Annotated[Settings, Depends(get_settings)]) -> IRunRepository:
@@ -49,7 +63,12 @@ def get_llm_provider(settings: Annotated[Settings, Depends(get_settings)]) -> IL
     model = settings.openai_model or "gpt-4o-mini"
     timeout = settings.openai_timeout_s or 300.0
     return _get_openai_provider(
-        settings.openai_api_key, settings.openai_base_url, model, timeout
+        settings.openai_api_key,
+        settings.openai_base_url,
+        model,
+        timeout,
+        settings.openai_max_tokens,
+        settings.openai_reasoning_effort,
     )
 
 
@@ -65,6 +84,8 @@ def get_reviewer_llm_provider(
         settings.openai_base_url,
         settings.openai_critic_model,
         timeout,
+        settings.openai_max_tokens,
+        settings.openai_reasoning_effort,
     )
 
 

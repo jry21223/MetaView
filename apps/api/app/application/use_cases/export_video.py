@@ -19,10 +19,13 @@ import os
 import shutil
 import subprocess
 import wave
+from collections import deque
 from pathlib import Path
 from typing import Any
 
 import httpx
+
+_RENDER_TAIL_LINES = 40
 
 from app.application.ports.export_repository import IExportJobRepository
 from app.application.ports.run_repository import IRunRepository
@@ -210,20 +213,27 @@ class ExportVideoUseCase:
         env = os.environ.copy()
         env.setdefault("NODE_ENV", "production")
 
-        proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            cwd=str(self._web_dir),
-            env=env,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-        )
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                cwd=str(self._web_dir),
+                env=env,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+        except FileNotFoundError as exc:
+            raise RuntimeError(
+                f"failed to spawn remotion CLI ({cmd[0]} not on PATH): {exc}"
+            ) from exc
 
         assert proc.stdout is not None
+        tail: deque[str] = deque(maxlen=_RENDER_TAIL_LINES)
         async for raw in proc.stdout:
             line = raw.decode("utf-8", errors="replace").rstrip()
             if not line:
                 continue
             logger.info("[render %s] %s", job_id, line)
+            tail.append(line)
             progress = _parse_render_progress(line)
             if progress is not None:
                 # 0.15 → 0.95 maps onto Remotion's own 0..1 progress
@@ -234,7 +244,10 @@ class ExportVideoUseCase:
 
         rc = await proc.wait()
         if rc != 0:
-            raise RuntimeError(f"remotion render exited with code {rc}")
+            detail = "\n".join(tail) if tail else "(no output captured)"
+            raise RuntimeError(
+                f"remotion render exited with code {rc}\n--- last {len(tail)} lines ---\n{detail}"
+            )
         if not output_path.exists():
             raise RuntimeError("render finished but output file missing")
 

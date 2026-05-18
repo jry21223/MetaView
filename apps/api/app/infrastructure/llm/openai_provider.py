@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import httpx
 
 
@@ -10,18 +12,22 @@ class OpenAIProvider:
         base_url: str,
         model: str,
         timeout: float | None = 300.0,
+        max_tokens: int | None = None,
+        reasoning_effort: str | None = None,
     ) -> None:
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._model = model
         self._timeout = timeout
+        self._max_tokens = max_tokens
+        self._reasoning_effort = reasoning_effort
 
     async def complete(self, system: str, user: str) -> str:
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
         }
-        payload = {
+        payload: dict[str, Any] = {
             "model": self._model,
             "messages": [
                 {"role": "system", "content": system},
@@ -29,6 +35,13 @@ class OpenAIProvider:
             ],
             "temperature": 0.3,
         }
+        if self._max_tokens is not None:
+            payload["max_tokens"] = self._max_tokens
+        if self._reasoning_effort:
+            # OpenAI gpt-5/o-series accept this; providers that don't will
+            # usually 400. Keep behind an explicit env var so the default
+            # remains compatible with non-OpenAI servers.
+            payload["reasoning_effort"] = self._reasoning_effort
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             resp = await client.post(
                 f"{self._base_url}/chat/completions",

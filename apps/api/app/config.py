@@ -68,6 +68,14 @@ class Settings(BaseSettings):
     openai_test_model: str | None = None
     openai_supports_vision: bool = False
     openai_timeout_s: float | None = 300.0
+    # Generation budget — wider room for longer, more thorough teaching scripts.
+    # Set ``None`` to fall back to the provider default; otherwise we pass
+    # ``max_tokens`` on each chat/completions call.
+    openai_max_tokens: int | None = 16000
+    # Optional. When set we forward ``reasoning_effort`` (gpt-5 / o-series) so
+    # the model thinks for longer. Leave empty for providers that reject the
+    # field (DeepSeek, local vLLM, etc.). Allowed: minimal/low/medium/high.
+    openai_reasoning_effort: str | None = None
 
     @field_validator("openai_timeout_s", mode="before")
     @classmethod
@@ -87,6 +95,18 @@ class Settings(BaseSettings):
         normalized = value.strip().lower()
         if normalized not in {"off", "on_failure", "math_always", "always"}:
             return "on_failure"
+        return normalized
+
+    @field_validator("openai_reasoning_effort", mode="before")
+    @classmethod
+    def normalize_reasoning_effort(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().lower()
+        if not normalized:
+            return None
+        if normalized not in {"minimal", "low", "medium", "high"}:
+            return None
         return normalized
 
     @property
