@@ -72,7 +72,7 @@ export function SettingsPage({
       baseUrl: baseUrl.trim(),
       model: model.trim(),
     });
-    flash('Provider 已保存');
+    flash('服务商配置已保存');
   };
 
   const handleClearExportJobs = () => {
@@ -86,7 +86,7 @@ export function SettingsPage({
 
   const handleClearTtsCache = () => {
     tts.clearCache();
-    flash('TTS 音频缓存已清空');
+    flash('朗读音频缓存已清空');
   };
 
   return (
@@ -101,8 +101,8 @@ export function SettingsPage({
       />
       <main className="mv-settings-body">
         <header className="mv-settings-head">
-          <div className="mv-eyebrow-mini">SETTINGS</div>
-          <h1 className="mv-settings-title">本地偏好与 Provider 配置</h1>
+          <div className="mv-eyebrow-mini">设置</div>
+          <h1 className="mv-settings-title">本地偏好与模型服务商配置</h1>
           <p className="mv-settings-sub">
             所有设置只存在你本地浏览器（localStorage / sessionStorage），不会上传服务端。
           </p>
@@ -115,13 +115,13 @@ export function SettingsPage({
 
         {/* ───── LLM Provider ───── */}
         <section className="mv-settings-section">
-          <h2 className="mv-settings-section-title">LLM Provider</h2>
+          <h2 className="mv-settings-section-title">模型服务商</h2>
           <p className="mv-settings-section-hint">
-            配置 OpenAI 或任意兼容接口；留空 API Key 时会回退到后端默认凭据。
+            配置 OpenAI 或任意兼容接口；留空密钥时会回退到后端默认凭据。
           </p>
 
           <div className="mv-settings-field">
-            <label htmlFor="mv-set-key">API Key</label>
+            <label htmlFor="mv-set-key">API 密钥</label>
             <div className="mv-settings-field-inline">
               <input
                 id="mv-set-key"
@@ -142,7 +142,7 @@ export function SettingsPage({
           </div>
 
           <div className="mv-settings-field">
-            <label htmlFor="mv-set-base">Base URL</label>
+            <label htmlFor="mv-set-base">接口地址</label>
             <input
               id="mv-set-base"
               type="url"
@@ -154,7 +154,7 @@ export function SettingsPage({
           </div>
 
           <div className="mv-settings-field">
-            <label htmlFor="mv-set-model">Model</label>
+            <label htmlFor="mv-set-model">模型</label>
             <input
               id="mv-set-model"
               type="text"
@@ -171,41 +171,41 @@ export function SettingsPage({
               className="mv-chip mv-chip-primary"
               onClick={handleProviderSave}
             >
-              保存 Provider
+              保存服务商配置
             </button>
           </div>
         </section>
 
         {/* ───── TTS ───── */}
         <section className="mv-settings-section">
-          <h2 className="mv-settings-section-title">TTS · 朗读</h2>
+          <h2 className="mv-settings-section-title">朗读 · 语音合成</h2>
           <p className="mv-settings-section-hint">
-            选择朗读后端：浏览器自带的 system 不需要配置；OpenAI 走后端代理（issue #40），
-            API Key 由后端 <code>METAVIEW_TTS_API_KEY</code> 提供。
+            选择朗读后端：浏览器自带语音不需要配置；OpenAI 走后端代理（issue #40），
+            API 密钥由后端 <code>METAVIEW_TTS_API_KEY</code> 提供。
           </p>
 
           <div className="mv-settings-field">
-            <label>后端</label>
+            <label>朗读引擎</label>
             <div className="mv-settings-segmented">
               <button
                 type="button"
                 className={`mv-chip${tts.config.backend === 'system' ? ' mv-chip-primary' : ''}`}
                 onClick={() => tts.updateConfig({ backend: 'system' })}
               >
-                system · 浏览器
+                浏览器语音
               </button>
               <button
                 type="button"
                 className={`mv-chip${tts.config.backend === 'openai' ? ' mv-chip-primary' : ''}`}
                 onClick={() => tts.updateConfig({ backend: 'openai' })}
               >
-                openai · 服务端
+                OpenAI 服务端
               </button>
             </div>
           </div>
 
           <div className="mv-settings-field">
-            <label htmlFor="mv-set-voice">Voice</label>
+            <label htmlFor="mv-set-voice">音色</label>
             <select
               id="mv-set-voice"
               className="mv-text-input"
@@ -213,7 +213,7 @@ export function SettingsPage({
               onChange={(e) => tts.updateConfig({ voice: e.target.value })}
               disabled={tts.config.backend === 'system'}
             >
-              <option value="auto">auto · 跟随学科推荐</option>
+              <option value="auto">自动 · 跟随学科推荐</option>
               {OPENAI_VOICES.map((v) => (
                 <option key={v.id} value={v.id}>
                   {v.label} — {v.description}
@@ -246,7 +246,7 @@ export function SettingsPage({
               className="mv-chip"
               onClick={handleClearTtsCache}
             >
-              清空 TTS 音频缓存
+              清空朗读音频缓存
             </button>
           </div>
         </section>
@@ -310,7 +310,7 @@ export function SettingsPage({
 
           <div className="mv-settings-field mv-settings-field-row">
             <label htmlFor="mv-set-dock">
-              工作台显示历史 Dock
+              工作台显示历史侧栏
             </label>
             <input
               id="mv-set-dock"
@@ -341,7 +341,7 @@ export function SettingsPage({
               className="mv-chip"
               onClick={handleClearTtsCache}
             >
-              清空 TTS 音频缓存
+              清空朗读音频缓存
             </button>
           </div>
         </section>

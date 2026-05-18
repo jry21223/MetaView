@@ -63,7 +63,7 @@ export function TemplatesPage({
       />
       <main className="mv-templates-body">
         <header className="mv-templates-head">
-          <div className="mv-eyebrow-mini">TEMPLATE LIBRARY</div>
+          <div className="mv-eyebrow-mini">模板库</div>
           <h1 className="mv-templates-title">挑一个模板，立刻看到它怎么讲</h1>
           <p className="mv-templates-sub">
             每个模板已经写好了对应的 prompt，点一下就会带着它跑一遍管线；进入工作台后还能继续微调。
