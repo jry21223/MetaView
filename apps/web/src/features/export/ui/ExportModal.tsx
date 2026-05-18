@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useTTS } from "../../playbook/engine/player/useTTS";
+import { readStoredTTSConfig } from "../../playbook/engine/player/useTTS";
 import {
   buildDownloadUrl,
   getExportStatus,
@@ -48,6 +48,47 @@ const POLL_INTERVAL_MS = 1500;
  *  a timeout error rather than burning network forever. Issue #59. */
 const POLL_TIMEOUT_MS = 10 * 60 * 1000;
 
+/** sessionStorage key holding a {runId: jobId} map so closing & reopening the
+ *  modal can rejoin the still-running render instead of starting a fresh
+ *  client-side state machine. Issue #70. */
+const JOB_MAP_KEY = "mv_export_jobs";
+
+function readJobMap(): Record<string, string> {
+  try {
+    const raw = sessionStorage.getItem(JOB_MAP_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return {};
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof k === "string" && typeof v === "string") out[k] = v;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function persistJobMapping(runId: string, jobId: string): void {
+  try {
+    const m = readJobMap();
+    m[runId] = jobId;
+    sessionStorage.setItem(JOB_MAP_KEY, JSON.stringify(m));
+  } catch {
+    // ignore quota / storage errors — at worst we lose resume capability
+  }
+}
+
+function clearJobMapping(runId: string): void {
+  try {
+    const m = readJobMap();
+    delete m[runId];
+    sessionStorage.setItem(JOB_MAP_KEY, JSON.stringify(m));
+  } catch {
+    // ignore
+  }
+}
+
 function formatElapsed(ms: number): string {
   const total = Math.max(0, Math.round(ms / 1000));
   const m = Math.floor(total / 60);
@@ -62,7 +103,6 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   accentColor,
   onClose,
 }) => {
-  const tts = useTTS();
   const [withAudio, setWithAudio] = useState(false);
   const [quality, setQuality] = useState<ExportQuality>("1080p");
   const [format, setFormat] = useState<ExportFormat>("mp4");
@@ -79,6 +119,33 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     if (pollTimer.current !== null) window.clearTimeout(pollTimer.current);
     if (elapsedTimer.current !== null) window.clearInterval(elapsedTimer.current);
   }, []);
+
+  // Issue #70: on mount, rejoin any in-flight export for this run so closing
+  // and reopening the modal does not strand the user in a "queueing" UI that
+  // will never update.
+  useEffect(() => {
+    if (!runId) return;
+    const stored = readJobMap()[runId];
+    if (!stored) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const next = await getExportStatus(stored);
+        if (cancelled) return;
+        setJob(next);
+        if (next.status !== "completed" && next.status !== "failed") {
+          startedAtRef.current = Date.now();
+          pollUntilDone(stored);
+        }
+      } catch {
+        // 404 (server restart wiped in-memory job repo) — drop stale mapping
+        clearJobMapping(runId);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [runId]);
 
   const isWorking = job !== null && job.status !== "completed" && job.status !== "failed";
 
@@ -117,6 +184,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         pollTimer.current = window.setTimeout(tick, POLL_INTERVAL_MS);
       } catch (err) {
         setError(err instanceof Error ? err.message : "轮询失败");
+        return;
       }
     };
     pollTimer.current = window.setTimeout(tick, POLL_INTERVAL_MS);
@@ -130,7 +198,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     startedAtRef.current = Date.now();
     setElapsedMs(0);
     try {
-      if (withAudio && tts.config.backend !== "openai") {
+      // Issue #72: only read the persisted TTS config when audio is actually
+      // requested — avoids the heavier `useTTS` hook side effects for silent
+      // exports.
+      const ttsConfig = withAudio ? readStoredTTSConfig() : null;
+      if (withAudio && ttsConfig && ttsConfig.backend !== "openai") {
         throw new Error(
           "含配音导出需要在 TTS 设置中切换到 OpenAI 后端（系统语音不支持服务端渲染）。API Key 由后端配置。",
         );
@@ -139,12 +211,15 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         run_id: runId,
         with_audio: withAudio,
         options: { quality, fps, format },
-        ...(withAudio && {
-          tts: { voice: tts.config.voice || "alloy" },
+        ...(withAudio && ttsConfig && {
+          tts: { voice: ttsConfig.voice || "alloy" },
         }),
       };
       const created = await submitExport(body);
       setJob(created);
+      // Persist so reopening the modal rejoins this job instead of starting
+      // from scratch. Issue #70.
+      persistJobMapping(runId, created.job_id);
       pollUntilDone(created.job_id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "提交失败");
@@ -387,7 +462,38 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 {job.error ?? "未知错误"}
               </div>
             )}
+            {error && (
+              <div role="alert" style={{ fontSize: 12, color: c.warn, lineHeight: 1.5 }}>
+                {error}
+              </div>
+            )}
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              {!isWorking && (
+                <button
+                  onClick={() => {
+                    if (pollTimer.current !== null) {
+                      window.clearTimeout(pollTimer.current);
+                      pollTimer.current = null;
+                    }
+                    if (runId) clearJobMapping(runId);
+                    setJob(null);
+                    setError(null);
+                    startedAtRef.current = null;
+                    setElapsedMs(0);
+                  }}
+                  style={{
+                    border: `1px solid ${c.border}`,
+                    background: "transparent",
+                    color: c.text,
+                    padding: "6px 14px",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    fontSize: 12,
+                  }}
+                >
+                  重新导出
+                </button>
+              )}
               {canDownload && job.output_url && (
                 <a
                   href={buildDownloadUrl(job.output_url)}

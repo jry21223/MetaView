@@ -106,6 +106,16 @@ function saveConfig(cfg: TTSConfig): void {
 
 export const __testing = { sanitizeStoredConfig, TTS_PROXY_ENDPOINT };
 
+/**
+ * Non-hook accessor for the persisted TTS config. Use this when a component
+ * only needs to know the latest backend/voice (e.g. ExportModal at submit
+ * time) but does NOT want to pay the cost of mounting the full `useTTS` hook
+ * (AudioContext refs, event handlers, cache plumbing). Issue #72.
+ */
+export function readStoredTTSConfig(): TTSConfig {
+  return loadConfig();
+}
+
 export interface UseTTSResult {
   enabled: boolean;
   toggle: () => void;

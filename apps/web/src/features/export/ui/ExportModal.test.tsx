@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import React from "react";
 import { http, HttpResponse } from "msw";
@@ -49,9 +49,17 @@ function fixtureExportPipeline(): CapturedSubmit {
   return captured;
 }
 
-describe("ExportModal (issue #14 / #58)", () => {
+describe("ExportModal (issue #14 / #58 / #69 / #70 / #72 / #75)", () => {
+  beforeEach(() => {
+    // Issue #70: the modal persists jobIds in sessionStorage to survive a
+    // close/reopen cycle. Wipe both stores between tests so prior fixtures
+    // don't leak into the next render.
+    sessionStorage.clear();
+    localStorage.clear();
+  });
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
   });
 
   it("renders the preview card with the playbook's first step title", () => {
@@ -107,5 +115,202 @@ describe("ExportModal (issue #14 / #58)", () => {
     });
     const alert = await findByRole("alert");
     expect(alert.textContent ?? "").toMatch(/OpenAI 后端/);
+  });
+
+  // ---- Issue #75 — expanded coverage below this line ----
+
+  it("× button calls onClose", () => {
+    const onClose = vi.fn();
+    const { getByLabelText } = render(
+      <ExportModal runId="r1" isDark previewTitle="x" onClose={onClose} />,
+    );
+    fireEvent.click(getByLabelText("关闭"));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables 开始导出 when runId is null", () => {
+    const { getByText } = render(
+      <ExportModal runId={null} isDark previewTitle="x" onClose={() => undefined} />,
+    );
+    expect((getByText("开始导出") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("surfaces server-side submit failure as alert", async () => {
+    server.use(
+      http.post(`${API_BASE_URL}/api/v1/exports`, () =>
+        HttpResponse.json({ detail: "boom" }, { status: 500 }),
+      ),
+    );
+    const { getByText, findByRole } = render(
+      <ExportModal runId="r1" isDark previewTitle="x" onClose={() => undefined} />,
+    );
+    await act(async () => {
+      fireEvent.click(getByText("开始导出"));
+    });
+    const alert = await findByRole("alert");
+    expect(alert.textContent ?? "").toMatch(/boom|提交/);
+  });
+
+  it("renders the download link when status reaches completed", async () => {
+    server.use(
+      http.post(`${API_BASE_URL}/api/v1/exports`, () =>
+        HttpResponse.json({
+          job_id: "j1",
+          run_id: "r1",
+          status: "queued",
+          progress: 0,
+          message: null,
+          output_url: null,
+          error: null,
+          with_audio: false,
+          created_at: "now",
+        }),
+      ),
+      http.get(`${API_BASE_URL}/api/v1/exports/j1`, () =>
+        HttpResponse.json({
+          job_id: "j1",
+          run_id: "r1",
+          status: "completed",
+          progress: 1,
+          message: null,
+          output_url: "/api/v1/exports/j1/download",
+          error: null,
+          with_audio: false,
+          created_at: "now",
+        }),
+      ),
+    );
+    const { getByText, findByText } = render(
+      <ExportModal runId="r1" isDark previewTitle="x" onClose={() => undefined} />,
+    );
+    await act(async () => {
+      fireEvent.click(getByText("开始导出"));
+    });
+    const link = await findByText(/下载 MP4/, {}, { timeout: 4000 });
+    expect((link as HTMLAnchorElement).href).toContain("/api/v1/exports/j1/download");
+  });
+
+  it("renders the server's error string when status reaches failed", async () => {
+    server.use(
+      http.post(`${API_BASE_URL}/api/v1/exports`, () =>
+        HttpResponse.json({
+          job_id: "j1",
+          run_id: "r1",
+          status: "queued",
+          progress: 0,
+          message: null,
+          output_url: null,
+          error: null,
+          with_audio: false,
+          created_at: "now",
+        }),
+      ),
+      http.get(`${API_BASE_URL}/api/v1/exports/j1`, () =>
+        HttpResponse.json({
+          job_id: "j1",
+          run_id: "r1",
+          status: "failed",
+          progress: 0.2,
+          message: null,
+          output_url: null,
+          error: "remotion crashed",
+          with_audio: false,
+          created_at: "now",
+        }),
+      ),
+    );
+    const { getByText, findByText } = render(
+      <ExportModal runId="r1" isDark previewTitle="x" onClose={() => undefined} />,
+    );
+    await act(async () => {
+      fireEvent.click(getByText("开始导出"));
+    });
+    await findByText(/remotion crashed/, {}, { timeout: 4000 });
+  });
+
+  it(
+    "stops polling when the poll request errors (issue #69)",
+    async () => {
+      let pollCalls = 0;
+      server.use(
+        http.post(`${API_BASE_URL}/api/v1/exports`, () =>
+          HttpResponse.json({
+            job_id: "j1",
+            run_id: "r1",
+            status: "queued",
+            progress: 0,
+            message: null,
+            output_url: null,
+            error: null,
+            with_audio: false,
+            created_at: "now",
+          }),
+        ),
+        http.get(`${API_BASE_URL}/api/v1/exports/j1`, () => {
+          pollCalls += 1;
+          return HttpResponse.json({ detail: "network down" }, { status: 502 });
+        }),
+      );
+      const { getByText, findByRole } = render(
+        <ExportModal runId="r1" isDark previewTitle="x" onClose={() => undefined} />,
+      );
+      await act(async () => {
+        fireEvent.click(getByText("开始导出"));
+      });
+      const alert = await findByRole("alert", {}, { timeout: 4000 });
+      expect(alert.textContent ?? "").toMatch(/network down|轮询/);
+      const stopAt = pollCalls;
+      // Give the (now-stopped) poll loop a couple of intervals to misbehave.
+      // POLL_INTERVAL_MS is 1500 — wait > 2 intervals to be confident.
+      await new Promise((resolve) => setTimeout(resolve, 3500));
+      expect(pollCalls).toBe(stopAt);
+    },
+    15000,
+  );
+
+  it("forwards the persisted TTS voice when withAudio + openai backend", async () => {
+    // Pre-seed localStorage as if the user already switched to the OpenAI
+    // backend in the player TTS settings — readStoredTTSConfig() is what the
+    // modal reads at submit time (issue #72).
+    localStorage.setItem(
+      "mv_tts_settings",
+      JSON.stringify({ enabled: true, backend: "openai", voice: "echo", rate: 1.0 }),
+    );
+    const captured = fixtureExportPipeline();
+    const { getByText } = render(
+      <ExportModal runId="r1" isDark previewTitle="x" onClose={() => undefined} />,
+    );
+    fireEvent.click(getByText("包含配音（OpenAI TTS）"));
+    await act(async () => {
+      fireEvent.click(getByText("开始导出"));
+    });
+    await waitFor(() => expect(captured.body).not.toBeNull());
+    expect(captured.body).toMatchObject({
+      with_audio: true,
+      tts: { voice: "echo" },
+    });
+  });
+
+  it("rejoins an in-flight job via sessionStorage on mount (issue #70)", async () => {
+    sessionStorage.setItem("mv_export_jobs", JSON.stringify({ r1: "j1" }));
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/exports/j1`, () =>
+        HttpResponse.json({
+          job_id: "j1",
+          run_id: "r1",
+          status: "completed",
+          progress: 1,
+          message: null,
+          output_url: "/api/v1/exports/j1/download",
+          error: null,
+          with_audio: false,
+          created_at: "now",
+        }),
+      ),
+    );
+    const { findByText } = render(
+      <ExportModal runId="r1" isDark previewTitle="x" onClose={() => undefined} />,
+    );
+    await findByText(/下载 MP4/, {}, { timeout: 4000 });
   });
 });
