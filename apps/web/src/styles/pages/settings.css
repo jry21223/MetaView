@@ -155,3 +155,28 @@
 .mv-settings-danger {
   border-color: color-mix(in oklab, var(--warn) 40%, var(--line));
 }
+
+/* Probe row colors — only used when 朗读引擎 = OpenAI 服务端. */
+.mv-settings-probe-ok {
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.mv-settings-probe-err {
+  color: var(--warn);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.mv-settings-probe-hint {
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.mv-settings-probe-hint code {
+  font-family: 'IBM Plex Mono', monospace;
+  background: var(--surface-2);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 11px;
+}

@@ -7,6 +7,7 @@ import {
   OPENAI_VOICES,
   useTTS,
 } from '../../features/playbook/engine/player/useTTS';
+import { API_BASE_URL } from '../../shared/config/constants';
 import type { TweakValues } from '../../features/studio-editor/hooks/useTweaks';
 import { THEME_PALETTE, type ThemeName } from '../../shared/config/themePalette';
 
@@ -58,6 +59,9 @@ export function SettingsPage({
   const [model, setModel] = useState(providerSettings.model);
   const [showKey, setShowKey] = useState(false);
   const [savedFlash, setSavedFlash] = useState<string | null>(null);
+  const [ttsProbe, setTtsProbe] = useState<
+    { kind: 'idle' } | { kind: 'loading' } | { kind: 'ok' } | { kind: 'error'; detail: string }
+  >({ kind: 'idle' });
 
   const tts = useTTS();
 
@@ -87,6 +91,42 @@ export function SettingsPage({
   const handleClearTtsCache = () => {
     tts.clearCache();
     flash('朗读音频缓存已清空');
+  };
+
+  /** Fire a short request through the backend TTS proxy so the user can
+   *  verify their METAVIEW_TTS_API_KEY is set without having to start a
+   *  full playback. 503 from the proxy means the env var isn't configured;
+   *  surface that message directly. */
+  const handleTtsProbe = async () => {
+    setTtsProbe({ kind: 'loading' });
+    try {
+      const resp = await fetch(`${API_BASE_URL}/api/v1/tts/speech`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: '朗读后端测试。',
+          voice: tts.config.voice === 'auto' ? 'alloy' : tts.config.voice,
+          rate: 1.0,
+        }),
+      });
+      if (!resp.ok) {
+        let detail = `状态码 ${resp.status}`;
+        try {
+          const payload = (await resp.json()) as { detail?: string };
+          if (payload?.detail) detail = payload.detail;
+        } catch {
+          // fall through with status-only detail
+        }
+        setTtsProbe({ kind: 'error', detail });
+        return;
+      }
+      setTtsProbe({ kind: 'ok' });
+    } catch (err) {
+      setTtsProbe({
+        kind: 'error',
+        detail: err instanceof Error ? err.message : '请求失败',
+      });
+    }
   };
 
   return (
@@ -180,8 +220,9 @@ export function SettingsPage({
         <section className="mv-settings-section">
           <h2 className="mv-settings-section-title">朗读 · 语音合成</h2>
           <p className="mv-settings-section-hint">
-            选择朗读后端：浏览器自带语音不需要配置；OpenAI 走后端代理（issue #40），
-            API 密钥由后端 <code>METAVIEW_TTS_API_KEY</code> 提供。
+            浏览器语音不需要配置；OpenAI 服务端走后端代理（issue #40），
+            前端不再存第三方密钥。API 密钥需在服务器 <code>.env</code> 设置
+            <code>METAVIEW_TTS_API_KEY</code>（缺省回退到 <code>METAVIEW_OPENAI_API_KEY</code>）。
           </p>
 
           <div className="mv-settings-field">
@@ -203,6 +244,35 @@ export function SettingsPage({
               </button>
             </div>
           </div>
+
+          {tts.config.backend === 'openai' && (
+            <div className="mv-settings-field">
+              <label>API 密钥状态</label>
+              <div className="mv-settings-field-inline">
+                <button
+                  type="button"
+                  className="mv-chip"
+                  onClick={handleTtsProbe}
+                  disabled={ttsProbe.kind === 'loading'}
+                >
+                  {ttsProbe.kind === 'loading' ? '测试中…' : '测试朗读后端'}
+                </button>
+                {ttsProbe.kind === 'ok' && (
+                  <span className="mv-settings-probe-ok">✓ 后端可用，密钥已生效</span>
+                )}
+                {ttsProbe.kind === 'error' && (
+                  <span className="mv-settings-probe-err" role="alert">
+                    ✗ {ttsProbe.detail}
+                  </span>
+                )}
+                {ttsProbe.kind === 'idle' && (
+                  <span className="mv-settings-probe-hint">
+                    点一下确认 <code>METAVIEW_TTS_API_KEY</code> 是否已配置
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="mv-settings-field">
             <label htmlFor="mv-set-voice">音色</label>

@@ -88,6 +88,8 @@ function loadConfig(): TTSConfig {
   return { ...DEFAULT_CONFIG };
 }
 
+const TTS_CONFIG_CHANGE_EVENT = 'mv-tts-config-change';
+
 function saveConfig(cfg: TTSConfig): void {
   try {
     // Persist only the sanitized shape so we don't accidentally re-introduce
@@ -99,6 +101,10 @@ function saveConfig(cfg: TTSConfig): void {
       rate: cfg.rate,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(safe));
+    // Same-tab broadcast — ``storage`` events only fire cross-tab, so each
+    // useTTS instance subscribes to this custom event to pick up changes
+    // made by another component in the same window (e.g. SettingsPage).
+    window.dispatchEvent(new CustomEvent(TTS_CONFIG_CHANGE_EVENT));
   } catch {
     // ignore quota errors
   }
@@ -137,6 +143,25 @@ export interface UseTTSResult {
 export function useTTS(): UseTTSResult {
   const [config, setConfig] = useState<TTSConfig>(loadConfig);
   const [speaking, setSpeaking] = useState(false);
+  // Keep multiple useTTS instances (player + SettingsPage + ExportModal lazy
+  // read) in sync. ``storage`` events only fire cross-tab, so we also listen
+  // for the same-tab custom event that ``saveConfig`` dispatches. Without
+  // this, switching the backend in Settings did not take effect for the
+  // already-mounted player. (Companion to issue #40 / #72 layering.)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const refresh = () => setConfig(loadConfig());
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== STORAGE_KEY) return;
+      refresh();
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener(TTS_CONFIG_CHANGE_EVENT, refresh);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener(TTS_CONFIG_CHANGE_EVENT, refresh);
+    };
+  }, []);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const audioSrcRef = useRef<AudioBufferSourceNode | null>(null);
   const abortRef = useRef<AbortController | null>(null);
