@@ -58,6 +58,20 @@ export default defineConfig({
       // Thresholds pinned at the current baseline (May 2026: ~50% lines,
       // ~78% branches, ~76% functions) so any regression is loud; bump
       // these up as new tests land. Issue #66.
+      //
+      // Issue #73 — long-term we want:
+      //   1. per-module overrides (``"src/shared/**": { lines: 80, ... }``)
+      //      so cross-cutting utilities stay tightly tested even when the
+      //      whole-tree average sags.
+      //   2. diff-coverage in CI (run ``diff-cover coverage/lcov.info
+      //      --compare-branch=origin/main --fail-under=80`` after this
+      //      job) so PRs only have to clear the bar for the lines they
+      //      actually touched.
+      //   3. a baseline-bumping commit (``ci(coverage): raise floor``) any
+      //      time global coverage holds above the new bar for a sprint.
+      // (1) is blocked on the v8 coverage / DOMPurify ESM interop bug
+      // breaking ``vitest --coverage`` for the math-scene renderers — fix
+      // that first, then turn the overrides on.
       thresholds: {
         statements: 50,
         branches: 70,

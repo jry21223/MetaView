@@ -37,12 +37,15 @@ test:
 # Issue #66 — coverage reporting + per-side thresholds. Kept off the
 # default ``check`` target so CI fast path stays fast; opt in via
 # ``make test-coverage`` locally or in a dedicated CI job.
+# Issue #73 — backend currently sits at ~82% line coverage; the floor is
+# 75% so any meaningful regression trips the gate but flake-level noise
+# (a tiny PR touching a low-coverage path) doesn't.
 test-coverage:
 	.venv/bin/pytest apps/api/tests \
 		--cov=apps/api/app \
 		--cov-report=term-missing \
 		--cov-report=html:coverage/api \
-		--cov-fail-under=60
+		--cov-fail-under=75
 	npm --workspace apps/web run test:coverage
 
 build:
