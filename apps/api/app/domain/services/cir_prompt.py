@@ -89,7 +89,15 @@ B. WHEN TO USE visual_kind="scene" (2D 几何场景 — 最重要的新能力！
      - segments: 线段。**必须**用 ``{"x0":..,"y0":..,"x1":..,"y1":..,"arrow":bool}`` 形状；
        **不要**用 ``{"points":[...]}`` 写 polyline。每条边写一条 segment。
        矩形边界 = 4 条 segment（4 条边）。
-     - vector_field: P, Q 都是 x, y 的表达式（同 function 允许的字符集）。step 是采样格距。
+     - vector_field: **可选高级元素，默认不要发**。P, Q 都是 x, y 的表达式（同 function 允许
+       的字符集）。step 是采样格距。仅在 narration **明确**讨论以下任一概念时才使用：
+       「流场 / 相平面流 / 矢量场本身（旋度/散度/通量）/ 格林/斯托克斯/高斯定理的几何含义」。
+       ⚠️ 反例：只是想画"在某点的速度方向 / 某个箭头"——用一条 ``segments`` 加 ``arrow:true``，
+       **不要**铺一整个 vector_field 网格，否则视觉信息密度远超讲解，学生会以为画错了。
+       ⚠️ 反例：画轨迹 (cos t, -sin t) 只想说明运动方向——用一条 segments 箭头标在曲线上的某点
+       即可，不要画整个 (y, -x) 流场。
+       ✓ 正例：narration 是「这个流场 F=(-y, x) 的旋度为 2，所以每一点都在做反时针旋转」——
+       这时才该发 vector_field，因为讨论的就是它本身。
      - curves: ``{"expression_y":"sin(x)"}`` (1D) 或
        ``{"expression_y":"sin(t)","expression_x":"cos(t)","t_min":0,"t_max":6.28}`` (参数式)。
        **不要**用 ``{"points":[...]}`` 输出预采样点；表达式让前端在帧时实时采样。
@@ -436,6 +444,8 @@ Example (bubble sort compare step):
 4. visual_kind="function" 时 plot.curves 是否非空、表达式是否仅含允许的字符？
 5. visual_kind="scene" 时 step.scene 是否非空？regions/segments/vector_field/curves 至少有一个？
    vector_field.expression_px / expression_py 是否只用允许的字符？
+   **`vector_field` 仅在 narration 真讨论流场/旋度/散度时发**；只想画一个方向箭头一律改用
+   `segments` + `arrow:true`，不要无脑铺整个网格。
 6. visual_kind="formula" 时 plot.formula_latex 是否非空、annotations 是否 1–3 条？
 7. 涉及自由参数的 function 步骤是否在 execution_map.parameter_controls 列出了对应滑杆？
 8. 如果使用了 layers：每个 layer.timing.enter_at <= exit_at，且都在 [0,1] 之内？
