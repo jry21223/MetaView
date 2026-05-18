@@ -223,13 +223,15 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
           })}
         </div>
 
-        {/* Subtitle row */}
+        {/* Subtitle row — minHeight so short narration uses the compact row,
+            longer text wraps up to PLAYBOOK_LAYOUT.SUBTITLE_MAX_LINES before
+            the ellipsis kicks in. */}
         <div
           style={{
-            height: subtitleHeight,
+            minHeight: subtitleHeight,
             display: "flex",
             alignItems: "center",
-            padding: "0 20px",
+            padding: "8px 20px",
             background: subtitleBg,
             borderTop: `1px solid ${dividerColor}`,
             gap: 12,
@@ -242,9 +244,11 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
               fontSize: 14,
               lineHeight: 1.5,
               flex: 1,
-              whiteSpace: "nowrap",
+              display: "-webkit-box",
+              WebkitBoxOrient: "vertical",
+              WebkitLineClamp: PLAYBOOK_LAYOUT.SUBTITLE_MAX_LINES,
               overflow: "hidden",
-              textOverflow: "ellipsis",
+              wordBreak: "break-word",
             }}
           >
             {step.voiceover_text}

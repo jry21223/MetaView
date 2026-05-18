@@ -10,8 +10,11 @@ export const PLAYBOOK_DEFAULTS = {
 export const PLAYBOOK_LAYOUT = {
   /** Fraction of width allocated to the viz panel when code track is present (0–1) */
   VIZ_SPLIT_RATIO: 0.5,
-  /** Height of the subtitle bar in px (within the composition canvas) */
+  /** Minimum height of the subtitle bar in px (within the composition canvas).
+   *  The actual row grows up to MAX_LINES * line-height when narration wraps. */
   SUBTITLE_HEIGHT: 52,
+  /** Maximum number of subtitle lines before truncating with ellipsis. */
+  SUBTITLE_MAX_LINES: 3,
   /** Frames for subtitle fade-in at the start of each step */
   SUBTITLE_FADE_FRAMES: 6,
 } as const;
