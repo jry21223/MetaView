@@ -7,7 +7,12 @@
   "overrides": {
     "flatted": "^3.4.2",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "remotion": "4.0.462",
+    "@remotion/bundler": "4.0.462",
+    "@remotion/cli": "4.0.462",
+    "@remotion/renderer": "4.0.462",
+    "@remotion/player": "4.0.462"
   },
   "scripts": {
     "build:web": "npm --workspace apps/web run build",
