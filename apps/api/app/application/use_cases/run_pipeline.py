@@ -56,7 +56,9 @@ class RunPipelineUseCase:
         self._max_repair_attempts = max(0, max_repair_attempts)
         self._reviewer_mode = _normalize_reviewer_mode(reviewer_mode)
         self._agent_provider = agent_provider
-        self._generation_mode = generation_mode if generation_mode in {"single", "agent"} else "single"
+        self._generation_mode = (
+            generation_mode if generation_mode in {"single", "agent"} else "single"
+        )
 
     async def execute(self, run_id: str, request: PipelineRequest) -> None:
         await self._repo.update(run_id, status=PipelineRunStatus.RUNNING)
