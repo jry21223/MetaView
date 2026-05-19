@@ -210,3 +210,60 @@ end_frame_i = (i+1) * 60                               # 无 execution_map（兼
 | `apps/api/app/application/use_cases/export_video.py` | Remotion CLI subprocess + TTS 配音对齐 + stderr 回传 |
 | `apps/api/app/presentation/router_exports.py` | `/exports` 路由（提交 / 状态 / 下载） |
 | `apps/web/src/remotion/Root.tsx` & `PlaybookExportComposition.tsx` | Remotion `Composition`，导出时与播放器共用 `renderers/registry` |
+
+## 10. Agent 生成模式（`METAVIEW_GENERATION_MODE=agent`）
+
+第二条并行的生成链路，用 [pi-agent-core](https://github.com/earendil-works/pi)
+做 agent runtime，通过细粒度 **Drawing CLI** 工具一步步建出 PlaybookScript。
+**默认仍是 `single` 模式**——agent 模式开启后才会绕过 CIR/builder/reviewer。
+
+### 切换
+
+```bash
+METAVIEW_GENERATION_MODE=agent
+METAVIEW_AGENT_BASE_URL=http://agent:8001   # docker-compose service name
+METAVIEW_AGENT_TIMEOUT_S=600
+```
+
+`docker-compose up` 会同时启 `api` / `web` / `agent` 三个 service。本地 `make
+dev` 同样并行起三个进程。
+
+### Drawing CLI 工具集
+
+`apps/agent/src/tools/drawing.ts` 注册 L1 原子工具：`plan_outline`、
+`begin_step`、`set_axes`、`add_curve_parametric`、`add_curve_1d`、
+`add_point`、`add_arrow`、`add_segment`、`add_region`、`add_formula`、
+`add_array_tokens`、`add_parameter_control`、`commit_step`、`finalize_playbook`。
+
+**没有 `add_vector_field` 工具**——这是从能力面上消除「无端铺整片流场」
+这个老毛病的关键设计。要画方向只能用 `add_arrow` 一根根加。
+
+`apps/agent/src/tools/templates.ts` 注册 L2 教学模板（约 11 个跨学科）：
+`template_array_swap` / `template_tangent_at` / `template_force_diagram` /
+`template_projectile_trajectory` / `template_riemann_sum` 等，LLM 一次调用
+展开成多个 step。
+
+### 几何自检
+
+`apps/agent/src/tools/asserts.ts` 把三个工具透传到 FastAPI：
+
+| 工具 | 路由 | 后端实现 |
+|---|---|---|
+| `assert_orientation` | `POST /api/v1/agent/assert/orientation` | sympy 算参数曲线在 t∈[t_min,t_max] 区间的有向面积，判 cw/ccw |
+| `assert_passes_through` | `POST /api/v1/agent/assert/passes-through` | 数值采样 + refine，找最近点距离 |
+| `assert_monotonic` | `POST /api/v1/agent/assert/monotonic` | sympy `diff` 后区间内符号一致性 |
+
+LLM 在 narration 里写「顺/逆时针」「递增/递减」之前，**必须**先调对应
+`assert_*`，工具结果是确定真值，不一致就被强制回去改 narration。
+
+### 关键文件
+
+| 文件 | 职责 |
+|---|---|
+| `apps/agent/src/server.ts` | Express，`POST /generate` 入口 |
+| `apps/agent/src/agent.ts` | `Agent` 实例 + 工具注册 + system prompt |
+| `apps/agent/src/state/playbookEmitter.ts` | 累积工具调用 → PlaybookScript JSON |
+| `apps/api/app/application/ports/agent_provider.py` | `IAgentProvider` Protocol |
+| `apps/api/app/infrastructure/agent/http_agent_provider.py` | httpx 客户端 |
+| `apps/api/app/domain/services/geometry_validators.py` | sympy 校验纯函数 |
+| `apps/api/app/presentation/router_agent.py` | `/api/v1/agent/assert/*` 路由 |

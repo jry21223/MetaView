@@ -1,0 +1,105 @@
+"""Tests for the /api/v1/agent/assert/* endpoints exposed for the Node sidecar."""
+
+from __future__ import annotations
+
+import math
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app.main import create_app
+
+
+@pytest.fixture()
+def client() -> TestClient:
+    return TestClient(create_app())
+
+
+def test_orientation_endpoint_returns_clockwise_for_cos_negative_sin(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        "/api/v1/agent/assert/orientation",
+        json={
+            "expression_x": "cos(t)",
+            "expression_y": "-sin(t)",
+            "t_min": 0.0,
+            "t_max": 2 * math.pi,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["direction"] == "clockwise"
+
+
+def test_orientation_endpoint_returns_counterclockwise(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/agent/assert/orientation",
+        json={
+            "expression_x": "cos(t)",
+            "expression_y": "sin(t)",
+            "t_min": 0.0,
+            "t_max": 2 * math.pi,
+        },
+    )
+    assert response.json()["direction"] == "counterclockwise"
+
+
+def test_passes_through_endpoint(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/agent/assert/passes-through",
+        json={
+            "expression_x": "cos(t)",
+            "expression_y": "sin(t)",
+            "t_min": 0.0,
+            "t_max": 2 * math.pi,
+            "target_x": 1.0,
+            "target_y": 0.0,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["passes"] is True
+    assert payload["distance"] < 1e-3
+
+
+def test_passes_through_far_point_misses(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/agent/assert/passes-through",
+        json={
+            "expression_x": "cos(t)",
+            "expression_y": "sin(t)",
+            "t_min": 0.0,
+            "t_max": 2 * math.pi,
+            "target_x": 10.0,
+            "target_y": 10.0,
+        },
+    )
+    payload = response.json()
+    assert payload["passes"] is False
+
+
+def test_monotonic_endpoint_increasing(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/agent/assert/monotonic",
+        json={"expression": "x**2", "x_min": 0.1, "x_max": 2.0},
+    )
+    assert response.json()["verdict"] == "increasing"
+
+
+def test_monotonic_endpoint_mixed(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/agent/assert/monotonic",
+        json={"expression": "x**2", "x_min": -1.0, "x_max": 1.0},
+    )
+    assert response.json()["verdict"] == "mixed"
+
+
+def test_rejects_oversize_expression(client: TestClient) -> None:
+    # Endpoint pydantic guard: max_length=256 on expression fields.
+    big = "x" * 300
+    response = client.post(
+        "/api/v1/agent/assert/monotonic",
+        json={"expression": big, "x_min": 0.0, "x_max": 1.0},
+    )
+    assert response.status_code == 422

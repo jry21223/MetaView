@@ -9,10 +9,12 @@ from typing import Any
 from pydantic import ValidationError
 
 from app.application.dto.pipeline_dto import PipelineRequest
+from app.application.ports.agent_provider import IAgentProvider
 from app.application.ports.llm_provider import ILLMProvider
 from app.application.ports.run_repository import IRunRepository
 from app.domain.models.cir import CirDocument, ExecutionMap
 from app.domain.models.pipeline_run import PipelineRunStatus
+from app.domain.models.playbook import PlaybookScript
 from app.domain.models.review import CirReviewIssue, CirReviewReport, ReviewSeverity
 from app.domain.models.topic import TopicDomain
 from app.domain.services.cir_prompt import build_cir_prompt
@@ -45,15 +47,60 @@ class RunPipelineUseCase:
         reviewer_llm: ILLMProvider | None = None,
         max_repair_attempts: int = 0,
         reviewer_mode: str = "on_failure",
+        agent_provider: IAgentProvider | None = None,
+        generation_mode: str = "single",
     ) -> None:
         self._repo = run_repo
         self._llm = llm
         self._reviewer_llm = reviewer_llm
         self._max_repair_attempts = max(0, max_repair_attempts)
         self._reviewer_mode = _normalize_reviewer_mode(reviewer_mode)
+        self._agent_provider = agent_provider
+        self._generation_mode = generation_mode if generation_mode in {"single", "agent"} else "single"
 
     async def execute(self, run_id: str, request: PipelineRequest) -> None:
         await self._repo.update(run_id, status=PipelineRunStatus.RUNNING)
+        if self._generation_mode == "agent" and self._agent_provider is not None:
+            await self._execute_agent(run_id, request)
+            return
+        await self._execute_single(run_id, request)
+
+    async def _execute_agent(self, run_id: str, request: PipelineRequest) -> None:
+        """Generate via the Node sidecar (pi-agent-core) and persist the
+        resulting PlaybookScript verbatim. Skips CIR parsing / playbook_builder
+        because the agent has already emitted the final shape via the Drawing
+        CLI commit_step / finalize_playbook tools.
+        """
+        assert self._agent_provider is not None  # for type-checkers
+        provider_config: dict[str, Any] | None = None
+        if request.provider_api_key:
+            provider_config = {
+                "api_key": request.provider_api_key,
+                "base_url": request.provider_base_url,
+                "model": request.provider_model,
+            }
+        try:
+            playbook_dict = await self._agent_provider.generate(
+                request.prompt, provider_config=provider_config
+            )
+            # Validate the sidecar payload against the canonical PlaybookScript
+            # schema so any malformed output is caught here (not at render time).
+            playbook = PlaybookScript.model_validate(playbook_dict)
+            await self._repo.update(
+                run_id,
+                status=PipelineRunStatus.SUCCEEDED,
+                playbook_json=playbook.model_dump_json(),
+            )
+        except Exception as exc:
+            logger.exception("Pipeline run %s (agent mode) failed", run_id)
+            await self._repo.update(
+                run_id,
+                status=PipelineRunStatus.FAILED,
+                error=str(exc),
+            )
+
+    async def _execute_single(self, run_id: str, request: PipelineRequest) -> None:
+        """Original single-shot pipeline: prompt → LLM → CIR JSON → builder."""
         review_report = CirReviewReport()
         try:
             domain_hint = _resolve_domain(request.domain, request.prompt)

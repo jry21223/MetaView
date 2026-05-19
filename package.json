@@ -2,7 +2,8 @@
   "name": "metaview",
   "private": true,
   "workspaces": [
-    "apps/web"
+    "apps/web",
+    "apps/agent"
   ],
   "overrides": {
     "flatted": "^3.4.2",

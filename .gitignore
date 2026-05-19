@@ -33,6 +33,10 @@ PPT版本对比说明.md
 COMPETITION_SUBMISSION/
 data/html_previews/
 tools/
+# Allow the agent's TS tool registry which happens to live under a path
+# that matches the broad ``tools/`` ignore above.
+!apps/agent/src/tools/
+!apps/agent/src/tools/**
 coverage/
 apps/web/coverage/
 .coverage

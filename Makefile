@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 
-.PHONY: bootstrap bootstrap-manim setup-hooks dev-web dev-api dev start stop lint test test-coverage build check docker-build docker-up docker-down
+.PHONY: bootstrap bootstrap-manim setup-hooks dev-web dev-api dev-agent dev start stop lint test test-coverage build check docker-build docker-up docker-down
 
 DOCKER_COMPOSE_CMD := $(shell sh -lc 'if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then printf "%s" "docker compose"; elif command -v docker-compose >/dev/null 2>&1; then printf "%s" "docker-compose"; fi')
 
@@ -23,16 +23,21 @@ dev-web:
 dev-api:
 	.venv/bin/uvicorn app.main:app --app-dir apps/api --reload --host 0.0.0.0 --port 8000
 
+dev-agent:
+	npm --workspace apps/agent run dev
+
 dev:
-	@trap 'kill 0' INT TERM EXIT; $(MAKE) dev-api & $(MAKE) dev-web & wait
+	@trap 'kill 0' INT TERM EXIT; $(MAKE) dev-api & $(MAKE) dev-web & $(MAKE) dev-agent & wait
 
 lint:
 	npm --workspace apps/web run lint
+	npm --workspace apps/agent run lint
 	.venv/bin/ruff check apps/api/app apps/api/tests
 
 test:
 	.venv/bin/pytest apps/api/tests -q
 	npm --workspace apps/web run test
+	npm --workspace apps/agent run test
 
 # Issue #66 — coverage reporting + per-side thresholds. Kept off the
 # default ``check`` target so CI fast path stays fast; opt in via
@@ -50,6 +55,7 @@ test-coverage:
 
 build:
 	npm --workspace apps/web run build
+	npm --workspace apps/agent run build
 
 check: lint test build
 

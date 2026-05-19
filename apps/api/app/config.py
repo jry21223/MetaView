@@ -77,6 +77,16 @@ class Settings(BaseSettings):
     # field (DeepSeek, local vLLM, etc.). Allowed: minimal/low/medium/high.
     openai_reasoning_effort: str | None = None
 
+    # ── Generation pipeline mode (single-shot vs agent sidecar) ─────────────
+    # ``single`` keeps the current OpenAIProvider.complete() → CIR JSON path.
+    # ``agent`` routes to the apps/agent Node sidecar (pi-agent-core) which
+    # builds the PlaybookScript turn-by-turn via Drawing CLI tool calls and
+    # calls back into /api/v1/agent/assert/* for sympy-based geometry checks.
+    # Toggle is per-deployment; per-request override stays out of scope for now.
+    generation_mode: str = "single"
+    agent_base_url: str = "http://agent:8001"
+    agent_timeout_s: float = 600.0
+
     @field_validator("openai_timeout_s", mode="before")
     @classmethod
     def normalize_optional_timeout(cls, value: float | str | None) -> float | str | None:
@@ -107,6 +117,16 @@ class Settings(BaseSettings):
             return None
         if normalized not in {"minimal", "low", "medium", "high"}:
             return None
+        return normalized
+
+    @field_validator("generation_mode", mode="before")
+    @classmethod
+    def normalize_generation_mode(cls, value: str | None) -> str:
+        if value is None:
+            return "single"
+        normalized = value.strip().lower()
+        if normalized not in {"single", "agent"}:
+            return "single"
         return normalized
 
     @property

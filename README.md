@@ -108,6 +108,9 @@ make check   # 上面三步串联
 | `METAVIEW_OPENAI_TIMEOUT_S` | `300` | 请求超时秒数 |
 | `METAVIEW_OPENAI_MAX_TOKENS` | `16000` | chat/completions 的 `max_tokens`；CIR 长脚本需要这么大，被截断会触发 `_regenerate` |
 | `METAVIEW_OPENAI_REASONING_EFFORT` | – | gpt-5 / o-series 专用 (`minimal\|low\|medium\|high`)，其它服务商留空 |
+| `METAVIEW_GENERATION_MODE` | `single` | `single`（现状 LLM→CIR）或 `agent`（pi-agent-core Drawing CLI 链路） |
+| `METAVIEW_AGENT_BASE_URL` | `http://agent:8001` | agent sidecar 地址（仅 agent 模式生效） |
+| `METAVIEW_AGENT_TIMEOUT_S` | `600` | agent 生成超时秒数 |
 | `METAVIEW_DEFAULT_PROVIDER` | – | 显式指定默认 provider，留空自动 |
 | `METAVIEW_MOCK_PROVIDER_ENABLED` | `true` | 是否暴露 `mock` provider |
 | `METAVIEW_ENABLED_DOMAINS` | 全部七项 | 启用的学科 |

@@ -6,10 +6,12 @@ from typing import Annotated
 
 from fastapi import Depends
 
+from app.application.ports.agent_provider import IAgentProvider
 from app.application.ports.export_repository import IExportJobRepository
 from app.application.ports.llm_provider import ILLMProvider
 from app.application.ports.run_repository import IRunRepository
 from app.config import Settings, get_settings
+from app.infrastructure.agent.http_agent_provider import HttpAgentProvider
 from app.infrastructure.llm.openai_provider import OpenAIProvider
 from app.infrastructure.persistence.in_memory_export_repository import (
     InMemoryExportJobRepository,
@@ -70,6 +72,25 @@ def get_llm_provider(settings: Annotated[Settings, Depends(get_settings)]) -> IL
         settings.openai_max_tokens,
         settings.openai_reasoning_effort,
     )
+
+
+@lru_cache
+def _get_agent_provider(base_url: str, timeout_s: float) -> HttpAgentProvider:
+    return HttpAgentProvider(base_url=base_url, timeout_s=timeout_s)
+
+
+def get_agent_provider(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> IAgentProvider | None:
+    """Return the configured agent sidecar client when generation_mode=agent.
+
+    Returns ``None`` in single-shot mode so the use-case never accidentally
+    calls into the sidecar (and so unit tests can construct without a
+    network-bound provider).
+    """
+    if settings.generation_mode != "agent":
+        return None
+    return _get_agent_provider(settings.agent_base_url, settings.agent_timeout_s)
 
 
 def get_reviewer_llm_provider(

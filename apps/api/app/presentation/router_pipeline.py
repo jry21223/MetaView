@@ -8,6 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends
 from starlette.requests import Request
 
 from app.application.dto.pipeline_dto import PipelineRequest, PipelineRunResponse
+from app.application.ports.agent_provider import IAgentProvider
 from app.application.ports.llm_provider import ILLMProvider
 from app.application.ports.run_repository import IRunRepository
 from app.application.use_cases.run_pipeline import RunPipelineUseCase
@@ -15,6 +16,7 @@ from app.config import Settings, get_settings
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.infrastructure.llm.openai_provider import OpenAIProvider
 from app.presentation.dependencies import (
+    get_agent_provider,
     get_llm_provider,
     get_reviewer_llm_provider,
     get_run_repo,
@@ -34,6 +36,7 @@ async def submit_pipeline(
     run_repo: Annotated[IRunRepository, Depends(get_run_repo)],
     llm: Annotated[ILLMProvider, Depends(get_llm_provider)],
     reviewer_llm: Annotated[ILLMProvider | None, Depends(get_reviewer_llm_provider)],
+    agent_provider: Annotated[IAgentProvider | None, Depends(get_agent_provider)],
 ) -> PipelineRunResponse:
     run_id = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
@@ -61,6 +64,8 @@ async def submit_pipeline(
         reviewer_llm=effective_reviewer,
         max_repair_attempts=settings.max_repair_attempts,
         reviewer_mode=settings.reviewer_mode,
+        agent_provider=agent_provider,
+        generation_mode=settings.generation_mode,
     )
     background_tasks.add_task(use_case.execute, run_id, payload)
 

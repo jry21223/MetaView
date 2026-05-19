@@ -7,6 +7,8 @@ services:
         APT_MIRROR: ${APT_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn/debian}
         APT_SECURITY_MIRROR: ${APT_SECURITY_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn/debian-security}
         APT_PIPELINE_DEPTH: ${APT_PIPELINE_DEPTH:-0}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+        PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-pypi.tuna.tsinghua.edu.cn}
     environment:
       METAVIEW_DEFAULT_PROVIDER: ${METAVIEW_DEFAULT_PROVIDER:-mock}
       METAVIEW_DEFAULT_ROUTER_PROVIDER: ${METAVIEW_DEFAULT_ROUTER_PROVIDER:-mock}
@@ -25,11 +27,34 @@ services:
       METAVIEW_OPENAI_MODEL: ${METAVIEW_OPENAI_MODEL:-}
       METAVIEW_OPENAI_SUPPORTS_VISION: ${METAVIEW_OPENAI_SUPPORTS_VISION:-false}
       METAVIEW_OPENAI_TIMEOUT_S: ${METAVIEW_OPENAI_TIMEOUT_S:-300}
+      # Agent sidecar wiring — only used when generation_mode=agent.
+      METAVIEW_GENERATION_MODE: ${METAVIEW_GENERATION_MODE:-single}
+      METAVIEW_AGENT_BASE_URL: ${METAVIEW_AGENT_BASE_URL:-http://agent:8001}
+      METAVIEW_AGENT_TIMEOUT_S: ${METAVIEW_AGENT_TIMEOUT_S:-600}
     ports:
       - "8000:8000"
     volumes:
       - ./data:/app/data
       - ./skills:/app/skills
+
+  agent:
+    build:
+      context: .
+      dockerfile: apps/agent/Dockerfile
+    environment:
+      # The sidecar reaches the FastAPI side over docker-compose's internal
+      # network so the assert_* tools can call /api/v1/agent/assert/*.
+      API_BASE_URL: ${AGENT_API_BASE_URL:-http://api:8000}
+      AGENT_DEFAULT_PROVIDER: ${AGENT_DEFAULT_PROVIDER:-openai}
+      AGENT_DEFAULT_MODEL: ${AGENT_DEFAULT_MODEL:-gpt-4o-mini}
+      # Reuse the LLM key already configured for single-shot generation so
+      # operators only manage one secret.
+      AGENT_DEFAULT_API_KEY: ${METAVIEW_OPENAI_API_KEY:-}
+      LOG_LEVEL: ${AGENT_LOG_LEVEL:-info}
+    depends_on:
+      - api
+    ports:
+      - "8001:8001"
 
   web:
     build:
