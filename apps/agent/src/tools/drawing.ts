@@ -7,11 +7,12 @@
  * single biggest pedagogical guardrail in the new pipeline.
  */
 
-import { Type, type Static, type TSchema } from "@earendil-works/pi-ai";
-import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
+import { Type, type TSchema } from "@earendil-works/pi-ai";
+import type { AgentTool } from "@earendil-works/pi-agent-core";
 
 import type { PlaybookEmitter } from "../state/playbookEmitter.js";
 import type { PlaybookOutput } from "../state/types.js";
+import { defineTool, toolResult } from "./common.js";
 
 export interface DrawingToolDeps {
   emitter: PlaybookEmitter;
@@ -22,34 +23,6 @@ const EmphasisSchema = Type.Union([
   Type.Literal("secondary"),
   Type.Literal("accent"),
 ]);
-
-/** Wrap a JSON-serializable details object into the AgentToolResult envelope
- *  pi-agent-core expects. ``content`` is what the model sees; ``details`` is
- *  what the rest of our code reads. */
-function toolResult<T>(details: T, opts?: { terminate?: boolean }): AgentToolResult<T> {
-  return {
-    content: [{ type: "text", text: JSON.stringify(details) }],
-    details,
-    terminate: opts?.terminate,
-  };
-}
-
-/** Helper for declaring an AgentTool with stricter typing of args. */
-function defineTool<S extends TSchema, D>(
-  name: string,
-  label: string,
-  description: string,
-  parameters: S,
-  execute: (params: Static<S>) => Promise<AgentToolResult<D>>,
-): AgentTool<S, D> {
-  return {
-    name,
-    label,
-    description,
-    parameters,
-    execute: async (_toolCallId, params) => execute(params),
-  };
-}
 
 export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
   const { emitter } = deps;

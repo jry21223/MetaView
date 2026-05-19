@@ -16,6 +16,7 @@ import type {
   RegionBuilder,
   SegmentBuilder,
   StepBuilder,
+  VisualKind,
 } from "./types.js";
 
 const DEFAULT_FPS = 30;
@@ -65,7 +66,6 @@ export class PlaybookEmitter {
       title,
       narration: [],
       voiceover_text: "",
-      visual_kind: "scene",
       curves: [],
       points: [],
       segments: [],
@@ -125,7 +125,6 @@ export class PlaybookEmitter {
     x_max?: number,
   ): number {
     const step = this.requireStep("add_curve_1d");
-    step.visual_kind = "function";
     const curve: CurveBuilder = {
       curve_id: this.nextCurveId++,
       expression_x: null,
@@ -200,13 +199,10 @@ export class PlaybookEmitter {
   addFormula(latex: string): void {
     const step = this.requireStep("add_formula");
     step.formula_latex = latex;
-    // For pure formula steps with no scene elements, the rendered snapshot
-    // collapses to ``visual_kind: formula``; downstream commit decides.
   }
 
   addArrayTokens(values: string[], emphasisMap?: Record<number, Emphasis>): void {
     const step = this.requireStep("add_array_tokens");
-    step.visual_kind = "array";
     step.tokens = values.map<ArrayTokenBuilder>((v, i) => ({
       id: `t${i}`,
       label: String(v),
@@ -224,7 +220,6 @@ export class PlaybookEmitter {
 
   commitStep(): { step_index: number; summary: string } {
     const step = this.requireStep("commit_step");
-    this.applyVisualKindHeuristics(step);
     this.skeleton.steps.push(step);
     const index = step.index;
     const summary = `step ${index} ("${step.title}") — ${step.curves.length} curves, ` +
@@ -235,9 +230,36 @@ export class PlaybookEmitter {
   }
 
   // ── Inspection (used by assert tools so they can look up a curve_id) ──
-  getCurrentCurve(curve_id: number): CurveBuilder | null {
-    if (!this.currentStep) return null;
-    return this.currentStep.curves.find((c) => c.curve_id === curve_id) ?? null;
+  /** Resolve a parametric curve currently in the open step. Returns the
+   *  shape required by assert_* tools (expression strings + t-range) or an
+   *  error message ready to surface as the tool result. Encapsulates the
+   *  "is this actually a parametric curve in the current step" check so
+   *  asserts.ts doesn't have to know StepBuilder internals. */
+  resolveParametricCurve(
+    curve_id: number,
+  ):
+    | { ok: true; expression_x: string; expression_y: string; t_min: number; t_max: number }
+    | { ok: false; reason: string } {
+    if (!this.currentStep) {
+      return { ok: false, reason: "no open step — call begin_step first" };
+    }
+    const curve = this.currentStep.curves.find((c) => c.curve_id === curve_id);
+    if (!curve) {
+      return { ok: false, reason: `curve_id ${curve_id} not found in current step` };
+    }
+    if (!curve.is_parametric || curve.expression_x == null || curve.t_min == null || curve.t_max == null) {
+      return {
+        ok: false,
+        reason: `curve_id ${curve_id} is not a parametric curve (need add_curve_parametric)`,
+      };
+    }
+    return {
+      ok: true,
+      expression_x: curve.expression_x,
+      expression_y: curve.expression_y,
+      t_min: curve.t_min,
+      t_max: curve.t_max,
+    };
   }
 
   hasOpenStep(): boolean {
@@ -286,29 +308,31 @@ export class PlaybookEmitter {
     return this.currentStep;
   }
 
-  private applyVisualKindHeuristics(step: StepBuilder): void {
-    // If a step ended up with no visual elements at all but has a formula,
-    // mark it as ``formula`` so the player renders the KaTeX overlay only.
-    if (
-      step.curves.length === 0 &&
-      step.points.length === 0 &&
-      step.segments.length === 0 &&
-      step.regions.length === 0 &&
-      step.tokens.length === 0 &&
-      step.formula_latex
-    ) {
-      step.visual_kind = "formula";
-    } else if (step.tokens.length > 0) {
-      step.visual_kind = "array";
-    } else if (step.curves.some((c) => c.is_parametric) ||
-      step.regions.length > 0 ||
-      step.segments.length > 0
-    ) {
-      step.visual_kind = "scene";
-    } else if (step.curves.length > 0) {
-      step.visual_kind = "function";
-    }
+}
+
+/** Derive the rendered visual kind from a step's accumulated content. Pure,
+ *  used by serializeSnapshot so we never have to keep a mutable
+ *  ``visual_kind`` field in sync with the visual elements. */
+function deriveVisualKind(step: StepBuilder): VisualKind {
+  if (step.tokens.length > 0) return "array";
+  if (
+    step.curves.length === 0 &&
+    step.points.length === 0 &&
+    step.segments.length === 0 &&
+    step.regions.length === 0 &&
+    step.formula_latex
+  ) {
+    return "formula";
   }
+  if (
+    step.curves.some((c) => c.is_parametric) ||
+    step.regions.length > 0 ||
+    step.segments.length > 0
+  ) {
+    return "scene";
+  }
+  if (step.curves.length > 0) return "function";
+  return "scene";
 }
 
 function serializeStep(
@@ -336,7 +360,8 @@ function serializeStep(
 }
 
 function serializeSnapshot(step: StepBuilder): Record<string, unknown> | null {
-  if (step.visual_kind === "array") {
+  const kind = deriveVisualKind(step);
+  if (kind === "array") {
     const labels = step.tokens.map((t) => t.label);
     const allNumeric = labels.every((l) => /^-?\d+(\.\d+)?$/.test(l));
     return {
@@ -349,13 +374,13 @@ function serializeSnapshot(step: StepBuilder): Record<string, unknown> | null {
       })),
     };
   }
-  if (step.visual_kind === "formula") {
+  if (kind === "formula") {
     return {
       kind: "math_formula",
       formula_latex: step.formula_latex ?? "",
     };
   }
-  if (step.visual_kind === "function") {
+  if (kind === "function") {
     const primary = step.curves[0];
     return {
       kind: "math_plot",

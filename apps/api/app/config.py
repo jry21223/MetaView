@@ -1,9 +1,13 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _ALL_DOMAINS = "algorithm,math,code,physics,chemistry,biology,geography"
+
+GenerationMode = Literal["single", "agent"]
+_GENERATION_MODES: frozenset[str] = frozenset(("single", "agent"))
 
 
 class Settings(BaseSettings):
@@ -83,7 +87,7 @@ class Settings(BaseSettings):
     # builds the PlaybookScript turn-by-turn via Drawing CLI tool calls and
     # calls back into /api/v1/agent/assert/* for sympy-based geometry checks.
     # Toggle is per-deployment; per-request override stays out of scope for now.
-    generation_mode: str = "single"
+    generation_mode: GenerationMode = "single"
     agent_base_url: str = "http://agent:8001"
     agent_timeout_s: float = 600.0
 
@@ -121,13 +125,13 @@ class Settings(BaseSettings):
 
     @field_validator("generation_mode", mode="before")
     @classmethod
-    def normalize_generation_mode(cls, value: str | None) -> str:
+    def normalize_generation_mode(cls, value: str | None) -> GenerationMode:
         if value is None:
             return "single"
         normalized = value.strip().lower()
-        if normalized not in {"single", "agent"}:
+        if normalized not in _GENERATION_MODES:
             return "single"
-        return normalized
+        return normalized  # type: ignore[return-value]
 
     @property
     def enabled_topic_domains(self) -> tuple[str, ...]:

@@ -51,12 +51,13 @@ export interface ArrayTokenBuilder {
   emphasis: Emphasis;
 }
 
+export type VisualKind = "scene" | "array" | "function" | "formula" | "graph";
+
 export interface StepBuilder {
   index: number;
   title: string;
   narration: unknown[];
   voiceover_text: string;
-  visual_kind: "scene" | "array" | "function" | "formula" | "graph";
   // scene-style accumulators
   axes?: {
     x_min: number;

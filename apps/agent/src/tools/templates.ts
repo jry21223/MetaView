@@ -10,36 +10,14 @@
  * the wording for the specific lesson it's teaching.
  */
 
-import { Type, type Static, type TSchema } from "@earendil-works/pi-ai";
-import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
+import { Type } from "@earendil-works/pi-ai";
+import type { AgentTool } from "@earendil-works/pi-agent-core";
 
 import type { PlaybookEmitter } from "../state/playbookEmitter.js";
+import { defineTool, toolResult } from "./common.js";
 
 export interface TemplateToolDeps {
   emitter: PlaybookEmitter;
-}
-
-function toolResult<T>(details: T): AgentToolResult<T> {
-  return {
-    content: [{ type: "text", text: JSON.stringify(details) }],
-    details,
-  };
-}
-
-function defineTool<S extends TSchema, D>(
-  name: string,
-  label: string,
-  description: string,
-  parameters: S,
-  execute: (params: Static<S>) => Promise<AgentToolResult<D>>,
-): AgentTool<S, D> {
-  return {
-    name,
-    label,
-    description,
-    parameters,
-    execute: async (_toolCallId, params) => execute(params),
-  };
 }
 
 function makeStepRange(startIndex: number, count: number): number[] {

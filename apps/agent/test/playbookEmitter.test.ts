@@ -36,14 +36,29 @@ describe("PlaybookEmitter — step lifecycle", () => {
 });
 
 describe("PlaybookEmitter — parametric curve + orientation lookup", () => {
-  it("returns the curve previously added for assert_orientation lookup", () => {
+  it("resolveParametricCurve returns the curve previously added", () => {
     const e = new PlaybookEmitter();
     e.beginStep(1, "circle");
     const id = e.addCurveParametric("cos(t)", "-sin(t)", 0, 6.28, "C", "primary");
-    const curve = e.getCurrentCurve(id);
-    expect(curve?.expression_x).toBe("cos(t)");
-    expect(curve?.expression_y).toBe("-sin(t)");
-    expect(curve?.is_parametric).toBe(true);
+    const resolved = e.resolveParametricCurve(id);
+    expect(resolved.ok).toBe(true);
+    if (resolved.ok) {
+      expect(resolved.expression_x).toBe("cos(t)");
+      expect(resolved.expression_y).toBe("-sin(t)");
+      expect(resolved.t_min).toBe(0);
+      expect(resolved.t_max).toBe(6.28);
+    }
+  });
+
+  it("resolveParametricCurve refuses 1D curves", () => {
+    const e = new PlaybookEmitter();
+    e.beginStep(1, "plot");
+    const id = e.addCurve1D("x**2", "f", "primary");
+    const resolved = e.resolveParametricCurve(id);
+    expect(resolved.ok).toBe(false);
+    if (!resolved.ok) {
+      expect(resolved.reason).toMatch(/not a parametric curve/);
+    }
   });
 });
 

@@ -12,6 +12,7 @@ from app.application.dto.pipeline_dto import PipelineRequest
 from app.application.ports.agent_provider import IAgentProvider
 from app.application.ports.llm_provider import ILLMProvider
 from app.application.ports.run_repository import IRunRepository
+from app.config import GenerationMode
 from app.domain.models.cir import CirDocument, ExecutionMap
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.domain.models.playbook import PlaybookScript
@@ -48,7 +49,7 @@ class RunPipelineUseCase:
         max_repair_attempts: int = 0,
         reviewer_mode: str = "on_failure",
         agent_provider: IAgentProvider | None = None,
-        generation_mode: str = "single",
+        generation_mode: GenerationMode | str = "single",
     ) -> None:
         self._repo = run_repo
         self._llm = llm
@@ -56,8 +57,8 @@ class RunPipelineUseCase:
         self._max_repair_attempts = max(0, max_repair_attempts)
         self._reviewer_mode = _normalize_reviewer_mode(reviewer_mode)
         self._agent_provider = agent_provider
-        self._generation_mode = (
-            generation_mode if generation_mode in {"single", "agent"} else "single"
+        self._generation_mode: GenerationMode = (
+            generation_mode if generation_mode == "agent" else "single"
         )
 
     async def execute(self, run_id: str, request: PipelineRequest) -> None:

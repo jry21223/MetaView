@@ -5,10 +5,11 @@
  * "clockwise" / "counterclockwise" / "increasing" / "passes through (x, y)".
  */
 
-import { Type, type Static, type TSchema } from "@earendil-works/pi-ai";
-import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
+import { Type } from "@earendil-works/pi-ai";
+import type { AgentTool } from "@earendil-works/pi-agent-core";
 
 import type { PlaybookEmitter } from "../state/playbookEmitter.js";
+import { defineTool, toolResult } from "./common.js";
 
 export interface AssertToolDeps {
   emitter: PlaybookEmitter;
@@ -31,29 +32,6 @@ interface PassesThroughResult {
 interface MonotonicResult {
   verdict: "increasing" | "decreasing" | "mixed" | "constant" | "error";
   reason: string;
-}
-
-function toolResult<T>(details: T): AgentToolResult<T> {
-  return {
-    content: [{ type: "text", text: JSON.stringify(details) }],
-    details,
-  };
-}
-
-function defineTool<S extends TSchema, D>(
-  name: string,
-  label: string,
-  description: string,
-  parameters: S,
-  execute: (params: Static<S>) => Promise<AgentToolResult<D>>,
-): AgentTool<S, D> {
-  return {
-    name,
-    label,
-    description,
-    parameters,
-    execute: async (_toolCallId, params) => execute(params),
-  };
 }
 
 export function makeAssertTools(deps: AssertToolDeps): AgentTool[] {
@@ -85,24 +63,18 @@ export function makeAssertTools(deps: AssertToolDeps): AgentTool[] {
         curve_id: Type.Integer(),
       }),
       async (args) => {
-        const curve = emitter.getCurrentCurve(args.curve_id);
-        if (
-          !curve ||
-          !curve.is_parametric ||
-          curve.expression_x == null ||
-          curve.t_min == null ||
-          curve.t_max == null
-        ) {
+        const resolved = emitter.resolveParametricCurve(args.curve_id);
+        if (!resolved.ok) {
           return toolResult<OrientationResult>({
             direction: "error",
-            reason: `curve_id ${args.curve_id} is not a parametric curve in the current step`,
+            reason: resolved.reason,
           });
         }
         const data = await post<OrientationResult>("/api/v1/agent/assert/orientation", {
-          expression_x: curve.expression_x,
-          expression_y: curve.expression_y,
-          t_min: curve.t_min,
-          t_max: curve.t_max,
+          expression_x: resolved.expression_x,
+          expression_y: resolved.expression_y,
+          t_min: resolved.t_min,
+          t_max: resolved.t_max,
         });
         return toolResult(data);
       },
@@ -122,28 +94,22 @@ export function makeAssertTools(deps: AssertToolDeps): AgentTool[] {
         tol: Type.Optional(Type.Number({ minimum: 0 })),
       }),
       async (args) => {
-        const curve = emitter.getCurrentCurve(args.curve_id);
-        if (
-          !curve ||
-          !curve.is_parametric ||
-          curve.expression_x == null ||
-          curve.t_min == null ||
-          curve.t_max == null
-        ) {
+        const resolved = emitter.resolveParametricCurve(args.curve_id);
+        if (!resolved.ok) {
           return toolResult<PassesThroughResult>({
             passes: false,
             closest_t: null,
             distance: null,
-            reason: `curve_id ${args.curve_id} is not a parametric curve in the current step`,
+            reason: resolved.reason,
           });
         }
         const data = await post<PassesThroughResult>(
           "/api/v1/agent/assert/passes-through",
           {
-            expression_x: curve.expression_x,
-            expression_y: curve.expression_y,
-            t_min: curve.t_min,
-            t_max: curve.t_max,
+            expression_x: resolved.expression_x,
+            expression_y: resolved.expression_y,
+            t_min: resolved.t_min,
+            t_max: resolved.t_max,
             target_x: args.x,
             target_y: args.y,
             tol: args.tol ?? 0.01,

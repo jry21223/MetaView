@@ -11,13 +11,12 @@ and return a flat JSON object the TS side can pipe straight into a
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from starlette.requests import Request
 
-from app.config import Settings, get_settings
 from app.domain.services.geometry_validators import (
     check_monotonic,
     check_orientation,
@@ -73,7 +72,6 @@ class MonotonicResponse(BaseModel):
 async def assert_orientation(
     request: Request,
     payload: OrientationRequest,
-    _: Annotated[Settings, Depends(get_settings)],
 ) -> OrientationResponse:
     result = check_orientation(
         payload.expression_x,
@@ -89,7 +87,6 @@ async def assert_orientation(
 async def assert_passes_through(
     request: Request,
     payload: PointOnCurveRequest,
-    _: Annotated[Settings, Depends(get_settings)],
 ) -> PointOnCurveResponse:
     result = check_point_on_curve(
         payload.expression_x,
@@ -113,7 +110,6 @@ async def assert_passes_through(
 async def assert_monotonic(
     request: Request,
     payload: MonotonicRequest,
-    _: Annotated[Settings, Depends(get_settings)],
 ) -> MonotonicResponse:
     result = check_monotonic(payload.expression, payload.x_min, payload.x_max)
     return MonotonicResponse(verdict=result.verdict, reason=result.reason)
