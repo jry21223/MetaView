@@ -357,6 +357,8 @@
   letter-spacing: 0.04em;
   text-transform: none;
   color: var(--mfr-title);
+  will-change: opacity;
+  transform: translateZ(0);
 }
 
 .math-formula-renderer__formula {
@@ -365,6 +367,8 @@
   max-width: 100%;
   overflow-x: auto;
   text-align: center;
+  will-change: opacity;
+  transform: translateZ(0);
 }
 
 .math-formula-renderer__formula .katex {
@@ -377,6 +381,8 @@
   font-size: 17px;
   line-height: 1.55;
   color: var(--mfr-caption);
+  will-change: opacity;
+  transform: translateZ(0);
 }
 
 .math-formula-renderer__annotations {
@@ -390,6 +396,8 @@
   align-self: stretch;
   max-width: 720px;
   margin: 0 auto;
+  will-change: opacity;
+  transform: translateZ(0);
 }
 
 .math-formula-renderer__annotation {
@@ -463,6 +471,8 @@
   font-weight: 600;
   letter-spacing: 0.04em;
   color: var(--msr-title);
+  will-change: opacity;
+  transform: translateZ(0);
 }
 
 .math-scene-renderer__stage {
@@ -521,6 +531,7 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
+  will-change: opacity;
 }
 
 .katex-overlay__anchor {
@@ -556,6 +567,7 @@
   color: #e8ecf4;
   border: 1px solid rgba(77, 232, 176, 0.32);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  will-change: opacity;
 }
 
 .narration-card[data-theme="light"] {
@@ -575,7 +587,7 @@
 
 .narration-card[data-position="center"] {
   top: 50%;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) translateZ(0);
 }
 
 .narration-card[data-emphasis="accent"] {

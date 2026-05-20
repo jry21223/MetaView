@@ -732,11 +732,10 @@ def _build_math_formula_snapshot(cir_step: CirStep) -> MathFormulaSnapshot:
         safe_title = cir_step.title.replace("{", "").replace("}", "").replace("\\", "")
         formula_latex = f"\\text{{{safe_title}}}"
 
-    caption = cir_step.title.strip() or None
     annotations = [a.strip() for a in cir_step.annotations if a and a.strip()]
     return MathFormulaSnapshot(
         formula_latex=formula_latex,
-        caption=caption,
+        caption=None,
         highlights=[],
         annotations=annotations,
     )

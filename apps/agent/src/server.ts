@@ -20,6 +20,8 @@ const DEFAULT_API_KEY =
   process.env.AGENT_DEFAULT_API_KEY ??
   process.env.METAVIEW_OPENAI_API_KEY ??
   process.env.OPENAI_API_KEY;
+// Hard ceiling so a hung agent loop can't block the worker indefinitely.
+const GENERATE_TIMEOUT_MS = Number(process.env.AGENT_TIMEOUT_MS ?? 540_000);
 
 const app = express();
 app.use(express.json({ limit: "2mb" }));
@@ -37,15 +39,24 @@ app.post("/generate", async (req: Request, res: Response) => {
     res.status(400).json({ detail: "missing or invalid 'prompt' field" });
     return;
   }
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(
+      () => reject(new Error(`agent timed out after ${GENERATE_TIMEOUT_MS}ms`)),
+      GENERATE_TIMEOUT_MS,
+    ),
+  );
   try {
-    const playbook = await runAgentGeneration({
-      prompt,
-      provider,
-      apiBaseUrl: API_BASE_URL,
-      defaultProvider: DEFAULT_PROVIDER,
-      defaultModel: DEFAULT_MODEL,
-      defaultApiKey: DEFAULT_API_KEY,
-    });
+    const playbook = await Promise.race([
+      runAgentGeneration({
+        prompt,
+        provider,
+        apiBaseUrl: API_BASE_URL,
+        defaultProvider: DEFAULT_PROVIDER,
+        defaultModel: DEFAULT_MODEL,
+        defaultApiKey: DEFAULT_API_KEY,
+      }),
+      timeout,
+    ]);
     res.json({ playbook });
   } catch (err) {
     log.error({ err }, "generate failed");
