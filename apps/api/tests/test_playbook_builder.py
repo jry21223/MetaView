@@ -671,7 +671,9 @@ class TestMathFallbackChain:
         playbook = build_playbook(self._math_cir(step), execution_map=None)
         snap = playbook.steps[0].snapshot
         assert isinstance(snap, MathFormulaSnapshot)
-        assert snap.caption == "格林公式"
+        # caption is intentionally None: the step title is already shown in the
+        # renderer's title slot, so duplicating it as a caption is removed.
+        assert snap.caption is None
         assert len(snap.annotations) == 2
 
     def test_math_array_visual_kind_reroutes_to_formula(self):
