@@ -1,4 +1,6 @@
 // Re-export barrel — backwards-compatible surface for migrating consumers
+export type * from "../../entities/topic/types";
+export type * from "../../entities/execution/types";
 export type * from "../../entities/cir/types";
 export type * from "../../entities/pipeline/types";
 export type * from "../../entities/provider/types";

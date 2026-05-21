@@ -4,6 +4,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
+from app.domain.models.execution import ExecutionParameterControl
 from app.domain.models.topic import TopicDomain, VisualKind
 
 
@@ -258,14 +259,6 @@ class CirDocument(BaseModel):
     summary: str
     steps: list[CirStep] = Field(default_factory=list)
     preset_id: str | None = Field(default=None)
-
-
-class ExecutionParameterControl(BaseModel):
-    id: str
-    label: str
-    value: str
-    description: str | None = None
-    placeholder: str | None = None
 
 
 class ExecutionArrayTrack(BaseModel):

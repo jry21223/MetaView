@@ -5,7 +5,7 @@ from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, Field
 
-from app.domain.models.cir import ExecutionParameterControl
+from app.domain.models.execution import ExecutionParameterControl
 from app.domain.models.topic import TopicDomain
 
 

@@ -4,10 +4,10 @@ from app.domain.models.cir import (
     ExecutionArrayTrack,
     ExecutionCheckpoint,
     ExecutionMap,
-    ExecutionParameterControl,
     LayoutInstruction,
     VisualToken,
 )
+from app.domain.models.execution import ExecutionParameterControl
 from app.domain.models.pipeline_run import (
     PipelineRunStatus,
     SandboxMode,

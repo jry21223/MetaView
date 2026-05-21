@@ -1,4 +1,4 @@
-import type { ExecutionParameterControl } from "../../../entities/cir/types";
+import type { ExecutionParameterControl } from "../../../entities/execution/types";
 
 export type SnapshotKind =
   | "algorithm_array"

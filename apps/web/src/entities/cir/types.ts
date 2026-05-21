@@ -1,11 +1,5 @@
-export type TopicDomain =
-  | "algorithm"
-  | "math"
-  | "code"
-  | "physics"
-  | "chemistry"
-  | "biology"
-  | "geography";
+import type { TopicDomain } from "../topic/types";
+import type { ExecutionParameterControl } from "../execution/types";
 
 export type VisualKind =
   | "array"
@@ -44,14 +38,6 @@ export interface CirDocument {
   domain: TopicDomain;
   summary: string;
   steps: CirStep[];
-}
-
-export interface ExecutionParameterControl {
-  id: string;
-  label: string;
-  value: string;
-  description?: string | null;
-  placeholder?: string | null;
 }
 
 export interface ExecutionArrayTrack {
