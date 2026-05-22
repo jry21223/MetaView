@@ -418,23 +418,23 @@ Example (bubble sort compare step):
   ``layers`` JSON。每个 call 指定一个 ``tool`` 名称和 ``args`` 参数，
   后端会自动展开为正确的 ``LayerSpec`` 对象。
 
-示例：
-```json
-{
+``animation_calls`` 示例：
+`` ```json
+{{
   "animation_calls": [
-    {
+    {{
       "tool": "math.show_tangent",
-      "args": {
+      "args": {{
         "expression": "x^2",
         "x0": 2,
         "tangent_expression": "4*x - 4",
-        "formula_latex": "f'(2)=4",
+        "formula_latex": "f \\u2032(2)=4",
         "caption": "切线斜率就是这一点的瞬时变化率。"
-      }
-    }
+      }}
+    }}
   ]
-}
-```
+}}
+`` ```
 
 已注册的 animation tools（优先使用）：
 - ``math.show_tangent`` — 函数曲线 + 切线 + 标记点。
