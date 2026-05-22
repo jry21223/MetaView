@@ -246,6 +246,10 @@ class CirStep(BaseModel):
     annotations: list[str] = Field(default_factory=list)
     start_time: float | None = None
     end_time: float | None = None
+    # High-level animation macros. When non-empty, the builder expands these
+    # into ``LayerSpec`` objects before materialising the snapshot. The LLM
+    # should prefer animation_calls over raw layers for common patterns.
+    animation_calls: list[AnimationCall] = Field(default_factory=list)
     # New layered output path. Empty list -> the builder synthesises a single
     # layer from ``visual_kind`` + ``plot`` / ``scene`` / ``tokens`` (legacy).
     layers: list[LayerSpec] = Field(default_factory=list)
@@ -258,6 +262,18 @@ class CirDocument(BaseModel):
     summary: str
     steps: list[CirStep] = Field(default_factory=list)
     preset_id: str | None = Field(default=None)
+
+
+class AnimationCall(BaseModel):
+    """A high-level animation macro invoked by the LLM.
+
+    Instead of hand-writing low-level LayerSpec JSON, the LLM emits a
+    ``tool`` name and ``args``. The backend Animation Tool Registry expands
+    the call into one or more ``LayerSpec`` objects deterministically.
+    """
+
+    tool: str
+    args: dict = Field(default_factory=dict)
 
 
 class ExecutionParameterControl(BaseModel):

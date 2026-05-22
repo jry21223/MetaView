@@ -413,6 +413,40 @@ Example (bubble sort compare step):
       {{"id":"A2","label":"幅度 A₂","value":"0.5","description":"拖动看第二分量的幅度"}},
       {{"id":"w2","label":"角频率 ω₂","value":"5.0","description":"拖动看第二分量的频率"}}]`
 
+## Animation Macros（推荐 — 替代直接写 layers）
+- 对于常见教学动画，应优先使用 ``step.animation_calls`` 而非手写底层
+  ``layers`` JSON。每个 call 指定一个 ``tool`` 名称和 ``args`` 参数，
+  后端会自动展开为正确的 ``LayerSpec`` 对象。
+
+示例：
+```json
+{
+  "animation_calls": [
+    {
+      "tool": "math.show_tangent",
+      "args": {
+        "expression": "x^2",
+        "x0": 2,
+        "tangent_expression": "4*x - 4",
+        "formula_latex": "f'(2)=4",
+        "caption": "切线斜率就是这一点的瞬时变化率。"
+      }
+    }
+  ]
+}
+```
+
+已注册的 animation tools（优先使用）：
+- ``math.show_tangent`` — 函数曲线 + 切线 + 标记点。
+  参数：expression, x0, tangent_expression, formula_latex, caption, x_min, x_max
+- ``math.show_function`` — 函数作图，支持一到两条曲线。
+  参数：expression, expression_2, x_min, x_max, formula_latex, marker_x, shade_from, shade_to
+- ``math.show_integral_area`` — 定积分面积填充。
+  参数：expression, from_, to, x_min, x_max, formula_latex
+
+``animation_calls`` 与 ``layers`` 可以同时使用：macro 展开的层在前，
+手写层在后（z_order 更高的手写层会覆盖在 macro 层之上）。
+
 ## Multi-layer step（可选，进阶能力）
 - 当一个步骤需要叠加多种视觉（例如：底层画区域 + 中层叠加向量场 + 顶层写公式），
   使用 step.layers 数组按时序与 z_order 叠合每一层。

@@ -4,6 +4,7 @@ import json
 import logging
 import re
 
+from app.domain.animation_tools import expand_cir_animation_calls
 from app.domain.models.cir import (
     CirDocument,
     CirStep,
@@ -111,6 +112,9 @@ def build_playbook(
     source_code: str | None = None,
     source_language: str = "python",
 ) -> PlaybookScript:
+    # Expand high-level animation macros before processing steps.
+    cir = expand_cir_animation_calls(cir)
+
     checkpoint_by_step: dict[str, ExecutionCheckpoint] = {}
     if execution_map:
         for cp in execution_map.checkpoints:
