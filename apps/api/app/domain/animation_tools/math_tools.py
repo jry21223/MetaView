@@ -78,7 +78,12 @@ def show_tangent(args: dict) -> list[LayerSpec]:
             LayerSpec(
                 kind=LayerKind.KATEX_OVERLAY,
                 timing=LayerTimingSpec(enter_at=0.3, exit_at=1.0, z_order=2),
-                katex_overlay=KaTeXOverlaySpec(x=x_max, y=(x_max - x_min) * 0.8, latex=formula_latex, align="ne"),
+                katex_overlay=KaTeXOverlaySpec(
+                    x=x_max,
+                    y=(x_max - x_min) * 0.8,
+                    latex=formula_latex,
+                    align="ne",
+                ),
             )
         )
 

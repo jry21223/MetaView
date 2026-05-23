@@ -10,7 +10,7 @@ import logging
 from collections.abc import Callable
 
 from app.domain.animation_tools.types import AnimationTool
-from app.domain.models.cir import AnimationCall, CirDocument, LayerSpec
+from app.domain.models.cir import CirDocument, LayerSpec
 
 logger = logging.getLogger(__name__)
 

@@ -1,7 +1,5 @@
 """Tests for the Animation Tool Registry — macro expansion and CIR integration."""
 
-import pytest
-
 from app.domain.animation_tools import expand_animation_call, expand_cir_animation_calls
 from app.domain.animation_tools.registry import _REGISTRY
 from app.domain.models.cir import (
@@ -9,7 +7,6 @@ from app.domain.models.cir import (
     CirDocument,
     CirStep,
     LayerKind,
-    PlotSpec,
     VisualKind,
 )
 from app.domain.models.topic import TopicDomain
