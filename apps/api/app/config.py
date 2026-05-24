@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     mock_provider_enabled: bool = True
     enabled_domains: str = _ALL_DOMAINS
     max_repair_attempts: int = 2
+    pipeline_timeout_s: float | None = 900.0
     history_db_path: str = "data/pipeline_runs.db"
     reviewer_mode: str = "on_failure"
 
@@ -91,7 +92,7 @@ class Settings(BaseSettings):
     agent_base_url: str = "http://agent:8001"
     agent_timeout_s: float = 600.0
 
-    @field_validator("openai_timeout_s", mode="before")
+    @field_validator("openai_timeout_s", "pipeline_timeout_s", mode="before")
     @classmethod
     def normalize_optional_timeout(cls, value: float | str | None) -> float | str | None:
         if value is None:
