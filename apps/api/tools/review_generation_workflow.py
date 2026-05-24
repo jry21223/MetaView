@@ -20,6 +20,25 @@ DEFAULT_PROMPT = (
 )
 
 
+def load_env_value(name: str, paths: list[Path]) -> str | None:
+    if os.getenv(name):
+        return os.getenv(name)
+    for path in paths:
+        if not path.exists() or not path.is_file():
+            continue
+        for raw_line in path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            if key.strip() != name:
+                continue
+            value = value.strip().strip("\"'")
+            if value:
+                return value
+    return None
+
+
 def request_json(method: str, url: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
     data = None
     headers = {"Accept": "application/json"}
@@ -150,8 +169,8 @@ def blackdetect(video_path: Path) -> list[str]:
 def write_report(path: Path, report: dict[str, Any]) -> None:
     path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     md_path = path.with_suffix(".md")
-    frame_lines = "\n".join(f"- `{p}`" for p in report["frames"])
-    black_lines = "\n".join(f"- `{line}`" for line in report["blackdetect"]) or "- none"
+    frame_lines = "\n".join(f"- `{p}`" for p in report.get("frames", [])) or "- none"
+    black_lines = "\n".join(f"- `{line}`" for line in report.get("blackdetect", [])) or "- none"
     md_path.write_text(
         "\n".join(
             [
@@ -159,15 +178,17 @@ def write_report(path: Path, report: dict[str, Any]) -> None:
                 "",
                 f"- API: `{report['api_base']}`",
                 f"- Run: `{report['run_id']}`",
-                f"- Export: `{report['job_id']}`",
-                f"- Video: `{report['video_path']}`",
-                f"- Title: {report['title']}",
-                f"- Steps: {report['step_count']}",
-                f"- Snapshots: `{', '.join(report['snapshot_kinds'])}`",
+                f"- Status: `{report.get('status', 'unknown')}`",
+                f"- Export: `{report.get('job_id') or 'not started'}`",
+                f"- Video: `{report.get('video_path') or 'not available'}`",
+                f"- Title: {report.get('title')}",
+                f"- Steps: {report.get('step_count', 0)}",
+                f"- Snapshots: `{', '.join(report.get('snapshot_kinds', []))}`",
+                f"- Error: {report.get('error') or 'none'}",
                 "",
                 "## Video Probe",
                 "",
-                f"```json\n{json.dumps(report['probe'], ensure_ascii=False, indent=2)}\n```",
+                f"```json\n{json.dumps(report.get('probe', {}), ensure_ascii=False, indent=2)}\n```",
                 "",
                 "## Blackdetect",
                 "",
@@ -192,10 +213,18 @@ def write_report(path: Path, report: dict[str, Any]) -> None:
 
 
 def main() -> int:
+    repo_root = Path(__file__).resolve().parents[3]
+    env_paths = [repo_root / ".env.local", repo_root / ".env"]
     parser = argparse.ArgumentParser(description="Run a real MetaView generation/export review.")
     parser.add_argument("--api-base", default=os.getenv("METAVIEW_REVIEW_API_BASE", "http://127.0.0.1:8000"))
     parser.add_argument("--prompt", default=os.getenv("METAVIEW_REVIEW_PROMPT", DEFAULT_PROMPT))
-    parser.add_argument("--provider-api-key", default=os.getenv("METAVIEW_REVIEW_API_KEY"))
+    parser.add_argument(
+        "--provider-api-key",
+        default=(
+            load_env_value("METAVIEW_REVIEW_API_KEY", env_paths)
+            or load_env_value("OPENAI_API_KEY", env_paths)
+        ),
+    )
     parser.add_argument("--provider-base-url", default=os.getenv("METAVIEW_REVIEW_BASE_URL", "https://api.openai.com/v1"))
     parser.add_argument("--provider-model", default=os.getenv("METAVIEW_REVIEW_MODEL", "gpt-4o-mini"))
     parser.add_argument("--out-dir", default=os.getenv("METAVIEW_REVIEW_OUT_DIR", "/tmp/metaview-review"))
@@ -221,7 +250,23 @@ def main() -> int:
 
     created = request_json("POST", f"{api_base}/api/v1/pipeline", payload)
     run_id = created["run_id"]
-    run = wait_for_run(api_base, run_id, args.pipeline_timeout, 2.0)
+    report_path = out_dir / f"{run_id}-review.json"
+    try:
+        run = wait_for_run(api_base, run_id, args.pipeline_timeout, 2.0)
+    except Exception as exc:
+        failed_run = request_json("GET", f"{api_base}/api/v1/runs/{run_id}")
+        write_report(
+            report_path,
+            {
+                "api_base": api_base,
+                "run_id": run_id,
+                "status": failed_run.get("status", "failed"),
+                "error": failed_run.get("error") or str(exc),
+            },
+        )
+        print(f"review report: {report_path}")
+        print(f"review markdown: {report_path.with_suffix('.md')}")
+        raise
 
     job = request_json(
         "POST",
@@ -250,6 +295,7 @@ def main() -> int:
         "api_base": api_base,
         "run_id": run_id,
         "job_id": job_id,
+        "status": "completed",
         "video_path": str(video_path),
         "frames": [str(p) for p in frames],
         "title": playbook.get("title"),
