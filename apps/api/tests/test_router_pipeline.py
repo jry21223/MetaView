@@ -113,3 +113,35 @@ def test_list_runs_includes_prompt(client) -> None:
     assert resp.status_code == 200
     runs = resp.json()
     assert any(r["prompt"] == prompt for r in runs)
+
+
+def test_init_db_migrates_legacy_request_id_schema(tmp_path) -> None:
+    db = str(tmp_path / "legacy.db")
+    import sqlite3
+
+    with sqlite3.connect(db) as conn:
+        conn.execute("""
+            CREATE TABLE pipeline_runs (
+                request_id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                prompt TEXT NOT NULL,
+                status TEXT,
+                error_message TEXT,
+                review_json TEXT
+            )
+        """)
+        conn.execute(
+            "INSERT INTO pipeline_runs"
+            " (request_id, created_at, prompt, status, error_message, review_json)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
+            ("legacy-1", "2026-05-24T00:00:00+00:00", "旧记录", "failed", "boom", None),
+        )
+
+    init_db(db)
+
+    with sqlite3.connect(db) as conn:
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(pipeline_runs)")}
+        row = conn.execute("SELECT * FROM pipeline_runs WHERE run_id='legacy-1'").fetchone()
+
+    assert "run_id" in cols
+    assert row is not None

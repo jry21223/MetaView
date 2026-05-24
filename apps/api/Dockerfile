@@ -1,3 +1,13 @@
+FROM node:22-slim AS web_deps
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+COPY apps/web/package.json ./apps/web/package.json
+COPY apps/agent/package.json ./apps/agent/package.json
+RUN npm install --workspace=apps/web --no-audit --no-fund
+COPY apps/web ./apps/web
+
 FROM python:3.11-slim AS base
 
 WORKDIR /app
@@ -5,6 +15,8 @@ WORKDIR /app
 ARG APT_MIRROR=https://deb.debian.org/debian
 ARG APT_SECURITY_MIRROR=https://deb.debian.org/debian-security
 ARG APT_PIPELINE_DEPTH=0
+ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+ARG PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -21,6 +33,7 @@ RUN sed -i "s|http://deb.debian.org/debian|${APT_MIRROR}|g; s|https://deb.debian
         ffmpeg \
         fontconfig \
         fonts-noto-cjk \
+        libnss3 \
         texlive-latex-base \
         texlive-latex-extra \
         texlive-fonts-recommended \
@@ -32,12 +45,23 @@ RUN sed -i "s|http://deb.debian.org/debian|${APT_MIRROR}|g; s|https://deb.debian
 
 COPY apps/api/requirements.txt ./requirements.txt
 COPY apps/api/requirements-subjects.txt ./requirements-subjects.txt
-COPY apps/api/requirements-manim.txt ./requirements-manim.txt
-RUN pip install --no-cache-dir -r requirements.txt -r requirements-manim.txt
+RUN pip install --no-cache-dir \
+        --index-url "${PIP_INDEX_URL}" \
+        --trusted-host "${PIP_TRUSTED_HOST}" \
+        --retries 5 \
+        --timeout 120 \
+        -r requirements.txt \
+        -r requirements-subjects.txt
 
 COPY apps/api ./apps/api
 COPY skills ./skills
 COPY data ./data
+COPY --from=web_deps /usr/local/bin/node /usr/local/bin/node
+COPY --from=web_deps /usr/local/bin/npm /usr/local/bin/npm
+COPY --from=web_deps /usr/local/bin/npx /usr/local/bin/npx
+COPY --from=web_deps /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+COPY --from=web_deps /app/node_modules ./node_modules
+COPY --from=web_deps /app/apps/web ./apps/web
 
 EXPOSE 8000
 

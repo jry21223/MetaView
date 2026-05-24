@@ -346,9 +346,14 @@ sync_code() {
         --exclude '.ruff_cache' \
         --exclude '.pytest_cache' \
         --exclude '.mypy_cache' \
+        --exclude '.npm-cache' \
+        --exclude '.coverage' \
+        --exclude 'coverage' \
+        --exclude 'apps/web/coverage' \
         --exclude 'apps/web/dist' \
         --exclude 'data/pipeline_runs.db' \
         --exclude 'data/media' \
+        --exclude 'data/exports' \
         --exclude 'data/html_previews' \
         --exclude 'data/debug' \
         --exclude '*.sqlite3' \
@@ -546,8 +551,8 @@ fi
 
 echo "备份媒体文件..."
 if [ -d data/media ]; then
-    tar -czf backups/$backup_name_media.tar.gz data/media
-    echo "  -> backups/$backup_name_media.tar.gz"
+    tar -czf backups/${backup_name}_media.tar.gz data/media
+    echo "  -> backups/${backup_name}_media.tar.gz"
 fi
 
 echo "备份版本信息..."

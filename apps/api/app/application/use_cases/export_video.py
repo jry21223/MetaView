@@ -5,7 +5,7 @@ Pipeline:
 2. (with_audio) Pre-generate per-step mp3 via OpenAI-compatible TTS,
    then re-stretch each step's end_frame to match audio duration.
 3. Write inputProps.json next to a per-job tmp dir.
-4. Spawn ``npx remotion render`` and stream stdout/stderr for progress.
+4. Spawn the local Remotion CLI and stream stdout/stderr for progress.
 5. On success, store output mp4 path in the export repo.
 """
 
@@ -189,10 +189,9 @@ class ExportVideoUseCase:
         # Codec is picked from the desired container; Remotion ships h264/vp8/gif.
         codec = {"mp4": "h264", "webm": "vp8", "gif": "gif"}.get(options.format, "h264")
         width, height = _QUALITY_TO_DIMENSIONS.get(options.quality, (1920, 1080))
+        remotion_bin = _resolve_remotion_bin(self._web_dir)
         cmd = [
-            "npx",
-            "--yes",
-            "remotion",
+            str(remotion_bin),
             "render",
             "src/remotion/index.ts",
             "playbook",
@@ -223,7 +222,7 @@ class ExportVideoUseCase:
             )
         except FileNotFoundError as exc:
             raise RuntimeError(
-                f"failed to spawn remotion CLI ({cmd[0]} not on PATH): {exc}"
+                f"failed to spawn remotion CLI ({cmd[0]}): {exc}"
             ) from exc
 
         assert proc.stdout is not None
@@ -265,6 +264,24 @@ def _parse_render_progress(line: str) -> float | None:
     if m:
         return min(1.0, int(m.group(1)) / 100.0)
     return None
+
+
+def _resolve_remotion_bin(web_dir: Path) -> Path:
+    binary = "remotion.cmd" if os.name == "nt" else "remotion"
+    candidates = [
+        web_dir / "node_modules" / ".bin" / binary,
+        web_dir.parent.parent / "node_modules" / ".bin" / binary,
+    ]
+    found = shutil.which("remotion")
+    if found:
+        candidates.append(Path(found))
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    raise RuntimeError(
+        "remotion CLI not found; run npm install for the web workspace or include "
+        "node_modules/.bin/remotion in the deployment image"
+    )
 
 
 def _stretch_end_frames(playbook: dict[str, Any], audio_files: list[str]) -> dict[str, Any]:

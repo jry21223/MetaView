@@ -16,7 +16,6 @@ ENV NODE_ENV=production
 ENV PORT=8001
 
 COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/apps/agent/node_modules ./apps/agent/node_modules
 COPY --from=build /app/apps/agent/dist ./apps/agent/dist
 COPY --from=build /app/apps/agent/package.json ./apps/agent/package.json
 
