@@ -37,6 +37,8 @@ tools/
 # that matches the broad ``tools/`` ignore above.
 !apps/agent/src/tools/
 !apps/agent/src/tools/**
+!apps/api/tools/
+!apps/api/tools/**
 coverage/
 apps/web/coverage/
 .coverage
