@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from dataclasses import dataclass
@@ -50,6 +51,7 @@ class RunPipelineUseCase:
         reviewer_mode: str = "on_failure",
         agent_provider: IAgentProvider | None = None,
         generation_mode: GenerationMode | str = "single",
+        pipeline_timeout_s: float | None = None,
     ) -> None:
         self._repo = run_repo
         self._llm = llm
@@ -60,13 +62,38 @@ class RunPipelineUseCase:
         self._generation_mode: GenerationMode = (
             generation_mode if generation_mode == "agent" else "single"
         )
+        self._pipeline_timeout_s = pipeline_timeout_s
 
     async def execute(self, run_id: str, request: PipelineRequest) -> None:
         await self._repo.update(run_id, status=PipelineRunStatus.RUNNING)
-        if self._generation_mode == "agent" and self._agent_provider is not None:
-            await self._execute_agent(run_id, request)
+        try:
+            if self._generation_mode == "agent" and self._agent_provider is not None:
+                await self._run_with_total_timeout(
+                    self._execute_agent(run_id, request), run_id=run_id
+                )
+                return
+            await self._run_with_total_timeout(
+                self._execute_single(run_id, request), run_id=run_id
+            )
+        except TimeoutError:
+            timeout = self._pipeline_timeout_s
+            logger.exception("Pipeline run %s timed out after %.1fs", run_id, timeout)
+            await self._repo.update(
+                run_id,
+                status=PipelineRunStatus.FAILED,
+                error=f"Pipeline timed out after {timeout:.1f}s",
+            )
+
+    async def _run_with_total_timeout(self, operation, *, run_id: str) -> None:
+        timeout = self._pipeline_timeout_s
+        if timeout is None or timeout <= 0:
+            await operation
             return
-        await self._execute_single(run_id, request)
+        try:
+            await asyncio.wait_for(operation, timeout=timeout)
+        except TimeoutError:
+            logger.warning("Pipeline run %s exceeded total timeout %.1fs", run_id, timeout)
+            raise
 
     async def _execute_agent(self, run_id: str, request: PipelineRequest) -> None:
         """Generate via the Node sidecar (pi-agent-core) and persist the

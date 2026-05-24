@@ -37,8 +37,6 @@ class TestCheckOrientation:
 
     def test_invalid_expression(self) -> None:
         result = check_orientation("__import__('os')", "sin(t)", 0.0, 1.0)
-        # Even if sympify accepts it, downstream subs cannot produce a float;
-        # we treat the case as an error rather than crashing.
         assert result.direction == "error"
 
 
@@ -82,6 +80,10 @@ class TestCheckMonotonic:
         result = check_monotonic("x**2", 0.1, 2.0)
         assert result.verdict == "increasing"
 
+    def test_caret_exponent_is_supported(self) -> None:
+        result = check_monotonic("x^2", 0.1, 2.0)
+        assert result.verdict == "increasing"
+
     def test_quadratic_decreasing_on_negative(self) -> None:
         result = check_monotonic("x**2", -2.0, -0.1)
         assert result.verdict == "decreasing"
@@ -100,6 +102,18 @@ class TestCheckMonotonic:
 
     def test_invalid_expression(self) -> None:
         result = check_monotonic("$$$", 0.0, 1.0)
+        assert result.verdict == "error"
+
+    def test_rejects_attribute_access(self) -> None:
+        result = check_monotonic("sin.__globals__", 0.0, 1.0)
+        assert result.verdict == "error"
+
+    def test_rejects_unknown_symbol(self) -> None:
+        result = check_monotonic("y + 1", 0.0, 1.0)
+        assert result.verdict == "error"
+
+    def test_rejects_string_constant(self) -> None:
+        result = check_monotonic("sin('x')", 0.0, 1.0)
         assert result.verdict == "error"
 
 

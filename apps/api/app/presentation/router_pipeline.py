@@ -43,14 +43,15 @@ async def submit_pipeline(
     await run_repo.create(run_id, payload.prompt, created_at)
 
     # Per-request provider override takes precedence over the injected default.
-    # When the caller supplies a custom api key, we cannot reuse the global
-    # reviewer provider (different account); drop the reviewer to avoid
-    # crossing credentials and let the generator self-repair.
+    # When the caller supplies custom credentials, we cannot reuse the global
+    # reviewer provider. Drop the reviewer to avoid crossing accounts and let
+    # the generator self-repair.
     effective_llm: ILLMProvider = llm
     effective_reviewer: ILLMProvider | None = reviewer_llm
-    if payload.provider_api_key:
+    provider_key = payload.provider_api_key
+    if provider_key:
         effective_llm = OpenAIProvider(
-            api_key=payload.provider_api_key,
+            api_key=provider_key,
             base_url=payload.provider_base_url or "https://api.openai.com/v1",
             model=payload.provider_model or "gpt-4o-mini",
             max_tokens=settings.openai_max_tokens,
@@ -66,6 +67,7 @@ async def submit_pipeline(
         reviewer_mode=settings.reviewer_mode,
         agent_provider=agent_provider,
         generation_mode=settings.generation_mode,
+        pipeline_timeout_s=settings.pipeline_timeout_s,
     )
     background_tasks.add_task(use_case.execute, run_id, payload)
 

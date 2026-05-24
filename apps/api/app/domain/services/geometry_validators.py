@@ -12,15 +12,16 @@ isolation here.
 
 from __future__ import annotations
 
+import ast
 import math
 from dataclasses import dataclass
-from typing import Callable, Final, Literal
+from typing import Any, Callable, Final, Literal
 
 import numpy as np
 import sympy as sp
 
 _X, _Y, _T = sp.symbols("x y t", real=True)
-_ALLOWED_FUNCS: Final[dict[str, sp.Function]] = {
+_ALLOWED_FUNCS: Final[dict[str, Any]] = {
     "sin": sp.sin,
     "cos": sp.cos,
     "tan": sp.tan,
@@ -39,6 +40,31 @@ _ALLOWED_FUNCS: Final[dict[str, sp.Function]] = {
     "Abs": sp.Abs,
     "pi": sp.pi,
     "e": sp.E,
+}
+_ALLOWED_CALLS: Final[frozenset[str]] = frozenset(
+    name for name, value in _ALLOWED_FUNCS.items() if callable(value)
+)
+_ALLOWED_FUNCTIONS: Final[frozenset[Any]] = frozenset(
+    value for value in _ALLOWED_FUNCS.values() if callable(value)
+)
+_MAX_EXPR_CHARS: Final = 512
+_MAX_AST_NODES: Final = 80
+_NUMPY_MODULES: Final[dict[str, Any]] = {
+    "sin": np.sin,
+    "cos": np.cos,
+    "tan": np.tan,
+    "asin": np.arcsin,
+    "acos": np.arccos,
+    "atan": np.arctan,
+    "exp": np.exp,
+    "log": np.log,
+    "sqrt": np.sqrt,
+    "cbrt": np.cbrt,
+    "Abs": np.abs,
+    "abs": np.abs,
+    "floor": np.floor,
+    "ceiling": np.ceil,
+    "ceil": np.ceil,
 }
 
 OrientationVerdict = Literal["clockwise", "counterclockwise", "static", "error"]
@@ -65,26 +91,120 @@ class MonotonicResult:
     reason: str
 
 
+class _UnsafeExpression(ValueError):
+    """Raised when an expression uses syntax outside the math-only subset."""
+
+
+class _ExpressionGuard(ast.NodeVisitor):
+    """Validate untrusted math expressions before handing them to SymPy.
+
+    ``sympify``/``lambdify`` are not treated as a sandbox. The guard keeps the
+    accepted language to numeric constants, one declared variable, arithmetic
+    operators, and direct calls to whitelisted math functions. Attribute access,
+    subscripting, comprehensions, strings, lambdas, and unknown names are
+    rejected before SymPy sees the text.
+    """
+
+    def __init__(self, symbol: sp.Symbol) -> None:
+        self._allowed_names = frozenset((*_ALLOWED_FUNCS.keys(), str(symbol)))
+        self._node_count = 0
+
+    def generic_visit(self, node: ast.AST) -> None:
+        self._node_count += 1
+        if self._node_count > _MAX_AST_NODES:
+            raise _UnsafeExpression("expression is too complex")
+        allowed_nodes = (
+            ast.Expression,
+            ast.BinOp,
+            ast.UnaryOp,
+            ast.Call,
+            ast.Name,
+            ast.Load,
+            ast.Constant,
+            ast.Add,
+            ast.Sub,
+            ast.Mult,
+            ast.Div,
+            ast.Pow,
+            ast.USub,
+            ast.UAdd,
+        )
+        if not isinstance(node, allowed_nodes):
+            raise _UnsafeExpression(f"unsupported syntax: {node.__class__.__name__}")
+        super().generic_visit(node)
+
+    def visit_Call(self, node: ast.Call) -> None:
+        self._node_count += 1
+        if self._node_count > _MAX_AST_NODES:
+            raise _UnsafeExpression("expression is too complex")
+        if not isinstance(node.func, ast.Name) or node.func.id not in _ALLOWED_CALLS:
+            raise _UnsafeExpression("only whitelisted math functions may be called")
+        if node.keywords:
+            raise _UnsafeExpression("keyword arguments are not supported")
+        for arg in node.args:
+            self.visit(arg)
+
+    def visit_Name(self, node: ast.Name) -> None:
+        self._node_count += 1
+        if self._node_count > _MAX_AST_NODES:
+            raise _UnsafeExpression("expression is too complex")
+        if node.id not in self._allowed_names:
+            raise _UnsafeExpression(f"unknown name: {node.id}")
+
+    def visit_Constant(self, node: ast.Constant) -> None:
+        self._node_count += 1
+        if self._node_count > _MAX_AST_NODES:
+            raise _UnsafeExpression("expression is too complex")
+        if isinstance(node.value, bool) or not isinstance(node.value, (int, float)):
+            raise _UnsafeExpression("only numeric constants are supported")
+
+
+def _normalize_expression(expr: str) -> str:
+    # Users and LLMs often write ``x^2`` for exponentiation. Convert it before
+    # Python AST validation so the renderer-compatible notation still works.
+    return expr.replace("^", "**")
+
+
+def _validate_expression(expr: str, symbol: sp.Symbol) -> str:
+    normalized = _normalize_expression(expr.strip())
+    if not normalized or len(normalized) > _MAX_EXPR_CHARS:
+        raise _UnsafeExpression("expression is empty or too long")
+    tree = ast.parse(normalized, mode="eval")
+    _ExpressionGuard(symbol).visit(tree)
+    return normalized
+
+
+def _uses_only_allowed_functions(expr: sp.Expr) -> bool:
+    return all(func.func in _ALLOWED_FUNCTIONS for func in expr.atoms(sp.Function))
+
+
 def _parse(expr: str, symbol: sp.Symbol) -> sp.Expr | None:
-    """Parse an expression string with whitelisted functions and a single
-    declared variable. Returns ``None`` on parse error.
+    """Parse an expression string with whitelisted math syntax.
+
+    Returns ``None`` on parse error or when the expression escapes the supported
+    subset. This is a pre-validation layer around SymPy, not a general-purpose
+    code execution sandbox.
     """
     try:
-        # ``sympify`` with ``locals=_ALLOWED_FUNCS`` blocks arbitrary attribute
-        # access (no ``__import__`` / ``getattr`` here) while still resolving
-        # the common math vocabulary the player expects.
-        return sp.sympify(expr, locals={**_ALLOWED_FUNCS, str(symbol): symbol})
-    except (sp.SympifyError, SyntaxError, TypeError, ValueError):
+        normalized = _validate_expression(expr, symbol)
+        parsed = sp.sympify(normalized, locals={**_ALLOWED_FUNCS, str(symbol): symbol})
+    except (SyntaxError, TypeError, ValueError, sp.SympifyError):
         return None
+    if not isinstance(parsed, sp.Expr):
+        return None
+    if parsed.free_symbols - {symbol}:
+        return None
+    if not _uses_only_allowed_functions(parsed):
+        return None
+    if parsed.has(sp.zoo, sp.oo, -sp.oo, sp.nan):
+        return None
+    return parsed
 
 
 def _compile(expr: sp.Expr, symbol: sp.Symbol) -> Callable[[np.ndarray], np.ndarray] | None:
-    """Lambdify a sympy expression to a numpy-vectorized callable. Returns
-    ``None`` if compilation fails or the result evaluates to non-float values
-    (e.g. ``__import__('os')`` sneaks past sympify but blows up on subs).
-    """
+    """Lambdify a validated sympy expression to a numpy-vectorized callable."""
     try:
-        fn = sp.lambdify(symbol, expr, modules="numpy")
+        fn = sp.lambdify(symbol, expr, modules=[_NUMPY_MODULES])
     except (TypeError, ValueError, AttributeError, SyntaxError):
         return None
     return fn
