@@ -7,7 +7,8 @@ cross-origin request to the upstream TTS provider.
 
 from __future__ import annotations
 
-from typing import Annotated
+import re
+from typing import Annotated, Final
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
@@ -19,6 +20,14 @@ from app.config import Settings, get_settings
 from app.presentation.rate_limit import write_limit
 
 router = APIRouter(prefix="/tts", tags=["tts"])
+
+_BEARER_TOKEN_RE: Final = re.compile(r"Bearer\s+[A-Za-z0-9._~+/=-]+", re.IGNORECASE)
+_OPENAI_KEY_RE: Final = re.compile(r"sk-[A-Za-z0-9._-]{8,}", re.IGNORECASE)
+_SECRET_FIELD_RE: Final = re.compile(
+    r'(?P<quote>"?)(?P<key>api[_-]?key|authorization|token)'
+    r'(?P=quote)(?P<sep>\s*[:=]\s*")(?P<value>[^"]+)(?P<end>")',
+    re.IGNORECASE,
+)
 
 
 class TtsSpeechRequest(BaseModel):
@@ -44,6 +53,25 @@ def _resolve_api_key(settings: Settings) -> str:
             detail="TTS not configured: set METAVIEW_TTS_API_KEY or METAVIEW_OPENAI_API_KEY",
         )
     return key
+
+
+def _redact_secret_field(match: re.Match[str]) -> str:
+    quote = match.group("quote")
+    key = match.group("key")
+    sep = match.group("sep")
+    end = match.group("end")
+    return f"{quote}{key}{quote}{sep}[REDACTED]{end}"
+
+
+def _sanitize_upstream_error(text: str, status_code: int) -> str:
+    """Return bounded upstream error detail without leaking credentials."""
+    detail = text[:300].strip()
+    if not detail:
+        return f"upstream returned {status_code}"
+    detail = _BEARER_TOKEN_RE.sub("Bearer [REDACTED]", detail)
+    detail = _OPENAI_KEY_RE.sub("sk-[REDACTED]", detail)
+    detail = _SECRET_FIELD_RE.sub(_redact_secret_field, detail)
+    return detail
 
 
 @router.post("/speech")
@@ -87,11 +115,10 @@ async def synthesize_speech(
             ) from exc
 
     if upstream.status_code >= 400:
-        # Surface a sanitized message — never leak the upstream auth header,
-        # but pass through enough detail for the client to retry intelligently.
+        content_type = upstream.headers.get("content-type", "")
         detail = (
-            upstream.text[:300]
-            if upstream.headers.get("content-type", "").startswith("application/json")
+            _sanitize_upstream_error(upstream.text, upstream.status_code)
+            if content_type.startswith("application/json")
             else f"upstream returned {upstream.status_code}"
         )
         raise HTTPException(status_code=upstream.status_code, detail=detail)
