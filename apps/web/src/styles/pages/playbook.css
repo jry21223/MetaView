@@ -324,26 +324,58 @@
   background: var(--mfr-bg);
   color: var(--mfr-text);
   position: relative;
+  overflow: hidden;
 }
 
 .math-formula-renderer[data-theme="dark"] {
-  --mfr-bg: #0a0c10;
+  --mfr-bg: #111820;
   --mfr-text: #e8ecf4;
   --mfr-caption: rgba(232, 236, 244, 0.78);
-  --mfr-annotation: rgba(232, 236, 244, 0.55);
+  --mfr-annotation: rgba(232, 236, 244, 0.72);
   --mfr-accent: #ffd84d;
-  --mfr-divider: rgba(255, 255, 255, 0.08);
-  --mfr-title: rgba(232, 236, 244, 0.6);
+  --mfr-divider: rgba(255, 255, 255, 0.14);
+  --mfr-panel: rgba(255, 255, 255, 0.055);
+  --mfr-panel-border: rgba(255, 255, 255, 0.14);
+  --mfr-grid: rgba(255, 255, 255, 0.045);
+  --mfr-title: rgba(232, 236, 244, 0.7);
 }
 
 .math-formula-renderer[data-theme="light"] {
   --mfr-bg: #f5f7fa;
   --mfr-text: #141820;
   --mfr-caption: rgba(20, 24, 32, 0.78);
-  --mfr-annotation: rgba(20, 24, 32, 0.55);
+  --mfr-annotation: rgba(20, 24, 32, 0.72);
   --mfr-accent: #b07d00;
   --mfr-divider: rgba(0, 0, 0, 0.08);
+  --mfr-panel: rgba(255, 255, 255, 0.72);
+  --mfr-panel-border: rgba(20, 24, 32, 0.12);
+  --mfr-grid: rgba(20, 24, 32, 0.055);
   --mfr-title: rgba(20, 24, 32, 0.6);
+}
+
+.math-formula-renderer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--mfr-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--mfr-grid) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: linear-gradient(to bottom, transparent, black 18%, black 82%, transparent);
+  pointer-events: none;
+}
+
+.math-formula-renderer::after {
+  content: "";
+  position: absolute;
+  left: 56px;
+  right: 56px;
+  top: 86px;
+  bottom: 72px;
+  border: 1px solid var(--mfr-panel-border);
+  border-radius: 8px;
+  background: var(--mfr-panel);
+  pointer-events: none;
 }
 
 .math-formula-renderer__title {
@@ -359,16 +391,18 @@
   color: var(--mfr-title);
   will-change: opacity;
   transform: translateZ(0);
+  z-index: 1;
 }
 
 .math-formula-renderer__formula {
-  font-size: 32px;
+  font-size: 42px;
   line-height: 1.35;
   max-width: 100%;
   overflow-x: auto;
   text-align: center;
   will-change: opacity;
   transform: translateZ(0);
+  z-index: 1;
 }
 
 .math-formula-renderer__formula .katex {
@@ -383,13 +417,15 @@
   color: var(--mfr-caption);
   will-change: opacity;
   transform: translateZ(0);
+  z-index: 1;
 }
 
 .math-formula-renderer__annotations {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  font-size: 15px;
   color: var(--mfr-annotation);
   border-top: 1px solid var(--mfr-divider);
   padding-top: 14px;
@@ -398,18 +434,22 @@
   margin: 0 auto;
   will-change: opacity;
   transform: translateZ(0);
+  z-index: 1;
 }
 
 .math-formula-renderer__annotation {
-  padding-left: 16px;
+  padding: 7px 12px 7px 26px;
   position: relative;
   line-height: 1.5;
+  border: 1px solid var(--mfr-panel-border);
+  border-radius: 6px;
+  background: var(--mfr-panel);
 }
 
 .math-formula-renderer__annotation::before {
   content: "•";
   position: absolute;
-  left: 0;
+  left: 12px;
   color: var(--mfr-accent);
 }
 
@@ -421,6 +461,7 @@
   color: var(--mfr-annotation);
   font-size: 16px;
   font-style: italic;
+  z-index: 1;
 }
 
 /* ── MathSceneRenderer ───────────────────────────────────────────────── */
