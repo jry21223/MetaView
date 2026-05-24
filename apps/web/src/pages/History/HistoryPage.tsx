@@ -65,10 +65,22 @@ function RunItem({
   });
   const stepCount = run.playbook?.steps?.length ?? '—';
   const showPromptSubtitle = !!run.playbook?.title && !!run.prompt;
+  const itemClassName = [
+    'mv-history-item',
+    isSelected ? 'is-selected' : '',
+    isCompared ? 'is-compared' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
-    <div className={`mv-history-item${isSelected ? ' is-selected' : ''}`} aria-pressed={isSelected}>
-      <button type="button" className="mv-history-item__main" onClick={onClick}>
+    <div className={itemClassName}>
+      <button
+        type="button"
+        className="mv-history-item__main"
+        aria-pressed={isSelected}
+        onClick={onClick}
+      >
         <div className="mv-history-item-head">
           <span className="mv-history-item-title">{title}</span>
           <StatusBadge status={run.status} />
@@ -111,7 +123,7 @@ function CenterHint({ children }: { children: React.ReactNode }) {
   return <div className="mv-history-hint">{children}</div>;
 }
 
-interface StatsBarProps {
+interface StatsLineProps {
   total: number;
   succeeded: number;
   failed: number;
@@ -119,28 +131,25 @@ interface StatsBarProps {
   averageSteps: number | null;
 }
 
-function StatsBar({ total, succeeded, failed, inFlight, averageSteps }: StatsBarProps) {
-  const cards: Array<{ label: string; value: string }> = [
-    { label: '总计', value: String(total) },
-    { label: '成功', value: String(succeeded) },
-    { label: '失败', value: String(failed) },
-    { label: '进行中', value: String(inFlight) },
-    {
-      label: '平均步数',
-      value: averageSteps === null ? '—' : averageSteps.toFixed(1),
-    },
-  ];
+function StatsLine({ total, succeeded, failed, inFlight, averageSteps }: StatsLineProps) {
+  const avg = averageSteps === null ? '—' : averageSteps.toFixed(1);
   return (
-    <div className="mv-history-stats">
-      {cards.map((card) => (
-        <div key={card.label} className="mv-history-stats__card">
-          <div className="mv-history-stats__label">{card.label}</div>
-          <div className="mv-history-stats__value">{card.value}</div>
-        </div>
-      ))}
+    <div className="mv-history-stats-line">
+      <span>总计 <b>{total}</b></span>
+      <span className="is-ok">成功 <b>{succeeded}</b></span>
+      <span className="is-bad">失败 <b>{failed}</b></span>
+      <span>进行中 <b>{inFlight}</b></span>
+      <span>平均 <b>{avg}</b> 步</span>
     </div>
   );
 }
+
+const PRIMARY_STATUS_CHIPS: Array<{ value: StatusFilter; label: string }> = [
+  { value: 'all', label: '全部' },
+  { value: 'succeeded', label: '成功' },
+  { value: 'failed', label: '失败' },
+  { value: 'running', label: '生成中' },
+];
 
 interface CompareDrawerProps {
   runs: PipelineRunResult[];
@@ -213,6 +222,18 @@ export function HistoryPage({
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [filter, setFilter] = useState<HistoryFilter>(DEFAULT_FILTER);
   const [compareIds, setCompareIds] = useState<string[]>([]);
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
+  const hasExtraStatusFilter = filter.status === 'queued' || filter.status === 'reviewing';
+  const hasExtraFilter =
+    filter.domain !== '' || filter.timeWindow !== 'all' || hasExtraStatusFilter;
+  const moreFiltersClassName = [
+    'mv-history-chip',
+    'mv-history-chip--ghost',
+    moreFiltersOpen ? 'is-active' : '',
+    hasExtraFilter ? 'has-dot' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   const domains = useMemo(() => uniqueDomains(runs), [runs]);
   const filtered = useMemo(() => applyHistoryFilter(runs, filter), [runs, filter]);
@@ -273,7 +294,7 @@ export function HistoryPage({
       />
       <main className="mv-history-main">
         <aside className="mv-history-list">
-          <StatsBar {...stats} />
+          <StatsLine {...stats} />
 
           <div className="mv-history-toolbar">
             <input
@@ -283,47 +304,79 @@ export function HistoryPage({
               value={filter.search}
               onChange={(e) => setFilter((f) => ({ ...f, search: e.target.value }))}
             />
-            <select
-              aria-label="学科筛选"
-              className="mv-history-filter"
-              value={filter.domain}
-              onChange={(e) => setFilter((f) => ({ ...f, domain: e.target.value }))}
-            >
-              <option value="">全部学科</option>
-              {domains.map((d) => (
-                <option key={d} value={d}>
-                  {d.toUpperCase()}
-                </option>
-              ))}
-            </select>
-            <select
-              aria-label="状态筛选"
-              className="mv-history-filter"
-              value={filter.status}
-              onChange={(e) =>
-                setFilter((f) => ({ ...f, status: e.target.value as StatusFilter }))
-              }
-            >
-              <option value="all">全部状态</option>
-              <option value="succeeded">成功</option>
-              <option value="failed">失败</option>
-              <option value="running">生成中</option>
-              <option value="queued">排队</option>
-              <option value="reviewing">审核中</option>
-            </select>
-            <select
-              aria-label="时间筛选"
-              className="mv-history-filter"
-              value={filter.timeWindow}
-              onChange={(e) =>
-                setFilter((f) => ({ ...f, timeWindow: e.target.value as TimeWindow }))
-              }
-            >
-              <option value="all">全部时间</option>
-              <option value="today">今天</option>
-              <option value="week">本周</option>
-              <option value="month">本月</option>
-            </select>
+
+            <div className="mv-history-status-chips" role="group" aria-label="状态筛选">
+              {PRIMARY_STATUS_CHIPS.map((chip) => {
+                const active = filter.status === chip.value;
+                return (
+                  <button
+                    key={chip.value}
+                    type="button"
+                    aria-pressed={active}
+                    className={`mv-history-chip${active ? ' is-active' : ''}`}
+                    onClick={() => setFilter((f) => ({ ...f, status: chip.value }))}
+                  >
+                    {chip.label}
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                className={moreFiltersClassName}
+                aria-expanded={moreFiltersOpen}
+                onClick={() => setMoreFiltersOpen((v) => !v)}
+              >
+                更多筛选 {moreFiltersOpen ? '▾' : '▸'}
+              </button>
+            </div>
+
+            {moreFiltersOpen && (
+              <div className="mv-history-more-filters">
+                <select
+                  aria-label="学科筛选"
+                  className="mv-history-filter"
+                  value={filter.domain}
+                  onChange={(e) => setFilter((f) => ({ ...f, domain: e.target.value }))}
+                >
+                  <option value="">全部学科</option>
+                  {domains.map((d) => (
+                    <option key={d} value={d}>
+                      {d.toUpperCase()}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  aria-label="时间筛选"
+                  className="mv-history-filter"
+                  value={filter.timeWindow}
+                  onChange={(e) =>
+                    setFilter((f) => ({ ...f, timeWindow: e.target.value as TimeWindow }))
+                  }
+                >
+                  <option value="all">全部时间</option>
+                  <option value="today">今天</option>
+                  <option value="week">本周</option>
+                  <option value="month">本月</option>
+                </select>
+                <select
+                  aria-label="其它状态筛选"
+                  className="mv-history-filter"
+                  value={hasExtraStatusFilter ? filter.status : ''}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === 'queued' || v === 'reviewing') {
+                      setFilter((f) => ({ ...f, status: v }));
+                    } else {
+                      setFilter((f) => ({ ...f, status: 'all' }));
+                    }
+                  }}
+                >
+                  <option value="">其它状态…</option>
+                  <option value="queued">排队</option>
+                  <option value="reviewing">审核中</option>
+                </select>
+              </div>
+            )}
           </div>
 
           <div className="mv-history-list-head">

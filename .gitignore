@@ -22,6 +22,7 @@ data/*.sqlite3
 data/media/
 data/debug/
 apps/api/data/
+apps/api/uv.lock
 *.log
 apps/web/dev.log
 apps/api/tests/.tmp/
