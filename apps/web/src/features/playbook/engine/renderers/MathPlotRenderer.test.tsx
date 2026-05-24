@@ -64,10 +64,10 @@ describe("MathPlotRenderer", () => {
     expect(firstPolylinePointCount(markup)).toBeGreaterThan(100);
   });
 
-  it("labels the curve and shows the narration text", () => {
+  it("labels the curve without duplicating shared subtitles", () => {
     const markup = render(makeSnap());
     expect(markup).toContain("f(x)");
-    expect(markup).toContain("先画出 f(x) = x 的平方");
+    expect(markup).not.toContain("先画出 f(x) = x 的平方");
   });
 
   it("renders the KaTeX formula when formula_latex is provided", () => {

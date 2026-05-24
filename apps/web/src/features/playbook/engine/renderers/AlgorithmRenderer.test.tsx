@@ -61,10 +61,10 @@ describe("AlgorithmRenderer", () => {
     }
   });
 
-  it("renders the step title and voiceover narration", () => {
+  it("renders the step title without duplicating shared subtitles", () => {
     const markup = render(defaultSnap());
     expect(markup).toContain("比较 arr[0] 和 arr[1]");
-    expect(markup).toContain("现在比较前两个元素");
+    expect(markup).not.toContain("现在比较前两个元素");
   });
 
   it("renders all configured pointers", () => {

@@ -1,6 +1,6 @@
 import React from "react";
 import { useCurrentFrame } from "remotion";
-import type { Layer, PlaybookScript } from "../types";
+import type { Layer, MathPlotCurve, MathPlotSnapshot, PlaybookScript } from "../types";
 import { CodeHighlightRenderer } from "../renderers/CodeHighlightRenderer";
 import { useStepProgress } from "./useInterpolatedState";
 import type { RendererProps } from "../renderers/types";
@@ -84,6 +84,93 @@ function LayerSlot({
   );
 }
 
+function timingKey(layer: Layer): string {
+  const { enter_at, exit_at, z_order } = layer.timing;
+  return `${enter_at}|${exit_at}|${z_order}`;
+}
+
+function curveKey(curve: MathPlotCurve): string {
+  return `${curve.expression}\u0000${curve.label ?? ""}\u0000${curve.emphasis ?? ""}`;
+}
+
+function mergeCurves(a: MathPlotCurve[], b: MathPlotCurve[]): MathPlotCurve[] {
+  const seen = new Set<string>();
+  const out: MathPlotCurve[] = [];
+  for (const curve of [...a, ...b]) {
+    const key = curveKey(curve);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(curve);
+  }
+  return out;
+}
+
+function mergeOptionalRange(
+  aMin: number | null | undefined,
+  aMax: number | null | undefined,
+  bMin: number | null | undefined,
+  bMax: number | null | undefined,
+): [number | null, number | null] {
+  if (aMin == null || aMax == null) return [bMin ?? null, bMax ?? null];
+  if (bMin == null || bMax == null) return [aMin, aMax];
+  return [Math.min(aMin, bMin), Math.max(aMax, bMax)];
+}
+
+function mergeMathPlotSnapshots(a: MathPlotSnapshot, b: MathPlotSnapshot): MathPlotSnapshot {
+  const [yMin, yMax] = mergeOptionalRange(a.y_min, a.y_max, b.y_min, b.y_max);
+  const hasBShade = b.shade_from != null && b.shade_to != null;
+  const hasAShade = a.shade_from != null && a.shade_to != null;
+
+  return {
+    ...a,
+    ...b,
+    curves: mergeCurves(a.curves ?? [], b.curves ?? []),
+    x_min: Math.min(a.x_min, b.x_min),
+    x_max: Math.max(a.x_max, b.x_max),
+    y_min: yMin,
+    y_max: yMax,
+    marker_x: b.marker_x ?? a.marker_x,
+    shade_from: hasBShade ? b.shade_from : hasAShade ? a.shade_from : null,
+    shade_to: hasBShade ? b.shade_to : hasAShade ? a.shade_to : null,
+    x_label: b.x_label || a.x_label,
+    y_label: b.y_label || a.y_label,
+    formula_latex: b.formula_latex ?? a.formula_latex,
+  };
+}
+
+function normalizeLayerStack(layers: Layer[]): Layer[] {
+  const out: Layer[] = [];
+  const mathPlotIndexByTiming = new Map<string, number>();
+
+  for (const layer of layers) {
+    if (layer.body.kind !== "math_plot") {
+      out.push(layer);
+      continue;
+    }
+
+    const key = timingKey(layer);
+    const existingIndex = mathPlotIndexByTiming.get(key);
+    if (existingIndex == null) {
+      mathPlotIndexByTiming.set(key, out.length);
+      out.push(layer);
+      continue;
+    }
+
+    const existing = out[existingIndex];
+    if (existing.body.kind !== "math_plot") {
+      out.push(layer);
+      continue;
+    }
+
+    out[existingIndex] = {
+      ...existing,
+      body: mergeMathPlotSnapshots(existing.body, layer.body),
+    };
+  }
+
+  return out;
+}
+
 /**
  * Multi-layer scene composer. Renders each layer in z_order ascending into
  * stacked absolute layers and falls back to the legacy single-snapshot path
@@ -100,7 +187,7 @@ function SceneCompositor({
   if (!layers || layers.length === 0) {
     return <SnapshotRenderer {...baseProps} />;
   }
-  const sorted = [...layers].sort((a, b) => a.timing.z_order - b.timing.z_order);
+  const sorted = normalizeLayerStack([...layers].sort((a, b) => a.timing.z_order - b.timing.z_order));
   return (
     <div className="scene-compositor" style={{ position: "relative", width: "100%", height: "100%" }}>
       {sorted.map((layer, i) => (

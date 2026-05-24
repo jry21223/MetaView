@@ -146,7 +146,6 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({ step, frame, stepSta
   // Spring-driven `progress` can briefly overshoot; for time-fades use raw elapsed.
   const elapsed = Math.max(0, frame - stepStartFrame);
   const titleOpacity = clamp01(elapsed / 8);
-  const narrationOpacity = clamp01((elapsed - 6) / 10);
   const reveal = clamp01(progress);
 
   const xMin = snap.x_min;
@@ -538,22 +537,6 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({ step, frame, stepSta
         )}
       </div>
 
-      {/* Narration line */}
-      <div
-        style={{
-          padding: "2px 24px 10px",
-          textAlign: "center",
-          color: colors.narration,
-          fontSize: 14,
-          lineHeight: 1.5,
-          opacity: narrationOpacity,
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
-      >
-        {step.voiceover_text}
-      </div>
     </div>
   );
 };

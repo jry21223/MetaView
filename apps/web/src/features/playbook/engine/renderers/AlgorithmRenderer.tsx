@@ -129,12 +129,6 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const narrationOpacity = interpolate(elapsed, [6, 14], [0, 1], {
-    easing: ENTER_BEZIER,
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-
   // Used to draw arc Y-offset only for swap pairs (two cells in swap_indices that exchange).
   const swapSet = new Set(snap.swap_indices);
 
@@ -348,20 +342,6 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
         </div>
       )}
 
-      {/* Narration text */}
-      <p
-        style={{
-          color: colors.narration,
-          fontSize: 15,
-          maxWidth: 720,
-          textAlign: "center",
-          lineHeight: 1.6,
-          margin: 0,
-          opacity: narrationOpacity,
-        }}
-      >
-        {step.voiceover_text}
-      </p>
     </div>
   );
 };

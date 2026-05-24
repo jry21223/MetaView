@@ -257,19 +257,6 @@ export const BinaryTreeRenderer: React.FC<RendererProps> = ({
         </g>
       </svg>
 
-      <p
-        style={{
-          color: colors.narration,
-          fontSize: 14,
-          maxWidth: 720,
-          textAlign: "center",
-          lineHeight: 1.6,
-          margin: 0,
-          opacity: spring({ frame: Math.max(0, elapsed - 10), fps, config: { stiffness: 60, damping: 20 } }),
-        }}
-      >
-        {step.voiceover_text}
-      </p>
     </div>
   );
 };

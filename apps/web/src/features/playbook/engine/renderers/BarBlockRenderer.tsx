@@ -96,12 +96,6 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const narrationOpacity = interpolate(elapsed, [6, 14], [0, 1], {
-    easing: ENTER_BEZIER,
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-
   if (!n) {
     return (
       <div
@@ -391,19 +385,6 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
         </div>
       )}
 
-      <p
-        style={{
-          color: c.narration(theme),
-          fontSize: 15,
-          maxWidth: 720,
-          textAlign: "center",
-          lineHeight: 1.6,
-          margin: 0,
-          opacity: narrationOpacity,
-        }}
-      >
-        {step.voiceover_text}
-      </p>
     </div>
   );
 };
