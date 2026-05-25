@@ -259,7 +259,8 @@ export function HistoryPage({
     onRerun?.(prompt);
   };
 
-  const selectedRun = filtered.find((r) => r.run_id === selectedRunId) ?? null;
+  const selectedRun = filtered.find((r) => r.run_id === selectedRunId) ?? filtered[0] ?? null;
+  const effectiveSelectedRunId = selectedRun?.run_id ?? null;
   const playbook =
     selectedRun?.status === 'succeeded' ? (selectedRun.playbook as PlaybookScript | null) : null;
 
@@ -387,7 +388,7 @@ export function HistoryPage({
               <RunItem
                 key={run.run_id}
                 run={run}
-                isSelected={run.run_id === selectedRunId}
+                isSelected={run.run_id === effectiveSelectedRunId}
                 isCompared={compareIds.includes(run.run_id)}
                 compareDisabled={compareIds.length >= 2}
                 onClick={() => setSelectedRunId(run.run_id)}

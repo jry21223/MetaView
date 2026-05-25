@@ -11,6 +11,7 @@ import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { resolveNarrationTemplate } from "./resolveNarrationTemplate";
 import { useResolvedScript, type ScriptOverrides } from "./useResolvedScript";
 import { resolveCodePanelOverlay } from "./resolveCodePanelOverlay";
+import { resolveInitialPreviewFrame, resolvePlayerTimelineKey } from "./previewFrame";
 import { CodeHighlightRenderer } from "../renderers/CodeHighlightRenderer";
 import { getParamPanel } from "../param-panels/registry";
 import type { ParamPanelProps } from "../param-panels/types";
@@ -318,6 +319,8 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   const [paramPanelOpen, setParamPanelOpen] = useState(true);
   const script = useResolvedScript(baseScript, overrides);
   const hasDomainPanel = getParamPanel(baseScript.domain) !== null;
+  const initialPreviewFrame = useMemo(() => resolveInitialPreviewFrame(script), [script]);
+  const playerTimelineKey = useMemo(() => resolvePlayerTimelineKey(baseScript), [baseScript]);
 
   const tts = useTTS();
   // Push the playbook domain into useTTS so AUTO-voice resolution still
@@ -599,6 +602,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
         <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
           <div className="playbook-player__stage" style={{ flex: 1, minWidth: 0 }}>
             <Player
+              key={playerTimelineKey}
               ref={playerRef}
               component={PlaybookComposition}
               inputProps={{ script, theme, showSubtitles, swapDurationFrames }}
@@ -606,6 +610,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
               fps={script.fps}
               compositionWidth={PLAYBOOK_DEFAULTS.COMPOSITION_WIDTH}
               compositionHeight={PLAYBOOK_DEFAULTS.COMPOSITION_HEIGHT}
+              initialFrame={initialPreviewFrame}
               style={{ height: "100%", aspectRatio: "16/9", maxWidth: "100%" }}
               playbackRate={playbackRate}
               clickToPlay={false}

@@ -20,6 +20,8 @@
   flex: 1;
   display: grid;
   grid-template-columns: var(--mv-history-aside-w) 1fr;
+  height: calc(100dvh - 64px);
+  max-height: calc(100dvh - 64px);
   overflow: hidden;
   min-height: 0;
 }
@@ -61,6 +63,14 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.mv-history-detail > .playbook-player {
+  flex: 1 1 0;
+  height: auto;
+  min-height: 0;
 }
 
 /* ───── Run item content ───── */
@@ -350,6 +360,7 @@
 }
 
 .mv-history-detail__badge-row {
+  flex: 0 0 auto;
   padding: 10px 24px 0;
 }
 
