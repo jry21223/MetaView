@@ -5,7 +5,6 @@ import {
   applyHistoryFilter,
   computeHistoryStats,
   DEFAULT_FILTER,
-  runsToCsv,
   uniqueDomains,
   type HistoryFilter,
   type StatusFilter,
@@ -254,24 +253,6 @@ export function HistoryPage({
     });
   };
 
-  const handleExportCsv = () => {
-    // Issue #64: prompts may contain PII (pasted source, names, emails).
-    // Make sharing them an explicit confirmation step before we serialize.
-    const includePrompt = window.confirm(
-      "导出 CSV 时是否包含原始 prompt？\n勾选 “确定” 包含 prompt（可能含敏感信息），“取消” 仅导出元数据。",
-    );
-    const csv = runsToCsv(filtered, { includePrompt });
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `metaview-history-${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
   const handleRerun = (run: PipelineRunResult) => {
     const prompt = run.prompt?.trim();
     if (!prompt) return;
@@ -388,9 +369,6 @@ export function HistoryPage({
               )}
             </span>
             <div className="mv-history-list-actions">
-              <button type="button" className="mv-chip" onClick={handleExportCsv}>
-                ↓ CSV
-              </button>
               <button type="button" className="mv-chip" onClick={refresh}>
                 ↻ 刷新
               </button>
