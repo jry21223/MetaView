@@ -3,6 +3,7 @@ import { TweakValues } from '../../features/studio-editor/hooks/useTweaks';
 import { usePipelinePoller } from '../../features/pipeline/hooks/usePipelinePoller';
 import { PlaybookPlayer } from '../../features/playbook/engine/player/PlaybookPlayer';
 import { GlobalTopbar, Stage } from '../../shared/ui/GlobalTopbar';
+import { MathCurveLoader } from '../../shared/ui/MathCurveLoader';
 import { useProviderSettings, ProviderSettings } from '../../features/providers/hooks/useProviderSettings';
 import type { PlaybookScript } from '../../features/playbook/engine/types';
 import { ExportModal } from '../../features/export/ui/ExportModal';
@@ -294,8 +295,18 @@ const STATUS_ORDER: Record<NonNullable<PipelineStatus>, number> = {
   failed: 3,
 };
 
+const STATUS_LOADER_LABEL: Record<NonNullable<PipelineStatus>, string> = {
+  queued: '排队等待生成',
+  running: '正在生成脚本',
+  reviewing: '正在审核与修正',
+  succeeded: '渲染完成',
+  failed: '生成失败',
+};
+
 function PipelineSkeleton({ status }: PipelineSkeletonProps) {
   const currentOrder = status !== null ? STATUS_ORDER[status] : -1;
+  const loaderLabel = status !== null ? STATUS_LOADER_LABEL[status] : '正在准备生成';
+  const loaderVariant = status === 'reviewing' ? 'lissajous' : status === 'queued' ? 'orbit' : 'rose';
 
   return (
     <div className="mv-pipeline-skeleton">
@@ -317,6 +328,14 @@ function PipelineSkeleton({ status }: PipelineSkeletonProps) {
       </div>
 
       <div className="mv-skeleton-area">
+        <MathCurveLoader
+          className="mv-pipeline-curve-loader"
+          variant={loaderVariant}
+          particles={18}
+          size={132}
+          speed={1.45}
+          label={loaderLabel}
+        />
         <div className="mv-skeleton-bar mv-skeleton-title" />
         <div className="mv-skeleton-cells">
           {Array.from({ length: 8 }, (_, i) => (

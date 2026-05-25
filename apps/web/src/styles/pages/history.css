@@ -43,7 +43,12 @@
   font-size: 12px;
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
   color: var(--ink-3);
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
 }
+
+.mv-history-inline-loader { flex: 0 0 auto; }
 
 .mv-history-list-body {
   flex: 1;

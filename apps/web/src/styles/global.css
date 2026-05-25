@@ -47,3 +47,104 @@ body {
   to { opacity: 1; transform: none; }
 }
 @keyframes mv-caption-blink { to { opacity: 0; } }
+
+/* Shared mathematical loading animation. */
+.mv-math-curve-loader {
+  --mv-loader-color: var(--accent);
+  --mv-loader-size: 96px;
+  --mv-loader-speed: 1.6s;
+
+  width: var(--mv-loader-size);
+  min-width: var(--mv-loader-size);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--mv-loader-color);
+}
+
+.mv-math-curve-loader__svg {
+  width: var(--mv-loader-size);
+  height: var(--mv-loader-size);
+  overflow: visible;
+  filter: drop-shadow(0 0 10px color-mix(in oklab, var(--mv-loader-color) 24%, transparent));
+}
+
+.mv-math-curve-loader__ghost,
+.mv-math-curve-loader__draw {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.mv-math-curve-loader__ghost {
+  stroke: currentColor;
+  stroke-width: 1.2;
+  opacity: 0.16;
+}
+
+.mv-math-curve-loader__draw {
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 0.34 0.66;
+  animation: mv-curve-loader-draw var(--mv-loader-speed) ease-in-out infinite;
+}
+
+.mv-math-curve-loader__particles {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mv-curve-loader-orbit calc(var(--mv-loader-speed) * 2.4) linear infinite;
+}
+
+.mv-math-curve-loader__particle {
+  fill: currentColor;
+  opacity: 0.78;
+  animation: mv-curve-loader-pulse var(--mv-loader-speed) ease-in-out infinite;
+}
+
+.mv-math-curve-loader__label {
+  max-width: 180px;
+  color: var(--ink-3);
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  line-height: 1.35;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.mv-export-curve-loader { align-self: center; }
+
+@keyframes mv-curve-loader-draw {
+  0% { stroke-dashoffset: 0.95; opacity: 0.42; }
+  45% { opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 0.42; }
+}
+
+@keyframes mv-curve-loader-orbit {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes mv-curve-loader-pulse {
+  0%, 100% { transform: scale(0.72); opacity: 0.28; }
+  50% { transform: scale(1); opacity: 0.9; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mv-math-curve-loader__draw,
+  .mv-math-curve-loader__particles,
+  .mv-math-curve-loader__particle {
+    animation: none;
+  }
+
+  .mv-math-curve-loader__draw {
+    stroke-dasharray: none;
+    opacity: 0.88;
+  }
+
+  .mv-math-curve-loader__particle {
+    opacity: 0.42;
+  }
+}

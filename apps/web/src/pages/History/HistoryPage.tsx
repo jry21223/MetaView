@@ -19,6 +19,7 @@ import { themeMode } from '../../features/studio-editor/hooks/useTweaks';
 import type { PipelineRunResult } from '../../entities/pipeline/types';
 import type { PlaybookScript } from '../../entities/playbook/types';
 import { GlobalTopbar, Stage } from '../../shared/ui/GlobalTopbar';
+import { MathCurveLoader } from '../../shared/ui/MathCurveLoader';
 
 const STATUS_LABEL: Record<PipelineRunResult['status'], string> = {
   queued: '排队',
@@ -381,7 +382,19 @@ export function HistoryPage({
 
           <div className="mv-history-list-head">
             <span className="mv-history-list-count">
-              {isLoading ? '加载中…' : `${filtered.length} / ${runs.length} 条`}
+              {isLoading ? (
+                <MathCurveLoader
+                  className="mv-history-inline-loader"
+                  variant="lissajous"
+                  particles={6}
+                  size={22}
+                  speed={1.2}
+                  label="正在同步历史记录"
+                  showLabel={false}
+                />
+              ) : (
+                `${filtered.length} / ${runs.length} 条`
+              )}
             </span>
             <div className="mv-history-list-actions">
               <button type="button" className="mv-chip" onClick={handleExportCsv}>
@@ -395,6 +408,17 @@ export function HistoryPage({
 
           <div className="mv-history-list-body">
             {error && <div className="mv-history-error">{error}</div>}
+            {isLoading && runs.length === 0 && (
+              <CenterHint>
+                <MathCurveLoader
+                  variant="lissajous"
+                  particles={12}
+                  size={76}
+                  speed={1.35}
+                  label="正在同步历史记录"
+                />
+              </CenterHint>
+            )}
             {!isLoading && !error && filtered.length === 0 && (
               <CenterHint>没有匹配的记录</CenterHint>
             )}
