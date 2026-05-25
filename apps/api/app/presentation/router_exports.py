@@ -19,6 +19,12 @@ from app.presentation.rate_limit import read_limit, write_limit
 
 router = APIRouter(prefix="/exports", tags=["exports"])
 
+_DOWNLOAD_MEDIA_TYPES = {
+    ".mp4": "video/mp4",
+    ".webm": "video/webm",
+    ".gif": "image/gif",
+}
+
 
 def _resolve_path(raw: str) -> Path:
     p = Path(raw)
@@ -117,8 +123,9 @@ def download_export(
     path = Path(job.output_path)
     if not path.exists():
         raise HTTPException(status_code=410, detail="output file missing")
+    suffix = path.suffix.lower()
     return FileResponse(
         path,
-        media_type="video/mp4",
-        filename=f"metaview-{job.run_id[:8]}.mp4",
+        media_type=_DOWNLOAD_MEDIA_TYPES.get(suffix, "application/octet-stream"),
+        filename=f"metaview-{job.run_id[:8]}{suffix}",
     )

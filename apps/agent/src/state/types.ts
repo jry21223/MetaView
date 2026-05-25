@@ -94,6 +94,33 @@ export interface PlaybookSkeleton {
   step_frames: number;
 }
 
+export interface LayerOutput {
+  timing: {
+    enter_at: number;
+    exit_at: number;
+    appear_anim: "fade" | "draw" | "slide" | "scale" | "none";
+    z_order: number;
+  };
+  body: Record<string, unknown>;
+}
+
+export interface MetaStepOutput {
+  step_id: string;
+  title: string;
+  end_frame: number;
+  narration_template: unknown[];
+  voiceover_text: string;
+  tokens: Array<{
+    id: string;
+    label: string;
+    value: string | null;
+    emphasis: Emphasis;
+  }>;
+  code_highlight: null;
+  snapshot: Record<string, unknown>;
+  layers: LayerOutput[];
+}
+
 /** PlaybookScript JSON shape (matches apps/api/app/domain/models/playbook.py). */
 export interface PlaybookOutput {
   fps: number;
@@ -101,6 +128,6 @@ export interface PlaybookOutput {
   domain: string;
   title: string;
   summary: string;
-  steps: Array<Record<string, unknown>>;
+  steps: MetaStepOutput[];
   parameter_controls: ParameterControl[];
 }

@@ -63,6 +63,18 @@ describe("PlaybookEmitter — parametric curve + orientation lookup", () => {
 });
 
 describe("PlaybookEmitter — finalize", () => {
+  it("emits Python PlaybookScript step_id instead of the internal id field", () => {
+    const e = new PlaybookEmitter();
+    e.beginStep(1, "array");
+    e.addArrayTokens(["3", "1"]);
+    e.commitStep();
+
+    const step = e.finalize().steps[0];
+
+    expect(step.step_id).toBe("step_01");
+    expect(step).not.toHaveProperty("id");
+  });
+
   it("never emits a vector_field field on any snapshot", () => {
     const e = new PlaybookEmitter();
     e.setOutline("math", ["a"]);
@@ -108,8 +120,17 @@ describe("PlaybookEmitter — finalize", () => {
     e.beginStep(1, "array");
     e.addArrayTokens(["3", "1", "4", "1", "5"]);
     e.commitStep();
-    const snap = e.finalize().steps[0].snapshot as Record<string, unknown>;
+    const step = e.finalize().steps[0];
+    const snap = step.snapshot as Record<string, unknown>;
     expect(snap.kind).toBe("algorithm_bars");
+    expect(snap.array_values).toEqual(["3", "1", "4", "1", "5"]);
+    expect(snap.numeric_values).toEqual([3, 1, 4, 1, 5]);
+    expect(snap.active_indices).toEqual([]);
+    expect(snap.swap_indices).toEqual([]);
+    expect(snap.sorted_indices).toEqual([]);
+    expect(snap.pointers).toEqual({});
+    expect(snap).not.toHaveProperty("tokens");
+    expect(step.layers[0].body).toEqual(snap);
   });
 
   it("uses algorithm_array when labels contain non-numeric tokens", () => {
@@ -119,6 +140,23 @@ describe("PlaybookEmitter — finalize", () => {
     e.commitStep();
     const snap = e.finalize().steps[0].snapshot as Record<string, unknown>;
     expect(snap.kind).toBe("algorithm_array");
+    expect(snap.array_values).toEqual(["foo", "bar"]);
+    expect(snap.active_indices).toEqual([]);
+    expect(snap.swap_indices).toEqual([]);
+    expect(snap.sorted_indices).toEqual([]);
+    expect(snap.pointers).toEqual({});
+    expect(snap).not.toHaveProperty("tokens");
+  });
+
+  it("maps token emphasis into array active and sorted indices", () => {
+    const e = new PlaybookEmitter();
+    e.beginStep(1, "array emphasis");
+    e.addArrayTokens(["A", "B", "C"], { 0: "primary", 2: "accent" });
+    e.commitStep();
+    const snap = e.finalize().steps[0].snapshot as Record<string, unknown>;
+    expect(snap.kind).toBe("algorithm_array");
+    expect(snap.active_indices).toEqual([0]);
+    expect(snap.sorted_indices).toEqual([2]);
   });
 
   it("propagates the planned domain", () => {

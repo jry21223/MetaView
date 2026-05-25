@@ -9,6 +9,7 @@ import type {
   ArrayTokenBuilder,
   CurveBuilder,
   Emphasis,
+  MetaStepOutput,
   ParameterControl,
   PlaybookOutput,
   PlaybookSkeleton,
@@ -338,11 +339,11 @@ function deriveVisualKind(step: StepBuilder): VisualKind {
 function serializeStep(
   step: StepBuilder,
   endFrame: number,
-): Record<string, unknown> {
+): MetaStepOutput {
   const id = `step_${String(step.index).padStart(2, "0")}`;
   const snapshot = serializeSnapshot(step);
   return {
-    id,
+    step_id: id,
     title: step.title,
     end_frame: endFrame,
     narration_template: step.narration,
@@ -355,23 +356,41 @@ function serializeStep(
     })),
     code_highlight: null,
     snapshot,
-    layers: snapshot ? [{ timing: { enter_at: 0, exit_at: 1, appear_anim: "fade", z_order: 0 }, body: snapshot }] : [],
+    layers: [{ timing: { enter_at: 0, exit_at: 1, appear_anim: "fade", z_order: 0 }, body: snapshot }],
   };
 }
 
-function serializeSnapshot(step: StepBuilder): Record<string, unknown> | null {
+function serializeSnapshot(step: StepBuilder): Record<string, unknown> {
   const kind = deriveVisualKind(step);
   if (kind === "array") {
     const labels = step.tokens.map((t) => t.label);
-    const allNumeric = labels.every((l) => /^-?\d+(\.\d+)?$/.test(l));
+    const numericValues = labels.map((label) => Number(label));
+    const allNumeric =
+      labels.every((label) => label.trim() !== "") &&
+      numericValues.every((value) => Number.isFinite(value));
+    const activeIndices = step.tokens
+      .map((token, index) => (token.emphasis === "primary" ? index : -1))
+      .filter((index) => index >= 0);
+    const sortedIndices = step.tokens
+      .map((token, index) => (token.emphasis === "accent" ? index : -1))
+      .filter((index) => index >= 0);
+    const base = {
+      array_values: labels,
+      active_indices: activeIndices,
+      swap_indices: [] as number[],
+      sorted_indices: sortedIndices,
+      pointers: {} as Record<string, number>,
+    };
+    if (allNumeric) {
+      return {
+        kind: "algorithm_bars",
+        ...base,
+        numeric_values: numericValues,
+      };
+    }
     return {
-      kind: allNumeric ? "algorithm_bars" : "algorithm_array",
-      tokens: step.tokens.map((t) => ({
-        id: t.id,
-        label: t.label,
-        value: t.value,
-        emphasis: t.emphasis,
-      })),
+      kind: "algorithm_array",
+      ...base,
     };
   }
   if (kind === "formula") {

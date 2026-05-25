@@ -54,11 +54,52 @@ class _FakeAgent:
 
 _MIN_PLAYBOOK: dict[str, Any] = {
     "fps": 30,
-    "total_frames": 60,
-    "domain": "math",
+    "total_frames": 120,
+    "domain": "algorithm",
     "title": "Sample",
     "summary": "From agent",
-    "steps": [],
+    "steps": [
+        {
+            "step_id": "step_01",
+            "end_frame": 120,
+            "title": "Array state",
+            "voiceover_text": "Show the array.",
+            "tokens": [
+                {"id": "t0", "label": "3", "value": "3", "emphasis": "primary"},
+                {"id": "t1", "label": "1", "value": "1", "emphasis": "accent"},
+            ],
+            "code_highlight": None,
+            "narration_template": ["Show the array."],
+            "snapshot": {
+                "kind": "algorithm_bars",
+                "array_values": ["3", "1"],
+                "numeric_values": [3, 1],
+                "active_indices": [0],
+                "swap_indices": [],
+                "sorted_indices": [1],
+                "pointers": {},
+            },
+            "layers": [
+                {
+                    "timing": {
+                        "enter_at": 0,
+                        "exit_at": 1,
+                        "appear_anim": "fade",
+                        "z_order": 0,
+                    },
+                    "body": {
+                        "kind": "algorithm_bars",
+                        "array_values": ["3", "1"],
+                        "numeric_values": [3, 1],
+                        "active_indices": [0],
+                        "swap_indices": [],
+                        "sorted_indices": [1],
+                        "pointers": {},
+                    },
+                }
+            ],
+        }
+    ],
     "parameter_controls": [],
 }
 
@@ -82,6 +123,11 @@ async def test_agent_mode_routes_to_agent_provider() -> None:
     assert last["status"].value == "succeeded"
     playbook_dict = json.loads(last["playbook_json"])
     assert playbook_dict["title"] == "Sample"
+    assert playbook_dict["steps"][0]["step_id"] == "step_01"
+    assert playbook_dict["steps"][0]["snapshot"]["array_values"] == ["3", "1"]
+    assert playbook_dict["steps"][0]["snapshot"]["numeric_values"] == [3.0, 1.0]
+    assert "tokens" not in playbook_dict["steps"][0]["snapshot"]
+    assert playbook_dict["steps"][0]["layers"][0]["body"] == playbook_dict["steps"][0]["snapshot"]
 
 
 @pytest.mark.asyncio
@@ -126,6 +172,25 @@ async def test_agent_mode_bad_payload_fails_run() -> None:
 
     assert repo.updates[-1]["status"].value == "failed"
     assert "error" in repo.updates[-1]
+
+
+@pytest.mark.asyncio
+async def test_agent_mode_rejects_legacy_id_only_step_payload() -> None:
+    legacy = json.loads(json.dumps(_MIN_PLAYBOOK))
+    legacy["steps"][0]["id"] = legacy["steps"][0].pop("step_id")
+    repo = _RecordingRepo()
+    agent = _FakeAgent(legacy)
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        agent_provider=agent,
+        generation_mode="agent",
+    )
+
+    await use_case.execute("run-1", PipelineRequest(prompt="x"))
+
+    assert repo.updates[-1]["status"].value == "failed"
+    assert "step_id" in repo.updates[-1]["error"]
 
 
 @pytest.mark.asyncio
