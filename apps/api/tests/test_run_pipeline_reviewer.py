@@ -11,8 +11,11 @@ from app.infrastructure.persistence.db_init import init_db
 from app.infrastructure.persistence.sqlite_run_repository import SqliteRunRepository
 
 
-def _combined(cir: dict) -> str:
-    return json.dumps({"cir": cir}, ensure_ascii=False)
+def _combined(cir: dict, execution_map: dict | None = None) -> str:
+    payload: dict = {"cir": cir}
+    if execution_map is not None:
+        payload["execution_map"] = execution_map
+    return json.dumps(payload, ensure_ascii=False)
 
 
 def _valid_scene_cir() -> dict:
@@ -261,3 +264,116 @@ async def test_reviewer_mode_off_fails_fast_without_repair(repo) -> None:
     assert result.review is not None
     assert result.review.attempts == 0
     assert result.review.status == "failed"
+
+
+@pytest.mark.asyncio
+async def test_execution_map_error_fails_when_reviewer_mode_off(repo) -> None:
+    cir = {
+        "version": "0.1.0",
+        "title": "曲线",
+        "domain": "math",
+        "summary": "演示曲线。",
+        "steps": [
+            {
+                "id": "s1",
+                "title": "画函数",
+                "narration": "先画出 f(x)。",
+                "visual_kind": "function",
+                "tokens": [],
+                "plot": {"curves": [{"expression": "x", "label": "f"}]},
+                "annotations": [],
+            }
+        ],
+    }
+    execution_map = {
+        "duration_s": 2,
+        "checkpoints": [
+            {
+                "id": "cp1",
+                "step_index": 0,
+                "step_id": "missing",
+                "visual_kind": "function",
+                "title": "bad",
+                "summary": "bad",
+                "start_s": 0,
+                "end_s": 2,
+            }
+        ],
+    }
+    generator = SequenceLLM([_combined(cir, execution_map)])
+    use_case = RunPipelineUseCase(
+        repo,
+        generator,
+        max_repair_attempts=2,
+        reviewer_mode="off",
+    )
+    await repo.create("run-5", "画函数", "2024-01-01T00:00:00+00:00")
+
+    await use_case.execute("run-5", PipelineRequest(prompt="画函数", domain="math"))
+
+    result = await repo.get("run-5")
+    assert result is not None
+    assert result.status == PipelineRunStatus.FAILED
+    assert result.error is not None
+    assert "execution_map_orphan_checkpoint" in result.error
+    assert result.review is not None
+    assert result.review.status == "failed"
+
+
+@pytest.mark.asyncio
+async def test_execution_map_warnings_do_not_block_pipeline(repo) -> None:
+    cir = {
+        "version": "0.1.0",
+        "title": "数组",
+        "domain": "algorithm",
+        "summary": "演示数组。",
+        "steps": [
+            {
+                "id": "s1",
+                "title": "看数组",
+                "narration": "观察当前数组。",
+                "visual_kind": "array",
+                "tokens": [
+                    {"id": "t0", "label": "3", "value": "3", "emphasis": "primary"},
+                    {"id": "t1", "label": "1", "value": "1", "emphasis": "secondary"},
+                ],
+                "annotations": [],
+            }
+        ],
+    }
+    execution_map = {
+        "duration_s": 2,
+        "algorithm_code": ["line 0"],
+        "checkpoints": [
+            {
+                "id": "cp1",
+                "step_index": 0,
+                "step_id": "s1",
+                "visual_kind": "array",
+                "title": "warn",
+                "summary": "warn",
+                "start_s": 0,
+                "end_s": 2,
+                "focus_tokens": ["missing"],
+                "array_focus_indices": [9],
+                "code_lines": [3],
+            }
+        ],
+    }
+    generator = SequenceLLM([_combined(cir, execution_map)])
+    use_case = RunPipelineUseCase(repo, generator)
+    await repo.create("run-6", "看数组", "2024-01-01T00:00:00+00:00")
+
+    await use_case.execute("run-6", PipelineRequest(prompt="看数组", domain="algorithm"))
+
+    result = await repo.get("run-6")
+    assert result is not None
+    assert result.status == PipelineRunStatus.SUCCEEDED
+    assert result.playbook is not None
+    assert result.review is not None
+    assert result.review.status == "warnings"
+    assert {issue.code for issue in result.review.issues} >= {
+        "execution_map_unknown_focus_token",
+        "execution_map_array_index_out_of_range",
+        "execution_map_code_line_out_of_range",
+    }
