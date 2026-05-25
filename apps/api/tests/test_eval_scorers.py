@@ -6,13 +6,19 @@ synthetic minimal payloads for edge cases.
 
 from __future__ import annotations
 
-import json
 import pathlib
 
 import pytest
 
+from app.domain.models.playbook import (
+    MathFormulaSnapshot,
+    MathPlotCurve,
+    MathPlotSnapshot,
+    MetaStep,
+    NarrationCardSnapshot,
+    PlaybookScript,
+)
 from eval.scorers import (
-    ScoreCard,
     score_diversity,
     score_narration,
     score_playbook,
@@ -21,14 +27,6 @@ from eval.scorers import (
     score_step_count,
     score_temporal_coherence,
     score_title_caption,
-)
-from app.domain.models.playbook import (
-    MathFormulaSnapshot,
-    MathPlotCurve,
-    MathPlotSnapshot,
-    MetaStep,
-    NarrationCardSnapshot,
-    PlaybookScript,
 )
 
 FIXTURE_PATH = pathlib.Path(__file__).parents[3] / "eval" / "fixtures" / "sample_math_playbook.json"
