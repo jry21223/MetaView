@@ -1,4 +1,4 @@
-import type { ExecutionParameterControl } from "../../../entities/cir/types";
+import type { ExecutionParameterControl } from "../../../entities/execution/types";
 
 export type SnapshotKind =
   | "algorithm_array"
@@ -261,6 +261,8 @@ export interface MetaStep<T extends AnySnapshot = AnySnapshot> {
 }
 
 export interface PlaybookScript {
+  /** Frozen contract version; absent on pre-versioning stored playbooks. */
+  schema_version?: string;
   fps: number;
   total_frames: number;
   domain: string;

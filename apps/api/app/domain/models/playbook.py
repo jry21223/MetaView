@@ -5,7 +5,7 @@ from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, Field
 
-from app.domain.models.cir import ExecutionParameterControl
+from app.domain.models.execution import ExecutionParameterControl
 from app.domain.models.topic import TopicDomain
 
 
@@ -264,6 +264,9 @@ class MetaStep(BaseModel):
 
 
 class PlaybookScript(BaseModel):
+    # Frozen contract boundary between the generation pipeline and the renderer.
+    # Stored verbatim as playbook_json; old rows without this field default below.
+    schema_version: str = Field(default="1.0.0")
     fps: int = Field(default=30, ge=1)
     total_frames: int = Field(ge=1)
     domain: TopicDomain
