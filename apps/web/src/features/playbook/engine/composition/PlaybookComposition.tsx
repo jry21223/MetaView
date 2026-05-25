@@ -1,12 +1,13 @@
 import React from "react";
 import { useCurrentFrame } from "remotion";
-import type { Layer, MathPlotCurve, MathPlotSnapshot, PlaybookScript } from "../types";
+import type { PlaybookScript } from "../types";
 import { CodeHighlightRenderer } from "../renderers/CodeHighlightRenderer";
 import { useStepProgress } from "./useInterpolatedState";
 import type { RendererProps } from "../renderers/types";
 import { PLAYBOOK_LAYOUT } from "../../../../shared/config/constants";
 import { rendererRegistry } from "../renderers/registry";
 import { appearTransform, useTimeline } from "../foundation";
+import { compileVisualTimeline, type VisualLayerState, type VisualStepState } from "./visualContinuity";
 
 interface PlaybookCompositionProps {
   script: PlaybookScript;
@@ -45,27 +46,32 @@ function SnapshotRenderer(props: RendererProps) {
  * progress is outside [enter_at, exit_at], the layer renders nothing.
  */
 function LayerSlot({
-  layer,
+  layerState,
   baseProps,
   stepProgress,
 }: {
-  layer: Layer;
+  layerState: VisualLayerState;
   baseProps: RendererProps;
   stepProgress: number;
 }) {
+  const { layer } = layerState;
   const slice = useTimeline(layer.timing, stepProgress);
+  const visualProgress = useStepProgress(layerState.visualStartFrame, layerState.visualEndFrame);
   if (!slice.visible) return null;
   const Renderer = rendererRegistry.get(layer.body.kind);
   if (!Renderer) return null;
   // Each layer renders against its body snapshot; clone the step so the
   // existing RendererProps contract works without changing every renderer.
   const layerStep = { ...baseProps.step, snapshot: layer.body };
-  const appear = appearTransform(slice.anim, slice.progress);
+  const appear = layerState.isVisualContinuation
+    ? appearTransform("none", 1)
+    : appearTransform(slice.anim, slice.progress);
   return (
     <div
       className="scene-compositor__layer"
       data-layer-kind={layer.body.kind}
       data-appear-anim={slice.anim}
+      data-visual-continuation={layerState.isVisualContinuation ? "true" : "false"}
       style={{
         position: "absolute",
         inset: 0,
@@ -78,97 +84,14 @@ function LayerSlot({
       {React.createElement(Renderer, {
         ...baseProps,
         step: layerStep,
-        progress: slice.progress,
+        progress: visualProgress,
+        stepProgress,
+        visualStartFrame: layerState.visualStartFrame,
+        visualKey: layerState.visualKey,
+        isVisualContinuation: layerState.isVisualContinuation,
       })}
     </div>
   );
-}
-
-function timingKey(layer: Layer): string {
-  const { enter_at, exit_at, z_order } = layer.timing;
-  return `${enter_at}|${exit_at}|${z_order}`;
-}
-
-function curveKey(curve: MathPlotCurve): string {
-  return `${curve.expression}\u0000${curve.label ?? ""}\u0000${curve.emphasis ?? ""}`;
-}
-
-function mergeCurves(a: MathPlotCurve[], b: MathPlotCurve[]): MathPlotCurve[] {
-  const seen = new Set<string>();
-  const out: MathPlotCurve[] = [];
-  for (const curve of [...a, ...b]) {
-    const key = curveKey(curve);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(curve);
-  }
-  return out;
-}
-
-function mergeOptionalRange(
-  aMin: number | null | undefined,
-  aMax: number | null | undefined,
-  bMin: number | null | undefined,
-  bMax: number | null | undefined,
-): [number | null, number | null] {
-  if (aMin == null || aMax == null) return [bMin ?? null, bMax ?? null];
-  if (bMin == null || bMax == null) return [aMin, aMax];
-  return [Math.min(aMin, bMin), Math.max(aMax, bMax)];
-}
-
-function mergeMathPlotSnapshots(a: MathPlotSnapshot, b: MathPlotSnapshot): MathPlotSnapshot {
-  const [yMin, yMax] = mergeOptionalRange(a.y_min, a.y_max, b.y_min, b.y_max);
-  const hasBShade = b.shade_from != null && b.shade_to != null;
-  const hasAShade = a.shade_from != null && a.shade_to != null;
-
-  return {
-    ...a,
-    ...b,
-    curves: mergeCurves(a.curves ?? [], b.curves ?? []),
-    x_min: Math.min(a.x_min, b.x_min),
-    x_max: Math.max(a.x_max, b.x_max),
-    y_min: yMin,
-    y_max: yMax,
-    marker_x: b.marker_x ?? a.marker_x,
-    shade_from: hasBShade ? b.shade_from : hasAShade ? a.shade_from : null,
-    shade_to: hasBShade ? b.shade_to : hasAShade ? a.shade_to : null,
-    x_label: b.x_label || a.x_label,
-    y_label: b.y_label || a.y_label,
-    formula_latex: b.formula_latex ?? a.formula_latex,
-  };
-}
-
-function normalizeLayerStack(layers: Layer[]): Layer[] {
-  const out: Layer[] = [];
-  const mathPlotIndexByTiming = new Map<string, number>();
-
-  for (const layer of layers) {
-    if (layer.body.kind !== "math_plot") {
-      out.push(layer);
-      continue;
-    }
-
-    const key = timingKey(layer);
-    const existingIndex = mathPlotIndexByTiming.get(key);
-    if (existingIndex == null) {
-      mathPlotIndexByTiming.set(key, out.length);
-      out.push(layer);
-      continue;
-    }
-
-    const existing = out[existingIndex];
-    if (existing.body.kind !== "math_plot") {
-      out.push(layer);
-      continue;
-    }
-
-    out[existingIndex] = {
-      ...existing,
-      body: mergeMathPlotSnapshots(existing.body, layer.body),
-    };
-  }
-
-  return out;
 }
 
 /**
@@ -179,21 +102,22 @@ function normalizeLayerStack(layers: Layer[]): Layer[] {
 function SceneCompositor({
   baseProps,
   stepProgress,
+  visualState,
 }: {
   baseProps: RendererProps;
   stepProgress: number;
+  visualState: VisualStepState | undefined;
 }) {
-  const layers = baseProps.step.layers;
+  const layers = visualState?.layers;
   if (!layers || layers.length === 0) {
     return <SnapshotRenderer {...baseProps} />;
   }
-  const sorted = normalizeLayerStack([...layers].sort((a, b) => a.timing.z_order - b.timing.z_order));
   return (
     <div className="scene-compositor" style={{ position: "relative", width: "100%", height: "100%" }}>
-      {sorted.map((layer, i) => (
+      {layers.map((layerState, i) => (
         <LayerSlot
-          key={`${layer.body.kind}-${i}`}
-          layer={layer}
+          key={`${layerState.visualKey}-${i}`}
+          layerState={layerState}
           baseProps={baseProps}
           stepProgress={stepProgress}
         />
@@ -210,15 +134,17 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
   swapDurationFrames,
 }) => {
   const frame = useCurrentFrame();
+  const visualTimeline = React.useMemo(() => compileVisualTimeline(script), [script]);
 
   const stepIndex = script.steps.findIndex((s) => frame < s.end_frame);
   const activeIndex = stepIndex === -1 ? script.steps.length - 1 : stepIndex;
   const step = script.steps[activeIndex];
+  const visualState = visualTimeline.steps[activeIndex];
   const prevStep = activeIndex > 0 ? script.steps[activeIndex - 1] : null;
 
   const stepStartFrame = prevStep?.end_frame ?? 0;
   const stepEndFrame = step?.end_frame ?? script.total_frames;
-  const progress = useStepProgress(stepStartFrame, stepEndFrame);
+  const stepProgress = useStepProgress(stepStartFrame, stepEndFrame);
 
   if (!step) return null;
 
@@ -241,9 +167,13 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
     frame,
     stepStartFrame,
     stepEndFrame,
-    progress,
+    stepProgress,
+    progress: stepProgress,
     theme,
     swapDurationFrames,
+    visualStartFrame: visualState?.visualStartFrame,
+    visualKey: visualState?.visualKey,
+    isVisualContinuation: visualState?.isVisualContinuation,
   };
 
   return (
@@ -252,7 +182,11 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
         {/* Visual track */}
         <div style={{ width: hasCodeTrack ? `${vizRatio * 100}%` : "100%", height: "100%" }}>
-          <SceneCompositor baseProps={rendererProps} stepProgress={progress} />
+          <SceneCompositor
+            baseProps={rendererProps}
+            stepProgress={stepProgress}
+            visualState={visualState}
+          />
         </div>
 
         {/* Code track */}

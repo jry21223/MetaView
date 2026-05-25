@@ -1,18 +1,34 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { PlaybookScript } from "../types";
+import type { Layer, MathPlotSnapshot, MetaStep, PlaybookScript } from "../types";
+
+const remotionState = vi.hoisted(() => ({ frame: 0 }));
 
 vi.mock("remotion", async () => {
   const actual = await vi.importActual<typeof import("remotion")>("remotion");
   return {
     ...actual,
-    useCurrentFrame: () => 0,
+    useCurrentFrame: () => remotionState.frame,
     useVideoConfig: () => ({ fps: 30 }),
-    spring: () => 1,
+    spring: ({ frame, durationInFrames }: { frame: number; durationInFrames?: number }) => {
+      const duration = Math.max(1, durationInFrames ?? 1);
+      return Math.max(0, Math.min(1, frame / duration));
+    },
   };
 });
 
 import { PlaybookComposition } from "./PlaybookComposition";
+
+function plotSnapshot(expression = "x^2"): MathPlotSnapshot {
+  return {
+    kind: "math_plot",
+    curves: [{ expression, label: "f(x)", emphasis: "primary" }],
+    x_min: -2,
+    x_max: 2,
+    x_label: "x",
+    y_label: "y",
+  };
+}
 
 function mathScript(): PlaybookScript {
   return {
@@ -29,15 +45,7 @@ function mathScript(): PlaybookScript {
         title: "画直线",
         voiceover_text: "观察斜率变化",
         tokens: [],
-        snapshot: {
-          kind: "math_plot",
-          curves: [{ expression: "a*x", label: "f(x)", emphasis: "primary" }],
-          params: { a: 2 },
-          x_min: -2,
-          x_max: 2,
-          x_label: "x",
-          y_label: "y",
-        },
+        snapshot: { ...plotSnapshot("a*x"), params: { a: 2 } },
       },
     ],
   };
@@ -101,7 +109,55 @@ function layeredMathScript(): PlaybookScript {
   };
 }
 
+function step({
+  id,
+  endFrame,
+  title,
+  voiceover,
+  snapshot,
+  layers,
+}: {
+  id: string;
+  endFrame: number;
+  title: string;
+  voiceover: string;
+  snapshot: MathPlotSnapshot;
+  layers?: Layer[];
+}): MetaStep {
+  return {
+    step_id: id,
+    end_frame: endFrame,
+    title,
+    voiceover_text: voiceover,
+    tokens: [],
+    snapshot,
+    layers,
+  };
+}
+
+function twoStepScript(first: MetaStep, second: MetaStep): PlaybookScript {
+  return {
+    fps: 30,
+    total_frames: second.end_frame,
+    domain: "math",
+    title: "连续分镜",
+    summary: "",
+    parameter_controls: [],
+    steps: [first, second],
+  };
+}
+
+function firstPolylinePointCount(markup: string): number {
+  const match = markup.match(/<polyline[^>]*points="([^"]+)"/);
+  if (!match) return 0;
+  return match[1].trim().split(/\s+/).length;
+}
+
 describe("PlaybookComposition", () => {
+  beforeEach(() => {
+    remotionState.frame = 0;
+  });
+
   it("renders math_plot snapshots through the renderer registry", () => {
     const markup = renderToStaticMarkup(<PlaybookComposition script={mathScript()} showSubtitles={false} />);
     expect(markup).toContain("<svg");
@@ -116,9 +172,107 @@ describe("PlaybookComposition", () => {
   });
 
   it("merges simultaneous math plot layers into one scene", () => {
+    remotionState.frame = 60;
     const markup = renderToStaticMarkup(<PlaybookComposition script={layeredMathScript()} showSubtitles={false} />);
     expect(markup.match(/<svg/g)).toHaveLength(1);
     expect(markup).toContain("tangent");
     expect(markup).toContain("<polygon");
+  });
+
+  it("continues identical math plot geometry across a narration step boundary", () => {
+    const snapshot = plotSnapshot();
+    const script = twoStepScript(
+      step({
+        id: "s1",
+        endFrame: 60,
+        title: "画出曲线",
+        voiceover: "第一段说明",
+        snapshot,
+      }),
+      step({
+        id: "s2",
+        endFrame: 120,
+        title: "解释曲线",
+        voiceover: "第二段说明",
+        snapshot,
+      }),
+    );
+
+    remotionState.frame = 60;
+    const markup = renderToStaticMarkup(<PlaybookComposition script={script} />);
+
+    expect(firstPolylinePointCount(markup)).toBeGreaterThan(100);
+    expect(markup).toContain("第二段说明");
+    expect(markup).toContain("2 / 2");
+    expect(markup).toContain('data-visual-continuation="true"');
+  });
+
+  it("restarts math plot geometry when the visual snapshot changes", () => {
+    const script = twoStepScript(
+      step({
+        id: "s1",
+        endFrame: 60,
+        title: "画出抛物线",
+        voiceover: "第一段说明",
+        snapshot: plotSnapshot("x^2"),
+      }),
+      step({
+        id: "s2",
+        endFrame: 120,
+        title: "切到正弦",
+        voiceover: "第二段说明",
+        snapshot: plotSnapshot("sin(x)"),
+      }),
+    );
+
+    remotionState.frame = 60;
+    const markup = renderToStaticMarkup(<PlaybookComposition script={script} showSubtitles={false} />);
+
+    expect(firstPolylinePointCount(markup)).toBeLessThanOrEqual(3);
+    expect(markup).toContain('data-visual-continuation="false"');
+  });
+
+  it("keeps an unchanged layer drawn while a new layer enters", () => {
+    const plotLayer: Layer = {
+      timing: { enter_at: 0, exit_at: 1, appear_anim: "draw", z_order: 0 },
+      body: plotSnapshot(),
+    };
+    const script = twoStepScript(
+      step({
+        id: "s1",
+        endFrame: 60,
+        title: "先看曲线",
+        voiceover: "第一段说明",
+        snapshot: plotSnapshot(),
+        layers: [plotLayer],
+      }),
+      step({
+        id: "s2",
+        endFrame: 120,
+        title: "加入说明",
+        voiceover: "第二段说明",
+        snapshot: plotSnapshot(),
+        layers: [
+          plotLayer,
+          {
+            timing: { enter_at: 0, exit_at: 1, appear_anim: "fade", z_order: 1 },
+            body: {
+              kind: "narration_card",
+              text: "补充说明",
+              position: "bottom",
+              emphasis: "secondary",
+            },
+          },
+        ],
+      }),
+    );
+
+    remotionState.frame = 60;
+    const markup = renderToStaticMarkup(<PlaybookComposition script={script} showSubtitles={false} />);
+
+    expect(firstPolylinePointCount(markup)).toBeGreaterThan(100);
+    expect(markup).toContain("补充说明");
+    expect(markup).toContain('data-layer-kind="math_plot"');
+    expect(markup).toContain('data-layer-kind="narration_card"');
   });
 });

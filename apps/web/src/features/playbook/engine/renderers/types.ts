@@ -6,6 +6,19 @@ export interface RendererProps {
   frame: number;
   stepStartFrame: number;
   stepEndFrame: number;
+  /**
+   * Current step progress. Geometry renderers should usually use `progress`
+   * instead; this field is for labels/text that intentionally restart on
+   * every narration step.
+   */
+  stepProgress?: number;
+  /** Start frame of the visual slot whose geometry is currently being rendered. */
+  visualStartFrame?: number;
+  /** Stable key for the visual slot, used by the continuity compiler. */
+  visualKey?: string;
+  /** True when this visual slot is continuing from the immediately previous step. */
+  isVisualContinuation?: boolean;
+  /** Geometry progress. This may span multiple narration steps. */
   progress: number;
   theme: "dark" | "light";
   /**
