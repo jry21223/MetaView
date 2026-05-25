@@ -1,0 +1,234 @@
+{
+  "fps": 30,
+  "total_frames": 540,
+  "domain": "code",
+  "title": "CODE 讲解：code recursion factorial",
+  "summary": "逐行追踪 factorial(4) 的递归调用栈，展示压栈与回溯返回值。",
+  "steps": [
+    {
+      "step_id": "step_01",
+      "end_frame": 90,
+      "title": "第 1 步",
+      "voiceover_text": "首先来了解code领域的基本概念，这是理解后续内容的基础。",
+      "animation_hint": "enter",
+      "snapshot": {
+        "kind": "math_formula",
+        "formula_latex": "F = ma",
+        "caption": null,
+        "highlights": [],
+        "annotations": [
+          "基本方程"
+        ]
+      },
+      "layers": [
+        {
+          "timing": {
+            "enter_at": 0.0,
+            "exit_at": 1.0,
+            "appear_anim": "fade",
+            "z_order": 0
+          },
+          "body": {
+            "kind": "math_formula",
+            "formula_latex": "F = ma",
+            "caption": null,
+            "highlights": [],
+            "annotations": [
+              "基本方程"
+            ]
+          }
+        }
+      ],
+      "code_highlight": null,
+      "narration_template": null,
+      "tokens": []
+    },
+    {
+      "step_id": "step_02",
+      "end_frame": 180,
+      "title": "第 2 步",
+      "voiceover_text": "深入分析逐行追踪 factorial(4) 的递的核心原理，建立数学模型。",
+      "animation_hint": "enter",
+      "snapshot": {
+        "kind": "math_formula",
+        "formula_latex": "\\Delta x = v_0 t + \\frac{1}{2}at^2",
+        "caption": null,
+        "highlights": [],
+        "annotations": [
+          "位移方程"
+        ]
+      },
+      "layers": [
+        {
+          "timing": {
+            "enter_at": 0.0,
+            "exit_at": 1.0,
+            "appear_anim": "fade",
+            "z_order": 0
+          },
+          "body": {
+            "kind": "math_formula",
+            "formula_latex": "\\Delta x = v_0 t + \\frac{1}{2}at^2",
+            "caption": null,
+            "highlights": [],
+            "annotations": [
+              "位移方程"
+            ]
+          }
+        }
+      ],
+      "code_highlight": null,
+      "narration_template": null,
+      "tokens": []
+    },
+    {
+      "step_id": "step_03",
+      "end_frame": 270,
+      "title": "第 3 步",
+      "voiceover_text": "通过方程推导，我们可以得到定量关系式，用于计算。",
+      "animation_hint": "enter",
+      "snapshot": {
+        "kind": "math_formula",
+        "formula_latex": "E = \\frac{1}{2}mv^2",
+        "caption": null,
+        "highlights": [],
+        "annotations": [
+          "动能公式"
+        ]
+      },
+      "layers": [
+        {
+          "timing": {
+            "enter_at": 0.0,
+            "exit_at": 1.0,
+            "appear_anim": "fade",
+            "z_order": 0
+          },
+          "body": {
+            "kind": "math_formula",
+            "formula_latex": "E = \\frac{1}{2}mv^2",
+            "caption": null,
+            "highlights": [],
+            "annotations": [
+              "动能公式"
+            ]
+          }
+        }
+      ],
+      "code_highlight": null,
+      "narration_template": null,
+      "tokens": []
+    },
+    {
+      "step_id": "step_04",
+      "end_frame": 360,
+      "title": "第 4 步",
+      "voiceover_text": "代入具体数值，逐步求解，验证推导是否正确。",
+      "animation_hint": "enter",
+      "snapshot": {
+        "kind": "math_formula",
+        "formula_latex": "W = F \\cdot d \\cdot \\cos\\theta",
+        "caption": null,
+        "highlights": [],
+        "annotations": [
+          "功的定义"
+        ]
+      },
+      "layers": [
+        {
+          "timing": {
+            "enter_at": 0.0,
+            "exit_at": 1.0,
+            "appear_anim": "fade",
+            "z_order": 0
+          },
+          "body": {
+            "kind": "math_formula",
+            "formula_latex": "W = F \\cdot d \\cdot \\cos\\theta",
+            "caption": null,
+            "highlights": [],
+            "annotations": [
+              "功的定义"
+            ]
+          }
+        }
+      ],
+      "code_highlight": null,
+      "narration_template": null,
+      "tokens": []
+    },
+    {
+      "step_id": "step_05",
+      "end_frame": 450,
+      "title": "第 5 步",
+      "voiceover_text": "这个规律在实际code问题中有广泛应用。",
+      "animation_hint": "enter",
+      "snapshot": {
+        "kind": "math_formula",
+        "formula_latex": "P = \\frac{W}{t}",
+        "caption": null,
+        "highlights": [],
+        "annotations": [
+          "功率定义"
+        ]
+      },
+      "layers": [
+        {
+          "timing": {
+            "enter_at": 0.0,
+            "exit_at": 1.0,
+            "appear_anim": "fade",
+            "z_order": 0
+          },
+          "body": {
+            "kind": "math_formula",
+            "formula_latex": "P = \\frac{W}{t}",
+            "caption": null,
+            "highlights": [],
+            "annotations": [
+              "功率定义"
+            ]
+          }
+        }
+      ],
+      "code_highlight": null,
+      "narration_template": null,
+      "tokens": []
+    },
+    {
+      "step_id": "step_06",
+      "end_frame": 540,
+      "title": "总结",
+      "voiceover_text": "总结本节核心要点，掌握分析方法，应用于实际问题。",
+      "animation_hint": null,
+      "snapshot": {
+        "kind": "narration_card",
+        "text": "总结：逐行追踪 factorial(4) 的递归调用栈，展示压栈与回溯返回值。",
+        "position": "bottom",
+        "emphasis": "primary"
+      },
+      "layers": [
+        {
+          "timing": {
+            "enter_at": 0.0,
+            "exit_at": 1.0,
+            "appear_anim": "fade",
+            "z_order": 0
+          },
+          "body": {
+            "kind": "narration_card",
+            "text": "总结：逐行追踪 factorial(4) 的递归调用栈，展示压栈与回溯返回值。",
+            "position": "bottom",
+            "emphasis": "primary"
+          }
+        }
+      ],
+      "code_highlight": null,
+      "narration_template": null,
+      "tokens": []
+    }
+  ],
+  "parameter_controls": [],
+  "algorithm_id": null,
+  "initial_data": {}
+}

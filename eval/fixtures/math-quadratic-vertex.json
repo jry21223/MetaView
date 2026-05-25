@@ -1,0 +1,307 @@
+{
+  "fps": 30,
+  "total_frames": 540,
+  "domain": "math",
+  "title": "数学讲解：math quadratic vertex",
+  "summary": "讲解二次函数 f(x)=x²-4x+3 的图像：开口、顶点、与坐标轴的交点。",
+  "steps": [
+    {
+      "step_id": "step_01",
+      "end_frame": 90,
+      "title": "引入概念",
+      "voiceover_text": "本节我们将深入探讨这个数学概念，理解其定义和几何直觉。",
+      "animation_hint": "enter",
+      "snapshot": {
+        "kind": "narration_card",
+        "text": "概念导入：讲解二次函数 f(x)=x²-4x+3 的图像：开口、顶点、与坐标轴的交点。",
+        "position": "bottom",
+        "emphasis": "primary"
+      },
+      "layers": [
+        {
+          "timing": {
+            "enter_at": 0.0,
+            "exit_at": 1.0,
+            "appear_anim": "fade",
+            "z_order": 0
+          },
+          "body": {
+            "kind": "narration_card",
+            "text": "概念导入：讲解二次函数 f(x)=x²-4x+3 的图像：开口、顶点、与坐标轴的交点。",
+            "position": "bottom",
+            "emphasis": "primary"
+          }
+        }
+      ],
+      "code_highlight": null,
+      "narration_template": null,
+      "tokens": []
+    },
+    {
+      "step_id": "step_02",
+      "end_frame": 180,
+      "title": "建立函数图像",
+      "voiceover_text": "在坐标系中画出函数图像，观察它的基本形态和变化趋势。",
+      "animation_hint": "draw",
+      "snapshot": {
+        "kind": "math_plot",
+        "curves": [
+          {
+            "expression": "x^2",
+            "label": "f(x)",
+            "emphasis": "primary"
+          }
+        ],
+        "x_min": -3.0,
+        "x_max": 3.0,
+        "y_min": null,
+        "y_max": null,
+        "marker_x": null,
+        "shade_from": null,
+        "shade_to": null,
+        "x_label": "x",
+        "y_label": "y",
+        "formula_latex": "f(x) = x^2"
+      },
+      "layers": [
+        {
+          "timing": {
+            "enter_at": 0.0,
+            "exit_at": 1.0,
+            "appear_anim": "fade",
+            "z_order": 0
+          },
+          "body": {
+            "kind": "math_plot",
+            "curves": [
+              {
+                "expression": "x^2",
+                "label": "f(x)",
+                "emphasis": "primary"
+              }
+            ],
+            "x_min": -3.0,
+            "x_max": 3.0,
+            "y_min": null,
+            "y_max": null,
+            "marker_x": null,
+            "shade_from": null,
+            "shade_to": null,
+            "x_label": "x",
+            "y_label": "y",
+            "formula_latex": "f(x) = x^2"
+          }
+        }
+      ],
+      "code_highlight": null,
+      "narration_template": null,
+      "tokens": []
+    },
+    {
+      "step_id": "step_03",
+      "end_frame": 270,
+      "title": "关键特征分析",
+      "voiceover_text": "分析函数的单调性、极值点和对称轴，这些是理解函数行为的关键。",
+      "animation_hint": "highlight",
+      "snapshot": {
+        "kind": "math_plot",
+        "curves": [
+          {
+            "expression": "x^2 - 4*x + 3",
+            "label": "f(x)",
+            "emphasis": "primary"
+          }
+        ],
+        "x_min": -1.0,
+        "x_max": 5.0,
+        "y_min": null,
+        "y_max": null,
+        "marker_x": 2.0,
+        "shade_from": null,
+        "shade_to": null,
+        "x_label": "x",
+        "y_label": "y",
+        "formula_latex": "f(x) = x^2 - 4x + 3"
+      },
+      "layers": [
+        {
+          "timing": {
+            "enter_at": 0.0,
+            "exit_at": 1.0,
+            "appear_anim": "fade",
+            "z_order": 0
+          },
+          "body": {
+            "kind": "math_plot",
+            "curves": [
+              {
+                "expression": "x^2 - 4*x + 3",
+                "label": "f(x)",
+                "emphasis": "primary"
+              }
+            ],
+            "x_min": -1.0,
+            "x_max": 5.0,
+            "y_min": null,
+            "y_max": null,
+            "marker_x": 2.0,
+            "shade_from": null,
+            "shade_to": null,
+            "x_label": "x",
+            "y_label": "y",
+            "formula_latex": null
+          }
+        }
+      ],
+      "code_highlight": null,
+      "narration_template": null,
+      "tokens": []
+    },
+    {
+      "step_id": "step_04",
+      "end_frame": 360,
+      "title": "公式推导",
+      "voiceover_text": "通过代数推导，得出这个函数的标准表达式，掌握求解步骤。",
+      "animation_hint": "enter",
+      "snapshot": {
+        "kind": "math_formula",
+        "formula_latex": "f(x) = a(x-h)^2 + k",
+        "caption": null,
+        "highlights": [
+          "a",
+          "h",
+          "k"
+        ],
+        "annotations": [
+          "顶点式",
+          "a > 0 开口向上"
+        ]
+      },
+      "layers": [
+        {
+          "timing": {
+            "enter_at": 0.0,
+            "exit_at": 1.0,
+            "appear_anim": "fade",
+            "z_order": 0
+          },
+          "body": {
+            "kind": "math_formula",
+            "formula_latex": "f(x) = a(x-h)^2 + k",
+            "caption": null,
+            "highlights": [],
+            "annotations": []
+          }
+        }
+      ],
+      "code_highlight": null,
+      "narration_template": null,
+      "tokens": []
+    },
+    {
+      "step_id": "step_05",
+      "end_frame": 450,
+      "title": "例题计算",
+      "voiceover_text": "代入具体数值，逐步计算，验证我们的公式是否正确。",
+      "animation_hint": "draw",
+      "snapshot": {
+        "kind": "math_plot",
+        "curves": [
+          {
+            "expression": "x^2 - 4*x + 3",
+            "label": "f(x)",
+            "emphasis": "primary"
+          },
+          {
+            "expression": "2*x - 5",
+            "label": "切线",
+            "emphasis": "secondary"
+          }
+        ],
+        "x_min": -1.0,
+        "x_max": 5.0,
+        "y_min": null,
+        "y_max": null,
+        "marker_x": null,
+        "shade_from": null,
+        "shade_to": null,
+        "x_label": "x",
+        "y_label": "y",
+        "formula_latex": null
+      },
+      "layers": [
+        {
+          "timing": {
+            "enter_at": 0.0,
+            "exit_at": 1.0,
+            "appear_anim": "fade",
+            "z_order": 0
+          },
+          "body": {
+            "kind": "math_plot",
+            "curves": [
+              {
+                "expression": "x^2 - 4*x + 3",
+                "label": "f(x)",
+                "emphasis": "primary"
+              },
+              {
+                "expression": "2*x - 5",
+                "label": "切线",
+                "emphasis": "secondary"
+              }
+            ],
+            "x_min": -1.0,
+            "x_max": 5.0,
+            "y_min": null,
+            "y_max": null,
+            "marker_x": null,
+            "shade_from": null,
+            "shade_to": null,
+            "x_label": "x",
+            "y_label": "y",
+            "formula_latex": null
+          }
+        }
+      ],
+      "code_highlight": null,
+      "narration_template": null,
+      "tokens": []
+    },
+    {
+      "step_id": "step_06",
+      "end_frame": 540,
+      "title": "总结",
+      "voiceover_text": "通过本次学习，我们掌握了该函数的核心特性和分析方法，可以应用到实际问题中。",
+      "animation_hint": "enter",
+      "snapshot": {
+        "kind": "narration_card",
+        "text": "✓ 顶点坐标 (h, k)  ✓ 对称轴 x = h  ✓ 开口方向由 a 决定",
+        "position": "bottom",
+        "emphasis": "primary"
+      },
+      "layers": [
+        {
+          "timing": {
+            "enter_at": 0.0,
+            "exit_at": 1.0,
+            "appear_anim": "fade",
+            "z_order": 0
+          },
+          "body": {
+            "kind": "narration_card",
+            "text": "✓ 顶点坐标 (h, k)  ✓ 对称轴 x = h  ✓ 开口方向由 a 决定",
+            "position": "bottom",
+            "emphasis": "primary"
+          }
+        }
+      ],
+      "code_highlight": null,
+      "narration_template": null,
+      "tokens": []
+    }
+  ],
+  "parameter_controls": [],
+  "algorithm_id": null,
+  "initial_data": {}
+}

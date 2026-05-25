@@ -1,0 +1,260 @@
+{
+  "fps": 30,
+  "total_frames": 240,
+  "domain": "math",
+  "title": "定积分与曲线下面积",
+  "summary": "Mock response — set METAVIEW_OPENAI_API_KEY to enable real generation. 这是一个数学函数图示例。",
+  "steps": [
+    {
+      "step_id": "step_01",
+      "end_frame": 60,
+      "title": "认识曲线 f(x) = x²",
+      "voiceover_text": "先画出抛物线 f(x) = x²，它在 x ≥ 0 时单调上升。",
+      "animation_hint": "enter",
+      "snapshot": {
+        "kind": "math_plot",
+        "curves": [
+          {
+            "expression": "x^2",
+            "label": "f(x)",
+            "emphasis": "primary"
+          }
+        ],
+        "x_min": -1.0,
+        "x_max": 3.0,
+        "y_min": null,
+        "y_max": null,
+        "marker_x": null,
+        "shade_from": null,
+        "shade_to": null,
+        "x_label": "x",
+        "y_label": "y",
+        "formula_latex": "f(x) = x^2"
+      },
+      "layers": [
+        {
+          "timing": {
+            "enter_at": 0.0,
+            "exit_at": 1.0,
+            "appear_anim": "fade",
+            "z_order": 0
+          },
+          "body": {
+            "kind": "math_plot",
+            "curves": [
+              {
+                "expression": "x^2",
+                "label": "f(x)",
+                "emphasis": "primary"
+              }
+            ],
+            "x_min": -1.0,
+            "x_max": 3.0,
+            "y_min": null,
+            "y_max": null,
+            "marker_x": null,
+            "shade_from": null,
+            "shade_to": null,
+            "x_label": "x",
+            "y_label": "y",
+            "formula_latex": "f(x) = x^2"
+          }
+        }
+      ],
+      "code_highlight": null,
+      "narration_template": [
+        "先画出抛物线 f(x) = x²，它在 x ≥ 0 时单调上升。"
+      ],
+      "tokens": []
+    },
+    {
+      "step_id": "step_02",
+      "end_frame": 120,
+      "title": "锁定区间 [0, 2]",
+      "voiceover_text": "我们关心 x 从 0 到 2 这段曲线下方的面积。",
+      "animation_hint": "reveal",
+      "snapshot": {
+        "kind": "math_plot",
+        "curves": [
+          {
+            "expression": "x^2",
+            "label": "f(x)",
+            "emphasis": "primary"
+          }
+        ],
+        "x_min": -1.0,
+        "x_max": 3.0,
+        "y_min": null,
+        "y_max": null,
+        "marker_x": 2.0,
+        "shade_from": 0.0,
+        "shade_to": 2.0,
+        "x_label": "x",
+        "y_label": "y",
+        "formula_latex": "\\int_0^2 x^2\\,dx"
+      },
+      "layers": [
+        {
+          "timing": {
+            "enter_at": 0.0,
+            "exit_at": 1.0,
+            "appear_anim": "fade",
+            "z_order": 0
+          },
+          "body": {
+            "kind": "math_plot",
+            "curves": [
+              {
+                "expression": "x^2",
+                "label": "f(x)",
+                "emphasis": "primary"
+              }
+            ],
+            "x_min": -1.0,
+            "x_max": 3.0,
+            "y_min": null,
+            "y_max": null,
+            "marker_x": 2.0,
+            "shade_from": 0.0,
+            "shade_to": 2.0,
+            "x_label": "x",
+            "y_label": "y",
+            "formula_latex": "\\int_0^2 x^2\\,dx"
+          }
+        }
+      ],
+      "code_highlight": null,
+      "narration_template": [
+        "我们关心 x 从 0 到 2 这段曲线下方的面积。"
+      ],
+      "tokens": []
+    },
+    {
+      "step_id": "step_03",
+      "end_frame": 180,
+      "title": "用矩形逼近",
+      "voiceover_text": "把区间分成若干小段，每段用一个矩形近似——段越多越精确。",
+      "animation_hint": "reveal",
+      "snapshot": {
+        "kind": "math_plot",
+        "curves": [
+          {
+            "expression": "x^2",
+            "label": "f(x)",
+            "emphasis": "primary"
+          }
+        ],
+        "x_min": -1.0,
+        "x_max": 3.0,
+        "y_min": null,
+        "y_max": null,
+        "marker_x": null,
+        "shade_from": 0.0,
+        "shade_to": 2.0,
+        "x_label": "x",
+        "y_label": "y",
+        "formula_latex": "\\sum f(x_i)\\,\\Delta x"
+      },
+      "layers": [
+        {
+          "timing": {
+            "enter_at": 0.0,
+            "exit_at": 1.0,
+            "appear_anim": "fade",
+            "z_order": 0
+          },
+          "body": {
+            "kind": "math_plot",
+            "curves": [
+              {
+                "expression": "x^2",
+                "label": "f(x)",
+                "emphasis": "primary"
+              }
+            ],
+            "x_min": -1.0,
+            "x_max": 3.0,
+            "y_min": null,
+            "y_max": null,
+            "marker_x": null,
+            "shade_from": 0.0,
+            "shade_to": 2.0,
+            "x_label": "x",
+            "y_label": "y",
+            "formula_latex": "\\sum f(x_i)\\,\\Delta x"
+          }
+        }
+      ],
+      "code_highlight": null,
+      "narration_template": [
+        "把区间分成若干小段，每段用一个矩形近似——段越多越精确。"
+      ],
+      "tokens": []
+    },
+    {
+      "step_id": "step_04",
+      "end_frame": 240,
+      "title": "结论：面积 = 8/3",
+      "voiceover_text": "取极限后，矩形面积之和收敛到 8/3 ≈ 2.667，这就是定积分的几何意义。",
+      "animation_hint": "reveal",
+      "snapshot": {
+        "kind": "math_plot",
+        "curves": [
+          {
+            "expression": "x^2",
+            "label": "f(x)",
+            "emphasis": "accent"
+          }
+        ],
+        "x_min": -1.0,
+        "x_max": 3.0,
+        "y_min": null,
+        "y_max": null,
+        "marker_x": null,
+        "shade_from": 0.0,
+        "shade_to": 2.0,
+        "x_label": "x",
+        "y_label": "y",
+        "formula_latex": "\\int_0^2 x^2\\,dx = \\tfrac{8}{3}"
+      },
+      "layers": [
+        {
+          "timing": {
+            "enter_at": 0.0,
+            "exit_at": 1.0,
+            "appear_anim": "fade",
+            "z_order": 0
+          },
+          "body": {
+            "kind": "math_plot",
+            "curves": [
+              {
+                "expression": "x^2",
+                "label": "f(x)",
+                "emphasis": "accent"
+              }
+            ],
+            "x_min": -1.0,
+            "x_max": 3.0,
+            "y_min": null,
+            "y_max": null,
+            "marker_x": null,
+            "shade_from": 0.0,
+            "shade_to": 2.0,
+            "x_label": "x",
+            "y_label": "y",
+            "formula_latex": "\\int_0^2 x^2\\,dx = \\tfrac{8}{3}"
+          }
+        }
+      ],
+      "code_highlight": null,
+      "narration_template": [
+        "取极限后，矩形面积之和收敛到 8/3 ≈ 2.667，这就是定积分的几何意义。"
+      ],
+      "tokens": []
+    }
+  ],
+  "parameter_controls": [],
+  "algorithm_id": null,
+  "initial_data": {}
+}
