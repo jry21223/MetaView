@@ -1,7 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { TweakValues } from '../hooks/useTweaks';
 import { GlobalTopbar, Stage } from '../../../shared/ui/GlobalTopbar';
-import { MathCurveLoader } from '../../../shared/ui/MathCurveLoader';
 
 const TEMPLATE_GALLERY = [
   { id: 'merge-sort', subject: 'algo', title: '归并排序', desc: '数组分治 → 合并', tag: '算法' },
@@ -196,17 +195,6 @@ export function IntakeScreen({ onSubmit, t, isSubmitting = false, submitError = 
             <div className="mv-spacer" />
             {(thinking || submitError) && (
               <span className={`mv-intake-thinking${submitError ? ' mv-intake-error' : ''}`}>
-                {pending && !submitError && (
-                  <MathCurveLoader
-                    className="mv-intake-thinking-loader"
-                    decorative
-                    showLabel={false}
-                    variant="orbit"
-                    size={24}
-                    particles={7}
-                    speed={1.2}
-                  />
-                )}
                 {submitError ?? thinking}
               </span>
             )}

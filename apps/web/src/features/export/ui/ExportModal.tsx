@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { MathCurveLoader } from "../../../shared/ui/MathCurveLoader";
 import { readStoredTTSConfig } from "../../playbook/engine/player/useTTS";
 import {
   buildDownloadUrl,
@@ -431,18 +430,6 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         {job && (
           <>
             {previewCard}
-
-            {isWorking && (
-              <MathCurveLoader
-                className="mv-export-curve-loader"
-                variant={job.status === "generating_audio" ? "lissajous" : "orbit"}
-                particles={10}
-                size={66}
-                speed={1.3}
-                color={c.accent}
-                label={STATUS_LABEL[job.status] ?? "正在导出"}
-              />
-            )}
 
             <div style={{ fontSize: 12, color: c.muted, display: "flex", gap: 8, flexWrap: "wrap" }}>
               <span>{STATUS_LABEL[job.status] ?? job.status}</span>

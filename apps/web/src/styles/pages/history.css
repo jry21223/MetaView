@@ -48,8 +48,6 @@
   min-height: 24px;
 }
 
-.mv-history-inline-loader { flex: 0 0 auto; }
-
 .mv-history-list-body {
   flex: 1;
   overflow-y: auto;
