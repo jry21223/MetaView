@@ -104,5 +104,5 @@ eval:
 eval-shots:
 	@test -n "$(ID)" || (echo "Usage: make eval-shots ID=<fixture-id>"; exit 1)
 	node apps/web/scripts/render-shots.mjs \
-		--input eval/fixtures/$(ID).json \
-		--output eval/shots/$(ID)
+		eval/fixtures/$(ID).json \
+		eval/shots/$(ID)
