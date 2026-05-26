@@ -12,9 +12,13 @@ import { useProviderSettings } from '../features/providers/hooks/useProviderSett
 import { ProviderSettingsModal } from '../features/providers/ui/ProviderSettingsModal';
 import type { Stage } from '../shared/ui/GlobalTopbar';
 
+function shouldOpenMotionDemo(): boolean {
+  return import.meta.env.DEV && new URLSearchParams(window.location.search).has('motion-demo');
+}
+
 export function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const [stage, setStage] = useState<Stage>('intake');
+  const [stage, setStage] = useState<Stage>(() => (shouldOpenMotionDemo() ? 'workbench' : 'intake'));
   const [providerModalOpen, setProviderModalOpen] = useState(false);
   const { submit, runId, isSubmitting, error: submitError } = usePipelineSubmit();
   const { settings: providerSettings, update: updateProvider, isConfigured } = useProviderSettings();

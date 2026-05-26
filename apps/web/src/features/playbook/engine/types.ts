@@ -1,4 +1,5 @@
 import type { ExecutionParameterControl } from "../../../entities/execution/types";
+import type { MotionSceneSnapshot } from "./motion/types";
 
 export type SnapshotKind =
   | "algorithm_array"
@@ -7,6 +8,7 @@ export type SnapshotKind =
   | "math_plot"
   | "math_formula"
   | "math_scene"
+  | "motion_scene"
   | "katex_overlay"
   | "narration_card";
 
@@ -197,6 +199,7 @@ export type AnySnapshot =
   | MathPlotSnapshot
   | MathFormulaSnapshot
   | MathSceneSnapshot
+  | MotionSceneSnapshot
   | KaTeXOverlaySnapshot
   | NarrationCardSnapshot;
 

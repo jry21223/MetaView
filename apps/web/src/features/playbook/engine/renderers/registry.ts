@@ -7,6 +7,7 @@ import { KaTeXOverlayRenderer } from "./KaTeXOverlayRenderer";
 import { MathFormulaRenderer } from "./MathFormulaRenderer";
 import { MathPlotRenderer } from "./MathPlotRenderer";
 import { MathSceneRenderer } from "./MathSceneRenderer";
+import { MotionSceneRenderer } from "./MotionSceneRenderer";
 import { NarrationCardRenderer } from "./NarrationCardRenderer";
 
 const registry = new Map<SnapshotKind, RendererComponent>([
@@ -16,6 +17,7 @@ const registry = new Map<SnapshotKind, RendererComponent>([
   ["math_plot", MathPlotRenderer],
   ["math_formula", MathFormulaRenderer],
   ["math_scene", MathSceneRenderer],
+  ["motion_scene", MotionSceneRenderer],
   ["katex_overlay", KaTeXOverlayRenderer],
   ["narration_card", NarrationCardRenderer],
 ]);

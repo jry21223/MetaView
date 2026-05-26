@@ -791,6 +791,13 @@
 }
 .mv-left-handle:hover { color: var(--accent); border-color: var(--accent); }
 
+.mv-motion-demo-switch {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 6;
+}
+
 /* ── Empty/loading right-column placeholders ────────────────────────── */
 .mv-right-placeholder {
   flex: 1; min-height: 0;

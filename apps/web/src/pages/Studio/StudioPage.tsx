@@ -5,6 +5,7 @@ import { PlaybookPlayer } from '../../features/playbook/engine/player/PlaybookPl
 import { GlobalTopbar, Stage } from '../../shared/ui/GlobalTopbar';
 import { useProviderSettings, ProviderSettings } from '../../features/providers/hooks/useProviderSettings';
 import type { PlaybookScript } from '../../features/playbook/engine/types';
+import { motionSceneDemo } from '../../features/playbook/engine/fixtures/motionSceneDemo';
 import { ExportModal } from '../../features/export/ui/ExportModal';
 
 // ── Domain mapping ────────────────────────────────────────────────────────
@@ -302,6 +303,10 @@ const STATUS_LOADER_LABEL: Record<NonNullable<PipelineStatus>, string> = {
   failed: '生成失败',
 };
 
+function shouldOpenMotionDemo(): boolean {
+  return import.meta.env.DEV && new URLSearchParams(window.location.search).has('motion-demo');
+}
+
 function PipelineSkeleton({ status }: PipelineSkeletonProps) {
   const currentOrder = status !== null ? STATUS_ORDER[status] : -1;
   const loaderLabel = status !== null ? STATUS_LOADER_LABEL[status] : '正在准备生成';
@@ -367,6 +372,10 @@ export function StudioPage({
   const [problemCollapsed, setProblemCollapsed] = useState(false);
   const [chatCollapsed, setChatCollapsed] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [motionDemoEnabled, setMotionDemoEnabled] = useState(() => shouldOpenMotionDemo());
+  const showMotionDemo = import.meta.env.DEV && motionDemoEnabled;
+  const activePlaybook = showMotionDemo ? motionSceneDemo : playbook;
+  const canExport = !showMotionDemo && !!playbook && !!runId;
 
   useEffect(() => {
     if (error) onNavigate('intake');
@@ -386,14 +395,14 @@ export function StudioPage({
         isDark={isDark}
         onToggleTheme={() => setTweak('theme', isDark ? 'light' : 'dark')}
         onOpenProviderSettings={onOpenProviderSettings}
-        onOpenExport={() => setExportOpen(true)}
-        exportEnabled={!!playbook && !!runId}
+        onOpenExport={canExport ? () => setExportOpen(true) : undefined}
+        exportEnabled={canExport}
       />
       {exportOpen && (
         <ExportModal
           runId={runId}
           isDark={isDark}
-          previewTitle={playbook?.steps?.[0]?.title ?? playbook?.title ?? null}
+          previewTitle={activePlaybook?.steps?.[0]?.title ?? activePlaybook?.title ?? null}
           accentColor={t.accent}
           onClose={() => setExportOpen(false)}
         />
@@ -402,13 +411,13 @@ export function StudioPage({
         {!leftCollapsed && (
           <aside className="mv-left">
             <ProblemCard
-              playbook={playbook}
-              runId={runId}
+              playbook={activePlaybook}
+              runId={showMotionDemo ? 'motion-demo' : runId}
               collapsed={problemCollapsed}
               onToggle={() => setProblemCollapsed((v) => !v)}
             />
             <ChatPanel
-              playbook={playbook}
+              playbook={activePlaybook}
               isProviderConfigured={isProviderConfigured}
               onOpenProviderSettings={onOpenProviderSettings}
               collapsed={chatCollapsed}
@@ -426,12 +435,24 @@ export function StudioPage({
             {leftCollapsed ? '›' : '‹'}
           </button>
 
-          {playbook ? (
+          {import.meta.env.DEV && (
+            <div className="mv-motion-demo-switch">
+              <button
+                type="button"
+                className={`mv-chip${showMotionDemo ? ' mv-chip-primary' : ''}`}
+                onClick={() => setMotionDemoEnabled((v) => !v)}
+              >
+                Motion demo
+              </button>
+            </div>
+          )}
+
+          {activePlaybook ? (
             <PlaybookPlayer
-              script={playbook}
+              script={activePlaybook}
               theme={isDark ? 'dark' : 'light'}
               swapDurationFrames={t.swapFrames}
-              onOpenExport={() => setExportOpen(true)}
+              onOpenExport={canExport ? () => setExportOpen(true) : undefined}
             />
           ) : isLoading ? (
             <PipelineSkeleton status={status} />
