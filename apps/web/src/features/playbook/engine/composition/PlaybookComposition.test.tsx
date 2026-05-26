@@ -169,7 +169,8 @@ describe("PlaybookComposition", () => {
   it("renders the motion scene demo through the renderer registry", () => {
     const markup = renderToStaticMarkup(<PlaybookComposition script={motionSceneDemo} showSubtitles={false} />);
     expect(markup).toContain("motion-scene-renderer");
-    expect(markup).toContain('data-object-id="triangle"');
+    expect(markup).toContain('data-object-id="triangle_fill"');
+    expect(markup).toContain('data-object-id="base_edge"');
     expect(markup).not.toContain("Unknown snapshot kind");
   });
 
