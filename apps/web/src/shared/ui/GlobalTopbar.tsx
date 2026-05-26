@@ -4,7 +4,10 @@ export type Stage = 'intake' | 'workbench' | 'history' | 'templates' | 'settings
 
 interface GlobalTopbarProps {
   stage: Stage;
+  appEdition?: 'self' | 'ops';
   isProviderConfigured: boolean;
+  accountBalanceYuan?: string | null;
+  accountName?: string | null;
   onNavigate: (stage: Stage) => void;
   isDark: boolean;
   onToggleTheme: () => void;
@@ -15,7 +18,10 @@ interface GlobalTopbarProps {
 
 export function GlobalTopbar({
   stage,
+  appEdition = 'self',
   isProviderConfigured,
+  accountBalanceYuan,
+  accountName,
   onNavigate,
   isDark,
   onToggleTheme,
@@ -80,13 +86,30 @@ export function GlobalTopbar({
           <button
             className="mv-icon-btn"
             onClick={onOpenProviderSettings}
-            title="服务商设置"
+            title={appEdition === 'ops' ? '账户与充值' : '模型服务商设置'}
           >
-            ⚙
+            {appEdition === 'ops' ? '¥' : '⚙'}
           </button>
         )}
         <div className="mv-status">
-          {isProviderConfigured ? (
+          {appEdition === 'ops' ? (
+            accountBalanceYuan != null ? (
+              <>
+                <span className="mv-pulse" />
+                <span>{accountName ?? 'ACCOUNT'} · ¥ {accountBalanceYuan}</span>
+              </>
+            ) : (
+              <>
+                <span className="mv-pulse" />
+                <span>账户同步中</span>
+              </>
+            )
+          ) : accountBalanceYuan != null ? (
+            <>
+              <span className="mv-pulse" />
+              <span>{accountName ?? 'ACCOUNT'} · ¥ {accountBalanceYuan}</span>
+            </>
+          ) : isProviderConfigured ? (
             <>
               <span className="mv-pulse" />
               <span>CORE NODES ONLINE</span>

@@ -7,7 +7,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 _ALL_DOMAINS = "algorithm,math,code,physics,chemistry,biology,geography"
 
 GenerationMode = Literal["single", "agent"]
+AppEdition = Literal["self", "ops"]
 _GENERATION_MODES: frozenset[str] = frozenset(("single", "agent"))
+_APP_EDITIONS: frozenset[str] = frozenset(("self", "ops"))
 
 
 class Settings(BaseSettings):
@@ -20,6 +22,7 @@ class Settings(BaseSettings):
 
     app_name: str = "MetaView API"
     app_version: str = "2.0.0"
+    app_edition: AppEdition = "self"
     api_prefix: str = "/api/v1"
     cors_origins: list[str] = ["http://127.0.0.1:5173", "http://localhost:5173"]
     cors_origin_regex: str = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
@@ -92,6 +95,29 @@ class Settings(BaseSettings):
     agent_base_url: str = "http://agent:8001"
     agent_timeout_s: float = 600.0
 
+    # Account / recharge
+    account_session_cookie: str = "mv_session"
+    account_session_days: int = 30
+    account_session_secure: bool = False
+    recharge_min_cents: int = 500
+
+    # WeChat OAuth login (Website App / Open Platform)
+    wechat_login_appid: str | None = None
+    wechat_login_secret: str | None = None
+    wechat_login_redirect_uri: str | None = None
+    wechat_login_success_url: str = "http://127.0.0.1:5173/"
+
+    # WeChat Pay API v3 Native recharge
+    wechat_pay_appid: str | None = None
+    wechat_pay_mchid: str | None = None
+    wechat_pay_merchant_serial_no: str | None = None
+    wechat_pay_private_key_path: str | None = None
+    wechat_pay_private_key: str | None = None
+    wechat_pay_api_v3_key: str | None = None
+    wechat_pay_notify_url: str | None = None
+    wechat_pay_platform_public_key_path: str | None = None
+    wechat_pay_api_base: str = "https://api.mch.weixin.qq.com"
+
     @field_validator("openai_timeout_s", "pipeline_timeout_s", mode="before")
     @classmethod
     def normalize_optional_timeout(cls, value: float | str | None) -> float | str | None:
@@ -132,6 +158,16 @@ class Settings(BaseSettings):
         normalized = value.strip().lower()
         if normalized not in _GENERATION_MODES:
             return "single"
+        return normalized  # type: ignore[return-value]
+
+    @field_validator("app_edition", mode="before")
+    @classmethod
+    def normalize_app_edition(cls, value: str | None) -> AppEdition:
+        if value is None:
+            return "self"
+        normalized = value.strip().lower()
+        if normalized not in _APP_EDITIONS:
+            return "self"
         return normalized  # type: ignore[return-value]
 
     @property

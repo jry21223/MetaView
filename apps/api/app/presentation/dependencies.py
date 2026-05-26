@@ -6,16 +6,23 @@ from typing import Annotated
 
 from fastapi import Depends
 
+from app.application.ports.account_repository import IAccountRepository
 from app.application.ports.agent_provider import IAgentProvider
 from app.application.ports.export_repository import IExportJobRepository
 from app.application.ports.llm_provider import ILLMProvider
+from app.application.ports.oauth_client import IOAuthClient
+from app.application.ports.payment_gateway import IPaymentGateway
 from app.application.ports.run_repository import IRunRepository
+from app.application.use_cases.account import AccountUseCase
 from app.config import Settings, get_settings
 from app.infrastructure.agent.http_agent_provider import HttpAgentProvider
+from app.infrastructure.auth.wechat_oauth import WeChatOAuthClient
 from app.infrastructure.llm.openai_provider import OpenAIProvider
+from app.infrastructure.payment.wechat_pay import WeChatPayClient
 from app.infrastructure.persistence.in_memory_export_repository import (
     InMemoryExportJobRepository,
 )
+from app.infrastructure.persistence.sqlite_account_repository import SqliteAccountRepository
 from app.infrastructure.persistence.sqlite_run_repository import SqliteRunRepository
 
 logger = logging.getLogger(__name__)
@@ -24,6 +31,11 @@ logger = logging.getLogger(__name__)
 @lru_cache
 def _get_run_repo(db_path: str) -> SqliteRunRepository:
     return SqliteRunRepository(db_path)
+
+
+@lru_cache(maxsize=4)
+def _get_account_repo(db_path: str) -> SqliteAccountRepository:
+    return SqliteAccountRepository(db_path)
 
 
 @lru_cache
@@ -47,6 +59,33 @@ def _get_openai_provider(
 
 def get_run_repo(settings: Annotated[Settings, Depends(get_settings)]) -> IRunRepository:
     return _get_run_repo(settings.history_db_path)
+
+
+def get_account_repo(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> IAccountRepository:
+    return _get_account_repo(settings.history_db_path)
+
+
+def get_payment_gateway(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> IPaymentGateway:
+    return WeChatPayClient(settings)
+
+
+def get_oauth_client(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> IOAuthClient:
+    return WeChatOAuthClient(settings)
+
+
+def get_account_use_case(
+    settings: Annotated[Settings, Depends(get_settings)],
+    repo: Annotated[IAccountRepository, Depends(get_account_repo)],
+    payment: Annotated[IPaymentGateway, Depends(get_payment_gateway)],
+    oauth: Annotated[IOAuthClient, Depends(get_oauth_client)],
+) -> AccountUseCase:
+    return AccountUseCase(settings=settings, repo=repo, payment=payment, oauth=oauth)
 
 
 @lru_cache

@@ -5,6 +5,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
+from app.config import get_settings
 from app.infrastructure.persistence.db_init import init_db
 from app.infrastructure.persistence.sqlite_run_repository import SqliteRunRepository
 from app.main import create_app
@@ -93,6 +94,28 @@ def test_post_pipeline_returns_prompt_in_response(client) -> None:
     resp = client.post("/api/v1/pipeline", json={"prompt": prompt})
     assert resp.status_code == 202
     assert resp.json()["prompt"] == prompt
+
+
+def test_ops_edition_rejects_client_provider_override(monkeypatch, tmp_path) -> None:
+    get_settings.cache_clear()
+    db = str(tmp_path / "ops.db")
+    init_db(db)
+    repo = SqliteRunRepository(db)
+    monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    app = create_app()
+    app.dependency_overrides[get_run_repo] = lambda: repo
+    app.dependency_overrides[get_llm_provider] = lambda: _MockLLM()
+
+    with TestClient(app) as c:
+        resp = c.post(
+            "/api/v1/pipeline",
+            json={"prompt": "test", "provider_api_key": "sk-user"},
+        )
+
+    get_settings.cache_clear()
+    assert resp.status_code == 400
+    assert "平台托管模型" in resp.json()["detail"]
 
 
 def test_get_run_returns_prompt(client) -> None:

@@ -354,16 +354,19 @@ function PipelineSkeleton({ status }: PipelineSkeletonProps) {
 // ── StudioPage ────────────────────────────────────────────────────────────
 
 export interface StudioPageProps {
+  appEdition?: 'self' | 'ops';
   runId: string | null;
   t: TweakValues;
   setTweak: (key: keyof TweakValues, value: TweakValues[keyof TweakValues]) => void;
   onNavigate: (stage: Stage) => void;
   isProviderConfigured: boolean;
+  accountBalanceYuan?: string | null;
+  accountName?: string | null;
   onOpenProviderSettings?: () => void;
 }
 
 export function StudioPage({
-  runId, t, setTweak, onNavigate, isProviderConfigured, onOpenProviderSettings,
+  appEdition = 'self', runId, t, setTweak, onNavigate, isProviderConfigured, accountBalanceYuan = null, accountName = null, onOpenProviderSettings,
 }: StudioPageProps) {
   const isDark = t.theme === 'dark';
   const { playbook, error, isLoading, status } = usePipelinePoller(runId);
@@ -390,7 +393,10 @@ export function StudioPage({
     <>
       <GlobalTopbar
         stage="workbench"
+        appEdition={appEdition}
         isProviderConfigured={isProviderConfigured}
+        accountBalanceYuan={accountBalanceYuan}
+        accountName={accountName}
         onNavigate={onNavigate}
         isDark={isDark}
         onToggleTheme={() => setTweak('theme', isDark ? 'light' : 'dark')}

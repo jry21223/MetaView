@@ -195,10 +195,13 @@ function CompareDrawer({ runs, onClose }: CompareDrawerProps) {
 }
 
 export interface HistoryPageProps {
+  appEdition?: 'self' | 'ops';
   t: TweakValues;
   setTweak: (key: keyof TweakValues, value: TweakValues[keyof TweakValues]) => void;
   onNavigate: (stage: Stage) => void;
   isProviderConfigured: boolean;
+  accountBalanceYuan?: string | null;
+  accountName?: string | null;
   onOpenProviderSettings?: () => void;
   /**
    * Re-run a stored prompt. Returns once the new run has been queued so the
@@ -208,10 +211,13 @@ export interface HistoryPageProps {
 }
 
 export function HistoryPage({
+  appEdition = 'self',
   t,
   setTweak,
   onNavigate,
   isProviderConfigured,
+  accountBalanceYuan = null,
+  accountName = null,
   onOpenProviderSettings,
   onRerun,
 }: HistoryPageProps) {
@@ -268,7 +274,10 @@ export function HistoryPage({
     <>
       <GlobalTopbar
         stage="history"
+        appEdition={appEdition}
         isProviderConfigured={isProviderConfigured}
+        accountBalanceYuan={accountBalanceYuan}
+        accountName={accountName}
         onNavigate={onNavigate}
         isDark={isDark}
         onToggleTheme={() => setTweak('theme', isDark ? 'light' : 'dark')}
