@@ -1,0 +1,10 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">MetaView mark</title>
+  <desc id="desc">Rounded viewport with a continuous MV motion path and focus node.</desc>
+  <rect x="4" y="4" width="56" height="56" rx="8" fill="#0e1412"/>
+  <rect x="4.75" y="4.75" width="54.5" height="54.5" rx="7.25" stroke="#10b981" stroke-opacity="0.34" stroke-width="1.5"/>
+  <path d="M15 43V21L25.5 34.5L36 21L47 43L55 25" stroke="#4de8b0" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M15 43V21L25.5 34.5L36 21L47 43L55 25" stroke="#10b981" stroke-opacity="0.2" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="55" cy="25" r="4.25" fill="#f7d65c"/>
+  <circle cx="55" cy="25" r="7.5" stroke="#f7d65c" stroke-opacity="0.22" stroke-width="2"/>
+</svg>
