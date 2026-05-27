@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
+import { RECHARGE_USAGE_ESTIMATE } from "../../../shared/config/constants";
 import type { AccountMe, RechargeOrder } from "../api/accountApi";
 import {
   createRechargeOrder,
@@ -16,8 +17,30 @@ interface RechargeModalProps {
 }
 
 const PRESETS = ["5", "10", "30", "50", "100"];
+const FOCUSABLE_SELECTOR = [
+  "a[href]",
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  '[tabindex]:not([tabindex="-1"])',
+].join(",");
+
+function estimateRuns(amountYuan: string): number | null {
+  const parsed = Number(amountYuan);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.max(1, Math.round(parsed * RECHARGE_USAGE_ESTIMATE.RUNS_PER_YUAN));
+}
+
+function getFocusableElements(root: HTMLElement): HTMLElement[] {
+  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+    (element) => element.tabIndex >= 0 && !element.hasAttribute("hidden"),
+  );
+}
 
 export function RechargeModal({ account, onRefreshAccount, onClose }: RechargeModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
   const [amount, setAmount] = useState("10");
   const [orders, setOrders] = useState<RechargeOrder[]>([]);
   const [activeOrder, setActiveOrder] = useState<RechargeOrder | null>(null);
@@ -30,6 +53,57 @@ export function RechargeModal({ account, onRefreshAccount, onClose }: RechargeMo
     () => ((account?.recharge_min_cents ?? 500) / 100).toFixed(0),
     [account?.recharge_min_cents],
   );
+  const currentEstimate = estimateRuns(amount);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    const previousActive = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    document.body.classList.add("mv-modal-open");
+    modalRef.current?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const modal = modalRef.current;
+      if (!modal) return;
+      const focusable = getFocusableElements(modal);
+      if (focusable.length === 0) {
+        event.preventDefault();
+        modal.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey) {
+        if (active === first || !modal.contains(active)) {
+          event.preventDefault();
+          last.focus();
+        }
+        return;
+      }
+      if (active === last || !modal.contains(active)) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.classList.remove("mv-modal-open");
+      previousActive?.focus();
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,13 +193,32 @@ export function RechargeModal({ account, onRefreshAccount, onClose }: RechargeMo
 
   return (
     <div className="mv-account-modal-backdrop" onMouseDown={onClose}>
-      <div className="mv-account-modal" onMouseDown={(e) => e.stopPropagation()}>
+      <div
+        ref={modalRef}
+        className="mv-account-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="mv-account-modal-title"
+        tabIndex={-1}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <div className="mv-account-modal__head">
           <div>
-            <div className="mv-account-modal__title">账户与充值</div>
-            <div className="mv-account-modal__sub">微信支付 Native 充值，最低 {minYuan} 元</div>
+            <div className="mv-account-modal__title" id="mv-account-modal-title">
+              账户与充值
+            </div>
+            <div className="mv-account-modal__sub">
+              微信支付 Native 充值，最低 {minYuan} 元；余额按基础生成消耗
+            </div>
           </div>
-          <button className="mv-icon-btn" onClick={onClose} style={{ fontSize: 18 }}>×</button>
+          <button
+            className="mv-icon-btn"
+            onClick={onClose}
+            style={{ fontSize: 18 }}
+            aria-label="关闭账户与充值"
+          >
+            ×
+          </button>
         </div>
 
         <section className="mv-account-card">
@@ -147,7 +240,11 @@ export function RechargeModal({ account, onRefreshAccount, onClose }: RechargeMo
             className="mv-chip"
             onClick={loginWithWeChat}
             disabled={!account?.wechat_login_enabled}
-            title={account?.wechat_login_enabled ? "使用微信扫码登录" : "后端未配置微信登录"}
+            title={
+              account?.wechat_login_enabled
+                ? "使用微信扫码登录"
+                : "缺少微信开放平台网站应用配置"
+            }
           >
             微信登录
           </button>
@@ -155,6 +252,13 @@ export function RechargeModal({ account, onRefreshAccount, onClose }: RechargeMo
             退出当前账户
           </button>
         </div>
+        {!account?.wechat_login_enabled && (
+          <div className="mv-account-note">
+            微信登录尚未配置。需要微信开放平台网站应用 AppID/AppSecret、微信登录权限和授权回调域名；
+            后端填写 METAVIEW_WECHAT_LOGIN_APPID、METAVIEW_WECHAT_LOGIN_SECRET、
+            METAVIEW_WECHAT_LOGIN_REDIRECT_URI 和 METAVIEW_WECHAT_LOGIN_SUCCESS_URL。
+          </div>
+        )}
 
         <section className="mv-recharge-box">
           <div className="mv-recharge-presets">
@@ -162,10 +266,13 @@ export function RechargeModal({ account, onRefreshAccount, onClose }: RechargeMo
               <button
                 key={value}
                 type="button"
-                className={`mv-chip${amount === value ? " mv-chip-primary" : ""}`}
+                className={`mv-chip mv-recharge-preset${
+                  amount === value ? " mv-chip-primary" : ""
+                }`}
                 onClick={() => setAmount(value)}
               >
-                ¥{value}
+                <span>¥{value}</span>
+                <small>约 {estimateRuns(value)} 次</small>
               </button>
             ))}
           </div>
@@ -174,6 +281,7 @@ export function RechargeModal({ account, onRefreshAccount, onClose }: RechargeMo
             <span>自定义</span>
             <input
               className="mv-text-input"
+              aria-label="充值金额"
               type="number"
               min={minYuan}
               step="0.01"
@@ -188,11 +296,17 @@ export function RechargeModal({ account, onRefreshAccount, onClose }: RechargeMo
               {loading ? "创建中..." : "充值"}
             </button>
           </div>
+          {currentEstimate && (
+            <div className="mv-recharge-estimate">
+              当前约可支持 {currentEstimate} 次{RECHARGE_USAGE_ESTIMATE.UNIT_LABEL}。按现阶段 1 元约
+              {RECHARGE_USAGE_ESTIMATE.RUNS_PER_YUAN} 次估算，实际以平台扣费规则为准。
+            </div>
+          )}
 
           {!account?.payment_enabled && (
             <div className="mv-account-note">
-              微信支付尚未配置。需要设置商户号、AppID、商户私钥、证书序列号、APIv3 Key
-              和支付回调地址后才能创建真实订单。
+              微信支付尚未配置。需要设置微信支付商户号、支付 AppID、商户 API
+              私钥或证书路径、证书序列号、APIv3 Key 和支付回调 URL 后才能创建真实订单。
             </div>
           )}
         </section>

@@ -22,6 +22,7 @@ export function OpsAppShell() {
   const [accountModalOpen, setAccountModalOpen] = useState(false);
   const { submit, runId, isSubmitting, error: submitError } = usePipelineSubmit();
   const { account, refresh: refreshAccount } = useAccount();
+  const accountAvatarUrl = account?.avatar_url ?? null;
 
   const css = useMemo(() => themeVars(t), [t]);
   const mode = themeMode(t);
@@ -62,6 +63,7 @@ export function OpsAppShell() {
           isProviderConfigured
           accountBalanceYuan={account?.balance_yuan ?? null}
           accountName={account?.display_name ?? null}
+          accountAvatarUrl={accountAvatarUrl}
           onOpenProviderSettings={openAccountPanel}
           onNavigate={setStage}
           onToggleTheme={toggleTheme}
@@ -79,6 +81,7 @@ export function OpsAppShell() {
             isProviderConfigured
             accountBalanceYuan={account?.balance_yuan ?? null}
             accountName={account?.display_name ?? null}
+            accountAvatarUrl={accountAvatarUrl}
             onOpenProviderSettings={openAccountPanel}
           />
         </ErrorBoundary>
@@ -94,6 +97,7 @@ export function OpsAppShell() {
             isProviderConfigured
             accountBalanceYuan={account?.balance_yuan ?? null}
             accountName={account?.display_name ?? null}
+            accountAvatarUrl={accountAvatarUrl}
             onOpenProviderSettings={openAccountPanel}
             onRerun={async (prompt) => {
               await submitWithPlatformProvider(prompt);
@@ -111,6 +115,7 @@ export function OpsAppShell() {
             isProviderConfigured
             accountBalanceYuan={account?.balance_yuan ?? null}
             accountName={account?.display_name ?? null}
+            accountAvatarUrl={accountAvatarUrl}
             onNavigate={setStage}
             onToggleTheme={toggleTheme}
             onOpenProviderSettings={openAccountPanel}
@@ -127,6 +132,7 @@ export function OpsAppShell() {
             isProviderConfigured
             accountBalanceYuan={account?.balance_yuan ?? null}
             accountName={account?.display_name ?? null}
+            accountAvatarUrl={accountAvatarUrl}
             onNavigate={setStage}
             onToggleTheme={toggleTheme}
             onOpenProviderSettings={openAccountPanel}

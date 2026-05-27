@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 export type Stage = 'intake' | 'workbench' | 'history' | 'templates' | 'settings';
 
@@ -8,6 +8,7 @@ interface GlobalTopbarProps {
   isProviderConfigured: boolean;
   accountBalanceYuan?: string | null;
   accountName?: string | null;
+  accountAvatarUrl?: string | null;
   onNavigate: (stage: Stage) => void;
   isDark: boolean;
   onToggleTheme: () => void;
@@ -22,6 +23,7 @@ export function GlobalTopbar({
   isProviderConfigured,
   accountBalanceYuan,
   accountName,
+  accountAvatarUrl,
   onNavigate,
   isDark,
   onToggleTheme,
@@ -29,10 +31,15 @@ export function GlobalTopbar({
   onOpenExport,
   exportEnabled,
 }: GlobalTopbarProps) {
+  const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
   const isWorkbench = stage === 'intake' || stage === 'workbench';
   const isHistory = stage === 'history';
   const isTemplates = stage === 'templates';
   const isSettings = stage === 'settings';
+  const avatarUrl =
+    appEdition === 'ops' && accountAvatarUrl && failedAvatarUrl !== accountAvatarUrl
+      ? accountAvatarUrl
+      : null;
 
   return (
     <header className="mv-top">
@@ -124,7 +131,17 @@ export function GlobalTopbar({
         <button className="mv-icon-btn" title="切换主题" onClick={onToggleTheme}>
           {isDark ? '☀' : '☾'}
         </button>
-        <div className="mv-avatar">MV</div>
+        {avatarUrl ? (
+          <img
+            className="mv-avatar mv-avatar-img"
+            src={avatarUrl}
+            alt={`${accountName ?? '微信用户'}头像`}
+            referrerPolicy="no-referrer"
+            onError={() => setFailedAvatarUrl(avatarUrl)}
+          />
+        ) : (
+          <div className="mv-avatar">MV</div>
+        )}
       </div>
     </header>
   );

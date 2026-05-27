@@ -14,6 +14,7 @@ interface TemplatesPageProps {
   isProviderConfigured: boolean;
   accountBalanceYuan?: string | null;
   accountName?: string | null;
+  accountAvatarUrl?: string | null;
   onNavigate: (stage: Stage) => void;
   onToggleTheme: () => void;
   onOpenProviderSettings: () => void;
@@ -30,6 +31,7 @@ export function TemplatesPage({
   isProviderConfigured,
   accountBalanceYuan = null,
   accountName = null,
+  accountAvatarUrl = null,
   onNavigate,
   onToggleTheme,
   onOpenProviderSettings,
@@ -65,6 +67,7 @@ export function TemplatesPage({
         isProviderConfigured={isProviderConfigured}
         accountBalanceYuan={accountBalanceYuan}
         accountName={accountName}
+        accountAvatarUrl={accountAvatarUrl}
         onNavigate={onNavigate}
         isDark={isDark}
         onToggleTheme={onToggleTheme}

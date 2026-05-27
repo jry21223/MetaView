@@ -30,6 +30,7 @@ interface IntakeScreenProps {
   isProviderConfigured?: boolean;
   accountBalanceYuan?: string | null;
   accountName?: string | null;
+  accountAvatarUrl?: string | null;
   onOpenProviderSettings?: () => void;
   onNavigate: (stage: Stage) => void;
   onToggleTheme: () => void;
@@ -57,7 +58,7 @@ function languageFromName(name: string): string | undefined {
   return EXT_TO_LANGUAGE[ext];
 }
 
-export function IntakeScreen({ appEdition = 'self', onSubmit, t, isSubmitting = false, submitError = null, isProviderConfigured = false, accountBalanceYuan = null, accountName = null, onOpenProviderSettings, onNavigate, onToggleTheme }: IntakeScreenProps) {
+export function IntakeScreen({ appEdition = 'self', onSubmit, t, isSubmitting = false, submitError = null, isProviderConfigured = false, accountBalanceYuan = null, accountName = null, accountAvatarUrl = null, onOpenProviderSettings, onNavigate, onToggleTheme }: IntakeScreenProps) {
   const [input, setInput] = useState('');
   const [files, setFiles] = useState<Array<{ name: string; size: number }>>([]);
   const [fileObjects, setFileObjects] = useState<File[]>([]);
@@ -137,6 +138,7 @@ export function IntakeScreen({ appEdition = 'self', onSubmit, t, isSubmitting = 
         isProviderConfigured={isProviderConfigured}
         accountBalanceYuan={accountBalanceYuan}
         accountName={accountName}
+        accountAvatarUrl={accountAvatarUrl}
         onNavigate={onNavigate}
         isDark={isDark}
         onToggleTheme={onToggleTheme}

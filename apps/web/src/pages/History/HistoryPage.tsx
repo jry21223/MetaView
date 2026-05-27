@@ -202,6 +202,7 @@ export interface HistoryPageProps {
   isProviderConfigured: boolean;
   accountBalanceYuan?: string | null;
   accountName?: string | null;
+  accountAvatarUrl?: string | null;
   onOpenProviderSettings?: () => void;
   /**
    * Re-run a stored prompt. Returns once the new run has been queued so the
@@ -218,6 +219,7 @@ export function HistoryPage({
   isProviderConfigured,
   accountBalanceYuan = null,
   accountName = null,
+  accountAvatarUrl = null,
   onOpenProviderSettings,
   onRerun,
 }: HistoryPageProps) {
@@ -278,6 +280,7 @@ export function HistoryPage({
         isProviderConfigured={isProviderConfigured}
         accountBalanceYuan={accountBalanceYuan}
         accountName={accountName}
+        accountAvatarUrl={accountAvatarUrl}
         onNavigate={onNavigate}
         isDark={isDark}
         onToggleTheme={() => setTweak('theme', isDark ? 'light' : 'dark')}

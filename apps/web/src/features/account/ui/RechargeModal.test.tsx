@@ -25,7 +25,38 @@ const BASE_ACCOUNT: AccountMe = {
 describe("RechargeModal", () => {
   afterEach(() => {
     cleanup();
+    document.body.classList.remove("mv-modal-open");
     vi.useRealTimers();
+  });
+
+  it("locks the page behind the dialog and traps keyboard focus", async () => {
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/account/recharge-orders`, () =>
+        HttpResponse.json([]),
+      ),
+    );
+    const onClose = vi.fn();
+    const { getByLabelText, getByRole, unmount } = render(
+      <RechargeModal
+        account={BASE_ACCOUNT}
+        onRefreshAccount={() => undefined}
+        onClose={onClose}
+      />,
+    );
+
+    const dialog = getByRole("dialog", { name: "账户与充值" });
+    await waitFor(() => expect(document.activeElement).toBe(dialog));
+    expect(document.body.classList.contains("mv-modal-open")).toBe(true);
+
+    getByLabelText("充值金额").focus();
+    fireEvent.keyDown(document, { key: "Tab" });
+    expect(document.activeElement).toBe(getByLabelText("关闭账户与充值"));
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    unmount();
+    expect(document.body.classList.contains("mv-modal-open")).toBe(false);
   });
 
   it("keeps recharge disabled when payment is not configured", () => {
@@ -44,6 +75,9 @@ describe("RechargeModal", () => {
 
     expect((getByRole("button", { name: "充值" }) as HTMLButtonElement).disabled).toBe(true);
     expect(getByText(/微信支付尚未配置/)).toBeTruthy();
+    expect(getByText(/微信开放平台网站应用/)).toBeTruthy();
+    expect(getByText("约 50 次")).toBeTruthy();
+    expect(getByText(/当前约可支持 100 次基础生成/)).toBeTruthy();
   });
 
   it("creates a custom amount recharge order through the API", async () => {

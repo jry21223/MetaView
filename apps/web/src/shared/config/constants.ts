@@ -13,6 +13,11 @@ export const PLAYBOOK_DEFAULTS = {
   INITIAL_PREVIEW_FRAME: 18,
 } as const;
 
+export const RECHARGE_USAGE_ESTIMATE = {
+  RUNS_PER_YUAN: 10,
+  UNIT_LABEL: "基础生成",
+} as const;
+
 export const PLAYBOOK_LAYOUT = {
   /** Fraction of width allocated to the viz panel when code track is present (0–1) */
   VIZ_SPLIT_RATIO: 0.5,
