@@ -2,10 +2,16 @@ FROM node:22-slim AS web_deps
 
 WORKDIR /app
 
+ARG NPM_REGISTRY=https://registry.npmmirror.com
+
 COPY package.json package-lock.json ./
 COPY apps/web/package.json ./apps/web/package.json
 COPY apps/agent/package.json ./apps/agent/package.json
-RUN npm install --workspace=apps/web --no-audit --no-fund
+RUN npm install --workspace=apps/web --no-audit --no-fund \
+        --registry="${NPM_REGISTRY}" \
+        --fetch-retries=5 \
+        --fetch-retry-mintimeout=20000 \
+        --fetch-retry-maxtimeout=120000
 COPY apps/web ./apps/web
 
 FROM python:3.11-slim AS base
