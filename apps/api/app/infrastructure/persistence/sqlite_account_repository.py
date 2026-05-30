@@ -294,7 +294,7 @@ class SqliteAccountRepository:
         channel: str,
     ) -> RechargeOrder:
         now = iso(utc_now())
-        order_id = f"mv{uuid.uuid4().hex}"
+        order_id = f"mv{uuid.uuid4().hex[:30]}"
 
         def _sync() -> RechargeOrder:
             with self._connect() as conn:

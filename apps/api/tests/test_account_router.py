@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+import re
 
 import pytest
 from fastapi.testclient import TestClient
@@ -67,6 +68,23 @@ def test_list_recharge_orders_starts_empty(account_client: TestClient) -> None:
 
     assert response.status_code == 200
     assert response.json() == []
+
+
+@pytest.mark.asyncio
+async def test_recharge_order_id_matches_wechat_pay_limits(tmp_path: Path) -> None:
+    db = str(tmp_path / "order-id.db")
+    init_db(db)
+    repo = SqliteAccountRepository(db)
+    session = await repo.get_or_create_session(None, session_days=30)
+
+    order = await repo.create_recharge_order(
+        session.account.user_id,
+        500,
+        channel="wechat_native",
+    )
+
+    assert len(order.order_id) <= 32
+    assert re.fullmatch(r"[0-9A-Za-z_-]+", order.order_id)
 
 
 @pytest.mark.asyncio
