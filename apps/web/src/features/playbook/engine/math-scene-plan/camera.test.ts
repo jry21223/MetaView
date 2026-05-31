@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { triangleScene } from "./fixtures";
 import {
+  expandViewBoxToMinSize,
   interpolateViewBox,
   viewBoxFromBounds,
   viewBoxFromSnapshot,
+  viewBoxHeight,
+  viewBoxWidth,
   type CameraViewBox,
 } from "./camera";
 
@@ -38,5 +41,19 @@ describe("math-scene-plan camera", () => {
       y: [-1, 9],
     });
     expect(interpolateViewBox(from, to, 1)).toEqual(to);
+  });
+
+  it("reports viewBox dimensions", () => {
+    const viewBox: CameraViewBox = { x: [-1, 7], y: [-2, 4] };
+
+    expect(viewBoxWidth(viewBox)).toBe(8);
+    expect(viewBoxHeight(viewBox)).toBe(6);
+  });
+
+  it("expands a viewBox to a minimum size around its center", () => {
+    expect(expandViewBoxToMinSize({ x: [2, 4], y: [3, 4] }, 6, 5)).toEqual({
+      x: [0, 6],
+      y: [1, 6],
+    });
   });
 });

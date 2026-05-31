@@ -39,6 +39,30 @@ export function viewBoxFromBounds(
   };
 }
 
+export function viewBoxWidth(viewBox: CameraViewBox): number {
+  return viewBox.x[1] - viewBox.x[0];
+}
+
+export function viewBoxHeight(viewBox: CameraViewBox): number {
+  return viewBox.y[1] - viewBox.y[0];
+}
+
+export function expandViewBoxToMinSize(
+  viewBox: CameraViewBox,
+  minWidth: number,
+  minHeight: number,
+): CameraViewBox {
+  const cx = (viewBox.x[0] + viewBox.x[1]) / 2;
+  const cy = (viewBox.y[0] + viewBox.y[1]) / 2;
+  const width = Math.max(viewBoxWidth(viewBox), minWidth);
+  const height = Math.max(viewBoxHeight(viewBox), minHeight);
+
+  return {
+    x: [cx - width / 2, cx + width / 2],
+    y: [cy - height / 2, cy + height / 2],
+  };
+}
+
 export function interpolateViewBox(
   from: CameraViewBox,
   to: CameraViewBox,

@@ -3,7 +3,7 @@ import {
   trianglePlusSquareScene,
   triangleScene,
 } from "./fixtures";
-import { collectObjectKeySet, segmentKey } from "./identity";
+import { collectObjectKeySet, segmentKey, vectorFieldKey } from "./identity";
 import {
   diffMathSceneObjects,
   isAdded,
@@ -55,6 +55,32 @@ describe("math-scene-plan diff", () => {
     expect(isRemoved(squareSegmentKey, diff)).toBe(true);
     expect(isAdded(squareSegmentKey, diff)).toBe(false);
     expect(isPersisted(squareSegmentKey, diff)).toBe(false);
+    expectDisjoint(diff);
+  });
+
+  it("diffs vector fields as single optional objects", () => {
+    const previous = {
+      ...triangleScene,
+      vector_field: {
+        expression_px: "-y",
+        expression_py: "x",
+        step: 0.5,
+        label: "F",
+      },
+    };
+    const current = {
+      ...triangleScene,
+      vector_field: {
+        expression_px: "-y",
+        expression_py: "x",
+        step: 1,
+        label: "F",
+      },
+    };
+    const diff = diffMathSceneObjects(previous, current);
+
+    expect(isRemoved(vectorFieldKey(previous.vector_field), diff)).toBe(true);
+    expect(isAdded(vectorFieldKey(current.vector_field), diff)).toBe(true);
     expectDisjoint(diff);
   });
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { MathFormulaSnapshot, MathSceneSnapshot, MetaStep } from "../types";
 import {
+  trianglePlusSquarePlusFormulaScene,
   trianglePlusSquareScene,
   triangleScene,
 } from "./fixtures";
@@ -37,6 +38,8 @@ function allPlannedObjects(
     ...plan.segments,
     ...plan.regions,
     ...plan.curves,
+    ...plan.annotations,
+    ...(plan.vectorField ? [plan.vectorField] : []),
   ];
 }
 
@@ -102,6 +105,8 @@ describe("math-scene-plan plan", () => {
     expect(plan.segments).toHaveLength(trianglePlusSquareScene.segments?.length ?? 0);
     expect(plan.regions).toHaveLength(trianglePlusSquareScene.regions?.length ?? 0);
     expect(plan.curves).toHaveLength(trianglePlusSquareScene.curves?.length ?? 0);
+    expect(plan.annotations).toHaveLength(trianglePlusSquareScene.annotations?.length ?? 0);
+    expect(plan.vectorField).toBeNull();
   });
 
   it("returns the current snapshot viewBox as camera v1", () => {
@@ -115,5 +120,37 @@ describe("math-scene-plan plan", () => {
       x: [trianglePlusSquareScene.x_min, trianglePlusSquareScene.x_max],
       y: [trianglePlusSquareScene.y_min, trianglePlusSquareScene.y_max],
     });
+  });
+
+  it("plans annotations and vector fields with object-level progress", () => {
+    const previous = {
+      ...trianglePlusSquarePlusFormulaScene,
+      vector_field: {
+        expression_px: "-y",
+        expression_py: "x",
+        step: 0.5,
+        label: "F",
+      },
+    };
+    const current = {
+      ...previous,
+      annotations: [
+        ...(previous.annotations ?? []),
+        { x: 6, y: 3, text: "$new$", align: "nw" as const },
+      ],
+    };
+    const plan = buildMathSceneRenderPlan({
+      previousStep: sceneStep(previous, "previous"),
+      currentSnapshot: current,
+      stepProgress: 0.25,
+    });
+
+    expect(plan.annotations).toHaveLength(current.annotations?.length ?? 0);
+    expect(plan.annotations[0]?.persisted).toBe(true);
+    expect(plan.annotations[0]?.progress).toBe(1);
+    expect(plan.annotations[1]?.added).toBe(true);
+    expect(plan.annotations[1]?.progress).toBe(0.25);
+    expect(plan.vectorField?.persisted).toBe(true);
+    expect(plan.vectorField?.progress).toBe(1);
   });
 });

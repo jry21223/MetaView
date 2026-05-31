@@ -1,18 +1,22 @@
 import type {
+  MathSceneAnnotation,
   MathSceneCurve,
   MathScenePoint,
   MathSceneRegion,
   MathSceneSegment,
   MathSceneSnapshot,
+  MathSceneVectorField,
   MetaStep,
 } from "../types";
 import { viewBoxFromSnapshot, type CameraViewBox } from "./camera";
 import { diffMathSceneObjects, isAdded, isPersisted } from "./diff";
 import {
   curveKey,
+  annotationKey,
   pointKey,
   regionKey,
   segmentKey,
+  vectorFieldKey,
 } from "./identity";
 import { objectProgress, shouldRenderObject } from "./progress";
 
@@ -29,6 +33,8 @@ export interface MathSceneRenderPlan {
   segments: PlannedObject<MathSceneSegment>[];
   regions: PlannedObject<MathSceneRegion>[];
   curves: PlannedObject<MathSceneCurve>[];
+  annotations: PlannedObject<MathSceneAnnotation>[];
+  vectorField: PlannedObject<MathSceneVectorField> | null;
   camera: CameraViewBox;
 }
 
@@ -61,6 +67,16 @@ function planObjects<T>(
   });
 }
 
+function planObject<T>(
+  object: T | null | undefined,
+  keyForObject: (object: T) => string,
+  diff: ReturnType<typeof diffMathSceneObjects>,
+  stepProgress: number,
+): PlannedObject<T> | null {
+  if (!object) return null;
+  return planObjects([object], keyForObject, diff, stepProgress)[0] ?? null;
+}
+
 export function buildMathSceneRenderPlan(args: {
   previousStep?: MetaStep | null;
   currentSnapshot: MathSceneSnapshot;
@@ -77,6 +93,18 @@ export function buildMathSceneRenderPlan(args: {
     segments: planObjects(currentSnapshot.segments ?? [], segmentKey, diff, stepProgress),
     regions: planObjects(currentSnapshot.regions ?? [], regionKey, diff, stepProgress),
     curves: planObjects(currentSnapshot.curves ?? [], curveKey, diff, stepProgress),
+    annotations: planObjects(
+      currentSnapshot.annotations ?? [],
+      annotationKey,
+      diff,
+      stepProgress,
+    ),
+    vectorField: planObject(
+      currentSnapshot.vector_field,
+      vectorFieldKey,
+      diff,
+      stepProgress,
+    ),
     camera: viewBoxFromSnapshot(currentSnapshot),
   };
 }

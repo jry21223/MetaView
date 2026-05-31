@@ -5,6 +5,7 @@ import type {
   MathSceneSegment,
   MathSceneSnapshot,
 } from "../types";
+import type { PlannedObject } from "./plan";
 
 export interface Bounds {
   xMin: number;
@@ -140,4 +141,33 @@ export function padBounds(bounds: Bounds, paddingRatio: number): Bounds {
     yMin: normalized.yMin - yPad,
     yMax: normalized.yMax + yPad,
   };
+}
+
+export function boundsOfPlannedObjects(args: {
+  points?: PlannedObject<MathScenePoint>[];
+  segments?: PlannedObject<MathSceneSegment>[];
+  regions?: PlannedObject<MathSceneRegion>[];
+  annotations?: PlannedObject<MathSceneAnnotation>[];
+  onlyAdded?: boolean;
+}): Bounds | null {
+  const { points = [], segments = [], regions = [], annotations = [], onlyAdded = false } = args;
+  const include = <T>(object: PlannedObject<T>): boolean => !onlyAdded || object.added;
+  let result = emptyBounds();
+
+  for (const point of points) {
+    if (include(point)) result = mergeBounds(result, boundsOfPoint(point.object));
+  }
+  for (const segment of segments) {
+    if (include(segment)) result = mergeBounds(result, boundsOfSegment(segment.object));
+  }
+  for (const region of regions) {
+    if (include(region)) result = mergeBounds(result, boundsOfRegion(region.object));
+  }
+  for (const annotation of annotations) {
+    if (include(annotation)) {
+      result = mergeBounds(result, boundsOfAnnotation(annotation.object));
+    }
+  }
+
+  return result;
 }

@@ -5,6 +5,7 @@ import type {
   MathSceneRegion,
   MathSceneSegment,
   MathSceneSnapshot,
+  MathSceneVectorField,
 } from "../types";
 
 export type MathSceneObjectKind =
@@ -12,7 +13,8 @@ export type MathSceneObjectKind =
   | "segment"
   | "region"
   | "curve"
-  | "annotation";
+  | "annotation"
+  | "vector_field";
 
 export interface MathSceneObjectRef {
   kind: MathSceneObjectKind;
@@ -69,6 +71,16 @@ export function annotationKey(annotation: MathSceneAnnotation): string {
   ].join(":");
 }
 
+export function vectorFieldKey(field: MathSceneVectorField): string {
+  return [
+    "vector_field",
+    field.expression_px ?? "",
+    field.expression_py ?? "",
+    n(field.step),
+    field.label ?? "",
+  ].join(":");
+}
+
 export function collectObjectRefs(snapshot: MathSceneSnapshot): MathSceneObjectRef[] {
   return [
     ...(snapshot.points ?? []).map((point) => ({
@@ -91,6 +103,14 @@ export function collectObjectRefs(snapshot: MathSceneSnapshot): MathSceneObjectR
       kind: "annotation" as const,
       key: annotationKey(annotation),
     })),
+    ...(snapshot.vector_field
+      ? [
+          {
+            kind: "vector_field" as const,
+            key: vectorFieldKey(snapshot.vector_field),
+          },
+        ]
+      : []),
   ];
 }
 

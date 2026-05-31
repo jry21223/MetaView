@@ -8,6 +8,7 @@ import {
   pointKey,
   regionKey,
   segmentKey,
+  vectorFieldKey,
 } from "./identity";
 
 describe("math-scene-plan identity", () => {
@@ -77,6 +78,12 @@ describe("math-scene-plan identity", () => {
       ],
       curves: [{ expression_y: "x^2", label: "f" }],
       annotations: [{ x: 1, y: 1, text: "$f$", align: "ne" }],
+      vector_field: {
+        expression_px: "-y",
+        expression_py: "x",
+        step: 0.5,
+        label: "F",
+      },
     };
 
     const refs = collectObjectRefs(snapshot);
@@ -86,7 +93,25 @@ describe("math-scene-plan identity", () => {
       { kind: "region", key: regionKey(snapshot.regions[0]) },
       { kind: "curve", key: curveKey(snapshot.curves[0]) },
       { kind: "annotation", key: annotationKey(snapshot.annotations[0]) },
+      { kind: "vector_field", key: vectorFieldKey(snapshot.vector_field) },
     ]);
     expect(collectObjectKeySet(snapshot)).toEqual(new Set(refs.map((ref) => ref.key)));
+  });
+
+  it("creates vector field keys from field expressions and sampling", () => {
+    const a = vectorFieldKey({
+      expression_px: "-y",
+      expression_py: "x",
+      step: 0.5,
+      label: "F",
+    });
+    const b = vectorFieldKey({
+      expression_px: "-y",
+      expression_py: "x",
+      step: 1,
+      label: "F",
+    });
+
+    expect(a).not.toBe(b);
   });
 });

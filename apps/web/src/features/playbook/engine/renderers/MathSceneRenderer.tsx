@@ -14,15 +14,11 @@ import type { RendererProps } from "./types";
 import { compileExpr, type CompiledExpr } from "../../../../shared/lib/mathExpr";
 import { sanitizeKatex } from "../../../../shared/lib/sanitizeKatex";
 import { clamp01 } from "../foundation";
+import { planCameraViewBox } from "../math-scene-plan/cameraPlanner";
 import {
-  mathSceneAnnotationKey,
-  mathSceneCurveKey,
-  mathScenePointKey,
-  mathSceneRegionKey,
-  mathSceneSegmentKey,
-  previousMathSceneIdentitySets,
-  progressForIdentity,
-} from "./mathSceneIdentity";
+  buildMathSceneRenderPlan,
+  type PlannedObject,
+} from "../math-scene-plan/plan";
 import { revealRegionVertices } from "./regionReveal";
 
 type Emphasis = "primary" | "secondary" | "accent";
@@ -94,24 +90,18 @@ const COMPACT_LABEL_RE = /^[A-Za-z0-9._\-+=\s,:'"]+$/;
 function RegionsLayer({
   regions,
   theme,
-  progress,
-  previousKeys,
 }: {
-  regions: MathSceneRegion[];
+  regions: PlannedObject<MathSceneRegion>[];
   theme: "dark" | "light";
-  progress: number;
-  previousKeys: Set<string>;
 }) {
   return (
     <>
-      {regions.map((region) => {
+      {regions.map(({ key, object: region, progress }) => {
         if (region.vertices.length < 3) return null;
-        const key = mathSceneRegionKey(region);
         const color = emphasisColor(theme, region.emphasis);
-        const regionProgress = progressForIdentity(key, previousKeys, progress);
         const points = revealRegionVertices(
           region.vertices as ReadonlyArray<readonly [number, number]>,
-          regionProgress,
+          progress,
         );
         return (
           <Polygon
@@ -248,20 +238,14 @@ function SegmentLayer({
 function PointsLayer({
   points,
   theme,
-  progress,
-  previousKeys,
 }: {
-  points: MathScenePoint[];
+  points: PlannedObject<MathScenePoint>[];
   theme: "dark" | "light";
-  progress: number;
-  previousKeys: Set<string>;
 }) {
   return (
     <>
-      {points.map((p) => {
-        const key = mathScenePointKey(p);
-        const pointProgress = progressForIdentity(key, previousKeys, progress);
-        const fadeIn = clamp01(pointProgress * 1.5);
+      {points.map(({ key, object: p, progress }) => {
+        const fadeIn = clamp01(progress * 1.5);
         const color = emphasisColor(theme, p.emphasis);
         return (
           <React.Fragment key={key}>
@@ -276,20 +260,21 @@ function PointsLayer({
   );
 }
 
-function AnnotationsLayer({ annotations }: { annotations: MathSceneAnnotation[] }) {
+function AnnotationsLayer({
+  annotations,
+}: {
+  annotations: PlannedObject<MathSceneAnnotation>[];
+}) {
   return (
     <>
-      {annotations.map((a) => {
-        const key = mathSceneAnnotationKey(a);
-        return (
-          <LaTeX
-            key={key}
-            at={[a.x, a.y]}
-            tex={annotationTex(a.text)}
-            color={Theme.foreground}
-          />
-        );
-      })}
+      {annotations.map(({ key, object: a }) => (
+        <LaTeX
+          key={key}
+          at={[a.x, a.y]}
+          tex={annotationTex(a.text)}
+          color={Theme.foreground}
+        />
+      ))}
     </>
   );
 }
@@ -317,9 +302,23 @@ export const MathSceneRenderer: React.FC<RendererProps> = ({
   theme,
 }) => {
   const snap = step.snapshot as MathSceneSnapshot;
-  const previousIdentities = React.useMemo(
-    () => previousMathSceneIdentitySets(prevStep),
-    [prevStep],
+  const plan = React.useMemo(
+    () => {
+      const basePlan = buildMathSceneRenderPlan({
+        previousStep: prevStep,
+        currentSnapshot: snap,
+        stepProgress: progress,
+      });
+      return {
+        ...basePlan,
+        camera: planCameraViewBox({
+          plan: basePlan,
+          fallback: basePlan.camera,
+          progress,
+        }),
+      };
+    },
+    [prevStep, snap, progress],
   );
   const elapsed = Math.max(0, frame - stepStartFrame);
   const titleOpacity = clamp01(elapsed / 8);
@@ -330,11 +329,7 @@ export const MathSceneRenderer: React.FC<RendererProps> = ({
   const yMax = snap.y_max;
   const fallbackVectorStep = Math.max((xMax - xMin) / 8, (yMax - yMin) / 8, 0.25);
 
-  const regions = snap.regions ?? [];
-  const curves = snap.curves ?? [];
-  const segments = snap.segments ?? [];
   const points = snap.points ?? [];
-  const annotations = snap.annotations ?? [];
   const scope = snap.params;
 
   const labelTokens = points
@@ -349,59 +344,43 @@ export const MathSceneRenderer: React.FC<RendererProps> = ({
 
       <div className="math-scene-renderer__stage">
         <Mafs
-          viewBox={{ x: [xMin, xMax], y: [yMin, yMax] }}
+          viewBox={plan.camera}
           preserveAspectRatio="contain"
           pan={false}
           zoom={false}
         >
           <Coordinates.Cartesian />
-          <RegionsLayer
-            regions={regions}
-            theme={theme}
-            progress={progress}
-            previousKeys={previousIdentities.regions}
-          />
-          {snap.vector_field && (
+          <RegionsLayer regions={plan.regions} theme={theme} />
+          {plan.vectorField && (
             <VectorFieldLayer
-              field={snap.vector_field}
+              field={plan.vectorField.object}
               theme={theme}
-              progress={progress}
+              progress={plan.vectorField.progress}
               scope={scope}
               fallbackStep={fallbackVectorStep}
             />
           )}
-          {curves.map((curve) => {
-            const key = mathSceneCurveKey(curve);
-            return (
-              <CurveLayer
-                key={key}
-                curve={curve}
-                theme={theme}
-                progress={progressForIdentity(key, previousIdentities.curves, progress)}
-                scope={scope}
-                xMin={xMin}
-                xMax={xMax}
-              />
-            );
-          })}
-          {segments.map((segment) => {
-            const key = mathSceneSegmentKey(segment);
-            return (
-              <SegmentLayer
-                key={key}
-                segment={segment}
-                theme={theme}
-                progress={progressForIdentity(key, previousIdentities.segments, progress)}
-              />
-            );
-          })}
-          <PointsLayer
-            points={points}
-            theme={theme}
-            progress={progress}
-            previousKeys={previousIdentities.points}
-          />
-          <AnnotationsLayer annotations={annotations} />
+          {plan.curves.map(({ key, object: curve, progress: curveProgress }) => (
+            <CurveLayer
+              key={key}
+              curve={curve}
+              theme={theme}
+              progress={curveProgress}
+              scope={scope}
+              xMin={xMin}
+              xMax={xMax}
+            />
+          ))}
+          {plan.segments.map(({ key, object: segment, progress: segmentProgress }) => (
+            <SegmentLayer
+              key={key}
+              segment={segment}
+              theme={theme}
+              progress={segmentProgress}
+            />
+          ))}
+          <PointsLayer points={plan.points} theme={theme} />
+          <AnnotationsLayer annotations={plan.annotations} />
         </Mafs>
       </div>
 

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { MathSceneSnapshot } from "../types";
-import { triangleScene } from "./fixtures";
+import { trianglePlusSquareScene, triangleScene } from "./fixtures";
+import { buildMathSceneRenderPlan } from "./plan";
 import {
   boundsOfAnnotation,
   boundsOfPoint,
+  boundsOfPlannedObjects,
   boundsOfRegion,
   boundsOfScene,
   boundsOfSegment,
@@ -124,6 +126,50 @@ describe("math-scene-plan bounds", () => {
       xMax: 7,
       yMin: -1,
       yMax: 4,
+    });
+  });
+
+  it("calculates bounds for planned objects and can include only added objects", () => {
+    const allAddedPlan = buildMathSceneRenderPlan({
+      currentSnapshot: triangleScene,
+      stepProgress: 0.5,
+    });
+    const mixedPlan = buildMathSceneRenderPlan({
+      previousStep: {
+        step_id: "triangle",
+        end_frame: 30,
+        title: "triangle",
+        voiceover_text: "",
+        snapshot: triangleScene,
+        tokens: [],
+      },
+      currentSnapshot: trianglePlusSquareScene,
+      stepProgress: 0.5,
+    });
+
+    expect(
+      boundsOfPlannedObjects({
+        points: allAddedPlan.points,
+        segments: allAddedPlan.segments,
+        onlyAdded: true,
+      }),
+    ).toEqual({
+      xMin: 0,
+      xMax: 4,
+      yMin: 0,
+      yMax: 3,
+    });
+    expect(
+      boundsOfPlannedObjects({
+        points: mixedPlan.points,
+        segments: mixedPlan.segments,
+        onlyAdded: true,
+      }),
+    ).toEqual({
+      xMin: 4,
+      xMax: 6,
+      yMin: 0,
+      yMax: 2,
     });
   });
 });
