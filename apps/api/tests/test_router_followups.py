@@ -1,0 +1,271 @@
+from __future__ import annotations
+
+import asyncio
+import json
+from collections.abc import Iterator
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app.config import get_settings
+from app.domain.models.pipeline_run import PipelineRunStatus
+from app.infrastructure.persistence.db_init import init_db
+from app.infrastructure.persistence.sqlite_run_repository import SqliteRunRepository
+from app.main import create_app
+from app.presentation.dependencies import get_llm_provider, get_run_repo
+
+
+class SequenceLLM:
+    def __init__(self, responses: list[str]) -> None:
+        self.responses = responses
+        self.calls = 0
+
+    async def complete(self, system: str, user: str) -> str:
+        self.calls += 1
+        if len(self.responses) == 1:
+            return self.responses[0]
+        return self.responses.pop(0)
+
+
+@pytest.fixture
+def followup_client(monkeypatch, tmp_path) -> Iterator[tuple[TestClient, SqliteRunRepository, SequenceLLM]]:
+    get_settings.cache_clear()
+    monkeypatch.setenv("METAVIEW_OPENAI_API_KEY", "sk-server")
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    db = str(tmp_path / "followups.db")
+    init_db(db)
+    repo = SqliteRunRepository(db)
+    llm = SequenceLLM([_llm_payload([
+        {"op": "replace", "path": "/summary", "value": "改成更直观的版本。"},
+        {"op": "replace", "path": "/steps/0/title", "value": "先观察数组"},
+        {"op": "replace", "path": "/steps/1/voiceover_text", "value": "第二步强调交换原因。"},
+        {"op": "replace", "path": "/steps/0/layers/0/body/array_values", "value": ["3", "1"]},
+    ])])
+    app = create_app()
+    app.dependency_overrides[get_run_repo] = lambda: repo
+    app.dependency_overrides[get_llm_provider] = lambda: llm
+    with TestClient(app) as client:
+        yield client, repo, llm
+    get_settings.cache_clear()
+
+
+def test_followup_applies_patch_persists_history_and_versions(followup_client) -> None:
+    client, repo, _llm = followup_client
+    run_id = _seed_run(repo)
+
+    resp = client.post(f"/api/v1/runs/{run_id}/follow-up", json={"message": "换个角度讲"})
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["reply"] == "已按要求更新。"
+    assert data["change_summary"] == "refactor: update explanation"
+    assert data["playbook"]["summary"] == "改成更直观的版本。"
+    assert data["playbook"]["steps"][0]["title"] == "先观察数组"
+    assert data["playbook"]["steps"][0]["snapshot"]["array_values"] == ["3", "1"]
+    stored = _run(repo.get(run_id))
+    assert stored is not None
+    assert stored.playbook is not None
+    assert stored.playbook.summary == "改成更直观的版本。"
+
+    history = client.get(f"/api/v1/runs/{run_id}/follow-ups").json()
+    assert len(history["followups"]) == 1
+    assert history["followups"][0]["version_id"] == data["version_id"]
+    assert [v["version_number"] for v in history["versions"]] == [0, 1]
+    assert history["versions"][0]["summary"] == "initial playbook"
+    assert history["versions"][0]["is_head"] is False
+    assert history["versions"][1]["summary"] == "refactor: update explanation"
+    assert history["versions"][1]["parent_version_id"] == history["versions"][0]["version_id"]
+    assert history["versions"][1]["short_id"]
+    assert history["versions"][1]["is_head"] is True
+
+
+def test_followup_repairs_invalid_patch_once(monkeypatch, tmp_path) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("METAVIEW_OPENAI_API_KEY", "sk-server")
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    db = str(tmp_path / "repair.db")
+    init_db(db)
+    repo = SqliteRunRepository(db)
+    run_id = _seed_run(repo)
+    llm = SequenceLLM([
+        _llm_payload([{"op": "replace", "path": "/fps", "value": 24}]),
+        _llm_payload([{"op": "replace", "path": "/title", "value": "修复后的标题"}]),
+    ])
+    app = create_app()
+    app.dependency_overrides[get_run_repo] = lambda: repo
+    app.dependency_overrides[get_llm_provider] = lambda: llm
+
+    with TestClient(app) as client:
+        resp = client.post(f"/api/v1/runs/{run_id}/follow-up", json={"message": "改标题"})
+
+    get_settings.cache_clear()
+    assert resp.status_code == 200
+    assert llm.calls == 2
+    assert resp.json()["playbook"]["title"] == "修复后的标题"
+
+
+def test_followup_restore_version(followup_client) -> None:
+    client, _repo, _llm = followup_client
+    run_id = _seed_run(_repo)
+    client.post(f"/api/v1/runs/{run_id}/follow-up", json={"message": "修改"})
+    versions = client.get(f"/api/v1/runs/{run_id}/follow-ups").json()["versions"]
+    original_version = versions[0]["version_id"]
+
+    resp = client.post(f"/api/v1/runs/{run_id}/versions/{original_version}/restore")
+
+    assert resp.status_code == 200
+    assert resp.json()["playbook"]["summary"] == "Original summary."
+    versions_after = client.get(f"/api/v1/runs/{run_id}/follow-ups").json()["versions"]
+    assert len(versions_after) == 3
+    assert versions_after[1]["is_head"] is False
+    assert versions_after[-1]["source"] == "restore"
+    assert versions_after[-1]["parent_version_id"] == versions[1]["version_id"]
+    assert versions_after[-1]["summary"].startswith("revert: restore ")
+    assert versions_after[-1]["is_head"] is True
+
+
+def test_followup_coerces_numeric_parameter_contract(monkeypatch, tmp_path) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("METAVIEW_OPENAI_API_KEY", "sk-server")
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    db = str(tmp_path / "numeric-params.db")
+    init_db(db)
+    repo = SqliteRunRepository(db)
+    run_id = _seed_run(repo)
+    llm = SequenceLLM([
+        _llm_payload([
+            {
+                "op": "replace",
+                "path": "/parameter_controls",
+                "value": [
+                    {"id": "mass", "label": "质量", "value": 2},
+                    {"id": "angle", "label": "角度", "value": 30},
+                    {"id": "mu_s", "label": "静摩擦系数", "value": 0.5},
+                ],
+            },
+            {
+                "op": "replace",
+                "path": "/initial_data",
+                "value": {"mass": [2], "angle": [30], "mu_s": [0.5]},
+            },
+        ])
+    ])
+    app = create_app()
+    app.dependency_overrides[get_run_repo] = lambda: repo
+    app.dependency_overrides[get_llm_provider] = lambda: llm
+
+    with TestClient(app) as client:
+        resp = client.post(f"/api/v1/runs/{run_id}/follow-up", json={"message": "加参数"})
+
+    get_settings.cache_clear()
+    assert resp.status_code == 200
+    playbook = resp.json()["playbook"]
+    assert [item["value"] for item in playbook["parameter_controls"]] == ["2", "30", "0.5"]
+    assert playbook["initial_data"] == {
+        "mass": ["2"],
+        "angle": ["30"],
+        "mu_s": ["0.5"],
+    }
+
+
+def test_followup_ops_rejects_provider_override(monkeypatch, tmp_path) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
+    monkeypatch.setenv("METAVIEW_OPENAI_API_KEY", "sk-server")
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    db = str(tmp_path / "ops.db")
+    init_db(db)
+    repo = SqliteRunRepository(db)
+    run_id = _seed_run(repo)
+    app = create_app()
+    app.dependency_overrides[get_run_repo] = lambda: repo
+    app.dependency_overrides[get_llm_provider] = lambda: SequenceLLM([_llm_payload([])])
+
+    with TestClient(app) as client:
+        resp = client.post(
+            f"/api/v1/runs/{run_id}/follow-up",
+            json={"message": "改一下", "provider_api_key": "sk-user"},
+        )
+
+    get_settings.cache_clear()
+    assert resp.status_code == 400
+
+
+def _seed_run(repo: SqliteRunRepository) -> str:
+    run_id = "run-1"
+    _run(repo.create(run_id, "prompt", "2026-06-01T00:00:00+00:00"))
+    _run(
+        repo.update(
+            run_id,
+            status=PipelineRunStatus.SUCCEEDED,
+            playbook_json=json.dumps(_playbook(), ensure_ascii=False),
+        )
+    )
+    return run_id
+
+
+def _run(coro):
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop.run_until_complete(coro)
+
+
+def _llm_payload(patch: list[dict]) -> str:
+    return json.dumps(
+        {
+            "reply": "已按要求更新。",
+            "change_summary": "refactor: update explanation",
+            "patch": patch,
+        },
+        ensure_ascii=False,
+    )
+
+
+def _playbook() -> dict:
+    return {
+        "schema_version": "1.0.0",
+        "fps": 30,
+        "total_frames": 120,
+        "domain": "algorithm",
+        "title": "Original",
+        "summary": "Original summary.",
+        "steps": [
+            _step("step_01", 60, "Step 1", ["1", "2"]),
+            _step("step_02", 120, "Step 2", ["2", "1"]),
+        ],
+        "parameter_controls": [],
+        "initial_data": {},
+    }
+
+
+def _step(step_id: str, end_frame: int, title: str, values: list[str]) -> dict:
+    snapshot = {
+        "kind": "algorithm_array",
+        "array_values": values,
+        "active_indices": [],
+        "swap_indices": [],
+        "sorted_indices": [],
+        "pointers": {},
+    }
+    return {
+        "step_id": step_id,
+        "end_frame": end_frame,
+        "title": title,
+        "voiceover_text": f"{title} narration.",
+        "snapshot": snapshot,
+        "layers": [
+            {
+                "timing": {
+                    "enter_at": 0.0,
+                    "exit_at": 1.0,
+                    "appear_anim": "fade",
+                    "z_order": 0,
+                },
+                "body": snapshot,
+            }
+        ],
+        "tokens": [],
+    }

@@ -16,6 +16,37 @@ def _create_pipeline_runs(conn: sqlite3.Connection) -> None:
             created_at  TEXT NOT NULL
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS pipeline_run_followups (
+            followup_id    TEXT PRIMARY KEY,
+            run_id         TEXT NOT NULL,
+            user_message   TEXT NOT NULL,
+            assistant_reply TEXT NOT NULL,
+            change_summary TEXT NOT NULL,
+            patch_json     TEXT NOT NULL,
+            version_id     TEXT,
+            created_at     TEXT NOT NULL,
+            FOREIGN KEY(run_id) REFERENCES pipeline_runs(run_id)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS pipeline_run_versions (
+            version_id    TEXT PRIMARY KEY,
+            run_id        TEXT NOT NULL,
+            version_number INTEGER NOT NULL,
+            playbook_json TEXT NOT NULL,
+            source        TEXT NOT NULL,
+            followup_id   TEXT,
+            parent_version_id TEXT,
+            summary       TEXT,
+            created_at    TEXT NOT NULL,
+            FOREIGN KEY(run_id) REFERENCES pipeline_runs(run_id),
+            FOREIGN KEY(followup_id) REFERENCES pipeline_run_followups(followup_id),
+            UNIQUE(run_id, version_number)
+        )
+    """)
+    _add_column_if_missing(conn, "pipeline_run_versions", "parent_version_id", "TEXT")
+    _add_column_if_missing(conn, "pipeline_run_versions", "summary", "TEXT")
 
 
 def _create_accounts(conn: sqlite3.Connection) -> None:
