@@ -102,6 +102,8 @@ async def submit_followup(
             raise HTTPException(
                 status_code=404, detail=f"Run {run_id!r} has no playbook"
             )
+        base_playbook = run.playbook
+        parent_version_id = payload.base_version_id
         if payload.base_version_id:
             base_json = await run_repo.get_version_playbook(run_id, payload.base_version_id)
             if base_json is None:
@@ -109,6 +111,10 @@ async def submit_followup(
                     status_code=404,
                     detail=f"Version {payload.base_version_id!r} not found",
                 )
+            try:
+                base_playbook = PlaybookScript.model_validate_json(base_json)
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail="Stored version is invalid") from exc
 
         effective_llm = _resolve_followup_llm(payload, settings, llm)
         use_case = FollowUpPatchUseCase(
@@ -116,14 +122,15 @@ async def submit_followup(
             default_step_frames=settings.playbook_default_step_frames,
         )
         try:
-            result = await use_case.execute(run.playbook, payload)
+            result = await use_case.execute(base_playbook, payload)
         except FollowUpPatchError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
         now = _now()
         current_json = run.playbook.model_dump_json()
         await run_repo.ensure_initial_version(run_id, current_json, now)
-        parent_version_id = await run_repo.get_head_version_id(run_id)
+        if parent_version_id is None:
+            parent_version_id = await run_repo.get_head_version_id(run_id)
         followup_id = str(uuid.uuid4())
         patch_json = json.dumps(result.patch, ensure_ascii=False)
         await run_repo.append_followup(

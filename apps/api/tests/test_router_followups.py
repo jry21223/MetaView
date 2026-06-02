@@ -124,6 +124,40 @@ def test_followup_restore_version(followup_client) -> None:
     assert versions_after[-1]["is_head"] is True
 
 
+def test_followup_uses_selected_base_version(monkeypatch, tmp_path) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("METAVIEW_OPENAI_API_KEY", "sk-server")
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    db = str(tmp_path / "base-version.db")
+    init_db(db)
+    repo = SqliteRunRepository(db)
+    run_id = _seed_run(repo)
+    llm = SequenceLLM([
+        _llm_payload([{"op": "replace", "path": "/summary", "value": "当前 HEAD 摘要。"}]),
+        _llm_payload([{"op": "replace", "path": "/title", "value": "从旧版本继续"}]),
+    ])
+    app = create_app()
+    app.dependency_overrides[get_run_repo] = lambda: repo
+    app.dependency_overrides[get_llm_provider] = lambda: llm
+
+    with TestClient(app) as client:
+        first = client.post(f"/api/v1/runs/{run_id}/follow-up", json={"message": "先改摘要"})
+        versions = client.get(f"/api/v1/runs/{run_id}/follow-ups").json()["versions"]
+        original_version = versions[0]["version_id"]
+        second = client.post(
+            f"/api/v1/runs/{run_id}/follow-up",
+            json={"message": "从旧版继续改标题", "base_version_id": original_version},
+        )
+        versions_after = client.get(f"/api/v1/runs/{run_id}/follow-ups").json()["versions"]
+
+    get_settings.cache_clear()
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert second.json()["playbook"]["title"] == "从旧版本继续"
+    assert second.json()["playbook"]["summary"] == "Original summary."
+    assert versions_after[-1]["parent_version_id"] == original_version
+
+
 def test_followup_coerces_numeric_parameter_contract(monkeypatch, tmp_path) -> None:
     get_settings.cache_clear()
     monkeypatch.setenv("METAVIEW_OPENAI_API_KEY", "sk-server")
