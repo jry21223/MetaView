@@ -1,4 +1,4 @@
-import type { TopicDomain } from "../../entities/cir/types";
+import type { TopicDomain } from "../../entities/topic/types";
 
 export interface DomainMetricCard {
   label: string;

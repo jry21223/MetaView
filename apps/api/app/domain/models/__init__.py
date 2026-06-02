@@ -4,10 +4,10 @@ from app.domain.models.cir import (
     ExecutionArrayTrack,
     ExecutionCheckpoint,
     ExecutionMap,
-    ExecutionParameterControl,
     LayoutInstruction,
     VisualToken,
 )
+from app.domain.models.execution import ExecutionParameterControl
 from app.domain.models.pipeline_run import (
     PipelineRunStatus,
     SandboxMode,
@@ -22,6 +22,7 @@ from app.domain.models.playbook import (
     AlgorithmTreeSnapshot,
     AnySnapshot,
     MetaStep,
+    MotionSceneSnapshot,
     PlaybookScript,
     SnapshotKind,
 )
@@ -35,6 +36,6 @@ __all__ = [
     "PipelineRunStatus", "SandboxMode", "SandboxStatus", "UITheme",
     "ValidationSeverity", "ValidationStatus",
     "PlaybookScript", "MetaStep", "AlgorithmArraySnapshot", "AlgorithmBarsSnapshot",
-    "AlgorithmTreeSnapshot", "AnySnapshot", "SnapshotKind",
+    "AlgorithmTreeSnapshot", "MotionSceneSnapshot", "AnySnapshot", "SnapshotKind",
     "ReviewSeverity", "CirReviewIssue", "CirReviewReport",
 ]

@@ -1,0 +1,24 @@
+<svg width="320" height="72" viewBox="0 0 320 72" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">MetaView logo light</title>
+  <desc id="desc">MetaView light logo lockup with viewport mark and custom vector wordmark.</desc>
+  <rect width="320" height="72" rx="12" fill="#faf8f3"/>
+  <g aria-hidden="true">
+    <rect x="12" y="12" width="48" height="48" rx="8" fill="#ffffff"/>
+    <rect x="12.75" y="12.75" width="46.5" height="46.5" rx="7.25" stroke="#00896e" stroke-opacity="0.34" stroke-width="1.5"/>
+    <path d="M22 45V27L30.5 38L39 27L48 45L55 30" stroke="#00896e" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M22 45V27L30.5 38L39 27L48 45L55 30" stroke="#10b981" stroke-opacity="0.14" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="55" cy="30" r="3.6" fill="#b07d00"/>
+  </g>
+  <g stroke="#161a18" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-label="MetaView">
+    <path d="M78 50V22L88 38L98 22V50"/>
+    <path d="M130 43C127 48 123 51 117 51C110 51 105 46 105 39C105 32 110 27 117 27C124 27 129 32 129 39H106"/>
+    <path d="M144 22V50M136 30H153"/>
+    <path d="M184 39C184 46 179 51 172 51C165 51 160 46 160 39C160 32 165 27 172 27C179 27 184 32 184 39ZM184 29V50"/>
+    <path d="M196 22L207 50L218 22"/>
+    <path d="M228 30V50"/>
+    <path d="M228 22.5V22"/>
+    <path d="M263 43C260 48 256 51 250 51C243 51 238 46 238 39C238 32 243 27 250 27C257 27 262 32 262 39H239"/>
+    <path d="M274 30L280 50L288 35L296 50L304 30"/>
+  </g>
+  <path d="M78 50V22L88 38L98 22V50" stroke="#00896e" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"/>
+</svg>

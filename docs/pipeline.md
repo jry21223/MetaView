@@ -221,12 +221,28 @@ end_frame_i = (i+1) * 60                               # 无 execution_map（兼
 
 ```bash
 METAVIEW_GENERATION_MODE=agent
+METAVIEW_AGENT_PROVIDER=http
 METAVIEW_AGENT_BASE_URL=http://agent:8001   # docker-compose service name
 METAVIEW_AGENT_TIMEOUT_S=600
 ```
 
 `docker-compose up` 会同时启 `api` / `web` / `agent` 三个 service。本地 `make
 dev` 同样并行起三个进程。
+
+也可以不启动 Node sidecar，直接用 OpenAI Codex Python SDK 生成
+`PlaybookScript`：
+
+```bash
+METAVIEW_GENERATION_MODE=agent
+METAVIEW_AGENT_PROVIDER=codex
+METAVIEW_CODEX_MODEL=gpt-5.2-codex
+METAVIEW_CODEX_EFFORT=high
+METAVIEW_CODEX_CWD=.
+```
+
+Python SDK 会复用本机已有 Codex 登录；请求里传入 `provider_api_key` 时会调用
+SDK 的 API-key 登录。该路径仍然只返回 PlaybookScript，并由后端 Pydantic 契约
+校验后交给 Remotion Player。
 
 ### Drawing CLI 工具集
 
@@ -265,5 +281,6 @@ LLM 在 narration 里写「顺/逆时针」「递增/递减」之前，**必须*
 | `apps/agent/src/state/playbookEmitter.ts` | 累积工具调用 → PlaybookScript JSON |
 | `apps/api/app/application/ports/agent_provider.py` | `IAgentProvider` Protocol |
 | `apps/api/app/infrastructure/agent/http_agent_provider.py` | httpx 客户端 |
+| `apps/api/app/infrastructure/agent/codex_agent_provider.py` | OpenAI Codex Python SDK 客户端 |
 | `apps/api/app/domain/services/geometry_validators.py` | sympy 校验纯函数 |
 | `apps/api/app/presentation/router_agent.py` | `/api/v1/agent/assert/*` 路由 |

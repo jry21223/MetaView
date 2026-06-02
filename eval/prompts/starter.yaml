@@ -1,0 +1,85 @@
+# MetaView eval — 起步题库 (starter prompt set)
+#
+# 跨 domain 的代表性 prompt，作为「真实题库回归」的种子集。
+# 每条用真实学生/老师会问的口吻；难度从基础到中等，覆盖不同视觉类型
+# (函数图 / 场景几何 / 数组算法 / 代码追踪 / 受力图 / 轨迹 ...)。
+#
+# 用法：把 prompt 喂给 agent 管线生成 PlaybookScript，再渲帧 + 打分。
+# 你可以随时增删/替换成自己的真题——这只是让 harness 先跑起来。
+#
+# 字段：
+#   id      稳定标识，用于 baseline diff
+#   domain  algorithm | math | code | physics | chemistry | biology | geography
+#   prompt  喂给生成管线的中文提示
+#   note    这条想考察 agent 的什么能力（人工 review 时的关注点）
+
+prompts:
+  - id: math-quadratic-vertex
+    domain: math
+    prompt: 讲解二次函数 f(x)=x²-4x+3 的图像：开口、顶点、与坐标轴的交点。
+    note: 函数图渲染 + 顶点/零点标注是否正确
+
+  - id: math-derivative-tangent
+    domain: math
+    prompt: 用动画解释导数的几何意义：曲线 y=x² 在点 (1,1) 处切线的斜率为什么是 2。
+    note: 切线斜率 assert_passes_through / 切线绘制
+
+  - id: math-definite-integral
+    domain: math
+    prompt: 演示定积分 ∫₀² x² dx 作为曲线下面积，用矩形逼近收敛到 8/3。
+    note: 区域填充 + 矩形逼近的分步推进
+
+  - id: math-shm-standard-form
+    domain: math
+    prompt: 把弹簧振子方程化成标准形式 x'' + ω²x = 0，并说明 ω=√(k/m) 的含义。
+    note: 公式渲染（KaTeX）+ 标题不应重复出现（回归点）
+
+  - id: math-parametric-circle
+    domain: math
+    prompt: 用参数方程 (cos t, sin t) 演示单位圆的逆时针运动，标出 t=0, π/2, π 的位置。
+    note: 参数曲线朝向必须 assert_orientation（逆时针）
+
+  - id: algorithm-bubble-sort
+    domain: algorithm
+    prompt: 用数组动画演示冒泡排序对 [5,2,8,1,9] 的完整过程，高亮每次比较和交换。
+    note: 数组 token + 指针 + 交换动画；步数是否合理
+
+  - id: algorithm-binary-search
+    domain: algorithm
+    prompt: 演示在有序数组 [1,3,5,7,9,11] 里二分查找 7 的过程，标出 low/mid/high。
+    note: 指针移动插值 + 区间收缩可视化
+
+  - id: algorithm-bfs-tree
+    domain: algorithm
+    prompt: 用二叉树演示广度优先遍历的访问顺序，逐层点亮节点。
+    note: 树渲染 + 逐层揭示节奏
+
+  - id: code-recursion-factorial
+    domain: code
+    prompt: 逐行追踪 factorial(4) 的递归调用栈，展示压栈与回溯返回值。
+    note: 代码高亮轨道 + 调用栈状态同步
+
+  - id: physics-projectile
+    domain: physics
+    prompt: 演示平抛运动：水平速度不变、竖直加速，画出抛物线轨迹和分速度矢量。
+    note: 轨迹 + 速度分量矢量（add_arrow 而非 vector_field）
+
+  - id: physics-free-body
+    domain: physics
+    prompt: 画出斜面上静止木块的受力图：重力、支持力、摩擦力，并说明平衡条件。
+    note: 受力矢量方向/标注；不要堆砌无关箭头
+
+  - id: chemistry-titration-curve
+    domain: chemistry
+    prompt: 用 pH-体积曲线讲解强酸强碱滴定的滴定曲线，标出等当点。
+    note: 曲线 + 等当点标注；坐标轴语义
+
+  - id: biology-enzyme-kinetics
+    domain: biology
+    prompt: 用米氏方程曲线解释酶促反应速率随底物浓度的变化，标出 Vmax 和 Km。
+    note: 饱和曲线 + 渐近线/特征点标注
+
+  - id: geography-coriolis
+    domain: geography
+    prompt: 用动画解释科里奥利效应如何让北半球运动物体向右偏转。
+    note: 偏转轨迹的朝向必须 assert_orientation（向右偏）

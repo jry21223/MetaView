@@ -1,0 +1,152 @@
+.motion-scene-renderer {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  background: var(--motion-bg);
+  color: var(--motion-text);
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.motion-scene-renderer[data-theme="dark"] {
+  --motion-bg: #0a0c10;
+  --motion-grid: rgba(232, 236, 244, 0.055);
+  --motion-text: #e8ecf4;
+  --motion-muted: rgba(232, 236, 244, 0.52);
+  --motion-primary: #4de8b0;
+  --motion-secondary: #7db8ff;
+  --motion-accent: #ffd84d;
+  --motion-muted-stroke: rgba(232, 236, 244, 0.32);
+  --motion-fill-primary: rgba(77, 232, 176, 0.16);
+  --motion-fill-secondary: rgba(125, 184, 255, 0.14);
+  --motion-fill-accent: rgba(255, 216, 77, 0.14);
+  --motion-fill-muted: rgba(232, 236, 244, 0.08);
+}
+
+.motion-scene-renderer[data-theme="light"] {
+  --motion-bg: #f5f7fa;
+  --motion-grid: rgba(20, 24, 32, 0.06);
+  --motion-text: #141820;
+  --motion-muted: rgba(20, 24, 32, 0.58);
+  --motion-primary: #0a8f6e;
+  --motion-secondary: #2563c0;
+  --motion-accent: #b07d00;
+  --motion-muted-stroke: rgba(20, 24, 32, 0.34);
+  --motion-fill-primary: rgba(10, 143, 110, 0.14);
+  --motion-fill-secondary: rgba(37, 99, 192, 0.12);
+  --motion-fill-accent: rgba(176, 125, 0, 0.12);
+  --motion-fill-muted: rgba(20, 24, 32, 0.06);
+}
+
+.motion-scene-renderer__svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.motion-scene-renderer__bg {
+  fill: var(--motion-bg);
+}
+
+.motion-scene-renderer__grid {
+  fill: none;
+  stroke: var(--motion-grid);
+  stroke-width: 1;
+}
+
+.motion-object {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.motion-shape,
+.motion-line,
+.motion-point {
+  vector-effect: non-scaling-stroke;
+}
+
+.motion-shape,
+.motion-point {
+  stroke-width: 3;
+}
+
+.motion-line {
+  fill: none;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.motion-shape--primary,
+.motion-line--primary,
+.motion-point--primary {
+  stroke: var(--motion-primary);
+}
+
+.motion-shape--primary,
+.motion-point--primary {
+  fill: var(--motion-fill-primary);
+}
+
+.motion-shape--secondary,
+.motion-line--secondary,
+.motion-point--secondary {
+  stroke: var(--motion-secondary);
+}
+
+.motion-shape--secondary,
+.motion-point--secondary {
+  fill: var(--motion-fill-secondary);
+}
+
+.motion-shape--accent,
+.motion-line--accent,
+.motion-point--accent {
+  stroke: var(--motion-accent);
+}
+
+.motion-shape--accent,
+.motion-point--accent {
+  fill: var(--motion-fill-accent);
+}
+
+.motion-shape--muted,
+.motion-line--muted,
+.motion-point--muted {
+  stroke: var(--motion-muted-stroke);
+}
+
+.motion-shape--muted,
+.motion-point--muted {
+  fill: var(--motion-fill-muted);
+}
+
+.motion-label,
+.motion-text {
+  fill: var(--motion-text);
+  paint-order: stroke;
+  stroke: var(--motion-bg);
+  stroke-width: 5;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.motion-label {
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.motion-text--title {
+  font-size: 34px;
+  font-weight: 750;
+}
+
+.motion-text--label {
+  font-size: 20px;
+  font-weight: 650;
+}
+
+.motion-text--caption {
+  font-size: 16px;
+  fill: var(--motion-muted);
+}

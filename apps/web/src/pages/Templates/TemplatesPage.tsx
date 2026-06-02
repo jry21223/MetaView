@@ -9,8 +9,12 @@ import {
 } from './templates';
 
 interface TemplatesPageProps {
+  appEdition?: 'self' | 'ops';
   isDark: boolean;
   isProviderConfigured: boolean;
+  accountBalanceYuan?: string | null;
+  accountName?: string | null;
+  accountAvatarUrl?: string | null;
   onNavigate: (stage: Stage) => void;
   onToggleTheme: () => void;
   onOpenProviderSettings: () => void;
@@ -22,8 +26,12 @@ interface TemplatesPageProps {
 type DomainFilter = TemplateDomain | 'all';
 
 export function TemplatesPage({
+  appEdition = 'self',
   isDark,
   isProviderConfigured,
+  accountBalanceYuan = null,
+  accountName = null,
+  accountAvatarUrl = null,
   onNavigate,
   onToggleTheme,
   onOpenProviderSettings,
@@ -55,7 +63,11 @@ export function TemplatesPage({
     <>
       <GlobalTopbar
         stage="templates"
+        appEdition={appEdition}
         isProviderConfigured={isProviderConfigured}
+        accountBalanceYuan={accountBalanceYuan}
+        accountName={accountName}
+        accountAvatarUrl={accountAvatarUrl}
         onNavigate={onNavigate}
         isDark={isDark}
         onToggleTheme={onToggleTheme}

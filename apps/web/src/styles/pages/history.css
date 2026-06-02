@@ -512,33 +512,47 @@
 
 .mv-history-item:hover .mv-history-item__actions,
 .mv-history-item:focus-within .mv-history-item__actions,
-.mv-history-item.is-selected .mv-history-item__actions,
-.mv-history-item.is-compared .mv-history-item__actions {
+.mv-history-item.is-selected .mv-history-item__actions {
   max-height: 40px;
   padding-top: 4px;
   padding-bottom: 10px;
   opacity: 1;
 }
 
-.mv-history-item__compare {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-}
-
-.mv-history-item__rerun {
+.mv-history-item__open,
+.mv-history-item__delete {
   border: 1px solid var(--line-2);
   background: transparent;
-  color: var(--accent);
-  padding: 2px 8px;
+  padding: 3px 8px;
   border-radius: 5px;
   font-size: 11px;
+  line-height: 1.2;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.mv-history-item__rerun:disabled {
+.mv-history-item__open {
+  color: var(--accent);
+}
+
+.mv-history-item__delete {
+  color: var(--mv-status-failed);
+  border-color: color-mix(in srgb, var(--mv-status-failed), transparent 62%);
+}
+
+.mv-history-item__open:hover {
+  background: var(--accent-soft);
+}
+
+.mv-history-item__delete:hover {
+  background: color-mix(in srgb, var(--mv-status-failed), transparent 88%);
+}
+
+.mv-history-item__delete:disabled {
   color: var(--ink-3);
+  border-color: var(--line);
   cursor: not-allowed;
 }
 

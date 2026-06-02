@@ -22,11 +22,15 @@ export interface IntakeContext {
 }
 
 interface IntakeScreenProps {
+  appEdition?: 'self' | 'ops';
   onSubmit: (ctx: IntakeContext) => void | Promise<void>;
   t: TweakValues;
   isSubmitting?: boolean;
   submitError?: string | null;
   isProviderConfigured?: boolean;
+  accountBalanceYuan?: string | null;
+  accountName?: string | null;
+  accountAvatarUrl?: string | null;
   onOpenProviderSettings?: () => void;
   onNavigate: (stage: Stage) => void;
   onToggleTheme: () => void;
@@ -54,7 +58,7 @@ function languageFromName(name: string): string | undefined {
   return EXT_TO_LANGUAGE[ext];
 }
 
-export function IntakeScreen({ onSubmit, t, isSubmitting = false, submitError = null, isProviderConfigured = false, onOpenProviderSettings, onNavigate, onToggleTheme }: IntakeScreenProps) {
+export function IntakeScreen({ appEdition = 'self', onSubmit, t, isSubmitting = false, submitError = null, isProviderConfigured = false, accountBalanceYuan = null, accountName = null, accountAvatarUrl = null, onOpenProviderSettings, onNavigate, onToggleTheme }: IntakeScreenProps) {
   const [input, setInput] = useState('');
   const [files, setFiles] = useState<Array<{ name: string; size: number }>>([]);
   const [fileObjects, setFileObjects] = useState<File[]>([]);
@@ -130,7 +134,11 @@ export function IntakeScreen({ onSubmit, t, isSubmitting = false, submitError = 
     <>
       <GlobalTopbar
         stage="intake"
+        appEdition={appEdition}
         isProviderConfigured={isProviderConfigured}
+        accountBalanceYuan={accountBalanceYuan}
+        accountName={accountName}
+        accountAvatarUrl={accountAvatarUrl}
         onNavigate={onNavigate}
         isDark={isDark}
         onToggleTheme={onToggleTheme}

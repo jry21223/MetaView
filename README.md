@@ -51,6 +51,8 @@ make dev                  # 同时拉起 API:8000 和 Web:5173
 
 或拆终端：`make dev-api` / `make dev-web`。
 
+也可以用启动脚本：`./start.sh` 启动自用版，`./start.sh op` 启动运营版。
+
 未配置真实 LLM 时默认走内置 `mock` provider，可在前端 Provider 面板填写 OpenAI 兼容接口（也支持本地 Ollama / vLLM 网关）。
 
 ### Docker
@@ -109,8 +111,12 @@ make check   # 上面三步串联
 | `METAVIEW_OPENAI_MAX_TOKENS` | `16000` | chat/completions 的 `max_tokens`；CIR 长脚本需要这么大，被截断会触发 `_regenerate` |
 | `METAVIEW_OPENAI_REASONING_EFFORT` | – | gpt-5 / o-series 专用 (`minimal\|low\|medium\|high`)，其它服务商留空 |
 | `METAVIEW_GENERATION_MODE` | `single` | `single`（现状 LLM→CIR）或 `agent`（pi-agent-core Drawing CLI 链路） |
+| `METAVIEW_AGENT_PROVIDER` | `http` | `agent` 模式下的实现：`http` 走 Node sidecar，`codex` 走 Python Codex SDK |
 | `METAVIEW_AGENT_BASE_URL` | `http://agent:8001` | agent sidecar 地址（仅 agent 模式生效） |
 | `METAVIEW_AGENT_TIMEOUT_S` | `600` | agent 生成超时秒数 |
+| `METAVIEW_CODEX_MODEL` | – | Python Codex SDK 模型覆盖（如 `gpt-5.2-codex`） |
+| `METAVIEW_CODEX_EFFORT` | – | Python Codex SDK reasoning effort（`minimal\|low\|medium\|high\|xhigh`） |
+| `METAVIEW_CODEX_CWD` | `.` | Codex thread 工作目录 |
 | `METAVIEW_DEFAULT_PROVIDER` | – | 显式指定默认 provider，留空自动 |
 | `METAVIEW_MOCK_PROVIDER_ENABLED` | `true` | 是否暴露 `mock` provider |
 | `METAVIEW_ENABLED_DOMAINS` | 全部七项 | 启用的学科 |

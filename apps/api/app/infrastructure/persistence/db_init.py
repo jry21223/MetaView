@@ -16,10 +16,122 @@ def _create_pipeline_runs(conn: sqlite3.Connection) -> None:
             created_at  TEXT NOT NULL
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS pipeline_run_followups (
+            followup_id    TEXT PRIMARY KEY,
+            run_id         TEXT NOT NULL,
+            user_message   TEXT NOT NULL,
+            assistant_reply TEXT NOT NULL,
+            change_summary TEXT NOT NULL,
+            patch_json     TEXT NOT NULL,
+            version_id     TEXT,
+            created_at     TEXT NOT NULL,
+            FOREIGN KEY(run_id) REFERENCES pipeline_runs(run_id)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS pipeline_run_versions (
+            version_id    TEXT PRIMARY KEY,
+            run_id        TEXT NOT NULL,
+            version_number INTEGER NOT NULL,
+            playbook_json TEXT NOT NULL,
+            source        TEXT NOT NULL,
+            followup_id   TEXT,
+            parent_version_id TEXT,
+            summary       TEXT,
+            created_at    TEXT NOT NULL,
+            FOREIGN KEY(run_id) REFERENCES pipeline_runs(run_id),
+            FOREIGN KEY(followup_id) REFERENCES pipeline_run_followups(followup_id),
+            UNIQUE(run_id, version_number)
+        )
+    """)
+    _add_column_if_missing(conn, "pipeline_run_versions", "parent_version_id", "TEXT")
+    _add_column_if_missing(conn, "pipeline_run_versions", "summary", "TEXT")
+
+
+def _create_accounts(conn: sqlite3.Connection) -> None:
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS accounts (
+            user_id      TEXT PRIMARY KEY,
+            display_name TEXT NOT NULL,
+            avatar_url   TEXT,
+            login_provider TEXT NOT NULL,
+            status       TEXT NOT NULL DEFAULT 'enabled',
+            role         TEXT NOT NULL DEFAULT 'user',
+            wechat_openid TEXT UNIQUE,
+            wechat_unionid TEXT UNIQUE,
+            balance_cents INTEGER NOT NULL DEFAULT 0,
+            created_at  TEXT NOT NULL,
+            updated_at  TEXT NOT NULL,
+            last_login_at TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS account_sessions (
+            token_hash TEXT PRIMARY KEY,
+            user_id    TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            FOREIGN KEY(user_id) REFERENCES accounts(user_id)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS wechat_oauth_states (
+            state      TEXT PRIMARY KEY,
+            token_hash TEXT,
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS recharge_orders (
+            order_id       TEXT PRIMARY KEY,
+            user_id        TEXT NOT NULL,
+            amount_cents   INTEGER NOT NULL,
+            status         TEXT NOT NULL,
+            channel        TEXT NOT NULL,
+            provider_order_id TEXT,
+            code_url       TEXT,
+            created_at     TEXT NOT NULL,
+            paid_at        TEXT,
+            FOREIGN KEY(user_id) REFERENCES accounts(user_id)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS balance_ledger (
+            ledger_id    TEXT PRIMARY KEY,
+            user_id      TEXT NOT NULL,
+            order_id     TEXT,
+            amount_cents INTEGER NOT NULL,
+            kind         TEXT NOT NULL,
+            created_at   TEXT NOT NULL,
+            FOREIGN KEY(user_id) REFERENCES accounts(user_id),
+            FOREIGN KEY(order_id) REFERENCES recharge_orders(order_id)
+        )
+    """)
+    _add_column_if_missing(conn, "accounts", "status", "TEXT NOT NULL DEFAULT 'enabled'")
+    _add_column_if_missing(conn, "accounts", "role", "TEXT NOT NULL DEFAULT 'user'")
+    _add_column_if_missing(conn, "accounts", "last_login_at", "TEXT")
+    _add_column_if_missing(conn, "recharge_orders", "provider_order_id", "TEXT")
+    conn.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_recharge_provider_order_id
+        ON recharge_orders(provider_order_id)
+        WHERE provider_order_id IS NOT NULL
+    """)
 
 
 def _columns(conn: sqlite3.Connection, table: str) -> set[str]:
     return {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+
+
+def _add_column_if_missing(
+    conn: sqlite3.Connection,
+    table: str,
+    column: str,
+    definition: str,
+) -> None:
+    if column not in _columns(conn, table):
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
 
 def _migrate_legacy_pipeline_runs(conn: sqlite3.Connection) -> None:
@@ -56,6 +168,7 @@ def init_db(db_path: str) -> None:
     os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
     with sqlite3.connect(db_path) as conn:
         _create_pipeline_runs(conn)
+        _create_accounts(conn)
         _migrate_legacy_pipeline_runs(conn)
         try:
             conn.execute("ALTER TABLE pipeline_runs ADD COLUMN review_json TEXT")

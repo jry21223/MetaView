@@ -1,0 +1,340 @@
+{
+  "fps": 30,
+  "total_frames": 540,
+  "domain": "algorithm",
+  "title": "算法演示：algorithm bubble sort",
+  "summary": "用数组动画演示冒泡排序对 [5,2,8,1,9] 的完整过程，高亮每次比较和交换。",
+  "steps": [
+    {
+      "step_id": "step_01",
+      "end_frame": 90,
+      "title": "问题介绍",
+      "voiceover_text": "我们来演示这个算法。初始输入数组是 ['5', '2', '8', '1', '9']，目标是通过系统性操作解决问题。",
+      "animation_hint": "enter",
+      "snapshot": {
+        "kind": "narration_card",
+        "text": "算法演示：用数组动画演示冒泡排序对 [5,2,8,1,9] 的完整过程，高亮每次比较和交换。",
+        "position": "bottom",
+        "emphasis": "primary"
+      },
+      "layers": [
+        {
+          "timing": {
+            "enter_at": 0.0,
+            "exit_at": 1.0,
+            "appear_anim": "fade",
+            "z_order": 0
+          },
+          "body": {
+            "kind": "narration_card",
+            "text": "算法演示：用数组动画演示冒泡排序对 [5,2,8,1,9] 的完整过程，高亮每次比较和交换。",
+            "position": "bottom",
+            "emphasis": "primary"
+          }
+        }
+      ],
+      "code_highlight": null,
+      "narration_template": null,
+      "tokens": []
+    },
+    {
+      "step_id": "step_02",
+      "end_frame": 180,
+      "title": "初始状态",
+      "voiceover_text": "首先显示初始数组，所有元素处于未处理状态，高亮显示当前待比较的位置。",
+      "animation_hint": "enter",
+      "snapshot": {
+        "kind": "algorithm_array",
+        "array_values": [
+          "5",
+          "2",
+          "8",
+          "1",
+          "9"
+        ],
+        "active_indices": [],
+        "swap_indices": [],
+        "sorted_indices": [],
+        "pointers": {}
+      },
+      "layers": [
+        {
+          "timing": {
+            "enter_at": 0.0,
+            "exit_at": 1.0,
+            "appear_anim": "fade",
+            "z_order": 0
+          },
+          "body": {
+            "kind": "algorithm_array",
+            "array_values": [
+              "5",
+              "2",
+              "8",
+              "1",
+              "9"
+            ],
+            "active_indices": [],
+            "swap_indices": [],
+            "sorted_indices": [],
+            "pointers": {}
+          }
+        }
+      ],
+      "code_highlight": null,
+      "narration_template": null,
+      "tokens": []
+    },
+    {
+      "step_id": "step_03",
+      "end_frame": 270,
+      "title": "第一次比较",
+      "voiceover_text": "从第一个位置开始，比较相邻元素的大小，确定是否需要交换。",
+      "animation_hint": "highlight",
+      "snapshot": {
+        "kind": "algorithm_array",
+        "array_values": [
+          "5",
+          "2",
+          "8",
+          "1",
+          "9"
+        ],
+        "active_indices": [
+          0,
+          1
+        ],
+        "swap_indices": [],
+        "sorted_indices": [],
+        "pointers": {}
+      },
+      "layers": [
+        {
+          "timing": {
+            "enter_at": 0.0,
+            "exit_at": 1.0,
+            "appear_anim": "fade",
+            "z_order": 0
+          },
+          "body": {
+            "kind": "algorithm_array",
+            "array_values": [
+              "5",
+              "2",
+              "8",
+              "1",
+              "9"
+            ],
+            "active_indices": [
+              0,
+              1
+            ],
+            "swap_indices": [],
+            "sorted_indices": [],
+            "pointers": {}
+          }
+        }
+      ],
+      "code_highlight": null,
+      "narration_template": null,
+      "tokens": []
+    },
+    {
+      "step_id": "step_04",
+      "end_frame": 360,
+      "title": "执行交换",
+      "voiceover_text": "发现顺序不对，执行交换操作，两个元素互换位置，数组更加有序。",
+      "animation_hint": "swap",
+      "snapshot": {
+        "kind": "algorithm_array",
+        "array_values": [
+          "2",
+          "5",
+          "8",
+          "1",
+          "9"
+        ],
+        "active_indices": [
+          0,
+          1
+        ],
+        "swap_indices": [
+          0,
+          1
+        ],
+        "sorted_indices": [],
+        "pointers": {}
+      },
+      "layers": [
+        {
+          "timing": {
+            "enter_at": 0.0,
+            "exit_at": 1.0,
+            "appear_anim": "fade",
+            "z_order": 0
+          },
+          "body": {
+            "kind": "algorithm_array",
+            "array_values": [
+              "2",
+              "5",
+              "8",
+              "1",
+              "9"
+            ],
+            "active_indices": [
+              0,
+              1
+            ],
+            "swap_indices": [
+              0,
+              1
+            ],
+            "sorted_indices": [],
+            "pointers": {}
+          }
+        }
+      ],
+      "code_highlight": null,
+      "narration_template": null,
+      "tokens": []
+    },
+    {
+      "step_id": "step_05",
+      "end_frame": 450,
+      "title": "高度图对比",
+      "voiceover_text": "用柱状图直观展示元素高度，可以更清楚地看到排序过程中的变化。",
+      "animation_hint": "enter",
+      "snapshot": {
+        "kind": "algorithm_bars",
+        "array_values": [
+          "1",
+          "2",
+          "5",
+          "8",
+          "9"
+        ],
+        "numeric_values": [
+          1.0,
+          2.0,
+          5.0,
+          8.0,
+          9.0
+        ],
+        "active_indices": [],
+        "swap_indices": [],
+        "sorted_indices": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "pointers": {}
+      },
+      "layers": [
+        {
+          "timing": {
+            "enter_at": 0.0,
+            "exit_at": 1.0,
+            "appear_anim": "fade",
+            "z_order": 0
+          },
+          "body": {
+            "kind": "algorithm_bars",
+            "array_values": [
+              "1",
+              "2",
+              "5",
+              "8",
+              "9"
+            ],
+            "numeric_values": [
+              1.0,
+              2.0,
+              5.0,
+              8.0,
+              9.0
+            ],
+            "active_indices": [],
+            "swap_indices": [],
+            "sorted_indices": [
+              0,
+              1,
+              2,
+              3,
+              4
+            ],
+            "pointers": {}
+          }
+        }
+      ],
+      "code_highlight": null,
+      "narration_template": null,
+      "tokens": []
+    },
+    {
+      "step_id": "step_06",
+      "end_frame": 540,
+      "title": "排序完成",
+      "voiceover_text": "经过多轮遍历，所有元素都就位，数组完成排序，绿色表示已排序的元素。",
+      "animation_hint": "enter",
+      "snapshot": {
+        "kind": "algorithm_array",
+        "array_values": [
+          "1",
+          "2",
+          "5",
+          "8",
+          "9"
+        ],
+        "active_indices": [],
+        "swap_indices": [],
+        "sorted_indices": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "pointers": {}
+      },
+      "layers": [
+        {
+          "timing": {
+            "enter_at": 0.0,
+            "exit_at": 1.0,
+            "appear_anim": "fade",
+            "z_order": 0
+          },
+          "body": {
+            "kind": "algorithm_array",
+            "array_values": [
+              "1",
+              "2",
+              "5",
+              "8",
+              "9"
+            ],
+            "active_indices": [],
+            "swap_indices": [],
+            "sorted_indices": [
+              0,
+              1,
+              2,
+              3,
+              4
+            ],
+            "pointers": {}
+          }
+        }
+      ],
+      "code_highlight": null,
+      "narration_template": null,
+      "tokens": []
+    }
+  ],
+  "parameter_controls": [],
+  "algorithm_id": null,
+  "initial_data": {}
+}

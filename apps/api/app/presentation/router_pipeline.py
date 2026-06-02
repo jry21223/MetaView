@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from starlette.requests import Request
 
 from app.application.dto.pipeline_dto import PipelineRequest, PipelineRunResponse
@@ -38,6 +38,14 @@ async def submit_pipeline(
     reviewer_llm: Annotated[ILLMProvider | None, Depends(get_reviewer_llm_provider)],
     agent_provider: Annotated[IAgentProvider | None, Depends(get_agent_provider)],
 ) -> PipelineRunResponse:
+    if settings.app_edition == "ops" and (
+        payload.provider_api_key or payload.provider_base_url or payload.provider_model
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="运营版使用平台托管模型，不能提交客户端 Provider 配置",
+        )
+
     run_id = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
     await run_repo.create(run_id, payload.prompt, created_at)

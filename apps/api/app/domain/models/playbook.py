@@ -5,7 +5,7 @@ from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, Field
 
-from app.domain.models.cir import ExecutionParameterControl
+from app.domain.models.execution import ExecutionParameterControl
 from app.domain.models.topic import TopicDomain
 
 
@@ -16,6 +16,7 @@ class SnapshotKind(str, Enum):
     MATH_PLOT = "math_plot"
     MATH_FORMULA = "math_formula"
     MATH_SCENE = "math_scene"
+    MOTION_SCENE = "motion_scene"
     KATEX_OVERLAY = "katex_overlay"
     NARRATION_CARD = "narration_card"
 
@@ -174,6 +175,106 @@ class MathSceneSnapshot(BaseModel):
     caption: str | None = None
 
 
+MotionStyle = Literal["primary", "secondary", "accent", "muted"]
+MotionTextStyle = Literal["title", "label", "caption"]
+MotionEasing = Literal["linear", "easeOut", "easeInOut", "spring"]
+
+
+class MotionSceneWorld(BaseModel):
+    xMin: float
+    xMax: float
+    yMin: float
+    yMax: float
+
+
+class MotionSceneViewport(BaseModel):
+    width: float
+    height: float
+    world: MotionSceneWorld
+
+
+class MotionPointObject(BaseModel):
+    id: str
+    type: Literal["point"] = "point"
+    x: float
+    y: float
+    r: float | None = None
+    label: str | None = None
+    style: MotionStyle | None = None
+
+
+class MotionSegmentObject(BaseModel):
+    id: str
+    type: Literal["segment"] = "segment"
+    x1: float
+    y1: float
+    x2: float
+    y2: float
+    label: str | None = None
+    arrow: bool = False
+    style: MotionStyle | None = None
+
+
+class MotionPolygonObject(BaseModel):
+    id: str
+    type: Literal["polygon"] = "polygon"
+    points: list[tuple[float, float]]
+    label: str | None = None
+    style: MotionStyle | None = None
+
+
+class MotionTextObject(BaseModel):
+    id: str
+    type: Literal["text"] = "text"
+    x: float
+    y: float
+    text: str
+    style: MotionTextStyle | None = None
+
+
+MotionObject = Annotated[
+    Union[
+        MotionPointObject,
+        MotionSegmentObject,
+        MotionPolygonObject,
+        MotionTextObject,
+    ],
+    Field(discriminator="type"),
+]
+
+
+class MotionKeyframe(BaseModel):
+    t: float
+    value: float
+
+
+class MotionTrack(BaseModel):
+    target: str
+    property: Literal["opacity", "x", "y", "scale", "rotate", "drawProgress", "highlight"]
+    keyframes: list[MotionKeyframe] = Field(default_factory=list)
+    easing: MotionEasing | None = None
+
+
+class MotionCameraKeyframe(BaseModel):
+    t: float
+    x: float
+    y: float
+    zoom: float
+
+
+class MotionCameraTrack(BaseModel):
+    keyframes: list[MotionCameraKeyframe] = Field(default_factory=list)
+    easing: Literal["linear", "easeOut", "easeInOut"] | None = None
+
+
+class MotionSceneSnapshot(BaseModel):
+    kind: Literal["motion_scene"] = "motion_scene"
+    viewport: MotionSceneViewport
+    objects: list[MotionObject] = Field(default_factory=list)
+    tracks: list[MotionTrack] = Field(default_factory=list)
+    camera: MotionCameraTrack | None = None
+
+
 class KaTeXOverlaySnapshot(BaseModel):
     """A KaTeX label anchored at a (x, y) in the underlying scene coords.
 
@@ -211,6 +312,7 @@ AnySnapshot = Annotated[
         MathPlotSnapshot,
         MathFormulaSnapshot,
         MathSceneSnapshot,
+        MotionSceneSnapshot,
         KaTeXOverlaySnapshot,
         NarrationCardSnapshot,
     ],
@@ -264,6 +366,9 @@ class MetaStep(BaseModel):
 
 
 class PlaybookScript(BaseModel):
+    # Frozen contract boundary between the generation pipeline and the renderer.
+    # Stored verbatim as playbook_json; old rows without this field default below.
+    schema_version: str = Field(default="1.0.0")
     fps: int = Field(default=30, ge=1)
     total_frames: int = Field(ge=1)
     domain: TopicDomain

@@ -5,6 +5,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
+from app.config import get_settings
 from app.infrastructure.persistence.db_init import init_db
 from app.infrastructure.persistence.sqlite_run_repository import SqliteRunRepository
 from app.main import create_app
@@ -83,6 +84,33 @@ def test_list_runs_returns_array(client) -> None:
     assert len(resp.json()) >= 2
 
 
+def test_delete_run_removes_created_run(client) -> None:
+    post_resp = client.post("/api/v1/pipeline", json={"prompt": "删除这一条"})
+    run_id = post_resp.json()["run_id"]
+
+    delete_resp = client.delete(f"/api/v1/runs/{run_id}")
+
+    assert delete_resp.status_code == 204
+    assert client.get(f"/api/v1/runs/{run_id}").status_code == 404
+
+
+def test_delete_unknown_run_returns_404(client) -> None:
+    resp = client.delete("/api/v1/runs/nonexistent-id")
+
+    assert resp.status_code == 404
+
+
+def test_deleted_run_is_absent_from_list(client) -> None:
+    post_resp = client.post("/api/v1/pipeline", json={"prompt": "列表里也删掉"})
+    run_id = post_resp.json()["run_id"]
+
+    assert client.delete(f"/api/v1/runs/{run_id}").status_code == 204
+
+    resp = client.get("/api/v1/runs")
+    assert resp.status_code == 200
+    assert all(run["run_id"] != run_id for run in resp.json())
+
+
 def test_post_pipeline_rejects_empty_prompt(client) -> None:
     resp = client.post("/api/v1/pipeline", json={"prompt": ""})
     assert resp.status_code == 422
@@ -93,6 +121,28 @@ def test_post_pipeline_returns_prompt_in_response(client) -> None:
     resp = client.post("/api/v1/pipeline", json={"prompt": prompt})
     assert resp.status_code == 202
     assert resp.json()["prompt"] == prompt
+
+
+def test_ops_edition_rejects_client_provider_override(monkeypatch, tmp_path) -> None:
+    get_settings.cache_clear()
+    db = str(tmp_path / "ops.db")
+    init_db(db)
+    repo = SqliteRunRepository(db)
+    monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    app = create_app()
+    app.dependency_overrides[get_run_repo] = lambda: repo
+    app.dependency_overrides[get_llm_provider] = lambda: _MockLLM()
+
+    with TestClient(app) as c:
+        resp = c.post(
+            "/api/v1/pipeline",
+            json={"prompt": "test", "provider_api_key": "sk-user"},
+        )
+
+    get_settings.cache_clear()
+    assert resp.status_code == 400
+    assert "平台托管模型" in resp.json()["detail"]
 
 
 def test_get_run_returns_prompt(client) -> None:

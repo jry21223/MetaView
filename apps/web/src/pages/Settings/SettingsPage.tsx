@@ -7,22 +7,26 @@ import {
   OPENAI_VOICES,
   useTTS,
 } from '../../features/playbook/engine/player/useTTS';
-import { API_BASE_URL } from '../../shared/config/constants';
+import { API_BASE_URL, type AppEdition } from '../../shared/config/constants';
 import type { TweakValues } from '../../features/studio-editor/hooks/useTweaks';
 import { THEME_PALETTE, type ThemeName } from '../../shared/config/themePalette';
 
 type SetTweakFn = <K extends keyof TweakValues>(key: K, value: TweakValues[K]) => void;
 
 interface SettingsPageProps {
+  appEdition?: AppEdition;
   isDark: boolean;
   isProviderConfigured: boolean;
+  accountBalanceYuan?: string | null;
+  accountName?: string | null;
+  accountAvatarUrl?: string | null;
   onNavigate: (stage: Stage) => void;
   onToggleTheme: () => void;
   onOpenProviderSettings: () => void;
 
   /** Provider state passed in by the host so changes survive navigation. */
-  providerSettings: ProviderSettings;
-  onUpdateProvider: (next: ProviderSettings) => void;
+  providerSettings?: ProviderSettings;
+  onUpdateProvider?: (next: ProviderSettings) => void;
 
   /** Appearance tweaks (theme / density / layout). */
   tweaks: TweakValues;
@@ -44,8 +48,12 @@ const LAYOUT_OPTIONS: Array<{ id: TweakValues['layout']; label: string; hint: st
 const VOICE_RATE_BOUNDS = { min: 0.5, max: 2.0, step: 0.05 } as const;
 
 export function SettingsPage({
+  appEdition = 'self',
   isDark,
   isProviderConfigured,
+  accountBalanceYuan = null,
+  accountName = null,
+  accountAvatarUrl = null,
   onNavigate,
   onToggleTheme,
   onOpenProviderSettings,
@@ -54,9 +62,12 @@ export function SettingsPage({
   tweaks,
   setTweak,
 }: SettingsPageProps) {
-  const [apiKey, setApiKey] = useState(providerSettings.apiKey);
-  const [baseUrl, setBaseUrl] = useState(providerSettings.baseUrl);
-  const [model, setModel] = useState(providerSettings.model);
+  const showProviderSettings = appEdition === 'self';
+  const [apiKey, setApiKey] = useState(providerSettings?.apiKey ?? '');
+  const [baseUrl, setBaseUrl] = useState(
+    providerSettings?.baseUrl ?? 'https://api.openai.com/v1',
+  );
+  const [model, setModel] = useState(providerSettings?.model ?? 'gpt-4o-mini');
   const [showKey, setShowKey] = useState(false);
   const [savedFlash, setSavedFlash] = useState<string | null>(null);
   const [ttsProbe, setTtsProbe] = useState<
@@ -71,6 +82,7 @@ export function SettingsPage({
   };
 
   const handleProviderSave = () => {
+    if (!onUpdateProvider) return;
     onUpdateProvider({
       apiKey: apiKey.trim(),
       baseUrl: baseUrl.trim(),
@@ -133,7 +145,11 @@ export function SettingsPage({
     <>
       <GlobalTopbar
         stage="settings"
+        appEdition={appEdition}
         isProviderConfigured={isProviderConfigured}
+        accountBalanceYuan={accountBalanceYuan}
+        accountName={accountName}
+        accountAvatarUrl={accountAvatarUrl}
         onNavigate={onNavigate}
         isDark={isDark}
         onToggleTheme={onToggleTheme}
@@ -142,9 +158,13 @@ export function SettingsPage({
       <main className="mv-settings-body">
         <header className="mv-settings-head">
           <div className="mv-eyebrow-mini">设置</div>
-          <h1 className="mv-settings-title">本地偏好与模型服务商配置</h1>
+          <h1 className="mv-settings-title">
+            {showProviderSettings ? '本地偏好与模型服务商配置' : '账户偏好与播放设置'}
+          </h1>
           <p className="mv-settings-sub">
-            所有设置只存在你本地浏览器（localStorage / sessionStorage），不会上传服务端。
+            {showProviderSettings
+              ? '所有设置只存在你本地浏览器（localStorage / sessionStorage），不会上传服务端。'
+              : '运营版由平台托管模型服务；这里保留播放、朗读和界面偏好。'}
           </p>
           {savedFlash && (
             <div className="mv-settings-flash" role="status" aria-live="polite">
@@ -153,7 +173,7 @@ export function SettingsPage({
           )}
         </header>
 
-        {/* ───── LLM Provider ───── */}
+        {showProviderSettings && (
         <section className="mv-settings-section">
           <h2 className="mv-settings-section-title">模型服务商</h2>
           <p className="mv-settings-section-hint">
@@ -215,6 +235,7 @@ export function SettingsPage({
             </button>
           </div>
         </section>
+        )}
 
         {/* ───── TTS ───── */}
         <section className="mv-settings-section">

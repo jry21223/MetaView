@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 
-.PHONY: bootstrap bootstrap-manim setup-hooks dev-web dev-api dev-agent dev review-real-generation start stop lint test test-coverage build check docker-build docker-up docker-down
+.PHONY: bootstrap bootstrap-manim setup-hooks dev-web dev-api dev-agent dev review-real-generation start stop lint test test-coverage build check docker-build docker-up docker-down eval eval-shots eval-generate
 
 DOCKER_COMPOSE_CMD := $(shell sh -lc 'if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then printf "%s" "docker compose"; elif command -v docker-compose >/dev/null 2>&1; then printf "%s" "docker-compose"; fi')
 
@@ -80,3 +80,29 @@ docker-down: docker-check
 start: docker-up
 
 stop: docker-down
+
+# ---------------------------------------------------------------------------
+# Eval targets
+# ---------------------------------------------------------------------------
+
+# Generate baseline fixtures using the single/CIR pipeline (no API key).
+# Use eval-generate LIVE=1 to call the real agent pipeline instead.
+eval-generate:
+	cd apps/api && uv run python -m eval.generate_fixtures \
+		$(if $(LIVE),--live --api $(or $(API),http://localhost:8000),--single) \
+		--overwrite \
+		--prompts ../../eval/prompts/starter.yaml
+
+# Run recorded-mode scorer against any fixtures that exist in eval/fixtures/.
+# No API key required; exits 1 if avg score < 90.
+eval:
+	cd apps/api && uv run python -m eval.runner --recorded \
+		--prompts ../../eval/prompts/starter.yaml
+
+# Render per-step PNG stills for one playbook fixture.
+# Usage: make eval-shots ID=sample_math_playbook
+eval-shots:
+	@test -n "$(ID)" || (echo "Usage: make eval-shots ID=<fixture-id>"; exit 1)
+	node apps/web/scripts/render-shots.mjs \
+		eval/fixtures/$(ID).json \
+		eval/shots/$(ID)

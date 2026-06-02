@@ -104,6 +104,74 @@ _MIN_PLAYBOOK: dict[str, Any] = {
 }
 
 
+_MOTION_SCENE_PLAYBOOK: dict[str, Any] = {
+    "fps": 30,
+    "total_frames": 60,
+    "domain": "math",
+    "title": "Motion Scene",
+    "summary": "Agent-authored object motion scene",
+    "steps": [
+        {
+            "step_id": "motion_01",
+            "end_frame": 60,
+            "title": "Move a point",
+            "voiceover_text": "Track a point across the canvas.",
+            "tokens": [],
+            "snapshot": {
+                "kind": "motion_scene",
+                "viewport": {
+                    "width": 960,
+                    "height": 540,
+                    "world": {"xMin": 0, "xMax": 960, "yMin": 0, "yMax": 540},
+                },
+                "objects": [
+                    {"id": "p1", "type": "point", "x": 120, "y": 180, "style": "primary"},
+                    {"id": "label", "type": "text", "x": 160, "y": 160, "text": "A"},
+                ],
+                "tracks": [
+                    {
+                        "target": "p1",
+                        "property": "x",
+                        "keyframes": [{"t": 0, "value": 120}, {"t": 1, "value": 300}],
+                        "easing": "linear",
+                    }
+                ],
+                "camera": {
+                    "keyframes": [
+                        {"t": 0, "x": 480, "y": 270, "zoom": 1},
+                        {"t": 1, "x": 300, "y": 220, "zoom": 1.2},
+                    ],
+                    "easing": "easeInOut",
+                },
+            },
+            "layers": [
+                {
+                    "body": {
+                        "kind": "motion_scene",
+                        "viewport": {
+                            "width": 960,
+                            "height": 540,
+                            "world": {"xMin": 0, "xMax": 960, "yMin": 0, "yMax": 540},
+                        },
+                        "objects": [
+                            {
+                                "id": "p1",
+                                "type": "point",
+                                "x": 120,
+                                "y": 180,
+                                "style": "primary",
+                            }
+                        ],
+                        "tracks": [],
+                    }
+                }
+            ],
+        }
+    ],
+    "parameter_controls": [],
+}
+
+
 @pytest.mark.asyncio
 async def test_agent_mode_routes_to_agent_provider() -> None:
     repo = _RecordingRepo()
@@ -128,6 +196,28 @@ async def test_agent_mode_routes_to_agent_provider() -> None:
     assert playbook_dict["steps"][0]["snapshot"]["numeric_values"] == [3.0, 1.0]
     assert "tokens" not in playbook_dict["steps"][0]["snapshot"]
     assert playbook_dict["steps"][0]["layers"][0]["body"] == playbook_dict["steps"][0]["snapshot"]
+
+
+@pytest.mark.asyncio
+async def test_agent_mode_accepts_motion_scene_playbook_contract() -> None:
+    repo = _RecordingRepo()
+    agent = _FakeAgent(_MOTION_SCENE_PLAYBOOK)
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        agent_provider=agent,
+        generation_mode="agent",
+    )
+
+    await use_case.execute("run-motion", PipelineRequest(prompt="show object motion"))
+
+    last = repo.updates[-1]
+    assert last["status"].value == "succeeded"
+    playbook_dict = json.loads(last["playbook_json"])
+    step = playbook_dict["steps"][0]
+    assert step["snapshot"]["kind"] == "motion_scene"
+    assert step["snapshot"]["tracks"][0]["property"] == "x"
+    assert step["layers"][0]["body"]["kind"] == "motion_scene"
 
 
 @pytest.mark.asyncio

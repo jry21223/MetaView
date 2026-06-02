@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { Layer, MathPlotSnapshot, MetaStep, PlaybookScript } from "../types";
+import { motionSceneDemo } from "../fixtures/motionSceneDemo";
 
 const remotionState = vi.hoisted(() => ({ frame: 0 }));
 
@@ -162,6 +163,14 @@ describe("PlaybookComposition", () => {
     const markup = renderToStaticMarkup(<PlaybookComposition script={mathScript()} showSubtitles={false} />);
     expect(markup).toContain("<svg");
     expect(markup).toContain("<polyline");
+    expect(markup).not.toContain("Unknown snapshot kind");
+  });
+
+  it("renders the motion scene demo through the renderer registry", () => {
+    const markup = renderToStaticMarkup(<PlaybookComposition script={motionSceneDemo} showSubtitles={false} />);
+    expect(markup).toContain("motion-scene-renderer");
+    expect(markup).toContain('data-object-id="triangle_fill"');
+    expect(markup).toContain('data-object-id="base_edge"');
     expect(markup).not.toContain("Unknown snapshot kind");
   });
 
