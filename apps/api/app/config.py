@@ -7,8 +7,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 _ALL_DOMAINS = "algorithm,math,code,physics,chemistry,biology,geography"
 
 GenerationMode = Literal["single", "agent"]
+AgentProviderKind = Literal["http", "codex"]
 AppEdition = Literal["self", "ops"]
 _GENERATION_MODES: frozenset[str] = frozenset(("single", "agent"))
+_AGENT_PROVIDERS: frozenset[str] = frozenset(("http", "codex"))
 _APP_EDITIONS: frozenset[str] = frozenset(("self", "ops"))
 
 
@@ -92,8 +94,12 @@ class Settings(BaseSettings):
     # calls back into /api/v1/agent/assert/* for sympy-based geometry checks.
     # Toggle is per-deployment; per-request override stays out of scope for now.
     generation_mode: GenerationMode = "single"
+    agent_provider: AgentProviderKind = "http"
     agent_base_url: str = "http://agent:8001"
     agent_timeout_s: float = 600.0
+    codex_model: str | None = None
+    codex_effort: str | None = None
+    codex_cwd: str = "."
 
     # Account / recharge
     account_session_cookie: str = "mv_session"
@@ -159,6 +165,26 @@ class Settings(BaseSettings):
         if normalized not in _GENERATION_MODES:
             return "single"
         return normalized  # type: ignore[return-value]
+
+    @field_validator("agent_provider", mode="before")
+    @classmethod
+    def normalize_agent_provider(cls, value: str | None) -> AgentProviderKind:
+        if value is None:
+            return "http"
+        normalized = value.strip().lower()
+        if normalized not in _AGENT_PROVIDERS:
+            return "http"
+        return normalized  # type: ignore[return-value]
+
+    @field_validator("codex_effort", mode="before")
+    @classmethod
+    def normalize_codex_effort(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().lower()
+        if normalized not in {"minimal", "low", "medium", "high", "xhigh"}:
+            return None
+        return normalized
 
     @field_validator("app_edition", mode="before")
     @classmethod

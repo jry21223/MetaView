@@ -78,6 +78,20 @@ describe("math-scene-plan bounds", () => {
     });
   });
 
+  it("normalizes reversed bounds and ignores non-finite bounds when merging", () => {
+    expect(
+      mergeBounds(
+        { xMin: 4, xMax: 1, yMin: 3, yMax: -1 },
+        { xMin: Number.NaN, xMax: 8, yMin: 0, yMax: 2 },
+      ),
+    ).toEqual({
+      xMin: 1,
+      xMax: 4,
+      yMin: -1,
+      yMax: 3,
+    });
+  });
+
   it("pads bounds and expands zero-size ranges", () => {
     expect(padBounds({ xMin: 0, xMax: 2, yMin: 0, yMax: 4 }, 0.25)).toEqual({
       xMin: -0.5,
@@ -90,6 +104,23 @@ describe("math-scene-plan bounds", () => {
       xMax: 1.1,
       yMin: 1.9,
       yMax: 2.1,
+    });
+  });
+
+  it("normalizes bounds and clamps invalid padding ratios", () => {
+    expect(padBounds({ xMin: 4, xMax: 0, yMin: 3, yMax: -1 }, -1)).toEqual({
+      xMin: 0,
+      xMax: 4,
+      yMin: -1,
+      yMax: 3,
+    });
+    expect(
+      padBounds({ xMin: 0, xMax: 2, yMin: 0, yMax: 2 }, Number.NaN),
+    ).toEqual({
+      xMin: 0,
+      xMax: 2,
+      yMin: 0,
+      yMax: 2,
     });
   });
 

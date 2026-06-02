@@ -20,6 +20,7 @@ export function SelfAppShell() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [stage, setStage] = useState<Stage>(() => (shouldOpenMotionDemo() ? 'workbench' : 'intake'));
   const [providerModalOpen, setProviderModalOpen] = useState(false);
+  const [openedRunId, setOpenedRunId] = useState<string | null>(null);
   const { submit, runId, isSubmitting, error: submitError } = usePipelineSubmit();
   const { settings: providerSettings, update: updateProvider, isConfigured } = useProviderSettings();
 
@@ -32,12 +33,19 @@ export function SelfAppShell() {
   };
 
   const handleSubmit = async (ctx: IntakeContext) => {
+    setOpenedRunId(null);
     await submitWithProvider(ctx.raw || ctx.title, ctx.sourceCode, ctx.language);
     setStage('workbench');
   };
 
   const handleUseTemplate = async (prompt: string) => {
+    setOpenedRunId(null);
     await submitWithProvider(prompt);
+    setStage('workbench');
+  };
+
+  const handleOpenHistoryRun = (historyRunId: string) => {
+    setOpenedRunId(historyRunId);
     setStage('workbench');
   };
 
@@ -65,7 +73,7 @@ export function SelfAppShell() {
         <ErrorBoundary theme={mode}>
           <StudioPage
             appEdition="self"
-            runId={runId}
+            runId={openedRunId ?? runId}
             t={t}
             setTweak={setTweak}
             onNavigate={setStage}
@@ -84,10 +92,7 @@ export function SelfAppShell() {
             onNavigate={setStage}
             isProviderConfigured={isConfigured}
             onOpenProviderSettings={() => setProviderModalOpen(true)}
-            onRerun={async (prompt) => {
-              await submitWithProvider(prompt);
-              setStage('workbench');
-            }}
+            onOpenInWorkbench={handleOpenHistoryRun}
           />
         </ErrorBoundary>
       )}

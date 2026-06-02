@@ -31,6 +31,17 @@ describe("math-scene-plan camera", () => {
     expect(viewBox.y[1]).toBeGreaterThanOrEqual(3);
   });
 
+  it("returns the fallback viewBox when bounds are not finite", () => {
+    const fallback: CameraViewBox = { x: [-10, 10], y: [-5, 5] };
+
+    expect(
+      viewBoxFromBounds(
+        { xMin: 0, xMax: Number.POSITIVE_INFINITY, yMin: 1, yMax: 3 },
+        fallback,
+      ),
+    ).toEqual(fallback);
+  });
+
   it("interpolates viewBoxes at progress 0, 0.5, and 1", () => {
     const from: CameraViewBox = { x: [0, 10], y: [0, 10] };
     const to: CameraViewBox = { x: [2, 6], y: [-2, 8] };
@@ -41,6 +52,15 @@ describe("math-scene-plan camera", () => {
       y: [-1, 9],
     });
     expect(interpolateViewBox(from, to, 1)).toEqual(to);
+  });
+
+  it("clamps interpolation progress to the valid range", () => {
+    const from: CameraViewBox = { x: [0, 10], y: [0, 10] };
+    const to: CameraViewBox = { x: [2, 6], y: [-2, 8] };
+
+    expect(interpolateViewBox(from, to, -1)).toEqual(from);
+    expect(interpolateViewBox(from, to, Number.NaN)).toEqual(from);
+    expect(interpolateViewBox(from, to, 2)).toEqual(to);
   });
 
   it("reports viewBox dimensions", () => {

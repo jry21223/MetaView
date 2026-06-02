@@ -9,6 +9,10 @@ import type {
   MetaStep,
 } from "../types";
 import { viewBoxFromSnapshot, type CameraViewBox } from "./camera";
+import {
+  diagnoseMathScenePlan,
+  type MathScenePlanDiagnostics,
+} from "./diagnostics";
 import { diffMathSceneObjects, isAdded, isPersisted } from "./diff";
 import {
   curveKey,
@@ -36,6 +40,7 @@ export interface MathSceneRenderPlan {
   annotations: PlannedObject<MathSceneAnnotation>[];
   vectorField: PlannedObject<MathSceneVectorField> | null;
   camera: CameraViewBox;
+  diagnostics: MathScenePlanDiagnostics;
 }
 
 function previousMathSceneSnapshot(
@@ -106,5 +111,6 @@ export function buildMathSceneRenderPlan(args: {
       stepProgress,
     ),
     camera: viewBoxFromSnapshot(currentSnapshot),
+    diagnostics: diagnoseMathScenePlan(currentSnapshot),
   };
 }

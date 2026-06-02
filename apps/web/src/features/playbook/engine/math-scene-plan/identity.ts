@@ -21,16 +21,54 @@ export interface MathSceneObjectRef {
   key: string;
 }
 
+export type MathSceneIdentitySets = Record<MathSceneObjectKind, Set<string>>;
+
+type ObjectWithExplicitId = {
+  id?: unknown;
+};
+
+function emptyIdentitySets(): MathSceneIdentitySets {
+  return {
+    point: new Set(),
+    segment: new Set(),
+    region: new Set(),
+    curve: new Set(),
+    annotation: new Set(),
+    vector_field: new Set(),
+  };
+}
+
 function n(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "";
   return Number(value).toFixed(3);
 }
 
+function explicitIdKey(
+  kind: MathSceneObjectKind,
+  object: ObjectWithExplicitId,
+): string | null {
+  const id = object.id;
+  if (typeof id === "string") {
+    const trimmed = id.trim();
+    return trimmed ? [kind, "id", trimmed].join(":") : null;
+  }
+  if (typeof id === "number" && Number.isFinite(id)) {
+    return [kind, "id", String(id)].join(":");
+  }
+  return null;
+}
+
 export function pointKey(point: MathScenePoint): string {
+  const explicit = explicitIdKey("point", point as ObjectWithExplicitId);
+  if (explicit) return explicit;
+
   return ["point", point.label ?? "", n(point.x), n(point.y)].join(":");
 }
 
 export function segmentKey(segment: MathSceneSegment): string {
+  const explicit = explicitIdKey("segment", segment as ObjectWithExplicitId);
+  if (explicit) return explicit;
+
   return [
     "segment",
     segment.label ?? "",
@@ -43,6 +81,9 @@ export function segmentKey(segment: MathSceneSegment): string {
 }
 
 export function regionKey(region: MathSceneRegion): string {
+  const explicit = explicitIdKey("region", region as ObjectWithExplicitId);
+  if (explicit) return explicit;
+
   return [
     "region",
     region.label ?? "",
@@ -51,6 +92,9 @@ export function regionKey(region: MathSceneRegion): string {
 }
 
 export function curveKey(curve: MathSceneCurve): string {
+  const explicit = explicitIdKey("curve", curve as ObjectWithExplicitId);
+  if (explicit) return explicit;
+
   return [
     "curve",
     curve.label ?? "",
@@ -62,6 +106,9 @@ export function curveKey(curve: MathSceneCurve): string {
 }
 
 export function annotationKey(annotation: MathSceneAnnotation): string {
+  const explicit = explicitIdKey("annotation", annotation as ObjectWithExplicitId);
+  if (explicit) return explicit;
+
   return [
     "annotation",
     annotation.text ?? "",
@@ -72,6 +119,9 @@ export function annotationKey(annotation: MathSceneAnnotation): string {
 }
 
 export function vectorFieldKey(field: MathSceneVectorField): string {
+  const explicit = explicitIdKey("vector_field", field as ObjectWithExplicitId);
+  if (explicit) return explicit;
+
   return [
     "vector_field",
     field.expression_px ?? "",
@@ -112,6 +162,14 @@ export function collectObjectRefs(snapshot: MathSceneSnapshot): MathSceneObjectR
         ]
       : []),
   ];
+}
+
+export function collectIdentitySets(snapshot: MathSceneSnapshot): MathSceneIdentitySets {
+  const sets = emptyIdentitySets();
+  for (const ref of collectObjectRefs(snapshot)) {
+    sets[ref.kind].add(ref.key);
+  }
+  return sets;
 }
 
 export function collectObjectKeySet(snapshot: MathSceneSnapshot): Set<string> {

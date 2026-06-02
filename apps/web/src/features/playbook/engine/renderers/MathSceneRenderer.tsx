@@ -17,6 +17,7 @@ import { clamp01 } from "../foundation";
 import { planCameraViewBox } from "../math-scene-plan/cameraPlanner";
 import {
   buildMathSceneRenderPlan,
+  type MathSceneRenderPlan,
   type PlannedObject,
 } from "../math-scene-plan/plan";
 import { revealRegionVertices } from "./regionReveal";
@@ -87,6 +88,18 @@ function evalSegmentTip(s: MathSceneSegment, progress: number): [number, number]
 
 const COMPACT_LABEL_RE = /^[A-Za-z0-9._\-+=\s,:'"]+$/;
 
+function plannedObjectData(
+  kind: string,
+  key: string,
+  progress: number,
+): Record<string, string> {
+  return {
+    "data-math-scene-kind": kind,
+    "data-math-scene-key": key,
+    "data-math-scene-progress": progress.toFixed(3),
+  };
+}
+
 function RegionsLayer({
   regions,
   theme,
@@ -104,13 +117,14 @@ function RegionsLayer({
           progress,
         );
         return (
-          <Polygon
-            key={key}
-            points={points}
-            color={color}
-            fillOpacity={0.18}
-            strokeOpacity={0.9}
-          />
+          <g key={key} {...plannedObjectData("region", key, progress)}>
+            <Polygon
+              points={points}
+              color={color}
+              fillOpacity={0.18}
+              strokeOpacity={0.9}
+            />
+          </g>
         );
       })}
     </>
@@ -248,12 +262,16 @@ function PointsLayer({
         const fadeIn = clamp01(progress * 1.5);
         const color = emphasisColor(theme, p.emphasis);
         return (
-          <React.Fragment key={key}>
-            <Point x={p.x} y={p.y} color={color} opacity={fadeIn} />
+          <g
+            key={key}
+            opacity={fadeIn}
+            {...plannedObjectData("point", key, progress)}
+          >
+            <Point x={p.x} y={p.y} color={color} />
             {p.label && p.label.trim() && (
               <LaTeX at={[p.x, p.y]} tex={annotationTex(p.label)} color={color} />
             )}
-          </React.Fragment>
+          </g>
         );
       })}
     </>
@@ -267,13 +285,18 @@ function AnnotationsLayer({
 }) {
   return (
     <>
-      {annotations.map(({ key, object: a }) => (
-        <LaTeX
+      {annotations.map(({ key, object: a, progress }) => (
+        <g
           key={key}
-          at={[a.x, a.y]}
-          tex={annotationTex(a.text)}
-          color={Theme.foreground}
-        />
+          opacity={clamp01(progress * 1.5)}
+          {...plannedObjectData("annotation", key, progress)}
+        >
+          <LaTeX
+            at={[a.x, a.y]}
+            tex={annotationTex(a.text)}
+            color={Theme.foreground}
+          />
+        </g>
       ))}
     </>
   );
@@ -290,6 +313,56 @@ function FormulaCorner({ latex }: { latex: string }) {
       className="math-scene-renderer__formula"
       dangerouslySetInnerHTML={{ __html: html }}
     />
+  );
+}
+
+function mathScenePlanDebugEnabled(): boolean {
+  if (!import.meta.env.DEV || typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).has("debugMathScenePlan");
+}
+
+function plannedObjects(plan: MathSceneRenderPlan): PlannedObject<unknown>[] {
+  return [
+    ...plan.points,
+    ...plan.segments,
+    ...plan.regions,
+    ...plan.curves,
+    ...plan.annotations,
+    ...(plan.vectorField ? [plan.vectorField] : []),
+  ];
+}
+
+function planObjectCounts(plan: MathSceneRenderPlan): {
+  added: number;
+  persisted: number;
+} {
+  return plannedObjects(plan).reduce(
+    (counts, object) => ({
+      added: counts.added + (object.added ? 1 : 0),
+      persisted: counts.persisted + (object.persisted ? 1 : 0),
+    }),
+    { added: 0, persisted: 0 },
+  );
+}
+
+function formatCameraValue(value: number): string {
+  if (!Number.isFinite(value)) return String(value);
+  const rounded = Math.abs(value) < 0.005 ? 0 : value;
+  return rounded.toFixed(2);
+}
+
+function DebugMathScenePlanOverlay({ plan }: { plan: MathSceneRenderPlan }) {
+  const counts = planObjectCounts(plan);
+  const [x0, x1] = plan.camera.x;
+  const [y0, y1] = plan.camera.y;
+  const viewBox = `viewBox x[${formatCameraValue(x0)}, ${formatCameraValue(x1)}] y[${formatCameraValue(y0)}, ${formatCameraValue(y1)}]`;
+
+  return (
+    <div className="math-scene-renderer__debug-plan" aria-hidden="true">
+      <span>added {counts.added}</span>
+      <span>persisted {counts.persisted}</span>
+      <span>{viewBox}</span>
+    </div>
   );
 }
 
@@ -352,32 +425,43 @@ export const MathSceneRenderer: React.FC<RendererProps> = ({
           <Coordinates.Cartesian />
           <RegionsLayer regions={plan.regions} theme={theme} />
           {plan.vectorField && (
-            <VectorFieldLayer
-              field={plan.vectorField.object}
-              theme={theme}
-              progress={plan.vectorField.progress}
-              scope={scope}
-              fallbackStep={fallbackVectorStep}
-            />
+            <g
+              key={plan.vectorField.key}
+              {...plannedObjectData(
+                "vector_field",
+                plan.vectorField.key,
+                plan.vectorField.progress,
+              )}
+            >
+              <VectorFieldLayer
+                field={plan.vectorField.object}
+                theme={theme}
+                progress={plan.vectorField.progress}
+                scope={scope}
+                fallbackStep={fallbackVectorStep}
+              />
+            </g>
           )}
           {plan.curves.map(({ key, object: curve, progress: curveProgress }) => (
-            <CurveLayer
-              key={key}
-              curve={curve}
-              theme={theme}
-              progress={curveProgress}
-              scope={scope}
-              xMin={xMin}
-              xMax={xMax}
-            />
+            <g key={key} {...plannedObjectData("curve", key, curveProgress)}>
+              <CurveLayer
+                curve={curve}
+                theme={theme}
+                progress={curveProgress}
+                scope={scope}
+                xMin={xMin}
+                xMax={xMax}
+              />
+            </g>
           ))}
           {plan.segments.map(({ key, object: segment, progress: segmentProgress }) => (
-            <SegmentLayer
-              key={key}
-              segment={segment}
-              theme={theme}
-              progress={segmentProgress}
-            />
+            <g key={key} {...plannedObjectData("segment", key, segmentProgress)}>
+              <SegmentLayer
+                segment={segment}
+                theme={theme}
+                progress={segmentProgress}
+              />
+            </g>
           ))}
           <PointsLayer points={plan.points} theme={theme} />
           <AnnotationsLayer annotations={plan.annotations} />
@@ -397,6 +481,8 @@ export const MathSceneRenderer: React.FC<RendererProps> = ({
           {labelTokens.join("  ·  ")}
         </div>
       )}
+
+      {mathScenePlanDebugEnabled() && <DebugMathScenePlanOverlay plan={plan} />}
     </div>
   );
 };

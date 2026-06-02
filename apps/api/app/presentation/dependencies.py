@@ -15,6 +15,7 @@ from app.application.ports.payment_gateway import IPaymentGateway
 from app.application.ports.run_repository import IRunRepository
 from app.application.use_cases.account import AccountUseCase
 from app.config import Settings, get_settings
+from app.infrastructure.agent.codex_agent_provider import CodexAgentProvider
 from app.infrastructure.agent.http_agent_provider import HttpAgentProvider
 from app.infrastructure.auth.wechat_oauth import WeChatOAuthClient
 from app.infrastructure.llm.openai_provider import OpenAIProvider
@@ -118,6 +119,21 @@ def _get_agent_provider(base_url: str, timeout_s: float) -> HttpAgentProvider:
     return HttpAgentProvider(base_url=base_url, timeout_s=timeout_s)
 
 
+@lru_cache
+def _get_codex_agent_provider(
+    cwd: str,
+    model: str | None,
+    effort: str | None,
+    timeout_s: float,
+) -> CodexAgentProvider:
+    return CodexAgentProvider(
+        cwd=cwd,
+        model=model,
+        effort=effort,
+        timeout_s=timeout_s,
+    )
+
+
 def get_agent_provider(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> IAgentProvider | None:
@@ -129,6 +145,13 @@ def get_agent_provider(
     """
     if settings.generation_mode != "agent":
         return None
+    if settings.agent_provider == "codex":
+        return _get_codex_agent_provider(
+            settings.codex_cwd,
+            settings.codex_model,
+            settings.codex_effort,
+            settings.agent_timeout_s,
+        )
     return _get_agent_provider(settings.agent_base_url, settings.agent_timeout_s)
 
 

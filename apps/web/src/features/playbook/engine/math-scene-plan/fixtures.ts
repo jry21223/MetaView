@@ -1,4 +1,4 @@
-import type { MathSceneSnapshot } from "../types";
+import type { MathSceneSnapshot, MetaStep } from "../types";
 
 export const triangleScene: MathSceneSnapshot = {
   kind: "math_scene",
@@ -40,7 +40,7 @@ export const trianglePlusSquareScene: MathSceneSnapshot = {
   ],
 };
 
-export const trianglePlusSquarePlusFormulaScene: MathSceneSnapshot = {
+export const trianglePlusSquarePlusAnnotationScene: MathSceneSnapshot = {
   ...trianglePlusSquareScene,
   annotations: [
     ...(trianglePlusSquareScene.annotations ?? []),
@@ -48,3 +48,42 @@ export const trianglePlusSquarePlusFormulaScene: MathSceneSnapshot = {
   ],
   formula_latex: "A=s^2",
 };
+
+export const trianglePlusSquarePlusFormulaScene =
+  trianglePlusSquarePlusAnnotationScene;
+
+export const vectorFieldScene: MathSceneSnapshot = {
+  kind: "math_scene",
+  x_min: -3,
+  x_max: 3,
+  y_min: -3,
+  y_max: 3,
+  x_label: "x",
+  y_label: "y",
+  points: [],
+  segments: [],
+  regions: [],
+  curves: [],
+  annotations: [{ x: 1.8, y: 2.4, text: "$F(x,y)=(-y,x)$", align: "ne" }],
+  vector_field: {
+    expression_px: "-y",
+    expression_py: "x",
+    step: 0.5,
+    label: "F",
+  },
+};
+
+export function makeMathSceneStep(
+  snapshot: MathSceneSnapshot = triangleScene,
+  overrides: Partial<MetaStep<MathSceneSnapshot>> = {},
+): MetaStep<MathSceneSnapshot> {
+  return {
+    step_id: "math-scene-step",
+    end_frame: 30,
+    title: "Math scene",
+    voiceover_text: "",
+    snapshot,
+    tokens: [],
+    ...overrides,
+  };
+}

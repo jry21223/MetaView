@@ -20,6 +20,7 @@ export function OpsAppShell() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [stage, setStage] = useState<Stage>(() => (shouldOpenMotionDemo() ? 'workbench' : 'intake'));
   const [accountModalOpen, setAccountModalOpen] = useState(false);
+  const [openedRunId, setOpenedRunId] = useState<string | null>(null);
   const { submit, runId, isSubmitting, error: submitError } = usePipelineSubmit();
   const { account, refresh: refreshAccount } = useAccount();
   const accountAvatarUrl = account?.avatar_url ?? null;
@@ -38,12 +39,19 @@ export function OpsAppShell() {
   };
 
   const handleSubmit = async (ctx: IntakeContext) => {
+    setOpenedRunId(null);
     await submitWithPlatformProvider(ctx.raw || ctx.title, ctx.sourceCode, ctx.language);
     setStage('workbench');
   };
 
   const handleUseTemplate = async (prompt: string) => {
+    setOpenedRunId(null);
     await submitWithPlatformProvider(prompt);
+    setStage('workbench');
+  };
+
+  const handleOpenHistoryRun = (historyRunId: string) => {
+    setOpenedRunId(historyRunId);
     setStage('workbench');
   };
 
@@ -74,7 +82,7 @@ export function OpsAppShell() {
         <ErrorBoundary theme={mode}>
           <StudioPage
             appEdition="ops"
-            runId={runId}
+            runId={openedRunId ?? runId}
             t={t}
             setTweak={setTweak}
             onNavigate={setStage}
@@ -99,10 +107,7 @@ export function OpsAppShell() {
             accountName={account?.display_name ?? null}
             accountAvatarUrl={accountAvatarUrl}
             onOpenProviderSettings={openAccountPanel}
-            onRerun={async (prompt) => {
-              await submitWithPlatformProvider(prompt);
-              setStage('workbench');
-            }}
+            onOpenInWorkbench={handleOpenHistoryRun}
           />
         </ErrorBoundary>
       )}

@@ -49,36 +49,52 @@ export function usePipelinePoller(runId: string | null): UsePipelinePollerResult
   const attemptsRef = useRef(0);
 
   useEffect(() => {
-    if (!runId) return;
+    if (!runId) {
+      dispatch({ type: "reset" });
+      return;
+    }
 
     dispatch({ type: "reset" });
     attemptsRef.current = 0;
+    let cancelled = false;
+    let timer: ReturnType<typeof setInterval> | null = null;
 
-    const timer = setInterval(async () => {
+    const poll = async () => {
       attemptsRef.current += 1;
 
       if (attemptsRef.current > MAX_ATTEMPTS) {
-        clearInterval(timer);
-        dispatch({ type: "timeout" });
+        if (timer) clearInterval(timer);
+        if (!cancelled) dispatch({ type: "timeout" });
         return;
       }
 
       try {
         const result = await getPipelineRun(runId);
+        if (cancelled) return;
         dispatch({ type: "poll_success", result });
         if (result.status === "succeeded" || result.status === "failed") {
-          clearInterval(timer);
+          if (timer) clearInterval(timer);
         }
       } catch (err) {
-        clearInterval(timer);
-        dispatch({
-          type: "poll_error",
-          error: err instanceof Error ? err.message : "查询失败，请返回重试",
-        });
+        if (timer) clearInterval(timer);
+        if (!cancelled) {
+          dispatch({
+            type: "poll_error",
+            error: err instanceof Error ? err.message : "查询失败，请返回重试",
+          });
+        }
       }
+    };
+
+    void poll();
+    timer = setInterval(() => {
+      void poll();
     }, POLL_INTERVAL_MS);
 
-    return () => clearInterval(timer);
+    return () => {
+      cancelled = true;
+      if (timer) clearInterval(timer);
+    };
   }, [runId]);
 
   const isLoading =

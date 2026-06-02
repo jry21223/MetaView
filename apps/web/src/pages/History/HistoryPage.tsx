@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { TweakValues } from '../../features/studio-editor/hooks/useTweaks';
+import { deletePipelineRun } from '../../features/history/api/historyApi';
 import { useHistoryRuns } from '../../features/history/hooks/useHistoryRuns';
 import {
   applyHistoryFilter,
@@ -38,21 +39,19 @@ function StatusBadge({ status }: { status: PipelineRunResult['status'] }) {
 interface RunItemProps {
   run: PipelineRunResult;
   isSelected: boolean;
-  isCompared: boolean;
-  compareDisabled: boolean;
   onClick: () => void;
-  onToggleCompare: () => void;
-  onRerun: () => void;
+  onOpenInWorkbench: () => void;
+  onDelete: () => void;
+  isDeleting: boolean;
 }
 
 function RunItem({
   run,
   isSelected,
-  isCompared,
-  compareDisabled,
   onClick,
-  onToggleCompare,
-  onRerun,
+  onOpenInWorkbench,
+  onDelete,
+  isDeleting,
 }: RunItemProps) {
   const title = run.playbook?.title ?? run.prompt ?? '未命名';
   const domain = run.playbook?.domain ?? '—';
@@ -67,7 +66,6 @@ function RunItem({
   const itemClassName = [
     'mv-history-item',
     isSelected ? 'is-selected' : '',
-    isCompared ? 'is-compared' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -92,26 +90,23 @@ function RunItem({
         </div>
       </button>
       <div className="mv-history-item__actions">
-        <label
-          className="mv-history-item__compare"
-          title={isCompared ? '取消对比' : compareDisabled ? '最多同时对比两条' : '加入对比'}
-        >
-          <input
-            type="checkbox"
-            checked={isCompared}
-            disabled={!isCompared && compareDisabled}
-            onChange={onToggleCompare}
-          />
-          <span>对比</span>
-        </label>
         <button
           type="button"
-          className="mv-history-item__rerun"
-          disabled={!run.prompt?.trim()}
-          onClick={onRerun}
-          title="使用原 prompt 重新执行"
+          className="mv-history-item__open"
+          onClick={onOpenInWorkbench}
+          title="在工作台打开完整功能"
         >
-          ⚡ 重跑
+          在工作台打开
+        </button>
+        <button
+          type="button"
+          className="mv-history-item__delete"
+          disabled={isDeleting}
+          onClick={onDelete}
+          title="删除历史记录"
+          aria-label="删除历史记录"
+        >
+          删除
         </button>
       </div>
     </div>
@@ -150,50 +145,6 @@ const PRIMARY_STATUS_CHIPS: Array<{ value: StatusFilter; label: string }> = [
   { value: 'running', label: '生成中' },
 ];
 
-interface CompareDrawerProps {
-  runs: PipelineRunResult[];
-  onClose: () => void;
-}
-
-function CompareDrawer({ runs, onClose }: CompareDrawerProps) {
-  if (runs.length === 0) return null;
-  return (
-    <div className="mv-history-compare" role="dialog" aria-label="对比">
-      <div className="mv-history-compare__head">
-        <span>对比 {runs.length} 条记录</span>
-        <button type="button" onClick={onClose} aria-label="关闭对比">
-          ×
-        </button>
-      </div>
-      <div className="mv-history-compare__grid">
-        {runs.map((run) => (
-          <div key={run.run_id} className="mv-history-compare__col">
-            <div className="mv-history-compare__title">
-              {run.playbook?.title ?? run.prompt ?? '未命名'}
-            </div>
-            <dl>
-              <dt>状态</dt>
-              <dd>
-                <StatusBadge status={run.status} />
-              </dd>
-              <dt>时间</dt>
-              <dd>{new Date(run.created_at).toLocaleString('zh-CN')}</dd>
-              <dt>学科</dt>
-              <dd>{run.playbook?.domain?.toUpperCase() ?? '—'}</dd>
-              <dt>步数</dt>
-              <dd>{run.playbook?.steps?.length ?? '—'}</dd>
-              <dt>修订</dt>
-              <dd>{run.review?.attempts ?? 0}</dd>
-              <dt>错误</dt>
-              <dd>{run.error ?? '—'}</dd>
-            </dl>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export interface HistoryPageProps {
   appEdition?: 'self' | 'ops';
   t: TweakValues;
@@ -204,11 +155,7 @@ export interface HistoryPageProps {
   accountName?: string | null;
   accountAvatarUrl?: string | null;
   onOpenProviderSettings?: () => void;
-  /**
-   * Re-run a stored prompt. Returns once the new run has been queued so the
-   * caller can navigate to the workbench. Issue #16.
-   */
-  onRerun?: (prompt: string) => void;
+  onOpenInWorkbench?: (runId: string) => void;
 }
 
 export function HistoryPage({
@@ -221,15 +168,16 @@ export function HistoryPage({
   accountName = null,
   accountAvatarUrl = null,
   onOpenProviderSettings,
-  onRerun,
+  onOpenInWorkbench,
 }: HistoryPageProps) {
   const mode = themeMode(t);
   const isDark = mode === 'dark';
   const { runs, isLoading, error, refresh } = useHistoryRuns();
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [filter, setFilter] = useState<HistoryFilter>(DEFAULT_FILTER);
-  const [compareIds, setCompareIds] = useState<string[]>([]);
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
+  const [deletingRunId, setDeletingRunId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const hasExtraStatusFilter = filter.status === 'queued' || filter.status === 'reviewing';
   const hasExtraFilter =
     filter.domain !== '' || filter.timeWindow !== 'all' || hasExtraStatusFilter;
@@ -245,26 +193,20 @@ export function HistoryPage({
   const domains = useMemo(() => uniqueDomains(runs), [runs]);
   const filtered = useMemo(() => applyHistoryFilter(runs, filter), [runs, filter]);
   const stats = useMemo(() => computeHistoryStats(filtered), [filtered]);
-  const compareRuns = useMemo(
-    () =>
-      compareIds
-        .map((id) => runs.find((r) => r.run_id === id))
-        .filter((r): r is PipelineRunResult => !!r),
-    [compareIds, runs],
-  );
 
-  const toggleCompare = (id: string) => {
-    setCompareIds((prev) => {
-      if (prev.includes(id)) return prev.filter((x) => x !== id);
-      if (prev.length >= 2) return prev; // cap at 2-way compare for MVP
-      return [...prev, id];
-    });
-  };
-
-  const handleRerun = (run: PipelineRunResult) => {
-    const prompt = run.prompt?.trim();
-    if (!prompt) return;
-    onRerun?.(prompt);
+  const handleDelete = async (run: PipelineRunResult) => {
+    if (!window.confirm('确定删除这条历史记录吗？')) return;
+    setDeletingRunId(run.run_id);
+    setDeleteError(null);
+    try {
+      await deletePipelineRun(run.run_id);
+      if (selectedRunId === run.run_id) setSelectedRunId(null);
+      refresh();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : '删除失败');
+    } finally {
+      setDeletingRunId(null);
+    }
   };
 
   const selectedRun = filtered.find((r) => r.run_id === selectedRunId) ?? filtered[0] ?? null;
@@ -390,6 +332,7 @@ export function HistoryPage({
 
           <div className="mv-history-list-body">
             {error && <div className="mv-history-error">{error}</div>}
+            {deleteError && <div className="mv-history-error">{deleteError}</div>}
             {isLoading && runs.length === 0 && (
               <CenterHint>正在同步历史记录</CenterHint>
             )}
@@ -401,22 +344,18 @@ export function HistoryPage({
                 key={run.run_id}
                 run={run}
                 isSelected={run.run_id === effectiveSelectedRunId}
-                isCompared={compareIds.includes(run.run_id)}
-                compareDisabled={compareIds.length >= 2}
                 onClick={() => setSelectedRunId(run.run_id)}
-                onToggleCompare={() => toggleCompare(run.run_id)}
-                onRerun={() => handleRerun(run)}
+                onOpenInWorkbench={() => onOpenInWorkbench?.(run.run_id)}
+                onDelete={() => void handleDelete(run)}
+                isDeleting={deletingRunId === run.run_id}
               />
             ))}
           </div>
         </aside>
 
         <div className="mv-history-detail">
-          {compareRuns.length > 0 && (
-            <CompareDrawer runs={compareRuns} onClose={() => setCompareIds([])} />
-          )}
-          {!selectedRun && compareRuns.length === 0 && (
-            <CenterHint>← 选择一条记录回放动画，或勾选两条进行对比</CenterHint>
+          {!selectedRun && (
+            <CenterHint>← 选择一条记录回放动画，或在工作台打开使用完整功能</CenterHint>
           )}
           {selectedRun && selectedRun.status === 'failed' && (
             <PromptDoctor report={selectedRun.review ?? null} error={selectedRun.error} />

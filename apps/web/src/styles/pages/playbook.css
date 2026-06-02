@@ -490,6 +490,8 @@
   --msr-legend: rgba(232, 236, 244, 0.5);
   --msr-formula-bg: rgba(255, 255, 255, 0.06);
   --msr-formula-border: rgba(255, 255, 255, 0.1);
+  --msr-debug-bg: rgba(10, 12, 16, 0.82);
+  --msr-debug-border: rgba(255, 255, 255, 0.16);
   --mafs-fg-color: rgba(232, 236, 244, 0.92);
   --mafs-line-color: rgba(232, 236, 244, 0.16);
 }
@@ -502,6 +504,8 @@
   --msr-legend: rgba(20, 24, 32, 0.55);
   --msr-formula-bg: rgba(0, 0, 0, 0.04);
   --msr-formula-border: rgba(0, 0, 0, 0.08);
+  --msr-debug-bg: rgba(245, 247, 250, 0.92);
+  --msr-debug-border: rgba(20, 24, 32, 0.14);
   --mafs-fg-color: rgba(20, 24, 32, 0.85);
   --mafs-line-color: rgba(20, 24, 32, 0.12);
 }
@@ -556,6 +560,26 @@
   font-size: 12px;
   color: var(--msr-legend);
   letter-spacing: 0.03em;
+}
+
+.math-scene-renderer__debug-plan {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 3;
+  display: grid;
+  gap: 2px;
+  max-width: min(360px, calc(100% - 32px));
+  padding: 8px 10px;
+  border: 1px solid var(--msr-debug-border);
+  border-radius: 6px;
+  background: var(--msr-debug-bg);
+  color: var(--msr-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.35;
+  pointer-events: none;
+  white-space: nowrap;
 }
 
 /* ── Scene Compositor (Phase 3) ─────────────────────────────────────────── */
