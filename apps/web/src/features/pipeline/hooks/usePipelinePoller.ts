@@ -5,6 +5,7 @@ import type { PlaybookScript } from "../../../entities/playbook/types";
 
 const POLL_INTERVAL_MS = 2000;
 const MAX_ATTEMPTS = 120;
+const ACTIVE_RUN_STATUSES = new Set<PipelineRunResult["status"]>(["queued", "running", "reviewing"]);
 
 interface State {
   playbook: PlaybookScript | null;
@@ -97,8 +98,7 @@ export function usePipelinePoller(runId: string | null): UsePipelinePollerResult
     };
   }, [runId]);
 
-  const isLoading =
-    runId !== null && (state.status === "queued" || state.status === "running" || state.status === null);
+  const isLoading = runId !== null && (state.status === null || ACTIVE_RUN_STATUSES.has(state.status));
 
   return { ...state, isLoading };
 }
