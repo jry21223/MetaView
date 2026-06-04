@@ -98,6 +98,32 @@ def test_newapi_topup_rejects_bad_signature(newapi_topup_client: TestClient) -> 
     assert "签名无效" in response.json()["detail"]
 
 
+def test_newapi_topup_payment_config_error_returns_503(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", str(tmp_path / "newapi-topup-prod.db"))
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_INTENT_SECRET", "intent-secret")
+    monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_RECEIPT_TOKEN", "receipt-token")
+    monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_DEV_MODE", "false")
+    monkeypatch.setenv("METAVIEW_WECHAT_PAY_APPID", "wx-app")
+    monkeypatch.setenv("METAVIEW_WECHAT_PAY_MCHID", "mch")
+    monkeypatch.setenv("METAVIEW_WECHAT_PAY_MERCHANT_SERIAL_NO", "serial")
+    monkeypatch.setenv("METAVIEW_WECHAT_PAY_NOTIFY_URL", "https://metaview.top/api/v1/billing/wechat/notify")
+    monkeypatch.setenv("METAVIEW_WECHAT_PAY_API_V3_KEY", "x" * 32)
+    monkeypatch.setenv("METAVIEW_WECHAT_PAY_PRIVATE_KEY_PATH", str(tmp_path / "missing.pem"))
+    monkeypatch.setenv("METAVIEW_WECHAT_PAY_PLATFORM_PUBLIC_KEY_PATH", str(tmp_path / "pub.pem"))
+    app = create_app()
+    with TestClient(app) as client:
+        response = _start_topup(client)
+    get_settings.cache_clear()
+
+    assert response.status_code == 503
+    assert "微信支付暂不可用" in response.json()["detail"]
+
+
 def test_newapi_topup_verify_requires_internal_token(
     newapi_topup_client: TestClient,
 ) -> None:
@@ -149,4 +175,3 @@ def _extract_intent_id(html: str) -> str:
     match = re.search(r"nup[0-9a-f]{29}", html)
     assert match is not None
     return match.group(0)
-

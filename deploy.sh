@@ -353,6 +353,7 @@ sync_code() {
         --exclude 'apps/web/dist' \
         --exclude 'data/pipeline_runs.db' \
         --exclude 'data/media' \
+        --exclude 'data/wechat' \
         --exclude 'data/exports' \
         --exclude 'data/html_previews' \
         --exclude 'data/debug' \
@@ -555,6 +556,12 @@ if [ -d data/media ]; then
     echo "  -> backups/${backup_name}_media.tar.gz"
 fi
 
+echo "备份微信支付证书..."
+if [ -d data/wechat ]; then
+    tar -czf backups/${backup_name}_wechat.tar.gz data/wechat
+    echo "  -> backups/${backup_name}_wechat.tar.gz"
+fi
+
 echo "备份版本信息..."
 cp .deploy_version backups/$backup_name.version 2>/dev/null || true
 
@@ -594,6 +601,12 @@ echo "恢复版本标记..."
 backup_ver=\$(basename $last_backup .db).version
 if [ -f backups/\$backup_ver ]; then
     cp backups/\$backup_ver .deploy_version
+fi
+
+echo "恢复微信支付证书..."
+backup_wechat=\$(basename $last_backup .db)_wechat.tar.gz
+if [ -f backups/\$backup_wechat ]; then
+    tar -xzf backups/\$backup_wechat
 fi
 
 echo "重启服务..."

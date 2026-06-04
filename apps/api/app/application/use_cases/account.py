@@ -137,11 +137,14 @@ class AccountUseCase:
             amount_cents,
             channel="wechat_native",
         )
-        native = await self._payment.create_native_order(
-            order_id=order.order_id,
-            amount_cents=order.amount_cents,
-            description=f"MetaView 账户充值 {money_from_cents(order.amount_cents)} 元",
-        )
+        try:
+            native = await self._payment.create_native_order(
+                order_id=order.order_id,
+                amount_cents=order.amount_cents,
+                description=f"MetaView 账户充值 {money_from_cents(order.amount_cents)} 元",
+            )
+        except RuntimeError as exc:
+            raise PaymentNotConfiguredError("微信支付暂不可用，请稍后重试") from exc
         order = await self._repo.attach_order_payment_info(
             order.order_id,
             code_url=native.code_url,

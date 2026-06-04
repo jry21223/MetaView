@@ -119,11 +119,14 @@ class NewApiTopupUseCase:
         if not self._settings.newapi_topup_dev_mode:
             if not self._payment.configured:
                 raise NewApiTopupPaymentError("微信支付未配置，暂时不能充值")
-            native = await self._payment.create_native_order(
-                order_id=intent.order_id,
-                amount_cents=intent.amount_cents,
-                description=f"NewAPI 额度充值 {money_from_cents(intent.amount_cents)} 元",
-            )
+            try:
+                native = await self._payment.create_native_order(
+                    order_id=intent.order_id,
+                    amount_cents=intent.amount_cents,
+                    description=f"NewAPI 额度充值 {money_from_cents(intent.amount_cents)} 元",
+                )
+            except RuntimeError as exc:
+                raise NewApiTopupPaymentError("微信支付暂不可用，请稍后重试") from exc
             updated = await self._repo.attach_payment_info(
                 intent.intent_id,
                 code_url=native.code_url,
@@ -359,4 +362,3 @@ def _build_return_url(intent: NewApiTopupIntent, receipt_code: str) -> str:
             }
         )
     )
-

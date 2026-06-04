@@ -63,6 +63,32 @@ def test_recharge_validates_minimum_before_payment_config(account_client: TestCl
     assert "微信支付未配置" in unconfigured.json()["detail"]
 
 
+def test_recharge_payment_config_error_returns_503(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", str(tmp_path / "account-payment.db"))
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    monkeypatch.setenv("METAVIEW_WECHAT_PAY_APPID", "wx-app")
+    monkeypatch.setenv("METAVIEW_WECHAT_PAY_MCHID", "mch")
+    monkeypatch.setenv("METAVIEW_WECHAT_PAY_MERCHANT_SERIAL_NO", "serial")
+    monkeypatch.setenv("METAVIEW_WECHAT_PAY_NOTIFY_URL", "https://metaview.top/api/v1/billing/wechat/notify")
+    monkeypatch.setenv("METAVIEW_WECHAT_PAY_API_V3_KEY", "x" * 32)
+    monkeypatch.setenv("METAVIEW_WECHAT_PAY_PRIVATE_KEY_PATH", str(tmp_path / "missing.pem"))
+    monkeypatch.setenv("METAVIEW_WECHAT_PAY_PLATFORM_PUBLIC_KEY_PATH", str(tmp_path / "pub.pem"))
+    app = create_app()
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/account/recharge-orders",
+            json={"amount_yuan": "5.00"},
+        )
+    get_settings.cache_clear()
+
+    assert response.status_code == 503
+    assert "微信支付暂不可用" in response.json()["detail"]
+
+
 def test_list_recharge_orders_starts_empty(account_client: TestClient) -> None:
     response = account_client.get("/api/v1/account/recharge-orders")
 

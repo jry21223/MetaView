@@ -163,7 +163,10 @@ class WeChatPayClient:
 
         private_key_source = self._settings.wechat_pay_private_key
         if not private_key_source and self._settings.wechat_pay_private_key_path:
-            private_key_source = Path(self._settings.wechat_pay_private_key_path).read_text()
+            try:
+                private_key_source = Path(self._settings.wechat_pay_private_key_path).read_text()
+            except OSError as exc:
+                raise WeChatPayConfigError("WeChat Pay merchant private key is unreadable") from exc
         if not private_key_source:
             raise WeChatPayConfigError("WeChat Pay merchant private key is required")
 
@@ -191,5 +194,9 @@ class WeChatPayClient:
             ) from exc
 
         message = f"{timestamp}\n{nonce}\n{body.decode('utf-8')}\n".encode("utf-8")
-        public_key = serialization.load_pem_public_key(Path(public_key_path).read_bytes())
+        try:
+            public_key_source = Path(public_key_path).read_bytes()
+        except OSError as exc:
+            raise WeChatPayConfigError("WeChat Pay platform public key is unreadable") from exc
+        public_key = serialization.load_pem_public_key(public_key_source)
         public_key.verify(base64.b64decode(signature), message, padding.PKCS1v15(), hashes.SHA256())
