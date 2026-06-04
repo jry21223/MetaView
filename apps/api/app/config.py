@@ -124,6 +124,15 @@ class Settings(BaseSettings):
     wechat_pay_platform_public_key_path: str | None = None
     wechat_pay_api_base: str = "https://api.mch.weixin.qq.com"
 
+    # NewAPI redirect top-up bridge (local/dev checkout integration)
+    newapi_topup_intent_secret: str | None = None
+    newapi_topup_receipt_token: str | None = None
+    newapi_topup_dev_mode: bool = False
+    newapi_topup_allowed_return_origins: str = (
+        "http://localhost:3000,http://127.0.0.1:3000"
+    )
+    newapi_quota_per_yuan: int = 500_000
+
     @field_validator("openai_timeout_s", "pipeline_timeout_s", mode="before")
     @classmethod
     def normalize_optional_timeout(cls, value: float | str | None) -> float | str | None:

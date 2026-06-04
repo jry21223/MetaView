@@ -11,6 +11,7 @@ from app.presentation.rate_limit import install_rate_limiter
 from app.presentation.router_account import router as account_router
 from app.presentation.router_agent import router as agent_router
 from app.presentation.router_exports import router as exports_router
+from app.presentation.router_newapi_topup import router as newapi_topup_router
 from app.presentation.router_pipeline import router as pipeline_router
 from app.presentation.router_runs import router as runs_router
 from app.presentation.router_tts import router as tts_router
@@ -49,6 +50,7 @@ def create_app() -> FastAPI:
     app.include_router(tts_router, prefix=settings.api_prefix)
     app.include_router(agent_router, prefix=settings.api_prefix)
     app.include_router(account_router, prefix=settings.api_prefix)
+    app.include_router(newapi_topup_router, prefix=settings.api_prefix)
 
     register_error_handlers(app)
 

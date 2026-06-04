@@ -120,6 +120,38 @@ def _create_accounts(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _create_newapi_topups(conn: sqlite3.Connection) -> None:
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS newapi_topup_intents (
+            intent_id         TEXT PRIMARY KEY,
+            order_id          TEXT NOT NULL UNIQUE,
+            newapi_user_id    INTEGER NOT NULL,
+            amount_cents      INTEGER NOT NULL,
+            quota_delta       INTEGER NOT NULL,
+            state             TEXT NOT NULL,
+            return_url        TEXT NOT NULL,
+            status            TEXT NOT NULL,
+            code_url          TEXT,
+            provider_order_id TEXT,
+            receipt_code_hash TEXT,
+            created_at        TEXT NOT NULL,
+            expires_at        TEXT NOT NULL,
+            paid_at           TEXT,
+            verified_at       TEXT,
+            acked_at          TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_newapi_topup_provider_order_id
+        ON newapi_topup_intents(provider_order_id)
+        WHERE provider_order_id IS NOT NULL
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_newapi_topup_state
+        ON newapi_topup_intents(state)
+    """)
+
+
 def _columns(conn: sqlite3.Connection, table: str) -> set[str]:
     return {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
 
@@ -169,6 +201,7 @@ def init_db(db_path: str) -> None:
     with sqlite3.connect(db_path) as conn:
         _create_pipeline_runs(conn)
         _create_accounts(conn)
+        _create_newapi_topups(conn)
         _migrate_legacy_pipeline_runs(conn)
         try:
             conn.execute("ALTER TABLE pipeline_runs ADD COLUMN review_json TEXT")

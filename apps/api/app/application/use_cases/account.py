@@ -45,6 +45,10 @@ class PaymentNotificationError(AccountUseCaseError):
     pass
 
 
+class PaymentOrderNotFoundError(PaymentNotificationError):
+    pass
+
+
 @dataclass(frozen=True)
 class WeChatLoginStart:
     session: SessionAccount
@@ -173,7 +177,7 @@ class AccountUseCase:
             paid_at=paid_at,
         )
         if order is None:
-            raise PaymentNotificationError("微信支付回调订单不存在")
+            raise PaymentOrderNotFoundError("微信支付回调订单不存在")
         if order.status != "paid":
             raise PaymentNotificationError("微信支付回调金额或订单状态不匹配")
         return "success"

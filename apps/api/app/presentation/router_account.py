@@ -16,10 +16,16 @@ from app.application.use_cases.account import (
     OrderNotFoundError,
     PaymentNotConfiguredError,
     PaymentNotificationError,
+    PaymentOrderNotFoundError,
+)
+from app.application.use_cases.newapi_topup import (
+    NewApiTopupOrderNotFoundError,
+    NewApiTopupPaymentError,
+    NewApiTopupUseCase,
 )
 from app.config import Settings, get_settings
 from app.domain.models.account import RechargeOrder, SessionAccount, money_from_cents
-from app.presentation.dependencies import get_account_use_case
+from app.presentation.dependencies import get_account_use_case, get_newapi_topup_use_case
 from app.presentation.rate_limit import read_limit, write_limit
 
 router = APIRouter(tags=["account"])
@@ -249,10 +255,18 @@ async def get_recharge_order(
 async def wechat_pay_notify(
     request: Request,
     use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
+    newapi_topup: Annotated[NewApiTopupUseCase, Depends(get_newapi_topup_use_case)],
 ) -> dict[str, str]:
     body = await request.body()
     try:
         result = await use_case.handle_payment_notification(dict(request.headers), body)
+    except PaymentOrderNotFoundError:
+        try:
+            result = await newapi_topup.handle_payment_notification(dict(request.headers), body)
+        except NewApiTopupOrderNotFoundError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except NewApiTopupPaymentError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
     except PaymentNotificationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except RuntimeError as exc:

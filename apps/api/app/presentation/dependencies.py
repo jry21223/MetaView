@@ -14,6 +14,7 @@ from app.application.ports.oauth_client import IOAuthClient
 from app.application.ports.payment_gateway import IPaymentGateway
 from app.application.ports.run_repository import IRunRepository
 from app.application.use_cases.account import AccountUseCase
+from app.application.use_cases.newapi_topup import NewApiTopupUseCase
 from app.config import Settings, get_settings
 from app.infrastructure.agent.codex_agent_provider import CodexAgentProvider
 from app.infrastructure.agent.http_agent_provider import HttpAgentProvider
@@ -24,6 +25,9 @@ from app.infrastructure.persistence.in_memory_export_repository import (
     InMemoryExportJobRepository,
 )
 from app.infrastructure.persistence.sqlite_account_repository import SqliteAccountRepository
+from app.infrastructure.persistence.sqlite_newapi_topup_repository import (
+    SqliteNewApiTopupRepository,
+)
 from app.infrastructure.persistence.sqlite_run_repository import SqliteRunRepository
 
 logger = logging.getLogger(__name__)
@@ -37,6 +41,11 @@ def _get_run_repo(db_path: str) -> SqliteRunRepository:
 @lru_cache(maxsize=4)
 def _get_account_repo(db_path: str) -> SqliteAccountRepository:
     return SqliteAccountRepository(db_path)
+
+
+@lru_cache(maxsize=4)
+def _get_newapi_topup_repo(db_path: str) -> SqliteNewApiTopupRepository:
+    return SqliteNewApiTopupRepository(db_path)
 
 
 @lru_cache
@@ -68,6 +77,12 @@ def get_account_repo(
     return _get_account_repo(settings.history_db_path)
 
 
+def get_newapi_topup_repo(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> SqliteNewApiTopupRepository:
+    return _get_newapi_topup_repo(settings.history_db_path)
+
+
 def get_payment_gateway(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> IPaymentGateway:
@@ -87,6 +102,14 @@ def get_account_use_case(
     oauth: Annotated[IOAuthClient, Depends(get_oauth_client)],
 ) -> AccountUseCase:
     return AccountUseCase(settings=settings, repo=repo, payment=payment, oauth=oauth)
+
+
+def get_newapi_topup_use_case(
+    settings: Annotated[Settings, Depends(get_settings)],
+    repo: Annotated[SqliteNewApiTopupRepository, Depends(get_newapi_topup_repo)],
+    payment: Annotated[IPaymentGateway, Depends(get_payment_gateway)],
+) -> NewApiTopupUseCase:
+    return NewApiTopupUseCase(settings=settings, repo=repo, payment=payment)
 
 
 @lru_cache
