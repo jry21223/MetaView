@@ -79,7 +79,6 @@ class CodexAgentProvider:
                     cwd=self._cwd,
                     effort=effort,
                     model=model,
-                    output_schema=schema,
                     sandbox=Sandbox.read_only,
                 )
         except Exception as exc:

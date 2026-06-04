@@ -103,6 +103,7 @@ async def test_codex_provider_returns_validated_playbook_dict() -> None:
     assert fake.thread_start_calls[0]["model"] == "gpt-5.2-codex"
     assert fake.thread.run_calls[0]["effort"] == "high"
     assert "JSON Schema" in fake.thread.run_calls[0]["input"]
+    assert "output_schema" not in fake.thread.run_calls[0]
 
 
 @pytest.mark.asyncio
