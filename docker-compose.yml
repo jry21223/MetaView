@@ -9,6 +9,7 @@ services:
         APT_PIPELINE_DEPTH: ${APT_PIPELINE_DEPTH:-0}
         PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
         PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-pypi.tuna.tsinghua.edu.cn}
+        PIP_FIND_LINKS: ${PIP_FIND_LINKS:-/tmp/wheelhouse}
     environment:
       METAVIEW_DEFAULT_PROVIDER: ${METAVIEW_DEFAULT_PROVIDER:-mock}
       METAVIEW_DEFAULT_ROUTER_PROVIDER: ${METAVIEW_DEFAULT_ROUTER_PROVIDER:-mock}
