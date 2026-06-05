@@ -1,5 +1,7 @@
 import type { MetaStep } from "../types";
 
+export type RendererRenderMode = "standalone" | "stage-base" | "stage-overlay";
+
 export interface RendererProps {
   step: MetaStep;
   prevStep: MetaStep | null;
@@ -21,6 +23,10 @@ export interface RendererProps {
   /** Geometry progress. This may span multiple narration steps. */
   progress: number;
   theme: "dark" | "light";
+  /** Script domain, used by generic snapshots that need domain-specific fallback UI. */
+  domain?: string;
+  /** Whether the renderer is drawing alone, as the base stage, or as stage geometry only. */
+  renderMode?: RendererRenderMode;
   /**
    * Total frames for the bar-swap animation. Optional — consumers should
    * fall back to `DEFAULT_SWAP_FRAMES` when absent so existing tests and

@@ -373,8 +373,10 @@ export const MathSceneRenderer: React.FC<RendererProps> = ({
   stepStartFrame,
   progress,
   theme,
+  renderMode = "standalone",
 }) => {
   const snap = step.snapshot as MathSceneSnapshot;
+  const isOverlayMode = renderMode === "stage-overlay";
   const plan = React.useMemo(
     () => {
       const basePlan = buildMathSceneRenderPlan({
@@ -410,10 +412,15 @@ export const MathSceneRenderer: React.FC<RendererProps> = ({
     .filter((label): label is string => !!label && label.trim().length > 0 && COMPACT_LABEL_RE.test(label));
 
   return (
-    <div className="math-scene-renderer" data-theme={theme}>
-      <div className="math-scene-renderer__title" style={{ opacity: titleOpacity }}>
-        {step.title}
-      </div>
+    <div
+      className={`math-scene-renderer${isOverlayMode ? " math-scene-renderer--overlay" : ""}`}
+      data-theme={theme}
+    >
+      {!isOverlayMode && (
+        <div className="math-scene-renderer__title" style={{ opacity: titleOpacity }}>
+          {step.title}
+        </div>
+      )}
 
       <div className="math-scene-renderer__stage">
         <Mafs
@@ -422,7 +429,7 @@ export const MathSceneRenderer: React.FC<RendererProps> = ({
           pan={false}
           zoom={false}
         >
-          <Coordinates.Cartesian />
+          {!isOverlayMode && <Coordinates.Cartesian />}
           <RegionsLayer regions={plan.regions} theme={theme} />
           {plan.vectorField && (
             <g
@@ -468,21 +475,21 @@ export const MathSceneRenderer: React.FC<RendererProps> = ({
         </Mafs>
       </div>
 
-      {snap.formula_latex && snap.formula_latex.trim() && (
+      {!isOverlayMode && snap.formula_latex && snap.formula_latex.trim() && (
         <FormulaCorner latex={snap.formula_latex} />
       )}
 
-      {snap.caption && snap.caption.trim() && (
+      {!isOverlayMode && snap.caption && snap.caption.trim() && (
         <div className="math-scene-renderer__caption">{snap.caption}</div>
       )}
 
-      {labelTokens.length > 0 && (
+      {!isOverlayMode && labelTokens.length > 0 && (
         <div className="math-scene-renderer__legend" aria-hidden="true">
           {labelTokens.join("  ·  ")}
         </div>
       )}
 
-      {mathScenePlanDebugEnabled() && <DebugMathScenePlanOverlay plan={plan} />}
+      {!isOverlayMode && mathScenePlanDebugEnabled() && <DebugMathScenePlanOverlay plan={plan} />}
     </div>
   );
 };

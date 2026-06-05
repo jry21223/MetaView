@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AlgorithmRenderer } from "./AlgorithmRenderer";
+import { DomainArrayRenderer } from "./DomainArrayRenderer";
 import { rendererRegistry } from "./registry";
 import type { AlgorithmArraySnapshot, MetaStep } from "../types";
 import type { RendererProps } from "./types";
@@ -51,7 +52,7 @@ function defaultSnap(extra: Partial<AlgorithmArraySnapshot> = {}): AlgorithmArra
 
 describe("AlgorithmRenderer", () => {
   it("is registered for the algorithm_array snapshot kind", () => {
-    expect(rendererRegistry.get("algorithm_array")).toBe(AlgorithmRenderer);
+    expect(rendererRegistry.get("algorithm_array")).toBe(DomainArrayRenderer);
   });
 
   it("renders every array value as a labeled cell", () => {

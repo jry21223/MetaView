@@ -510,6 +510,12 @@
   --mafs-line-color: rgba(20, 24, 32, 0.12);
 }
 
+.math-scene-renderer--overlay {
+  background: transparent;
+  padding: 0;
+  gap: 0;
+}
+
 .math-scene-renderer__title {
   text-align: center;
   font-size: 14px;

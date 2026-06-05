@@ -1,5 +1,6 @@
 from app.domain.models.topic import TopicDomain
 from app.domain.services.cir_prompt import build_cir_prompt
+from app.domain.services.domain_router import SkillMode
 
 
 def test_returns_two_strings() -> None:
@@ -92,3 +93,42 @@ def test_math_prompt_forbids_points_polyline_shape() -> None:
     # Explicit guidance for segments and curves shapes.
     assert "x0" in system and "x1" in system  # segment shape called out
     assert "expression_y" in system  # curve shape called out
+
+
+def test_build_cir_prompt_generic_mode_has_no_domain_specific_guidance() -> None:
+    system, user = build_cir_prompt(
+        "explain an unfamiliar idea",
+        None,
+        skill_mode=SkillMode.GENERIC,
+    )
+    assert user == "explain an unfamiliar idea"
+    assert "Skill mode: generic" in system
+    assert "No confident subject-specific skill was matched" in system
+    assert "VISUAL + PEDAGOGY RULES for algorithms" not in system
+    assert "VISUAL + PEDAGOGY RULES for physics" not in system
+
+
+def test_build_cir_prompt_specialized_mode_keeps_domain_guidance() -> None:
+    system, _ = build_cir_prompt(
+        "斜面小球受力分析",
+        TopicDomain.PHYSICS,
+        skill_mode=SkillMode.SPECIALIZED,
+    )
+    assert "Skill mode: specialized" in system
+    assert "VISUAL + PEDAGOGY RULES for physics" in system
+
+
+def test_physics_prompt_prefers_scene_for_spatial_diagrams() -> None:
+    system, _ = build_cir_prompt("讲解斜面受力", TopicDomain.PHYSICS)
+    assert 'visual_kind="scene"' in system
+    assert "force diagrams" in system
+    assert "vectors" in system
+    assert "free-body diagrams" in system
+    assert "projectile motion" in system
+
+
+def test_physics_prompt_limits_array_to_quantity_tables() -> None:
+    system, _ = build_cir_prompt("讲解牛顿第二定律", TopicDomain.PHYSICS)
+    assert "compact quantity table" in system
+    assert 'visual_kind="array" only' in system
+    assert 'Use visual_kind="array" to show forces' not in system

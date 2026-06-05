@@ -8,6 +8,7 @@ import { PLAYBOOK_LAYOUT } from "../../../../shared/config/constants";
 import { rendererRegistry } from "../renderers/registry";
 import { appearTransform, useTimeline } from "../foundation";
 import { compileVisualTimeline, type VisualLayerState, type VisualStepState } from "./visualContinuity";
+import { snapshotSurface } from "./snapshotSurface";
 
 interface PlaybookCompositionProps {
   script: PlaybookScript;
@@ -49,10 +50,12 @@ function LayerSlot({
   layerState,
   baseProps,
   stepProgress,
+  firstStageLayerKey,
 }: {
   layerState: VisualLayerState;
   baseProps: RendererProps;
   stepProgress: number;
+  firstStageLayerKey?: string;
 }) {
   const { layer } = layerState;
   const slice = useTimeline(layer.timing, stepProgress);
@@ -60,6 +63,13 @@ function LayerSlot({
   if (!slice.visible) return null;
   const Renderer = rendererRegistry.get(layer.body.kind);
   if (!Renderer) return null;
+  const surface = snapshotSurface(layer.body.kind);
+  const renderMode =
+    surface === "overlay"
+      ? "standalone"
+      : layerState.visualKey === firstStageLayerKey
+        ? "stage-base"
+        : "stage-overlay";
   // Each layer renders against its body snapshot; clone the step so the
   // existing RendererProps contract works without changing every renderer.
   const layerStep = { ...baseProps.step, snapshot: layer.body };
@@ -89,6 +99,7 @@ function LayerSlot({
         visualStartFrame: layerState.visualStartFrame,
         visualKey: layerState.visualKey,
         isVisualContinuation: layerState.isVisualContinuation,
+        renderMode,
       })}
     </div>
   );
@@ -112,6 +123,9 @@ function SceneCompositor({
   if (!layers || layers.length === 0) {
     return <SnapshotRenderer {...baseProps} />;
   }
+  const firstStageLayerKey = layers.find(
+    (layerState) => snapshotSurface(layerState.layer.body.kind) === "stage",
+  )?.visualKey;
   return (
     <div className="scene-compositor" style={{ position: "relative", width: "100%", height: "100%" }}>
       {layers.map((layerState, i) => (
@@ -120,6 +134,7 @@ function SceneCompositor({
           layerState={layerState}
           baseProps={baseProps}
           stepProgress={stepProgress}
+          firstStageLayerKey={firstStageLayerKey}
         />
       ))}
     </div>
@@ -170,6 +185,7 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
     stepProgress,
     progress: stepProgress,
     theme,
+    domain: script.domain,
     swapDurationFrames,
     visualStartFrame: visualState?.visualStartFrame,
     visualKey: visualState?.visualKey,

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { Layer, MathPlotSnapshot, MetaStep, PlaybookScript } from "../types";
+import type { Layer, MathPlotSnapshot, MathSceneSnapshot, MetaStep, PlaybookScript } from "../types";
 import { motionSceneDemo } from "../fixtures/motionSceneDemo";
 
 const remotionState = vi.hoisted(() => ({ frame: 0 }));
@@ -28,6 +28,24 @@ function plotSnapshot(expression = "x^2"): MathPlotSnapshot {
     x_max: 2,
     x_label: "x",
     y_label: "y",
+  };
+}
+
+function sceneSnapshot(overrides: Partial<MathSceneSnapshot> = {}): MathSceneSnapshot {
+  return {
+    kind: "math_scene",
+    x_min: -1,
+    x_max: 4,
+    y_min: -1,
+    y_max: 3,
+    x_label: "x",
+    y_label: "y",
+    points: [],
+    segments: [],
+    regions: [],
+    curves: [],
+    annotations: [],
+    ...overrides,
   };
 }
 
@@ -103,6 +121,47 @@ function layeredMathScript(): PlaybookScript {
               x_label: "x",
               y_label: "y",
             },
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function layeredMathSceneScript(): PlaybookScript {
+  const base = sceneSnapshot({
+    points: [{ x: 0, y: 0, label: "O" }],
+    formula_latex: "F=ma",
+    caption: "base caption",
+  });
+  const overlay = sceneSnapshot({
+    segments: [{ x0: 0, y0: 0, x1: 2, y1: 1, arrow: true }],
+    formula_latex: "overlay formula hidden",
+    caption: "overlay caption hidden",
+  });
+  return {
+    fps: 30,
+    total_frames: 60,
+    domain: "physics",
+    title: "受力图",
+    summary: "Layered physics-style math scene",
+    parameter_controls: [],
+    steps: [
+      {
+        step_id: "s1",
+        end_frame: 60,
+        title: "合并力图",
+        voiceover_text: "先保留底图，再叠加力的方向。",
+        tokens: [],
+        snapshot: base,
+        layers: [
+          {
+            timing: { enter_at: 0, exit_at: 1, appear_anim: "fade", z_order: 0 },
+            body: base,
+          },
+          {
+            timing: { enter_at: 0, exit_at: 1, appear_anim: "fade", z_order: 1 },
+            body: overlay,
           },
         ],
       },
@@ -186,6 +245,20 @@ describe("PlaybookComposition", () => {
     expect(markup.match(/<svg/g)).toHaveLength(1);
     expect(markup).toContain("tangent");
     expect(markup).toContain("<polygon");
+  });
+
+  it("renders only the first stage layer with full math scene chrome", () => {
+    const markup = renderToStaticMarkup(
+      <PlaybookComposition script={layeredMathSceneScript()} showSubtitles={false} />,
+    );
+
+    expect(markup.match(/data-layer-kind="math_scene"/g)).toHaveLength(2);
+    expect(markup.match(/math-scene-renderer--overlay/g)).toHaveLength(1);
+    expect(markup.match(/math-scene-renderer__formula/g)).toHaveLength(1);
+    expect(markup).toContain("base caption");
+    expect(markup).not.toContain("overlay caption hidden");
+    expect(markup).not.toContain("overlay formula hidden");
+    expect(markup.match(/合并力图/g)).toHaveLength(1);
   });
 
   it("continues identical math plot geometry across a narration step boundary", () => {

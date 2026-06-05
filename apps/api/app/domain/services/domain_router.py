@@ -1,6 +1,23 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from enum import Enum
+
 from app.domain.models.topic import TopicDomain
+
+
+class SkillMode(str, Enum):
+    SPECIALIZED = "specialized"
+    GENERIC = "generic"
+
+
+@dataclass(frozen=True)
+class TopicRoute:
+    skill_mode: SkillMode
+    domain: TopicDomain | None
+    matched_keywords: tuple[str, ...] = ()
+    explicit: bool = False
+    reason: str = ""
 
 # Ordered by priority: earlier entries win on ambiguous prompts
 _KEYWORD_MAP: list[tuple[TopicDomain, frozenset[str]]] = [
@@ -48,14 +65,61 @@ _KEYWORD_MAP: list[tuple[TopicDomain, frozenset[str]]] = [
 ]
 
 
-def keyword_hint(prompt: str) -> TopicDomain:
-    """Return a domain hint based on keyword matching.
+def route_topic(
+    prompt: str,
+    explicit_domain: str | None = None,
+    *,
+    source_code: str | None = None,
+) -> TopicRoute:
+    """Route a prompt to either a specialized subject skill or generic mode.
 
-    Result is a best-effort guess passed to the LLM as a hint.
-    The LLM makes the final domain decision via CirDocument.domain.
+    The returned domain is only a prompt hint. Generic mode deliberately leaves
+    it empty so the LLM chooses the final CirDocument.domain from the existing
+    public enum.
     """
+    if explicit_domain:
+        try:
+            return TopicRoute(
+                skill_mode=SkillMode.SPECIALIZED,
+                domain=TopicDomain(explicit_domain.lower()),
+                explicit=True,
+                reason="explicit_domain",
+            )
+        except ValueError:
+            pass
+
+    if source_code and source_code.strip():
+        return TopicRoute(
+            skill_mode=SkillMode.SPECIALIZED,
+            domain=TopicDomain.CODE,
+            matched_keywords=("source_code",),
+            reason="source_code_present",
+        )
+
     lowered = prompt.lower()
     for domain, keywords in _KEYWORD_MAP:
-        if any(kw in lowered for kw in keywords):
-            return domain
-    return TopicDomain.ALGORITHM
+        matched = tuple(sorted(kw for kw in keywords if kw in lowered))
+        if matched:
+            return TopicRoute(
+                skill_mode=SkillMode.SPECIALIZED,
+                domain=domain,
+                matched_keywords=matched,
+                reason="keyword_match",
+            )
+
+    return TopicRoute(
+        skill_mode=SkillMode.GENERIC,
+        domain=None,
+        matched_keywords=(),
+        reason="no_keyword_match",
+    )
+
+
+def keyword_hint(prompt: str) -> TopicDomain | None:
+    """Return the keyword-matched domain hint, or None when no keyword matches."""
+    return route_topic(prompt).domain
+
+
+def keyword_hint_or_algorithm(prompt: str) -> TopicDomain:
+    """Deprecated compatibility helper for legacy mock/default behavior."""
+    return route_topic(prompt).domain or TopicDomain.ALGORITHM

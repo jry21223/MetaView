@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { MetaStep, PlaybookScript } from "../types";
-import { compileVisualTimeline, visualStepKey } from "./visualContinuity";
+import type { MathSceneSnapshot, MetaStep, PlaybookScript } from "../types";
+import { compileVisualTimeline, normaliseVisualLayers, visualStepKey } from "./visualContinuity";
 
 function mathStep(overrides: Partial<MetaStep> = {}): MetaStep {
   return {
@@ -30,6 +30,24 @@ function script(steps: MetaStep[]): PlaybookScript {
     summary: "",
     parameter_controls: [],
     steps,
+  };
+}
+
+function sceneSnapshot(overrides: Partial<MathSceneSnapshot> = {}): MathSceneSnapshot {
+  return {
+    kind: "math_scene",
+    x_min: -1,
+    x_max: 3,
+    y_min: -1,
+    y_max: 3,
+    x_label: "x",
+    y_label: "y",
+    points: [],
+    segments: [],
+    regions: [],
+    curves: [],
+    annotations: [],
+    ...overrides,
   };
 }
 
@@ -141,5 +159,69 @@ describe("visualContinuity", () => {
     expect(timeline.steps[1].layers[0].isVisualContinuation).toBe(true);
     expect(timeline.steps[1].layers[0].visualStartFrame).toBe(0);
     expect(timeline.steps[1].layers[0].visualEndFrame).toBe(60);
+  });
+
+  it("merges simultaneous math scene layers with identical timing", () => {
+    const first = sceneSnapshot({
+      x_min: -2,
+      x_max: 2,
+      y_min: -1,
+      y_max: 2,
+      points: [{ x: 0, y: 0, label: "O" }],
+      segments: [{ x0: 0, y0: 0, x1: 1, y1: 1, arrow: true }],
+      formula_latex: "F=ma",
+      caption: "base caption",
+    });
+    const second = sceneSnapshot({
+      x_min: -4,
+      x_max: 4,
+      y_min: -3,
+      y_max: 3,
+      regions: [
+        {
+          vertices: [
+            [0, 0],
+            [2, 0],
+            [2, 1],
+          ],
+        },
+      ],
+      curves: [{ expression_y: "x^2", label: "path" }],
+      annotations: [{ x: 2, y: 1, text: "$v$" }],
+      vector_field: { expression_px: "x", expression_py: "y" },
+      formula_latex: "E_k=\\frac12mv^2",
+      caption: "overlay caption wins",
+    });
+    const layers = normaliseVisualLayers(
+      mathStep({
+        snapshot: first,
+        layers: [
+          {
+            timing: { enter_at: 0, exit_at: 1, appear_anim: "fade", z_order: 0 },
+            body: first,
+          },
+          {
+            timing: { enter_at: 0, exit_at: 1, appear_anim: "draw", z_order: 0 },
+            body: second,
+          },
+        ],
+      }),
+    );
+
+    expect(layers).toHaveLength(1);
+    expect(layers[0].body.kind).toBe("math_scene");
+    if (layers[0].body.kind !== "math_scene") return;
+    expect(layers[0].body.points).toHaveLength(1);
+    expect(layers[0].body.segments).toHaveLength(1);
+    expect(layers[0].body.regions).toHaveLength(1);
+    expect(layers[0].body.curves).toHaveLength(1);
+    expect(layers[0].body.annotations).toHaveLength(1);
+    expect(layers[0].body.vector_field).toEqual(second.vector_field);
+    expect(layers[0].body.formula_latex).toBe(second.formula_latex);
+    expect(layers[0].body.caption).toBe(second.caption);
+    expect(layers[0].body.x_min).toBe(-4);
+    expect(layers[0].body.x_max).toBe(4);
+    expect(layers[0].body.y_min).toBe(-3);
+    expect(layers[0].body.y_max).toBe(3);
   });
 });

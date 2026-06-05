@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { BarBlockRenderer } from "./BarBlockRenderer";
+import { DomainArrayRenderer } from "./DomainArrayRenderer";
 import { rendererRegistry } from "./registry";
 import type { AlgorithmBarsSnapshot, MetaStep } from "../types";
 import type { RendererProps } from "./types";
@@ -98,6 +99,6 @@ describe("BarBlockRenderer", () => {
   });
 
   it("is registered for the algorithm_bars snapshot kind", () => {
-    expect(rendererRegistry.get("algorithm_bars")).toBe(BarBlockRenderer);
+    expect(rendererRegistry.get("algorithm_bars")).toBe(DomainArrayRenderer);
   });
 });

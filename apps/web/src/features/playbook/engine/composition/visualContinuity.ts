@@ -1,4 +1,11 @@
-import type { Layer, MathPlotCurve, MathPlotSnapshot, MetaStep, PlaybookScript } from "../types";
+import type {
+  Layer,
+  MathPlotCurve,
+  MathPlotSnapshot,
+  MathSceneSnapshot,
+  MetaStep,
+  PlaybookScript,
+} from "../types";
 import { normaliseTiming } from "../foundation/useTimeline";
 
 const DEFAULT_LAYER: Pick<Layer, "timing"> = {
@@ -99,11 +106,33 @@ function mergeMathPlotSnapshots(a: MathPlotSnapshot, b: MathPlotSnapshot): MathP
   };
 }
 
+function mergeMathSceneSnapshots(a: MathSceneSnapshot, b: MathSceneSnapshot): MathSceneSnapshot {
+  return {
+    ...a,
+    ...b,
+    points: [...(a.points ?? []), ...(b.points ?? [])],
+    segments: [...(a.segments ?? []), ...(b.segments ?? [])],
+    regions: [...(a.regions ?? []), ...(b.regions ?? [])],
+    curves: [...(a.curves ?? []), ...(b.curves ?? [])],
+    annotations: [...(a.annotations ?? []), ...(b.annotations ?? [])],
+    vector_field: b.vector_field ?? a.vector_field,
+    formula_latex: b.formula_latex ?? a.formula_latex,
+    caption: b.caption ?? a.caption,
+    x_min: Math.min(a.x_min, b.x_min),
+    x_max: Math.max(a.x_max, b.x_max),
+    y_min: Math.min(a.y_min, b.y_min),
+    y_max: Math.max(a.y_max, b.y_max),
+    x_label: b.x_label || a.x_label,
+    y_label: b.y_label || a.y_label,
+    params: a.params || b.params ? { ...(a.params ?? {}), ...(b.params ?? {}) } : undefined,
+  };
+}
+
 /**
  * Return the exact layer stack the compositor should render. Legacy scripts
  * with only `snapshot` become a one-layer visual stack, and simultaneous
- * math_plot layers with identical timing are merged so the plot keeps one
- * coordinate system.
+ * math_plot / math_scene layers with identical timing are merged so the
+ * renderer keeps one coordinate system.
  */
 export function normaliseVisualLayers(step: MetaStep): Layer[] {
   const source =
@@ -113,6 +142,7 @@ export function normaliseVisualLayers(step: MetaStep): Layer[] {
 
   const out: Layer[] = [];
   const mathPlotIndexByTiming = new Map<string, number>();
+  const mathSceneIndexByTiming = new Map<string, number>();
   const sorted = [...source].sort((a, b) => a.timing.z_order - b.timing.z_order);
 
   for (const layer of sorted) {
@@ -127,29 +157,51 @@ export function normaliseVisualLayers(step: MetaStep): Layer[] {
       },
     };
 
-    if (normalisedLayer.body.kind !== "math_plot") {
-      out.push(normalisedLayer);
-      continue;
-    }
-
     const key = timingKey(normalisedLayer);
-    const existingIndex = mathPlotIndexByTiming.get(key);
-    if (existingIndex == null) {
-      mathPlotIndexByTiming.set(key, out.length);
-      out.push(normalisedLayer);
+
+    if (normalisedLayer.body.kind === "math_plot") {
+      const existingIndex = mathPlotIndexByTiming.get(key);
+      if (existingIndex == null) {
+        mathPlotIndexByTiming.set(key, out.length);
+        out.push(normalisedLayer);
+        continue;
+      }
+
+      const existing = out[existingIndex];
+      if (existing.body.kind !== "math_plot") {
+        out.push(normalisedLayer);
+        continue;
+      }
+
+      out[existingIndex] = {
+        ...existing,
+        body: mergeMathPlotSnapshots(existing.body, normalisedLayer.body),
+      };
       continue;
     }
 
-    const existing = out[existingIndex];
-    if (existing.body.kind !== "math_plot") {
-      out.push(normalisedLayer);
+    if (normalisedLayer.body.kind === "math_scene") {
+      const existingIndex = mathSceneIndexByTiming.get(key);
+      if (existingIndex == null) {
+        mathSceneIndexByTiming.set(key, out.length);
+        out.push(normalisedLayer);
+        continue;
+      }
+
+      const existing = out[existingIndex];
+      if (existing.body.kind !== "math_scene") {
+        out.push(normalisedLayer);
+        continue;
+      }
+
+      out[existingIndex] = {
+        ...existing,
+        body: mergeMathSceneSnapshots(existing.body, normalisedLayer.body),
+      };
       continue;
     }
 
-    out[existingIndex] = {
-      ...existing,
-      body: mergeMathPlotSnapshots(existing.body, normalisedLayer.body),
-    };
+    out.push(normalisedLayer);
   }
 
   return out;

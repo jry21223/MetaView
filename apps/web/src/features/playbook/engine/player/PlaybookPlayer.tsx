@@ -13,6 +13,7 @@ import { useResolvedScript, type ScriptOverrides } from "./useResolvedScript";
 import { resolveCodePanelOverlay } from "./resolveCodePanelOverlay";
 import { resolveInitialPreviewFrame, resolvePlayerTimelineKey } from "./previewFrame";
 import { CodeHighlightRenderer } from "../renderers/CodeHighlightRenderer";
+import { domainCapability } from "../domainCapabilities";
 import { getParamPanel } from "../param-panels/registry";
 import type { ParamPanelProps } from "../param-panels/types";
 
@@ -318,6 +319,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   // bar. Collapse remembers per-mount only — no persistence needed.
   const [paramPanelOpen, setParamPanelOpen] = useState(true);
   const script = useResolvedScript(baseScript, overrides);
+  const capability = useMemo(() => domainCapability(script.domain), [script.domain]);
   const hasDomainPanel = getParamPanel(baseScript.domain) !== null;
   const initialPreviewFrame = useMemo(() => resolveInitialPreviewFrame(script), [script]);
   const playerTimelineKey = useMemo(() => resolvePlayerTimelineKey(baseScript), [baseScript]);
@@ -600,7 +602,35 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
       {/* Main content: stage + code panel + controls + tweaks */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
-          <div className="playbook-player__stage" style={{ flex: 1, minWidth: 0 }}>
+          <div className="playbook-player__stage" style={{ flex: 1, minWidth: 0, position: "relative" }}>
+            {capability.message && capability.support !== "full" && (
+              <div
+                title={capability.message}
+                style={{
+                  position: "absolute",
+                  top: 10,
+                  left: 10,
+                  zIndex: 4,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "4px 8px",
+                  borderRadius: 6,
+                  border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "rgba(20,24,32,0.12)"}`,
+                  background: isDark ? "rgba(10,12,16,0.72)" : "rgba(245,247,250,0.90)",
+                  color: isDark ? "#c9d1d9" : "#24292f",
+                  fontFamily: "IBM Plex Mono, ui-monospace, monospace",
+                  fontSize: 10,
+                  lineHeight: 1.2,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                  pointerEvents: "auto",
+                }}
+              >
+                <span>{capability.domain}</span>
+                <span>{capability.support}</span>
+              </div>
+            )}
             <Player
               key={playerTimelineKey}
               ref={playerRef}

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.domain.models.topic import TopicDomain
 from app.domain.services.algorithm_code_library import infer_id, prompt_hint
+from app.domain.services.domain_router import SkillMode
 from app.domain.services.scene_examples import examples_for_domain
 
 _DOMAIN_GUIDANCE: dict[TopicDomain, str] = {
@@ -125,7 +126,12 @@ D. 多层组合（高级）：
     TopicDomain.PHYSICS: """
 VISUAL + PEDAGOGY RULES for physics:
 - Step template: 现象（生活例子） → 受力分析或机制 → 列方程 → 代入数字解 → 验证单位。
-- Use visual_kind="array" to show forces, components, or quantities.
+- Use visual_kind="scene" for force diagrams, projectile motion, vectors, fields, motion paths,
+  free-body diagrams, optics rays, and any spatial explanation.
+  Fill step.scene with segments/arrows/points/curves/regions.
+- Use visual_kind="formula" for pure derivation or law explanation.
+  Put the core equation in step.plot.formula_latex.
+- Use visual_kind="array" only for a compact quantity table when there is no spatial diagram.
 - Token labels = physical quantities with units (e.g. "F=10N", "θ=30°", "a=5m/s²").
 - Always state units; never use bare numbers for physical quantities.
 - Use emphasis="primary" for the quantity being solved in each step.
@@ -134,23 +140,42 @@ VISUAL + PEDAGOGY RULES for physics:
     TopicDomain.CHEMISTRY: """
 VISUAL + PEDAGOGY RULES for chemistry:
 - Step template: 反应背景一句（为什么会发生） → 反应物结构 → 反应箭头与机制 → 产物 → 守恒检查（原子数/电荷）。
-- Use visual_kind="array" to show reactants, products, or molecular components.
+- Use visual_kind="formula" for chemical equations, conservation checks, and symbolic reaction laws.
+- Use visual_kind="array" only for reactants, products, or process-step cards.
+- A dedicated molecule renderer is not implemented yet; do not pretend molecule geometry exists.
 - Token labels = chemical symbols or compound formulas (e.g. "H₂O", "CO₂", "→").
 - Mention oxidation state changes when relevant, and explain in one line why electrons move.
 """,
     TopicDomain.BIOLOGY: """
 VISUAL + PEDAGOGY RULES for biology:
 - Step template: 结构（画一遍）→ 功能（结构如何实现功能）→ 过程（按时间走一遍）→ 结果（对整体生物的意义）。
-- Use visual_kind="array" to show biological components or process stages.
+- Use visual_kind="array" only for process stages or compact structure/process cards.
+- Use visual_kind="formula" as a text/formula fallback for abstract concepts.
+- A dedicated cell/process renderer is not implemented yet; do not pretend organelle diagrams exist.
 - Avoid jargon stacking; explain each new term with one analogy before reusing it.
 """,
     TopicDomain.GEOGRAPHY: """
 VISUAL + PEDAGOGY RULES for geography:
 - Step template: 现象（先放一张「场景图」 token 列表） → 成因（自然/人文驱动力） → 影响 → 应对。
-- Use visual_kind="array" to show regions, factors, or process stages.
+- Use visual_kind="array" only for factor lists, regions, or process-stage cards.
+- Use visual_kind="formula" as a text/formula fallback for non-spatial explanation.
+- A dedicated map renderer is not implemented yet; do not pretend map rendering exists.
 - Always state spatial/temporal scale up front (where, when).
 """,
 }
+
+_GENERIC_GUIDANCE = """
+VISUAL + PEDAGOGY RULES for generic mode:
+- No confident subject-specific skill was matched.
+- Choose the final cir.domain yourself from:
+  algorithm, math, code, physics, chemistry, biology, geography.
+- Do not default to algorithm unless the prompt clearly involves algorithms, code execution, arrays, searching, sorting, graph traversal, or data structures.
+- Prefer visual_kind="formula" for abstract explanation.
+- Prefer visual_kind="scene" for spatial, geometric, physical, diagrammatic, or process explanations.
+- Prefer visual_kind="array" only when the content is naturally a list, sequence, table, or set of comparable items.
+- Use clear step-by-step teaching narration.
+- Avoid pretending a domain-specific renderer exists when the prompt does not require it.
+"""
 
 _COMBINED_SCHEMA = """{
   "cir": {
@@ -275,9 +300,10 @@ Rules for algorithm_code:
 
 def build_cir_prompt(
     prompt: str,
-    domain_hint: TopicDomain,
+    domain_hint: TopicDomain | None,
     source_code: str | None = None,
     language: str = "python",
+    skill_mode: SkillMode = SkillMode.SPECIALIZED,
 ) -> tuple[str, str]:
     """Return (system_prompt, user_prompt) for CIR + ExecutionMap generation.
 
@@ -286,10 +312,21 @@ def build_cir_prompt(
       - "execution_map": the execution semantics layer (timing, code lines,
         token focus, array indices)
 
-    The domain_hint is a keyword-based guess; the LLM decides the final
-    CirDocument.domain value and may override it.
+    The domain_hint is a keyword-based guess; in generic mode it is None so the
+    LLM decides the final CirDocument.domain value without subject-specific
+    guidance.
     """
-    domain_guidance = _DOMAIN_GUIDANCE.get(domain_hint, _DOMAIN_GUIDANCE[TopicDomain.ALGORITHM])
+    if skill_mode == SkillMode.GENERIC or domain_hint is None:
+        domain_guidance = _GENERIC_GUIDANCE
+        domain_section = """Keyword analysis found no confident subject match.
+Skill mode: generic.
+The model must choose the final cir.domain itself."""
+    else:
+        domain_guidance = _DOMAIN_GUIDANCE.get(domain_hint, _GENERIC_GUIDANCE)
+        domain_section = f"""Keyword analysis suggests: **{domain_hint.value}**
+Skill mode: specialized.
+You may change this if the topic clearly belongs to a different domain."""
+
     code_track = ""
     if source_code and source_code.strip():
         code_track = _CODE_TRACK_INSTRUCTION.format(
@@ -299,11 +336,19 @@ def build_cir_prompt(
     # For algorithm domain: add pseudocode generation instruction.
     # If the prompt matches a pre-baked algorithm, inject the canonical pseudocode.
     algo_code_track = ""
-    if domain_hint == TopicDomain.ALGORITHM and not source_code:
+    if (
+        skill_mode == SkillMode.SPECIALIZED
+        and domain_hint == TopicDomain.ALGORITHM
+        and not source_code
+    ):
         algo_id = infer_id(prompt)
         canonical_hint = prompt_hint(algo_id) if algo_id else ""
         algo_code_track = _ALGO_CODE_INSTRUCTION + canonical_hint
-    examples = examples_for_domain(domain_hint)
+    examples = (
+        examples_for_domain(domain_hint)
+        if skill_mode == SkillMode.SPECIALIZED and domain_hint is not None
+        else ""
+    )
 
     system = f"""You are an expert educational animator. \
 Your job is to convert a student's question into a step-by-step visual teaching script.
@@ -352,8 +397,7 @@ Only use: "array", "graph", "function", "scene", or "formula"
                不能用于向量场或 2D 区域。Requires step.plot.formula_latex。
 
 ## Domain Classification
-Keyword analysis suggests: **{domain_hint.value}**
-You may change this if the topic clearly belongs to a different domain.
+{domain_section}
 {domain_guidance}
 
 ## Narration Output Format
@@ -457,7 +501,7 @@ Example (bubble sort compare step):
   - math 2D 几何：math_scene(region) → math_scene(vector_field) → katex_overlay → math_formula
   - math 1D：math_plot + katex_overlay（角落公式）
   - math 抽象：math_formula + narration_card（强调要点）
-  - physics：array_boxes（量纲表）+ katex_overlay（公式）
+  - physics：math_scene（受力/轨迹/光路）+ katex_overlay（公式），或 math_formula（纯推导）
 - appear_anim 可选值：fade（默认渐显） | draw（曲线/段沿进度延伸） | slide（侧向滑入）
   | scale（缩放入场） | none（立即出现）。
 - 不需要在 layers 里重复 step 顶层的 tokens/scene/plot——同 kind 的 layer 不指定 scene/plot 时
@@ -481,15 +525,17 @@ Example (bubble sort compare step):
    **`vector_field` 仅在 narration 真讨论流场/旋度/散度时发**；只想画一个方向箭头一律改用
    `segments` + `arrow:true`，不要无脑铺整个网格。
 6. visual_kind="formula" 时 plot.formula_latex 是否非空、annotations 是否 1–3 条？
-7. 涉及自由参数的 function 步骤是否在 execution_map.parameter_controls 列出了对应滑杆？
-8. 如果使用了 layers：每个 layer.timing.enter_at <= exit_at，且都在 [0,1] 之内？
+7. 如果 domain == physics：受力图、向量、轨迹、场、光路、free-body diagram 等空间解释必须用
+   "scene" 并填 step.scene；纯推导用 "formula"；只有紧凑量表才能用 "array"。
+8. 涉及自由参数的 function 步骤是否在 execution_map.parameter_controls 列出了对应滑杆？
+9. 如果使用了 layers：每个 layer.timing.enter_at <= exit_at，且都在 [0,1] 之内？
    层之间的 z_order 是否反映正确的视觉前后关系？
    **不要把同一种 kind 的 layer 重复两次**——一个 step 里 math_scene 只能出现一次。
-9. 让一名零基础同学读你的 narration——他能复述出「这一步在干嘛、为什么」吗？
-10. 步数是否落在 8–14 之间？少于 8 步时，先问自己「有没有把动机、定义、例子、反例、推广、应用都讲过」；
+10. 让一名零基础同学读你的 narration——他能复述出「这一步在干嘛、为什么」吗？
+11. 步数是否落在 8–14 之间？少于 8 步时，先问自己「有没有把动机、定义、例子、反例、推广、应用都讲过」；
     多于 14 步时，把过渡步合并掉。
-11. 每一步 narration 合并后是否够 ≥3 句话、≥80 中文字 / ≥50 英文 words？短了就补「为什么 / 例子 / 学到了什么」。
-12. 是否出现了「我们来看下一步 / 接下来 / 然后呢」这种过渡式 narration？有就改成实质内容。
+12. 每一步 narration 合并后是否够 ≥3 句话、≥80 中文字 / ≥50 英文 words？短了就补「为什么 / 例子 / 学到了什么」。
+13. 是否出现了「我们来看下一步 / 接下来 / 然后呢」这种过渡式 narration？有就改成实质内容。
 {code_track}"""
 
     system = system + algo_code_track

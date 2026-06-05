@@ -18,10 +18,9 @@ from app.domain.models.cir import CirDocument, ExecutionMap
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.domain.models.playbook import PlaybookScript
 from app.domain.models.review import CirReviewIssue, CirReviewReport, ReviewSeverity
-from app.domain.models.topic import TopicDomain
 from app.domain.services.cir_prompt import build_cir_prompt
 from app.domain.services.cir_quality import validate_cir_quality
-from app.domain.services.domain_router import keyword_hint
+from app.domain.services.domain_router import SkillMode, TopicRoute, route_topic
 from app.domain.services.playbook_builder import build_playbook
 from app.domain.services.reviewer_prompt import (
     PipelineValidationError,
@@ -133,12 +132,20 @@ class RunPipelineUseCase:
         """Original single-shot pipeline: prompt → LLM → CIR JSON → builder."""
         review_report = CirReviewReport()
         try:
-            domain_hint = _resolve_domain(request.domain, request.prompt)
+            route = _resolve_route(request)
+            logger.info(
+                "Pipeline route: skill_mode=%s domain=%s reason=%s matched=%s",
+                route.skill_mode,
+                route.domain.value if route.domain else None,
+                route.reason,
+                route.matched_keywords,
+            )
             system, user = build_cir_prompt(
                 request.prompt,
-                domain_hint,
+                route.domain,
                 source_code=request.source_code,
                 language=request.language,
+                skill_mode=route.skill_mode,
             )
             raw = await self._llm.complete(system, user)
             parsed, review_report = await self._review_output(
@@ -410,13 +417,39 @@ def _format_error_path(loc: tuple[Any, ...]) -> str:
     return out
 
 
-def _resolve_domain(explicit: str | None, prompt: str) -> TopicDomain:
-    if explicit:
-        try:
-            return TopicDomain(explicit.lower())
-        except ValueError:
-            pass
-    return keyword_hint(prompt)
+def _resolve_route(request: PipelineRequest) -> TopicRoute:
+    route = route_topic(
+        request.prompt,
+        explicit_domain=request.domain,
+        source_code=request.source_code,
+    )
+    override = (request.skill_mode_override or "auto").lower()
+
+    if override == "generic":
+        return TopicRoute(
+            skill_mode=SkillMode.GENERIC,
+            domain=None,
+            reason="skill_mode_override_generic",
+        )
+
+    if override == "specialized":
+        if route.domain is not None:
+            return TopicRoute(
+                skill_mode=SkillMode.SPECIALIZED,
+                domain=route.domain,
+                matched_keywords=route.matched_keywords,
+                explicit=route.explicit,
+                reason="skill_mode_override_specialized",
+            )
+        return TopicRoute(
+            skill_mode=SkillMode.GENERIC,
+            domain=None,
+            matched_keywords=route.matched_keywords,
+            explicit=route.explicit,
+            reason="skill_mode_override_specialized_no_domain",
+        )
+
+    return route
 
 
 def _strip_markdown_fences(text: str) -> str:

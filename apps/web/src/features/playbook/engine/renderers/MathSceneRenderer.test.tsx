@@ -216,6 +216,18 @@ describe("MathSceneRenderer", () => {
     expect(markup).not.toContain("math-scene-renderer__formula");
   });
 
+  it("omits full-stage chrome in stage-overlay mode", () => {
+    const markup = render(makeScene(), { renderMode: "stage-overlay" });
+    expect(markup).toContain("math-scene-renderer--overlay");
+    expect(markup).toContain("math-scene-renderer__stage");
+    expect(markup).not.toContain("math-scene-renderer__title");
+    expect(markup).not.toContain("math-scene-renderer__formula");
+    expect(markup).not.toContain("math-scene-renderer__caption");
+    expect(markup).not.toContain("math-scene-renderer__legend");
+    expect(markup).not.toContain("格林公式");
+    expect(markup).not.toContain("把环路积分转换为面积分");
+  });
+
   it("renders math scene objects from the plan with stable keys and per-object progress", async () => {
     const previousSnapshot: MathSceneSnapshot = {
       kind: "math_scene",

@@ -1,8 +1,7 @@
 import type { SnapshotKind } from "../types";
 import type { RendererComponent } from "./types";
-import { AlgorithmRenderer } from "./AlgorithmRenderer";
-import { BarBlockRenderer } from "./BarBlockRenderer";
 import { BinaryTreeRenderer } from "./BinaryTreeRenderer";
+import { DomainArrayRenderer } from "./DomainArrayRenderer";
 import { KaTeXOverlayRenderer } from "./KaTeXOverlayRenderer";
 import { MathFormulaRenderer } from "./MathFormulaRenderer";
 import { MathPlotRenderer } from "./MathPlotRenderer";
@@ -11,8 +10,8 @@ import { MotionSceneRenderer } from "./MotionSceneRenderer";
 import { NarrationCardRenderer } from "./NarrationCardRenderer";
 
 const registry = new Map<SnapshotKind, RendererComponent>([
-  ["algorithm_array", AlgorithmRenderer],
-  ["algorithm_bars", BarBlockRenderer],
+  ["algorithm_array", DomainArrayRenderer],
+  ["algorithm_bars", DomainArrayRenderer],
   ["algorithm_tree", BinaryTreeRenderer],
   ["math_plot", MathPlotRenderer],
   ["math_formula", MathFormulaRenderer],

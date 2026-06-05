@@ -1,7 +1,7 @@
 import pytest
 
 from app.domain.models.topic import TopicDomain
-from app.domain.services.domain_router import keyword_hint
+from app.domain.services.domain_router import SkillMode, keyword_hint, route_topic
 
 
 @pytest.mark.parametrize("prompt,expected", [
@@ -24,8 +24,35 @@ def test_keyword_hint_correct_domain(prompt: str, expected: TopicDomain) -> None
     assert keyword_hint(prompt) == expected
 
 
-def test_keyword_hint_defaults_to_algorithm_for_unknown() -> None:
-    assert keyword_hint("some completely unrelated text 随机文字") == TopicDomain.ALGORITHM
+def test_route_topic_unknown_uses_generic_skill() -> None:
+    route = route_topic("some completely unrelated text 随机文字")
+    assert route.skill_mode == SkillMode.GENERIC
+    assert route.domain is None
+    assert route.reason == "no_keyword_match"
+
+
+def test_keyword_hint_returns_none_for_unknown() -> None:
+    assert keyword_hint("some completely unrelated text 随机文字") is None
+
+
+def test_route_topic_algorithm_keyword_uses_specialized_skill() -> None:
+    route = route_topic("请可视化二分查找的过程")
+    assert route.skill_mode == SkillMode.SPECIALIZED
+    assert route.domain == TopicDomain.ALGORITHM
+    assert "二分" in route.matched_keywords
+
+
+def test_route_topic_explicit_domain_wins() -> None:
+    route = route_topic("anything", explicit_domain="physics")
+    assert route.skill_mode == SkillMode.SPECIALIZED
+    assert route.domain == TopicDomain.PHYSICS
+    assert route.explicit is True
+
+
+def test_route_topic_source_code_routes_to_code() -> None:
+    route = route_topic("explain this", source_code="def f():\n    return 1")
+    assert route.skill_mode == SkillMode.SPECIALIZED
+    assert route.domain == TopicDomain.CODE
 
 
 def test_keyword_hint_is_case_insensitive() -> None:
