@@ -20,6 +20,8 @@ import time
 
 import yaml  # type: ignore[import]
 
+from eval.live_client import generate_live_playbook
+
 REPO_ROOT = pathlib.Path(__file__).parents[3]
 PROMPTS_DEFAULT = REPO_ROOT / "eval" / "prompts" / "starter.yaml"
 FIXTURES_DIR = REPO_ROOT / "eval" / "fixtures"
@@ -614,22 +616,19 @@ def _generate_single(prompt_id: str, prompt: str, domain: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _generate_live(prompt: str, api_base: str, timeout: int = 180) -> str:
-    try:
-        import httpx
-    except ImportError:
-        raise RuntimeError("httpx not installed; run: uv add httpx") from None
-
-    payload = {"prompt": prompt, "generation_mode": "agent"}
-    resp = httpx.post(f"{api_base}/api/pipeline/run", json=payload, timeout=timeout)
-    resp.raise_for_status()
-    data = resp.json()
-    playbook = data.get("playbook")
-    if playbook is None:
-        raise ValueError(f"No 'playbook' in response: {list(data.keys())}")
-    if isinstance(playbook, dict):
-        return json.dumps(playbook, ensure_ascii=False, indent=2)
-    return playbook
+def _generate_live(
+    prompt: str,
+    api_base: str,
+    api_prefix: str = "/api/v1",
+    timeout: int = 180,
+) -> str:
+    raw = generate_live_playbook(
+        prompt,
+        api_base,
+        api_prefix=api_prefix,
+        timeout=timeout,
+    )
+    return json.dumps(json.loads(raw), ensure_ascii=False, indent=2)
 
 
 # ---------------------------------------------------------------------------
@@ -644,6 +643,8 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument("--live", action="store_true")
     parser.add_argument("--prompts", default=str(PROMPTS_DEFAULT))
     parser.add_argument("--api", default="http://localhost:8000")
+    parser.add_argument("--api-prefix", default="/api/v1")
+    parser.add_argument("--live-timeout", type=int, default=900)
     parser.add_argument("--ids", nargs="*")
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args(argv)
@@ -677,7 +678,12 @@ def main(argv: list[str] | None = None) -> int:
 
         try:
             raw = (
-                _generate_live(prompt, args.api)
+                _generate_live(
+                    prompt,
+                    args.api,
+                    api_prefix=args.api_prefix,
+                    timeout=args.live_timeout,
+                )
                 if args.live
                 else _generate_single(pid, prompt, domain)
             )

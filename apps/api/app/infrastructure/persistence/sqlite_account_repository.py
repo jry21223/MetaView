@@ -426,6 +426,104 @@ class SqliteAccountRepository:
 
         return await asyncio.to_thread(_sync)
 
+    async def consume_balance(
+        self,
+        *,
+        user_id: str,
+        amount_cents: int,
+        ledger_id: str,
+        created_at: str,
+    ) -> bool:
+        if amount_cents <= 0:
+            return True
+
+        def _sync() -> bool:
+            with self._connect() as conn:
+                existing = conn.execute(
+                    "SELECT ledger_id FROM balance_ledger WHERE ledger_id = ?",
+                    (ledger_id,),
+                ).fetchone()
+                if existing is not None:
+                    return True
+
+                cursor = conn.execute(
+                    """
+                    UPDATE accounts
+                    SET balance_cents = balance_cents - ?, updated_at = ?
+                    WHERE user_id = ? AND balance_cents >= ?
+                    """,
+                    (amount_cents, created_at, user_id, amount_cents),
+                )
+                if cursor.rowcount == 0:
+                    return False
+                conn.execute(
+                    """
+                    INSERT INTO balance_ledger
+                        (ledger_id, user_id, order_id, amount_cents, kind, created_at)
+                    VALUES (?, ?, NULL, ?, 'consume', ?)
+                    """,
+                    (ledger_id, user_id, amount_cents, created_at),
+                )
+                conn.commit()
+                return True
+
+        return await asyncio.to_thread(_sync)
+
+    async def refund_balance(
+        self,
+        *,
+        user_id: str,
+        amount_cents: int,
+        consume_ledger_id: str,
+        refund_ledger_id: str,
+        created_at: str,
+    ) -> bool:
+        if amount_cents <= 0:
+            return True
+
+        def _sync() -> bool:
+            with self._connect() as conn:
+                existing_refund = conn.execute(
+                    "SELECT ledger_id FROM balance_ledger WHERE ledger_id = ?",
+                    (refund_ledger_id,),
+                ).fetchone()
+                if existing_refund is not None:
+                    return True
+
+                consumed = conn.execute(
+                    """
+                    SELECT ledger_id FROM balance_ledger
+                    WHERE ledger_id = ?
+                        AND user_id = ?
+                        AND amount_cents = ?
+                        AND kind = 'consume'
+                    """,
+                    (consume_ledger_id, user_id, amount_cents),
+                ).fetchone()
+                if consumed is None:
+                    return False
+
+                conn.execute(
+                    """
+                    UPDATE accounts
+                    SET balance_cents = balance_cents + ?, updated_at = ?
+                    WHERE user_id = ?
+                    """,
+                    (amount_cents, created_at, user_id),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO balance_ledger
+                        (ledger_id, user_id, order_id, amount_cents, kind, created_at)
+                    VALUES (?, ?, NULL, ?, 'refund', ?)
+                    """,
+                    (refund_ledger_id, user_id, amount_cents, created_at),
+                )
+                conn.commit()
+                return True
+
+        return await asyncio.to_thread(_sync)
+
 
 def _row_to_account(row: sqlite3.Row) -> Account:
     return Account(

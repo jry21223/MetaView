@@ -8,7 +8,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from starlette.requests import Request
 
 from app.application.dto.followup_dto import (
@@ -21,12 +21,15 @@ from app.application.dto.pipeline_dto import PipelineRunResponse
 from app.application.ports.director_repository import IRunDirectorRepository
 from app.application.ports.llm_provider import ILLMProvider
 from app.application.ports.run_repository import IRunRepository
+from app.application.use_cases.account import AccountUseCase, InsufficientBalanceError
 from app.application.use_cases.follow_up import FollowUpPatchError, FollowUpPatchUseCase
 from app.config import Settings, get_settings
+from app.domain.models.account import SessionAccount
 from app.domain.models.playbook import PlaybookScript
 from app.domain.services.director_builder import build_default_director
 from app.infrastructure.llm.openai_provider import OpenAIProvider
 from app.presentation.dependencies import (
+    get_account_use_case,
     get_llm_provider,
     get_run_director_repo,
     get_run_repo,
@@ -41,21 +44,31 @@ _RUN_LOCKS: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 @read_limit()
 async def list_runs(
     request: Request,
+    response: Response,
+    settings: Annotated[Settings, Depends(get_settings)],
     run_repo: Annotated[IRunRepository, Depends(get_run_repo)],
+    account_use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
     limit: int = 50,
 ) -> list[PipelineRunResponse]:
-    return await run_repo.list(limit=limit)
+    owner = await _owner_session(request, response, settings, account_use_case)
+    owner_user_id = owner.account.user_id if owner is not None else None
+    return await run_repo.list(limit=limit, user_id=owner_user_id)
 
 
 @router.get("/{run_id}", response_model=PipelineRunResponse)
 @read_limit()
 async def get_run(
     request: Request,
+    response: Response,
     run_id: str,
+    settings: Annotated[Settings, Depends(get_settings)],
     run_repo: Annotated[IRunRepository, Depends(get_run_repo)],
     director_repo: Annotated[IRunDirectorRepository, Depends(get_run_director_repo)],
+    account_use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
 ) -> PipelineRunResponse:
-    run = await run_repo.get(run_id)
+    owner = await _owner_session(request, response, settings, account_use_case)
+    owner_user_id = owner.account.user_id if owner is not None else None
+    run = await run_repo.get(run_id, user_id=owner_user_id)
     if run is None:
         raise HTTPException(status_code=404, detail=f"Run {run_id!r} not found")
     run.director = await director_repo.get(run_id)
@@ -66,10 +79,15 @@ async def get_run(
 @read_limit()
 async def list_followups(
     request: Request,
+    response: Response,
     run_id: str,
+    settings: Annotated[Settings, Depends(get_settings)],
     run_repo: Annotated[IRunRepository, Depends(get_run_repo)],
+    account_use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
 ) -> RunFollowUpsResponse:
-    run = await run_repo.get(run_id)
+    owner = await _owner_session(request, response, settings, account_use_case)
+    owner_user_id = owner.account.user_id if owner is not None else None
+    run = await run_repo.get(run_id, user_id=owner_user_id)
     if run is None:
         raise HTTPException(status_code=404, detail=f"Run {run_id!r} not found")
     return RunFollowUpsResponse(
@@ -82,12 +100,14 @@ async def list_followups(
 @write_limit()
 async def submit_followup(
     request: Request,
+    response: Response,
     run_id: str,
     payload: FollowUpRequest,
     settings: Annotated[Settings, Depends(get_settings)],
     run_repo: Annotated[IRunRepository, Depends(get_run_repo)],
     director_repo: Annotated[IRunDirectorRepository, Depends(get_run_director_repo)],
     llm: Annotated[ILLMProvider, Depends(get_llm_provider)],
+    account_use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
 ) -> FollowUpResponse:
     if settings.app_edition == "ops" and (
         payload.provider_api_key or payload.provider_base_url or payload.provider_model
@@ -106,7 +126,9 @@ async def submit_followup(
         )
 
     async with _RUN_LOCKS[run_id]:
-        run = await run_repo.get(run_id)
+        owner = await _owner_session(request, response, settings, account_use_case)
+        owner_user_id = owner.account.user_id if owner is not None else None
+        run = await run_repo.get(run_id, user_id=owner_user_id)
         if run is None or run.playbook is None:
             raise HTTPException(
                 status_code=404, detail=f"Run {run_id!r} has no playbook"
@@ -130,43 +152,60 @@ async def submit_followup(
             effective_llm,
             default_step_frames=settings.playbook_default_step_frames,
         )
-        try:
-            result = await use_case.execute(base_playbook, payload)
-        except FollowUpPatchError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-        now = _now()
-        current_json = run.playbook.model_dump_json()
-        await run_repo.ensure_initial_version(run_id, current_json, now)
-        if parent_version_id is None:
-            parent_version_id = await run_repo.get_head_version_id(run_id)
         followup_id = str(uuid.uuid4())
-        patch_json = json.dumps(result.patch, ensure_ascii=False)
-        await run_repo.append_followup(
-            run_id,
-            followup_id=followup_id,
-            user_message=payload.message,
-            assistant_reply=result.reply,
-            change_summary=result.change_summary,
-            patch_json=patch_json,
-            created_at=now,
-        )
-        version_id = str(uuid.uuid4())
-        next_json = result.playbook.model_dump_json()
-        await run_repo.append_version(
-            run_id,
-            version_id=version_id,
-            playbook_json=next_json,
-            source="followup",
-            followup_id=followup_id,
-            parent_version_id=parent_version_id,
-            summary=result.change_summary,
-            created_at=now,
-        )
-        await run_repo.attach_followup_version(followup_id, version_id)
-        await run_repo.update_playbook_json(run_id, next_json)
-        director = build_default_director(result.playbook, run_id)
-        await director_repo.upsert(director, now)
+        consume_ledger_id = f"followup:{run_id}:{followup_id}"
+        if owner is not None:
+            try:
+                await account_use_case.consume_generation_credit(
+                    session=owner,
+                    ledger_id=consume_ledger_id,
+                )
+            except InsufficientBalanceError as exc:
+                raise HTTPException(status_code=402, detail=str(exc)) from exc
+        try:
+            try:
+                result = await use_case.execute(base_playbook, payload)
+            except FollowUpPatchError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+            now = _now()
+            current_json = run.playbook.model_dump_json()
+            await run_repo.ensure_initial_version(run_id, current_json, now)
+            if parent_version_id is None:
+                parent_version_id = await run_repo.get_head_version_id(run_id)
+            patch_json = json.dumps(result.patch, ensure_ascii=False)
+            await run_repo.append_followup(
+                run_id,
+                followup_id=followup_id,
+                user_message=payload.message,
+                assistant_reply=result.reply,
+                change_summary=result.change_summary,
+                patch_json=patch_json,
+                created_at=now,
+            )
+            version_id = str(uuid.uuid4())
+            next_json = result.playbook.model_dump_json()
+            await run_repo.append_version(
+                run_id,
+                version_id=version_id,
+                playbook_json=next_json,
+                source="followup",
+                followup_id=followup_id,
+                parent_version_id=parent_version_id,
+                summary=result.change_summary,
+                created_at=now,
+            )
+            await run_repo.attach_followup_version(followup_id, version_id)
+            await run_repo.update_playbook_json(run_id, next_json)
+            director = build_default_director(result.playbook, run_id)
+            await director_repo.upsert(director, now)
+        except Exception:
+            if owner is not None:
+                await account_use_case.refund_generation_credit(
+                    session=owner,
+                    ledger_id=consume_ledger_id,
+                )
+            raise
 
     return FollowUpResponse(
         reply=result.reply,
@@ -181,13 +220,18 @@ async def submit_followup(
 @write_limit()
 async def restore_version(
     request: Request,
+    response: Response,
     run_id: str,
     version_id: str,
+    settings: Annotated[Settings, Depends(get_settings)],
     run_repo: Annotated[IRunRepository, Depends(get_run_repo)],
     director_repo: Annotated[IRunDirectorRepository, Depends(get_run_director_repo)],
+    account_use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
 ) -> RestoreVersionResponse:
     async with _RUN_LOCKS[run_id]:
-        run = await run_repo.get(run_id)
+        owner = await _owner_session(request, response, settings, account_use_case)
+        owner_user_id = owner.account.user_id if owner is not None else None
+        run = await run_repo.get(run_id, user_id=owner_user_id)
         if run is None:
             raise HTTPException(status_code=404, detail=f"Run {run_id!r} not found")
         playbook_json = await run_repo.get_version_playbook(run_id, version_id)
@@ -227,14 +271,19 @@ async def restore_version(
 @write_limit()
 async def delete_run(
     request: Request,
+    response: Response,
     run_id: str,
+    settings: Annotated[Settings, Depends(get_settings)],
     run_repo: Annotated[IRunRepository, Depends(get_run_repo)],
     director_repo: Annotated[IRunDirectorRepository, Depends(get_run_director_repo)],
+    account_use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
 ) -> None:
-    await director_repo.delete(run_id)
-    deleted = await run_repo.delete(run_id)
+    owner = await _owner_session(request, response, settings, account_use_case)
+    owner_user_id = owner.account.user_id if owner is not None else None
+    deleted = await run_repo.delete(run_id, user_id=owner_user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail=f"Run {run_id!r} not found")
+    await director_repo.delete(run_id)
 
 
 def _resolve_followup_llm(
@@ -263,3 +312,26 @@ def _short_version_id(version_id: str) -> str:
     if len(compact) >= 8 and all(c in "0123456789abcdefABCDEF" for c in compact[:8]):
         return compact[:8].lower()
     return hashlib.sha1(version_id.encode("utf-8")).hexdigest()[:8]
+
+
+async def _owner_session(
+    request: Request,
+    response: Response,
+    settings: Settings,
+    account_use_case: AccountUseCase,
+) -> SessionAccount | None:
+    if settings.app_edition != "ops":
+        return None
+    session = await account_use_case.get_or_create_session(
+        request.cookies.get(settings.account_session_cookie)
+    )
+    if request.cookies.get(settings.account_session_cookie) != session.token:
+        response.set_cookie(
+            settings.account_session_cookie,
+            session.token,
+            max_age=settings.account_session_days * 24 * 60 * 60,
+            httponly=True,
+            secure=settings.account_session_secure,
+            samesite="lax",
+        )
+    return session

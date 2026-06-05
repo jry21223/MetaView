@@ -8,14 +8,17 @@ def _create_pipeline_runs(conn: sqlite3.Connection) -> None:
     conn.execute("""
         CREATE TABLE IF NOT EXISTS pipeline_runs (
             run_id      TEXT PRIMARY KEY,
+            user_id     TEXT,
             status      TEXT NOT NULL,
             prompt      TEXT NOT NULL,
             playbook_json TEXT,
             error       TEXT,
             review_json TEXT,
-            created_at  TEXT NOT NULL
+            created_at  TEXT NOT NULL,
+            FOREIGN KEY(user_id) REFERENCES accounts(user_id)
         )
     """)
+    _add_column_if_missing(conn, "pipeline_runs", "user_id", "TEXT")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS pipeline_run_followups (
             followup_id    TEXT PRIMARY KEY,
@@ -162,6 +165,20 @@ def _create_newapi_topups(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _create_wechat_replay_cache(conn: sqlite3.Connection) -> None:
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS wechat_pay_notification_replays (
+            key_hash   TEXT PRIMARY KEY,
+            seen_at    INTEGER NOT NULL,
+            expires_at INTEGER NOT NULL
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_wechat_pay_replays_expires_at
+        ON wechat_pay_notification_replays(expires_at)
+    """)
+
+
 def _columns(conn: sqlite3.Connection, table: str) -> set[str]:
     return {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
 
@@ -193,9 +210,10 @@ def _migrate_legacy_pipeline_runs(conn: sqlite3.Connection) -> None:
     review_expr = "review_json" if "review_json" in legacy_cols else "NULL"
     conn.execute(f"""
         INSERT OR IGNORE INTO pipeline_runs
-            (run_id, status, prompt, playbook_json, error, review_json, created_at)
+            (run_id, user_id, status, prompt, playbook_json, error, review_json, created_at)
         SELECT
             request_id,
+            NULL,
             {status_expr},
             prompt,
             NULL,
@@ -212,6 +230,7 @@ def init_db(db_path: str) -> None:
         _create_pipeline_runs(conn)
         _create_accounts(conn)
         _create_newapi_topups(conn)
+        _create_wechat_replay_cache(conn)
         _migrate_legacy_pipeline_runs(conn)
         try:
             conn.execute("ALTER TABLE pipeline_runs ADD COLUMN review_json TEXT")

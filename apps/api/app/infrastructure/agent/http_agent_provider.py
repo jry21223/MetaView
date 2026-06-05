@@ -22,9 +22,15 @@ logger = logging.getLogger(__name__)
 class HttpAgentProvider:
     """Per-request HTTP client targeting the sidecar's ``/generate`` route."""
 
-    def __init__(self, base_url: str, timeout_s: float = 600.0) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        timeout_s: float = 600.0,
+        shared_token: str | None = None,
+    ) -> None:
         self._base_url = base_url.rstrip("/")
         self._timeout_s = timeout_s
+        self._shared_token = shared_token
 
     async def generate(
         self,
@@ -38,9 +44,14 @@ class HttpAgentProvider:
             body["provider"] = provider_config
 
         url = f"{self._base_url}/generate"
+        headers = (
+            {"X-MetaView-Agent-Token": self._shared_token}
+            if self._shared_token
+            else None
+        )
         try:
             async with httpx.AsyncClient(timeout=self._timeout_s) as client:
-                resp = await client.post(url, json=body)
+                resp = await client.post(url, json=body, headers=headers)
         except httpx.HTTPError as exc:
             raise AgentProviderError(
                 f"agent sidecar unreachable ({self._base_url}): {exc}"

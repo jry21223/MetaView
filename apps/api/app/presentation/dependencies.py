@@ -153,8 +153,16 @@ def get_llm_provider(settings: Annotated[Settings, Depends(get_settings)]) -> IL
 
 
 @lru_cache
-def _get_agent_provider(base_url: str, timeout_s: float) -> HttpAgentProvider:
-    return HttpAgentProvider(base_url=base_url, timeout_s=timeout_s)
+def _get_agent_provider(
+    base_url: str,
+    timeout_s: float,
+    shared_token: str | None,
+) -> HttpAgentProvider:
+    return HttpAgentProvider(
+        base_url=base_url,
+        timeout_s=timeout_s,
+        shared_token=shared_token,
+    )
 
 
 @lru_cache
@@ -190,7 +198,11 @@ def get_agent_provider(
             settings.codex_effort,
             settings.agent_timeout_s,
         )
-    return _get_agent_provider(settings.agent_base_url, settings.agent_timeout_s)
+    return _get_agent_provider(
+        settings.agent_base_url,
+        settings.agent_timeout_s,
+        settings.agent_shared_token,
+    )
 
 
 def get_reviewer_llm_provider(

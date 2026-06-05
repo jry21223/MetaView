@@ -20,13 +20,19 @@ class SqliteRunRepository:
         conn.row_factory = sqlite3.Row
         return conn
 
-    async def create(self, run_id: str, prompt: str, created_at: str) -> None:
+    async def create(
+        self,
+        run_id: str,
+        prompt: str,
+        created_at: str,
+        user_id: str | None = None,
+    ) -> None:
         def _sync() -> None:
             with self._connect() as conn:
                 conn.execute(
                     "INSERT INTO pipeline_runs"
-                    " (run_id, status, prompt, created_at) VALUES (?, ?, ?, ?)",
-                    (run_id, PipelineRunStatus.QUEUED.value, prompt, created_at),
+                    " (run_id, user_id, status, prompt, created_at) VALUES (?, ?, ?, ?, ?)",
+                    (run_id, user_id, PipelineRunStatus.QUEUED.value, prompt, created_at),
                 )
                 conn.commit()
 
@@ -53,9 +59,18 @@ class SqliteRunRepository:
 
         await asyncio.to_thread(_sync)
 
-    async def get(self, run_id: str) -> PipelineRunResponse | None:
+    async def get(
+        self,
+        run_id: str,
+        user_id: str | None = None,
+    ) -> PipelineRunResponse | None:
         def _sync() -> sqlite3.Row | None:
             with self._connect() as conn:
+                if user_id is not None:
+                    return conn.execute(
+                        "SELECT * FROM pipeline_runs WHERE run_id=? AND user_id=?",
+                        (run_id, user_id),
+                    ).fetchone()
                 return conn.execute(
                     "SELECT * FROM pipeline_runs WHERE run_id=?", (run_id,)
                 ).fetchone()
@@ -76,9 +91,19 @@ class SqliteRunRepository:
 
         await asyncio.to_thread(_sync)
 
-    async def list(self, limit: int = 50) -> list[PipelineRunResponse]:
+    async def list(
+        self,
+        limit: int = 50,
+        user_id: str | None = None,
+    ) -> list[PipelineRunResponse]:
         def _sync() -> list[sqlite3.Row]:
             with self._connect() as conn:
+                if user_id is not None:
+                    return conn.execute(
+                        "SELECT * FROM pipeline_runs"
+                        " WHERE user_id=? ORDER BY created_at DESC LIMIT ?",
+                        (user_id, limit),
+                    ).fetchall()
                 return conn.execute(
                     "SELECT * FROM pipeline_runs ORDER BY created_at DESC LIMIT ?", (limit,)
                 ).fetchall()
@@ -86,9 +111,16 @@ class SqliteRunRepository:
         rows = await asyncio.to_thread(_sync)
         return [_row_to_response(r) for r in rows]
 
-    async def delete(self, run_id: str) -> bool:
+    async def delete(self, run_id: str, user_id: str | None = None) -> bool:
         def _sync() -> bool:
             with self._connect() as conn:
+                if user_id is not None:
+                    owned = conn.execute(
+                        "SELECT run_id FROM pipeline_runs WHERE run_id=? AND user_id=?",
+                        (run_id, user_id),
+                    ).fetchone()
+                    if owned is None:
+                        return False
                 conn.execute(
                     "DELETE FROM pipeline_run_directors WHERE run_id=?", (run_id,)
                 )

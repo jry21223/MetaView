@@ -12,11 +12,10 @@ __pycache__
 apps/web/dist
 apps/web/coverage
 coverage
-data/pipeline_runs.db
-data/media
-data/exports
-data/html_previews
-data/debug
+data
+eval/reports
+eval/videos
+eval/shots
 *.sqlite3
 .env
 backups

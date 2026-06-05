@@ -10,6 +10,7 @@ describe("followupApi", () => {
     let requestBody: unknown = null;
     server.use(
       http.post(`${API_BASE_URL}/api/v1/runs/run-1/follow-up`, async ({ request }) => {
+        expect(request.credentials).toBe("include");
         requestBody = await request.json();
         return HttpResponse.json({
           reply: "已更新",
@@ -38,8 +39,13 @@ describe("followupApi", () => {
 
   it("loads follow-up history and restores versions", async () => {
     server.use(
-      http.get(`${API_BASE_URL}/api/v1/runs/run-1/follow-ups`, () =>
-        HttpResponse.json({
+      http.post(`${API_BASE_URL}/api/v1/runs/run-1/versions/v0/restore`, ({ request }) => {
+        expect(request.credentials).toBe("include");
+        return HttpResponse.json({ version_id: "v2", playbook: playbook("Original") });
+      }),
+      http.get(`${API_BASE_URL}/api/v1/runs/run-1/follow-ups`, ({ request }) => {
+        expect(request.credentials).toBe("include");
+        return HttpResponse.json({
           followups: [
             {
               followup_id: "f1",
@@ -66,11 +72,8 @@ describe("followupApi", () => {
               is_head: true,
             },
           ],
-        }),
-      ),
-      http.post(`${API_BASE_URL}/api/v1/runs/run-1/versions/v0/restore`, () =>
-        HttpResponse.json({ version_id: "v2", playbook: playbook("Original") }),
-      ),
+        });
+      }),
     );
 
     const history = await listRunFollowUps("run-1");

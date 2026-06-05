@@ -4,8 +4,9 @@ import type { PipelineRunResult } from "../../../entities/pipeline/types";
 import type { DirectorScript, PlaybookScript } from "../../../entities/playbook/types";
 
 const POLL_INTERVAL_MS = 2000;
-const MAX_ATTEMPTS = 120;
+const SOFT_TIMEOUT_ATTEMPTS = 450;
 const ACTIVE_RUN_STATUSES = new Set<PipelineRunResult["status"]>(["queued", "running", "reviewing"]);
+const STILL_RUNNING_MESSAGE = "仍在生成，可稍后到历史记录查看";
 
 interface State {
   playbook: PlaybookScript | null;
@@ -18,7 +19,7 @@ type Action =
   | { type: "reset" }
   | { type: "poll_success"; result: PipelineRunResult }
   | { type: "poll_error"; error: string }
-  | { type: "timeout" };
+  | { type: "soft_timeout" };
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -31,13 +32,18 @@ function reducer(state: State, action: Action): State {
         status: result.status,
         playbook: succeeded ? (result.playbook ?? null) : state.playbook,
         director: succeeded ? (result.director ?? null) : state.director,
-        error: result.status === "failed" ? (result.error ?? "生成失败，请返回重试") : null,
+        error:
+          result.status === "failed"
+            ? (result.error ?? "生成失败，请返回重试")
+            : state.error === STILL_RUNNING_MESSAGE && ACTIVE_RUN_STATUSES.has(result.status)
+              ? STILL_RUNNING_MESSAGE
+              : null,
       };
     }
     case "poll_error":
       return { ...state, status: "failed", error: action.error };
-    case "timeout":
-      return { ...state, status: "failed", error: "生成超时，请返回重试" };
+    case "soft_timeout":
+      return { ...state, status: state.status ?? "running", error: STILL_RUNNING_MESSAGE };
   }
 }
 
@@ -57,6 +63,7 @@ export function usePipelinePoller(runId: string | null): UsePipelinePollerResult
     error: null,
   });
   const attemptsRef = useRef(0);
+  const softTimeoutShownRef = useRef(false);
 
   useEffect(() => {
     if (!runId) {
@@ -66,16 +73,16 @@ export function usePipelinePoller(runId: string | null): UsePipelinePollerResult
 
     dispatch({ type: "reset" });
     attemptsRef.current = 0;
+    softTimeoutShownRef.current = false;
     let cancelled = false;
     let timer: ReturnType<typeof setInterval> | null = null;
 
     const poll = async () => {
       attemptsRef.current += 1;
 
-      if (attemptsRef.current > MAX_ATTEMPTS) {
-        if (timer) clearInterval(timer);
-        if (!cancelled) dispatch({ type: "timeout" });
-        return;
+      if (attemptsRef.current > SOFT_TIMEOUT_ATTEMPTS && !softTimeoutShownRef.current) {
+        softTimeoutShownRef.current = true;
+        if (!cancelled) dispatch({ type: "soft_timeout" });
       }
 
       try {

@@ -10,6 +10,7 @@ import express, { type Request, type Response } from "express";
 import pino from "pino";
 
 import { runAgentGeneration } from "./agent.js";
+import { hasValidSharedToken } from "./auth.js";
 
 const log = pino({ level: process.env.LOG_LEVEL ?? "info" });
 const PORT = Number(process.env.PORT ?? 8001);
@@ -20,6 +21,7 @@ const DEFAULT_API_KEY =
   process.env.AGENT_DEFAULT_API_KEY ??
   process.env.METAVIEW_OPENAI_API_KEY ??
   process.env.OPENAI_API_KEY;
+const SHARED_TOKEN = process.env.AGENT_SHARED_TOKEN ?? process.env.METAVIEW_AGENT_SHARED_TOKEN;
 // Hard ceiling so a hung agent loop can't block the worker indefinitely.
 const GENERATE_TIMEOUT_MS = Number(process.env.AGENT_TIMEOUT_MS ?? 540_000);
 
@@ -31,6 +33,10 @@ app.get("/healthz", (_req: Request, res: Response) => {
 });
 
 app.post("/generate", async (req: Request, res: Response) => {
+  if (!hasValidSharedToken(SHARED_TOKEN, req.header("X-MetaView-Agent-Token"))) {
+    res.status(401).json({ detail: "missing or invalid agent token" });
+    return;
+  }
   const { prompt, provider } = (req.body ?? {}) as {
     prompt?: string;
     provider?: { provider?: string; model?: string; api_key?: string; base_url?: string };

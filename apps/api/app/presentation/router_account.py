@@ -8,6 +8,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from starlette.requests import Request
 
+from app.application.ports.payment_gateway import IPaymentGateway
 from app.application.use_cases.account import (
     AccountUseCase,
     AmountValidationError,
@@ -25,7 +26,11 @@ from app.application.use_cases.newapi_topup import (
 )
 from app.config import Settings, get_settings
 from app.domain.models.account import RechargeOrder, SessionAccount, money_from_cents
-from app.presentation.dependencies import get_account_use_case, get_newapi_topup_use_case
+from app.presentation.dependencies import (
+    get_account_use_case,
+    get_newapi_topup_use_case,
+    get_payment_gateway,
+)
 from app.presentation.rate_limit import read_limit, write_limit
 
 router = APIRouter(tags=["account"])
@@ -254,15 +259,17 @@ async def get_recharge_order(
 @router.post("/billing/wechat/notify")
 async def wechat_pay_notify(
     request: Request,
+    payment: Annotated[IPaymentGateway, Depends(get_payment_gateway)],
     use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
     newapi_topup: Annotated[NewApiTopupUseCase, Depends(get_newapi_topup_use_case)],
 ) -> dict[str, str]:
     body = await request.body()
     try:
-        result = await use_case.handle_payment_notification(dict(request.headers), body)
+        transaction = payment.decode_notification(dict(request.headers), body)
+        result = await use_case.handle_payment_transaction(transaction)
     except PaymentOrderNotFoundError:
         try:
-            result = await newapi_topup.handle_payment_notification(dict(request.headers), body)
+            result = await newapi_topup.handle_payment_transaction(transaction)
         except NewApiTopupOrderNotFoundError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except NewApiTopupPaymentError as exc:

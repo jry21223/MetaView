@@ -14,7 +14,7 @@ from urllib.parse import urlencode, urlparse
 from app.application.ports.newapi_topup_repository import INewApiTopupRepository
 from app.application.ports.payment_gateway import IPaymentGateway
 from app.config import Settings
-from app.domain.models.account import money_from_cents
+from app.domain.models.account import PaymentTransaction, money_from_cents
 from app.domain.models.newapi_topup import NewApiTopupIntent
 
 
@@ -170,6 +170,9 @@ class NewApiTopupUseCase:
         body: bytes,
     ) -> str:
         transaction = self._payment.decode_notification(headers, body)
+        return await self.handle_payment_transaction(transaction)
+
+    async def handle_payment_transaction(self, transaction: PaymentTransaction) -> str:
         if transaction.trade_state != "SUCCESS":
             return "ignored"
         intent = await self._repo.get_intent_by_order_id(transaction.order_id)

@@ -144,6 +144,26 @@ def test_speech_passes_through_upstream_error_code(client) -> None:
     assert r.status_code == 401
 
 
+def test_speech_redacts_upstream_error_secrets(client) -> None:
+    _FakeAsyncClient.response = _FakeResponse(
+        status_code=401,
+        content=(
+            b'{"error":"Authorization: Bearer abc.def_ghi-123 '
+            b'and key sk-secret123456789"}'
+        ),
+        headers={"content-type": "application/json"},
+    )
+
+    r = client.post("/api/v1/tts/speech", json={"text": "x"})
+
+    assert r.status_code == 401
+    detail = r.json()["detail"]
+    assert "abc.def_ghi-123" not in detail
+    assert "sk-secret123456789" not in detail
+    assert "Bearer [REDACTED]" in detail
+    assert "sk-[REDACTED]" in detail
+
+
 def test_speech_validates_text_length(client) -> None:
     r = client.post("/api/v1/tts/speech", json={"text": ""})
     assert r.status_code == 422

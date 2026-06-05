@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 
 import pytest
@@ -48,6 +49,12 @@ class MockLLMFailure:
 class MockLLMWithFences:
     async def complete(self, system: str, user: str) -> str:
         return f"```json\n{_VALID_CIR}\n```"
+
+
+class MockLLMSlow:
+    async def complete(self, system: str, user: str) -> str:
+        await asyncio.sleep(1)
+        return _VALID_CIR
 
 
 @pytest.fixture
@@ -130,3 +137,16 @@ def test_strip_markdown_fences_with_json_tag() -> None:
 def test_strip_markdown_fences_without_tag() -> None:
     raw = '```\n{"key": "value"}\n```'
     assert _strip_markdown_fences(raw) == '{"key": "value"}'
+
+
+@pytest.mark.asyncio
+async def test_pipeline_total_timeout_marks_run_failed(repo) -> None:
+    use_case = RunPipelineUseCase(repo, MockLLMSlow(), pipeline_timeout_s=0.01)
+    await repo.create("run-timeout", "test prompt", "2024-01-01T00:00:00+00:00")
+
+    await use_case.execute("run-timeout", PipelineRequest(prompt="test prompt"))
+
+    result = await repo.get("run-timeout")
+    assert result is not None
+    assert result.status == PipelineRunStatus.FAILED
+    assert result.error == "Pipeline timed out after 0.0s"

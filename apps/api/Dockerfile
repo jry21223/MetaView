@@ -65,7 +65,7 @@ RUN pip install --no-cache-dir \
 
 COPY apps/api ./apps/api
 COPY skills ./skills
-COPY data ./data
+RUN mkdir -p ./data
 COPY --from=web_deps /usr/local/bin/node /usr/local/bin/node
 COPY --from=web_deps /usr/local/bin/npm /usr/local/bin/npm
 COPY --from=web_deps /usr/local/bin/npx /usr/local/bin/npx

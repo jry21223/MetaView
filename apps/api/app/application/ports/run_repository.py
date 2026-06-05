@@ -8,7 +8,13 @@ from app.domain.models.pipeline_run import PipelineRunStatus
 
 
 class IRunRepository(Protocol):
-    async def create(self, run_id: str, prompt: str, created_at: str) -> None: ...
+    async def create(
+        self,
+        run_id: str,
+        prompt: str,
+        created_at: str,
+        user_id: str | None = None,
+    ) -> None: ...
 
     async def update(
         self,
@@ -20,13 +26,21 @@ class IRunRepository(Protocol):
         review_json: str | None = None,
     ) -> None: ...
 
-    async def get(self, run_id: str) -> PipelineRunResponse | None: ...
+    async def get(
+        self,
+        run_id: str,
+        user_id: str | None = None,
+    ) -> PipelineRunResponse | None: ...
 
     async def update_playbook_json(self, run_id: str, playbook_json: str) -> None: ...
 
-    async def list(self, limit: int = 50) -> list[PipelineRunResponse]: ...
+    async def list(
+        self,
+        limit: int = 50,
+        user_id: str | None = None,
+    ) -> list[PipelineRunResponse]: ...
 
-    async def delete(self, run_id: str) -> bool: ...
+    async def delete(self, run_id: str, user_id: str | None = None) -> bool: ...
 
     async def ensure_initial_version(
         self, run_id: str, playbook_json: str, created_at: str

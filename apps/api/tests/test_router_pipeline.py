@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import sqlite3
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
+from app.domain.models.pipeline_run import PipelineRunStatus
 from app.infrastructure.persistence.db_init import init_db
+from app.infrastructure.persistence.sqlite_account_repository import SqliteAccountRepository
 from app.infrastructure.persistence.sqlite_director_repository import (
     SqliteRunDirectorRepository,
 )
@@ -35,6 +39,11 @@ _VALID_CIR = json.dumps({
 class _MockLLM:
     async def complete(self, system: str, user: str) -> str:
         return _VALID_CIR
+
+
+class _FailingLLM:
+    async def complete(self, system: str, user: str) -> str:
+        raise RuntimeError("provider failed")
 
 
 @pytest.fixture
@@ -152,6 +161,121 @@ def test_ops_edition_rejects_client_provider_override(monkeypatch, tmp_path) -> 
     assert "平台托管模型" in resp.json()["detail"]
 
 
+def test_ops_pipeline_scopes_runs_and_consumes_balance(monkeypatch, tmp_path) -> None:
+    get_settings.cache_clear()
+    db = str(tmp_path / "ops-scope.db")
+    init_db(db)
+    repo = SqliteRunRepository(db)
+    director_repo = SqliteRunDirectorRepository(db)
+    session_a = _session_with_balance(db, 20)
+    session_b = _session_with_balance(db, 20)
+    monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
+    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", db)
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    monkeypatch.setenv("METAVIEW_GENERATION_COST_CENTS", "10")
+    app = create_app()
+    app.dependency_overrides[get_run_repo] = lambda: repo
+    app.dependency_overrides[get_run_director_repo] = lambda: director_repo
+    app.dependency_overrides[get_llm_provider] = lambda: _MockLLM()
+
+    with TestClient(app) as client_a:
+        created = client_a.post(
+            "/api/v1/pipeline",
+            json={"prompt": "ops run"},
+            headers={"Cookie": f"mv_session={session_a.token}"},
+        )
+        run_id = created.json()["run_id"]
+        own_get = client_a.get(
+            f"/api/v1/runs/{run_id}",
+            headers={"Cookie": f"mv_session={session_a.token}"},
+        )
+        own_list = client_a.get(
+            "/api/v1/runs",
+            headers={"Cookie": f"mv_session={session_a.token}"},
+        )
+
+    with TestClient(app) as client_b:
+        other_get = client_b.get(
+            f"/api/v1/runs/{run_id}",
+            headers={"Cookie": f"mv_session={session_b.token}"},
+        )
+        other_delete = client_b.delete(
+            f"/api/v1/runs/{run_id}",
+            headers={"Cookie": f"mv_session={session_b.token}"},
+        )
+
+    get_settings.cache_clear()
+    assert created.status_code == 202
+    assert own_get.status_code == 200
+    assert any(item["run_id"] == run_id for item in own_list.json())
+    assert other_get.status_code == 404
+    assert other_delete.status_code == 404
+    assert _balance(db, session_a.account.user_id) == 10
+    assert _ledger_count(db, session_a.account.user_id, "consume") == 1
+
+
+def test_ops_pipeline_rejects_insufficient_balance(monkeypatch, tmp_path) -> None:
+    get_settings.cache_clear()
+    db = str(tmp_path / "ops-insufficient.db")
+    init_db(db)
+    repo = SqliteRunRepository(db)
+    director_repo = SqliteRunDirectorRepository(db)
+    session = _session_with_balance(db, 0)
+    monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
+    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", db)
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    monkeypatch.setenv("METAVIEW_GENERATION_COST_CENTS", "10")
+    app = create_app()
+    app.dependency_overrides[get_run_repo] = lambda: repo
+    app.dependency_overrides[get_run_director_repo] = lambda: director_repo
+    app.dependency_overrides[get_llm_provider] = lambda: _MockLLM()
+
+    with TestClient(app) as client:
+        resp = client.post(
+            "/api/v1/pipeline",
+            json={"prompt": "ops run"},
+            headers={"Cookie": f"mv_session={session.token}"},
+        )
+
+    get_settings.cache_clear()
+    assert resp.status_code == 402
+    assert "余额不足" in resp.json()["detail"]
+    assert _run(repo.list()) == []
+
+
+def test_ops_pipeline_refunds_balance_when_generation_fails(monkeypatch, tmp_path) -> None:
+    get_settings.cache_clear()
+    db = str(tmp_path / "ops-refund.db")
+    init_db(db)
+    repo = SqliteRunRepository(db)
+    director_repo = SqliteRunDirectorRepository(db)
+    session = _session_with_balance(db, 20)
+    monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
+    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", db)
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    monkeypatch.setenv("METAVIEW_GENERATION_COST_CENTS", "10")
+    app = create_app()
+    app.dependency_overrides[get_run_repo] = lambda: repo
+    app.dependency_overrides[get_run_director_repo] = lambda: director_repo
+    app.dependency_overrides[get_llm_provider] = lambda: _FailingLLM()
+
+    with TestClient(app) as client:
+        resp = client.post(
+            "/api/v1/pipeline",
+            json={"prompt": "ops run"},
+            headers={"Cookie": f"mv_session={session.token}"},
+        )
+
+    get_settings.cache_clear()
+    run = _run(repo.get(resp.json()["run_id"], user_id=session.account.user_id))
+    assert resp.status_code == 202
+    assert run is not None
+    assert run.status == PipelineRunStatus.FAILED
+    assert _balance(db, session.account.user_id) == 20
+    assert _ledger_count(db, session.account.user_id, "consume") == 1
+    assert _ledger_count(db, session.account.user_id, "refund") == 1
+
+
 def test_get_run_includes_active_director_after_success(client) -> None:
     post_resp = client.post("/api/v1/pipeline", json={"prompt": "可视化栈"})
     run_id = post_resp.json()["run_id"]
@@ -225,3 +349,43 @@ def test_init_db_migrates_legacy_request_id_schema(tmp_path) -> None:
 
     assert "run_id" in cols
     assert row is not None
+
+
+def _session_with_balance(db: str, balance_cents: int):
+    session = _run(SqliteAccountRepository(db).get_or_create_session(None, session_days=30))
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            "UPDATE accounts SET balance_cents = ? WHERE user_id = ?",
+            (balance_cents, session.account.user_id),
+        )
+        conn.commit()
+    return session
+
+
+def _balance(db: str, user_id: str) -> int:
+    with sqlite3.connect(db) as conn:
+        row = conn.execute(
+            "SELECT balance_cents FROM accounts WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+    assert row is not None
+    return int(row[0])
+
+
+def _ledger_count(db: str, user_id: str, kind: str) -> int:
+    with sqlite3.connect(db) as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) FROM balance_ledger WHERE user_id = ? AND kind = ?",
+            (user_id, kind),
+        ).fetchone()
+    assert row is not None
+    return int(row[0])
+
+
+def _run(coro):
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop.run_until_complete(coro)

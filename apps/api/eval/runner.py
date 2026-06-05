@@ -31,6 +31,7 @@ from typing import Any
 
 import yaml  # type: ignore[import]
 
+from eval.live_client import generate_live_playbook
 from eval.scorers import ScoreCard, score_playbook
 
 REPO_ROOT = pathlib.Path(__file__).parents[3]  # worktree root
@@ -52,22 +53,19 @@ def _load_recorded(prompt_id: str) -> str | None:
     return None
 
 
-def _generate_live(prompt: str, api_base: str, timeout: int = 120) -> str:
-    """POST prompt to /api/pipeline/run and return the playbook JSON string."""
-    try:
-        import httpx  # optional dep — present in dev requirements
-    except ImportError:
-        raise RuntimeError("httpx not installed; run: uv add httpx")
-
-    payload = {"prompt": prompt, "generation_mode": "agent"}
-    resp = httpx.post(f"{api_base}/api/pipeline/run", json=payload, timeout=timeout)
-    resp.raise_for_status()
-    data = resp.json()
-
-    playbook = data.get("playbook")
-    if playbook is None:
-        raise ValueError(f"No 'playbook' in response: {data}")
-    return json.dumps(playbook) if isinstance(playbook, dict) else playbook
+def _generate_live(
+    prompt: str,
+    api_base: str,
+    api_prefix: str = "/api/v1",
+    timeout: int = 900,
+) -> str:
+    """Submit prompt to the async pipeline API and return the playbook JSON."""
+    return generate_live_playbook(
+        prompt,
+        api_base,
+        api_prefix=api_prefix,
+        timeout=timeout,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -138,6 +136,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="Path to prompts YAML (default: eval/prompts/starter.yaml)")
     parser.add_argument("--api", default="http://localhost:8000",
                         help="API base URL for --live mode")
+    parser.add_argument("--api-prefix", default="/api/v1",
+                        help="API prefix for --live mode")
+    parser.add_argument("--live-timeout", type=int, default=900,
+                        help="Seconds to wait for each live run")
     parser.add_argument("--output", default=None,
                         help="Path for JSON report (default: eval/reports/<timestamp>.json)")
     parser.add_argument("--ids", nargs="*", help="Subset of prompt IDs to run")
@@ -163,7 +165,12 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.live:
             try:
-                raw = _generate_live(prompt_text, args.api)
+                raw = _generate_live(
+                    prompt_text,
+                    args.api,
+                    api_prefix=args.api_prefix,
+                    timeout=args.live_timeout,
+                )
             except Exception as exc:
                 raw = json.dumps({"error": str(exc)})
                 print(f"  {pid}: generation failed — {exc}")

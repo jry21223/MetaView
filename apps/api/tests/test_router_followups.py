@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sqlite3
 from collections.abc import Iterator
 
 import pytest
@@ -10,6 +11,7 @@ from fastapi.testclient import TestClient
 from app.config import get_settings
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.infrastructure.persistence.db_init import init_db
+from app.infrastructure.persistence.sqlite_account_repository import SqliteAccountRepository
 from app.infrastructure.persistence.sqlite_director_repository import (
     SqliteRunDirectorRepository,
 )
@@ -252,9 +254,88 @@ def test_followup_ops_rejects_provider_override(monkeypatch, tmp_path) -> None:
     assert resp.status_code == 400
 
 
-def _seed_run(repo: SqliteRunRepository) -> str:
+def test_followup_ops_scopes_run_and_consumes_balance(monkeypatch, tmp_path) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
+    monkeypatch.setenv("METAVIEW_OPENAI_API_KEY", "sk-server")
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    monkeypatch.setenv("METAVIEW_GENERATION_COST_CENTS", "10")
+    db = str(tmp_path / "ops-followup.db")
+    init_db(db)
+    repo = SqliteRunRepository(db)
+    director_repo = SqliteRunDirectorRepository(db)
+    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", db)
+    owner = _session_with_balance(db, 20)
+    other = _session_with_balance(db, 20)
+    run_id = _seed_run(repo, user_id=owner.account.user_id)
+    app = create_app()
+    app.dependency_overrides[get_run_repo] = lambda: repo
+    app.dependency_overrides[get_run_director_repo] = lambda: director_repo
+    app.dependency_overrides[get_llm_provider] = lambda: SequenceLLM([_llm_payload([])])
+
+    with TestClient(app) as client:
+        ok = client.post(
+            f"/api/v1/runs/{run_id}/follow-up",
+            json={"message": "改一下"},
+            headers={"Cookie": f"mv_session={owner.token}"},
+        )
+
+    with TestClient(app) as client:
+        blocked_followup = client.post(
+            f"/api/v1/runs/{run_id}/follow-up",
+            json={"message": "越权改一下"},
+            headers={"Cookie": f"mv_session={other.token}"},
+        )
+        blocked_restore = client.post(
+            f"/api/v1/runs/{run_id}/versions/{run_id}:v0/restore",
+            headers={"Cookie": f"mv_session={other.token}"},
+        )
+
+    get_settings.cache_clear()
+    assert ok.status_code == 200
+    assert blocked_followup.status_code == 404
+    assert blocked_restore.status_code == 404
+    assert _balance(db, owner.account.user_id) == 10
+    assert _ledger_count(db, owner.account.user_id, "consume") == 1
+
+
+def test_followup_ops_refunds_balance_when_patch_fails(monkeypatch, tmp_path) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
+    monkeypatch.setenv("METAVIEW_OPENAI_API_KEY", "sk-server")
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    monkeypatch.setenv("METAVIEW_GENERATION_COST_CENTS", "10")
+    db = str(tmp_path / "ops-followup-refund.db")
+    init_db(db)
+    repo = SqliteRunRepository(db)
+    director_repo = SqliteRunDirectorRepository(db)
+    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", db)
+    owner = _session_with_balance(db, 20)
+    run_id = _seed_run(repo, user_id=owner.account.user_id)
+    app = create_app()
+    app.dependency_overrides[get_run_repo] = lambda: repo
+    app.dependency_overrides[get_run_director_repo] = lambda: director_repo
+    app.dependency_overrides[get_llm_provider] = lambda: SequenceLLM([
+        _llm_payload([{"op": "replace", "path": "/fps", "value": 24}])
+    ])
+
+    with TestClient(app) as client:
+        resp = client.post(
+            f"/api/v1/runs/{run_id}/follow-up",
+            json={"message": "改一下"},
+            headers={"Cookie": f"mv_session={owner.token}"},
+        )
+
+    get_settings.cache_clear()
+    assert resp.status_code == 422
+    assert _balance(db, owner.account.user_id) == 20
+    assert _ledger_count(db, owner.account.user_id, "consume") == 1
+    assert _ledger_count(db, owner.account.user_id, "refund") == 1
+
+
+def _seed_run(repo: SqliteRunRepository, user_id: str | None = None) -> str:
     run_id = "run-1"
-    _run(repo.create(run_id, "prompt", "2026-06-01T00:00:00+00:00"))
+    _run(repo.create(run_id, "prompt", "2026-06-01T00:00:00+00:00", user_id=user_id))
     _run(
         repo.update(
             run_id,
@@ -272,6 +353,37 @@ def _run(coro):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
     return loop.run_until_complete(coro)
+
+
+def _session_with_balance(db: str, balance_cents: int):
+    session = _run(SqliteAccountRepository(db).get_or_create_session(None, session_days=30))
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            "UPDATE accounts SET balance_cents = ? WHERE user_id = ?",
+            (balance_cents, session.account.user_id),
+        )
+        conn.commit()
+    return session
+
+
+def _balance(db: str, user_id: str) -> int:
+    with sqlite3.connect(db) as conn:
+        row = conn.execute(
+            "SELECT balance_cents FROM accounts WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+    assert row is not None
+    return int(row[0])
+
+
+def _ledger_count(db: str, user_id: str, kind: str) -> int:
+    with sqlite3.connect(db) as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) FROM balance_ledger WHERE user_id = ? AND kind = ?",
+            (user_id, kind),
+        ).fetchone()
+    assert row is not None
+    return int(row[0])
 
 
 def _llm_payload(patch: list[dict]) -> str:

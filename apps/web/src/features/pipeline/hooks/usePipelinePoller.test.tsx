@@ -1,6 +1,6 @@
-import { cleanup, render, waitFor } from "@testing-library/react";
+import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { PipelineRunResult } from "../../../entities/pipeline/types";
 import { server } from "../../../mocks/server";
@@ -14,6 +14,7 @@ function PollerProbe({ runId }: { runId: string | null }) {
     <div>
       <span data-testid="status">{result.status ?? "none"}</span>
       <span data-testid="loading">{String(result.isLoading)}</span>
+      <span data-testid="error">{result.error ?? ""}</span>
     </div>
   );
 }
@@ -33,6 +34,7 @@ function fixtureRun(status: PipelineRunResult["status"]): PipelineRunResult {
 describe("usePipelinePoller", () => {
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
   });
 
   it("keeps the loading animation active while the API reports reviewing", async () => {
@@ -55,5 +57,26 @@ describe("usePipelinePoller", () => {
 
     await waitFor(() => expect(getByTestId("status").textContent).toBe("succeeded"));
     expect(getByTestId("loading").textContent).toBe("false");
+  });
+
+  it("keeps polling beyond the old four-minute budget without marking the run failed", async () => {
+    vi.useFakeTimers();
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/runs/run-1`, () => HttpResponse.json(fixtureRun("running"))),
+    );
+
+    const { getByTestId } = render(<PollerProbe runId="run-1" />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(getByTestId("status").textContent).toBe("running");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(902_000);
+    });
+
+    expect(getByTestId("status").textContent).toBe("running");
+    expect(getByTestId("loading").textContent).toBe("true");
+    expect(getByTestId("error").textContent).toBe("仍在生成，可稍后到历史记录查看");
   });
 });

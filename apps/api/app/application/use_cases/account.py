@@ -10,6 +10,7 @@ from app.application.ports.oauth_client import IOAuthClient
 from app.application.ports.payment_gateway import IPaymentGateway
 from app.config import Settings
 from app.domain.models.account import (
+    PaymentTransaction,
     RechargeOrder,
     SessionAccount,
     amount_to_cents,
@@ -42,6 +43,10 @@ class OrderNotFoundError(AccountUseCaseError):
 
 
 class PaymentNotificationError(AccountUseCaseError):
+    pass
+
+
+class InsufficientBalanceError(AccountUseCaseError):
     pass
 
 
@@ -82,6 +87,43 @@ class AccountUseCase:
         return await self._repo.get_or_create_session(
             token,
             session_days=self._settings.account_session_days,
+        )
+
+    async def consume_generation_credit(
+        self,
+        *,
+        session: SessionAccount,
+        ledger_id: str,
+    ) -> None:
+        cost_cents = self._settings.generation_cost_cents
+        if cost_cents <= 0:
+            return
+        consumed = await self._repo.consume_balance(
+            user_id=session.account.user_id,
+            amount_cents=cost_cents,
+            ledger_id=ledger_id,
+            created_at=datetime.now(timezone.utc).isoformat(),
+        )
+        if not consumed:
+            raise InsufficientBalanceError(
+                f"账户余额不足，本次需要 {money_from_cents(cost_cents)} 元"
+            )
+
+    async def refund_generation_credit(
+        self,
+        *,
+        session: SessionAccount,
+        ledger_id: str,
+    ) -> bool:
+        cost_cents = self._settings.generation_cost_cents
+        if cost_cents <= 0:
+            return True
+        return await self._repo.refund_balance(
+            user_id=session.account.user_id,
+            amount_cents=cost_cents,
+            consume_ledger_id=ledger_id,
+            refund_ledger_id=f"refund:{ledger_id}",
+            created_at=datetime.now(timezone.utc).isoformat(),
         )
 
     async def logout(self, token: str | None) -> None:
@@ -170,6 +212,9 @@ class AccountUseCase:
         body: bytes,
     ) -> str:
         transaction = self._payment.decode_notification(headers, body)
+        return await self.handle_payment_transaction(transaction)
+
+    async def handle_payment_transaction(self, transaction: PaymentTransaction) -> str:
         if transaction.trade_state != "SUCCESS":
             return "ignored"
         paid_at = datetime.now(timezone.utc).isoformat()

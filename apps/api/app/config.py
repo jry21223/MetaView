@@ -97,6 +97,7 @@ class Settings(BaseSettings):
     agent_provider: AgentProviderKind = "http"
     agent_base_url: str = "http://agent:8001"
     agent_timeout_s: float = 600.0
+    agent_shared_token: str | None = None
     codex_model: str | None = None
     codex_effort: str | None = None
     codex_cwd: str = "."
@@ -106,6 +107,7 @@ class Settings(BaseSettings):
     account_session_days: int = 30
     account_session_secure: bool = False
     recharge_min_cents: int = 500
+    generation_cost_cents: int = 10
 
     # WeChat OAuth login (Website App / Open Platform)
     wechat_login_appid: str | None = None
@@ -123,6 +125,8 @@ class Settings(BaseSettings):
     wechat_pay_notify_url: str | None = None
     wechat_pay_platform_public_key_path: str | None = None
     wechat_pay_api_base: str = "https://api.mch.weixin.qq.com"
+    wechat_notify_max_skew_s: int = 300
+    wechat_notify_replay_ttl_s: int = 600
 
     # NewAPI redirect top-up bridge (local/dev checkout integration)
     newapi_topup_intent_secret: str | None = None

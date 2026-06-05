@@ -109,14 +109,18 @@ make check
 | `METAVIEW_AGENT_PROVIDER` | `http` | `agent` 模式实现：`http` 或 `codex` |
 | `METAVIEW_AGENT_BASE_URL` | `http://agent:8001` | agent sidecar 地址 |
 | `METAVIEW_AGENT_TIMEOUT_S` | `600` | agent 生成超时秒数 |
+| `METAVIEW_AGENT_SHARED_TOKEN` | - | API 调用 agent sidecar 的共享鉴权 token |
 | `METAVIEW_CODEX_MODEL` | - | Python Codex SDK 模型覆盖 |
 | `METAVIEW_CODEX_EFFORT` | - | Python Codex SDK reasoning effort |
 | `METAVIEW_CODEX_CWD` | `.` | Codex thread 工作目录 |
+| `METAVIEW_GENERATION_COST_CENTS` | `10` | 运营版每次生成 / follow-up 预扣金额，失败会退款 |
 | `METAVIEW_DEFAULT_PROVIDER` | - | 显式指定默认 provider |
 | `METAVIEW_MOCK_PROVIDER_ENABLED` | `true` | 是否暴露 `mock` provider |
 | `METAVIEW_ENABLED_DOMAINS` | 全部七项 | 启用的学科 |
 | `METAVIEW_MAX_REPAIR_ATTEMPTS` | `2` | CIR 自动修复轮数 |
 | `METAVIEW_HISTORY_DB_PATH` | `data/pipeline_runs.db` | SQLite 路径 |
+| `METAVIEW_WECHAT_NOTIFY_MAX_SKEW_S` | `300` | 微信支付回调时间戳允许偏移秒数 |
+| `METAVIEW_WECHAT_NOTIFY_REPLAY_TTL_S` | `600` | 微信支付回调重放缓存保留秒数 |
 | `METAVIEW_PLAYBOOK_DEFAULT_FPS` | `30` | Remotion 默认帧率 |
 | `METAVIEW_PLAYBOOK_COMPOSITION_WIDTH` / `_HEIGHT` | `960` / `540` | 默认画布 |
 | `METAVIEW_CORS_ORIGIN_REGEX` | localhost 正则 | 允许的浏览器来源 |
@@ -181,6 +185,7 @@ Remotion 尺寸和 FPS 必须从 `PLAYBOOK_DEFAULTS` 读取；组件内不要写
 - [`docs/README.md`](docs/README.md) - 开发文档索引
 - [`docs/pipeline.md`](docs/pipeline.md) - CIR、PlaybookScript、时间轴和视频导出管线
 - [`docs/frontend-shell.md`](docs/frontend-shell.md) - Stage 路由、GlobalTopbar、Studio 布局、Provider 配置
+- [`docs/html-css-implementation.md`](docs/html-css-implementation.md) - HTML/CSS 写法和项目对应关系
 - [`docs/remotion-skills.md`](docs/remotion-skills.md) - Remotion 组件、渲染器、注册表约定
 - [`docs/topic-routing.md`](docs/topic-routing.md) - 学科路由策略
 - [`docs/skill-ab-eval.md`](docs/skill-ab-eval.md) - specialized / generic skill 对比

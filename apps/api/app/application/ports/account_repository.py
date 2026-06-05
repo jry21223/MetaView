@@ -65,3 +65,22 @@ class IAccountRepository(Protocol):
         provider_order_id: str,
         paid_at: str,
     ) -> RechargeOrder | None: ...
+
+    async def consume_balance(
+        self,
+        *,
+        user_id: str,
+        amount_cents: int,
+        ledger_id: str,
+        created_at: str,
+    ) -> bool: ...
+
+    async def refund_balance(
+        self,
+        *,
+        user_id: str,
+        amount_cents: int,
+        consume_ledger_id: str,
+        refund_ledger_id: str,
+        created_at: str,
+    ) -> bool: ...

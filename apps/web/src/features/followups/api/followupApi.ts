@@ -54,6 +54,7 @@ export async function submitRunFollowUp(
   const response = await fetch(`${API_BASE_URL}/api/v1/runs/${runId}/follow-up`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify({
       message,
       messages,
@@ -73,7 +74,10 @@ export async function listRunFollowUps(
   runId: string,
   signal?: AbortSignal,
 ): Promise<RunFollowUpsResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/runs/${runId}/follow-ups`, { signal });
+  const response = await fetch(`${API_BASE_URL}/api/v1/runs/${runId}/follow-ups`, {
+    credentials: "include",
+    signal,
+  });
   if (!response.ok) {
     throw new Error(await readErrorMessage(response, "Failed to load follow-ups"));
   }
@@ -86,6 +90,7 @@ export async function restoreRunVersion(
 ): Promise<{ version_id: string; playbook: PlaybookScript; director?: DirectorScript | null }> {
   const response = await fetch(`${API_BASE_URL}/api/v1/runs/${runId}/versions/${versionId}/restore`, {
     method: "POST",
+    credentials: "include",
   });
   if (!response.ok) {
     throw new Error(await readErrorMessage(response, "Version restore failed"));

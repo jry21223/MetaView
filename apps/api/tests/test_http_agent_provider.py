@@ -19,6 +19,8 @@ from app.infrastructure.agent.http_agent_provider import HttpAgentProvider
 
 def _make_provider_with_handler(
     handler,
+    *,
+    shared_token: str | None = None,
 ) -> HttpAgentProvider:
     """Construct a HttpAgentProvider whose internal AsyncClient is backed by an
     in-memory transport. We monkeypatch httpx.AsyncClient at the class level via
@@ -36,7 +38,11 @@ def _make_provider_with_handler(
     from app.infrastructure.agent import http_agent_provider as mod
 
     mod.httpx.AsyncClient = _PatchedAsyncClient  # type: ignore[assignment]
-    return HttpAgentProvider(base_url="http://agent:8001", timeout_s=5.0)
+    return HttpAgentProvider(
+        base_url="http://agent:8001",
+        timeout_s=5.0,
+        shared_token=shared_token,
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -99,6 +105,29 @@ async def test_forwards_provider_config_when_user_key_supplied() -> None:
         "base_url": "https://x",
         "model": "gpt-4o-mini",
     }
+
+
+@pytest.mark.asyncio
+async def test_forwards_agent_shared_token_header() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers["x-metaview-agent-token"] == "shared-secret"
+        return httpx.Response(
+            200,
+            json={
+                "playbook": {
+                    "fps": 30,
+                    "total_frames": 1,
+                    "domain": "math",
+                    "title": "t",
+                    "summary": "s",
+                    "steps": [],
+                    "parameter_controls": [],
+                }
+            },
+        )
+
+    provider = _make_provider_with_handler(handler, shared_token="shared-secret")
+    await provider.generate("prompt")
 
 
 @pytest.mark.asyncio

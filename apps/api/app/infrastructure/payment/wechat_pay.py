@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import secrets
+import sqlite3
 import time
 from pathlib import Path
 from typing import Any
@@ -184,6 +186,12 @@ class WeChatPayClient:
         signature = headers.get("wechatpay-signature") or headers.get("Wechatpay-Signature")
         if not timestamp or not nonce or not signature:
             raise WeChatPayGatewayError("WeChat Pay notification signature headers missing")
+        timestamp_seconds = _parse_timestamp(timestamp)
+        now_seconds = int(time.time())
+        if abs(now_seconds - timestamp_seconds) > self._settings.wechat_notify_max_skew_s:
+            raise WeChatPayGatewayError(
+                "WeChat Pay notification timestamp is outside the allowed window"
+            )
 
         try:
             from cryptography.hazmat.primitives import hashes, serialization
@@ -200,3 +208,41 @@ class WeChatPayClient:
             raise WeChatPayConfigError("WeChat Pay platform public key is unreadable") from exc
         public_key = serialization.load_pem_public_key(public_key_source)
         public_key.verify(base64.b64decode(signature), message, padding.PKCS1v15(), hashes.SHA256())
+        self._record_notification_replay(timestamp, nonce, signature, now_seconds)
+
+    def _record_notification_replay(
+        self,
+        timestamp: str,
+        nonce: str,
+        signature: str,
+        now_seconds: int,
+    ) -> None:
+        key = hashlib.sha256(f"{timestamp}\n{nonce}\n{signature}".encode("utf-8")).hexdigest()
+        ttl = max(1, self._settings.wechat_notify_replay_ttl_s)
+        expires_at = now_seconds + ttl
+        try:
+            with sqlite3.connect(self._settings.history_db_path) as conn:
+                conn.execute(
+                    "DELETE FROM wechat_pay_notification_replays WHERE expires_at < ?",
+                    (now_seconds,),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO wechat_pay_notification_replays
+                        (key_hash, seen_at, expires_at)
+                    VALUES (?, ?, ?)
+                    """,
+                    (key, now_seconds, expires_at),
+                )
+                conn.commit()
+        except sqlite3.IntegrityError as exc:
+            raise WeChatPayGatewayError("WeChat Pay notification replay detected") from exc
+        except sqlite3.Error as exc:
+            raise WeChatPayGatewayError("WeChat Pay replay cache is unavailable") from exc
+
+
+def _parse_timestamp(timestamp: str) -> int:
+    try:
+        return int(timestamp)
+    except ValueError as exc:
+        raise WeChatPayGatewayError("WeChat Pay notification timestamp is invalid") from exc

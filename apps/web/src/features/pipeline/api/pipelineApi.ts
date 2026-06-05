@@ -23,6 +23,7 @@ export async function submitPipeline(
   const response = await fetch(`${API_BASE_URL}/api/v1/pipeline`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify(req),
   });
   if (!response.ok) {
@@ -32,7 +33,9 @@ export async function submitPipeline(
 }
 
 export async function getPipelineRun(runId: string): Promise<PipelineRunResult> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/runs/${runId}`);
+  const response = await fetch(`${API_BASE_URL}/api/v1/runs/${runId}`, {
+    credentials: "include",
+  });
   if (!response.ok) {
     throw new Error(await readErrorMessage(response, "Failed to fetch run"));
   }
