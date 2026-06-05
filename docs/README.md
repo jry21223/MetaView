@@ -7,4 +7,4 @@
 | [remotion-skills.md](./remotion-skills.md) | Remotion 组件 / 渲染器 / 注册表约定 |
 | [newapi-metaview-topup-integration.md](./newapi-metaview-topup-integration.md) | NewAPI 真实站点兼容 MetaView 充值的 signed intent / receipt / quota 入账接入说明 |
 
-> 项目级开发规范见根目录 [`CLAUDE.md`](../CLAUDE.md)，提交协作规范见 [`CONTRIBUTING.md`](../CONTRIBUTING.md)。
+> 项目入口和开发约束见根目录 [`README.md`](../README.md)，提交协作规范见 [`CONTRIBUTING.md`](../CONTRIBUTING.md)。
