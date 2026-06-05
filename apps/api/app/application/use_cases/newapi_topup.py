@@ -178,9 +178,12 @@ class NewApiTopupUseCase:
         intent = await self._repo.get_intent_by_order_id(transaction.order_id)
         if intent is None:
             raise NewApiTopupOrderNotFoundError("NewAPI 充值单不存在")
-        if intent.status == "paid":
+        if intent.status in {"paid", "verified", "acked"}:
             return "success"
-        receipt_code = f"mvr_{secrets.token_urlsafe(24)}"
+        receipt_code = _build_receipt_code(
+            self._settings.newapi_topup_intent_secret,
+            intent.intent_id,
+        )
         paid = await self._repo.mark_paid(
             order_id=transaction.order_id,
             amount_cents=transaction.amount_cents,
@@ -191,6 +194,24 @@ class NewApiTopupUseCase:
         if paid is None or paid.status != "paid":
             raise NewApiTopupPaymentError("微信支付回调金额或订单状态不匹配")
         return "success"
+
+    async def complete_paid_redirect(self, intent_id: str) -> NewApiTopupPaid:
+        intent = await self._repo.get_intent(intent_id)
+        if intent is None:
+            raise NewApiTopupOrderNotFoundError("NewAPI 充值单不存在")
+        if intent.status not in {"paid", "verified", "acked"}:
+            raise NewApiTopupReceiptError("NewAPI 充值单尚未支付")
+        receipt_code = _build_receipt_code(
+            self._settings.newapi_topup_intent_secret,
+            intent.intent_id,
+        )
+        if intent.receipt_code_hash != _hash_receipt(receipt_code):
+            raise NewApiTopupReceiptError("NewAPI receipt_code 无法重建")
+        return NewApiTopupPaid(
+            intent=intent,
+            receipt_code=receipt_code,
+            redirect_url=_build_return_url(intent, receipt_code),
+        )
 
     async def verify_receipt(
         self,
@@ -340,6 +361,17 @@ def _iso_now() -> str:
 
 def _hash_receipt(receipt_code: str) -> str:
     return hashlib.sha256(receipt_code.encode("utf-8")).hexdigest()
+
+
+def _build_receipt_code(secret: str | None, intent_id: str) -> str:
+    if not secret:
+        raise NewApiTopupNotConfiguredError("NewAPI 充值跳转密钥未配置")
+    digest = hmac.new(
+        secret.encode("utf-8"),
+        f"newapi-receipt:{intent_id}".encode("utf-8"),
+        hashlib.sha256,
+    ).digest()
+    return f"mvr_{_b64url_encode(digest)}"
 
 
 def _validate_return_url(return_url: str, *, allowed_origins: str) -> None:

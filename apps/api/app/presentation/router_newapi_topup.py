@@ -99,6 +99,22 @@ async def dev_pay_newapi_topup(
     return RedirectResponse(paid.redirect_url, status_code=303)
 
 
+@router.get("/newapi/topups/{intent_id}/complete")
+@read_limit()
+async def complete_newapi_topup(
+    request: Request,
+    intent_id: str,
+    use_case: Annotated[NewApiTopupUseCase, Depends(get_newapi_topup_use_case)],
+) -> RedirectResponse:
+    try:
+        paid = await use_case.complete_paid_redirect(intent_id)
+    except NewApiTopupOrderNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (NewApiTopupNotConfiguredError, NewApiTopupReceiptError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return RedirectResponse(paid.redirect_url, status_code=303)
+
+
 @router.post(
     "/internal/newapi/topup-receipts/verify",
     response_model=ReceiptVerifyResponse,
@@ -182,6 +198,9 @@ def _checkout_html(request: Request, intent: NewApiTopupIntent, dev_mode: bool) 
     amount = money_from_cents(intent.amount_cents)
     quota = f"{intent.quota_delta:,}"
     dev_action = escape(str(request.url_for("dev_pay_newapi_topup", intent_id=intent.intent_id)))
+    complete_action = escape(
+        str(request.url_for("complete_newapi_topup", intent_id=intent.intent_id))
+    )
     code_url = escape(intent.code_url or "")
     payment_block = (
         f"""
@@ -193,6 +212,9 @@ def _checkout_html(request: Request, intent: NewApiTopupIntent, dev_mode: bool) 
         else f"""
         <p class="hint">微信 Native 支付二维码地址</p>
         <code>{code_url}</code>
+        <form method="get" action="{complete_action}">
+            <button type="submit">已完成支付，返回 NewAPI</button>
+        </form>
         """
     )
     return f"""

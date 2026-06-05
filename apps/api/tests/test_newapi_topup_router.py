@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -9,7 +11,9 @@ from fastapi.testclient import TestClient
 
 from app.application.use_cases.newapi_topup import encode_signed_payload
 from app.config import get_settings
+from app.domain.models.account import NativePaymentOrder, PaymentTransaction
 from app.main import create_app
+from app.presentation.dependencies import get_payment_gateway
 
 
 @pytest.fixture
@@ -124,6 +128,74 @@ def test_newapi_topup_payment_config_error_returns_503(
     assert "微信支付暂不可用" in response.json()["detail"]
 
 
+def test_newapi_topup_real_payment_redirects_with_verifiable_receipt(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", str(tmp_path / "newapi-topup-real.db"))
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_INTENT_SECRET", "intent-secret")
+    monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_RECEIPT_TOKEN", "receipt-token")
+    monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_DEV_MODE", "false")
+    payment = _FakePaymentGateway()
+    app = create_app()
+    app.dependency_overrides[get_payment_gateway] = lambda: payment
+
+    with TestClient(app) as client:
+        start = _start_topup(client)
+        assert start.status_code == 200
+        assert "已完成支付，返回 NewAPI" in start.text
+        intent_id = _extract_intent_id(start.text)
+
+        pending = client.get(
+            f"/api/v1/newapi/topups/{intent_id}/complete",
+            follow_redirects=False,
+        )
+        assert pending.status_code == 400
+        assert "尚未支付" in pending.json()["detail"]
+
+        payment.transaction = PaymentTransaction(
+            order_id=intent_id,
+            amount_cents=500,
+            provider_order_id="wx_tx_newapi_1",
+            trade_state="SUCCESS",
+        )
+        notified = client.post("/api/v1/billing/wechat/notify", content=b"{}")
+        assert notified.status_code == 200
+        assert notified.json() == {"code": "SUCCESS", "message": "success"}
+
+        completed = client.get(
+            f"/api/v1/newapi/topups/{intent_id}/complete",
+            follow_redirects=False,
+        )
+        assert completed.status_code == 303
+        query = parse_qs(urlparse(completed.headers["location"]).query)
+        receipt_code = query["receipt_code"][0]
+        assert query["state"] == ["state-1"]
+        assert query["intent_id"] == [intent_id]
+        assert receipt_code.startswith("mvr_")
+
+        verified = client.post(
+            "/api/v1/internal/newapi/topup-receipts/verify",
+            headers={"Authorization": "Bearer receipt-token"},
+            json={
+                "intent_id": intent_id,
+                "receipt_code": receipt_code,
+                "newapi_user_id": 4,
+                "state": "state-1",
+            },
+        )
+        assert verified.status_code == 200
+        assert verified.json()["status"] == "verified"
+
+        duplicate_notify = client.post("/api/v1/billing/wechat/notify", content=b"{}")
+        assert duplicate_notify.status_code == 200
+        assert duplicate_notify.json() == {"code": "SUCCESS", "message": "success"}
+
+    get_settings.cache_clear()
+
+
 def test_newapi_topup_verify_requires_internal_token(
     newapi_topup_client: TestClient,
 ) -> None:
@@ -175,3 +247,30 @@ def _extract_intent_id(html: str) -> str:
     match = re.search(r"nup[0-9a-f]{29}", html)
     assert match is not None
     return match.group(0)
+
+
+@dataclass
+class _FakePaymentGateway:
+    transaction: PaymentTransaction | None = None
+    configured: bool = True
+
+    async def create_native_order(
+        self,
+        *,
+        order_id: str,
+        amount_cents: int,
+        description: str,
+    ) -> NativePaymentOrder:
+        return NativePaymentOrder(
+            code_url=f"weixin://wxpay/{order_id}",
+            provider_order_id=f"wx_pre_{order_id}",
+        )
+
+    def decode_notification(
+        self,
+        headers: dict[str, str],
+        body: bytes,
+    ) -> PaymentTransaction:
+        if self.transaction is None:
+            raise AssertionError("No fake payment transaction configured")
+        return self.transaction
