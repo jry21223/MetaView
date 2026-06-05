@@ -8,6 +8,7 @@ export type SnapshotKind =
   | "math_plot"
   | "math_formula"
   | "math_scene"
+  | "solid_geometry_scene"
   | "motion_scene"
   | "katex_overlay"
   | "narration_card";
@@ -166,6 +167,47 @@ export interface MathSceneSnapshot {
   params?: Record<string, number>;
 }
 
+export interface SolidGeometryPoint {
+  label: string;
+  position: [number, number, number];
+  math_position_latex?: [string, string, string] | null;
+}
+
+export interface SolidGeometryEdge {
+  start: string;
+  end: string;
+  label?: string | null;
+  emphasis?: "primary" | "secondary" | "muted" | "accent";
+}
+
+export interface SolidGeometryPlane {
+  id: string;
+  vertices: string[];
+  label?: string | null;
+  emphasis?: "primary" | "secondary" | "muted" | "accent";
+}
+
+export interface SolidGeometryVector {
+  id: string;
+  start: string;
+  end?: string | null;
+  direction?: [number, number, number] | null;
+  label?: string | null;
+  emphasis?: "primary" | "secondary" | "muted" | "accent";
+}
+
+export interface SolidGeometrySceneSnapshot {
+  kind: "solid_geometry_scene";
+  points: SolidGeometryPoint[];
+  edges: SolidGeometryEdge[];
+  planes?: SolidGeometryPlane[];
+  vectors?: SolidGeometryVector[];
+  visible_elements?: string[];
+  focus_target?: string | null;
+  formula_latex?: string | null;
+  caption?: string | null;
+}
+
 /** Free-floating KaTeX label anchored at scene coordinates.
  *
  * `x_min/x_max/y_min/y_max` describe the parent scene's viewport so the
@@ -199,6 +241,7 @@ export type AnySnapshot =
   | MathPlotSnapshot
   | MathFormulaSnapshot
   | MathSceneSnapshot
+  | SolidGeometrySceneSnapshot
   | MotionSceneSnapshot
   | KaTeXOverlaySnapshot
   | NarrationCardSnapshot;

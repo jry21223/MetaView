@@ -30,6 +30,12 @@ from app.domain.services.reviewer_prompt import (
     ReviewResult,
     build_reviewer_prompt,
 )
+from app.domain.skills.solid_geometry.geometry_kernel import solve_solid_geometry
+from app.domain.skills.solid_geometry.playbook_adapter import (
+    build_solid_geometry_playbook,
+    validate_solution_playbook_consistency,
+)
+from app.domain.skills.solid_geometry.spec_extractor import extract_solid_geometry_spec
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +144,26 @@ class RunPipelineUseCase:
         """Original single-shot pipeline: prompt → LLM → CIR JSON → builder."""
         review_report = CirReviewReport()
         try:
+            solid_spec = extract_solid_geometry_spec(request.prompt)
+            if solid_spec is not None:
+                solution = solve_solid_geometry(solid_spec)
+                playbook = build_solid_geometry_playbook(
+                    solution,
+                    run_id=run_id,
+                    prompt=request.prompt,
+                )
+                validate_solution_playbook_consistency(solution, playbook)
+                review_report.status = "clean"
+                review_report.actions.append("solid_geometry_skill_pack")
+                await self._repo.update(
+                    run_id,
+                    status=PipelineRunStatus.SUCCEEDED,
+                    playbook_json=playbook.model_dump_json(),
+                    review_json=review_report.model_dump_json(),
+                )
+                await self._upsert_default_director(run_id, playbook)
+                return
+
             route = _resolve_route(request)
             logger.info(
                 "Pipeline route: skill_mode=%s domain=%s reason=%s matched=%s",

@@ -45,6 +45,12 @@ A solid geometry skill pack can eventually emit a beat like:
 
 The Director does not decide how the camera is moved. It only names the intent. The selected renderer adapter owns concrete execution.
 
-## V1 Boundary
+## Solid Geometry V1
 
-This document adds the bridge vocabulary only. It does not add a geometry kernel, a physics solver, Canvas/WebGL renderers, Three.js, or an editor UI.
+The first concrete skill pack using this bridge is documented in
+[`solid-geometry-skill.md`](./solid-geometry-skill.md). It adds a small
+SymPy-backed kernel and an SVG `solid_geometry_scene` renderer, while keeping
+the existing `PlaybookScript -> DirectorScript -> Renderer` boundary.
+
+Still out of scope for the shared skill-pack bridge: a physics solver,
+Canvas/WebGL renderers, Three.js camera execution, or an editor UI.

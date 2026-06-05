@@ -13,6 +13,7 @@ export function snapshotSurface(kind: SnapshotKind): SnapshotSurface {
     case "math_plot":
     case "math_formula":
     case "math_scene":
+    case "solid_geometry_scene":
     case "motion_scene":
     default:
       return "stage";

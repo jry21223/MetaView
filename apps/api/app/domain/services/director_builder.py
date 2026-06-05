@@ -59,6 +59,7 @@ def build_default_director(playbook: PlaybookScript, run_id: str) -> DirectorScr
                 pacing=pacing,
                 voiceover_text=None,
                 emphasis_terms=_extract_emphasis_terms(step),
+                focus_target=getattr(step.snapshot, "focus_target", None),
             )
         )
         previous_end = end_frame
@@ -71,7 +72,7 @@ def _beat_style(
 ) -> tuple[DirectorIntent, DirectorShotType, DirectorCameraMotion, DirectorPacing]:
     if snapshot.kind in {"math_formula", "math_plot", "katex_overlay"}:
         return "focus", "close", "hold", "normal"
-    if snapshot.kind in {"math_scene", "motion_scene"}:
+    if snapshot.kind in {"math_scene", "motion_scene", "solid_geometry_scene"}:
         return "reveal", "medium", "hold", "normal"
     if snapshot.kind == "narration_card":
         return "summary", "wide", "hold", "normal"
@@ -105,6 +106,8 @@ def _snapshot_text(snapshot: AnySnapshot) -> list[str]:
             curve_text = [curve.expression for curve in snapshot.curves]
             return [snapshot.formula_latex or "", *curve_text]
         case "math_scene":
+            return [snapshot.formula_latex or "", snapshot.caption or ""]
+        case "solid_geometry_scene":
             return [snapshot.formula_latex or "", snapshot.caption or ""]
         case "narration_card":
             return [snapshot.text]

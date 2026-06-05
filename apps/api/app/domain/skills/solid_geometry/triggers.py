@@ -13,7 +13,24 @@ class SkillTrigger:
 SOLID_GEOMETRY_TRIGGERS: tuple[SkillTrigger, ...] = (
     SkillTrigger(
         skill_id="solid_geometry",
-        keywords=("solid geometry", "tetrahedron", "prism", "pyramid", "line_be"),
+        keywords=(
+            "立体几何",
+            "线面角",
+            "二面角",
+            "异面直线",
+            "点到平面距离",
+            "正四棱锥",
+            "正方体",
+            "长方体",
+            "solid geometry",
+            "line-plane angle",
+            "dihedral angle",
+            "skew lines",
+            "point-to-plane distance",
+            "cube",
+            "cuboid",
+            "pyramid",
+        ),
         output_contract="ProblemSpec -> PlaybookScript -> DirectorScript",
     ),
 )

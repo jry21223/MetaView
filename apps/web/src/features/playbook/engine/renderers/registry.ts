@@ -8,6 +8,7 @@ import { MathPlotRenderer } from "./MathPlotRenderer";
 import { MathSceneRenderer } from "./MathSceneRenderer";
 import { MotionSceneRenderer } from "./MotionSceneRenderer";
 import { NarrationCardRenderer } from "./NarrationCardRenderer";
+import { SolidGeometrySceneRenderer } from "./SolidGeometrySceneRenderer";
 
 const registry = new Map<SnapshotKind, RendererComponent>([
   ["algorithm_array", DomainArrayRenderer],
@@ -16,6 +17,7 @@ const registry = new Map<SnapshotKind, RendererComponent>([
   ["math_plot", MathPlotRenderer],
   ["math_formula", MathFormulaRenderer],
   ["math_scene", MathSceneRenderer],
+  ["solid_geometry_scene", SolidGeometrySceneRenderer],
   ["motion_scene", MotionSceneRenderer],
   ["katex_overlay", KaTeXOverlayRenderer],
   ["narration_card", NarrationCardRenderer],

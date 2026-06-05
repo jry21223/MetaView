@@ -16,6 +16,7 @@ class SnapshotKind(str, Enum):
     MATH_PLOT = "math_plot"
     MATH_FORMULA = "math_formula"
     MATH_SCENE = "math_scene"
+    SOLID_GEOMETRY_SCENE = "solid_geometry_scene"
     MOTION_SCENE = "motion_scene"
     KATEX_OVERLAY = "katex_overlay"
     NARRATION_CARD = "narration_card"
@@ -175,6 +176,50 @@ class MathSceneSnapshot(BaseModel):
     caption: str | None = None
 
 
+SolidGeometryEmphasis = Literal["primary", "secondary", "muted", "accent"]
+
+
+class SolidGeometryPoint(BaseModel):
+    label: str
+    position: tuple[float, float, float]
+    math_position_latex: tuple[str, str, str] | None = None
+
+
+class SolidGeometryEdge(BaseModel):
+    start: str
+    end: str
+    label: str | None = None
+    emphasis: SolidGeometryEmphasis = "secondary"
+
+
+class SolidGeometryPlane(BaseModel):
+    id: str
+    vertices: list[str]
+    label: str | None = None
+    emphasis: SolidGeometryEmphasis = "secondary"
+
+
+class SolidGeometryVector(BaseModel):
+    id: str
+    start: str
+    end: str | None = None
+    direction: tuple[float, float, float] | None = None
+    label: str | None = None
+    emphasis: SolidGeometryEmphasis = "accent"
+
+
+class SolidGeometrySceneSnapshot(BaseModel):
+    kind: Literal["solid_geometry_scene"] = "solid_geometry_scene"
+    points: list[SolidGeometryPoint] = Field(default_factory=list)
+    edges: list[SolidGeometryEdge] = Field(default_factory=list)
+    planes: list[SolidGeometryPlane] = Field(default_factory=list)
+    vectors: list[SolidGeometryVector] = Field(default_factory=list)
+    visible_elements: list[str] = Field(default_factory=list)
+    focus_target: str | None = None
+    formula_latex: str | None = None
+    caption: str | None = None
+
+
 MotionStyle = Literal["primary", "secondary", "accent", "muted"]
 MotionTextStyle = Literal["title", "label", "caption"]
 MotionEasing = Literal["linear", "easeOut", "easeInOut", "spring"]
@@ -312,6 +357,7 @@ AnySnapshot = Annotated[
         MathPlotSnapshot,
         MathFormulaSnapshot,
         MathSceneSnapshot,
+        SolidGeometrySceneSnapshot,
         MotionSceneSnapshot,
         KaTeXOverlaySnapshot,
         NarrationCardSnapshot,

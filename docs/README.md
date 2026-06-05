@@ -6,6 +6,7 @@
 | [frontend-shell.md](./frontend-shell.md) | Stage 路由、GlobalTopbar、Studio 布局、Provider 配置 |
 | [html-css-implementation.md](./html-css-implementation.md) | HTML 中 CSS 的三种写法、选择器、盒模型、Flex 示例和项目内对应关系 |
 | [remotion-skills.md](./remotion-skills.md) | Remotion 组件 / 渲染器 / 注册表约定 |
+| [solid-geometry-skill.md](./solid-geometry-skill.md) | 立体几何 deterministic skill pack：ProblemSpec、SymPy kernel、Playbook snapshot 与 V1 范围 |
 | [newapi-metaview-topup-integration.md](./newapi-metaview-topup-integration.md) | NewAPI 真实站点兼容 MetaView 充值的 signed intent / receipt / quota 入账接入说明 |
 
 > 项目入口和开发约束见根目录 [`README.md`](../README.md)，提交协作规范见 [`CONTRIBUTING.md`](../CONTRIBUTING.md)。
