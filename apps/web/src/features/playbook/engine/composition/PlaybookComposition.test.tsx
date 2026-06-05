@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type {
   DirectorCameraMotion,
+  DirectorSource,
   DirectorScript,
   Layer,
   MathPlotSnapshot,
@@ -82,10 +83,11 @@ function directorFor(
   script: PlaybookScript,
   cameraMotion: DirectorCameraMotion,
   voiceoverText = "Director override.",
+  source: DirectorSource = "rule",
 ): DirectorScript {
   return {
     schema_version: "1.0.0",
-    source: "rule",
+    source,
     run_id: "run-1",
     beats: [
       {
@@ -99,6 +101,30 @@ function directorFor(
         pacing: "normal",
         voiceover_text: voiceoverText,
         emphasis_terms: [],
+      },
+    ],
+  };
+}
+
+function mathSceneScript(): PlaybookScript {
+  return {
+    fps: 30,
+    total_frames: 60,
+    domain: "math",
+    title: "几何场景",
+    summary: "Shows a geometry scene",
+    parameter_controls: [],
+    steps: [
+      {
+        step_id: "s1",
+        end_frame: 60,
+        title: "画线段",
+        voiceover_text: "观察线段长度",
+        tokens: [],
+        snapshot: sceneSnapshot({
+          points: [{ x: 0, y: 0, label: "A" }],
+          segments: [{ x0: 0, y0: 0, x1: 2, y1: 1, label: "AB" }],
+        }),
       },
     ],
   };
@@ -282,22 +308,33 @@ describe("PlaybookComposition", () => {
     expect(markup).not.toContain("transform:");
   });
 
-  it("uses director voiceover text for subtitles when present", () => {
+  it("uses manual director voiceover text for subtitles when present", () => {
     const script = mathScript();
     const markup = renderToStaticMarkup(
-      <PlaybookComposition script={script} director={directorFor(script, "hold", "导演旁白覆盖。")} />,
+      <PlaybookComposition script={script} director={directorFor(script, "hold", "导演旁白覆盖。", "manual")} />,
     );
 
     expect(markup).toContain("导演旁白覆盖。");
     expect(markup).not.toContain("观察斜率变化");
   });
 
+  it("does not let rule director voiceover override subtitles", () => {
+    const script = mathScript();
+    const markup = renderToStaticMarkup(
+      <PlaybookComposition script={script} director={directorFor(script, "hold", "规则旁白不覆盖。")} />,
+    );
+
+    expect(markup).toContain("观察斜率变化");
+    expect(markup).not.toContain("规则旁白不覆盖。");
+  });
+
   it.each([
     ["hold", undefined],
-    ["push_in", "transform:scale(1.0300)"],
-    ["pull_out", "transform:scale(1.0300)"],
-    ["pan_left", "transform:translateX(-9.00px)"],
-    ["pan_right", "transform:translateX(9.00px)"],
+    ["push_in", "transform:scale(1.0125)"],
+    ["pull_out", "transform:scale(1.0125)"],
+    ["pan_left", "transform:translateX(-7.00px)"],
+    ["pan_right", "transform:translateX(7.00px)"],
+    ["focus_target", undefined],
   ] as const)("applies %s camera motion to the visual stage", (cameraMotion, expectedTransform) => {
     remotionState.frame = 30;
     const script = mathScript();
@@ -311,6 +348,18 @@ describe("PlaybookComposition", () => {
     } else {
       expect(markup).not.toContain("transform:");
     }
+  });
+
+  it("does not apply outer stage camera transforms to math_scene steps", () => {
+    remotionState.frame = 30;
+    const script = mathSceneScript();
+    const markup = renderToStaticMarkup(
+      <PlaybookComposition script={script} director={directorFor(script, "push_in")} showSubtitles={false} />,
+    );
+
+    expect(markup).toContain('data-camera-motion="push_in"');
+    expect(markup).toContain('data-director-adapter="math_scene"');
+    expect(markup).not.toContain("transform:scale(1.0125)");
   });
 
   it("merges simultaneous math plot layers into one scene", () => {

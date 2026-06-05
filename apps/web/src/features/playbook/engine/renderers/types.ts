@@ -1,4 +1,5 @@
 import type { MetaStep } from "../types";
+import type { DirectorFramePlan } from "../director/framePlan";
 
 export type RendererRenderMode = "standalone" | "stage-base" | "stage-overlay";
 
@@ -33,6 +34,8 @@ export interface RendererProps {
    * call sites that don't pipe it through keep working.
    */
   swapDurationFrames?: number;
+  /** Per-frame director runtime plan for renderer-specific camera execution. */
+  directorFrame?: DirectorFramePlan;
 }
 
 export type RendererComponent = React.FC<RendererProps>;

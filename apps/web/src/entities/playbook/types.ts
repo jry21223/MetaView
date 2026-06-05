@@ -8,5 +8,10 @@ export type {
   MathPlotCurve,
   AnySnapshot,
   DirectorBeat,
+  DirectorCameraMotion,
+  DirectorIntent,
+  DirectorPacing,
   DirectorScript,
+  DirectorShotType,
+  DirectorSource,
 } from "../../features/playbook/engine/types";

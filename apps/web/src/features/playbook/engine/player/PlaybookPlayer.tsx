@@ -16,7 +16,7 @@ import { CodeHighlightRenderer } from "../renderers/CodeHighlightRenderer";
 import { domainCapability } from "../domainCapabilities";
 import { getParamPanel } from "../param-panels/registry";
 import type { ParamPanelProps } from "../param-panels/types";
-import { findDirectorBeatForStep, resolveDirectorVoiceover } from "../director";
+import { resolveDirectorVoiceover } from "../director";
 
 // ── ParamPanelSlot (static component — resolves domain panel from registry) ──
 
@@ -427,12 +427,11 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     if (!ttsRef.current.enabled) return;
     const step = script.steps[currentStepIndex];
     if (!step) return;
-    const directorText = findDirectorBeatForStep(director, step)?.voiceover_text?.trim();
-    const text =
-      directorText ||
-      (step.narration_template && step.tokens.length > 0
+    const fallback =
+      step.narration_template && step.tokens.length > 0
         ? resolveNarrationTemplate(step.narration_template, step.tokens)
-        : resolveDirectorVoiceover(director, step));
+        : step.voiceover_text;
+    const text = resolveDirectorVoiceover(director, step, fallback);
     if (!text.trim()) return;
     const voice = resolveVoice(ttsRef.current.config.voice, script.domain);
     const rate = step.tts_rate ?? ttsRef.current.config.rate;

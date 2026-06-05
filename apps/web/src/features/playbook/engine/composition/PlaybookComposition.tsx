@@ -9,11 +9,7 @@ import { rendererRegistry } from "../renderers/registry";
 import { appearTransform, useTimeline } from "../foundation";
 import { compileVisualTimeline, type VisualLayerState, type VisualStepState } from "./visualContinuity";
 import { snapshotSurface } from "./snapshotSurface";
-import {
-  cameraTransformForBeat,
-  findActiveDirectorBeat,
-  resolveDirectorVoiceover,
-} from "../director";
+import { buildDirectorFramePlan } from "../director";
 
 interface PlaybookCompositionProps {
   script: PlaybookScript;
@@ -57,15 +53,37 @@ function LayerSlot({
   baseProps,
   stepProgress,
   firstStageLayerKey,
+  director,
+  script,
+  frame,
 }: {
   layerState: VisualLayerState;
   baseProps: RendererProps;
   stepProgress: number;
   firstStageLayerKey?: string;
+  director?: DirectorScript | null;
+  script: PlaybookScript;
+  frame: number;
 }) {
   const { layer } = layerState;
   const slice = useTimeline(layer.timing, stepProgress);
   const visualProgress = useStepProgress(layerState.visualStartFrame, layerState.visualEndFrame);
+  const layerStep = React.useMemo(
+    () => ({ ...baseProps.step, snapshot: layer.body }),
+    [baseProps.step, layer.body],
+  );
+  const layerDirectorFrame = React.useMemo(
+    () =>
+      buildDirectorFramePlan({
+        director: director ?? null,
+        script,
+        frame,
+        step: layerStep,
+        prevStep: baseProps.prevStep,
+        stepProgress: visualProgress,
+      }),
+    [baseProps.prevStep, director, frame, layerStep, script, visualProgress],
+  );
   if (!slice.visible) return null;
   const Renderer = rendererRegistry.get(layer.body.kind);
   if (!Renderer) return null;
@@ -76,9 +94,6 @@ function LayerSlot({
       : layerState.visualKey === firstStageLayerKey
         ? "stage-base"
         : "stage-overlay";
-  // Each layer renders against its body snapshot; clone the step so the
-  // existing RendererProps contract works without changing every renderer.
-  const layerStep = { ...baseProps.step, snapshot: layer.body };
   const appear = layerState.isVisualContinuation
     ? appearTransform("none", 1)
     : appearTransform(slice.anim, slice.progress);
@@ -106,6 +121,7 @@ function LayerSlot({
         visualKey: layerState.visualKey,
         isVisualContinuation: layerState.isVisualContinuation,
         renderMode,
+        directorFrame: layerDirectorFrame,
       })}
     </div>
   );
@@ -120,10 +136,16 @@ function SceneCompositor({
   baseProps,
   stepProgress,
   visualState,
+  director,
+  script,
+  frame,
 }: {
   baseProps: RendererProps;
   stepProgress: number;
   visualState: VisualStepState | undefined;
+  director?: DirectorScript | null;
+  script: PlaybookScript;
+  frame: number;
 }) {
   const layers = visualState?.layers;
   if (!layers || layers.length === 0) {
@@ -141,6 +163,9 @@ function SceneCompositor({
           baseProps={baseProps}
           stepProgress={stepProgress}
           firstStageLayerKey={firstStageLayerKey}
+          director={director}
+          script={script}
+          frame={frame}
         />
       ))}
     </div>
@@ -168,11 +193,24 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
   const stepEndFrame = step?.end_frame ?? script.total_frames;
   const stepProgress = useStepProgress(stepStartFrame, stepEndFrame);
 
-  if (!step) return null;
+  const directorFrame = React.useMemo(
+    () => {
+      if (!step) return null;
+      return buildDirectorFramePlan({
+        director,
+        script,
+        frame,
+        step,
+        prevStep,
+        stepProgress,
+      });
+    },
+    [director, frame, prevStep, script, step, stepProgress],
+  );
+  if (!step || !directorFrame) return null;
 
-  const activeBeat = findActiveDirectorBeat(director, frame);
-  const cameraTransform = cameraTransformForBeat(activeBeat, frame);
-  const subtitleText = resolveDirectorVoiceover(director, step);
+  const cameraTransform = directorFrame.stage.transform;
+  const subtitleText = directorFrame.voiceoverText ?? step.voiceover_text;
   const hasCodeTrack = showInlineCode && step.code_highlight != null;
   const subtitleHeight = PLAYBOOK_LAYOUT.SUBTITLE_HEIGHT;
   const vizRatio = PLAYBOOK_LAYOUT.VIZ_SPLIT_RATIO;
@@ -200,6 +238,7 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
     visualStartFrame: visualState?.visualStartFrame,
     visualKey: visualState?.visualKey,
     isVisualContinuation: visualState?.isVisualContinuation,
+    directorFrame,
   };
 
   return (
@@ -215,7 +254,8 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
           }}
         >
           <div
-            data-camera-motion={activeBeat?.camera_motion}
+            data-camera-motion={directorFrame.activeBeat?.camera_motion}
+            data-director-adapter={directorFrame.debug.adapter}
             style={{
               width: "100%",
               height: "100%",
@@ -227,6 +267,9 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
               baseProps={rendererProps}
               stepProgress={stepProgress}
               visualState={visualState}
+              director={director}
+              script={script}
+              frame={frame}
             />
           </div>
         </div>

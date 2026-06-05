@@ -70,11 +70,12 @@ def test_followup_applies_patch_persists_history_and_versions(followup_client) -
     assert data["playbook"]["summary"] == "改成更直观的版本。"
     assert data["playbook"]["steps"][0]["title"] == "先观察数组"
     assert data["playbook"]["steps"][0]["snapshot"]["array_values"] == ["3", "1"]
-    assert data["director"]["beats"][0]["voiceover_text"] == "Step 1 narration."
-    assert data["director"]["beats"][1]["voiceover_text"] == "第二步强调交换原因。"
+    assert data["playbook"]["steps"][1]["voiceover_text"] == "第二步强调交换原因。"
+    assert data["director"]["beats"][0]["voiceover_text"] is None
+    assert data["director"]["beats"][1]["voiceover_text"] is None
     active_director = _run(director_repo.get(run_id))
     assert active_director is not None
-    assert active_director.beats[1].voiceover_text == "第二步强调交换原因。"
+    assert active_director.beats[1].voiceover_text is None
     stored = _run(repo.get(run_id))
     assert stored is not None
     assert stored.playbook is not None
@@ -130,10 +131,11 @@ def test_followup_restore_version(followup_client) -> None:
 
     assert resp.status_code == 200
     assert resp.json()["playbook"]["summary"] == "Original summary."
-    assert resp.json()["director"]["beats"][0]["voiceover_text"] == "Step 1 narration."
+    assert resp.json()["playbook"]["steps"][0]["voiceover_text"] == "Step 1 narration."
+    assert resp.json()["director"]["beats"][0]["voiceover_text"] is None
     active_director = _run(director_repo.get(run_id))
     assert active_director is not None
-    assert active_director.beats[0].voiceover_text == "Step 1 narration."
+    assert active_director.beats[0].voiceover_text is None
     versions_after = client.get(f"/api/v1/runs/{run_id}/follow-ups").json()["versions"]
     assert len(versions_after) == 3
     assert versions_after[1]["is_head"] is False

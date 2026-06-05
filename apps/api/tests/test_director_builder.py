@@ -28,6 +28,7 @@ def test_director_script_validates_beat_frame_ranges() -> None:
 
     assert director.schema_version == "1.0.0"
     assert director.source == "rule"
+    assert director.beats[0].focus_target is None
 
     with pytest.raises(ValidationError):
         DirectorBeat(
@@ -39,6 +40,39 @@ def test_director_script_validates_beat_frame_ranges() -> None:
             shot_type="medium",
             camera_motion="hold",
             pacing="normal",
+        )
+
+
+def test_director_script_rejects_invalid_source_and_overlapping_beats() -> None:
+    with pytest.raises(ValidationError):
+        DirectorScript(run_id="run-1", source="unknown", beats=[])
+
+    with pytest.raises(ValidationError):
+        DirectorScript(
+            run_id="run-1",
+            beats=[
+                DirectorBeat(
+                    beat_id="beat_01",
+                    step_id="s1",
+                    start_frame=0,
+                    end_frame=30,
+                    intent="hook",
+                    shot_type="medium",
+                    camera_motion="hold",
+                    pacing="normal",
+                ),
+                DirectorBeat(
+                    beat_id="beat_02",
+                    step_id="s2",
+                    start_frame=29,
+                    end_frame=60,
+                    intent="focus",
+                    shot_type="close",
+                    camera_motion="focus_target",
+                    pacing="normal",
+                    focus_target="segment:Line_BE",
+                ),
+            ],
         )
 
 
@@ -73,7 +107,7 @@ def test_build_default_director_infers_formula_scene_and_summary_beats() -> None
     assert director.beats[-1].intent == "summary"
     assert director.beats[-1].camera_motion == "pull_out"
     assert director.beats[-1].pacing == "slow"
-    assert director.beats[0].voiceover_text == "Explain the formula."
+    assert director.beats[0].voiceover_text is None
     assert "核心公式" in director.beats[0].emphasis_terms
 
 

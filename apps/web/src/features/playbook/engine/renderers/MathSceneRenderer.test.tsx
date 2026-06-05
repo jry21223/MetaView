@@ -10,11 +10,13 @@ import {
   makeMathSceneStep,
   vectorFieldScene,
 } from "../math-scene-plan/fixtures";
+import { buildMathSceneRenderPlan } from "../math-scene-plan/plan";
 import {
   pointKey,
   segmentKey,
   vectorFieldKey,
 } from "../math-scene-plan/identity";
+import type { DirectorFramePlan } from "../director/framePlan";
 
 const originalResizeObserver = globalThis.ResizeObserver;
 
@@ -330,6 +332,42 @@ describe("MathSceneRenderer", () => {
     expect(overlay?.textContent).toContain("viewBox");
     expect(overlay?.textContent).toContain("x[");
     expect(overlay?.textContent).toContain("y[");
+  });
+
+  it("prefers directorFrame math scene plans when provided", () => {
+    window.history.pushState({}, "", "/?debugMathScenePlan");
+    const emptySnapshot = makeScene({
+      points: [],
+      segments: [],
+      regions: [],
+      curves: [],
+      annotations: [],
+      vector_field: null,
+    });
+    const renderPlan = buildMathSceneRenderPlan({
+      currentSnapshot: emptySnapshot,
+      stepProgress: 1,
+    });
+    const directorFrame: DirectorFramePlan = {
+      activeBeat: null,
+      localProgress: 0,
+      stage: { reason: "test" },
+      mathScene: { renderPlan, reason: "test" },
+      voiceoverText: null,
+      debug: { adapter: "math_scene", reason: "test" },
+    };
+
+    const { container } = renderDom(
+      <MathSceneRenderer
+        {...props(sceneStep(makeScene()), {
+          directorFrame,
+        })}
+      />,
+    );
+
+    const overlay = container.querySelector(".math-scene-renderer__debug-plan");
+    expect(overlay?.textContent).toContain("added 0");
+    expect(overlay?.textContent).toContain("persisted 0");
   });
 });
 

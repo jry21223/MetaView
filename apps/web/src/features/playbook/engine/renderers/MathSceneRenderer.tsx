@@ -374,10 +374,11 @@ export const MathSceneRenderer: React.FC<RendererProps> = ({
   progress,
   theme,
   renderMode = "standalone",
+  directorFrame,
 }) => {
   const snap = step.snapshot as MathSceneSnapshot;
   const isOverlayMode = renderMode === "stage-overlay";
-  const plan = React.useMemo(
+  const fallbackPlan = React.useMemo(
     () => {
       const basePlan = buildMathSceneRenderPlan({
         previousStep: prevStep,
@@ -395,6 +396,7 @@ export const MathSceneRenderer: React.FC<RendererProps> = ({
     },
     [prevStep, snap, progress],
   );
+  const plan = directorFrame?.mathScene?.renderPlan ?? fallbackPlan;
   const elapsed = Math.max(0, frame - stepStartFrame);
   const titleOpacity = clamp01(elapsed / 8);
 

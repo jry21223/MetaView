@@ -57,7 +57,7 @@ def build_default_director(playbook: PlaybookScript, run_id: str) -> DirectorScr
                 shot_type=shot_type,
                 camera_motion=camera_motion,
                 pacing=pacing,
-                voiceover_text=step.voiceover_text,
+                voiceover_text=None,
                 emphasis_terms=_extract_emphasis_terms(step),
             )
         )
