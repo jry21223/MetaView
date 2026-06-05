@@ -11,6 +11,7 @@ from app.application.dto.pipeline_dto import PipelineRequest, PipelineRunRespons
 from app.application.ports.agent_provider import IAgentProvider
 from app.application.ports.director_repository import IRunDirectorRepository
 from app.application.ports.llm_provider import ILLMProvider
+from app.application.ports.router_provider import IRouterProvider
 from app.application.ports.run_repository import IRunRepository
 from app.application.use_cases.account import AccountUseCase, InsufficientBalanceError
 from app.application.use_cases.run_pipeline import RunPipelineUseCase
@@ -18,11 +19,13 @@ from app.config import Settings, get_settings
 from app.domain.models.account import SessionAccount
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.infrastructure.llm.openai_provider import OpenAIProvider
+from app.infrastructure.router.llm_router_provider import LLMRouterProvider
 from app.presentation.dependencies import (
     get_account_use_case,
     get_agent_provider,
     get_llm_provider,
     get_reviewer_llm_provider,
+    get_router_provider,
     get_run_director_repo,
     get_run_repo,
 )
@@ -43,6 +46,7 @@ async def submit_pipeline(
     director_repo: Annotated[IRunDirectorRepository, Depends(get_run_director_repo)],
     llm: Annotated[ILLMProvider, Depends(get_llm_provider)],
     reviewer_llm: Annotated[ILLMProvider | None, Depends(get_reviewer_llm_provider)],
+    router_provider: Annotated[IRouterProvider | None, Depends(get_router_provider)],
     agent_provider: Annotated[IAgentProvider | None, Depends(get_agent_provider)],
     account_use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
 ) -> PipelineRunResponse:
@@ -82,14 +86,26 @@ async def submit_pipeline(
     # the generator self-repair.
     effective_llm: ILLMProvider = llm
     effective_reviewer: ILLMProvider | None = reviewer_llm
+    effective_router: IRouterProvider | None = router_provider
     provider_key = payload.provider_api_key
     if provider_key:
+        router_model = settings.router_model or payload.provider_model or "gpt-4o-mini"
         effective_llm = OpenAIProvider(
             api_key=provider_key,
             base_url=payload.provider_base_url or "https://api.openai.com/v1",
             model=payload.provider_model or "gpt-4o-mini",
             max_tokens=settings.openai_max_tokens,
             reasoning_effort=settings.openai_reasoning_effort,
+        )
+        effective_router = LLMRouterProvider(
+            OpenAIProvider(
+                api_key=provider_key,
+                base_url=payload.provider_base_url or "https://api.openai.com/v1",
+                model=router_model,
+                timeout=settings.router_timeout_s,
+                temperature=settings.router_temperature,
+            ),
+            model_name=router_model,
         )
         effective_reviewer = None
 
@@ -103,6 +119,10 @@ async def submit_pipeline(
         generation_mode=settings.generation_mode,
         pipeline_timeout_s=settings.pipeline_timeout_s,
         director_repo=director_repo,
+        router_provider=effective_router,
+        router_mode=settings.router_mode,
+        router_min_confidence=settings.router_min_confidence,
+        router_refine_confidence=settings.router_refine_confidence,
     )
     background_tasks.add_task(
         _execute_pipeline_with_optional_refund,

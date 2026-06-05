@@ -14,6 +14,7 @@ class OpenAIProvider:
         timeout: float | None = 300.0,
         max_tokens: int | None = None,
         reasoning_effort: str | None = None,
+        temperature: float = 0.3,
     ) -> None:
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
@@ -21,6 +22,7 @@ class OpenAIProvider:
         self._timeout = timeout
         self._max_tokens = max_tokens
         self._reasoning_effort = reasoning_effort
+        self._temperature = temperature
 
     async def complete(self, system: str, user: str) -> str:
         headers = {
@@ -33,7 +35,7 @@ class OpenAIProvider:
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
-            "temperature": 0.3,
+            "temperature": self._temperature,
         }
         if self._max_tokens is not None:
             payload["max_tokens"] = self._max_tokens

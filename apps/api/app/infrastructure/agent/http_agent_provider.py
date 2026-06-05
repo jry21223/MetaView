@@ -36,12 +36,15 @@ class HttpAgentProvider:
         self,
         prompt: str,
         provider_config: dict[str, Any] | None = None,
+        route_decision: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         body: dict[str, Any] = {"prompt": prompt}
         if provider_config:
             # Forward an opaque ``provider`` blob — the sidecar decides which
             # pi-ai provider to instantiate (openai / anthropic / deepseek …).
             body["provider"] = provider_config
+        if route_decision:
+            body["route_decision"] = route_decision
 
         url = f"{self._base_url}/generate"
         headers = (

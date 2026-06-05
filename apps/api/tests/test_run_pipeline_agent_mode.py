@@ -60,9 +60,16 @@ class _FakeAgent:
         self.calls: list[dict[str, Any]] = []
 
     async def generate(
-        self, prompt: str, provider_config: dict[str, Any] | None = None
+        self,
+        prompt: str,
+        provider_config: dict[str, Any] | None = None,
+        route_decision: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        self.calls.append({"prompt": prompt, "provider_config": provider_config})
+        self.calls.append({
+            "prompt": prompt,
+            "provider_config": provider_config,
+            "route_decision": route_decision,
+        })
         return self.playbook
 
 
@@ -201,7 +208,9 @@ async def test_agent_mode_routes_to_agent_provider() -> None:
 
     await use_case.execute("run-1", PipelineRequest(prompt="hello math"))
 
-    assert agent.calls == [{"prompt": "hello math", "provider_config": None}]
+    assert agent.calls[0]["prompt"] == "hello math"
+    assert agent.calls[0]["provider_config"] is None
+    assert agent.calls[0]["route_decision"]["destination"] == "generic_cir"
     # The final update must carry the persisted playbook JSON.
     last = repo.updates[-1]
     assert last["status"].value == "succeeded"

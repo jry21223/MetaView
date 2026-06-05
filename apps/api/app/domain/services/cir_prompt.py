@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import json
+from typing import Any
+
+from app.domain.models.route_decision import RouteDecision
 from app.domain.models.topic import TopicDomain
 from app.domain.services.algorithm_code_library import infer_id, prompt_hint
 from app.domain.services.domain_router import SkillMode
@@ -304,6 +308,7 @@ def build_cir_prompt(
     source_code: str | None = None,
     language: str = "python",
     skill_mode: SkillMode = SkillMode.SPECIALIZED,
+    route_decision: RouteDecision | dict[str, Any] | None = None,
 ) -> tuple[str, str]:
     """Return (system_prompt, user_prompt) for CIR + ExecutionMap generation.
 
@@ -326,6 +331,8 @@ The model must choose the final cir.domain itself."""
         domain_section = f"""Keyword analysis suggests: **{domain_hint.value}**
 Skill mode: specialized.
 You may change this if the topic clearly belongs to a different domain."""
+
+    route_section = _format_route_decision(route_decision)
 
     code_track = ""
     if source_code and source_code.strip():
@@ -397,6 +404,7 @@ Only use: "array", "graph", "function", "scene", or "formula"
                不能用于向量场或 2D 区域。Requires step.plot.formula_latex。
 
 ## Domain Classification
+{route_section}
 {domain_section}
 {domain_guidance}
 
@@ -541,3 +549,19 @@ Example (bubble sort compare step):
     system = system + algo_code_track
     user = prompt
     return system, user
+
+
+def _format_route_decision(route_decision: RouteDecision | dict[str, Any] | None) -> str:
+    if route_decision is None:
+        return ""
+    if isinstance(route_decision, RouteDecision):
+        payload = route_decision.model_dump(mode="json")
+    else:
+        payload = route_decision
+    return f"""## MetaView Router Decision
+The router classified this request as:
+```json
+{json.dumps(payload, ensure_ascii=False, indent=2)}
+```
+Use this as routing context only. Do not use unsupported deterministic skill output, and do not invent deterministic results when skill_id is unsupported or null.
+"""

@@ -18,4 +18,5 @@ class IAgentProvider(Protocol):
         self,
         prompt: str,
         provider_config: dict[str, Any] | None = None,
+        route_decision: dict[str, Any] | None = None,
     ) -> dict[str, Any]: ...

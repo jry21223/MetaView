@@ -13,6 +13,7 @@ from app.application.ports.export_repository import IExportJobRepository
 from app.application.ports.llm_provider import ILLMProvider
 from app.application.ports.oauth_client import IOAuthClient
 from app.application.ports.payment_gateway import IPaymentGateway
+from app.application.ports.router_provider import IRouterProvider
 from app.application.ports.run_repository import IRunRepository
 from app.application.use_cases.account import AccountUseCase
 from app.application.use_cases.newapi_topup import NewApiTopupUseCase
@@ -33,6 +34,7 @@ from app.infrastructure.persistence.sqlite_newapi_topup_repository import (
     SqliteNewApiTopupRepository,
 )
 from app.infrastructure.persistence.sqlite_run_repository import SqliteRunRepository
+from app.infrastructure.router.llm_router_provider import LLMRouterProvider
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +67,7 @@ def _get_openai_provider(
     timeout: float,
     max_tokens: int | None,
     reasoning_effort: str | None,
+    temperature: float = 0.3,
 ) -> OpenAIProvider:
     return OpenAIProvider(
         api_key=api_key,
@@ -73,6 +76,7 @@ def _get_openai_provider(
         timeout=timeout,
         max_tokens=max_tokens,
         reasoning_effort=reasoning_effort,
+        temperature=temperature,
     )
 
 
@@ -150,6 +154,28 @@ def get_llm_provider(settings: Annotated[Settings, Depends(get_settings)]) -> IL
         settings.openai_max_tokens,
         settings.openai_reasoning_effort,
     )
+
+
+def get_router_provider(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> IRouterProvider | None:
+    if settings.router_mode not in {"llm", "hybrid"}:
+        return None
+    if not settings.openai_api_key:
+        logger.warning("METAVIEW_OPENAI_API_KEY not set — model router will use fallback")
+        return None
+    model = settings.router_model or settings.openai_router_model or settings.openai_model
+    model = model or "gpt-4o-mini"
+    llm = _get_openai_provider(
+        settings.openai_api_key,
+        settings.openai_base_url,
+        model,
+        settings.router_timeout_s,
+        None,
+        None,
+        settings.router_temperature,
+    )
+    return LLMRouterProvider(llm, model_name=model)
 
 
 @lru_cache

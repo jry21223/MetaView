@@ -1,56 +1,77 @@
 # Skill Pack Architecture
 
-MetaView uses Director as the bridge between specialized problem solvers and renderer-specific execution.
-
-The target flow is:
+MetaView skills are pluggable domain experts. The central pipeline routes a
+request to a registered `SkillPack`, asks that skill to produce a
+`PlaybookScript` JSON payload, then builds the normal `DirectorScript` and
+hands rendering to the existing renderer layer.
 
 ```text
-SkillPack -> ProblemSpec -> PlaybookScript -> DirectorScript -> DirectorFramePlan -> RendererAdapter
+SkillPack Registry
+  -> Small Model Router or registry heuristic
+  -> Selected SkillPack
+  -> ProblemSpec validation
+  -> Skill-specific deterministic kernel or composer
+  -> PlaybookScript JSON
+  -> DirectorScript
+  -> Renderer
 ```
 
-## Responsibilities
+`RunPipelineUseCase` only knows the shared skill interfaces and registry. It
+does not import a skill package such as `solid_geometry`, and it does not know
+how any skill extracts specs, solves kernels, or builds playbooks.
 
-- `SkillPack` detects and normalizes a problem family, such as solid geometry or force analysis.
-- `ProblemSpec` stores structured inputs that a domain kernel can validate and solve.
-- `PlaybookScript` remains the persistent visual and narration script.
-- `DirectorScript` stores persistent high-level shot intent, such as `focus_target`, `intent`, and `camera_motion`.
-- `DirectorFramePlan` resolves the current beat and chooses the renderer adapter for the current frame.
-- Renderer adapters execute the same intent through renderer-native camera systems.
+## Core Contracts
 
-## Renderer Execution
+- `SkillManifest` describes the skill, execution mode, capabilities, examples,
+  and unsupported notes.
+- `SkillRouteInput` contains the user prompt plus optional source code and
+  language.
+- `SkillRouteMatch` identifies a selected skill and may include a candidate
+  `problem_spec`.
+- `SkillPack.validate_problem_spec()` converts untrusted router output into the
+  skill-owned Pydantic spec model.
+- `SkillPack.execute()` returns `SkillExecutionResult` with `PlaybookScript`
+  JSON. The pipeline validates that JSON against the shared `PlaybookScript`
+  schema before persisting it.
 
-- MathScene adapter maps focused or newly added objects to a Mafs `viewBox`.
-- Stage adapter maps push, pull, and pan motion to conservative CSS transforms.
-- Future Three adapter can map `focus_target` to camera position and target.
-- Future Canvas/SVG adapters can map `focus_target` to viewport transforms.
+## Registry
 
-## Future Skill Pack Contract
+The default skill list lives in:
 
-A solid geometry skill pack can eventually emit a beat like:
-
-```json
-{
-  "beat_id": "beat_02",
-  "step_id": "step_02",
-  "start_frame": 60,
-  "end_frame": 120,
-  "intent": "focus",
-  "shot_type": "close",
-  "camera_motion": "focus_target",
-  "pacing": "normal",
-  "focus_target": "segment:Line_BE",
-  "emphasis_terms": ["Line_BE"]
-}
+```text
+apps/api/app/domain/skills/registry.py
 ```
 
-The Director does not decide how the camera is moved. It only names the intent. The selected renderer adapter owns concrete execution.
+Adding a new skill should add a package and register its `SkillPack` in
+`build_default_skill_registry()`. The central pipeline should not gain a new
+skill-specific import or branch.
 
-## Solid Geometry V1
+## Routing
 
-The first concrete skill pack using this bridge is documented in
-[`solid-geometry-skill.md`](./solid-geometry-skill.md). It adds a small
-SymPy-backed kernel and an SVG `solid_geometry_scene` renderer, while keeping
-the existing `PlaybookScript -> DirectorScript -> Renderer` boundary.
+The small model router receives all current manifests and returns either a
+`SkillRouteMatch` JSON object or `null`. The router prompt is intentionally
+dynamic:
 
-Still out of scope for the shared skill-pack bridge: a physics solver,
-Canvas/WebGL renderers, Three.js camera execution, or an editor UI.
+```text
+Do not assume the only skill is solid_geometry. The skill list is dynamic.
+```
+
+The router must not solve final answers. It can only choose a skill and
+optionally draft a `problem_spec` for that skill to validate.
+
+If the model router is unavailable, low confidence, or returns `null`, the
+registry asks each skill for a heuristic match and chooses the highest
+confidence match.
+
+## First Implementation
+
+`solid_geometry` is the first `SkillPack`. It is not the skill framework
+itself. Its package owns:
+
+- manifest and capabilities
+- heuristic spec extraction
+- `SolidGeometryProblemSpec` validation
+- deterministic SymPy kernel execution
+- `PlaybookScript` construction for `solid_geometry_scene`
+
+The shared Director and renderer contracts remain unchanged.

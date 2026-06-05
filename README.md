@@ -105,6 +105,11 @@ make check
 | `METAVIEW_OPENAI_TIMEOUT_S` | `300` | 请求超时秒数 |
 | `METAVIEW_OPENAI_MAX_TOKENS` | `16000` | chat/completions 的 `max_tokens` |
 | `METAVIEW_OPENAI_REASONING_EFFORT` | - | gpt-5 / o-series 专用，支持 `minimal\|low\|medium\|high` |
+| `METAVIEW_ROUTER_MODE` | `hybrid` | 路由模式：`off` / `heuristic` / `llm` / `hybrid` |
+| `METAVIEW_ROUTER_MODEL` | - | 小模型路由模型；为空时复用 router/openai/default 模型 |
+| `METAVIEW_ROUTER_TIMEOUT_S` | `12` | 小模型路由超时秒数 |
+| `METAVIEW_ROUTER_MIN_CONFIDENCE` | `0.72` | 路由结果直接采用的最低置信度 |
+| `METAVIEW_ROUTER_REFINE_CONFIDENCE` | `0.55` | 预留 refinement 阈值，V1 低于采用阈值时 fallback |
 | `METAVIEW_GENERATION_MODE` | `single` | `single` 或 `agent` |
 | `METAVIEW_AGENT_PROVIDER` | `http` | `agent` 模式实现：`http` 或 `codex` |
 | `METAVIEW_AGENT_BASE_URL` | `http://agent:8001` | agent sidecar 地址 |
@@ -127,6 +132,22 @@ make check
 | `VITE_API_BASE_URL` | 同源 | 前端构建时 API 基地址 |
 
 完整变量列表见 [`.env.example`](.env.example)。
+
+### 小模型路由配置
+
+MetaView 的生成入口先经过小模型路由，再进入确定性 skill、普通 CIR 或 agent。默认 `METAVIEW_ROUTER_MODE=hybrid`：有可用 router model 时优先用模型输出 `RouteDecision`，失败或低置信度时回退到确定性 parser / 旧 topic router。
+
+最小配置示例：
+
+```env
+METAVIEW_ROUTER_MODE=hybrid
+METAVIEW_ROUTER_MODEL=gpt-4o-mini
+METAVIEW_ROUTER_TIMEOUT_S=12
+METAVIEW_ROUTER_MIN_CONFIDENCE=0.72
+METAVIEW_ROUTER_REFINE_CONFIDENCE=0.55
+```
+
+新增 skill 时先在 `apps/api/app/domain/skills/*/manifest.py` 声明 capability 和 supported 状态，再让 router prompt 读取 manifest，而不是继续堆关键词。当前 `solid_geometry` skill 的结构参考 [wy51ai/edulab](https://github.com/wy51ai/edulab) 的 `edu-solid-geometry`：结构化题面 -> 确定性 kernel 精确计算 -> 可视化讲解输出。
 
 ## 播放器快捷键
 

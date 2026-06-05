@@ -1,6 +1,12 @@
 # Solid Geometry Skill
 
-MetaView 的 `solid_geometry` V1 借鉴 edulab `edu-solid-geometry` 的确定性 skill 架构：先把题目归一化为结构化 spec，再由 SymPy kernel 计算精确坐标、向量、法向量和答案，最后把同一份 kernel 数据转成 `PlaybookScript` 和 `solid_geometry_scene` snapshot。
+MetaView 的 `solid_geometry` V1 是第一个 `SkillPack` 实现。它借鉴 edulab
+`edu-solid-geometry` 的确定性 skill 架构：先把题目归一化为结构化
+`SolidGeometryProblemSpec`，再由 SymPy kernel 计算精确坐标、向量、法向量和答案，最后把同一份
+kernel 数据转成 `PlaybookScript` 和 `solid_geometry_scene` snapshot。
+
+它不是 skill 框架本身。中心 pipeline 只通过 `SkillRegistry` 和 `SkillPack`
+接口调用它，不直接导入 solid geometry 的 extractor、kernel 或 playbook adapter。
 
 它不直接嵌入 edulab 的 HTML 页面，也不把 lesson 模板作为 iframe/raw HTML 放进前端。
 
@@ -20,7 +26,21 @@ MetaView 的 `solid_geometry` V1 借鉴 edulab `edu-solid-geometry` 的确定性
 长方体长 2 宽 3 高 4，求体积
 ```
 
-无法解析的 prompt 返回 `None`，交回通用 pipeline；V1 不让 LLM 直接猜最终几何数值。
+无法解析或尚未支持的 prompt 交回通用 pipeline；V1 不让 LLM 直接猜最终几何数值。
+
+## SkillPack Files
+
+```text
+apps/api/app/domain/skills/solid_geometry/manifest.py
+apps/api/app/domain/skills/solid_geometry/skill_pack.py
+apps/api/app/domain/skills/solid_geometry/problem_spec.py
+apps/api/app/domain/skills/solid_geometry/spec_extractor.py
+apps/api/app/domain/skills/solid_geometry/geometry_kernel.py
+apps/api/app/domain/skills/solid_geometry/playbook_adapter.py
+```
+
+`skill_pack.py` is the package boundary. It owns solid-specific imports and
+returns `SkillExecutionResult(playbook_json=...)` to the pipeline.
 
 ## ProblemSpec
 
@@ -46,7 +66,7 @@ MetaView 的 `solid_geometry` V1 借鉴 edulab `edu-solid-geometry` 的确定性
 - 尺寸只解析为安全数字字面量，使用 `sympy.Rational` 保持 exact computation。
 - 顶点坐标、渲染坐标、目标向量、平面法向量和最终答案来自同一个 kernel。
 - `solution.answer_latex` 必须出现在最终 step 的 voiceover 或 snapshot formula 中。
-- `checks["answer_consistency"]` 必须为 `true`，否则 adapter/pipeline 不应吞掉错误。
+- `checks["answer_consistency"]` 必须为 `true`，否则 skill pack 不应吞掉错误。
 
 ## Snapshot
 
@@ -74,7 +94,9 @@ MetaView 的 `solid_geometry` V1 借鉴 edulab `edu-solid-geometry` 的确定性
 }
 ```
 
-The frontend V1 renderer uses SVG/isometric projection for CI and Remotion stability. A later renderer can replace it with Three.js while keeping this snapshot contract.
+The frontend V1 renderer uses SVG/isometric projection for CI and Remotion
+stability. A later renderer can replace it with Three.js while keeping this
+snapshot contract.
 
 ## Roadmap
 

@@ -1,7 +1,7 @@
 /**
  * HTTP entry point for the MetaView agent sidecar.
  *
- * Exposes ``POST /generate`` with a JSON body ``{ prompt, provider? }`` and
+ * Exposes ``POST /generate`` with a JSON body ``{ prompt, provider?, route_decision? }`` and
  * returns ``{ playbook: PlaybookScript }`` once the pi-agent-core loop has
  * walked the entire Drawing CLI flow. Health probe at ``GET /healthz``.
  */
@@ -37,9 +37,10 @@ app.post("/generate", async (req: Request, res: Response) => {
     res.status(401).json({ detail: "missing or invalid agent token" });
     return;
   }
-  const { prompt, provider } = (req.body ?? {}) as {
+  const { prompt, provider, route_decision } = (req.body ?? {}) as {
     prompt?: string;
     provider?: { provider?: string; model?: string; api_key?: string; base_url?: string };
+    route_decision?: Record<string, unknown>;
   };
   if (!prompt || typeof prompt !== "string") {
     res.status(400).json({ detail: "missing or invalid 'prompt' field" });
@@ -56,6 +57,7 @@ app.post("/generate", async (req: Request, res: Response) => {
       runAgentGeneration({
         prompt,
         provider,
+        routeDecision: route_decision,
         apiBaseUrl: API_BASE_URL,
         defaultProvider: DEFAULT_PROVIDER,
         defaultModel: DEFAULT_MODEL,

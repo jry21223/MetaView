@@ -51,6 +51,7 @@ class CodexAgentProvider:
         self,
         prompt: str,
         provider_config: dict[str, Any] | None = None,
+        route_decision: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         try:
             from openai_codex import AsyncCodex, Sandbox
@@ -75,7 +76,7 @@ class CodexAgentProvider:
                     sandbox=Sandbox.read_only,
                 )
                 result = await thread.run(
-                    _build_user_prompt(prompt, schema),
+                    _build_user_prompt(prompt, schema, route_decision=route_decision),
                     cwd=self._cwd,
                     effort=effort,
                     model=model,
@@ -104,8 +105,20 @@ class CodexAgentProvider:
             raise AgentProviderError(f"codex SDK playbook failed schema validation: {exc}") from exc
 
 
-def _build_user_prompt(prompt: str, schema: dict[str, Any]) -> str:
+def _build_user_prompt(
+    prompt: str,
+    schema: dict[str, Any],
+    *,
+    route_decision: dict[str, Any] | None = None,
+) -> str:
+    route_context = ""
+    if route_decision:
+        route_context = (
+            "[MetaView route decision]\n"
+            f"{json.dumps(route_decision, ensure_ascii=False, indent=2)}\n\n"
+        )
     return (
+        f"{route_context}"
         "Create a MetaView educational animation playbook for this prompt:\n"
         f"{prompt}\n\n"
         "Validate against this JSON Schema and return only the JSON object:\n"

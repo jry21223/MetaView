@@ -22,6 +22,7 @@ export interface ProviderConfig {
 export interface GenerateOptions {
   prompt: string;
   provider?: ProviderConfig;
+  routeDecision?: Record<string, unknown>;
   apiBaseUrl: string; // FastAPI base URL the agent calls back to (for asserts)
   defaultProvider: string;
   defaultModel: string;
@@ -112,9 +113,21 @@ export async function runAgentGeneration(opts: GenerateOptions): Promise<unknown
     getApiKey: () => apiKey,
   });
 
-  await agent.prompt(opts.prompt);
+  await agent.prompt(buildAgentPrompt(opts.prompt, opts.routeDecision));
 
   // The emitter has all committed steps by now even if finalize_playbook
   // wasn't explicitly called — its idempotent ``finalize`` covers the case.
   return emitter.finalize();
+}
+
+
+function buildAgentPrompt(prompt: string, routeDecision?: Record<string, unknown>): string {
+  if (!routeDecision) {
+    return prompt;
+  }
+  return `[MetaView route decision]
+${JSON.stringify(routeDecision, null, 2)}
+
+[user prompt]
+${prompt}`;
 }

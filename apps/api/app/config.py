@@ -9,9 +9,11 @@ _ALL_DOMAINS = "algorithm,math,code,physics,chemistry,biology,geography"
 GenerationMode = Literal["single", "agent"]
 AgentProviderKind = Literal["http", "codex"]
 AppEdition = Literal["self", "ops"]
+RouterMode = Literal["off", "heuristic", "llm", "hybrid"]
 _GENERATION_MODES: frozenset[str] = frozenset(("single", "agent"))
 _AGENT_PROVIDERS: frozenset[str] = frozenset(("http", "codex"))
 _APP_EDITIONS: frozenset[str] = frozenset(("self", "ops"))
+_ROUTER_MODES: frozenset[str] = frozenset(("off", "heuristic", "llm", "hybrid"))
 
 
 class Settings(BaseSettings):
@@ -86,6 +88,16 @@ class Settings(BaseSettings):
     # the model thinks for longer. Leave empty for providers that reject the
     # field (DeepSeek, local vLLM, etc.). Allowed: minimal/low/medium/high.
     openai_reasoning_effort: str | None = None
+
+    # Model router. Hybrid mode uses the small router first and falls back to
+    # deterministic parsers / legacy topic routing when the model is unavailable
+    # or too uncertain.
+    router_mode: RouterMode = "hybrid"
+    router_model: str | None = None
+    router_timeout_s: float = 12.0
+    router_min_confidence: float = 0.72
+    router_refine_confidence: float = 0.55
+    router_temperature: float = 0.0
 
     # ── Generation pipeline mode (single-shot vs agent sidecar) ─────────────
     # ``single`` keeps the current OpenAIProvider.complete() → CIR JSON path.
@@ -177,6 +189,16 @@ class Settings(BaseSettings):
         normalized = value.strip().lower()
         if normalized not in _GENERATION_MODES:
             return "single"
+        return normalized  # type: ignore[return-value]
+
+    @field_validator("router_mode", mode="before")
+    @classmethod
+    def normalize_router_mode(cls, value: str | None) -> RouterMode:
+        if value is None:
+            return "hybrid"
+        normalized = value.strip().lower()
+        if normalized not in _ROUTER_MODES:
+            return "hybrid"
         return normalized  # type: ignore[return-value]
 
     @field_validator("agent_provider", mode="before")
