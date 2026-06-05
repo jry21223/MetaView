@@ -29,6 +29,11 @@ prompts:
     prompt: 演示定积分 ∫₀² x² dx 作为曲线下面积，用矩形逼近收敛到 8/3。
     note: 区域填充 + 矩形逼近的分步推进
 
+  - id: math-green-theorem
+    domain: math
+    prompt: 用动画讲解格林公式，说明边界线积分与区域旋度积分为什么相等，并用 F=(-y/2,x/2) 在单位正方形上验证。
+    note: 二维区域 + 正向边界 + 向量场旋度 + 线积分/面积分对应关系
+
   - id: math-shm-standard-form
     domain: math
     prompt: 把弹簧振子方程化成标准形式 x'' + ω²x = 0，并说明 ω=√(k/m) 的含义。

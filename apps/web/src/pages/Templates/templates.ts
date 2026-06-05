@@ -88,6 +88,13 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
     prompt: "演示两个正弦分量 A1·sin(ω1·x) + A2·sin(ω2·x) 如何合成一个复合波，让 A1、ω1、A2、ω2 都是可拖动的参数",
   },
   {
+    id: "green-theorem",
+    domain: "math",
+    title: "格林公式",
+    desc: "边界线积分与区域旋度积分的对应",
+    prompt: "用动画讲解格林公式，说明边界线积分与区域旋度积分为什么相等，并用 F=(-y/2,x/2) 在单位正方形上验证",
+  },
+  {
     id: "vector-field-curl",
     domain: "math",
     title: "向量场与旋度",

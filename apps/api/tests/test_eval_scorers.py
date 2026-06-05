@@ -29,7 +29,9 @@ from eval.scorers import (
     score_title_caption,
 )
 
-FIXTURE_PATH = pathlib.Path(__file__).parents[3] / "eval" / "fixtures" / "sample_math_playbook.json"
+FIXTURE_DIR = pathlib.Path(__file__).parents[3] / "eval" / "fixtures"
+FIXTURE_PATH = FIXTURE_DIR / "sample_math_playbook.json"
+GREEN_THEOREM_FIXTURE_PATH = FIXTURE_DIR / "math-green-theorem.json"
 
 
 @pytest.fixture()
@@ -306,3 +308,23 @@ def test_score_playbook_passed_flag() -> None:
     # Check individual scores are in range
     for dim in card.dimensions:
         assert 0.0 <= dim.score <= dim.max_score
+
+
+def test_green_theorem_fixture_is_scene_based() -> None:
+    raw = GREEN_THEOREM_FIXTURE_PATH.read_text()
+    script = PlaybookScript.model_validate_json(raw)
+
+    assert script.title == "格林公式讲解"
+    assert script.domain == "math"
+
+    snapshot_kinds = {step.snapshot.kind for step in script.steps}
+    assert {"math_scene", "math_formula", "narration_card"}.issubset(snapshot_kinds)
+
+    math_scenes = [step.snapshot for step in script.steps if step.snapshot.kind == "math_scene"]
+    assert any(scene.regions for scene in math_scenes)
+    assert any(scene.vector_field is not None for scene in math_scenes)
+    assert any(scene.segments for scene in math_scenes)
+
+    card = score_playbook("math-green-theorem", raw)
+    assert card.parse_error is None
+    assert card.passed
