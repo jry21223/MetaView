@@ -9,12 +9,13 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
 
 from app.application.dto.export_dto import ExportJobResponse, ExportRequest
+from app.application.ports.director_repository import IRunDirectorRepository
 from app.application.ports.export_repository import IExportJobRepository
 from app.application.ports.run_repository import IRunRepository
 from app.application.use_cases.export_video import ExportVideoUseCase
 from app.config import Settings, get_settings
 from app.domain.models.export_job import ExportJob, ExportJobStatus
-from app.presentation.dependencies import get_export_repo, get_run_repo
+from app.presentation.dependencies import get_export_repo, get_run_director_repo, get_run_repo
 from app.presentation.rate_limit import read_limit, write_limit
 
 router = APIRouter(prefix="/exports", tags=["exports"])
@@ -59,6 +60,7 @@ async def submit_export(
     background_tasks: BackgroundTasks,
     export_repo: Annotated[IExportJobRepository, Depends(get_export_repo)],
     run_repo: Annotated[IRunRepository, Depends(get_run_repo)],
+    director_repo: Annotated[IRunDirectorRepository, Depends(get_run_director_repo)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> ExportJobResponse:
     if payload.with_audio and payload.tts is None:
@@ -79,6 +81,7 @@ async def submit_export(
     use_case = ExportVideoUseCase(
         export_repo,
         run_repo,
+        director_repo,
         web_app_dir=_resolve_path(settings.export_web_app_dir),
         artifacts_dir=_resolve_path(settings.export_artifacts_dir),
     )

@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from json import JSONDecodeError
 from typing import Any
 
@@ -11,6 +12,7 @@ from pydantic import ValidationError
 
 from app.application.dto.pipeline_dto import PipelineRequest
 from app.application.ports.agent_provider import IAgentProvider
+from app.application.ports.director_repository import IRunDirectorRepository
 from app.application.ports.llm_provider import ILLMProvider
 from app.application.ports.run_repository import IRunRepository
 from app.config import GenerationMode
@@ -20,6 +22,7 @@ from app.domain.models.playbook import PlaybookScript
 from app.domain.models.review import CirReviewIssue, CirReviewReport, ReviewSeverity
 from app.domain.services.cir_prompt import build_cir_prompt
 from app.domain.services.cir_quality import validate_cir_quality
+from app.domain.services.director_builder import build_default_director
 from app.domain.services.domain_router import SkillMode, TopicRoute, route_topic
 from app.domain.services.playbook_builder import build_playbook
 from app.domain.services.reviewer_prompt import (
@@ -51,6 +54,7 @@ class RunPipelineUseCase:
         agent_provider: IAgentProvider | None = None,
         generation_mode: GenerationMode | str = "single",
         pipeline_timeout_s: float | None = None,
+        director_repo: IRunDirectorRepository | None = None,
     ) -> None:
         self._repo = run_repo
         self._llm = llm
@@ -62,6 +66,7 @@ class RunPipelineUseCase:
             generation_mode if generation_mode == "agent" else "single"
         )
         self._pipeline_timeout_s = pipeline_timeout_s
+        self._director_repo = director_repo
 
     async def execute(self, run_id: str, request: PipelineRequest) -> None:
         await self._repo.update(run_id, status=PipelineRunStatus.RUNNING)
@@ -120,6 +125,7 @@ class RunPipelineUseCase:
                 status=PipelineRunStatus.SUCCEEDED,
                 playbook_json=playbook.model_dump_json(),
             )
+            await self._upsert_default_director(run_id, playbook)
         except Exception as exc:
             logger.exception("Pipeline run %s (agent mode) failed", run_id)
             await self._repo.update(
@@ -171,6 +177,7 @@ class RunPipelineUseCase:
                 playbook_json=playbook.model_dump_json(),
                 review_json=review_report.model_dump_json(),
             )
+            await self._upsert_default_director(run_id, playbook)
         except PipelineValidationError as exc:
             logger.exception("Pipeline run %s failed review", run_id)
             await self._repo.update(
@@ -187,6 +194,22 @@ class RunPipelineUseCase:
                 error=str(exc),
                 review_json=review_report.model_dump_json(),
             )
+
+    async def _upsert_default_director(
+        self,
+        run_id: str,
+        playbook: PlaybookScript,
+    ) -> None:
+        if self._director_repo is None:
+            return
+        director = build_default_director(playbook, run_id)
+        try:
+            await self._director_repo.upsert(
+                director,
+                datetime.now(timezone.utc).isoformat(),
+            )
+        except Exception:  # noqa: BLE001 - hidden metadata must not fail generation.
+            logger.warning("Failed to persist default director for run %s", run_id, exc_info=True)
 
     async def _review_output(
         self,

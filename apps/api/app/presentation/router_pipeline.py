@@ -9,6 +9,7 @@ from starlette.requests import Request
 
 from app.application.dto.pipeline_dto import PipelineRequest, PipelineRunResponse
 from app.application.ports.agent_provider import IAgentProvider
+from app.application.ports.director_repository import IRunDirectorRepository
 from app.application.ports.llm_provider import ILLMProvider
 from app.application.ports.run_repository import IRunRepository
 from app.application.use_cases.run_pipeline import RunPipelineUseCase
@@ -19,6 +20,7 @@ from app.presentation.dependencies import (
     get_agent_provider,
     get_llm_provider,
     get_reviewer_llm_provider,
+    get_run_director_repo,
     get_run_repo,
 )
 from app.presentation.rate_limit import write_limit
@@ -34,6 +36,7 @@ async def submit_pipeline(
     background_tasks: BackgroundTasks,
     settings: Annotated[Settings, Depends(get_settings)],
     run_repo: Annotated[IRunRepository, Depends(get_run_repo)],
+    director_repo: Annotated[IRunDirectorRepository, Depends(get_run_director_repo)],
     llm: Annotated[ILLMProvider, Depends(get_llm_provider)],
     reviewer_llm: Annotated[ILLMProvider | None, Depends(get_reviewer_llm_provider)],
     agent_provider: Annotated[IAgentProvider | None, Depends(get_agent_provider)],
@@ -76,6 +79,7 @@ async def submit_pipeline(
         agent_provider=agent_provider,
         generation_mode=settings.generation_mode,
         pipeline_timeout_s=settings.pipeline_timeout_s,
+        director_repo=director_repo,
     )
     background_tasks.add_task(use_case.execute, run_id, payload)
 

@@ -8,9 +8,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.infrastructure.persistence.db_init import init_db
+from app.infrastructure.persistence.sqlite_director_repository import (
+    SqliteRunDirectorRepository,
+)
 from app.infrastructure.persistence.sqlite_run_repository import SqliteRunRepository
 from app.main import create_app
-from app.presentation.dependencies import get_llm_provider, get_run_repo
+from app.presentation.dependencies import get_llm_provider, get_run_director_repo, get_run_repo
 from app.presentation.rate_limit import get_limiter
 
 _VALID_CIR = json.dumps(
@@ -42,7 +45,7 @@ class _MockLLM:
 def _repo(tmp_path):
     db = str(tmp_path / "test.db")
     init_db(db)
-    return SqliteRunRepository(db)
+    return SqliteRunRepository(db), SqliteRunDirectorRepository(db)
 
 
 @pytest.fixture
@@ -54,7 +57,9 @@ def body_limit_client(_repo, monkeypatch):
     monkeypatch.setenv("METAVIEW_MAX_BODY_BYTES", "256")
     monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
     app = create_app()
-    app.dependency_overrides[get_run_repo] = lambda: _repo
+    run_repo, director_repo = _repo
+    app.dependency_overrides[get_run_repo] = lambda: run_repo
+    app.dependency_overrides[get_run_director_repo] = lambda: director_repo
     app.dependency_overrides[get_llm_provider] = lambda: _MockLLM()
     with TestClient(app) as c:
         yield c
@@ -73,7 +78,9 @@ def rate_limited_client(_repo, monkeypatch):
     # Fresh limiter state — slowapi keeps an in-memory bucket per process.
     get_limiter().reset()
     app = create_app()
-    app.dependency_overrides[get_run_repo] = lambda: _repo
+    run_repo, director_repo = _repo
+    app.dependency_overrides[get_run_repo] = lambda: run_repo
+    app.dependency_overrides[get_run_director_repo] = lambda: director_repo
     app.dependency_overrides[get_llm_provider] = lambda: _MockLLM()
     with TestClient(app) as c:
         yield c

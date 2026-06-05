@@ -90,6 +90,9 @@ class SqliteRunRepository:
         def _sync() -> bool:
             with self._connect() as conn:
                 conn.execute(
+                    "DELETE FROM pipeline_run_directors WHERE run_id=?", (run_id,)
+                )
+                conn.execute(
                     "DELETE FROM pipeline_run_versions WHERE run_id=?", (run_id,)
                 )
                 conn.execute(

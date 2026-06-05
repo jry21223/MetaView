@@ -59,6 +59,7 @@ export const RemotionRoot: React.FC = () => {
         height={PLAYBOOK_DEFAULTS.COMPOSITION_HEIGHT}
         defaultProps={{
           script: FALLBACK_SCRIPT,
+          director: null,
           theme: "dark",
           showSubtitles: true,
           audioFiles: [],

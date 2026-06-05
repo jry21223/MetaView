@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { Layer, MathPlotSnapshot, MathSceneSnapshot, MetaStep, PlaybookScript } from "../types";
+import type {
+  DirectorCameraMotion,
+  DirectorScript,
+  Layer,
+  MathPlotSnapshot,
+  MathSceneSnapshot,
+  MetaStep,
+  PlaybookScript,
+} from "../types";
 import { motionSceneDemo } from "../fixtures/motionSceneDemo";
 
 const remotionState = vi.hoisted(() => ({ frame: 0 }));
@@ -65,6 +73,32 @@ function mathScript(): PlaybookScript {
         voiceover_text: "观察斜率变化",
         tokens: [],
         snapshot: { ...plotSnapshot("a*x"), params: { a: 2 } },
+      },
+    ],
+  };
+}
+
+function directorFor(
+  script: PlaybookScript,
+  cameraMotion: DirectorCameraMotion,
+  voiceoverText = "Director override.",
+): DirectorScript {
+  return {
+    schema_version: "1.0.0",
+    source: "rule",
+    run_id: "run-1",
+    beats: [
+      {
+        beat_id: "beat_01",
+        step_id: script.steps[0].step_id,
+        start_frame: 0,
+        end_frame: script.steps[0].end_frame,
+        intent: "hook",
+        shot_type: "medium",
+        camera_motion: cameraMotion,
+        pacing: "normal",
+        voiceover_text: voiceoverText,
+        emphasis_terms: [],
       },
     ],
   };
@@ -237,6 +271,46 @@ describe("PlaybookComposition", () => {
     const markup = renderToStaticMarkup(<PlaybookComposition script={mathScript()} />);
     const matches = markup.match(/观察斜率变化/g) ?? [];
     expect(matches).toHaveLength(1);
+  });
+
+  it("keeps subtitle and stage transform unchanged without a director", () => {
+    remotionState.frame = 30;
+    const markup = renderToStaticMarkup(<PlaybookComposition script={mathScript()} />);
+
+    expect(markup).toContain("观察斜率变化");
+    expect(markup).not.toContain("data-camera-motion");
+    expect(markup).not.toContain("transform:");
+  });
+
+  it("uses director voiceover text for subtitles when present", () => {
+    const script = mathScript();
+    const markup = renderToStaticMarkup(
+      <PlaybookComposition script={script} director={directorFor(script, "hold", "导演旁白覆盖。")} />,
+    );
+
+    expect(markup).toContain("导演旁白覆盖。");
+    expect(markup).not.toContain("观察斜率变化");
+  });
+
+  it.each([
+    ["hold", undefined],
+    ["push_in", "transform:scale(1.0300)"],
+    ["pull_out", "transform:scale(1.0300)"],
+    ["pan_left", "transform:translateX(-9.00px)"],
+    ["pan_right", "transform:translateX(9.00px)"],
+  ] as const)("applies %s camera motion to the visual stage", (cameraMotion, expectedTransform) => {
+    remotionState.frame = 30;
+    const script = mathScript();
+    const markup = renderToStaticMarkup(
+      <PlaybookComposition script={script} director={directorFor(script, cameraMotion)} showSubtitles={false} />,
+    );
+
+    expect(markup).toContain(`data-camera-motion="${cameraMotion}"`);
+    if (expectedTransform) {
+      expect(markup).toContain(expectedTransform);
+    } else {
+      expect(markup).not.toContain("transform:");
+    }
   });
 
   it("merges simultaneous math plot layers into one scene", () => {

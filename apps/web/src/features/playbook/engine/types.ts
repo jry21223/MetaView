@@ -276,3 +276,28 @@ export interface PlaybookScript {
   algorithm_id?: string | null;
   initial_data?: Record<string, string[]>;
 }
+
+export type DirectorIntent = "hook" | "focus" | "reveal" | "summary" | "explain";
+export type DirectorShotType = "wide" | "medium" | "close";
+export type DirectorCameraMotion = "hold" | "push_in" | "pull_out" | "pan_left" | "pan_right";
+export type DirectorPacing = "fast" | "normal" | "slow";
+
+export interface DirectorBeat {
+  beat_id: string;
+  step_id: string;
+  start_frame: number;
+  end_frame: number;
+  intent: DirectorIntent;
+  shot_type: DirectorShotType;
+  camera_motion: DirectorCameraMotion;
+  pacing: DirectorPacing;
+  voiceover_text: string;
+  emphasis_terms: string[];
+}
+
+export interface DirectorScript {
+  schema_version: string;
+  source: string;
+  run_id: string;
+  beats: DirectorBeat[];
+}

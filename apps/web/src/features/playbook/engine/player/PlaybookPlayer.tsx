@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Player } from "@remotion/player";
 import type { PlayerRef } from "@remotion/player";
-import type { PlaybookScript } from "../types";
+import type { DirectorScript, PlaybookScript } from "../types";
 import { usePlaybookController } from "./usePlaybookController";
 import { PlaybookComposition } from "../composition/PlaybookComposition";
 import { PLAYBOOK_DEFAULTS } from "../../../../shared/config/constants";
@@ -16,6 +16,7 @@ import { CodeHighlightRenderer } from "../renderers/CodeHighlightRenderer";
 import { domainCapability } from "../domainCapabilities";
 import { getParamPanel } from "../param-panels/registry";
 import type { ParamPanelProps } from "../param-panels/types";
+import { findDirectorBeatForStep, resolveDirectorVoiceover } from "../director";
 
 // ── ParamPanelSlot (static component — resolves domain panel from registry) ──
 
@@ -289,6 +290,7 @@ const TTSConfigPopover: React.FC<TTSPopoverProps> = ({ config, onUpdate, onClose
 
 interface PlaybookPlayerProps {
   script: PlaybookScript;
+  director?: DirectorScript | null;
   theme?: "dark" | "light";
   /**
    * Total frames for the bar-swap animation. Sourced from
@@ -302,6 +304,7 @@ interface PlaybookPlayerProps {
 
 export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   script: baseScript,
+  director = null,
   theme = "dark",
   swapDurationFrames = 24,
   onOpenExport,
@@ -424,15 +427,17 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     if (!ttsRef.current.enabled) return;
     const step = script.steps[currentStepIndex];
     if (!step) return;
+    const directorText = findDirectorBeatForStep(director, step)?.voiceover_text?.trim();
     const text =
-      step.narration_template && step.tokens.length > 0
+      directorText ||
+      (step.narration_template && step.tokens.length > 0
         ? resolveNarrationTemplate(step.narration_template, step.tokens)
-        : step.voiceover_text;
+        : resolveDirectorVoiceover(director, step));
     if (!text.trim()) return;
     const voice = resolveVoice(ttsRef.current.config.voice, script.domain);
     const rate = step.tts_rate ?? ttsRef.current.config.rate;
     ttsRef.current.speak(text, { voice, rate });
-  }, [currentStepIndex, script]); // script included so step data is never stale
+  }, [currentStepIndex, director, script]); // script included so step data is never stale
 
   const handleVoicePreview = useCallback(
     (voice: string, sampleText: string) => {
@@ -635,7 +640,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
               key={playerTimelineKey}
               ref={playerRef}
               component={PlaybookComposition}
-              inputProps={{ script, theme, showSubtitles, swapDurationFrames }}
+              inputProps={{ script, director, theme, showSubtitles, swapDurationFrames }}
               durationInFrames={script.total_frames}
               fps={script.fps}
               compositionWidth={PLAYBOOK_DEFAULTS.COMPOSITION_WIDTH}

@@ -35,6 +35,20 @@ class _RecordingRepo:
         self.updates.append({"run_id": run_id, **kwargs})
 
 
+class _RecordingDirectorRepo:
+    def __init__(self) -> None:
+        self.upserts: list[dict[str, Any]] = []
+
+    async def upsert(self, director: Any, updated_at: str) -> None:
+        self.upserts.append({"director": director, "updated_at": updated_at})
+
+    async def get(self, run_id: str) -> Any:
+        return None
+
+    async def delete(self, run_id: str) -> bool:
+        return False
+
+
 class _RaisingLLM:
     async def complete(self, system: str, user: str) -> str:  # noqa: ARG002
         raise AssertionError("LLM.complete must not be called in agent mode")
@@ -175,12 +189,14 @@ _MOTION_SCENE_PLAYBOOK: dict[str, Any] = {
 @pytest.mark.asyncio
 async def test_agent_mode_routes_to_agent_provider() -> None:
     repo = _RecordingRepo()
+    director_repo = _RecordingDirectorRepo()
     agent = _FakeAgent(_MIN_PLAYBOOK)
     use_case = RunPipelineUseCase(
         repo,
         _RaisingLLM(),
         agent_provider=agent,
         generation_mode="agent",
+        director_repo=director_repo,
     )
 
     await use_case.execute("run-1", PipelineRequest(prompt="hello math"))
@@ -196,6 +212,8 @@ async def test_agent_mode_routes_to_agent_provider() -> None:
     assert playbook_dict["steps"][0]["snapshot"]["numeric_values"] == [3.0, 1.0]
     assert "tokens" not in playbook_dict["steps"][0]["snapshot"]
     assert playbook_dict["steps"][0]["layers"][0]["body"] == playbook_dict["steps"][0]["snapshot"]
+    assert director_repo.upserts[0]["director"].run_id == "run-1"
+    assert director_repo.upserts[0]["director"].beats[0].step_id == "step_01"
 
 
 @pytest.mark.asyncio

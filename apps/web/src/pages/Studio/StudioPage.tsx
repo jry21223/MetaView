@@ -4,7 +4,7 @@ import { usePipelinePoller } from '../../features/pipeline/hooks/usePipelinePoll
 import { PlaybookPlayer } from '../../features/playbook/engine/player/PlaybookPlayer';
 import { GlobalTopbar, Stage } from '../../shared/ui/GlobalTopbar';
 import { useProviderSettings } from '../../features/providers/hooks/useProviderSettings';
-import type { PlaybookScript } from '../../features/playbook/engine/types';
+import type { DirectorScript, PlaybookScript } from '../../features/playbook/engine/types';
 import { motionSceneDemo } from '../../features/playbook/engine/fixtures/motionSceneDemo';
 import { ExportModal } from '../../features/export/ui/ExportModal';
 import {
@@ -95,7 +95,7 @@ interface ChatPanelProps {
   playbook: PlaybookScript | null;
   isProviderConfigured: boolean;
   onOpenProviderSettings?: () => void;
-  onPlaybookPatched: (playbook: PlaybookScript) => void;
+  onPlaybookPatched: (playbook: PlaybookScript, director?: DirectorScript | null) => void;
   collapsed: boolean;
   onToggle: () => void;
 }
@@ -192,7 +192,7 @@ function ChatPanel({
         provider,
         abortRef.current.signal,
       );
-      onPlaybookPatched(result.playbook);
+      onPlaybookPatched(result.playbook, result.director);
       setMsgs([
         ...nextMsgs,
         {
@@ -219,7 +219,7 @@ function ChatPanel({
     setPending(true);
     try {
       const result = await restoreRunVersion(runId, versionId);
-      onPlaybookPatched(result.playbook);
+      onPlaybookPatched(result.playbook, result.director);
       setMsgs((current) => [
         ...current,
         {
@@ -447,7 +447,7 @@ export function StudioPage({
   appEdition = 'self', runId, t, setTweak, onNavigate, isProviderConfigured, accountBalanceYuan = null, accountName = null, accountAvatarUrl = null, onOpenProviderSettings,
 }: StudioPageProps) {
   const isDark = t.theme === 'dark';
-  const { playbook, error, isLoading, status } = usePipelinePoller(runId);
+  const { playbook, director, error, isLoading, status } = usePipelinePoller(runId);
 
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [problemCollapsed, setProblemCollapsed] = useState(false);
@@ -457,11 +457,17 @@ export function StudioPage({
   const [patchedPlaybook, setPatchedPlaybook] = useState<{
     runId: string;
     playbook: PlaybookScript;
+    director?: DirectorScript | null;
   } | null>(null);
   const showMotionDemo = import.meta.env.DEV && motionDemoEnabled;
-  const activePatchedPlaybook =
-    patchedPlaybook?.runId === runId ? patchedPlaybook.playbook : null;
-  const activePlaybook = showMotionDemo ? motionSceneDemo : (activePatchedPlaybook ?? playbook);
+  const activePatchedRun =
+    patchedPlaybook?.runId === runId ? patchedPlaybook : null;
+  const activePlaybook = showMotionDemo ? motionSceneDemo : (activePatchedRun?.playbook ?? playbook);
+  const activeDirector = showMotionDemo
+    ? null
+    : activePatchedRun
+      ? (activePatchedRun.director ?? null)
+      : director;
   const canExport = !showMotionDemo && !!playbook && !!runId;
 
   useEffect(() => {
@@ -513,8 +519,14 @@ export function StudioPage({
               playbook={activePlaybook}
               isProviderConfigured={isProviderConfigured}
               onOpenProviderSettings={onOpenProviderSettings}
-              onPlaybookPatched={(next) => {
-                if (runId) setPatchedPlaybook({ runId, playbook: next });
+              onPlaybookPatched={(next, nextDirector) => {
+                if (runId) {
+                  setPatchedPlaybook({
+                    runId,
+                    playbook: next,
+                    director: nextDirector ?? null,
+                  });
+                }
               }}
               collapsed={chatCollapsed}
               onToggle={() => setChatCollapsed((v) => !v)}
@@ -546,6 +558,7 @@ export function StudioPage({
           {activePlaybook ? (
             <PlaybookPlayer
               script={activePlaybook}
+              director={activeDirector}
               theme={isDark ? 'dark' : 'light'}
               swapDurationFrames={t.swapFrames}
               onOpenExport={canExport ? () => setExportOpen(true) : undefined}

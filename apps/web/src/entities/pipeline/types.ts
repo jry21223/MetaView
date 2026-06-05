@@ -1,6 +1,6 @@
 import type { CirDocument, ExecutionMap } from "../cir/types";
 import type { ProviderDescriptor, SkillDescriptor } from "../provider/types";
-import type { PlaybookScript } from "../playbook/types";
+import type { DirectorScript, PlaybookScript } from "../playbook/types";
 
 export interface ReviewIssue {
   code: string;
@@ -22,6 +22,7 @@ export interface PipelineRunResult {
   status: "queued" | "running" | "reviewing" | "succeeded" | "failed";
   prompt?: string;
   playbook?: PlaybookScript | null;
+  director?: DirectorScript | null;
   error?: string | null;
   created_at: string;
   review?: ReviewReport | null;

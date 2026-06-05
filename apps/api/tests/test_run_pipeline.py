@@ -8,6 +8,9 @@ from app.application.dto.pipeline_dto import PipelineRequest
 from app.application.use_cases.run_pipeline import RunPipelineUseCase, _strip_markdown_fences
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.infrastructure.persistence.db_init import init_db
+from app.infrastructure.persistence.sqlite_director_repository import (
+    SqliteRunDirectorRepository,
+)
 from app.infrastructure.persistence.sqlite_run_repository import SqliteRunRepository
 
 _VALID_CIR = json.dumps({
@@ -54,6 +57,13 @@ def repo(tmp_path):
     return SqliteRunRepository(db)
 
 
+@pytest.fixture
+def repos(tmp_path):
+    db = str(tmp_path / "director-test.db")
+    init_db(db)
+    return SqliteRunRepository(db), SqliteRunDirectorRepository(db)
+
+
 @pytest.mark.asyncio
 async def test_successful_pipeline_run(repo) -> None:
     use_case = RunPipelineUseCase(repo, MockLLMSuccess())
@@ -66,6 +76,21 @@ async def test_successful_pipeline_run(repo) -> None:
     assert result.playbook is not None
     assert result.playbook.title == "Binary Search"
     assert result.error is None
+
+
+@pytest.mark.asyncio
+async def test_successful_pipeline_run_persists_active_director(repos) -> None:
+    run_repo, director_repo = repos
+    use_case = RunPipelineUseCase(run_repo, MockLLMSuccess(), director_repo=director_repo)
+    await run_repo.create("run-director", "test prompt", "2024-01-01T00:00:00+00:00")
+
+    await use_case.execute("run-director", PipelineRequest(prompt="test prompt"))
+
+    director = await director_repo.get("run-director")
+    assert director is not None
+    assert director.run_id == "run-director"
+    assert director.beats[0].step_id == "step_01"
+    assert director.beats[0].camera_motion == "push_in"
 
 
 @pytest.mark.asyncio

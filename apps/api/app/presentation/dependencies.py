@@ -8,6 +8,7 @@ from fastapi import Depends
 
 from app.application.ports.account_repository import IAccountRepository
 from app.application.ports.agent_provider import IAgentProvider
+from app.application.ports.director_repository import IRunDirectorRepository
 from app.application.ports.export_repository import IExportJobRepository
 from app.application.ports.llm_provider import ILLMProvider
 from app.application.ports.oauth_client import IOAuthClient
@@ -25,6 +26,9 @@ from app.infrastructure.persistence.in_memory_export_repository import (
     InMemoryExportJobRepository,
 )
 from app.infrastructure.persistence.sqlite_account_repository import SqliteAccountRepository
+from app.infrastructure.persistence.sqlite_director_repository import (
+    SqliteRunDirectorRepository,
+)
 from app.infrastructure.persistence.sqlite_newapi_topup_repository import (
     SqliteNewApiTopupRepository,
 )
@@ -36,6 +40,11 @@ logger = logging.getLogger(__name__)
 @lru_cache
 def _get_run_repo(db_path: str) -> SqliteRunRepository:
     return SqliteRunRepository(db_path)
+
+
+@lru_cache
+def _get_run_director_repo(db_path: str) -> SqliteRunDirectorRepository:
+    return SqliteRunDirectorRepository(db_path)
 
 
 @lru_cache(maxsize=4)
@@ -69,6 +78,12 @@ def _get_openai_provider(
 
 def get_run_repo(settings: Annotated[Settings, Depends(get_settings)]) -> IRunRepository:
     return _get_run_repo(settings.history_db_path)
+
+
+def get_run_director_repo(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> IRunDirectorRepository:
+    return _get_run_director_repo(settings.history_db_path)
 
 
 def get_account_repo(

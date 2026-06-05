@@ -25,6 +25,7 @@ from typing import Any
 
 import httpx
 
+from app.application.ports.director_repository import IRunDirectorRepository
 from app.application.ports.export_repository import IExportJobRepository
 from app.application.ports.run_repository import IRunRepository
 from app.domain.models.export_job import ExportJobStatus, ExportOptions, TtsConfig
@@ -46,11 +47,13 @@ class ExportVideoUseCase:
         self,
         export_repo: IExportJobRepository,
         run_repo: IRunRepository,
+        director_repo: IRunDirectorRepository,
         web_app_dir: Path,
         artifacts_dir: Path,
     ) -> None:
         self._exports = export_repo
         self._runs = run_repo
+        self._directors = director_repo
         self._web_dir = web_app_dir
         self._artifacts = artifacts_dir
         self._artifacts.mkdir(parents=True, exist_ok=True)
@@ -69,6 +72,7 @@ class ExportVideoUseCase:
                 raise ValueError(f"Run {run_id!r} has no playbook to export")
 
             playbook = run.playbook.model_dump()
+            director = await self._get_export_director(run_id)
 
             job_dir = self._artifacts / job_id
             job_dir.mkdir(parents=True, exist_ok=True)
@@ -95,6 +99,8 @@ class ExportVideoUseCase:
                 "showSubtitles": True,
                 "audioFiles": audio_files,
             }
+            if director is not None:
+                input_props["director"] = director.model_dump()
             props_path = job_dir / "inputProps.json"
             props_path.write_text(json.dumps(input_props), encoding="utf-8")
 
@@ -127,6 +133,13 @@ class ExportVideoUseCase:
                 status=ExportJobStatus.FAILED,
                 error=str(exc),
             )
+
+    async def _get_export_director(self, run_id: str):
+        try:
+            return await self._directors.get(run_id)
+        except Exception:  # noqa: BLE001 - export falls back to playbook-only props.
+            logger.warning("Failed to load director for export run %s", run_id, exc_info=True)
+            return None
 
     async def _generate_step_audio(
         self,

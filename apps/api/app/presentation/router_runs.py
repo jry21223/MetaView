@@ -18,13 +18,19 @@ from app.application.dto.followup_dto import (
     RunFollowUpsResponse,
 )
 from app.application.dto.pipeline_dto import PipelineRunResponse
+from app.application.ports.director_repository import IRunDirectorRepository
 from app.application.ports.llm_provider import ILLMProvider
 from app.application.ports.run_repository import IRunRepository
 from app.application.use_cases.follow_up import FollowUpPatchError, FollowUpPatchUseCase
 from app.config import Settings, get_settings
 from app.domain.models.playbook import PlaybookScript
+from app.domain.services.director_builder import build_default_director
 from app.infrastructure.llm.openai_provider import OpenAIProvider
-from app.presentation.dependencies import get_llm_provider, get_run_repo
+from app.presentation.dependencies import (
+    get_llm_provider,
+    get_run_director_repo,
+    get_run_repo,
+)
 from app.presentation.rate_limit import read_limit, write_limit
 
 router = APIRouter(prefix="/runs", tags=["runs"])
@@ -47,10 +53,12 @@ async def get_run(
     request: Request,
     run_id: str,
     run_repo: Annotated[IRunRepository, Depends(get_run_repo)],
+    director_repo: Annotated[IRunDirectorRepository, Depends(get_run_director_repo)],
 ) -> PipelineRunResponse:
     run = await run_repo.get(run_id)
     if run is None:
         raise HTTPException(status_code=404, detail=f"Run {run_id!r} not found")
+    run.director = await director_repo.get(run_id)
     return run
 
 
@@ -78,6 +86,7 @@ async def submit_followup(
     payload: FollowUpRequest,
     settings: Annotated[Settings, Depends(get_settings)],
     run_repo: Annotated[IRunRepository, Depends(get_run_repo)],
+    director_repo: Annotated[IRunDirectorRepository, Depends(get_run_director_repo)],
     llm: Annotated[ILLMProvider, Depends(get_llm_provider)],
 ) -> FollowUpResponse:
     if settings.app_edition == "ops" and (
@@ -156,12 +165,15 @@ async def submit_followup(
         )
         await run_repo.attach_followup_version(followup_id, version_id)
         await run_repo.update_playbook_json(run_id, next_json)
+        director = build_default_director(result.playbook, run_id)
+        await director_repo.upsert(director, now)
 
     return FollowUpResponse(
         reply=result.reply,
         change_summary=result.change_summary,
         version_id=version_id,
         playbook=result.playbook,
+        director=director,
     )
 
 
@@ -172,6 +184,7 @@ async def restore_version(
     run_id: str,
     version_id: str,
     run_repo: Annotated[IRunRepository, Depends(get_run_repo)],
+    director_repo: Annotated[IRunDirectorRepository, Depends(get_run_director_repo)],
 ) -> RestoreVersionResponse:
     async with _RUN_LOCKS[run_id]:
         run = await run_repo.get(run_id)
@@ -200,8 +213,14 @@ async def restore_version(
             created_at=now,
         )
         await run_repo.update_playbook_json(run_id, playbook.model_dump_json())
+        director = build_default_director(playbook, run_id)
+        await director_repo.upsert(director, now)
 
-    return RestoreVersionResponse(version_id=restore_version_id, playbook=playbook)
+    return RestoreVersionResponse(
+        version_id=restore_version_id,
+        playbook=playbook,
+        director=director,
+    )
 
 
 @router.delete("/{run_id}", status_code=204)
@@ -210,7 +229,9 @@ async def delete_run(
     request: Request,
     run_id: str,
     run_repo: Annotated[IRunRepository, Depends(get_run_repo)],
+    director_repo: Annotated[IRunDirectorRepository, Depends(get_run_director_repo)],
 ) -> None:
+    await director_repo.delete(run_id)
     deleted = await run_repo.delete(run_id)
     if not deleted:
         raise HTTPException(status_code=404, detail=f"Run {run_id!r} not found")

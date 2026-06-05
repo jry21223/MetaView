@@ -1,7 +1,7 @@
 import { useEffect, useRef, useReducer } from "react";
 import { getPipelineRun } from "../api/pipelineApi";
 import type { PipelineRunResult } from "../../../entities/pipeline/types";
-import type { PlaybookScript } from "../../../entities/playbook/types";
+import type { DirectorScript, PlaybookScript } from "../../../entities/playbook/types";
 
 const POLL_INTERVAL_MS = 2000;
 const MAX_ATTEMPTS = 120;
@@ -9,6 +9,7 @@ const ACTIVE_RUN_STATUSES = new Set<PipelineRunResult["status"]>(["queued", "run
 
 interface State {
   playbook: PlaybookScript | null;
+  director: DirectorScript | null;
   status: PipelineRunResult["status"] | null;
   error: string | null;
 }
@@ -22,12 +23,14 @@ type Action =
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "reset":
-      return { playbook: null, status: null, error: null };
+      return { playbook: null, director: null, status: null, error: null };
     case "poll_success": {
       const { result } = action;
+      const succeeded = result.status === "succeeded";
       return {
         status: result.status,
-        playbook: result.status === "succeeded" ? (result.playbook ?? null) : state.playbook,
+        playbook: succeeded ? (result.playbook ?? null) : state.playbook,
+        director: succeeded ? (result.director ?? null) : state.director,
         error: result.status === "failed" ? (result.error ?? "生成失败，请返回重试") : null,
       };
     }
@@ -40,13 +43,19 @@ function reducer(state: State, action: Action): State {
 
 export interface UsePipelinePollerResult {
   playbook: PlaybookScript | null;
+  director: DirectorScript | null;
   status: PipelineRunResult["status"] | null;
   error: string | null;
   isLoading: boolean;
 }
 
 export function usePipelinePoller(runId: string | null): UsePipelinePollerResult {
-  const [state, dispatch] = useReducer(reducer, { playbook: null, status: null, error: null });
+  const [state, dispatch] = useReducer(reducer, {
+    playbook: null,
+    director: null,
+    status: null,
+    error: null,
+  });
   const attemptsRef = useRef(0);
 
   useEffect(() => {

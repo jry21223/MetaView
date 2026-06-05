@@ -4,6 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.domain.models.director import DirectorScript
 from app.domain.models.playbook import PlaybookScript
 
 
@@ -26,6 +27,7 @@ class FollowUpResponse(BaseModel):
     change_summary: str
     version_id: str
     playbook: PlaybookScript
+    director: DirectorScript | None = None
 
 
 class RunFollowUpRecord(BaseModel):
@@ -60,3 +62,4 @@ class RunFollowUpsResponse(BaseModel):
 class RestoreVersionResponse(BaseModel):
     version_id: str
     playbook: PlaybookScript
+    director: DirectorScript | None = None

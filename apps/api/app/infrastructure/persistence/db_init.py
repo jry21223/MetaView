@@ -47,6 +47,16 @@ def _create_pipeline_runs(conn: sqlite3.Connection) -> None:
     """)
     _add_column_if_missing(conn, "pipeline_run_versions", "parent_version_id", "TEXT")
     _add_column_if_missing(conn, "pipeline_run_versions", "summary", "TEXT")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS pipeline_run_directors (
+            run_id        TEXT PRIMARY KEY,
+            director_json TEXT NOT NULL,
+            source        TEXT NOT NULL,
+            created_at    TEXT NOT NULL,
+            updated_at    TEXT NOT NULL,
+            FOREIGN KEY(run_id) REFERENCES pipeline_runs(run_id)
+        )
+    """)
 
 
 def _create_accounts(conn: sqlite3.Connection) -> None:

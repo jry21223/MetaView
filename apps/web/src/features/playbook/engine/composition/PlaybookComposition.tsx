@@ -1,6 +1,6 @@
 import React from "react";
 import { useCurrentFrame } from "remotion";
-import type { PlaybookScript } from "../types";
+import type { DirectorScript, PlaybookScript } from "../types";
 import { CodeHighlightRenderer } from "../renderers/CodeHighlightRenderer";
 import { useStepProgress } from "./useInterpolatedState";
 import type { RendererProps } from "../renderers/types";
@@ -9,9 +9,15 @@ import { rendererRegistry } from "../renderers/registry";
 import { appearTransform, useTimeline } from "../foundation";
 import { compileVisualTimeline, type VisualLayerState, type VisualStepState } from "./visualContinuity";
 import { snapshotSurface } from "./snapshotSurface";
+import {
+  cameraTransformForBeat,
+  findActiveDirectorBeat,
+  resolveDirectorVoiceover,
+} from "../director";
 
 interface PlaybookCompositionProps {
   script: PlaybookScript;
+  director?: DirectorScript | null;
   theme?: "dark" | "light";
   showSubtitles?: boolean;
   showInlineCode?: boolean;
@@ -143,6 +149,7 @@ function SceneCompositor({
 
 export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
   script,
+  director = null,
   theme = "dark",
   showSubtitles = true,
   showInlineCode = false,
@@ -163,6 +170,9 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
 
   if (!step) return null;
 
+  const activeBeat = findActiveDirectorBeat(director, frame);
+  const cameraTransform = cameraTransformForBeat(activeBeat, frame);
+  const subtitleText = resolveDirectorVoiceover(director, step);
   const hasCodeTrack = showInlineCode && step.code_highlight != null;
   const subtitleHeight = PLAYBOOK_LAYOUT.SUBTITLE_HEIGHT;
   const vizRatio = PLAYBOOK_LAYOUT.VIZ_SPLIT_RATIO;
@@ -197,12 +207,28 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
       {/* Main content area */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
         {/* Visual track */}
-        <div style={{ width: hasCodeTrack ? `${vizRatio * 100}%` : "100%", height: "100%" }}>
-          <SceneCompositor
-            baseProps={rendererProps}
-            stepProgress={stepProgress}
-            visualState={visualState}
-          />
+        <div
+          style={{
+            width: hasCodeTrack ? `${vizRatio * 100}%` : "100%",
+            height: "100%",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            data-camera-motion={activeBeat?.camera_motion}
+            style={{
+              width: "100%",
+              height: "100%",
+              transform: cameraTransform,
+              transformOrigin: "center center",
+            }}
+          >
+            <SceneCompositor
+              baseProps={rendererProps}
+              stepProgress={stepProgress}
+              visualState={visualState}
+            />
+          </div>
         </div>
 
         {/* Code track */}
@@ -288,7 +314,7 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
               wordBreak: "break-word",
             }}
           >
-            {step.voiceover_text}
+            {subtitleText}
           </span>
           <span
             style={{

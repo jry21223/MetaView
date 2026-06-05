@@ -1,5 +1,5 @@
 import { API_BASE_URL, readErrorMessage } from "../../../shared/api/httpClient";
-import type { PlaybookScript } from "../../playbook/engine/types";
+import type { DirectorScript, PlaybookScript } from "../../playbook/engine/types";
 import type { ProviderSettings } from "../../providers/hooks/useProviderSettings";
 
 export interface FollowUpChatMessage {
@@ -41,6 +41,7 @@ export interface FollowUpResponse {
   change_summary: string;
   version_id: string;
   playbook: PlaybookScript;
+  director?: DirectorScript | null;
 }
 
 export async function submitRunFollowUp(
@@ -82,12 +83,16 @@ export async function listRunFollowUps(
 export async function restoreRunVersion(
   runId: string,
   versionId: string,
-): Promise<{ version_id: string; playbook: PlaybookScript }> {
+): Promise<{ version_id: string; playbook: PlaybookScript; director?: DirectorScript | null }> {
   const response = await fetch(`${API_BASE_URL}/api/v1/runs/${runId}/versions/${versionId}/restore`, {
     method: "POST",
   });
   if (!response.ok) {
     throw new Error(await readErrorMessage(response, "Version restore failed"));
   }
-  return (await response.json()) as { version_id: string; playbook: PlaybookScript };
+  return (await response.json()) as {
+    version_id: string;
+    playbook: PlaybookScript;
+    director?: DirectorScript | null;
+  };
 }

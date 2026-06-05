@@ -381,6 +381,7 @@ export function HistoryPage({
               )}
               <PlaybookPlayer
                 script={playbook}
+                director={selectedRun?.director ?? null}
                 theme={isDark ? 'dark' : 'light'}
                 swapDurationFrames={t.swapFrames}
               />

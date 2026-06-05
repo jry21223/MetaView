@@ -1,10 +1,11 @@
 import React from "react";
 import { Audio, Sequence } from "remotion";
-import type { PlaybookScript } from "../features/playbook/engine/types";
+import type { DirectorScript, PlaybookScript } from "../features/playbook/engine/types";
 import { PlaybookComposition } from "../features/playbook/engine/composition/PlaybookComposition";
 
 export type PlaybookExportProps = {
   script: PlaybookScript;
+  director?: DirectorScript | null;
   theme: "dark" | "light";
   showSubtitles: boolean;
   /**
@@ -22,13 +23,19 @@ function stepStart(script: PlaybookScript, index: number): number {
 
 export const PlaybookExportComposition: React.FC<PlaybookExportProps> = ({
   script,
+  director = null,
   theme,
   showSubtitles,
   audioFiles = [],
 }) => {
   return (
     <>
-      <PlaybookComposition script={script} theme={theme} showSubtitles={showSubtitles} />
+      <PlaybookComposition
+        script={script}
+        director={director}
+        theme={theme}
+        showSubtitles={showSubtitles}
+      />
       {audioFiles.map((src, i) => {
         if (!src) return null;
         const step = script.steps[i];

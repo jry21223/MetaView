@@ -7,9 +7,12 @@ from fastapi.testclient import TestClient
 
 from app.config import get_settings
 from app.infrastructure.persistence.db_init import init_db
+from app.infrastructure.persistence.sqlite_director_repository import (
+    SqliteRunDirectorRepository,
+)
 from app.infrastructure.persistence.sqlite_run_repository import SqliteRunRepository
 from app.main import create_app
-from app.presentation.dependencies import get_llm_provider, get_run_repo
+from app.presentation.dependencies import get_llm_provider, get_run_director_repo, get_run_repo
 
 _VALID_CIR = json.dumps({
     "version": "0.1.0",
@@ -39,12 +42,14 @@ def client(tmp_path):
     db = str(tmp_path / "test.db")
     init_db(db)
     repo = SqliteRunRepository(db)
+    director_repo = SqliteRunDirectorRepository(db)
 
     app = create_app()
     # Existing router tests fire several POSTs back-to-back; disable per-IP
     # rate limiting so they don't bump into the production threshold.
     app.state.limiter.enabled = False
     app.dependency_overrides[get_run_repo] = lambda: repo
+    app.dependency_overrides[get_run_director_repo] = lambda: director_repo
     app.dependency_overrides[get_llm_provider] = lambda: _MockLLM()
 
     with TestClient(app) as c:
@@ -128,10 +133,12 @@ def test_ops_edition_rejects_client_provider_override(monkeypatch, tmp_path) -> 
     db = str(tmp_path / "ops.db")
     init_db(db)
     repo = SqliteRunRepository(db)
+    director_repo = SqliteRunDirectorRepository(db)
     monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
     monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
     app = create_app()
     app.dependency_overrides[get_run_repo] = lambda: repo
+    app.dependency_overrides[get_run_director_repo] = lambda: director_repo
     app.dependency_overrides[get_llm_provider] = lambda: _MockLLM()
 
     with TestClient(app) as c:
@@ -143,6 +150,29 @@ def test_ops_edition_rejects_client_provider_override(monkeypatch, tmp_path) -> 
     get_settings.cache_clear()
     assert resp.status_code == 400
     assert "平台托管模型" in resp.json()["detail"]
+
+
+def test_get_run_includes_active_director_after_success(client) -> None:
+    post_resp = client.post("/api/v1/pipeline", json={"prompt": "可视化栈"})
+    run_id = post_resp.json()["run_id"]
+
+    get_resp = client.get(f"/api/v1/runs/{run_id}")
+
+    assert get_resp.status_code == 200
+    data = get_resp.json()
+    assert data["director"]["run_id"] == run_id
+    assert data["director"]["beats"][0]["step_id"] == "step_01"
+
+
+def test_delete_run_removes_active_director(client) -> None:
+    post_resp = client.post("/api/v1/pipeline", json={"prompt": "删除导演脚本"})
+    run_id = post_resp.json()["run_id"]
+    assert client.get(f"/api/v1/runs/{run_id}").json()["director"] is not None
+
+    delete_resp = client.delete(f"/api/v1/runs/{run_id}")
+
+    assert delete_resp.status_code == 204
+    assert client.get(f"/api/v1/runs/{run_id}").status_code == 404
 
 
 def test_get_run_returns_prompt(client) -> None:
