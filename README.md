@@ -38,6 +38,11 @@
 
 历史记录页现在展示每次运行的**原始提示词**（`prompt` 字段），方便对比不同输入的输出差异。
 
+题目进入生成前会先做 topic routing：明确学科或高置信关键词走对应 specialized skill；
+未命中则走 generic skill，让 LLM 从现有七个 `cir.domain` 中自行选择最终领域，不再默认落到
+algorithm。详见 [`docs/topic-routing.md`](docs/topic-routing.md)；同题 specialized/generic
+对比见 [`docs/skill-ab-eval.md`](docs/skill-ab-eval.md)。
+
 ## 快速开始
 
 ### 本地开发
