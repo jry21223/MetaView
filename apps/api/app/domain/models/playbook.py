@@ -16,6 +16,16 @@ class SnapshotKind(str, Enum):
     MATH_PLOT = "math_plot"
     MATH_FORMULA = "math_formula"
     MATH_SCENE = "math_scene"
+    MATRIX_SCENE = "matrix_scene"
+    TABLE_SCENE = "table_scene"
+    GRAPH_SCENE = "graph_scene"
+    STATS_CHART_SCENE = "stats_chart_scene"
+    ITERATION_TRACE_SCENE = "iteration_trace_scene"
+    PHASE_PORTRAIT_SCENE = "phase_portrait_scene"
+    COMPLEX_PLANE_SCENE = "complex_plane_scene"
+    OPTIMIZATION_SCENE = "optimization_scene"
+    MODELING_SCENE = "modeling_scene"
+    MANIFOLD_SCENE = "manifold_scene"
     SOLID_GEOMETRY_SCENE = "solid_geometry_scene"
     MOTION_SCENE = "motion_scene"
     KATEX_OVERLAY = "katex_overlay"
@@ -172,6 +182,202 @@ class MathSceneSnapshot(BaseModel):
     vector_field: MathSceneVectorField | None = None
     segments: list[MathSceneSegment] = Field(default_factory=list)
     annotations: list[MathSceneAnnotation] = Field(default_factory=list)
+    formula_latex: str | None = None
+    caption: str | None = None
+
+
+CellValue = str | int | float
+SceneEmphasis = Literal["primary", "secondary", "accent", "muted"]
+
+
+class MatrixSceneSnapshot(BaseModel):
+    kind: Literal["matrix_scene"] = "matrix_scene"
+    matrix: list[list[CellValue]] = Field(default_factory=list)
+    row_labels: list[str] = Field(default_factory=list)
+    col_labels: list[str] = Field(default_factory=list)
+    active_rows: list[int] = Field(default_factory=list)
+    active_columns: list[int] = Field(default_factory=list)
+    active_cells: list[tuple[int, int]] = Field(default_factory=list)
+    operation_label: str | None = None
+    formula_latex: str | None = None
+    caption: str | None = None
+
+
+class TableSceneSnapshot(BaseModel):
+    kind: Literal["table_scene"] = "table_scene"
+    columns: list[str] = Field(default_factory=list)
+    rows: list[list[CellValue]] = Field(default_factory=list)
+    active_rows: list[int] = Field(default_factory=list)
+    active_columns: list[int] = Field(default_factory=list)
+    active_cells: list[tuple[int, int]] = Field(default_factory=list)
+    caption: str | None = None
+
+
+class GraphSceneNode(BaseModel):
+    id: str
+    label: str | None = None
+    x: float | None = None
+    y: float | None = None
+    emphasis: SceneEmphasis = "secondary"
+
+
+class GraphSceneEdge(BaseModel):
+    source: str
+    target: str
+    label: str | None = None
+    weight: float | None = None
+    emphasis: SceneEmphasis = "secondary"
+
+
+class GraphSceneSnapshot(BaseModel):
+    kind: Literal["graph_scene"] = "graph_scene"
+    nodes: list[GraphSceneNode] = Field(default_factory=list)
+    edges: list[GraphSceneEdge] = Field(default_factory=list)
+    directed: bool = False
+    weighted: bool = False
+    active_node_ids: list[str] = Field(default_factory=list)
+    active_edge_ids: list[str] = Field(default_factory=list)
+    caption: str | None = None
+
+
+class ChartPoint(BaseModel):
+    x: float
+    y: float
+    label: str | None = None
+
+
+class ChartSeries(BaseModel):
+    label: str
+    points: list[ChartPoint] = Field(default_factory=list)
+    values: list[float] = Field(default_factory=list)
+    emphasis: SceneEmphasis = "primary"
+
+
+class StatsChartSceneSnapshot(BaseModel):
+    kind: Literal["stats_chart_scene"] = "stats_chart_scene"
+    chart_type: Literal["line", "bar", "histogram", "distribution", "box"] = "line"
+    series: list[ChartSeries] = Field(default_factory=list)
+    x_label: str = "x"
+    y_label: str = "y"
+    current_index: int | None = None
+    formula_latex: str | None = None
+    caption: str | None = None
+
+
+class IterationTraceItem(BaseModel):
+    index: int
+    value: CellValue
+    error: float | None = None
+    label: str | None = None
+
+
+class IterationTraceSceneSnapshot(BaseModel):
+    kind: Literal["iteration_trace_scene"] = "iteration_trace_scene"
+    iterations: list[IterationTraceItem] = Field(default_factory=list)
+    metric_name: str = "error"
+    current_index: int | None = None
+    formula_latex: str | None = None
+    caption: str | None = None
+
+
+class PhaseTrajectory(BaseModel):
+    label: str | None = None
+    points: list[tuple[float, float]] = Field(default_factory=list)
+    emphasis: SceneEmphasis = "primary"
+
+
+class PhaseEquilibrium(BaseModel):
+    x: float
+    y: float
+    label: str | None = None
+    stable: bool | None = None
+
+
+class PhasePortraitSceneSnapshot(BaseModel):
+    kind: Literal["phase_portrait_scene"] = "phase_portrait_scene"
+    trajectories: list[PhaseTrajectory] = Field(default_factory=list)
+    equilibria: list[PhaseEquilibrium] = Field(default_factory=list)
+    vector_field: MathSceneVectorField | None = None
+    x_min: float = -5.0
+    x_max: float = 5.0
+    y_min: float = -5.0
+    y_max: float = 5.0
+    formula_latex: str | None = None
+    caption: str | None = None
+
+
+class ComplexPlanePoint(BaseModel):
+    re: float
+    im: float
+    label: str | None = None
+    emphasis: SceneEmphasis = "primary"
+
+
+class ComplexPlaneSceneSnapshot(BaseModel):
+    kind: Literal["complex_plane_scene"] = "complex_plane_scene"
+    points: list[ComplexPlanePoint] = Field(default_factory=list)
+    contours: list[list[tuple[float, float]]] = Field(default_factory=list)
+    mapping_grid: list[list[tuple[float, float]]] = Field(default_factory=list)
+    x_min: float = -4.0
+    x_max: float = 4.0
+    y_min: float = -4.0
+    y_max: float = 4.0
+    formula_latex: str | None = None
+    caption: str | None = None
+
+
+class OptimizationSceneSnapshot(BaseModel):
+    kind: Literal["optimization_scene"] = "optimization_scene"
+    objective: str | None = None
+    feasible_region: list[tuple[float, float]] = Field(default_factory=list)
+    iterates: list[tuple[float, float]] = Field(default_factory=list)
+    optimum: tuple[float, float] | None = None
+    x_min: float = -1.0
+    x_max: float = 6.0
+    y_min: float = -1.0
+    y_max: float = 6.0
+    formula_latex: str | None = None
+    caption: str | None = None
+
+
+class ModelingVariable(BaseModel):
+    id: str
+    label: str
+    value: CellValue | None = None
+    unit: str | None = None
+
+
+class ModelingRelation(BaseModel):
+    source: str
+    target: str
+    label: str | None = None
+    emphasis: SceneEmphasis = "secondary"
+
+
+class ModelingSceneSnapshot(BaseModel):
+    kind: Literal["modeling_scene"] = "modeling_scene"
+    variables: list[ModelingVariable] = Field(default_factory=list)
+    relations: list[ModelingRelation] = Field(default_factory=list)
+    assumptions: list[str] = Field(default_factory=list)
+    simulation_series: list[ChartSeries] = Field(default_factory=list)
+    formula_latex: str | None = None
+    caption: str | None = None
+
+
+class ManifoldTangentVector(BaseModel):
+    at: tuple[float, float, float]
+    direction: tuple[float, float, float]
+    label: str | None = None
+    emphasis: SceneEmphasis = "accent"
+
+
+class ManifoldSceneSnapshot(BaseModel):
+    kind: Literal["manifold_scene"] = "manifold_scene"
+    chart_name: str | None = None
+    param_surface: str | None = None
+    u_range: tuple[float, float] = (-2.0, 2.0)
+    v_range: tuple[float, float] = (-2.0, 2.0)
+    tangent_vectors: list[ManifoldTangentVector] = Field(default_factory=list)
     formula_latex: str | None = None
     caption: str | None = None
 
@@ -357,6 +563,16 @@ AnySnapshot = Annotated[
         MathPlotSnapshot,
         MathFormulaSnapshot,
         MathSceneSnapshot,
+        MatrixSceneSnapshot,
+        TableSceneSnapshot,
+        GraphSceneSnapshot,
+        StatsChartSceneSnapshot,
+        IterationTraceSceneSnapshot,
+        PhasePortraitSceneSnapshot,
+        ComplexPlaneSceneSnapshot,
+        OptimizationSceneSnapshot,
+        ModelingSceneSnapshot,
+        ManifoldSceneSnapshot,
         SolidGeometrySceneSnapshot,
         MotionSceneSnapshot,
         KaTeXOverlaySnapshot,

@@ -21,10 +21,20 @@ from app.domain.models.playbook import (
     AlgorithmBarsSnapshot,
     AlgorithmTreeSnapshot,
     AnySnapshot,
+    ComplexPlaneSceneSnapshot,
+    GraphSceneSnapshot,
+    IterationTraceSceneSnapshot,
+    ManifoldSceneSnapshot,
+    MatrixSceneSnapshot,
     MetaStep,
+    ModelingSceneSnapshot,
     MotionSceneSnapshot,
+    OptimizationSceneSnapshot,
+    PhasePortraitSceneSnapshot,
     PlaybookScript,
     SnapshotKind,
+    StatsChartSceneSnapshot,
+    TableSceneSnapshot,
 )
 from app.domain.models.review import CirReviewIssue, CirReviewReport, ReviewSeverity
 from app.domain.models.topic import TopicDomain, VisualKind
@@ -36,6 +46,9 @@ __all__ = [
     "PipelineRunStatus", "SandboxMode", "SandboxStatus", "UITheme",
     "ValidationSeverity", "ValidationStatus",
     "PlaybookScript", "MetaStep", "AlgorithmArraySnapshot", "AlgorithmBarsSnapshot",
-    "AlgorithmTreeSnapshot", "MotionSceneSnapshot", "AnySnapshot", "SnapshotKind",
+    "AlgorithmTreeSnapshot", "MotionSceneSnapshot", "MatrixSceneSnapshot", "TableSceneSnapshot",
+    "GraphSceneSnapshot", "StatsChartSceneSnapshot", "IterationTraceSceneSnapshot",
+    "PhasePortraitSceneSnapshot", "ComplexPlaneSceneSnapshot", "OptimizationSceneSnapshot",
+    "ModelingSceneSnapshot", "ManifoldSceneSnapshot", "AnySnapshot", "SnapshotKind",
     "ReviewSeverity", "CirReviewIssue", "CirReviewReport",
 ]
