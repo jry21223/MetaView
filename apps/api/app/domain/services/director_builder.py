@@ -70,9 +70,27 @@ def build_default_director(playbook: PlaybookScript, run_id: str) -> DirectorScr
 def _beat_style(
     snapshot: AnySnapshot,
 ) -> tuple[DirectorIntent, DirectorShotType, DirectorCameraMotion, DirectorPacing]:
-    if snapshot.kind in {"math_formula", "math_plot", "katex_overlay"}:
+    if snapshot.kind in {
+        "math_formula",
+        "math_plot",
+        "katex_overlay",
+        "table_scene",
+        "matrix_scene",
+    }:
         return "focus", "close", "hold", "normal"
-    if snapshot.kind in {"math_scene", "motion_scene", "solid_geometry_scene"}:
+    if snapshot.kind in {
+        "math_scene",
+        "motion_scene",
+        "solid_geometry_scene",
+        "graph_scene",
+        "stats_chart_scene",
+        "iteration_trace_scene",
+        "phase_portrait_scene",
+        "complex_plane_scene",
+        "optimization_scene",
+        "modeling_scene",
+        "manifold_scene",
+    }:
         return "reveal", "medium", "hold", "normal"
     if snapshot.kind == "narration_card":
         return "summary", "wide", "hold", "normal"
@@ -109,6 +127,26 @@ def _snapshot_text(snapshot: AnySnapshot) -> list[str]:
             return [snapshot.formula_latex or "", snapshot.caption or ""]
         case "solid_geometry_scene":
             return [snapshot.formula_latex or "", snapshot.caption or ""]
+        case "matrix_scene":
+            return [
+                snapshot.formula_latex or "",
+                snapshot.caption or "",
+                snapshot.operation_label or "",
+            ]
+        case "table_scene":
+            return [snapshot.caption or ""]
+        case (
+            "stats_chart_scene"
+            | "iteration_trace_scene"
+            | "phase_portrait_scene"
+            | "complex_plane_scene"
+            | "optimization_scene"
+            | "modeling_scene"
+            | "manifold_scene"
+        ):
+            return [snapshot.formula_latex or "", snapshot.caption or ""]
+        case "graph_scene":
+            return [snapshot.caption or ""]
         case "narration_card":
             return [snapshot.text]
         case "katex_overlay":

@@ -8,6 +8,16 @@ export type SnapshotKind =
   | "math_plot"
   | "math_formula"
   | "math_scene"
+  | "matrix_scene"
+  | "table_scene"
+  | "graph_scene"
+  | "stats_chart_scene"
+  | "iteration_trace_scene"
+  | "phase_portrait_scene"
+  | "complex_plane_scene"
+  | "optimization_scene"
+  | "modeling_scene"
+  | "manifold_scene"
   | "solid_geometry_scene"
   | "motion_scene"
   | "katex_overlay"
@@ -167,6 +177,201 @@ export interface MathSceneSnapshot {
   params?: Record<string, number>;
 }
 
+export type SceneCellValue = string | number;
+export type SceneEmphasis = "primary" | "secondary" | "accent" | "muted";
+
+export interface MatrixSceneSnapshot {
+  kind: "matrix_scene";
+  matrix: SceneCellValue[][];
+  row_labels?: string[];
+  col_labels?: string[];
+  active_rows?: number[];
+  active_columns?: number[];
+  active_cells?: Array<[number, number]>;
+  operation_label?: string | null;
+  formula_latex?: string | null;
+  caption?: string | null;
+}
+
+export interface TableSceneSnapshot {
+  kind: "table_scene";
+  columns: string[];
+  rows: SceneCellValue[][];
+  active_rows?: number[];
+  active_columns?: number[];
+  active_cells?: Array<[number, number]>;
+  caption?: string | null;
+}
+
+export interface GraphSceneNode {
+  id: string;
+  label?: string | null;
+  x?: number | null;
+  y?: number | null;
+  emphasis?: SceneEmphasis;
+}
+
+export interface GraphSceneEdge {
+  source: string;
+  target: string;
+  label?: string | null;
+  weight?: number | null;
+  emphasis?: SceneEmphasis;
+}
+
+export interface GraphSceneSnapshot {
+  kind: "graph_scene";
+  nodes: GraphSceneNode[];
+  edges: GraphSceneEdge[];
+  directed?: boolean;
+  weighted?: boolean;
+  active_node_ids?: string[];
+  active_edge_ids?: string[];
+  caption?: string | null;
+}
+
+export interface ChartPoint {
+  x: number;
+  y: number;
+  label?: string | null;
+}
+
+export interface ChartSeries {
+  label: string;
+  points?: ChartPoint[];
+  values?: number[];
+  emphasis?: SceneEmphasis;
+}
+
+export interface StatsChartSceneSnapshot {
+  kind: "stats_chart_scene";
+  chart_type?: "line" | "bar" | "histogram" | "distribution" | "box";
+  series: ChartSeries[];
+  x_label?: string;
+  y_label?: string;
+  current_index?: number | null;
+  formula_latex?: string | null;
+  caption?: string | null;
+}
+
+export interface IterationTraceItem {
+  index: number;
+  value: SceneCellValue;
+  error?: number | null;
+  label?: string | null;
+}
+
+export interface IterationTraceSceneSnapshot {
+  kind: "iteration_trace_scene";
+  iterations: IterationTraceItem[];
+  metric_name?: string;
+  current_index?: number | null;
+  formula_latex?: string | null;
+  caption?: string | null;
+}
+
+export interface PhaseTrajectory {
+  label?: string | null;
+  points: Array<[number, number]>;
+  emphasis?: SceneEmphasis;
+}
+
+export interface PhaseEquilibrium {
+  x: number;
+  y: number;
+  label?: string | null;
+  stable?: boolean | null;
+}
+
+export interface PhasePortraitSceneSnapshot {
+  kind: "phase_portrait_scene";
+  trajectories: PhaseTrajectory[];
+  equilibria?: PhaseEquilibrium[];
+  vector_field?: MathSceneVectorField | null;
+  x_min?: number;
+  x_max?: number;
+  y_min?: number;
+  y_max?: number;
+  formula_latex?: string | null;
+  caption?: string | null;
+}
+
+export interface ComplexPlanePoint {
+  re: number;
+  im: number;
+  label?: string | null;
+  emphasis?: SceneEmphasis;
+}
+
+export interface ComplexPlaneSceneSnapshot {
+  kind: "complex_plane_scene";
+  points: ComplexPlanePoint[];
+  contours?: Array<Array<[number, number]>>;
+  mapping_grid?: Array<Array<[number, number]>>;
+  x_min?: number;
+  x_max?: number;
+  y_min?: number;
+  y_max?: number;
+  formula_latex?: string | null;
+  caption?: string | null;
+}
+
+export interface OptimizationSceneSnapshot {
+  kind: "optimization_scene";
+  objective?: string | null;
+  feasible_region?: Array<[number, number]>;
+  iterates?: Array<[number, number]>;
+  optimum?: [number, number] | null;
+  x_min?: number;
+  x_max?: number;
+  y_min?: number;
+  y_max?: number;
+  formula_latex?: string | null;
+  caption?: string | null;
+}
+
+export interface ModelingVariable {
+  id: string;
+  label: string;
+  value?: SceneCellValue | null;
+  unit?: string | null;
+}
+
+export interface ModelingRelation {
+  source: string;
+  target: string;
+  label?: string | null;
+  emphasis?: SceneEmphasis;
+}
+
+export interface ModelingSceneSnapshot {
+  kind: "modeling_scene";
+  variables: ModelingVariable[];
+  relations: ModelingRelation[];
+  assumptions?: string[];
+  simulation_series?: ChartSeries[];
+  formula_latex?: string | null;
+  caption?: string | null;
+}
+
+export interface ManifoldTangentVector {
+  at: [number, number, number];
+  direction: [number, number, number];
+  label?: string | null;
+  emphasis?: SceneEmphasis;
+}
+
+export interface ManifoldSceneSnapshot {
+  kind: "manifold_scene";
+  chart_name?: string | null;
+  param_surface?: string | null;
+  u_range?: [number, number];
+  v_range?: [number, number];
+  tangent_vectors?: ManifoldTangentVector[];
+  formula_latex?: string | null;
+  caption?: string | null;
+}
+
 export interface SolidGeometryPoint {
   label: string;
   position: [number, number, number];
@@ -241,6 +446,16 @@ export type AnySnapshot =
   | MathPlotSnapshot
   | MathFormulaSnapshot
   | MathSceneSnapshot
+  | MatrixSceneSnapshot
+  | TableSceneSnapshot
+  | GraphSceneSnapshot
+  | StatsChartSceneSnapshot
+  | IterationTraceSceneSnapshot
+  | PhasePortraitSceneSnapshot
+  | ComplexPlaneSceneSnapshot
+  | OptimizationSceneSnapshot
+  | ModelingSceneSnapshot
+  | ManifoldSceneSnapshot
   | SolidGeometrySceneSnapshot
   | MotionSceneSnapshot
   | KaTeXOverlaySnapshot

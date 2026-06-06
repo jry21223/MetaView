@@ -1,0 +1,105 @@
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+import type { AnySnapshot, MetaStep, SnapshotKind } from "../types";
+import {
+  ComplexPlaneSceneRenderer,
+  GraphSceneRenderer,
+  IterationTraceSceneRenderer,
+  ManifoldSceneRenderer,
+  MatrixSceneRenderer,
+  ModelingSceneRenderer,
+  OptimizationSceneRenderer,
+  PhasePortraitSceneRenderer,
+  StatsChartSceneRenderer,
+  TableSceneRenderer,
+} from "./AdvancedMathRenderers";
+import { rendererRegistry } from "./registry";
+import type { RendererComponent, RendererProps } from "./types";
+
+const EXPECTED: Array<[SnapshotKind, RendererComponent]> = [
+  ["matrix_scene", MatrixSceneRenderer],
+  ["table_scene", TableSceneRenderer],
+  ["graph_scene", GraphSceneRenderer],
+  ["stats_chart_scene", StatsChartSceneRenderer],
+  ["iteration_trace_scene", IterationTraceSceneRenderer],
+  ["phase_portrait_scene", PhasePortraitSceneRenderer],
+  ["complex_plane_scene", ComplexPlaneSceneRenderer],
+  ["optimization_scene", OptimizationSceneRenderer],
+  ["modeling_scene", ModelingSceneRenderer],
+  ["manifold_scene", ManifoldSceneRenderer],
+];
+
+function step(snapshot: AnySnapshot): MetaStep {
+  return {
+    step_id: "s1",
+    end_frame: 90,
+    title: "Advanced math scene",
+    voiceover_text: "Render the scene",
+    snapshot,
+    tokens: [],
+  };
+}
+
+function props(snapshot: AnySnapshot): RendererProps {
+  return {
+    step: step(snapshot),
+    prevStep: null,
+    frame: 120,
+    stepStartFrame: 0,
+    stepEndFrame: 90,
+    progress: 1,
+    theme: "dark",
+  };
+}
+
+function render(snapshot: AnySnapshot): string {
+  const Renderer = rendererRegistry.get(snapshot.kind);
+  if (!Renderer) throw new Error(`missing renderer for ${snapshot.kind}`);
+  return renderToStaticMarkup(<Renderer {...props(snapshot)} />);
+}
+
+describe("advanced math renderers", () => {
+  it.each(EXPECTED)("registers %s", (kind, renderer) => {
+    expect(rendererRegistry.get(kind)).toBe(renderer);
+  });
+
+  it("renders matrix_scene with highlighted cells", () => {
+    const markup = render({
+      kind: "matrix_scene",
+      matrix: [[1, 2], [3, 4]],
+      col_labels: ["x", "y"],
+      active_cells: [[0, 1]],
+      operation_label: "RREF",
+      caption: "Matrix state",
+    });
+
+    expect(markup).toContain("RREF");
+    expect(markup).toContain("Matrix state");
+    expect(markup).toContain("4");
+  });
+
+  it("renders every new snapshot kind without unknown fallback", () => {
+    const snapshots: AnySnapshot[] = [
+      { kind: "table_scene", columns: ["a"], rows: [["b"]], caption: "table" },
+      { kind: "graph_scene", nodes: [{ id: "a" }, { id: "b" }], edges: [{ source: "a", target: "b" }], directed: true },
+      { kind: "stats_chart_scene", chart_type: "line", series: [{ label: "s", values: [1, 2, 3] }] },
+      { kind: "iteration_trace_scene", iterations: [{ index: 0, value: "x", error: 1 }], metric_name: "error" },
+      { kind: "phase_portrait_scene", trajectories: [{ points: [[0, 0], [1, 1]] }], equilibria: [{ x: 0, y: 0, stable: true }] },
+      { kind: "complex_plane_scene", points: [{ re: 1, im: 2, label: "z" }] },
+      { kind: "optimization_scene", feasible_region: [[0, 0], [2, 0], [1, 2]], iterates: [[0, 0], [1, 1]], optimum: [1, 2] },
+      {
+        kind: "modeling_scene",
+        variables: [{ id: "x", label: "Demand", value: 10 }],
+        relations: [{ source: "x", target: "y", label: "drives" }],
+        assumptions: ["Linear response"],
+      },
+      { kind: "manifold_scene", chart_name: "U", tangent_vectors: [{ at: [0, 0, 0], direction: [1, 0, 0], label: "v" }] },
+    ];
+
+    for (const snapshot of snapshots) {
+      const markup = render(snapshot);
+      expect(markup).toContain("advanced-math-renderer");
+      expect(markup).not.toContain("Unknown snapshot kind");
+    }
+  });
+});
