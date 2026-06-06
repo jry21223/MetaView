@@ -33,10 +33,12 @@ class SkillRegistry:
 
 
 def build_default_skill_registry() -> SkillRegistry:
+    from app.domain.skills.quadratic_transform.skill_pack import QuadraticTransformSkillPack
     from app.domain.skills.solid_geometry.skill_pack import SolidGeometrySkillPack
 
     return SkillRegistry([
         SolidGeometrySkillPack(),
+        QuadraticTransformSkillPack(),
     ])
 
 
