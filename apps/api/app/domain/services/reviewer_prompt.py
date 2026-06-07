@@ -1,11 +1,21 @@
 from __future__ import annotations
 
 import json
+from json import JSONDecodeError
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
-from app.domain.models.review import CirReviewIssue, CirReviewReport
+from app.domain.models.playbook import PlaybookScript
+from app.domain.models.review import (
+    SUPPORTED_PLAYBOOK_REVIEW_CODES,
+    CirReviewIssue,
+    CirReviewReport,
+    PlaybookIssueSeverity,
+    PlaybookReviewIssue,
+    PlaybookReviewStatus,
+    PlaybookReviewVerdict,
+)
 
 
 class ReviewResult(BaseModel):
@@ -16,7 +26,7 @@ class ReviewResult(BaseModel):
 
 
 class PipelineValidationError(Exception):
-    def __init__(self, report: CirReviewReport) -> None:
+    def __init__(self, report: CirReviewReport | PlaybookReviewVerdict) -> None:
         super().__init__("Pipeline output failed review")
         self.report = report
 
@@ -45,6 +55,28 @@ Use "accept" only if the listed issues are false positives.
 Never return markdown fences or explanatory prose."""
 
 
+_PLAYBOOK_REVIEWER_SYSTEM = f"""You are the PlaybookScript reviewer for MetaView.
+Return ONLY strict JSON matching this shape:
+{{
+  "status": "clean" | "warnings" | "blocked",
+  "summary": "short reviewer summary",
+  "issues": [
+    {{
+      "code": "machine.readable_code",
+      "severity": "warning" | "error",
+      "path": "steps[0].snapshot",
+      "message": "specific issue",
+      "suggestion": "specific repair guidance or null",
+      "requires_repair": false
+    }}
+  ]
+}}
+
+Use "blocked" for any error-level issue. Use "clean" only when there are no
+errors. Never return markdown fences, prose, or corrected PlaybookScript JSON.
+Supported issue codes include:
+{", ".join(SUPPORTED_PLAYBOOK_REVIEW_CODES)}"""
+
 def build_reviewer_prompt(
     original_user: str,
     previous_output: str,
@@ -56,3 +88,45 @@ def build_reviewer_prompt(
         "blocking_issues": [issue.model_dump(mode="json") for issue in issues],
     }
     return _REVIEWER_SYSTEM, json.dumps(user_payload, ensure_ascii=False)
+
+
+def build_playbook_reviewer_prompt(
+    original_prompt: str,
+    playbook: PlaybookScript,
+    self_check: PlaybookReviewVerdict,
+) -> tuple[str, str]:
+    user_payload = {
+        "original_prompt": original_prompt,
+        "playbook": playbook.model_dump(mode="json"),
+        "api_self_check": self_check.model_dump(mode="json"),
+    }
+    return _PLAYBOOK_REVIEWER_SYSTEM, json.dumps(user_payload, ensure_ascii=False)
+
+
+def parse_playbook_reviewer_output(raw: str) -> PlaybookReviewVerdict:
+    try:
+        data = json.loads(raw.strip())
+    except JSONDecodeError as exc:
+        return _invalid_playbook_reviewer_verdict(f"Reviewer output is not JSON: {exc.msg}")
+    try:
+        return PlaybookReviewVerdict.model_validate(data)
+    except ValidationError as exc:
+        return _invalid_playbook_reviewer_verdict(f"Reviewer output failed schema: {exc}")
+
+
+def _invalid_playbook_reviewer_verdict(message: str) -> PlaybookReviewVerdict:
+    return PlaybookReviewVerdict(
+        status=PlaybookReviewStatus.BLOCKED,
+        summary="Third-party reviewer returned invalid structured JSON.",
+        issues=[
+            PlaybookReviewIssue(
+                code="reviewer.invalid_output",
+                severity=PlaybookIssueSeverity.ERROR,
+                path="reviewer",
+                message=message,
+                suggestion="Return one JSON object matching PlaybookReviewVerdict.",
+                requires_repair=True,
+            )
+        ],
+        actions=["reviewer:invalid_output"],
+    )

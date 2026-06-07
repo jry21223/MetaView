@@ -8,6 +8,12 @@ import { Agent, type AgentTool } from "@earendil-works/pi-agent-core";
 import { getModel, type KnownProvider } from "@earendil-works/pi-ai";
 
 import { PlaybookEmitter } from "./state/playbookEmitter.js";
+import {
+  AgentSelfCheckError,
+  selfCheckPlaybook,
+  type SelfCheckReport,
+} from "./state/playbookSelfCheck.js";
+import type { PlaybookOutput } from "./state/types.js";
 import { makeAssertTools } from "./tools/asserts.js";
 import { makeDrawingTools } from "./tools/drawing.js";
 import { makeTemplateTools } from "./tools/templates.js";
@@ -76,7 +82,38 @@ Output discipline:
   saying clockwise/counterclockwise.
 `.trim();
 
-export async function runAgentGeneration(opts: GenerateOptions): Promise<unknown> {
+const MAX_SELF_REPAIR_ATTEMPTS = 2;
+
+export async function runAgentGeneration(opts: GenerateOptions): Promise<PlaybookOutput> {
+  let userPrompt = buildAgentPrompt(opts.prompt, opts.routeDecision);
+  let lastReport: SelfCheckReport | null = null;
+
+  for (let attempt = 0; attempt <= MAX_SELF_REPAIR_ATTEMPTS; attempt++) {
+    const playbook = await runAgentAttempt(opts, userPrompt);
+    const report = selfCheckPlaybook(playbook, opts.prompt);
+    if (report.status !== "blocked") {
+      return playbook;
+    }
+    lastReport = report;
+    if (attempt >= MAX_SELF_REPAIR_ATTEMPTS) {
+      throw new AgentSelfCheckError(report);
+    }
+    userPrompt = buildAgentSelfRepairPrompt({
+      originalPrompt: opts.prompt,
+      routeDecision: opts.routeDecision,
+      previousPlaybook: playbook,
+      report,
+      repairAttempt: attempt + 1,
+    });
+  }
+
+  throw new AgentSelfCheckError(lastReport ?? { status: "blocked", issues: [] });
+}
+
+async function runAgentAttempt(
+  opts: GenerateOptions,
+  userPrompt: string,
+): Promise<PlaybookOutput> {
   const emitter = new PlaybookEmitter();
 
   const drawingTools = makeDrawingTools({ emitter });
@@ -113,7 +150,7 @@ export async function runAgentGeneration(opts: GenerateOptions): Promise<unknown
     getApiKey: () => apiKey,
   });
 
-  await agent.prompt(buildAgentPrompt(opts.prompt, opts.routeDecision));
+  await agent.prompt(userPrompt);
 
   // The emitter has all committed steps by now even if finalize_playbook
   // wasn't explicitly called — its idempotent ``finalize`` covers the case.
@@ -130,4 +167,33 @@ ${JSON.stringify(routeDecision, null, 2)}
 
 [user prompt]
 ${prompt}`;
+}
+
+interface SelfRepairPromptInput {
+  originalPrompt: string;
+  routeDecision?: Record<string, unknown>;
+  previousPlaybook: PlaybookOutput;
+  report: SelfCheckReport;
+  repairAttempt: number;
+}
+
+export function buildAgentSelfRepairPrompt(input: SelfRepairPromptInput): string {
+  const payload = {
+    reason: "agent self-check blocked the candidate PlaybookScript",
+    repair_attempt: input.repairAttempt,
+    max_self_repair_attempts: MAX_SELF_REPAIR_ATTEMPTS,
+    original_prompt: input.originalPrompt,
+    route_decision: input.routeDecision ?? null,
+    previous_playbook: input.previousPlaybook,
+    self_check: input.report,
+    instructions: [
+      "Repair by building a complete PlaybookScript through the Drawing CLI tools.",
+      "Keep PlaybookScript as the only rendering exit.",
+      "Do not introduce raw HTML, iframe, Manim, or server video rendering.",
+      "Use only renderer-supported snapshot kinds.",
+      "Call finalize_playbook only after addressing all error-level self-check issues.",
+    ],
+  };
+  return `[MetaView agent self-repair]
+${JSON.stringify(payload, null, 2)}`;
 }

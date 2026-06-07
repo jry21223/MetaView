@@ -6,6 +6,15 @@ from typing import Any, Protocol
 class AgentProviderError(RuntimeError):
     """Raised when the agent sidecar cannot produce a PlaybookScript."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        structured_failure: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.structured_failure = structured_failure
+
 
 class IAgentProvider(Protocol):
     """Generate a complete PlaybookScript via an agent loop (e.g. Node sidecar

@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 from app.domain.models.director import DirectorScript
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.domain.models.playbook import PlaybookScript
-from app.domain.models.review import CirReviewReport
+from app.domain.models.review import CirReviewReport, PlaybookReviewVerdict
 
 
 class PipelineRequest(BaseModel):
@@ -40,4 +40,4 @@ class PipelineRunResponse(BaseModel):
     director: DirectorScript | None = None
     error: str | None = None
     created_at: str
-    review: CirReviewReport | None = None
+    review: CirReviewReport | PlaybookReviewVerdict | None = None

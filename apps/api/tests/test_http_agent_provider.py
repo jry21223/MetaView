@@ -143,6 +143,36 @@ async def test_500_response_raises_agent_provider_error() -> None:
 
 
 @pytest.mark.asyncio
+async def test_500_response_preserves_structured_self_check_failure() -> None:
+    self_check = {
+        "status": "blocked",
+        "issues": [
+            {
+                "code": "step.empty_voiceover",
+                "severity": "error",
+                "path": "steps[0].voiceover_text",
+                "message": "Every step must have non-empty voiceover_text.",
+                "suggestion": "Write narration.",
+            }
+        ],
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            500,
+            json={
+                "detail": "agent self-check blocked PlaybookScript generation",
+                "self_check": self_check,
+            },
+        )
+
+    provider = _make_provider_with_handler(handler)
+    with pytest.raises(AgentProviderError) as excinfo:
+        await provider.generate("prompt")
+    assert excinfo.value.structured_failure == self_check
+
+
+@pytest.mark.asyncio
 async def test_missing_playbook_field_raises() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"other": "thing"})

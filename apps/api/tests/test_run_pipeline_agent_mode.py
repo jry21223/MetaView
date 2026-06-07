@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 
 from app.application.dto.pipeline_dto import PipelineRequest
+from app.application.ports.agent_provider import AgentProviderError
 from app.application.use_cases.run_pipeline import RunPipelineUseCase
 
 
@@ -71,6 +72,85 @@ class _FakeAgent:
             "route_decision": route_decision,
         })
         return self.playbook
+
+
+class _SequenceAgent:
+    def __init__(self, playbooks: list[dict[str, Any]]) -> None:
+        self.playbooks = playbooks
+        self.calls: list[dict[str, Any]] = []
+
+    async def generate(
+        self,
+        prompt: str,
+        provider_config: dict[str, Any] | None = None,
+        route_decision: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        self.calls.append({
+            "prompt": prompt,
+            "provider_config": provider_config,
+            "route_decision": route_decision,
+        })
+        index = min(len(self.calls) - 1, len(self.playbooks) - 1)
+        return self.playbooks[index]
+
+
+class _SequenceReviewer:
+    model_name = "critic-test"
+
+    def __init__(self, responses: list[str]) -> None:
+        self.responses = responses
+        self.calls: list[tuple[str, str]] = []
+
+    async def complete(self, system: str, user: str) -> str:
+        self.calls.append((system, user))
+        index = min(len(self.calls) - 1, len(self.responses) - 1)
+        return self.responses[index]
+
+
+class _StructuredFailureAgent:
+    async def generate(
+        self,
+        prompt: str,
+        provider_config: dict[str, Any] | None = None,
+        route_decision: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        raise AgentProviderError(
+            "agent self-check blocked PlaybookScript generation",
+            structured_failure={
+                "status": "blocked",
+                "issues": [
+                    {
+                        "code": "step.empty_voiceover",
+                        "severity": "error",
+                        "path": "steps[0].voiceover_text",
+                        "message": "Every step must have non-empty voiceover_text.",
+                        "suggestion": "Write narration.",
+                    }
+                ],
+            },
+        )
+
+
+def _playbook_copy() -> dict[str, Any]:
+    return json.loads(json.dumps(_MIN_PLAYBOOK))
+
+
+def _reviewer_response(status: str, issues: list[dict[str, Any]] | None = None) -> str:
+    return json.dumps({
+        "status": status,
+        "summary": f"Reviewer returned {status}.",
+        "issues": issues or [],
+    })
+
+
+def _blocking_issue(code: str = "review.final_answer_missing") -> dict[str, Any]:
+    return {
+        "code": code,
+        "severity": "error",
+        "path": "steps[-1].voiceover_text",
+        "message": "The final step does not answer the original prompt.",
+        "suggestion": "Regenerate the playbook so the final step states the answer.",
+    }
 
 
 _MIN_PLAYBOOK: dict[str, Any] = {
@@ -221,8 +301,175 @@ async def test_agent_mode_routes_to_agent_provider() -> None:
     assert playbook_dict["steps"][0]["snapshot"]["numeric_values"] == [3.0, 1.0]
     assert "tokens" not in playbook_dict["steps"][0]["snapshot"]
     assert playbook_dict["steps"][0]["layers"][0]["body"] == playbook_dict["steps"][0]["snapshot"]
+    review = json.loads(last["review_json"])
+    assert review["status"] == "clean"
+    assert "agent:self_check:clean" in review["actions"]
+    assert "reviewer:unconfigured" in review["actions"]
+    assert "reviewer:status:warnings" in review["actions"]
     assert director_repo.upserts[0]["director"].run_id == "run-1"
     assert director_repo.upserts[0]["director"].beats[0].step_id == "step_01"
+
+
+@pytest.mark.asyncio
+async def test_agent_mode_clean_output_records_self_check_and_reviewer_status() -> None:
+    repo = _RecordingRepo()
+    agent = _FakeAgent(_MIN_PLAYBOOK)
+    reviewer = _SequenceReviewer([_reviewer_response("clean")])
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        reviewer_llm=reviewer,
+        agent_provider=agent,
+        generation_mode="agent",
+    )
+
+    await use_case.execute("run-clean", PipelineRequest(prompt="Show the array"))
+
+    last = repo.updates[-1]
+    assert last["status"].value == "succeeded"
+    review = json.loads(last["review_json"])
+    assert "agent:self_check:clean" in review["actions"]
+    assert "reviewer:model:critic-test" in review["actions"]
+    assert "reviewer:status:clean" in review["actions"]
+
+
+@pytest.mark.asyncio
+async def test_agent_mode_self_check_blocked_repairs_before_persisting() -> None:
+    blocked = _playbook_copy()
+    blocked["steps"][0]["voiceover_text"] = ""
+    repaired = _playbook_copy()
+    repaired["steps"][0]["voiceover_text"] = "Show the array and explain the final answer."
+    agent = _SequenceAgent([blocked, repaired])
+    reviewer = _SequenceReviewer([_reviewer_response("clean")])
+    repo = _RecordingRepo()
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        reviewer_llm=reviewer,
+        agent_provider=agent,
+        generation_mode="agent",
+    )
+
+    await use_case.execute("run-self-repair", PipelineRequest(prompt="Show the array"))
+
+    assert len(agent.calls) == 2
+    assert "agent self-check blocked" in agent.calls[1]["prompt"]
+    last = repo.updates[-1]
+    assert last["status"].value == "succeeded"
+    persisted = json.loads(last["playbook_json"])
+    assert persisted["steps"][0]["voiceover_text"] == repaired["steps"][0]["voiceover_text"]
+    review = json.loads(last["review_json"])
+    assert "agent:self_check:blocked" in review["actions"]
+    assert "agent:self_repair_attempt:1" in review["actions"]
+    assert "agent:self_check:clean" in review["actions"]
+
+
+@pytest.mark.asyncio
+async def test_agent_mode_reviewer_blocked_repairs_and_reruns_reviewer() -> None:
+    initial = _playbook_copy()
+    repaired = _playbook_copy()
+    repaired["title"] = "Repaired Sample"
+    agent = _SequenceAgent([initial, repaired])
+    reviewer = _SequenceReviewer([
+        _reviewer_response("blocked", [_blocking_issue()]),
+        _reviewer_response("clean"),
+    ])
+    repo = _RecordingRepo()
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        reviewer_llm=reviewer,
+        agent_provider=agent,
+        generation_mode="agent",
+    )
+
+    await use_case.execute("run-reviewer-repair", PipelineRequest(prompt="Show the array"))
+
+    assert len(agent.calls) == 2
+    assert "third-party reviewer blocked" in agent.calls[1]["prompt"]
+    assert len(reviewer.calls) == 2
+    last = repo.updates[-1]
+    assert last["status"].value == "succeeded"
+    persisted = json.loads(last["playbook_json"])
+    assert persisted["title"] == "Repaired Sample"
+    review = json.loads(last["review_json"])
+    assert "reviewer:status:blocked" in review["actions"]
+    assert "reviewer:repair_attempt:1" in review["actions"]
+    assert "reviewer:status:clean" in review["actions"]
+
+
+@pytest.mark.asyncio
+async def test_agent_mode_reviewer_blocked_after_max_attempts_fails() -> None:
+    agent = _SequenceAgent([_playbook_copy(), _playbook_copy()])
+    reviewer = _SequenceReviewer([
+        _reviewer_response("blocked", [_blocking_issue("review.missing_answer")]),
+        _reviewer_response("blocked", [_blocking_issue("review.still_missing_answer")]),
+    ])
+    repo = _RecordingRepo()
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        reviewer_llm=reviewer,
+        max_repair_attempts=1,
+        agent_provider=agent,
+        generation_mode="agent",
+    )
+
+    await use_case.execute("run-reviewer-fail", PipelineRequest(prompt="Show the array"))
+
+    last = repo.updates[-1]
+    assert last["status"].value == "failed"
+    assert "review.still_missing_answer" in last["error"]
+    assert "playbook_json" not in last
+    review = json.loads(last["review_json"])
+    assert review["status"] == "blocked"
+    assert "reviewer:repair_attempt:1" in review["actions"]
+
+
+@pytest.mark.asyncio
+async def test_agent_mode_malformed_reviewer_json_fails_closed() -> None:
+    agent = _FakeAgent(_MIN_PLAYBOOK)
+    reviewer = _SequenceReviewer(["not json"])
+    repo = _RecordingRepo()
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        reviewer_llm=reviewer,
+        agent_provider=agent,
+        generation_mode="agent",
+    )
+
+    await use_case.execute("run-reviewer-malformed", PipelineRequest(prompt="Show the array"))
+
+    last = repo.updates[-1]
+    assert last["status"].value == "failed"
+    assert "reviewer.invalid_output" in last["error"]
+    assert "playbook_json" not in last
+    review = json.loads(last["review_json"])
+    assert review["status"] == "blocked"
+    assert "reviewer:status:blocked" in review["actions"]
+
+
+@pytest.mark.asyncio
+async def test_agent_mode_structured_sidecar_self_check_failure_is_reviewed() -> None:
+    repo = _RecordingRepo()
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        agent_provider=_StructuredFailureAgent(),
+        generation_mode="agent",
+    )
+
+    await use_case.execute("run-sidecar-self-check", PipelineRequest(prompt="Show the array"))
+
+    last = repo.updates[-1]
+    assert last["status"].value == "failed"
+    assert "step.empty_voiceover" in last["error"]
+    assert "playbook_json" not in last
+    review = json.loads(last["review_json"])
+    assert review["status"] == "blocked"
+    assert review["issues"][0]["code"] == "step.empty_voiceover"
+    assert "agent:self_check:blocked" in review["actions"]
 
 
 @pytest.mark.asyncio
@@ -287,8 +534,14 @@ async def test_agent_mode_bad_payload_fails_run() -> None:
 
     await use_case.execute("run-1", PipelineRequest(prompt="x"))
 
+    assert len(agent.calls) == 3
     assert repo.updates[-1]["status"].value == "failed"
     assert "error" in repo.updates[-1]
+    review = json.loads(repo.updates[-1]["review_json"])
+    assert review["status"] == "blocked"
+    assert review["issues"][0]["code"] == "schema.invalid"
+    assert "agent:self_repair_attempt:1" in review["actions"]
+    assert "agent:self_repair_attempt:2" in review["actions"]
 
 
 @pytest.mark.asyncio
@@ -308,6 +561,72 @@ async def test_agent_mode_rejects_legacy_id_only_step_payload() -> None:
 
     assert repo.updates[-1]["status"].value == "failed"
     assert "step_id" in repo.updates[-1]["error"]
+    review = json.loads(repo.updates[-1]["review_json"])
+    assert review["status"] == "blocked"
+    assert review["issues"][0]["code"] == "schema.invalid"
+
+
+@pytest.mark.asyncio
+async def test_agent_mode_rejects_invalid_third_party_reviewer_output() -> None:
+    repo = _RecordingRepo()
+    agent = _FakeAgent(_MIN_PLAYBOOK)
+    reviewer = _SequenceReviewer(["Looks good to me."])
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        reviewer_llm=reviewer,
+        agent_provider=agent,
+        generation_mode="agent",
+    )
+
+    await use_case.execute("run-1", PipelineRequest(prompt="hello math"))
+
+    last = repo.updates[-1]
+    assert last["status"].value == "failed"
+    review = json.loads(last["review_json"])
+    assert review["status"] == "blocked"
+    assert review["issues"][0]["code"] == "reviewer.invalid_output"
+
+
+@pytest.mark.asyncio
+async def test_agent_mode_persists_third_party_reviewer_warnings() -> None:
+    repo = _RecordingRepo()
+    agent = _FakeAgent(_MIN_PLAYBOOK)
+    reviewer = _SequenceReviewer([
+        json.dumps(
+            {
+                "status": "warnings",
+                "summary": "Useful but shallow.",
+                "issues": [
+                    {
+                        "code": "step.too_shallow",
+                        "severity": "warning",
+                        "path": "steps[0]",
+                        "message": "The step could carry more reasoning.",
+                        "suggestion": "Add a comparison or decision point.",
+                        "requires_repair": False,
+                    }
+                ],
+            }
+        )
+    ])
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        reviewer_llm=reviewer,
+        agent_provider=agent,
+        generation_mode="agent",
+    )
+
+    await use_case.execute("run-1", PipelineRequest(prompt="hello math"))
+
+    last = repo.updates[-1]
+    assert last["status"].value == "succeeded"
+    review = json.loads(last["review_json"])
+    assert review["status"] == "warnings"
+    assert review["issues"][0]["code"] == "step.too_shallow"
+    assert "reviewer:started" in review["actions"]
+    assert "reviewer:status:warnings" in review["actions"]
 
 
 @pytest.mark.asyncio

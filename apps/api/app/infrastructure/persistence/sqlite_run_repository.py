@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import sqlite3
 
 from app.application.dto.followup_dto import RunFollowUpRecord, RunVersionRecord
 from app.application.dto.pipeline_dto import PipelineRunResponse
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.domain.models.playbook import PlaybookScript
-from app.domain.models.review import CirReviewReport
+from app.domain.models.review import CirReviewReport, PlaybookReviewVerdict
 
 
 class SqliteRunRepository:
@@ -315,7 +316,7 @@ def _row_to_response(row: sqlite3.Row) -> PipelineRunResponse:
         playbook = PlaybookScript.model_validate_json(row["playbook_json"])
     review = None
     if "review_json" in row.keys() and row["review_json"]:
-        review = CirReviewReport.model_validate_json(row["review_json"])
+        review = _parse_review_json(row["review_json"])
     return PipelineRunResponse(
         run_id=row["run_id"],
         status=PipelineRunStatus(row["status"]),
@@ -324,6 +325,26 @@ def _row_to_response(row: sqlite3.Row) -> PipelineRunResponse:
         error=row["error"],
         created_at=row["created_at"],
         review=review,
+    )
+
+
+def _parse_review_json(raw: str) -> CirReviewReport | PlaybookReviewVerdict:
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return CirReviewReport.model_validate_json(raw)
+    if isinstance(data, dict) and (
+        data.get("status") == "blocked" or "summary" in data or _has_playbook_issue(data)
+    ):
+        return PlaybookReviewVerdict.model_validate(data)
+    return CirReviewReport.model_validate(data)
+
+
+def _has_playbook_issue(data: dict) -> bool:
+    issues = data.get("issues")
+    return isinstance(issues, list) and any(
+        isinstance(issue, dict) and "requires_repair" in issue
+        for issue in issues
     )
 
 

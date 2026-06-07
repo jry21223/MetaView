@@ -36,7 +36,15 @@ from app.domain.models.playbook import (
     StatsChartSceneSnapshot,
     TableSceneSnapshot,
 )
-from app.domain.models.review import CirReviewIssue, CirReviewReport, ReviewSeverity
+from app.domain.models.review import (
+    CirReviewIssue,
+    CirReviewReport,
+    PlaybookIssueSeverity,
+    PlaybookReviewIssue,
+    PlaybookReviewStatus,
+    PlaybookReviewVerdict,
+    ReviewSeverity,
+)
 from app.domain.models.topic import TopicDomain, VisualKind
 
 __all__ = [
@@ -51,4 +59,6 @@ __all__ = [
     "PhasePortraitSceneSnapshot", "ComplexPlaneSceneSnapshot", "OptimizationSceneSnapshot",
     "ModelingSceneSnapshot", "ManifoldSceneSnapshot", "AnySnapshot", "SnapshotKind",
     "ReviewSeverity", "CirReviewIssue", "CirReviewReport",
+    "PlaybookIssueSeverity", "PlaybookReviewIssue", "PlaybookReviewStatus",
+    "PlaybookReviewVerdict",
 ]

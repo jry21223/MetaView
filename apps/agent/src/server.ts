@@ -11,6 +11,7 @@ import pino from "pino";
 
 import { runAgentGeneration } from "./agent.js";
 import { hasValidSharedToken } from "./auth.js";
+import { AgentSelfCheckError } from "./state/playbookSelfCheck.js";
 
 const log = pino({ level: process.env.LOG_LEVEL ?? "info" });
 const PORT = Number(process.env.PORT ?? 8001);
@@ -68,6 +69,13 @@ app.post("/generate", async (req: Request, res: Response) => {
     res.json({ playbook });
   } catch (err) {
     log.error({ err }, "generate failed");
+    if (err instanceof AgentSelfCheckError) {
+      res.status(500).json({
+        detail: err.message,
+        self_check: err.report,
+      });
+      return;
+    }
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ detail: message });
   }

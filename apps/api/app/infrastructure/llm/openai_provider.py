@@ -24,6 +24,10 @@ class OpenAIProvider:
         self._reasoning_effort = reasoning_effort
         self._temperature = temperature
 
+    @property
+    def model_name(self) -> str:
+        return self._model
+
     async def complete(self, system: str, user: str) -> str:
         headers = {
             "Authorization": f"Bearer {self._api_key}",

@@ -11,7 +11,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from app.application.dto.pipeline_dto import PipelineRequest
-from app.application.ports.agent_provider import IAgentProvider
+from app.application.ports.agent_provider import AgentProviderError, IAgentProvider
 from app.application.ports.director_repository import IRunDirectorRepository
 from app.application.ports.llm_provider import ILLMProvider
 from app.application.ports.router_provider import IRouterProvider
@@ -20,7 +20,15 @@ from app.config import GenerationMode, RouterMode
 from app.domain.models.cir import CirDocument, ExecutionMap
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.domain.models.playbook import PlaybookScript
-from app.domain.models.review import CirReviewIssue, CirReviewReport, ReviewSeverity
+from app.domain.models.review import (
+    CirReviewIssue,
+    CirReviewReport,
+    PlaybookIssueSeverity,
+    PlaybookReviewIssue,
+    PlaybookReviewStatus,
+    PlaybookReviewVerdict,
+    ReviewSeverity,
+)
 from app.domain.models.route_decision import RouteDecision
 from app.domain.services.cir_prompt import build_cir_prompt
 from app.domain.services.cir_quality import validate_cir_quality
@@ -28,10 +36,16 @@ from app.domain.services.director_builder import build_default_director
 from app.domain.services.domain_router import SkillMode, TopicRoute, route_topic
 from app.domain.services.model_router import topic_route_from_decision
 from app.domain.services.playbook_builder import build_playbook
+from app.domain.services.playbook_quality import (
+    playbook_review_verdict_from_issues,
+    self_check_playbook,
+)
 from app.domain.services.reviewer_prompt import (
     PipelineValidationError,
     ReviewResult,
+    build_playbook_reviewer_prompt,
     build_reviewer_prompt,
+    parse_playbook_reviewer_output,
 )
 from app.domain.skills.base import (
     SkillExecutionContext,
@@ -41,6 +55,9 @@ from app.domain.skills.base import (
 from app.domain.skills.registry import SkillRegistry, build_default_skill_registry
 
 logger = logging.getLogger(__name__)
+
+AGENT_SELF_REPAIR_ATTEMPTS = 2
+AGENT_REVIEWER_REPAIR_ATTEMPTS = 1
 
 
 @dataclass(frozen=True)
@@ -341,36 +358,277 @@ class RunPipelineUseCase:
                 "base_url": request.provider_base_url,
                 "model": request.provider_model,
             }
+        review_report = PlaybookReviewVerdict(
+            status=PlaybookReviewStatus.CLEAN,
+            summary="Agent Playbook review pending.",
+            actions=_route_review_actions(route_context, generator="agent"),
+        )
         try:
-            playbook_dict = await self._agent_provider.generate(
+            playbook, review_report = await self._generate_agent_playbook_with_self_check(
+                run_id,
                 request.prompt,
                 provider_config=provider_config,
-                route_decision=route_context.decision.model_dump(mode="json"),
+                route_context=route_context,
+                review_report=review_report,
             )
-            # Validate the sidecar payload against the canonical PlaybookScript
-            # schema so any malformed output is caught here (not at render time).
-            playbook = PlaybookScript.model_validate(playbook_dict)
+            playbook, review_report = await self._review_agent_playbook(
+                run_id,
+                request.prompt,
+                playbook,
+                provider_config=provider_config,
+                route_context=route_context,
+                review_report=review_report,
+            )
             await self._repo.update(
                 run_id,
                 status=PipelineRunStatus.SUCCEEDED,
                 playbook_json=playbook.model_dump_json(),
-                review_json=CirReviewReport(
-                    status="clean",
-                    actions=_route_review_actions(route_context, generator="agent"),
-                ).model_dump_json(),
+                review_json=review_report.model_dump_json(),
             )
             await self._upsert_default_director(run_id, playbook)
+        except PipelineValidationError as exc:
+            logger.exception("Pipeline run %s (agent mode) failed review", run_id)
+            await self._repo.update(
+                run_id,
+                status=PipelineRunStatus.FAILED,
+                error=humanize_issues(exc.report),
+                review_json=exc.report.model_dump_json(),
+            )
+        except AgentProviderError as exc:
+            logger.exception("Pipeline run %s (agent mode) failed in provider", run_id)
+            failure_review = _agent_provider_error_verdict(
+                exc,
+                actions=review_report.actions,
+            )
+            await self._repo.update(
+                run_id,
+                status=PipelineRunStatus.FAILED,
+                error=humanize_issues(failure_review),
+                review_json=failure_review.model_dump_json(),
+            )
         except Exception as exc:
             logger.exception("Pipeline run %s (agent mode) failed", run_id)
+            failure_review = _playbook_schema_error_verdict(
+                exc,
+                actions=[*review_report.actions, "agent:schema_validation:blocked"],
+            )
             await self._repo.update(
                 run_id,
                 status=PipelineRunStatus.FAILED,
                 error=str(exc),
-                review_json=CirReviewReport(
-                    status="failed",
-                    actions=_route_review_actions(route_context, generator="agent"),
-                ).model_dump_json(),
+                review_json=failure_review.model_dump_json(),
             )
+
+    async def _generate_agent_playbook_with_self_check(
+        self,
+        run_id: str,
+        prompt: str,
+        *,
+        provider_config: dict[str, Any] | None,
+        route_context: RouteContext,
+        review_report: PlaybookReviewVerdict,
+    ) -> tuple[PlaybookScript, PlaybookReviewVerdict]:
+        assert self._agent_provider is not None
+        route_decision = route_context.decision.model_dump(mode="json")
+        generation_prompt = prompt
+        last_payload: dict[str, Any] | None = None
+        for attempt in range(AGENT_SELF_REPAIR_ATTEMPTS + 1):
+            playbook_dict = await self._agent_provider.generate(
+                generation_prompt,
+                provider_config=provider_config,
+                route_decision=route_decision,
+            )
+            last_payload = playbook_dict
+            # Validate the sidecar payload against the canonical PlaybookScript
+            # schema so any malformed output is caught here, before persistence
+            # or third-party review.
+            try:
+                playbook = PlaybookScript.model_validate(playbook_dict)
+            except ValidationError as exc:
+                check = _playbook_schema_error_verdict(
+                    exc,
+                    actions=[*review_report.actions, "agent:schema_validation:blocked"],
+                )
+                if attempt >= AGENT_SELF_REPAIR_ATTEMPTS:
+                    raise PipelineValidationError(check) from exc
+                review_report = _with_playbook_review_actions(
+                    check,
+                    [*check.actions, f"agent:self_repair_attempt:{attempt + 1}"],
+                )
+                await self._repo.update(
+                    run_id,
+                    status=PipelineRunStatus.REVIEWING,
+                    review_json=review_report.model_dump_json(),
+                )
+                generation_prompt = _build_agent_self_repair_prompt(
+                    prompt,
+                    last_payload,
+                    check.issues,
+                )
+                continue
+
+            check = self_check_playbook(playbook, prompt)
+            check = _with_playbook_review_actions(
+                check,
+                [*review_report.actions, *check.actions, f"agent:self_check:{check.status.value}"],
+            )
+
+            if check.status != PlaybookReviewStatus.BLOCKED:
+                return playbook, check
+
+            if attempt >= AGENT_SELF_REPAIR_ATTEMPTS:
+                raise PipelineValidationError(check)
+
+            review_report = _with_playbook_review_actions(
+                check,
+                [*check.actions, f"agent:self_repair_attempt:{attempt + 1}"],
+            )
+            await self._repo.update(
+                run_id,
+                status=PipelineRunStatus.REVIEWING,
+                review_json=review_report.model_dump_json(),
+            )
+            generation_prompt = _build_agent_self_repair_prompt(
+                prompt,
+                last_payload,
+                check.issues,
+            )
+
+        raise PipelineValidationError(review_report)
+
+    async def _review_agent_playbook(
+        self,
+        run_id: str,
+        prompt: str,
+        playbook: PlaybookScript,
+        *,
+        provider_config: dict[str, Any] | None,
+        route_context: RouteContext,
+        review_report: PlaybookReviewVerdict,
+    ) -> tuple[PlaybookScript, PlaybookReviewVerdict]:
+        if self._reviewer_mode == "off":
+            return playbook, _with_playbook_review_actions(
+                review_report,
+                [
+                    *review_report.actions,
+                    "reviewer:disabled",
+                    "reviewer:status:warnings",
+                ],
+            )
+
+        if self._reviewer_llm is None:
+            return playbook, _with_playbook_review_actions(
+                review_report,
+                [
+                    *review_report.actions,
+                    "reviewer:unconfigured",
+                    "reviewer:status:warnings",
+                ],
+            )
+
+        review_report = _with_playbook_review_actions(
+            review_report,
+            [*review_report.actions, "reviewer:started"],
+        )
+        reviewer_model = getattr(self._reviewer_llm, "model_name", None)
+        if reviewer_model:
+            review_report = _with_playbook_review_actions(
+                review_report,
+                [*review_report.actions, f"reviewer:model:{reviewer_model}"],
+            )
+
+        attempts_allowed = AGENT_REVIEWER_REPAIR_ATTEMPTS
+        for attempt in range(attempts_allowed + 1):
+            result = await self._call_agent_reviewer(
+                prompt,
+                playbook,
+                review_report,
+            )
+            result = _merge_playbook_reviews(review_report, result)
+            result = _with_playbook_review_actions(
+                result,
+                [*result.actions, f"reviewer:status:{result.status.value}"],
+            )
+            blocking = _blocking_playbook_review_issues(result)
+
+            if not blocking:
+                return playbook, result
+
+            if (
+                attempt >= attempts_allowed
+                or any(issue.code == "reviewer.invalid_output" for issue in blocking)
+            ):
+                raise PipelineValidationError(result)
+
+            review_report = _with_playbook_review_actions(
+                result,
+                [*result.actions, f"reviewer:repair_attempt:{attempt + 1}"],
+            )
+            await self._repo.update(
+                run_id,
+                status=PipelineRunStatus.REVIEWING,
+                review_json=review_report.model_dump_json(),
+            )
+
+            playbook, review_report = await self._repair_agent_playbook_from_reviewer(
+                prompt,
+                playbook,
+                blocking,
+                provider_config=provider_config,
+                route_context=route_context,
+                review_report=review_report,
+            )
+
+        raise PipelineValidationError(review_report)
+
+    async def _call_agent_reviewer(
+        self,
+        prompt: str,
+        playbook: PlaybookScript,
+        self_check: PlaybookReviewVerdict,
+    ) -> PlaybookReviewVerdict:
+        assert self._reviewer_llm is not None
+        system, user = build_playbook_reviewer_prompt(
+            prompt,
+            playbook,
+            self_check,
+        )
+        raw = await self._reviewer_llm.complete(system, user)
+        return parse_playbook_reviewer_output(raw)
+
+    async def _repair_agent_playbook_from_reviewer(
+        self,
+        prompt: str,
+        playbook: PlaybookScript,
+        blocking: list[PlaybookReviewIssue],
+        *,
+        provider_config: dict[str, Any] | None,
+        route_context: RouteContext,
+        review_report: PlaybookReviewVerdict,
+    ) -> tuple[PlaybookScript, PlaybookReviewVerdict]:
+        assert self._agent_provider is not None
+        repaired_payload = await self._agent_provider.generate(
+            _build_agent_reviewer_repair_prompt(prompt, playbook, blocking),
+            provider_config=provider_config,
+            route_decision=route_context.decision.model_dump(mode="json"),
+        )
+        try:
+            repaired = PlaybookScript.model_validate(repaired_payload)
+        except ValidationError as exc:
+            raise PipelineValidationError(
+                _playbook_schema_error_verdict(
+                    exc,
+                    actions=[*review_report.actions, "agent:schema_validation:blocked"],
+                )
+            ) from exc
+        check = self_check_playbook(repaired, prompt)
+        check = _with_playbook_review_actions(
+            check,
+            [*review_report.actions, *check.actions, f"agent:self_check:{check.status.value}"],
+        )
+        if check.status == PlaybookReviewStatus.BLOCKED:
+            raise PipelineValidationError(check)
+        return repaired, check
 
     async def _execute_single(
         self,
@@ -586,6 +844,178 @@ def _parse_combined_output(raw: str) -> tuple[CirDocument, ExecutionMap | None]:
     return CirDocument.model_validate(data), None
 
 
+def _with_playbook_review_actions(
+    verdict: PlaybookReviewVerdict,
+    actions: list[str],
+) -> PlaybookReviewVerdict:
+    seen: set[str] = set()
+    unique_actions: list[str] = []
+    for action in actions:
+        if action not in seen:
+            unique_actions.append(action)
+            seen.add(action)
+    return verdict.model_copy(update={"actions": unique_actions})
+
+
+def _merge_playbook_reviews(
+    self_check: PlaybookReviewVerdict,
+    reviewer: PlaybookReviewVerdict,
+) -> PlaybookReviewVerdict:
+    return playbook_review_verdict_from_issues(
+        [*self_check.issues, *reviewer.issues],
+        clean_summary=reviewer.summary,
+        warning_summary=reviewer.summary,
+        blocked_summary=reviewer.summary,
+        actions=[*self_check.actions, *reviewer.actions],
+    )
+
+
+def _playbook_schema_error_verdict(
+    exc: Exception,
+    *,
+    actions: list[str],
+) -> PlaybookReviewVerdict:
+    if isinstance(exc, ValidationError):
+        issues = [
+            PlaybookReviewIssue(
+                code="schema.invalid",
+                severity=PlaybookIssueSeverity.ERROR,
+                path=_format_error_path(("playbook", *error.get("loc", ()))),
+                message=str(error.get("msg", "PlaybookScript schema validation failed")),
+                suggestion="Return a JSON object that matches the PlaybookScript schema.",
+                requires_repair=True,
+            )
+            for error in exc.errors()
+        ]
+    else:
+        issues = [
+            PlaybookReviewIssue(
+                code="schema.invalid",
+                severity=PlaybookIssueSeverity.ERROR,
+                path="playbook",
+                message=f"Agent did not produce a valid PlaybookScript: {exc}",
+                suggestion="Return a complete PlaybookScript JSON object.",
+                requires_repair=True,
+            )
+        ]
+    return PlaybookReviewVerdict(
+        status=PlaybookReviewStatus.BLOCKED,
+        summary="PlaybookScript schema validation failed.",
+        issues=issues,
+        actions=actions,
+    )
+
+
+def _agent_provider_error_verdict(
+    exc: AgentProviderError,
+    *,
+    actions: list[str],
+) -> PlaybookReviewVerdict:
+    structured = exc.structured_failure
+    if isinstance(structured, dict):
+        try:
+            status = PlaybookReviewStatus(structured.get("status"))
+            issues = [
+                _playbook_issue_from_structured_failure(issue)
+                for issue in structured.get("issues", [])
+                if isinstance(issue, dict)
+            ]
+            verdict = PlaybookReviewVerdict(
+                status=status,
+                summary="Agent provider self-check failed.",
+                issues=issues,
+                actions=[
+                    *actions,
+                    f"agent:self_check:{status.value}",
+                ],
+            )
+            return _with_playbook_review_actions(verdict, verdict.actions)
+        except (TypeError, ValueError, ValidationError):
+            logger.warning("Invalid structured agent failure: %r", structured)
+
+    return _playbook_schema_error_verdict(
+        exc,
+        actions=[*actions, "agent:provider_error"],
+    )
+
+
+def _playbook_issue_from_structured_failure(
+    issue: dict[str, Any],
+) -> PlaybookReviewIssue:
+    severity = PlaybookIssueSeverity(issue.get("severity"))
+    return PlaybookReviewIssue(
+        code=str(issue.get("code", "schema.invalid")),
+        severity=severity,
+        path=str(issue.get("path", "playbook")),
+        message=str(issue.get("message", "Agent provider self-check failed.")),
+        suggestion=(
+            str(issue["suggestion"])
+            if issue.get("suggestion") is not None
+            else "Repair the PlaybookScript and retry generation."
+        ),
+        requires_repair=severity == PlaybookIssueSeverity.ERROR,
+    )
+
+
+def _blocking_playbook_review_issues(
+    result: PlaybookReviewVerdict,
+) -> list[PlaybookReviewIssue]:
+    return [issue for issue in result.issues if issue.severity == PlaybookIssueSeverity.ERROR]
+
+
+def _build_agent_self_repair_prompt(
+    original_prompt: str,
+    previous_payload: dict[str, Any] | None,
+    issues: list[PlaybookReviewIssue],
+) -> str:
+    return _build_agent_repair_prompt(
+        reason="agent self-check blocked the candidate PlaybookScript",
+        original_prompt=original_prompt,
+        previous_payload=previous_payload,
+        issues=issues,
+    )
+
+
+def _build_agent_reviewer_repair_prompt(
+    original_prompt: str,
+    playbook: PlaybookScript,
+    issues: list[PlaybookReviewIssue],
+) -> str:
+    return _build_agent_repair_prompt(
+        reason="third-party reviewer blocked the candidate PlaybookScript",
+        original_prompt=original_prompt,
+        previous_payload=playbook.model_dump(mode="json"),
+        issues=issues,
+    )
+
+
+def _build_agent_repair_prompt(
+    *,
+    reason: str,
+    original_prompt: str,
+    previous_payload: dict[str, Any] | None,
+    issues: list[PlaybookReviewIssue],
+) -> str:
+    repair_payload = {
+        "reason": reason,
+        "original_prompt": original_prompt,
+        "previous_playbook": previous_payload,
+        "blocking_issues": [issue.model_dump(mode="json") for issue in issues],
+        "instructions": [
+            "Repair by returning a complete PlaybookScript JSON object.",
+            "Keep PlaybookScript as the only rendering exit.",
+            "Do not introduce raw HTML, iframe, Manim, or server video rendering.",
+            "Use only renderer-supported snapshot kinds.",
+        ],
+    }
+    return (
+        "Your previous MetaView agent output failed review. "
+        "Repair it using this structured feedback and return a complete "
+        "PlaybookScript through the normal agent generation path:\n"
+        f"{json.dumps(repair_payload, ensure_ascii=False, indent=2)}"
+    )
+
+
 def try_parse_combined_output(raw: str) -> ParseResult:
     try:
         data = json.loads(raw)
@@ -629,7 +1059,7 @@ def try_parse_combined_output(raw: str) -> ParseResult:
     return ParseResult(ok=True, raw_data=data, cir=cir, execution_map=execution_map, issues=[])
 
 
-def humanize_issues(report: CirReviewReport) -> str:
+def humanize_issues(report: CirReviewReport | PlaybookReviewVerdict) -> str:
     if not report.issues:
         return "Pipeline output failed review."
     shown = report.issues[:5]
@@ -642,7 +1072,8 @@ def humanize_issues(report: CirReviewReport) -> str:
         if len(report.issues) <= len(shown)
         else f" (+{len(report.issues) - len(shown)} more)"
     )
-    prefix = f"Pipeline output failed review after {report.attempts} repair attempt(s): "
+    attempts = getattr(report, "attempts", 0)
+    prefix = f"Pipeline output failed review after {attempts} repair attempt(s): "
     return prefix + "; ".join(parts) + suffix
 
 

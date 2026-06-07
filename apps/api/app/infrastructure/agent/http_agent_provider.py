@@ -65,8 +65,14 @@ class HttpAgentProvider:
                 detail = resp.json()
             except ValueError:
                 detail = resp.text[:500]
+            structured_failure = (
+                detail.get("self_check")
+                if isinstance(detail, dict) and isinstance(detail.get("self_check"), dict)
+                else None
+            )
             raise AgentProviderError(
-                f"agent sidecar returned {resp.status_code}: {detail!r}"
+                f"agent sidecar returned {resp.status_code}: {detail!r}",
+                structured_failure=structured_failure,
             )
 
         try:
