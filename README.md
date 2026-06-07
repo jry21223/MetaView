@@ -2,7 +2,12 @@
 
 MetaView v2 是一个教育可视化平台：后端用 FastAPI 生成结构化教学脚本，前端用 React 19 + Remotion 按帧播放教学动画。
 
-唯一渲染路径是 **LLM → CIR + ExecutionMap → PlaybookScript → Remotion Player**。项目不引入 Manim、HTML iframe 或服务端视频渲染；管线契约见 [`docs/pipeline.md`](docs/pipeline.md)。
+唯一渲染出口是 **PlaybookScript → Remotion Player / Export**。生成路径可以有两条：
+
+1. `single mode`: **LLM → CIR + ExecutionMap → PlaybookScript**
+2. `agent mode`: **Agent tool loop → self-check → PlaybookScript**
+
+项目仍不引入 Manim、HTML iframe 或服务端 HTML 视频渲染；管线契约见 [`docs/pipeline.md`](docs/pipeline.md)。
 
 ## 功能概览
 

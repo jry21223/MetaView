@@ -1,11 +1,12 @@
 # 渲染管线
 
-> 唯一渲染路径：**LLM → CIR + ExecutionMap → PlaybookScript → Remotion Player**
-> 后端不渲染视频；前端通过 Remotion 帧驱动渲染。
+> 唯一渲染出口：**PlaybookScript → Remotion Player / Export**
+> 生成路径可以有两条：`single mode` 走 **LLM → CIR + ExecutionMap → PlaybookScript**；`agent mode` 走 **Agent tool loop → self-check → PlaybookScript**。
+> 项目仍不引入 Manim、HTML iframe 或服务端 HTML 视频渲染；前端通过 Remotion 帧驱动渲染。
 
-## 1. LLM 输出契约
+## 1. Single generation path: LLM 输出契约
 
-LLM 必须输出**单一 JSON 对象**，包含两层：
+`METAVIEW_GENERATION_MODE=single` 时，LLM 必须输出**单一 JSON 对象**，包含两层：
 
 ```jsonc
 {
@@ -161,6 +162,12 @@ end_frame_i = (i+1) * 60                               # 无 execution_map（兼
 入口 `POST /api/v1/exports` →
 `ExportVideoUseCase`（`apps/api/app/application/use_cases/export_video.py`）：
 
+当前稳定性边界：
+
+- runtime player TTS 支持交互播放，播放器可在浏览器里朗读并按步骤暂停/继续。
+- `with_audio` 导出会尝试合成音频并按音频时长拉伸步骤，但除非对应 provider、时长探测和对齐路径已有测试覆盖，否则属于 beta。
+- 无音轨导出是稳定路径；当音频时序无法保证时，保持 silent export。
+
 1. 从 `IRunRepository` 取该 run 的 `PlaybookScript`，序列化为 `inputProps.json`。
 2. （可选 `with_audio`）调 TTS 代理 `POST {tts_base_url}/audio/speech` 逐步合成 mp3，
    再用 `ffprobe`（缺失时回退到 wave / 动画时长）测每段时长，按 `fps` 重新拉伸
@@ -211,11 +218,32 @@ end_frame_i = (i+1) * 60                               # 无 execution_map（兼
 | `apps/api/app/presentation/router_exports.py` | `/exports` 路由（提交 / 状态 / 下载） |
 | `apps/web/src/remotion/Root.tsx` & `PlaybookExportComposition.tsx` | Remotion `Composition`，导出时与播放器共用 `renderers/registry` |
 
-## 10. Agent 生成模式（`METAVIEW_GENERATION_MODE=agent`）
+## Agent generation path
 
-第二条并行的生成链路，用 [pi-agent-core](https://github.com/earendil-works/pi)
-做 agent runtime，通过细粒度 **Drawing CLI** 工具一步步建出 PlaybookScript。
-**默认仍是 `single` 模式**——agent 模式开启后才会绕过 CIR/builder/reviewer。
+Agent mode 是一等质量编排路径，不是备用渲染器。它用
+[pi-agent-core](https://github.com/earendil-works/pi) 做 agent runtime，通过细粒度
+**Drawing CLI** 工具一步步建出最终 PlaybookScript。
+
+Agent mode 不绕过规范化的 PlaybookScript 契约。它可以跳过 CIR parsing 和
+`playbook_builder`，但必须返回 schema-valid `PlaybookScript`，并且仍然走同一个
+**PlaybookScript → Remotion Player / Export** 渲染出口。
+
+Required gates:
+
+- agent self-check before finalization;
+- PlaybookScript schema validation in API;
+- third-party reviewer verdict;
+- renderer compatibility gate;
+- persisted review report.
+
+`third-party reviewer` 指生成 agent 之外的 reviewer verdict，例如独立 reviewer LLM 或
+`docs/generation-review-workflow.md` 的人工/自动复检流程。`renderer compatibility gate`
+必须检查所有 step 和 layer 的 `snapshot.kind` 都能通过前端 renderer registry；是否属于
+launch-supported 产品承诺，按 [`docs/frontend-shell.md`](frontend-shell.md) 的 support
+level 处理。
+
+**默认仍是 `single` 模式**。agent 模式开启后，只允许替换生成路径；不能绕过
+PlaybookScript validation、renderer compatibility checks、self-check 或第三方 review。
 
 ### 切换
 
@@ -242,7 +270,7 @@ METAVIEW_CODEX_CWD=.
 
 Python SDK 会复用本机已有 Codex 登录；请求里传入 `provider_api_key` 时会调用
 SDK 的 API-key 登录。该路径仍然只返回 PlaybookScript，并由后端 Pydantic 契约
-校验后交给 Remotion Player。
+校验后必须继续通过 reviewer、compatibility gate，再进入同一个 Remotion exit。
 
 ### Drawing CLI 工具集
 

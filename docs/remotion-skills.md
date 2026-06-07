@@ -54,7 +54,7 @@ const opacity = interpolate(progress, [0, 1], [0, 1]);
 > Tailwind animation class names are FORBIDDEN — they will not render correctly.
 
 **项目里所有 `style={{ transition: "..." }}` 都要删掉，换成 `interpolate` 派生。**
-（`@remotion/player` 的 Player 实时播放虽然能跑 CSS transition，但与 Remotion 渲染保持一致更安全；同一份代码将来可直接服务端渲染。）
+（`@remotion/player` 的 Player 实时播放虽然能跑 CSS transition，但与 Remotion Export 保持一致更安全。）
 
 ---
 
@@ -87,6 +87,8 @@ const calculateMetadata: CalculateMetadataFunction<Props> = async () => {
 1. Player 在 `step.end_frame` 时 pause
 2. 监听 `tts.speaking` 由 true → false
 3. 触发 `play()`，进入下一步
+
+这是 runtime player 的交互播放策略。导出侧可以走 `with_audio` beta 路径合成音频并拉伸步骤，但只有在 provider、时长探测和对齐路径都有测试覆盖时才视为可交付；否则保持无音轨导出作为稳定路径。
 
 **未来切换路径**（如果改成预生成 mp3）：把每个 step 的 voiceover 预渲染到 `public/voiceover/{run_id}/{step_id}.mp3`，在 `calculateMetadata` 里调 `getAudioDuration` 重写 `MetaStep.end_frame`，前端就无需 runtime 同步。
 

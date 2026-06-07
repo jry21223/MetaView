@@ -2,8 +2,8 @@
 
 | 文档 | 内容 |
 |------|------|
-| [pipeline.md](./pipeline.md) | LLM → CIR + ExecutionMap → PlaybookScript → Remotion 渲染管线 / 思考时长调参 / 视频导出管线 |
-| [frontend-shell.md](./frontend-shell.md) | Stage 路由、GlobalTopbar、Studio 布局、Provider 配置 |
+| [pipeline.md](./pipeline.md) | single / agent 生成路径、PlaybookScript 渲染出口、思考时长调参、视频导出管线 |
+| [frontend-shell.md](./frontend-shell.md) | Stage 路由、GlobalTopbar、Studio 布局、Provider 配置、snapshot support levels |
 | [html-css-implementation.md](./html-css-implementation.md) | HTML 中 CSS 的三种写法、选择器、盒模型、Flex 示例和项目内对应关系 |
 | [remotion-skills.md](./remotion-skills.md) | Remotion 组件 / 渲染器 / 注册表约定 |
 | [solid-geometry-skill.md](./solid-geometry-skill.md) | 立体几何 deterministic skill pack：ProblemSpec、SymPy kernel、Playbook snapshot 与 V1 范围 |

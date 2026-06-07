@@ -44,6 +44,29 @@ interface GlobalTopbarProps {
   - **关闭逻辑**：`onMouseDown` 触发关闭，内层 `onMouseDown` `stopPropagation`。这样从内部拖拽到外部释放鼠标不会误关。
 - 凭据保存在 localStorage（用户自带 key），前端调用 OpenAI 兼容接口（`baseUrl + /chat/completions`）。
 
+## Snapshot support levels
+
+前端 renderer registry 可以注册比首发产品面更宽的 snapshot kind。`registered` 只表示有渲染器入口；`launch-supported` 才表示生成、review、导出和产品验收都按首发质量承诺覆盖。
+
+Launch-supported:
+
+- `algorithm_array`, `algorithm_bars`, `algorithm_tree`
+- `math_plot`, `math_formula`, `math_scene`
+- `matrix_scene`, `table_scene`
+- `solid_geometry_scene`
+- `katex_overlay`, `narration_card`
+
+Experimental:
+
+- `graph_scene`, `stats_chart_scene`, `iteration_trace_scene`
+
+Parked:
+
+- `phase_portrait_scene`, `complex_plane_scene`
+- `optimization_scene`, `modeling_scene`, `manifold_scene`
+
+任何已注册但未列入 launch-supported 的 kind，都不能仅因为 registry 可渲染就进入首发生成承诺。
+
 ## Studio 布局
 
 `StudioPage` 用 CSS Grid，`--left-w` 控制左栏宽度：
