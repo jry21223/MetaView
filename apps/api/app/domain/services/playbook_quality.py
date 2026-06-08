@@ -16,8 +16,8 @@ from app.domain.models.review import (
     PlaybookReviewVerdict,
 )
 
-MIN_AGENT_STEPS = 1
-MAX_AGENT_STEPS = 16
+MIN_AGENT_STEPS = 8
+MAX_AGENT_STEPS = 14
 
 SUPPORTED_FRONTEND_SNAPSHOT_KINDS = {
     "algorithm_array",
@@ -143,11 +143,18 @@ def _check_steps(
         if not step.layers:
             issues.append(_issue(
                 "renderer.contract_risk",
-                PlaybookIssueSeverity.WARNING,
+                PlaybookIssueSeverity.ERROR,
                 f"steps[{index}].layers",
                 "Every step must carry at least one renderer layer.",
                 "Mirror the primary snapshot into layers[0].body.",
             ))
+        else:
+            _check_primary_layer_mirror(
+                step.snapshot,
+                step.layers[0].body,
+                f"steps[{index}].layers[0].body",
+                issues,
+            )
         for layer_index, layer in enumerate(step.layers):
             _check_snapshot(
                 layer.body,
@@ -159,6 +166,37 @@ def _check_steps(
         _check_narration_visual_match(index, step.title, step.voiceover_text, step.snapshot, issues)
 
     _check_final_step_answers_prompt(playbook, prompt, issues)
+
+
+def _check_primary_layer_mirror(
+    snapshot: Any,
+    primary_layer_body: Any,
+    path: str,
+    issues: list[PlaybookReviewIssue],
+) -> None:
+    snapshot_kind = getattr(snapshot, "kind", None)
+    layer_kind = getattr(primary_layer_body, "kind", None)
+    if layer_kind != snapshot_kind:
+        issues.append(_issue(
+            "renderer.contract_risk",
+            PlaybookIssueSeverity.ERROR,
+            f"{path}.kind",
+            (
+                "Primary renderer layer kind must match the step snapshot kind; "
+                f"got {layer_kind!r} for snapshot kind {snapshot_kind!r}."
+            ),
+            "Mirror the primary snapshot into layers[0].body before adding overlay layers.",
+        ))
+        return
+
+    if _snapshot_json(primary_layer_body) != _snapshot_json(snapshot):
+        issues.append(_issue(
+            "renderer.contract_risk",
+            PlaybookIssueSeverity.ERROR,
+            path,
+            "Primary renderer layer body must deeply equal the step snapshot.",
+            "Copy the full primary snapshot into layers[0].body and put overlays after it.",
+        ))
 
 
 def _check_snapshot(snapshot: Any, path: str, issues: list[PlaybookReviewIssue]) -> None:
@@ -184,6 +222,14 @@ def _check_snapshot(snapshot: Any, path: str, issues: list[PlaybookReviewIssue])
             ),
         ))
     _check_algorithm_indices(snapshot, path, issues)
+
+
+def _snapshot_json(snapshot: Any) -> dict[str, Any]:
+    if hasattr(snapshot, "model_dump"):
+        return snapshot.model_dump(mode="json", exclude_none=True)
+    if isinstance(snapshot, dict):
+        return {key: value for key, value in snapshot.items() if value is not None}
+    return {}
 
 
 def _snapshot_has_meaningful_payload(snapshot: Any) -> bool:

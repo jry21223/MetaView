@@ -4,7 +4,9 @@
  */
 
 .mv-settings-body {
+  width: 100%;
   max-width: 720px;
+  box-sizing: border-box;
   margin: 0 auto;
   padding: 48px 28px 64px;
   display: flex;
@@ -112,6 +114,138 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.mv-settings-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mv-settings-theme-card {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+  min-width: 0;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.mv-settings-theme-card:hover {
+  border-color: var(--theme-preview-accent);
+  transform: translateY(-1px);
+}
+
+.mv-settings-theme-card.is-on {
+  border-color: var(--theme-preview-accent);
+  box-shadow:
+    0 0 0 1px var(--theme-preview-accent),
+    0 10px 24px color-mix(in oklab, var(--theme-preview-accent) 18%, transparent);
+}
+
+.mv-settings-theme-stage {
+  height: 76px;
+  border-radius: 6px;
+  border: 1px solid var(--theme-preview-line);
+  background: var(--theme-preview-surface);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 7px;
+  padding: 10px;
+  overflow: hidden;
+}
+
+.mv-settings-theme-line {
+  width: 52%;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--theme-preview-ink-2);
+}
+
+.mv-settings-theme-line.is-wide {
+  width: 76%;
+  background: var(--theme-preview-ink);
+}
+
+.mv-settings-theme-bars {
+  display: flex;
+  align-items: end;
+  gap: 5px;
+  height: 26px;
+}
+
+.mv-settings-theme-bars span {
+  flex: 1;
+  min-width: 0;
+  border-radius: 4px 4px 2px 2px;
+  background: var(--theme-preview-accent);
+}
+
+.mv-settings-theme-bars span:nth-child(1) { height: 42%; }
+.mv-settings-theme-bars span:nth-child(2) { height: 78%; }
+.mv-settings-theme-bars span:nth-child(3) { height: 58%; background: var(--theme-preview-line-2); }
+
+.mv-settings-theme-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.mv-settings-theme-name {
+  min-width: 0;
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mv-settings-theme-mode {
+  color: var(--ink-3);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.mv-settings-accent-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mv-settings-accent-row input[type="color"] {
+  width: 44px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.mv-settings-accent-swatch {
+  width: 36px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in oklab, var(--accent) 45%, var(--line));
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16);
+}
+
+.mv-settings-accent-value {
+  color: var(--ink-2);
+  font-size: 12px;
 }
 
 .mv-settings-layout-grid {

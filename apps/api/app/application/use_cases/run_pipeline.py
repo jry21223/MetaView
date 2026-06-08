@@ -512,19 +512,11 @@ class RunPipelineUseCase:
                 [
                     *review_report.actions,
                     "reviewer:disabled",
-                    "reviewer:status:warnings",
                 ],
             )
 
         if self._reviewer_llm is None:
-            return playbook, _with_playbook_review_actions(
-                review_report,
-                [
-                    *review_report.actions,
-                    "reviewer:unconfigured",
-                    "reviewer:status:warnings",
-                ],
-            )
+            raise PipelineValidationError(_missing_playbook_reviewer_verdict(review_report))
 
         review_report = _with_playbook_review_actions(
             review_report,
@@ -903,6 +895,36 @@ def _playbook_schema_error_verdict(
         summary="PlaybookScript schema validation failed.",
         issues=issues,
         actions=actions,
+    )
+
+
+def _missing_playbook_reviewer_verdict(
+    review_report: PlaybookReviewVerdict,
+) -> PlaybookReviewVerdict:
+    return PlaybookReviewVerdict(
+        status=PlaybookReviewStatus.BLOCKED,
+        summary="Agent mode requires a configured reviewer unless reviewer_mode=off.",
+        issues=[
+            PlaybookReviewIssue(
+                code="reviewer.unconfigured",
+                severity=PlaybookIssueSeverity.ERROR,
+                path="reviewer",
+                message=(
+                    "Agent generation cannot complete because reviewer_mode is enabled "
+                    "but no reviewer LLM is configured."
+                ),
+                suggestion=(
+                    "Configure METAVIEW_OPENAI_CRITIC_MODEL with a reviewer provider, "
+                    "or explicitly set METAVIEW_REVIEWER_MODE=off for local/dev use."
+                ),
+                requires_repair=True,
+            )
+        ],
+        actions=[
+            *review_report.actions,
+            "reviewer:unconfigured",
+            "reviewer:status:blocked",
+        ],
     )
 
 

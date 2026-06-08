@@ -12,6 +12,15 @@
   flex-shrink: 0;
 }
 
+@media (max-width: 720px) {
+  .mv-top {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px;
+  }
+}
+
 /* ───── Main grid ───── */
 .mv-main {
   flex: 1; min-height: 0;

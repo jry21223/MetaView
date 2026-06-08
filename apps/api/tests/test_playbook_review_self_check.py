@@ -7,74 +7,42 @@ from app.domain.models.review import PlaybookReviewStatus
 from app.domain.services.playbook_review import review_playbook_script
 
 
+def _array_step(index: int) -> dict:
+    active = (index - 1) % 3
+    snapshot = {
+        "kind": "algorithm_array",
+        "array_values": ["1", "3", "5"],
+        "active_indices": [active],
+        "swap_indices": [],
+        "sorted_indices": [],
+        "pointers": {"cursor": active},
+    }
+    return {
+        "step_id": f"step_{index:02d}",
+        "end_frame": index * 60,
+        "title": f"Array interval {index}",
+        "voiceover_text": f"Inspect the sorted array interval {index}.",
+        "snapshot": deepcopy(snapshot),
+        "layers": [{"body": deepcopy(snapshot)}],
+    }
+
+
 def _valid_playbook() -> PlaybookScript:
+    steps = [_array_step(index) for index in range(1, 9)]
+    steps[0]["code_highlight"] = {
+        "language": "python",
+        "lines": ["left = 0", "right = len(a) - 1"],
+        "active_lines": [0],
+        "active_line": 0,
+    }
     return PlaybookScript.model_validate(
         {
             "fps": 30,
-            "total_frames": 120,
+            "total_frames": 480,
             "domain": "algorithm",
             "title": "Binary search",
             "summary": "Show a search interval.",
-            "steps": [
-                {
-                    "step_id": "step_01",
-                    "end_frame": 60,
-                    "title": "Initial interval",
-                    "voiceover_text": "Start by looking at the whole sorted array.",
-                    "snapshot": {
-                        "kind": "algorithm_array",
-                        "array_values": ["1", "3", "5"],
-                        "active_indices": [0, 1, 2],
-                        "swap_indices": [],
-                        "sorted_indices": [],
-                        "pointers": {"left": 0, "right": 2},
-                    },
-                    "layers": [
-                        {
-                            "body": {
-                                "kind": "algorithm_array",
-                                "array_values": ["1", "3", "5"],
-                                "active_indices": [0, 1, 2],
-                                "swap_indices": [],
-                                "sorted_indices": [],
-                                "pointers": {"left": 0, "right": 2},
-                            }
-                        }
-                    ],
-                    "code_highlight": {
-                        "language": "python",
-                        "lines": ["left = 0", "right = len(a) - 1"],
-                        "active_lines": [0],
-                        "active_line": 0,
-                    },
-                },
-                {
-                    "step_id": "step_02",
-                    "end_frame": 120,
-                    "title": "Choose middle",
-                    "voiceover_text": "Compare the target with the middle value.",
-                    "snapshot": {
-                        "kind": "algorithm_array",
-                        "array_values": ["1", "3", "5"],
-                        "active_indices": [1],
-                        "swap_indices": [],
-                        "sorted_indices": [],
-                        "pointers": {"mid": 1},
-                    },
-                    "layers": [
-                        {
-                            "body": {
-                                "kind": "algorithm_array",
-                                "array_values": ["1", "3", "5"],
-                                "active_indices": [1],
-                                "swap_indices": [],
-                                "sorted_indices": [],
-                                "pointers": {"mid": 1},
-                            }
-                        }
-                    ],
-                },
-            ],
+            "steps": steps,
             "parameter_controls": [],
         }
     )
@@ -85,6 +53,36 @@ def test_playbook_self_check_returns_clean_for_renderer_ready_script() -> None:
 
     assert verdict.status == PlaybookReviewStatus.CLEAN
     assert verdict.issues == []
+
+
+def test_playbook_self_check_blocks_one_step_agent_playbook_as_too_shallow() -> None:
+    payload = _valid_playbook().model_dump(mode="json")
+    payload["steps"] = payload["steps"][:1]
+    payload["total_frames"] = payload["steps"][-1]["end_frame"]
+    playbook = PlaybookScript.model_validate(payload)
+
+    verdict = review_playbook_script(playbook, prompt="Explain binary search.")
+
+    assert verdict.status == PlaybookReviewStatus.BLOCKED
+    assert any(issue.code == "step.too_shallow" for issue in verdict.issues)
+
+
+def test_playbook_self_check_accepts_eight_step_agent_playbook() -> None:
+    verdict = review_playbook_script(_valid_playbook(), prompt="Explain binary search.")
+
+    assert verdict.status == PlaybookReviewStatus.CLEAN
+
+
+def test_playbook_self_check_blocks_fifteen_step_agent_playbook() -> None:
+    payload = _valid_playbook().model_dump(mode="json")
+    payload["steps"] = [_array_step(index) for index in range(1, 16)]
+    payload["total_frames"] = payload["steps"][-1]["end_frame"]
+    playbook = PlaybookScript.model_validate(payload)
+
+    verdict = review_playbook_script(playbook, prompt="Explain binary search.")
+
+    assert verdict.status == PlaybookReviewStatus.BLOCKED
+    assert any(issue.code == "step.too_shallow" for issue in verdict.issues)
 
 
 def test_playbook_self_check_blocks_non_monotonic_and_overlong_timeline() -> None:
@@ -105,16 +103,10 @@ def test_playbook_self_check_blocks_non_monotonic_and_overlong_timeline() -> Non
 def test_playbook_self_check_blocks_empty_voiceover_and_snapshot_payload() -> None:
     payload = _valid_playbook().model_dump(mode="json")
     payload["domain"] = "math"
-    payload["steps"] = [
-        {
-            "step_id": "step_01",
-            "end_frame": 120,
-            "title": "Plot",
-            "voiceover_text": " ",
-            "snapshot": {"kind": "math_plot", "curves": []},
-            "layers": [{"body": {"kind": "math_plot", "curves": []}}],
-        }
-    ]
+    payload["steps"][0]["title"] = "Plot"
+    payload["steps"][0]["voiceover_text"] = " "
+    payload["steps"][0]["snapshot"] = {"kind": "math_plot", "curves": []}
+    payload["steps"][0]["layers"] = [{"body": {"kind": "math_plot", "curves": []}}]
     playbook = PlaybookScript.model_validate(payload)
 
     verdict = review_playbook_script(playbook, prompt="Plot f(x).")
@@ -148,3 +140,50 @@ def test_playbook_self_check_reports_algorithm_index_out_of_range() -> None:
 
     assert verdict.status == PlaybookReviewStatus.BLOCKED
     assert any(issue.code == "algorithm.invalid_state_transition" for issue in verdict.issues)
+
+
+def test_playbook_self_check_blocks_empty_layers() -> None:
+    payload = _valid_playbook().model_dump(mode="json")
+    payload["steps"][0]["layers"] = []
+    playbook = PlaybookScript.model_validate(payload)
+
+    verdict = review_playbook_script(playbook, prompt="Explain binary search.")
+
+    assert verdict.status == PlaybookReviewStatus.BLOCKED
+    assert any(issue.code == "renderer.contract_risk" for issue in verdict.issues)
+
+
+def test_playbook_self_check_blocks_primary_layer_kind_mismatch() -> None:
+    payload = _valid_playbook().model_dump(mode="json")
+    payload["domain"] = "math"
+    math_plot = {
+        "kind": "math_plot",
+        "curves": [{"expression": "x^2", "label": "f"}],
+    }
+    payload["steps"][0]["snapshot"] = math_plot
+    payload["steps"][0]["layers"][0]["body"] = {
+        "kind": "math_formula",
+        "formula_latex": "f(x)=x^2",
+    }
+    playbook = PlaybookScript.model_validate(payload)
+
+    verdict = review_playbook_script(playbook, prompt="Plot f(x)=x^2.")
+
+    assert verdict.status == PlaybookReviewStatus.BLOCKED
+    assert any(issue.code == "renderer.contract_risk" for issue in verdict.issues)
+
+
+def test_playbook_self_check_accepts_primary_layer_that_mirrors_snapshot() -> None:
+    payload = _valid_playbook().model_dump(mode="json")
+    math_plot = {
+        "kind": "math_plot",
+        "curves": [{"expression": "x^2", "label": "f"}],
+    }
+    payload["domain"] = "math"
+    payload["steps"][0]["snapshot"] = math_plot
+    payload["steps"][0]["layers"][0]["body"] = deepcopy(math_plot)
+    playbook = PlaybookScript.model_validate(payload)
+
+    verdict = review_playbook_script(playbook, prompt="Explain binary search.")
+
+    assert verdict.status == PlaybookReviewStatus.CLEAN

@@ -53,6 +53,7 @@ SUPPORTED_PLAYBOOK_REVIEW_CODES: tuple[str, ...] = (
     "math.inconsistent_formula",
     "algorithm.invalid_state_transition",
     "code.line_out_of_range",
+    "reviewer.unconfigured",
     "reviewer.invalid_output",
 )
 

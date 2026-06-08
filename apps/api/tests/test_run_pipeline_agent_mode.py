@@ -135,6 +135,88 @@ def _playbook_copy() -> dict[str, Any]:
     return json.loads(json.dumps(_MIN_PLAYBOOK))
 
 
+def _algorithm_step(index: int) -> dict[str, Any]:
+    active = (index - 1) % 4
+    snapshot = {
+        "kind": "algorithm_bars",
+        "array_values": ["3", "1", "4", "2"],
+        "numeric_values": [3, 1, 4, 2],
+        "active_indices": [active],
+        "swap_indices": [],
+        "sorted_indices": list(range(active)),
+        "pointers": {"cursor": active},
+    }
+    return {
+        "step_id": f"step_{index:02d}",
+        "end_frame": index * 60,
+        "title": f"Array state {index}",
+        "voiceover_text": f"Show the array state {index} and explain the array result.",
+        "tokens": [
+            {"id": "t0", "label": "3", "value": "3", "emphasis": "primary"},
+            {"id": "t1", "label": "1", "value": "1", "emphasis": "accent"},
+            {"id": "t2", "label": "4", "value": "4", "emphasis": "secondary"},
+            {"id": "t3", "label": "2", "value": "2", "emphasis": "secondary"},
+        ],
+        "code_highlight": None,
+        "narration_template": [
+            f"Show the array state {index} and explain the array result."
+        ],
+        "snapshot": snapshot,
+        "layers": [
+            {
+                "timing": {
+                    "enter_at": 0,
+                    "exit_at": 1,
+                    "appear_anim": "fade",
+                    "z_order": 0,
+                },
+                "body": json.loads(json.dumps(snapshot)),
+            }
+        ],
+    }
+
+
+def _motion_step(index: int) -> dict[str, Any]:
+    start_x = 120 + (index - 1) * 20
+    end_x = start_x + 120
+    snapshot = {
+        "kind": "motion_scene",
+        "viewport": {
+            "width": 960,
+            "height": 540,
+            "world": {"xMin": 0, "xMax": 960, "yMin": 0, "yMax": 540},
+        },
+        "objects": [
+            {"id": "p1", "type": "point", "x": start_x, "y": 180, "style": "primary"},
+            {"id": "label", "type": "text", "x": start_x + 40, "y": 160, "text": "A"},
+        ],
+        "tracks": [
+            {
+                "target": "p1",
+                "property": "x",
+                "keyframes": [{"t": 0, "value": start_x}, {"t": 1, "value": end_x}],
+                "easing": "linear",
+            }
+        ],
+        "camera": {
+            "keyframes": [
+                {"t": 0, "x": 480, "y": 270, "zoom": 1},
+                {"t": 1, "x": end_x, "y": 220, "zoom": 1.2},
+            ],
+            "easing": "easeInOut",
+        },
+    }
+    return {
+        "step_id": f"motion_{index:02d}",
+        "end_frame": index * 60,
+        "title": f"Move point {index}",
+        "voiceover_text": f"Track the motion scene point across the canvas in step {index}.",
+        "tokens": [],
+        "snapshot": snapshot,
+        "layers": [{"body": json.loads(json.dumps(snapshot))}],
+    }
+
+
 def _reviewer_response(status: str, issues: list[dict[str, Any]] | None = None) -> str:
     return json.dumps({
         "status": status,
@@ -155,120 +237,22 @@ def _blocking_issue(code: str = "review.final_answer_missing") -> dict[str, Any]
 
 _MIN_PLAYBOOK: dict[str, Any] = {
     "fps": 30,
-    "total_frames": 120,
+    "total_frames": 480,
     "domain": "algorithm",
     "title": "Sample",
     "summary": "From agent",
-    "steps": [
-        {
-            "step_id": "step_01",
-            "end_frame": 120,
-            "title": "Array state",
-            "voiceover_text": "Show the array.",
-            "tokens": [
-                {"id": "t0", "label": "3", "value": "3", "emphasis": "primary"},
-                {"id": "t1", "label": "1", "value": "1", "emphasis": "accent"},
-            ],
-            "code_highlight": None,
-            "narration_template": ["Show the array."],
-            "snapshot": {
-                "kind": "algorithm_bars",
-                "array_values": ["3", "1"],
-                "numeric_values": [3, 1],
-                "active_indices": [0],
-                "swap_indices": [],
-                "sorted_indices": [1],
-                "pointers": {},
-            },
-            "layers": [
-                {
-                    "timing": {
-                        "enter_at": 0,
-                        "exit_at": 1,
-                        "appear_anim": "fade",
-                        "z_order": 0,
-                    },
-                    "body": {
-                        "kind": "algorithm_bars",
-                        "array_values": ["3", "1"],
-                        "numeric_values": [3, 1],
-                        "active_indices": [0],
-                        "swap_indices": [],
-                        "sorted_indices": [1],
-                        "pointers": {},
-                    },
-                }
-            ],
-        }
-    ],
+    "steps": [_algorithm_step(index) for index in range(1, 9)],
     "parameter_controls": [],
 }
 
 
 _MOTION_SCENE_PLAYBOOK: dict[str, Any] = {
     "fps": 30,
-    "total_frames": 60,
+    "total_frames": 480,
     "domain": "math",
     "title": "Motion Scene",
     "summary": "Agent-authored object motion scene",
-    "steps": [
-        {
-            "step_id": "motion_01",
-            "end_frame": 60,
-            "title": "Move a point",
-            "voiceover_text": "Track a point across the canvas.",
-            "tokens": [],
-            "snapshot": {
-                "kind": "motion_scene",
-                "viewport": {
-                    "width": 960,
-                    "height": 540,
-                    "world": {"xMin": 0, "xMax": 960, "yMin": 0, "yMax": 540},
-                },
-                "objects": [
-                    {"id": "p1", "type": "point", "x": 120, "y": 180, "style": "primary"},
-                    {"id": "label", "type": "text", "x": 160, "y": 160, "text": "A"},
-                ],
-                "tracks": [
-                    {
-                        "target": "p1",
-                        "property": "x",
-                        "keyframes": [{"t": 0, "value": 120}, {"t": 1, "value": 300}],
-                        "easing": "linear",
-                    }
-                ],
-                "camera": {
-                    "keyframes": [
-                        {"t": 0, "x": 480, "y": 270, "zoom": 1},
-                        {"t": 1, "x": 300, "y": 220, "zoom": 1.2},
-                    ],
-                    "easing": "easeInOut",
-                },
-            },
-            "layers": [
-                {
-                    "body": {
-                        "kind": "motion_scene",
-                        "viewport": {
-                            "width": 960,
-                            "height": 540,
-                            "world": {"xMin": 0, "xMax": 960, "yMin": 0, "yMax": 540},
-                        },
-                        "objects": [
-                            {
-                                "id": "p1",
-                                "type": "point",
-                                "x": 120,
-                                "y": 180,
-                                "style": "primary",
-                            }
-                        ],
-                        "tracks": [],
-                    }
-                }
-            ],
-        }
-    ],
+    "steps": [_motion_step(index) for index in range(1, 9)],
     "parameter_controls": [],
 }
 
@@ -284,6 +268,7 @@ async def test_agent_mode_routes_to_agent_provider() -> None:
         agent_provider=agent,
         generation_mode="agent",
         director_repo=director_repo,
+        reviewer_mode="off",
     )
 
     await use_case.execute("run-1", PipelineRequest(prompt="hello math"))
@@ -297,17 +282,41 @@ async def test_agent_mode_routes_to_agent_provider() -> None:
     playbook_dict = json.loads(last["playbook_json"])
     assert playbook_dict["title"] == "Sample"
     assert playbook_dict["steps"][0]["step_id"] == "step_01"
-    assert playbook_dict["steps"][0]["snapshot"]["array_values"] == ["3", "1"]
-    assert playbook_dict["steps"][0]["snapshot"]["numeric_values"] == [3.0, 1.0]
+    assert playbook_dict["steps"][0]["snapshot"]["array_values"] == ["3", "1", "4", "2"]
+    assert playbook_dict["steps"][0]["snapshot"]["numeric_values"] == [3.0, 1.0, 4.0, 2.0]
     assert "tokens" not in playbook_dict["steps"][0]["snapshot"]
     assert playbook_dict["steps"][0]["layers"][0]["body"] == playbook_dict["steps"][0]["snapshot"]
     review = json.loads(last["review_json"])
     assert review["status"] == "clean"
     assert "agent:self_check:clean" in review["actions"]
-    assert "reviewer:unconfigured" in review["actions"]
-    assert "reviewer:status:warnings" in review["actions"]
+    assert "reviewer:disabled" in review["actions"]
+    assert "reviewer:unconfigured" not in review["actions"]
     assert director_repo.upserts[0]["director"].run_id == "run-1"
     assert director_repo.upserts[0]["director"].beats[0].step_id == "step_01"
+
+
+@pytest.mark.asyncio
+async def test_agent_mode_missing_reviewer_fails_when_reviewer_enabled() -> None:
+    repo = _RecordingRepo()
+    agent = _FakeAgent(_MIN_PLAYBOOK)
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        agent_provider=agent,
+        generation_mode="agent",
+        reviewer_mode="on_failure",
+    )
+
+    await use_case.execute("run-reviewer-missing", PipelineRequest(prompt="Show the array"))
+
+    last = repo.updates[-1]
+    assert last["status"].value == "failed"
+    assert "reviewer.unconfigured" in last["error"]
+    assert "playbook_json" not in last
+    review = json.loads(last["review_json"])
+    assert review["status"] == "blocked"
+    assert review["issues"][0]["code"] == "reviewer.unconfigured"
+    assert "reviewer:unconfigured" in review["actions"]
 
 
 @pytest.mark.asyncio
@@ -481,6 +490,7 @@ async def test_agent_mode_accepts_motion_scene_playbook_contract() -> None:
         _RaisingLLM(),
         agent_provider=agent,
         generation_mode="agent",
+        reviewer_mode="off",
     )
 
     await use_case.execute("run-motion", PipelineRequest(prompt="show object motion"))
@@ -503,6 +513,7 @@ async def test_agent_mode_forwards_provider_override() -> None:
         _RaisingLLM(),
         agent_provider=agent,
         generation_mode="agent",
+        reviewer_mode="off",
     )
 
     await use_case.execute(

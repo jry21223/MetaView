@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sqlite3
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -16,7 +17,13 @@ from app.infrastructure.persistence.sqlite_director_repository import (
 )
 from app.infrastructure.persistence.sqlite_run_repository import SqliteRunRepository
 from app.main import create_app
-from app.presentation.dependencies import get_llm_provider, get_run_director_repo, get_run_repo
+from app.presentation.dependencies import (
+    get_agent_provider,
+    get_llm_provider,
+    get_reviewer_llm_provider,
+    get_run_director_repo,
+    get_run_repo,
+)
 
 _VALID_CIR = json.dumps({
     "version": "0.1.0",
@@ -44,6 +51,54 @@ class _MockLLM:
 class _FailingLLM:
     async def complete(self, system: str, user: str) -> str:
         raise RuntimeError("provider failed")
+
+
+class _Agent:
+    def __init__(self, playbook: dict[str, Any]) -> None:
+        self.playbook = playbook
+
+    async def generate(
+        self,
+        prompt: str,
+        provider_config: dict[str, Any] | None = None,
+        route_decision: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return self.playbook
+
+
+def _agent_step(index: int) -> dict[str, Any]:
+    active = (index - 1) % 3
+    snapshot = {
+        "kind": "algorithm_array",
+        "array_values": ["1", "3", "5"],
+        "active_indices": [active],
+        "swap_indices": [],
+        "sorted_indices": [],
+        "pointers": {"cursor": active},
+    }
+    return {
+        "step_id": f"step_{index:02d}",
+        "title": f"Array step {index}",
+        "end_frame": index * 60,
+        "narration_template": [f"Inspect the array step {index} and state the result."],
+        "voiceover_text": f"Inspect the array step {index} and state the result.",
+        "tokens": [],
+        "code_highlight": None,
+        "snapshot": snapshot,
+        "layers": [{"body": json.loads(json.dumps(snapshot))}],
+    }
+
+
+def _valid_agent_playbook() -> dict[str, Any]:
+    return {
+        "fps": 30,
+        "total_frames": 480,
+        "domain": "algorithm",
+        "title": "Agent Array",
+        "summary": "Inspect the array and state the result.",
+        "steps": [_agent_step(index) for index in range(1, 9)],
+        "parameter_controls": [],
+    }
 
 
 @pytest.fixture
@@ -271,6 +326,47 @@ def test_ops_pipeline_refunds_balance_when_generation_fails(monkeypatch, tmp_pat
     assert resp.status_code == 202
     assert run is not None
     assert run.status == PipelineRunStatus.FAILED
+    assert _balance(db, session.account.user_id) == 20
+    assert _ledger_count(db, session.account.user_id, "consume") == 1
+    assert _ledger_count(db, session.account.user_id, "refund") == 1
+
+
+def test_ops_agent_pipeline_fails_when_reviewer_missing(monkeypatch, tmp_path) -> None:
+    get_settings.cache_clear()
+    db = str(tmp_path / "ops-agent-reviewer.db")
+    init_db(db)
+    repo = SqliteRunRepository(db)
+    director_repo = SqliteRunDirectorRepository(db)
+    session = _session_with_balance(db, 20)
+    monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
+    monkeypatch.setenv("METAVIEW_GENERATION_MODE", "agent")
+    monkeypatch.setenv("METAVIEW_REVIEWER_MODE", "on_failure")
+    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", db)
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    monkeypatch.setenv("METAVIEW_GENERATION_COST_CENTS", "10")
+    app = create_app()
+    app.dependency_overrides[get_run_repo] = lambda: repo
+    app.dependency_overrides[get_run_director_repo] = lambda: director_repo
+    app.dependency_overrides[get_llm_provider] = lambda: _MockLLM()
+    app.dependency_overrides[get_agent_provider] = lambda: _Agent(_valid_agent_playbook())
+    app.dependency_overrides[get_reviewer_llm_provider] = lambda: None
+
+    with TestClient(app) as client:
+        resp = client.post(
+            "/api/v1/pipeline",
+            json={"prompt": "ops agent run"},
+            headers={"Cookie": f"mv_session={session.token}"},
+        )
+
+    run = _run(repo.get(resp.json()["run_id"], user_id=session.account.user_id))
+    get_settings.cache_clear()
+    assert resp.status_code == 202
+    assert run is not None
+    assert run.status == PipelineRunStatus.FAILED
+    assert run.playbook is None
+    assert run.review is not None
+    assert run.review.status == "blocked"
+    assert run.review.issues[0].code == "reviewer.unconfigured"
     assert _balance(db, session.account.user_id) == 20
     assert _ledger_count(db, session.account.user_id, "consume") == 1
     assert _ledger_count(db, session.account.user_id, "refund") == 1

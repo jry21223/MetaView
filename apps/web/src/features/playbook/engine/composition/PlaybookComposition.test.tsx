@@ -10,7 +10,7 @@ import type {
   MetaStep,
   PlaybookScript,
 } from "../types";
-import { motionSceneDemo } from "../fixtures/motionSceneDemo";
+import type { MotionSceneSnapshot } from "../motion/types";
 
 const remotionState = vi.hoisted(() => ({ frame: 0 }));
 
@@ -74,6 +74,79 @@ function mathScript(): PlaybookScript {
         voiceover_text: "观察斜率变化",
         tokens: [],
         snapshot: { ...plotSnapshot("a*x"), params: { a: 2 } },
+      },
+    ],
+  };
+}
+
+function motionSnapshot(): MotionSceneSnapshot {
+  return {
+    kind: "motion_scene",
+    viewport: {
+      width: 960,
+      height: 540,
+      world: { xMin: 0, xMax: 960, yMin: 0, yMax: 540 },
+    },
+    objects: [
+      {
+        id: "base_edge",
+        type: "segment",
+        x1: 220,
+        y1: 380,
+        x2: 580,
+        y2: 380,
+        style: "accent",
+      },
+      {
+        id: "triangle_fill",
+        type: "polygon",
+        points: [
+          [220, 380],
+          [580, 380],
+          [220, 140],
+        ],
+        style: "primary",
+      },
+    ],
+    tracks: [
+      {
+        target: "base_edge",
+        property: "drawProgress",
+        keyframes: [
+          { t: 0, value: 0 },
+          { t: 1, value: 1 },
+        ],
+        easing: "linear",
+      },
+      {
+        target: "triangle_fill",
+        property: "opacity",
+        keyframes: [
+          { t: 0, value: 0 },
+          { t: 1, value: 1 },
+        ],
+        easing: "linear",
+      },
+    ],
+  };
+}
+
+function motionScript(): PlaybookScript {
+  return {
+    fps: 30,
+    total_frames: 90,
+    domain: "math",
+    title: "Motion scene registry fixture",
+    summary: "",
+    parameter_controls: [],
+    steps: [
+      {
+        step_id: "motion-registry",
+        end_frame: 90,
+        title: "Motion scene",
+        voiceover_text: "Object identity demo",
+        tokens: [],
+        snapshot: motionSnapshot(),
       },
     ],
   };
@@ -286,7 +359,7 @@ describe("PlaybookComposition", () => {
   });
 
   it("renders the motion scene demo through the renderer registry", () => {
-    const markup = renderToStaticMarkup(<PlaybookComposition script={motionSceneDemo} showSubtitles={false} />);
+    const markup = renderToStaticMarkup(<PlaybookComposition script={motionScript()} showSubtitles={false} />);
     expect(markup).toContain("motion-scene-renderer");
     expect(markup).toContain('data-object-id="triangle_fill"');
     expect(markup).toContain('data-object-id="base_edge"');

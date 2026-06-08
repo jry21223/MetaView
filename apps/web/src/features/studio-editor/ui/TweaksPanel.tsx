@@ -1,18 +1,10 @@
 import React from 'react';
 import { TweakValues } from '../hooks/useTweaks';
-import { THEME_PALETTE, type ThemeName } from '../../../shared/config/themePalette';
 
 interface TweaksPanelProps {
   t: TweakValues;
   setTweak: (key: keyof TweakValues, value: TweakValues[keyof TweakValues]) => void;
 }
-
-const THEME_OPTIONS = Object.entries(THEME_PALETTE).map(([id, descriptor]) => ({
-  id: id as ThemeName,
-  label: descriptor.label,
-  accent: descriptor.accent,
-  surface: descriptor.surface2,
-}));
 
 export function TweaksPanel({ t, setTweak }: TweaksPanelProps) {
   const [open, setOpen] = React.useState(false);
@@ -35,68 +27,6 @@ export function TweaksPanel({ t, setTweak }: TweaksPanelProps) {
             <button className="mv-icon-btn" onClick={() => setOpen(false)}>×</button>
           </div>
           <div className="mv-tweaks-body">
-            <div className="mv-tweak-section">主题</div>
-
-            <div className="mv-tweak-row">
-              <div className="mv-tweak-label">主题</div>
-              <div
-                className="mv-tweak-theme-grid"
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                  gap: 6,
-                }}
-              >
-                {THEME_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    className={`mv-tweak-theme-chip${t.theme === opt.id ? ' is-on' : ''}`}
-                    onClick={() => setTweak('theme', opt.id)}
-                    title={opt.label}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      padding: '4px 8px',
-                      borderRadius: 6,
-                      border: `1px solid ${t.theme === opt.id ? opt.accent : 'var(--line-2)'}`,
-                      background: t.theme === opt.id ? `${opt.accent}26` : 'transparent',
-                      color: 'var(--ink)',
-                      fontSize: 11,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <span
-                      aria-hidden
-                      style={{
-                        width: 14,
-                        height: 14,
-                        borderRadius: 4,
-                        background: opt.surface,
-                        border: `1px solid ${opt.accent}`,
-                        boxShadow: `inset 0 0 0 2px ${opt.accent}`,
-                        flexShrink: 0,
-                      }}
-                    />
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {opt.label}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="mv-tweak-row">
-              <div className="mv-tweak-label">强调色</div>
-              <input
-                type="color"
-                value={t.accent}
-                onChange={(e) => setTweak('accent', e.target.value)}
-                style={{ width: 56, height: 26, borderRadius: 6, border: '1px solid var(--line)', cursor: 'pointer', background: 'transparent' }}
-              />
-            </div>
-
             <div className="mv-tweak-section">布局</div>
 
             <div className="mv-tweak-row">

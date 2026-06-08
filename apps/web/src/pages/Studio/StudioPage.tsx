@@ -5,7 +5,6 @@ import { PlaybookPlayer } from '../../features/playbook/engine/player/PlaybookPl
 import { GlobalTopbar, Stage } from '../../shared/ui/GlobalTopbar';
 import { useProviderSettings } from '../../features/providers/hooks/useProviderSettings';
 import type { DirectorScript, PlaybookScript } from '../../features/playbook/engine/types';
-import { motionSceneDemo } from '../../features/playbook/engine/fixtures/motionSceneDemo';
 import { ExportModal } from '../../features/export/ui/ExportModal';
 import {
   listRunFollowUps,
@@ -135,7 +134,7 @@ function ChatPanel({
     abortRef.current?.abort();
     setMsgs([]);
     setVersions([]);
-    if (!runId || runId === 'motion-demo') return;
+    if (!runId) return;
     const controller = new AbortController();
     listRunFollowUps(runId, controller.signal)
       .then((data) => {
@@ -161,7 +160,7 @@ function ChatPanel({
 
   const domain = playbook?.domain ?? '';
   const suggestions = DOMAIN_SUGGESTIONS[domain] ?? FALLBACK_SUGGESTIONS;
-  const canModify = !!runId && runId !== 'motion-demo' && !!playbook;
+  const canModify = !!runId && !!playbook;
 
   const send = async (text?: string) => {
     const userText = (text ?? input).trim();
@@ -380,10 +379,6 @@ const STATUS_LOADER_LABEL: Record<NonNullable<PipelineStatus>, string> = {
   failed: '生成失败',
 };
 
-function shouldOpenMotionDemo(): boolean {
-  return import.meta.env.DEV && new URLSearchParams(window.location.search).has('motion-demo');
-}
-
 function PipelineSkeleton({ status }: PipelineSkeletonProps) {
   const currentOrder = status !== null ? STATUS_ORDER[status] : -1;
   const loaderLabel = status !== null ? STATUS_LOADER_LABEL[status] : '正在准备生成';
@@ -453,22 +448,18 @@ export function StudioPage({
   const [problemCollapsed, setProblemCollapsed] = useState(false);
   const [chatCollapsed, setChatCollapsed] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
-  const [motionDemoEnabled, setMotionDemoEnabled] = useState(() => shouldOpenMotionDemo());
   const [patchedPlaybook, setPatchedPlaybook] = useState<{
     runId: string;
     playbook: PlaybookScript;
     director?: DirectorScript | null;
   } | null>(null);
-  const showMotionDemo = import.meta.env.DEV && motionDemoEnabled;
   const activePatchedRun =
     patchedPlaybook?.runId === runId ? patchedPlaybook : null;
-  const activePlaybook = showMotionDemo ? motionSceneDemo : (activePatchedRun?.playbook ?? playbook);
-  const activeDirector = showMotionDemo
-    ? null
-    : activePatchedRun
-      ? (activePatchedRun.director ?? null)
-      : director;
-  const canExport = !showMotionDemo && !!playbook && !!runId;
+  const activePlaybook = activePatchedRun?.playbook ?? playbook;
+  const activeDirector = activePatchedRun
+    ? (activePatchedRun.director ?? null)
+    : director;
+  const canExport = !!playbook && !!runId;
 
   useEffect(() => {
     if (error) onNavigate('intake');
@@ -509,13 +500,13 @@ export function StudioPage({
           <aside className="mv-left">
             <ProblemCard
               playbook={activePlaybook}
-              runId={showMotionDemo ? 'motion-demo' : runId}
+              runId={runId}
               collapsed={problemCollapsed}
               onToggle={() => setProblemCollapsed((v) => !v)}
             />
             <ChatPanel
               appEdition={appEdition}
-              runId={showMotionDemo ? null : runId}
+              runId={runId}
               playbook={activePlaybook}
               isProviderConfigured={isProviderConfigured}
               onOpenProviderSettings={onOpenProviderSettings}
@@ -542,18 +533,6 @@ export function StudioPage({
           >
             {leftCollapsed ? '›' : '‹'}
           </button>
-
-          {import.meta.env.DEV && (
-            <div className="mv-motion-demo-switch">
-              <button
-                type="button"
-                className={`mv-chip${showMotionDemo ? ' mv-chip-primary' : ''}`}
-                onClick={() => setMotionDemoEnabled((v) => !v)}
-              >
-                Motion demo
-              </button>
-            </div>
-          )}
 
           {activePlaybook ? (
             <PlaybookPlayer

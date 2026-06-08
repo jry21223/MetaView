@@ -3,46 +3,44 @@ import { buildAgentSelfRepairPrompt } from "../src/agent.js";
 import { selfCheckPlaybook } from "../src/state/playbookSelfCheck.js";
 import type { PlaybookOutput } from "../src/state/types.js";
 
-function validPlaybook(): PlaybookOutput {
+function makeStep(index: number): PlaybookOutput["steps"][number] {
+  const activeIndex = (index - 1) % 2;
+  const snapshot = {
+    kind: "algorithm_array",
+    array_values: ["3", "1"],
+    active_indices: [activeIndex],
+    swap_indices: [],
+    sorted_indices: [],
+    pointers: { cursor: activeIndex },
+  };
+  return {
+    step_id: `step_${String(index).padStart(2, "0")}`,
+    title: `Scan array ${index}`,
+    end_frame: index * 60,
+    narration_template: [`Scan the whole array in step ${index} and name the result.`],
+    voiceover_text: `Scan the whole array in step ${index} and name the result.`,
+    tokens: [],
+    code_highlight: null,
+    snapshot,
+    layers: [
+      {
+        timing: { enter_at: 0, exit_at: 1, appear_anim: "fade", z_order: 0 },
+        body: { ...snapshot, pointers: { ...snapshot.pointers } },
+      },
+    ],
+  };
+}
+
+function validPlaybook(stepCount = 8): PlaybookOutput {
+  const steps = Array.from({ length: stepCount }, (_, index) => makeStep(index + 1));
   return {
     fps: 30,
-    total_frames: 120,
+    total_frames: steps.at(-1)?.end_frame ?? 0,
     domain: "algorithm",
     title: "Array scan",
     summary: "Scan the array and explain the result.",
     parameter_controls: [],
-    steps: [
-      {
-        step_id: "step_01",
-        title: "Scan array",
-        end_frame: 120,
-        narration_template: ["Scan the whole array and name the result."],
-        voiceover_text: "Scan the whole array and name the result.",
-        tokens: [],
-        code_highlight: null,
-        snapshot: {
-          kind: "algorithm_array",
-          array_values: ["3", "1"],
-          active_indices: [0],
-          swap_indices: [],
-          sorted_indices: [],
-          pointers: {},
-        },
-        layers: [
-          {
-            timing: { enter_at: 0, exit_at: 1, appear_anim: "fade", z_order: 0 },
-            body: {
-              kind: "algorithm_array",
-              array_values: ["3", "1"],
-              active_indices: [0],
-              swap_indices: [],
-              sorted_indices: [],
-              pointers: {},
-            },
-          },
-        ],
-      },
-    ],
+    steps,
   };
 }
 
@@ -52,6 +50,26 @@ describe("agent playbook self-check", () => {
 
     expect(report.status).toBe("clean");
     expect(report.issues).toEqual([]);
+  });
+
+  it("blocks one-step product playbooks as too shallow", () => {
+    const report = selfCheckPlaybook(validPlaybook(1), "Scan the array");
+
+    expect(report.status).toBe("blocked");
+    expect(report.issues.map((issue) => issue.code)).toContain("step.too_shallow");
+  });
+
+  it("accepts an eight-step product playbook", () => {
+    const report = selfCheckPlaybook(validPlaybook(8), "Scan the array");
+
+    expect(report.status).toBe("clean");
+  });
+
+  it("blocks fifteen-step product playbooks", () => {
+    const report = selfCheckPlaybook(validPlaybook(15), "Scan the array");
+
+    expect(report.status).toBe("blocked");
+    expect(report.issues.map((issue) => issue.code)).toContain("step.too_shallow");
   });
 
   it("blocks empty narration, empty snapshot payload, and invalid timing", () => {
@@ -82,6 +100,47 @@ describe("agent playbook self-check", () => {
     const codes = report.issues.map((issue) => issue.code);
     expect(codes).toContain("snapshot.unsupported_kind");
     expect(codes).toContain("renderer.contract_risk");
+  });
+
+  it("blocks empty layers as a renderer contract risk", () => {
+    const playbook = validPlaybook();
+    playbook.steps[0].layers = [];
+
+    const report = selfCheckPlaybook(playbook, "Scan the array");
+
+    expect(report.status).toBe("blocked");
+    expect(report.issues.map((issue) => issue.code)).toContain("renderer.contract_risk");
+  });
+
+  it("blocks primary layer kind mismatch as a renderer contract risk", () => {
+    const playbook = validPlaybook();
+    playbook.steps[0].snapshot = {
+      kind: "math_plot",
+      curves: [{ expression: "x^2", label: "f" }],
+    };
+    playbook.steps[0].layers[0].body = {
+      kind: "math_formula",
+      formula_latex: "f(x)=x^2",
+    };
+
+    const report = selfCheckPlaybook(playbook, "Scan the array");
+
+    expect(report.status).toBe("blocked");
+    expect(report.issues.map((issue) => issue.code)).toContain("renderer.contract_risk");
+  });
+
+  it("keeps mirrored primary layer snapshots clean", () => {
+    const playbook = validPlaybook();
+    const snapshot = {
+      kind: "math_plot",
+      curves: [{ expression: "x^2", label: "f" }],
+    };
+    playbook.steps[0].snapshot = snapshot;
+    playbook.steps[0].layers[0].body = { ...snapshot, curves: [...snapshot.curves] };
+
+    const report = selfCheckPlaybook(playbook, "Scan the array");
+
+    expect(report.status).toBe("clean");
   });
 
   it("builds a structured repair prompt from blocked self-check output", () => {

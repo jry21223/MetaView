@@ -80,6 +80,42 @@
   padding: 0;
 }
 
+@media (max-width: 720px) {
+  .mv-brand { min-width: 0; }
+  .mv-brand-meta { display: none; }
+  .mv-nav {
+    justify-self: stretch;
+    max-width: 100%;
+    overflow-x: auto;
+    border-radius: 10px;
+  }
+  .mv-nav-item {
+    flex: 1 0 auto;
+    padding: 7px 10px;
+    font-size: 12px;
+  }
+  .mv-top-right {
+    min-width: 0;
+    gap: 8px;
+    justify-content: space-between;
+  }
+  .mv-status {
+    min-width: 0;
+    flex: 1 1 auto;
+    letter-spacing: 0.06em;
+  }
+  .mv-status span:last-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mv-icon-btn,
+  .mv-avatar {
+    flex: 0 0 auto;
+  }
+}
+
 /* ───── Cards ───── */
 .mv-card {
   background: var(--surface);
@@ -1065,13 +1101,6 @@
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 .mv-left-handle:hover { color: var(--accent); border-color: var(--accent); }
-
-.mv-motion-demo-switch {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 6;
-}
 
 /* ── Empty/loading right-column placeholders ────────────────────────── */
 .mv-right-placeholder {

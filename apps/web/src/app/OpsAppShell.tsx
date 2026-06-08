@@ -12,13 +12,9 @@ import { SettingsPage } from '../pages/Settings/SettingsPage';
 import { usePipelineSubmit } from '../features/pipeline/hooks/usePipelineSubmit';
 import type { Stage } from '../shared/ui/GlobalTopbar';
 
-function shouldOpenMotionDemo(): boolean {
-  return import.meta.env.DEV && new URLSearchParams(window.location.search).has('motion-demo');
-}
-
 export function OpsAppShell() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const [stage, setStage] = useState<Stage>(() => (shouldOpenMotionDemo() ? 'workbench' : 'intake'));
+  const [stage, setStage] = useState<Stage>('intake');
   const [accountModalOpen, setAccountModalOpen] = useState(false);
   const [openedRunId, setOpenedRunId] = useState<string | null>(null);
   const { submit, runId, isSubmitting, error: submitError } = usePipelineSubmit();

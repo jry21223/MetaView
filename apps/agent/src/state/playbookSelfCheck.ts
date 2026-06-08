@@ -26,8 +26,8 @@ export class AgentSelfCheckError extends Error {
   }
 }
 
-const MIN_AGENT_STEPS = 1;
-const MAX_AGENT_STEPS = 16;
+const MIN_AGENT_STEPS = 8;
+const MAX_AGENT_STEPS = 14;
 
 const SUPPORTED_FRONTEND_SNAPSHOT_KINDS = new Set([
   "algorithm_array",
@@ -161,11 +161,18 @@ function checkSteps(
     if (!step.layers.length) {
       issues.push(issue(
         "renderer.contract_risk",
-        "warning",
+        "error",
         `steps[${index}].layers`,
-        "Every step should carry at least one renderer layer.",
+        "Every step must carry at least one renderer layer.",
         "Mirror the primary snapshot into layers[0].body.",
       ));
+    } else {
+      checkPrimaryLayerMirror(
+        step.snapshot,
+        step.layers[0].body,
+        `steps[${index}].layers[0].body`,
+        issues,
+      );
     }
     step.layers.forEach((layer, layerIndex) => {
       checkSnapshot(layer.body, `steps[${index}].layers[${layerIndex}].body`, issues);
@@ -180,6 +187,35 @@ function checkSteps(
   });
 
   checkFinalStepAnswersPrompt(playbook, prompt, issues);
+}
+
+function checkPrimaryLayerMirror(
+  snapshot: Record<string, unknown>,
+  primaryLayerBody: Record<string, unknown>,
+  path: string,
+  issues: SelfCheckIssue[],
+): void {
+  const snapshotKind = typeof snapshot.kind === "string" ? snapshot.kind : "";
+  const layerKind = typeof primaryLayerBody.kind === "string" ? primaryLayerBody.kind : "";
+  if (layerKind !== snapshotKind) {
+    issues.push(issue(
+      "renderer.contract_risk",
+      "error",
+      `${path}.kind`,
+      `Primary renderer layer kind must match the step snapshot kind; got ${JSON.stringify(layerKind)} for snapshot kind ${JSON.stringify(snapshotKind)}.`,
+      "Mirror the primary snapshot into layers[0].body before adding overlay layers.",
+    ));
+    return;
+  }
+  if (!deepJsonEqual(primaryLayerBody, snapshot)) {
+    issues.push(issue(
+      "renderer.contract_risk",
+      "error",
+      path,
+      "Primary renderer layer body must deeply equal the step snapshot.",
+      "Copy the full primary snapshot into layers[0].body and put overlays after it.",
+    ));
+  }
 }
 
 function checkSnapshot(
@@ -355,6 +391,25 @@ function isMeaningful(value: unknown): boolean {
   if (typeof value === "string") return value.trim().length > 0;
   if (value && typeof value === "object") return Object.keys(value).length > 0;
   return value !== null && value !== undefined;
+}
+
+function deepJsonEqual(left: unknown, right: unknown): boolean {
+  return JSON.stringify(canonicalJson(left)) === JSON.stringify(canonicalJson(right));
+}
+
+function canonicalJson(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => canonicalJson(item));
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, item]) => item !== undefined && item !== null)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, item]) => [key, canonicalJson(item)]),
+    );
+  }
+  return value;
 }
 
 function issue(

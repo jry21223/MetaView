@@ -45,6 +45,11 @@ const LAYOUT_OPTIONS: Array<{ id: TweakValues['layout']; label: string; hint: st
   { id: 'top', label: '顶部', hint: '极简 · 全宽' },
 ];
 
+const THEME_OPTIONS = (Object.keys(THEME_PALETTE) as ThemeName[]).map((name) => ({
+  id: name,
+  ...THEME_PALETTE[name],
+}));
+
 const VOICE_RATE_BOUNDS = { min: 0.5, max: 2.0, step: 0.05 } as const;
 
 export function SettingsPage({
@@ -346,23 +351,62 @@ export function SettingsPage({
         <section className="mv-settings-section">
           <h2 className="mv-settings-section-title">外观</h2>
           <p className="mv-settings-section-hint">
-            实时生效；同样的设置在顶部右侧的小齿轮也能切换。
+            实时生效；主题和强调色会同步到工作台与播放器。
           </p>
 
           <div className="mv-settings-field">
-            <label htmlFor="mv-set-theme">主题</label>
-            <select
-              id="mv-set-theme"
-              className="mv-text-input"
-              value={tweaks.theme}
-              onChange={(e) => setTweak('theme', e.target.value as ThemeName)}
-            >
-              {(Object.keys(THEME_PALETTE) as ThemeName[]).map((name) => (
-                <option key={name} value={name}>
-                  {THEME_PALETTE[name].label}
-                </option>
-              ))}
-            </select>
+            <label>主题</label>
+            <div className="mv-settings-theme-grid" role="group" aria-label="主题">
+              {THEME_OPTIONS.map((theme) => {
+                const selected = tweaks.theme === theme.id;
+                return (
+                  <button
+                    key={theme.id}
+                    type="button"
+                    className={`mv-settings-theme-card${selected ? ' is-on' : ''}`}
+                    aria-pressed={selected}
+                    onClick={() => setTweak('theme', theme.id)}
+                    style={{
+                      '--theme-preview-surface': theme.surface2,
+                      '--theme-preview-ink': theme.ink,
+                      '--theme-preview-ink-2': theme.ink2,
+                      '--theme-preview-line': theme.line,
+                      '--theme-preview-line-2': theme.line2,
+                      '--theme-preview-accent': theme.accent,
+                    } as React.CSSProperties}
+                  >
+                    <span className="mv-settings-theme-stage" aria-hidden>
+                      <span className="mv-settings-theme-line is-wide" />
+                      <span className="mv-settings-theme-line" />
+                      <span className="mv-settings-theme-bars">
+                        <span />
+                        <span />
+                        <span />
+                      </span>
+                    </span>
+                    <span className="mv-settings-theme-meta">
+                      <span className="mv-settings-theme-name">{theme.label}</span>
+                      <span className="mv-settings-theme-mode">{theme.type}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="mv-settings-field">
+            <label htmlFor="mv-set-accent">强调色</label>
+            <div className="mv-settings-accent-row">
+              <input
+                id="mv-set-accent"
+                type="color"
+                value={tweaks.accent}
+                onChange={(e) => setTweak('accent', e.target.value)}
+                aria-label="强调色"
+              />
+              <span className="mv-settings-accent-swatch" style={{ background: tweaks.accent }} />
+              <span className="mv-settings-accent-value mv-mono">{tweaks.accent}</span>
+            </div>
           </div>
 
           <div className="mv-settings-field">
