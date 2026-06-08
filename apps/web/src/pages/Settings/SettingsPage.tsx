@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { GlobalTopbar, type Stage } from '../../shared/ui/GlobalTopbar';
 import {
   type ProviderSettings,
+  type RouterModeSetting,
 } from '../../features/providers/hooks/useProviderSettings';
 import {
   OPENAI_VOICES,
@@ -45,12 +46,24 @@ const LAYOUT_OPTIONS: Array<{ id: TweakValues['layout']; label: string; hint: st
   { id: 'top', label: '顶部', hint: '极简 · 全宽' },
 ];
 
+const ROUTER_MODE_OPTIONS: Array<{ id: RouterModeSetting; label: string; hint: string }> = [
+  { id: 'hybrid', label: 'Hybrid', hint: '小模型优先，失败回退规则' },
+  { id: 'llm', label: 'LLM', hint: '仅使用路由模型' },
+  { id: 'heuristic', label: 'Heuristic', hint: '仅使用确定性规则' },
+  { id: 'off', label: 'Off', hint: '关闭路由模型' },
+];
+
 const THEME_OPTIONS = (Object.keys(THEME_PALETTE) as ThemeName[]).map((name) => ({
   id: name,
   ...THEME_PALETTE[name],
 }));
 
 const VOICE_RATE_BOUNDS = { min: 0.5, max: 2.0, step: 0.05 } as const;
+
+function clampNumber(value: number, fallback: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(min, Math.min(max, value));
+}
 
 export function SettingsPage({
   appEdition = 'self',
@@ -73,6 +86,14 @@ export function SettingsPage({
     providerSettings?.baseUrl ?? 'https://api.openai.com/v1',
   );
   const [model, setModel] = useState(providerSettings?.model ?? 'gpt-4o-mini');
+  const [routerMode, setRouterMode] = useState<RouterModeSetting>(
+    providerSettings?.routerMode ?? 'hybrid',
+  );
+  const [routerModel, setRouterModel] = useState(providerSettings?.routerModel ?? '');
+  const [routerMinConfidence, setRouterMinConfidence] = useState(
+    providerSettings?.routerMinConfidence ?? 0.72,
+  );
+  const [routerTimeoutS, setRouterTimeoutS] = useState(providerSettings?.routerTimeoutS ?? 12);
   const [showKey, setShowKey] = useState(false);
   const [savedFlash, setSavedFlash] = useState<string | null>(null);
   const [ttsProbe, setTtsProbe] = useState<
@@ -86,14 +107,20 @@ export function SettingsPage({
     window.setTimeout(() => setSavedFlash((cur) => (cur === msg ? null : cur)), 1800);
   };
 
+  const routerUsesModel = routerMode === 'hybrid' || routerMode === 'llm';
+
   const handleProviderSave = () => {
     if (!onUpdateProvider) return;
     onUpdateProvider({
       apiKey: apiKey.trim(),
       baseUrl: baseUrl.trim(),
       model: model.trim(),
+      routerMode,
+      routerModel: routerModel.trim(),
+      routerMinConfidence: clampNumber(routerMinConfidence, 0.72, 0, 1),
+      routerTimeoutS: clampNumber(routerTimeoutS, 12, 1, 60),
     });
-    flash('服务商配置已保存');
+    flash('服务商与路由配置已保存');
   };
 
   const handleClearExportJobs = () => {
@@ -164,11 +191,11 @@ export function SettingsPage({
         <header className="mv-settings-head">
           <div className="mv-eyebrow-mini">设置</div>
           <h1 className="mv-settings-title">
-            {showProviderSettings ? '本地偏好与模型服务商配置' : '账户偏好与播放设置'}
+            {showProviderSettings ? '教学生成与模型路由' : '账户偏好与播放设置'}
           </h1>
           <p className="mv-settings-sub">
             {showProviderSettings
-              ? '所有设置只存在你本地浏览器（localStorage / sessionStorage），不会上传服务端。'
+              ? '把生成模型、路由模型、朗读和界面偏好放在一页；本地设置只保存在当前浏览器。'
               : '运营版由平台托管模型服务；这里保留播放、朗读和界面偏好。'}
           </p>
           {savedFlash && (
@@ -180,7 +207,7 @@ export function SettingsPage({
 
         {showProviderSettings && (
         <section className="mv-settings-section">
-          <h2 className="mv-settings-section-title">模型服务商</h2>
+          <h2 className="mv-settings-section-title">生成模型</h2>
           <p className="mv-settings-section-hint">
             配置 OpenAI 或任意兼容接口；留空密钥时会回退到后端默认凭据。
           </p>
@@ -219,7 +246,7 @@ export function SettingsPage({
           </div>
 
           <div className="mv-settings-field">
-            <label htmlFor="mv-set-model">模型</label>
+            <label htmlFor="mv-set-model">生成模型</label>
             <input
               id="mv-set-model"
               type="text"
@@ -229,6 +256,79 @@ export function SettingsPage({
               placeholder="gpt-4o-mini"
             />
           </div>
+        </section>
+        )}
+
+        {showProviderSettings && (
+        <section className="mv-settings-section">
+          <h2 className="mv-settings-section-title">小模型路由</h2>
+          <p className="mv-settings-section-hint">
+            题目进入生成链路前先判断学科与 specialized skill；路由模型建议使用小而快的模型。
+          </p>
+
+          <div className="mv-settings-field">
+            <label>Router Mode</label>
+            <div className="mv-settings-segmented mv-router-mode-grid">
+              {ROUTER_MODE_OPTIONS.map((mode) => (
+                <button
+                  key={mode.id}
+                  type="button"
+                  className={`mv-chip${routerMode === mode.id ? ' mv-chip-primary' : ''}`}
+                  onClick={() => setRouterMode(mode.id)}
+                  title={mode.hint}
+                >
+                  <span className="mv-settings-layout-label">{mode.label}</span>
+                  <span className="mv-settings-layout-hint">{mode.hint}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mv-settings-field">
+            <label htmlFor="mv-set-router-model">Router Model</label>
+            <input
+              id="mv-set-router-model"
+              type="text"
+              className="mv-text-input mv-mono"
+              value={routerModel}
+              onChange={(e) => setRouterModel(e.target.value)}
+              placeholder="留空则复用后端默认 / 生成模型"
+              disabled={!routerUsesModel}
+            />
+          </div>
+
+          <div className="mv-settings-router-grid">
+            <div className="mv-settings-field">
+              <label htmlFor="mv-set-router-confidence">
+                最低置信度 · {routerMinConfidence.toFixed(2)}
+              </label>
+              <input
+                id="mv-set-router-confidence"
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={routerMinConfidence}
+                onChange={(e) => setRouterMinConfidence(Number.parseFloat(e.target.value))}
+                disabled={!routerUsesModel}
+                className="mv-settings-slider"
+              />
+            </div>
+            <div className="mv-settings-field">
+              <label htmlFor="mv-set-router-timeout">路由超时（秒）</label>
+              <input
+                id="mv-set-router-timeout"
+                type="number"
+                min={1}
+                max={60}
+                step={1}
+                className="mv-text-input mv-mono"
+                value={routerTimeoutS}
+                onChange={(e) => setRouterTimeoutS(Number.parseFloat(e.target.value))}
+                disabled={!routerUsesModel}
+              />
+            </div>
+          </div>
 
           <div className="mv-settings-actions">
             <button
@@ -236,7 +336,7 @@ export function SettingsPage({
               className="mv-chip mv-chip-primary"
               onClick={handleProviderSave}
             >
-              保存服务商配置
+              保存模型与路由配置
             </button>
           </div>
         </section>
