@@ -52,7 +52,7 @@ RUN sed -i "s|http://deb.debian.org/debian|${APT_MIRROR}|g; s|https://deb.debian
 
 COPY apps/api/requirements.txt ./requirements.txt
 COPY apps/api/requirements-subjects.txt ./requirements-subjects.txt
-COPY vendor/wheelhouse /tmp/wheelhouse
+RUN mkdir -p /tmp/wheelhouse
 RUN pip install --no-cache-dir \
         --find-links "${PIP_FIND_LINKS}" \
         --prefer-binary \
@@ -64,7 +64,7 @@ RUN pip install --no-cache-dir \
         -r requirements-subjects.txt
 
 COPY apps/api ./apps/api
-COPY skills ./skills
+RUN mkdir -p ./skills
 RUN mkdir -p ./data
 COPY --from=web_deps /usr/local/bin/node /usr/local/bin/node
 COPY --from=web_deps /usr/local/bin/npm /usr/local/bin/npm
