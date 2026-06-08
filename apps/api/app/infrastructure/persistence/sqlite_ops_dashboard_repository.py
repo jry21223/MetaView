@@ -62,24 +62,32 @@ class SqliteOpsDashboardRepository:
         generated_at = datetime.now(timezone.utc)
         window = _build_window(generated_at, window_days)
         with self._connect() as conn:
-            accounts = conn.execute("SELECT * FROM accounts").fetchall()
+            accounts = conn.execute(
+                """
+                SELECT user_id, role, status, balance_cents, created_at
+                FROM accounts
+                """
+            ).fetchall()
             runs = conn.execute(
                 """
-                SELECT r.*, a.display_name AS user_display_name
+                SELECT run_id, user_id, status, prompt, playbook_json, error, created_at
                 FROM pipeline_runs AS r
-                LEFT JOIN accounts AS a ON a.user_id = r.user_id
                 ORDER BY r.created_at DESC
                 """
             ).fetchall()
             orders = conn.execute(
                 """
-                SELECT o.*, a.display_name AS user_display_name
+                SELECT order_id, amount_cents, status, channel, created_at, paid_at
                 FROM recharge_orders AS o
-                LEFT JOIN accounts AS a ON a.user_id = o.user_id
                 ORDER BY o.created_at DESC
                 """
             ).fetchall()
-            ledger = conn.execute("SELECT * FROM balance_ledger").fetchall()
+            ledger = conn.execute(
+                """
+                SELECT amount_cents, kind, created_at
+                FROM balance_ledger
+                """
+            ).fetchall()
 
         run_trend = _build_run_trend(runs, window)
         revenue_trend = _build_revenue_trend(orders, window)
@@ -380,8 +388,6 @@ def _run_row(row: sqlite3.Row) -> OpsRunRow:
     title, domain, _ = _playbook_meta(row["playbook_json"])
     return OpsRunRow(
         run_id=row["run_id"],
-        user_id=row["user_id"],
-        user_display_name=row["user_display_name"],
         status=row["status"],
         prompt=row["prompt"] or "",
         title=title,
@@ -394,8 +400,6 @@ def _run_row(row: sqlite3.Row) -> OpsRunRow:
 def _order_row(row: sqlite3.Row) -> OpsOrderRow:
     return OpsOrderRow(
         order_id=row["order_id"],
-        user_id=row["user_id"],
-        user_display_name=row["user_display_name"],
         amount_cents=int(row["amount_cents"]),
         amount_yuan=money_from_cents(int(row["amount_cents"])),
         status=row["status"],

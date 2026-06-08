@@ -37,8 +37,6 @@ export interface OpsDistributionPoint {
 
 export interface OpsRunRow {
   run_id: string;
-  user_id?: string | null;
-  user_display_name?: string | null;
   status: string;
   prompt: string;
   title?: string | null;
@@ -49,8 +47,6 @@ export interface OpsRunRow {
 
 export interface OpsOrderRow {
   order_id: string;
-  user_id: string;
-  user_display_name?: string | null;
   amount_cents: number;
   amount_yuan: string;
   status: string;

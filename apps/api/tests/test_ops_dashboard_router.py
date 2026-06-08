@@ -122,6 +122,34 @@ def test_ops_dashboard_aggregates_global_metrics_and_recent_rows(
     assert data["health_tree"][0]["id"] == "generation"
 
 
+def test_ops_dashboard_redacts_recent_row_user_identity(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    db = _db(tmp_path, "redacted-users.db")
+    admin = _session(db, role="admin")
+    user = _session(db, role="user", display_name="敏感用户")
+    _seed_dashboard_data(db, user.account.user_id)
+
+    with _client(monkeypatch, db) as client:
+        resp = client.get(
+            "/api/v1/ops/dashboard?window_days=7&limit=2",
+            headers={"Cookie": f"mv_session={admin.token}"},
+        )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["recent_runs"]
+    assert data["recent_orders"]
+    assert "user_id" not in data["recent_runs"][0]
+    assert "user_display_name" not in data["recent_runs"][0]
+    assert "user_id" not in data["recent_orders"][0]
+    assert "user_display_name" not in data["recent_orders"][0]
+    serialized = json.dumps(data, ensure_ascii=False)
+    assert user.account.user_id not in serialized
+    assert "敏感用户" not in serialized
+
+
 def test_ops_dashboard_validates_query_shape(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -169,16 +197,17 @@ def _session(
     role: str,
     status: str = "enabled",
     balance_cents: int = 0,
+    display_name: str = "游客账户",
 ):
     session = _run(SqliteAccountRepository(db).get_or_create_session(None, session_days=30))
     with sqlite3.connect(db) as conn:
         conn.execute(
             """
             UPDATE accounts
-            SET role = ?, status = ?, balance_cents = ?, created_at = ?
+            SET role = ?, status = ?, balance_cents = ?, display_name = ?, created_at = ?
             WHERE user_id = ?
             """,
-            (role, status, balance_cents, _iso(3), session.account.user_id),
+            (role, status, balance_cents, display_name, _iso(3), session.account.user_id),
         )
         conn.commit()
     return session

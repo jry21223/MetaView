@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -86,8 +87,40 @@ def test_newapi_topup_dev_receipt_flow(newapi_topup_client: TestClient) -> None:
     assert acked.status_code == 200
     assert acked.json()["status"] == "acked"
 
+    repeated_verify = newapi_topup_client.post(
+        "/api/v1/internal/newapi/topup-receipts/verify",
+        headers={"Authorization": "Bearer receipt-token"},
+        json={
+            "intent_id": intent_id,
+            "receipt_code": receipt_code,
+            "newapi_user_id": 4,
+            "state": "state-1",
+        },
+    )
+    assert repeated_verify.status_code == 200
+    assert repeated_verify.json()["status"] == "acked"
+
+    repeated_ack = newapi_topup_client.post(
+        "/api/v1/internal/newapi/topup-receipts/ack",
+        headers={"Authorization": "Bearer receipt-token"},
+        json={"intent_id": intent_id, "newapi_user_id": 4, "state": "state-1"},
+    )
+    assert repeated_ack.status_code == 200
+    assert repeated_ack.json()["status"] == "acked"
+    assert repeated_ack.json()["acked_at"] == acked.json()["acked_at"]
+
     refreshed = newapi_topup_client.get("/api/v1/account/me")
     assert refreshed.json()["balance_cents"] == 0
+
+
+def test_newapi_topup_checkout_does_not_render_user_identifier(
+    newapi_topup_client: TestClient,
+) -> None:
+    start = _start_topup(newapi_topup_client)
+
+    assert start.status_code == 200
+    assert "NewAPI 用户" not in start.text
+    assert re.search(r"<dd>\s*4\s*</dd>", start.text) is None
 
 
 def test_newapi_topup_rejects_bad_signature(newapi_topup_client: TestClient) -> None:
@@ -126,6 +159,20 @@ def test_newapi_topup_payment_config_error_returns_503(
 
     assert response.status_code == 503
     assert "微信支付暂不可用" in response.json()["detail"]
+
+
+def test_newapi_topup_rejects_expired_signed_intent(
+    newapi_topup_client: TestClient,
+) -> None:
+    payload, sig = _signed_payload(expires_in=timedelta(minutes=-1))
+
+    response = newapi_topup_client.get(
+        "/api/v1/newapi/topups/start",
+        params={"payload": payload, "sig": sig},
+    )
+
+    assert response.status_code == 422
+    assert "已过期" in response.json()["detail"]
 
 
 def test_newapi_topup_real_payment_redirects_with_verifiable_receipt(
@@ -189,9 +236,101 @@ def test_newapi_topup_real_payment_redirects_with_verifiable_receipt(
         assert verified.status_code == 200
         assert verified.json()["status"] == "verified"
 
+        acked = client.post(
+            "/api/v1/internal/newapi/topup-receipts/ack",
+            headers={"Authorization": "Bearer receipt-token"},
+            json={"intent_id": intent_id, "newapi_user_id": 4, "state": "state-1"},
+        )
+        assert acked.status_code == 200
+        assert acked.json()["status"] == "acked"
+
         duplicate_notify = client.post("/api/v1/billing/wechat/notify", content=b"{}")
         assert duplicate_notify.status_code == 200
         assert duplicate_notify.json() == {"code": "SUCCESS", "message": "success"}
+
+    get_settings.cache_clear()
+
+
+def test_newapi_topup_failed_payment_callback_is_ignored_without_receipt(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", str(tmp_path / "newapi-topup-failed.db"))
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_INTENT_SECRET", "intent-secret")
+    monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_RECEIPT_TOKEN", "receipt-token")
+    monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_DEV_MODE", "false")
+    payment = _FakePaymentGateway()
+    app = create_app()
+    app.dependency_overrides[get_payment_gateway] = lambda: payment
+
+    with TestClient(app) as client:
+        start = _start_topup(client)
+        assert start.status_code == 200
+        intent_id = _extract_intent_id(start.text)
+
+        payment.transaction = PaymentTransaction(
+            order_id=intent_id,
+            amount_cents=500,
+            provider_order_id="wx_tx_newapi_failed",
+            trade_state="CLOSED",
+        )
+        notified = client.post("/api/v1/billing/wechat/notify", content=b"{}")
+        assert notified.status_code == 200
+        assert notified.json() == {"code": "SUCCESS", "message": "ignored"}
+
+        completed = client.get(
+            f"/api/v1/newapi/topups/{intent_id}/complete",
+            follow_redirects=False,
+        )
+        assert completed.status_code == 400
+        assert "尚未支付" in completed.json()["detail"]
+
+    get_settings.cache_clear()
+
+
+def test_newapi_topup_rejects_real_payment_callback_after_intent_expiry(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    get_settings.cache_clear()
+    db = tmp_path / "newapi-topup-expired-real.db"
+    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", str(db))
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_INTENT_SECRET", "intent-secret")
+    monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_RECEIPT_TOKEN", "receipt-token")
+    monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_DEV_MODE", "false")
+    payment = _FakePaymentGateway()
+    app = create_app()
+    app.dependency_overrides[get_payment_gateway] = lambda: payment
+
+    with TestClient(app) as client:
+        start = _start_topup(client)
+        assert start.status_code == 200
+        intent_id = _extract_intent_id(start.text)
+        _expire_intent(db, intent_id)
+
+        payment.transaction = PaymentTransaction(
+            order_id=intent_id,
+            amount_cents=500,
+            provider_order_id="wx_tx_newapi_expired",
+            trade_state="SUCCESS",
+        )
+        notified = client.post("/api/v1/billing/wechat/notify", content=b"{}")
+        assert notified.status_code == 400
+        assert "已过期" in notified.json()["detail"]
+
+        with sqlite3.connect(db) as conn:
+            row = conn.execute(
+                """
+                SELECT status, receipt_code_hash, paid_at
+                FROM newapi_topup_intents
+                WHERE intent_id = ?
+                """,
+                (intent_id,),
+            ).fetchone()
+        assert row == ("pending", None, None)
 
     get_settings.cache_clear()
 
@@ -228,8 +367,8 @@ def _start_topup(client: TestClient):
     )
 
 
-def _signed_payload() -> tuple[str, str]:
-    expires_at = (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()
+def _signed_payload(*, expires_in: timedelta = timedelta(minutes=10)) -> tuple[str, str]:
+    expires_at = (datetime.now(timezone.utc) + expires_in).isoformat()
     return encode_signed_payload(
         "intent-secret",
         {
@@ -247,6 +386,16 @@ def _extract_intent_id(html: str) -> str:
     match = re.search(r"nup[0-9a-f]{29}", html)
     assert match is not None
     return match.group(0)
+
+
+def _expire_intent(db: Path, intent_id: str) -> None:
+    expired_at = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            "UPDATE newapi_topup_intents SET expires_at = ? WHERE intent_id = ?",
+            (expired_at, intent_id),
+        )
+        conn.commit()
 
 
 @dataclass
