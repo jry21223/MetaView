@@ -1,0 +1,104 @@
+/* Minimal classroom layer — intentionally loaded last. */
+
+.mv-root {
+  letter-spacing: -0.005em;
+}
+
+.mv-card,
+.mv-settings-section,
+.mv-pipeline-skeleton,
+.mv-right-placeholder,
+.mv-account-card,
+.mv-recharge-box,
+.mv-pay-panel,
+.mv-order-list {
+  box-shadow: none;
+}
+
+.mv-card,
+.mv-settings-section,
+.mv-history-item,
+.mv-commit-item,
+.mv-chat-input-wrap,
+.mv-intake-composer,
+.mv-tpl-card {
+  border-radius: 10px;
+}
+
+.mv-top {
+  background: color-mix(in oklab, var(--bg) 92%, white);
+}
+
+.mv-nav,
+.mv-chip,
+.mv-icon-btn,
+.playbook-ctrl-btn,
+.mv-text-input,
+.mv-intake-composer {
+  border-color: color-mix(in oklab, var(--line) 82%, var(--ink-3));
+}
+
+.mv-card-eyebrow,
+.mv-eyebrow,
+.mv-eyebrow-mini,
+.mv-stage-axis,
+.mv-pipeline-status,
+.mv-history-meta {
+  letter-spacing: 0.08em;
+}
+
+.mv-intake-title {
+  font-size: clamp(30px, 5vw, 44px);
+  font-weight: 650;
+}
+
+.mv-intake-sub,
+.mv-settings-sub,
+.mv-settings-section-hint,
+.mv-tpl-desc,
+.mv-msg-bubble {
+  line-height: 1.65;
+}
+
+.mv-intake-composer,
+.mv-chat-input-wrap,
+.mv-settings-section,
+.mv-card {
+  background: color-mix(in oklab, var(--surface) 94%, white);
+}
+
+.mv-subject-chip,
+.mv-pill,
+.mv-chip-primary,
+.mv-send,
+.mv-intake-send {
+  font-weight: 600;
+}
+
+.mv-stage-wrap,
+.playbook-player__stage {
+  background: #0f172a;
+}
+
+.mv-settings-router-grid,
+.mv-router-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.mv-router-mode-grid .mv-chip {
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  height: auto;
+  padding: 10px 12px;
+  gap: 2px;
+}
+
+@media (max-width: 720px) {
+  .mv-settings-router-grid,
+  .mv-router-mode-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
