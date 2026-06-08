@@ -1,6 +1,8 @@
 import { API_BASE_URL, readErrorMessage } from "../../../shared/api/httpClient";
 import type { PipelineRunResult } from "../../../entities/pipeline/types";
 
+export type SubmitRouterMode = "off" | "heuristic" | "llm" | "hybrid";
+
 export interface SubmitPipelineRequest {
   prompt: string;
   domain?: string | null;
@@ -9,6 +11,10 @@ export interface SubmitPipelineRequest {
   provider_api_key?: string | null;
   provider_base_url?: string | null;
   provider_model?: string | null;
+  router_mode?: SubmitRouterMode | null;
+  router_model?: string | null;
+  router_min_confidence?: number | null;
+  router_timeout_s?: number | null;
 }
 
 export interface SubmitPipelineResponse {
