@@ -57,7 +57,8 @@ class CodexAgentProvider:
             from openai_codex import AsyncCodex, Sandbox
         except ImportError as exc:
             raise AgentProviderError(
-                "openai-codex SDK is not installed; install apps/api/requirements.txt"
+                "openai-codex SDK is not installed; install the optional Codex SDK "
+                "before selecting METAVIEW_AGENT_PROVIDER=codex"
             ) from exc
 
         model = _coerce_model(provider_config) or self._model
