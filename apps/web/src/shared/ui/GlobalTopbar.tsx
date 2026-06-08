@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export type Stage = 'intake' | 'workbench' | 'history' | 'templates' | 'settings';
+export type Stage = 'dashboard' | 'intake' | 'workbench' | 'history' | 'templates' | 'settings';
 
 interface GlobalTopbarProps {
   stage: Stage;
@@ -32,6 +32,7 @@ export function GlobalTopbar({
   exportEnabled,
 }: GlobalTopbarProps) {
   const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
+  const isDashboard = stage === 'dashboard';
   const isWorkbench = stage === 'intake' || stage === 'workbench';
   const isHistory = stage === 'history';
   const isTemplates = stage === 'templates';
@@ -50,6 +51,14 @@ export function GlobalTopbar({
       </div>
 
       <nav className="mv-nav">
+        {appEdition === 'ops' && (
+          <button
+            className={`mv-nav-item${isDashboard ? ' is-active' : ''}`}
+            onClick={() => onNavigate('dashboard')}
+          >
+            运营面板
+          </button>
+        )}
         <button
           className={`mv-nav-item${isWorkbench ? ' is-active' : ''}`}
           onClick={() => onNavigate('intake')}

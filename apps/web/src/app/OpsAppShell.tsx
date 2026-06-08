@@ -7,6 +7,7 @@ import { IntakeScreen, IntakeContext } from '../features/studio-editor/ui/Intake
 import { TweaksPanel } from '../features/studio-editor/ui/TweaksPanel';
 import { StudioPage } from '../pages/Studio/StudioPage';
 import { HistoryPage } from '../pages/History/HistoryPage';
+import { OpsDashboardPage } from '../pages/OpsDashboard/OpsDashboardPage';
 import { TemplatesPage } from '../pages/Templates/TemplatesPage';
 import { SettingsPage } from '../pages/Settings/SettingsPage';
 import { usePipelineSubmit } from '../features/pipeline/hooks/usePipelineSubmit';
@@ -14,7 +15,7 @@ import type { Stage } from '../shared/ui/GlobalTopbar';
 
 export function OpsAppShell() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const [stage, setStage] = useState<Stage>('intake');
+  const [stage, setStage] = useState<Stage>('dashboard');
   const [accountModalOpen, setAccountModalOpen] = useState(false);
   const [openedRunId, setOpenedRunId] = useState<string | null>(null);
   const { submit, runId, isSubmitting, error: submitError } = usePipelineSubmit();
@@ -57,6 +58,18 @@ export function OpsAppShell() {
       data-theme={t.theme}
       style={css}
     >
+      {stage === 'dashboard' && (
+        <ErrorBoundary theme={mode}>
+          <OpsDashboardPage
+            accountBalanceYuan={account?.balance_yuan ?? null}
+            accountName={account?.display_name ?? null}
+            accountAvatarUrl={accountAvatarUrl}
+            onNavigate={setStage}
+            onOpenProviderSettings={openAccountPanel}
+          />
+        </ErrorBoundary>
+      )}
+
       {stage === 'intake' && (
         <IntakeScreen
           appEdition="ops"
