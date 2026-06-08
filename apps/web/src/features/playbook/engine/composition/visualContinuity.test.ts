@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { MathSceneSnapshot, MetaStep, PlaybookScript } from "../types";
-import { compileVisualTimeline, normaliseVisualLayers, visualStepKey } from "./visualContinuity";
+import type { Layer, MathSceneSnapshot, MetaStep, PlaybookScript } from "../types";
+import {
+  compileVisualTimeline,
+  normaliseVisualLayers,
+  semanticVisualKey,
+  visualStepKey,
+} from "./visualContinuity";
 
 function mathStep(overrides: Partial<MetaStep> = {}): MetaStep {
   return {
@@ -69,7 +74,7 @@ describe("visualContinuity", () => {
     expect(visualStepKey(a)).toBe(visualStepKey(b));
   });
 
-  it("changes the key when visual plot fields change", () => {
+  it("keeps the stage-main key when visual plot fields change", () => {
     const base = mathStep();
     const expressionChanged = mathStep({
       snapshot: {
@@ -103,14 +108,14 @@ describe("visualContinuity", () => {
       },
     });
 
-    expect(visualStepKey(base)).not.toBe(visualStepKey(expressionChanged));
-    expect(visualStepKey(base)).not.toBe(visualStepKey(rangeChanged));
-    expect(visualStepKey(base)).not.toBe(visualStepKey(paramsChanged));
+    expect(visualStepKey(base)).toBe(visualStepKey(expressionChanged));
+    expect(visualStepKey(base)).toBe(visualStepKey(rangeChanged));
+    expect(visualStepKey(base)).toBe(visualStepKey(paramsChanged));
   });
 
-  it("continues only across adjacent matching steps", () => {
+  it("continues adjacent stage layers across body-only changes", () => {
     const first = mathStep({ step_id: "s1", end_frame: 60 });
-    const different = mathStep({
+    const bodyChanged = mathStep({
       step_id: "s2",
       end_frame: 120,
       snapshot: {
@@ -123,12 +128,58 @@ describe("visualContinuity", () => {
       },
     });
     const sameAsFirst = mathStep({ step_id: "s3", end_frame: 180 });
-    const timeline = compileVisualTimeline(script([first, different, sameAsFirst]));
+    const timeline = compileVisualTimeline(script([first, bodyChanged, sameAsFirst]));
 
     expect(timeline.steps[0].isVisualContinuation).toBe(false);
+    expect(timeline.steps[1].isVisualContinuation).toBe(true);
+    expect(timeline.steps[1].layers[0].isVisualContinuation).toBe(true);
+    expect(timeline.steps[1].layers[0].visualStartFrame).toBe(0);
+    expect(timeline.steps[2].isVisualContinuation).toBe(true);
+    expect(timeline.steps[2].layers[0].isVisualContinuation).toBe(true);
+  });
+
+  it("changes semantic stage identity when the snapshot kind changes", () => {
+    const first = mathStep({ step_id: "s1", end_frame: 60 });
+    const kindChanged = mathStep({
+      step_id: "s2",
+      end_frame: 120,
+      snapshot: {
+        kind: "math_formula",
+        formula_latex: "x^2",
+      },
+    });
+    const timeline = compileVisualTimeline(script([first, kindChanged]));
+
     expect(timeline.steps[1].isVisualContinuation).toBe(false);
-    expect(timeline.steps[2].isVisualContinuation).toBe(false);
-    expect(timeline.steps[2].visualStartFrame).toBe(120);
+    expect(timeline.steps[1].layers[0].isVisualContinuation).toBe(false);
+    expect(timeline.steps[1].layers[0].visualStartFrame).toBe(60);
+  });
+
+  it("derives semantic layer keys from id or role instead of body content", () => {
+    const baseLayer: Layer = {
+      timing: { enter_at: 0, exit_at: 1, appear_anim: "fade", z_order: 0 },
+      body: mathStep().snapshot,
+    };
+    const changedLayer: Layer = {
+      ...baseLayer,
+      body: {
+        kind: "math_plot",
+        curves: [{ expression: "sin(x)", label: "g(x)", emphasis: "secondary" }],
+        x_min: -4,
+        x_max: 4,
+        x_label: "x",
+        y_label: "y",
+      },
+    };
+    const explicitIdLayer = {
+      ...changedLayer,
+      id: "primary-plot",
+    } as Layer;
+
+    expect(semanticVisualKey(baseLayer, 0, "stage-main")).toBe("math_plot:stage-main:0");
+    expect(semanticVisualKey(changedLayer, 0, "stage-main")).toBe("math_plot:stage-main:0");
+    expect(semanticVisualKey(changedLayer, 1, "overlay")).toBe("math_plot:overlay:0:1");
+    expect(semanticVisualKey(explicitIdLayer, 0, "stage-main")).toBe("math_plot:id:primary-plot");
   });
 
   it("reuses visual layer start frames for adjacent matching layer bodies", () => {

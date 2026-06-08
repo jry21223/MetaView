@@ -471,6 +471,7 @@ export interface LayerTiming {
 
 /** Composable visual unit within a step. */
 export interface Layer {
+  id?: string;
   timing: LayerTiming;
   body: AnySnapshot;
 }

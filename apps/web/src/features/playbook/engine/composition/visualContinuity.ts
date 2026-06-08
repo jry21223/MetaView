@@ -7,6 +7,7 @@ import type {
   PlaybookScript,
 } from "../types";
 import { normaliseTiming } from "../foundation/useTimeline";
+import { snapshotSurface } from "./snapshotSurface";
 
 const DEFAULT_LAYER: Pick<Layer, "timing"> = {
   timing: { enter_at: 0, exit_at: 1, appear_anim: "none", z_order: 0 },
@@ -33,6 +34,8 @@ export interface VisualStepState {
 export interface VisualTimeline {
   steps: VisualStepState[];
 }
+
+export type SemanticVisualLayerRole = "stage-main" | "stage-overlay" | "overlay";
 
 function stableNormalize(value: unknown): unknown {
   if (value === undefined) return undefined;
@@ -207,20 +210,31 @@ export function normaliseVisualLayers(step: MetaStep): Layer[] {
   return out;
 }
 
-function layerBaseKey(layer: Layer): string {
-  return stableStringify({
-    z_order: layer.timing.z_order,
-    body: layer.body,
-  });
+export function semanticVisualKey(
+  layer: Layer,
+  index: number,
+  role: SemanticVisualLayerRole,
+): string {
+  const explicitId = typeof layer.id === "string" ? layer.id.trim() : "";
+  if (explicitId) return `${layer.body.kind}:id:${explicitId}`;
+  if (role === "stage-main") return `${layer.body.kind}:stage-main:${layer.timing.z_order}`;
+  return `${layer.body.kind}:${role}:${layer.timing.z_order}:${index}`;
 }
 
 function countedLayerKeys(layers: Layer[]): Array<{ layer: Layer; visualKey: string }> {
   const counts = new Map<string, number>();
-  return layers.map((layer) => {
-    const base = layerBaseKey(layer);
+  const firstStageIndex = layers.findIndex((layer) => snapshotSurface(layer.body.kind) === "stage");
+  return layers.map((layer, index) => {
+    const role: SemanticVisualLayerRole =
+      snapshotSurface(layer.body.kind) === "overlay"
+        ? "overlay"
+        : index === firstStageIndex
+          ? "stage-main"
+          : "stage-overlay";
+    const base = semanticVisualKey(layer, index, role);
     const count = counts.get(base) ?? 0;
     counts.set(base, count + 1);
-    return { layer, visualKey: `${base}#${count}` };
+    return { layer, visualKey: count === 0 ? base : `${base}#${count}` };
   });
 }
 

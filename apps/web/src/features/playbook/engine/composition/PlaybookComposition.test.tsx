@@ -346,6 +346,10 @@ function firstPolylinePointCount(markup: string): number {
   return match[1].trim().split(/\s+/).length;
 }
 
+function layerOpenTag(markup: string, kind: string): string {
+  return markup.match(new RegExp(`<div[^>]*data-layer-kind="${kind}"[^>]*>`))?.[0] ?? "";
+}
+
 describe("PlaybookComposition", () => {
   beforeEach(() => {
     remotionState.frame = 0;
@@ -485,7 +489,7 @@ describe("PlaybookComposition", () => {
     expect(markup).toContain('data-visual-continuation="true"');
   });
 
-  it("restarts math plot geometry when the visual snapshot changes", () => {
+  it("keeps the semantic stage layer mounted when the visual snapshot changes", () => {
     const script = twoStepScript(
       step({
         id: "s1",
@@ -506,8 +510,51 @@ describe("PlaybookComposition", () => {
     remotionState.frame = 60;
     const markup = renderToStaticMarkup(<PlaybookComposition script={script} showSubtitles={false} />);
 
-    expect(firstPolylinePointCount(markup)).toBeLessThanOrEqual(3);
-    expect(markup).toContain('data-visual-continuation="false"');
+    expect(firstPolylinePointCount(markup)).toBeGreaterThan(100);
+    expect(markup).toContain('data-visual-continuation="true"');
+  });
+
+  it("renders the new step base layer opaque over a stable stage background at the boundary", () => {
+    const script = twoStepScript(
+      step({
+        id: "s1",
+        endFrame: 60,
+        title: "先看抛物线",
+        voiceover: "第一段说明",
+        snapshot: plotSnapshot("x^2"),
+        layers: [
+          {
+            timing: { enter_at: 0, exit_at: 1, appear_anim: "fade", z_order: 0 },
+            body: plotSnapshot("x^2"),
+          },
+        ],
+      }),
+      step({
+        id: "s2",
+        endFrame: 120,
+        title: "切换到正弦",
+        voiceover: "第二段说明",
+        snapshot: plotSnapshot("sin(x)"),
+        layers: [
+          {
+            timing: { enter_at: 0, exit_at: 1, appear_anim: "fade", z_order: 0 },
+            body: plotSnapshot("sin(x)"),
+          },
+        ],
+      }),
+    );
+
+    remotionState.frame = 60;
+    const markup = renderToStaticMarkup(
+      <PlaybookComposition script={script} showSubtitles={false} theme="dark" />,
+    );
+    const baseLayer = layerOpenTag(markup, "math_plot");
+
+    expect(markup).toContain("scene-compositor");
+    expect(markup).toContain("background:#0f1117");
+    expect(baseLayer).not.toBe("");
+    expect(baseLayer).toContain("opacity:1");
+    expect(baseLayer).not.toContain("opacity:0");
   });
 
   it("keeps an unchanged layer drawn while a new layer enters", () => {

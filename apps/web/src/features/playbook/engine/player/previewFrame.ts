@@ -9,16 +9,11 @@ export function resolveInitialPreviewFrame(script: PlaybookScript): number {
 
 export function resolvePlayerTimelineKey(script: PlaybookScript): string {
   const fingerprint = JSON.stringify({
-    domain: script.domain,
     fps: script.fps,
     total_frames: script.total_frames,
-    title: script.title,
     steps: script.steps.map((step) => ({
       step_id: step.step_id,
       end_frame: step.end_frame,
-      title: step.title,
-      snapshot: step.snapshot,
-      layers: step.layers,
     })),
   });
   let hash = 0;
