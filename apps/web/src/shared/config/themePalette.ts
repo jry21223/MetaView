@@ -30,7 +30,7 @@ export interface ThemePalette {
   warn: string;
 }
 
-const DEFAULT_ACCENT = "#2563eb";
+const DEFAULT_ACCENT = "#10b981";
 
 /**
  * Identifier for every theme MetaView knows about. The pair "dark" / "light"
@@ -69,30 +69,30 @@ export interface ThemeDescriptor extends ThemePalette {
 
 export const THEME_PALETTE: Record<ThemeName, ThemeDescriptor> = {
   dark: {
-    label: "Chalk Dark",
+    label: "Dark",
     type: "dark",
-    surface2: "#111827",
-    ink: "#f3f4f6",
-    ink2: "#cbd5e1",
-    ink3: "#64748b",
-    line: "#263244",
-    line2: "#334155",
+    surface2: "#0e1412",
+    ink: "#e8efe9",
+    ink2: "#9ba8a0",
+    ink3: "#5b6862",
+    line: "#1d2a23",
+    line2: "#27332c",
     accent: DEFAULT_ACCENT,
     accentSoft: `${DEFAULT_ACCENT}26`,
-    warn: "#d97706",
+    warn: "#e9a23b",
   },
   light: {
-    label: "Classroom Light",
+    label: "Light",
     type: "light",
-    surface2: "#fbf7ee",
-    ink: "#1f2937",
-    ink2: "#667085",
-    ink3: "#98a2b3",
-    line: "#e7dcc6",
-    line2: "#d8c8aa",
+    surface2: "#faf8f3",
+    ink: "#161a18",
+    ink2: "#5d655f",
+    ink3: "#9aa39d",
+    line: "#e6e2d5",
+    line2: "#d6d1c2",
     accent: DEFAULT_ACCENT,
-    accentSoft: `${DEFAULT_ACCENT}20`,
-    warn: "#c2410c",
+    accentSoft: `${DEFAULT_ACCENT}26`,
+    warn: "#e9a23b",
   },
   monokai: {
     label: "Monokai",
@@ -103,7 +103,7 @@ export const THEME_PALETTE: Record<ThemeName, ThemeDescriptor> = {
     ink3: "#75715e",
     line: "#3e3d32",
     line2: "#49483e",
-    accent: "#f92672",
+    accent: "#f92672", // signature pink
     accentSoft: "#f9267226",
     warn: "#fd971f",
   },
