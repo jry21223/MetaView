@@ -131,6 +131,13 @@ make check
 | `METAVIEW_HISTORY_DB_PATH` | `data/pipeline_runs.db` | SQLite 路径 |
 | `METAVIEW_WECHAT_NOTIFY_MAX_SKEW_S` | `300` | 微信支付回调时间戳允许偏移秒数 |
 | `METAVIEW_WECHAT_NOTIFY_REPLAY_TTL_S` | `600` | 微信支付回调重放缓存保留秒数 |
+| `METAVIEW_PAYMENT_GATEWAY` | `wechat` | 支付网关选择：`wechat` / `easypay` |
+| `METAVIEW_EPAY_SUBMIT_URL` | - | 开启 `easypay` 时的收银台提交地址 |
+| `METAVIEW_EPAY_MERCHANT_ID` | - | 开启 `easypay` 时的平台商户ID |
+| `METAVIEW_EPAY_API_KEY` | - | 开启 `easypay` 时的签名密钥 |
+| `METAVIEW_EPAY_PAY_TYPE` | `alipay` | 开启 `easypay` 时创建订单的支付类型 |
+| `METAVIEW_EPAY_NOTIFY_URL` | - | 开启 `easypay` 时的回调通知地址 |
+| `METAVIEW_EPAY_RETURN_URL` | - | 开启 `easypay` 时可选的完成页跳转地址 |
 | `METAVIEW_PLAYBOOK_DEFAULT_FPS` | `30` | Remotion 默认帧率 |
 | `METAVIEW_PLAYBOOK_COMPOSITION_WIDTH` / `_HEIGHT` | `960` / `540` | 默认画布 |
 | `METAVIEW_CORS_ORIGIN_REGEX` | localhost 正则 | 允许的浏览器来源 |

@@ -118,7 +118,7 @@ class NewApiTopupUseCase:
         )
         if not self._settings.newapi_topup_dev_mode:
             if not self._payment.configured:
-                raise NewApiTopupPaymentError("微信支付未配置，暂时不能充值")
+                raise NewApiTopupPaymentError("易支付未配置，暂时不能充值")
             try:
                 native = await self._payment.create_native_order(
                     order_id=intent.order_id,
@@ -126,7 +126,7 @@ class NewApiTopupUseCase:
                     description=f"NewAPI 额度充值 {money_from_cents(intent.amount_cents)} 元",
                 )
             except RuntimeError as exc:
-                raise NewApiTopupPaymentError("微信支付暂不可用，请稍后重试") from exc
+                raise NewApiTopupPaymentError("易支付暂不可用，请稍后重试") from exc
             updated = await self._repo.attach_payment_info(
                 intent.intent_id,
                 code_url=native.code_url,
@@ -194,7 +194,7 @@ class NewApiTopupUseCase:
             receipt_code_hash=_hash_receipt(receipt_code),
         )
         if paid is None or paid.status != "paid":
-            raise NewApiTopupPaymentError("微信支付回调金额或订单状态不匹配")
+            raise NewApiTopupPaymentError("易支付回调金额或订单状态不匹配")
         return "success"
 
     async def complete_paid_redirect(self, intent_id: str) -> NewApiTopupPaid:

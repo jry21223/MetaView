@@ -8,12 +8,14 @@ _ALL_DOMAINS = "algorithm,math,code,physics,chemistry,biology,geography"
 
 GenerationMode = Literal["single", "agent"]
 AgentProviderKind = Literal["http", "codex"]
+PaymentGatewayKind = Literal["wechat", "easypay"]
 AppEdition = Literal["self", "ops"]
 RouterMode = Literal["off", "heuristic", "llm", "hybrid"]
 _GENERATION_MODES: frozenset[str] = frozenset(("single", "agent"))
 _AGENT_PROVIDERS: frozenset[str] = frozenset(("http", "codex"))
 _APP_EDITIONS: frozenset[str] = frozenset(("self", "ops"))
 _ROUTER_MODES: frozenset[str] = frozenset(("off", "heuristic", "llm", "hybrid"))
+_PAYMENT_GATEWAYS: frozenset[str] = frozenset(("wechat", "easypay"))
 
 
 class Settings(BaseSettings):
@@ -140,6 +142,22 @@ class Settings(BaseSettings):
     wechat_notify_max_skew_s: int = 300
     wechat_notify_replay_ttl_s: int = 600
 
+    # Pluggable payment gateway (wechat/easypay)
+    payment_gateway: PaymentGatewayKind = "wechat"
+    # Legacy Epay-compatible fields
+    easypay_submit_url: str | None = None
+    easypay_merchant_id: str | None = None
+    easypay_api_key: str | None = None
+    # Preferred Epay-compatible fields
+    easypay_api_base: str | None = None
+    easypay_submit_path: str = "/submit.php"
+    easypay_pid: str | None = None
+    easypay_key: str | None = None
+    easypay_sign_type: str = "MD5"
+    easypay_pay_type: str = "alipay"
+    easypay_notify_url: str | None = None
+    easypay_return_url: str | None = None
+
     # NewAPI redirect top-up bridge (local/dev checkout integration)
     newapi_topup_intent_secret: str | None = None
     newapi_topup_receipt_token: str | None = None
@@ -189,6 +207,16 @@ class Settings(BaseSettings):
         normalized = value.strip().lower()
         if normalized not in _GENERATION_MODES:
             return "single"
+        return normalized  # type: ignore[return-value]
+
+    @field_validator("payment_gateway", mode="before")
+    @classmethod
+    def normalize_payment_gateway(cls, value: str | None) -> PaymentGatewayKind:
+        if value is None:
+            return "wechat"
+        normalized = value.strip().lower()
+        if normalized not in _PAYMENT_GATEWAYS:
+            return "wechat"
         return normalized  # type: ignore[return-value]
 
     @field_validator("router_mode", mode="before")

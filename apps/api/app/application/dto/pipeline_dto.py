@@ -49,7 +49,13 @@ class PipelineRequest(BaseModel):
             raise ValueError("router_mode must be off, heuristic, llm, or hybrid")
         return normalized
 
-    @field_validator("provider_api_key", "provider_base_url", "provider_model", "router_model", mode="before")
+    @field_validator(
+        "provider_api_key",
+        "provider_base_url",
+        "provider_model",
+        "router_model",
+        mode="before",
+    )
     @classmethod
     def normalize_optional_string(cls, value):
         if value is None:

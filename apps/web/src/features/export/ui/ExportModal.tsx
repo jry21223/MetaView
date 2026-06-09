@@ -119,7 +119,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ runId, isDark, preview
       if (elapsedTimer.current !== null) window.clearInterval(elapsedTimer.current);
       elapsedTimer.current = null;
     };
-  }, [isWorking, job?.created_at]);
+  }, [isWorking, job]);
 
   const pollUntilDone = (jobId: string): void => {
     const deadline = Date.now() + POLL_TIMEOUT_MS;

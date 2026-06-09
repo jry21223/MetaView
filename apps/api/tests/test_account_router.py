@@ -14,6 +14,7 @@ from app.domain.models.account import NativePaymentOrder, OAuthIdentity, Payment
 from app.infrastructure.persistence.db_init import init_db
 from app.infrastructure.persistence.sqlite_account_repository import SqliteAccountRepository
 from app.main import create_app
+from app.presentation.dependencies import get_payment_gateway
 
 
 def test_app_edition_defaults_and_normalizes(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -60,7 +61,7 @@ def test_recharge_validates_minimum_before_payment_config(account_client: TestCl
         json={"amount_yuan": "5.00"},
     )
     assert unconfigured.status_code == 503
-    assert "微信支付未配置" in unconfigured.json()["detail"]
+    assert "易支付未配置" in unconfigured.json()["detail"]
 
 
 def test_recharge_payment_config_error_returns_503(
@@ -70,14 +71,13 @@ def test_recharge_payment_config_error_returns_503(
     get_settings.cache_clear()
     monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", str(tmp_path / "account-payment.db"))
     monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
-    monkeypatch.setenv("METAVIEW_WECHAT_PAY_APPID", "wx-app")
-    monkeypatch.setenv("METAVIEW_WECHAT_PAY_MCHID", "mch")
-    monkeypatch.setenv("METAVIEW_WECHAT_PAY_MERCHANT_SERIAL_NO", "serial")
-    monkeypatch.setenv("METAVIEW_WECHAT_PAY_NOTIFY_URL", "https://metaview.top/api/v1/billing/wechat/notify")
-    monkeypatch.setenv("METAVIEW_WECHAT_PAY_API_V3_KEY", "x" * 32)
-    monkeypatch.setenv("METAVIEW_WECHAT_PAY_PRIVATE_KEY_PATH", str(tmp_path / "missing.pem"))
-    monkeypatch.setenv("METAVIEW_WECHAT_PAY_PLATFORM_PUBLIC_KEY_PATH", str(tmp_path / "pub.pem"))
+    monkeypatch.setenv("METAVIEW_PAYMENT_GATEWAY", "easypay")
+    monkeypatch.setenv("METAVIEW_EPAY_SUBMIT_URL", "https://pay.example.com/submit.php")
+    monkeypatch.setenv("METAVIEW_EPAY_PID", "pid")
+    monkeypatch.setenv("METAVIEW_EPAY_KEY", "secret")
+    monkeypatch.setenv("METAVIEW_EPAY_NOTIFY_URL", "https://metaview.top/api/v1/billing/epay/notify")
     app = create_app()
+    app.dependency_overrides[get_payment_gateway] = lambda: _FailingPaymentGateway()
     with TestClient(app) as client:
         response = client.post(
             "/api/v1/account/recharge-orders",
@@ -86,7 +86,7 @@ def test_recharge_payment_config_error_returns_503(
     get_settings.cache_clear()
 
     assert response.status_code == 503
-    assert "微信支付暂不可用" in response.json()["detail"]
+    assert "易支付暂不可用" in response.json()["detail"]
 
 
 def test_list_recharge_orders_starts_empty(account_client: TestClient) -> None:
@@ -106,7 +106,7 @@ async def test_recharge_order_id_matches_wechat_pay_limits(tmp_path: Path) -> No
     order = await repo.create_recharge_order(
         session.account.user_id,
         500,
-        channel="wechat_native",
+        channel="epay",
     )
 
     assert len(order.order_id) <= 32
@@ -124,7 +124,7 @@ async def test_wechat_binding_merges_guest_balance(tmp_path: Path) -> None:
     order = await repo.create_recharge_order(
         paying_guest.account.user_id,
         500,
-        channel="wechat_native",
+        channel="epay",
     )
     await repo.mark_order_paid(
         order_id=order.order_id,
@@ -180,6 +180,26 @@ class _FakePaymentGateway:
         return self.transaction
 
 
+class _FailingPaymentGateway:
+    configured = True
+
+    async def create_native_order(
+        self,
+        *,
+        order_id: str,
+        amount_cents: int,
+        description: str,
+    ) -> NativePaymentOrder:
+        raise RuntimeError("payment provider unavailable")
+
+    def decode_notification(
+        self,
+        headers: dict[str, str],
+        body: bytes,
+    ) -> PaymentTransaction:
+        raise AssertionError("notification should not happen in this test")
+
+
 class _DisabledOAuthClient:
     configured = False
 
@@ -199,7 +219,7 @@ async def test_payment_notification_is_idempotent_and_checks_amount(tmp_path: Pa
     order = await repo.create_recharge_order(
         session.account.user_id,
         500,
-        channel="wechat_native",
+        channel="epay",
     )
     payment = _FakePaymentGateway(
         PaymentTransaction(
@@ -224,7 +244,7 @@ async def test_payment_notification_is_idempotent_and_checks_amount(tmp_path: Pa
     mismatch = await repo.create_recharge_order(
         session.account.user_id,
         500,
-        channel="wechat_native",
+        channel="epay",
     )
     payment.transaction = PaymentTransaction(
         order_id=mismatch.order_id,

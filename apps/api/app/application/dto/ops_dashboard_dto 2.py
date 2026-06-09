@@ -4,7 +4,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-
 MetricTrend = Literal["up", "down", "neutral"]
 HealthStatus = Literal["ok", "warn", "bad", "neutral"]
 

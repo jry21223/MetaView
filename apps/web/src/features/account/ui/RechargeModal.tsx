@@ -208,7 +208,7 @@ export function RechargeModal({ account, onRefreshAccount, onClose }: RechargeMo
               账户与充值
             </div>
             <div className="mv-account-modal__sub">
-              微信支付 Native 充值，最低 {minYuan} 元；余额按基础生成消耗
+              易支付充值，最低 {minYuan} 元；余额按基础生成消耗
             </div>
           </div>
           <button
@@ -305,8 +305,9 @@ export function RechargeModal({ account, onRefreshAccount, onClose }: RechargeMo
 
           {!account?.payment_enabled && (
             <div className="mv-account-note">
-              微信支付尚未配置。需要设置微信支付商户号、支付 AppID、商户 API
-              私钥或证书路径、证书序列号、APIv3 Key 和支付回调 URL 后才能创建真实订单。
+              易支付尚未配置。请配置：METAVIEW_EPAY_PID、METAVIEW_EPAY_KEY、
+              METAVIEW_EPAY_API_BASE + METAVIEW_EPAY_SUBMIT_PATH（或 METAVIEW_EPAY_SUBMIT_URL）、
+              METAVIEW_EPAY_NOTIFY_URL，以及可选 METAVIEW_EPAY_RETURN_URL，才能创建真实订单。
             </div>
           )}
         </section>
@@ -318,6 +319,15 @@ export function RechargeModal({ account, onRefreshAccount, onClose }: RechargeMo
               <div className="mv-pay-panel__amount">¥ {activeOrder.amount_yuan}</div>
               <div className="mv-account-note">状态：{activeOrder.status}</div>
             </div>
+            {activeOrder.code_url && (
+              <button
+                type="button"
+                className="mv-chip"
+                onClick={() => window.open(activeOrder.code_url as string, "_blank")}
+              >
+                打开支付链接
+              </button>
+            )}
             {qrSvg && activeOrder.status === "pending" && (
               <div className="mv-pay-panel__qr" dangerouslySetInnerHTML={{ __html: qrSvg }} />
             )}

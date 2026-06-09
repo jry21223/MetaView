@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response
-from fastapi.responses import RedirectResponse
+from fastapi.responses import PlainTextResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from starlette.requests import Request
 
@@ -263,19 +263,53 @@ async def wechat_pay_notify(
     use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
     newapi_topup: Annotated[NewApiTopupUseCase, Depends(get_newapi_topup_use_case)],
 ) -> dict[str, str]:
-    body = await request.body()
     try:
-        transaction = payment.decode_notification(dict(request.headers), body)
-        result = await use_case.handle_payment_transaction(transaction)
-    except PaymentOrderNotFoundError:
-        try:
-            result = await newapi_topup.handle_payment_transaction(transaction)
-        except NewApiTopupOrderNotFoundError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        except NewApiTopupPaymentError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        result = await _handle_payment_notification(request, payment, use_case, newapi_topup)
+    except PaymentOrderNotFoundError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except NewApiTopupOrderNotFoundError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except PaymentNotificationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except NewApiTopupPaymentError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=400, detail=f"微信支付回调验签/解密失败: {exc}") from exc
     return {"code": "SUCCESS", "message": result}
+
+
+@router.post("/billing/epay/notify")
+async def epay_notify(
+    request: Request,
+    payment: Annotated[IPaymentGateway, Depends(get_payment_gateway)],
+    use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
+    newapi_topup: Annotated[NewApiTopupUseCase, Depends(get_newapi_topup_use_case)],
+) -> PlainTextResponse:
+    try:
+        await _handle_payment_notification(request, payment, use_case, newapi_topup)
+    except PaymentOrderNotFoundError:
+        return PlainTextResponse("fail", status_code=400)
+    except NewApiTopupOrderNotFoundError:
+        return PlainTextResponse("fail", status_code=400)
+    except PaymentNotificationError:
+        return PlainTextResponse("fail", status_code=400)
+    except NewApiTopupPaymentError:
+        return PlainTextResponse("fail", status_code=400)
+    except RuntimeError:
+        return PlainTextResponse("fail", status_code=400)
+    return PlainTextResponse("success")
+
+
+async def _handle_payment_notification(
+    request: Request,
+    payment: Annotated[IPaymentGateway, Depends(get_payment_gateway)],
+    use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
+    newapi_topup: Annotated[NewApiTopupUseCase, Depends(get_newapi_topup_use_case)],
+) -> str:
+    body = await request.body()
+    transaction = payment.decode_notification(dict(request.headers), body)
+    try:
+        result = await use_case.handle_payment_transaction(transaction)
+    except PaymentOrderNotFoundError:
+        result = await newapi_topup.handle_payment_transaction(transaction)
+    return result

@@ -171,13 +171,13 @@ class AccountUseCase:
         except ValueError as exc:
             raise AmountValidationError(str(exc)) from exc
         if not self._payment.configured:
-            raise PaymentNotConfiguredError("微信支付未配置，暂时不能充值")
+            raise PaymentNotConfiguredError("易支付未配置，暂时不能充值")
 
         session = await self.get_or_create_session(token)
         order = await self._repo.create_recharge_order(
             session.account.user_id,
             amount_cents,
-            channel="wechat_native",
+            channel="epay",
         )
         try:
             native = await self._payment.create_native_order(
@@ -186,7 +186,7 @@ class AccountUseCase:
                 description=f"MetaView 账户充值 {money_from_cents(order.amount_cents)} 元",
             )
         except RuntimeError as exc:
-            raise PaymentNotConfiguredError("微信支付暂不可用，请稍后重试") from exc
+            raise PaymentNotConfiguredError("易支付暂不可用，请稍后重试") from exc
         order = await self._repo.attach_order_payment_info(
             order.order_id,
             code_url=native.code_url,
@@ -225,7 +225,7 @@ class AccountUseCase:
             paid_at=paid_at,
         )
         if order is None:
-            raise PaymentOrderNotFoundError("微信支付回调订单不存在")
+            raise PaymentOrderNotFoundError("易支付回调订单不存在")
         if order.status != "paid":
-            raise PaymentNotificationError("微信支付回调金额或订单状态不匹配")
+            raise PaymentNotificationError("易支付回调金额或订单状态不匹配")
         return "success"

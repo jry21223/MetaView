@@ -74,8 +74,8 @@ describe("RechargeModal", () => {
     );
 
     expect((getByRole("button", { name: "充值" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(getByText(/微信支付尚未配置/)).toBeTruthy();
-    expect(getByText(/微信开放平台网站应用/)).toBeTruthy();
+    expect(getByText(/易支付尚未配置/)).toBeTruthy();
+    expect(getByText(/METAVIEW_EPAY_/)).toBeTruthy();
     expect(getByText("约 50 次")).toBeTruthy();
     expect(getByText(/当前约可支持 100 次基础生成/)).toBeTruthy();
   });
@@ -94,9 +94,9 @@ describe("RechargeModal", () => {
             amount_cents: 500,
             amount_yuan: "5.00",
             status: "pending",
-            channel: "wechat_native",
+            channel: "epay",
             provider_order_id: null,
-            code_url: "weixin://wxpay/test",
+            code_url: "https://pay.example.com/submit.php?token=abc",
             created_at: "now",
             paid_at: null,
           },

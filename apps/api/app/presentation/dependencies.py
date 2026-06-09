@@ -24,6 +24,7 @@ from app.infrastructure.agent.codex_agent_provider import CodexAgentProvider
 from app.infrastructure.agent.http_agent_provider import HttpAgentProvider
 from app.infrastructure.auth.wechat_oauth import WeChatOAuthClient
 from app.infrastructure.llm.openai_provider import OpenAIProvider
+from app.infrastructure.payment.easy_pay import EasyPayClient
 from app.infrastructure.payment.wechat_pay import WeChatPayClient
 from app.infrastructure.persistence.in_memory_export_repository import (
     InMemoryExportJobRepository,
@@ -121,6 +122,8 @@ def get_ops_dashboard_repo(
 def get_payment_gateway(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> IPaymentGateway:
+    if settings.payment_gateway == "easypay":
+        return EasyPayClient(settings)
     return WeChatPayClient(settings)
 
 

@@ -210,8 +210,11 @@ def _checkout_html(request: Request, intent: NewApiTopupIntent, dev_mode: bool) 
         """
         if dev_mode
         else f"""
-        <p class="hint">微信 Native 支付二维码地址</p>
+        <p class="hint">易支付收银台链接</p>
         <code>{code_url}</code>
+        <form method="get" action="{code_url}" target="_blank">
+            <button type="submit">打开支付链接</button>
+        </form>
         <form method="get" action="{complete_action}">
             <button type="submit">已完成支付，返回 NewAPI</button>
         </form>
