@@ -18,6 +18,12 @@ class PipelineRequest(BaseModel):
     provider_api_key: str | None = None
     provider_base_url: str | None = None
     provider_model: str | None = None
+    # Per-request router override. This lets the self-hosted Settings page pick
+    # a small/cheap router model independently from the generation model.
+    router_mode: str | None = None
+    router_model: str | None = None
+    router_min_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    router_timeout_s: float | None = Field(default=None, ge=1.0, le=60.0)
 
     @field_validator("skill_mode_override", mode="before")
     @classmethod
@@ -30,6 +36,26 @@ class PipelineRequest(BaseModel):
         if normalized not in {"auto", "specialized", "generic"}:
             raise ValueError("skill_mode_override must be auto, specialized, or generic")
         return normalized
+
+    @field_validator("router_mode", mode="before")
+    @classmethod
+    def normalize_router_mode(cls, value):
+        if value is None:
+            return None
+        normalized = str(value).strip().lower()
+        if not normalized:
+            return None
+        if normalized not in {"off", "heuristic", "llm", "hybrid"}:
+            raise ValueError("router_mode must be off, heuristic, llm, or hybrid")
+        return normalized
+
+    @field_validator("provider_api_key", "provider_base_url", "provider_model", "router_model", mode="before")
+    @classmethod
+    def normalize_optional_string(cls, value):
+        if value is None:
+            return None
+        normalized = str(value).strip()
+        return normalized or None
 
 
 class PipelineRunResponse(BaseModel):

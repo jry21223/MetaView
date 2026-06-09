@@ -31,6 +31,10 @@ export function usePipelineSubmit(): UsePipelineSubmitResult {
         provider_api_key: provider?.apiKey || null,
         provider_base_url: provider?.baseUrl || null,
         provider_model: provider?.model || null,
+        router_mode: provider?.routerMode ?? null,
+        router_model: provider?.routerModel || null,
+        router_min_confidence: provider?.routerMinConfidence ?? null,
+        router_timeout_s: provider?.routerTimeoutS ?? null,
       });
       setRunId(result.run_id);
     } catch (err) {

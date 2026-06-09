@@ -31,6 +31,14 @@ function frameToStepIndex(frame: number, steps: MetaStep[]): number {
   return lo;
 }
 
+function deferFrame(fn: () => void): void {
+  if (typeof window === "undefined") {
+    fn();
+    return;
+  }
+  window.requestAnimationFrame(fn);
+}
+
 export function usePlaybookController(
   script: PlaybookScript,
   playerRef: React.RefObject<PlayerRef | null>,
@@ -61,11 +69,17 @@ export function usePlaybookController(
   const goToStep = useCallback(
     (index: number) => {
       const clamped = Math.max(0, Math.min(index, script.steps.length - 1));
-      setCurrentStepIndex(clamped);
       const startFrame = stepStartFrame(clamped);
+      const player = playerRef.current;
+
+      awaitingAudioRef.current = false;
       prevFrameRef.current = startFrame;
-      playerRef.current?.seekTo(startFrame);
-      playerRef.current?.play();
+      // Manual step jumps should be a stable seek, not a new autoplay cycle.
+      // Pausing before seek avoids the brief blank frame users saw when the
+      // Remotion Player had to repaint while playback was still advancing.
+      player?.pause();
+      player?.seekTo(startFrame);
+      deferFrame(() => setCurrentStepIndex((current) => (current === clamped ? current : clamped)));
     },
     [script.steps.length, stepStartFrame, playerRef]
   );

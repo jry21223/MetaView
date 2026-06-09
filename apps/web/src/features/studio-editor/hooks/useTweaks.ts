@@ -16,8 +16,8 @@ export interface TweakValues {
 }
 
 export const TWEAK_DEFAULTS: TweakValues = {
-  theme: 'dark',
-  accent: THEME_PALETTE.dark.accent,
+  theme: 'light',
+  accent: THEME_PALETTE.light.accent,
   layout: 'drawer',
   leftRatio: 22,
   paramsHeight: 32,
@@ -38,12 +38,12 @@ export function themeMode(t: TweakValues): 'dark' | 'light' {
 }
 
 export function themeVars(t: TweakValues): Record<string, string> {
-  const p = THEME_PALETTE[t.theme] ?? THEME_PALETTE.dark;
+  const p = THEME_PALETTE[t.theme] ?? THEME_PALETTE.light;
   const dark = p.type === 'dark';
   return {
-    '--bg': dark ? '#0b0f0d' : '#f4f1ea',
-    '--bg-2': dark ? '#10161310' : '#ffffff',
-    '--surface': dark ? '#11171580' : '#ffffff',
+    '--bg': dark ? '#0f172a' : '#f6f2e8',
+    '--bg-2': dark ? '#111827' : '#fffdf8',
+    '--surface': dark ? '#111827cc' : '#fffdf8',
     '--surface-2': p.surface2,
     '--ink': p.ink,
     '--ink-2': p.ink2,
@@ -53,10 +53,10 @@ export function themeVars(t: TweakValues): Record<string, string> {
     // ``t.accent`` defaults to the theme's accent (see useTweaks initializer);
     // users can still override via the color picker.
     '--accent': t.accent,
-    '--accent-soft': t.accent + '26',
+    '--accent-soft': t.accent + '1f',
     '--warn': p.warn,
-    '--radius': '14px',
-    '--radius-sm': '10px',
+    '--radius': '12px',
+    '--radius-sm': '8px',
   };
 }
 

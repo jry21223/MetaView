@@ -50,12 +50,10 @@ async def submit_pipeline(
     agent_provider: Annotated[IAgentProvider | None, Depends(get_agent_provider)],
     account_use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
 ) -> PipelineRunResponse:
-    if settings.app_edition == "ops" and (
-        payload.provider_api_key or payload.provider_base_url or payload.provider_model
-    ):
+    if settings.app_edition == "ops" and _has_client_model_overrides(payload):
         raise HTTPException(
             status_code=400,
-            detail="运营版使用平台托管模型，不能提交客户端 Provider 配置",
+            detail="运营版使用平台托管模型，不能提交客户端 Provider / Router 配置",
         )
 
     run_id = str(uuid.uuid4())
@@ -88,8 +86,9 @@ async def submit_pipeline(
     effective_reviewer: ILLMProvider | None = reviewer_llm
     effective_router: IRouterProvider | None = router_provider
     provider_key = payload.provider_api_key
+    router_mode = payload.router_mode or settings.router_mode
+    router_timeout_s = payload.router_timeout_s or settings.router_timeout_s
     if provider_key:
-        router_model = settings.router_model or payload.provider_model or "gpt-4o-mini"
         effective_llm = OpenAIProvider(
             api_key=provider_key,
             base_url=payload.provider_base_url or "https://api.openai.com/v1",
@@ -97,17 +96,28 @@ async def submit_pipeline(
             max_tokens=settings.openai_max_tokens,
             reasoning_effort=settings.openai_reasoning_effort,
         )
-        effective_router = LLMRouterProvider(
-            OpenAIProvider(
-                api_key=provider_key,
-                base_url=payload.provider_base_url or "https://api.openai.com/v1",
-                model=router_model,
-                timeout=settings.router_timeout_s,
-                temperature=settings.router_temperature,
-            ),
-            model_name=router_model,
-        )
         effective_reviewer = None
+        effective_router = _build_request_router(
+            payload,
+            settings,
+            api_key=provider_key,
+            base_url=payload.provider_base_url or "https://api.openai.com/v1",
+            fallback_model=payload.provider_model or "gpt-4o-mini",
+            router_mode=router_mode,
+            router_timeout_s=router_timeout_s,
+        )
+    elif _needs_router_rebuild(payload, router_mode) and settings.openai_api_key:
+        effective_router = _build_request_router(
+            payload,
+            settings,
+            api_key=settings.openai_api_key,
+            base_url=settings.openai_base_url,
+            fallback_model=settings.openai_model or "gpt-4o-mini",
+            router_mode=router_mode,
+            router_timeout_s=router_timeout_s,
+        )
+    elif router_mode in {"off", "heuristic"}:
+        effective_router = None
 
     use_case = RunPipelineUseCase(
         run_repo,
@@ -120,8 +130,8 @@ async def submit_pipeline(
         pipeline_timeout_s=settings.pipeline_timeout_s,
         director_repo=director_repo,
         router_provider=effective_router,
-        router_mode=settings.router_mode,
-        router_min_confidence=settings.router_min_confidence,
+        router_mode=router_mode,
+        router_min_confidence=payload.router_min_confidence or settings.router_min_confidence,
         router_refine_confidence=settings.router_refine_confidence,
     )
     background_tasks.add_task(
@@ -161,6 +171,56 @@ async def _execute_pipeline_with_optional_refund(
             session=owner_session,
             ledger_id=consume_ledger_id,
         )
+
+
+def _has_client_model_overrides(payload: PipelineRequest) -> bool:
+    return any(
+        (
+            payload.provider_api_key,
+            payload.provider_base_url,
+            payload.provider_model,
+            payload.router_mode,
+            payload.router_model,
+            payload.router_min_confidence is not None,
+            payload.router_timeout_s is not None,
+        )
+    )
+
+
+def _needs_router_rebuild(payload: PipelineRequest, router_mode: str) -> bool:
+    return bool(
+        router_mode in {"llm", "hybrid"}
+        and (payload.router_model or payload.router_timeout_s is not None)
+    )
+
+
+def _build_request_router(
+    payload: PipelineRequest,
+    settings: Settings,
+    *,
+    api_key: str,
+    base_url: str,
+    fallback_model: str,
+    router_mode: str,
+    router_timeout_s: float,
+) -> IRouterProvider | None:
+    if router_mode not in {"llm", "hybrid"}:
+        return None
+    model = (
+        payload.router_model
+        or settings.router_model
+        or settings.openai_router_model
+        or fallback_model
+        or "gpt-4o-mini"
+    )
+    llm = OpenAIProvider(
+        api_key=api_key,
+        base_url=base_url,
+        model=model,
+        timeout=router_timeout_s,
+        temperature=settings.router_temperature,
+    )
+    return LLMRouterProvider(llm, model_name=model)
 
 
 def _maybe_set_session_cookie(
