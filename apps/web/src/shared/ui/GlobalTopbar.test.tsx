@@ -37,4 +37,16 @@ describe("GlobalTopbar account avatar", () => {
     fireEvent.error(getByAltText("微信用户头像"));
     expect(getByText("MV")).toBeTruthy();
   });
+
+  it("does not render the ops dashboard button on the dashboard stage", () => {
+    const { queryByText } = render(<GlobalTopbar {...baseProps} stage="dashboard" />);
+
+    expect(queryByText("运营面板")).toBeFalsy();
+  });
+
+  it("renders the ops dashboard button on non-dashboard ops stages", () => {
+    const { getByText } = render(<GlobalTopbar {...baseProps} stage="intake" />);
+
+    expect(getByText("运营面板")).toBeTruthy();
+  });
 });

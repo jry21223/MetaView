@@ -42,6 +42,8 @@ export function GlobalTopbar({
       ? accountAvatarUrl
       : null;
 
+  const showOpsDashboardNav = appEdition === 'ops' && stage !== 'dashboard';
+
   return (
     <header className="mv-top">
       <div className="mv-brand">
@@ -51,7 +53,7 @@ export function GlobalTopbar({
       </div>
 
       <nav className="mv-nav">
-        {appEdition === 'ops' && (
+        {showOpsDashboardNav && (
           <button
             className={`mv-nav-item${isDashboard ? ' is-active' : ''}`}
             onClick={() => onNavigate('dashboard')}
