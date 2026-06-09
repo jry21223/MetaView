@@ -75,15 +75,12 @@ describe("App edition shells", () => {
     expect(document.body.textContent).toContain("余额 ¥ 5.00");
   });
 
-  it("self edition no longer exposes top navigation shortcut buttons", async () => {
+  it("self edition does not expose ops dashboard shortcut", async () => {
     vi.stubEnv("VITE_APP_EDITION", "self");
 
     const { App } = await import("./App");
     const { queryByText } = render(<App />);
 
-    await waitFor(() => expect(queryByText("任务历史")).toBeNull());
-    expect(queryByText("工作台")).toBeNull();
-    expect(queryByText("模板")).toBeNull();
-    expect(queryByText("设置")).toBeNull();
+    await waitFor(() => expect(queryByText("运营面板")).toBeNull());
   });
 });

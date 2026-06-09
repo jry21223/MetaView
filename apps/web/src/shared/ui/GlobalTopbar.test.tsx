@@ -38,13 +38,23 @@ describe("GlobalTopbar account avatar", () => {
     expect(getByText("MV")).toBeTruthy();
   });
 
-  it("does not render any nav entry text", () => {
+  it("hides only ops dashboard nav on dashboard stage", () => {
     const { queryByText } = render(<GlobalTopbar {...baseProps} stage="dashboard" />);
 
     expect(queryByText("运营面板")).toBeFalsy();
-    expect(queryByText("工作台")).toBeFalsy();
-    expect(queryByText("任务历史")).toBeFalsy();
-    expect(queryByText("模板")).toBeFalsy();
-    expect(queryByText("设置")).toBeFalsy();
+    expect(queryByText("工作台")).toBeTruthy();
+    expect(queryByText("任务历史")).toBeTruthy();
+    expect(queryByText("模板")).toBeTruthy();
+    expect(queryByText("设置")).toBeTruthy();
+  });
+
+  it("shows ops dashboard nav on non-dashboard ops stage", () => {
+    const { queryByText } = render(<GlobalTopbar {...baseProps} stage="workbench" appEdition="ops" />);
+
+    expect(queryByText("运营面板")).toBeTruthy();
+    expect(queryByText("工作台")).toBeTruthy();
+    expect(queryByText("任务历史")).toBeTruthy();
+    expect(queryByText("模板")).toBeTruthy();
+    expect(queryByText("设置")).toBeTruthy();
   });
 });
