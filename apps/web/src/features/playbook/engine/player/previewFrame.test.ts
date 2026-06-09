@@ -88,7 +88,7 @@ describe("resolvePlayerTimelineKey", () => {
     expect(resolvePlayerTimelineKey(base)).not.toBe(resolvePlayerTimelineKey(changed));
   });
 
-  it("changes when snapshot content changes without changing the timeline shape", () => {
+  it("does not change when snapshot content changes without changing the timeline shape", () => {
     const base = script();
     const changed = script({
       steps: [
@@ -103,6 +103,6 @@ describe("resolvePlayerTimelineKey", () => {
       ],
     });
 
-    expect(resolvePlayerTimelineKey(base)).not.toBe(resolvePlayerTimelineKey(changed));
+    expect(resolvePlayerTimelineKey(base)).toBe(resolvePlayerTimelineKey(changed));
   });
 });

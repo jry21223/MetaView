@@ -55,8 +55,6 @@ export function sampleDashboard(): OpsDashboardResponse {
     recent_runs: [
       {
         run_id: "run-1",
-        user_id: "user-1",
-        user_display_name: "微信用户",
         status: "succeeded",
         prompt: "讲解矩阵",
         title: "矩阵特征值",
@@ -68,8 +66,6 @@ export function sampleDashboard(): OpsDashboardResponse {
     recent_orders: [
       {
         order_id: "order-1",
-        user_id: "user-1",
-        user_display_name: "微信用户",
         amount_cents: 1500,
         amount_yuan: "15.00",
         status: "paid",

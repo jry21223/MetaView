@@ -289,8 +289,6 @@ def _checkout_html(request: Request, intent: NewApiTopupIntent, dev_mode: bool) 
         <main>
             <h1>MetaView NewAPI 充值收银台</h1>
             <dl>
-                <dt>NewAPI 用户</dt>
-                <dd>{intent.newapi_user_id}</dd>
                 <dt>充值金额</dt>
                 <dd>¥{amount}</dd>
                 <dt>兑换额度</dt>

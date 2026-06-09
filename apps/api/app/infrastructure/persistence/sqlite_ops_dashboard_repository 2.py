@@ -62,32 +62,24 @@ class SqliteOpsDashboardRepository:
         generated_at = datetime.now(timezone.utc)
         window = _build_window(generated_at, window_days)
         with self._connect() as conn:
-            accounts = conn.execute(
-                """
-                SELECT user_id, role, status, balance_cents, created_at
-                FROM accounts
-                """
-            ).fetchall()
+            accounts = conn.execute("SELECT * FROM accounts").fetchall()
             runs = conn.execute(
                 """
-                SELECT run_id, user_id, status, prompt, playbook_json, error, created_at
+                SELECT r.*, a.display_name AS user_display_name
                 FROM pipeline_runs AS r
+                LEFT JOIN accounts AS a ON a.user_id = r.user_id
                 ORDER BY r.created_at DESC
                 """
             ).fetchall()
             orders = conn.execute(
                 """
-                SELECT order_id, amount_cents, status, channel, created_at, paid_at
+                SELECT o.*, a.display_name AS user_display_name
                 FROM recharge_orders AS o
+                LEFT JOIN accounts AS a ON a.user_id = o.user_id
                 ORDER BY o.created_at DESC
                 """
             ).fetchall()
-            ledger = conn.execute(
-                """
-                SELECT amount_cents, kind, created_at
-                FROM balance_ledger
-                """
-            ).fetchall()
+            ledger = conn.execute("SELECT * FROM balance_ledger").fetchall()
 
         run_trend = _build_run_trend(runs, window)
         revenue_trend = _build_revenue_trend(orders, window)
@@ -244,9 +236,7 @@ def _build_kpis(
     window: _Window,
 ) -> list[OpsMetricCard]:
     total_users = len(accounts)
-    new_users = sum(
-        1 for row in accounts if _in_window(row["created_at"], window.start, window.end)
-    )
+    new_users = sum(1 for row in accounts if _in_window(row["created_at"], window.start, window.end))
     active_users = len(
         {
             row["user_id"]
@@ -254,11 +244,7 @@ def _build_kpis(
             if row["user_id"] and _in_window(row["created_at"], window.start, window.end)
         }
     )
-    admin_users = sum(
-        1
-        for row in accounts
-        if row["role"] == "admin" and row["status"] == "enabled"
-    )
+    admin_users = sum(1 for row in accounts if row["role"] == "admin" and row["status"] == "enabled")
     run_total = sum(point.total for point in run_trend)
     succeeded = sum(point.succeeded for point in run_trend)
     failed = sum(point.failed for point in run_trend)
@@ -268,19 +254,13 @@ def _build_kpis(
     balance_cents = sum(int(row["balance_cents"]) for row in accounts)
     consumed_cents = _ledger_sum(ledger, "consume", window.start, window.end)
     previous_runs = sum(
-        1
-        for row in runs
-        if _in_window(row["created_at"], window.previous_start, window.previous_end)
+        1 for row in runs if _in_window(row["created_at"], window.previous_start, window.previous_end)
     )
     previous_revenue = sum(
         int(row["amount_cents"])
         for row in orders
         if row["status"] == "paid"
-        and _in_window(
-            row["paid_at"] or row["created_at"],
-            window.previous_start,
-            window.previous_end,
-        )
+        and _in_window(row["paid_at"] or row["created_at"], window.previous_start, window.previous_end)
     )
     previous_consumed = _ledger_sum(ledger, "consume", window.previous_start, window.previous_end)
 
@@ -388,6 +368,8 @@ def _run_row(row: sqlite3.Row) -> OpsRunRow:
     title, domain, _ = _playbook_meta(row["playbook_json"])
     return OpsRunRow(
         run_id=row["run_id"],
+        user_id=row["user_id"],
+        user_display_name=row["user_display_name"],
         status=row["status"],
         prompt=row["prompt"] or "",
         title=title,
@@ -400,6 +382,8 @@ def _run_row(row: sqlite3.Row) -> OpsRunRow:
 def _order_row(row: sqlite3.Row) -> OpsOrderRow:
     return OpsOrderRow(
         order_id=row["order_id"],
+        user_id=row["user_id"],
+        user_display_name=row["user_display_name"],
         amount_cents=int(row["amount_cents"]),
         amount_yuan=money_from_cents(int(row["amount_cents"])),
         status=row["status"],
@@ -460,24 +444,9 @@ def _build_health_tree(
             value=metrics["runs"].value,
             status="bad" if failed > 0 else ("warn" if in_flight > 0 else "ok"),
             children=[
-                OpsHealthTreeItem(
-                    id="generation-success",
-                    label="成功率",
-                    value=metrics["success_rate"].value,
-                    status="neutral",
-                ),
-                OpsHealthTreeItem(
-                    id="generation-active",
-                    label="进行中",
-                    value=str(in_flight),
-                    status="warn" if in_flight else "ok",
-                ),
-                OpsHealthTreeItem(
-                    id="generation-failed",
-                    label="失败",
-                    value=str(failed),
-                    status="bad" if failed else "ok",
-                ),
+                OpsHealthTreeItem(id="generation-success", label="成功率", value=metrics["success_rate"].value, status="neutral"),
+                OpsHealthTreeItem(id="generation-active", label="进行中", value=str(in_flight), status="warn" if in_flight else "ok"),
+                OpsHealthTreeItem(id="generation-failed", label="失败", value=str(failed), status="bad" if failed else "ok"),
             ],
         ),
         OpsHealthTreeItem(
@@ -486,24 +455,9 @@ def _build_health_tree(
             value=metrics["revenue"].value,
             status="warn" if pending_orders > 0 else "ok",
             children=[
-                OpsHealthTreeItem(
-                    id="billing-pending",
-                    label="待支付订单",
-                    value=str(pending_orders),
-                    status="warn" if pending_orders else "ok",
-                ),
-                OpsHealthTreeItem(
-                    id="billing-balance",
-                    label="未消费余额",
-                    value=metrics["balance"].value,
-                    status="neutral",
-                ),
-                OpsHealthTreeItem(
-                    id="billing-refund",
-                    label="退款回补",
-                    value=f"¥ {money_from_cents(refunds)}",
-                    status="warn" if refunds else "ok",
-                ),
+                OpsHealthTreeItem(id="billing-pending", label="待支付订单", value=str(pending_orders), status="warn" if pending_orders else "ok"),
+                OpsHealthTreeItem(id="billing-balance", label="未消费余额", value=metrics["balance"].value, status="neutral"),
+                OpsHealthTreeItem(id="billing-refund", label="退款回补", value=f"¥ {money_from_cents(refunds)}", status="warn" if refunds else "ok"),
             ],
         ),
         OpsHealthTreeItem(
@@ -512,18 +466,8 @@ def _build_health_tree(
             value=metrics["users"].value,
             status="warn" if disabled_users > 0 else "ok",
             children=[
-                OpsHealthTreeItem(
-                    id="accounts-active",
-                    label="近窗活跃",
-                    value=metrics["users"].helper,
-                    status="neutral",
-                ),
-                OpsHealthTreeItem(
-                    id="accounts-disabled",
-                    label="禁用账户",
-                    value=str(disabled_users),
-                    status="warn" if disabled_users else "ok",
-                ),
+                OpsHealthTreeItem(id="accounts-active", label="近窗活跃", value=metrics["users"].helper, status="neutral"),
+                OpsHealthTreeItem(id="accounts-disabled", label="禁用账户", value=str(disabled_users), status="warn" if disabled_users else "ok"),
             ],
         ),
     ]

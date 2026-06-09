@@ -4,6 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+
 MetricTrend = Literal["up", "down", "neutral"]
 HealthStatus = Literal["ok", "warn", "bad", "neutral"]
 
@@ -41,6 +42,8 @@ class OpsDistributionPoint(BaseModel):
 
 class OpsRunRow(BaseModel):
     run_id: str
+    user_id: str | None = None
+    user_display_name: str | None = None
     status: str
     prompt: str
     title: str | None = None
@@ -51,6 +54,8 @@ class OpsRunRow(BaseModel):
 
 class OpsOrderRow(BaseModel):
     order_id: str
+    user_id: str
+    user_display_name: str | None = None
     amount_cents: int
     amount_yuan: str
     status: str

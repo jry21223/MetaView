@@ -57,6 +57,29 @@ describe("OpsDashboardPage", () => {
     expect(getByText(/生成任务 · 3/)).toBeTruthy();
   });
 
+  it("does not render row-level user identifiers from dashboard payloads", async () => {
+    const dashboard = sampleDashboard();
+    Object.assign(dashboard.recent_runs[0], {
+      user_id: "user-secret-1",
+      user_display_name: "敏感用户",
+    });
+    Object.assign(dashboard.recent_orders[0], {
+      user_id: "user-secret-1",
+      user_display_name: "敏感用户",
+    });
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>
+        HttpResponse.json(dashboard),
+      ),
+    );
+
+    const { findByText, queryByText } = renderPage();
+
+    expect(await findByText("矩阵特征值")).toBeTruthy();
+    expect(queryByText("敏感用户")).toBeNull();
+    expect(document.body.textContent).not.toContain("user-secret-1");
+  });
+
   it("shows the admin permission empty state for 403 responses", async () => {
     server.use(
       http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>

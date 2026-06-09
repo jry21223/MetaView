@@ -664,7 +664,6 @@ const runColumns: GridColDef[] = [
   { field: "title", headerName: "任务", flex: 1.2, minWidth: 180 },
   { field: "status", headerName: "状态", width: 96 },
   { field: "domain", headerName: "学科", width: 100 },
-  { field: "user", headerName: "用户", width: 140 },
   { field: "createdAt", headerName: "创建时间", width: 150 },
 ];
 
@@ -672,7 +671,6 @@ const orderColumns: GridColDef[] = [
   { field: "order", headerName: "订单", flex: 1, minWidth: 160 },
   { field: "amount", headerName: "金额", width: 110 },
   { field: "status", headerName: "状态", width: 96 },
-  { field: "user", headerName: "用户", width: 140 },
   { field: "createdAt", headerName: "创建时间", width: 150 },
 ];
 
@@ -682,7 +680,6 @@ function runTableRow(row: OpsRunRow) {
     title: row.title ?? row.prompt,
     status: statusLabel(row.status),
     domain: row.domain ?? "未识别",
-    user: row.user_display_name ?? row.user_id ?? "匿名",
     createdAt: formatDateTime(row.created_at),
   };
 }
@@ -693,7 +690,6 @@ function orderTableRow(row: OpsOrderRow) {
     order: row.order_id,
     amount: `¥ ${row.amount_yuan}`,
     status: orderStatusLabel(row.status),
-    user: row.user_display_name ?? row.user_id,
     createdAt: formatDateTime(row.created_at),
   };
 }

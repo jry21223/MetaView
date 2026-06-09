@@ -180,6 +180,8 @@ class NewApiTopupUseCase:
             raise NewApiTopupOrderNotFoundError("NewAPI 充值单不存在")
         if intent.status in {"paid", "verified", "acked"}:
             return "success"
+        if _parse_datetime(intent.expires_at) <= _now():
+            raise NewApiTopupPaymentError("NewAPI 充值单已过期")
         receipt_code = _build_receipt_code(
             self._settings.newapi_topup_intent_secret,
             intent.intent_id,

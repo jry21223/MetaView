@@ -21,6 +21,10 @@ interface PlaybookCompositionProps {
   swapDurationFrames?: number;
 }
 
+function stageBackground(theme: "dark" | "light"): string {
+  return theme === "dark" ? "#0f1117" : "#f6f8fa";
+}
+
 function SnapshotRenderer(props: RendererProps) {
   const Renderer = rendererRegistry.get(props.step.snapshot.kind);
   if (Renderer) return React.createElement(Renderer, props);
@@ -94,7 +98,7 @@ function LayerSlot({
       : layerState.visualKey === firstStageLayerKey
         ? "stage-base"
         : "stage-overlay";
-  const appear = layerState.isVisualContinuation
+  const appear = renderMode === "stage-base" || layerState.isVisualContinuation
     ? appearTransform("none", 1)
     : appearTransform(slice.anim, slice.progress);
   return (
@@ -155,10 +159,18 @@ function SceneCompositor({
     (layerState) => snapshotSurface(layerState.layer.body.kind) === "stage",
   )?.visualKey;
   return (
-    <div className="scene-compositor" style={{ position: "relative", width: "100%", height: "100%" }}>
-      {layers.map((layerState, i) => (
+    <div
+      className="scene-compositor"
+      style={{
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        background: stageBackground(baseProps.theme),
+      }}
+    >
+      {layers.map((layerState) => (
         <LayerSlot
-          key={`${layerState.visualKey}-${i}`}
+          key={layerState.visualKey}
           layerState={layerState}
           baseProps={baseProps}
           stepProgress={stepProgress}
@@ -220,6 +232,7 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
   const fadeProgress = Math.min(1, localFrame / PLAYBOOK_LAYOUT.SUBTITLE_FADE_FRAMES);
 
   const isDark = theme === "dark";
+  const visualBackground = stageBackground(theme);
   const subtitleBg = isDark ? "rgba(10,12,16,0.85)" : "rgba(245,247,250,0.92)";
   const subtitleColor = isDark ? "#c9d1d9" : "#24292f";
   const dividerColor = isDark ? "#30363d" : "#d0d7de";
@@ -251,6 +264,7 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
             width: hasCodeTrack ? `${vizRatio * 100}%` : "100%",
             height: "100%",
             overflow: "hidden",
+            background: visualBackground,
           }}
         >
           <div
@@ -261,6 +275,7 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
               height: "100%",
               transform: cameraTransform,
               transformOrigin: "center center",
+              background: visualBackground,
             }}
           >
             <SceneCompositor
