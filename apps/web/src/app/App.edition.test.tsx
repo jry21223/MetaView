@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { cleanup, render, waitFor } from "@testing-library/react";
 import React from "react";
 import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -75,51 +75,15 @@ describe("App edition shells", () => {
     expect(document.body.textContent).toContain("余额 ¥ 5.00");
   });
 
-  it("opens an existing history run in the workbench without submitting", async () => {
-    let detailHits = 0;
-    let submitHits = 0;
-    server.use(
-      http.get(`${API_BASE_URL}/api/v1/runs`, () =>
-        HttpResponse.json([
-          {
-            run_id: "history-run-1",
-            status: "running",
-            prompt: "讲解格林公式",
-            playbook: null,
-            error: null,
-            created_at: "2026-06-01T10:00:00.000Z",
-            review: null,
-          },
-        ]),
-      ),
-      http.get(`${API_BASE_URL}/api/v1/runs/history-run-1`, () => {
-        detailHits += 1;
-        return HttpResponse.json({
-          run_id: "history-run-1",
-          status: "running",
-          prompt: "讲解格林公式",
-          playbook: null,
-          error: null,
-          created_at: "2026-06-01T10:00:00.000Z",
-          review: null,
-        });
-      }),
-      http.post(`${API_BASE_URL}/api/v1/pipeline`, () => {
-        submitHits += 1;
-        return HttpResponse.json({ detail: "should not submit" }, { status: 500 });
-      }),
-    );
+  it("self edition no longer exposes top navigation shortcut buttons", async () => {
     vi.stubEnv("VITE_APP_EDITION", "self");
 
     const { App } = await import("./App");
-    const { getByRole, getByText } = render(<App />);
+    const { queryByText } = render(<App />);
 
-    fireEvent.click(getByRole("button", { name: "任务历史" }));
-    await waitFor(() => expect(getByText("讲解格林公式")).toBeTruthy());
-    fireEvent.click(getByRole("button", { name: "在工作台打开" }));
-
-    await waitFor(() => expect(detailHits).toBeGreaterThan(0));
-    expect(submitHits).toBe(0);
-    expect(document.body.textContent).toContain("正在生成脚本");
+    await waitFor(() => expect(queryByText("任务历史")).toBeNull());
+    expect(queryByText("工作台")).toBeNull();
+    expect(queryByText("模板")).toBeNull();
+    expect(queryByText("设置")).toBeNull();
   });
 });

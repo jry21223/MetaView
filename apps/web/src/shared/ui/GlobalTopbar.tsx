@@ -32,17 +32,10 @@ export function GlobalTopbar({
   exportEnabled,
 }: GlobalTopbarProps) {
   const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
-  const isDashboard = stage === 'dashboard';
-  const isWorkbench = stage === 'intake' || stage === 'workbench';
-  const isHistory = stage === 'history';
-  const isTemplates = stage === 'templates';
-  const isSettings = stage === 'settings';
   const avatarUrl =
     appEdition === 'ops' && accountAvatarUrl && failedAvatarUrl !== accountAvatarUrl
       ? accountAvatarUrl
       : null;
-
-  const showOpsDashboardNav = appEdition === 'ops' && stage !== 'dashboard';
 
   return (
     <header className="mv-top">
@@ -52,40 +45,7 @@ export function GlobalTopbar({
         <span className="mv-brand-meta">/ Concept Studio · v0.3</span>
       </div>
 
-      <nav className="mv-nav">
-        {showOpsDashboardNav && (
-          <button
-            className={`mv-nav-item${isDashboard ? ' is-active' : ''}`}
-            onClick={() => onNavigate('dashboard')}
-          >
-            运营面板
-          </button>
-        )}
-        <button
-          className={`mv-nav-item${isWorkbench ? ' is-active' : ''}`}
-          onClick={() => onNavigate('intake')}
-        >
-          工作台
-        </button>
-        <button
-          className={`mv-nav-item${isHistory ? ' is-active' : ''}`}
-          onClick={() => onNavigate('history')}
-        >
-          任务历史
-        </button>
-        <button
-          className={`mv-nav-item${isTemplates ? ' is-active' : ''}`}
-          onClick={() => onNavigate('templates')}
-        >
-          模板
-        </button>
-        <button
-          className={`mv-nav-item${isSettings ? ' is-active' : ''}`}
-          onClick={() => onNavigate('settings')}
-        >
-          设置
-        </button>
-      </nav>
+      <nav className="mv-nav" />
 
       <div className="mv-top-right">
         {onOpenExport && (
