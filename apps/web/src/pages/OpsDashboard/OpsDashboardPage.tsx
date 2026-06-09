@@ -522,7 +522,6 @@ function SideMenu({
   onOpenProviderSettings,
 }: OpsDashboardPageProps) {
   const navItems: Array<{ stage: Stage; label: string; icon: React.ReactNode }> = [
-    { stage: "dashboard", label: "运营面板", icon: <DashboardIcon /> },
     { stage: "intake", label: "工作台", icon: <PlayCircleIcon /> },
     { stage: "history", label: "任务历史", icon: <HistoryIcon /> },
     { stage: "templates", label: "模板", icon: <ViewModuleIcon /> },

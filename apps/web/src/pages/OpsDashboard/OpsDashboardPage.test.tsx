@@ -93,6 +93,19 @@ describe("OpsDashboardPage", () => {
     expect(queryByText("最近任务")).toBeNull();
   });
 
+  it("does not show dashboard nav item while already on dashboard", async () => {
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>
+        HttpResponse.json(sampleDashboard()),
+      ),
+    );
+
+    const { findByText, queryByText } = renderPage();
+    await findByText("全局运营");
+
+    expect(queryByText("运营面板")).toBeNull();
+  });
+
   it("shows loading and generic error states", async () => {
     server.use(
       http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>
