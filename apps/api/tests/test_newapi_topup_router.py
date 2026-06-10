@@ -26,10 +26,12 @@ def newapi_topup_client(monkeypatch: pytest.MonkeyPatch, tmp_path):
     monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_RECEIPT_TOKEN", "receipt-token")
     monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_DEV_MODE", "true")
     monkeypatch.setenv("METAVIEW_PAYMENT_GATEWAY", "easypay")
-    monkeypatch.setenv("METAVIEW_EPAY_SUBMIT_URL", "https://pay.example.com/submit.php")
+    monkeypatch.setenv("METAVIEW_EPAY_API_BASE", "https://pay.example.com")
+    monkeypatch.setenv("METAVIEW_EPAY_SUBMIT_PATH", "/submit.php")
     monkeypatch.setenv("METAVIEW_EPAY_PID", "pid")
     monkeypatch.setenv("METAVIEW_EPAY_KEY", "secret")
     monkeypatch.setenv("METAVIEW_EPAY_NOTIFY_URL", "https://metaview.top/api/v1/billing/epay/notify")
+    monkeypatch.setenv("METAVIEW_EPAY_RETURN_URL", "https://metaview.top/payment/result")
     app = create_app()
     with TestClient(app) as client:
         yield client
@@ -151,10 +153,12 @@ def test_newapi_topup_payment_config_error_returns_503(
     monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_RECEIPT_TOKEN", "receipt-token")
     monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_DEV_MODE", "false")
     monkeypatch.setenv("METAVIEW_PAYMENT_GATEWAY", "easypay")
-    monkeypatch.setenv("METAVIEW_EPAY_SUBMIT_URL", "https://pay.example.com/submit.php")
+    monkeypatch.setenv("METAVIEW_EPAY_API_BASE", "https://pay.example.com")
+    monkeypatch.setenv("METAVIEW_EPAY_SUBMIT_PATH", "/submit.php")
     monkeypatch.setenv("METAVIEW_EPAY_PID", "pid")
     monkeypatch.setenv("METAVIEW_EPAY_KEY", "secret")
     monkeypatch.setenv("METAVIEW_EPAY_NOTIFY_URL", "https://metaview.top/api/v1/billing/epay/notify")
+    monkeypatch.setenv("METAVIEW_EPAY_RETURN_URL", "https://metaview.top/payment/result")
     app = create_app()
     app.dependency_overrides[get_payment_gateway] = lambda: _FailingPaymentGateway()
     with TestClient(app) as client:
@@ -253,7 +257,7 @@ def test_newapi_topup_real_payment_redirects_with_verifiable_receipt(
         assert duplicate_notify.text == "success"
         legacy_notify = client.post("/api/v1/billing/wechat/notify", content=b"{}")
         assert legacy_notify.status_code == 200
-        assert legacy_notify.json() == {"code": "SUCCESS", "message": "success"}
+        assert legacy_notify.text == "success"
 
     get_settings.cache_clear()
 
@@ -326,7 +330,7 @@ def test_newapi_topup_rejects_real_payment_callback_after_intent_expiry(
         )
         notified = client.post("/api/v1/billing/wechat/notify", content=b"{}")
         assert notified.status_code == 400
-        assert "已过期" in notified.json()["detail"]
+        assert notified.text == "fail"
         legacy_fail = client.post("/api/v1/billing/epay/notify", content=b"{}")
         assert legacy_fail.status_code == 400
         assert legacy_fail.text == "fail"
@@ -429,6 +433,7 @@ class _FakePaymentGateway:
         self,
         headers: dict[str, str],
         body: bytes,
+        query: dict[str, str] | None = None,
     ) -> PaymentTransaction:
         if self.transaction is None:
             raise AssertionError("No fake payment transaction configured")
@@ -451,5 +456,6 @@ class _FailingPaymentGateway:
         self,
         headers: dict[str, str],
         body: bytes,
+        query: dict[str, str] | None = None,
     ) -> PaymentTransaction:
         raise AssertionError("notification should not happen in this test")

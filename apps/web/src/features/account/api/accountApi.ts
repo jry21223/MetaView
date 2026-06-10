@@ -21,6 +21,8 @@ export interface RechargeOrder {
   status: "pending" | "paid" | "closed" | string;
   channel: string;
   code_url?: string | null;
+  checkout_url?: string | null;
+  payment_url?: string | null;
   provider_order_id?: string | null;
   created_at: string;
   paid_at?: string | null;

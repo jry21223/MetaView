@@ -256,29 +256,7 @@ async def get_recharge_order(
     return _order_response(order)
 
 
-@router.post("/billing/wechat/notify")
-async def wechat_pay_notify(
-    request: Request,
-    payment: Annotated[IPaymentGateway, Depends(get_payment_gateway)],
-    use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
-    newapi_topup: Annotated[NewApiTopupUseCase, Depends(get_newapi_topup_use_case)],
-) -> dict[str, str]:
-    try:
-        result = await _handle_payment_notification(request, payment, use_case, newapi_topup)
-    except PaymentOrderNotFoundError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except NewApiTopupOrderNotFoundError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except PaymentNotificationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except NewApiTopupPaymentError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except RuntimeError as exc:
-        raise HTTPException(status_code=400, detail=f"微信支付回调验签/解密失败: {exc}") from exc
-    return {"code": "SUCCESS", "message": result}
-
-
-@router.post("/billing/epay/notify")
+@router.api_route("/billing/epay/notify", methods=["GET", "POST"])
 async def epay_notify(
     request: Request,
     payment: Annotated[IPaymentGateway, Depends(get_payment_gateway)],
@@ -300,6 +278,18 @@ async def epay_notify(
     return PlainTextResponse("success")
 
 
+@router.api_route("/billing/wechat/notify", methods=["GET", "POST"])
+async def wechat_pay_notify(
+    request: Request,
+    payment: Annotated[IPaymentGateway, Depends(get_payment_gateway)],
+    use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
+    newapi_topup: Annotated[NewApiTopupUseCase, Depends(get_newapi_topup_use_case)],
+) -> PlainTextResponse:
+    # Deprecated alias: historical callback path retained for backward compatibility only.
+    # Actual callback processing uses the shared EasyPay-compatible handler.
+    return await epay_notify(request, payment, use_case, newapi_topup)
+
+
 async def _handle_payment_notification(
     request: Request,
     payment: Annotated[IPaymentGateway, Depends(get_payment_gateway)],
@@ -307,9 +297,14 @@ async def _handle_payment_notification(
     newapi_topup: Annotated[NewApiTopupUseCase, Depends(get_newapi_topup_use_case)],
 ) -> str:
     body = await request.body()
-    transaction = payment.decode_notification(dict(request.headers), body)
+    query = dict(request.query_params)
+    transaction = payment.decode_notification(
+        dict(request.headers),
+        body,
+        query=query,
+    )
     try:
-        result = await use_case.handle_payment_transaction(transaction)
+        return await use_case.handle_payment_notification(dict(request.headers), body, query=query)
     except PaymentOrderNotFoundError:
         result = await newapi_topup.handle_payment_transaction(transaction)
-    return result
+        return result

@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import QRCode from "qrcode";
 import { RECHARGE_USAGE_ESTIMATE } from "../../../shared/config/constants";
 import type { AccountMe, RechargeOrder } from "../api/accountApi";
 import {
@@ -38,13 +37,16 @@ function getFocusableElements(root: HTMLElement): HTMLElement[] {
   );
 }
 
+function getCheckoutUrl(order: RechargeOrder): string | null {
+  return order.code_url ?? order.checkout_url ?? order.payment_url ?? null;
+}
+
 export function RechargeModal({ account, onRefreshAccount, onClose }: RechargeModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   const [amount, setAmount] = useState("10");
   const [orders, setOrders] = useState<RechargeOrder[]>([]);
   const [activeOrder, setActiveOrder] = useState<RechargeOrder | null>(null);
-  const [qrSvg, setQrSvg] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -123,24 +125,6 @@ export function RechargeModal({ account, onRefreshAccount, onClose }: RechargeMo
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    if (!activeOrder?.code_url) {
-      return;
-    }
-    QRCode.toString(activeOrder.code_url, {
-      type: "svg",
-      width: 180,
-      margin: 1,
-      color: { dark: "#0a0c10", light: "#ffffff" },
-    }).then((svg) => {
-      if (!cancelled) setQrSvg(svg);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [activeOrder?.code_url]);
-
-  useEffect(() => {
     if (!activeOrder || activeOrder.status !== "pending") return;
     const timer = window.setInterval(async () => {
       try {
@@ -165,6 +149,11 @@ export function RechargeModal({ account, onRefreshAccount, onClose }: RechargeMo
       const order = await createRechargeOrder(amount.trim());
       setActiveOrder(order);
       setOrders((prev) => [order, ...prev.filter((item) => item.order_id !== order.order_id)]);
+      const checkoutUrl = getCheckoutUrl(order);
+      if (!checkoutUrl) {
+        throw new Error("充值订单未返回支付链接");
+      }
+      window.location.href = checkoutUrl;
     } catch (err) {
       setError(err instanceof Error ? err.message : "创建充值订单失败");
     } finally {
@@ -307,7 +296,8 @@ export function RechargeModal({ account, onRefreshAccount, onClose }: RechargeMo
             <div className="mv-account-note">
               易支付尚未配置。请配置：METAVIEW_EPAY_PID、METAVIEW_EPAY_KEY、
               METAVIEW_EPAY_API_BASE + METAVIEW_EPAY_SUBMIT_PATH（或 METAVIEW_EPAY_SUBMIT_URL）、
-              METAVIEW_EPAY_NOTIFY_URL，以及可选 METAVIEW_EPAY_RETURN_URL，才能创建真实订单。
+              METAVIEW_EPAY_NOTIFY_URL、METAVIEW_EPAY_RETURN_URL（均为必填），
+              才能创建真实订单。
             </div>
           )}
         </section>
@@ -319,19 +309,10 @@ export function RechargeModal({ account, onRefreshAccount, onClose }: RechargeMo
               <div className="mv-pay-panel__amount">¥ {activeOrder.amount_yuan}</div>
               <div className="mv-account-note">状态：{activeOrder.status}</div>
             </div>
-            {activeOrder.code_url && (
-              <button
-                type="button"
-                className="mv-chip"
-                onClick={() => window.open(activeOrder.code_url as string, "_blank")}
-              >
-                打开支付链接
-              </button>
-            )}
-            {qrSvg && activeOrder.status === "pending" && (
-              <div className="mv-pay-panel__qr" dangerouslySetInnerHTML={{ __html: qrSvg }} />
-            )}
             {activeOrder.status === "paid" && <div className="mv-pay-panel__paid">已到账</div>}
+            {activeOrder.status === "pending" && (
+              <div className="mv-account-note">请在跳转到支付页后完成支付并稍后返回。</div>
+            )}
           </section>
         )}
 

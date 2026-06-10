@@ -388,7 +388,23 @@ class SqliteAccountRepository:
                 if row is None:
                     return None
                 if row["status"] == "paid":
-                    return _row_to_order(row)
+                    conn.execute(
+                        """
+                        UPDATE recharge_orders
+                        SET provider_order_id = CASE
+                            WHEN provider_order_id IS NULL OR provider_order_id = ''
+                            THEN ?
+                            ELSE provider_order_id
+                        END
+                        WHERE order_id = ?
+                        """,
+                        (provider_order_id, order_id),
+                    )
+                    conn.commit()
+                    next_row = conn.execute(
+                        "SELECT * FROM recharge_orders WHERE order_id = ?", (order_id,)
+                    ).fetchone()
+                    return _row_to_order(next_row) if next_row else None
                 if row["status"] != "pending" or row["amount_cents"] != amount_cents:
                     return _row_to_order(row)
 
@@ -396,11 +412,16 @@ class SqliteAccountRepository:
                 conn.execute(
                     """
                     UPDATE recharge_orders
-                    SET status = 'paid', provider_order_id = COALESCE(provider_order_id, ?),
-                        paid_at = ?
+                    SET status = 'paid',
+                        paid_at = ?,
+                        provider_order_id = CASE
+                            WHEN provider_order_id IS NULL OR provider_order_id = ''
+                            THEN ?
+                            ELSE provider_order_id
+                        END
                     WHERE order_id = ?
                     """,
-                    (provider_order_id, paid_at, order_id),
+                    (paid_at, provider_order_id, order_id),
                 )
                 conn.execute(
                     """

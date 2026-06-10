@@ -168,8 +168,10 @@ class NewApiTopupUseCase:
         self,
         headers: dict[str, str],
         body: bytes,
+        *,
+        query: dict[str, str] | None = None,
     ) -> str:
-        transaction = self._payment.decode_notification(headers, body)
+        transaction = self._payment.decode_notification(headers, body, query=query)
         return await self.handle_payment_transaction(transaction)
 
     async def handle_payment_transaction(self, transaction: PaymentTransaction) -> str:

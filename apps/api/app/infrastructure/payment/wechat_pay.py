@@ -82,7 +82,13 @@ class WeChatPayClient:
             raise WeChatPayGatewayError("WeChat Pay response missing code_url")
         return NativePaymentOrder(code_url=code_url)
 
-    def decode_notification(self, headers: dict[str, str], body: bytes) -> PaymentTransaction:
+    def decode_notification(
+        self,
+        headers: dict[str, str],
+        body: bytes,
+        *,
+        query: dict[str, str] | None = None,
+    ) -> PaymentTransaction:
         if not self._settings.wechat_pay_api_v3_key:
             raise WeChatPayConfigError("METAVIEW_WECHAT_PAY_API_V3_KEY is required")
         self._verify_notification(headers, body)

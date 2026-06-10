@@ -77,7 +77,7 @@ class AccountUseCase:
 
     @property
     def payment_enabled(self) -> bool:
-        return self._payment.configured
+        return self._settings.payment_gateway == "easypay" and self._payment.configured
 
     @property
     def wechat_login_enabled(self) -> bool:
@@ -210,8 +210,12 @@ class AccountUseCase:
         self,
         headers: dict[str, str],
         body: bytes,
+        *,
+        query: dict[str, str] | None = None,
     ) -> str:
-        transaction = self._payment.decode_notification(headers, body)
+        transaction = self._payment.decode_notification(headers, body, query=query)
+        if transaction.trade_state != "SUCCESS":
+            raise PaymentNotificationError("易支付回调支付未成功")
         return await self.handle_payment_transaction(transaction)
 
     async def handle_payment_transaction(self, transaction: PaymentTransaction) -> str:

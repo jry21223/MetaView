@@ -17,4 +17,10 @@ class IPaymentGateway(Protocol):
         description: str,
     ) -> NativePaymentOrder: ...
 
-    def decode_notification(self, headers: dict[str, str], body: bytes) -> PaymentTransaction: ...
+    def decode_notification(
+        self,
+        headers: dict[str, str],
+        body: bytes,
+        *,
+        query: dict[str, str] | None = None,
+    ) -> PaymentTransaction: ...

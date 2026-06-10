@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _ALL_DOMAINS = "algorithm,math,code,physics,chemistry,biology,geography"
@@ -129,7 +129,7 @@ class Settings(BaseSettings):
     wechat_login_redirect_uri: str | None = None
     wechat_login_success_url: str = "http://127.0.0.1:5173/"
 
-    # WeChat Pay API v3 Native recharge
+    # Legacy WeChat Pay API v3 Native recharge (legacy / deprecated; kept for compatibility only).
     wechat_pay_appid: str | None = None
     wechat_pay_mchid: str | None = None
     wechat_pay_merchant_serial_no: str | None = None
@@ -143,20 +143,53 @@ class Settings(BaseSettings):
     wechat_notify_replay_ttl_s: int = 600
 
     # Pluggable payment gateway (wechat/easypay)
-    payment_gateway: PaymentGatewayKind = "wechat"
-    # Legacy Epay-compatible fields
-    easypay_submit_url: str | None = None
-    easypay_merchant_id: str | None = None
-    easypay_api_key: str | None = None
-    # Preferred Epay-compatible fields
-    easypay_api_base: str | None = None
-    easypay_submit_path: str = "/submit.php"
-    easypay_pid: str | None = None
-    easypay_key: str | None = None
-    easypay_sign_type: str = "MD5"
-    easypay_pay_type: str = "alipay"
-    easypay_notify_url: str | None = None
-    easypay_return_url: str | None = None
+    payment_gateway: PaymentGatewayKind = "easypay"
+    # Primary Easypay-compatible fields (prefer these in configuration).
+    # Legacy `METAVIEW_EASYPAY_*` are supported as compatibility aliases.
+    epay_api_base: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("epay_api_base", "easypay_api_base"),
+    )
+    epay_submit_path: str = Field(
+        default="/submit.php",
+        validation_alias=AliasChoices("epay_submit_path", "easypay_submit_path"),
+    )
+    epay_submit_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("epay_submit_url", "easypay_submit_url"),
+    )
+    epay_pid: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("epay_pid", "easypay_pid"),
+    )
+    epay_merchant_id: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("epay_merchant_id", "easypay_merchant_id"),
+    )
+    epay_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("epay_key", "easypay_key"),
+    )
+    epay_api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("epay_api_key", "easypay_api_key"),
+    )
+    epay_sign_type: str = Field(
+        default="MD5",
+        validation_alias=AliasChoices("epay_sign_type", "easypay_sign_type"),
+    )
+    epay_pay_type: str = Field(
+        default="wxpay",
+        validation_alias=AliasChoices("epay_pay_type", "easypay_pay_type"),
+    )
+    epay_notify_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("epay_notify_url", "easypay_notify_url"),
+    )
+    epay_return_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("epay_return_url", "easypay_return_url"),
+    )
 
     # NewAPI redirect top-up bridge (local/dev checkout integration)
     newapi_topup_intent_secret: str | None = None
@@ -213,10 +246,10 @@ class Settings(BaseSettings):
     @classmethod
     def normalize_payment_gateway(cls, value: str | None) -> PaymentGatewayKind:
         if value is None:
-            return "wechat"
+            return "easypay"
         normalized = value.strip().lower()
         if normalized not in _PAYMENT_GATEWAYS:
-            return "wechat"
+            return "easypay"
         return normalized  # type: ignore[return-value]
 
     @field_validator("router_mode", mode="before")
