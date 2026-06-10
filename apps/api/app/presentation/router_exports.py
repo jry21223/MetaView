@@ -76,7 +76,7 @@ async def submit_export(
         with_audio=payload.with_audio,
         created_at=datetime.now(timezone.utc).isoformat(),
     )
-    export_repo.create(job)
+    await export_repo.create(job)
 
     use_case = ExportVideoUseCase(
         export_repo,
@@ -99,13 +99,13 @@ async def submit_export(
 
 @router.get("/{job_id}", response_model=ExportJobResponse)
 @read_limit()
-def get_export(
+async def get_export(
     request: Request,
     job_id: str,
     export_repo: Annotated[IExportJobRepository, Depends(get_export_repo)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> ExportJobResponse:
-    job = export_repo.get(job_id)
+    job = await export_repo.get(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail=f"Export {job_id!r} not found")
     return _to_response(job, request, settings.api_prefix)
@@ -113,12 +113,12 @@ def get_export(
 
 @router.get("/{job_id}/download")
 @read_limit()
-def download_export(
+async def download_export(
     request: Request,
     job_id: str,
     export_repo: Annotated[IExportJobRepository, Depends(get_export_repo)],
 ) -> FileResponse:
-    job = export_repo.get(job_id)
+    job = await export_repo.get(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail=f"Export {job_id!r} not found")
     if job.status != ExportJobStatus.COMPLETED or not job.output_path:

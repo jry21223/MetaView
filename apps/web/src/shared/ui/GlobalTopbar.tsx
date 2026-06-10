@@ -1,10 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 
-export type Stage = 'dashboard' | 'intake' | 'workbench' | 'history' | 'templates' | 'settings';
+export type Stage =
+  | "dashboard"
+  | "intake"
+  | "workbench"
+  | "history"
+  | "templates"
+  | "settings";
 
 interface GlobalTopbarProps {
   stage: Stage;
-  appEdition?: 'self' | 'ops';
+  appEdition?: "self" | "ops";
   isProviderConfigured: boolean;
   accountBalanceYuan?: string | null;
   accountName?: string | null;
@@ -19,7 +25,7 @@ interface GlobalTopbarProps {
 
 export function GlobalTopbar({
   stage,
-  appEdition = 'self',
+  appEdition = "self",
   isProviderConfigured,
   accountBalanceYuan,
   accountName,
@@ -32,59 +38,50 @@ export function GlobalTopbar({
   exportEnabled,
 }: GlobalTopbarProps) {
   const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
-  const isDashboard = stage === 'dashboard';
-  const isWorkbench = stage === 'workbench';
-  const isHistory = stage === 'history';
-  const isTemplates = stage === 'templates';
-  const isSettings = stage === 'settings';
-  const showOpsDashboardNav = appEdition === 'ops' && !isDashboard;
+  const isWorkbench = stage === "workbench" || stage === "intake";
+  const isHistory = stage === "history";
+  const isTemplates = stage === "templates";
+  const isSettings = stage === "settings";
   const avatarUrl =
-    appEdition === 'ops' && accountAvatarUrl && failedAvatarUrl !== accountAvatarUrl
+    appEdition === "ops" &&
+    accountAvatarUrl &&
+    failedAvatarUrl !== accountAvatarUrl
       ? accountAvatarUrl
       : null;
 
   return (
     <header className="mv-top">
       <div className="mv-brand">
-        <span className="mv-pulse" />
+        <span className="mv-brand-strip" />
         <span className="mv-brand-name">MetaView</span>
-        <span className="mv-brand-meta">/ Concept Studio · v0.3</span>
+        <span className="mv-brand-meta">THEORETICAL CANVAS</span>
       </div>
 
       <nav className="mv-nav">
-        {showOpsDashboardNav && (
-          <button
-            className={`mv-nav-item ${isDashboard ? 'is-active' : ''}`}
-            onClick={() => onNavigate('dashboard')}
-            type="button"
-          >
-            运营面板
-          </button>
-        )}
         <button
-          className={`mv-nav-item ${isWorkbench ? 'is-active' : ''}`}
-          onClick={() => onNavigate('workbench')}
+          className={`mv-nav-item ${isWorkbench ? "is-active" : ""}`}
+          onClick={() => onNavigate("intake")}
           type="button"
         >
           工作台
         </button>
         <button
-          className={`mv-nav-item ${isHistory ? 'is-active' : ''}`}
-          onClick={() => onNavigate('history')}
+          className={`mv-nav-item ${isHistory ? "is-active" : ""}`}
+          onClick={() => onNavigate("history")}
           type="button"
         >
           任务历史
         </button>
         <button
-          className={`mv-nav-item ${isTemplates ? 'is-active' : ''}`}
-          onClick={() => onNavigate('templates')}
+          className={`mv-nav-item ${isTemplates ? "is-active" : ""}`}
+          onClick={() => onNavigate("templates")}
           type="button"
         >
           模板
         </button>
         <button
-          className={`mv-nav-item ${isSettings ? 'is-active' : ''}`}
-          onClick={() => onNavigate('settings')}
+          className={`mv-nav-item ${isSettings ? "is-active" : ""}`}
+          onClick={() => onNavigate("settings")}
           type="button"
         >
           设置
@@ -97,7 +94,7 @@ export function GlobalTopbar({
             className="mv-icon-btn"
             onClick={onOpenExport}
             disabled={!exportEnabled}
-            title={exportEnabled ? '导出 MP4' : '等待生成完成后可导出'}
+            title={exportEnabled ? "导出 MP4" : "等待生成完成后可导出"}
             aria-label="导出 MP4"
             style={{ opacity: exportEnabled ? 1 : 0.5 }}
           >
@@ -108,17 +105,19 @@ export function GlobalTopbar({
           <button
             className="mv-icon-btn"
             onClick={onOpenProviderSettings}
-            title={appEdition === 'ops' ? '账户与充值' : '模型服务商设置'}
+            title={appEdition === "ops" ? "账户与充值" : "模型服务商设置"}
           >
-            {appEdition === 'ops' ? '¥' : '⚙'}
+            {appEdition === "ops" ? "¥" : "⚙"}
           </button>
         )}
         <div className="mv-status">
-          {appEdition === 'ops' ? (
+          {appEdition === "ops" ? (
             accountBalanceYuan != null ? (
               <>
                 <span className="mv-pulse" />
-                <span>{accountName ?? 'ACCOUNT'} · ¥ {accountBalanceYuan}</span>
+                <span>
+                  {accountName ?? "ACCOUNT"} · ¥ {accountBalanceYuan}
+                </span>
               </>
             ) : (
               <>
@@ -129,7 +128,9 @@ export function GlobalTopbar({
           ) : accountBalanceYuan != null ? (
             <>
               <span className="mv-pulse" />
-              <span>{accountName ?? 'ACCOUNT'} · ¥ {accountBalanceYuan}</span>
+              <span>
+                {accountName ?? "ACCOUNT"} · ¥ {accountBalanceYuan}
+              </span>
             </>
           ) : isProviderConfigured ? (
             <>
@@ -143,14 +144,18 @@ export function GlobalTopbar({
             </>
           )}
         </div>
-        <button className="mv-icon-btn" title="切换主题" onClick={onToggleTheme}>
-          {isDark ? '☀' : '☾'}
+        <button
+          className="mv-icon-btn"
+          title="切换主题"
+          onClick={onToggleTheme}
+        >
+          {isDark ? "☀" : "☾"}
         </button>
         {avatarUrl ? (
           <img
             className="mv-avatar mv-avatar-img"
             src={avatarUrl}
-            alt={`${accountName ?? '微信用户'}头像`}
+            alt={`${accountName ?? "微信用户"}头像`}
             referrerPolicy="no-referrer"
             onError={() => setFailedAvatarUrl(avatarUrl)}
           />

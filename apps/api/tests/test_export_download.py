@@ -31,7 +31,7 @@ def client_and_repo() -> tuple[TestClient, InMemoryExportJobRepository]:
         (".gif", "image/gif"),
     ],
 )
-def test_download_export_uses_output_file_format(
+async def test_download_export_uses_output_file_format(
     client_and_repo: tuple[TestClient, InMemoryExportJobRepository],
     tmp_path: Path,
     suffix: str,
@@ -40,7 +40,7 @@ def test_download_export_uses_output_file_format(
     client, repo = client_and_repo
     output = tmp_path / f"video{suffix}"
     output.write_bytes(b"fake video")
-    repo.create(
+    await repo.create(
         ExportJob(
             job_id=f"job{suffix}",
             run_id="run-abcdef1234",

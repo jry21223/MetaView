@@ -1,18 +1,24 @@
-import React, { useState } from 'react';
-import { GlobalTopbar, type Stage } from '../../shared/ui/GlobalTopbar';
+import React, { useState } from "react";
+import { GlobalTopbar, type Stage } from "../../shared/ui/GlobalTopbar";
 import {
   type ProviderSettings,
   type RouterModeSetting,
-} from '../../features/providers/hooks/useProviderSettings';
+} from "../../features/providers/hooks/useProviderSettings";
 import {
   OPENAI_VOICES,
   useTTS,
-} from '../../features/playbook/engine/player/useTTS';
-import { API_BASE_URL, type AppEdition } from '../../shared/config/constants';
-import type { TweakValues } from '../../features/studio-editor/hooks/useTweaks';
-import { THEME_PALETTE, type ThemeName } from '../../shared/config/themePalette';
+} from "../../features/playbook/engine/player/useTTS";
+import { API_BASE_URL, type AppEdition } from "../../shared/config/constants";
+import type { TweakValues } from "../../features/studio-editor/hooks/useTweaks";
+import {
+  THEME_PALETTE,
+  type ThemeName,
+} from "../../shared/config/themePalette";
 
-type SetTweakFn = <K extends keyof TweakValues>(key: K, value: TweakValues[K]) => void;
+type SetTweakFn = <K extends keyof TweakValues>(
+  key: K,
+  value: TweakValues[K],
+) => void;
 
 interface SettingsPageProps {
   appEdition?: AppEdition;
@@ -34,39 +40,54 @@ interface SettingsPageProps {
   setTweak: SetTweakFn;
 }
 
-const DENSITY_OPTIONS: Array<{ id: TweakValues['density']; label: string }> = [
-  { id: 'compact', label: '紧凑' },
-  { id: 'regular', label: '常规' },
-  { id: 'comfy', label: '宽松' },
+const DENSITY_OPTIONS: Array<{ id: TweakValues["density"]; label: string }> = [
+  { id: "compact", label: "紧凑" },
+  { id: "regular", label: "常规" },
+  { id: "comfy", label: "宽松" },
 ];
 
-const LAYOUT_OPTIONS: Array<{ id: TweakValues['layout']; label: string; hint: string }> = [
-  { id: 'drawer', label: '抽屉', hint: '默认；侧栏可收纳' },
-  { id: 'left', label: '左栏固定', hint: '永远显示左栏' },
-  { id: 'top', label: '顶部', hint: '极简 · 全宽' },
+const LAYOUT_OPTIONS: Array<{
+  id: TweakValues["layout"];
+  label: string;
+  hint: string;
+}> = [
+  { id: "drawer", label: "抽屉", hint: "默认；侧栏可收纳" },
+  { id: "left", label: "左栏固定", hint: "永远显示左栏" },
+  { id: "top", label: "顶部", hint: "极简 · 全宽" },
 ];
 
-const ROUTER_MODE_OPTIONS: Array<{ id: RouterModeSetting; label: string; hint: string }> = [
-  { id: 'hybrid', label: 'Hybrid', hint: '小模型优先，失败回退规则' },
-  { id: 'llm', label: 'LLM', hint: '仅使用路由模型' },
-  { id: 'heuristic', label: 'Heuristic', hint: '仅使用确定性规则' },
-  { id: 'off', label: 'Off', hint: '关闭路由模型' },
+const ROUTER_MODE_OPTIONS: Array<{
+  id: RouterModeSetting;
+  label: string;
+  hint: string;
+}> = [
+  { id: "hybrid", label: "Hybrid", hint: "小模型优先，失败回退规则" },
+  { id: "llm", label: "LLM", hint: "仅使用路由模型" },
+  { id: "heuristic", label: "Heuristic", hint: "仅使用确定性规则" },
+  { id: "off", label: "Off", hint: "关闭路由模型" },
 ];
 
-const THEME_OPTIONS = (Object.keys(THEME_PALETTE) as ThemeName[]).map((name) => ({
-  id: name,
-  ...THEME_PALETTE[name],
-}));
+const THEME_OPTIONS = (Object.keys(THEME_PALETTE) as ThemeName[]).map(
+  (name) => ({
+    id: name,
+    ...THEME_PALETTE[name],
+  }),
+);
 
 const VOICE_RATE_BOUNDS = { min: 0.5, max: 2.0, step: 0.05 } as const;
 
-function clampNumber(value: number, fallback: number, min: number, max: number): number {
+function clampNumber(
+  value: number,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
   if (!Number.isFinite(value)) return fallback;
   return Math.max(min, Math.min(max, value));
 }
 
 export function SettingsPage({
-  appEdition = 'self',
+  appEdition = "self",
   isDark,
   isProviderConfigured,
   accountBalanceYuan = null,
@@ -80,34 +101,44 @@ export function SettingsPage({
   tweaks,
   setTweak,
 }: SettingsPageProps) {
-  const showProviderSettings = appEdition === 'self';
-  const [apiKey, setApiKey] = useState(providerSettings?.apiKey ?? '');
+  const showProviderSettings = appEdition === "self";
+  const [apiKey, setApiKey] = useState(providerSettings?.apiKey ?? "");
   const [baseUrl, setBaseUrl] = useState(
-    providerSettings?.baseUrl ?? 'https://api.openai.com/v1',
+    providerSettings?.baseUrl ?? "https://api.openai.com/v1",
   );
-  const [model, setModel] = useState(providerSettings?.model ?? 'gpt-4o-mini');
+  const [model, setModel] = useState(providerSettings?.model ?? "gpt-4o-mini");
   const [routerMode, setRouterMode] = useState<RouterModeSetting>(
-    providerSettings?.routerMode ?? 'hybrid',
+    providerSettings?.routerMode ?? "hybrid",
   );
-  const [routerModel, setRouterModel] = useState(providerSettings?.routerModel ?? '');
+  const [routerModel, setRouterModel] = useState(
+    providerSettings?.routerModel ?? "",
+  );
   const [routerMinConfidence, setRouterMinConfidence] = useState(
     providerSettings?.routerMinConfidence ?? 0.72,
   );
-  const [routerTimeoutS, setRouterTimeoutS] = useState(providerSettings?.routerTimeoutS ?? 12);
+  const [routerTimeoutS, setRouterTimeoutS] = useState(
+    providerSettings?.routerTimeoutS ?? 12,
+  );
   const [showKey, setShowKey] = useState(false);
   const [savedFlash, setSavedFlash] = useState<string | null>(null);
   const [ttsProbe, setTtsProbe] = useState<
-    { kind: 'idle' } | { kind: 'loading' } | { kind: 'ok' } | { kind: 'error'; detail: string }
-  >({ kind: 'idle' });
+    | { kind: "idle" }
+    | { kind: "loading" }
+    | { kind: "ok" }
+    | { kind: "error"; detail: string }
+  >({ kind: "idle" });
 
   const tts = useTTS();
 
   const flash = (msg: string) => {
     setSavedFlash(msg);
-    window.setTimeout(() => setSavedFlash((cur) => (cur === msg ? null : cur)), 1800);
+    window.setTimeout(
+      () => setSavedFlash((cur) => (cur === msg ? null : cur)),
+      1800,
+    );
   };
 
-  const routerUsesModel = routerMode === 'hybrid' || routerMode === 'llm';
+  const routerUsesModel = routerMode === "hybrid" || routerMode === "llm";
 
   const handleProviderSave = () => {
     if (!onUpdateProvider) return;
@@ -120,21 +151,21 @@ export function SettingsPage({
       routerMinConfidence: clampNumber(routerMinConfidence, 0.72, 0, 1),
       routerTimeoutS: clampNumber(routerTimeoutS, 12, 1, 60),
     });
-    flash('服务商与路由配置已保存');
+    flash("服务商与路由配置已保存");
   };
 
   const handleClearExportJobs = () => {
     try {
-      window.sessionStorage.removeItem('mv_export_jobs');
-      flash('已清除本地导出任务记录');
+      window.sessionStorage.removeItem("mv_export_jobs");
+      flash("已清除本地导出任务记录");
     } catch {
-      flash('清除失败（sessionStorage 不可用）');
+      flash("清除失败（sessionStorage 不可用）");
     }
   };
 
   const handleClearTtsCache = () => {
     tts.clearCache();
-    flash('朗读音频缓存已清空');
+    flash("朗读音频缓存已清空");
   };
 
   /** Fire a short request through the backend TTS proxy so the user can
@@ -142,14 +173,14 @@ export function SettingsPage({
    *  full playback. 503 from the proxy means the env var isn't configured;
    *  surface that message directly. */
   const handleTtsProbe = async () => {
-    setTtsProbe({ kind: 'loading' });
+    setTtsProbe({ kind: "loading" });
     try {
       const resp = await fetch(`${API_BASE_URL}/api/v1/tts/speech`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          text: '朗读后端测试。',
-          voice: tts.config.voice === 'auto' ? 'alloy' : tts.config.voice,
+          text: "朗读后端测试。",
+          voice: tts.config.voice === "auto" ? "alloy" : tts.config.voice,
           rate: 1.0,
         }),
       });
@@ -161,14 +192,14 @@ export function SettingsPage({
         } catch {
           // fall through with status-only detail
         }
-        setTtsProbe({ kind: 'error', detail });
+        setTtsProbe({ kind: "error", detail });
         return;
       }
-      setTtsProbe({ kind: 'ok' });
+      setTtsProbe({ kind: "ok" });
     } catch (err) {
       setTtsProbe({
-        kind: 'error',
-        detail: err instanceof Error ? err.message : '请求失败',
+        kind: "error",
+        detail: err instanceof Error ? err.message : "请求失败",
       });
     }
   };
@@ -191,12 +222,12 @@ export function SettingsPage({
         <header className="mv-settings-head">
           <div className="mv-eyebrow-mini">设置</div>
           <h1 className="mv-settings-title">
-            {showProviderSettings ? '教学生成与模型路由' : '账户偏好与播放设置'}
+            {showProviderSettings ? "教学生成与模型路由" : "账户偏好与播放设置"}
           </h1>
           <p className="mv-settings-sub">
             {showProviderSettings
-              ? '把生成模型、路由模型、朗读和界面偏好放在一页；本地设置只保存在当前浏览器。'
-              : '运营版由平台托管模型服务；这里保留播放、朗读和界面偏好。'}
+              ? "把生成模型、路由模型、朗读和界面偏好放在一页；本地设置只保存在当前浏览器。"
+              : "运营版由平台托管模型服务；这里保留播放、朗读和界面偏好。"}
           </p>
           {savedFlash && (
             <div className="mv-settings-flash" role="status" aria-live="polite">
@@ -206,140 +237,147 @@ export function SettingsPage({
         </header>
 
         {showProviderSettings && (
-        <section className="mv-settings-section">
-          <h2 className="mv-settings-section-title">生成模型</h2>
-          <p className="mv-settings-section-hint">
-            配置 OpenAI 或任意兼容接口；留空密钥时会回退到后端默认凭据。
-          </p>
+          <section className="mv-settings-section">
+            <h2 className="mv-settings-section-title">生成模型</h2>
+            <p className="mv-settings-section-hint">
+              配置 OpenAI 或任意兼容接口；留空密钥时会回退到后端默认凭据。
+            </p>
 
-          <div className="mv-settings-field">
-            <label htmlFor="mv-set-key">API 密钥</label>
-            <div className="mv-settings-field-inline">
-              <input
-                id="mv-set-key"
-                type={showKey ? 'text' : 'password'}
-                className="mv-text-input mv-mono"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="sk-..."
-              />
-              <button
-                type="button"
-                className="mv-chip"
-                onClick={() => setShowKey((s) => !s)}
-              >
-                {showKey ? '隐藏' : '显示'}
-              </button>
+            <div className="mv-settings-field">
+              <label htmlFor="mv-set-key">API 密钥</label>
+              <div className="mv-settings-field-inline">
+                <input
+                  id="mv-set-key"
+                  type={showKey ? "text" : "password"}
+                  className="mv-text-input mv-mono"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="sk-..."
+                />
+                <button
+                  type="button"
+                  className="mv-chip"
+                  onClick={() => setShowKey((s) => !s)}
+                >
+                  {showKey ? "隐藏" : "显示"}
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div className="mv-settings-field">
-            <label htmlFor="mv-set-base">接口地址</label>
-            <input
-              id="mv-set-base"
-              type="url"
-              className="mv-text-input mv-mono"
-              value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
-              placeholder="https://api.openai.com/v1"
-            />
-          </div>
+            <div className="mv-settings-field">
+              <label htmlFor="mv-set-base">接口地址</label>
+              <input
+                id="mv-set-base"
+                type="url"
+                className="mv-text-input mv-mono"
+                value={baseUrl}
+                onChange={(e) => setBaseUrl(e.target.value)}
+                placeholder="https://api.openai.com/v1"
+              />
+            </div>
 
-          <div className="mv-settings-field">
-            <label htmlFor="mv-set-model">生成模型</label>
-            <input
-              id="mv-set-model"
-              type="text"
-              className="mv-text-input mv-mono"
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              placeholder="gpt-4o-mini"
-            />
-          </div>
-        </section>
+            <div className="mv-settings-field">
+              <label htmlFor="mv-set-model">生成模型</label>
+              <input
+                id="mv-set-model"
+                type="text"
+                className="mv-text-input mv-mono"
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                placeholder="gpt-4o-mini"
+              />
+            </div>
+          </section>
         )}
 
         {showProviderSettings && (
-        <section className="mv-settings-section">
-          <h2 className="mv-settings-section-title">小模型路由</h2>
-          <p className="mv-settings-section-hint">
-            题目进入生成链路前先判断学科与 specialized skill；路由模型建议使用小而快的模型。
-          </p>
+          <section className="mv-settings-section">
+            <h2 className="mv-settings-section-title">小模型路由</h2>
+            <p className="mv-settings-section-hint">
+              题目进入生成链路前先判断学科与 specialized
+              skill；路由模型建议使用小而快的模型。
+            </p>
 
-          <div className="mv-settings-field">
-            <label>Router Mode</label>
-            <div className="mv-settings-segmented mv-router-mode-grid">
-              {ROUTER_MODE_OPTIONS.map((mode) => (
-                <button
-                  key={mode.id}
-                  type="button"
-                  className={`mv-chip${routerMode === mode.id ? ' mv-chip-primary' : ''}`}
-                  onClick={() => setRouterMode(mode.id)}
-                  title={mode.hint}
-                >
-                  <span className="mv-settings-layout-label">{mode.label}</span>
-                  <span className="mv-settings-layout-hint">{mode.hint}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="mv-settings-field">
-            <label htmlFor="mv-set-router-model">Router Model</label>
-            <input
-              id="mv-set-router-model"
-              type="text"
-              className="mv-text-input mv-mono"
-              value={routerModel}
-              onChange={(e) => setRouterModel(e.target.value)}
-              placeholder="留空则复用后端默认 / 生成模型"
-              disabled={!routerUsesModel}
-            />
-          </div>
-
-          <div className="mv-settings-router-grid">
             <div className="mv-settings-field">
-              <label htmlFor="mv-set-router-confidence">
-                最低置信度 · {routerMinConfidence.toFixed(2)}
-              </label>
-              <input
-                id="mv-set-router-confidence"
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={routerMinConfidence}
-                onChange={(e) => setRouterMinConfidence(Number.parseFloat(e.target.value))}
-                disabled={!routerUsesModel}
-                className="mv-settings-slider"
-              />
+              <label>Router Mode</label>
+              <div className="mv-settings-segmented mv-router-mode-grid">
+                {ROUTER_MODE_OPTIONS.map((mode) => (
+                  <button
+                    key={mode.id}
+                    type="button"
+                    className={`mv-chip${routerMode === mode.id ? " mv-chip-primary" : ""}`}
+                    onClick={() => setRouterMode(mode.id)}
+                    title={mode.hint}
+                  >
+                    <span className="mv-settings-layout-label">
+                      {mode.label}
+                    </span>
+                    <span className="mv-settings-layout-hint">{mode.hint}</span>
+                  </button>
+                ))}
+              </div>
             </div>
+
             <div className="mv-settings-field">
-              <label htmlFor="mv-set-router-timeout">路由超时（秒）</label>
+              <label htmlFor="mv-set-router-model">Router Model</label>
               <input
-                id="mv-set-router-timeout"
-                type="number"
-                min={1}
-                max={60}
-                step={1}
+                id="mv-set-router-model"
+                type="text"
                 className="mv-text-input mv-mono"
-                value={routerTimeoutS}
-                onChange={(e) => setRouterTimeoutS(Number.parseFloat(e.target.value))}
+                value={routerModel}
+                onChange={(e) => setRouterModel(e.target.value)}
+                placeholder="留空则复用后端默认 / 生成模型"
                 disabled={!routerUsesModel}
               />
             </div>
-          </div>
 
-          <div className="mv-settings-actions">
-            <button
-              type="button"
-              className="mv-chip mv-chip-primary"
-              onClick={handleProviderSave}
-            >
-              保存模型与路由配置
-            </button>
-          </div>
-        </section>
+            <div className="mv-settings-router-grid">
+              <div className="mv-settings-field">
+                <label htmlFor="mv-set-router-confidence">
+                  最低置信度 · {routerMinConfidence.toFixed(2)}
+                </label>
+                <input
+                  id="mv-set-router-confidence"
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={routerMinConfidence}
+                  onChange={(e) =>
+                    setRouterMinConfidence(Number.parseFloat(e.target.value))
+                  }
+                  disabled={!routerUsesModel}
+                  className="mv-settings-slider"
+                />
+              </div>
+              <div className="mv-settings-field">
+                <label htmlFor="mv-set-router-timeout">路由超时（秒）</label>
+                <input
+                  id="mv-set-router-timeout"
+                  type="number"
+                  min={1}
+                  max={60}
+                  step={1}
+                  className="mv-text-input mv-mono"
+                  value={routerTimeoutS}
+                  onChange={(e) =>
+                    setRouterTimeoutS(Number.parseFloat(e.target.value))
+                  }
+                  disabled={!routerUsesModel}
+                />
+              </div>
+            </div>
+
+            <div className="mv-settings-actions">
+              <button
+                type="button"
+                className="mv-chip mv-chip-primary"
+                onClick={handleProviderSave}
+              >
+                保存模型与路由配置
+              </button>
+            </div>
+          </section>
         )}
 
         {/* ───── TTS ───── */}
@@ -348,7 +386,8 @@ export function SettingsPage({
           <p className="mv-settings-section-hint">
             浏览器语音不需要配置；OpenAI 服务端走后端代理（issue #40），
             前端不再存第三方密钥。API 密钥需在服务器 <code>.env</code> 设置
-            <code>METAVIEW_TTS_API_KEY</code>（缺省回退到 <code>METAVIEW_OPENAI_API_KEY</code>）。
+            <code>METAVIEW_TTS_API_KEY</code>（缺省回退到{" "}
+            <code>METAVIEW_OPENAI_API_KEY</code>）。
           </p>
 
           <div className="mv-settings-field">
@@ -356,22 +395,22 @@ export function SettingsPage({
             <div className="mv-settings-segmented">
               <button
                 type="button"
-                className={`mv-chip${tts.config.backend === 'system' ? ' mv-chip-primary' : ''}`}
-                onClick={() => tts.updateConfig({ backend: 'system' })}
+                className={`mv-chip${tts.config.backend === "system" ? " mv-chip-primary" : ""}`}
+                onClick={() => tts.updateConfig({ backend: "system" })}
               >
                 浏览器语音
               </button>
               <button
                 type="button"
-                className={`mv-chip${tts.config.backend === 'openai' ? ' mv-chip-primary' : ''}`}
-                onClick={() => tts.updateConfig({ backend: 'openai' })}
+                className={`mv-chip${tts.config.backend === "openai" ? " mv-chip-primary" : ""}`}
+                onClick={() => tts.updateConfig({ backend: "openai" })}
               >
                 OpenAI 服务端
               </button>
             </div>
           </div>
 
-          {tts.config.backend === 'openai' && (
+          {tts.config.backend === "openai" && (
             <div className="mv-settings-field">
               <label>API 密钥状态</label>
               <div className="mv-settings-field-inline">
@@ -379,19 +418,21 @@ export function SettingsPage({
                   type="button"
                   className="mv-chip"
                   onClick={handleTtsProbe}
-                  disabled={ttsProbe.kind === 'loading'}
+                  disabled={ttsProbe.kind === "loading"}
                 >
-                  {ttsProbe.kind === 'loading' ? '测试中…' : '测试朗读后端'}
+                  {ttsProbe.kind === "loading" ? "测试中…" : "测试朗读后端"}
                 </button>
-                {ttsProbe.kind === 'ok' && (
-                  <span className="mv-settings-probe-ok">✓ 后端可用，密钥已生效</span>
+                {ttsProbe.kind === "ok" && (
+                  <span className="mv-settings-probe-ok">
+                    ✓ 后端可用，密钥已生效
+                  </span>
                 )}
-                {ttsProbe.kind === 'error' && (
+                {ttsProbe.kind === "error" && (
                   <span className="mv-settings-probe-err" role="alert">
                     ✗ {ttsProbe.detail}
                   </span>
                 )}
-                {ttsProbe.kind === 'idle' && (
+                {ttsProbe.kind === "idle" && (
                   <span className="mv-settings-probe-hint">
                     点一下确认 <code>METAVIEW_TTS_API_KEY</code> 是否已配置
                   </span>
@@ -407,7 +448,7 @@ export function SettingsPage({
               className="mv-text-input"
               value={tts.config.voice}
               onChange={(e) => tts.updateConfig({ voice: e.target.value })}
-              disabled={tts.config.backend === 'system'}
+              disabled={tts.config.backend === "system"}
             >
               <option value="auto">自动 · 跟随学科推荐</option>
               {OPENAI_VOICES.map((v) => (
@@ -430,7 +471,9 @@ export function SettingsPage({
               step={VOICE_RATE_BOUNDS.step}
               value={tts.config.rate}
               onChange={(e) =>
-                tts.updateConfig({ rate: Number.parseFloat(e.target.value) || 1.0 })
+                tts.updateConfig({
+                  rate: Number.parseFloat(e.target.value) || 1.0,
+                })
               }
               className="mv-settings-slider"
             />
@@ -456,24 +499,30 @@ export function SettingsPage({
 
           <div className="mv-settings-field">
             <label>主题</label>
-            <div className="mv-settings-theme-grid" role="group" aria-label="主题">
+            <div
+              className="mv-settings-theme-grid"
+              role="group"
+              aria-label="主题"
+            >
               {THEME_OPTIONS.map((theme) => {
                 const selected = tweaks.theme === theme.id;
                 return (
                   <button
                     key={theme.id}
                     type="button"
-                    className={`mv-settings-theme-card${selected ? ' is-on' : ''}`}
+                    className={`mv-settings-theme-card${selected ? " is-on" : ""}`}
                     aria-pressed={selected}
-                    onClick={() => setTweak('theme', theme.id)}
-                    style={{
-                      '--theme-preview-surface': theme.surface2,
-                      '--theme-preview-ink': theme.ink,
-                      '--theme-preview-ink-2': theme.ink2,
-                      '--theme-preview-line': theme.line,
-                      '--theme-preview-line-2': theme.line2,
-                      '--theme-preview-accent': theme.accent,
-                    } as React.CSSProperties}
+                    onClick={() => setTweak("theme", theme.id)}
+                    style={
+                      {
+                        "--theme-preview-surface": theme.surface2,
+                        "--theme-preview-ink": theme.ink,
+                        "--theme-preview-ink-2": theme.ink2,
+                        "--theme-preview-line": theme.line,
+                        "--theme-preview-line-2": theme.line2,
+                        "--theme-preview-accent": theme.accent,
+                      } as React.CSSProperties
+                    }
                   >
                     <span className="mv-settings-theme-stage" aria-hidden>
                       <span className="mv-settings-theme-line is-wide" />
@@ -485,8 +534,12 @@ export function SettingsPage({
                       </span>
                     </span>
                     <span className="mv-settings-theme-meta">
-                      <span className="mv-settings-theme-name">{theme.label}</span>
-                      <span className="mv-settings-theme-mode">{theme.type}</span>
+                      <span className="mv-settings-theme-name">
+                        {theme.label}
+                      </span>
+                      <span className="mv-settings-theme-mode">
+                        {theme.type}
+                      </span>
                     </span>
                   </button>
                 );
@@ -501,11 +554,16 @@ export function SettingsPage({
                 id="mv-set-accent"
                 type="color"
                 value={tweaks.accent}
-                onChange={(e) => setTweak('accent', e.target.value)}
+                onChange={(e) => setTweak("accent", e.target.value)}
                 aria-label="强调色"
               />
-              <span className="mv-settings-accent-swatch" style={{ background: tweaks.accent }} />
-              <span className="mv-settings-accent-value mv-mono">{tweaks.accent}</span>
+              <span
+                className="mv-settings-accent-swatch"
+                style={{ background: tweaks.accent }}
+              />
+              <span className="mv-settings-accent-value mv-mono">
+                {tweaks.accent}
+              </span>
             </div>
           </div>
 
@@ -516,8 +574,8 @@ export function SettingsPage({
                 <button
                   key={d.id}
                   type="button"
-                  className={`mv-chip${tweaks.density === d.id ? ' mv-chip-primary' : ''}`}
-                  onClick={() => setTweak('density', d.id)}
+                  className={`mv-chip${tweaks.density === d.id ? " mv-chip-primary" : ""}`}
+                  onClick={() => setTweak("density", d.id)}
                 >
                   {d.label}
                 </button>
@@ -532,8 +590,8 @@ export function SettingsPage({
                 <button
                   key={l.id}
                   type="button"
-                  className={`mv-chip${tweaks.layout === l.id ? ' mv-chip-primary' : ''}`}
-                  onClick={() => setTweak('layout', l.id)}
+                  className={`mv-chip${tweaks.layout === l.id ? " mv-chip-primary" : ""}`}
+                  onClick={() => setTweak("layout", l.id)}
                   title={l.hint}
                 >
                   <span className="mv-settings-layout-label">{l.label}</span>
@@ -544,14 +602,12 @@ export function SettingsPage({
           </div>
 
           <div className="mv-settings-field mv-settings-field-row">
-            <label htmlFor="mv-set-dock">
-              工作台显示历史侧栏
-            </label>
+            <label htmlFor="mv-set-dock">工作台显示历史侧栏</label>
             <input
               id="mv-set-dock"
               type="checkbox"
               checked={tweaks.showHistoryDock}
-              onChange={(e) => setTweak('showHistoryDock', e.target.checked)}
+              onChange={(e) => setTweak("showHistoryDock", e.target.checked)}
             />
           </div>
         </section>

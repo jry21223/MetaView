@@ -22,24 +22,32 @@ describe("App edition shells", () => {
     server.use(
       http.get(`${API_BASE_URL}/api/v1/account/me`, () => {
         accountHits += 1;
-        return HttpResponse.json({ detail: "should not be requested" }, { status: 500 });
+        return HttpResponse.json(
+          { detail: "should not be requested" },
+          { status: 500 },
+        );
       }),
       http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () => {
         opsHits += 1;
-        return HttpResponse.json({ detail: "should not be requested" }, { status: 500 });
+        return HttpResponse.json(
+          { detail: "should not be requested" },
+          { status: 500 },
+        );
       }),
     );
     vi.stubEnv("VITE_APP_EDITION", "self");
 
     const { App } = await import("./App");
     render(<App />);
-    await waitFor(() => expect(document.body.textContent).toContain("MetaView"));
+    await waitFor(() =>
+      expect(document.body.textContent).toContain("MetaView"),
+    );
 
     expect(accountHits).toBe(0);
     expect(opsHits).toBe(0);
   });
 
-  it("ops edition loads account state and opens the global dashboard", async () => {
+  it("ops edition loads account state and opens the intake screen by default", async () => {
     let accountHits = 0;
     let dashboardHits = 0;
     server.use(
@@ -70,9 +78,10 @@ describe("App edition shells", () => {
     render(<App />);
 
     await waitFor(() => expect(accountHits).toBe(1));
-    await waitFor(() => expect(dashboardHits).toBe(1));
-    expect(document.body.textContent).toContain("全局运营");
-    expect(document.body.textContent).toContain("余额 ¥ 5.00");
+    await waitFor(() => expect(dashboardHits).toBe(0));
+    expect(document.body.textContent).toContain("把题目交给我");
+    expect(document.body.textContent).not.toContain("全局运营");
+    expect(document.body.textContent).toContain("游客账户 · ¥ 5.00");
   });
 
   it("self edition does not expose ops dashboard shortcut", async () => {

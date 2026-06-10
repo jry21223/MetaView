@@ -1,12 +1,8 @@
 import { describe, expect, it } from "vitest";
-import {
-  MATH_PRESETS,
-  getPreset,
-  initialParams,
-} from "./presets";
+import { MATH_PRESETS, getPreset, initialParams } from "./presets";
 import { compileExpr } from "../../../shared/lib/mathExpr";
 
-describe("math-widget presets", () => {
+describe("param-widget presets", () => {
   it("ships at least four presets with unique ids", () => {
     expect(MATH_PRESETS.length).toBeGreaterThanOrEqual(4);
     const ids = MATH_PRESETS.map((p) => p.id);
@@ -32,7 +28,10 @@ describe("math-widget presets", () => {
 
   it("every curve expression compiles and evaluates to a number at the initial params", () => {
     for (const preset of MATH_PRESETS) {
-      const scope = { ...initialParams(preset), x: (preset.xRange[0] + preset.xRange[1]) / 2 };
+      const scope = {
+        ...initialParams(preset),
+        x: (preset.xRange[0] + preset.xRange[1]) / 2,
+      };
       for (const curve of preset.curves) {
         const fn = compileExpr(curve.expression);
         expect(typeof fn(scope)).toBe("number");
@@ -43,7 +42,8 @@ describe("math-widget presets", () => {
   it("xRange is ordered and non-degenerate", () => {
     for (const preset of MATH_PRESETS) {
       expect(preset.xRange[0]).toBeLessThan(preset.xRange[1]);
-      if (preset.yRange) expect(preset.yRange[0]).toBeLessThan(preset.yRange[1]);
+      if (preset.yRange)
+        expect(preset.yRange[0]).toBeLessThan(preset.yRange[1]);
     }
   });
 
@@ -72,6 +72,8 @@ describe("math-widget presets", () => {
     const f = compileExpr(preset.curves[0].expression); // 0.5*x^2
     const tangent = compileExpr(preset.curves[1].expression); // a*x - 0.5*a^2
     // both equal f(a) at x = a
-    expect(tangent({ ...params, x: params.a })).toBeCloseTo(f({ ...params, x: params.a }));
+    expect(tangent({ ...params, x: params.a })).toBeCloseTo(
+      f({ ...params, x: params.a }),
+    );
   });
 });

@@ -16,7 +16,7 @@ export interface PlotMarker {
   label?: string;
 }
 
-interface FunctionPlotProps {
+interface ParamPlotProps {
   series: PlotSeries[];
   xRange: [number, number];
   /** Fixed y-range; omit to auto-fit from the supplied samples. */
@@ -66,7 +66,7 @@ function toSegments(pts: SamplePoint[]): SamplePoint[][] {
   return out;
 }
 
-export function FunctionPlot({
+export function ParamPlot({
   series,
   xRange,
   yRange,
@@ -74,7 +74,7 @@ export function FunctionPlot({
   marker,
   xLabel = "x",
   yLabel = "y",
-}: FunctionPlotProps): React.JSX.Element {
+}: ParamPlotProps): React.JSX.Element {
   const c = THEME[theme];
   const [xMin, xMax] = xRange[0] < xRange[1] ? xRange : [-10, 10];
 
@@ -84,7 +84,8 @@ export function FunctionPlot({
     [yLo, yHi] = yRange;
   } else {
     const ys: number[] = [];
-    for (const s of series) for (const p of s.points) if (Number.isFinite(p.y)) ys.push(p.y);
+    for (const s of series)
+      for (const p of s.points) if (Number.isFinite(p.y)) ys.push(p.y);
     [yLo, yHi] = padRange(...autoYBounds(ys));
   }
   if (!(yLo < yHi)) {
@@ -125,31 +126,88 @@ export function FunctionPlot({
       <rect x={M.left} y={M.top} width={PW} height={PH} fill={c.bg} />
 
       {xTicks.map((t) => (
-        <line key={`gx${t}`} x1={sx(t)} y1={M.top} x2={sx(t)} y2={M.top + PH} stroke={c.grid} strokeWidth={1} />
+        <line
+          key={`gx${t}`}
+          x1={sx(t)}
+          y1={M.top}
+          x2={sx(t)}
+          y2={M.top + PH}
+          stroke={c.grid}
+          strokeWidth={1}
+        />
       ))}
       {yTicks.map((t) => (
-        <line key={`gy${t}`} x1={M.left} y1={sy(t)} x2={M.left + PW} y2={sy(t)} stroke={c.grid} strokeWidth={1} />
+        <line
+          key={`gy${t}`}
+          x1={M.left}
+          y1={sy(t)}
+          x2={M.left + PW}
+          y2={sy(t)}
+          stroke={c.grid}
+          strokeWidth={1}
+        />
       ))}
 
-      <line x1={M.left} y1={axisY} x2={M.left + PW} y2={axisY} stroke={c.axis} strokeWidth={1.6} />
-      <line x1={axisX} y1={M.top} x2={axisX} y2={M.top + PH} stroke={c.axis} strokeWidth={1.6} />
-      <text x={M.left + PW - 4} y={axisY - 6} textAnchor="end" fontSize={13} fontStyle="italic" fill={c.label}>
+      <line
+        x1={M.left}
+        y1={axisY}
+        x2={M.left + PW}
+        y2={axisY}
+        stroke={c.axis}
+        strokeWidth={1.6}
+      />
+      <line
+        x1={axisX}
+        y1={M.top}
+        x2={axisX}
+        y2={M.top + PH}
+        stroke={c.axis}
+        strokeWidth={1.6}
+      />
+      <text
+        x={M.left + PW - 4}
+        y={axisY - 6}
+        textAnchor="end"
+        fontSize={13}
+        fontStyle="italic"
+        fill={c.label}
+      >
         {xLabel}
       </text>
-      <text x={axisX + 8} y={M.top + 12} fontSize={13} fontStyle="italic" fill={c.label}>
+      <text
+        x={axisX + 8}
+        y={M.top + 12}
+        fontSize={13}
+        fontStyle="italic"
+        fill={c.label}
+      >
         {yLabel}
       </text>
 
       {xTicks.map((t) =>
         t === 0 && hasYAxis ? null : (
-          <text key={`tx${t}`} x={sx(t)} y={axisY + 15} textAnchor="middle" fontSize={11} fill={c.tick}>
+          <text
+            key={`tx${t}`}
+            x={sx(t)}
+            y={axisY + 15}
+            textAnchor="middle"
+            fontSize={11}
+            fill={c.tick}
+          >
             {fmtNum(t)}
           </text>
         ),
       )}
       {yTicks.map((t) =>
         t === 0 ? null : (
-          <text key={`ty${t}`} x={axisX - 6} y={sy(t) + 4} textAnchor="end" fontSize={11} fill={c.tick}>
+          <text
+            key={`ty${t}`}
+            x={axisX - 6}
+            y={sy(t) + 4}
+            textAnchor="end"
+            fontSize={11}
+            fill={c.tick}
+          >
             {fmtNum(t)}
           </text>
         ),
@@ -183,8 +241,19 @@ export function FunctionPlot({
               strokeWidth={1.3}
               strokeDasharray="4 4"
             />
-            <circle cx={sx(marker.x)} cy={sy(marker.y)} r={8} fill={marker.color} opacity={0.3} />
-            <circle cx={sx(marker.x)} cy={sy(marker.y)} r={4.5} fill={marker.color} />
+            <circle
+              cx={sx(marker.x)}
+              cy={sy(marker.y)}
+              r={8}
+              fill={marker.color}
+              opacity={0.3}
+            />
+            <circle
+              cx={sx(marker.x)}
+              cy={sy(marker.y)}
+              r={4.5}
+              fill={marker.color}
+            />
           </g>
         )}
       </g>

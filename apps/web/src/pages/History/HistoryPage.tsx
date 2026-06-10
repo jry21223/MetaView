@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react';
-import { TweakValues } from '../../features/studio-editor/hooks/useTweaks';
-import { deletePipelineRun } from '../../features/history/api/historyApi';
-import { useHistoryRuns } from '../../features/history/hooks/useHistoryRuns';
+import React, { useMemo, useState } from "react";
+import { TweakValues } from "../../features/studio-editor/hooks/useTweaks";
+import { deletePipelineRun } from "../../features/history/api/historyApi";
+import { useHistoryRuns } from "../../features/history/hooks/useHistoryRuns";
 import {
   applyHistoryFilter,
   computeHistoryStats,
@@ -10,25 +10,25 @@ import {
   type HistoryFilter,
   type StatusFilter,
   type TimeWindow,
-} from '../../features/history/lib/historyFilters';
-import { PlaybookPlayer } from '../../features/playbook/engine/player/PlaybookPlayer';
-import { AutoRefinedBadge } from '../../features/runs/AutoRefinedBadge';
-import { PromptDoctor } from '../../features/runs/PromptDoctor';
-import { RunProgressStepper } from '../../features/runs/RunProgressStepper';
-import { themeMode } from '../../features/studio-editor/hooks/useTweaks';
-import type { PipelineRunResult } from '../../entities/pipeline/types';
-import type { PlaybookScript } from '../../entities/playbook/types';
-import { GlobalTopbar, Stage } from '../../shared/ui/GlobalTopbar';
+} from "../../features/history/lib/historyFilters";
+import { PlaybookPlayer } from "../../features/playbook/engine/player/PlaybookPlayer";
+import { AutoRefinedBadge } from "../../features/runs/AutoRefinedBadge";
+import { PromptDoctor } from "../../features/runs/PromptDoctor";
+import { RunProgressStepper } from "../../features/runs/RunProgressStepper";
+import { themeMode } from "../../features/studio-editor/hooks/useTweaks";
+import type { PipelineRunResult } from "../../entities/pipeline/types";
+import type { PlaybookScript } from "../../entities/playbook/types";
+import { GlobalTopbar, Stage } from "../../shared/ui/GlobalTopbar";
 
-const STATUS_LABEL: Record<PipelineRunResult['status'], string> = {
-  queued: '排队',
-  running: '生成中',
-  reviewing: '审核中',
-  succeeded: '完成',
-  failed: '失败',
+const STATUS_LABEL: Record<PipelineRunResult["status"], string> = {
+  queued: "排队",
+  running: "生成中",
+  reviewing: "审核中",
+  succeeded: "完成",
+  failed: "失败",
 };
 
-function StatusBadge({ status }: { status: PipelineRunResult['status'] }) {
+function StatusBadge({ status }: { status: PipelineRunResult["status"] }) {
   return (
     <span className="mv-history-badge" data-status={status}>
       {STATUS_LABEL[status]}
@@ -53,22 +53,19 @@ function RunItem({
   onDelete,
   isDeleting,
 }: RunItemProps) {
-  const title = run.playbook?.title ?? run.prompt ?? '未命名';
-  const domain = run.playbook?.domain ?? '—';
-  const date = new Date(run.created_at).toLocaleString('zh-CN', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+  const title = run.playbook?.title ?? run.prompt ?? "未命名";
+  const domain = run.playbook?.domain ?? "—";
+  const date = new Date(run.created_at).toLocaleString("zh-CN", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
-  const stepCount = run.playbook?.steps?.length ?? '—';
+  const stepCount = run.playbook?.steps?.length ?? "—";
   const showPromptSubtitle = !!run.playbook?.title && !!run.prompt;
-  const itemClassName = [
-    'mv-history-item',
-    isSelected ? 'is-selected' : '',
-  ]
+  const itemClassName = ["mv-history-item", isSelected ? "is-selected" : ""]
     .filter(Boolean)
-    .join(' ');
+    .join(" ");
 
   return (
     <div className={itemClassName}>
@@ -82,7 +79,9 @@ function RunItem({
           <span className="mv-history-item-title">{title}</span>
           <StatusBadge status={run.status} />
         </div>
-        {showPromptSubtitle && <span className="mv-history-item-subtitle">{run.prompt}</span>}
+        {showPromptSubtitle && (
+          <span className="mv-history-item-subtitle">{run.prompt}</span>
+        )}
         <div className="mv-history-item-meta">
           <span className="mv-history-item-domain">{domain.toUpperCase()}</span>
           <span className="mv-history-item-date">{date}</span>
@@ -125,30 +124,49 @@ interface StatsLineProps {
   averageSteps: number | null;
 }
 
-function StatsLine({ total, succeeded, failed, inFlight, averageSteps }: StatsLineProps) {
-  const avg = averageSteps === null ? '—' : averageSteps.toFixed(1);
+function StatsLine({
+  total,
+  succeeded,
+  failed,
+  inFlight,
+  averageSteps,
+}: StatsLineProps) {
+  const avg = averageSteps === null ? "—" : averageSteps.toFixed(1);
   return (
     <div className="mv-history-stats-line">
-      <span>总计 <b>{total}</b></span>
-      <span className="is-ok">成功 <b>{succeeded}</b></span>
-      <span className="is-bad">失败 <b>{failed}</b></span>
-      <span>进行中 <b>{inFlight}</b></span>
-      <span>平均 <b>{avg}</b> 步</span>
+      <span>
+        总计 <b>{total}</b>
+      </span>
+      <span className="is-ok">
+        成功 <b>{succeeded}</b>
+      </span>
+      <span className="is-bad">
+        失败 <b>{failed}</b>
+      </span>
+      <span>
+        进行中 <b>{inFlight}</b>
+      </span>
+      <span>
+        平均 <b>{avg}</b> 步
+      </span>
     </div>
   );
 }
 
 const PRIMARY_STATUS_CHIPS: Array<{ value: StatusFilter; label: string }> = [
-  { value: 'all', label: '全部' },
-  { value: 'succeeded', label: '成功' },
-  { value: 'failed', label: '失败' },
-  { value: 'running', label: '生成中' },
+  { value: "all", label: "全部" },
+  { value: "succeeded", label: "成功" },
+  { value: "failed", label: "失败" },
+  { value: "running", label: "生成中" },
 ];
 
 export interface HistoryPageProps {
-  appEdition?: 'self' | 'ops';
+  appEdition?: "self" | "ops";
   t: TweakValues;
-  setTweak: (key: keyof TweakValues, value: TweakValues[keyof TweakValues]) => void;
+  setTweak: (
+    key: keyof TweakValues,
+    value: TweakValues[keyof TweakValues],
+  ) => void;
   onNavigate: (stage: Stage) => void;
   isProviderConfigured: boolean;
   accountBalanceYuan?: string | null;
@@ -159,7 +177,7 @@ export interface HistoryPageProps {
 }
 
 export function HistoryPage({
-  appEdition = 'self',
+  appEdition = "self",
   t,
   setTweak,
   onNavigate,
@@ -171,31 +189,35 @@ export function HistoryPage({
   onOpenInWorkbench,
 }: HistoryPageProps) {
   const mode = themeMode(t);
-  const isDark = mode === 'dark';
+  const isDark = mode === "dark";
   const { runs, isLoading, error, refresh } = useHistoryRuns();
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [filter, setFilter] = useState<HistoryFilter>(DEFAULT_FILTER);
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const [deletingRunId, setDeletingRunId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const hasExtraStatusFilter = filter.status === 'queued' || filter.status === 'reviewing';
+  const hasExtraStatusFilter =
+    filter.status === "queued" || filter.status === "reviewing";
   const hasExtraFilter =
-    filter.domain !== '' || filter.timeWindow !== 'all' || hasExtraStatusFilter;
+    filter.domain !== "" || filter.timeWindow !== "all" || hasExtraStatusFilter;
   const moreFiltersClassName = [
-    'mv-history-chip',
-    'mv-history-chip--ghost',
-    moreFiltersOpen ? 'is-active' : '',
-    hasExtraFilter ? 'has-dot' : '',
+    "mv-history-chip",
+    "mv-history-chip--ghost",
+    moreFiltersOpen ? "is-active" : "",
+    hasExtraFilter ? "has-dot" : "",
   ]
     .filter(Boolean)
-    .join(' ');
+    .join(" ");
 
   const domains = useMemo(() => uniqueDomains(runs), [runs]);
-  const filtered = useMemo(() => applyHistoryFilter(runs, filter), [runs, filter]);
+  const filtered = useMemo(
+    () => applyHistoryFilter(runs, filter),
+    [runs, filter],
+  );
   const stats = useMemo(() => computeHistoryStats(filtered), [filtered]);
 
   const handleDelete = async (run: PipelineRunResult) => {
-    if (!window.confirm('确定删除这条历史记录吗？')) return;
+    if (!window.confirm("确定删除这条历史记录吗？")) return;
     setDeletingRunId(run.run_id);
     setDeleteError(null);
     try {
@@ -203,16 +225,19 @@ export function HistoryPage({
       if (selectedRunId === run.run_id) setSelectedRunId(null);
       refresh();
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : '删除失败');
+      setDeleteError(err instanceof Error ? err.message : "删除失败");
     } finally {
       setDeletingRunId(null);
     }
   };
 
-  const selectedRun = filtered.find((r) => r.run_id === selectedRunId) ?? filtered[0] ?? null;
+  const selectedRun =
+    filtered.find((r) => r.run_id === selectedRunId) ?? filtered[0] ?? null;
   const effectiveSelectedRunId = selectedRun?.run_id ?? null;
   const playbook =
-    selectedRun?.status === 'succeeded' ? (selectedRun.playbook as PlaybookScript | null) : null;
+    selectedRun?.status === "succeeded"
+      ? (selectedRun.playbook as PlaybookScript | null)
+      : null;
 
   return (
     <>
@@ -225,7 +250,7 @@ export function HistoryPage({
         accountAvatarUrl={accountAvatarUrl}
         onNavigate={onNavigate}
         isDark={isDark}
-        onToggleTheme={() => setTweak('theme', isDark ? 'light' : 'dark')}
+        onToggleTheme={() => setTweak("theme", isDark ? "light" : "dark")}
         onOpenProviderSettings={onOpenProviderSettings}
       />
       <main className="mv-history-main">
@@ -238,10 +263,16 @@ export function HistoryPage({
               className="mv-history-search"
               placeholder="🔍 搜索标题 / 摘要 / prompt…"
               value={filter.search}
-              onChange={(e) => setFilter((f) => ({ ...f, search: e.target.value }))}
+              onChange={(e) =>
+                setFilter((f) => ({ ...f, search: e.target.value }))
+              }
             />
 
-            <div className="mv-history-status-chips" role="group" aria-label="状态筛选">
+            <div
+              className="mv-history-status-chips"
+              role="group"
+              aria-label="状态筛选"
+            >
               {PRIMARY_STATUS_CHIPS.map((chip) => {
                 const active = filter.status === chip.value;
                 return (
@@ -249,8 +280,10 @@ export function HistoryPage({
                     key={chip.value}
                     type="button"
                     aria-pressed={active}
-                    className={`mv-history-chip${active ? ' is-active' : ''}`}
-                    onClick={() => setFilter((f) => ({ ...f, status: chip.value }))}
+                    className={`mv-history-chip${active ? " is-active" : ""}`}
+                    onClick={() =>
+                      setFilter((f) => ({ ...f, status: chip.value }))
+                    }
                   >
                     {chip.label}
                   </button>
@@ -262,7 +295,7 @@ export function HistoryPage({
                 aria-expanded={moreFiltersOpen}
                 onClick={() => setMoreFiltersOpen((v) => !v)}
               >
-                更多筛选 {moreFiltersOpen ? '▾' : '▸'}
+                更多筛选 {moreFiltersOpen ? "▾" : "▸"}
               </button>
             </div>
 
@@ -272,7 +305,9 @@ export function HistoryPage({
                   aria-label="学科筛选"
                   className="mv-history-filter"
                   value={filter.domain}
-                  onChange={(e) => setFilter((f) => ({ ...f, domain: e.target.value }))}
+                  onChange={(e) =>
+                    setFilter((f) => ({ ...f, domain: e.target.value }))
+                  }
                 >
                   <option value="">全部学科</option>
                   {domains.map((d) => (
@@ -286,7 +321,10 @@ export function HistoryPage({
                   className="mv-history-filter"
                   value={filter.timeWindow}
                   onChange={(e) =>
-                    setFilter((f) => ({ ...f, timeWindow: e.target.value as TimeWindow }))
+                    setFilter((f) => ({
+                      ...f,
+                      timeWindow: e.target.value as TimeWindow,
+                    }))
                   }
                 >
                   <option value="all">全部时间</option>
@@ -297,13 +335,13 @@ export function HistoryPage({
                 <select
                   aria-label="其它状态筛选"
                   className="mv-history-filter"
-                  value={hasExtraStatusFilter ? filter.status : ''}
+                  value={hasExtraStatusFilter ? filter.status : ""}
                   onChange={(e) => {
                     const v = e.target.value;
-                    if (v === 'queued' || v === 'reviewing') {
+                    if (v === "queued" || v === "reviewing") {
                       setFilter((f) => ({ ...f, status: v }));
                     } else {
-                      setFilter((f) => ({ ...f, status: 'all' }));
+                      setFilter((f) => ({ ...f, status: "all" }));
                     }
                   }}
                 >
@@ -317,11 +355,7 @@ export function HistoryPage({
 
           <div className="mv-history-list-head">
             <span className="mv-history-list-count">
-              {isLoading ? (
-                '同步中'
-              ) : (
-                `${filtered.length} / ${runs.length} 条`
-              )}
+              {isLoading ? "同步中" : `${filtered.length} / ${runs.length} 条`}
             </span>
             <div className="mv-history-list-actions">
               <button type="button" className="mv-chip" onClick={refresh}>
@@ -332,7 +366,9 @@ export function HistoryPage({
 
           <div className="mv-history-list-body">
             {error && <div className="mv-history-error">{error}</div>}
-            {deleteError && <div className="mv-history-error">{deleteError}</div>}
+            {deleteError && (
+              <div className="mv-history-error">{deleteError}</div>
+            )}
             {isLoading && runs.length === 0 && (
               <CenterHint>正在同步历史记录</CenterHint>
             )}
@@ -355,15 +391,20 @@ export function HistoryPage({
 
         <div className="mv-history-detail">
           {!selectedRun && (
-            <CenterHint>← 选择一条记录回放动画，或在工作台打开使用完整功能</CenterHint>
+            <CenterHint>
+              ← 选择一条记录回放动画，或在工作台打开使用完整功能
+            </CenterHint>
           )}
-          {selectedRun && selectedRun.status === 'failed' && (
-            <PromptDoctor report={selectedRun.review ?? null} error={selectedRun.error} />
+          {selectedRun && selectedRun.status === "failed" && (
+            <PromptDoctor
+              report={selectedRun.review ?? null}
+              error={selectedRun.error}
+            />
           )}
           {selectedRun &&
-            (selectedRun.status === 'queued' ||
-              selectedRun.status === 'running' ||
-              selectedRun.status === 'reviewing') && (
+            (selectedRun.status === "queued" ||
+              selectedRun.status === "running" ||
+              selectedRun.status === "reviewing") && (
               <div className="mv-history-detail__stepper">
                 <RunProgressStepper
                   status={selectedRun.status}
@@ -382,7 +423,7 @@ export function HistoryPage({
               <PlaybookPlayer
                 script={playbook}
                 director={selectedRun?.director ?? null}
-                theme={isDark ? 'dark' : 'light'}
+                theme={isDark ? "dark" : "light"}
                 swapDurationFrames={t.swapFrames}
               />
             </>

@@ -142,7 +142,7 @@ end_frame_i = (i+1) * 60                               # 无 execution_map（兼
 
 **幻觉/注入防御**：`playbook_builder._sanitize_expression` 用白名单字符 `[0-9A-Za-z_+\-*/^%(). ,]` 过滤每个 `expression`，越界的 `marker_x` / `shade_*` 会被夹到定义域内；若没有任何合法曲线，整步降级为 `array` 视图（绝不渲染空白）。
 
-> 交互版同源能力见 `apps/web/src/features/math-widget/`（顶栏「📐 数学画板」）：内置预设 + 参数滑块 + 实时 KaTeX 公式 + `FunctionPlot`，与渲染器共用 `mathExpr` / `plotMath`。
+> 交互版同源能力见 `apps/web/src/features/param-widget/`（顶栏「📐 数学画板」）：内置预设 + 参数滑块 + 实时 KaTeX 公式 + `ParamPlot`，与渲染器共用 `mathExpr` / `plotMath`。
 
 ## 7. LLM 思考时长 / 长度调参
 
@@ -211,7 +211,7 @@ end_frame_i = (i+1) * 60                               # 无 execution_map（兼
 | `apps/api/app/domain/models/playbook.py` | 输出端契约（`MathPlotSnapshot` 等，前端消费） |
 | `apps/web/src/shared/lib/mathExpr.ts` | 无依赖表达式解析/求值/采样（渲染器 + 画板共用） |
 | `apps/web/src/features/playbook/engine/renderers/MathPlotRenderer.tsx` | 函数图渲染器 |
-| `apps/web/src/features/math-widget/` | 交互数学画板（预设 + 滑块 + KaTeX） |
+| `apps/web/src/features/param-widget/` | 交互参数面板（预设 + 滑块 + KaTeX） |
 | `apps/web/src/features/playbook/engine/player/PlaybookPlayer.tsx` | Remotion 入口 |
 | `apps/api/app/infrastructure/llm/openai_provider.py` | OpenAI 兼容 HTTP 客户端（`max_tokens` / `reasoning_effort`） |
 | `apps/api/app/application/use_cases/export_video.py` | Remotion CLI subprocess + TTS 配音对齐 + stderr 回传 |

@@ -1,48 +1,79 @@
-import React, { useMemo, useState } from 'react';
-import { ErrorBoundary } from '../shared/ui/ErrorBoundary';
-import { useTweaks, themeVars, themeMode, TWEAK_DEFAULTS } from '../features/studio-editor/hooks/useTweaks';
-import { IntakeScreen, IntakeContext } from '../features/studio-editor/ui/IntakeScreen';
-import { TweaksPanel } from '../features/studio-editor/ui/TweaksPanel';
-import { StudioPage } from '../pages/Studio/StudioPage';
-import { HistoryPage } from '../pages/History/HistoryPage';
-import { TemplatesPage } from '../pages/Templates/TemplatesPage';
-import { SettingsPage } from '../pages/Settings/SettingsPage';
-import { usePipelineSubmit } from '../features/pipeline/hooks/usePipelineSubmit';
-import { useProviderSettings } from '../features/providers/hooks/useProviderSettings';
-import { ProviderSettingsModal } from '../features/providers/ui/ProviderSettingsModal';
-import type { Stage } from '../shared/ui/GlobalTopbar';
+import React, { useMemo, useState } from "react";
+import { ErrorBoundary } from "../shared/ui/ErrorBoundary";
+import {
+  useTweaks,
+  themeVars,
+  themeMode,
+  TWEAK_DEFAULTS,
+} from "../features/studio-editor/hooks/useTweaks";
+import {
+  IntakeScreen,
+  IntakeContext,
+} from "../features/studio-editor/ui/IntakeScreen";
+import { TweaksPanel } from "../features/studio-editor/ui/TweaksPanel";
+import { StudioPage } from "../pages/Studio/StudioPage";
+import { HistoryPage } from "../pages/History/HistoryPage";
+import { TemplatesPage } from "../pages/Templates/TemplatesPage";
+import { SettingsPage } from "../pages/Settings/SettingsPage";
+import { usePipelineSubmit } from "../features/pipeline/hooks/usePipelineSubmit";
+import { useProviderSettings } from "../features/providers/hooks/useProviderSettings";
+import { ProviderSettingsModal } from "../features/providers/ui/ProviderSettingsModal";
+import type { Stage } from "../shared/ui/GlobalTopbar";
 
 export function SelfAppShell() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const [stage, setStage] = useState<Stage>('intake');
+  const [stage, setStage] = useState<Stage>("intake");
   const [providerModalOpen, setProviderModalOpen] = useState(false);
   const [openedRunId, setOpenedRunId] = useState<string | null>(null);
-  const { submit, runId, isSubmitting, error: submitError } = usePipelineSubmit();
-  const { settings: providerSettings, update: updateProvider, isConfigured } = useProviderSettings();
+  const {
+    submit,
+    runId,
+    isSubmitting,
+    error: submitError,
+  } = usePipelineSubmit();
+  const {
+    settings: providerSettings,
+    update: updateProvider,
+    isConfigured,
+  } = useProviderSettings();
 
   const css = useMemo(() => themeVars(t), [t]);
   const mode = themeMode(t);
-  const toggleTheme = () => setTweak('theme', mode === 'dark' ? 'light' : 'dark');
+  const toggleTheme = () =>
+    setTweak("theme", mode === "dark" ? "light" : "dark");
 
-  const submitWithProvider = async (prompt: string, sourceCode?: string, language?: string) => {
-    await submit(prompt, sourceCode, language, isConfigured ? providerSettings : undefined);
+  const submitWithProvider = async (
+    prompt: string,
+    sourceCode?: string,
+    language?: string,
+  ) => {
+    await submit(
+      prompt,
+      sourceCode,
+      language,
+      isConfigured ? providerSettings : undefined,
+    );
   };
 
   const handleSubmit = async (ctx: IntakeContext) => {
     setOpenedRunId(null);
-    await submitWithProvider(ctx.raw || ctx.title, ctx.sourceCode, ctx.language);
-    setStage('workbench');
+    await submitWithProvider(
+      ctx.raw || ctx.title,
+      ctx.sourceCode,
+      ctx.language,
+    );
+    setStage("workbench");
   };
 
   const handleUseTemplate = async (prompt: string) => {
     setOpenedRunId(null);
     await submitWithProvider(prompt);
-    setStage('workbench');
+    setStage("workbench");
   };
 
   const handleOpenHistoryRun = (historyRunId: string) => {
     setOpenedRunId(historyRunId);
-    setStage('workbench');
+    setStage("workbench");
   };
 
   return (
@@ -51,7 +82,7 @@ export function SelfAppShell() {
       data-theme={t.theme}
       style={css}
     >
-      {stage === 'intake' && (
+      {stage === "intake" && (
         <IntakeScreen
           appEdition="self"
           onSubmit={handleSubmit}
@@ -65,7 +96,7 @@ export function SelfAppShell() {
         />
       )}
 
-      {stage === 'workbench' && (
+      {stage === "workbench" && (
         <ErrorBoundary theme={mode}>
           <StudioPage
             appEdition="self"
@@ -79,7 +110,7 @@ export function SelfAppShell() {
         </ErrorBoundary>
       )}
 
-      {stage === 'history' && (
+      {stage === "history" && (
         <ErrorBoundary theme={mode}>
           <HistoryPage
             appEdition="self"
@@ -93,11 +124,11 @@ export function SelfAppShell() {
         </ErrorBoundary>
       )}
 
-      {stage === 'templates' && (
+      {stage === "templates" && (
         <ErrorBoundary theme={mode}>
           <TemplatesPage
             appEdition="self"
-            isDark={mode === 'dark'}
+            isDark={mode === "dark"}
             isProviderConfigured={isConfigured}
             onNavigate={setStage}
             onToggleTheme={toggleTheme}
@@ -107,11 +138,11 @@ export function SelfAppShell() {
         </ErrorBoundary>
       )}
 
-      {stage === 'settings' && (
+      {stage === "settings" && (
         <ErrorBoundary theme={mode}>
           <SettingsPage
             appEdition="self"
-            isDark={mode === 'dark'}
+            isDark={mode === "dark"}
             isProviderConfigured={isConfigured}
             onNavigate={setStage}
             onToggleTheme={toggleTheme}

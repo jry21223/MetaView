@@ -1,15 +1,15 @@
-import React, { useMemo, useState } from 'react';
-import { GlobalTopbar, type Stage } from '../../shared/ui/GlobalTopbar';
+import React, { useMemo, useState } from "react";
+import { GlobalTopbar, type Stage } from "../../shared/ui/GlobalTopbar";
 import {
   TEMPLATES,
   TEMPLATE_DOMAIN_LABEL,
   templatesByDomain,
   type TemplateDef,
   type TemplateDomain,
-} from './templates';
+} from "./templates";
 
 interface TemplatesPageProps {
-  appEdition?: 'self' | 'ops';
+  appEdition?: "self" | "ops";
   isDark: boolean;
   isProviderConfigured: boolean;
   accountBalanceYuan?: string | null;
@@ -23,10 +23,10 @@ interface TemplatesPageProps {
   onUseTemplate: (prompt: string) => void | Promise<void>;
 }
 
-type DomainFilter = TemplateDomain | 'all';
+type DomainFilter = TemplateDomain | "all";
 
 export function TemplatesPage({
-  appEdition = 'self',
+  appEdition = "self",
   isDark,
   isProviderConfigured,
   accountBalanceYuan = null,
@@ -37,8 +37,8 @@ export function TemplatesPage({
   onOpenProviderSettings,
   onUseTemplate,
 }: TemplatesPageProps) {
-  const [filter, setFilter] = useState<DomainFilter>('all');
-  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<DomainFilter>("all");
+  const [search, setSearch] = useState("");
 
   const grouped = useMemo(() => templatesByDomain(), []);
   const availableDomains = useMemo<TemplateDomain[]>(
@@ -49,7 +49,7 @@ export function TemplatesPage({
   const filtered = useMemo<TemplateDef[]>(() => {
     const q = search.trim().toLowerCase();
     return TEMPLATES.filter((tpl) => {
-      if (filter !== 'all' && tpl.domain !== filter) return false;
+      if (filter !== "all" && tpl.domain !== filter) return false;
       if (!q) return true;
       return (
         tpl.title.toLowerCase().includes(q) ||
@@ -78,7 +78,8 @@ export function TemplatesPage({
           <div className="mv-eyebrow-mini">模板库</div>
           <h1 className="mv-templates-title">挑一个模板，立刻看到它怎么讲</h1>
           <p className="mv-templates-sub">
-            每个模板已经写好了对应的 prompt，点一下就会带着它跑一遍管线；进入工作台后还能继续微调。
+            每个模板已经写好了对应的
+            prompt，点一下就会带着它跑一遍管线；进入工作台后还能继续微调。
           </p>
         </header>
 
@@ -93,8 +94,8 @@ export function TemplatesPage({
           <div className="mv-templates-filters">
             <button
               type="button"
-              className={`mv-chip${filter === 'all' ? ' mv-chip-primary' : ''}`}
-              onClick={() => setFilter('all')}
+              className={`mv-chip${filter === "all" ? " mv-chip-primary" : ""}`}
+              onClick={() => setFilter("all")}
             >
               全部
             </button>
@@ -102,7 +103,7 @@ export function TemplatesPage({
               <button
                 key={d}
                 type="button"
-                className={`mv-chip${filter === d ? ' mv-chip-primary' : ''}`}
+                className={`mv-chip${filter === d ? " mv-chip-primary" : ""}`}
                 onClick={() => setFilter(d)}
               >
                 {TEMPLATE_DOMAIN_LABEL[d]}
@@ -112,7 +113,9 @@ export function TemplatesPage({
         </section>
 
         {filtered.length === 0 && (
-          <div className="mv-templates-empty">没有匹配的模板。试试改一下搜索关键字。</div>
+          <div className="mv-templates-empty">
+            没有匹配的模板。试试改一下搜索关键字。
+          </div>
         )}
 
         <div className="mv-templates-grid">
@@ -123,7 +126,9 @@ export function TemplatesPage({
               className="mv-tpl-card mv-tpl-card-lg"
               onClick={() => onUseTemplate(tpl.prompt)}
             >
-              <div className="mv-tpl-tag">{TEMPLATE_DOMAIN_LABEL[tpl.domain]}</div>
+              <div className="mv-tpl-tag">
+                {TEMPLATE_DOMAIN_LABEL[tpl.domain]}
+              </div>
               <div className="mv-tpl-title">{tpl.title}</div>
               <div className="mv-tpl-desc">{tpl.desc}</div>
               <div className="mv-tpl-prompt-preview">{tpl.prompt}</div>
@@ -134,7 +139,8 @@ export function TemplatesPage({
 
         <footer className="mv-templates-foot">
           <span>
-            模板写在 <code>apps/web/src/pages/Templates/templates.ts</code>；新增一项是一个对象。
+            模板写在 <code>apps/web/src/pages/Templates/templates.ts</code>
+            ；新增一项是一个对象。
           </span>
         </footer>
       </main>

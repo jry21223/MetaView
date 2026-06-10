@@ -1,18 +1,54 @@
-import React, { useState, useRef } from 'react';
-import { TweakValues } from '../hooks/useTweaks';
-import { GlobalTopbar, Stage } from '../../../shared/ui/GlobalTopbar';
+import React, { useState, useRef } from "react";
+import { TweakValues } from "../hooks/useTweaks";
+import { GlobalTopbar, Stage } from "../../../shared/ui/GlobalTopbar";
 
 const TEMPLATE_GALLERY = [
-  { id: 'merge-sort', subject: 'algo', title: '归并排序', desc: '数组分治 → 合并', tag: '算法' },
-  { id: 'ode-2', subject: 'math', title: '二阶常微分方程', desc: '相图 + 数值解', tag: '高数' },
-  { id: 'incline', subject: 'phys', title: '斜面摩擦', desc: '受力分析 + 加速度', tag: '物理' },
-  { id: 'binary-search', subject: 'algo', title: '二分查找', desc: '有序数组 / 收敛区间', tag: '算法' },
-  { id: 'fft', subject: 'math', title: '傅里叶变换', desc: '时域 ⇄ 频域', tag: '高数' },
-  { id: 'projectile', subject: 'phys', title: '抛体运动', desc: '速度合成 + 轨迹', tag: '物理' },
+  {
+    id: "merge-sort",
+    subject: "algo",
+    title: "归并排序",
+    desc: "数组分治 → 合并",
+    tag: "算法",
+  },
+  {
+    id: "ode-2",
+    subject: "math",
+    title: "二阶常微分方程",
+    desc: "相图 + 数值解",
+    tag: "高数",
+  },
+  {
+    id: "incline",
+    subject: "phys",
+    title: "斜面摩擦",
+    desc: "受力分析 + 加速度",
+    tag: "物理",
+  },
+  {
+    id: "binary-search",
+    subject: "algo",
+    title: "二分查找",
+    desc: "有序数组 / 收敛区间",
+    tag: "算法",
+  },
+  {
+    id: "fft",
+    subject: "math",
+    title: "傅里叶变换",
+    desc: "时域 ⇄ 频域",
+    tag: "高数",
+  },
+  {
+    id: "projectile",
+    subject: "phys",
+    title: "抛体运动",
+    desc: "速度合成 + 轨迹",
+    tag: "物理",
+  },
 ] as const;
 
 export interface IntakeContext {
-  subject: 'algo' | 'math' | 'phys';
+  subject: "algo" | "math" | "phys";
   template: string;
   title: string;
   raw: string;
@@ -22,7 +58,7 @@ export interface IntakeContext {
 }
 
 interface IntakeScreenProps {
-  appEdition?: 'self' | 'ops';
+  appEdition?: "self" | "ops";
   onSubmit: (ctx: IntakeContext) => void | Promise<void>;
   t: TweakValues;
   isSubmitting?: boolean;
@@ -46,31 +82,60 @@ function readFileAsText(file: File): Promise<string> {
 }
 
 const EXT_TO_LANGUAGE: Record<string, string> = {
-  '.py': 'python', '.js': 'javascript', '.ts': 'typescript',
-  '.tsx': 'typescript', '.jsx': 'javascript', '.java': 'java',
-  '.cpp': 'cpp', '.c': 'c', '.cs': 'csharp', '.go': 'go',
-  '.rs': 'rust', '.rb': 'ruby', '.swift': 'swift', '.kt': 'kotlin',
-  '.php': 'php', '.r': 'r', '.m': 'objc', '.sh': 'bash',
+  ".py": "python",
+  ".js": "javascript",
+  ".ts": "typescript",
+  ".tsx": "typescript",
+  ".jsx": "javascript",
+  ".java": "java",
+  ".cpp": "cpp",
+  ".c": "c",
+  ".cs": "csharp",
+  ".go": "go",
+  ".rs": "rust",
+  ".rb": "ruby",
+  ".swift": "swift",
+  ".kt": "kotlin",
+  ".php": "php",
+  ".r": "r",
+  ".m": "objc",
+  ".sh": "bash",
 };
 
 function languageFromName(name: string): string | undefined {
-  const ext = name.slice(name.lastIndexOf('.')).toLowerCase();
+  const ext = name.slice(name.lastIndexOf(".")).toLowerCase();
   return EXT_TO_LANGUAGE[ext];
 }
 
-export function IntakeScreen({ appEdition = 'self', onSubmit, t, isSubmitting = false, submitError = null, isProviderConfigured = false, accountBalanceYuan = null, accountName = null, accountAvatarUrl = null, onOpenProviderSettings, onNavigate, onToggleTheme }: IntakeScreenProps) {
-  const [input, setInput] = useState('');
+export function IntakeScreen({
+  appEdition = "self",
+  onSubmit,
+  t,
+  isSubmitting = false,
+  submitError = null,
+  isProviderConfigured = false,
+  accountBalanceYuan = null,
+  accountName = null,
+  accountAvatarUrl = null,
+  onOpenProviderSettings,
+  onNavigate,
+  onToggleTheme,
+}: IntakeScreenProps) {
+  const [input, setInput] = useState("");
   const [files, setFiles] = useState<Array<{ name: string; size: number }>>([]);
   const [fileObjects, setFileObjects] = useState<File[]>([]);
-  const [thinking, setThinking] = useState('');
+  const [thinking, setThinking] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
-  const isDark = t.theme === 'dark';
+  const isDark = t.theme === "dark";
 
   const handleFiles = (list: FileList | null) => {
     if (!list) return;
     const arr = Array.from(list);
     setFileObjects((prev) => [...prev, ...arr]);
-    setFiles((prev) => [...prev, ...arr.map((f) => ({ name: f.name, size: f.size }))]);
+    setFiles((prev) => [
+      ...prev,
+      ...arr.map((f) => ({ name: f.name, size: f.size })),
+    ]);
   };
 
   const removeFile = (index: number) => {
@@ -81,15 +146,22 @@ export function IntakeScreen({ appEdition = 'self', onSubmit, t, isSubmitting = 
   const submit = async () => {
     if (!input.trim() && files.length === 0) return;
 
-    setThinking('正在理解你的需求…');
+    setThinking("正在理解你的需求…");
 
-    const subject = input.toLowerCase().includes('排序') || input.toLowerCase().includes('算法') || input.toLowerCase().includes('search')
-      ? 'algo'
-      : input.includes('微分') || input.includes('积分') || input.includes('傅里叶')
-      ? 'math'
-      : input.includes('斜面') || input.includes('物理') || input.includes('力')
-      ? 'phys'
-      : 'algo';
+    const subject =
+      input.toLowerCase().includes("排序") ||
+      input.toLowerCase().includes("算法") ||
+      input.toLowerCase().includes("search")
+        ? "algo"
+        : input.includes("微分") ||
+            input.includes("积分") ||
+            input.includes("傅里叶")
+          ? "math"
+          : input.includes("斜面") ||
+              input.includes("物理") ||
+              input.includes("力")
+            ? "phys"
+            : "algo";
 
     let sourceCode: string | undefined;
     let language: string | undefined;
@@ -103,24 +175,24 @@ export function IntakeScreen({ appEdition = 'self', onSubmit, t, isSubmitting = 
       }
     }
 
-    setThinking('提交中…');
+    setThinking("提交中…");
 
     await onSubmit({
       subject,
-      template: 'merge-sort',
-      title: input.slice(0, 40) || '未命名',
+      template: "merge-sort",
+      title: input.slice(0, 40) || "未命名",
       raw: input,
       files,
       sourceCode,
       language,
     });
 
-    setThinking('');
+    setThinking("");
   };
 
-  const pickTemplate = (tpl: typeof TEMPLATE_GALLERY[number]) => {
+  const pickTemplate = (tpl: (typeof TEMPLATE_GALLERY)[number]) => {
     onSubmit({
-      subject: tpl.subject as IntakeContext['subject'],
+      subject: tpl.subject as IntakeContext["subject"],
       template: tpl.id,
       title: tpl.title,
       raw: tpl.title,
@@ -153,7 +225,8 @@ export function IntakeScreen({ appEdition = 'self', onSubmit, t, isSubmitting = 
             动画与讲解自动展开。
           </h1>
           <p className="mv-intake-sub">
-            粘贴题目文本、上传题图或源码 — 自动识别学科与最合适的可视化模板。也可以从下方模板直接开始。
+            粘贴题目文本、上传题图或源码 —
+            自动识别学科与最合适的可视化模板。也可以从下方模板直接开始。
           </p>
         </div>
 
@@ -177,32 +250,40 @@ export function IntakeScreen({ appEdition = 'self', onSubmit, t, isSubmitting = 
             onChange={(e) => {
               setInput(e.target.value);
               const el = e.target;
-              el.style.height = 'auto';
+              el.style.height = "auto";
               el.style.height = `${el.scrollHeight}px`;
             }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault();
                 submit();
               }
             }}
-            style={{ resize: 'none', overflow: 'hidden', minHeight: 96 }}
+            style={{ resize: "none", overflow: "hidden", minHeight: 96 }}
           />
           <div className="mv-intake-actions">
-            <button className="mv-chip" onClick={() => fileRef.current?.click()}>
+            <button
+              className="mv-chip"
+              onClick={() => fileRef.current?.click()}
+            >
               ＋ 附件
             </button>
             <input
               ref={fileRef}
               type="file"
               multiple
-              style={{ display: 'none' }}
-              onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }}
+              style={{ display: "none" }}
+              onChange={(e) => {
+                handleFiles(e.target.files);
+                e.target.value = "";
+              }}
             />
             <span className="mv-intake-hint">⌘ + ↵ 提交</span>
             <div className="mv-spacer" />
             {(thinking || submitError) && (
-              <span className={`mv-intake-thinking${submitError ? ' mv-intake-error' : ''}`}>
+              <span
+                className={`mv-intake-thinking${submitError ? " mv-intake-error" : ""}`}
+              >
                 {submitError ?? thinking}
               </span>
             )}
@@ -211,7 +292,7 @@ export function IntakeScreen({ appEdition = 'self', onSubmit, t, isSubmitting = 
               onClick={submit}
               disabled={pending || (!input.trim() && files.length === 0)}
             >
-              {pending ? '识别中…' : '理解并生成 →'}
+              {pending ? "识别中…" : "理解并生成 →"}
             </button>
           </div>
         </div>
@@ -222,7 +303,11 @@ export function IntakeScreen({ appEdition = 'self', onSubmit, t, isSubmitting = 
 
         <div className="mv-intake-templates">
           {TEMPLATE_GALLERY.map((tpl) => (
-            <button key={tpl.id} className="mv-tpl-card" onClick={() => pickTemplate(tpl)}>
+            <button
+              key={tpl.id}
+              className="mv-tpl-card"
+              onClick={() => pickTemplate(tpl)}
+            >
               <div className="mv-tpl-tag">{tpl.tag}</div>
               <div className="mv-tpl-title">{tpl.title}</div>
               <div className="mv-tpl-desc">{tpl.desc}</div>
@@ -231,7 +316,15 @@ export function IntakeScreen({ appEdition = 'self', onSubmit, t, isSubmitting = 
           ))}
           <button
             className="mv-tpl-card mv-tpl-blank"
-            onClick={() => onSubmit({ subject: 'algo', template: 'blank', title: '空白模板', raw: '', files: [] })}
+            onClick={() =>
+              onSubmit({
+                subject: "algo",
+                template: "blank",
+                title: "空白模板",
+                raw: "",
+                files: [],
+              })
+            }
           >
             <div className="mv-tpl-tag">自定义</div>
             <div className="mv-tpl-title">空白模板</div>

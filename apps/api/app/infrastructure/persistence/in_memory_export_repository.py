@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import threading
+import asyncio
 
 from app.domain.models.export_job import ExportJob, ExportJobStatus
 
@@ -14,17 +14,17 @@ class InMemoryExportJobRepository:
 
     def __init__(self) -> None:
         self._jobs: dict[str, ExportJob] = {}
-        self._lock = threading.Lock()
+        self._lock = asyncio.Lock()
 
-    def create(self, job: ExportJob) -> None:
-        with self._lock:
+    async def create(self, job: ExportJob) -> None:
+        async with self._lock:
             self._jobs[job.job_id] = job
 
-    def get(self, job_id: str) -> ExportJob | None:
-        with self._lock:
+    async def get(self, job_id: str) -> ExportJob | None:
+        async with self._lock:
             return self._jobs.get(job_id)
 
-    def update(
+    async def update(
         self,
         job_id: str,
         *,
@@ -34,7 +34,7 @@ class InMemoryExportJobRepository:
         output_path: str | None = None,
         error: str | None = None,
     ) -> None:
-        with self._lock:
+        async with self._lock:
             existing = self._jobs.get(job_id)
             if existing is None:
                 return

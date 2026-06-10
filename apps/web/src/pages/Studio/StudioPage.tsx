@@ -1,42 +1,45 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { TweakValues } from '../../features/studio-editor/hooks/useTweaks';
-import { usePipelinePoller } from '../../features/pipeline/hooks/usePipelinePoller';
-import { PlaybookPlayer } from '../../features/playbook/engine/player/PlaybookPlayer';
-import { GlobalTopbar, Stage } from '../../shared/ui/GlobalTopbar';
-import { useProviderSettings } from '../../features/providers/hooks/useProviderSettings';
-import type { DirectorScript, PlaybookScript } from '../../features/playbook/engine/types';
-import { ExportModal } from '../../features/export/ui/ExportModal';
+import React, { useEffect, useRef, useState } from "react";
+import { TweakValues } from "../../features/studio-editor/hooks/useTweaks";
+import { usePipelinePoller } from "../../features/pipeline/hooks/usePipelinePoller";
+import { PlaybookPlayer } from "../../features/playbook/engine/player/PlaybookPlayer";
+import { GlobalTopbar, Stage } from "../../shared/ui/GlobalTopbar";
+import { useProviderSettings } from "../../features/providers/hooks/useProviderSettings";
+import type {
+  DirectorScript,
+  PlaybookScript,
+} from "../../features/playbook/engine/types";
+import { ExportModal } from "../../features/export/ui/ExportModal";
 import {
   listRunFollowUps,
   restoreRunVersion,
   submitRunFollowUp,
   type RunVersionRecord,
-} from '../../features/followups/api/followupApi';
-import { FollowupCommitLog } from '../../features/followups/ui/FollowupCommitLog';
+} from "../../features/followups/api/followupApi";
+import { FollowupCommitLog } from "../../features/followups/ui/FollowupCommitLog";
 
 // ── Domain mapping ────────────────────────────────────────────────────────
 
 const DOMAIN_LABEL: Record<string, string> = {
-  algorithm: '算法',
-  math: '数学',
-  code: '代码',
-  physics: '物理',
-  chemistry: '化学',
-  biology: '生物',
-  geography: '地理',
+  algorithm: "算法",
+  math: "数学",
+  code: "代码",
+  physics: "物理",
+  chemistry: "化学",
+  biology: "生物",
+  geography: "地理",
 };
 
 const DOMAIN_SUGGESTIONS: Record<string, string[]> = {
-  algorithm: ['换一组数据', '为什么这个复杂度', '对比其他方法'],
-  math: ['改变初始条件', '几何意义', '推导过程'],
-  physics: ['改变参数', '加上其他力', '受力分析'],
-  code: ['解释这段逻辑', '更好的写法', '边界情况'],
-  chemistry: ['换反应物', '反应机理', '平衡条件'],
-  biology: ['详细解释步骤', '实际应用', '相关知识点'],
-  geography: ['原因分析', '影响因素', '对比其他地区'],
+  algorithm: ["换一组数据", "为什么这个复杂度", "对比其他方法"],
+  math: ["改变初始条件", "几何意义", "推导过程"],
+  physics: ["改变参数", "加上其他力", "受力分析"],
+  code: ["解释这段逻辑", "更好的写法", "边界情况"],
+  chemistry: ["换反应物", "反应机理", "平衡条件"],
+  biology: ["详细解释步骤", "实际应用", "相关知识点"],
+  geography: ["原因分析", "影响因素", "对比其他地区"],
 };
 
-const FALLBACK_SUGGESTIONS = ['换个角度讲', '展开第一步', '总结要点'];
+const FALLBACK_SUGGESTIONS = ["换个角度讲", "展开第一步", "总结要点"];
 
 // ── ProblemCard ───────────────────────────────────────────────────────────
 
@@ -47,27 +50,45 @@ interface ProblemCardProps {
   onToggle: () => void;
 }
 
-function ProblemCard({ playbook, runId, collapsed, onToggle }: ProblemCardProps) {
-  const domain = playbook?.domain ?? '';
-  const domainLabel = DOMAIN_LABEL[domain] ?? domain ?? '—';
-  const taskId = runId ? `#${runId.slice(0, 8)}` : '#—';
+function ProblemCard({
+  playbook,
+  runId,
+  collapsed,
+  onToggle,
+}: ProblemCardProps) {
+  const domain = playbook?.domain ?? "";
+  const domainLabel = DOMAIN_LABEL[domain] ?? domain ?? "—";
+  const taskId = runId ? `#${runId.slice(0, 8)}` : "#—";
 
   return (
-    <div className={`mv-card mv-problem mv-problem-slim${collapsed ? ' is-collapsed' : ''}`}>
+    <div
+      className={`mv-card mv-problem mv-problem-slim${collapsed ? " is-collapsed" : ""}`}
+    >
       <div className="mv-problem-row">
         <div className="mv-problem-eyebrow">
           <span className="mv-subject-chip">{domainLabel}</span>
           <span className="mv-eyebrow-mini">任务 {taskId}</span>
         </div>
-        <button className="mv-chip mv-chip-collapse" onClick={onToggle} title={collapsed ? '展开' : '折叠'}>
-          {collapsed ? '展开 ▴' : '折叠 ▾'}
+        <button
+          className="mv-chip mv-chip-collapse"
+          onClick={onToggle}
+          title={collapsed ? "展开" : "折叠"}
+        >
+          {collapsed ? "展开 ▴" : "折叠 ▾"}
         </button>
       </div>
-      <h2 className="mv-problem-title">{playbook?.title ?? '等待生成…'}</h2>
+      <h2 className="mv-problem-title">{playbook?.title ?? "等待生成…"}</h2>
       {playbook && (
         <>
           {playbook.summary && (
-            <p style={{ margin: 0, fontSize: 12, lineHeight: 1.55, color: 'var(--ink-2)' }}>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 12,
+                lineHeight: 1.55,
+                color: "var(--ink-2)",
+              }}
+            >
               {playbook.summary}
             </p>
           )}
@@ -80,7 +101,7 @@ function ProblemCard({ playbook, runId, collapsed, onToggle }: ProblemCardProps)
 // ── ChatPanel ─────────────────────────────────────────────────────────────
 
 interface ChatMessage {
-  from: 'user' | 'ai';
+  from: "user" | "ai";
   text: string;
   changeSummary?: string;
   versionId?: string | null;
@@ -89,12 +110,15 @@ interface ChatMessage {
 }
 
 interface ChatPanelProps {
-  appEdition: 'self' | 'ops';
+  appEdition: "self" | "ops";
   runId: string | null;
   playbook: PlaybookScript | null;
   isProviderConfigured: boolean;
   onOpenProviderSettings?: () => void;
-  onPlaybookPatched: (playbook: PlaybookScript, director?: DirectorScript | null) => void;
+  onPlaybookPatched: (
+    playbook: PlaybookScript,
+    director?: DirectorScript | null,
+  ) => void;
   collapsed: boolean;
   onToggle: () => void;
 }
@@ -103,7 +127,7 @@ function formatChatError(err: unknown): string {
   if (err instanceof Error) {
     return `（请求失败：${err.message}）`;
   }
-  return '（接口暂时不可用，稍后再试）';
+  return "（接口暂时不可用，稍后再试）";
 }
 
 function ChatPanel({
@@ -119,13 +143,14 @@ function ChatPanel({
   const { settings } = useProviderSettings();
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
   const [versions, setVersions] = useState<RunVersionRecord[]>([]);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (scrollRef.current)
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [msgs]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
@@ -139,9 +164,9 @@ function ChatPanel({
     listRunFollowUps(runId, controller.signal)
       .then((data) => {
         const loaded: ChatMessage[] = data.followups.flatMap((item) => [
-          { from: 'user' as const, text: item.user_message },
+          { from: "user" as const, text: item.user_message },
           {
-            from: 'ai' as const,
+            from: "ai" as const,
             text: item.assistant_reply,
             changeSummary: item.change_summary,
             versionId: item.version_id,
@@ -151,14 +176,14 @@ function ChatPanel({
         setVersions(data.versions);
       })
       .catch((err) => {
-        if ((err as Error).name !== 'AbortError') {
-          setMsgs([{ from: 'ai', text: formatChatError(err), error: true }]);
+        if ((err as Error).name !== "AbortError") {
+          setMsgs([{ from: "ai", text: formatChatError(err), error: true }]);
         }
       });
     return () => controller.abort();
   }, [runId]);
 
-  const domain = playbook?.domain ?? '';
+  const domain = playbook?.domain ?? "";
   const suggestions = DOMAIN_SUGGESTIONS[domain] ?? FALLBACK_SUGGESTIONS;
   const canModify = !!runId && !!playbook;
 
@@ -169,9 +194,9 @@ function ChatPanel({
     abortRef.current?.abort();
     abortRef.current = new AbortController();
 
-    const nextMsgs: ChatMessage[] = [...msgs, { from: 'user', text: userText }];
-    setMsgs([...nextMsgs, { from: 'ai', text: '思考中…', pending: true }]);
-    setInput('');
+    const nextMsgs: ChatMessage[] = [...msgs, { from: "user", text: userText }];
+    setMsgs([...nextMsgs, { from: "ai", text: "思考中…", pending: true }]);
+    setInput("");
     setPending(true);
 
     try {
@@ -179,11 +204,15 @@ function ChatPanel({
         .filter((m) => !m.pending && !m.error)
         .slice(-12)
         .map((m) => ({
-          role: (m.from === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+          role: (m.from === "user" ? "user" : "assistant") as
+            | "user"
+            | "assistant",
           content: m.text,
         }));
       const provider =
-        appEdition === 'self' && settings.apiKey.trim().length > 0 ? settings : undefined;
+        appEdition === "self" && settings.apiKey.trim().length > 0
+          ? settings
+          : undefined;
       const result = await submitRunFollowUp(
         runId!,
         userText,
@@ -195,8 +224,8 @@ function ChatPanel({
       setMsgs([
         ...nextMsgs,
         {
-          from: 'ai',
-          text: result.reply.trim() || '已更新当前 Playbook。',
+          from: "ai",
+          text: result.reply.trim() || "已更新当前 Playbook。",
           changeSummary: result.change_summary,
           versionId: result.version_id,
         },
@@ -205,8 +234,11 @@ function ChatPanel({
         .then((data) => setVersions(data.versions))
         .catch(() => undefined);
     } catch (err) {
-      if ((err as Error).name === 'AbortError') return;
-      setMsgs([...nextMsgs, { from: 'ai', text: formatChatError(err), error: true }]);
+      if ((err as Error).name === "AbortError") return;
+      setMsgs([
+        ...nextMsgs,
+        { from: "ai", text: formatChatError(err), error: true },
+      ]);
     } finally {
       setPending(false);
     }
@@ -222,8 +254,8 @@ function ChatPanel({
       setMsgs((current) => [
         ...current,
         {
-          from: 'ai',
-          text: '已恢复到选中的历史版本。',
+          from: "ai",
+          text: "已恢复到选中的历史版本。",
           changeSummary: `revert: restore ${target?.short_id ?? versionId.slice(0, 8)}`,
           versionId: result.version_id,
         },
@@ -232,53 +264,76 @@ function ChatPanel({
         .then((data) => setVersions(data.versions))
         .catch(() => undefined);
     } catch (err) {
-      setMsgs((current) => [...current, { from: 'ai', text: formatChatError(err), error: true }]);
+      setMsgs((current) => [
+        ...current,
+        { from: "ai", text: formatChatError(err), error: true },
+      ]);
     } finally {
       setPending(false);
     }
   };
 
   return (
-    <div className={`mv-card mv-chat${collapsed ? ' is-collapsed' : ''}`}>
+    <div className={`mv-card mv-chat${collapsed ? " is-collapsed" : ""}`}>
       <div className="mv-card-eyebrow">
         <span>追问 · 围绕题目</span>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           {!collapsed && msgs.length > 0 && (
             <span className="mv-eyebrow-mini">{msgs.length} 条</span>
           )}
           <button className="mv-chip mv-chip-collapse" onClick={onToggle}>
-            {collapsed ? '展开 ▴' : '折叠 ▾'}
+            {collapsed ? "展开 ▴" : "折叠 ▾"}
           </button>
         </div>
       </div>
 
       <div className="mv-chat-stream" ref={scrollRef}>
         {msgs.length === 0 && !isProviderConfigured && (
-          <div style={{ fontSize: 12, color: 'var(--ink-3)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <span>可以基于当前题目继续修改；未配置本地 Provider 时将使用服务器模型。</span>
-            {appEdition === 'self' && onOpenProviderSettings && (
-              <button className="mv-chip mv-chip-primary" onClick={onOpenProviderSettings} style={{ alignSelf: 'flex-start' }}>
+          <div
+            style={{
+              fontSize: 12,
+              color: "var(--ink-3)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
+            <span>
+              可以基于当前题目继续修改；未配置本地 Provider 时将使用服务器模型。
+            </span>
+            {appEdition === "self" && onOpenProviderSettings && (
+              <button
+                className="mv-chip mv-chip-primary"
+                onClick={onOpenProviderSettings}
+                style={{ alignSelf: "flex-start" }}
+              >
                 配置本地 Provider →
               </button>
             )}
           </div>
         )}
         {msgs.length === 0 && isProviderConfigured && canModify && (
-          <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+          <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
             可以让 MetaView 在当前基础上修改步骤、讲解或画面。
           </div>
         )}
         {msgs.length === 0 && !canModify && (
-          <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+          <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
             需要真实生成任务后才能保存修改版本。
           </div>
         )}
         {msgs.map((m, i) => (
-          <div key={i} className={`mv-msg mv-msg-${m.from}${m.pending ? ' is-pending' : ''}`}>
+          <div
+            key={i}
+            className={`mv-msg mv-msg-${m.from}${m.pending ? " is-pending" : ""}`}
+          >
             <div className="mv-msg-meta">
-              <span>{m.from === 'user' ? '你' : 'MetaView'}</span>
+              <span>{m.from === "user" ? "你" : "MetaView"}</span>
             </div>
-            <div className="mv-msg-bubble" style={m.error ? { color: 'var(--ink-3)' } : undefined}>
+            <div
+              className="mv-msg-bubble"
+              style={m.error ? { color: "var(--ink-3)" } : undefined}
+            >
               {m.text}
             </div>
             {m.changeSummary && (
@@ -316,11 +371,11 @@ function ChatPanel({
         <textarea
           rows={1}
           className="mv-chat-input"
-          placeholder={canModify ? '描述你想怎样修改当前讲解…' : '等待真实任务'}
+          placeholder={canModify ? "描述你想怎样修改当前讲解…" : "等待真实任务"}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               send();
             }
@@ -334,7 +389,7 @@ function ChatPanel({
             onClick={() => send()}
             disabled={pending || !input.trim() || !canModify}
           >
-            {pending ? '生成中…' : '发送 ↵'}
+            {pending ? "生成中…" : "发送 ↵"}
           </button>
         </div>
       </div>
@@ -345,11 +400,11 @@ function ChatPanel({
 // ── PipelineSkeleton ──────────────────────────────────────────────────────
 
 type PipelineStatus =
-  | 'queued'
-  | 'running'
-  | 'reviewing'
-  | 'succeeded'
-  | 'failed'
+  | "queued"
+  | "running"
+  | "reviewing"
+  | "succeeded"
+  | "failed"
   | null;
 
 interface PipelineSkeletonProps {
@@ -357,10 +412,10 @@ interface PipelineSkeletonProps {
 }
 
 const STAGES: { key: PipelineStatus; label: string }[] = [
-  { key: 'queued', label: '排队中' },
-  { key: 'running', label: '脚本生成' },
-  { key: 'reviewing', label: '审核与修正' },
-  { key: 'succeeded', label: '渲染完成' },
+  { key: "queued", label: "排队中" },
+  { key: "running", label: "脚本生成" },
+  { key: "reviewing", label: "审核与修正" },
+  { key: "succeeded", label: "渲染完成" },
 ];
 
 const STATUS_ORDER: Record<NonNullable<PipelineStatus>, number> = {
@@ -372,16 +427,17 @@ const STATUS_ORDER: Record<NonNullable<PipelineStatus>, number> = {
 };
 
 const STATUS_LOADER_LABEL: Record<NonNullable<PipelineStatus>, string> = {
-  queued: '排队等待生成',
-  running: '正在生成脚本',
-  reviewing: '正在审核与修正',
-  succeeded: '渲染完成',
-  failed: '生成失败',
+  queued: "排队等待生成",
+  running: "正在生成脚本",
+  reviewing: "正在审核与修正",
+  succeeded: "渲染完成",
+  failed: "生成失败",
 };
 
 function PipelineSkeleton({ status }: PipelineSkeletonProps) {
   const currentOrder = status !== null ? STATUS_ORDER[status] : -1;
-  const loaderLabel = status !== null ? STATUS_LOADER_LABEL[status] : '正在准备生成';
+  const loaderLabel =
+    status !== null ? STATUS_LOADER_LABEL[status] : "正在准备生成";
 
   return (
     <div className="mv-pipeline-skeleton">
@@ -392,7 +448,9 @@ function PipelineSkeleton({ status }: PipelineSkeletonProps) {
           const isActive = currentOrder === stageOrder;
           return (
             <React.Fragment key={stage.key}>
-              <div className={`mv-stage${isActive ? ' is-active' : isDone ? ' is-done' : ''}`}>
+              <div
+                className={`mv-stage${isActive ? " is-active" : isDone ? " is-done" : ""}`}
+              >
                 <span className="mv-stage-dot" />
                 <span>{stage.label}</span>
               </div>
@@ -426,10 +484,13 @@ function PipelineSkeleton({ status }: PipelineSkeletonProps) {
 // ── StudioPage ────────────────────────────────────────────────────────────
 
 export interface StudioPageProps {
-  appEdition?: 'self' | 'ops';
+  appEdition?: "self" | "ops";
   runId: string | null;
   t: TweakValues;
-  setTweak: (key: keyof TweakValues, value: TweakValues[keyof TweakValues]) => void;
+  setTweak: (
+    key: keyof TweakValues,
+    value: TweakValues[keyof TweakValues],
+  ) => void;
   onNavigate: (stage: Stage) => void;
   isProviderConfigured: boolean;
   accountBalanceYuan?: string | null;
@@ -439,10 +500,20 @@ export interface StudioPageProps {
 }
 
 export function StudioPage({
-  appEdition = 'self', runId, t, setTweak, onNavigate, isProviderConfigured, accountBalanceYuan = null, accountName = null, accountAvatarUrl = null, onOpenProviderSettings,
+  appEdition = "self",
+  runId,
+  t,
+  setTweak,
+  onNavigate,
+  isProviderConfigured,
+  accountBalanceYuan = null,
+  accountName = null,
+  accountAvatarUrl = null,
+  onOpenProviderSettings,
 }: StudioPageProps) {
-  const isDark = t.theme === 'dark';
-  const { playbook, director, error, isLoading, status } = usePipelinePoller(runId);
+  const isDark = t.theme === "dark";
+  const { playbook, director, error, isLoading, status } =
+    usePipelinePoller(runId);
 
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [problemCollapsed, setProblemCollapsed] = useState(false);
@@ -462,12 +533,12 @@ export function StudioPage({
   const canExport = !!playbook && !!runId;
 
   useEffect(() => {
-    if (error) onNavigate('intake');
+    if (error) onNavigate("intake");
   }, [error, onNavigate]);
 
   const mainStyle = {
-    ['--left-w' as string]: leftCollapsed ? '0px' : `${t.leftRatio}%`,
-    gridTemplateColumns: leftCollapsed ? '1fr' : `var(--left-w) 1fr`,
+    ["--left-w" as string]: leftCollapsed ? "0px" : `${t.leftRatio}%`,
+    gridTemplateColumns: leftCollapsed ? "1fr" : `var(--left-w) 1fr`,
   } as React.CSSProperties;
 
   return (
@@ -481,7 +552,7 @@ export function StudioPage({
         accountAvatarUrl={accountAvatarUrl}
         onNavigate={onNavigate}
         isDark={isDark}
-        onToggleTheme={() => setTweak('theme', isDark ? 'light' : 'dark')}
+        onToggleTheme={() => setTweak("theme", isDark ? "light" : "dark")}
         onOpenProviderSettings={onOpenProviderSettings}
         onOpenExport={canExport ? () => setExportOpen(true) : undefined}
         exportEnabled={canExport}
@@ -490,7 +561,9 @@ export function StudioPage({
         <ExportModal
           runId={runId}
           isDark={isDark}
-          previewTitle={activePlaybook?.steps?.[0]?.title ?? activePlaybook?.title ?? null}
+          previewTitle={
+            activePlaybook?.steps?.[0]?.title ?? activePlaybook?.title ?? null
+          }
           accentColor={t.accent}
           onClose={() => setExportOpen(false)}
         />
@@ -529,16 +602,16 @@ export function StudioPage({
           <button
             className="mv-left-handle"
             onClick={() => setLeftCollapsed((v) => !v)}
-            title={leftCollapsed ? '展开左栏' : '折叠左栏'}
+            title={leftCollapsed ? "展开左栏" : "折叠左栏"}
           >
-            {leftCollapsed ? '›' : '‹'}
+            {leftCollapsed ? "›" : "‹"}
           </button>
 
           {activePlaybook ? (
             <PlaybookPlayer
               script={activePlaybook}
               director={activeDirector}
-              theme={isDark ? 'dark' : 'light'}
+              theme={isDark ? "dark" : "light"}
               swapDurationFrames={t.swapFrames}
               onOpenExport={canExport ? () => setExportOpen(true) : undefined}
             />
@@ -546,7 +619,14 @@ export function StudioPage({
             <PipelineSkeleton status={status} />
           ) : !error ? (
             <div className="mv-right-placeholder">
-              <span>提交一个题目开始生成</span>
+              <span>暂无任务</span>
+              <button
+                className="mv-send"
+                type="button"
+                onClick={() => onNavigate("intake")}
+              >
+                先提交一个题目
+              </button>
             </div>
           ) : null}
         </section>

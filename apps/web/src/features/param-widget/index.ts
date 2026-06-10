@@ -5,5 +5,5 @@ export type {
   MathCurve,
   CurveEmphasis,
 } from "./lib/presets";
-export { FunctionPlot } from "./ui/FunctionPlot";
-export type { PlotSeries, PlotMarker } from "./ui/FunctionPlot";
+export { ParamPlot } from "./ui/ParamPlot";
+export type { PlotSeries, PlotMarker } from "./ui/ParamPlot";

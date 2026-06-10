@@ -6,11 +6,11 @@ from app.domain.models.export_job import ExportJob, ExportJobStatus
 
 
 class IExportJobRepository(Protocol):
-    def create(self, job: ExportJob) -> None: ...
+    async def create(self, job: ExportJob) -> None: ...
 
-    def get(self, job_id: str) -> ExportJob | None: ...
+    async def get(self, job_id: str) -> ExportJob | None: ...
 
-    def update(
+    async def update(
         self,
         job_id: str,
         *,

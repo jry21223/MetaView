@@ -305,6 +305,6 @@ async def _handle_payment_notification(
     )
     try:
         return await use_case.handle_payment_notification(dict(request.headers), body, query=query)
-    except PaymentOrderNotFoundError:
+    except (PaymentOrderNotFoundError, PaymentNotificationError):
         result = await newapi_topup.handle_payment_transaction(transaction)
         return result

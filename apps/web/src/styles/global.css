@@ -1,14 +1,31 @@
 /* MetaView v2 — Global Base Styles */
 
-@import 'mafs/core.css';
-@import 'mafs/font.css';
+@import "mafs/core.css";
+@import "mafs/font.css";
 
-* { box-sizing: border-box; }
-html, body, #root { min-height: 100%; margin: 0; }
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+}
+
+:root {
+  --font-headline: "Space Grotesk", "Inter", sans-serif;
+}
 
 body {
-  font-family: 'Inter', -apple-system, system-ui, 'PingFang SC', 'Noto Sans SC', sans-serif;
-  font-feature-settings: 'cv11', 'ss01';
+  font-family:
+    "Inter",
+    -apple-system,
+    system-ui,
+    "PingFang SC",
+    "Noto Sans SC",
+    sans-serif;
+  font-feature-settings: "cv11", "ss01";
   -webkit-font-smoothing: antialiased;
   background: var(--bg);
   color: var(--ink);
@@ -25,8 +42,8 @@ body.mv-modal-open {
 .mv-history-id,
 .mv-pill-sub,
 .mv-status span:last-child {
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
-  font-feature-settings: 'tnum', 'cv03';
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-feature-settings: "tnum", "cv03";
 }
 
 .mv-root {
@@ -38,16 +55,58 @@ body.mv-modal-open {
 }
 
 /* Scrollbars */
-*::-webkit-scrollbar { width: 8px; height: 8px; }
-*::-webkit-scrollbar-track { background: transparent; }
-*::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 4px; }
-*::-webkit-scrollbar-thumb:hover { background: var(--ink-3); }
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--line-2);
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-3);
+}
 
 /* Shared keyframes */
-@keyframes pulse { 50% { opacity: 0.5; } }
-@keyframes spin { to { transform: rotate(360deg); } }
-@keyframes dockIn {
-  from { opacity: 0; transform: translateY(8px) scale(0.98); }
-  to { opacity: 1; transform: none; }
+@keyframes pulse {
+  50% {
+    opacity: 0.5;
+  }
 }
-@keyframes mv-caption-blink { to { opacity: 0; } }
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes dockIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes mv-caption-blink {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes neon-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 28%, transparent);
+    opacity: 1;
+  }
+  50% {
+    box-shadow:
+      0 0 28px color-mix(in srgb, var(--accent) 40%, transparent),
+      0 0 8px color-mix(in srgb, var(--accent) 60%, transparent);
+    opacity: 0.85;
+  }
+}

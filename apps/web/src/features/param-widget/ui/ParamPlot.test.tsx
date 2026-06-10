@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { FunctionPlot, type PlotSeries } from "./FunctionPlot";
+import { ParamPlot, type PlotSeries } from "./ParamPlot";
 import { compileExpr, sampleExpr } from "../../../shared/lib/mathExpr";
 
 function lineSeries(expr: string, color = "#4de8b0", dashed = false): PlotSeries {
   return { points: sampleExpr(compileExpr(expr), -5, 5, 60), color, dashed };
 }
 
-function render(props: Parameters<typeof FunctionPlot>[0]): string {
-  return renderToStaticMarkup(<FunctionPlot {...props} />);
+function render(props: Parameters<typeof ParamPlot>[0]): string {
+  return renderToStaticMarkup(<ParamPlot {...props} />);
 }
 
-describe("FunctionPlot", () => {
+describe("ParamPlot", () => {
   it("renders an SVG with a polyline for each series", () => {
     const markup = render({
       series: [lineSeries("x"), lineSeries("x^2", "#7db8ff")],

@@ -81,7 +81,7 @@ class ExportVideoUseCase:
             if with_audio:
                 if tts is None:
                     raise ValueError("with_audio=True requires a tts config")
-                self._exports.update(
+                await self._exports.update(
                     job_id,
                     status=ExportJobStatus.GENERATING_AUDIO,
                     progress=0.05,
@@ -110,7 +110,7 @@ class ExportVideoUseCase:
             extension = _FORMAT_TO_EXTENSION.get(opts.format, "mp4")
             output_path = job_dir / f"video.{extension}"
 
-            self._exports.update(
+            await self._exports.update(
                 job_id,
                 status=ExportJobStatus.RENDERING,
                 progress=0.15,
@@ -119,7 +119,7 @@ class ExportVideoUseCase:
 
             await self._run_remotion_render(job_id, props_path, output_path, opts)
 
-            self._exports.update(
+            await self._exports.update(
                 job_id,
                 status=ExportJobStatus.COMPLETED,
                 progress=1.0,
@@ -128,7 +128,7 @@ class ExportVideoUseCase:
             )
         except Exception as exc:  # noqa: BLE001
             logger.exception("export job %s failed", job_id)
-            self._exports.update(
+            await self._exports.update(
                 job_id,
                 status=ExportJobStatus.FAILED,
                 error=str(exc),
@@ -156,9 +156,7 @@ class ExportVideoUseCase:
         settings = get_settings()
         api_key = (tts.api_key or settings.tts_api_key or settings.openai_api_key or "").strip()
         if not api_key:
-            raise RuntimeError(
-                "TTS not configured: set METAVIEW_TTS_API_KEY (or pass tts.api_key)"
-            )
+            raise RuntimeError("TTS not configured: set METAVIEW_TTS_API_KEY (or pass tts.api_key)")
         base_url = (tts.base_url or settings.tts_base_url).rstrip("/")
         model = tts.model or settings.tts_model
 
@@ -234,11 +232,10 @@ class ExportVideoUseCase:
                 stderr=asyncio.subprocess.STDOUT,
             )
         except FileNotFoundError as exc:
-            raise RuntimeError(
-                f"failed to spawn remotion CLI ({cmd[0]}): {exc}"
-            ) from exc
+            raise RuntimeError(f"failed to spawn remotion CLI ({cmd[0]}): {exc}") from exc
 
-        assert proc.stdout is not None
+        if proc.stdout is None:
+            raise RuntimeError("remotion subprocess has no stdout stream")
         tail: deque[str] = deque(maxlen=_RENDER_TAIL_LINES)
         async for raw in proc.stdout:
             line = raw.decode("utf-8", errors="replace").rstrip()
@@ -249,7 +246,7 @@ class ExportVideoUseCase:
             progress = _parse_render_progress(line)
             if progress is not None:
                 # 0.15 → 0.95 maps onto Remotion's own 0..1 progress
-                self._exports.update(
+                await self._exports.update(
                     job_id,
                     progress=0.15 + progress * 0.80,
                 )
@@ -300,11 +297,12 @@ def _resolve_remotion_bin(web_dir: Path) -> Path:
 def _stretch_end_frames(playbook: dict[str, Any], audio_files: list[str]) -> dict[str, Any]:
     fps = int(playbook.get("fps", 30))
     steps = playbook.get("steps", [])
+    original_ends = [step["end_frame"] for step in steps]
     cumulative = 0
     for i, step in enumerate(steps):
-        prev_end = steps[i - 1]["end_frame"] if i > 0 else 0
-        current_end = step["end_frame"]
-        animation_frames = max(1, current_end - prev_end)
+        prev_end_original = original_ends[i - 1] if i > 0 else 0
+        current_end_original = original_ends[i]
+        animation_frames = max(1, current_end_original - prev_end_original)
         audio_frames = 0
         path = audio_files[i] if i < len(audio_files) else ""
         if path:

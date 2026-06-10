@@ -46,7 +46,7 @@ async def test_export_input_props_includes_active_director_when_available(tmp_pa
     export_repo = InMemoryExportJobRepository()
     await _seed_run(run_repo, "run-1")
     await director_repo.upsert(_director("run-1"), "2026-06-05T00:00:00+00:00")
-    export_repo.create(_job("job-1", "run-1"))
+    await export_repo.create(_job("job-1", "run-1"))
     use_case = RecordingExportVideoUseCase(
         export_repo,
         run_repo,
@@ -61,7 +61,7 @@ async def test_export_input_props_includes_active_director_when_available(tmp_pa
     assert use_case.input_props["script"]["title"] == "Export fixture"
     assert use_case.input_props["director"]["run_id"] == "run-1"
     assert use_case.input_props["director"]["beats"][0]["camera_motion"] == "push_in"
-    job = export_repo.get("job-1")
+    job = await export_repo.get("job-1")
     assert job is not None
     assert job.output_path is not None
 
@@ -74,7 +74,7 @@ async def test_export_input_props_omits_director_when_missing(tmp_path) -> None:
     director_repo = SqliteRunDirectorRepository(db)
     export_repo = InMemoryExportJobRepository()
     await _seed_run(run_repo, "run-2")
-    export_repo.create(_job("job-2", "run-2"))
+    await export_repo.create(_job("job-2", "run-2"))
     use_case = RecordingExportVideoUseCase(
         export_repo,
         run_repo,

@@ -175,11 +175,11 @@ class NewApiTopupUseCase:
         return await self.handle_payment_transaction(transaction)
 
     async def handle_payment_transaction(self, transaction: PaymentTransaction) -> str:
-        if transaction.trade_state != "SUCCESS":
-            return "ignored"
         intent = await self._repo.get_intent_by_order_id(transaction.order_id)
         if intent is None:
             raise NewApiTopupOrderNotFoundError("NewAPI 充值单不存在")
+        if transaction.trade_state != "SUCCESS":
+            return "ignored"
         if intent.status in {"paid", "verified", "acked"}:
             return "success"
         if _parse_datetime(intent.expires_at) <= _now():
