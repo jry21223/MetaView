@@ -31,6 +31,7 @@ from app.presentation.dependencies import (
     get_newapi_topup_use_case,
     get_payment_gateway,
 )
+from app.presentation.edition_policy import require_account_features, require_wechat_session
 from app.presentation.rate_limit import read_limit, write_limit
 
 router = APIRouter(tags=["account"])
@@ -131,14 +132,10 @@ def _order_response(order: RechargeOrder) -> RechargeOrderResponse:
 @read_limit()
 async def get_me(
     request: Request,
-    response: Response,
     settings: Annotated[Settings, Depends(get_settings)],
     use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
 ) -> AccountMeResponse:
-    session = await use_case.get_or_create_session(
-        request.cookies.get(settings.account_session_cookie)
-    )
-    _maybe_set_session_cookie(request, response, settings, session)
+    session = await require_wechat_session(request, settings, use_case)
     return _account_response(settings, use_case, session)
 
 
@@ -163,6 +160,7 @@ async def wechat_login_url(
     settings: Annotated[Settings, Depends(get_settings)],
     use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
 ) -> WeChatLoginUrlResponse:
+    require_account_features(settings)
     try:
         result = await use_case.begin_wechat_login(
             request.cookies.get(settings.account_session_cookie)
@@ -180,6 +178,7 @@ async def wechat_callback(
     settings: Annotated[Settings, Depends(get_settings)],
     use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
 ) -> RedirectResponse:
+    require_account_features(settings)
     code = request.query_params.get("code")
     state = request.query_params.get("state")
     if not code or not state:
@@ -201,14 +200,11 @@ async def wechat_callback(
 @read_limit()
 async def list_recharge_orders(
     request: Request,
-    response: Response,
     settings: Annotated[Settings, Depends(get_settings)],
     use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
 ) -> list[RechargeOrderResponse]:
-    session, orders = await use_case.list_recharge_orders(
-        request.cookies.get(settings.account_session_cookie)
-    )
-    _maybe_set_session_cookie(request, response, settings, session)
+    session = await require_wechat_session(request, settings, use_case)
+    orders = await use_case.list_recharge_orders_for_session(session)
     return [_order_response(order) for order in orders]
 
 
@@ -216,23 +212,19 @@ async def list_recharge_orders(
 @write_limit()
 async def create_recharge_order(
     request: Request,
-    response: Response,
     payload: RechargeOrderRequest,
     settings: Annotated[Settings, Depends(get_settings)],
     use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
 ) -> RechargeOrderResponse:
+    session = await require_wechat_session(request, settings, use_case)
     try:
-        session, order = await use_case.create_recharge_order(
-            request.cookies.get(settings.account_session_cookie),
-            payload.amount_yuan,
-        )
+        order = await use_case.create_recharge_order_for_session(session, payload.amount_yuan)
     except AmountValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except PaymentNotConfiguredError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-    _maybe_set_session_cookie(request, response, settings, session)
     return _order_response(order)
 
 
@@ -240,19 +232,15 @@ async def create_recharge_order(
 @read_limit()
 async def get_recharge_order(
     request: Request,
-    response: Response,
     order_id: str,
     settings: Annotated[Settings, Depends(get_settings)],
     use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
 ) -> RechargeOrderResponse:
+    session = await require_wechat_session(request, settings, use_case)
     try:
-        session, order = await use_case.get_recharge_order(
-            request.cookies.get(settings.account_session_cookie),
-            order_id,
-        )
+        order = await use_case.get_recharge_order_for_session(session, order_id)
     except OrderNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    _maybe_set_session_cookie(request, response, settings, session)
     return _order_response(order)
 
 

@@ -40,8 +40,7 @@ def newapi_topup_client(monkeypatch: pytest.MonkeyPatch, tmp_path):
 
 def test_newapi_topup_dev_receipt_flow(newapi_topup_client: TestClient) -> None:
     me = newapi_topup_client.get("/api/v1/account/me")
-    assert me.status_code == 200
-    assert me.json()["balance_cents"] == 0
+    assert me.status_code == 404
 
     start = _start_topup(newapi_topup_client)
     assert start.status_code == 200
@@ -117,7 +116,7 @@ def test_newapi_topup_dev_receipt_flow(newapi_topup_client: TestClient) -> None:
     assert repeated_ack.json()["acked_at"] == acked.json()["acked_at"]
 
     refreshed = newapi_topup_client.get("/api/v1/account/me")
-    assert refreshed.json()["balance_cents"] == 0
+    assert refreshed.status_code == 404
 
 
 def test_newapi_topup_checkout_does_not_render_user_identifier(

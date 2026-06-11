@@ -63,6 +63,14 @@ make dev-web
 
 未配置真实 LLM 时默认走内置 `mock` provider。前端 Provider 面板可填写 OpenAI 兼容接口，也支持本地 Ollama / vLLM 网关。
 
+## Edition 边界
+
+`METAVIEW_APP_EDITION` 和 `VITE_APP_EDITION` 必须保持一致：
+
+- `self` 是纯 BYOK 单机版。前端不请求账户接口，不显示余额、充值或微信登录；生成、追问和 TTS 可以使用浏览器本地保存的 OpenAI 兼容 provider 配置。后端仍使用本地 SQLite 保存运行历史。
+- `ops` 是 SaaS 用户版。所有用户态接口必须有有效微信登录 session；生成和 follow-up 使用平台托管模型并按账户余额扣费，客户端提交 provider/router/TTS key 会被拒绝。
+- 运营面板不在 UI 中暴露入口。管理员直接访问 `/admin`，后端仍要求 `METAVIEW_APP_EDITION=ops` 且当前账户 `role=admin`。
+
 ## Docker
 
 ```bash
@@ -110,6 +118,10 @@ make check
 | `METAVIEW_OPENAI_TIMEOUT_S` | `300` | 请求超时秒数 |
 | `METAVIEW_OPENAI_MAX_TOKENS` | `16000` | chat/completions 的 `max_tokens` |
 | `METAVIEW_OPENAI_REASONING_EFFORT` | - | gpt-5 / o-series 专用，支持 `minimal\|low\|medium\|high` |
+| `METAVIEW_APP_EDITION` | `self` | 后端 edition：`self` / `ops` |
+| `METAVIEW_TTS_API_KEY` | - | 平台托管 TTS key；为空时回退 `METAVIEW_OPENAI_API_KEY` |
+| `METAVIEW_TTS_BASE_URL` | `https://api.openai.com/v1` | 平台托管 TTS 兼容接口根地址 |
+| `METAVIEW_TTS_MODEL` | `tts-1` | 平台托管 TTS 模型 |
 | `METAVIEW_ROUTER_MODE` | `hybrid` | 路由模式：`off` / `heuristic` / `llm` / `hybrid` |
 | `METAVIEW_ROUTER_MODEL` | - | 小模型路由模型；为空时复用 router/openai/default 模型 |
 | `METAVIEW_ROUTER_TIMEOUT_S` | `12` | 小模型路由超时秒数 |
@@ -144,6 +156,7 @@ make check
 | `METAVIEW_PLAYBOOK_COMPOSITION_WIDTH` / `_HEIGHT` | `960` / `540` | 默认画布 |
 | `METAVIEW_CORS_ORIGIN_REGEX` | localhost 正则 | 允许的浏览器来源 |
 | `VITE_API_BASE_URL` | 同源 | 前端构建时 API 基地址 |
+| `VITE_APP_EDITION` | `self` | 前端 edition：`self` / `ops`，应与 `METAVIEW_APP_EDITION` 一致 |
 
 完整变量列表见 [`.env.example`](.env.example)。
 

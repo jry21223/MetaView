@@ -14,6 +14,7 @@ describe("App edition shells", () => {
     vi.resetModules();
     localStorage.clear();
     sessionStorage.clear();
+    window.history.pushState({}, "", "/");
   });
 
   it("self edition does not load account state on the intake screen", async () => {
@@ -47,7 +48,30 @@ describe("App edition shells", () => {
     expect(opsHits).toBe(0);
   });
 
-  it("ops edition loads account state and opens the intake screen by default", async () => {
+  it("ops edition shows the login gate when account session is missing", async () => {
+    let accountHits = 0;
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/account/me`, () => {
+        accountHits += 1;
+        return HttpResponse.json({ detail: "请先使用微信登录" }, { status: 401 });
+      }),
+      http.get(`${API_BASE_URL}/api/v1/auth/wechat/login-url`, () => {
+        return HttpResponse.json({ detail: "微信登录未配置" }, { status: 503 });
+      }),
+    );
+    vi.stubEnv("VITE_APP_EDITION", "ops");
+
+    const { App } = await import("./App");
+    render(<App />);
+
+    await waitFor(() => expect(accountHits).toBe(1));
+    await waitFor(() =>
+      expect(document.body.textContent).toContain("登录暂未开放"),
+    );
+    expect(document.body.textContent).not.toContain("把题目交给我");
+  });
+
+  it("ops edition opens the intake screen after WeChat login", async () => {
     let accountHits = 0;
     let dashboardHits = 0;
     server.use(
@@ -55,16 +79,16 @@ describe("App edition shells", () => {
         accountHits += 1;
         return HttpResponse.json({
           user_id: "user_1",
-          display_name: "游客账户",
+          display_name: "微信用户",
           avatar_url: null,
-          login_provider: "guest",
+          login_provider: "wechat",
           status: "enabled",
-          role: "admin",
+          role: "user",
           balance_cents: 500,
           balance_yuan: "5.00",
           recharge_min_cents: 500,
           payment_enabled: false,
-          wechat_login_enabled: false,
+          wechat_login_enabled: true,
         });
       }),
       http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () => {
@@ -81,7 +105,7 @@ describe("App edition shells", () => {
     await waitFor(() => expect(dashboardHits).toBe(0));
     expect(document.body.textContent).toContain("把题目交给我");
     expect(document.body.textContent).not.toContain("全局运营");
-    expect(document.body.textContent).toContain("游客账户 · ¥ 5.00");
+    expect(document.body.textContent).toContain("微信用户 · ¥ 5.00");
   });
 
   it("self edition does not expose ops dashboard shortcut", async () => {
@@ -91,5 +115,24 @@ describe("App edition shells", () => {
     const { queryByText } = render(<App />);
 
     await waitFor(() => expect(queryByText("运营面板")).toBeNull());
+  });
+
+  it("loads the hidden ops dashboard on /admin without exposing a nav shortcut", async () => {
+    let dashboardHits = 0;
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () => {
+        dashboardHits += 1;
+        return HttpResponse.json(sampleDashboard());
+      }),
+    );
+    vi.stubEnv("VITE_APP_EDITION", "ops");
+    window.history.pushState({}, "", "/admin");
+
+    const { App } = await import("./App");
+    const { queryByText } = render(<App />);
+
+    await waitFor(() => expect(dashboardHits).toBe(1));
+    expect(document.body.textContent).toContain("全局运营");
+    expect(queryByText("运营面板")).toBeNull();
   });
 });

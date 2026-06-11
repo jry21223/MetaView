@@ -120,6 +120,7 @@ export function SettingsPage({
     providerSettings?.routerTimeoutS ?? 12,
   );
   const [showKey, setShowKey] = useState(false);
+  const [showTtsKey, setShowTtsKey] = useState(false);
   const [savedFlash, setSavedFlash] = useState<string | null>(null);
   const [ttsProbe, setTtsProbe] = useState<
     | { kind: "idle" }
@@ -129,6 +130,7 @@ export function SettingsPage({
   >({ kind: "idle" });
 
   const tts = useTTS();
+  const showLocalTtsSettings = appEdition === "self";
 
   const flash = (msg: string) => {
     setSavedFlash(msg);
@@ -182,6 +184,11 @@ export function SettingsPage({
           text: "朗读后端测试。",
           voice: tts.config.voice === "auto" ? "alloy" : tts.config.voice,
           rate: 1.0,
+          ...(showLocalTtsSettings && {
+            api_key: tts.config.apiKey || null,
+            base_url: tts.config.baseUrl || null,
+            model: tts.config.model || null,
+          }),
         }),
       });
       if (!resp.ok) {
@@ -382,12 +389,22 @@ export function SettingsPage({
 
         {/* ───── TTS ───── */}
         <section className="mv-settings-section">
-          <h2 className="mv-settings-section-title">朗读 · 语音合成</h2>
+          <h2 className="mv-settings-section-title">
+            {showLocalTtsSettings ? "本地 TTS 配置" : "平台托管 TTS"}
+          </h2>
           <p className="mv-settings-section-hint">
-            浏览器语音不需要配置；OpenAI 服务端走后端代理（issue #40），
-            前端不再存第三方密钥。API 密钥需在服务器 <code>.env</code> 设置
-            <code>METAVIEW_TTS_API_KEY</code>（缺省回退到{" "}
-            <code>METAVIEW_OPENAI_API_KEY</code>）。
+            {showLocalTtsSettings ? (
+              <>
+                浏览器语音不需要配置；OpenAI / 兼容 TTS
+                通过后端临时代理，请求只使用当前浏览器保存的本地配置。
+              </>
+            ) : (
+              <>
+                运营版使用平台托管 TTS。API 密钥由服务器 <code>.env</code>{" "}
+                中的 <code>METAVIEW_TTS_API_KEY</code> 或{" "}
+                <code>METAVIEW_OPENAI_API_KEY</code> 提供。
+              </>
+            )}
           </p>
 
           <div className="mv-settings-field">
@@ -405,10 +422,59 @@ export function SettingsPage({
                 className={`mv-chip${tts.config.backend === "openai" ? " mv-chip-primary" : ""}`}
                 onClick={() => tts.updateConfig({ backend: "openai" })}
               >
-                OpenAI 服务端
+                {showLocalTtsSettings ? "OpenAI / 兼容 API" : "平台 TTS"}
               </button>
             </div>
           </div>
+
+          {showLocalTtsSettings && (
+            <>
+              <div className="mv-settings-field">
+                <label htmlFor="mv-set-tts-key">TTS API 密钥</label>
+                <div className="mv-settings-field-inline">
+                  <input
+                    id="mv-set-tts-key"
+                    type={showTtsKey ? "text" : "password"}
+                    className="mv-text-input mv-mono"
+                    value={tts.config.apiKey}
+                    onChange={(e) => tts.updateConfig({ apiKey: e.target.value })}
+                    placeholder="sk-..."
+                  />
+                  <button
+                    type="button"
+                    className="mv-chip"
+                    onClick={() => setShowTtsKey((s) => !s)}
+                  >
+                    {showTtsKey ? "隐藏" : "显示"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="mv-settings-field">
+                <label htmlFor="mv-set-tts-base">TTS 接口地址</label>
+                <input
+                  id="mv-set-tts-base"
+                  type="url"
+                  className="mv-text-input mv-mono"
+                  value={tts.config.baseUrl}
+                  onChange={(e) => tts.updateConfig({ baseUrl: e.target.value })}
+                  placeholder="https://api.openai.com/v1"
+                />
+              </div>
+
+              <div className="mv-settings-field">
+                <label htmlFor="mv-set-tts-model">TTS 模型</label>
+                <input
+                  id="mv-set-tts-model"
+                  type="text"
+                  className="mv-text-input mv-mono"
+                  value={tts.config.model}
+                  onChange={(e) => tts.updateConfig({ model: e.target.value })}
+                  placeholder="tts-1"
+                />
+              </div>
+            </>
+          )}
 
           {tts.config.backend === "openai" && (
             <div className="mv-settings-field">

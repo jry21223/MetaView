@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { API_BASE_URL } from "../../../../shared/config/constants";
+import { API_BASE_URL, APP_EDITION } from "../../../../shared/config/constants";
 import { isSSML, normalizeSSML } from "./ssml";
 import { sharedTTSCache, ttsCacheKey, type TTSCacheStats } from "./ttsCache";
 
@@ -12,6 +12,9 @@ export interface TTSConfig {
   /** "auto" = follow domain mapping; otherwise an explicit voice id */
   voice: string;
   rate: number;
+  apiKey: string;
+  baseUrl: string;
+  model: string;
 }
 
 export interface SpeakOptions {
@@ -53,14 +56,17 @@ const DEFAULT_CONFIG: TTSConfig = {
   backend: "system",
   voice: "alloy",
   rate: 1.0,
+  apiKey: "",
+  baseUrl: "https://api.openai.com/v1",
+  model: "tts-1",
 };
 
 const TTS_PROXY_ENDPOINT = `${API_BASE_URL}/api/v1/tts/speech`;
 
 /**
  * Trim a parsed config object to the fields we currently persist. Older
- * builds (pre-issue #40) stored ``apiKey`` / ``baseUrl`` / ``model``; this
- * filter migrates those entries silently the next time we save. Issue #40.
+ * builds stored a narrower shape; keep unknown entries out while preserving
+ * the self-edition BYOK fields the TTS proxy accepts per request.
  */
 function sanitizeStoredConfig(parsed: unknown): Partial<TTSConfig> {
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
@@ -72,6 +78,9 @@ function sanitizeStoredConfig(parsed: unknown): Partial<TTSConfig> {
   if (raw.backend === "system" || raw.backend === "openai") out.backend = raw.backend;
   if (typeof raw.voice === "string") out.voice = raw.voice;
   if (typeof raw.rate === "number" && Number.isFinite(raw.rate)) out.rate = raw.rate;
+  if (typeof raw.apiKey === "string") out.apiKey = raw.apiKey;
+  if (typeof raw.baseUrl === "string" && raw.baseUrl.trim()) out.baseUrl = raw.baseUrl;
+  if (typeof raw.model === "string" && raw.model.trim()) out.model = raw.model;
   return out;
 }
 
@@ -99,6 +108,9 @@ function saveConfig(cfg: TTSConfig): void {
       backend: cfg.backend,
       voice: cfg.voice,
       rate: cfg.rate,
+      apiKey: cfg.apiKey,
+      baseUrl: cfg.baseUrl,
+      model: cfg.model,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(safe));
     // Same-tab broadcast — ``storage`` events only fire cross-tab, so each
@@ -250,7 +262,13 @@ export function useTTS(): UseTTSResult {
       // Issue #40: cache key no longer mixes in user-supplied baseUrl/model —
       // the backend proxy owns both — so the key fingerprints exactly the
       // synthesis-shaping inputs the client controls.
-      const key = ttsCacheKey({ voice, rate, text });
+      const key = ttsCacheKey({
+        voice,
+        rate,
+        text,
+        baseUrl: APP_EDITION === "self" ? config.baseUrl : "",
+        model: APP_EDITION === "self" ? config.model : "",
+      });
       const cached = sharedTTSCache.get(key);
       if (cached) {
         try {
@@ -268,7 +286,16 @@ export function useTTS(): UseTTSResult {
           method: "POST",
           signal: ac.signal,
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, voice, rate }),
+          body: JSON.stringify({
+            text,
+            voice,
+            rate,
+            ...(APP_EDITION === "self" && {
+              api_key: config.apiKey || null,
+              base_url: config.baseUrl || null,
+              model: config.model || null,
+            }),
+          }),
         });
         if (ac.signal.aborted) return;
         if (!res.ok) throw new Error(`TTS proxy ${res.status}`);
@@ -282,7 +309,7 @@ export function useTTS(): UseTTSResult {
         setSpeaking(false);
       }
     },
-    [playArrayBuffer],
+    [config.apiKey, config.baseUrl, config.model, playArrayBuffer],
   );
 
   const speak = useCallback(

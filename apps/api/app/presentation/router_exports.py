@@ -65,6 +65,15 @@ async def submit_export(
 ) -> ExportJobResponse:
     if payload.with_audio and payload.tts is None:
         raise HTTPException(status_code=400, detail="with_audio=true requires a tts config")
+    if (
+        settings.app_edition == "ops"
+        and payload.tts is not None
+        and (payload.tts.api_key or payload.tts.base_url or payload.tts.model)
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="运营版使用平台托管 TTS，不能提交客户端 TTS 配置",
+        )
     run = await run_repo.get(payload.run_id)
     if run is None or run.playbook is None:
         raise HTTPException(status_code=404, detail=f"Run {payload.run_id!r} has no playbook")

@@ -59,4 +59,36 @@ describe("SettingsPage appearance controls", () => {
 
     expect(setTweak).toHaveBeenCalledWith("accent", "#ff0055");
   });
+
+  it("shows local TTS provider settings in self edition", () => {
+    const { getByText, getByLabelText } = renderSettingsPage({
+      appEdition: "self",
+      providerSettings: {
+        apiKey: "",
+        baseUrl: "https://api.openai.com/v1",
+        model: "gpt-4o-mini",
+        routerMode: "hybrid",
+        routerModel: "",
+        routerMinConfidence: 0.72,
+        routerTimeoutS: 12,
+      },
+      onUpdateProvider: vi.fn(),
+    });
+
+    expect(getByText("本地 TTS 配置")).toBeTruthy();
+    expect(getByLabelText("TTS API 密钥")).toBeTruthy();
+    expect(getByLabelText("TTS 接口地址")).toBeTruthy();
+    expect(getByLabelText("TTS 模型")).toBeTruthy();
+  });
+
+  it("shows platform-managed TTS in ops edition without local key fields", () => {
+    const { getByText, queryByLabelText } = renderSettingsPage({
+      appEdition: "ops",
+    });
+
+    expect(getByText("平台托管 TTS")).toBeTruthy();
+    expect(queryByLabelText("TTS API 密钥")).toBeNull();
+    expect(queryByLabelText("TTS 接口地址")).toBeNull();
+    expect(queryByLabelText("TTS 模型")).toBeNull();
+  });
 });

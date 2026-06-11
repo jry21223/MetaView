@@ -238,7 +238,8 @@ def test_followup_ops_rejects_provider_override(monkeypatch, tmp_path) -> None:
     init_db(db)
     repo = SqliteRunRepository(db)
     director_repo = SqliteRunDirectorRepository(db)
-    run_id = _seed_run(repo)
+    owner = _session_with_balance(db, 20)
+    run_id = _seed_run(repo, user_id=owner.account.user_id)
     app = create_app()
     app.dependency_overrides[get_run_repo] = lambda: repo
     app.dependency_overrides[get_run_director_repo] = lambda: director_repo
@@ -248,10 +249,43 @@ def test_followup_ops_rejects_provider_override(monkeypatch, tmp_path) -> None:
         resp = client.post(
             f"/api/v1/runs/{run_id}/follow-up",
             json={"message": "改一下", "provider_api_key": "sk-user"},
+            headers={"Cookie": f"mv_session={owner.token}"},
         )
 
     get_settings.cache_clear()
     assert resp.status_code == 400
+
+
+def test_followup_ops_requires_wechat_session(monkeypatch, tmp_path) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
+    monkeypatch.setenv("METAVIEW_OPENAI_API_KEY", "sk-server")
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    db = str(tmp_path / "ops-followup-login-required.db")
+    init_db(db)
+    repo = SqliteRunRepository(db)
+    director_repo = SqliteRunDirectorRepository(db)
+    guest = _session_with_balance(db, 20, login_provider="guest")
+    run_id = _seed_run(repo)
+    app = create_app()
+    app.dependency_overrides[get_run_repo] = lambda: repo
+    app.dependency_overrides[get_run_director_repo] = lambda: director_repo
+    app.dependency_overrides[get_llm_provider] = lambda: SequenceLLM([_llm_payload([])])
+
+    with TestClient(app) as client:
+        missing = client.post(
+            f"/api/v1/runs/{run_id}/follow-up",
+            json={"message": "改一下"},
+        )
+        guest_resp = client.post(
+            f"/api/v1/runs/{run_id}/follow-up",
+            json={"message": "改一下"},
+            headers={"Cookie": f"mv_session={guest.token}"},
+        )
+
+    get_settings.cache_clear()
+    assert missing.status_code == 401
+    assert guest_resp.status_code == 401
 
 
 def test_followup_ops_scopes_run_and_consumes_balance(monkeypatch, tmp_path) -> None:
@@ -355,12 +389,31 @@ def _run(coro):
     return loop.run_until_complete(coro)
 
 
-def _session_with_balance(db: str, balance_cents: int):
+def _session_with_balance(
+    db: str,
+    balance_cents: int,
+    *,
+    login_provider: str = "wechat",
+):
     session = _run(SqliteAccountRepository(db).get_or_create_session(None, session_days=30))
     with sqlite3.connect(db) as conn:
         conn.execute(
-            "UPDATE accounts SET balance_cents = ? WHERE user_id = ?",
-            (balance_cents, session.account.user_id),
+            """
+            UPDATE accounts
+            SET balance_cents = ?,
+                login_provider = ?,
+                display_name = ?,
+                wechat_openid = CASE WHEN ? = 'wechat' THEN ? ELSE NULL END
+            WHERE user_id = ?
+            """,
+            (
+                balance_cents,
+                login_provider,
+                "微信用户" if login_provider == "wechat" else "游客账户",
+                login_provider,
+                f"openid_{session.account.user_id}",
+                session.account.user_id,
+            ),
         )
         conn.commit()
     return session

@@ -198,7 +198,9 @@ def test_ops_edition_rejects_client_provider_override(monkeypatch, tmp_path) -> 
     init_db(db)
     repo = SqliteRunRepository(db)
     director_repo = SqliteRunDirectorRepository(db)
+    session = _session_with_balance(db, 20)
     monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
+    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", db)
     monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
     app = create_app()
     app.dependency_overrides[get_run_repo] = lambda: repo
@@ -209,11 +211,67 @@ def test_ops_edition_rejects_client_provider_override(monkeypatch, tmp_path) -> 
         resp = c.post(
             "/api/v1/pipeline",
             json={"prompt": "test", "provider_api_key": "sk-user"},
+            headers={"Cookie": f"mv_session={session.token}"},
         )
 
     get_settings.cache_clear()
     assert resp.status_code == 400
     assert "平台托管模型" in resp.json()["detail"]
+
+
+def test_ops_pipeline_requires_wechat_session(monkeypatch, tmp_path) -> None:
+    get_settings.cache_clear()
+    db = str(tmp_path / "ops-login-required.db")
+    init_db(db)
+    repo = SqliteRunRepository(db)
+    director_repo = SqliteRunDirectorRepository(db)
+    guest = _session_with_balance(db, 20, login_provider="guest")
+    monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
+    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", db)
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    app = create_app()
+    app.dependency_overrides[get_run_repo] = lambda: repo
+    app.dependency_overrides[get_run_director_repo] = lambda: director_repo
+    app.dependency_overrides[get_llm_provider] = lambda: _MockLLM()
+
+    with TestClient(app) as client:
+        missing = client.post("/api/v1/pipeline", json={"prompt": "ops run"})
+        guest_resp = client.post(
+            "/api/v1/pipeline",
+            json={"prompt": "ops run"},
+            headers={"Cookie": f"mv_session={guest.token}"},
+        )
+
+    get_settings.cache_clear()
+    assert missing.status_code == 401
+    assert guest_resp.status_code == 401
+    assert _run(repo.list()) == []
+
+
+def test_ops_runs_require_wechat_session(monkeypatch, tmp_path) -> None:
+    get_settings.cache_clear()
+    db = str(tmp_path / "ops-runs-login-required.db")
+    init_db(db)
+    repo = SqliteRunRepository(db)
+    director_repo = SqliteRunDirectorRepository(db)
+    guest = _session_with_balance(db, 20, login_provider="guest")
+    monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
+    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", db)
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    app = create_app()
+    app.dependency_overrides[get_run_repo] = lambda: repo
+    app.dependency_overrides[get_run_director_repo] = lambda: director_repo
+
+    with TestClient(app) as client:
+        missing = client.get("/api/v1/runs")
+        guest_resp = client.get(
+            "/api/v1/runs",
+            headers={"Cookie": f"mv_session={guest.token}"},
+        )
+
+    get_settings.cache_clear()
+    assert missing.status_code == 401
+    assert guest_resp.status_code == 401
 
 
 def test_ops_pipeline_scopes_runs_and_consumes_balance(monkeypatch, tmp_path) -> None:
@@ -447,12 +505,31 @@ def test_init_db_migrates_legacy_request_id_schema(tmp_path) -> None:
     assert row is not None
 
 
-def _session_with_balance(db: str, balance_cents: int):
+def _session_with_balance(
+    db: str,
+    balance_cents: int,
+    *,
+    login_provider: str = "wechat",
+):
     session = _run(SqliteAccountRepository(db).get_or_create_session(None, session_days=30))
     with sqlite3.connect(db) as conn:
         conn.execute(
-            "UPDATE accounts SET balance_cents = ? WHERE user_id = ?",
-            (balance_cents, session.account.user_id),
+            """
+            UPDATE accounts
+            SET balance_cents = ?,
+                login_provider = ?,
+                display_name = ?,
+                wechat_openid = CASE WHEN ? = 'wechat' THEN ? ELSE NULL END
+            WHERE user_id = ?
+            """,
+            (
+                balance_cents,
+                login_provider,
+                "微信用户" if login_provider == "wechat" else "游客账户",
+                login_provider,
+                f"openid_{session.account.user_id}",
+                session.account.user_id,
+            ),
         )
         conn.commit()
     return session

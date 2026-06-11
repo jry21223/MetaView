@@ -57,4 +57,22 @@ describe("GlobalTopbar account avatar", () => {
     expect(queryByText("模板")).toBeTruthy();
     expect(queryByText("设置")).toBeTruthy();
   });
+
+  it("self mode shows provider status without account or recharge controls", () => {
+    const { queryByLabelText, queryByText, getByText } = render(
+      <GlobalTopbar
+        {...baseProps}
+        appEdition="self"
+        accountBalanceYuan={null}
+        accountName={null}
+        onOpenProviderSettings={vi.fn()}
+        onOpenAccount={vi.fn()}
+      />,
+    );
+
+    expect(queryByLabelText("账户与充值")).toBeNull();
+    expect(queryByText(/¥ 5\.00/)).toBeNull();
+    expect(getByText("CORE NODES ONLINE")).toBeTruthy();
+    expect(queryByLabelText("模型服务商设置")).toBeTruthy();
+  });
 });

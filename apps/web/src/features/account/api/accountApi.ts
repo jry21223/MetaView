@@ -28,11 +28,26 @@ export interface RechargeOrder {
   paid_at?: string | null;
 }
 
+export class AccountRequestError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "AccountRequestError";
+    this.status = status;
+  }
+}
+
 export async function fetchAccountMe(): Promise<AccountMe> {
   const response = await fetch(`${API_BASE_URL}/api/v1/account/me`, {
     credentials: "include",
   });
-  if (!response.ok) throw new Error(await readErrorMessage(response, "Account request failed"));
+  if (!response.ok) {
+    throw new AccountRequestError(
+      await readErrorMessage(response, "Account request failed"),
+      response.status,
+    );
+  }
   return (await response.json()) as AccountMe;
 }
 

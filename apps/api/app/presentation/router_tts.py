@@ -16,7 +16,10 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from starlette.requests import Request
 
+from app.application.use_cases.account import AccountUseCase
 from app.config import Settings, get_settings
+from app.presentation.dependencies import get_account_use_case
+from app.presentation.edition_policy import require_wechat_session
 from app.presentation.rate_limit import write_limit
 
 router = APIRouter(prefix="/tts", tags=["tts"])
@@ -37,22 +40,40 @@ class TtsSpeechRequest(BaseModel):
     voice: str | None = Field(default=None, max_length=64)
     rate: float = Field(default=1.0, ge=0.25, le=4.0)
     model: str | None = Field(default=None, max_length=64)
+    api_key: str | None = Field(default=None, max_length=4096)
+    base_url: str | None = Field(default=None, max_length=2048)
     response_format: str = Field(default="mp3", max_length=8)
 
 
-def _resolve_api_key(settings: Settings) -> str:
+def _resolve_api_key(settings: Settings, payload: TtsSpeechRequest) -> str:
     """Return the configured TTS key, falling back to the LLM key.
 
     Operators can either set ``METAVIEW_TTS_API_KEY`` directly or reuse
     ``METAVIEW_OPENAI_API_KEY`` for hobby setups.
     """
-    key = (settings.tts_api_key or settings.openai_api_key or "").strip()
+    key = (
+        payload.api_key
+        if settings.app_edition == "self" and payload.api_key
+        else settings.tts_api_key or settings.openai_api_key or ""
+    ).strip()
     if not key:
         raise HTTPException(
             status_code=503,
             detail="TTS not configured: set METAVIEW_TTS_API_KEY or METAVIEW_OPENAI_API_KEY",
         )
     return key
+
+
+def _resolve_base_url(settings: Settings, payload: TtsSpeechRequest) -> str:
+    if settings.app_edition == "self" and payload.base_url:
+        return payload.base_url
+    return settings.tts_base_url
+
+
+def _resolve_model(settings: Settings, payload: TtsSpeechRequest) -> str:
+    if settings.app_edition == "self" and payload.model:
+        return payload.model
+    return settings.tts_model
 
 
 def _redact_secret_field(match: re.Match[str]) -> str:
@@ -80,15 +101,25 @@ async def synthesize_speech(
     request: Request,
     payload: TtsSpeechRequest,
     settings: Annotated[Settings, Depends(get_settings)],
+    account_use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
 ) -> Response:
     """Forward a text→audio request to the configured TTS provider.
 
     Returns the audio bytes directly so the browser can decode through the
     existing AudioContext pipeline without rebuilding the cache layer.
     """
-    api_key = _resolve_api_key(settings)
+    if settings.app_edition == "ops":
+        await require_wechat_session(request, settings, account_use_case)
+        if payload.api_key or payload.base_url or payload.model:
+            raise HTTPException(
+                status_code=400,
+                detail="运营版使用平台托管 TTS，不能提交客户端 TTS 配置",
+            )
+
+    api_key = _resolve_api_key(settings, payload)
     voice = payload.voice or settings.tts_default_voice
-    model = payload.model or settings.tts_model
+    model = _resolve_model(settings, payload)
+    base_url = _resolve_base_url(settings, payload)
 
     body = {
         "model": model,
@@ -102,7 +133,7 @@ async def synthesize_speech(
     async with httpx.AsyncClient(timeout=timeout) as client:
         try:
             upstream = await client.post(
-                f"{settings.tts_base_url.rstrip('/')}/audio/speech",
+                f"{base_url.rstrip('/')}/audio/speech",
                 headers={
                     "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",

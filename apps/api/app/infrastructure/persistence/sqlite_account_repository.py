@@ -39,6 +39,28 @@ class SqliteAccountRepository:
     ) -> SessionAccount:
         return await asyncio.to_thread(self._get_or_create_session_sync, token, session_days)
 
+    async def get_session(self, token: str | None) -> SessionAccount | None:
+        if not token:
+            return None
+        return await asyncio.to_thread(self._get_session_sync, token)
+
+    def _get_session_sync(self, token: str) -> SessionAccount | None:
+        now = utc_now()
+        token_hash = hash_token(token)
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT a.*
+                FROM account_sessions s
+                JOIN accounts a ON a.user_id = s.user_id
+                WHERE s.token_hash = ? AND s.expires_at > ?
+                """,
+                (token_hash, iso(now)),
+            ).fetchone()
+            if row is None:
+                return None
+            return SessionAccount(token, token_hash, _row_to_account(row))
+
     def _get_or_create_session_sync(
         self,
         token: str | None,

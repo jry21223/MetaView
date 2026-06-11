@@ -24,14 +24,14 @@ export interface TTSCacheKeyParts {
   voice: string;
   rate: number;
   text: string;
+  baseUrl?: string;
+  model?: string;
 }
 
 const DEFAULT_MAX_BYTES = 64 * 1024 * 1024; // 64 MB — generous but bounded
 
 export function ttsCacheKey(parts: TTSCacheKeyParts): string {
-  // Issue #40 dropped baseUrl/model from the key — the backend proxy owns
-  // those choices now, so the client never sees them flux.
-  return `${parts.voice}|${parts.rate.toFixed(2)}|${parts.text}`;
+  return `${parts.baseUrl ?? ""}|${parts.model ?? ""}|${parts.voice}|${parts.rate.toFixed(2)}|${parts.text}`;
 }
 
 export class TTSAudioCache {

@@ -34,6 +34,7 @@ from app.presentation.dependencies import (
     get_run_director_repo,
     get_run_repo,
 )
+from app.presentation.edition_policy import require_wechat_session
 from app.presentation.rate_limit import read_limit, write_limit
 
 router = APIRouter(prefix="/runs", tags=["runs"])
@@ -322,16 +323,4 @@ async def _owner_session(
 ) -> SessionAccount | None:
     if settings.app_edition != "ops":
         return None
-    session = await account_use_case.get_or_create_session(
-        request.cookies.get(settings.account_session_cookie)
-    )
-    if request.cookies.get(settings.account_session_cookie) != session.token:
-        response.set_cookie(
-            settings.account_session_cookie,
-            session.token,
-            max_age=settings.account_session_days * 24 * 60 * 60,
-            httponly=True,
-            secure=settings.account_session_secure,
-            samesite="lax",
-        )
-    return session
+    return await require_wechat_session(request, settings, account_use_case)

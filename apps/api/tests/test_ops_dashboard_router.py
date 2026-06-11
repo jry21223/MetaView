@@ -23,7 +23,7 @@ def test_ops_dashboard_requires_admin_role(monkeypatch: pytest.MonkeyPatch, tmp_
         resp = client.get(
             "/api/v1/ops/dashboard",
             headers={"Cookie": f"mv_session={session.token}"},
-        )
+    )
 
     assert resp.status_code == 403
     assert "管理员权限" in resp.json()["detail"]
@@ -43,7 +43,7 @@ def test_ops_dashboard_rejects_disabled_admin(
         )
 
     assert resp.status_code == 403
-    assert "管理员权限" in resp.json()["detail"]
+    assert "账户已禁用" in resp.json()["detail"]
 
 
 def test_ops_dashboard_rejects_self_edition(
@@ -72,8 +72,8 @@ def test_ops_dashboard_rejects_missing_admin_session(
     with _client(monkeypatch, db) as client:
         resp = client.get("/api/v1/ops/dashboard")
 
-    assert resp.status_code == 403
-    assert "管理员权限" in resp.json()["detail"]
+    assert resp.status_code == 401
+    assert "微信登录" in resp.json()["detail"]
 
 
 def test_ops_dashboard_aggregates_global_metrics_and_recent_rows(
@@ -204,10 +204,24 @@ def _session(
         conn.execute(
             """
             UPDATE accounts
-            SET role = ?, status = ?, balance_cents = ?, display_name = ?, created_at = ?
+            SET role = ?,
+                status = ?,
+                balance_cents = ?,
+                display_name = ?,
+                login_provider = 'wechat',
+                wechat_openid = ?,
+                created_at = ?
             WHERE user_id = ?
             """,
-            (role, status, balance_cents, display_name, _iso(3), session.account.user_id),
+            (
+                role,
+                status,
+                balance_cents,
+                display_name,
+                f"openid_{session.account.user_id}",
+                _iso(3),
+                session.account.user_id,
+            ),
         )
         conn.commit()
     return session

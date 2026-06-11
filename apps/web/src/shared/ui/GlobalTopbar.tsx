@@ -106,6 +106,7 @@ export function GlobalTopbar({
             className="mv-icon-btn"
             onClick={onOpenProviderSettings}
             title={appEdition === "ops" ? "账户与充值" : "模型服务商设置"}
+            aria-label={appEdition === "ops" ? "账户与充值" : "模型服务商设置"}
           >
             {appEdition === "ops" ? "¥" : "⚙"}
           </button>

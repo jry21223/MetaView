@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from starlette.requests import Request
 
 from app.application.dto.pipeline_dto import PipelineRequest, PipelineRunResponse
@@ -29,6 +29,7 @@ from app.presentation.dependencies import (
     get_run_director_repo,
     get_run_repo,
 )
+from app.presentation.edition_policy import require_wechat_session
 from app.presentation.rate_limit import write_limit
 
 router = APIRouter(prefix="/pipeline", tags=["pipeline"])
@@ -38,7 +39,6 @@ router = APIRouter(prefix="/pipeline", tags=["pipeline"])
 @write_limit()
 async def submit_pipeline(
     request: Request,
-    response: Response,
     payload: PipelineRequest,
     background_tasks: BackgroundTasks,
     settings: Annotated[Settings, Depends(get_settings)],
@@ -50,23 +50,19 @@ async def submit_pipeline(
     agent_provider: Annotated[IAgentProvider | None, Depends(get_agent_provider)],
     account_use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
 ) -> PipelineRunResponse:
-    if settings.app_edition == "ops" and _has_client_model_overrides(payload):
-        raise HTTPException(
-            status_code=400,
-            detail="运营版使用平台托管模型，不能提交客户端 Provider / Router 配置",
-        )
-
     run_id = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
     owner_user_id: str | None = None
     owner_session: SessionAccount | None = None
     consume_ledger_id: str | None = None
     if settings.app_edition == "ops":
-        owner_session = await account_use_case.get_or_create_session(
-            request.cookies.get(settings.account_session_cookie)
-        )
+        owner_session = await require_wechat_session(request, settings, account_use_case)
         owner_user_id = owner_session.account.user_id
-        _maybe_set_session_cookie(request, response, settings, owner_session.token)
+        if _has_client_model_overrides(payload):
+            raise HTTPException(
+                status_code=400,
+                detail="运营版使用平台托管模型，不能提交客户端 Provider / Router 配置",
+            )
         consume_ledger_id = f"pipeline:{run_id}"
         try:
             await account_use_case.consume_generation_credit(
@@ -221,21 +217,3 @@ def _build_request_router(
         temperature=settings.router_temperature,
     )
     return LLMRouterProvider(llm, model_name=model)
-
-
-def _maybe_set_session_cookie(
-    request: Request,
-    response: Response,
-    settings: Settings,
-    token: str,
-) -> None:
-    if request.cookies.get(settings.account_session_cookie) == token:
-        return
-    response.set_cookie(
-        settings.account_session_cookie,
-        token,
-        max_age=settings.account_session_days * 24 * 60 * 60,
-        httponly=True,
-        secure=settings.account_session_secure,
-        samesite="lax",
-    )

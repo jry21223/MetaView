@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { APP_EDITION } from "../../../shared/config/constants";
 import { readStoredTTSConfig } from "../../playbook/engine/player/useTTS";
 import {
   buildDownloadUrl,
@@ -234,7 +235,16 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         with_audio: withAudio,
         options: { quality, fps, format },
         ...(withAudio &&
-          ttsConfig && { tts: { voice: ttsConfig.voice || "alloy" } }),
+          ttsConfig && {
+            tts: {
+              voice: ttsConfig.voice || "alloy",
+              ...(APP_EDITION === "self" && {
+                api_key: ttsConfig.apiKey || undefined,
+                base_url: ttsConfig.baseUrl || undefined,
+                model: ttsConfig.model || undefined,
+              }),
+            },
+          }),
       });
       const startedAt = readJobStartedAt(created) ?? Date.now();
       startedAtRef.current = startedAt;

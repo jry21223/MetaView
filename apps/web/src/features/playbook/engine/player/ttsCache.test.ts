@@ -21,6 +21,33 @@ describe("ttsCacheKey", () => {
     expect(a).not.toBe(b);
     expect(a).not.toBe(c);
   });
+
+  it("distinguishes by TTS provider and model without including API keys", () => {
+    const a = ttsCacheKey({
+      voice: "alloy",
+      rate: 1,
+      text: "hi",
+      baseUrl: "https://a.example/v1",
+      model: "tts-a",
+    });
+    const b = ttsCacheKey({
+      voice: "alloy",
+      rate: 1,
+      text: "hi",
+      baseUrl: "https://b.example/v1",
+      model: "tts-a",
+    });
+    const c = ttsCacheKey({
+      voice: "alloy",
+      rate: 1,
+      text: "hi",
+      baseUrl: "https://a.example/v1",
+      model: "tts-b",
+    });
+    expect(a).not.toBe(b);
+    expect(a).not.toBe(c);
+    expect(a).not.toContain("sk-");
+  });
 });
 
 describe("TTSAudioCache", () => {

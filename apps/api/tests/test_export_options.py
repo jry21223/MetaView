@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import pytest
+from fastapi.testclient import TestClient
 
 from app.application.dto.export_dto import ExportRequest
+from app.config import get_settings
 from app.domain.models.export_job import ExportOptions
+from app.main import create_app
 
 
 def test_default_options_match_historical_behaviour() -> None:
@@ -50,3 +53,24 @@ def test_unsupported_quality_rejected(bad_quality: str) -> None:
 def test_unsupported_format_rejected(bad_format: str) -> None:
     with pytest.raises(Exception):  # noqa: B017
         ExportOptions.model_validate({"format": bad_format})
+
+
+def test_ops_export_rejects_client_tts_provider_config(monkeypatch) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    app = create_app()
+
+    with TestClient(app) as client:
+        resp = client.post(
+            "/api/v1/exports",
+            json={
+                "run_id": "missing-run",
+                "with_audio": True,
+                "tts": {"voice": "alloy", "api_key": "sk-client"},
+            },
+        )
+
+    get_settings.cache_clear()
+    assert resp.status_code == 400
+    assert "平台托管 TTS" in resp.json()["detail"]

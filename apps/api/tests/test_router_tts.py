@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import sqlite3
 from collections.abc import Iterator
 from typing import Any
 
@@ -10,6 +12,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
+from app.infrastructure.persistence.db_init import init_db
+from app.infrastructure.persistence.sqlite_account_repository import SqliteAccountRepository
 from app.main import create_app
 
 
@@ -88,6 +92,24 @@ def client_without_key(monkeypatch) -> TestClient:
     get_settings.cache_clear()
 
 
+@pytest.fixture
+def ops_client(monkeypatch, tmp_path) -> tuple[TestClient, object]:
+    get_settings.cache_clear()
+    db = str(tmp_path / "tts-ops.db")
+    init_db(db)
+    session = _wechat_session(db)
+    monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
+    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", db)
+    monkeypatch.setenv("METAVIEW_TTS_API_KEY", "sk-server-secret")
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    monkeypatch.setattr(
+        "app.presentation.router_tts.httpx.AsyncClient", _FakeAsyncClient
+    )
+    app = create_app()
+    yield TestClient(app), session
+    get_settings.cache_clear()
+
+
 def test_speech_returns_audio_bytes_from_upstream(client) -> None:
     _FakeAsyncClient.response = _FakeResponse(
         status_code=200,
@@ -107,6 +129,64 @@ def test_speech_returns_audio_bytes_from_upstream(client) -> None:
     assert req["headers"]["Authorization"] == "Bearer sk-test-secret"
     assert req["json"]["voice"] == "echo"
     assert req["json"]["speed"] == 1.25
+
+
+def test_self_speech_accepts_temporary_provider_config(client) -> None:
+    _FakeAsyncClient.response = _FakeResponse(
+        status_code=200,
+        content=b"audio",
+        headers={"content-type": "audio/mpeg"},
+    )
+
+    r = client.post(
+        "/api/v1/tts/speech",
+        json={
+            "text": "你好",
+            "voice": "nova",
+            "api_key": "sk-client-secret",
+            "base_url": "https://tts.example.test/v1",
+            "model": "tts-custom",
+        },
+    )
+
+    assert r.status_code == 200
+    req = _FakeAsyncClient.last_request
+    assert req is not None
+    assert req["url"] == "https://tts.example.test/v1/audio/speech"
+    assert req["headers"]["Authorization"] == "Bearer sk-client-secret"
+    assert req["json"]["model"] == "tts-custom"
+
+
+def test_ops_speech_requires_wechat_session(ops_client) -> None:
+    client, _session = ops_client
+    _FakeAsyncClient.response = _FakeResponse(
+        status_code=200,
+        content=b"audio",
+        headers={"content-type": "audio/mpeg"},
+    )
+
+    r = client.post("/api/v1/tts/speech", json={"text": "hi"})
+
+    assert r.status_code == 401
+    assert _FakeAsyncClient.last_request is None
+
+
+def test_ops_speech_rejects_client_provider_config(ops_client) -> None:
+    client, session = ops_client
+    _FakeAsyncClient.response = _FakeResponse(
+        status_code=200,
+        content=b"audio",
+        headers={"content-type": "audio/mpeg"},
+    )
+
+    r = client.post(
+        "/api/v1/tts/speech",
+        json={"text": "hi", "api_key": "sk-client-secret"},
+        headers={"Cookie": f"mv_session={session.token}"},
+    )
+
+    assert r.status_code == 400
+    assert _FakeAsyncClient.last_request is None
 
 
 def test_speech_defaults_voice_to_settings(client) -> None:
@@ -176,3 +256,29 @@ def test_speech_validates_rate_range(client) -> None:
     assert r.status_code == 422
     r = client.post("/api/v1/tts/speech", json={"text": "x", "rate": 0.1})
     assert r.status_code == 422
+
+
+def _wechat_session(db: str):
+    session = _run(SqliteAccountRepository(db).get_or_create_session(None, session_days=30))
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            """
+            UPDATE accounts
+            SET login_provider = 'wechat',
+                display_name = '微信用户',
+                wechat_openid = ?
+            WHERE user_id = ?
+            """,
+            (f"openid_{session.account.user_id}", session.account.user_id),
+        )
+        conn.commit()
+    return session
+
+
+def _run(coro):
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop.run_until_complete(coro)

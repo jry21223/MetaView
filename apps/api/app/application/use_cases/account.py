@@ -89,6 +89,9 @@ class AccountUseCase:
             session_days=self._settings.account_session_days,
         )
 
+    async def get_session(self, token: str | None) -> SessionAccount | None:
+        return await self._repo.get_session(token)
+
     async def consume_generation_credit(
         self,
         *,
@@ -159,13 +162,27 @@ class AccountUseCase:
         token: str | None,
     ) -> tuple[SessionAccount, list[RechargeOrder]]:
         session = await self.get_or_create_session(token)
-        return session, await self._repo.list_orders(session.account.user_id)
+        return session, await self.list_recharge_orders_for_session(session)
+
+    async def list_recharge_orders_for_session(
+        self,
+        session: SessionAccount,
+    ) -> list[RechargeOrder]:
+        return await self._repo.list_orders(session.account.user_id)
 
     async def create_recharge_order(
         self,
         token: str | None,
         amount_yuan: Decimal,
     ) -> tuple[SessionAccount, RechargeOrder]:
+        session = await self.get_or_create_session(token)
+        return session, await self.create_recharge_order_for_session(session, amount_yuan)
+
+    async def create_recharge_order_for_session(
+        self,
+        session: SessionAccount,
+        amount_yuan: Decimal,
+    ) -> RechargeOrder:
         try:
             amount_cents = amount_to_cents(amount_yuan, self._settings.recharge_min_cents)
         except ValueError as exc:
@@ -173,7 +190,6 @@ class AccountUseCase:
         if not self._payment.configured:
             raise PaymentNotConfiguredError("易支付未配置，暂时不能充值")
 
-        session = await self.get_or_create_session(token)
         order = await self._repo.create_recharge_order(
             session.account.user_id,
             amount_cents,
@@ -193,7 +209,7 @@ class AccountUseCase:
             provider_order_id=native.provider_order_id,
         )
         assert order is not None
-        return session, order
+        return order
 
     async def get_recharge_order(
         self,
@@ -201,10 +217,17 @@ class AccountUseCase:
         order_id: str,
     ) -> tuple[SessionAccount, RechargeOrder]:
         session = await self.get_or_create_session(token)
+        return session, await self.get_recharge_order_for_session(session, order_id)
+
+    async def get_recharge_order_for_session(
+        self,
+        session: SessionAccount,
+        order_id: str,
+    ) -> RechargeOrder:
         order = await self._repo.get_order(order_id, session.account.user_id)
         if order is None:
             raise OrderNotFoundError("订单不存在")
-        return session, order
+        return order
 
     async def handle_payment_notification(
         self,

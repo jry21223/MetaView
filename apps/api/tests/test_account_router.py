@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import re
+import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -110,33 +112,104 @@ def _build_configured_epay_client() -> EasyPayClient:
     return EasyPayClient(_epay_test_settings())
 
 
-def test_get_me_creates_guest_session(account_client: TestClient) -> None:
+def test_self_get_me_does_not_create_guest_session(account_client: TestClient) -> None:
     response = account_client.get("/api/v1/account/me")
 
+    assert response.status_code == 404
+    assert "账户功能" in response.json()["detail"]
+    assert "set-cookie" not in response.headers
+
+
+def test_ops_get_me_requires_wechat_session(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    db = str(tmp_path / "ops-auth.db")
+    init_db(db)
+    guest = _wechat_session(db, login_provider="guest")
+    get_settings.cache_clear()
+    monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
+    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", db)
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    app = create_app()
+
+    with TestClient(app) as client:
+        missing = client.get("/api/v1/account/me")
+        guest_resp = client.get(
+            "/api/v1/account/me",
+            headers={"Cookie": f"mv_session={guest.token}"},
+        )
+
+    get_settings.cache_clear()
+    assert missing.status_code == 401
+    assert guest_resp.status_code == 401
+
+
+def test_ops_get_me_returns_wechat_account(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    db = str(tmp_path / "ops-me.db")
+    init_db(db)
+    session = _wechat_session(db, balance_cents=500, display_name="微信用户")
+    get_settings.cache_clear()
+    monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
+    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", db)
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    app = create_app()
+
+    with TestClient(app) as client:
+        response = client.get(
+            "/api/v1/account/me",
+            headers={"Cookie": f"mv_session={session.token}"},
+        )
+
+    get_settings.cache_clear()
     assert response.status_code == 200
     data = response.json()
-    assert data["login_provider"] == "guest"
-    assert data["status"] == "enabled"
-    assert data["role"] == "user"
-    assert data["balance_cents"] == 0
-    assert data["payment_enabled"] is False
-    assert "mv_session=" in response.headers["set-cookie"]
+    assert data["login_provider"] == "wechat"
+    assert data["display_name"] == "微信用户"
+    assert data["balance_cents"] == 500
 
 
-def test_recharge_validates_minimum_before_payment_config(account_client: TestClient) -> None:
-    too_small = account_client.post(
-        "/api/v1/account/recharge-orders",
-        json={"amount_yuan": "4.99"},
-    )
+def test_recharge_validates_minimum_before_payment_config(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    db = str(tmp_path / "ops-recharge-validation.db")
+    init_db(db)
+    session = _wechat_session(db)
+    get_settings.cache_clear()
+    monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
+    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", db)
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    app = create_app()
+
+    with TestClient(app) as client:
+        too_small = client.post(
+            "/api/v1/account/recharge-orders",
+            json={"amount_yuan": "4.99"},
+            headers={"Cookie": f"mv_session={session.token}"},
+        )
+        unconfigured = client.post(
+            "/api/v1/account/recharge-orders",
+            json={"amount_yuan": "5.00"},
+            headers={"Cookie": f"mv_session={session.token}"},
+        )
+
+    get_settings.cache_clear()
     assert too_small.status_code == 422
     assert "最低充值金额" in too_small.json()["detail"]
+    assert unconfigured.status_code == 503
+    assert "易支付未配置" in unconfigured.json()["detail"]
 
-    unconfigured = account_client.post(
+
+def test_self_recharge_orders_are_not_available(account_client: TestClient) -> None:
+    response = account_client.post(
         "/api/v1/account/recharge-orders",
         json={"amount_yuan": "5.00"},
     )
-    assert unconfigured.status_code == 503
-    assert "易支付未配置" in unconfigured.json()["detail"]
+    assert response.status_code == 404
 
 
 def test_epay_query_root_path_redirects_to_epay_mount(account_client: TestClient) -> None:
@@ -155,7 +228,11 @@ def test_recharge_payment_config_error_returns_503(
     tmp_path: Path,
 ) -> None:
     get_settings.cache_clear()
-    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", str(tmp_path / "account-payment.db"))
+    db = str(tmp_path / "account-payment.db")
+    init_db(db)
+    session = _wechat_session(db)
+    monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
+    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", db)
     monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
     monkeypatch.setenv("METAVIEW_PAYMENT_GATEWAY", "easypay")
     monkeypatch.setenv("METAVIEW_EPAY_API_BASE", "https://pay.example.com")
@@ -170,6 +247,7 @@ def test_recharge_payment_config_error_returns_503(
         response = client.post(
             "/api/v1/account/recharge-orders",
             json={"amount_yuan": "5.00"},
+            headers={"Cookie": f"mv_session={session.token}"},
         )
     get_settings.cache_clear()
 
@@ -177,9 +255,26 @@ def test_recharge_payment_config_error_returns_503(
     assert "易支付暂不可用" in response.json()["detail"]
 
 
-def test_list_recharge_orders_starts_empty(account_client: TestClient) -> None:
-    response = account_client.get("/api/v1/account/recharge-orders")
+def test_list_recharge_orders_starts_empty(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    db = str(tmp_path / "ops-empty-orders.db")
+    init_db(db)
+    session = _wechat_session(db)
+    get_settings.cache_clear()
+    monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
+    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", db)
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    app = create_app()
 
+    with TestClient(app) as client:
+        response = client.get(
+            "/api/v1/account/recharge-orders",
+            headers={"Cookie": f"mv_session={session.token}"},
+        )
+
+    get_settings.cache_clear()
     assert response.status_code == 200
     assert response.json() == []
 
@@ -300,6 +395,48 @@ class _DisabledOAuthClient:
         raise AssertionError("OAuth is disabled in this test")
 
 
+def _wechat_session(
+    db: str,
+    *,
+    login_provider: str = "wechat",
+    balance_cents: int = 0,
+    display_name: str = "微信用户",
+):
+    session = _run(SqliteAccountRepository(db).get_or_create_session(None, session_days=30))
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            """
+            UPDATE accounts
+            SET login_provider = ?,
+                display_name = ?,
+                balance_cents = ?,
+                wechat_openid = CASE WHEN ? = 'wechat' THEN ? ELSE NULL END,
+                updated_at = ?
+            WHERE user_id = ?
+            """,
+            (
+                login_provider,
+                display_name,
+                balance_cents,
+                login_provider,
+                f"openid_{session.account.user_id}",
+                datetime.now(timezone.utc).isoformat(),
+                session.account.user_id,
+            ),
+        )
+        conn.commit()
+    return session
+
+
+def _run(coro):
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop.run_until_complete(coro)
+
+
 @pytest.mark.asyncio
 async def test_payment_notification_is_idempotent_and_checks_amount(tmp_path: Path) -> None:
     db = str(tmp_path / "notify.db")
@@ -355,13 +492,22 @@ def test_epay_notify_route_supports_query_form_and_json_and_marks_order_paid(
     tmp_path: Path,
 ) -> None:
     get_settings.cache_clear()
-    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", str(tmp_path / "notify-method-route.db"))
+    db = str(tmp_path / "notify-method-route.db")
+    init_db(db)
+    session = _wechat_session(db)
+    monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
+    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", db)
     monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
     app = create_app()
     app.dependency_overrides[get_payment_gateway] = lambda: _build_configured_epay_client()
 
     with TestClient(app) as client:
-        create_resp = client.post("/api/v1/account/recharge-orders", json={"amount_yuan": "5.00"})
+        cookie = {"Cookie": f"mv_session={session.token}"}
+        create_resp = client.post(
+            "/api/v1/account/recharge-orders",
+            json={"amount_yuan": "5.00"},
+            headers=cookie,
+        )
         assert create_resp.status_code == 201
         order_id = create_resp.json()["order_id"]
 
@@ -372,11 +518,11 @@ def test_epay_notify_route_supports_query_form_and_json_and_marks_order_paid(
         assert response.status_code == 200
         assert response.text == "success"
 
-        order = client.get(f"/api/v1/account/recharge-orders/{order_id}")
+        order = client.get(f"/api/v1/account/recharge-orders/{order_id}", headers=cookie)
         assert order.status_code == 200
         assert order.json()["status"] == "paid"
         assert order.json()["provider_order_id"] == "tx_method"
-        assert client.get("/api/v1/account/me").json()["balance_cents"] == 500
+        assert client.get("/api/v1/account/me", headers=cookie).json()["balance_cents"] == 500
 
 
 @pytest.mark.parametrize("method", ["query", "form", "json"])
@@ -386,13 +532,22 @@ def test_epay_notify_route_rejects_amount_mismatch(
     tmp_path: Path,
 ) -> None:
     get_settings.cache_clear()
-    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", str(tmp_path / "notify-mismatch.db"))
+    db = str(tmp_path / "notify-mismatch.db")
+    init_db(db)
+    session = _wechat_session(db)
+    monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
+    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", db)
     monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
     app = create_app()
     app.dependency_overrides[get_payment_gateway] = lambda: _build_configured_epay_client()
 
     with TestClient(app) as client:
-        create_resp = client.post("/api/v1/account/recharge-orders", json={"amount_yuan": "5.00"})
+        cookie = {"Cookie": f"mv_session={session.token}"}
+        create_resp = client.post(
+            "/api/v1/account/recharge-orders",
+            json={"amount_yuan": "5.00"},
+            headers=cookie,
+        )
         assert create_resp.status_code == 201
         order_id = create_resp.json()["order_id"]
 
@@ -403,21 +558,30 @@ def test_epay_notify_route_rejects_amount_mismatch(
         assert response.status_code == 400
         assert response.text == "fail"
 
-        order = client.get(f"/api/v1/account/recharge-orders/{order_id}")
+        order = client.get(f"/api/v1/account/recharge-orders/{order_id}", headers=cookie)
         assert order.status_code == 200
         assert order.json()["status"] == "pending"
-        assert client.get("/api/v1/account/me").json()["balance_cents"] == 0
+        assert client.get("/api/v1/account/me", headers=cookie).json()["balance_cents"] == 0
 
 
 def test_epay_notify_route_rejects_bad_signature(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     get_settings.cache_clear()
-    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", str(tmp_path / "notify-bad-sig.db"))
+    db = str(tmp_path / "notify-bad-sig.db")
+    init_db(db)
+    session = _wechat_session(db)
+    monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
+    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", db)
     monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
     app = create_app()
     app.dependency_overrides[get_payment_gateway] = lambda: _build_configured_epay_client()
 
     with TestClient(app) as client:
-        create_resp = client.post("/api/v1/account/recharge-orders", json={"amount_yuan": "5.00"})
+        cookie = {"Cookie": f"mv_session={session.token}"}
+        create_resp = client.post(
+            "/api/v1/account/recharge-orders",
+            json={"amount_yuan": "5.00"},
+            headers=cookie,
+        )
         assert create_resp.status_code == 201
         order_id = create_resp.json()["order_id"]
 
@@ -427,10 +591,10 @@ def test_epay_notify_route_rejects_bad_signature(monkeypatch: pytest.MonkeyPatch
         assert response.status_code == 400
         assert response.text == "fail"
 
-        order = client.get(f"/api/v1/account/recharge-orders/{order_id}")
+        order = client.get(f"/api/v1/account/recharge-orders/{order_id}", headers=cookie)
         assert order.status_code == 200
         assert order.json()["status"] == "pending"
-        assert client.get("/api/v1/account/me").json()["balance_cents"] == 0
+        assert client.get("/api/v1/account/me", headers=cookie).json()["balance_cents"] == 0
 
 
 @pytest.mark.asyncio
