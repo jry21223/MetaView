@@ -124,6 +124,7 @@ class NewApiTopupUseCase:
                     order_id=intent.order_id,
                     amount_cents=intent.amount_cents,
                     description=f"NewAPI 额度充值 {money_from_cents(intent.amount_cents)} 元",
+                    return_url=_build_complete_url(self._settings, intent.intent_id),
                 )
             except RuntimeError as exc:
                 raise NewApiTopupPaymentError("易支付暂不可用，请稍后重试") from exc
@@ -401,3 +402,15 @@ def _build_return_url(intent: NewApiTopupIntent, receipt_code: str) -> str:
             }
         )
     )
+
+
+def _build_complete_url(settings: Settings, intent_id: str) -> str:
+    base_url = settings.epay_notify_url or settings.epay_return_url
+    if not base_url:
+        raise NewApiTopupPaymentError("易支付回跳地址未配置")
+    parsed = urlparse(base_url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise NewApiTopupPaymentError("易支付回跳地址无效")
+    api_prefix = settings.api_prefix.strip("/")
+    path_prefix = f"/{api_prefix}" if api_prefix else ""
+    return f"{parsed.scheme}://{parsed.netloc}{path_prefix}/newapi/topups/{intent_id}/complete"

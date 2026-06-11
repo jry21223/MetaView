@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from "react";
 import MenuIcon from "@mui/icons-material/Menu";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import DashboardIcon from "@mui/icons-material/Dashboard";
 import HistoryIcon from "@mui/icons-material/History";
 import PlayCircleIcon from "@mui/icons-material/PlayCircle";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";

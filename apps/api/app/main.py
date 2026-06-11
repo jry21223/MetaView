@@ -1,7 +1,8 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 
 from app.config import get_settings
 from app.infrastructure.persistence.db_init import init_db
@@ -59,6 +60,11 @@ def create_app() -> FastAPI:
     @app.get("/health")
     async def health() -> dict:
         return {"status": "ok", "version": settings.app_version}
+
+    @app.get("/api/query/{order_id:path}", include_in_schema=False)
+    async def epay_query_subpath_compat(order_id: str, request: Request) -> RedirectResponse:
+        query = f"?{request.url.query}" if request.url.query else ""
+        return RedirectResponse(f"/epay/api/query/{order_id}{query}", status_code=307)
 
     return app
 

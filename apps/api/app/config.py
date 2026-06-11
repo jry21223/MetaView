@@ -148,47 +148,102 @@ class Settings(BaseSettings):
     # Legacy `METAVIEW_EASYPAY_*` are supported as compatibility aliases.
     epay_api_base: str | None = Field(
         default=None,
-        validation_alias=AliasChoices("epay_api_base", "easypay_api_base"),
+        validation_alias=AliasChoices(
+            "METAVIEW_EPAY_API_BASE",
+            "METAVIEW_EASYPAY_API_BASE",
+            "epay_api_base",
+            "easypay_api_base",
+        ),
     )
     epay_submit_path: str = Field(
         default="/submit.php",
-        validation_alias=AliasChoices("epay_submit_path", "easypay_submit_path"),
+        validation_alias=AliasChoices(
+            "METAVIEW_EPAY_SUBMIT_PATH",
+            "METAVIEW_EASYPAY_SUBMIT_PATH",
+            "epay_submit_path",
+            "easypay_submit_path",
+        ),
     )
     epay_submit_url: str | None = Field(
         default=None,
-        validation_alias=AliasChoices("epay_submit_url", "easypay_submit_url"),
+        validation_alias=AliasChoices(
+            "METAVIEW_EPAY_SUBMIT_URL",
+            "METAVIEW_EASYPAY_SUBMIT_URL",
+            "epay_submit_url",
+            "easypay_submit_url",
+        ),
     )
     epay_pid: str | None = Field(
         default=None,
-        validation_alias=AliasChoices("epay_pid", "easypay_pid"),
+        validation_alias=AliasChoices(
+            "METAVIEW_EPAY_PID",
+            "METAVIEW_EASYPAY_PID",
+            "epay_pid",
+            "easypay_pid",
+        ),
     )
     epay_merchant_id: str | None = Field(
         default=None,
-        validation_alias=AliasChoices("epay_merchant_id", "easypay_merchant_id"),
+        validation_alias=AliasChoices(
+            "METAVIEW_EPAY_MERCHANT_ID",
+            "METAVIEW_EASYPAY_MERCHANT_ID",
+            "epay_merchant_id",
+            "easypay_merchant_id",
+        ),
     )
     epay_key: str | None = Field(
         default=None,
-        validation_alias=AliasChoices("epay_key", "easypay_key"),
+        validation_alias=AliasChoices(
+            "METAVIEW_EPAY_KEY",
+            "METAVIEW_EASYPAY_KEY",
+            "epay_key",
+            "easypay_key",
+        ),
     )
     epay_api_key: str | None = Field(
         default=None,
-        validation_alias=AliasChoices("epay_api_key", "easypay_api_key"),
+        validation_alias=AliasChoices(
+            "METAVIEW_EPAY_API_KEY",
+            "METAVIEW_EASYPAY_API_KEY",
+            "epay_api_key",
+            "easypay_api_key",
+        ),
     )
     epay_sign_type: str = Field(
         default="MD5",
-        validation_alias=AliasChoices("epay_sign_type", "easypay_sign_type"),
+        validation_alias=AliasChoices(
+            "METAVIEW_EPAY_SIGN_TYPE",
+            "METAVIEW_EASYPAY_SIGN_TYPE",
+            "epay_sign_type",
+            "easypay_sign_type",
+        ),
     )
     epay_pay_type: str = Field(
         default="wxpay",
-        validation_alias=AliasChoices("epay_pay_type", "easypay_pay_type"),
+        validation_alias=AliasChoices(
+            "METAVIEW_EPAY_PAY_TYPE",
+            "METAVIEW_EASYPAY_PAY_TYPE",
+            "epay_pay_type",
+            "easypay_pay_type",
+        ),
     )
     epay_notify_url: str | None = Field(
         default=None,
-        validation_alias=AliasChoices("epay_notify_url", "easypay_notify_url"),
+        validation_alias=AliasChoices(
+            "METAVIEW_EPAY_NOTIFY_URL",
+            "METAVIEW_EASYPAY_NOTIFY_URL",
+            "epay_notify_url",
+            "easypay_notify_url",
+        ),
     )
     epay_return_url: str | None = Field(
         default=None,
-        validation_alias=AliasChoices("epay_return_url", "easypay_return_url"),
+        validation_alias=AliasChoices(
+            "METAVIEW_EPAY_RETURN_URL",
+            "METAVIEW_EASYPAY_RETURN_URL",
+            "epay_return_url",
+            "easypay_return_url",
+        ),
     )
 
     # NewAPI redirect top-up bridge (local/dev checkout integration)

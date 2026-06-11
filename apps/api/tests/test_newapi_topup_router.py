@@ -169,6 +169,32 @@ def test_newapi_topup_payment_config_error_returns_503(
     assert "易支付暂不可用" in response.json()["detail"]
 
 
+def test_newapi_topup_real_payment_uses_receipt_complete_return_url(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    get_settings.cache_clear()
+    db = tmp_path / "newapi-topup-return.db"
+    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", str(db))
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_INTENT_SECRET", "intent-secret")
+    monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_RECEIPT_TOKEN", "receipt-token")
+    monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_DEV_MODE", "false")
+    _set_epay_public_urls(monkeypatch)
+    payment = _RecordingPaymentGateway()
+    app = create_app()
+    app.dependency_overrides[get_payment_gateway] = lambda: payment
+
+    with TestClient(app) as client:
+        start = _start_topup(client)
+        assert start.status_code == 200
+        intent_id = _extract_intent_id(start.text)
+
+    get_settings.cache_clear()
+
+    assert payment.return_url == f"https://metaview.top/api/v1/newapi/topups/{intent_id}/complete"
+
+
 def test_newapi_topup_rejects_expired_signed_intent(
     newapi_topup_client: TestClient,
 ) -> None:
@@ -193,6 +219,7 @@ def test_newapi_topup_real_payment_redirects_with_verifiable_receipt(
     monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_INTENT_SECRET", "intent-secret")
     monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_RECEIPT_TOKEN", "receipt-token")
     monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_DEV_MODE", "false")
+    _set_epay_public_urls(monkeypatch)
     payment = _FakePaymentGateway()
     app = create_app()
     app.dependency_overrides[get_payment_gateway] = lambda: payment
@@ -272,6 +299,7 @@ def test_newapi_topup_failed_payment_callback_is_ignored_without_receipt(
     monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_INTENT_SECRET", "intent-secret")
     monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_RECEIPT_TOKEN", "receipt-token")
     monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_DEV_MODE", "false")
+    _set_epay_public_urls(monkeypatch)
     payment = _FakePaymentGateway()
     app = create_app()
     app.dependency_overrides[get_payment_gateway] = lambda: payment
@@ -312,6 +340,7 @@ def test_newapi_topup_rejects_real_payment_callback_after_intent_expiry(
     monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_INTENT_SECRET", "intent-secret")
     monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_RECEIPT_TOKEN", "receipt-token")
     monkeypatch.setenv("METAVIEW_NEWAPI_TOPUP_DEV_MODE", "false")
+    _set_epay_public_urls(monkeypatch)
     payment = _FakePaymentGateway()
     app = create_app()
     app.dependency_overrides[get_payment_gateway] = lambda: payment
@@ -381,6 +410,11 @@ def _start_topup(client: TestClient):
     )
 
 
+def _set_epay_public_urls(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("METAVIEW_EPAY_NOTIFY_URL", "https://metaview.top/api/v1/billing/epay/notify")
+    monkeypatch.setenv("METAVIEW_EPAY_RETURN_URL", "https://metaview.top/payment/result")
+
+
 def _signed_payload(*, expires_in: timedelta = timedelta(minutes=10)) -> tuple[str, str]:
     expires_at = (datetime.now(timezone.utc) + expires_in).isoformat()
     return encode_signed_payload(
@@ -423,6 +457,7 @@ class _FakePaymentGateway:
         order_id: str,
         amount_cents: int,
         description: str,
+        return_url: str | None = None,
     ) -> NativePaymentOrder:
         return NativePaymentOrder(
             code_url=f"weixin://wxpay/{order_id}",
@@ -440,6 +475,34 @@ class _FakePaymentGateway:
         return self.transaction
 
 
+@dataclass
+class _RecordingPaymentGateway:
+    configured: bool = True
+    return_url: str | None = None
+
+    async def create_native_order(
+        self,
+        *,
+        order_id: str,
+        amount_cents: int,
+        description: str,
+        return_url: str | None = None,
+    ) -> NativePaymentOrder:
+        self.return_url = return_url
+        return NativePaymentOrder(
+            code_url=f"weixin://wxpay/{order_id}",
+            provider_order_id=f"wx_pre_{order_id}",
+        )
+
+    def decode_notification(
+        self,
+        headers: dict[str, str],
+        body: bytes,
+        query: dict[str, str] | None = None,
+    ) -> PaymentTransaction:
+        raise AssertionError("notification should not happen in this test")
+
+
 class _FailingPaymentGateway:
     configured = True
 
@@ -449,6 +512,7 @@ class _FailingPaymentGateway:
         order_id: str,
         amount_cents: int,
         description: str,
+        return_url: str | None = None,
     ) -> NativePaymentOrder:
         raise RuntimeError("payment provider unavailable")
 

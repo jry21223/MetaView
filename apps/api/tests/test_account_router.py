@@ -12,9 +12,9 @@ from fastapi.testclient import TestClient
 from app.application.use_cases.account import AccountUseCase, PaymentNotificationError
 from app.config import Settings, get_settings
 from app.domain.models.account import NativePaymentOrder, OAuthIdentity, PaymentTransaction
+from app.infrastructure.payment.easy_pay import EasyPayClient
 from app.infrastructure.persistence.db_init import init_db
 from app.infrastructure.persistence.sqlite_account_repository import SqliteAccountRepository
-from app.infrastructure.payment.easy_pay import EasyPayClient
 from app.main import create_app
 from app.presentation.dependencies import get_payment_gateway
 
@@ -24,6 +24,24 @@ def test_app_edition_defaults_and_normalizes(monkeypatch: pytest.MonkeyPatch) ->
     assert Settings(_env_file=None).app_edition == "self"
     assert Settings(app_edition="ops", _env_file=None).app_edition == "ops"
     assert Settings(app_edition="bad", _env_file=None).app_edition == "self"
+
+
+def test_epay_settings_accept_prefixed_env_aliases(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("METAVIEW_EPAY_API_BASE", "https://pay.example.com")
+    monkeypatch.setenv("METAVIEW_EPAY_SUBMIT_PATH", "/submit.php")
+    monkeypatch.setenv("METAVIEW_EPAY_PID", "pid")
+    monkeypatch.setenv("METAVIEW_EPAY_KEY", "secret")
+    monkeypatch.setenv("METAVIEW_EPAY_NOTIFY_URL", "https://metaview.top/api/v1/billing/epay/notify")
+    monkeypatch.setenv("METAVIEW_EPAY_RETURN_URL", "https://metaview.top/payment/result")
+
+    settings = Settings(_env_file=None)
+
+    assert settings.epay_api_base == "https://pay.example.com"
+    assert settings.epay_submit_path == "/submit.php"
+    assert settings.epay_pid == "pid"
+    assert settings.epay_key == "secret"
+    assert settings.epay_notify_url == "https://metaview.top/api/v1/billing/epay/notify"
+    assert settings.epay_return_url == "https://metaview.top/payment/result"
 
 
 @pytest.fixture
@@ -119,6 +137,17 @@ def test_recharge_validates_minimum_before_payment_config(account_client: TestCl
     )
     assert unconfigured.status_code == 503
     assert "易支付未配置" in unconfigured.json()["detail"]
+
+
+def test_epay_query_root_path_redirects_to_epay_mount(account_client: TestClient) -> None:
+    response = account_client.get(
+        "/api/query/USR1NOKOCybp1781152987",
+        params={"poll": "1"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 307
+    assert response.headers["location"] == "/epay/api/query/USR1NOKOCybp1781152987?poll=1"
 
 
 def test_recharge_payment_config_error_returns_503(

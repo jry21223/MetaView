@@ -15,6 +15,7 @@ class IPaymentGateway(Protocol):
         order_id: str,
         amount_cents: int,
         description: str,
+        return_url: str | None = None,
     ) -> NativePaymentOrder: ...
 
     def decode_notification(

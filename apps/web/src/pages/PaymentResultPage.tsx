@@ -11,13 +11,13 @@ export function PaymentResultPage() {
     [searchParams],
   );
 
-  const [status, setStatus] = useState<PollStatus>("loading");
-  const [error, setError] = useState<string>("");
+  const [status, setStatus] = useState<PollStatus>(() => (orderId ? "loading" : "error"));
+  const [error, setError] = useState<string>(() =>
+    orderId ? "" : "支付回调缺少订单号参数（order_id / out_trade_no）",
+  );
 
   useEffect(() => {
     if (!orderId) {
-      setStatus("error");
-      setError("支付回调缺少订单号参数（order_id / out_trade_no）");
       return;
     }
 
@@ -116,4 +116,3 @@ export function PaymentResultPage() {
     </main>
   );
 }
-

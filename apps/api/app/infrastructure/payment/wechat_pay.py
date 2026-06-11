@@ -48,6 +48,7 @@ class WeChatPayClient:
         order_id: str,
         amount_cents: int,
         description: str,
+        return_url: str | None = None,
     ) -> NativePaymentOrder:
         if not self.configured:
             raise WeChatPayConfigError("WeChat Pay is not configured")

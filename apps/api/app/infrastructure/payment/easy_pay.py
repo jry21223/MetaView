@@ -60,6 +60,7 @@ class EasyPayClient:
         order_id: str,
         amount_cents: int,
         description: str,
+        return_url: str | None = None,
     ) -> NativePaymentOrder:
         if not self.configured:
             raise EasyPayConfigError("Epay is not configured")
@@ -69,6 +70,7 @@ class EasyPayClient:
             order_id=order_id,
             amount_cents=amount_cents,
             description=description[:127],
+            return_url=return_url,
         )
         if "?" in submit_url:
             code_url = f"{submit_url}&{urlencode(params)}"
@@ -121,6 +123,7 @@ class EasyPayClient:
         order_id: str,
         amount_cents: int,
         description: str,
+        return_url: str | None = None,
     ) -> dict[str, str]:
         submit_params = {
             "pid": self._merchant_id,
@@ -129,7 +132,7 @@ class EasyPayClient:
             "name": description,
             "money": self._format_money(amount_cents),
             "notify_url": self._settings.epay_notify_url,
-            "return_url": self._settings.epay_return_url,
+            "return_url": return_url or self._settings.epay_return_url,
         }
         sign = self._sign(submit_params)
         submit_params["sign"] = sign
