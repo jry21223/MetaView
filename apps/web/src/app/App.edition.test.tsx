@@ -7,6 +7,10 @@ import { server } from "../mocks/server";
 import { API_BASE_URL } from "../shared/config/constants";
 import { sampleDashboard } from "../pages/OpsDashboard/testFixtures";
 
+vi.mock("@remotion/player", () => ({
+  Player: () => null,
+}));
+
 describe("App edition shells", () => {
   afterEach(() => {
     cleanup();
@@ -46,6 +50,18 @@ describe("App edition shells", () => {
 
     expect(accountHits).toBe(0);
     expect(opsHits).toBe(0);
+  });
+
+  it("self edition shows the looping brand logo animation on the intake screen", async () => {
+    vi.stubEnv("VITE_APP_EDITION", "self");
+
+    const { App } = await import("./App");
+    const { queryByLabelText } = render(<App />);
+
+    await waitFor(() =>
+      expect(document.body.textContent).toContain("MetaView"),
+    );
+    expect(queryByLabelText("MetaView logo animation")).not.toBeNull();
   });
 
   it("ops edition shows the login gate when account session is missing", async () => {

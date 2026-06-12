@@ -2,6 +2,12 @@ import React, { useEffect, useState } from "react";
 import { Composition, continueRender, delayRender, type CalculateMetadataFunction } from "remotion";
 import type { PlaybookScript } from "../features/playbook/engine/types";
 import { PLAYBOOK_DEFAULTS } from "../shared/config/constants";
+import { BrandLogoLoop } from "../shared/ui/BrandLogoLoop";
+import {
+  BRAND_LOGO_LOOP_DURATION_FRAMES,
+  BRAND_LOGO_LOOP_FPS,
+  BRAND_LOGO_LOOP_SIZE,
+} from "../shared/ui/brandLogoLoopModel";
 import { PlaybookExportComposition, type PlaybookExportProps } from "./PlaybookExportComposition";
 
 const FALLBACK_SCRIPT: PlaybookScript = {
@@ -65,6 +71,14 @@ export const RemotionRoot: React.FC = () => {
           audioFiles: [],
         }}
         calculateMetadata={calculateMetadata}
+      />
+      <Composition
+        id="brand-logo-loop"
+        component={BrandLogoLoop}
+        durationInFrames={BRAND_LOGO_LOOP_DURATION_FRAMES}
+        fps={BRAND_LOGO_LOOP_FPS}
+        width={BRAND_LOGO_LOOP_SIZE}
+        height={BRAND_LOGO_LOOP_SIZE}
       />
     </FontReadyGate>
   );

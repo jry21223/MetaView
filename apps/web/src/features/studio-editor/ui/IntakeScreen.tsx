@@ -1,6 +1,13 @@
+import { Player } from "@remotion/player";
 import React, { useState, useRef } from "react";
 import { TweakValues } from "../hooks/useTweaks";
 import { GlobalTopbar, Stage } from "../../../shared/ui/GlobalTopbar";
+import { BrandLogoLoop } from "../../../shared/ui/BrandLogoLoop";
+import {
+  BRAND_LOGO_LOOP_DURATION_FRAMES,
+  BRAND_LOGO_LOOP_FPS,
+  BRAND_LOGO_LOOP_SIZE,
+} from "../../../shared/ui/brandLogoLoopModel";
 
 const TEMPLATE_GALLERY = [
   {
@@ -218,6 +225,25 @@ export function IntakeScreen({
       />
       <div className="mv-intake-body">
         <div className="mv-intake-hero">
+          <div
+            className="mv-brand-loop-shell"
+            role="img"
+            aria-label="MetaView logo animation"
+          >
+            <Player
+              component={BrandLogoLoop}
+              durationInFrames={BRAND_LOGO_LOOP_DURATION_FRAMES}
+              fps={BRAND_LOGO_LOOP_FPS}
+              compositionWidth={BRAND_LOGO_LOOP_SIZE}
+              compositionHeight={BRAND_LOGO_LOOP_SIZE}
+              autoPlay
+              loop
+              controls={false}
+              clickToPlay={false}
+              acknowledgeRemotionLicense
+              style={{ width: "100%", height: "100%" }}
+            />
+          </div>
           <div className="mv-eyebrow-mini">为每道题，生成可解释的动画</div>
           <h1 className="mv-intake-title">
             把题目<span className="mv-accent-text">交给我</span>，
