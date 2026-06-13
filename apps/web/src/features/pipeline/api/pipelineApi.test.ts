@@ -10,7 +10,12 @@ describe("pipelineApi", () => {
     server.use(
       http.post(`${API_BASE_URL}/api/v1/pipeline`, async ({ request }) => {
         expect(request.credentials).toBe("include");
-        expect(await request.json()).toMatchObject({ prompt: "hello" });
+        expect(await request.json()).toMatchObject({
+          prompt: "hello",
+          domain: "algorithm",
+          source_code: "print('hello')",
+          language: "python",
+        });
         return HttpResponse.json({
           run_id: "run-1",
           status: "queued",
@@ -32,7 +37,12 @@ describe("pipelineApi", () => {
       }),
     );
 
-    const submitted = await submitPipeline({ prompt: "hello" });
+    const submitted = await submitPipeline({
+      prompt: "hello",
+      domain: "algorithm",
+      source_code: "print('hello')",
+      language: "python",
+    });
     const run = await getPipelineRun(submitted.run_id);
 
     expect(submitted.run_id).toBe("run-1");

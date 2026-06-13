@@ -39,6 +39,11 @@ function deferFrame(fn: () => void): void {
   window.requestAnimationFrame(fn);
 }
 
+function clampStepIndex(index: number, stepCount: number): number {
+  if (stepCount <= 0) return 0;
+  return Math.max(0, Math.min(index, stepCount - 1));
+}
+
 export function usePlaybookController(
   script: PlaybookScript,
   playerRef: React.RefObject<PlayerRef | null>,
@@ -58,6 +63,13 @@ export function usePlaybookController(
     gateRef.current = gate;
   });
 
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setCurrentStepIndex((current) => clampStepIndex(current, script.steps.length));
+    }, 0);
+    return () => clearTimeout(id);
+  }, [script.steps.length]);
+
   const stepStartFrame = useCallback(
     (index: number): number => {
       if (index <= 0) return 0;
@@ -68,7 +80,7 @@ export function usePlaybookController(
 
   const goToStep = useCallback(
     (index: number) => {
-      const clamped = Math.max(0, Math.min(index, script.steps.length - 1));
+      const clamped = clampStepIndex(index, script.steps.length);
       const startFrame = stepStartFrame(clamped);
       const player = playerRef.current;
 

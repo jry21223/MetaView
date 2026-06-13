@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useReducer } from "react";
-import { API_BASE_URL, readErrorMessage } from "../../../shared/api/httpClient";
 import type { PipelineRunResult } from "../../../entities/pipeline/types";
+import { getPipelineRuns } from "../api/historyApi";
 
 interface State {
   runs: PipelineRunResult[];
@@ -39,11 +39,7 @@ export function useHistoryRuns(): UseHistoryRunsResult {
     let cancelled = false;
     dispatch({ type: "fetch_start" });
 
-    fetch(`${API_BASE_URL}/api/v1/runs`)
-      .then(async (resp) => {
-        if (!resp.ok) throw new Error(await readErrorMessage(resp, "Failed to load history"));
-        return resp.json() as Promise<PipelineRunResult[]>;
-      })
+    getPipelineRuns()
       .then((data) => {
         if (!cancelled) dispatch({ type: "fetch_success", runs: data });
       })
