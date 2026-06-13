@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ErrorBoundary } from "../shared/ui/ErrorBoundary";
 import {
   useTweaks,
@@ -44,21 +44,24 @@ export function SelfAppShell() {
 
   const submitWithProvider = async (
     prompt: string,
+    domain?: string | null,
     sourceCode?: string,
     language?: string,
   ) => {
-    await submit(
+    await submit({
       prompt,
+      domain,
       sourceCode,
       language,
-      isConfigured ? providerSettings : undefined,
-    );
+      provider: isConfigured ? providerSettings : undefined,
+    });
   };
 
   const handleSubmit = async (ctx: IntakeContext) => {
     setOpenedRunId(null);
     await submitWithProvider(
       ctx.raw || ctx.title,
+      ctx.domain,
       ctx.sourceCode,
       ctx.language,
     );
@@ -67,7 +70,7 @@ export function SelfAppShell() {
 
   const handleUseTemplate = async (prompt: string) => {
     setOpenedRunId(null);
-    await submitWithProvider(prompt);
+    await submitWithProvider(prompt, null);
     setStage("workbench");
   };
 
@@ -105,6 +108,7 @@ export function SelfAppShell() {
             setTweak={setTweak}
             onNavigate={setStage}
             isProviderConfigured={isConfigured}
+            providerSettings={providerSettings}
             onOpenProviderSettings={() => setProviderModalOpen(true)}
           />
         </ErrorBoundary>

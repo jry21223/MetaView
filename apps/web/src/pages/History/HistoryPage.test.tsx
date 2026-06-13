@@ -147,4 +147,22 @@ describe("HistoryPage actions", () => {
     await waitFor(() => expect(getByText("删除失败")).toBeTruthy());
     expect(getByText("讲解格林公式")).toBeTruthy();
   });
+
+  it("shows a helpful load-error state instead of raw fetch text", async () => {
+    let hits = 0;
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/runs`, () => {
+        hits += 1;
+        return HttpResponse.json({ detail: "Load failed" }, { status: 500 });
+      }),
+    );
+
+    const { getByText, queryByText, getByRole } = renderHistoryPage();
+
+    await waitFor(() => expect(getByText("无法加载历史记录")).toBeTruthy());
+    expect(queryByText("Load failed")).toBeNull();
+
+    fireEvent.click(getByRole("button", { name: "重试加载历史记录" }));
+    await waitFor(() => expect(hits).toBeGreaterThan(1));
+  });
 });

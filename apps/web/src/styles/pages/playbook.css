@@ -1,12 +1,41 @@
 /* ── PlaybookPlayer ──────────────────────────────────────────────────── */
 
 .playbook-player {
-  display: flex;
-  flex-direction: row;
+  --player-paper-strong: rgba(255, 255, 255, 0.96);
+  --player-paper-soft: rgba(248, 247, 241, 0.72);
+  --player-ink: #2c302b;
+  --player-ink-2: rgba(44, 48, 43, 0.66);
+  --player-ink-3: rgba(44, 48, 43, 0.42);
+  --player-line: rgba(65, 73, 62, 0.13);
+  --player-line-soft: rgba(65, 73, 62, 0.08);
+  --player-accent: #82976f;
+  --player-accent-soft: rgba(130, 151, 111, 0.14);
+  --player-radius: 8px;
+
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) minmax(320px, 360px);
   width: 100%;
   height: 100%;
-  background: var(--bg);
-  overflow: hidden;
+  min-height: 0;
+  background: transparent;
+  color: var(--player-ink);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.playbook-player[data-theme="dark"] {
+  --player-paper-strong: rgba(23, 28, 24, 0.96);
+  --player-paper-soft: rgba(26, 31, 27, 0.72);
+  --player-ink: rgba(239, 242, 235, 0.92);
+  --player-ink-2: rgba(239, 242, 235, 0.66);
+  --player-ink-3: rgba(239, 242, 235, 0.42);
+  --player-line: rgba(239, 242, 235, 0.13);
+  --player-line-soft: rgba(239, 242, 235, 0.08);
+  --player-accent: #9fb48d;
+  --player-accent-soft: rgba(159, 180, 141, 0.16);
 }
 
 .playbook-player-empty {
@@ -19,13 +48,329 @@
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
 }
 
-.playbook-player__stage {
-  flex: 1;
+.playbook-player__rail {
+  position: relative;
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-right: 1px solid var(--player-line-soft);
+  background: color-mix(in srgb, var(--player-paper-soft) 42%, transparent);
+}
+
+.playbook-player[data-theme="dark"] .playbook-player__rail {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.playbook-player__rail-mark {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  width: 100%;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  gap: 3px;
+  padding-top: 8px;
+}
+
+.playbook-player__rail-nav {
+  position: relative;
+  width: 100%;
+  min-height: 56px;
+}
+
+.playbook-player__rail-nav-trigger {
+  cursor: pointer;
+}
+
+.playbook-player__rail-nav-trigger:hover span,
+.playbook-player__rail-nav-trigger[aria-expanded="true"] span {
+  background: var(--player-accent);
+}
+
+.playbook-player__rail-mark span {
+  display: block;
+  width: 12px;
+  height: 1px;
+  background: var(--player-ink-3);
+}
+
+.playbook-player__rail-nav-menu {
+  position: absolute;
+  left: 44px;
+  top: 8px;
+  z-index: 30;
+  width: 164px;
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--player-line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--player-paper-strong) 94%, transparent);
+  box-shadow: 0 16px 38px rgba(38, 34, 25, 0.14);
+}
+
+.playbook-player__rail-nav-item {
+  appearance: none;
+  width: 100%;
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--player-ink-2);
+  padding: 0 8px;
+  text-align: left;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.playbook-player__rail-nav-item:hover,
+.playbook-player__rail-nav-item.is-active {
+  background: var(--player-accent-soft);
+  color: var(--player-ink);
+}
+
+.playbook-player__rail-nav-icon {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--player-accent);
+}
+
+.playbook-player__rail-nav-icon svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 1.8;
+}
+
+.playbook-player__rail-current {
+  margin-top: 74px;
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  color: var(--player-accent);
+}
+
+.playbook-player__rail-current span {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.playbook-player__rail-current small {
+  font-size: 10px;
+  color: var(--player-ink-3);
+}
+
+.playbook-player__rail-panel {
+  position: absolute;
+  left: 44px;
+  top: 92px;
+  width: 172px;
+  max-height: min(520px, calc(100% - 130px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 12px;
+  border: 1px solid var(--player-line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--player-paper-strong) 92%, transparent);
+  box-shadow: 0 16px 38px rgba(38, 34, 25, 0.14);
+  opacity: 0;
+  transform: translateX(-8px);
+  pointer-events: none;
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+
+.playbook-player__rail:hover .playbook-player__rail-panel,
+.playbook-player__rail:focus-within .playbook-player__rail-panel {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.playbook-player__rail-head {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--player-line-soft);
+}
+
+.playbook-player__rail-head span,
+.playbook-player__lesson-title span,
+.playbook-player__console-head small {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--player-ink-3);
+}
+
+.playbook-player__rail-head strong {
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 560;
+  color: var(--player-ink);
+}
+
+.playbook-player__rail-steps {
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  gap: 4px;
+}
+
+.playbook-player__rail-step {
+  appearance: none;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--player-ink-2);
+  padding: 7px 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.playbook-player__rail-step:hover,
+.playbook-player__rail-step.is-active {
+  background: var(--player-accent-soft);
+  color: var(--player-ink);
+}
+
+.playbook-player__rail-step span {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--player-accent);
+}
+
+.playbook-player__rail-step strong {
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.38;
+  font-weight: 520;
+}
+
+.playbook-player__workspace {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+  background: transparent;
+}
+
+.playbook-player__header {
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr) 180px;
+  align-items: center;
+  gap: 18px;
+  padding: 0 clamp(18px, 3.6vw, 52px);
+  border-bottom: 0;
+  background: transparent;
+}
+
+.playbook-player__brand,
+.playbook-player__lesson-title,
+.playbook-player__header-actions {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.playbook-player__brand {
+  visibility: hidden;
+  pointer-events: none;
+  color: var(--player-ink-3);
+  font-size: 12px;
+}
+
+.playbook-player__brand-mark {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--player-line);
+  border-radius: 5px;
+  background: var(--player-accent-soft);
+}
+
+.playbook-player__lesson-title {
+  justify-self: center;
+  max-width: 100%;
+  flex-direction: column;
+  gap: 2px;
+  text-align: center;
+}
+
+.playbook-player__lesson-title strong {
+  max-width: min(520px, 100%);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--player-ink-2);
+  font-size: 13px;
+  font-weight: 560;
+}
+
+.playbook-player__header-actions {
+  justify-content: flex-end;
+}
+
+.playbook-player__ghost-btn {
+  appearance: none;
+  border: 1px solid var(--player-line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--player-ink-2);
+  font: inherit;
+  font-size: 11px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.playbook-player__ghost-btn:hover {
+  border-color: var(--player-accent);
+  color: var(--player-ink);
+}
+
+.playbook-player__stage-shell {
   min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #0a0c10;
+  padding: clamp(16px, 2.4vw, 30px) clamp(18px, 3.6vw, 52px) 16px;
+}
+
+.playbook-player__stage {
+  flex: 1;
+  width: 100%;
+  max-width: 930px;
+  aspect-ratio: 16 / 9;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--player-paper-strong) 62%, transparent);
+  border: 1px solid var(--player-line-soft);
+  border-radius: var(--player-radius);
+  box-shadow: 0 14px 42px rgba(41, 38, 30, 0.055);
 }
 
 .playbook-player__stage > * {
@@ -33,37 +378,81 @@
   max-width: 100%;
 }
 
+.playbook-player__capability {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--player-line);
+  border-radius: 6px;
+  background: var(--player-paper-strong);
+  color: var(--player-ink-2);
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 10px;
+  line-height: 1.2;
+  text-transform: uppercase;
+  pointer-events: auto;
+}
+
 /* ── Controls bar ──────────────────────────────────────────────────────── */
 
 .playbook-player__controls {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  margin: 0 clamp(18px, 3.6vw, 52px);
+  padding: 10px 18px 10px 16px;
+  border: 1px solid var(--player-line-soft);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--player-paper-strong) 74%, transparent);
+  flex-shrink: 0;
+}
+
+.playbook-player__control-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
-  padding: 10px 16px;
-  border-top: 1px solid var(--line);
-  background: var(--bg);
-  flex-shrink: 0;
+  min-width: 0;
+}
+
+.playbook-player__settings-anchor {
+  position: relative;
+  display: inline-flex;
 }
 
 .playbook-ctrl-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 6px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--ink-2);
-  font-size: 14px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid var(--player-line);
+  background: color-mix(in srgb, var(--player-paper-strong) 54%, transparent);
+  color: var(--player-ink-2);
+  font-size: 16px;
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s, background 0.15s;
   line-height: 1;
+  flex-shrink: 0;
+}
+
+.playbook-ctrl-btn svg {
+  width: 14px;
+  height: 14px;
 }
 
 .playbook-ctrl-btn:hover:not(:disabled) {
-  color: var(--ink);
-  border-color: var(--line-2);
-  background: var(--surface-2);
+  color: var(--player-ink);
+  border-color: var(--player-accent);
+  background: var(--player-accent-soft);
 }
 
 .playbook-ctrl-btn:disabled {
@@ -72,38 +461,541 @@
 }
 
 .playbook-ctrl-btn--play {
-  padding: 6px 14px;
-  color: var(--accent);
-  border-color: var(--accent);
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  color: #ffffff;
+  background: var(--player-accent);
+  font-size: 14px;
+  box-shadow: 0 0 0 5px var(--player-accent-soft);
 }
 
 .playbook-ctrl-btn--play:hover:not(:disabled) {
-  background: rgba(77, 232, 176, 0.08);
-  color: var(--accent);
-  border-color: var(--accent);
+  color: #ffffff;
+  border-color: transparent;
+  background: color-mix(in srgb, var(--player-accent) 88%, var(--player-ink));
 }
 
-.playbook-ctrl-btn--mode.is-active {
-  background: rgba(77, 232, 176, 0.08);
-  color: var(--accent);
-  border-color: var(--accent);
+.playbook-player__progress {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  height: 24px;
+  padding: 0 8px;
+  position: relative;
 }
 
-.playbook-step-indicator {
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
-  font-size: 12px;
-  color: var(--ink-3);
-  min-width: 40px;
-  text-align: center;
+.playbook-player__progress::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 50%;
+  height: 1px;
+  background: var(--player-line);
+  transform: translateY(-50%);
 }
 
-.playbook-step-title {
-  flex: 1;
+.playbook-player__progress button {
+  appearance: none;
+  position: relative;
+  z-index: 1;
+  flex: 1 1 0;
+  min-width: 18px;
+  height: 24px;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.playbook-player__progress button::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--player-ink-3);
+}
+
+.playbook-player__progress button.is-active::before {
+  width: 10px;
+  height: 10px;
+  background: var(--player-accent);
+  box-shadow: 0 0 0 4px var(--player-accent-soft);
+}
+
+.playbook-player__caption {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  margin: 14px clamp(18px, 3.6vw, 52px) 24px;
+  padding: 12px 14px;
+  border: 1px solid var(--player-line-soft);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--player-paper-strong) 70%, transparent);
+  color: var(--player-ink-2);
+}
+
+.playbook-player__caption span {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: var(--player-accent-soft);
+  position: relative;
+}
+
+.playbook-player__caption span::before {
+  content: "";
+  position: absolute;
+  inset: 9px;
+  border-radius: 50%;
+  background: var(--player-accent);
+}
+
+.playbook-player__caption p {
+  margin: 0;
+  min-width: 0;
   font-size: 13px;
-  color: var(--ink-2);
+  line-height: 1.55;
+}
+
+.playbook-player__settings-popover {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  z-index: 100;
+  width: min(320px, calc(100vw - 48px));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--player-settings-border);
+  border-radius: 10px;
+  background: var(--player-settings-bg);
+  color: var(--player-settings-text);
+  box-shadow: 0 14px 36px rgba(38, 34, 25, 0.16);
+  font-size: 13px;
+}
+
+.playbook-player__settings-section {
+  display: grid;
+  gap: 9px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--player-settings-border) 70%, transparent);
+}
+
+.playbook-player__settings-section:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.playbook-player__settings-label {
+  font-size: 11px;
+  color: var(--player-settings-muted);
+  margin-bottom: 1px;
+}
+
+.playbook-player__settings-speed-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.playbook-player__settings-choice-row {
+  display: flex;
+  gap: 8px;
+}
+
+.playbook-player__settings-speed-row button,
+.playbook-player__settings-choice-row button,
+.playbook-player__settings-toggle {
+  appearance: none;
+  border: 1px solid var(--player-settings-border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--player-settings-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.playbook-player__settings-speed-row button,
+.playbook-player__settings-choice-row button {
+  min-height: 28px;
+  padding: 0 9px;
+}
+
+.playbook-player__settings-choice-row button {
+  flex: 1;
+}
+
+.playbook-player__settings-speed-row button.is-active,
+.playbook-player__settings-choice-row button.is-active,
+.playbook-player__settings-toggle.is-active {
+  border-color: var(--player-settings-accent);
+  background: color-mix(in srgb, var(--player-settings-accent) 12%, transparent);
+  color: var(--player-settings-accent);
+  font-weight: 600;
+}
+
+.playbook-player__settings-row {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--player-settings-text);
+}
+
+.playbook-player__settings-toggle {
+  min-width: 70px;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 10px;
+}
+
+.playbook-player__settings-toggle svg {
+  width: 13px;
+  height: 13px;
+}
+
+.playbook-player__settings-toggle:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.playbook-player__settings-note {
+  padding: 7px 8px;
+  border-radius: 7px;
+  color: var(--player-settings-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.playbook-player__settings-range {
+  width: 100%;
+  accent-color: var(--player-settings-accent);
+}
+
+.playbook-player__settings-footnote {
+  color: var(--player-settings-muted);
+  text-align: center;
+  font-size: 10px;
+}
+
+.playbook-player__console {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 18px 20px 12px;
+  border-left: 1px solid var(--player-line-soft);
+  background: transparent;
+}
+
+.playbook-player__console-card {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--player-line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--player-paper-strong) 72%, transparent);
+  overflow: hidden;
+}
+
+.playbook-player__console-head {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 13px;
+  border-bottom: 1px solid var(--player-line-soft);
+  color: var(--player-ink-2);
+}
+
+.playbook-player__console-head span {
+  font-size: 12px;
+  font-weight: 560;
+}
+
+.playbook-player__code-card {
+  flex: 0 1 338px;
+  min-height: 220px;
+}
+
+.playbook-player__code-body {
+  flex: 1;
+  min-height: 0;
+}
+
+.playbook-player__code-body > div {
+  background: transparent !important;
+}
+
+.playbook-player__code-empty {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  color: var(--player-ink-3);
+  font-size: 12px;
+  text-align: center;
+  padding: 18px;
+}
+
+.playbook-player__code-empty span {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  color: var(--player-accent);
+}
+
+.playbook-player__code-empty p {
+  margin: 0;
+}
+
+.playbook-player__params-card {
+  flex: 0 0 auto;
+  max-height: min(320px, 34vh);
+}
+
+.playbook-player__param-body {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.playbook-player__param-body .math-param-panel {
+  padding: 12px 13px 14px;
+  background: transparent;
+}
+
+.playbook-player__param-body .math-param-panel__formula-card,
+.playbook-player__param-body .math-param-panel__plot {
+  border-radius: 6px;
+}
+
+.playbook-player__follow-card {
+  flex: 1 1 188px;
+  min-height: 170px;
+}
+
+.playbook-player__follow-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.playbook-player__related-row {
+  flex: 0 0 auto;
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--player-line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--player-paper-strong) 64%, transparent);
+  padding: 0 13px;
+  color: var(--player-ink-2);
+}
+
+.playbook-player__related-card {
+  flex: 0 1 auto;
+  min-height: 44px;
+  max-height: min(218px, 28vh);
+  min-width: 0;
+  display: flex;
+  border: 1px solid var(--player-line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--player-paper-strong) 64%, transparent);
+  padding: 12px 13px 14px;
+  color: var(--player-ink-2);
+  overflow: hidden;
+}
+
+.playbook-player__related-card .mv-commit-log {
+  width: 100%;
+  min-height: 0;
+  margin-bottom: 0;
+  color: var(--player-ink-2);
+}
+
+.playbook-player__related-card .mv-commit-log-head {
+  color: var(--player-ink-3);
+}
+
+.playbook-player__related-card .mv-commit-list {
+  max-height: min(158px, 22vh);
+}
+
+.playbook-player__related-card .mv-commit-item {
+  border-color: var(--player-line);
+  background: color-mix(in srgb, var(--player-paper-soft) 72%, transparent);
+  border-radius: 7px;
+}
+
+.playbook-player__related-card .mv-commit-item.is-head {
+  border-color: color-mix(in srgb, var(--player-accent) 42%, var(--player-line));
+  background: color-mix(in srgb, var(--player-accent) 8%, var(--player-paper-soft));
+}
+
+.playbook-player__related-card .mv-commit-id,
+.playbook-player__related-card .mv-commit-summary {
+  color: var(--player-ink);
+}
+
+.playbook-player__related-card .mv-commit-time {
+  color: var(--player-ink-3);
+}
+
+.playbook-player__related-card .mv-commit-source,
+.playbook-player__related-card .mv-commit-restore {
+  border-color: var(--player-line);
+  background: color-mix(in srgb, var(--player-paper-strong) 78%, transparent);
+  color: var(--player-ink-2);
+}
+
+.playbook-player__related-card .mv-commit-source.is-followup {
+  color: var(--player-accent);
+  background: var(--player-accent-soft);
+}
+
+.playbook-player__related-card .mv-commit-head {
+  background: var(--player-accent);
+  color: #ffffff;
+}
+
+.playbook-player__related-row span {
+  font-size: 12px;
+}
+
+.playbook-player__related-row strong {
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 480;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.playbook-player__related-row small {
+  color: var(--player-ink-3);
+  font-size: 16px;
+}
+
+@media (max-width: 1180px) {
+  .playbook-player {
+    grid-template-columns: 52px minmax(0, 1fr) minmax(248px, 286px);
+  }
+
+  .playbook-player__header {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .playbook-player__brand {
+    display: none;
+  }
+
+  .playbook-player__lesson-title {
+    justify-self: start;
+    align-items: flex-start;
+    text-align: left;
+  }
+}
+
+@media (max-width: 920px) {
+  .playbook-player {
+    grid-template-columns: 46px minmax(0, 1fr);
+    grid-template-rows: minmax(520px, 1fr) auto;
+  }
+
+  .playbook-player__workspace {
+    grid-column: 2;
+  }
+
+  .playbook-player__console {
+    grid-column: 1 / -1;
+    border-left: 0;
+    border-top: 1px solid var(--player-line-soft);
+    padding: 14px;
+    max-height: 42vh;
+  }
+
+  .playbook-player__rail-panel {
+    top: 72px;
+  }
+}
+
+@media (max-width: 680px) {
+  .playbook-player {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    border-radius: 10px;
+  }
+
+  .playbook-player__rail {
+    display: none;
+  }
+
+  .playbook-player__workspace,
+  .playbook-player__console {
+    grid-column: 1;
+  }
+
+  .playbook-player__header {
+    min-height: 54px;
+    grid-template-columns: minmax(0, 1fr);
+    padding: 0 16px;
+  }
+
+  .playbook-player__header-actions {
+    display: none;
+  }
+
+  .playbook-player__stage-shell {
+    padding: 14px 14px 10px;
+  }
+
+  .playbook-player__controls,
+  .playbook-player__caption {
+    margin-left: 14px;
+    margin-right: 14px;
+  }
+
+  .playbook-player__controls {
+    gap: 10px;
+    padding: 8px 10px;
+  }
+
+  .playbook-player__control-actions {
+    gap: 6px;
+  }
+
+  .playbook-ctrl-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+  }
+
+  .playbook-ctrl-btn--play {
+    width: 32px;
+    height: 32px;
+  }
+
+  .playbook-player__settings-popover {
+    right: -74px;
+  }
 }
 
 /* ── TTS speaking pulse ───────────────────────────────────────────────────── */

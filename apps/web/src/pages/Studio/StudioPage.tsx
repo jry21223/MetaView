@@ -1,9 +1,9 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { TweakValues } from "../../features/studio-editor/hooks/useTweaks";
 import { usePipelinePoller } from "../../features/pipeline/hooks/usePipelinePoller";
 import { PlaybookPlayer } from "../../features/playbook/engine/player/PlaybookPlayer";
 import { GlobalTopbar, Stage } from "../../shared/ui/GlobalTopbar";
-import { useProviderSettings } from "../../features/providers/hooks/useProviderSettings";
+import type { ProviderSettings } from "../../features/providers/hooks/useProviderSettings";
 import type {
   DirectorScript,
   PlaybookScript,
@@ -19,16 +19,6 @@ import { FollowupCommitLog } from "../../features/followups/ui/FollowupCommitLog
 
 // ── Domain mapping ────────────────────────────────────────────────────────
 
-const DOMAIN_LABEL: Record<string, string> = {
-  algorithm: "算法",
-  math: "数学",
-  code: "代码",
-  physics: "物理",
-  chemistry: "化学",
-  biology: "生物",
-  geography: "地理",
-};
-
 const DOMAIN_SUGGESTIONS: Record<string, string[]> = {
   algorithm: ["换一组数据", "为什么这个复杂度", "对比其他方法"],
   math: ["改变初始条件", "几何意义", "推导过程"],
@@ -41,60 +31,40 @@ const DOMAIN_SUGGESTIONS: Record<string, string[]> = {
 
 const FALLBACK_SUGGESTIONS = ["换个角度讲", "展开第一步", "总结要点"];
 
-// ── ProblemCard ───────────────────────────────────────────────────────────
+type WorkbenchNavIconKind = "home" | "history" | "templates" | "settings";
 
-interface ProblemCardProps {
-  playbook: PlaybookScript | null;
-  runId: string | null;
-  collapsed: boolean;
-  onToggle: () => void;
-}
-
-function ProblemCard({
-  playbook,
-  runId,
-  collapsed,
-  onToggle,
-}: ProblemCardProps) {
-  const domain = playbook?.domain ?? "";
-  const domainLabel = DOMAIN_LABEL[domain] ?? domain ?? "—";
-  const taskId = runId ? `#${runId.slice(0, 8)}` : "#—";
-
+function WorkbenchNavIcon({ kind }: { kind: WorkbenchNavIconKind }) {
+  if (kind === "home") {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path d="M4 10.5 12 4l8 6.5V20H5v-7" />
+      </svg>
+    );
+  }
+  if (kind === "history") {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path d="M12 8v5l3 2" />
+        <path d="M4 12a8 8 0 1 0 2.4-5.7" />
+        <path d="M4 4v5h5" />
+      </svg>
+    );
+  }
+  if (kind === "templates") {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path d="M5 4h6v6H5z" />
+        <path d="M13 4h6v6h-6z" />
+        <path d="M5 14h6v6H5z" />
+        <path d="M13 14h6v6h-6z" />
+      </svg>
+    );
+  }
   return (
-    <div
-      className={`mv-card mv-problem mv-problem-slim${collapsed ? " is-collapsed" : ""}`}
-    >
-      <div className="mv-problem-row">
-        <div className="mv-problem-eyebrow">
-          <span className="mv-subject-chip">{domainLabel}</span>
-          <span className="mv-eyebrow-mini">任务 {taskId}</span>
-        </div>
-        <button
-          className="mv-chip mv-chip-collapse"
-          onClick={onToggle}
-          title={collapsed ? "展开" : "折叠"}
-        >
-          {collapsed ? "展开 ▴" : "折叠 ▾"}
-        </button>
-      </div>
-      <h2 className="mv-problem-title">{playbook?.title ?? "等待生成…"}</h2>
-      {playbook && (
-        <>
-          {playbook.summary && (
-            <p
-              style={{
-                margin: 0,
-                fontSize: 12,
-                lineHeight: 1.55,
-                color: "var(--ink-2)",
-              }}
-            >
-              {playbook.summary}
-            </p>
-          )}
-        </>
-      )}
-    </div>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+      <path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z" />
+      <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2 3.4-.2-.1a1.7 1.7 0 0 0-2 .1 1.7 1.7 0 0 0-.9 1.7v.2H10v-.2a1.7 1.7 0 0 0-.9-1.7 1.7 1.7 0 0 0-2-.1l-.2.1-2-3.4.1-.1A1.7 1.7 0 0 0 5.3 15a1.7 1.7 0 0 0-1.4-1.1h-.2v-3.8h.2A1.7 1.7 0 0 0 5.3 9a1.7 1.7 0 0 0-.3-1.9L4.9 7l2-3.4.2.1a1.7 1.7 0 0 0 2-.1A1.7 1.7 0 0 0 10 1.9v-.2h4.7v.2a1.7 1.7 0 0 0 .9 1.7 1.7 1.7 0 0 0 2 .1l.2-.1 2 3.4-.1.1A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.4 1.1h.2v3.8h-.2A1.7 1.7 0 0 0 19.4 15Z" />
+    </svg>
   );
 }
 
@@ -114,13 +84,16 @@ interface ChatPanelProps {
   runId: string | null;
   playbook: PlaybookScript | null;
   isProviderConfigured: boolean;
+  providerSettings?: ProviderSettings | null;
   onOpenProviderSettings?: () => void;
   onPlaybookPatched: (
     playbook: PlaybookScript,
     director?: DirectorScript | null,
   ) => void;
-  collapsed: boolean;
-  onToggle: () => void;
+  children: (slots: {
+    followupSlot: React.ReactNode;
+    relatedSlot: React.ReactNode;
+  }) => React.ReactNode;
 }
 
 function formatChatError(err: unknown): string {
@@ -135,12 +108,11 @@ function ChatPanel({
   runId,
   playbook,
   isProviderConfigured,
+  providerSettings,
   onOpenProviderSettings,
   onPlaybookPatched,
-  collapsed,
-  onToggle,
+  children,
 }: ChatPanelProps) {
-  const { settings } = useProviderSettings();
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
   const [versions, setVersions] = useState<RunVersionRecord[]>([]);
   const [input, setInput] = useState("");
@@ -210,8 +182,8 @@ function ChatPanel({
           content: m.text,
         }));
       const provider =
-        appEdition === "self" && settings.apiKey.trim().length > 0
-          ? settings
+        appEdition === "self" && providerSettings?.apiKey.trim().length
+          ? providerSettings
           : undefined;
       const result = await submitRunFollowUp(
         runId!,
@@ -273,20 +245,8 @@ function ChatPanel({
     }
   };
 
-  return (
-    <div className={`mv-card mv-chat${collapsed ? " is-collapsed" : ""}`}>
-      <div className="mv-card-eyebrow">
-        <span>追问 · 围绕题目</span>
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          {!collapsed && msgs.length > 0 && (
-            <span className="mv-eyebrow-mini">{msgs.length} 条</span>
-          )}
-          <button className="mv-chip mv-chip-collapse" onClick={onToggle}>
-            {collapsed ? "展开 ▴" : "折叠 ▾"}
-          </button>
-        </div>
-      </div>
-
+  const followupSlot = (
+    <div className="mv-followup-panel">
       <div className="mv-chat-stream" ref={scrollRef}>
         {msgs.length === 0 && !isProviderConfigured && (
           <div
@@ -345,15 +305,6 @@ function ChatPanel({
         ))}
       </div>
 
-      {versions.length > 0 && !collapsed && (
-        <FollowupCommitLog
-          versions={versions}
-          pending={pending}
-          canModify={canModify}
-          onRestore={restore}
-        />
-      )}
-
       <div className="mv-suggestions">
         {suggestions.map((s) => (
           <button
@@ -395,6 +346,17 @@ function ChatPanel({
       </div>
     </div>
   );
+  const relatedSlot =
+    versions.length > 0 ? (
+      <FollowupCommitLog
+        versions={versions}
+        pending={pending}
+        canModify={canModify}
+        onRestore={restore}
+      />
+    ) : null;
+
+  return <>{children({ followupSlot, relatedSlot })}</>;
 }
 
 // ── PipelineSkeleton ──────────────────────────────────────────────────────
@@ -493,6 +455,7 @@ export interface StudioPageProps {
   ) => void;
   onNavigate: (stage: Stage) => void;
   isProviderConfigured: boolean;
+  providerSettings?: ProviderSettings | null;
   accountBalanceYuan?: string | null;
   accountName?: string | null;
   accountAvatarUrl?: string | null;
@@ -506,6 +469,7 @@ export function StudioPage({
   setTweak,
   onNavigate,
   isProviderConfigured,
+  providerSettings = null,
   accountBalanceYuan = null,
   accountName = null,
   accountAvatarUrl = null,
@@ -515,9 +479,6 @@ export function StudioPage({
   const { playbook, director, error, isLoading, status } =
     usePipelinePoller(runId);
 
-  const [leftCollapsed, setLeftCollapsed] = useState(false);
-  const [problemCollapsed, setProblemCollapsed] = useState(false);
-  const [chatCollapsed, setChatCollapsed] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [patchedPlaybook, setPatchedPlaybook] = useState<{
     runId: string;
@@ -531,15 +492,40 @@ export function StudioPage({
     ? (activePatchedRun.director ?? null)
     : director;
   const canExport = !!playbook && !!runId;
+  const workbenchNavItems = useMemo(
+    () => [
+      {
+        id: "home",
+        label: "首页",
+        active: true,
+        icon: <WorkbenchNavIcon kind="home" />,
+        onSelect: () => onNavigate("intake"),
+      },
+      {
+        id: "history",
+        label: "任务历史",
+        icon: <WorkbenchNavIcon kind="history" />,
+        onSelect: () => onNavigate("history"),
+      },
+      {
+        id: "templates",
+        label: "模板",
+        icon: <WorkbenchNavIcon kind="templates" />,
+        onSelect: () => onNavigate("templates"),
+      },
+      {
+        id: "settings",
+        label: "设置",
+        icon: <WorkbenchNavIcon kind="settings" />,
+        onSelect: () => onNavigate("settings"),
+      },
+    ],
+    [onNavigate],
+  );
 
   useEffect(() => {
     if (error) onNavigate("intake");
   }, [error, onNavigate]);
-
-  const mainStyle = {
-    ["--left-w" as string]: leftCollapsed ? "0px" : `${t.leftRatio}%`,
-    gridTemplateColumns: leftCollapsed ? "1fr" : `var(--left-w) 1fr`,
-  } as React.CSSProperties;
 
   return (
     <>
@@ -556,6 +542,7 @@ export function StudioPage({
         onOpenProviderSettings={onOpenProviderSettings}
         onOpenExport={canExport ? () => setExportOpen(true) : undefined}
         exportEnabled={canExport}
+        hidePrimaryNav
       />
       {exportOpen && (
         <ExportModal
@@ -568,20 +555,15 @@ export function StudioPage({
           onClose={() => setExportOpen(false)}
         />
       )}
-      <main className="mv-main" style={mainStyle}>
-        {!leftCollapsed && (
-          <aside className="mv-left">
-            <ProblemCard
-              playbook={activePlaybook}
-              runId={runId}
-              collapsed={problemCollapsed}
-              onToggle={() => setProblemCollapsed((v) => !v)}
-            />
+      <main className="mv-main mv-main--player">
+        <section className="mv-right">
+          {activePlaybook ? (
             <ChatPanel
               appEdition={appEdition}
               runId={runId}
               playbook={activePlaybook}
               isProviderConfigured={isProviderConfigured}
+              providerSettings={providerSettings}
               onOpenProviderSettings={onOpenProviderSettings}
               onPlaybookPatched={(next, nextDirector) => {
                 if (runId) {
@@ -592,29 +574,20 @@ export function StudioPage({
                   });
                 }
               }}
-              collapsed={chatCollapsed}
-              onToggle={() => setChatCollapsed((v) => !v)}
-            />
-          </aside>
-        )}
-
-        <section className="mv-right">
-          <button
-            className="mv-left-handle"
-            onClick={() => setLeftCollapsed((v) => !v)}
-            title={leftCollapsed ? "展开左栏" : "折叠左栏"}
-          >
-            {leftCollapsed ? "›" : "‹"}
-          </button>
-
-          {activePlaybook ? (
-            <PlaybookPlayer
-              script={activePlaybook}
-              director={activeDirector}
-              theme={isDark ? "dark" : "light"}
-              swapDurationFrames={t.swapFrames}
-              onOpenExport={canExport ? () => setExportOpen(true) : undefined}
-            />
+            >
+              {({ followupSlot, relatedSlot }) => (
+                <PlaybookPlayer
+                  script={activePlaybook}
+                  director={activeDirector}
+                  theme={isDark ? "dark" : "light"}
+                  swapDurationFrames={t.swapFrames}
+                  onOpenExport={canExport ? () => setExportOpen(true) : undefined}
+                  workbenchNavItems={workbenchNavItems}
+                  followupSlot={followupSlot}
+                  relatedSlot={relatedSlot}
+                />
+              )}
+            </ChatPanel>
           ) : isLoading ? (
             <PipelineSkeleton status={status} />
           ) : !error ? (

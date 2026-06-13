@@ -33,6 +33,63 @@ export const TWEAK_DEFAULTS: TweakValues = {
 };
 
 const STORAGE_KEY = "mv_tweaks";
+const LAYOUTS = ["drawer", "left", "top"] as const;
+const DENSITIES = ["compact", "regular", "comfy"] as const;
+
+function hasOwn<T extends object>(source: T, key: PropertyKey): key is keyof T {
+  return Object.prototype.hasOwnProperty.call(source, key);
+}
+
+function isThemeName(value: unknown): value is ThemeName {
+  return typeof value === "string" && hasOwn(THEME_PALETTE, value);
+}
+
+function isOneOf<const T extends readonly string[]>(
+  value: unknown,
+  options: T,
+): value is T[number] {
+  return typeof value === "string" && options.includes(value);
+}
+
+function isHexColor(value: unknown): value is string {
+  return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value);
+}
+
+function numberInRange(
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max
+    ? value
+    : fallback;
+}
+
+function sanitizeTweaks(
+  candidate: Partial<TweakValues>,
+  defaults: TweakValues,
+): TweakValues {
+  const theme = isThemeName(candidate.theme) ? candidate.theme : defaults.theme;
+  const themeAccent = THEME_PALETTE[theme]?.accent ?? defaults.accent;
+
+  return {
+    theme,
+    accent: isHexColor(candidate.accent) ? candidate.accent : themeAccent,
+    layout: isOneOf(candidate.layout, LAYOUTS) ? candidate.layout : defaults.layout,
+    leftRatio: numberInRange(candidate.leftRatio, defaults.leftRatio, 12, 50),
+    paramsHeight: numberInRange(candidate.paramsHeight, defaults.paramsHeight, 20, 48),
+    chatHeight: numberInRange(candidate.chatHeight, defaults.chatHeight, 240, 520),
+    density: isOneOf(candidate.density, DENSITIES)
+      ? candidate.density
+      : defaults.density,
+    showHistoryDock:
+      typeof candidate.showHistoryDock === "boolean"
+        ? candidate.showHistoryDock
+        : defaults.showHistoryDock,
+    swapFrames: numberInRange(candidate.swapFrames, defaults.swapFrames, 12, 60),
+  };
+}
 
 /** Map a TweakValues theme to its underlying ``"dark" | "light"`` mode so
  *  renderers (Bar / Algorithm / Math) keep their existing binary
@@ -74,10 +131,7 @@ function loadFromStorage(defaults: TweakValues): TweakValues {
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
       return defaults;
-    const merged = { ...defaults, ...(parsed as Partial<TweakValues>) };
-    // Only accept theme names the palette knows about.
-    if (!(merged.theme in THEME_PALETTE)) merged.theme = defaults.theme;
-    return merged;
+    return sanitizeTweaks({ ...defaults, ...(parsed as Partial<TweakValues>) }, defaults);
   } catch {
     return defaults;
   }
@@ -124,10 +178,10 @@ export function useTweaks(defaults: TweakValues): [TweakValues, SetTweakFn] {
             next.accent = THEME_PALETTE[next.theme]?.accent ?? prev.accent;
           }
         }
-        return next;
+        return sanitizeTweaks(next, defaults);
       });
     },
-    [],
+    [defaults],
   ) as SetTweakFn;
 
   return [values, setTweak];

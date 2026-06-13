@@ -21,16 +21,16 @@ const DARK = {
 } as const;
 
 const LIGHT = {
-  bg: "#f6f8fa",
-  surface: "#ffffff",
-  activeBg: "#dbeafe",
-  activeBorder: "#3b82f6",
-  lineNum: "#8c8c8c",
-  text: "#24292f",
-  varBg: "#f6f8fa",
-  varLabel: "#57606a",
-  varValue: "#0550ae",
-  border: "#d0d7de",
+  bg: "#fbfaf6",
+  surface: "#fffefa",
+  activeBg: "rgba(130, 151, 111, 0.16)",
+  activeBorder: "#82976f",
+  lineNum: "#969b92",
+  text: "#30352f",
+  varBg: "#fbfaf6",
+  varLabel: "#73796f",
+  varValue: "#6f8e72",
+  border: "rgba(65, 73, 62, 0.14)",
 } as const;
 
 const TOKEN_DARK: Record<TokenKind, string> = {
@@ -43,11 +43,11 @@ const TOKEN_DARK: Record<TokenKind, string> = {
 };
 
 const TOKEN_LIGHT: Record<TokenKind, string> = {
-  keyword: "#8250df",
-  string: "#0a3069",
-  number: "#0550ae",
+  keyword: "#6f7f62",
+  string: "#5f7462",
+  number: "#6b6f66",
   comment: "#6e7781",
-  operator: "#cf222e",
+  operator: "#b45f5f",
   text: LIGHT.text,
 };
 
@@ -66,6 +66,7 @@ export const CodeHighlightRenderer: React.FC<CodeHighlightRendererProps> = ({
 
   useEffect(() => {
     const curr = overlay.variables ?? {};
+    let clearFlashId: ReturnType<typeof setTimeout> | undefined;
     // Schedule inside a callback to satisfy react-hooks/set-state-in-effect
     const flashId = setTimeout(() => {
       const prev = prevVarsRef.current;
@@ -75,9 +76,12 @@ export const CodeHighlightRenderer: React.FC<CodeHighlightRendererProps> = ({
       }
       prevVarsRef.current = { ...curr };
       setChangedKeys(changed);
-      setTimeout(() => setChangedKeys(new Set()), 300);
+      clearFlashId = setTimeout(() => setChangedKeys(new Set()), 300);
     }, 0);
-    return () => clearTimeout(flashId);
+    return () => {
+      clearTimeout(flashId);
+      if (clearFlashId) clearTimeout(clearFlashId);
+    };
   }, [overlay.variables]);
 
   useEffect(() => {
@@ -95,14 +99,14 @@ export const CodeHighlightRenderer: React.FC<CodeHighlightRendererProps> = ({
         height: "100%",
         background: c.bg,
         fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-        fontSize: 13,
+        fontSize: 12.5,
         overflow: "hidden",
       }}
     >
       {/* Language badge */}
       <div
         style={{
-          padding: "4px 12px",
+          padding: "4px 10px",
           background: c.surface,
           color: c.lineNum,
           fontSize: 11,
@@ -121,7 +125,7 @@ export const CodeHighlightRenderer: React.FC<CodeHighlightRendererProps> = ({
             overlay.lines.map((l) => l || " "),
             overlay.language,
           );
-          return overlay.lines.map((line, i) => {
+          return overlay.lines.map((_line, i) => {
             const isActive = activeSet.has(i);
             const isAnchor = i === overlay.active_line;
             const showLabel = isAnchor && !!overlay.operation_label;
@@ -143,10 +147,10 @@ export const CodeHighlightRenderer: React.FC<CodeHighlightRendererProps> = ({
               {/* Line number */}
               <span
                 style={{
-                  width: 40,
+                  width: 34,
                   flexShrink: 0,
                   textAlign: "right",
-                  paddingRight: 12,
+                  paddingRight: 10,
                   color: isActive ? c.activeBorder : c.lineNum,
                   userSelect: "none",
                   fontSize: 11,
@@ -160,8 +164,8 @@ export const CodeHighlightRenderer: React.FC<CodeHighlightRendererProps> = ({
               {showLabel && (
                 <span
                   style={{
-                    marginRight: 8,
-                    padding: "1px 8px",
+                    marginRight: 7,
+                    padding: "1px 7px",
                     borderRadius: 10,
                     fontSize: 10,
                     background: `${c.activeBorder}33`,
@@ -179,7 +183,7 @@ export const CodeHighlightRenderer: React.FC<CodeHighlightRendererProps> = ({
               <pre
                 style={{
                   margin: 0,
-                  padding: "0 12px 0 0",
+                  padding: "0 10px 0 0",
                   lineHeight: "22px",
                   whiteSpace: "pre",
                   flex: 1,
@@ -205,7 +209,7 @@ export const CodeHighlightRenderer: React.FC<CodeHighlightRendererProps> = ({
           style={{
             borderTop: `1px solid ${c.border}`,
             background: c.varBg,
-            padding: "6px 12px",
+            padding: "6px 10px",
             display: "flex",
             flexWrap: "wrap",
             gap: "8px 20px",

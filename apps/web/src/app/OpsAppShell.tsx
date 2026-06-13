@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "../shared/ui/ErrorBoundary";
 import { useAccount } from "../features/account";
 import { fetchWeChatLoginUrl } from "../features/account/api/accountApi";
@@ -49,16 +49,18 @@ export function OpsAppShell() {
 
   const submitWithPlatformProvider = async (
     prompt: string,
+    domain?: string | null,
     sourceCode?: string,
     language?: string,
   ) => {
-    await submit(prompt, sourceCode, language);
+    await submit({ prompt, domain, sourceCode, language });
   };
 
   const handleSubmit = async (ctx: IntakeContext) => {
     setOpenedRunId(null);
     await submitWithPlatformProvider(
       ctx.raw || ctx.title,
+      ctx.domain,
       ctx.sourceCode,
       ctx.language,
     );
@@ -67,7 +69,7 @@ export function OpsAppShell() {
 
   const handleUseTemplate = async (prompt: string) => {
     setOpenedRunId(null);
-    await submitWithPlatformProvider(prompt);
+    await submitWithPlatformProvider(prompt, null);
     setStage("workbench");
   };
 

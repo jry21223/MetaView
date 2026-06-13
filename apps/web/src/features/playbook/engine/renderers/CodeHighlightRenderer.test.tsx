@@ -69,4 +69,12 @@ describe("CodeHighlightRenderer", () => {
     const light = render(overlay(), "light");
     expect(dark).not.toBe(light);
   });
+
+  it("uses sage active line colors in the light theme", () => {
+    const markup = render(overlay(), "light");
+    expect(markup).toContain("#82976f");
+    expect(markup).toContain("rgba(130, 151, 111, 0.16)");
+    expect(markup).not.toContain("#3b82f6");
+    expect(markup).not.toContain("#dbeafe");
+  });
 });

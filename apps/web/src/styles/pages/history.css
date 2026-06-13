@@ -1,4 +1,4 @@
-/* MetaView v2 — History page
+/* MetaView - History page
  * Uses the live token system seeded by `useTweaks.themeVars()`
  * (--bg / --surface / --ink* / --line* / --accent* / --warn / --radius).
  * Status-specific colors are declared locally so the page owns its
@@ -79,6 +79,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-width: 0;
 }
 
 .mv-history-item-title {
@@ -102,6 +103,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
 }
 
 .mv-history-item-domain {
@@ -146,6 +148,34 @@
   font-size: 12px;
   color: var(--mv-status-failed);
   padding: 8px 4px;
+}
+
+.mv-history-load-error {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--mv-status-failed) 36%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 76%, transparent);
+  color: var(--ink-2);
+}
+
+.mv-history-load-error strong {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.mv-history-load-error span,
+.mv-history-load-error small {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-3);
+}
+
+.mv-history-load-error .mv-chip {
+  justify-self: start;
+  margin-top: 2px;
 }
 
 /* ───── Reviewer status badge (new "reviewing" state) ─────────────────── */
@@ -467,6 +497,8 @@
 .mv-history-item {
   display: flex;
   flex-direction: column;
+  width: 100%;
+  padding: 0;
   border-bottom: 1px solid var(--line);
   background: transparent;
   transition: background 0.15s;
@@ -478,6 +510,8 @@
 }
 
 .mv-history-item__main {
+  width: 100%;
+  box-sizing: border-box;
   text-align: left;
   background: transparent;
   border: none;
@@ -496,6 +530,8 @@
 }
 
 .mv-history-item__actions {
+  width: 100%;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: space-between;

@@ -62,9 +62,18 @@ const SettingsSVG = () => (
   </svg>
 );
 
-// ── TTS Config Popover ─────────────────────────────────────────────────────
+// ── Player Settings Popover ────────────────────────────────────────────────
 
-interface TTSPopoverProps {
+interface PlayerSettingsPopoverProps {
+  playbackRate: number;
+  onPlaybackRateChange: (rate: number) => void;
+  showSubtitles: boolean;
+  onShowSubtitlesChange: (next: boolean) => void;
+  stepThrough: boolean;
+  onStepThroughChange: (next: boolean) => void;
+  ttsEnabled: boolean;
+  ttsSupported: boolean;
+  onToggleTTS: () => void;
   config: TTSConfig;
   onUpdate: (patch: Partial<TTSConfig>) => void;
   onClose: () => void;
@@ -75,12 +84,29 @@ interface TTSPopoverProps {
 const SAMPLE_TEXT_DEFAULT = "你好，这是一段试听文字。Hello, this is a preview.";
 const SPEED_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
-const TTSConfigPopover: React.FC<TTSPopoverProps> = ({ config, onUpdate, onClose, isDark, onPreview }) => {
+const PlayerSettingsPopover: React.FC<PlayerSettingsPopoverProps> = ({
+  playbackRate,
+  onPlaybackRateChange,
+  showSubtitles,
+  onShowSubtitlesChange,
+  stepThrough,
+  onStepThroughChange,
+  ttsEnabled,
+  ttsSupported,
+  onToggleTTS,
+  config,
+  onUpdate,
+  onClose,
+  isDark,
+  onPreview,
+}) => {
   const popoverRef = useRef<HTMLDivElement>(null);
   const [sampleText, setSampleText] = useState(SAMPLE_TEXT_DEFAULT);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
+      const target = e.target as Element | null;
+      if (target?.closest(".playbook-player__settings-anchor")) return;
       if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
         onClose();
       }
@@ -99,45 +125,76 @@ const TTSConfigPopover: React.FC<TTSPopoverProps> = ({ config, onUpdate, onClose
   return (
     <div
       ref={popoverRef}
-      className="tts-popover"
+      className="playbook-player__settings-popover"
       style={{
-        position: "absolute",
-        bottom: "calc(100% + 8px)",
-        right: 0,
-        width: 260,
-        background: bg,
-        border: `1px solid ${border}`,
-        borderRadius: 8,
-        padding: "12px 14px",
-        boxShadow: isDark ? "0 8px 24px rgba(0,0,0,0.5)" : "0 8px 24px rgba(0,0,0,0.12)",
-        zIndex: 100,
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
-        fontFamily: "system-ui, sans-serif",
-        fontSize: 13,
-        color: text,
-      }}
+        "--player-settings-bg": bg,
+        "--player-settings-border": border,
+        "--player-settings-text": text,
+        "--player-settings-muted": muted,
+        "--player-settings-input": inputBg,
+        "--player-settings-accent": accent,
+      } as React.CSSProperties}
     >
-      {/* Backend toggle */}
-      <div>
-        <div style={{ fontSize: 11, color: muted, marginBottom: 6 }}>语音后端</div>
-        <div style={{ display: "flex", gap: 8 }}>
+      <div className="playbook-player__settings-section">
+        <div className="playbook-player__settings-label">播放速度</div>
+        <div className="playbook-player__settings-speed-row">
+          {SPEED_STEPS.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => onPlaybackRateChange(s)}
+              className={playbackRate === s ? "is-active" : ""}
+            >
+              {s}×
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="playbook-player__settings-section">
+        <div className="playbook-player__settings-row">
+          <span>字幕</span>
+          <button
+            type="button"
+            className={`playbook-player__settings-toggle${showSubtitles ? " is-active" : ""}`}
+            onClick={() => onShowSubtitlesChange(!showSubtitles)}
+          >
+            {showSubtitles ? "开启" : "关闭"}
+          </button>
+        </div>
+        <div className="playbook-player__settings-row">
+          <span>播放模式</span>
+          <button
+            type="button"
+            className={`playbook-player__settings-toggle${stepThrough ? " is-active" : ""}`}
+            onClick={() => onStepThroughChange(!stepThrough)}
+          >
+            {stepThrough ? "步进" : "连播"}
+          </button>
+        </div>
+        <div className="playbook-player__settings-row">
+          <span>语音朗读</span>
+          <button
+            type="button"
+            className={`playbook-player__settings-toggle${ttsEnabled ? " is-active" : ""}`}
+            onClick={onToggleTTS}
+            disabled={!ttsSupported}
+          >
+            {ttsEnabled ? <SpeakerOnSVG /> : <SpeakerOffSVG />}
+            {ttsEnabled ? "开启" : "关闭"}
+          </button>
+        </div>
+      </div>
+
+      <div className="playbook-player__settings-section">
+        <div className="playbook-player__settings-label">语音后端</div>
+        <div className="playbook-player__settings-choice-row">
           {(["system", "openai"] as const).map((b) => (
             <button
               key={b}
+              type="button"
               onClick={() => onUpdate({ backend: b })}
-              style={{
-                flex: 1,
-                padding: "4px 0",
-                borderRadius: 5,
-                border: `1px solid ${config.backend === b ? accent : border}`,
-                background: config.backend === b ? `${accent}18` : "transparent",
-                color: config.backend === b ? accent : muted,
-                cursor: "pointer",
-                fontSize: 12,
-                fontWeight: config.backend === b ? 600 : 400,
-              }}
+              className={config.backend === b ? "is-active" : ""}
             >
               {b === "system" ? "系统语音" : "OpenAI API"}
             </button>
@@ -151,13 +208,9 @@ const TTSConfigPopover: React.FC<TTSPopoverProps> = ({ config, onUpdate, onClose
          on purpose — issue #40. */}
       {config.backend === "openai" && (
         <div
+          className="playbook-player__settings-note"
           style={{
-            fontSize: 11,
-            color: muted,
-            padding: "6px 8px",
             border: `1px dashed ${border}`,
-            borderRadius: 5,
-            lineHeight: 1.45,
           }}
         >
           通过服务端代理调用，API Key 由管理员在后端配置（METAVIEW_TTS_API_KEY）。
@@ -167,7 +220,7 @@ const TTSConfigPopover: React.FC<TTSPopoverProps> = ({ config, onUpdate, onClose
       {/* Voice picker (OpenAI only) */}
       {config.backend === "openai" && (
         <div>
-          <div style={{ fontSize: 11, color: muted, marginBottom: 6 }}>
+          <div className="playbook-player__settings-label">
             音色 <span style={{ color: text }}>{config.voice === AUTO_VOICE ? "跟随学科" : config.voice}</span>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 180, overflowY: "auto" }}>
@@ -263,9 +316,8 @@ const TTSConfigPopover: React.FC<TTSPopoverProps> = ({ config, onUpdate, onClose
         </div>
       )}
 
-      {/* Rate slider */}
-      <div>
-        <div style={{ fontSize: 11, color: muted, marginBottom: 3 }}>
+      <div className="playbook-player__settings-section">
+        <div className="playbook-player__settings-label">
           语速 <span style={{ color: text }}>{config.rate.toFixed(1)}×</span>
         </div>
         <input
@@ -275,11 +327,11 @@ const TTSConfigPopover: React.FC<TTSPopoverProps> = ({ config, onUpdate, onClose
           step="0.1"
           value={config.rate}
           onChange={(e) => onUpdate({ rate: parseFloat(e.target.value) })}
-          style={{ width: "100%", accentColor: accent }}
+          className="playbook-player__settings-range"
         />
       </div>
 
-      <div style={{ fontSize: 10, color: muted, textAlign: "center", marginTop: 2 }}>
+      <div className="playbook-player__settings-footnote">
         设置存储在本地浏览器中
       </div>
     </div>
@@ -287,6 +339,14 @@ const TTSConfigPopover: React.FC<TTSPopoverProps> = ({ config, onUpdate, onClose
 };
 
 // ── Main component ─────────────────────────────────────────────────────────
+
+interface WorkbenchNavItem {
+  id: string;
+  label: string;
+  icon?: React.ReactNode;
+  active?: boolean;
+  onSelect: () => void;
+}
 
 interface PlaybookPlayerProps {
   script: PlaybookScript;
@@ -300,6 +360,9 @@ interface PlaybookPlayerProps {
    */
   swapDurationFrames?: number;
   onOpenExport?: () => void;
+  followupSlot?: React.ReactNode;
+  relatedSlot?: React.ReactNode;
+  workbenchNavItems?: WorkbenchNavItem[];
 }
 
 export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
@@ -308,24 +371,30 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   theme = "dark",
   swapDurationFrames = 24,
   onOpenExport,
+  followupSlot,
+  relatedSlot,
+  workbenchNavItems,
 }) => {
   const playerRef = useRef<PlayerRef | null>(null);
+  const railNavRef = useRef<HTMLDivElement | null>(null);
 
   // ── Tweak state (frontend-only hot reload) ─────────────────────────────
   const [overrides, setOverrides] = useState<ScriptOverrides>({});
   const [playbackRate, setPlaybackRate] = useState(1);
   const [showSubtitles, setShowSubtitles] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [codePanelOpen, setCodePanelOpen] = useState(true);
-  // Default expanded so users see their math sliders / array editor without
-  // having to know there's a hidden "参数面板 ▸" row tucked below the speed
-  // bar. Collapse remembers per-mount only — no persistence needed.
-  const [paramPanelOpen, setParamPanelOpen] = useState(true);
+  const [railNavOpen, setRailNavOpen] = useState(false);
   const script = useResolvedScript(baseScript, overrides);
   const capability = useMemo(() => domainCapability(script.domain), [script.domain]);
   const hasDomainPanel = getParamPanel(baseScript.domain) !== null;
   const initialPreviewFrame = useMemo(() => resolveInitialPreviewFrame(script), [script]);
   const playerTimelineKey = useMemo(() => resolvePlayerTimelineKey(baseScript), [baseScript]);
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setOverrides((current) => (Object.keys(current).length > 0 ? {} : current));
+    }, 0);
+    return () => clearTimeout(id);
+  }, [baseScript]);
 
   const tts = useTTS();
   // Push the playbook domain into useTTS so AUTO-voice resolution still
@@ -348,9 +417,12 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     ttsEnabled: tts.enabled,
   });
 
+  const safeStepIndex = script.steps.length
+    ? Math.min(currentStepIndex, script.steps.length - 1)
+    : 0;
   const codeOverlay = useMemo(
-    () => resolveCodePanelOverlay(script, currentStepIndex),
-    [script, currentStepIndex],
+    () => resolveCodePanelOverlay(script, safeStepIndex),
+    [script, safeStepIndex],
   );
 
   // Show code panel slot for algorithm domain, or any script that has code highlights.
@@ -362,7 +434,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   const showCodePanelSlot = isAlgorithmDomain || hasAnyCode;
 
   const [isPlaying, setIsPlaying] = useState(false);
-  const [showTTSConfig, setShowTTSConfig] = useState(false);
+  const [showPlayerSettings, setShowPlayerSettings] = useState(false);
   // Ref so auto-narrate effect always calls the latest speak function without re-registering.
   const ttsRef = useRef(tts);
   useLayoutEffect(() => { ttsRef.current = tts; });
@@ -418,14 +490,36 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     onSpeedUp: handleSpeedUp,
     onSpeedDown: handleSpeedDown,
     onOpenExport: onOpenExport,
-    onEscape: () => setShowTTSConfig(false),
+    onEscape: () => {
+      setShowPlayerSettings(false);
+      setRailNavOpen(false);
+    },
   });
+
+  useEffect(() => {
+    if (!railNavOpen) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (railNavRef.current?.contains(event.target as Node)) return;
+      setRailNavOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setRailNavOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [railNavOpen]);
 
   // Auto-narrate on step change.
   // ttsRef always holds the latest tts object, so no stale-closure risk on speak/backend changes.
   useEffect(() => {
     if (!ttsRef.current.enabled) return;
-    const step = script.steps[currentStepIndex];
+    const step = script.steps[safeStepIndex];
     if (!step) return;
     const fallback =
       step.narration_template && step.tokens.length > 0
@@ -436,7 +530,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     const voice = resolveVoice(ttsRef.current.config.voice, script.domain);
     const rate = step.tts_rate ?? ttsRef.current.config.rate;
     ttsRef.current.speak(text, { voice, rate });
-  }, [currentStepIndex, director, script]); // script included so step data is never stale
+  }, [safeStepIndex, director, script]); // script included so step data is never stale
 
   const handleVoicePreview = useCallback(
     (voice: string, sampleText: string) => {
@@ -453,183 +547,125 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     );
   }
 
-  const currentStep = script.steps[currentStepIndex];
+  const currentStep = script.steps[safeStepIndex];
   const isDark = theme === "dark";
-  const sidebarBg = isDark ? "#0f1117" : "#f0f2f5";
-  const sidebarText = isDark ? "#c9d1d9" : "#24292f";
-  const sidebarMuted = isDark ? "#6e7681" : "#6e7781";
-  const activeItemBg = isDark ? "rgba(77,232,176,0.10)" : "rgba(0,120,100,0.08)";
-  const activeItemBorder = isDark ? "#4de8b0" : "#00896e";
+  const currentNarrationFallback =
+    currentStep.narration_template && currentStep.tokens.length > 0
+      ? resolveNarrationTemplate(currentStep.narration_template, currentStep.tokens)
+      : currentStep.voiceover_text;
+  const currentNarration = resolveDirectorVoiceover(
+    director,
+    currentStep,
+    currentNarrationFallback,
+  );
+  const hasWorkbenchNav = !!workbenchNavItems?.length;
 
   return (
-    <div className="playbook-player" data-theme={theme} style={{ flexDirection: "row" }}>
-      {/* Step list sidebar (collapsible) */}
-      <aside
-        style={{
-          width: sidebarOpen ? 220 : 36,
-          flexShrink: 0,
-          background: sidebarBg,
-          borderRight: `1px solid ${isDark ? "#21262d" : "#d0d7de"}`,
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-          transition: "width 0.2s",
-          position: "relative",
-        }}
-      >
-        <button
-          onClick={() => setSidebarOpen((v) => !v)}
-          title={sidebarOpen ? "折叠步骤栏" : "展开步骤栏"}
-          style={{
-            position: "absolute",
-            top: 8,
-            right: 4,
-            zIndex: 2,
-            border: "none",
-            background: "transparent",
-            color: sidebarMuted,
-            cursor: "pointer",
-            fontSize: 14,
-            padding: "2px 6px",
-            borderRadius: 4,
-          }}
-        >
-          {sidebarOpen ? "‹" : "›"}
-        </button>
-        {!sidebarOpen && (
-          <div
-            style={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 6,
-              fontFamily: "IBM Plex Mono, monospace",
-              fontSize: 11,
-              color: activeItemBorder,
-            }}
-          >
-            <span style={{ fontWeight: 700, fontSize: 14 }}>
-              {String(currentStepIndex + 1).padStart(2, "0")}
-            </span>
-            <span style={{ color: sidebarMuted, fontSize: 10 }}>
-              / {script.steps.length}
-            </span>
+    <div className="playbook-player playbook-player--minimal" data-theme={theme}>
+      <aside className="playbook-player__rail" aria-label="Lesson steps">
+        {hasWorkbenchNav ? (
+          <div className="playbook-player__rail-nav" ref={railNavRef}>
+            <button
+              type="button"
+              className="playbook-player__rail-mark playbook-player__rail-nav-trigger"
+              aria-label={railNavOpen ? "关闭任务导航" : "打开任务导航"}
+              aria-haspopup="menu"
+              aria-expanded={railNavOpen}
+              onClick={() => setRailNavOpen((value) => !value)}
+            >
+              <span />
+              <span />
+              <span />
+            </button>
+            {railNavOpen && (
+              <div
+                className="playbook-player__rail-nav-menu"
+                role="menu"
+                aria-label="任务导航"
+              >
+                {workbenchNavItems.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    role="menuitem"
+                    className={`playbook-player__rail-nav-item${item.active ? " is-active" : ""}`}
+                    onClick={() => {
+                      item.onSelect();
+                      setRailNavOpen(false);
+                    }}
+                  >
+                    {item.icon && (
+                      <span className="playbook-player__rail-nav-icon" aria-hidden="true">
+                        {item.icon}
+                      </span>
+                    )}
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="playbook-player__rail-mark" aria-hidden="true">
+            <span />
+            <span />
+            <span />
           </div>
         )}
-        {sidebarOpen && (
-        <>
-        <div
-          style={{
-            padding: "14px 14px 10px",
-            borderBottom: `1px solid ${isDark ? "#21262d" : "#d0d7de"}`,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 10,
-              fontFamily: "IBM Plex Mono, monospace",
-              color: activeItemBorder,
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-              marginBottom: 4,
-            }}
-          >
-            {script.domain}
-          </div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: sidebarText, lineHeight: 1.3 }}>
-            {script.title}
-          </div>
+        <div className="playbook-player__rail-current" aria-hidden="true">
+          <span>{String(safeStepIndex + 1).padStart(2, "0")}</span>
+          <small>{String(script.steps.length).padStart(2, "0")}</small>
         </div>
-
-        <div
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            padding: "8px 8px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 3,
-          }}
-        >
-          {script.steps.map((step, i) => {
-            const isActive = i === currentStepIndex;
-            return (
+        <div className="playbook-player__rail-panel">
+          <div className="playbook-player__rail-head">
+            <span>{script.domain}</span>
+            <strong>{script.title}</strong>
+          </div>
+          <div className="playbook-player__rail-steps">
+            {script.steps.map((step, i) => (
               <button
                 key={step.step_id}
+                type="button"
+                className={`playbook-player__rail-step${i === safeStepIndex ? " is-active" : ""}`}
                 onClick={() => goToStep(i)}
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: 8,
-                  padding: "7px 10px",
-                  borderRadius: 6,
-                  border: `1px solid ${isActive ? activeItemBorder : "transparent"}`,
-                  background: isActive ? activeItemBg : "transparent",
-                  cursor: "pointer",
-                  textAlign: "left",
-                  width: "100%",
-                  transition: "background 0.15s, border-color 0.15s",
-                }}
               >
-                <span
-                  style={{
-                    fontSize: 10,
-                    fontFamily: "IBM Plex Mono, monospace",
-                    color: isActive ? activeItemBorder : sidebarMuted,
-                    minWidth: 16,
-                    marginTop: 1,
-                    fontWeight: 600,
-                  }}
-                >
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <span
-                  style={{
-                    fontSize: 12,
-                    color: isActive ? sidebarText : sidebarMuted,
-                    lineHeight: 1.4,
-                    fontWeight: isActive ? 600 : 400,
-                  }}
-                >
-                  {step.title}
-                </span>
+                <span>{String(i + 1).padStart(2, "0")}</span>
+                <strong>{step.title}</strong>
               </button>
-            );
-          })}
+            ))}
+          </div>
         </div>
-        </>
-        )}
       </aside>
 
-      {/* Main content: stage + code panel + controls + tweaks */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
-          <div className="playbook-player__stage" style={{ flex: 1, minWidth: 0, position: "relative" }}>
+      <div className="playbook-player__workspace">
+        <header className="playbook-player__header">
+          <div className="playbook-player__brand">
+            <span className="playbook-player__brand-mark" aria-hidden="true" />
+            <span>MetaView</span>
+          </div>
+          <div className="playbook-player__lesson-title">
+            <span>{script.domain}</span>
+            <strong>{script.title}</strong>
+          </div>
+          <div className="playbook-player__header-actions">
+            {onOpenExport && (
+              <button
+                type="button"
+                className="playbook-player__ghost-btn"
+                onClick={onOpenExport}
+              >
+                Export
+              </button>
+            )}
+          </div>
+        </header>
+
+        <section className="playbook-player__stage-shell" aria-label="Lesson animation">
+          <div className="playbook-player__stage">
             {capability.message && capability.support !== "full" && (
               <div
+                className="playbook-player__capability"
                 title={capability.message}
-                style={{
-                  position: "absolute",
-                  top: 10,
-                  left: 10,
-                  zIndex: 4,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "4px 8px",
-                  borderRadius: 6,
-                  border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "rgba(20,24,32,0.12)"}`,
-                  background: isDark ? "rgba(10,12,16,0.72)" : "rgba(245,247,250,0.90)",
-                  color: isDark ? "#c9d1d9" : "#24292f",
-                  fontFamily: "IBM Plex Mono, ui-monospace, monospace",
-                  fontSize: 10,
-                  lineHeight: 1.2,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                  pointerEvents: "auto",
-                }}
               >
                 <span>{capability.domain}</span>
                 <span>{capability.support}</span>
@@ -645,99 +681,14 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
               compositionWidth={PLAYBOOK_DEFAULTS.COMPOSITION_WIDTH}
               compositionHeight={PLAYBOOK_DEFAULTS.COMPOSITION_HEIGHT}
               initialFrame={initialPreviewFrame}
-              style={{ height: "100%", aspectRatio: "16/9", maxWidth: "100%" }}
+              style={{ width: "100%", height: "100%" }}
               playbackRate={playbackRate}
               clickToPlay={false}
             />
           </div>
-          {showCodePanelSlot && codePanelOpen && (
-            <div
-              style={{
-                width: 320,
-                flexShrink: 0,
-                borderLeft: `1px solid ${isDark ? "#21262d" : "#d0d7de"}`,
-                position: "relative",
-                display: "flex",
-                flexDirection: "column",
-              }}
-            >
-              <button
-                onClick={() => setCodePanelOpen(false)}
-                title="折叠代码面板"
-                style={{
-                  position: "absolute",
-                  top: 4,
-                  left: 4,
-                  zIndex: 2,
-                  border: "none",
-                  background: "transparent",
-                  color: sidebarMuted,
-                  cursor: "pointer",
-                  fontSize: 14,
-                  padding: "2px 6px",
-                }}
-              >
-                ›
-              </button>
-              {codeOverlay ? (
-                <CodeHighlightRenderer overlay={codeOverlay} theme={theme} />
-              ) : (
-                <div
-                  style={{
-                    flex: 1,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexDirection: "column",
-                    gap: 8,
-                    color: sidebarMuted,
-                    fontSize: 12,
-                    fontFamily: "system-ui, sans-serif",
-                    padding: 16,
-                    textAlign: "center",
-                  }}
-                >
-                  <span style={{ fontSize: 24 }}>{"</>"}</span>
-                  <span>上传代码文件后此处显示同步高亮</span>
-                </div>
-              )}
-            </div>
-          )}
-          {showCodePanelSlot && !codePanelOpen && (
-            <button
-              onClick={() => setCodePanelOpen(true)}
-              title="展开代码面板"
-              style={{
-                width: 24,
-                flexShrink: 0,
-                borderLeft: `1px solid ${isDark ? "#21262d" : "#d0d7de"}`,
-                background: "transparent",
-                color: sidebarMuted,
-                cursor: "pointer",
-                fontSize: 14,
-                writingMode: "vertical-rl",
-                padding: "8px 0",
-              }}
-            >
-              ‹ 代码
-            </button>
-          )}
-        </div>
+        </section>
 
         <div className="playbook-player__controls">
-          <button
-            className="playbook-ctrl-btn"
-            onClick={prev}
-            disabled={!canGoPrev}
-            aria-label="上一步"
-          >
-            &#8249;
-          </button>
-
-          <span className="playbook-step-indicator">
-            {currentStepIndex + 1} / {script.steps.length}
-          </span>
-
           <button
             className="playbook-ctrl-btn playbook-ctrl-btn--play"
             onClick={handlePlayPause}
@@ -746,154 +697,140 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
             {isPlaying ? "⏸" : "▶"}
           </button>
 
-          <span className="playbook-step-title">{currentStep?.title ?? ""}</span>
-
-          <button
-            className={`playbook-ctrl-btn playbook-ctrl-btn--mode ${stepThrough ? "is-active" : ""}`}
-            onClick={() => setStepThrough(!stepThrough)}
-            title={stepThrough ? "步进模式：每步自动暂停" : "连续播放"}
-          >
-            {stepThrough ? "步进" : "连播"}
-          </button>
-
-          {/* TTS speaker button */}
-          <button
-            className={`playbook-ctrl-btn${tts.enabled ? " is-active" : ""}${tts.speaking ? " is-speaking" : ""}`}
-            onClick={tts.toggle}
-            disabled={!tts.supported}
-            title="T — 语音朗读"
-            aria-label={tts.enabled ? "关闭语音" : "开启语音"}
-          >
-            {tts.enabled ? <SpeakerOnSVG /> : <SpeakerOffSVG />}
-          </button>
-
-          {/* TTS settings button + popover */}
-          <div style={{ position: "relative" }}>
-            <button
-              className="playbook-ctrl-btn"
-              onClick={() => setShowTTSConfig((v) => !v)}
-              title="TTS 设置"
-              aria-label="TTS 设置"
-            >
-              <SettingsSVG />
-            </button>
-            {showTTSConfig && (
-              <TTSConfigPopover
-                config={tts.config}
-                onUpdate={tts.updateConfig}
-                onClose={() => setShowTTSConfig(false)}
-                isDark={isDark}
-                onPreview={handleVoicePreview}
-              />
-            )}
-          </div>
-
-          <button
-            className="playbook-ctrl-btn"
-            onClick={next}
-            disabled={!canGoNext}
-            aria-label="下一步"
-          >
-            &#8250;
-          </button>
-        </div>
-
-        {/* Player toolbar — speed + subtitles (shared across all domains) */}
-        <div
-          className="playbook-tweakstrip"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 16,
-            padding: "8px 14px",
-            borderTop: `1px solid ${isDark ? "#21262d" : "#d0d7de"}`,
-            background: isDark ? "rgba(15,17,22,0.7)" : "rgba(247,249,252,0.85)",
-            fontSize: 12,
-            color: isDark ? "#c9d1d9" : "#24292f",
-          }}
-        >
-          <div style={{ flex: 1 }} />
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 11, color: isDark ? "#8b949e" : "#6e7781" }}>速度</span>
-            {SPEED_STEPS.map((s) => (
+          <div className="playbook-player__progress" role="group" aria-label="Lesson steps">
+            {script.steps.map((step, i) => (
               <button
-                key={s}
-                onClick={() => setPlaybackRate(s)}
-                style={{
-                  border: `1px solid ${playbackRate === s ? (isDark ? "#4de8b0" : "#00896e") : (isDark ? "#30363d" : "#d0d7de")}`,
-                  background: playbackRate === s ? `${isDark ? "#4de8b0" : "#00896e"}1a` : "transparent",
-                  color: playbackRate === s ? (isDark ? "#4de8b0" : "#00896e") : (isDark ? "#8b949e" : "#6e7781"),
-                  borderRadius: 5,
-                  padding: "2px 8px",
-                  cursor: "pointer",
-                  fontSize: 11,
-                  fontWeight: playbackRate === s ? 600 : 400,
-                }}
-              >
-                {s}×
-              </button>
+                key={step.step_id}
+                type="button"
+                className={i === safeStepIndex ? "is-active" : ""}
+                onClick={() => goToStep(i)}
+                title={step.title}
+                aria-label={`Step ${i + 1}: ${step.title}`}
+              />
             ))}
           </div>
-          <button
-            onClick={() => setShowSubtitles((v) => !v)}
-            style={{
-              border: `1px solid ${showSubtitles ? (isDark ? "#4de8b0" : "#00896e") : (isDark ? "#30363d" : "#d0d7de")}`,
-              background: showSubtitles ? `${isDark ? "#4de8b0" : "#00896e"}1a` : "transparent",
-              color: showSubtitles ? (isDark ? "#4de8b0" : "#00896e") : (isDark ? "#8b949e" : "#6e7781"),
-              borderRadius: 5,
-              padding: "2px 10px",
-              cursor: "pointer",
-              fontSize: 11,
-            }}
-          >
-            {showSubtitles ? "字幕开" : "字幕关"}
-          </button>
+
+          <div className="playbook-player__control-actions">
+            <div className="playbook-player__settings-anchor">
+              <button
+                className="playbook-ctrl-btn"
+                onClick={() => setShowPlayerSettings((v) => !v)}
+                title="播放器设置"
+                aria-label="播放器设置"
+                type="button"
+              >
+                <SettingsSVG />
+              </button>
+              {showPlayerSettings && (
+                <PlayerSettingsPopover
+                  playbackRate={playbackRate}
+                  onPlaybackRateChange={setPlaybackRate}
+                  showSubtitles={showSubtitles}
+                  onShowSubtitlesChange={setShowSubtitles}
+                  stepThrough={stepThrough}
+                  onStepThroughChange={setStepThrough}
+                  ttsEnabled={tts.enabled}
+                  ttsSupported={tts.supported}
+                  onToggleTTS={tts.toggle}
+                  config={tts.config}
+                  onUpdate={tts.updateConfig}
+                  onClose={() => setShowPlayerSettings(false)}
+                  isDark={isDark}
+                  onPreview={handleVoicePreview}
+                />
+              )}
+            </div>
+
+            <button
+              className="playbook-ctrl-btn"
+              onClick={prev}
+              disabled={!canGoPrev}
+              aria-label="上一步"
+              type="button"
+            >
+              &#8249;
+            </button>
+
+            <button
+              className="playbook-ctrl-btn"
+              onClick={next}
+              disabled={!canGoNext}
+              aria-label="下一步"
+              type="button"
+            >
+              &#8250;
+            </button>
+          </div>
         </div>
 
-        {/* Domain-specific param panel — looked up from registry */}
-        {hasDomainPanel && (
-          <div
-            className="playbook-parampanel"
-            style={{
-              flexShrink: 0,
-              borderTop: `1px solid ${isDark ? "#21262d" : "#d0d7de"}`,
-              background: isDark ? "#0f1117" : "#f7f9fc",
-            }}
-          >
-            <button
-              onClick={() => setParamPanelOpen((v) => !v)}
-              aria-expanded={paramPanelOpen}
-              style={{
-                width: "100%",
-                textAlign: "left",
-                padding: "7px 16px",
-                border: "none",
-                background: "transparent",
-                color: isDark ? "#c9d1d9" : "#24292f",
-                cursor: "pointer",
-                fontSize: 12,
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-              }}
-            >
-              <span>参数面板</span>
-              <span style={{ marginLeft: "auto", opacity: 0.7 }}>{paramPanelOpen ? "▾" : "▸"}</span>
-            </button>
-            {paramPanelOpen && (
-              <div style={{ maxHeight: "min(420px, 46vh)", overflowY: "auto" }}>
-                <ParamPanelSlot
-                  domain={baseScript.domain}
-                  script={baseScript}
-                  overrides={overrides}
-                  onOverridesChange={setOverrides}
-                  isDark={isDark}
-                />
-              </div>
-            )}
+        {showSubtitles && (
+          <div className="playbook-player__caption">
+            <span aria-hidden="true" />
+            <p>{currentNarration || currentStep.title}</p>
           </div>
         )}
       </div>
+
+      <aside className="playbook-player__console" aria-label="Learning console">
+        {showCodePanelSlot && (
+          <section className="playbook-player__console-card playbook-player__code-card">
+            <div className="playbook-player__console-head">
+              <span>Code Sync</span>
+              <small>{codeOverlay?.language ?? "source"}</small>
+            </div>
+            <div className="playbook-player__code-body">
+              {codeOverlay ? (
+                <CodeHighlightRenderer overlay={codeOverlay} theme={theme} />
+              ) : (
+                <div className="playbook-player__code-empty">
+                  <span>{"</>"}</span>
+                  <p>Code highlights will sync here.</p>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {hasDomainPanel && (
+          <section className="playbook-player__console-card playbook-player__params-card">
+            <div className="playbook-player__console-head">
+              <span>Params</span>
+              <small>{baseScript.domain}</small>
+            </div>
+            <div className="playbook-player__param-body">
+              <ParamPanelSlot
+                domain={baseScript.domain}
+                script={baseScript}
+                overrides={overrides}
+                onOverridesChange={setOverrides}
+                isDark={theme === "dark"}
+              />
+            </div>
+          </section>
+        )}
+
+        {followupSlot && (
+          <section className="playbook-player__console-card playbook-player__follow-card">
+            <div className="playbook-player__console-head">
+              <span>Follow-up</span>
+              <small>current step</small>
+            </div>
+            <div className="playbook-player__follow-body">{followupSlot}</div>
+          </section>
+        )}
+
+        {relatedSlot ? (
+          <section className="playbook-player__related-card" aria-label="Related study context">
+            {relatedSlot}
+          </section>
+        ) : (
+          <section className="playbook-player__related-row" aria-label="Related study context">
+            <span>Related</span>
+            <strong>{script.algorithm_id ?? "Study variants"}</strong>
+            <small>›</small>
+          </section>
+        )}
+      </aside>
     </div>
   );
 };

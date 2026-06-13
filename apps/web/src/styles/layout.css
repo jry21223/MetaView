@@ -1,32 +1,31 @@
-/* MetaView v2 — Layout */
+/* MetaView — Layout */
 
-/* Brand — neon strip */
+/* Brand mark */
 .mv-brand-strip {
   display: inline-block;
-  width: 8px;
-  height: 36px;
-  border-radius: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
   flex-shrink: 0;
-  background: linear-gradient(
-    180deg,
-    var(--accent) 0%,
-    var(--accent-dim) 60%,
-    transparent 100%
-  );
-  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 28%, transparent);
-  animation: neon-pulse 3s ease-in-out infinite;
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(circle at 50% 46%, var(--accent-soft), transparent 58%),
+    var(--surface);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.56);
 }
 
 /* ───── Topbar ───── */
 .mv-top {
   display: grid;
-  grid-template-columns: 280px 1fr auto;
+  grid-template-columns: minmax(190px, 240px) 1fr auto;
   align-items: center;
-  padding: 14px 22px;
+  min-height: 56px;
+  padding: 8px 22px;
   border-bottom: 1px solid var(--line);
-  background: var(--bg);
-  gap: 24px;
+  background: color-mix(in srgb, var(--surface) 64%, var(--bg));
+  gap: 20px;
   flex-shrink: 0;
+  backdrop-filter: blur(12px);
 }
 
 @media (max-width: 720px) {
@@ -49,19 +48,36 @@
   background: var(--bg);
 }
 
-.mv-left {
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap);
-  min-height: 0;
-  min-width: 0;
+.mv-main--player {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  padding: clamp(12px, 2.6vw, 32px);
+  background:
+    linear-gradient(rgba(77, 71, 58, 0.052) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(77, 71, 58, 0.052) 1px, transparent 1px),
+    #f5f1e9;
+  background-size: 32px 32px;
 }
+
+.mv-dark .mv-main--player {
+  background:
+    linear-gradient(rgba(234, 238, 226, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(234, 238, 226, 0.045) 1px, transparent 1px),
+    #101410;
+}
+
 .mv-right {
   display: flex;
   flex-direction: column;
   gap: var(--gap);
   min-height: 0;
   min-width: 0;
+}
+
+.mv-main--player .mv-right {
+  width: min(100%, 1400px);
+  margin: 0 auto;
+  gap: 0;
 }
 
 /* Layout variants via tweaks */
@@ -74,7 +90,7 @@
 
 @media (max-width: 640px) {
   .mv-brand-strip {
-    width: 6px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
   }
 }

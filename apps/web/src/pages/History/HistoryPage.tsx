@@ -116,6 +116,30 @@ function CenterHint({ children }: { children: React.ReactNode }) {
   return <div className="mv-history-hint">{children}</div>;
 }
 
+function isGenericLoadError(error: string): boolean {
+  return /failed to fetch|load failed|networkerror/i.test(error);
+}
+
+function HistoryLoadError({
+  error,
+  onRetry,
+}: {
+  error: string;
+  onRetry: () => void;
+}) {
+  const detail = isGenericLoadError(error) ? null : error;
+  return (
+    <div className="mv-history-load-error" role="status">
+      <strong>无法加载历史记录</strong>
+      <span>请确认后端服务正在运行，或稍后重试。</span>
+      {detail && <small>{detail}</small>}
+      <button type="button" className="mv-chip" onClick={onRetry}>
+        重试加载历史记录
+      </button>
+    </div>
+  );
+}
+
 interface StatsLineProps {
   total: number;
   succeeded: number;
@@ -365,7 +389,9 @@ export function HistoryPage({
           </div>
 
           <div className="mv-history-list-body">
-            {error && <div className="mv-history-error">{error}</div>}
+            {error && (
+              <HistoryLoadError error={error} onRetry={refresh} />
+            )}
             {deleteError && (
               <div className="mv-history-error">{deleteError}</div>
             )}

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { GlobalTopbar, type Stage } from "../../shared/ui/GlobalTopbar";
 import {
   TEMPLATES,
@@ -124,7 +124,9 @@ export function TemplatesPage({
               key={tpl.id}
               type="button"
               className="mv-tpl-card mv-tpl-card-lg"
-              onClick={() => onUseTemplate(tpl.prompt)}
+              onClick={() => {
+                void Promise.resolve(onUseTemplate(tpl.prompt)).catch(() => undefined);
+              }}
             >
               <div className="mv-tpl-tag">
                 {TEMPLATE_DOMAIN_LABEL[tpl.domain]}

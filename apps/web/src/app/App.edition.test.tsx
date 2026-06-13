@@ -84,7 +84,7 @@ describe("App edition shells", () => {
     await waitFor(() =>
       expect(document.body.textContent).toContain("登录暂未开放"),
     );
-    expect(document.body.textContent).not.toContain("把题目交给我");
+    expect(document.body.textContent).not.toContain("把题目变成可播放的讲解");
   });
 
   it("ops edition opens the intake screen after WeChat login", async () => {
@@ -119,7 +119,7 @@ describe("App edition shells", () => {
 
     await waitFor(() => expect(accountHits).toBe(1));
     await waitFor(() => expect(dashboardHits).toBe(0));
-    expect(document.body.textContent).toContain("把题目交给我");
+    expect(document.body.textContent).toContain("把题目变成可播放的讲解");
     expect(document.body.textContent).not.toContain("全局运营");
     expect(document.body.textContent).toContain("微信用户 · ¥ 5.00");
   });
