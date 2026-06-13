@@ -13,9 +13,13 @@ apps/web/dist
 apps/web/coverage
 coverage
 data
+outputs
+.playwright-cli
 eval/reports
 eval/videos
 eval/shots
+*.db
+*.sqlite
 *.sqlite3
 .env
 backups

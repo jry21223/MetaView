@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import type { ReviewReport } from "../../entities/pipeline/types";
 import { humanizeIssue } from "./issueMessages";
 
