@@ -11,9 +11,10 @@
   --player-accent: #82976f;
   --player-accent-soft: rgba(130, 151, 111, 0.14);
   --player-radius: 8px;
+  --player-workspace-x: clamp(12px, 1.8vw, 26px);
 
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr) minmax(320px, 360px);
+  grid-template-columns: 52px minmax(0, 1fr) minmax(332px, 382px);
   width: 100%;
   height: 100%;
   min-height: 0;
@@ -24,6 +25,10 @@
   box-shadow: none;
   overflow: visible;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.playbook-player--no-console {
+  grid-template-columns: 52px minmax(0, 1fr);
 }
 
 .playbook-player[data-theme="dark"] {
@@ -75,81 +80,54 @@
   padding-top: 8px;
 }
 
-.playbook-player__rail-nav {
-  position: relative;
-  width: 100%;
-  min-height: 56px;
-}
-
-.playbook-player__rail-nav-trigger {
-  cursor: pointer;
-}
-
-.playbook-player__rail-nav-trigger:hover span,
-.playbook-player__rail-nav-trigger[aria-expanded="true"] span {
-  background: var(--player-accent);
-}
-
 .playbook-player__rail-mark span {
   display: block;
   width: 12px;
   height: 1px;
   background: var(--player-ink-3);
+  border-radius: 999px;
+  transform-origin: 50% 50%;
+  transition:
+    background-color 160ms ease,
+    opacity 160ms ease,
+    transform 180ms ease;
 }
 
-.playbook-player__rail-nav-menu {
-  position: absolute;
-  left: 44px;
-  top: 8px;
-  z-index: 30;
-  width: 164px;
-  display: grid;
-  gap: 4px;
-  padding: 8px;
-  border: 1px solid var(--player-line);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--player-paper-strong) 94%, transparent);
-  box-shadow: 0 16px 38px rgba(38, 34, 25, 0.14);
-}
-
-.playbook-player__rail-nav-item {
-  appearance: none;
-  width: 100%;
-  min-height: 34px;
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
-  align-items: center;
-  gap: 9px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--player-ink-2);
-  padding: 0 8px;
-  text-align: left;
-  font: inherit;
-  font-size: 12px;
+.playbook-player__chrome-toggle {
   cursor: pointer;
+  padding: 0;
+  color: var(--player-ink-3);
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
 }
 
-.playbook-player__rail-nav-item:hover,
-.playbook-player__rail-nav-item.is-active {
-  background: var(--player-accent-soft);
-  color: var(--player-ink);
-}
-
-.playbook-player__rail-nav-icon {
-  width: 16px;
-  height: 16px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.playbook-player__chrome-toggle:hover,
+.playbook-player__chrome-toggle:focus-visible {
   color: var(--player-accent);
 }
 
-.playbook-player__rail-nav-icon svg {
-  width: 15px;
-  height: 15px;
-  stroke-width: 1.8;
+.playbook-player__chrome-toggle:focus-visible {
+  outline: 1px solid color-mix(in srgb, var(--player-accent) 62%, transparent);
+  outline-offset: -8px;
+}
+
+.playbook-player__chrome-toggle-icon {
+  width: 22px;
+  height: 22px;
+  display: block;
+  color: currentColor;
+  transition:
+    transform 180ms ease,
+    color 160ms ease;
+}
+
+.playbook-player__chrome-toggle.is-expanded:hover .playbook-player__chrome-toggle-icon {
+  transform: translateY(-1px);
+}
+
+.playbook-player__chrome-toggle.is-collapsed:hover .playbook-player__chrome-toggle-icon {
+  transform: translateY(1px);
 }
 
 .playbook-player__rail-current {
@@ -275,12 +253,12 @@
 }
 
 .playbook-player__header {
-  min-height: 52px;
+  min-height: 50px;
   display: grid;
-  grid-template-columns: 180px minmax(0, 1fr) 180px;
+  grid-template-columns: 150px minmax(0, 1fr) 150px;
   align-items: center;
-  gap: 18px;
-  padding: 0 clamp(18px, 3.6vw, 52px);
+  gap: 14px;
+  padding: 0 var(--player-workspace-x);
   border-bottom: 0;
   background: transparent;
 }
@@ -348,18 +326,30 @@
   color: var(--player-ink);
 }
 
+.playbook-player__export-btn {
+  width: 36px;
+  height: 32px;
+  padding: 0;
+  justify-content: center;
+}
+
+.playbook-player__export-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
 .playbook-player__stage-shell {
   min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: clamp(16px, 2.4vw, 30px) clamp(18px, 3.6vw, 52px) 16px;
+  padding: clamp(12px, 1.8vw, 22px) var(--player-workspace-x) 14px;
 }
 
 .playbook-player__stage {
   flex: 1;
   width: 100%;
-  max-width: 930px;
+  max-width: none;
   aspect-ratio: 16 / 9;
   min-height: 0;
   display: flex;
@@ -404,8 +394,8 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 18px;
-  margin: 0 clamp(18px, 3.6vw, 52px);
+  gap: 16px;
+  margin: 0 var(--player-workspace-x) 16px;
   padding: 10px 18px 10px 16px;
   border: 1px solid var(--player-line-soft);
   border-radius: 11px;
@@ -535,7 +525,7 @@
   grid-template-columns: 34px minmax(0, 1fr);
   align-items: center;
   gap: 14px;
-  margin: 14px clamp(18px, 3.6vw, 52px) 24px;
+  margin: 0 var(--player-workspace-x) 12px;
   padding: 12px 14px;
   border: 1px solid var(--player-line-soft);
   border-radius: 8px;
@@ -698,8 +688,8 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 20px 18px 20px 12px;
+  gap: 10px;
+  padding: 16px 14px 16px 10px;
   border-left: 1px solid var(--player-line-soft);
   background: transparent;
 }
@@ -715,7 +705,7 @@
 }
 
 .playbook-player__console-head {
-  min-height: 38px;
+  min-height: 36px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -819,7 +809,7 @@
   border: 1px solid var(--player-line);
   border-radius: 8px;
   background: color-mix(in srgb, var(--player-paper-strong) 64%, transparent);
-  padding: 12px 13px 14px;
+  padding: 10px 12px 12px;
   color: var(--player-ink-2);
   overflow: hidden;
 }
@@ -843,6 +833,12 @@
   border-color: var(--player-line);
   background: color-mix(in srgb, var(--player-paper-soft) 72%, transparent);
   border-radius: 7px;
+}
+
+.playbook-player__related-card .mv-commit-item:not(.is-head):hover:not(:disabled),
+.playbook-player__related-card .mv-commit-item:not(.is-head):focus-visible {
+  border-color: color-mix(in srgb, var(--player-accent) 48%, var(--player-line));
+  background: color-mix(in srgb, var(--player-accent) 9%, var(--player-paper-soft));
 }
 
 .playbook-player__related-card .mv-commit-item.is-head {

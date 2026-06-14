@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { TweakValues } from "../../features/studio-editor/hooks/useTweaks";
 import { usePipelinePoller } from "../../features/pipeline/hooks/usePipelinePoller";
 import { PlaybookPlayer } from "../../features/playbook/engine/player/PlaybookPlayer";
-import { GlobalTopbar, Stage } from "../../shared/ui/GlobalTopbar";
+import type { Stage } from "../../shared/ui/GlobalTopbar";
 import type { ProviderSettings } from "../../features/providers/hooks/useProviderSettings";
 import type {
   DirectorScript,
@@ -30,43 +30,6 @@ const DOMAIN_SUGGESTIONS: Record<string, string[]> = {
 };
 
 const FALLBACK_SUGGESTIONS = ["换个角度讲", "展开第一步", "总结要点"];
-
-type WorkbenchNavIconKind = "home" | "history" | "templates" | "settings";
-
-function WorkbenchNavIcon({ kind }: { kind: WorkbenchNavIconKind }) {
-  if (kind === "home") {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <path d="M4 10.5 12 4l8 6.5V20H5v-7" />
-      </svg>
-    );
-  }
-  if (kind === "history") {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <path d="M12 8v5l3 2" />
-        <path d="M4 12a8 8 0 1 0 2.4-5.7" />
-        <path d="M4 4v5h5" />
-      </svg>
-    );
-  }
-  if (kind === "templates") {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <path d="M5 4h6v6H5z" />
-        <path d="M13 4h6v6h-6z" />
-        <path d="M5 14h6v6H5z" />
-        <path d="M13 14h6v6h-6z" />
-      </svg>
-    );
-  }
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-      <path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z" />
-      <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2 3.4-.2-.1a1.7 1.7 0 0 0-2 .1 1.7 1.7 0 0 0-.9 1.7v.2H10v-.2a1.7 1.7 0 0 0-.9-1.7 1.7 1.7 0 0 0-2-.1l-.2.1-2-3.4.1-.1A1.7 1.7 0 0 0 5.3 15a1.7 1.7 0 0 0-1.4-1.1h-.2v-3.8h.2A1.7 1.7 0 0 0 5.3 9a1.7 1.7 0 0 0-.3-1.9L4.9 7l2-3.4.2.1a1.7 1.7 0 0 0 2-.1A1.7 1.7 0 0 0 10 1.9v-.2h4.7v.2a1.7 1.7 0 0 0 .9 1.7 1.7 1.7 0 0 0 2 .1l.2-.1 2 3.4-.1.1A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.4 1.1h.2v3.8h-.2A1.7 1.7 0 0 0 19.4 15Z" />
-    </svg>
-  );
-}
 
 // ── ChatPanel ─────────────────────────────────────────────────────────────
 
@@ -167,7 +130,7 @@ function ChatPanel({
     abortRef.current = new AbortController();
 
     const nextMsgs: ChatMessage[] = [...msgs, { from: "user", text: userText }];
-    setMsgs([...nextMsgs, { from: "ai", text: "思考中…", pending: true }]);
+      setMsgs([...nextMsgs, { from: "ai", text: "回复中…", pending: true }]);
     setInput("");
     setPending(true);
 
@@ -192,7 +155,9 @@ function ChatPanel({
         provider,
         abortRef.current.signal,
       );
-      onPlaybookPatched(result.playbook, result.director);
+      if (result.kind === "patch" && result.playbook) {
+        onPlaybookPatched(result.playbook, result.director);
+      }
       setMsgs([
         ...nextMsgs,
         {
@@ -202,9 +167,11 @@ function ChatPanel({
           versionId: result.version_id,
         },
       ]);
-      listRunFollowUps(runId!, abortRef.current.signal)
-        .then((data) => setVersions(data.versions))
-        .catch(() => undefined);
+      if (result.kind === "patch") {
+        listRunFollowUps(runId!, abortRef.current.signal)
+          .then((data) => setVersions(data.versions))
+          .catch(() => undefined);
+      }
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
       setMsgs([
@@ -218,7 +185,6 @@ function ChatPanel({
 
   const restore = async (versionId: string) => {
     if (!runId || pending) return;
-    const target = versions.find((version) => version.version_id === versionId);
     setPending(true);
     try {
       const result = await restoreRunVersion(runId, versionId);
@@ -227,8 +193,7 @@ function ChatPanel({
         ...current,
         {
           from: "ai",
-          text: "已恢复到选中的历史版本。",
-          changeSummary: `revert: restore ${target?.short_id ?? versionId.slice(0, 8)}`,
+          text: "已切换到选中的历史版本。",
           versionId: result.version_id,
         },
       ]);
@@ -259,7 +224,7 @@ function ChatPanel({
             }}
           >
             <span>
-              可以基于当前题目继续修改；未配置本地 Provider 时将使用服务器模型。
+              可以继续提问，也可以要求调整当前讲解；未配置本地 Provider 时将使用服务器模型。
             </span>
             {appEdition === "self" && onOpenProviderSettings && (
               <button
@@ -274,7 +239,7 @@ function ChatPanel({
         )}
         {msgs.length === 0 && isProviderConfigured && canModify && (
           <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
-            可以让 MetaView 在当前基础上修改步骤、讲解或画面。
+            可以继续提问，也可以要求调整当前讲解。
           </div>
         )}
         {msgs.length === 0 && !canModify && (
@@ -322,7 +287,7 @@ function ChatPanel({
         <textarea
           rows={1}
           className="mv-chat-input"
-          placeholder={canModify ? "描述你想怎样修改当前讲解…" : "等待真实任务"}
+          placeholder={canModify ? "还有什么想问的" : "等待真实任务"}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
@@ -340,7 +305,7 @@ function ChatPanel({
             onClick={() => send()}
             disabled={pending || !input.trim() || !canModify}
           >
-            {pending ? "生成中…" : "发送 ↵"}
+            {pending ? "回复中…" : "发送 ↵"}
           </button>
         </div>
       </div>
@@ -449,31 +414,24 @@ export interface StudioPageProps {
   appEdition?: "self" | "ops";
   runId: string | null;
   t: TweakValues;
-  setTweak: (
-    key: keyof TweakValues,
-    value: TweakValues[keyof TweakValues],
-  ) => void;
   onNavigate: (stage: Stage) => void;
   isProviderConfigured: boolean;
   providerSettings?: ProviderSettings | null;
-  accountBalanceYuan?: string | null;
-  accountName?: string | null;
-  accountAvatarUrl?: string | null;
   onOpenProviderSettings?: () => void;
+  topbarCollapsed?: boolean;
+  onToggleTopbar?: () => void;
 }
 
 export function StudioPage({
   appEdition = "self",
   runId,
   t,
-  setTweak,
   onNavigate,
   isProviderConfigured,
   providerSettings = null,
-  accountBalanceYuan = null,
-  accountName = null,
-  accountAvatarUrl = null,
   onOpenProviderSettings,
+  topbarCollapsed = false,
+  onToggleTopbar,
 }: StudioPageProps) {
   const isDark = t.theme === "dark";
   const { playbook, director, error, isLoading, status } =
@@ -492,36 +450,6 @@ export function StudioPage({
     ? (activePatchedRun.director ?? null)
     : director;
   const canExport = !!playbook && !!runId;
-  const workbenchNavItems = useMemo(
-    () => [
-      {
-        id: "home",
-        label: "首页",
-        active: true,
-        icon: <WorkbenchNavIcon kind="home" />,
-        onSelect: () => onNavigate("intake"),
-      },
-      {
-        id: "history",
-        label: "任务历史",
-        icon: <WorkbenchNavIcon kind="history" />,
-        onSelect: () => onNavigate("history"),
-      },
-      {
-        id: "templates",
-        label: "模板",
-        icon: <WorkbenchNavIcon kind="templates" />,
-        onSelect: () => onNavigate("templates"),
-      },
-      {
-        id: "settings",
-        label: "设置",
-        icon: <WorkbenchNavIcon kind="settings" />,
-        onSelect: () => onNavigate("settings"),
-      },
-    ],
-    [onNavigate],
-  );
 
   useEffect(() => {
     if (error) onNavigate("intake");
@@ -529,21 +457,6 @@ export function StudioPage({
 
   return (
     <>
-      <GlobalTopbar
-        stage="workbench"
-        appEdition={appEdition}
-        isProviderConfigured={isProviderConfigured}
-        accountBalanceYuan={accountBalanceYuan}
-        accountName={accountName}
-        accountAvatarUrl={accountAvatarUrl}
-        onNavigate={onNavigate}
-        isDark={isDark}
-        onToggleTheme={() => setTweak("theme", isDark ? "light" : "dark")}
-        onOpenProviderSettings={onOpenProviderSettings}
-        onOpenExport={canExport ? () => setExportOpen(true) : undefined}
-        exportEnabled={canExport}
-        hidePrimaryNav
-      />
       {exportOpen && (
         <ExportModal
           runId={runId}
@@ -582,7 +495,8 @@ export function StudioPage({
                   theme={isDark ? "dark" : "light"}
                   swapDurationFrames={t.swapFrames}
                   onOpenExport={canExport ? () => setExportOpen(true) : undefined}
-                  workbenchNavItems={workbenchNavItems}
+                  topbarCollapsed={topbarCollapsed}
+                  onToggleTopbar={onToggleTopbar}
                   followupSlot={followupSlot}
                   relatedSlot={relatedSlot}
                 />

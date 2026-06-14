@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { GlobalTopbar, type Stage } from "../../shared/ui/GlobalTopbar";
 import {
   type ProviderSettings,
   type RouterModeSetting,
@@ -22,14 +21,6 @@ type SetTweakFn = <K extends keyof TweakValues>(
 
 interface SettingsPageProps {
   appEdition?: AppEdition;
-  isDark: boolean;
-  isProviderConfigured: boolean;
-  accountBalanceYuan?: string | null;
-  accountName?: string | null;
-  accountAvatarUrl?: string | null;
-  onNavigate: (stage: Stage) => void;
-  onToggleTheme: () => void;
-  onOpenProviderSettings: () => void;
 
   /** Provider state passed in by the host so changes survive navigation. */
   providerSettings?: ProviderSettings;
@@ -88,14 +79,6 @@ function clampNumber(
 
 export function SettingsPage({
   appEdition = "self",
-  isDark,
-  isProviderConfigured,
-  accountBalanceYuan = null,
-  accountName = null,
-  accountAvatarUrl = null,
-  onNavigate,
-  onToggleTheme,
-  onOpenProviderSettings,
   providerSettings,
   onUpdateProvider,
   tweaks,
@@ -213,18 +196,6 @@ export function SettingsPage({
 
   return (
     <>
-      <GlobalTopbar
-        stage="settings"
-        appEdition={appEdition}
-        isProviderConfigured={isProviderConfigured}
-        accountBalanceYuan={accountBalanceYuan}
-        accountName={accountName}
-        accountAvatarUrl={accountAvatarUrl}
-        onNavigate={onNavigate}
-        isDark={isDark}
-        onToggleTheme={onToggleTheme}
-        onOpenProviderSettings={onOpenProviderSettings}
-      />
       <main className="mv-settings-body">
         <header className="mv-settings-head">
           <div className="mv-eyebrow-mini">设置</div>

@@ -1,4 +1,4 @@
-import { cleanup, render, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import React from "react";
 import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -15,6 +15,8 @@ describe("App edition shells", () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllEnvs();
+    vi.doUnmock("../features/pipeline/hooks/usePipelineSubmit");
+    vi.doUnmock("../features/pipeline/hooks/usePipelinePoller");
     vi.resetModules();
     localStorage.clear();
     sessionStorage.clear();
@@ -43,26 +45,25 @@ describe("App edition shells", () => {
     vi.stubEnv("VITE_APP_EDITION", "self");
 
     const { App } = await import("./App");
-    render(<App />);
-    await waitFor(() =>
-      expect(document.body.textContent).toContain("MetaView"),
-    );
+    const { container } = render(<App />);
+    expect(container.textContent).toContain("MetaView");
+    expect(container.querySelectorAll(".mv-top")).toHaveLength(1);
 
     expect(accountHits).toBe(0);
     expect(opsHits).toBe(0);
-  });
+  }, 20000);
 
   it("self edition shows the looping brand logo animation on the intake screen", async () => {
     vi.stubEnv("VITE_APP_EDITION", "self");
 
     const { App } = await import("./App");
-    const { queryByLabelText } = render(<App />);
+    const { container } = render(<App />);
 
-    await waitFor(() =>
-      expect(document.body.textContent).toContain("MetaView"),
-    );
-    expect(queryByLabelText("MetaView logo animation")).not.toBeNull();
-  });
+    expect(container.textContent).toContain("MetaView");
+    expect(
+      within(container).getByLabelText("MetaView logo animation"),
+    ).toBeTruthy();
+  }, 10000);
 
   it("ops edition shows the login gate when account session is missing", async () => {
     let accountHits = 0;
@@ -78,13 +79,13 @@ describe("App edition shells", () => {
     vi.stubEnv("VITE_APP_EDITION", "ops");
 
     const { App } = await import("./App");
-    render(<App />);
+    const { container } = render(<App />);
 
     await waitFor(() => expect(accountHits).toBe(1));
     await waitFor(() =>
-      expect(document.body.textContent).toContain("登录暂未开放"),
+      expect(container.textContent).toContain("登录暂未开放"),
     );
-    expect(document.body.textContent).not.toContain("把题目变成可播放的讲解");
+    expect(container.textContent).not.toContain("把题目变成可播放的讲解");
   });
 
   it("ops edition opens the intake screen after WeChat login", async () => {
@@ -115,13 +116,67 @@ describe("App edition shells", () => {
     vi.stubEnv("VITE_APP_EDITION", "ops");
 
     const { App } = await import("./App");
-    render(<App />);
+    const { container } = render(<App />);
 
     await waitFor(() => expect(accountHits).toBe(1));
     await waitFor(() => expect(dashboardHits).toBe(0));
-    expect(document.body.textContent).toContain("把题目变成可播放的讲解");
-    expect(document.body.textContent).not.toContain("全局运营");
-    expect(document.body.textContent).toContain("微信用户 · ¥ 5.00");
+    expect(container.textContent).toContain("把题目变成可播放的讲解");
+    expect(container.textContent).not.toContain("全局运营");
+    expect(container.textContent).toContain("微信用户 · ¥ 5.00");
+    expect(container.querySelectorAll(".mv-top")).toHaveLength(1);
+  });
+
+  it("owns the topbar shell globally and restores it after leaving workbench", async () => {
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/runs`, () => HttpResponse.json([])),
+      http.get(`${API_BASE_URL}/api/v1/runs/run-shell/follow-ups`, () =>
+        HttpResponse.json({ followups: [], versions: [] }),
+      ),
+    );
+    vi.stubEnv("VITE_APP_EDITION", "self");
+    vi.doMock("../features/pipeline/hooks/usePipelineSubmit", () => ({
+      usePipelineSubmit: () => ({
+        submit: vi.fn().mockResolvedValue(undefined),
+        runId: "run-shell",
+        isSubmitting: false,
+        error: null,
+      }),
+    }));
+    vi.doMock("../features/pipeline/hooks/usePipelinePoller", () => ({
+      usePipelinePoller: () => ({
+        playbook: shellPlaybook(),
+        director: null,
+        error: null,
+        isLoading: false,
+        status: "succeeded",
+      }),
+    }));
+
+    const { App } = await import("./App");
+    const { container, getByRole, getByText } = render(<App />);
+
+    expect(container.querySelectorAll(".mv-top")).toHaveLength(1);
+    fireEvent.click(getByRole("button", { name: /高数动画/ }));
+
+    await waitFor(() =>
+      expect(getByRole("button", { name: "隐藏顶部栏" })).toBeTruthy(),
+    );
+    const shell = container.querySelector(".mv-top-shell");
+    expect(shell).toBeTruthy();
+    expect(container.querySelectorAll(".mv-top")).toHaveLength(1);
+
+    fireEvent.click(getByRole("button", { name: "隐藏顶部栏" }));
+    expect(shell?.className).toContain("is-collapsed");
+    expect(shell?.getAttribute("aria-hidden")).toBe("true");
+    expect(shell?.hasAttribute("inert")).toBe(true);
+
+    fireEvent.click(getByText("任务历史"));
+    await waitFor(() => {
+      expect(shell?.className).not.toContain("is-collapsed");
+      expect(getByText("任务历史")).toBeTruthy();
+    });
+    expect(shell?.getAttribute("aria-hidden")).toBeNull();
+    expect(shell?.hasAttribute("inert")).toBe(false);
   });
 
   it("self edition does not expose ops dashboard shortcut", async () => {
@@ -145,10 +200,35 @@ describe("App edition shells", () => {
     window.history.pushState({}, "", "/admin");
 
     const { App } = await import("./App");
-    const { queryByText } = render(<App />);
+    const { container, queryByText } = render(<App />);
 
     await waitFor(() => expect(dashboardHits).toBe(1));
-    expect(document.body.textContent).toContain("全局运营");
+    expect(container.textContent).toContain("全局运营");
     expect(queryByText("运营面板")).toBeNull();
   });
 });
+
+function shellPlaybook() {
+  return {
+    schema_version: "1.0.0",
+    fps: 30,
+    total_frames: 60,
+    domain: "math",
+    title: "Shell topbar lesson",
+    summary: "用于验证 shell 级顶部栏。",
+    parameter_controls: [],
+    steps: [
+      {
+        step_id: "step_01",
+        end_frame: 60,
+        title: "Step 1",
+        voiceover_text: "Narration",
+        snapshot: {
+          kind: "math_formula",
+          formula_latex: "x",
+        },
+        tokens: [],
+      },
+    ],
+  };
+}

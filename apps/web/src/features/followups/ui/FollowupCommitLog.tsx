@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { RunVersionRecord } from "../api/followupApi";
 
 interface FollowupCommitLogProps {
@@ -19,6 +20,7 @@ export function FollowupCommitLog({
   canModify,
   onRestore,
 }: FollowupCommitLogProps) {
+  const [expanded, setExpanded] = useState(false);
   if (versions.length === 0) return null;
   const ordered = [...versions].sort((a, b) => {
     const timeDelta = Date.parse(b.created_at) - Date.parse(a.created_at);
@@ -26,41 +28,61 @@ export function FollowupCommitLog({
   });
 
   return (
-    <div className="mv-commit-log" aria-label="版本记录">
-      <div className="mv-commit-log-head">
+    <div className={`mv-commit-log${expanded ? " is-expanded" : " is-collapsed"}`} aria-label="版本记录">
+      <button
+        type="button"
+        className="mv-commit-log-head"
+        aria-expanded={expanded}
+        aria-label={expanded ? "收起版本记录" : "展开版本记录"}
+        onClick={() => setExpanded((current) => !current)}
+      >
         <span>版本记录</span>
         <span>{versions.length} commits</span>
-      </div>
-      <div className="mv-commit-list">
-        {ordered.map((version) => (
-          <div
-            key={version.version_id}
-            className={`mv-commit-item${version.is_head ? " is-head" : ""}`}
-          >
-            <div className="mv-commit-main">
-              <div className="mv-commit-meta">
-                <span className="mv-commit-id">{version.short_id}</span>
-                <span className={`mv-commit-source is-${version.source}`}>
-                  {SOURCE_LABELS[version.source] ?? version.source}
-                </span>
-                {version.is_head && <span className="mv-commit-head">HEAD</span>}
-              </div>
-              <div className="mv-commit-summary">{version.summary}</div>
-              <div className="mv-commit-time">{formatCommitTime(version.created_at)}</div>
-            </div>
-            {!version.is_head && (
+      </button>
+      {expanded && (
+        <div className="mv-commit-list">
+          {ordered.map((version) => {
+            const item = (
+              <>
+                <div className="mv-commit-main">
+                  <div className="mv-commit-meta">
+                    <span className="mv-commit-id">{version.short_id}</span>
+                    <span className={`mv-commit-source is-${version.source}`}>
+                      {SOURCE_LABELS[version.source] ?? version.source}
+                    </span>
+                    {version.is_head && <span className="mv-commit-head">HEAD</span>}
+                  </div>
+                  <div className="mv-commit-summary">{version.summary}</div>
+                  <div className="mv-commit-time">{formatCommitTime(version.created_at)}</div>
+                </div>
+              </>
+            );
+            const className = `mv-commit-item${version.is_head ? " is-head" : ""}`;
+            if (version.is_head) {
+              return (
+                <div key={version.version_id} className={className}>
+                  {item}
+                </div>
+              );
+            }
+            return (
               <button
+                key={version.version_id}
                 type="button"
-                className="mv-commit-restore"
-                onClick={() => onRestore(version.version_id)}
+                className={className}
+                onClick={() => {
+                  onRestore(version.version_id);
+                  setExpanded(false);
+                }}
                 disabled={pending || !canModify}
+                aria-label={`恢复版本 ${version.short_id}`}
               >
-                恢复到此版本
+                {item}
               </button>
-            )}
-          </div>
-        ))}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

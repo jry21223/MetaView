@@ -170,10 +170,6 @@ async def submit_followup(
                 raise HTTPException(status_code=422, detail=str(exc)) from exc
 
             now = _now()
-            current_json = run.playbook.model_dump_json()
-            await run_repo.ensure_initial_version(run_id, current_json, now)
-            if parent_version_id is None:
-                parent_version_id = await run_repo.get_head_version_id(run_id)
             patch_json = json.dumps(result.patch, ensure_ascii=False)
             await run_repo.append_followup(
                 run_id,
@@ -184,22 +180,29 @@ async def submit_followup(
                 patch_json=patch_json,
                 created_at=now,
             )
-            version_id = str(uuid.uuid4())
-            next_json = result.playbook.model_dump_json()
-            await run_repo.append_version(
-                run_id,
-                version_id=version_id,
-                playbook_json=next_json,
-                source="followup",
-                followup_id=followup_id,
-                parent_version_id=parent_version_id,
-                summary=result.change_summary,
-                created_at=now,
-            )
-            await run_repo.attach_followup_version(followup_id, version_id)
-            await run_repo.update_playbook_json(run_id, next_json)
-            director = build_default_director(result.playbook, run_id)
-            await director_repo.upsert(director, now)
+            version_id = None
+            director = None
+            if result.playbook is not None:
+                current_json = run.playbook.model_dump_json()
+                await run_repo.ensure_initial_version(run_id, current_json, now)
+                if parent_version_id is None:
+                    parent_version_id = await run_repo.get_head_version_id(run_id)
+                version_id = str(uuid.uuid4())
+                next_json = result.playbook.model_dump_json()
+                await run_repo.append_version(
+                    run_id,
+                    version_id=version_id,
+                    playbook_json=next_json,
+                    source="followup",
+                    followup_id=followup_id,
+                    parent_version_id=parent_version_id,
+                    summary=result.change_summary,
+                    created_at=now,
+                )
+                await run_repo.attach_followup_version(followup_id, version_id)
+                await run_repo.update_playbook_json(run_id, next_json)
+                director = build_default_director(result.playbook, run_id)
+                await director_repo.upsert(director, now)
         except Exception:
             if owner is not None:
                 await account_use_case.refund_generation_credit(
@@ -209,6 +212,7 @@ async def submit_followup(
             raise
 
     return FollowUpResponse(
+        kind="patch" if result.playbook is not None else "reply",
         reply=result.reply,
         change_summary=result.change_summary,
         version_id=version_id,
@@ -245,24 +249,12 @@ async def restore_version(
         except ValueError as exc:
             raise HTTPException(status_code=422, detail="Stored version is invalid") from exc
         now = _now()
-        parent_version_id = await run_repo.get_head_version_id(run_id)
-        restore_version_id = str(uuid.uuid4())
-        await run_repo.append_version(
-            run_id,
-            version_id=restore_version_id,
-            playbook_json=playbook.model_dump_json(),
-            source="restore",
-            followup_id=None,
-            parent_version_id=parent_version_id,
-            summary=f"revert: restore {_short_version_id(version_id)}",
-            created_at=now,
-        )
         await run_repo.update_playbook_json(run_id, playbook.model_dump_json())
         director = build_default_director(playbook, run_id)
         await director_repo.upsert(director, now)
 
     return RestoreVersionResponse(
-        version_id=restore_version_id,
+        version_id=version_id,
         playbook=playbook,
         director=director,
     )

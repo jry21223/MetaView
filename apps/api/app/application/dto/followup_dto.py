@@ -23,10 +23,11 @@ class FollowUpRequest(BaseModel):
 
 
 class FollowUpResponse(BaseModel):
+    kind: Literal["reply", "patch"]
     reply: str
     change_summary: str
-    version_id: str
-    playbook: PlaybookScript
+    version_id: str | None
+    playbook: PlaybookScript | None = None
     director: DirectorScript | None = None
 
 

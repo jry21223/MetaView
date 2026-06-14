@@ -2,7 +2,6 @@ import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { TWEAK_DEFAULTS } from "../hooks/useTweaks";
 import { IntakeScreen } from "./IntakeScreen";
 
 vi.mock("@remotion/player", () => ({
@@ -11,10 +10,6 @@ vi.mock("@remotion/player", () => ({
 
 const baseProps: React.ComponentProps<typeof IntakeScreen> = {
   onSubmit: vi.fn(),
-  t: TWEAK_DEFAULTS,
-  isProviderConfigured: true,
-  onNavigate: vi.fn(),
-  onToggleTheme: vi.fn(),
 };
 
 function renderIntake(
@@ -23,8 +18,6 @@ function renderIntake(
   const props = {
     ...baseProps,
     onSubmit: vi.fn(),
-    onNavigate: vi.fn(),
-    onToggleTheme: vi.fn(),
     ...overrides,
   };
 
@@ -41,11 +34,16 @@ describe("IntakeScreen launch home", () => {
   });
 
   it("renders the launch-ready intake without concept placeholder branding", () => {
-    const { getByText, queryByText, getByRole } = renderIntake();
+    const { container, getByText, queryByText, getByRole } = renderIntake();
 
     expect(getByText("把题目变成可播放的讲解")).toBeTruthy();
     expect(queryByText("MetaView v2")).toBeNull();
     expect(queryByText("生成式学习播放器")).toBeNull();
+    expect(
+      container.querySelector(
+        '[data-testid="meta-particle-field"][data-variant="singularity"]',
+      ),
+    ).toBeTruthy();
     expect(getByText("高数动画")).toBeTruthy();
     expect(getByText("算法题")).toBeTruthy();
     expect(getByText("英语拆解")).toBeTruthy();

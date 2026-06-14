@@ -1,8 +1,7 @@
 import { Player } from "@remotion/player";
 import { useRef, useState } from "react";
-import { TweakValues } from "../hooks/useTweaks";
-import { GlobalTopbar, Stage } from "../../../shared/ui/GlobalTopbar";
 import { BrandLogoLoop } from "../../../shared/ui/BrandLogoLoop";
+import { MetaParticleField } from "../../../shared/ui/MetaParticleField";
 import {
   BRAND_LOGO_LOOP_DURATION_FRAMES,
   BRAND_LOGO_LOOP_FPS,
@@ -72,18 +71,9 @@ export interface IntakeContext {
 }
 
 interface IntakeScreenProps {
-  appEdition?: "self" | "ops";
   onSubmit: (ctx: IntakeContext) => void | Promise<void>;
-  t: TweakValues;
   isSubmitting?: boolean;
   submitError?: string | null;
-  isProviderConfigured?: boolean;
-  accountBalanceYuan?: string | null;
-  accountName?: string | null;
-  accountAvatarUrl?: string | null;
-  onOpenProviderSettings?: () => void;
-  onNavigate: (stage: Stage) => void;
-  onToggleTheme: () => void;
 }
 
 function Icon({ kind }: { kind: (typeof TEMPLATE_GALLERY)[number]["icon"] }) {
@@ -199,18 +189,9 @@ function inferDomain(
 }
 
 export function IntakeScreen({
-  appEdition = "self",
   onSubmit,
-  t,
   isSubmitting = false,
   submitError = null,
-  isProviderConfigured = false,
-  accountBalanceYuan = null,
-  accountName = null,
-  accountAvatarUrl = null,
-  onOpenProviderSettings,
-  onNavigate,
-  onToggleTheme,
 }: IntakeScreenProps) {
   const [input, setInput] = useState("");
   const [mode, setMode] = useState<IntakeMode>("animation");
@@ -218,7 +199,6 @@ export function IntakeScreen({
   const [fileObjects, setFileObjects] = useState<File[]>([]);
   const [thinking, setThinking] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
-  const isDark = t.theme === "dark";
   const pending = isSubmitting || Boolean(thinking);
 
   const handleFiles = (list: FileList | null) => {
@@ -290,38 +270,29 @@ export function IntakeScreen({
 
   return (
     <>
-      <GlobalTopbar
-        stage="intake"
-        appEdition={appEdition}
-        isProviderConfigured={isProviderConfigured}
-        accountBalanceYuan={accountBalanceYuan}
-        accountName={accountName}
-        accountAvatarUrl={accountAvatarUrl}
-        onNavigate={onNavigate}
-        isDark={isDark}
-        onToggleTheme={onToggleTheme}
-        onOpenProviderSettings={onOpenProviderSettings}
-      />
       <main className="mv-intake-body">
         <section className="mv-intake-hero" aria-label="MetaView intake">
-          <div
-            className="mv-brand-loop-shell"
-            role="img"
-            aria-label="MetaView logo animation"
-          >
-            <Player
-              component={BrandLogoLoop}
-              durationInFrames={BRAND_LOGO_LOOP_DURATION_FRAMES}
-              fps={BRAND_LOGO_LOOP_FPS}
-              compositionWidth={BRAND_LOGO_LOOP_SIZE}
-              compositionHeight={BRAND_LOGO_LOOP_SIZE}
-              autoPlay
-              loop
-              controls={false}
-              clickToPlay={false}
-              acknowledgeRemotionLicense
-              style={{ width: "100%", height: "100%" }}
-            />
+          <div className="mv-intake-hero-visual">
+            <MetaParticleField variant="singularity" />
+            <div
+              className="mv-brand-loop-shell"
+              role="img"
+              aria-label="MetaView logo animation"
+            >
+              <Player
+                component={BrandLogoLoop}
+                durationInFrames={BRAND_LOGO_LOOP_DURATION_FRAMES}
+                fps={BRAND_LOGO_LOOP_FPS}
+                compositionWidth={BRAND_LOGO_LOOP_SIZE}
+                compositionHeight={BRAND_LOGO_LOOP_SIZE}
+                autoPlay
+                loop
+                controls={false}
+                clickToPlay={false}
+                acknowledgeRemotionLicense
+                style={{ width: "100%", height: "100%" }}
+              />
+            </div>
           </div>
           <h1 className="mv-intake-title">把题目变成可播放的讲解</h1>
           <p className="mv-intake-sub">

@@ -9,11 +9,6 @@ import { SettingsPage } from "./SettingsPage";
 function renderSettingsPage(overrides: Partial<React.ComponentProps<typeof SettingsPage>> = {}) {
   const props: React.ComponentProps<typeof SettingsPage> = {
     appEdition: "ops",
-    isDark: true,
-    isProviderConfigured: true,
-    onNavigate: vi.fn(),
-    onToggleTheme: vi.fn(),
-    onOpenProviderSettings: vi.fn(),
     tweaks: TWEAK_DEFAULTS,
     setTweak: vi.fn(),
     ...overrides,

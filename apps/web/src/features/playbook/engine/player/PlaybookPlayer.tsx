@@ -16,6 +16,7 @@ import { CodeHighlightRenderer } from "../renderers/CodeHighlightRenderer";
 import { domainCapability } from "../domainCapabilities";
 import { getParamPanel } from "../param-panels/registry";
 import type { ParamPanelProps } from "../param-panels/types";
+import { hasReplayableAlgorithmParams } from "../param-panels/AlgorithmParamPanel";
 import { resolveDirectorVoiceover } from "../director";
 
 // ── ParamPanelSlot (static component — resolves domain panel from registry) ──
@@ -62,13 +63,46 @@ const SettingsSVG = () => (
   </svg>
 );
 
+const ExportSVG = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+       aria-hidden="true">
+    <path d="M12 3v12" />
+    <path d="m7 10 5 5 5-5" />
+    <path d="M5 21h14" />
+  </svg>
+);
+
+function TopbarFoldIcon({ collapsed }: { collapsed: boolean }) {
+  return (
+    <svg
+      className="playbook-player__chrome-toggle-icon"
+      data-testid={
+        collapsed ? "topbar-toggle-icon-expand" : "topbar-toggle-icon-collapse"
+      }
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.55"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path className="playbook-player__chrome-toggle-bar" d="M7 7.5h10" />
+      {collapsed ? (
+        <path className="playbook-player__chrome-toggle-chevron" d="m7.5 11 4.5 4.5 4.5-4.5" />
+      ) : (
+        <path className="playbook-player__chrome-toggle-chevron" d="m7.5 14 4.5-4.5 4.5 4.5" />
+      )}
+    </svg>
+  );
+}
+
 // ── Player Settings Popover ────────────────────────────────────────────────
 
 interface PlayerSettingsPopoverProps {
   playbackRate: number;
   onPlaybackRateChange: (rate: number) => void;
-  showSubtitles: boolean;
-  onShowSubtitlesChange: (next: boolean) => void;
   stepThrough: boolean;
   onStepThroughChange: (next: boolean) => void;
   ttsEnabled: boolean;
@@ -87,8 +121,6 @@ const SPEED_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 const PlayerSettingsPopover: React.FC<PlayerSettingsPopoverProps> = ({
   playbackRate,
   onPlaybackRateChange,
-  showSubtitles,
-  onShowSubtitlesChange,
   stepThrough,
   onStepThroughChange,
   ttsEnabled,
@@ -152,16 +184,6 @@ const PlayerSettingsPopover: React.FC<PlayerSettingsPopoverProps> = ({
       </div>
 
       <div className="playbook-player__settings-section">
-        <div className="playbook-player__settings-row">
-          <span>字幕</span>
-          <button
-            type="button"
-            className={`playbook-player__settings-toggle${showSubtitles ? " is-active" : ""}`}
-            onClick={() => onShowSubtitlesChange(!showSubtitles)}
-          >
-            {showSubtitles ? "开启" : "关闭"}
-          </button>
-        </div>
         <div className="playbook-player__settings-row">
           <span>播放模式</span>
           <button
@@ -340,14 +362,6 @@ const PlayerSettingsPopover: React.FC<PlayerSettingsPopoverProps> = ({
 
 // ── Main component ─────────────────────────────────────────────────────────
 
-interface WorkbenchNavItem {
-  id: string;
-  label: string;
-  icon?: React.ReactNode;
-  active?: boolean;
-  onSelect: () => void;
-}
-
 interface PlaybookPlayerProps {
   script: PlaybookScript;
   director?: DirectorScript | null;
@@ -362,7 +376,9 @@ interface PlaybookPlayerProps {
   onOpenExport?: () => void;
   followupSlot?: React.ReactNode;
   relatedSlot?: React.ReactNode;
-  workbenchNavItems?: WorkbenchNavItem[];
+  showLearningConsole?: boolean;
+  topbarCollapsed?: boolean;
+  onToggleTopbar?: () => void;
 }
 
 export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
@@ -373,19 +389,24 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   onOpenExport,
   followupSlot,
   relatedSlot,
-  workbenchNavItems,
+  showLearningConsole = true,
+  topbarCollapsed = false,
+  onToggleTopbar,
 }) => {
   const playerRef = useRef<PlayerRef | null>(null);
-  const railNavRef = useRef<HTMLDivElement | null>(null);
 
   // ── Tweak state (frontend-only hot reload) ─────────────────────────────
   const [overrides, setOverrides] = useState<ScriptOverrides>({});
   const [playbackRate, setPlaybackRate] = useState(1);
-  const [showSubtitles, setShowSubtitles] = useState(true);
-  const [railNavOpen, setRailNavOpen] = useState(false);
   const script = useResolvedScript(baseScript, overrides);
   const capability = useMemo(() => domainCapability(script.domain), [script.domain]);
-  const hasDomainPanel = getParamPanel(baseScript.domain) !== null;
+  const hasDomainPanel = useMemo(() => {
+    if (getParamPanel(baseScript.domain) === null) return false;
+    if (baseScript.domain === "algorithm") {
+      return hasReplayableAlgorithmParams(baseScript);
+    }
+    return true;
+  }, [baseScript]);
   const initialPreviewFrame = useMemo(() => resolveInitialPreviewFrame(script), [script]);
   const playerTimelineKey = useMemo(() => resolvePlayerTimelineKey(baseScript), [baseScript]);
 
@@ -486,34 +507,13 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     onNext: next,
     onReset: handleReset,
     onToggleTTS: tts.toggle,
-    onToggleSubtitles: () => setShowSubtitles((v) => !v),
     onSpeedUp: handleSpeedUp,
     onSpeedDown: handleSpeedDown,
     onOpenExport: onOpenExport,
     onEscape: () => {
       setShowPlayerSettings(false);
-      setRailNavOpen(false);
     },
   });
-
-  useEffect(() => {
-    if (!railNavOpen) return;
-    const handlePointerDown = (event: MouseEvent) => {
-      if (railNavRef.current?.contains(event.target as Node)) return;
-      setRailNavOpen(false);
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setRailNavOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [railNavOpen]);
 
   // Auto-narrate on step change.
   // ttsRef always holds the latest tts object, so no stale-closure risk on speak/backend changes.
@@ -558,53 +558,29 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     currentStep,
     currentNarrationFallback,
   );
-  const hasWorkbenchNav = !!workbenchNavItems?.length;
+  const playerClassName = [
+    "playbook-player",
+    "playbook-player--minimal",
+    showLearningConsole ? "" : "playbook-player--no-console",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <div className="playbook-player playbook-player--minimal" data-theme={theme}>
+    <div className={playerClassName} data-theme={theme}>
       <aside className="playbook-player__rail" aria-label="Lesson steps">
-        {hasWorkbenchNav ? (
-          <div className="playbook-player__rail-nav" ref={railNavRef}>
-            <button
-              type="button"
-              className="playbook-player__rail-mark playbook-player__rail-nav-trigger"
-              aria-label={railNavOpen ? "关闭任务导航" : "打开任务导航"}
-              aria-haspopup="menu"
-              aria-expanded={railNavOpen}
-              onClick={() => setRailNavOpen((value) => !value)}
-            >
-              <span />
-              <span />
-              <span />
-            </button>
-            {railNavOpen && (
-              <div
-                className="playbook-player__rail-nav-menu"
-                role="menu"
-                aria-label="任务导航"
-              >
-                {workbenchNavItems.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    role="menuitem"
-                    className={`playbook-player__rail-nav-item${item.active ? " is-active" : ""}`}
-                    onClick={() => {
-                      item.onSelect();
-                      setRailNavOpen(false);
-                    }}
-                  >
-                    {item.icon && (
-                      <span className="playbook-player__rail-nav-icon" aria-hidden="true">
-                        {item.icon}
-                      </span>
-                    )}
-                    <span>{item.label}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+        {onToggleTopbar ? (
+          <button
+            type="button"
+            className={`playbook-player__rail-mark playbook-player__chrome-toggle${
+              topbarCollapsed ? " is-collapsed" : " is-expanded"
+            }`}
+            aria-label={topbarCollapsed ? "显示顶部栏" : "隐藏顶部栏"}
+            aria-pressed={topbarCollapsed}
+            onClick={onToggleTopbar}
+          >
+            <TopbarFoldIcon collapsed={topbarCollapsed} />
+          </button>
         ) : (
           <div className="playbook-player__rail-mark" aria-hidden="true">
             <span />
@@ -651,10 +627,12 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
             {onOpenExport && (
               <button
                 type="button"
-                className="playbook-player__ghost-btn"
+                className="playbook-player__ghost-btn playbook-player__export-btn"
                 onClick={onOpenExport}
+                title="导出 MP4"
+                aria-label="导出 MP4"
               >
-                Export
+                <ExportSVG />
               </button>
             )}
           </div>
@@ -675,7 +653,13 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
               key={playerTimelineKey}
               ref={playerRef}
               component={PlaybookComposition}
-              inputProps={{ script, director, theme, showSubtitles, swapDurationFrames }}
+              inputProps={{
+                script,
+                director,
+                theme,
+                showSubtitles: false,
+                swapDurationFrames,
+              }}
               durationInFrames={script.total_frames}
               fps={script.fps}
               compositionWidth={PLAYBOOK_DEFAULTS.COMPOSITION_WIDTH}
@@ -687,6 +671,11 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
             />
           </div>
         </section>
+
+        <div className="playbook-player__caption">
+          <span aria-hidden="true" />
+          <p>{currentNarration || currentStep.title}</p>
+        </div>
 
         <div className="playbook-player__controls">
           <button
@@ -725,8 +714,6 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
                 <PlayerSettingsPopover
                   playbackRate={playbackRate}
                   onPlaybackRateChange={setPlaybackRate}
-                  showSubtitles={showSubtitles}
-                  onShowSubtitlesChange={setShowSubtitles}
                   stepThrough={stepThrough}
                   onStepThroughChange={setStepThrough}
                   ttsEnabled={tts.enabled}
@@ -762,75 +749,70 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
             </button>
           </div>
         </div>
-
-        {showSubtitles && (
-          <div className="playbook-player__caption">
-            <span aria-hidden="true" />
-            <p>{currentNarration || currentStep.title}</p>
-          </div>
-        )}
       </div>
 
-      <aside className="playbook-player__console" aria-label="Learning console">
-        {showCodePanelSlot && (
-          <section className="playbook-player__console-card playbook-player__code-card">
-            <div className="playbook-player__console-head">
-              <span>Code Sync</span>
-              <small>{codeOverlay?.language ?? "source"}</small>
-            </div>
-            <div className="playbook-player__code-body">
-              {codeOverlay ? (
-                <CodeHighlightRenderer overlay={codeOverlay} theme={theme} />
-              ) : (
-                <div className="playbook-player__code-empty">
-                  <span>{"</>"}</span>
-                  <p>Code highlights will sync here.</p>
-                </div>
-              )}
-            </div>
-          </section>
-        )}
+      {showLearningConsole && (
+        <aside className="playbook-player__console" aria-label="Learning console">
+          {showCodePanelSlot && (
+            <section className="playbook-player__console-card playbook-player__code-card">
+              <div className="playbook-player__console-head">
+                <span>Code Sync</span>
+                <small>{codeOverlay?.language ?? "source"}</small>
+              </div>
+              <div className="playbook-player__code-body">
+                {codeOverlay ? (
+                  <CodeHighlightRenderer overlay={codeOverlay} theme={theme} />
+                ) : (
+                  <div className="playbook-player__code-empty">
+                    <span>{"</>"}</span>
+                    <p>Code highlights will sync here.</p>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
 
-        {hasDomainPanel && (
-          <section className="playbook-player__console-card playbook-player__params-card">
-            <div className="playbook-player__console-head">
-              <span>Params</span>
-              <small>{baseScript.domain}</small>
-            </div>
-            <div className="playbook-player__param-body">
-              <ParamPanelSlot
-                domain={baseScript.domain}
-                script={baseScript}
-                overrides={overrides}
-                onOverridesChange={setOverrides}
-                isDark={theme === "dark"}
-              />
-            </div>
-          </section>
-        )}
+          {hasDomainPanel && (
+            <section className="playbook-player__console-card playbook-player__params-card">
+              <div className="playbook-player__console-head">
+                <span>Params</span>
+                <small>{baseScript.domain}</small>
+              </div>
+              <div className="playbook-player__param-body">
+                <ParamPanelSlot
+                  domain={baseScript.domain}
+                  script={baseScript}
+                  overrides={overrides}
+                  onOverridesChange={setOverrides}
+                  isDark={theme === "dark"}
+                />
+              </div>
+            </section>
+          )}
 
-        {followupSlot && (
-          <section className="playbook-player__console-card playbook-player__follow-card">
-            <div className="playbook-player__console-head">
-              <span>Follow-up</span>
-              <small>current step</small>
-            </div>
-            <div className="playbook-player__follow-body">{followupSlot}</div>
-          </section>
-        )}
+          {followupSlot && (
+            <section className="playbook-player__console-card playbook-player__follow-card">
+              <div className="playbook-player__console-head">
+                <span>Follow-up</span>
+                <small>current step</small>
+              </div>
+              <div className="playbook-player__follow-body">{followupSlot}</div>
+            </section>
+          )}
 
-        {relatedSlot ? (
-          <section className="playbook-player__related-card" aria-label="Related study context">
-            {relatedSlot}
-          </section>
-        ) : (
-          <section className="playbook-player__related-row" aria-label="Related study context">
-            <span>Related</span>
-            <strong>{script.algorithm_id ?? "Study variants"}</strong>
-            <small>›</small>
-          </section>
-        )}
-      </aside>
+          {relatedSlot ? (
+            <section className="playbook-player__related-card" aria-label="Related study context">
+              {relatedSlot}
+            </section>
+          ) : (
+            <section className="playbook-player__related-row" aria-label="Related study context">
+              <span>Related</span>
+              <strong>{script.algorithm_id ?? "Study variants"}</strong>
+              <small>›</small>
+            </section>
+          )}
+        </aside>
+      )}
     </div>
   );
 };

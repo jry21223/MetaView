@@ -264,6 +264,24 @@ class SqliteRunRepository:
     async def get_head_version_id(self, run_id: str) -> str | None:
         def _sync() -> str | None:
             with self._connect() as conn:
+                active = conn.execute(
+                    "SELECT playbook_json FROM pipeline_runs WHERE run_id=?",
+                    (run_id,),
+                ).fetchone()
+                active_playbook_json = (
+                    str(active["playbook_json"])
+                    if active is not None and active["playbook_json"]
+                    else None
+                )
+                if active_playbook_json is not None:
+                    active_head = conn.execute(
+                        "SELECT version_id FROM pipeline_run_versions"
+                        " WHERE run_id=? AND playbook_json=?"
+                        " ORDER BY version_number DESC LIMIT 1",
+                        (run_id, active_playbook_json),
+                    ).fetchone()
+                    if active_head is not None:
+                        return str(active_head["version_id"])
                 row = conn.execute(
                     "SELECT version_id FROM pipeline_run_versions"
                     " WHERE run_id=? ORDER BY version_number DESC LIMIT 1",
@@ -288,11 +306,29 @@ class SqliteRunRepository:
     async def list_versions(self, run_id: str) -> list[RunVersionRecord]:
         def _sync() -> tuple[list[sqlite3.Row], str | None]:
             with self._connect() as conn:
-                head = conn.execute(
-                    "SELECT version_id FROM pipeline_run_versions"
-                    " WHERE run_id=? ORDER BY version_number DESC LIMIT 1",
+                active = conn.execute(
+                    "SELECT playbook_json FROM pipeline_runs WHERE run_id=?",
                     (run_id,),
                 ).fetchone()
+                active_playbook_json = (
+                    str(active["playbook_json"])
+                    if active is not None and active["playbook_json"]
+                    else None
+                )
+                head = None
+                if active_playbook_json is not None:
+                    head = conn.execute(
+                        "SELECT version_id FROM pipeline_run_versions"
+                        " WHERE run_id=? AND playbook_json=?"
+                        " ORDER BY version_number DESC LIMIT 1",
+                        (run_id, active_playbook_json),
+                    ).fetchone()
+                if head is None:
+                    head = conn.execute(
+                        "SELECT version_id FROM pipeline_run_versions"
+                        " WHERE run_id=? ORDER BY version_number DESC LIMIT 1",
+                        (run_id,),
+                    ).fetchone()
                 rows = conn.execute(
                     "SELECT v.version_id, v.run_id, v.version_number, v.source,"
                     " v.followup_id, v.parent_version_id, v.summary, v.created_at,"

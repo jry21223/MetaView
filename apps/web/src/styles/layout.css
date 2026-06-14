@@ -15,6 +15,43 @@
 }
 
 /* ───── Topbar ───── */
+.mv-top-shell {
+  display: grid;
+  grid-template-rows: 1fr;
+  flex-shrink: 0;
+  overflow: hidden;
+  transition:
+    grid-template-rows 180ms ease,
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.mv-top-shell > .mv-top {
+  overflow: hidden;
+  transition:
+    min-height 180ms ease,
+    padding 180ms ease,
+    border-color 180ms ease,
+    opacity 160ms ease,
+    transform 180ms ease;
+}
+
+.mv-top-shell.is-collapsed {
+  grid-template-rows: 0fr;
+  opacity: 0.18;
+  transform: translateY(-10px);
+  pointer-events: none;
+}
+
+.mv-top-shell.is-collapsed > .mv-top {
+  min-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-bottom-color: transparent;
+  opacity: 0;
+  transform: translateY(-14px);
+}
+
 .mv-top {
   display: grid;
   grid-template-columns: minmax(190px, 240px) 1fr auto;
@@ -37,6 +74,23 @@
   }
 }
 
+@media (max-width: 680px) {
+  .mv-top-shell.is-collapsed {
+    grid-template-rows: 1fr;
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+
+  .mv-top-shell.is-collapsed > .mv-top {
+    min-height: 56px;
+    padding: 12px;
+    border-bottom-color: var(--line);
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* ───── Main grid ───── */
 .mv-main {
   flex: 1;
@@ -51,7 +105,7 @@
 .mv-main--player {
   grid-template-columns: minmax(0, 1fr);
   gap: 0;
-  padding: clamp(12px, 2.6vw, 32px);
+  padding: clamp(10px, 1.6vw, 24px) clamp(10px, 1.6vw, 24px) 0;
   background:
     linear-gradient(rgba(77, 71, 58, 0.052) 1px, transparent 1px),
     linear-gradient(90deg, rgba(77, 71, 58, 0.052) 1px, transparent 1px),
@@ -75,8 +129,8 @@
 }
 
 .mv-main--player .mv-right {
-  width: min(100%, 1400px);
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
   gap: 0;
 }
 

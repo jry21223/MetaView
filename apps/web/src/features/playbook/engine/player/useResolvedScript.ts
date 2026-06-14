@@ -4,6 +4,7 @@ import type {
   AlgorithmBarsSnapshot,
   MathPlotCurve,
   MathPlotSnapshot,
+  MathSceneSnapshot,
   MetaStep,
   PlaybookScript,
 } from "../types";
@@ -133,9 +134,9 @@ function applyMathParamOverride(base: PlaybookScript, params: Record<string, num
 
   let changed = false;
   const steps = base.steps.map((step) => {
-    if (step.snapshot.kind !== "math_plot") return step;
+    if (step.snapshot.kind !== "math_plot" && step.snapshot.kind !== "math_scene") return step;
     changed = true;
-    const snapshot: MathPlotSnapshot = {
+    const snapshot: MathPlotSnapshot | MathSceneSnapshot = {
       ...step.snapshot,
       params: { ...(step.snapshot.params ?? {}), ...clean },
     };

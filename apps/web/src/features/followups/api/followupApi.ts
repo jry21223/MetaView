@@ -37,10 +37,11 @@ export interface RunFollowUpsResponse {
 }
 
 export interface FollowUpResponse {
+  kind: "reply" | "patch";
   reply: string;
   change_summary: string;
-  version_id: string;
-  playbook: PlaybookScript;
+  version_id: string | null;
+  playbook: PlaybookScript | null;
   director?: DirectorScript | null;
 }
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type {
   AlgorithmArraySnapshot,
   AlgorithmBarsSnapshot,
+  MathSceneSnapshot,
   MathPlotSnapshot,
   PlaybookScript,
 } from "../types";
@@ -44,6 +45,25 @@ describe("useResolvedScript", () => {
     const resolved = resolveScript(script(), { mathParams: { a: 3 } });
     expect(resolved.steps[0]?.snapshot.kind).toBe("math_plot");
     expect(resolved.steps[0]?.snapshot.kind === "math_plot" ? resolved.steps[0].snapshot.params : null).toEqual({ a: 3 });
+  });
+
+  it("applies math params to math_scene snapshots", () => {
+    const base = script();
+    base.steps[0].snapshot = {
+      kind: "math_scene",
+      x_min: -2,
+      x_max: 2,
+      y_min: -2,
+      y_max: 2,
+      x_label: "x",
+      y_label: "y",
+      curves: [{ expression_y: "a*sin(x)", label: "wave" }],
+      params: { b: 2 },
+    };
+
+    const resolved = resolveScript(base, { mathParams: { a: 3 } });
+    const snap = resolved.steps[0].snapshot as MathSceneSnapshot;
+    expect(snap.params).toEqual({ b: 2, a: 3 });
   });
 });
 

@@ -18,7 +18,6 @@ import { RunProgressStepper } from "../../features/runs/RunProgressStepper";
 import { themeMode } from "../../features/studio-editor/hooks/useTweaks";
 import type { PipelineRunResult } from "../../entities/pipeline/types";
 import type { PlaybookScript } from "../../entities/playbook/types";
-import { GlobalTopbar, Stage } from "../../shared/ui/GlobalTopbar";
 
 const STATUS_LABEL: Record<PipelineRunResult["status"], string> = {
   queued: "排队",
@@ -185,31 +184,12 @@ const PRIMARY_STATUS_CHIPS: Array<{ value: StatusFilter; label: string }> = [
 ];
 
 export interface HistoryPageProps {
-  appEdition?: "self" | "ops";
   t: TweakValues;
-  setTweak: (
-    key: keyof TweakValues,
-    value: TweakValues[keyof TweakValues],
-  ) => void;
-  onNavigate: (stage: Stage) => void;
-  isProviderConfigured: boolean;
-  accountBalanceYuan?: string | null;
-  accountName?: string | null;
-  accountAvatarUrl?: string | null;
-  onOpenProviderSettings?: () => void;
   onOpenInWorkbench?: (runId: string) => void;
 }
 
 export function HistoryPage({
-  appEdition = "self",
   t,
-  setTweak,
-  onNavigate,
-  isProviderConfigured,
-  accountBalanceYuan = null,
-  accountName = null,
-  accountAvatarUrl = null,
-  onOpenProviderSettings,
   onOpenInWorkbench,
 }: HistoryPageProps) {
   const mode = themeMode(t);
@@ -265,18 +245,6 @@ export function HistoryPage({
 
   return (
     <>
-      <GlobalTopbar
-        stage="history"
-        appEdition={appEdition}
-        isProviderConfigured={isProviderConfigured}
-        accountBalanceYuan={accountBalanceYuan}
-        accountName={accountName}
-        accountAvatarUrl={accountAvatarUrl}
-        onNavigate={onNavigate}
-        isDark={isDark}
-        onToggleTheme={() => setTweak("theme", isDark ? "light" : "dark")}
-        onOpenProviderSettings={onOpenProviderSettings}
-      />
       <main className="mv-history-main">
         <aside className="mv-history-list">
           <StatsLine {...stats} />
@@ -451,6 +419,7 @@ export function HistoryPage({
                 director={selectedRun?.director ?? null}
                 theme={isDark ? "dark" : "light"}
                 swapDurationFrames={t.swapFrames}
+                showLearningConsole={false}
               />
             </>
           )}

@@ -21,7 +21,7 @@ class FollowUpPatchResult:
     reply: str
     change_summary: str
     patch: list[dict[str, Any]]
-    playbook: PlaybookScript
+    playbook: PlaybookScript | None
 
 
 _ALLOWED_ROOTS = (
@@ -65,6 +65,13 @@ class FollowUpPatchUseCase:
             raise FollowUpPatchError("change_summary must be a non-empty string")
         if not isinstance(patch, list):
             raise FollowUpPatchError("patch must be a JSON array")
+        if len(patch) == 0:
+            return FollowUpPatchResult(
+                reply=reply,
+                change_summary=change_summary,
+                patch=[],
+                playbook=None,
+            )
 
         base = playbook.model_dump(mode="json")
         patched = _apply_patch(base, patch)
@@ -84,7 +91,8 @@ class FollowUpPatchUseCase:
 def _build_system_prompt() -> str:
     return """你是 MetaView 的 Playbook 局部修改助手。
 你会收到当前 PlaybookScript JSON、用户追问和最近对话。
-你的任务不是解释文字聊天，而是在当前基础上修改 Playbook。
+如果用户只是追问概念、步骤原因或文字解释，可以只回答问题；如果用户要求调整讲解、
+步骤、画面或参数，就在当前基础上修改 Playbook。
 
 只输出严格 JSON，不要 Markdown，不要代码围栏：
 {
@@ -94,6 +102,7 @@ def _build_system_prompt() -> str:
 }
 
 patch 使用 RFC 6902 子集，只能使用 add/remove/replace。
+如果只是文字回答且不需要修改视频，patch 必须是空数组 []。
 允许修改的路径根：/title, /summary, /steps, /parameter_controls, /algorithm_id, /initial_data。
 可以一次修改多个 step，也可以修改任意合法 renderer 的 snapshot/layers。
 parameter_controls.*.value 和 initial_data.*[] 必须是字符串，即使表示数字也写成 "2"。

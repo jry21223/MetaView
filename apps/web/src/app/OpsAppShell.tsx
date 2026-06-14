@@ -19,11 +19,16 @@ import { HistoryPage } from "../pages/History/HistoryPage";
 import { TemplatesPage } from "../pages/Templates/TemplatesPage";
 import { SettingsPage } from "../pages/Settings/SettingsPage";
 import { usePipelineSubmit } from "../features/pipeline/hooks/usePipelineSubmit";
-import type { Stage } from "../shared/ui/GlobalTopbar";
+import {
+  GlobalTopbar,
+  GlobalTopbarShell,
+  type Stage,
+} from "../shared/ui/GlobalTopbar";
 
 export function OpsAppShell() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [stage, setStage] = useState<Stage>("intake");
+  const [topbarCollapsed, setTopbarCollapsed] = useState(false);
   const [accountModalOpen, setAccountModalOpen] = useState(false);
   const [openedRunId, setOpenedRunId] = useState<string | null>(null);
   const {
@@ -42,10 +47,33 @@ export function OpsAppShell() {
 
   const css = useMemo(() => themeVars(t), [t]);
   const mode = themeMode(t);
+  const effectiveTopbarCollapsed = stage === "workbench" && topbarCollapsed;
   const toggleTheme = () =>
     setTweak("theme", mode === "dark" ? "light" : "dark");
+  const navigate = (nextStage: Stage) => {
+    if (nextStage !== "workbench") setTopbarCollapsed(false);
+    setStage(nextStage);
+  };
 
   const openAccountPanel = () => setAccountModalOpen(true);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mobileQuery = window.matchMedia("(max-width: 680px)");
+    const revealTopbarOnMobile = () => {
+      if (mobileQuery.matches) {
+        setTopbarCollapsed(false);
+      }
+    };
+
+    revealTopbarOnMobile();
+    if (mobileQuery.addEventListener) {
+      mobileQuery.addEventListener("change", revealTopbarOnMobile);
+      return () => mobileQuery.removeEventListener("change", revealTopbarOnMobile);
+    }
+    mobileQuery.addListener(revealTopbarOnMobile);
+    return () => mobileQuery.removeListener(revealTopbarOnMobile);
+  }, []);
 
   const submitWithPlatformProvider = async (
     prompt: string,
@@ -104,20 +132,26 @@ export function OpsAppShell() {
       data-theme={t.theme}
       style={css}
     >
-      {stage === "intake" && (
-        <IntakeScreen
+      <GlobalTopbarShell collapsed={effectiveTopbarCollapsed}>
+        <GlobalTopbar
+          stage={stage}
           appEdition="ops"
-          onSubmit={handleSubmit}
-          t={t}
-          isSubmitting={isSubmitting}
-          submitError={submitError}
           isProviderConfigured
           accountBalanceYuan={account?.balance_yuan ?? null}
           accountName={account?.display_name ?? null}
           accountAvatarUrl={accountAvatarUrl}
-          onOpenProviderSettings={openAccountPanel}
-          onNavigate={setStage}
+          onNavigate={navigate}
+          isDark={mode === "dark"}
           onToggleTheme={toggleTheme}
+          onOpenProviderSettings={openAccountPanel}
+        />
+      </GlobalTopbarShell>
+
+      {stage === "intake" && (
+        <IntakeScreen
+          onSubmit={handleSubmit}
+          isSubmitting={isSubmitting}
+          submitError={submitError}
         />
       )}
 
@@ -127,13 +161,11 @@ export function OpsAppShell() {
             appEdition="ops"
             runId={openedRunId ?? runId}
             t={t}
-            setTweak={setTweak}
-            onNavigate={setStage}
+            onNavigate={navigate}
             isProviderConfigured
-            accountBalanceYuan={account?.balance_yuan ?? null}
-            accountName={account?.display_name ?? null}
-            accountAvatarUrl={accountAvatarUrl}
             onOpenProviderSettings={openAccountPanel}
+            topbarCollapsed={effectiveTopbarCollapsed}
+            onToggleTopbar={() => setTopbarCollapsed((value) => !value)}
           />
         </ErrorBoundary>
       )}
@@ -141,15 +173,7 @@ export function OpsAppShell() {
       {stage === "history" && (
         <ErrorBoundary theme={mode}>
           <HistoryPage
-            appEdition="ops"
             t={t}
-            setTweak={setTweak}
-            onNavigate={setStage}
-            isProviderConfigured
-            accountBalanceYuan={account?.balance_yuan ?? null}
-            accountName={account?.display_name ?? null}
-            accountAvatarUrl={accountAvatarUrl}
-            onOpenProviderSettings={openAccountPanel}
             onOpenInWorkbench={handleOpenHistoryRun}
           />
         </ErrorBoundary>
@@ -158,15 +182,6 @@ export function OpsAppShell() {
       {stage === "templates" && (
         <ErrorBoundary theme={mode}>
           <TemplatesPage
-            appEdition="ops"
-            isDark={mode === "dark"}
-            isProviderConfigured
-            accountBalanceYuan={account?.balance_yuan ?? null}
-            accountName={account?.display_name ?? null}
-            accountAvatarUrl={accountAvatarUrl}
-            onNavigate={setStage}
-            onToggleTheme={toggleTheme}
-            onOpenProviderSettings={openAccountPanel}
             onUseTemplate={handleUseTemplate}
           />
         </ErrorBoundary>
@@ -176,14 +191,6 @@ export function OpsAppShell() {
         <ErrorBoundary theme={mode}>
           <SettingsPage
             appEdition="ops"
-            isDark={mode === "dark"}
-            isProviderConfigured
-            accountBalanceYuan={account?.balance_yuan ?? null}
-            accountName={account?.display_name ?? null}
-            accountAvatarUrl={accountAvatarUrl}
-            onNavigate={setStage}
-            onToggleTheme={toggleTheme}
-            onOpenProviderSettings={openAccountPanel}
             tweaks={t}
             setTweak={setTweak}
           />

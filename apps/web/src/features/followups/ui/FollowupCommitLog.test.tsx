@@ -7,10 +7,10 @@ import type { RunVersionRecord } from "../api/followupApi";
 describe("FollowupCommitLog", () => {
   afterEach(() => cleanup());
 
-  it("shows git-log style commits with the current HEAD marker", () => {
+  it("collapses by default and expands the git-log style commit list on click", () => {
     const onRestore = vi.fn();
 
-    const { getByText, getAllByRole } = render(
+    const { getByRole, getByText, queryByText } = render(
       <FollowupCommitLog
         versions={versions()}
         pending={false}
@@ -19,29 +19,68 @@ describe("FollowupCommitLog", () => {
       />,
     );
 
+    expect(getByRole("button", { name: "展开版本记录" })).toBeTruthy();
+    expect(queryByText("e5f6a7b8")).toBeNull();
+
+    fireEvent.click(getByRole("button", { name: "展开版本记录" }));
+
     expect(getByText("HEAD")).toBeTruthy();
     expect(getByText("e5f6a7b8")).toBeTruthy();
     expect(getByText("restore")).toBeTruthy();
     expect(getByText("revert: restore a1b2c3d4")).toBeTruthy();
-
-    fireEvent.click(getAllByRole("button", { name: "恢复到此版本" })[0]);
-
-    expect(onRestore).toHaveBeenCalledWith("version-1");
+    expect(queryByText("恢复到此版本")).toBeNull();
+    expect(onRestore).not.toHaveBeenCalled();
   });
 
-  it("does not offer restore for HEAD and disables historical restore while pending", () => {
-    const { getAllByRole, queryAllByText } = render(
+  it("restores historical versions by clicking the whole card and disables them while pending", () => {
+    const onRestore = vi.fn();
+    const { getByRole, getAllByRole, queryAllByText, rerender } = render(
+      <FollowupCommitLog
+        versions={versions()}
+        pending={false}
+        canModify
+        onRestore={onRestore}
+      />,
+    );
+
+    fireEvent.click(getByRole("button", { name: "展开版本记录" }));
+    expect(queryAllByText("HEAD")).toHaveLength(1);
+    expect(queryAllByText("恢复到此版本")).toHaveLength(0);
+
+    const restoreCards = getAllByRole("button", { name: /恢复版本/ });
+    expect(restoreCards).toHaveLength(2);
+    fireEvent.click(restoreCards[0]);
+    expect(onRestore).toHaveBeenCalledWith("version-1");
+
+    rerender(
       <FollowupCommitLog
         versions={versions()}
         pending
         canModify
-        onRestore={vi.fn()}
+        onRestore={onRestore}
+      />,
+    );
+    fireEvent.click(getByRole("button", { name: "展开版本记录" }));
+    expect((getAllByRole("button", { name: /恢复版本/ })[0] as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("collapses the version list after choosing a historical card", () => {
+    const onRestore = vi.fn();
+    const { getByRole, queryByText } = render(
+      <FollowupCommitLog
+        versions={versions()}
+        pending={false}
+        canModify
+        onRestore={onRestore}
       />,
     );
 
-    expect(queryAllByText("HEAD")).toHaveLength(1);
-    expect(getAllByRole("button", { name: "恢复到此版本" })).toHaveLength(2);
-    expect((getAllByRole("button", { name: "恢复到此版本" })[0] as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(getByRole("button", { name: "展开版本记录" }));
+    fireEvent.click(getByRole("button", { name: "恢复版本 c0ffee12" }));
+
+    expect(onRestore).toHaveBeenCalledWith("version-1");
+    expect(getByRole("button", { name: "展开版本记录" })).toBeTruthy();
+    expect(queryByText("c0ffee12")).toBeNull();
   });
 });
 

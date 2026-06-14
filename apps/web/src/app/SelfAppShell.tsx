@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "../shared/ui/ErrorBoundary";
 import {
   useTweaks,
@@ -18,11 +18,16 @@ import { SettingsPage } from "../pages/Settings/SettingsPage";
 import { usePipelineSubmit } from "../features/pipeline/hooks/usePipelineSubmit";
 import { useProviderSettings } from "../features/providers/hooks/useProviderSettings";
 import { ProviderSettingsModal } from "../features/providers/ui/ProviderSettingsModal";
-import type { Stage } from "../shared/ui/GlobalTopbar";
+import {
+  GlobalTopbar,
+  GlobalTopbarShell,
+  type Stage,
+} from "../shared/ui/GlobalTopbar";
 
 export function SelfAppShell() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [stage, setStage] = useState<Stage>("intake");
+  const [topbarCollapsed, setTopbarCollapsed] = useState(false);
   const [providerModalOpen, setProviderModalOpen] = useState(false);
   const [openedRunId, setOpenedRunId] = useState<string | null>(null);
   const {
@@ -39,8 +44,31 @@ export function SelfAppShell() {
 
   const css = useMemo(() => themeVars(t), [t]);
   const mode = themeMode(t);
+  const effectiveTopbarCollapsed = stage === "workbench" && topbarCollapsed;
   const toggleTheme = () =>
     setTweak("theme", mode === "dark" ? "light" : "dark");
+  const navigate = (nextStage: Stage) => {
+    if (nextStage !== "workbench") setTopbarCollapsed(false);
+    setStage(nextStage);
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mobileQuery = window.matchMedia("(max-width: 680px)");
+    const revealTopbarOnMobile = () => {
+      if (mobileQuery.matches) {
+        setTopbarCollapsed(false);
+      }
+    };
+
+    revealTopbarOnMobile();
+    if (mobileQuery.addEventListener) {
+      mobileQuery.addEventListener("change", revealTopbarOnMobile);
+      return () => mobileQuery.removeEventListener("change", revealTopbarOnMobile);
+    }
+    mobileQuery.addListener(revealTopbarOnMobile);
+    return () => mobileQuery.removeListener(revealTopbarOnMobile);
+  }, []);
 
   const submitWithProvider = async (
     prompt: string,
@@ -85,17 +113,23 @@ export function SelfAppShell() {
       data-theme={t.theme}
       style={css}
     >
+      <GlobalTopbarShell collapsed={effectiveTopbarCollapsed}>
+        <GlobalTopbar
+          stage={stage}
+          appEdition="self"
+          isProviderConfigured={isConfigured}
+          onNavigate={navigate}
+          isDark={mode === "dark"}
+          onToggleTheme={toggleTheme}
+          onOpenProviderSettings={() => setProviderModalOpen(true)}
+        />
+      </GlobalTopbarShell>
+
       {stage === "intake" && (
         <IntakeScreen
-          appEdition="self"
           onSubmit={handleSubmit}
-          t={t}
           isSubmitting={isSubmitting}
           submitError={submitError}
-          isProviderConfigured={isConfigured}
-          onOpenProviderSettings={() => setProviderModalOpen(true)}
-          onNavigate={setStage}
-          onToggleTheme={toggleTheme}
         />
       )}
 
@@ -105,11 +139,12 @@ export function SelfAppShell() {
             appEdition="self"
             runId={openedRunId ?? runId}
             t={t}
-            setTweak={setTweak}
-            onNavigate={setStage}
+            onNavigate={navigate}
             isProviderConfigured={isConfigured}
             providerSettings={providerSettings}
             onOpenProviderSettings={() => setProviderModalOpen(true)}
+            topbarCollapsed={effectiveTopbarCollapsed}
+            onToggleTopbar={() => setTopbarCollapsed((value) => !value)}
           />
         </ErrorBoundary>
       )}
@@ -117,12 +152,7 @@ export function SelfAppShell() {
       {stage === "history" && (
         <ErrorBoundary theme={mode}>
           <HistoryPage
-            appEdition="self"
             t={t}
-            setTweak={setTweak}
-            onNavigate={setStage}
-            isProviderConfigured={isConfigured}
-            onOpenProviderSettings={() => setProviderModalOpen(true)}
             onOpenInWorkbench={handleOpenHistoryRun}
           />
         </ErrorBoundary>
@@ -131,12 +161,6 @@ export function SelfAppShell() {
       {stage === "templates" && (
         <ErrorBoundary theme={mode}>
           <TemplatesPage
-            appEdition="self"
-            isDark={mode === "dark"}
-            isProviderConfigured={isConfigured}
-            onNavigate={setStage}
-            onToggleTheme={toggleTheme}
-            onOpenProviderSettings={() => setProviderModalOpen(true)}
             onUseTemplate={handleUseTemplate}
           />
         </ErrorBoundary>
@@ -146,11 +170,6 @@ export function SelfAppShell() {
         <ErrorBoundary theme={mode}>
           <SettingsPage
             appEdition="self"
-            isDark={mode === "dark"}
-            isProviderConfigured={isConfigured}
-            onNavigate={setStage}
-            onToggleTheme={toggleTheme}
-            onOpenProviderSettings={() => setProviderModalOpen(true)}
             providerSettings={providerSettings}
             onUpdateProvider={updateProvider}
             tweaks={t}

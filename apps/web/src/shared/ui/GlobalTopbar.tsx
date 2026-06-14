@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 export type Stage =
   | "dashboard"
@@ -35,8 +35,6 @@ export function GlobalTopbar({
   isDark,
   onToggleTheme,
   onOpenProviderSettings,
-  onOpenExport,
-  exportEnabled,
   hidePrimaryNav = false,
 }: GlobalTopbarProps) {
   const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
@@ -113,18 +111,6 @@ export function GlobalTopbar({
       )}
 
       <div className="mv-top-right">
-        {onOpenExport && (
-          <button
-            className="mv-icon-btn"
-            onClick={onOpenExport}
-            disabled={!exportEnabled}
-            title={exportEnabled ? "导出 MP4" : "等待生成完成后可导出"}
-            aria-label="导出 MP4"
-            style={{ opacity: exportEnabled ? 1 : 0.5 }}
-          >
-            ⤓
-          </button>
-        )}
         {onOpenProviderSettings && (
           <button
             className="mv-icon-btn"
@@ -206,5 +192,23 @@ export function GlobalTopbar({
         )}
       </div>
     </header>
+  );
+}
+
+export function GlobalTopbarShell({
+  collapsed,
+  children,
+}: {
+  collapsed: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className={`mv-top-shell${collapsed ? " is-collapsed" : ""}`}
+      aria-hidden={collapsed || undefined}
+      inert={collapsed || undefined}
+    >
+      {children}
+    </div>
   );
 }

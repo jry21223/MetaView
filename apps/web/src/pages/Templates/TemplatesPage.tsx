@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { GlobalTopbar, type Stage } from "../../shared/ui/GlobalTopbar";
 import {
   TEMPLATES,
   TEMPLATE_DOMAIN_LABEL,
@@ -9,15 +8,6 @@ import {
 } from "./templates";
 
 interface TemplatesPageProps {
-  appEdition?: "self" | "ops";
-  isDark: boolean;
-  isProviderConfigured: boolean;
-  accountBalanceYuan?: string | null;
-  accountName?: string | null;
-  accountAvatarUrl?: string | null;
-  onNavigate: (stage: Stage) => void;
-  onToggleTheme: () => void;
-  onOpenProviderSettings: () => void;
   /** Triggered when the user picks a template — host wires this to the
    *  pipeline submit + navigation to workbench. */
   onUseTemplate: (prompt: string) => void | Promise<void>;
@@ -26,15 +16,6 @@ interface TemplatesPageProps {
 type DomainFilter = TemplateDomain | "all";
 
 export function TemplatesPage({
-  appEdition = "self",
-  isDark,
-  isProviderConfigured,
-  accountBalanceYuan = null,
-  accountName = null,
-  accountAvatarUrl = null,
-  onNavigate,
-  onToggleTheme,
-  onOpenProviderSettings,
   onUseTemplate,
 }: TemplatesPageProps) {
   const [filter, setFilter] = useState<DomainFilter>("all");
@@ -61,18 +42,6 @@ export function TemplatesPage({
 
   return (
     <>
-      <GlobalTopbar
-        stage="templates"
-        appEdition={appEdition}
-        isProviderConfigured={isProviderConfigured}
-        accountBalanceYuan={accountBalanceYuan}
-        accountName={accountName}
-        accountAvatarUrl={accountAvatarUrl}
-        onNavigate={onNavigate}
-        isDark={isDark}
-        onToggleTheme={onToggleTheme}
-        onOpenProviderSettings={onOpenProviderSettings}
-      />
       <main className="mv-templates-body">
         <header className="mv-templates-head">
           <div className="mv-eyebrow-mini">模板库</div>

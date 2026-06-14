@@ -2,10 +2,28 @@ import { useCallback, useEffect, useState } from "react";
 import type { ParamPanelProps } from "./types";
 import { isReplaySupported } from "../replay/registry";
 
+type AlgorithmScript = ParamPanelProps["script"];
+
 function arraysEqual(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
   return true;
+}
+
+export function inferAlgorithmArray(script: AlgorithmScript): string[] | undefined {
+  const initialArray = script.initial_data?.array;
+  if (initialArray && initialArray.length > 0) return initialArray;
+  for (const step of script.steps) {
+    const snapshot = step.snapshot;
+    if (snapshot.kind === "algorithm_array" || snapshot.kind === "algorithm_bars") {
+      return snapshot.array_values;
+    }
+  }
+  return undefined;
+}
+
+export function hasReplayableAlgorithmParams(script: AlgorithmScript): boolean {
+  return isReplaySupported(script.algorithm_id) && !!inferAlgorithmArray(script)?.length;
 }
 
 export function AlgorithmParamPanel({
@@ -14,9 +32,8 @@ export function AlgorithmParamPanel({
   onOverridesChange,
   isDark,
 }: ParamPanelProps) {
-  const initialArray = script.initial_data?.array;
-  const replaySupported = isReplaySupported(script.algorithm_id);
-  const dataDisabled = !replaySupported || !initialArray;
+  const initialArray = inferAlgorithmArray(script);
+  const dataDisabled = !hasReplayableAlgorithmParams(script);
 
   const effective = overrides.array ?? initialArray ?? [];
   const dirty = !!overrides.array && !arraysEqual(overrides.array, initialArray ?? []);
@@ -70,13 +87,7 @@ export function AlgorithmParamPanel({
       };
 
   if (dataDisabled) {
-    return (
-      <div style={{ padding: "10px 16px", fontSize: 12, color: c.muted }}>
-        {script.algorithm_id
-          ? `「${script.algorithm_id}」暂不支持热加载`
-          : "未识别算法，热加载不可用"}
-      </div>
-    );
+    return null;
   }
 
   return (

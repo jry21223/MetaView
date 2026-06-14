@@ -95,6 +95,43 @@ def test_followup_applies_patch_persists_history_and_versions(followup_client) -
     assert history["versions"][1]["is_head"] is True
 
 
+def test_followup_can_reply_without_creating_version(monkeypatch, tmp_path) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("METAVIEW_OPENAI_API_KEY", "sk-server")
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    db = str(tmp_path / "reply-only.db")
+    init_db(db)
+    repo = SqliteRunRepository(db)
+    director_repo = SqliteRunDirectorRepository(db)
+    run_id = _seed_run(repo)
+    original = _run(repo.get(run_id))
+    assert original is not None
+    assert original.playbook is not None
+    llm = SequenceLLM([_llm_payload([])])
+    app = create_app()
+    app.dependency_overrides[get_run_repo] = lambda: repo
+    app.dependency_overrides[get_run_director_repo] = lambda: director_repo
+    app.dependency_overrides[get_llm_provider] = lambda: llm
+
+    with TestClient(app) as client:
+        resp = client.post(f"/api/v1/runs/{run_id}/follow-up", json={"message": "这里为什么要交换？"})
+        history = client.get(f"/api/v1/runs/{run_id}/follow-ups").json()
+
+    get_settings.cache_clear()
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["kind"] == "reply"
+    assert data["version_id"] is None
+    assert data["playbook"] is None
+    assert data["director"] is None
+    stored = _run(repo.get(run_id))
+    assert stored is not None
+    assert stored.playbook == original.playbook
+    assert history["followups"][0]["version_id"] is None
+    assert history["followups"][0]["patch_json"] == "[]"
+    assert history["versions"] == []
+
+
 def test_followup_repairs_invalid_patch_once(monkeypatch, tmp_path) -> None:
     get_settings.cache_clear()
     monkeypatch.setenv("METAVIEW_OPENAI_API_KEY", "sk-server")
@@ -139,12 +176,12 @@ def test_followup_restore_version(followup_client) -> None:
     assert active_director is not None
     assert active_director.beats[0].voiceover_text is None
     versions_after = client.get(f"/api/v1/runs/{run_id}/follow-ups").json()["versions"]
-    assert len(versions_after) == 3
+    assert resp.json()["version_id"] == original_version
+    assert len(versions_after) == 2
+    assert versions_after[0]["source"] == "initial"
+    assert versions_after[0]["is_head"] is True
+    assert versions_after[1]["source"] == "followup"
     assert versions_after[1]["is_head"] is False
-    assert versions_after[-1]["source"] == "restore"
-    assert versions_after[-1]["parent_version_id"] == versions[1]["version_id"]
-    assert versions_after[-1]["summary"].startswith("revert: restore ")
-    assert versions_after[-1]["is_head"] is True
 
 
 def test_followup_uses_selected_base_version(monkeypatch, tmp_path) -> None:

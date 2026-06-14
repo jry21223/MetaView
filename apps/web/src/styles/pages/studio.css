@@ -361,6 +361,10 @@
   flex-shrink: 0;
 }
 .mv-commit-log-head {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -369,6 +373,12 @@
   text-transform: uppercase;
   color: var(--ink-3);
   font-family: "IBM Plex Mono", monospace;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+.mv-commit-log-head:hover {
+  color: var(--ink-2);
 }
 .mv-commit-list {
   display: flex;
@@ -379,14 +389,32 @@
   padding-right: 2px;
 }
 .mv-commit-item {
+  appearance: none;
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  text-align: left;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
   align-items: center;
   border: 1px solid var(--line);
   background: var(--surface-2);
   border-radius: 8px;
   padding: 8px 9px;
+}
+.mv-commit-item:not(.is-head) {
+  cursor: pointer;
+}
+.mv-commit-item:not(.is-head):hover:not(:disabled),
+.mv-commit-item:not(.is-head):focus-visible {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface-2));
+  outline: none;
+}
+.mv-commit-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
 }
 .mv-commit-item.is-head {
   border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
@@ -1909,17 +1937,251 @@
 .mv-intake-hero {
   display: grid;
   justify-items: center;
-  max-width: 560px;
+  max-width: 680px;
   text-align: center;
-  padding-top: 4px;
+  padding-top: 0;
+}
+
+.mv-intake-hero-visual {
+  position: relative;
+  width: min(720px, calc(100vw - 48px));
+  height: 164px;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 8px;
+  overflow: visible;
+}
+
+.mv-meta-particle {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.mv-meta-particle__svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.mv-meta-particle__orbit,
+.mv-meta-particle__gravity-path,
+.mv-meta-particle__gravity-contour,
+.mv-meta-particle__comet-path {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ink-3) 44%, transparent);
+  stroke-width: 1.35;
+  stroke-linecap: round;
+  stroke-dasharray: 0.01 0.026;
+  opacity: 0.72;
+}
+
+.mv-meta-particle__gravity-path {
+  stroke: color-mix(in srgb, var(--accent) 12%, var(--ink-3));
+  stroke-width: 1;
+  opacity: 0.18;
+}
+
+.mv-meta-particle__gravity-contour {
+  stroke: color-mix(in srgb, var(--ink-3) 50%, transparent);
+  stroke-width: 0.9;
+  stroke-dasharray: 0.006 0.032;
+  opacity: 0.26;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mvMetaParticleContour 8s ease-in-out infinite;
+}
+
+.mv-meta-particle__orbit--1 {
+  opacity: 0.52;
+}
+
+.mv-meta-particle__orbit--2,
+.mv-meta-particle__orbit--3 {
+  stroke: color-mix(in srgb, var(--accent) 24%, var(--ink-3));
+}
+
+.mv-meta-particle__axis {
+  stroke: color-mix(in srgb, var(--ink-3) 18%, transparent);
+  stroke-width: 1;
+  stroke-dasharray: 4 6;
+}
+
+.mv-meta-particle__singularity-swirl {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mvMetaParticleSwirl 44s linear infinite;
+}
+
+.mv-meta-particle__event-horizon {
+  fill: none;
+  stroke: color-mix(in srgb, var(--accent) 16%, var(--ink-3));
+  stroke-width: 1.1;
+  stroke-dasharray: 0.018 0.04;
+  stroke-linecap: round;
+  opacity: 0.32;
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: rotate(-10deg);
+}
+
+.mv-meta-particle__event-horizon--middle {
+  opacity: 0.24;
+  stroke: color-mix(in srgb, var(--ink-3) 38%, transparent);
+}
+
+.mv-meta-particle__event-horizon--inner {
+  opacity: 0.17;
+  stroke-dasharray: 0.015 0.05;
+}
+
+.mv-meta-particle__singularity-halo,
+.mv-meta-particle__core-halo {
+  fill: var(--accent);
+  opacity: 0.04;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mvMetaParticleCore 5.6s ease-in-out infinite;
+}
+
+.mv-meta-particle__singularity-lens {
+  fill: color-mix(in srgb, var(--accent) 8%, transparent);
+  stroke: color-mix(in srgb, var(--ink-3) 20%, transparent);
+  stroke-width: 1;
+  opacity: 0.28;
+}
+
+.mv-meta-particle__lens-grid {
+  opacity: 0.2;
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: rotate(-8deg);
+  mask-image: radial-gradient(ellipse at center, black 34%, transparent 72%);
+}
+
+.mv-meta-particle__lens-line {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ink-3) 28%, transparent);
+  stroke-width: 0.75;
+}
+
+.mv-meta-particle__core {
+  fill: color-mix(in srgb, var(--accent) 64%, var(--ink-2));
+  opacity: 0.42;
+}
+
+.mv-meta-particle__singularity-core {
+  fill: color-mix(in srgb, #0b1612 76%, var(--accent));
+  opacity: 0.58;
+}
+
+.mv-meta-particle__particle {
+  opacity: 0.52;
+}
+
+.mv-meta-particle__particle--primary circle {
+  fill: color-mix(in srgb, var(--accent) 40%, var(--ink-3));
+}
+
+.mv-meta-particle__particle--secondary circle {
+  fill: color-mix(in srgb, var(--ink-2) 84%, var(--accent));
+}
+
+.mv-meta-particle__particle--warm circle {
+  fill: color-mix(in srgb, #a99562 36%, var(--ink-3));
+}
+
+.mv-meta-particle__comet-path {
+  stroke: color-mix(in srgb, var(--accent) 30%, var(--ink-3));
+  opacity: 0.34;
+}
+
+.mv-meta-particle__comet-bar {
+  fill: color-mix(in srgb, var(--ink) 24%, transparent);
+  opacity: 0.42;
+}
+
+.mv-meta-particle__comet-bar--soft {
+  fill: color-mix(in srgb, var(--ink-3) 26%, transparent);
+  opacity: 0.34;
+}
+
+.mv-meta-particle__dust {
+  fill: color-mix(in srgb, var(--ink-3) 38%, transparent);
+  opacity: 0.5;
+}
+
+.mv-dark .mv-meta-particle__orbit,
+.mv-dark .mv-meta-particle__gravity-path,
+.mv-dark .mv-meta-particle__gravity-contour,
+.mv-dark .mv-meta-particle__comet-path {
+  stroke: color-mix(in srgb, var(--ink-2) 32%, transparent);
+}
+
+.mv-dark .mv-meta-particle__orbit--2,
+.mv-dark .mv-meta-particle__orbit--3,
+.mv-dark .mv-meta-particle__event-horizon {
+  stroke: color-mix(in srgb, var(--accent) 30%, var(--ink-2));
+}
+
+.mv-dark .mv-meta-particle__axis {
+  stroke: color-mix(in srgb, var(--ink-2) 18%, transparent);
+}
+
+.mv-dark .mv-meta-particle__core {
+  opacity: 0.5;
+}
+
+.mv-dark .mv-meta-particle__singularity-core {
+  fill: color-mix(in srgb, #0a1210 68%, var(--accent));
+  opacity: 0.7;
+}
+
+.mv-dark .mv-meta-particle__lens-line {
+  stroke: color-mix(in srgb, var(--ink-2) 24%, transparent);
+}
+
+@keyframes mvMetaParticleCore {
+  0%,
+  100% {
+    transform: scale(0.86);
+    opacity: 0.025;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 0.075;
+  }
+}
+
+@keyframes mvMetaParticleSwirl {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes mvMetaParticleContour {
+  0%,
+  100% {
+    opacity: 0.18;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 0.32;
+    transform: translateY(-3px);
+  }
 }
 
 .mv-brand-loop-shell {
-  width: clamp(48px, 5vw, 64px);
+  position: relative;
+  z-index: 1;
+  width: 36px;
   aspect-ratio: 1;
-  margin: 0 auto 6px;
-  opacity: 0.16;
+  margin: 56px auto 0;
+  overflow: hidden;
+  border-radius: 999px;
+  opacity: 0.2;
   pointer-events: none;
+  filter: none;
 }
 
 .mv-intake-title {
@@ -2157,6 +2419,11 @@
     padding: 44px 18px 42px;
   }
 
+  .mv-intake-hero-visual {
+    width: min(640px, calc(100vw - 28px));
+    height: 140px;
+  }
+
   .mv-intake-composer,
   .mv-intake-templates {
     width: min(720px, calc(100vw - 52px));
@@ -2168,6 +2435,16 @@
 }
 
 @media (max-width: 640px) {
+  .mv-intake-hero-visual {
+    height: 112px;
+    margin-bottom: 6px;
+  }
+
+  .mv-brand-loop-shell {
+    width: 30px;
+    margin-top: 42px;
+  }
+
   .mv-intake-actions {
     align-items: stretch;
     flex-direction: column;
@@ -2189,6 +2466,19 @@
 
   .mv-intake-templates {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mv-meta-particle__core-halo,
+  .mv-meta-particle__singularity-halo,
+  .mv-meta-particle__singularity-swirl,
+  .mv-meta-particle__gravity-contour {
+    animation: none;
+  }
+
+  .mv-meta-particle__particle {
+    display: none;
   }
 }
 

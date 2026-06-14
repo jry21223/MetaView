@@ -9,7 +9,7 @@ vi.mock("@remotion/player", async () => {
   const React = await import("react");
   return {
     Player: React.forwardRef(function MockPlayer(
-      _props: unknown,
+      props: { inputProps?: { showSubtitles?: boolean } },
       ref: React.ForwardedRef<unknown>,
     ) {
       React.useImperativeHandle(ref, () => ({
@@ -19,7 +19,12 @@ vi.mock("@remotion/player", async () => {
         play: vi.fn(),
         seekTo: vi.fn(),
       }));
-      return <div data-testid="mock-remotion-player" />;
+      return (
+        <div
+          data-testid="mock-remotion-player"
+          data-show-subtitles={String(props.inputProps?.showSubtitles)}
+        />
+      );
     }),
   };
 });
@@ -138,9 +143,25 @@ describe("PlaybookPlayer", () => {
     expect(getByText("Ask a follow-up")).toBeTruthy();
   });
 
-  it("keeps the primary controls in the design order and moves playback options into settings", () => {
+  it("keeps the narration panel above controls and moves playback options into settings", () => {
     const { container, getByRole, getByText, queryByText } = render(
       <PlaybookPlayer script={baseScript()} theme="light" />,
+    );
+
+    expect(container.querySelector('[data-testid="mock-remotion-player"]')?.getAttribute("data-show-subtitles")).toBe(
+      "false",
+    );
+    const workspaceChildren = Array.from(
+      container.querySelector(".playbook-player__workspace")!.children,
+    );
+    expect(
+      workspaceChildren.findIndex((child) =>
+        child.classList.contains("playbook-player__caption"),
+      ),
+    ).toBeLessThan(
+      workspaceChildren.findIndex((child) =>
+        child.classList.contains("playbook-player__controls"),
+      ),
     );
 
     const controls = container.querySelector(".playbook-player__controls");
@@ -167,37 +188,68 @@ describe("PlaybookPlayer", () => {
 
     fireEvent.click(getByRole("button", { name: "播放器设置" }));
     expect(getByText("播放速度")).toBeTruthy();
-    expect(getByText("字幕")).toBeTruthy();
+    expect(queryByText("字幕")).toBeNull();
+    expect(getByText("播放模式")).toBeTruthy();
     expect(getByText("语音朗读")).toBeTruthy();
   });
 
-  it("opens workbench navigation from the left rail and closes it with Escape", () => {
-    const onHistory = vi.fn();
-    const { getByRole, queryByRole } = render(
+  it("renders the player export action as an icon-only button", () => {
+    const onOpenExport = vi.fn();
+    const { getByRole, queryByText } = render(
       <PlaybookPlayer
         script={baseScript()}
         theme="light"
-        workbenchNavItems={[
-          { id: "home", label: "首页", active: true, onSelect: vi.fn() },
-          { id: "history", label: "任务历史", onSelect: onHistory },
-          { id: "templates", label: "模板", onSelect: vi.fn() },
-          { id: "settings", label: "设置", onSelect: vi.fn() },
-        ]}
+        onOpenExport={onOpenExport}
       />,
     );
 
-    const trigger = getByRole("button", { name: "打开任务导航" });
+    expect(queryByText("Export")).toBeNull();
+    const exportButton = getByRole("button", { name: "导出 MP4" });
+    expect(exportButton.querySelector("svg")).toBeTruthy();
+
+    fireEvent.click(exportButton);
+    expect(onOpenExport).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses the left rail control to toggle the workbench topbar instead of opening a submenu", () => {
+    const onToggle = vi.fn();
+    const { getByRole, queryByRole, rerender } = render(
+      <PlaybookPlayer
+        script={baseScript()}
+        theme="light"
+        topbarCollapsed={false}
+        onToggleTopbar={onToggle}
+      />,
+    );
+
+    const trigger = getByRole("button", { name: "隐藏顶部栏" });
     fireEvent.click(trigger);
 
-    expect(getByRole("menu", { name: "任务导航" })).toBeTruthy();
-    fireEvent.click(getByRole("menuitem", { name: "任务历史" }));
-
-    expect(onHistory).toHaveBeenCalledTimes(1);
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    expect(trigger.getAttribute("aria-pressed")).toBe("false");
+    expect(trigger.querySelector('[data-testid="topbar-toggle-icon-collapse"]')).toBeTruthy();
     expect(queryByRole("menu", { name: "任务导航" })).toBeNull();
+    expect(queryByRole("menuitem", { name: "首页" })).toBeNull();
+    expect(queryByRole("menuitem", { name: "任务历史" })).toBeNull();
+    expect(queryByRole("menuitem", { name: "模板" })).toBeNull();
+    expect(queryByRole("menuitem", { name: "设置" })).toBeNull();
 
-    fireEvent.click(trigger);
-    expect(getByRole("menu", { name: "任务导航" })).toBeTruthy();
-    fireEvent.keyDown(document, { key: "Escape" });
+    rerender(
+      <PlaybookPlayer
+        script={baseScript()}
+        theme="light"
+        topbarCollapsed
+        onToggleTopbar={onToggle}
+      />,
+    );
+    expect(getByRole("button", { name: "显示顶部栏" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    expect(
+      getByRole("button", { name: "显示顶部栏" }).querySelector(
+        '[data-testid="topbar-toggle-icon-expand"]',
+      ),
+    ).toBeTruthy();
     expect(queryByRole("menu", { name: "任务导航" })).toBeNull();
   });
 
@@ -219,6 +271,108 @@ describe("PlaybookPlayer", () => {
     expect(within(relatedPanel).getByTestId("version-history")).toBeTruthy();
     expect(getByTestId("followup-slot")).toBeTruthy();
     expect(queryByText("Study variants")).toBeNull();
+  });
+
+  it("can hide the learning console for read-only history playback", () => {
+    const script = baseScript({
+      domain: "algorithm",
+      algorithm_id: "bubble_sort",
+      initial_data: {},
+      steps: [
+        {
+          ...baseScript().steps[0],
+          snapshot: {
+            kind: "algorithm_array",
+            array_values: ["3", "1", "2"],
+            active_indices: [0],
+            swap_indices: [],
+            sorted_indices: [],
+            pointers: {},
+          },
+          code_highlight: {
+            language: "python",
+            lines: ["for i in range(n):", "    pass"],
+            active_line: 1,
+            active_lines: [1],
+            variables: {},
+          },
+        },
+      ],
+    });
+
+    const { container, queryByLabelText, queryByText } = render(
+      <PlaybookPlayer
+        script={script}
+        theme="light"
+        showLearningConsole={false}
+        followupSlot={<div>Ask a follow-up</div>}
+        relatedSlot={<div>版本记录</div>}
+      />,
+    );
+
+    expect(container.querySelector(".playbook-player--no-console")).toBeTruthy();
+    expect(queryByLabelText("Learning console")).toBeNull();
+    expect(queryByText("Code Sync")).toBeNull();
+    expect(queryByText("Params")).toBeNull();
+    expect(queryByText("Follow-up")).toBeNull();
+    expect(queryByText("Related")).toBeNull();
+    expect(queryByText("Ask a follow-up")).toBeNull();
+    expect(queryByText("版本记录")).toBeNull();
+  });
+
+  it("shows algorithm params when replay can use array values from snapshots", () => {
+    const script = baseScript({
+      domain: "algorithm",
+      algorithm_id: "bubble_sort",
+      initial_data: {},
+      steps: [
+        {
+          ...baseScript().steps[0],
+          snapshot: {
+            kind: "algorithm_array",
+            array_values: ["3", "1", "2"],
+            active_indices: [],
+            swap_indices: [],
+            sorted_indices: [],
+            pointers: {},
+          },
+        },
+      ],
+    });
+
+    const { getByText, getByDisplayValue } = render(
+      <PlaybookPlayer script={script} theme="light" />,
+    );
+
+    expect(getByText("Params")).toBeTruthy();
+    expect(getByDisplayValue("3")).toBeTruthy();
+    expect(getByDisplayValue("1")).toBeTruthy();
+  });
+
+  it("hides algorithm params when no replayable controls are available", () => {
+    const script = baseScript({
+      domain: "algorithm",
+      algorithm_id: "bfs",
+      initial_data: {},
+      steps: [
+        {
+          ...baseScript().steps[0],
+          snapshot: {
+            kind: "algorithm_array",
+            array_values: ["3", "1", "2"],
+            active_indices: [],
+            swap_indices: [],
+            sorted_indices: [],
+            pointers: {},
+          },
+        },
+      ],
+    });
+
+    const { queryByText } = render(<PlaybookPlayer script={script} theme="light" />);
+
+    expect(queryByText("Params")).toBeNull();
+    expect(queryByText(/不可用|不支持/)).toBeNull();
   });
 
   it("clamps the current step when a patched script becomes shorter", async () => {

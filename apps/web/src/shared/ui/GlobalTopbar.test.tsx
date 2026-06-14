@@ -79,6 +79,20 @@ describe("GlobalTopbar account avatar", () => {
     expect(getByLabelText("切换主题")).toBeTruthy();
   });
 
+  it("does not render a topbar export action on the workbench", () => {
+    const { queryByLabelText } = render(
+      <GlobalTopbar
+        {...baseProps}
+        stage="workbench"
+        hidePrimaryNav
+        onOpenExport={vi.fn()}
+        exportEnabled
+      />,
+    );
+
+    expect(queryByLabelText("导出 MP4")).toBeNull();
+  });
+
   it("keeps the production MetaView brand and does not render concept placeholders", () => {
     const { getByText, queryByText } = render(<GlobalTopbar {...baseProps} />);
 

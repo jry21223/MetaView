@@ -7,7 +7,27 @@ import { server } from "../../mocks/server";
 import { API_BASE_URL } from "../../shared/config/constants";
 import { TWEAK_DEFAULTS } from "../../features/studio-editor/hooks/useTweaks";
 import type { PipelineRunResult } from "../../entities/pipeline/types";
+import type { PlaybookScript } from "../../entities/playbook/types";
 import { HistoryPage } from "./HistoryPage";
+
+vi.mock("@remotion/player", async () => {
+  const ReactModule = await import("react");
+  return {
+    Player: ReactModule.forwardRef(function MockPlayer(
+      _props: unknown,
+      ref: React.ForwardedRef<unknown>,
+    ) {
+      ReactModule.useImperativeHandle(ref, () => ({
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        pause: vi.fn(),
+        play: vi.fn(),
+        seekTo: vi.fn(),
+      }));
+      return ReactModule.createElement("div", { "data-testid": "mock-remotion-player" });
+    }),
+  };
+});
 
 const runsFixture: PipelineRunResult[] = [
   {
@@ -30,12 +50,20 @@ const runsFixture: PipelineRunResult[] = [
   },
 ];
 
+const succeededRun: PipelineRunResult = {
+  run_id: "run-ok",
+  status: "succeeded",
+  prompt: "归并排序",
+  playbook: historyPlaybook(),
+  director: null,
+  error: null,
+  created_at: "2026-06-01T08:00:00.000Z",
+  review: null,
+};
+
 function renderHistoryPage(overrides: Partial<React.ComponentProps<typeof HistoryPage>> = {}) {
   const props: React.ComponentProps<typeof HistoryPage> = {
     t: TWEAK_DEFAULTS,
-    setTweak: vi.fn(),
-    onNavigate: vi.fn(),
-    isProviderConfigured: true,
     onOpenInWorkbench: vi.fn(),
     ...overrides,
   };
@@ -165,4 +193,55 @@ describe("HistoryPage actions", () => {
     fireEvent.click(getByRole("button", { name: "重试加载历史记录" }));
     await waitFor(() => expect(hits).toBeGreaterThan(1));
   });
+
+  it("renders history playback without params, code sync, follow-up, or related panels", async () => {
+    fixtureRuns([succeededRun]);
+
+    const { findByTestId, queryByLabelText, queryByText } = renderHistoryPage();
+
+    await findByTestId("mock-remotion-player");
+    expect(queryByLabelText("Learning console")).toBeNull();
+    expect(queryByText("Params")).toBeNull();
+    expect(queryByText("Code Sync")).toBeNull();
+    expect(queryByText("Follow-up")).toBeNull();
+    expect(queryByText("Related")).toBeNull();
+  });
 });
+
+function historyPlaybook(): PlaybookScript {
+  return {
+    schema_version: "1.0.0",
+    fps: 30,
+    total_frames: 60,
+    domain: "algorithm",
+    algorithm_id: "bubble_sort",
+    title: "归并排序历史回放",
+    summary: "历史页只回放动画。",
+    initial_data: {},
+    parameter_controls: [],
+    steps: [
+      {
+        step_id: "step_01",
+        end_frame: 60,
+        title: "初始数组",
+        voiceover_text: "观察数组变化。",
+        snapshot: {
+          kind: "algorithm_array",
+          array_values: ["3", "1", "2"],
+          active_indices: [0],
+          swap_indices: [],
+          sorted_indices: [],
+          pointers: {},
+        },
+        code_highlight: {
+          language: "python",
+          lines: ["for i in range(n):", "    pass"],
+          active_line: 1,
+          active_lines: [1],
+          variables: {},
+        },
+        tokens: [],
+      },
+    ],
+  };
+}

@@ -13,6 +13,7 @@ describe("followupApi", () => {
         expect(request.credentials).toBe("include");
         requestBody = await request.json();
         return HttpResponse.json({
+          kind: "patch",
           reply: "已更新",
           change_summary: "refactor: update step",
           version_id: "v1",
@@ -28,7 +29,8 @@ describe("followupApi", () => {
       { apiKey: "sk-user", baseUrl: "https://api.example.com/v1", model: "gpt-test" },
     );
 
-    expect(result.playbook.title).toBe("Updated");
+    expect(result.playbook?.title).toBe("Updated");
+    expect(result.kind).toBe("patch");
     expect(requestBody).toMatchObject({
       message: "展开第一步",
       provider_api_key: "sk-user",
@@ -37,11 +39,32 @@ describe("followupApi", () => {
     });
   });
 
+  it("accepts text-only follow-up replies without patched playbooks", async () => {
+    server.use(
+      http.post(`${API_BASE_URL}/api/v1/runs/run-1/follow-up`, () =>
+        HttpResponse.json({
+          kind: "reply",
+          reply: "这里是因为当前元素比右侧更小。",
+          change_summary: "answer: explain current step",
+          version_id: null,
+          playbook: null,
+          director: null,
+        }),
+      ),
+    );
+
+    const result = await submitRunFollowUp("run-1", "这里为什么交换？", []);
+
+    expect(result.kind).toBe("reply");
+    expect(result.playbook).toBeNull();
+    expect(result.version_id).toBeNull();
+  });
+
   it("loads follow-up history and restores versions", async () => {
     server.use(
       http.post(`${API_BASE_URL}/api/v1/runs/run-1/versions/v0/restore`, ({ request }) => {
         expect(request.credentials).toBe("include");
-        return HttpResponse.json({ version_id: "v2", playbook: playbook("Original") });
+        return HttpResponse.json({ version_id: "v0", playbook: playbook("Original") });
       }),
       http.get(`${API_BASE_URL}/api/v1/runs/run-1/follow-ups`, ({ request }) => {
         expect(request.credentials).toBe("include");
@@ -82,6 +105,7 @@ describe("followupApi", () => {
     expect(history.followups[0].change_summary).toBe("feat: revise explanation");
     expect(history.versions[0].short_id).toBe("a1b2c3d4");
     expect(history.versions[0].is_head).toBe(true);
+    expect(restored.version_id).toBe("v0");
     expect(restored.playbook.title).toBe("Original");
   });
 });
