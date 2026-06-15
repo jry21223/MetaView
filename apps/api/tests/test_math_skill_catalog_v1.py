@@ -110,10 +110,20 @@ def test_default_registry_contains_v1_math_skills_and_routes_system() -> None:
     registry = build_default_skill_registry()
     manifests = {manifest.skill_id for manifest in registry.manifests()}
     route = registry.heuristic_match(SkillRouteInput(prompt="解方程组 x+2y=3, 3x-y=5"))
+    statistics_route = registry.heuristic_match(
+        SkillRouteInput(prompt="总体数据 [2,4,4,4,5,5,7,9]，求均值和极差")
+    )
 
-    assert {"elementary_algebra", "linear_algebra", "calculus_core"} <= manifests
+    assert {
+        "elementary_algebra",
+        "linear_algebra",
+        "calculus_core",
+        "probability_statistics_core",
+    } <= manifests
     assert route is not None
     assert route.skill_id == "linear_algebra"
+    assert statistics_route is not None
+    assert statistics_route.skill_id == "probability_statistics_core"
 
 
 @pytest.mark.asyncio
