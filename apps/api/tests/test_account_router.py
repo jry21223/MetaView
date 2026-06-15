@@ -33,8 +33,8 @@ def test_epay_settings_accept_prefixed_env_aliases(monkeypatch: pytest.MonkeyPat
     monkeypatch.setenv("METAVIEW_EPAY_SUBMIT_PATH", "/submit.php")
     monkeypatch.setenv("METAVIEW_EPAY_PID", "pid")
     monkeypatch.setenv("METAVIEW_EPAY_KEY", "secret")
-    monkeypatch.setenv("METAVIEW_EPAY_NOTIFY_URL", "https://metaview.top/api/v1/billing/epay/notify")
-    monkeypatch.setenv("METAVIEW_EPAY_RETURN_URL", "https://metaview.top/payment/result")
+    monkeypatch.setenv("METAVIEW_EPAY_NOTIFY_URL", "https://metaview.example.com/api/v1/billing/epay/notify")
+    monkeypatch.setenv("METAVIEW_EPAY_RETURN_URL", "https://metaview.example.com/payment/result")
 
     settings = Settings(_env_file=None)
 
@@ -42,8 +42,8 @@ def test_epay_settings_accept_prefixed_env_aliases(monkeypatch: pytest.MonkeyPat
     assert settings.epay_submit_path == "/submit.php"
     assert settings.epay_pid == "pid"
     assert settings.epay_key == "secret"
-    assert settings.epay_notify_url == "https://metaview.top/api/v1/billing/epay/notify"
-    assert settings.epay_return_url == "https://metaview.top/payment/result"
+    assert settings.epay_notify_url == "https://metaview.example.com/api/v1/billing/epay/notify"
+    assert settings.epay_return_url == "https://metaview.example.com/payment/result"
 
 
 @pytest.fixture
@@ -64,8 +64,8 @@ def _epay_test_settings() -> Settings:
         epay_submit_path="/submit.php",
         epay_pid="merchant-id",
         epay_key="test-key",
-        epay_notify_url="https://metaview.top/api/v1/billing/epay/notify",
-        epay_return_url="https://metaview.top/payment/result",
+        epay_notify_url="https://metaview.example.com/api/v1/billing/epay/notify",
+        epay_return_url="https://metaview.example.com/payment/result",
         _env_file=None,
     )
 
@@ -239,8 +239,8 @@ def test_recharge_payment_config_error_returns_503(
     monkeypatch.setenv("METAVIEW_EPAY_SUBMIT_PATH", "/submit.php")
     monkeypatch.setenv("METAVIEW_EPAY_PID", "pid")
     monkeypatch.setenv("METAVIEW_EPAY_KEY", "secret")
-    monkeypatch.setenv("METAVIEW_EPAY_NOTIFY_URL", "https://metaview.top/api/v1/billing/epay/notify")
-    monkeypatch.setenv("METAVIEW_EPAY_RETURN_URL", "https://metaview.top/payment/result")
+    monkeypatch.setenv("METAVIEW_EPAY_NOTIFY_URL", "https://metaview.example.com/api/v1/billing/epay/notify")
+    monkeypatch.setenv("METAVIEW_EPAY_RETURN_URL", "https://metaview.example.com/payment/result")
     app = create_app()
     app.dependency_overrides[get_payment_gateway] = lambda: _FailingPaymentGateway()
     with TestClient(app) as client:

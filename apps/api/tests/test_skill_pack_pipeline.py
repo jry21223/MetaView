@@ -122,7 +122,7 @@ class FakeSkillPack:
 
 
 def test_run_pipeline_does_not_import_solid_geometry_directly() -> None:
-    source = Path("apps/api/app/application/use_cases/run_pipeline.py").read_text()
+    source = Path("apps/api/app/application/use_cases/run_pipeline.py").read_text(encoding="utf-8")
 
     assert "app.domain.skills.solid_geometry" not in source
 

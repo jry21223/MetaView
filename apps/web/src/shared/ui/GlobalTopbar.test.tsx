@@ -38,17 +38,6 @@ describe("GlobalTopbar account avatar", () => {
     expect(getByText("MV")).toBeTruthy();
   });
 
-  it("does not render ops dashboard nav on dashboard stage", () => {
-    const { queryByText } = render(<GlobalTopbar {...baseProps} stage="dashboard" />);
-
-    expect(queryByText("运营面板")).toBeFalsy();
-    expect(queryByText("首页")).toBeTruthy();
-    expect(queryByText("工作台")).toBeNull();
-    expect(queryByText("任务历史")).toBeTruthy();
-    expect(queryByText("模板")).toBeTruthy();
-    expect(queryByText("设置")).toBeTruthy();
-  });
-
   it("does not show ops dashboard nav on workbench stage", () => {
     const { queryByText } = render(<GlobalTopbar {...baseProps} stage="workbench" appEdition="ops" />);
 
@@ -66,7 +55,7 @@ describe("GlobalTopbar account avatar", () => {
         {...baseProps}
         stage="workbench"
         hidePrimaryNav
-        onOpenProviderSettings={vi.fn()}
+        onOpenAccountPanel={vi.fn()}
       />,
     );
 
@@ -77,20 +66,6 @@ describe("GlobalTopbar account avatar", () => {
     expect(queryByText("设置")).toBeNull();
     expect(getByLabelText("账户与充值")).toBeTruthy();
     expect(getByLabelText("切换主题")).toBeTruthy();
-  });
-
-  it("does not render a topbar export action on the workbench", () => {
-    const { queryByLabelText } = render(
-      <GlobalTopbar
-        {...baseProps}
-        stage="workbench"
-        hidePrimaryNav
-        onOpenExport={vi.fn()}
-        exportEnabled
-      />,
-    );
-
-    expect(queryByLabelText("导出 MP4")).toBeNull();
   });
 
   it("keeps the production MetaView brand and does not render concept placeholders", () => {
@@ -131,7 +106,7 @@ describe("GlobalTopbar account avatar", () => {
 
     expect(queryByLabelText("账户与充值")).toBeNull();
     expect(queryByText(/¥ 5\.00/)).toBeNull();
-    expect(getByText("CORE NODES ONLINE")).toBeTruthy();
+    expect(getByText("模型已配置")).toBeTruthy();
     expect(queryByLabelText("模型服务商设置")).toBeTruthy();
   });
 });

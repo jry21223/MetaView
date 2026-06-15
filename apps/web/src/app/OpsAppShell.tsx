@@ -18,6 +18,7 @@ import { StudioPage } from "../pages/Studio/StudioPage";
 import { HistoryPage } from "../pages/History/HistoryPage";
 import { TemplatesPage } from "../pages/Templates/TemplatesPage";
 import { SettingsPage } from "../pages/Settings/SettingsPage";
+import { OPEN_ACCOUNT_PANEL_FLAG } from "../pages/PaymentResultPage";
 import { usePipelineSubmit } from "../features/pipeline/hooks/usePipelineSubmit";
 import {
   GlobalTopbar,
@@ -108,6 +109,13 @@ export function OpsAppShell() {
 
   const isLoggedIn = accountStatus === "authenticated" && account?.login_provider === "wechat";
 
+  useEffect(() => {
+    if (!isLoggedIn || typeof window === "undefined") return;
+    if (window.sessionStorage.getItem(OPEN_ACCOUNT_PANEL_FLAG) !== "1") return;
+    window.sessionStorage.removeItem(OPEN_ACCOUNT_PANEL_FLAG);
+    window.queueMicrotask(() => setAccountModalOpen(true));
+  }, [isLoggedIn]);
+
   if (!isLoggedIn) {
     return (
       <div
@@ -143,7 +151,7 @@ export function OpsAppShell() {
           onNavigate={navigate}
           isDark={mode === "dark"}
           onToggleTheme={toggleTheme}
-          onOpenProviderSettings={openAccountPanel}
+          onOpenAccountPanel={openAccountPanel}
         />
       </GlobalTopbarShell>
 

@@ -12,6 +12,7 @@ MetaView v2 是一个教育可视化平台：后端用 FastAPI 生成结构化�
 ## 功能概览
 
 - 支持 `algorithm`, `math`, `code`, `physics`, `chemistry`, `biology`, `geography` 七个教学领域。
+- 首发输入支持文本题目、粘贴代码和上传代码文件；暂不支持图片、截图、PDF、PPT/课件或任意附件生成。
 - 题目提交前会做 topic routing：高置信题目进入 specialized skill，未命中时走 generic skill 并由 LLM 决定最终 `cir.domain`。
 - 算法领域支持数组视图和 `algorithm_bars` 柱状视图，可回放冒泡、快排、插入、选择等排序过程。
 - 数学领域支持逐项代数和 `visual_kind="function"` 函数图，覆盖平移、缩放、导数切线、定积分阴影、三角波等场景。

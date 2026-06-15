@@ -560,7 +560,7 @@ function SideMenu({
         {navItems.map((item) => (
           <ListItemButton
             key={item.stage}
-            selected={item.stage === "dashboard"}
+            selected={false}
             onClick={() => onNavigate(item.stage)}
             sx={{ borderRadius: 1, mb: 0.5 }}
           >

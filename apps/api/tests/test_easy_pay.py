@@ -16,8 +16,8 @@ def _settings() -> Settings:
         epay_submit_path="/submit.php",
         epay_pid="merchant-id",
         epay_key="test-key",
-        epay_notify_url="https://metaview.top/api/v1/billing/epay/notify",
-        epay_return_url="https://metaview.top/payment/result",
+        epay_notify_url="https://metaview.example.com/api/v1/billing/epay/notify",
+        epay_return_url="https://metaview.example.com/payment/result",
         _env_file=None,
     )
 
@@ -37,7 +37,7 @@ async def test_create_native_order_builds_submit_php_link_with_signature() -> No
     assert query["pid"] == ["merchant-id"]
     assert query["money"] == ["5.00"]
     assert query["type"] == ["wxpay"]
-    assert query["return_url"] == ["https://metaview.top/payment/result"]
+    assert query["return_url"] == ["https://metaview.example.com/payment/result"]
     assert query["sign_type"] == ["MD5"]
 
 

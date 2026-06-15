@@ -25,10 +25,13 @@ python3 apps/api/tools/review_generation_workflow.py --no-provider-override
 ## Remote API
 
 ```bash
-METAVIEW_REVIEW_API_BASE=http://115.191.22.22 \
+METAVIEW_REVIEW_API_BASE=https://your-review-host.example \
 METAVIEW_REVIEW_API_KEY="$OPENAI_API_KEY" \
 make review-real-generation
 ```
+
+Pass API keys only through environment variables or a local, ignored `.env`
+file. Do not write real review hosts, deployment IPs, or keys into the repo.
 
 ## Outputs
 

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import React from "react";
 import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -53,7 +53,7 @@ describe("App edition shells", () => {
     expect(opsHits).toBe(0);
   }, 20000);
 
-  it("self edition shows the looping brand logo animation on the intake screen", async () => {
+  it("self edition shows the canvas particle field on the intake screen", async () => {
     vi.stubEnv("VITE_APP_EDITION", "self");
 
     const { App } = await import("./App");
@@ -61,8 +61,9 @@ describe("App edition shells", () => {
 
     expect(container.textContent).toContain("MetaView");
     expect(
-      within(container).getByLabelText("MetaView logo animation"),
+      container.querySelector('[data-testid="meta-particle-field"][data-variant="canvas"]'),
     ).toBeTruthy();
+    expect(container.querySelector('[aria-label="MetaView logo animation"]')).toBeNull();
   }, 10000);
 
   it("ops edition shows the login gate when account session is missing", async () => {
@@ -85,7 +86,7 @@ describe("App edition shells", () => {
     await waitFor(() =>
       expect(container.textContent).toContain("登录暂未开放"),
     );
-    expect(container.textContent).not.toContain("把题目变成可播放的讲解");
+    expect(container.textContent).not.toContain("把一道题变成可播放的理论画布");
   });
 
   it("ops edition opens the intake screen after WeChat login", async () => {
@@ -120,7 +121,7 @@ describe("App edition shells", () => {
 
     await waitFor(() => expect(accountHits).toBe(1));
     await waitFor(() => expect(dashboardHits).toBe(0));
-    expect(container.textContent).toContain("把题目变成可播放的讲解");
+    expect(container.textContent).toContain("把一道题变成可播放的理论画布");
     expect(container.textContent).not.toContain("全局运营");
     expect(container.textContent).toContain("微信用户 · ¥ 5.00");
     expect(container.querySelectorAll(".mv-top")).toHaveLength(1);
@@ -156,7 +157,7 @@ describe("App edition shells", () => {
     const { container, getByRole, getByText } = render(<App />);
 
     expect(container.querySelectorAll(".mv-top")).toHaveLength(1);
-    fireEvent.click(getByRole("button", { name: /高数动画/ }));
+    fireEvent.click(getByRole("button", { name: /数学题/ }));
 
     await waitFor(() =>
       expect(getByRole("button", { name: "隐藏顶部栏" })).toBeTruthy(),
@@ -186,6 +187,25 @@ describe("App edition shells", () => {
     const { queryByText } = render(<App />);
 
     await waitFor(() => expect(queryByText("运营面板")).toBeNull());
+  });
+
+  it("does not render the ops dashboard on /admin in self edition", async () => {
+    let dashboardHits = 0;
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () => {
+        dashboardHits += 1;
+        return HttpResponse.json(sampleDashboard());
+      }),
+    );
+    vi.stubEnv("VITE_APP_EDITION", "self");
+    window.history.pushState({}, "", "/admin");
+
+    const { App } = await import("./App");
+    const { container } = render(<App />);
+
+    expect(container.textContent).toContain("运营后台仅在 ops edition 可用");
+    expect(container.textContent).not.toContain("全局运营");
+    expect(dashboardHits).toBe(0);
   });
 
   it("loads the hidden ops dashboard on /admin without exposing a nav shortcut", async () => {

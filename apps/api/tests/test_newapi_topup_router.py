@@ -30,8 +30,8 @@ def newapi_topup_client(monkeypatch: pytest.MonkeyPatch, tmp_path):
     monkeypatch.setenv("METAVIEW_EPAY_SUBMIT_PATH", "/submit.php")
     monkeypatch.setenv("METAVIEW_EPAY_PID", "pid")
     monkeypatch.setenv("METAVIEW_EPAY_KEY", "secret")
-    monkeypatch.setenv("METAVIEW_EPAY_NOTIFY_URL", "https://metaview.top/api/v1/billing/epay/notify")
-    monkeypatch.setenv("METAVIEW_EPAY_RETURN_URL", "https://metaview.top/payment/result")
+    monkeypatch.setenv("METAVIEW_EPAY_NOTIFY_URL", "https://metaview.example.com/api/v1/billing/epay/notify")
+    monkeypatch.setenv("METAVIEW_EPAY_RETURN_URL", "https://metaview.example.com/payment/result")
     app = create_app()
     with TestClient(app) as client:
         yield client
@@ -156,8 +156,8 @@ def test_newapi_topup_payment_config_error_returns_503(
     monkeypatch.setenv("METAVIEW_EPAY_SUBMIT_PATH", "/submit.php")
     monkeypatch.setenv("METAVIEW_EPAY_PID", "pid")
     monkeypatch.setenv("METAVIEW_EPAY_KEY", "secret")
-    monkeypatch.setenv("METAVIEW_EPAY_NOTIFY_URL", "https://metaview.top/api/v1/billing/epay/notify")
-    monkeypatch.setenv("METAVIEW_EPAY_RETURN_URL", "https://metaview.top/payment/result")
+    monkeypatch.setenv("METAVIEW_EPAY_NOTIFY_URL", "https://metaview.example.com/api/v1/billing/epay/notify")
+    monkeypatch.setenv("METAVIEW_EPAY_RETURN_URL", "https://metaview.example.com/payment/result")
     app = create_app()
     app.dependency_overrides[get_payment_gateway] = lambda: _FailingPaymentGateway()
     with TestClient(app) as client:
@@ -191,7 +191,7 @@ def test_newapi_topup_real_payment_uses_receipt_complete_return_url(
 
     get_settings.cache_clear()
 
-    assert payment.return_url == f"https://metaview.top/api/v1/newapi/topups/{intent_id}/complete"
+    assert payment.return_url == f"https://metaview.example.com/api/v1/newapi/topups/{intent_id}/complete"
 
 
 def test_newapi_topup_rejects_expired_signed_intent(
@@ -410,8 +410,8 @@ def _start_topup(client: TestClient):
 
 
 def _set_epay_public_urls(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("METAVIEW_EPAY_NOTIFY_URL", "https://metaview.top/api/v1/billing/epay/notify")
-    monkeypatch.setenv("METAVIEW_EPAY_RETURN_URL", "https://metaview.top/payment/result")
+    monkeypatch.setenv("METAVIEW_EPAY_NOTIFY_URL", "https://metaview.example.com/api/v1/billing/epay/notify")
+    monkeypatch.setenv("METAVIEW_EPAY_RETURN_URL", "https://metaview.example.com/payment/result")
 
 
 def _signed_payload(*, expires_in: timedelta = timedelta(minutes=10)) -> tuple[str, str]:

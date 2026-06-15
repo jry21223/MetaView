@@ -310,9 +310,6 @@ export function RechargeModal({ account, onRefreshAccount, onClose }: RechargeMo
               <div className="mv-account-note">状态：{activeOrder.status}</div>
             </div>
             {activeOrder.status === "paid" && <div className="mv-pay-panel__paid">已到账</div>}
-            {activeOrder.status === "pending" && (
-              <div className="mv-account-note">请在跳转到支付页后完成支付并稍后返回。</div>
-            )}
           </section>
         )}
 

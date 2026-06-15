@@ -9,7 +9,20 @@ export function App() {
     return <PaymentResultPage />;
   }
   if (window.location.pathname === '/admin') {
-    return <OpsDashboardPage onNavigate={() => {}} />;
+    if (APP_EDITION === 'ops') {
+      return <OpsDashboardPage onNavigate={() => {}} />;
+    }
+    return (
+      <main className="mv-root mv-admin-unavailable">
+        <section className="mv-admin-unavailable__panel">
+          <h1>运营后台仅在 ops edition 可用</h1>
+          <p>当前是 self edition。后端仍会继续执行管理员权限校验。</p>
+          <button type="button" className="mv-chip" onClick={() => window.location.assign("/")}>
+            返回工作台
+          </button>
+        </section>
+      </main>
+    );
   }
 
   return APP_EDITION === 'ops' ? <OpsAppShell /> : <SelfAppShell />;

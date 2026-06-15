@@ -1,6 +1,6 @@
 import { useId } from "react";
 
-export type MetaParticleFieldVariant = "singularity" | "orbit" | "comet";
+export type MetaParticleFieldVariant = "canvas" | "singularity" | "orbit" | "comet";
 
 interface MetaParticleFieldProps {
   variant: MetaParticleFieldVariant;
@@ -32,6 +32,49 @@ const COMET_PATHS = [
   "M224 126C300 36 382 140 500 54",
 ] as const;
 
+const CANVAS_NODES: ReadonlyArray<{
+  x: number;
+  y: number;
+  r: number;
+  layer: 1 | 2 | 3;
+  mobileHidden?: boolean;
+}> = [
+  { x: 92, y: 226, r: 3.2, layer: 1 },
+  { x: 138, y: 174, r: 2.4, layer: 2 },
+  { x: 176, y: 118, r: 3.8, layer: 1 },
+  { x: 218, y: 204, r: 2.8, layer: 2 },
+  { x: 264, y: 82, r: 2.4, layer: 3, mobileHidden: true },
+  { x: 302, y: 146, r: 4.6, layer: 1 },
+  { x: 346, y: 218, r: 2.8, layer: 2 },
+  { x: 398, y: 112, r: 5.4, layer: 1 },
+  { x: 442, y: 178, r: 3.2, layer: 2 },
+  { x: 492, y: 82, r: 2.6, layer: 3, mobileHidden: true },
+  { x: 538, y: 152, r: 4.2, layer: 1 },
+  { x: 582, y: 218, r: 2.8, layer: 2 },
+  { x: 630, y: 120, r: 3.2, layer: 2 },
+  { x: 688, y: 178, r: 2.6, layer: 3, mobileHidden: true },
+  { x: 722, y: 226, r: 3.8, layer: 1 },
+] as const;
+
+const CANVAS_LINKS = [
+  { from: 0, to: 1, strength: 1 },
+  { from: 1, to: 2, strength: 2 },
+  { from: 2, to: 5, strength: 1 },
+  { from: 3, to: 5, strength: 2 },
+  { from: 5, to: 7, strength: 1 },
+  { from: 7, to: 8, strength: 2 },
+  { from: 8, to: 10, strength: 1 },
+  { from: 10, to: 12, strength: 2 },
+  { from: 11, to: 14, strength: 1 },
+  { from: 12, to: 14, strength: 2 },
+] as const;
+
+const CANVAS_PATHS = [
+  "M92 226C176 98 255 206 302 146C356 78 438 104 538 152C610 188 666 150 722 226",
+  "M138 174C232 232 326 76 398 112C478 150 512 74 630 120",
+  "M218 204C306 236 374 190 442 178C518 164 578 226 688 178",
+] as const;
+
 const ORBIT_PARTICLES = [
   { path: 0, r: 4.4, duration: "15s", begin: "-3s", tone: "primary" },
   { path: 1, r: 3.8, duration: "11s", begin: "-7s", tone: "secondary" },
@@ -42,6 +85,12 @@ const ORBIT_PARTICLES = [
 const COMET_PARTICLES = [
   { path: 0, r: 4.2, duration: "7s", begin: "-2s", tone: "primary" },
   { path: 1, r: 3.6, duration: "9s", begin: "-6s", tone: "secondary" },
+] as const;
+
+const CANVAS_PARTICLES = [
+  { path: 0, r: 3.2, duration: "24s", begin: "-4s", tone: "primary" },
+  { path: 1, r: 2.7, duration: "31s", begin: "-13s", tone: "secondary" },
+  { path: 2, r: 2.4, duration: "36s", begin: "-21s", tone: "warm" },
 ] as const;
 
 function safeId(raw: string) {
@@ -103,6 +152,7 @@ export function MetaParticleField({
   const id = safeId(useId());
   const singularityId = `mv-meta-particle-singularity-${id}`;
   const contourId = `mv-meta-particle-contour-${id}`;
+  const canvasId = `mv-meta-particle-canvas-${id}`;
   const orbitId = `mv-meta-particle-orbit-${id}`;
   const cometId = `mv-meta-particle-comet-${id}`;
   const rootClass = [
@@ -125,6 +175,63 @@ export function MetaParticleField({
         preserveAspectRatio="xMidYMid meet"
         focusable="false"
       >
+        {variant === "canvas" && (
+          <>
+            <g className="mv-meta-particle__canvas-grid">
+              {Array.from({ length: 9 }, (_, index) => (
+                <path
+                  key={`h-${index}`}
+                  className="mv-meta-particle__canvas-grid-line"
+                  d={`M76 ${52 + index * 24}H724`}
+                />
+              ))}
+              {Array.from({ length: 13 }, (_, index) => (
+                <path
+                  key={`v-${index}`}
+                  className="mv-meta-particle__canvas-grid-line"
+                  d={`M${88 + index * 52} 42V250`}
+                />
+              ))}
+            </g>
+            <g className="mv-meta-particle__canvas-paths">
+              {renderPaths(CANVAS_PATHS, canvasId, "mv-meta-particle__canvas-path")}
+            </g>
+            <g className="mv-meta-particle__canvas-links">
+              {CANVAS_LINKS.map((link, index) => {
+                const from = CANVAS_NODES[link.from];
+                const to = CANVAS_NODES[link.to];
+                return (
+                  <line
+                    key={`${link.from}-${link.to}-${index}`}
+                    className={`mv-meta-particle__canvas-link mv-meta-particle__canvas-link--${link.strength}`}
+                    x1={from.x}
+                    y1={from.y}
+                    x2={to.x}
+                    y2={to.y}
+                  />
+                );
+              })}
+            </g>
+            <g className="mv-meta-particle__canvas-nodes">
+              {CANVAS_NODES.map((node, index) => (
+                <circle
+                  key={`${node.x}-${node.y}-${index}`}
+                  className={[
+                    "mv-meta-particle__canvas-node",
+                    "mv-meta-particle__core",
+                    `mv-meta-particle__canvas-node--${node.layer}`,
+                    node.mobileHidden ? "is-mobile-hidden" : "",
+                  ].filter(Boolean).join(" ")}
+                  cx={node.x}
+                  cy={node.y}
+                  r={node.r}
+                />
+              ))}
+            </g>
+            {renderParticles(CANVAS_PARTICLES, canvasId)}
+          </>
+        )}
+
         {variant === "singularity" && (
           <>
             <g className="mv-meta-particle__lens-grid">

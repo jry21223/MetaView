@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { MetaParticleField, MetaParticleFieldVariant } from "./MetaParticleField";
 
-const variants: MetaParticleFieldVariant[] = ["singularity", "orbit", "comet"];
+const variants: MetaParticleFieldVariant[] = ["canvas", "singularity", "orbit", "comet"];
 
 describe("MetaParticleField", () => {
   afterEach(() => {
@@ -29,6 +29,16 @@ describe("MetaParticleField", () => {
     expect(container.querySelectorAll(".mv-meta-particle__particle")).toHaveLength(0);
     expect(queryByText(/meta/i)).toBeNull();
     expect(queryByText("M")).toBeNull();
+  });
+
+  it("renders the canvas variant as a static knowledge graph with reasoning paths", () => {
+    const { container } = render(<MetaParticleField variant="canvas" />);
+
+    expect(container.querySelector(".mv-meta-particle__canvas-grid")).toBeTruthy();
+    expect(container.querySelectorAll(".mv-meta-particle__canvas-node").length).toBeGreaterThan(10);
+    expect(container.querySelectorAll(".mv-meta-particle__canvas-link").length).toBeGreaterThan(5);
+    expect(container.querySelectorAll(".mv-meta-particle__canvas-path")).toHaveLength(3);
+    expect(container.querySelectorAll(".mv-meta-particle__particle")).toHaveLength(3);
   });
 
   it("keeps orbit and comet variants available as low-key motion variants", () => {

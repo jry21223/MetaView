@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from "react";
 
 export type Stage =
-  | "dashboard"
   | "intake"
   | "workbench"
   | "history"
@@ -19,8 +18,7 @@ interface GlobalTopbarProps {
   isDark: boolean;
   onToggleTheme: () => void;
   onOpenProviderSettings?: () => void;
-  onOpenExport?: () => void;
-  exportEnabled?: boolean;
+  onOpenAccountPanel?: () => void;
   hidePrimaryNav?: boolean;
 }
 
@@ -35,6 +33,7 @@ export function GlobalTopbar({
   isDark,
   onToggleTheme,
   onOpenProviderSettings,
+  onOpenAccountPanel,
   hidePrimaryNav = false,
 }: GlobalTopbarProps) {
   const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
@@ -48,6 +47,10 @@ export function GlobalTopbar({
     failedAvatarUrl !== accountAvatarUrl
       ? accountAvatarUrl
       : null;
+  const accountOrProviderHandler =
+    appEdition === "ops" ? onOpenAccountPanel : onOpenProviderSettings;
+  const accountOrProviderLabel =
+    appEdition === "ops" ? "账户与充值" : "模型服务商设置";
 
   return (
     <header className="mv-top">
@@ -63,6 +66,7 @@ export function GlobalTopbar({
         <nav className="mv-nav">
           <button
             className={`mv-nav-item ${isHome ? "is-active" : ""}`}
+            aria-current={isHome ? "page" : undefined}
             onClick={() => onNavigate("intake")}
             type="button"
           >
@@ -73,6 +77,7 @@ export function GlobalTopbar({
           </button>
           <button
             className={`mv-nav-item ${isHistory ? "is-active" : ""}`}
+            aria-current={isHistory ? "page" : undefined}
             onClick={() => onNavigate("history")}
             type="button"
           >
@@ -85,6 +90,7 @@ export function GlobalTopbar({
           </button>
           <button
             className={`mv-nav-item ${isTemplates ? "is-active" : ""}`}
+            aria-current={isTemplates ? "page" : undefined}
             onClick={() => onNavigate("templates")}
             type="button"
           >
@@ -98,6 +104,7 @@ export function GlobalTopbar({
           </button>
           <button
             className={`mv-nav-item ${isSettings ? "is-active" : ""}`}
+            aria-current={isSettings ? "page" : undefined}
             onClick={() => onNavigate("settings")}
             type="button"
           >
@@ -111,12 +118,12 @@ export function GlobalTopbar({
       )}
 
       <div className="mv-top-right">
-        {onOpenProviderSettings && (
+        {accountOrProviderHandler && (
           <button
             className="mv-icon-btn"
-            onClick={onOpenProviderSettings}
-            title={appEdition === "ops" ? "账户与充值" : "模型服务商设置"}
-            aria-label={appEdition === "ops" ? "账户与充值" : "模型服务商设置"}
+            onClick={accountOrProviderHandler}
+            title={accountOrProviderLabel}
+            aria-label={accountOrProviderLabel}
           >
             {appEdition === "ops" ? "¥" : "⚙"}
           </button>
@@ -146,12 +153,12 @@ export function GlobalTopbar({
           ) : isProviderConfigured ? (
             <>
               <span className="mv-pulse" />
-              <span>CORE NODES ONLINE</span>
+              <span>模型已配置</span>
             </>
           ) : (
             <>
               <span className="mv-pulse-offline" />
-              <span>NO PROVIDER SET</span>
+              <span>未配置模型</span>
             </>
           )}
         </div>

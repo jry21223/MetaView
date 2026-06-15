@@ -36,7 +36,7 @@ GREEN_THEOREM_FIXTURE_PATH = FIXTURE_DIR / "math-green-theorem.json"
 
 @pytest.fixture()
 def fixture_json() -> str:
-    return FIXTURE_PATH.read_text()
+    return FIXTURE_PATH.read_text(encoding="utf-8")
 
 
 @pytest.fixture()
@@ -311,7 +311,7 @@ def test_score_playbook_passed_flag() -> None:
 
 
 def test_green_theorem_fixture_is_scene_based() -> None:
-    raw = GREEN_THEOREM_FIXTURE_PATH.read_text()
+    raw = GREEN_THEOREM_FIXTURE_PATH.read_text(encoding="utf-8")
     script = PlaybookScript.model_validate_json(raw)
 
     assert script.title == "格林公式讲解"

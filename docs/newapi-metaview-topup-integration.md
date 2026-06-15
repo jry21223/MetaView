@@ -1,6 +1,6 @@
 # NewAPI 真实站点兼容 MetaView 充值接入说明
 
-本文面向 NewAPI 真实站点 `https://api.1ip.icu` 的技术人员，说明如何把 NewAPI 钱包充值入口接入 MetaView 收银台 `https://metaview.top`。
+本文面向 NewAPI 站点技术人员，说明如何把 NewAPI 钱包充值入口接入 MetaView 收银台。示例域名使用 `https://newapi.example.com` 与 `https://metaview.example.com`，生产部署请替换为自己的 HTTPS 域名。
 
 首版接入采用 **signed intent + MetaView receipt + NewAPI 幂等加 quota**。不要把 NewAPI 原生 redemption code 作为主路径：原生兑换码仍保留给后台批量发码，本接入只把 MetaView 支付结果作为一次性 receipt 凭证，NewAPI 服务端验真后直接给当前用户增加 quota。
 
@@ -30,11 +30,11 @@ NewAPI 用户选择充值金额
 NewAPI 生产环境需要增加：
 
 ```bash
-METAVIEW_CHECKOUT_URL=https://metaview.top/api/v1/newapi/topups/start
-METAVIEW_RETURN_URL=https://api.1ip.icu/api/user/metaview/topup/callback
+METAVIEW_CHECKOUT_URL=https://metaview.example.com/api/v1/newapi/topups/start
+METAVIEW_RETURN_URL=https://newapi.example.com/api/user/metaview/topup/callback
 METAVIEW_INTENT_SECRET=<METAVIEW_INTENT_SECRET>
-METAVIEW_RECEIPT_VERIFY_URL=https://metaview.top/api/v1/internal/newapi/topup-receipts/verify
-METAVIEW_RECEIPT_ACK_URL=https://metaview.top/api/v1/internal/newapi/topup-receipts/ack
+METAVIEW_RECEIPT_VERIFY_URL=https://metaview.example.com/api/v1/internal/newapi/topup-receipts/verify
+METAVIEW_RECEIPT_ACK_URL=https://metaview.example.com/api/v1/internal/newapi/topup-receipts/ack
 METAVIEW_RECEIPT_TOKEN=<METAVIEW_RECEIPT_TOKEN>
 ```
 
@@ -43,7 +43,7 @@ METAVIEW_RECEIPT_TOKEN=<METAVIEW_RECEIPT_TOKEN>
 - `<METAVIEW_INTENT_SECRET>` 与 MetaView 的 `METAVIEW_NEWAPI_TOPUP_INTENT_SECRET` 必须一致。
 - `<METAVIEW_RECEIPT_TOKEN>` 与 MetaView 的 `METAVIEW_NEWAPI_TOPUP_RECEIPT_TOKEN` 必须一致。
 - 密钥只放服务端环境变量，不返回给前端，不写日志，不放仓库。
-- MetaView 侧需要把 `https://api.1ip.icu` 加入 `METAVIEW_NEWAPI_TOPUP_ALLOWED_RETURN_ORIGINS`。
+- MetaView 侧需要把 `https://newapi.example.com` 加入 `METAVIEW_NEWAPI_TOPUP_ALLOWED_RETURN_ORIGINS`。
 
 ## 3. Public Interfaces
 
@@ -69,7 +69,7 @@ Content-Type: application/json
   "success": true,
   "message": "",
   "data": {
-    "jump_url": "https://metaview.top/api/v1/newapi/topups/start?payload=...&sig=..."
+    "jump_url": "https://metaview.example.com/api/v1/newapi/topups/start?payload=...&sig=..."
   }
 }
 ```
@@ -85,7 +85,7 @@ window.location.href = response.data.jump_url;
 NewAPI 后端生成的跳转地址：
 
 ```http
-GET https://metaview.top/api/v1/newapi/topups/start?payload=<base64url-json>&sig=<hmac-sha256>
+GET https://metaview.example.com/api/v1/newapi/topups/start?payload=<base64url-json>&sig=<hmac-sha256>
 ```
 
 `payload` 解码后的 JSON：
@@ -96,7 +96,7 @@ GET https://metaview.top/api/v1/newapi/topups/start?payload=<base64url-json>&sig
   "amount_cents": 500,
   "quota_delta": 2500000,
   "state": "random-opaque-state",
-  "return_url": "https://api.1ip.icu/api/user/metaview/topup/callback?newapi_user_id=4",
+  "return_url": "https://newapi.example.com/api/user/metaview/topup/callback?newapi_user_id=4",
   "expires_at": "2026-06-04T12:00:00Z"
 }
 ```
@@ -131,7 +131,7 @@ quota_delta = 500 * 500000 / 100 = 2500000
 MetaView 支付成功后会跳回 `return_url`，并追加：
 
 ```http
-GET https://api.1ip.icu/api/user/metaview/topup/callback?newapi_user_id=4&state=...&intent_id=nup...&receipt_code=mvr_...
+GET https://newapi.example.com/api/user/metaview/topup/callback?newapi_user_id=4&state=...&intent_id=nup...&receipt_code=mvr_...
 ```
 
 NewAPI callback 只把这些参数当作线索，不能直接入账。必须进入服务端 verify 流程。
@@ -141,7 +141,7 @@ NewAPI callback 只把这些参数当作线索，不能直接入账。必须进�
 NewAPI 服务端调用 MetaView：
 
 ```http
-POST https://metaview.top/api/v1/internal/newapi/topup-receipts/verify
+POST https://metaview.example.com/api/v1/internal/newapi/topup-receipts/verify
 Authorization: Bearer <METAVIEW_RECEIPT_TOKEN>
 Content-Type: application/json
 
@@ -180,7 +180,7 @@ NewAPI 必须校验响应：
 NewAPI 完成本地入账后调用：
 
 ```http
-POST https://metaview.top/api/v1/internal/newapi/topup-receipts/ack
+POST https://metaview.example.com/api/v1/internal/newapi/topup-receipts/ack
 Authorization: Bearer <METAVIEW_RECEIPT_TOKEN>
 Content-Type: application/json
 
@@ -298,7 +298,7 @@ if (paymentType === "metaview_topup") {
 - MetaView verify 返回非 2xx 时，不得入账。
 - verify 成功但本地入账失败时，不得 ack；保留错误日志，方便人工排查。
 - 本地入账成功但 ack 失败时，不得重复加 quota；再次 callback 时仍应通过 `intent_id` 幂等判断。
-- `return_url` 必须固定为 `https://api.1ip.icu` 域名下的 callback，不允许由浏览器传入。
+- `return_url` 必须固定为你的 NewAPI HTTPS 域名下的 callback，不允许由浏览器传入。
 - `expires_at` 建议设置为当前时间后 15 分钟，过期 intent 会被 MetaView 拒绝。
 
 ## 7. 验收测试
