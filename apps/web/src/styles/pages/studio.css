@@ -1718,6 +1718,16 @@
 /* ───── Intake / Landing ───── */
 /* ───── Launch-ready intake home ───── */
 .mv-intake-body {
+  --bg: #0f1410;
+  --surface: #121a15;
+  --surface-2: #17211b;
+  --ink: #e4e8df;
+  --ink-2: #b8c1b4;
+  --ink-3: #747e73;
+  --line: rgba(228, 232, 223, 0.1);
+  --line-2: rgba(228, 232, 223, 0.16);
+  --accent: #14c78f;
+  --accent-soft: rgba(20, 199, 143, 0.12);
   flex: 1;
   min-height: calc(100vh - 58px);
   max-width: none;
@@ -1725,24 +1735,39 @@
   margin: 0;
   position: relative;
   overflow: auto;
+  isolation: isolate;
   display: grid;
   align-content: center;
   justify-items: center;
   gap: 12px;
   padding: clamp(44px, 8vh, 78px) 24px 46px;
   background:
-    linear-gradient(rgba(82, 76, 62, 0.052) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(82, 76, 62, 0.052) 1px, transparent 1px),
-    color-mix(in srgb, var(--bg) 86%, #f5f0e4);
-  background-size: 34px 34px;
+    radial-gradient(ellipse 72% 54% at 50% 30%, rgba(20, 199, 143, 0.055), transparent 58%),
+    #0f1410;
 }
 
-.mv-dark .mv-intake-body {
-  background:
-    linear-gradient(rgba(232, 238, 221, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(232, 238, 221, 0.045) 1px, transparent 1px),
-    #121611;
-  background-size: 34px 34px;
+.mv-intake-body::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(232, 238, 221, 0.026) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232, 238, 221, 0.026) 1px, transparent 1px);
+  background-size: 52px 52px;
+  -webkit-mask-image: radial-gradient(
+    ellipse 62% 48% at 50% 34%,
+    transparent 0 30%,
+    rgba(0, 0, 0, 0.1) 54%,
+    #000 88%
+  );
+  mask-image: radial-gradient(
+    ellipse 62% 48% at 50% 34%,
+    transparent 0 30%,
+    rgba(0, 0, 0, 0.1) 54%,
+    #000 88%
+  );
 }
 
 .mv-intake-hero,
@@ -1943,6 +1968,10 @@
   opacity: 0.52;
 }
 
+.mv-meta-particle--singularity .mv-meta-particle__particle {
+  opacity: 0.36;
+}
+
 .mv-meta-particle__particle--primary circle {
   fill: color-mix(in srgb, var(--accent) 40%, var(--ink-3));
 }
@@ -2088,15 +2117,38 @@
   overflow: visible;
   border: 1px solid var(--line-2);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--surface) 84%, transparent);
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  backdrop-filter: blur(12px);
   box-shadow:
     0 8px 24px rgba(54, 48, 36, 0.07),
     inset 0 1px 0 rgba(255, 255, 255, 0.58);
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease,
+    background 180ms ease;
 }
 
 .mv-dark .mv-intake-composer {
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   backdrop-filter: blur(14px);
+}
+
+.mv-intake-composer:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 62%, var(--line-2));
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  box-shadow:
+    0 14px 36px rgba(54, 48, 36, 0.09),
+    0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  transform: translateY(-1px);
+}
+
+.mv-dark .mv-intake-composer:focus-within {
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  box-shadow:
+    0 14px 36px rgba(0, 0, 0, 0.22),
+    0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 .mv-intake-attachment-tab {
@@ -2149,10 +2201,22 @@
 }
 
 .mv-intake-input {
+  appearance: none;
+  display: block;
+  width: 100%;
+  border: 0;
+  outline: none;
   min-height: 104px;
   padding: 18px 20px 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
   font-size: 14px;
   line-height: 1.55;
+}
+
+.mv-intake-input::placeholder {
+  color: color-mix(in srgb, var(--ink-3) 82%, transparent);
 }
 
 .mv-intake-actions {
@@ -2231,7 +2295,8 @@
 .mv-intake-templates {
   width: min(620px, calc(100vw - 96px));
   max-width: none;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: grid;
+  grid-template-columns: repeat(4, minmax(136px, 1fr));
   gap: 10px;
   margin-top: 0;
 }
