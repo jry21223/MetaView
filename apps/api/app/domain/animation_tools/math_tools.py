@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pydantic import AliasChoices, BaseModel, Field
+
 from app.domain.animation_tools.registry import register
 from app.domain.models.cir import (
     KaTeXOverlaySpec,
@@ -11,193 +13,338 @@ from app.domain.models.cir import (
     NarrationCardSpec,
     PlotCurveSpec,
     PlotSpec,
+    SceneCurve,
+    SceneRegion,
+    SceneSegment,
+    SceneSpec,
 )
+
+
+class _PlotBounds(BaseModel):
+    x_min: float = -6.0
+    x_max: float = 6.0
+    y_min: float | None = None
+    y_max: float | None = None
+
+
+class MathShowTangentArgs(_PlotBounds):
+    expression: str = Field(min_length=1)
+    x0: float
+    tangent_expression: str = Field(min_length=1)
+    formula_latex: str | None = None
+    caption: str | None = None
+
+
+class MathShowFunctionArgs(_PlotBounds):
+    expression: str = Field(min_length=1)
+    expression_2: str | None = None
+    formula_latex: str | None = None
+    marker_x: float | None = None
+    shade_from: float | None = None
+    shade_to: float | None = None
+
+
+class MathShowIntegralAreaArgs(_PlotBounds):
+    expression: str = Field(min_length=1)
+    from_: float = Field(validation_alias=AliasChoices("from_", "from"))
+    to: float
+    formula_latex: str | None = None
+
+
+class MathShowDerivativeCompareArgs(_PlotBounds):
+    expression: str = Field(min_length=1)
+    derivative_expression: str = Field(min_length=1)
+    formula_latex: str | None = None
+    caption: str | None = None
+
+
+class MathShowFunctionTransformArgs(_PlotBounds):
+    base_expression: str = Field(min_length=1)
+    transformed_expression: str = Field(min_length=1)
+    base_label: str = "f(x)"
+    transformed_label: str = "g(x)"
+    formula_latex: str | None = None
+    caption: str | None = None
+
+
+class MathShowParametricCurveArgs(BaseModel):
+    expression_x: str = Field(min_length=1)
+    expression_y: str = Field(min_length=1)
+    t_min: float
+    t_max: float
+    x_min: float = -5.0
+    x_max: float = 5.0
+    y_min: float = -5.0
+    y_max: float = 5.0
+    formula_latex: str | None = None
+    caption: str | None = None
+
+
+class MathShowRegionBoundaryArgs(BaseModel):
+    vertices: list[tuple[float, float]] = Field(min_length=3)
+    label: str | None = None
+    x_min: float = -5.0
+    x_max: float = 5.0
+    y_min: float = -5.0
+    y_max: float = 5.0
+    formula_latex: str | None = None
+    caption: str | None = None
 
 
 @register("math.show_tangent")
 def show_tangent(args: dict) -> list[LayerSpec]:
-    """Draw a function curve and a tangent line at ``x0``.
-
-    Expected ``args`` keys:
-        expression (str) — the function, e.g. ``"x^2"``
-        x0 (float) — point at which to draw the tangent
-        tangent_expression (str) — the linear tangent formula, e.g. ``"4*x - 4"``
-        formula_latex (str, optional) — KaTeX label, e.g. ``"f'(2)=4"``
-        caption (str, optional) — explanatory text for the narration card
-        x_min (float, optional) — default -5.0
-        x_max (float, optional) — default 5.0
-    """
-    expression = args.get("expression", "x^2")
-    x0 = args.get("x0", 0.0)
-    tangent_expr = args.get("tangent_expression", "0")
-    formula_latex = args.get("formula_latex")
-    caption = args.get("caption")
-    x_min = args.get("x_min", -5.0)
-    x_max = args.get("x_max", 5.0)
-
-    layers: list[LayerSpec] = []
-
-    # Layer 1: function plot with marker and optional formula label
-    plot = PlotSpec(
-        curves=[
-            PlotCurveSpec(expression=expression, label="f(x)", emphasis="primary"),
-            PlotCurveSpec(
-                expression=tangent_expr,
-                label=f"切线 (x={x0})",
-                emphasis="secondary",
-            ),
-        ],
-        x_min=x_min,
-        x_max=x_max,
-        marker_x=x0,
-        formula_latex=formula_latex,
+    parsed = MathShowTangentArgs.model_validate(args)
+    layers = _plot_layers(
+        PlotSpec(
+            curves=[
+                PlotCurveSpec(
+                    expression=parsed.expression,
+                    label="f(x)",
+                    emphasis="primary",
+                ),
+                PlotCurveSpec(
+                    expression=parsed.tangent_expression,
+                    label=f"切线 (x={parsed.x0})",
+                    emphasis="secondary",
+                ),
+            ],
+            x_min=parsed.x_min,
+            x_max=parsed.x_max,
+            y_min=parsed.y_min,
+            y_max=parsed.y_max,
+            marker_x=parsed.x0,
+            formula_latex=parsed.formula_latex,
+        ),
+        formula_latex=parsed.formula_latex,
+        caption=parsed.caption,
     )
-    layers.append(
+    return layers
+
+
+@register("math.show_function")
+def show_function(args: dict) -> list[LayerSpec]:
+    parsed = MathShowFunctionArgs.model_validate(args)
+    curves = [
+        PlotCurveSpec(expression=parsed.expression, label="f(x)", emphasis="primary")
+    ]
+    if parsed.expression_2:
+        curves.append(
+            PlotCurveSpec(
+                expression=parsed.expression_2,
+                label="g(x)",
+                emphasis="secondary",
+            )
+        )
+    return _plot_layers(
+        PlotSpec(
+            curves=curves,
+            x_min=parsed.x_min,
+            x_max=parsed.x_max,
+            y_min=parsed.y_min,
+            y_max=parsed.y_max,
+            marker_x=parsed.marker_x,
+            shade_from=parsed.shade_from,
+            shade_to=parsed.shade_to,
+            formula_latex=parsed.formula_latex,
+        ),
+        formula_latex=parsed.formula_latex,
+    )
+
+
+@register("math.show_integral_area")
+def show_integral_area(args: dict) -> list[LayerSpec]:
+    parsed = MathShowIntegralAreaArgs.model_validate(args)
+    return _plot_layers(
+        PlotSpec(
+            curves=[
+                PlotCurveSpec(
+                    expression=parsed.expression,
+                    label="f(x)",
+                    emphasis="primary",
+                )
+            ],
+            x_min=parsed.x_min,
+            x_max=parsed.x_max,
+            y_min=parsed.y_min,
+            y_max=parsed.y_max,
+            shade_from=min(parsed.from_, parsed.to),
+            shade_to=max(parsed.from_, parsed.to),
+            formula_latex=parsed.formula_latex,
+        ),
+        formula_latex=parsed.formula_latex,
+    )
+
+
+@register("math.show_derivative_compare")
+def show_derivative_compare(args: dict) -> list[LayerSpec]:
+    parsed = MathShowDerivativeCompareArgs.model_validate(args)
+    return _plot_layers(
+        PlotSpec(
+            curves=[
+                PlotCurveSpec(
+                    expression=parsed.expression,
+                    label="f(x)",
+                    emphasis="primary",
+                ),
+                PlotCurveSpec(
+                    expression=parsed.derivative_expression,
+                    label="f'(x)",
+                    emphasis="accent",
+                ),
+            ],
+            x_min=parsed.x_min,
+            x_max=parsed.x_max,
+            y_min=parsed.y_min,
+            y_max=parsed.y_max,
+            formula_latex=parsed.formula_latex,
+        ),
+        formula_latex=parsed.formula_latex,
+        caption=parsed.caption,
+    )
+
+
+@register("math.show_function_transform")
+def show_function_transform(args: dict) -> list[LayerSpec]:
+    parsed = MathShowFunctionTransformArgs.model_validate(args)
+    return _plot_layers(
+        PlotSpec(
+            curves=[
+                PlotCurveSpec(
+                    expression=parsed.base_expression,
+                    label=parsed.base_label,
+                    emphasis="secondary",
+                ),
+                PlotCurveSpec(
+                    expression=parsed.transformed_expression,
+                    label=parsed.transformed_label,
+                    emphasis="primary",
+                ),
+            ],
+            x_min=parsed.x_min,
+            x_max=parsed.x_max,
+            y_min=parsed.y_min,
+            y_max=parsed.y_max,
+            formula_latex=parsed.formula_latex,
+        ),
+        formula_latex=parsed.formula_latex,
+        caption=parsed.caption,
+    )
+
+
+@register("math.show_parametric_curve")
+def show_parametric_curve(args: dict) -> list[LayerSpec]:
+    parsed = MathShowParametricCurveArgs.model_validate(args)
+    scene = SceneSpec(
+        x_min=parsed.x_min,
+        x_max=parsed.x_max,
+        y_min=parsed.y_min,
+        y_max=parsed.y_max,
+        curves=[
+            SceneCurve(
+                expression_x=parsed.expression_x,
+                expression_y=parsed.expression_y,
+                t_min=parsed.t_min,
+                t_max=parsed.t_max,
+                label="parametric",
+                emphasis="primary",
+                arrows=True,
+            )
+        ],
+        formula_latex=parsed.formula_latex,
+        caption=parsed.caption,
+    )
+    return _scene_layers(scene, parsed.formula_latex, parsed.caption)
+
+
+@register("math.show_region_boundary")
+def show_region_boundary(args: dict) -> list[LayerSpec]:
+    parsed = MathShowRegionBoundaryArgs.model_validate(args)
+    closed = [*parsed.vertices, parsed.vertices[0]]
+    scene = SceneSpec(
+        x_min=parsed.x_min,
+        x_max=parsed.x_max,
+        y_min=parsed.y_min,
+        y_max=parsed.y_max,
+        regions=[SceneRegion(vertices=parsed.vertices, label=parsed.label)],
+        segments=[
+            SceneSegment(
+                points=closed,
+                arrow=True,
+                label=parsed.label,
+                emphasis="accent",
+            )
+        ],
+        formula_latex=parsed.formula_latex,
+        caption=parsed.caption,
+    )
+    return _scene_layers(scene, parsed.formula_latex, parsed.caption)
+
+
+def _plot_layers(
+    plot: PlotSpec,
+    *,
+    formula_latex: str | None,
+    caption: str | None = None,
+) -> list[LayerSpec]:
+    layers = [
         LayerSpec(
             kind=LayerKind.MATH_PLOT,
             timing=LayerTimingSpec(enter_at=0.0, exit_at=1.0, z_order=0),
             plot=plot,
         )
-    )
+    ]
+    layers.extend(_overlay_layers(formula_latex, caption, x=plot.x_max, y=0.8 * plot.x_max))
+    return layers
 
-    # Layer 2: narration card (optional)
+
+def _scene_layers(
+    scene: SceneSpec,
+    formula_latex: str | None,
+    caption: str | None,
+) -> list[LayerSpec]:
+    layers = [
+        LayerSpec(
+            kind=LayerKind.MATH_SCENE,
+            timing=LayerTimingSpec(enter_at=0.0, exit_at=1.0, z_order=0),
+            scene=scene,
+        )
+    ]
+    layers.extend(_overlay_layers(formula_latex, caption, x=scene.x_max, y=scene.y_max))
+    return layers
+
+
+def _overlay_layers(
+    formula_latex: str | None,
+    caption: str | None,
+    *,
+    x: float,
+    y: float,
+) -> list[LayerSpec]:
+    layers: list[LayerSpec] = []
     if caption:
         layers.append(
             LayerSpec(
                 kind=LayerKind.NARRATION_CARD,
                 timing=LayerTimingSpec(
-                    enter_at=0.2, exit_at=1.0, z_order=1, appear_anim="fade"
+                    enter_at=0.2,
+                    exit_at=1.0,
+                    z_order=1,
+                    appear_anim="fade",
                 ),
                 narration_card=NarrationCardSpec(text=caption, position="bottom"),
             )
         )
-
-    # Layer 3: floating formula overlay when formula_latex is set
     if formula_latex:
         layers.append(
             LayerSpec(
                 kind=LayerKind.KATEX_OVERLAY,
                 timing=LayerTimingSpec(enter_at=0.3, exit_at=1.0, z_order=2),
                 katex_overlay=KaTeXOverlaySpec(
-                    x=x_max,
-                    y=(x_max - x_min) * 0.8,
+                    x=x,
+                    y=y,
                     latex=formula_latex,
                     align="ne",
                 ),
             )
         )
-
-    return layers
-
-
-@register("math.show_function")
-def show_function(args: dict) -> list[LayerSpec]:
-    """Draw one or more function curves on a 2D plot.
-
-    Expected ``args`` keys:
-        expression (str) — primary curve, e.g. ``"x^2"``
-        expression_2 (str, optional) — secondary curve
-        x_min / x_max (float, optional)
-        formula_latex (str, optional)
-        marker_x (float, optional)
-        shade_from / shade_to (float, optional)
-    """
-    expression = args.get("expression", "x")
-    expression_2 = args.get("expression_2")
-    formula_latex = args.get("formula_latex")
-    marker_x = args.get("marker_x")
-    shade_from = args.get("shade_from")
-    shade_to = args.get("shade_to")
-    x_min = args.get("x_min", -6.0)
-    x_max = args.get("x_max", 6.0)
-
-    curves = [PlotCurveSpec(expression=expression, label="f(x)", emphasis="primary")]
-    if expression_2:
-        curves.append(
-            PlotCurveSpec(expression=expression_2, label="g(x)", emphasis="secondary")
-        )
-
-    layers: list[LayerSpec] = [
-        LayerSpec(
-            kind=LayerKind.MATH_PLOT,
-            timing=LayerTimingSpec(enter_at=0.0, exit_at=1.0, z_order=0),
-            plot=PlotSpec(
-                curves=curves,
-                x_min=x_min,
-                x_max=x_max,
-                marker_x=marker_x,
-                shade_from=shade_from,
-                shade_to=shade_to,
-                formula_latex=formula_latex,
-            ),
-        )
-    ]
-
-    if formula_latex:
-        layers.append(
-            LayerSpec(
-                kind=LayerKind.KATEX_OVERLAY,
-                timing=LayerTimingSpec(enter_at=0.3, exit_at=1.0, z_order=1),
-                katex_overlay=KaTeXOverlaySpec(
-                    x=x_max,
-                    y=(x_max - x_min) * 0.8,
-                    latex=formula_latex,
-                    align="ne",
-                ),
-            )
-        )
-
-    return layers
-
-
-@register("math.show_integral_area")
-def show_integral_area(args: dict) -> list[LayerSpec]:
-    """Shade the area under a curve to illustrate definite integrals.
-
-    Expected ``args`` keys:
-        expression (str) — the function to integrate
-        from_ / to (float) — integration bounds (note: ``from_`` because
-            ``from`` is a Python keyword)
-        x_min / x_max (float, optional)
-        formula_latex (str, optional)
-    """
-    expression = args.get("expression", "x^2")
-    from_ = args.get("from_", args.get("from", 0.0))
-    to_ = args.get("to", 2.0)
-    formula_latex = args.get("formula_latex")
-    x_min = args.get("x_min", -1.0)
-    x_max = args.get("x_max", 4.0)
-
-    shade_from = min(from_, to_)
-    shade_to = max(from_, to_)
-
-    layers: list[LayerSpec] = [
-        LayerSpec(
-            kind=LayerKind.MATH_PLOT,
-            timing=LayerTimingSpec(enter_at=0.0, exit_at=1.0, z_order=0),
-            plot=PlotSpec(
-                curves=[PlotCurveSpec(expression=expression, label="f(x)", emphasis="primary")],
-                x_min=x_min,
-                x_max=x_max,
-                shade_from=shade_from,
-                shade_to=shade_to,
-                formula_latex=formula_latex,
-            ),
-        )
-    ]
-
-    if formula_latex:
-        layers.append(
-            LayerSpec(
-                kind=LayerKind.KATEX_OVERLAY,
-                timing=LayerTimingSpec(enter_at=0.3, exit_at=1.0, z_order=1),
-                katex_overlay=KaTeXOverlaySpec(
-                    x=x_max,
-                    y=(x_max - x_min) * 0.8,
-                    latex=formula_latex,
-                    align="ne",
-                ),
-            )
-        )
-
     return layers

@@ -362,6 +362,14 @@ def _build_layer_body(
         return _build_array_snapshot(cir_step, checkpoint, execution_map)
     if kind == LayerKind.TREE_GRAPH:
         return _build_tree_snapshot(cir_step, checkpoint)
+    if kind == LayerKind.TABLE_SCENE:
+        return spec.table_scene
+    if kind == LayerKind.GRAPH_SCENE:
+        return spec.graph_scene
+    if kind == LayerKind.STATS_CHART_SCENE:
+        return spec.stats_chart_scene
+    if kind == LayerKind.MOTION_SCENE:
+        return spec.motion_scene
     logger.warning("Unknown layer kind=%s in step %s", kind, cir_step.id)
     return None
 

@@ -465,10 +465,14 @@ Example (bubble sort compare step):
       {{"id":"A2","label":"幅度 A₂","value":"0.5","description":"拖动看第二分量的幅度"}},
       {{"id":"w2","label":"角频率 ω₂","value":"5.0","description":"拖动看第二分量的频率"}}]`
 
-## Animation Macros（推荐 — 替代直接写 layers）
-- 对于常见教学动画，应优先使用 ``step.animation_calls`` 而非手写底层
-  ``layers`` JSON。每个 call 指定一个 ``tool`` 名称和 ``args`` 参数，
-  后端会自动展开为正确的 ``LayerSpec`` 对象。
+## Animation Tool Registry（强烈推荐 — common animation 的首选路径）
+- 对于常见教学动画，必须优先使用 ``step.animation_calls``，让后端根据
+  ``tool + args`` 生成规范化 ``LayerSpec``。不要为这些常见动画手写大段
+  raw ``layers`` JSON。
+- raw ``layers`` 只作为高级 fallback：仅当当前工具无法表达该视觉，且你能
+  准确填写 layer body 时才使用。
+- 如果要画切线、函数对比、积分面积、参数曲线、区域边界、受力图、抛体轨迹、
+  化学计量表、图遍历、Punnett 方格或概率分布图，优先选择下列工具。
 
 ``animation_calls`` 示例：
 `` ```json
@@ -488,13 +492,36 @@ Example (bubble sort compare step):
 }}
 `` ```
 
-已注册的 animation tools（优先使用）：
+已注册的 animation tools（优先使用；不要为这些场景直接手写 layers）：
 - ``math.show_tangent`` — 函数曲线 + 切线 + 标记点。
-  参数：expression, x0, tangent_expression, formula_latex, caption, x_min, x_max
+  参数：expression, x0, tangent_expression, formula_latex?, caption?, x_min?, x_max?, y_min?, y_max?
 - ``math.show_function`` — 函数作图，支持一到两条曲线。
-  参数：expression, expression_2, x_min, x_max, formula_latex, marker_x, shade_from, shade_to
+  参数：expression, expression_2?, x_min?, x_max?, y_min?, y_max?, formula_latex?, marker_x?, shade_from?, shade_to?
 - ``math.show_integral_area`` — 定积分面积填充。
-  参数：expression, from_, to, x_min, x_max, formula_latex
+  参数：expression, from_ 或 from, to, x_min?, x_max?, y_min?, y_max?, formula_latex?
+- ``math.show_derivative_compare`` — 同屏比较 f(x) 与 f'(x)。
+  参数：expression, derivative_expression, formula_latex?, caption?, x_min?, x_max?, y_min?, y_max?
+- ``math.show_function_transform`` — 同屏比较原函数与变换后的函数。
+  参数：base_expression, transformed_expression, base_label?, transformed_label?, formula_latex?, caption?, bounds?
+- ``math.show_parametric_curve`` — 参数曲线场景。
+  参数：expression_x, expression_y, t_min, t_max, x_min?, x_max?, y_min?, y_max?, formula_latex?, caption?
+- ``math.show_region_boundary`` — 区域与边界。
+  参数：vertices, label?, x_min?, x_max?, y_min?, y_max?, formula_latex?, caption?
+- ``physics.force_diagram`` — 受力图。
+  参数：forces[{{name,magnitude,angle_deg}}], x_min?, x_max?, y_min?, y_max?, formula_latex?, caption?
+- ``physics.projectile_motion`` — 抛体轨迹动画。
+  参数：v0, angle_deg, g?, duration?, x_min?, x_max?, y_min?, y_max?, formula_latex?, caption?
+- ``chemistry.stoichiometry_table`` — 化学计量表。
+  参数：rows[{{species, coefficient, mol?, mass?, role}}], equation_latex, caption?
+- ``algorithm.graph_traversal`` — 图遍历/最短路过程图。
+  参数：nodes, edges[{{source,target,label?,weight?}}], active_node_ids, active_edge_ids, directed, weighted, caption?
+- ``biology.punnett_square`` — Punnett 方格与表现型计数。
+  参数：parent_a, parent_b, alleles, cells, phenotype_counts
+- ``stats.distribution_chart`` — 概率/统计分布图。
+  参数：chart_type, series[{{label, values?, points?, emphasis?}}], x_label, y_label, formula_latex?, caption?
+
+工具参数是后端 Pydantic schema 校验的：缺少必需参数、未知 tool 或参数类型错误都会进入
+review/repair。不要用空对象或猜测默认值调用工具；不确定时选更简单的已注册工具。
 
 ``animation_calls`` 与 ``layers`` 可以同时使用：macro 展开的层在前，
 手写层在后（z_order 更高的手写层会覆盖在 macro 层之上）。
