@@ -1718,16 +1718,6 @@
 /* ───── Intake / Landing ───── */
 /* ───── Launch-ready intake home ───── */
 .mv-intake-body {
-  --bg: #0f1410;
-  --surface: #121a15;
-  --surface-2: #17211b;
-  --ink: #e4e8df;
-  --ink-2: #b8c1b4;
-  --ink-3: #747e73;
-  --line: rgba(228, 232, 223, 0.1);
-  --line-2: rgba(228, 232, 223, 0.16);
-  --accent: #14c78f;
-  --accent-soft: rgba(20, 199, 143, 0.12);
   flex: 1;
   min-height: calc(100vh - 58px);
   max-width: none;
@@ -1742,8 +1732,16 @@
   gap: 12px;
   padding: clamp(44px, 8vh, 78px) 24px 46px;
   background:
-    radial-gradient(ellipse 72% 54% at 50% 30%, rgba(20, 199, 143, 0.055), transparent 58%),
-    #0f1410;
+    radial-gradient(
+      ellipse 68% 52% at 50% 30%,
+      color-mix(in srgb, var(--accent) 7%, transparent),
+      transparent 60%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bg) 94%, #fff) 0%,
+      color-mix(in srgb, var(--bg) 86%, #f5f0e4) 100%
+    );
 }
 
 .mv-intake-body::before {
@@ -1753,9 +1751,9 @@
   z-index: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(232, 238, 221, 0.026) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(232, 238, 221, 0.026) 1px, transparent 1px);
-  background-size: 52px 52px;
+    linear-gradient(rgba(82, 76, 62, 0.032) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(82, 76, 62, 0.032) 1px, transparent 1px);
+  background-size: 48px 48px;
   -webkit-mask-image: radial-gradient(
     ellipse 62% 48% at 50% 34%,
     transparent 0 30%,
@@ -1768,6 +1766,22 @@
     rgba(0, 0, 0, 0.1) 54%,
     #000 88%
   );
+}
+
+.mv-dark .mv-intake-body {
+  background:
+    radial-gradient(
+      ellipse 68% 52% at 50% 30%,
+      color-mix(in srgb, var(--accent) 8%, transparent),
+      transparent 60%
+    ),
+    #121611;
+}
+
+.mv-dark .mv-intake-body::before {
+  background-image:
+    linear-gradient(rgba(232, 238, 221, 0.026) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232, 238, 221, 0.026) 1px, transparent 1px);
 }
 
 .mv-intake-hero,
@@ -2302,14 +2316,20 @@
 }
 
 .mv-tpl-card {
+  appearance: none;
   min-height: 68px;
+  border: 1px solid color-mix(in srgb, var(--line-2) 72%, transparent);
   border-radius: 7px;
   padding: 10px 11px;
   background: color-mix(in srgb, var(--surface) 40%, transparent);
+  color: var(--ink);
+  text-align: left;
   box-shadow: none;
+  cursor: pointer;
 }
 
 .mv-tpl-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--line-2));
   transform: translateY(-1px);
   background: color-mix(in srgb, var(--accent-soft) 34%, var(--surface));
 }
