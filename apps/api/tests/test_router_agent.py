@@ -133,10 +133,31 @@ def test_animation_tool_list_requires_shared_token(monkeypatch: pytest.MonkeyPat
     assert wrong.status_code == 401
     assert ok.status_code == 200
     tools = ok.json()["tools"]
-    assert {
-        "name": "math.show_tangent",
-        "description": "Show a function and tangent line at a selected x value.",
-    } in tools
+    tangent = next(tool for tool in tools if tool["name"] == "math.show_tangent")
+    assert tangent["description"] == "Show a function and tangent line at a selected x value."
+    assert tangent["args_schema"]["properties"]["expression"]["minLength"] == 1
+
+
+def test_animation_tool_list_returns_args_schema(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("METAVIEW_AGENT_SHARED_TOKEN", "secret")
+    get_settings.cache_clear()
+    client = TestClient(create_app())
+
+    response = client.get(
+        "/api/v1/agent/animation-tools",
+        headers={"X-MetaView-Agent-Token": "secret"},
+    )
+
+    assert response.status_code == 200
+    tools = response.json()["tools"]
+    show_function = next(tool for tool in tools if tool["name"] == "math.show_function")
+    schema = show_function["args_schema"]
+    assert schema["type"] == "object"
+    assert schema["properties"]["expression"]["minLength"] == 1
+    assert "x_min" in schema["properties"]
+    assert "x_max" in schema["properties"]
 
 
 def test_animation_tool_expand_returns_layers_with_issues_empty(

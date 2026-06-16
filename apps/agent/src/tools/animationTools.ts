@@ -19,6 +19,7 @@ export interface AnimationToolDeps {
 interface AnimationToolInfo {
   name: string;
   description: string;
+  args_schema: unknown;
 }
 
 interface AnimationToolIssue {

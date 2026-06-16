@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -18,6 +18,7 @@ from app.domain.models.cir import CirDocument, LayerSpec
 logger = logging.getLogger(__name__)
 
 _REGISTRY: dict[str, AnimationTool] = {}
+_TOOL_ARGS_MODELS: dict[str, type[BaseModel]] = {}
 _TOOL_DESCRIPTIONS: dict[str, str] = {
     "algorithm.graph_traversal": "Build graph traversal layers with active nodes and edges.",
     "biology.punnett_square": "Build a Punnett square for simple inheritance explanations.",
@@ -64,6 +65,7 @@ class AnimationToolExpansionResult(BaseModel):
 class AnimationToolInfo(BaseModel):
     name: str
     description: str
+    args_schema: dict[str, Any] = Field(default_factory=dict)
 
 
 class CirAnimationToolExpansionResult(BaseModel):
@@ -71,7 +73,10 @@ class CirAnimationToolExpansionResult(BaseModel):
     issues: list[AnimationToolIssue] = Field(default_factory=list)
 
 
-def register(name: str) -> Callable[[AnimationTool], AnimationTool]:
+def register(
+    name: str,
+    args_model: type[BaseModel] | None = None,
+) -> Callable[[AnimationTool], AnimationTool]:
     """Decorator that registers an animation tool under ``name``.
 
     Usage::
@@ -85,6 +90,8 @@ def register(name: str) -> Callable[[AnimationTool], AnimationTool]:
         if name in _REGISTRY:
             logger.warning("Animation tool %r already registered; overwriting", name)
         _REGISTRY[name] = fn
+        if args_model is not None:
+            _TOOL_ARGS_MODELS[name] = args_model
         return fn
 
     return deco
@@ -96,9 +103,17 @@ def list_animation_tools() -> list[AnimationToolInfo]:
         AnimationToolInfo(
             name=name,
             description=_TOOL_DESCRIPTIONS.get(name, _description_from_name(name)),
+            args_schema=_args_schema_for_name(name),
         )
         for name in sorted(_REGISTRY)
     ]
+
+
+def _args_schema_for_name(name: str) -> dict[str, Any]:
+    model = _TOOL_ARGS_MODELS.get(name)
+    if model is None:
+        return {"type": "object", "properties": {}}
+    return model.model_json_schema()
 
 
 def _description_from_name(name: str) -> str:

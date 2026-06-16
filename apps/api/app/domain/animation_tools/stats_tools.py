@@ -27,7 +27,7 @@ class StatsDistributionChartArgs(BaseModel):
     caption: str | None = None
 
 
-@register("stats.distribution_chart")
+@register("stats.distribution_chart", StatsDistributionChartArgs)
 def distribution_chart(args: dict) -> list[LayerSpec]:
     parsed = StatsDistributionChartArgs.model_validate(args)
     snapshot = StatsChartSceneSnapshot(

@@ -48,7 +48,8 @@ Workflow you MUST follow:
       areas, parametric curves, graph traversal, force diagrams, projectile
       motion, stoichiometry tables, distributions, inheritance grids), call
       \`animation_tool_list\` / \`animation_tool_expand\` before manually
-      composing raw visual layers. Treat the expanded \`layers\` as the
+      composing raw visual layers. Read each tool's \`args_schema\` before
+      calling \`animation_tool_expand\`. Treat the expanded \`layers\` as the
       deterministic reference; do not invent raw LayerSpec JSON when a
       registry tool covers the pattern.
    b. If an L2 \`template_*\` tool matches the step's pedagogical intent

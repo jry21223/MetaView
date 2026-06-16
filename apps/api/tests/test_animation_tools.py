@@ -6,7 +6,7 @@ from app.domain.animation_tools import (
     safe_expand_animation_call,
     safe_expand_cir_animation_calls_with_issues,
 )
-from app.domain.animation_tools.registry import _REGISTRY
+from app.domain.animation_tools.registry import _REGISTRY, list_animation_tools
 from app.domain.models.cir import (
     AnimationCall,
     CirDocument,
@@ -417,3 +417,14 @@ class TestRegistry:
         # Expect at least 3 math tools
         math_tools = [k for k in _REGISTRY if k.startswith("math.")]
         assert len(math_tools) >= 7
+
+    def test_list_includes_args_schema_for_math_function(self):
+        tools = {tool.name: tool for tool in list_animation_tools()}
+
+        schema = tools["math.show_function"].args_schema
+
+        assert tools["math.show_function"].description
+        assert schema["type"] == "object"
+        assert schema["properties"]["expression"]["minLength"] == 1
+        assert "x_min" in schema["properties"]
+        assert "x_max" in schema["properties"]

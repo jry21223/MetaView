@@ -43,6 +43,10 @@ vi.mock("../features/playbook/engine/player/useTTS", () => ({
   }),
 }));
 
+function readTextForCssContract(filePath: string): string {
+  return fs.readFileSync(filePath, "utf8").replace(/\r\n/g, "\n");
+}
+
 const phoneViewports = [
   { width: 375, height: 667, label: "iPhone SE" },
   { width: 390, height: 844, label: "iPhone 14" },
@@ -154,16 +158,14 @@ describe("mobile web smoke", () => {
 
   it("keeps mobile shell, safe-area, reduced-motion, and overflow CSS contracts", () => {
     const webRoot = path.resolve(__dirname, "..", "..");
-    const html = fs.readFileSync(path.join(webRoot, "index.html"), "utf8");
-    const globalCss = fs.readFileSync(path.join(webRoot, "src/styles/global.css"), "utf8");
-    const layoutCss = fs.readFileSync(path.join(webRoot, "src/styles/layout.css"), "utf8");
-    const playbookCss = fs.readFileSync(
+    const html = readTextForCssContract(path.join(webRoot, "index.html"));
+    const globalCss = readTextForCssContract(path.join(webRoot, "src/styles/global.css"));
+    const layoutCss = readTextForCssContract(path.join(webRoot, "src/styles/layout.css"));
+    const playbookCss = readTextForCssContract(
       path.join(webRoot, "src/styles/pages/playbook.css"),
-      "utf8",
     );
-    const studioCss = fs.readFileSync(
+    const studioCss = readTextForCssContract(
       path.join(webRoot, "src/styles/pages/studio.css"),
-      "utf8",
     );
 
     expect(html).toContain("viewport-fit=cover");
