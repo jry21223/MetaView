@@ -26,6 +26,7 @@ import {
   type Stage,
 } from "../shared/ui/GlobalTopbar";
 import { useVisualViewportHeight } from "../shared/hooks/useVisualViewportHeight";
+import { shouldCollapseWorkbenchTopbarByDefault } from "./workbenchChrome";
 
 export function OpsAppShell() {
   useVisualViewportHeight();
@@ -57,6 +58,10 @@ export function OpsAppShell() {
   const navigate = (nextStage: Stage) => {
     if (nextStage !== "workbench") setTopbarCollapsed(false);
     setStage(nextStage);
+  };
+  const enterWorkbench = () => {
+    setTopbarCollapsed(shouldCollapseWorkbenchTopbarByDefault());
+    setStage("workbench");
   };
 
   const openAccountPanel = () => setAccountModalOpen(true);
@@ -96,18 +101,18 @@ export function OpsAppShell() {
       ctx.sourceCode,
       ctx.language,
     );
-    setStage("workbench");
+    enterWorkbench();
   };
 
   const handleUseTemplate = async (prompt: string) => {
     setOpenedRunId(null);
     await submitWithPlatformProvider(prompt, null);
-    setStage("workbench");
+    enterWorkbench();
   };
 
   const handleOpenHistoryRun = (historyRunId: string) => {
     setOpenedRunId(historyRunId);
-    setStage("workbench");
+    enterWorkbench();
   };
 
   const isLoggedIn = accountStatus === "authenticated" && account?.login_provider === "wechat";

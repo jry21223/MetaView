@@ -127,7 +127,7 @@ describe("App edition shells", () => {
     expect(container.querySelectorAll(".mv-top")).toHaveLength(1);
   });
 
-  it("owns the topbar shell globally and restores it after leaving workbench", async () => {
+  it("collapses the topbar by default on desktop workbench and restores it after leaving", async () => {
     server.use(
       http.get(`${API_BASE_URL}/api/v1/runs`, () => HttpResponse.json([])),
       http.get(`${API_BASE_URL}/api/v1/runs/run-shell/follow-ups`, () =>
@@ -160,16 +160,19 @@ describe("App edition shells", () => {
     fireEvent.click(getByRole("button", { name: /数学题/ }));
 
     await waitFor(() =>
-      expect(getByRole("button", { name: "隐藏顶部栏" })).toBeTruthy(),
+      expect(getByRole("button", { name: "显示顶部栏" })).toBeTruthy(),
     );
     const shell = container.querySelector(".mv-top-shell");
     expect(shell).toBeTruthy();
     expect(container.querySelectorAll(".mv-top")).toHaveLength(1);
-
-    fireEvent.click(getByRole("button", { name: "隐藏顶部栏" }));
     expect(shell?.className).toContain("is-collapsed");
     expect(shell?.getAttribute("aria-hidden")).toBe("true");
     expect(shell?.hasAttribute("inert")).toBe(true);
+
+    fireEvent.click(getByRole("button", { name: "显示顶部栏" }));
+    expect(shell?.className).not.toContain("is-collapsed");
+    expect(shell?.getAttribute("aria-hidden")).toBeNull();
+    expect(shell?.hasAttribute("inert")).toBe(false);
 
     fireEvent.click(getByText("任务历史"));
     await waitFor(() => {

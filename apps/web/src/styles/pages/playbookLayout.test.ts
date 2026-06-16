@@ -20,4 +20,17 @@ describe("playbook layout CSS", () => {
     expect(controls).toContain("margin: 0 var(--player-workspace-x) 16px;");
     expect(caption).toContain("margin: 0 var(--player-workspace-x) 12px;");
   });
+
+  it("lets follow-up stretch while related context stays pinned to the rail bottom", () => {
+    const follow = ruleBody(".playbook-player__follow-card");
+    const relatedRow = ruleBody(".playbook-player__related-row");
+    const relatedCard = ruleBody(".playbook-player__related-card");
+
+    expect(follow).toContain("flex: 1 1 auto;");
+    expect(follow).not.toContain("max-height: min(318px, 35vh);");
+    expect(relatedRow).toContain("margin-top: auto;");
+    expect(relatedRow).toContain("flex: 0 0 auto;");
+    expect(relatedCard).toContain("margin-top: auto;");
+    expect(relatedCard).toContain("flex: 0 0 auto;");
+  });
 });

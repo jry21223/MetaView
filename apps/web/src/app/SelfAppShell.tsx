@@ -24,6 +24,7 @@ import {
   type Stage,
 } from "../shared/ui/GlobalTopbar";
 import { useVisualViewportHeight } from "../shared/hooks/useVisualViewportHeight";
+import { shouldCollapseWorkbenchTopbarByDefault } from "./workbenchChrome";
 
 export function SelfAppShell() {
   useVisualViewportHeight();
@@ -53,6 +54,10 @@ export function SelfAppShell() {
   const navigate = (nextStage: Stage) => {
     if (nextStage !== "workbench") setTopbarCollapsed(false);
     setStage(nextStage);
+  };
+  const enterWorkbench = () => {
+    setTopbarCollapsed(shouldCollapseWorkbenchTopbarByDefault());
+    setStage("workbench");
   };
 
   useEffect(() => {
@@ -96,18 +101,18 @@ export function SelfAppShell() {
       ctx.sourceCode,
       ctx.language,
     );
-    setStage("workbench");
+    enterWorkbench();
   };
 
   const handleUseTemplate = async (prompt: string) => {
     setOpenedRunId(null);
     await submitWithProvider(prompt, null);
-    setStage("workbench");
+    enterWorkbench();
   };
 
   const handleOpenHistoryRun = (historyRunId: string) => {
     setOpenedRunId(historyRunId);
-    setStage("workbench");
+    enterWorkbench();
   };
 
   return (

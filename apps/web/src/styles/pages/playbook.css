@@ -776,9 +776,8 @@
 }
 
 .playbook-player__follow-card {
-  flex: 1 1 164px;
+  flex: 1 1 auto;
   min-height: 148px;
-  max-height: min(318px, 35vh);
 }
 
 .playbook-player__follow-body {
@@ -789,6 +788,7 @@
 }
 
 .playbook-player__related-row {
+  margin-top: auto;
   flex: 0 0 auto;
   min-height: 44px;
   display: grid;
@@ -803,7 +803,8 @@
 }
 
 .playbook-player__related-card {
-  flex: 0 1 auto;
+  margin-top: auto;
+  flex: 0 0 auto;
   min-height: 44px;
   max-height: min(218px, 28vh);
   min-width: 0;
