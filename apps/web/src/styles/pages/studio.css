@@ -78,6 +78,7 @@
 .mv-icon-btn svg {
   width: 14px;
   height: 14px;
+  display: block;
   stroke-width: 1.75;
 }
 .mv-nav-item:hover {
@@ -144,10 +145,12 @@
   color: var(--ink-2);
   width: 30px;
   height: 30px;
+  padding: 0;
   border-radius: 8px;
   display: grid;
   place-items: center;
   font-size: 14px;
+  line-height: 1;
   cursor: pointer;
   transition: all 0.15s;
 }
@@ -158,7 +161,7 @@
 .mv-nav-item:focus-visible,
 .mv-icon-btn:focus-visible,
 .mv-avatar:focus-visible,
-.mv-intake-tool:focus-visible,
+.mv-intake-action:focus-visible,
 .mv-intake-send:focus-visible,
 .mv-tpl-card:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--accent) 46%, transparent);
@@ -1733,55 +1736,30 @@
   padding: clamp(44px, 8vh, 78px) 24px 46px;
   background:
     radial-gradient(
-      ellipse 68% 52% at 50% 30%,
-      color-mix(in srgb, var(--accent) 7%, transparent),
-      transparent 60%
+      circle at 50% 0%,
+      color-mix(in srgb, var(--accent) 8%, transparent),
+      transparent 34%
     ),
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--bg) 94%, #fff) 0%,
-      color-mix(in srgb, var(--bg) 86%, #f5f0e4) 100%
-    );
+    var(--bg);
+  background-size: auto;
 }
 
 .mv-intake-body::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(rgba(82, 76, 62, 0.032) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(82, 76, 62, 0.032) 1px, transparent 1px);
-  background-size: 48px 48px;
-  -webkit-mask-image: radial-gradient(
-    ellipse 62% 48% at 50% 34%,
-    transparent 0 30%,
-    rgba(0, 0, 0, 0.1) 54%,
-    #000 88%
-  );
-  mask-image: radial-gradient(
-    ellipse 62% 48% at 50% 34%,
-    transparent 0 30%,
-    rgba(0, 0, 0, 0.1) 54%,
-    #000 88%
-  );
+  content: none;
 }
 
 .mv-dark .mv-intake-body {
   background:
     radial-gradient(
-      ellipse 68% 52% at 50% 30%,
+      circle at 50% 0%,
       color-mix(in srgb, var(--accent) 8%, transparent),
-      transparent 60%
+      transparent 34%
     ),
-    #121611;
+    var(--bg);
 }
 
 .mv-dark .mv-intake-body::before {
-  background-image:
-    linear-gradient(rgba(232, 238, 221, 0.026) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(232, 238, 221, 0.026) 1px, transparent 1px);
+  content: none;
 }
 
 .mv-intake-hero,
@@ -1801,12 +1779,13 @@
 
 .mv-intake-hero-visual {
   position: relative;
-  width: min(720px, calc(100vw - 48px));
-  height: 164px;
+  width: min(680px, calc(100vw - 48px));
+  height: clamp(96px, 14vw, 128px);
   display: grid;
   place-items: center;
-  margin: 0 auto 8px;
+  margin: 0 auto 4px;
   overflow: visible;
+  opacity: 0.72;
 }
 
 .mv-meta-particle {
@@ -1821,9 +1800,13 @@
   overflow: visible;
 }
 
+.mv-meta-particle__canvas-grid {
+  opacity: 0.28;
+}
+
 .mv-meta-particle__canvas-grid-line {
   fill: none;
-  stroke: color-mix(in srgb, var(--ink-3) 16%, transparent);
+  stroke: color-mix(in srgb, var(--ink-3) 14%, transparent);
   stroke-width: 0.7;
   vector-effect: non-scaling-stroke;
 }
@@ -1834,13 +1817,14 @@
   stroke-width: 1.2;
   stroke-linecap: round;
   stroke-dasharray: 0.018 0.038;
-  opacity: 0.35;
+  opacity: 0.34;
 }
 
 .mv-meta-particle__canvas-link {
   stroke: color-mix(in srgb, var(--ink-3) 32%, transparent);
   stroke-width: 0.85;
   vector-effect: non-scaling-stroke;
+  opacity: 0.22;
 }
 
 .mv-meta-particle__canvas-link--2 {
@@ -1851,7 +1835,7 @@
   fill: color-mix(in srgb, var(--surface) 70%, var(--accent));
   stroke: color-mix(in srgb, var(--accent) 36%, var(--ink-3));
   stroke-width: 1;
-  opacity: 0.76;
+  opacity: 0.42;
   transform-box: fill-box;
   transform-origin: center;
   animation: mvMetaParticleNode 9s ease-in-out infinite;
@@ -1859,12 +1843,12 @@
 
 .mv-meta-particle__canvas-node--2 {
   animation-delay: -2.4s;
-  opacity: 0.62;
+  opacity: 0.34;
 }
 
 .mv-meta-particle__canvas-node--3 {
   animation-delay: -5s;
-  opacity: 0.5;
+  opacity: 0.28;
 }
 
 .mv-meta-particle__orbit,
@@ -1982,6 +1966,26 @@
   opacity: 0.52;
 }
 
+.mv-meta-particle--canvas .mv-meta-particle__canvas-node {
+  opacity: 0.42;
+}
+
+.mv-meta-particle--canvas .mv-meta-particle__canvas-node--2 {
+  opacity: 0.34;
+}
+
+.mv-meta-particle--canvas .mv-meta-particle__canvas-node--3 {
+  opacity: 0.28;
+}
+
+.mv-meta-particle--canvas .mv-meta-particle__particle {
+  opacity: 0.38;
+}
+
+.mv-meta-particle--canvas .mv-meta-particle__dust {
+  opacity: 0.22;
+}
+
 .mv-meta-particle--singularity .mv-meta-particle__particle {
   opacity: 0.36;
 }
@@ -2066,6 +2070,18 @@
   stroke: color-mix(in srgb, var(--accent) 42%, var(--ink-2));
 }
 
+.mv-dark .mv-meta-particle--canvas .mv-meta-particle__canvas-node {
+  opacity: 0.4;
+}
+
+.mv-dark .mv-meta-particle--canvas .mv-meta-particle__canvas-node--2 {
+  opacity: 0.32;
+}
+
+.mv-dark .mv-meta-particle--canvas .mv-meta-particle__canvas-node--3 {
+  opacity: 0.26;
+}
+
 @keyframes mvMetaParticleCore {
   0%,
   100% {
@@ -2126,69 +2142,50 @@
 }
 
 .mv-intake-composer {
-  width: min(620px, calc(100vw - 96px));
-  margin-top: 24px;
-  overflow: visible;
-  border: 1px solid var(--line-2);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--surface) 82%, transparent);
-  backdrop-filter: blur(12px);
+  width: min(640px, calc(100vw - 40px));
+  margin-top: 22px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
   box-shadow:
-    0 8px 24px rgba(54, 48, 36, 0.07),
-    inset 0 1px 0 rgba(255, 255, 255, 0.58);
+    0 10px 30px rgba(42, 39, 30, 0.055),
+    inset 0 1px 0 rgba(255, 255, 255, 0.48);
   transition:
     border-color 180ms ease,
     box-shadow 180ms ease,
-    transform 180ms ease,
     background 180ms ease;
 }
 
 .mv-dark .mv-intake-composer {
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  backdrop-filter: blur(14px);
+  background: color-mix(in srgb, var(--surface) 88%, #0f1512);
+  border-color: color-mix(in srgb, var(--ink) 12%, transparent);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.045);
 }
 
 .mv-intake-composer:focus-within {
-  border-color: color-mix(in srgb, var(--accent) 62%, var(--line-2));
-  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--line-2));
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
   box-shadow:
-    0 14px 36px rgba(54, 48, 36, 0.09),
-    0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
-  transform: translateY(-1px);
+    0 12px 32px rgba(42, 39, 30, 0.07),
+    0 0 0 3px color-mix(in srgb, var(--accent) 8%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.54);
 }
 
 .mv-dark .mv-intake-composer:focus-within {
-  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  background: color-mix(in srgb, var(--surface) 90%, #0f1512);
   box-shadow:
-    0 14px 36px rgba(0, 0, 0, 0.22),
-    0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent);
-}
-
-.mv-intake-attachment-tab {
-  position: absolute;
-  top: -24px;
-  left: 14px;
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0 10px;
-  border: 1px solid var(--line-2);
-  border-bottom: 0;
-  border-radius: 7px 7px 0 0;
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
-  color: var(--ink-2);
-  font-size: 11px;
-}
-
-.mv-intake-attachment-tab svg {
-  width: 14px;
-  height: 14px;
-  color: var(--accent);
+    0 12px 32px rgba(0, 0, 0, 0.24),
+    0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .mv-intake-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   padding: 14px 18px 0;
 }
 
@@ -2204,13 +2201,24 @@
 }
 
 .mv-intake-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  padding: 0 10px;
   border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
   border-radius: 999px;
   background: var(--accent-soft);
+  color: var(--ink-2);
+  font-size: 12px;
 }
 
 .mv-intake-file button {
+  appearance: none;
+  border: 0;
+  background: transparent;
   color: var(--ink-2);
+  cursor: pointer;
   font-size: 11px;
 }
 
@@ -2220,13 +2228,13 @@
   width: 100%;
   border: 0;
   outline: none;
-  min-height: 104px;
-  padding: 18px 20px 8px;
+  min-height: 108px;
+  padding: 18px 18px 8px;
   background: transparent;
   color: var(--ink);
   font: inherit;
-  font-size: 14px;
-  line-height: 1.55;
+  font-size: 14.5px;
+  line-height: 1.65;
 }
 
 .mv-intake-input::placeholder {
@@ -2234,12 +2242,13 @@
 }
 
 .mv-intake-actions {
+  display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  padding: 0 12px 12px 14px;
-  border-top: 0;
-  background: transparent;
+  gap: 10px;
+  padding: 8px 10px 10px;
+  border-top: 1px solid color-mix(in srgb, var(--ink) 7%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 46%, transparent);
 }
 
 .mv-intake-toolrow,
@@ -2250,24 +2259,38 @@
   min-width: 0;
 }
 
-.mv-intake-tool {
-  width: 26px;
-  height: 26px;
-  display: grid;
-  place-items: center;
-  border: 0;
-  border-radius: 7px;
+.mv-intake-action {
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
   background: transparent;
-  color: var(--ink-3);
+  color: color-mix(in srgb, var(--ink-2) 84%, transparent);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 520;
   cursor: pointer;
 }
 
-.mv-intake-tool:hover {
+.mv-intake-action:hover {
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
   color: var(--ink);
-  background: var(--surface-2);
 }
 
-.mv-intake-tool svg,
+.mv-intake-action span {
+  display: inline;
+}
+
+.mv-intake-hint {
+  color: color-mix(in srgb, var(--ink-3) 76%, transparent);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.mv-intake-action svg,
 .mv-intake-send svg,
 .mv-tpl-card svg {
   width: 15px;
@@ -2291,14 +2314,34 @@
 
 .mv-intake-send {
   min-width: 104px;
-  min-height: 34px;
+  min-height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border-radius: 8px;
+  padding: 0 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  color: color-mix(in srgb, var(--accent) 76%, var(--ink));
   font-size: 13px;
   font-weight: 600;
+  box-shadow: none;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    opacity 150ms ease;
+}
+
+.mv-intake-send:hover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface));
+  transform: none;
+}
+
+.mv-intake-send:active {
+  background: color-mix(in srgb, var(--accent) 28%, var(--surface));
 }
 
 .mv-intake-send:disabled {
@@ -2307,21 +2350,22 @@
 }
 
 .mv-intake-templates {
-  width: min(620px, calc(100vw - 96px));
+  width: min(640px, calc(100vw - 40px));
   max-width: none;
   display: grid;
-  grid-template-columns: repeat(4, minmax(136px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
   margin-top: 0;
+  opacity: 0.86;
 }
 
 .mv-tpl-card {
   appearance: none;
-  min-height: 68px;
-  border: 1px solid color-mix(in srgb, var(--line-2) 72%, transparent);
-  border-radius: 7px;
-  padding: 10px 11px;
-  background: color-mix(in srgb, var(--surface) 40%, transparent);
+  min-height: 62px;
+  border: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+  border-radius: 12px;
+  padding: 12px 13px;
+  background: color-mix(in srgb, var(--surface) 68%, transparent);
   color: var(--ink);
   text-align: left;
   box-shadow: none;
@@ -2329,14 +2373,14 @@
 }
 
 .mv-tpl-card:hover {
-  border-color: color-mix(in srgb, var(--accent) 30%, var(--line-2));
-  transform: translateY(-1px);
-  background: color-mix(in srgb, var(--accent-soft) 34%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 24%, transparent);
+  transform: none;
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
 }
 
 .mv-dark .mv-tpl-card,
 .mv-dark .mv-tpl-card:hover {
-  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
 }
 
 .mv-tpl-head {
@@ -2347,7 +2391,7 @@
 }
 
 .mv-tpl-head svg {
-  color: var(--accent);
+  color: color-mix(in srgb, var(--accent) 72%, var(--ink-3));
   flex: 0 0 auto;
 }
 
@@ -2358,7 +2402,7 @@
 
 .mv-tpl-desc {
   margin-top: 6px;
-  color: color-mix(in srgb, var(--ink-3) 82%, transparent);
+  color: color-mix(in srgb, var(--ink-3) 86%, transparent);
   font-size: 10.5px;
   line-height: 1.35;
 }
@@ -2370,42 +2414,65 @@
 
   .mv-intake-hero-visual {
     width: min(640px, calc(100vw - 28px));
-    height: 140px;
+    height: 96px;
   }
 
   .mv-intake-composer,
   .mv-intake-templates {
-    width: min(720px, calc(100vw - 52px));
-  }
-
-  .mv-intake-templates {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: min(640px, calc(100vw - 40px));
   }
 }
 
 @media (max-width: 640px) {
+  .mv-intake-body {
+    gap: 10px;
+    padding: 34px 16px 34px;
+  }
+
   .mv-intake-hero-visual {
-    height: 112px;
-    margin-bottom: 6px;
+    height: 84px;
+    margin-bottom: 2px;
+    opacity: 0.55;
+  }
+
+  .mv-intake-title {
+    font-size: 24px;
+  }
+
+  .mv-intake-sub {
+    font-size: 13px;
+  }
+
+  .mv-intake-composer,
+  .mv-intake-templates {
+    width: calc(100vw - 32px);
   }
 
   .mv-intake-actions {
-    align-items: stretch;
-    flex-direction: column;
+    align-items: center;
   }
 
   .mv-intake-toolrow,
   .mv-intake-submitrow {
     justify-content: space-between;
-    width: 100%;
+  }
+
+  .mv-intake-action span,
+  .mv-intake-hint {
+    display: none;
   }
 
   .mv-intake-send {
-    flex: 1;
+    min-width: 112px;
   }
 
   .mv-intake-templates {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mv-meta-particle--canvas .mv-meta-particle__canvas-grid,
+  .mv-meta-particle--canvas .mv-meta-particle__particle {
+    display: none;
   }
 
   .mv-meta-particle__canvas-node.is-mobile-hidden {
@@ -2427,6 +2494,11 @@
 
   .mv-meta-particle__canvas-node {
     animation: none;
+  }
+
+  .mv-meta-particle__canvas-link,
+  .mv-meta-particle__canvas-path {
+    opacity: 0.18;
   }
 }
 

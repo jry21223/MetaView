@@ -52,6 +52,16 @@ describe("IntakeScreen launch home", () => {
     ).toBe(true);
   });
 
+  it("keeps code upload as a secondary composer action instead of a persistent tab", () => {
+    const { container, getByRole } = renderIntake();
+
+    expect(container.querySelector(".mv-intake-attachment-tab")).toBeNull();
+    const uploadButton = getByRole("button", { name: "上传代码文件" });
+    expect(uploadButton.closest(".mv-intake-actions")).toBeTruthy();
+    expect(uploadButton.classList.contains("mv-intake-action")).toBe(true);
+    expect(uploadButton.textContent).toContain("上传代码文件");
+  });
+
   it("submits math templates with a supported domain hint", () => {
     const { getByRole, props } = renderIntake();
 
