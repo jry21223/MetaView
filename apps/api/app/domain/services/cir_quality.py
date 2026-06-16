@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from app.domain.animation_tools import safe_expand_cir_animation_calls_with_issues
 from app.domain.models.cir import (
     CirDocument,
     CirStep,
@@ -50,8 +51,23 @@ def validate_cir_quality(
     issues.extend(validate_math_visual_kind(cir))
     issues.extend(validate_required_visual_payloads(cir))
     issues.extend(validate_duplicate_layers(cir))
+    issues.extend(validate_animation_tool_calls(cir))
     issues.extend(validate_execution_map_alignment(cir, execution_map))
     return issues
+
+
+def validate_animation_tool_calls(cir: CirDocument) -> list[CirReviewIssue]:
+    result = safe_expand_cir_animation_calls_with_issues(cir)
+    return [
+        CirReviewIssue(
+            code=issue.code,
+            severity=ReviewSeverity.ERROR,
+            path=issue.path,
+            message=issue.message,
+            suggestion="Use a registered animation tool with valid arguments.",
+        )
+        for issue in result.issues
+    ]
 
 
 def validate_math_visual_kind(cir: CirDocument) -> list[CirReviewIssue]:

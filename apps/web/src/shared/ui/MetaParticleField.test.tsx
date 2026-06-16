@@ -19,26 +19,27 @@ describe("MetaParticleField", () => {
     expect(container.querySelector(".mv-meta-particle__core")).toBeTruthy();
   });
 
-  it("renders the singularity as an abstract gravity field without glowing particles", () => {
+  it("renders the singularity as an abstract gravity field with restrained particles", () => {
     const { container, queryByText } = render(<MetaParticleField variant="singularity" />);
 
     expect(container.querySelector(".mv-meta-particle__singularity-core")).toBeTruthy();
     expect(container.querySelector(".mv-meta-particle__event-horizon")).toBeTruthy();
     expect(container.querySelector(".mv-meta-particle__lens-grid")).toBeTruthy();
     expect(container.querySelectorAll(".mv-meta-particle__gravity-contour").length).toBe(3);
-    expect(container.querySelectorAll(".mv-meta-particle__particle")).toHaveLength(0);
+    expect(container.querySelectorAll(".mv-meta-particle__particle")).toHaveLength(6);
+    expect(container.querySelector("[filter]")).toBeNull();
     expect(queryByText(/meta/i)).toBeNull();
     expect(queryByText("M")).toBeNull();
   });
 
-  it("renders the canvas variant as a static knowledge graph with reasoning paths", () => {
+  it("renders the canvas variant as a restrained distant knowledge graph", () => {
     const { container } = render(<MetaParticleField variant="canvas" />);
 
     expect(container.querySelector(".mv-meta-particle__canvas-grid")).toBeTruthy();
-    expect(container.querySelectorAll(".mv-meta-particle__canvas-node").length).toBeGreaterThan(10);
-    expect(container.querySelectorAll(".mv-meta-particle__canvas-link").length).toBeGreaterThan(5);
-    expect(container.querySelectorAll(".mv-meta-particle__canvas-path")).toHaveLength(3);
-    expect(container.querySelectorAll(".mv-meta-particle__particle")).toHaveLength(3);
+    expect(container.querySelectorAll(".mv-meta-particle__canvas-node").length).toBeLessThanOrEqual(12);
+    expect(container.querySelectorAll(".mv-meta-particle__canvas-link").length).toBeLessThanOrEqual(8);
+    expect(container.querySelectorAll(".mv-meta-particle__canvas-path")).toHaveLength(2);
+    expect(container.querySelectorAll(".mv-meta-particle__particle")).toHaveLength(2);
   });
 
   it("keeps orbit and comet variants available as low-key motion variants", () => {

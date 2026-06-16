@@ -5,6 +5,12 @@ from enum import Enum
 from pydantic import BaseModel, Field
 
 from app.domain.models.execution import ExecutionParameterControl
+from app.domain.models.playbook import (
+    GraphSceneSnapshot,
+    MotionSceneSnapshot,
+    StatsChartSceneSnapshot,
+    TableSceneSnapshot,
+)
 from app.domain.models.topic import TopicDomain, VisualKind
 
 
@@ -181,6 +187,10 @@ class LayerKind(str, Enum):
     ARRAY_BOXES = "array_boxes"
     BAR_BLOCKS = "bar_blocks"
     TREE_GRAPH = "tree_graph"
+    TABLE_SCENE = "table_scene"
+    GRAPH_SCENE = "graph_scene"
+    STATS_CHART_SCENE = "stats_chart_scene"
+    MOTION_SCENE = "motion_scene"
     NARRATION_CARD = "narration_card"
 
 
@@ -226,6 +236,10 @@ class LayerSpec(BaseModel):
     timing: LayerTimingSpec = Field(default_factory=LayerTimingSpec)
     scene: SceneSpec | None = None
     plot: PlotSpec | None = None
+    table_scene: TableSceneSnapshot | None = None
+    graph_scene: GraphSceneSnapshot | None = None
+    stats_chart_scene: StatsChartSceneSnapshot | None = None
+    motion_scene: MotionSceneSnapshot | None = None
     katex_overlay: KaTeXOverlaySpec | None = None
     narration_card: NarrationCardSpec | None = None
     # Layers that consume the step's existing tokens/edges (array boxes, tree

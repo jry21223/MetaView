@@ -40,17 +40,13 @@ const CANVAS_NODES: ReadonlyArray<{
   mobileHidden?: boolean;
 }> = [
   { x: 92, y: 226, r: 3.2, layer: 1 },
-  { x: 138, y: 174, r: 2.4, layer: 2 },
   { x: 176, y: 118, r: 3.8, layer: 1 },
   { x: 218, y: 204, r: 2.8, layer: 2 },
-  { x: 264, y: 82, r: 2.4, layer: 3, mobileHidden: true },
   { x: 302, y: 146, r: 4.6, layer: 1 },
   { x: 346, y: 218, r: 2.8, layer: 2 },
   { x: 398, y: 112, r: 5.4, layer: 1 },
   { x: 442, y: 178, r: 3.2, layer: 2 },
-  { x: 492, y: 82, r: 2.6, layer: 3, mobileHidden: true },
   { x: 538, y: 152, r: 4.2, layer: 1 },
-  { x: 582, y: 218, r: 2.8, layer: 2 },
   { x: 630, y: 120, r: 3.2, layer: 2 },
   { x: 688, y: 178, r: 2.6, layer: 3, mobileHidden: true },
   { x: 722, y: 226, r: 3.8, layer: 1 },
@@ -58,21 +54,27 @@ const CANVAS_NODES: ReadonlyArray<{
 
 const CANVAS_LINKS = [
   { from: 0, to: 1, strength: 1 },
-  { from: 1, to: 2, strength: 2 },
-  { from: 2, to: 5, strength: 1 },
-  { from: 3, to: 5, strength: 2 },
+  { from: 1, to: 3, strength: 2 },
+  { from: 2, to: 3, strength: 2 },
   { from: 5, to: 7, strength: 1 },
-  { from: 7, to: 8, strength: 2 },
-  { from: 8, to: 10, strength: 1 },
-  { from: 10, to: 12, strength: 2 },
-  { from: 11, to: 14, strength: 1 },
-  { from: 12, to: 14, strength: 2 },
+  { from: 6, to: 7, strength: 2 },
+  { from: 7, to: 8, strength: 1 },
+  { from: 8, to: 10, strength: 2 },
+  { from: 9, to: 10, strength: 1 },
 ] as const;
 
 const CANVAS_PATHS = [
   "M92 226C176 98 255 206 302 146C356 78 438 104 538 152C610 188 666 150 722 226",
   "M138 174C232 232 326 76 398 112C478 150 512 74 630 120",
-  "M218 204C306 236 374 190 442 178C518 164 578 226 688 178",
+] as const;
+
+const SINGULARITY_PARTICLES = [
+  { path: 0, r: 1.8, duration: "24s", begin: "-4s", tone: "primary" },
+  { path: 0, r: 1.3, duration: "32s", begin: "-18s", tone: "secondary" },
+  { path: 1, r: 1.6, duration: "28s", begin: "-11s", tone: "secondary" },
+  { path: 1, r: 2.1, duration: "36s", begin: "-24s", tone: "primary" },
+  { path: 2, r: 1.4, duration: "30s", begin: "-8s", tone: "warm" },
+  { path: 2, r: 1.9, duration: "26s", begin: "-20s", tone: "primary" },
 ] as const;
 
 const ORBIT_PARTICLES = [
@@ -90,7 +92,6 @@ const COMET_PARTICLES = [
 const CANVAS_PARTICLES = [
   { path: 0, r: 3.2, duration: "24s", begin: "-4s", tone: "primary" },
   { path: 1, r: 2.7, duration: "31s", begin: "-13s", tone: "secondary" },
-  { path: 2, r: 2.4, duration: "36s", begin: "-21s", tone: "warm" },
 ] as const;
 
 function safeId(raw: string) {
@@ -298,6 +299,7 @@ export function MetaParticleField({
               cy="150"
               r="17"
             />
+            {renderParticles(SINGULARITY_PARTICLES, singularityId)}
           </>
         )}
 

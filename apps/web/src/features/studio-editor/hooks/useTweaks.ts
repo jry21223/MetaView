@@ -20,8 +20,8 @@ export interface TweakValues {
 }
 
 export const TWEAK_DEFAULTS: TweakValues = {
-  theme: "dark",
-  accent: THEME_PALETTE.dark.accent,
+  theme: "light",
+  accent: THEME_PALETTE.light.accent,
   layout: "drawer",
   leftRatio: 22,
   paramsHeight: 32,

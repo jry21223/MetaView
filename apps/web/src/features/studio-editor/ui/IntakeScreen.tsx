@@ -320,13 +320,6 @@ export function IntakeScreen({
       </section>
 
       <section className="mv-intake-composer" aria-label="生成输入">
-        <div className="mv-intake-attachment-tab">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-            <path d="m21.4 11.6-8.5 8.5a5 5 0 0 1-7.1-7.1l9.2-9.2a3.4 3.4 0 0 1 4.8 4.8l-9.2 9.2a1.8 1.8 0 1 1-2.5-2.5l8.5-8.5" />
-          </svg>
-          上传代码文件
-        </div>
-
         {files.length > 0 && (
           <div className="mv-intake-files">
             {files.map((f, i) => (
@@ -369,7 +362,7 @@ export function IntakeScreen({
         <div className="mv-intake-actions">
           <div className="mv-intake-toolrow">
             <button
-              className="mv-intake-tool"
+              className="mv-intake-action"
               type="button"
               aria-label="上传代码文件"
               title="上传代码文件"
@@ -381,6 +374,7 @@ export function IntakeScreen({
                 <path d="M9 13h6" />
                 <path d="M9 17h4" />
               </svg>
+              <span>上传代码文件</span>
             </button>
             <input
               ref={fileRef}

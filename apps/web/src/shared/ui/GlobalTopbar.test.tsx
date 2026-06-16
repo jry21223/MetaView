@@ -109,4 +109,21 @@ describe("GlobalTopbar account avatar", () => {
     expect(getByText("模型已配置")).toBeTruthy();
     expect(queryByLabelText("模型服务商设置")).toBeTruthy();
   });
+
+  it("uses a square svg icon for provider settings instead of a font glyph", () => {
+    const { getByLabelText } = render(
+      <GlobalTopbar
+        {...baseProps}
+        appEdition="self"
+        accountBalanceYuan={null}
+        accountName={null}
+        onOpenProviderSettings={vi.fn()}
+      />,
+    );
+
+    const trigger = getByLabelText("模型服务商设置");
+
+    expect(trigger.querySelector("svg")).toBeTruthy();
+    expect(trigger.textContent?.trim()).toBe("");
+  });
 });

@@ -19,7 +19,7 @@ from app.domain.skills.base import (
     SkillRouteInput,
     SkillRouteMatch,
 )
-from app.domain.skills.registry import SkillRegistry
+from app.domain.skills.registry import SkillRegistry, build_default_skill_registry
 from app.domain.skills.solid_geometry.skill_pack import SolidGeometrySkillPack
 
 
@@ -125,6 +125,50 @@ def test_run_pipeline_does_not_import_solid_geometry_directly() -> None:
     source = Path("apps/api/app/application/use_cases/run_pipeline.py").read_text(encoding="utf-8")
 
     assert "app.domain.skills.solid_geometry" not in source
+    assert "app.domain.skills.physics_mechanics" not in source
+    assert "app.domain.skills.chemistry_stoichiometry" not in source
+    assert "app.domain.skills.algorithm_graph_core" not in source
+    assert "app.domain.skills.biology_genetics" not in source
+    assert "app.domain.skills.probability_statistics_core" not in source
+    assert "app.domain.skills.geography_climate" not in source
+
+
+def test_default_registry_contains_subject_skills_and_routes_prompts() -> None:
+    registry = build_default_skill_registry()
+    manifests = {manifest.skill_id for manifest in registry.manifests()}
+
+    assert {
+        "physics_mechanics",
+        "chemistry_stoichiometry",
+        "algorithm_graph_core",
+        "biology_genetics",
+        "probability_statistics_core",
+        "geography_climate",
+    } <= manifests
+
+    physics_route = registry.heuristic_match(
+        SkillRouteInput(prompt="质量 2kg 的物体受到 10N 水平拉力，忽略摩擦，求加速度")
+    )
+    chemistry_route = registry.heuristic_match(SkillRouteInput(prompt="配平 H2 + O2 -> H2O"))
+    graph_route = registry.heuristic_match(
+        SkillRouteInput(prompt="用 BFS 遍历图 A-B, A-C, B-D，从 A 开始")
+    )
+    biology_route = registry.heuristic_match(
+        SkillRouteInput(prompt="A 对 a 显性，亲本 Aa x Aa，求表现型比例")
+    )
+    statistics_route = registry.heuristic_match(
+        SkillRouteInput(prompt="二项分布 n=5, p=0.2, k=2，求概率")
+    )
+    geography_route = registry.heuristic_match(
+        SkillRouteInput(prompt="离线教学站点 EDU_TEMPERATE 的气候常年值摘要")
+    )
+
+    assert physics_route is not None and physics_route.skill_id == "physics_mechanics"
+    assert chemistry_route is not None and chemistry_route.skill_id == "chemistry_stoichiometry"
+    assert graph_route is not None and graph_route.skill_id == "algorithm_graph_core"
+    assert biology_route is not None and biology_route.skill_id == "biology_genetics"
+    assert statistics_route is not None and statistics_route.skill_id == "probability_statistics_core"
+    assert geography_route is not None and geography_route.skill_id == "geography_climate"
 
 
 @pytest.mark.asyncio

@@ -22,6 +22,15 @@ interface GlobalTopbarProps {
   hidePrimaryNav?: boolean;
 }
 
+function ProviderSettingsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M19.1 13.5c.1-.5.1-1 .1-1.5s0-1-.1-1.5l2-1.5-2-3.4-2.4 1a7.6 7.6 0 0 0-2.6-1.5L13.8 2h-3.6l-.4 3.1a7.6 7.6 0 0 0-2.6 1.5l-2.4-1-2 3.4 2 1.5A8.2 8.2 0 0 0 4.7 12c0 .5 0 1 .1 1.5l-2 1.5 2 3.4 2.4-1a7.6 7.6 0 0 0 2.6 1.5l.4 3.1h3.6l.4-3.1a7.6 7.6 0 0 0 2.6-1.5l2.4 1 2-3.4-2.1-1.5Z" />
+    </svg>
+  );
+}
+
 export function GlobalTopbar({
   stage,
   appEdition = "self",
@@ -125,7 +134,7 @@ export function GlobalTopbar({
             title={accountOrProviderLabel}
             aria-label={accountOrProviderLabel}
           >
-            {appEdition === "ops" ? "¥" : "⚙"}
+            {appEdition === "ops" ? "¥" : <ProviderSettingsIcon />}
           </button>
         )}
         <div className="mv-status">
