@@ -31,6 +31,22 @@ function ProviderSettingsIcon() {
   );
 }
 
+function NavSettingsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+      <path d="M4 7h8" />
+      <path d="M16 7h4" />
+      <circle cx="14" cy="7" r="2" />
+      <path d="M4 12h3" />
+      <path d="M11 12h9" />
+      <circle cx="9" cy="12" r="2" />
+      <path d="M4 17h11" />
+      <path d="M19 17h1" />
+      <circle cx="17" cy="17" r="2" />
+    </svg>
+  );
+}
+
 export function GlobalTopbar({
   stage,
   appEdition = "self",
@@ -117,10 +133,7 @@ export function GlobalTopbar({
             onClick={() => onNavigate("settings")}
             type="button"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-              <path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z" />
-              <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2 3.4-.2-.1a1.7 1.7 0 0 0-2 .1 1.7 1.7 0 0 0-.9 1.7v.2H10v-.2a1.7 1.7 0 0 0-.9-1.7 1.7 1.7 0 0 0-2-.1l-.2.1-2-3.4.1-.1A1.7 1.7 0 0 0 5.3 15a1.7 1.7 0 0 0-1.4-1.1h-.2v-3.8h.2A1.7 1.7 0 0 0 5.3 9a1.7 1.7 0 0 0-.3-1.9L4.9 7l2-3.4.2.1a1.7 1.7 0 0 0 2-.1A1.7 1.7 0 0 0 10 1.9v-.2h4.7v.2a1.7 1.7 0 0 0 .9 1.7 1.7 1.7 0 0 0 2 .1l.2-.1 2 3.4-.1.1A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.4 1.1h.2v3.8h-.2A1.7 1.7 0 0 0 19.4 15Z" />
-            </svg>
+            <NavSettingsIcon />
             设置
           </button>
         </nav>
