@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7
+
 FROM node:22-slim AS web_deps
 
 WORKDIR /app
@@ -7,8 +9,10 @@ ARG NPM_REGISTRY=https://registry.npmmirror.com
 COPY package.json package-lock.json ./
 COPY apps/web/package.json ./apps/web/package.json
 COPY apps/agent/package.json ./apps/agent/package.json
-RUN npm install --workspace=apps/web --no-audit --no-fund \
+RUN --mount=type=cache,id=metaview-npm,target=/root/.npm,sharing=locked \
+    npm install --workspace=apps/web --no-audit --no-fund \
         --registry="${NPM_REGISTRY}" \
+        --prefer-offline \
         --fetch-retries=5 \
         --fetch-retry-mintimeout=20000 \
         --fetch-retry-maxtimeout=120000
@@ -29,7 +33,10 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-RUN sed -i "s|http://deb.debian.org/debian|${APT_MIRROR}|g; s|https://deb.debian.org/debian|${APT_MIRROR}|g; s|http://deb.debian.org/debian-security|${APT_SECURITY_MIRROR}|g; s|https://deb.debian.org/debian-security|${APT_SECURITY_MIRROR}|g" /etc/apt/sources.list.d/debian.sources \
+RUN --mount=type=cache,id=metaview-apt-cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=metaview-apt-lists,target=/var/lib/apt/lists,sharing=locked \
+    rm -f /etc/apt/apt.conf.d/docker-clean \
+    && sed -i "s|http://deb.debian.org/debian|${APT_MIRROR}|g; s|https://deb.debian.org/debian|${APT_MIRROR}|g; s|http://deb.debian.org/debian-security|${APT_SECURITY_MIRROR}|g; s|https://deb.debian.org/debian-security|${APT_SECURITY_MIRROR}|g" /etc/apt/sources.list.d/debian.sources \
     && apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::http::Pipeline-Depth=${APT_PIPELINE_DEPTH} -o Acquire::https::Pipeline-Depth=${APT_PIPELINE_DEPTH} update \
     && apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::http::Pipeline-Depth=${APT_PIPELINE_DEPTH} -o Acquire::https::Pipeline-Depth=${APT_PIPELINE_DEPTH} install -y --no-install-recommends \
         build-essential \
@@ -47,13 +54,13 @@ RUN sed -i "s|http://deb.debian.org/debian|${APT_MIRROR}|g; s|https://deb.debian
         texlive-science \
         dvisvgm \
         ghostscript \
-        cm-super \
-    && rm -rf /var/lib/apt/lists/*
+        cm-super
 
 COPY apps/api/requirements.txt ./requirements.txt
 COPY apps/api/requirements-subjects.txt ./requirements-subjects.txt
 RUN mkdir -p /tmp/wheelhouse
-RUN pip install --no-cache-dir \
+RUN --mount=type=cache,id=metaview-pip,target=/root/.cache/pip,sharing=locked \
+    pip install \
         --find-links "${PIP_FIND_LINKS}" \
         --prefer-binary \
         --index-url "${PIP_INDEX_URL}" \

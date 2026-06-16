@@ -4,6 +4,7 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
       args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
         APT_MIRROR: ${APT_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn/debian}
         APT_SECURITY_MIRROR: ${APT_SECURITY_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn/debian-security}
         APT_PIPELINE_DEPTH: ${APT_PIPELINE_DEPTH:-0}
@@ -85,6 +86,8 @@ services:
     build:
       context: .
       dockerfile: apps/agent/Dockerfile
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
     environment:
       # The sidecar reaches the FastAPI side over docker-compose's internal
       # network so the assert_* tools can call /api/v1/agent/assert/*.
@@ -108,6 +111,7 @@ services:
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
         VITE_APP_EDITION: ${VITE_APP_EDITION:-self}
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
     depends_on:
       - api
     ports:
