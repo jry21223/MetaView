@@ -3,11 +3,20 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Generator
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app.config import get_settings
 from app.main import create_app
+
+
+@pytest.fixture(autouse=True)
+def clear_settings_cache() -> Generator[None, None, None]:
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 @pytest.fixture()
@@ -103,3 +112,70 @@ def test_rejects_oversize_expression(client: TestClient) -> None:
         json={"expression": big, "x_min": 0.0, "x_max": 1.0},
     )
     assert response.status_code == 422
+
+
+def test_animation_tool_list_requires_shared_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("METAVIEW_AGENT_SHARED_TOKEN", "secret")
+    get_settings.cache_clear()
+    client = TestClient(create_app())
+
+    missing = client.get("/api/v1/agent/animation-tools")
+    wrong = client.get(
+        "/api/v1/agent/animation-tools",
+        headers={"X-MetaView-Agent-Token": "wrong"},
+    )
+    ok = client.get(
+        "/api/v1/agent/animation-tools",
+        headers={"X-MetaView-Agent-Token": "secret"},
+    )
+
+    assert missing.status_code == 401
+    assert wrong.status_code == 401
+    assert ok.status_code == 200
+    tools = ok.json()["tools"]
+    assert {
+        "name": "math.show_tangent",
+        "description": "Show a function and tangent line at a selected x value.",
+    } in tools
+
+
+def test_animation_tool_expand_returns_layers_with_issues_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("METAVIEW_AGENT_SHARED_TOKEN", "secret")
+    get_settings.cache_clear()
+    client = TestClient(create_app())
+
+    response = client.post(
+        "/api/v1/agent/animation-tools/expand",
+        headers={"X-MetaView-Agent-Token": "secret"},
+        json={
+            "tool": "math.show_function",
+            "args": {"expression": "x**2", "x_min": -2, "x_max": 2},
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["issues"] == []
+    assert payload["layers"]
+    assert payload["layers"][0]["kind"] == "math_plot"
+
+
+def test_animation_tool_expand_reports_unknown_tool(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("METAVIEW_AGENT_SHARED_TOKEN", "secret")
+    get_settings.cache_clear()
+    client = TestClient(create_app())
+
+    response = client.post(
+        "/api/v1/agent/animation-tools/expand",
+        headers={"X-MetaView-Agent-Token": "secret"},
+        json={"tool": "math.nope", "args": {}},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["layers"] == []
+    assert payload["issues"][0]["code"] == "animation_tool.unknown_tool"

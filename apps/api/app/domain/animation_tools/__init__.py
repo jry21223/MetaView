@@ -17,9 +17,11 @@ from app.domain.animation_tools import (  # noqa: F401
 )
 from app.domain.animation_tools.registry import (
     AnimationToolExpansionResult,
+    AnimationToolInfo,
     AnimationToolIssue,
     expand_animation_call,
     expand_cir_animation_calls,
+    list_animation_tools,
     register,
     safe_expand_animation_call,
     safe_expand_cir_animation_calls_with_issues,
@@ -27,10 +29,12 @@ from app.domain.animation_tools.registry import (
 
 __all__ = [
     "AnimationToolExpansionResult",
+    "AnimationToolInfo",
     "AnimationToolIssue",
     "register",
     "expand_animation_call",
     "expand_cir_animation_calls",
+    "list_animation_tools",
     "safe_expand_animation_call",
     "safe_expand_cir_animation_calls_with_issues",
 ]

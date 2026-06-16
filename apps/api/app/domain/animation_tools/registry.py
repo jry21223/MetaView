@@ -18,6 +18,29 @@ from app.domain.models.cir import CirDocument, LayerSpec
 logger = logging.getLogger(__name__)
 
 _REGISTRY: dict[str, AnimationTool] = {}
+_TOOL_DESCRIPTIONS: dict[str, str] = {
+    "algorithm.graph_traversal": "Build graph traversal layers with active nodes and edges.",
+    "biology.punnett_square": "Build a Punnett square for simple inheritance explanations.",
+    "chemistry.stoichiometry_table": (
+        "Build stoichiometry table layers for balanced reaction quantities."
+    ),
+    "math.show_derivative_compare": "Compare a function and its derivative on shared plot layers.",
+    "math.show_function": (
+        "Build function plot layers with optional comparison, marker, or shaded interval."
+    ),
+    "math.show_function_transform": "Show a base function and transformed function on shared axes.",
+    "math.show_integral_area": "Show area under a function between two bounds.",
+    "math.show_parametric_curve": "Show a parametric curve in a math scene.",
+    "math.show_region_boundary": "Show a polygonal region boundary in a math scene.",
+    "math.show_tangent": "Show a function and tangent line at a selected x value.",
+    "physics.force_diagram": "Build force-vector scene layers for a body.",
+    "physics.projectile_motion": (
+        "Build projectile trajectory layers from initial velocity and angle."
+    ),
+    "stats.distribution_chart": (
+        "Build statistical chart layers for distribution-style comparisons."
+    ),
+}
 
 AnimationToolIssueCode = Literal[
     "animation_tool.unknown_tool",
@@ -36,6 +59,11 @@ class AnimationToolIssue(BaseModel):
 class AnimationToolExpansionResult(BaseModel):
     layers: list[LayerSpec] = Field(default_factory=list)
     issues: list[AnimationToolIssue] = Field(default_factory=list)
+
+
+class AnimationToolInfo(BaseModel):
+    name: str
+    description: str
 
 
 class CirAnimationToolExpansionResult(BaseModel):
@@ -60,6 +88,23 @@ def register(name: str) -> Callable[[AnimationTool], AnimationTool]:
         return fn
 
     return deco
+
+
+def list_animation_tools() -> list[AnimationToolInfo]:
+    """Return registered animation tools for agent-side discovery."""
+    return [
+        AnimationToolInfo(
+            name=name,
+            description=_TOOL_DESCRIPTIONS.get(name, _description_from_name(name)),
+        )
+        for name in sorted(_REGISTRY)
+    ]
+
+
+def _description_from_name(name: str) -> str:
+    domain, _, action = name.partition(".")
+    phrase = action.replace("_", " ") if action else name.replace("_", " ")
+    return f"{domain.title()} animation tool for {phrase}."
 
 
 def safe_expand_animation_call(
