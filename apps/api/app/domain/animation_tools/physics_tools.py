@@ -57,7 +57,7 @@ class PhysicsProjectileMotionArgs(BaseModel):
     caption: str | None = None
 
 
-@register("physics.force_diagram")
+@register("physics.force_diagram", PhysicsForceDiagramArgs)
 def force_diagram(args: dict) -> list[LayerSpec]:
     parsed = PhysicsForceDiagramArgs.model_validate(args)
     segments: list[SceneSegment] = []
@@ -105,7 +105,7 @@ def force_diagram(args: dict) -> list[LayerSpec]:
     ]
 
 
-@register("physics.projectile_motion")
+@register("physics.projectile_motion", PhysicsProjectileMotionArgs)
 def projectile_motion(args: dict) -> list[LayerSpec]:
     parsed = PhysicsProjectileMotionArgs.model_validate(args)
     angle = math.radians(parsed.angle_deg)

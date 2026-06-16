@@ -91,7 +91,7 @@ class MathShowRegionBoundaryArgs(BaseModel):
     caption: str | None = None
 
 
-@register("math.show_tangent")
+@register("math.show_tangent", MathShowTangentArgs)
 def show_tangent(args: dict) -> list[LayerSpec]:
     parsed = MathShowTangentArgs.model_validate(args)
     layers = _plot_layers(
@@ -121,7 +121,7 @@ def show_tangent(args: dict) -> list[LayerSpec]:
     return layers
 
 
-@register("math.show_function")
+@register("math.show_function", MathShowFunctionArgs)
 def show_function(args: dict) -> list[LayerSpec]:
     parsed = MathShowFunctionArgs.model_validate(args)
     curves = [
@@ -151,7 +151,7 @@ def show_function(args: dict) -> list[LayerSpec]:
     )
 
 
-@register("math.show_integral_area")
+@register("math.show_integral_area", MathShowIntegralAreaArgs)
 def show_integral_area(args: dict) -> list[LayerSpec]:
     parsed = MathShowIntegralAreaArgs.model_validate(args)
     return _plot_layers(
@@ -175,7 +175,7 @@ def show_integral_area(args: dict) -> list[LayerSpec]:
     )
 
 
-@register("math.show_derivative_compare")
+@register("math.show_derivative_compare", MathShowDerivativeCompareArgs)
 def show_derivative_compare(args: dict) -> list[LayerSpec]:
     parsed = MathShowDerivativeCompareArgs.model_validate(args)
     return _plot_layers(
@@ -203,7 +203,7 @@ def show_derivative_compare(args: dict) -> list[LayerSpec]:
     )
 
 
-@register("math.show_function_transform")
+@register("math.show_function_transform", MathShowFunctionTransformArgs)
 def show_function_transform(args: dict) -> list[LayerSpec]:
     parsed = MathShowFunctionTransformArgs.model_validate(args)
     return _plot_layers(
@@ -231,7 +231,7 @@ def show_function_transform(args: dict) -> list[LayerSpec]:
     )
 
 
-@register("math.show_parametric_curve")
+@register("math.show_parametric_curve", MathShowParametricCurveArgs)
 def show_parametric_curve(args: dict) -> list[LayerSpec]:
     parsed = MathShowParametricCurveArgs.model_validate(args)
     scene = SceneSpec(
@@ -256,7 +256,7 @@ def show_parametric_curve(args: dict) -> list[LayerSpec]:
     return _scene_layers(scene, parsed.formula_latex, parsed.caption)
 
 
-@register("math.show_region_boundary")
+@register("math.show_region_boundary", MathShowRegionBoundaryArgs)
 def show_region_boundary(args: dict) -> list[LayerSpec]:
     parsed = MathShowRegionBoundaryArgs.model_validate(args)
     closed = [*parsed.vertices, parsed.vertices[0]]

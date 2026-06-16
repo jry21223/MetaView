@@ -26,7 +26,7 @@ class AlgorithmGraphTraversalArgs(BaseModel):
     caption: str | None = None
 
 
-@register("algorithm.graph_traversal")
+@register("algorithm.graph_traversal", AlgorithmGraphTraversalArgs)
 def graph_traversal(args: dict) -> list[LayerSpec]:
     parsed = AlgorithmGraphTraversalArgs.model_validate(args)
     snapshot = GraphSceneSnapshot(
