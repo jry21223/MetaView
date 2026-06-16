@@ -11,10 +11,22 @@ body,
 #root {
   min-height: 100%;
   margin: 0;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
+  min-height: var(--mv-vvh);
 }
 
 :root {
   --font-headline: "Space Grotesk", "Inter", sans-serif;
+  --mv-safe-top: env(safe-area-inset-top, 0px);
+  --mv-safe-right: env(safe-area-inset-right, 0px);
+  --mv-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --mv-safe-left: env(safe-area-inset-left, 0px);
+  --mv-vvh: 100vh;
 }
 
 body {
@@ -29,6 +41,7 @@ body {
   -webkit-font-smoothing: antialiased;
   background: var(--bg);
   color: var(--ink);
+  min-width: 0;
 }
 
 body.mv-modal-open {
@@ -48,10 +61,26 @@ body.mv-modal-open {
 
 .mv-root {
   min-height: 100vh;
+  min-height: 100dvh;
+  min-height: var(--mv-vvh);
   display: flex;
   flex-direction: column;
   background: var(--bg);
   color: var(--ink);
+  overflow-x: hidden;
+  padding-left: var(--mv-safe-left);
+  padding-right: var(--mv-safe-right);
+}
+
+pre,
+code,
+kbd,
+samp {
+  max-width: 100%;
+}
+
+pre {
+  overflow-x: auto;
 }
 
 .mv-admin-unavailable {

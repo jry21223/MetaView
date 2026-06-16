@@ -52,6 +52,17 @@ describe("CodeHighlightRenderer", () => {
     }
   });
 
+  it("can offset line numbers for clipped mobile snippets", () => {
+    const markup = renderToStaticMarkup(
+      <CodeHighlightRenderer
+        overlay={overlay({ lines: ["        for j in range(len(arr) - i - 1):"] })}
+        theme="light"
+        lineNumberOffset={2}
+      />,
+    );
+    expect(markup).toContain(">3<");
+  });
+
   it("renders the operation label when supplied", () => {
     const markup = render(overlay({ operation_label: "交换 arr[j] 和 arr[j+1]" }));
     expect(markup).toContain("交换 arr[j] 和 arr[j+1]");

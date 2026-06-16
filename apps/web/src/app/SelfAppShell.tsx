@@ -23,8 +23,11 @@ import {
   GlobalTopbarShell,
   type Stage,
 } from "../shared/ui/GlobalTopbar";
+import { useVisualViewportHeight } from "../shared/hooks/useVisualViewportHeight";
 
 export function SelfAppShell() {
+  useVisualViewportHeight();
+
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [stage, setStage] = useState<Stage>("intake");
   const [topbarCollapsed, setTopbarCollapsed] = useState(false);

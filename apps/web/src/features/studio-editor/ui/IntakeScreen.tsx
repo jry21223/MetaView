@@ -10,7 +10,11 @@ type IntakeDomain =
   | "biology"
   | "geography";
 
-type IntakeTemplate = "math-problem" | "algorithm-code" | "physics-problem" | "code-file";
+type IntakeTemplate =
+  | "math-problem"
+  | "algorithm-code"
+  | "physics-problem"
+  | "chemistry-stoichiometry";
 
 const UNSUPPORTED_FILE_WARNING =
   "当前只支持上传代码文件。图片、PDF、课件暂未接入生成管线。";
@@ -21,7 +25,7 @@ const TEMPLATE_GALLERY: Array<{
   title: string;
   desc: string;
   prompt: string;
-  icon: "math" | "code" | "physics" | "file";
+  icon: "math" | "code" | "physics" | "chemistry";
 }> = [
   {
     id: "math-problem",
@@ -48,12 +52,12 @@ const TEMPLATE_GALLERY: Array<{
     icon: "physics",
   },
   {
-    id: "code-file",
-    domain: "code",
-    title: "代码文件",
-    desc: "上传 .py/.ts/.java 等代码文件",
-    prompt: "上传代码文件后生成代码讲解。",
-    icon: "file",
+    id: "chemistry-stoichiometry",
+    domain: "chemistry",
+    title: "化学计量",
+    desc: "配平、物质的量、反应比例关系",
+    prompt: "生成一个化学计量题讲解：展示方程式配平、物质的量换算和反应比例推导。",
+    icon: "chemistry",
   },
 ];
 
@@ -93,13 +97,14 @@ function Icon({ kind }: { kind: (typeof TEMPLATE_GALLERY)[number]["icon"] }) {
       </svg>
     );
   }
-  if (kind === "file") {
+  if (kind === "chemistry") {
     return (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-        <path d="M6 4h9l3 3v13H6z" />
-        <path d="M15 4v4h4" />
-        <path d="M9 13h6" />
-        <path d="M9 17h4" />
+        <path d="M9 3h6" />
+        <path d="M10 3v5l-4.8 8.3A3.2 3.2 0 0 0 8 21h8a3.2 3.2 0 0 0 2.8-4.7L14 8V3" />
+        <path d="M7.5 16h9" />
+        <circle cx="10" cy="18" r="0.8" />
+        <circle cx="14" cy="18" r="0.8" />
       </svg>
     );
   }
@@ -203,6 +208,17 @@ function inferDomain(raw: string, codeFile?: File): IntakeDomain | null {
     raw.includes("力")
   ) {
     return "physics";
+  }
+  if (
+    raw.includes("化学") ||
+    raw.includes("配平") ||
+    raw.includes("物质的量") ||
+    raw.includes("摩尔") ||
+    raw.includes("反应") ||
+    text.includes("stoichiometry") ||
+    text.includes("mole")
+  ) {
+    return "chemistry";
   }
   return null;
 }

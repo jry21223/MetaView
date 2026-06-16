@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Player } from "@remotion/player";
 import type { PlayerRef } from "@remotion/player";
-import type { DirectorScript, PlaybookScript } from "../types";
+import type { CodeHighlightOverlay, DirectorScript, PlaybookScript } from "../types";
 import { usePlaybookController } from "./usePlaybookController";
 import { PlaybookComposition } from "../composition/PlaybookComposition";
 import { PLAYBOOK_DEFAULTS } from "../../../../shared/config/constants";
@@ -18,6 +18,7 @@ import { getParamPanel } from "../param-panels/registry";
 import type { ParamPanelProps } from "../param-panels/types";
 import { hasReplayableAlgorithmParams } from "../param-panels/AlgorithmParamPanel";
 import { resolveDirectorVoiceover } from "../director";
+import { emitNativeEvent } from "../../../../shared/native/emitNativeEvent";
 
 // ── ParamPanelSlot (static component — resolves domain panel from registry) ──
 
@@ -73,6 +74,25 @@ const ExportSVG = () => (
   </svg>
 );
 
+const MoreSVG = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+       aria-hidden="true">
+    <circle cx="5" cy="12" r="1" />
+    <circle cx="12" cy="12" r="1" />
+    <circle cx="19" cy="12" r="1" />
+  </svg>
+);
+
+const CloseSVG = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+       aria-hidden="true">
+    <path d="M18 6 6 18" />
+    <path d="m6 6 12 12" />
+  </svg>
+);
+
 function TopbarFoldIcon({ collapsed }: { collapsed: boolean }) {
   return (
     <svg
@@ -95,6 +115,122 @@ function TopbarFoldIcon({ collapsed }: { collapsed: boolean }) {
         <path className="playbook-player__chrome-toggle-chevron" d="m7.5 14 4.5-4.5 4.5 4.5" />
       )}
     </svg>
+  );
+}
+
+export type PlaybookLayoutMode = "desktop" | "portrait";
+
+type MobileTabKey = "narration" | "code" | "params" | "followup" | "more";
+
+const PORTRAIT_QUERY = "(max-width: 680px) and (orientation: portrait)";
+const CODE_CONTEXT_LINES = 2;
+
+const MOBILE_TABS: Array<{ key: MobileTabKey; label: string }> = [
+  { key: "narration", label: "讲解" },
+  { key: "code", label: "代码" },
+  { key: "params", label: "参数" },
+  { key: "followup", label: "追问" },
+  { key: "more", label: "更多" },
+];
+
+function resolveAutoLayoutMode(): PlaybookLayoutMode {
+  if (typeof window === "undefined" || !window.matchMedia) return "desktop";
+  return window.matchMedia(PORTRAIT_QUERY).matches ? "portrait" : "desktop";
+}
+
+function useAutoLayoutMode(layoutMode?: PlaybookLayoutMode): PlaybookLayoutMode {
+  const [autoLayoutMode, setAutoLayoutMode] = useState<PlaybookLayoutMode>(
+    resolveAutoLayoutMode,
+  );
+
+  useEffect(() => {
+    if (layoutMode || typeof window === "undefined" || !window.matchMedia) return;
+    const query = window.matchMedia(PORTRAIT_QUERY);
+    const update = () => {
+      setAutoLayoutMode(query.matches ? "portrait" : "desktop");
+    };
+    query.addEventListener?.("change", update);
+    return () => query.removeEventListener?.("change", update);
+  }, [layoutMode]);
+
+  return layoutMode ?? autoLayoutMode;
+}
+
+interface ClippedCodeOverlay {
+  overlay: CodeHighlightOverlay;
+  lineNumberOffset: number;
+  fromLine: number;
+  toLine: number;
+  totalLines: number;
+}
+
+function clipCodeOverlay(
+  overlay: CodeHighlightOverlay | null,
+  contextLines = CODE_CONTEXT_LINES,
+): ClippedCodeOverlay | null {
+  if (!overlay || overlay.lines.length === 0) return null;
+  const anchor = Math.max(
+    0,
+    Math.min(
+      overlay.lines.length - 1,
+      overlay.active_line >= 0 ? overlay.active_line : overlay.active_lines[0] ?? 0,
+    ),
+  );
+  const from = Math.max(0, anchor - contextLines);
+  const to = Math.min(overlay.lines.length - 1, anchor + contextLines);
+  const activeLines = overlay.active_lines
+    .filter((line) => line >= from && line <= to)
+    .map((line) => line - from);
+
+  return {
+    overlay: {
+      ...overlay,
+      lines: overlay.lines.slice(from, to + 1),
+      active_line: anchor - from,
+      active_lines: activeLines.length ? activeLines : [anchor - from],
+    },
+    lineNumberOffset: from,
+    fromLine: from + 1,
+    toLine: to + 1,
+    totalLines: overlay.lines.length,
+  };
+}
+
+function MobileSheet({
+  title,
+  children,
+  onClose,
+}: {
+  title: string;
+  children: React.ReactNode;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  return (
+    <div className="playbook-player__mobile-sheet" role="dialog" aria-modal="true" aria-label={title}>
+      <button
+        type="button"
+        className="playbook-player__mobile-sheet-backdrop"
+        aria-label="关闭面板"
+        onClick={onClose}
+      />
+      <div className="playbook-player__mobile-sheet-panel">
+        <div className="playbook-player__mobile-sheet-head">
+          <strong>{title}</strong>
+          <button type="button" className="playbook-player__mobile-icon-btn" onClick={onClose} aria-label="关闭面板">
+            <CloseSVG />
+          </button>
+        </div>
+        <div className="playbook-player__mobile-sheet-body">{children}</div>
+      </div>
+    </div>
   );
 }
 
@@ -379,6 +515,7 @@ interface PlaybookPlayerProps {
   showLearningConsole?: boolean;
   topbarCollapsed?: boolean;
   onToggleTopbar?: () => void;
+  layoutMode?: PlaybookLayoutMode;
 }
 
 export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
@@ -392,12 +529,17 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   showLearningConsole = true,
   topbarCollapsed = false,
   onToggleTopbar,
+  layoutMode,
 }) => {
   const playerRef = useRef<PlayerRef | null>(null);
+  const resolvedLayoutMode = useAutoLayoutMode(layoutMode);
+  const isPortraitLayout = resolvedLayoutMode === "portrait";
 
   // ── Tweak state (frontend-only hot reload) ─────────────────────────────
   const [overrides, setOverrides] = useState<ScriptOverrides>({});
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [mobileTab, setMobileTab] = useState<MobileTabKey>("narration");
+  const [mobileSheet, setMobileSheet] = useState<MobileTabKey | null>(null);
   const script = useResolvedScript(baseScript, overrides);
   const capability = useMemo(() => domainCapability(script.domain), [script.domain]);
   const hasDomainPanel = useMemo(() => {
@@ -444,6 +586,10 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   const codeOverlay = useMemo(
     () => resolveCodePanelOverlay(script, safeStepIndex),
     [script, safeStepIndex],
+  );
+  const mobileCodeOverlay = useMemo(
+    () => clipCodeOverlay(codeOverlay),
+    [codeOverlay],
   );
 
   // Show code panel slot for algorithm domain, or any script that has code highlights.
@@ -558,9 +704,94 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     currentStep,
     currentNarrationFallback,
   );
+  const showMobileConsole = isPortraitLayout && showLearningConsole;
+  const mobileSheetTitle =
+    mobileSheet === "code"
+      ? "全部代码"
+      : mobileSheet === "params"
+        ? "参数"
+        : mobileSheet === "followup"
+          ? "追问"
+          : "更多";
+  const selectMobileTab = (tab: MobileTabKey) => {
+    setMobileTab(tab);
+    emitNativeEvent("playbook.mobileTabSelected", { tab });
+  };
+  const openMobileSheet = (sheet: MobileTabKey) => {
+    setMobileSheet(sheet);
+    emitNativeEvent("playbook.mobileSheetOpened", { sheet });
+  };
+  const mobileTabPanel =
+    mobileTab === "code" ? (
+      <div className="playbook-player__mobile-panel playbook-player__mobile-code-panel">
+        {mobileCodeOverlay ? (
+          <>
+            <div className="playbook-player__mobile-panel-head">
+              <span>
+                Lines {mobileCodeOverlay.fromLine}-{mobileCodeOverlay.toLine} / {mobileCodeOverlay.totalLines}
+              </span>
+              <button type="button" onClick={() => openMobileSheet("code")}>
+                查看全部代码
+              </button>
+            </div>
+            <div className="playbook-player__mobile-code-snippet">
+              <CodeHighlightRenderer
+                overlay={mobileCodeOverlay.overlay}
+                theme={theme}
+                lineNumberOffset={mobileCodeOverlay.lineNumberOffset}
+              />
+            </div>
+          </>
+        ) : (
+          <div className="playbook-player__mobile-empty">当前步骤没有代码同步片段。</div>
+        )}
+      </div>
+    ) : mobileTab === "params" ? (
+      <div className="playbook-player__mobile-panel">
+        {hasDomainPanel ? (
+          <div className="playbook-player__mobile-param-panel">
+            <ParamPanelSlot
+              domain={baseScript.domain}
+              script={baseScript}
+              overrides={overrides}
+              onOverridesChange={setOverrides}
+              isDark={theme === "dark"}
+            />
+          </div>
+        ) : (
+          <div className="playbook-player__mobile-empty">当前步骤没有可调参数。</div>
+        )}
+      </div>
+    ) : mobileTab === "followup" ? (
+      <div className="playbook-player__mobile-panel">
+        <button
+          type="button"
+          className="playbook-player__mobile-open-sheet"
+          onClick={() => openMobileSheet("followup")}
+        >
+          打开追问面板
+        </button>
+      </div>
+    ) : mobileTab === "more" ? (
+      <div className="playbook-player__mobile-panel">
+        <button
+          type="button"
+          className="playbook-player__mobile-open-sheet"
+          onClick={() => openMobileSheet("more")}
+        >
+          打开更多操作
+        </button>
+      </div>
+    ) : (
+      <div className="playbook-player__mobile-panel playbook-player__mobile-narration">
+        <span>步骤 {safeStepIndex + 1} / {script.steps.length}</span>
+        <p>{currentNarration || currentStep.title}</p>
+      </div>
+    );
   const playerClassName = [
     "playbook-player",
     "playbook-player--minimal",
+    isPortraitLayout ? "playbook-player--portrait" : "",
     showLearningConsole ? "" : "playbook-player--no-console",
   ]
     .filter(Boolean)
@@ -568,6 +799,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
 
   return (
     <div className={playerClassName} data-theme={theme}>
+      {!isPortraitLayout && (
       <aside className="playbook-player__rail" aria-label="Lesson steps">
         {onToggleTopbar ? (
           <button
@@ -612,6 +844,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
           </div>
         </div>
       </aside>
+      )}
 
       <div className="playbook-player__workspace">
         <header className="playbook-player__header">
@@ -624,6 +857,18 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
             <strong>{script.title}</strong>
           </div>
           <div className="playbook-player__header-actions">
+            {isPortraitLayout && onToggleTopbar && (
+              <button
+                type="button"
+                className="playbook-player__ghost-btn playbook-player__mobile-topbar-btn"
+                onClick={onToggleTopbar}
+                title={topbarCollapsed ? "显示顶部栏" : "返回导航"}
+                aria-label={topbarCollapsed ? "显示顶部栏" : "返回导航"}
+                aria-pressed={topbarCollapsed}
+              >
+                <TopbarFoldIcon collapsed={topbarCollapsed} />
+              </button>
+            )}
             {onOpenExport && (
               <button
                 type="button"
@@ -635,8 +880,26 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
                 <ExportSVG />
               </button>
             )}
+            {isPortraitLayout && showLearningConsole && (
+              <button
+                type="button"
+                className="playbook-player__ghost-btn playbook-player__mobile-more-btn"
+                onClick={() => openMobileSheet("more")}
+                title="更多"
+                aria-label="更多"
+              >
+                <MoreSVG />
+              </button>
+            )}
           </div>
         </header>
+
+        {isPortraitLayout && (
+          <div className="playbook-player__mobile-step">
+            <span>步骤 {safeStepIndex + 1} / {script.steps.length}</span>
+            <strong>{currentStep.title}</strong>
+          </div>
+        )}
 
         <section className="playbook-player__stage-shell" aria-label="Lesson animation">
           <div className="playbook-player__stage">
@@ -672,10 +935,12 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
           </div>
         </section>
 
-        <div className="playbook-player__caption">
-          <span aria-hidden="true" />
-          <p>{currentNarration || currentStep.title}</p>
-        </div>
+        {!isPortraitLayout && (
+          <div className="playbook-player__caption">
+            <span aria-hidden="true" />
+            <p>{currentNarration || currentStep.title}</p>
+          </div>
+        )}
 
         <div className="playbook-player__controls">
           <button
@@ -749,9 +1014,41 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
             </button>
           </div>
         </div>
+
+        {isPortraitLayout && (
+          <div className="playbook-player__caption playbook-player__caption--mobile">
+            <span aria-hidden="true" />
+            <p>{currentNarration || currentStep.title}</p>
+          </div>
+        )}
+
+        {showMobileConsole && (
+          <section className="playbook-player__mobile-console" aria-label="移动学习面板">
+            <div className="playbook-player__mobile-tabs" role="tablist" aria-label="移动学习面板">
+              {MOBILE_TABS.map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={mobileTab === tab.key}
+                  className={mobileTab === tab.key ? "is-active" : ""}
+                  onClick={() => {
+                    selectMobileTab(tab.key);
+                    if (tab.key === "followup" || tab.key === "more") {
+                      openMobileSheet(tab.key);
+                    }
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            {mobileTabPanel}
+          </section>
+        )}
       </div>
 
-      {showLearningConsole && (
+      {showLearningConsole && !isPortraitLayout && (
         <aside className="playbook-player__console" aria-label="Learning console">
           {showCodePanelSlot && (
             <section className="playbook-player__console-card playbook-player__code-card">
@@ -812,6 +1109,113 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
             </section>
           )}
         </aside>
+      )}
+
+      {showMobileConsole && mobileSheet && (
+        <MobileSheet title={mobileSheetTitle} onClose={() => setMobileSheet(null)}>
+          {mobileSheet === "code" && (
+            <div className="playbook-player__mobile-sheet-code">
+              {codeOverlay ? (
+                <CodeHighlightRenderer overlay={codeOverlay} theme={theme} />
+              ) : (
+                <div className="playbook-player__mobile-empty">当前讲解没有代码内容。</div>
+              )}
+            </div>
+          )}
+          {mobileSheet === "params" && (
+            <div className="playbook-player__mobile-sheet-section">
+              {hasDomainPanel ? (
+                <ParamPanelSlot
+                  domain={baseScript.domain}
+                  script={baseScript}
+                  overrides={overrides}
+                  onOverridesChange={setOverrides}
+                  isDark={theme === "dark"}
+                />
+              ) : (
+                <div className="playbook-player__mobile-empty">当前步骤没有可调参数。</div>
+              )}
+            </div>
+          )}
+          {mobileSheet === "followup" && (
+            <div className="playbook-player__mobile-followup-sheet">
+              {followupSlot ?? (
+                <div className="playbook-player__mobile-empty">当前讲解暂不能继续追问。</div>
+              )}
+            </div>
+          )}
+          {mobileSheet === "more" && (
+            <div className="playbook-player__mobile-more-sheet">
+              <div className="playbook-player__mobile-sheet-actions">
+                {onOpenExport && (
+                  <button
+                    type="button"
+                    className="playbook-player__mobile-action"
+                    onClick={() => {
+                      setMobileSheet(null);
+                      onOpenExport();
+                    }}
+                  >
+                    <ExportSVG />
+                    导出 MP4
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="playbook-player__mobile-action"
+                  onClick={() => setMobileSheet("followup")}
+                  disabled={!followupSlot}
+                >
+                  继续追问
+                </button>
+              </div>
+              <div className="playbook-player__mobile-setting">
+                <span>播放速度</span>
+                <div className="playbook-player__mobile-speed-row">
+                  {SPEED_STEPS.map((speed) => (
+                    <button
+                      key={speed}
+                      type="button"
+                      className={playbackRate === speed ? "is-active" : ""}
+                      onClick={() => setPlaybackRate(speed)}
+                    >
+                      {speed}x
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="playbook-player__mobile-setting-row">
+                <span>步进播放</span>
+                <button
+                  type="button"
+                  className={stepThrough ? "is-active" : ""}
+                  onClick={() => setStepThrough(!stepThrough)}
+                >
+                  {stepThrough ? "开启" : "关闭"}
+                </button>
+              </div>
+              <div className="playbook-player__mobile-setting-row">
+                <span>语音朗读</span>
+                <button
+                  type="button"
+                  className={tts.enabled ? "is-active" : ""}
+                  onClick={tts.toggle}
+                  disabled={!tts.supported}
+                >
+                  {tts.enabled ? "开启" : "关闭"}
+                </button>
+              </div>
+              <div className="playbook-player__mobile-related">
+                <span>版本与相关</span>
+                {relatedSlot ?? (
+                  <div className="playbook-player__mobile-empty">
+                    暂无历史版本或相关讲解。
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </MobileSheet>
       )}
     </div>
   );
