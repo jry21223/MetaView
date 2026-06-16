@@ -46,7 +46,8 @@ describe("IntakeScreen launch home", () => {
     expect(getByText("数学题")).toBeTruthy();
     expect(getByText("算法代码")).toBeTruthy();
     expect(getByText("物理题")).toBeTruthy();
-    expect(getByText("代码文件")).toBeTruthy();
+    expect(getByText("化学计量")).toBeTruthy();
+    expect(queryByText("代码文件")).toBeNull();
     expect(
       (getByRole("button", { name: "生成讲解" }) as HTMLButtonElement).disabled,
     ).toBe(true);
@@ -62,6 +63,20 @@ describe("IntakeScreen launch home", () => {
         domain: "math",
         template: "math-problem",
         title: "数学题",
+      }),
+    );
+  });
+
+  it("submits chemistry templates with a supported domain hint", () => {
+    const { getByRole, props } = renderIntake();
+
+    fireEvent.click(getByRole("button", { name: /化学计量/ }));
+
+    expect(props.onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        domain: "chemistry",
+        template: "chemistry-stoichiometry",
+        title: "化学计量",
       }),
     );
   });

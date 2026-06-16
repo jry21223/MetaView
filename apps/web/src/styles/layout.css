@@ -57,7 +57,7 @@
   grid-template-columns: minmax(190px, 240px) 1fr auto;
   align-items: center;
   min-height: 56px;
-  padding: 8px 22px;
+  padding: calc(8px + var(--mv-safe-top)) 22px 8px;
   border-bottom: 1px solid var(--line);
   background: color-mix(in srgb, var(--surface) 64%, var(--bg));
   gap: 20px;
@@ -70,7 +70,7 @@
     grid-template-columns: minmax(0, 1fr);
     align-items: stretch;
     gap: 10px;
-    padding: 12px;
+    padding: calc(12px + var(--mv-safe-top)) 12px 12px;
   }
 }
 
@@ -84,7 +84,7 @@
 
   .mv-top-shell.is-collapsed > .mv-top {
     min-height: 56px;
-    padding: 12px;
+    padding: calc(12px + var(--mv-safe-top)) 12px 12px;
     border-bottom-color: var(--line);
     opacity: 1;
     transform: none;
@@ -105,7 +105,10 @@
 .mv-main--player {
   grid-template-columns: minmax(0, 1fr);
   gap: 0;
-  padding: clamp(10px, 1.6vw, 24px) clamp(10px, 1.6vw, 24px) 0;
+  padding:
+    clamp(10px, 1.6vw, 24px)
+    clamp(10px, 1.6vw, 24px)
+    var(--mv-safe-bottom);
   background:
     linear-gradient(rgba(77, 71, 58, 0.052) 1px, transparent 1px),
     linear-gradient(90deg, rgba(77, 71, 58, 0.052) 1px, transparent 1px),

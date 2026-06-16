@@ -211,6 +211,114 @@ describe("PlaybookPlayer", () => {
     expect(onOpenExport).toHaveBeenCalledTimes(1);
   });
 
+  it("uses a portrait shell with mobile tabs while keeping export and more actions visible", () => {
+    const onOpenExport = vi.fn();
+    const { container } = render(
+      <PlaybookPlayer
+        script={baseScript()}
+        theme="light"
+        layoutMode="portrait"
+        onOpenExport={onOpenExport}
+        followupSlot={<div>Ask a follow-up</div>}
+      />,
+    );
+
+    expect(container.querySelector(".playbook-player--portrait")).toBeTruthy();
+    expect(container.querySelector(".playbook-player__rail")).toBeNull();
+    expect(container.querySelector(".playbook-player__console")).toBeNull();
+    expect(container.querySelector(".playbook-player__stage")).toBeTruthy();
+    expect(container.querySelector(".playbook-player__controls")).toBeTruthy();
+    expect(container.querySelector(".playbook-player__caption--mobile")).toBeTruthy();
+
+    const tabs = container.querySelectorAll(".playbook-player__mobile-tabs button");
+    expect(tabs).toHaveLength(5);
+
+    const exportButton = container.querySelector<HTMLButtonElement>(
+      ".playbook-player__header-actions .playbook-player__export-btn",
+    );
+    const moreButton = container.querySelector<HTMLButtonElement>(
+      ".playbook-player__header-actions .playbook-player__mobile-more-btn",
+    );
+    expect(exportButton).toBeTruthy();
+    expect(moreButton).toBeTruthy();
+
+    fireEvent.click(exportButton!);
+    expect(onOpenExport).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(moreButton!);
+    expect(container.querySelector(".playbook-player__mobile-sheet")).toBeTruthy();
+  });
+
+  it("shows only the active code context in the portrait code tab", () => {
+    const script = baseScript({
+      domain: "algorithm",
+      title: "Code slice",
+      steps: [
+        {
+          ...baseScript().steps[0],
+          snapshot: {
+            kind: "algorithm_array",
+            array_values: ["1", "2", "3"],
+            active_indices: [0],
+            swap_indices: [],
+            sorted_indices: [],
+            pointers: {},
+          },
+          code_highlight: {
+            language: "python",
+            lines: [
+              "line1",
+              "line2",
+              "line3",
+              "line4",
+              "line5",
+              "line6",
+              "line7",
+              "line8",
+            ],
+            active_line: 4,
+            active_lines: [4],
+            variables: {},
+          },
+        },
+      ],
+    });
+
+    const { container, queryByText, getByText } = render(
+      <PlaybookPlayer script={script} theme="light" layoutMode="portrait" />,
+    );
+
+    const codeTab = container.querySelectorAll<HTMLButtonElement>(
+      ".playbook-player__mobile-tabs button",
+    )[1];
+    fireEvent.click(codeTab);
+
+    expect(getByText("Lines 3-7 / 8")).toBeTruthy();
+    expect(getByText("line3")).toBeTruthy();
+    expect(getByText("line7")).toBeTruthy();
+    expect(queryByText("line1")).toBeNull();
+    expect(queryByText("line8")).toBeNull();
+  });
+
+  it("opens follow-up content in a portrait bottom sheet", () => {
+    const { container, getByLabelText } = render(
+      <PlaybookPlayer
+        script={baseScript()}
+        theme="light"
+        layoutMode="portrait"
+        followupSlot={<textarea aria-label="Ask follow-up" />}
+      />,
+    );
+
+    const followupTab = container.querySelectorAll<HTMLButtonElement>(
+      ".playbook-player__mobile-tabs button",
+    )[3];
+    fireEvent.click(followupTab);
+
+    expect(container.querySelector(".playbook-player__mobile-sheet")).toBeTruthy();
+    expect(getByLabelText("Ask follow-up")).toBeTruthy();
+  });
+
   it("uses the left rail control to toggle the workbench topbar instead of opening a submenu", () => {
     const onToggle = vi.fn();
     const { getByRole, queryByRole, rerender } = render(

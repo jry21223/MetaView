@@ -5,6 +5,7 @@ import { tokenizeLines, type TokenKind } from "./codeTokenizer";
 interface CodeHighlightRendererProps {
   overlay: CodeHighlightOverlay;
   theme?: "dark" | "light";
+  lineNumberOffset?: number;
 }
 
 const DARK = {
@@ -54,6 +55,7 @@ const TOKEN_LIGHT: Record<TokenKind, string> = {
 export const CodeHighlightRenderer: React.FC<CodeHighlightRendererProps> = ({
   overlay,
   theme = "dark",
+  lineNumberOffset = 0,
 }) => {
   const c = theme === "dark" ? DARK : LIGHT;
   const tokenColors = theme === "dark" ? TOKEN_DARK : TOKEN_LIGHT;
@@ -157,7 +159,7 @@ export const CodeHighlightRenderer: React.FC<CodeHighlightRendererProps> = ({
                   lineHeight: "22px",
                 }}
               >
-                {i + 1}
+                {lineNumberOffset + i + 1}
               </span>
 
               {/* Operation badge */}
