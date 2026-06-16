@@ -93,6 +93,17 @@ describe("GlobalTopbar account avatar", () => {
     expect(onNavigate).toHaveBeenNthCalledWith(4, "settings");
   });
 
+  it("keeps the primary nav settings icon compact at topbar size", () => {
+    const { getByRole } = render(<GlobalTopbar {...baseProps} />);
+
+    const trigger = getByRole("button", { name: "设置" });
+    const pathData = Array.from(trigger.querySelectorAll("path")).map(
+      (path) => path.getAttribute("d") ?? "",
+    );
+
+    expect(pathData.some((d) => d.length > 120)).toBe(false);
+  });
+
   it("self mode shows provider status without account or recharge controls", () => {
     const { queryByLabelText, queryByText, getByText } = render(
       <GlobalTopbar
