@@ -11,12 +11,21 @@ and return a flat JSON object the TS side can pipe straight into a
 
 from __future__ import annotations
 
-from typing import Literal
+import secrets
+from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 from starlette.requests import Request
 
+from app.config import get_settings
+from app.domain.animation_tools import (
+    AnimationToolInfo,
+    AnimationToolIssue,
+    list_animation_tools,
+    safe_expand_animation_call,
+)
+from app.domain.models.cir import LayerSpec
 from app.domain.services.geometry_validators import (
     check_monotonic,
     check_orientation,
@@ -67,6 +76,31 @@ class MonotonicResponse(BaseModel):
     reason: str
 
 
+class AnimationToolListResponse(BaseModel):
+    tools: list[AnimationToolInfo]
+
+
+class AnimationToolExpandRequest(BaseModel):
+    tool: str = Field(min_length=1, max_length=128)
+    args: dict[str, Any] = Field(default_factory=dict)
+
+
+class AnimationToolExpandResponse(BaseModel):
+    layers: list[LayerSpec] = Field(default_factory=list)
+    issues: list[AnimationToolIssue] = Field(default_factory=list)
+
+
+def _require_agent_token(
+    token: Annotated[str | None, Header(alias="X-MetaView-Agent-Token")] = None,
+) -> None:
+    expected = get_settings().agent_shared_token
+    if not expected:
+        return
+    if token and secrets.compare_digest(token, expected):
+        return
+    raise HTTPException(status_code=401, detail="missing or invalid agent token")
+
+
 @router.post("/assert/orientation", response_model=OrientationResponse)
 @write_limit()
 async def assert_orientation(
@@ -113,3 +147,27 @@ async def assert_monotonic(
 ) -> MonotonicResponse:
     result = check_monotonic(payload.expression, payload.x_min, payload.x_max)
     return MonotonicResponse(verdict=result.verdict, reason=result.reason)
+
+
+@router.get("/animation-tools", response_model=AnimationToolListResponse)
+async def get_animation_tools(
+    token: Annotated[str | None, Header(alias="X-MetaView-Agent-Token")] = None,
+) -> AnimationToolListResponse:
+    _require_agent_token(token)
+    return AnimationToolListResponse(tools=list_animation_tools())
+
+
+@router.post("/animation-tools/expand", response_model=AnimationToolExpandResponse)
+@write_limit()
+async def expand_animation_tool(
+    request: Request,
+    payload: AnimationToolExpandRequest,
+    token: Annotated[str | None, Header(alias="X-MetaView-Agent-Token")] = None,
+) -> AnimationToolExpandResponse:
+    _require_agent_token(token)
+    result = safe_expand_animation_call(
+        payload.tool,
+        payload.args,
+        path="agent.animation_tools.expand",
+    )
+    return AnimationToolExpandResponse(layers=result.layers, issues=result.issues)

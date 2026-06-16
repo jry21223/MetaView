@@ -1785,7 +1785,7 @@
   place-items: center;
   margin: 0 auto 4px;
   overflow: visible;
-  opacity: 0.72;
+  opacity: 0.62;
 }
 
 .mv-meta-particle {
@@ -1967,23 +1967,23 @@
 }
 
 .mv-meta-particle--canvas .mv-meta-particle__canvas-node {
-  opacity: 0.42;
+  opacity: 0.36;
 }
 
 .mv-meta-particle--canvas .mv-meta-particle__canvas-node--2 {
-  opacity: 0.34;
+  opacity: 0.29;
 }
 
 .mv-meta-particle--canvas .mv-meta-particle__canvas-node--3 {
-  opacity: 0.28;
+  opacity: 0.24;
 }
 
 .mv-meta-particle--canvas .mv-meta-particle__particle {
-  opacity: 0.38;
+  opacity: 0.32;
 }
 
 .mv-meta-particle--canvas .mv-meta-particle__dust {
-  opacity: 0.22;
+  opacity: 0.19;
 }
 
 .mv-meta-particle--singularity .mv-meta-particle__particle {
@@ -2071,15 +2071,15 @@
 }
 
 .mv-dark .mv-meta-particle--canvas .mv-meta-particle__canvas-node {
-  opacity: 0.4;
+  opacity: 0.34;
 }
 
 .mv-dark .mv-meta-particle--canvas .mv-meta-particle__canvas-node--2 {
-  opacity: 0.32;
+  opacity: 0.27;
 }
 
 .mv-dark .mv-meta-particle--canvas .mv-meta-particle__canvas-node--3 {
-  opacity: 0.26;
+  opacity: 0.22;
 }
 
 @keyframes mvMetaParticleCore {
@@ -2170,7 +2170,7 @@
   background: color-mix(in srgb, var(--surface) 96%, transparent);
   box-shadow:
     0 12px 32px rgba(42, 39, 30, 0.07),
-    0 0 0 3px color-mix(in srgb, var(--accent) 8%, transparent),
+    0 0 0 2px color-mix(in srgb, var(--accent) 6%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.54);
 }
 
@@ -2178,7 +2178,7 @@
   background: color-mix(in srgb, var(--surface) 90%, #0f1512);
   box-shadow:
     0 12px 32px rgba(0, 0, 0, 0.24),
-    0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent),
+    0 0 0 2px color-mix(in srgb, var(--accent) 7%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
@@ -2320,12 +2320,12 @@
   justify-content: center;
   gap: 8px;
   padding: 0 16px;
-  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
-  color: color-mix(in srgb, var(--accent) 76%, var(--ink));
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  color: color-mix(in srgb, var(--accent) 68%, var(--ink));
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 540;
   box-shadow: none;
   transition:
     background 150ms ease,
@@ -2336,12 +2336,12 @@
 
 .mv-intake-send:hover {
   opacity: 1;
-  background: color-mix(in srgb, var(--accent) 22%, var(--surface));
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
   transform: none;
 }
 
 .mv-intake-send:active {
-  background: color-mix(in srgb, var(--accent) 28%, var(--surface));
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
 }
 
 .mv-intake-send:disabled {
@@ -2362,10 +2362,10 @@
 .mv-tpl-card {
   appearance: none;
   min-height: 62px;
-  border: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink) 7%, transparent);
   border-radius: 12px;
   padding: 12px 13px;
-  background: color-mix(in srgb, var(--surface) 68%, transparent);
+  background: color-mix(in srgb, var(--surface) 54%, transparent);
   color: var(--ink);
   text-align: left;
   box-shadow: none;
@@ -2375,12 +2375,12 @@
 .mv-tpl-card:hover {
   border-color: color-mix(in srgb, var(--accent) 24%, transparent);
   transform: none;
-  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+  background: color-mix(in srgb, var(--accent) 4%, var(--surface));
 }
 
 .mv-dark .mv-tpl-card,
 .mv-dark .mv-tpl-card:hover {
-  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  background: color-mix(in srgb, var(--surface) 66%, transparent);
 }
 
 .mv-tpl-head {

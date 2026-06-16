@@ -15,6 +15,7 @@ import {
 } from "./state/playbookSelfCheck.js";
 import type { PlaybookOutput } from "./state/types.js";
 import { makeAssertTools } from "./tools/asserts.js";
+import { makeAnimationToolTools } from "./tools/animationTools.js";
 import { makeDrawingTools } from "./tools/drawing.js";
 import { makeTemplateTools } from "./tools/templates.js";
 
@@ -30,24 +31,32 @@ export interface GenerateOptions {
   provider?: ProviderConfig;
   routeDecision?: Record<string, unknown>;
   apiBaseUrl: string; // FastAPI base URL the agent calls back to (for asserts)
+  agentSharedToken?: string;
   defaultProvider: string;
   defaultModel: string;
   defaultApiKey?: string;
 }
 
-const SYSTEM_PROMPT = `You are MetaView's educational visual designer. You build a
+export const SYSTEM_PROMPT = `You are MetaView's educational visual designer. You build a
 step-by-step playbook by calling drawing tools.
 
 Workflow you MUST follow:
 
 1. Call \`plan_outline\` FIRST. It records 8-14 step titles and the domain.
 2. For EACH step:
-   a. If an L2 \`template_*\` tool matches the step's pedagogical intent
+   a. For common teaching animations (function plots, tangents, integral
+      areas, parametric curves, graph traversal, force diagrams, projectile
+      motion, stoichiometry tables, distributions, inheritance grids), call
+      \`animation_tool_list\` / \`animation_tool_expand\` before manually
+      composing raw visual layers. Treat the expanded \`layers\` as the
+      deterministic reference; do not invent raw LayerSpec JSON when a
+      registry tool covers the pattern.
+   b. If an L2 \`template_*\` tool matches the step's pedagogical intent
       (array swap, tangent at a point, force diagram, projectile, SHM,
       Riemann sum, code-line trace, …) — call it FIRST. Then refine the
       auto-generated narration via \`set_narration\` to fit this specific
       prompt.
-   b. Otherwise compose L1 primitives manually:
+   c. Otherwise compose L1 primitives manually:
          \`begin_step\` → \`set_axes\` → \`add_curve_*\` / \`add_point\` /
          \`add_arrow\` / \`add_segment\` / \`add_region\` / \`add_formula\` →
          \`set_narration\` → \`assert_*\` → \`commit_step\`.
@@ -118,8 +127,17 @@ async function runAgentAttempt(
 
   const drawingTools = makeDrawingTools({ emitter });
   const assertTools = makeAssertTools({ emitter, apiBaseUrl: opts.apiBaseUrl });
+  const animationToolBridge = makeAnimationToolTools({
+    apiBaseUrl: opts.apiBaseUrl,
+    sharedToken: opts.agentSharedToken,
+  });
   const templateTools = makeTemplateTools({ emitter });
-  const tools: AgentTool[] = [...drawingTools, ...templateTools, ...assertTools];
+  const tools: AgentTool[] = [
+    ...drawingTools,
+    ...animationToolBridge,
+    ...templateTools,
+    ...assertTools,
+  ];
 
   const providerName =
     (opts.provider?.provider as string | undefined) ?? opts.defaultProvider;

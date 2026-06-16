@@ -60,6 +60,7 @@ app.post("/generate", async (req: Request, res: Response) => {
         provider,
         routeDecision: route_decision,
         apiBaseUrl: API_BASE_URL,
+        agentSharedToken: SHARED_TOKEN,
         defaultProvider: DEFAULT_PROVIDER,
         defaultModel: DEFAULT_MODEL,
         defaultApiKey: DEFAULT_API_KEY,
