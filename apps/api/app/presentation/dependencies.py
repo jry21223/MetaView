@@ -223,12 +223,14 @@ def _get_codex_agent_provider(
     model: str | None,
     effort: str | None,
     timeout_s: float,
+    skills_dir: str,
 ) -> CodexAgentProvider:
     return CodexAgentProvider(
         cwd=cwd,
         model=model,
         effort=effort,
         timeout_s=timeout_s,
+        skills_dir=skills_dir,
     )
 
 
@@ -249,6 +251,7 @@ def get_agent_provider(
             settings.codex_model,
             settings.codex_effort,
             settings.agent_timeout_s,
+            settings.agent_skills_dir,
         )
     return _get_agent_provider(
         settings.agent_base_url,

@@ -17,6 +17,7 @@ import pytest
 from app.application.dto.pipeline_dto import PipelineRequest
 from app.application.ports.agent_provider import AgentProviderError
 from app.application.use_cases.run_pipeline import RunPipelineUseCase
+from app.domain.skills.registry import SkillRegistry
 
 
 class _RecordingRepo:
@@ -289,10 +290,34 @@ async def test_agent_mode_routes_to_agent_provider() -> None:
     review = json.loads(last["review_json"])
     assert review["status"] == "clean"
     assert "agent:self_check:clean" in review["actions"]
+    assert "agent_skill:generic" in review["actions"]
     assert "reviewer:disabled" in review["actions"]
     assert "reviewer:unconfigured" not in review["actions"]
     assert director_repo.upserts[0]["director"].run_id == "run-1"
     assert director_repo.upserts[0]["director"].beats[0].step_id == "step_01"
+
+
+@pytest.mark.asyncio
+async def test_agent_mode_records_domain_agent_skill_action() -> None:
+    repo = _RecordingRepo()
+    agent = _FakeAgent(_MIN_PLAYBOOK)
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        agent_provider=agent,
+        generation_mode="agent",
+        reviewer_mode="off",
+        skill_registry=SkillRegistry([]),
+    )
+
+    await use_case.execute(
+        "run-chemistry-agent",
+        PipelineRequest(prompt="讲解强酸强碱滴定曲线", domain="chemistry"),
+    )
+
+    review = json.loads(repo.updates[-1]["review_json"])
+    assert "router:domain:chemistry" in review["actions"]
+    assert "agent_skill:chemistry" in review["actions"]
 
 
 @pytest.mark.asyncio

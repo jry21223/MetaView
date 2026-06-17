@@ -263,14 +263,19 @@ dev` 同样并行起三个进程。
 ```bash
 METAVIEW_GENERATION_MODE=agent
 METAVIEW_AGENT_PROVIDER=codex
-METAVIEW_CODEX_MODEL=gpt-5.2-codex
+METAVIEW_CODEX_MODEL=gpt-5.5
 METAVIEW_CODEX_EFFORT=high
 METAVIEW_CODEX_CWD=.
+METAVIEW_AGENT_SKILLS_DIR=skills/metaview-agent
 ```
 
 Python SDK 会复用本机已有 Codex 登录；请求里传入 `provider_api_key` 时会调用
 SDK 的 API-key 登录。该路径仍然只返回 PlaybookScript，并由后端 Pydantic 契约
 校验后必须继续通过 reviewer、compatibility gate，再进入同一个 Remotion exit。
+Codex provider 会按 route decision 加载 `skills/metaview-agent/generic/SKILL.md`
+和对应学科的 `SKILL.md`，让 agent 具备“LLM + 本地学科指令 + 后端 runtime
+校验”的能力。可确定题型仍优先由 deterministic SkillPack 在服务端 runtime 中处理；
+Codex agent 负责开放题、fallback、讲解导演和修复。
 
 ### Drawing CLI 工具集
 

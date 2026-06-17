@@ -1189,6 +1189,8 @@ def _route_review_actions(route_context: RouteContext, *, generator: str) -> lis
         actions.append(f"router:model:{route_context.router_model}")
     if route.domain:
         actions.append(f"router:domain:{route.domain}")
+    if generator == "agent":
+        actions.append(f"agent_skill:{route.domain or 'generic'}")
     if route.skill_id:
         actions.append(f"router:skill_id:{route.skill_id}")
     if route.matched_capability:

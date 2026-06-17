@@ -112,9 +112,10 @@ class Settings(BaseSettings):
     agent_base_url: str = "http://agent:8001"
     agent_timeout_s: float = 600.0
     agent_shared_token: str | None = None
-    codex_model: str | None = None
+    codex_model: str | None = "gpt-5.5"
     codex_effort: str | None = None
     codex_cwd: str = "."
+    agent_skills_dir: str = "skills/metaview-agent"
 
     # Account / recharge
     account_session_cookie: str = "mv_session"
