@@ -8,6 +8,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from app.application.agent.types import AgentRequest, AgentResult
 from app.application.ports.agent_provider import AgentProviderError
 from app.domain.models.playbook import PlaybookScript
 
@@ -119,6 +120,30 @@ class CodexAgentProvider:
         except ValidationError as exc:
             raise AgentProviderError(f"codex SDK playbook failed schema validation: {exc}") from exc
 
+    async def run(self, request: AgentRequest) -> AgentResult:
+        prompt = _build_runtime_user_prompt(request)
+        playbook = await self.generate(
+            prompt,
+            provider_config=request.provider_config,
+            route_decision=request.route_decision,
+        )
+        return AgentResult(
+            playbook=playbook,
+            provider="codex",
+            tool_events=[],
+            runtime_events=[
+                {
+                    "event": "codex.tool_execution_unavailable",
+                    "detail": {
+                        "available_tool_count": len(request.available_tools),
+                        "role": "repo-aware fallback/planner/repair provider",
+                    },
+                }
+            ],
+            review=None,
+            artifacts={},
+        )
+
 
 def _build_user_prompt(
     prompt: str,
@@ -138,6 +163,27 @@ def _build_user_prompt(
         f"{prompt}\n\n"
         "Validate against this JSON Schema and return only the JSON object:\n"
         f"{json.dumps(schema, ensure_ascii=False)}"
+    )
+
+
+def _build_runtime_user_prompt(request: AgentRequest) -> str:
+    runtime_payload = {
+        "run_id": request.run_id,
+        "route_decision": request.route_decision,
+        "constraints": request.constraints.model_dump(mode="json"),
+        "tools": [tool.model_dump(mode="json") for tool in request.available_tools],
+        "note": (
+            "Codex can inspect these runtime tool manifests, but this provider "
+            "cannot execute tools yet. Prefer deterministic tool results when "
+            "they are already present in the prompt; do not invent exact "
+            "validator or kernel outputs."
+        ),
+    }
+    return (
+        "[MetaView runtime tools]\n"
+        f"{json.dumps(runtime_payload, ensure_ascii=False, indent=2)}\n\n"
+        "[user prompt]\n"
+        f"{request.prompt}"
     )
 
 

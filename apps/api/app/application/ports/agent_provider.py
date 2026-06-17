@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
+from app.application.agent.types import AgentRequest, AgentResult
+
 
 class AgentProviderError(RuntimeError):
     """Raised when the agent sidecar cannot produce a PlaybookScript."""
@@ -22,6 +24,8 @@ class IAgentProvider(Protocol):
     LLM credentials, tool execution, and self-review; the use-case layer just
     sees the final JSON-serializable dict shaped like ``PlaybookScript``.
     """
+
+    async def run(self, request: AgentRequest) -> AgentResult: ...
 
     async def generate(
         self,

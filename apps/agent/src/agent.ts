@@ -17,6 +17,7 @@ import type { PlaybookOutput } from "./state/types.js";
 import { makeAssertTools } from "./tools/asserts.js";
 import { makeAnimationToolTools } from "./tools/animationTools.js";
 import { makeDrawingTools } from "./tools/drawing.js";
+import { makeRuntimeToolTools } from "./tools/runtimeTools.js";
 import { makeTemplateTools } from "./tools/templates.js";
 
 export interface ProviderConfig {
@@ -27,9 +28,15 @@ export interface ProviderConfig {
 }
 
 export interface GenerateOptions {
+  runId?: string;
   prompt: string;
+  sourceCode?: string | null;
+  language?: string | null;
   provider?: ProviderConfig;
   routeDecision?: Record<string, unknown>;
+  playbookSchema?: Record<string, unknown>;
+  constraints?: Record<string, unknown>;
+  availableTools?: Array<Record<string, unknown>>;
   apiBaseUrl: string; // FastAPI base URL the agent calls back to (for asserts)
   agentSharedToken?: string;
   defaultProvider: string;
@@ -44,7 +51,10 @@ Workflow you MUST follow:
 
 1. Call \`plan_outline\` FIRST. It records 8-14 step titles and the domain.
 2. For EACH step:
-   a. For common teaching animations (function plots, tangents, integral
+   a. Call \`runtime_tool_list\` when deterministic kernels or validators may
+      help. Use \`runtime_tool_execute\` for SkillPack/kernel/validator facts
+      instead of guessing exact results.
+   b. For common teaching animations (function plots, tangents, integral
       areas, parametric curves, graph traversal, force diagrams, projectile
       motion, stoichiometry tables, distributions, inheritance grids), call
       \`animation_tool_list\` / \`animation_tool_expand\` before manually
@@ -52,12 +62,12 @@ Workflow you MUST follow:
       calling \`animation_tool_expand\`. Treat the expanded \`layers\` as the
       deterministic reference; do not invent raw LayerSpec JSON when a
       registry tool covers the pattern.
-   b. If an L2 \`template_*\` tool matches the step's pedagogical intent
+   c. If an L2 \`template_*\` tool matches the step's pedagogical intent
       (array swap, tangent at a point, force diagram, projectile, SHM,
       Riemann sum, code-line trace, …) — call it FIRST. Then refine the
       auto-generated narration via \`set_narration\` to fit this specific
       prompt.
-   c. Otherwise compose L1 primitives manually:
+   d. Otherwise compose L1 primitives manually:
          \`begin_step\` → \`set_axes\` → \`add_curve_*\` / \`add_point\` /
          \`add_arrow\` / \`add_segment\` / \`add_region\` / \`add_formula\` →
          \`set_narration\` → \`assert_*\` → \`commit_step\`.
@@ -128,6 +138,10 @@ async function runAgentAttempt(
 
   const drawingTools = makeDrawingTools({ emitter });
   const assertTools = makeAssertTools({ emitter, apiBaseUrl: opts.apiBaseUrl });
+  const runtimeTools = makeRuntimeToolTools({
+    apiBaseUrl: opts.apiBaseUrl,
+    sharedToken: opts.agentSharedToken,
+  });
   const animationToolBridge = makeAnimationToolTools({
     apiBaseUrl: opts.apiBaseUrl,
     sharedToken: opts.agentSharedToken,
@@ -135,6 +149,7 @@ async function runAgentAttempt(
   const templateTools = makeTemplateTools({ emitter });
   const tools: AgentTool[] = [
     ...drawingTools,
+    ...runtimeTools,
     ...animationToolBridge,
     ...templateTools,
     ...assertTools,

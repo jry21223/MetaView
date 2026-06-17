@@ -14,6 +14,7 @@ from typing import Any
 
 import httpx
 
+from app.application.agent.types import AgentRequest, AgentResult
 from app.application.ports.agent_provider import AgentProviderError
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,19 @@ class HttpAgentProvider:
         if route_decision:
             body["route_decision"] = route_decision
 
+        result = await self._post_generate(body)
+        return result.playbook
+
+    async def run(self, request: AgentRequest) -> AgentResult:
+        body = request.model_dump(mode="json")
+        if request.provider_config:
+            body["provider"] = request.provider_config
+        result = await self._post_generate(body)
+        if result.provider == "agent":
+            return result.model_copy(update={"provider": "pi"})
+        return result
+
+    async def _post_generate(self, body: dict[str, Any]) -> AgentResult:
         url = f"{self._base_url}/generate"
         headers = (
             {"X-MetaView-Agent-Token": self._shared_token}
@@ -89,4 +103,21 @@ class HttpAgentProvider:
             raise AgentProviderError(
                 f"agent sidecar 'playbook' field is not an object: {type(playbook)}"
             )
-        return playbook
+        return AgentResult(
+            playbook=playbook,
+            provider=str(payload.get("provider") or "agent"),
+            tool_events=_list_of_dicts(payload.get("tool_events")),
+            runtime_events=_list_of_dicts(payload.get("runtime_events")),
+            review=payload.get("review") if isinstance(payload.get("review"), dict) else None,
+            artifacts=(
+                payload.get("artifacts")
+                if isinstance(payload.get("artifacts"), dict)
+                else {}
+            ),
+        )
+
+
+def _list_of_dicts(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, dict)]

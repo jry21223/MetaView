@@ -18,19 +18,14 @@ from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 from starlette.requests import Request
 
+from app.application.agent.runtime_tool_hub import RuntimeToolHub
+from app.application.agent.types import ToolExecutionResult, ToolManifest
 from app.config import get_settings
 from app.domain.animation_tools import (
     AnimationToolInfo,
     AnimationToolIssue,
-    list_animation_tools,
-    safe_expand_animation_call,
 )
 from app.domain.models.cir import LayerSpec
-from app.domain.services.geometry_validators import (
-    check_monotonic,
-    check_orientation,
-    check_point_on_curve,
-)
 from app.presentation.rate_limit import write_limit
 
 router = APIRouter(prefix="/agent", tags=["agent"])
@@ -90,6 +85,15 @@ class AnimationToolExpandResponse(BaseModel):
     issues: list[AnimationToolIssue] = Field(default_factory=list)
 
 
+class RuntimeToolListResponse(BaseModel):
+    tools: list[ToolManifest]
+
+
+class RuntimeToolExecuteRequest(BaseModel):
+    tool: str = Field(min_length=1, max_length=160)
+    args: dict[str, Any] = Field(default_factory=dict)
+
+
 def _require_agent_token(
     token: Annotated[str | None, Header(alias="X-MetaView-Agent-Token")] = None,
 ) -> None:
@@ -107,13 +111,12 @@ async def assert_orientation(
     request: Request,
     payload: OrientationRequest,
 ) -> OrientationResponse:
-    result = check_orientation(
-        payload.expression_x,
-        payload.expression_y,
-        payload.t_min,
-        payload.t_max,
+    result = await RuntimeToolHub().execute_tool(
+        "geometry.assert_orientation",
+        payload.model_dump(mode="json"),
     )
-    return OrientationResponse(direction=result.direction, reason=result.reason)
+    data = result.result if isinstance(result.result, dict) else {}
+    return OrientationResponse.model_validate(data)
 
 
 @router.post("/assert/passes-through", response_model=PointOnCurveResponse)
@@ -122,21 +125,12 @@ async def assert_passes_through(
     request: Request,
     payload: PointOnCurveRequest,
 ) -> PointOnCurveResponse:
-    result = check_point_on_curve(
-        payload.expression_x,
-        payload.expression_y,
-        payload.t_min,
-        payload.t_max,
-        payload.target_x,
-        payload.target_y,
-        payload.tol,
+    result = await RuntimeToolHub().execute_tool(
+        "geometry.assert_passes_through",
+        payload.model_dump(mode="json"),
     )
-    return PointOnCurveResponse(
-        passes=result.passes,
-        closest_t=result.closest_t,
-        distance=result.distance,
-        reason=result.reason,
-    )
+    data = result.result if isinstance(result.result, dict) else {}
+    return PointOnCurveResponse.model_validate(data)
 
 
 @router.post("/assert/monotonic", response_model=MonotonicResponse)
@@ -145,8 +139,12 @@ async def assert_monotonic(
     request: Request,
     payload: MonotonicRequest,
 ) -> MonotonicResponse:
-    result = check_monotonic(payload.expression, payload.x_min, payload.x_max)
-    return MonotonicResponse(verdict=result.verdict, reason=result.reason)
+    result = await RuntimeToolHub().execute_tool(
+        "geometry.assert_monotonic",
+        payload.model_dump(mode="json"),
+    )
+    data = result.result if isinstance(result.result, dict) else {}
+    return MonotonicResponse.model_validate(data)
 
 
 @router.get("/animation-tools", response_model=AnimationToolListResponse)
@@ -154,7 +152,9 @@ async def get_animation_tools(
     token: Annotated[str | None, Header(alias="X-MetaView-Agent-Token")] = None,
 ) -> AnimationToolListResponse:
     _require_agent_token(token)
-    return AnimationToolListResponse(tools=list_animation_tools())
+    result = await RuntimeToolHub().execute_tool("animation_tool.list", {})
+    data = result.result if isinstance(result.result, dict) else {}
+    return AnimationToolListResponse.model_validate(data)
 
 
 @router.post("/animation-tools/expand", response_model=AnimationToolExpandResponse)
@@ -165,9 +165,28 @@ async def expand_animation_tool(
     token: Annotated[str | None, Header(alias="X-MetaView-Agent-Token")] = None,
 ) -> AnimationToolExpandResponse:
     _require_agent_token(token)
-    result = safe_expand_animation_call(
-        payload.tool,
-        payload.args,
-        path="agent.animation_tools.expand",
+    result = await RuntimeToolHub().execute_tool(
+        "animation_tool.expand",
+        payload.model_dump(mode="json"),
     )
-    return AnimationToolExpandResponse(layers=result.layers, issues=result.issues)
+    data = result.result if isinstance(result.result, dict) else {}
+    return AnimationToolExpandResponse.model_validate(data)
+
+
+@router.get("/runtime-tools", response_model=RuntimeToolListResponse)
+async def get_runtime_tools(
+    token: Annotated[str | None, Header(alias="X-MetaView-Agent-Token")] = None,
+) -> RuntimeToolListResponse:
+    _require_agent_token(token)
+    return RuntimeToolListResponse(tools=RuntimeToolHub().list_tools())
+
+
+@router.post("/runtime-tools/execute", response_model=ToolExecutionResult)
+@write_limit()
+async def execute_runtime_tool(
+    request: Request,
+    payload: RuntimeToolExecuteRequest,
+    token: Annotated[str | None, Header(alias="X-MetaView-Agent-Token")] = None,
+) -> ToolExecutionResult:
+    _require_agent_token(token)
+    return await RuntimeToolHub().execute_tool(payload.tool, payload.args)

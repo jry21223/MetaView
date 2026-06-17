@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+from app.application.agent.types import AgentConstraints, AgentRequest, ToolManifest
 from app.application.ports.agent_provider import AgentProviderError
 from app.infrastructure.agent.codex_agent_provider import CodexAgentProvider
 
@@ -105,6 +106,41 @@ async def test_codex_provider_returns_validated_playbook_dict() -> None:
     assert fake.thread.run_calls[0]["effort"] == "high"
     assert "JSON Schema" in fake.thread.run_calls[0]["input"]
     assert "output_schema" not in fake.thread.run_calls[0]
+
+
+@pytest.mark.asyncio
+async def test_codex_provider_run_includes_tool_manifests_and_returns_agent_result() -> None:
+    provider = CodexAgentProvider(cwd=".", model="gpt-5.5", effort="high")
+
+    result = await provider.run(
+        AgentRequest(
+            run_id="run-codex",
+            prompt="explain y=x",
+            source_code=None,
+            language=None,
+            route_decision={"destination": "generic_cir"},
+            provider_config=None,
+            playbook_schema={"type": "object"},
+            constraints=AgentConstraints(max_self_repair_attempts=2),
+            available_tools=[
+                ToolManifest(
+                    name="playbook.schema.validate",
+                    description="Validate PlaybookScript.",
+                    args_schema={"type": "object"},
+                    domain="playbook",
+                    deterministic=True,
+                )
+            ],
+        )
+    )
+
+    fake = _FakeCodex.instances[0]
+    prompt = fake.thread.run_calls[0]["input"]
+    assert "[MetaView runtime tools]" in prompt
+    assert "playbook.schema.validate" in prompt
+    assert result.provider == "codex"
+    assert result.playbook["title"] == "Line"
+    assert result.runtime_events[0]["event"] == "codex.tool_execution_unavailable"
 
 
 @pytest.mark.asyncio
