@@ -30,7 +30,7 @@ def build_algorithm_graph_playbook(
             step_id=f"algorithm_graph_core_{index + 1:02d}",
             end_frame=(index + 1) * _STEP_FRAMES,
             title=_title(index, snapshot.kind),
-            voiceover_text=getattr(snapshot, "caption", None) or solution.answer_text,
+            voiceover_text=_voiceover_text(index, snapshot.kind, solution),
             animation_hint=snapshot.kind,
             snapshot=snapshot,
             layers=[Layer(timing=LayerTiming(), body=snapshot)],
@@ -55,18 +55,23 @@ def _snapshots(
     solution: GraphAlgorithmSolution,
 ) -> list[GraphSceneSnapshot | TableSceneSnapshot | MathFormulaSnapshot]:
     graph = _graph_snapshot(solution)
+    rule = MathFormulaSnapshot(
+        formula_latex=solution.formula_latex or r"\text{graph algorithm}",
+        caption=_rule_caption(solution.kind),
+        highlights=[solution.formula_latex] if solution.formula_latex else [],
+    )
     table = TableSceneSnapshot(
         columns=_table_columns(solution.kind),
         rows=solution.table_rows,
         active_rows=[max(0, len(solution.table_rows) - 1)] if solution.table_rows else [],
         caption=_table_caption(solution.kind),
     )
-    formula = MathFormulaSnapshot(
-        formula_latex=solution.formula_latex or r"\text{graph algorithm}",
+    result = MathFormulaSnapshot(
+        formula_latex=_result_formula_latex(solution),
         caption=solution.answer_text,
-        highlights=[solution.formula_latex] if solution.formula_latex else [],
+        highlights=[solution.answer_text] if solution.answer_text else [],
     )
-    return [graph, table, formula]
+    return [graph, rule, table, result]
 
 
 def _graph_snapshot(solution: GraphAlgorithmSolution) -> GraphSceneSnapshot:
@@ -165,12 +170,53 @@ def _table_caption(kind: str) -> str:
     }.get(kind, "记录图算法过程。")
 
 
+def _rule_caption(kind: str) -> str:
+    return {
+        "bfs": "队列保存下一层边界，出队后再加入未访问邻居。",
+        "dfs": "先沿一条分支走到底，再按递归栈回退。",
+        "dijkstra": "每次选择当前距离最小的未确定节点，再松弛边。",
+        "topological_sort": "每次取出入度为 0 的节点，并释放后继节点。",
+    }.get(kind, "先明确算法不变量，再逐步更新状态。")
+
+
+def _voiceover_text(index: int, kind: str, solution: GraphAlgorithmSolution) -> str:
+    order = solution.path or solution.order
+    order_text = " -> ".join(order) if order else "待计算"
+    first = order[0] if order else "起点"
+    if kind == "graph_scene":
+        return (
+            f"先看图结构：从 {first} 开始，节点高亮展示算法会关注的访问路线，"
+            "我们先把图关系看清楚。"
+        )
+    if kind == "table_scene":
+        return (
+            f"过程表逐行记录当前节点和状态变化；到这一轮时，顺序已经推进为 {order_text}，"
+            "重点检查队列或候选集合。"
+        )
+    if index == 1:
+        return (
+            f"{_rule_caption(solution.kind)} 这一步先抓住规则，再看每一行状态为什么这样更新。"
+        )
+    return (
+        f"最后得到结论：{solution.answer_text}。你可以反过来检查每一步是否都遵守了刚才的规则。"
+    )
+
+
+def _result_formula_latex(solution: GraphAlgorithmSolution) -> str:
+    sequence = solution.path or solution.order
+    if sequence:
+        return r"\mathrm{Result}: " + r" \rightarrow ".join(sequence)
+    return solution.formula_latex or r"\text{graph algorithm result}"
+
+
 def _title(index: int, kind: str) -> str:
     if kind == "graph_scene":
         return "图结构"
     if kind == "table_scene":
         return "过程表"
-    return ["算法规则", "过程说明", "结果"][min(index, 2)]
+    if index == 1:
+        return "算法规则"
+    return "结果"
 
 
 def _playbook_title(kind: str) -> str:

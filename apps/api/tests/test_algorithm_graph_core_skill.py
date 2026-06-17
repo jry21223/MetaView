@@ -15,6 +15,7 @@ from app.domain.skills.algorithm_graph_core.manifest import ALGORITHM_GRAPH_CORE
 from app.domain.skills.algorithm_graph_core.skill_pack import AlgorithmGraphCoreSkillPack
 from app.domain.skills.base import SkillExecutionContext, SkillRouteInput
 from app.domain.skills.registry import SkillRegistry
+from eval.scorers import score_playbook
 
 
 class _RecordingRepo:
@@ -174,10 +175,14 @@ async def test_execute_outputs_valid_playbook_with_graph_scene() -> None:
     assert result.playbook_json is not None
     playbook = PlaybookScript.model_validate_json(result.playbook_json)
     assert playbook.domain == TopicDomain.ALGORITHM
-    assert 3 <= len(playbook.steps) <= 5
+    assert 4 <= len(playbook.steps) <= 5
     assert "graph_scene" in {step.snapshot.kind for step in playbook.steps}
     assert "table_scene" in {step.snapshot.kind for step in playbook.steps}
+    assert all(len(step.voiceover_text) >= 20 for step in playbook.steps)
     assert all(step.layers for step in playbook.steps)
+
+    score = score_playbook("algorithm-bfs-runtime", result.playbook_json)
+    assert score.passed, [(dim.name, dim.score, dim.issues) for dim in score.dimensions]
 
 
 @pytest.mark.asyncio
