@@ -29,7 +29,7 @@ class ChemistryStoichiometryTableArgs(BaseModel):
     caption: str | None = None
 
 
-@register("chemistry.stoichiometry_table")
+@register("chemistry.stoichiometry_table", ChemistryStoichiometryTableArgs)
 def stoichiometry_table(args: dict) -> list[LayerSpec]:
     parsed = ChemistryStoichiometryTableArgs.model_validate(args)
     table = TableSceneSnapshot(

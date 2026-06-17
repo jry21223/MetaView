@@ -17,7 +17,7 @@ class BiologyPunnettSquareArgs(BaseModel):
     phenotype_counts: dict[str, float] = Field(default_factory=dict)
 
 
-@register("biology.punnett_square")
+@register("biology.punnett_square", BiologyPunnettSquareArgs)
 def punnett_square(args: dict) -> list[LayerSpec]:
     parsed = BiologyPunnettSquareArgs.model_validate(args)
     table = TableSceneSnapshot(
