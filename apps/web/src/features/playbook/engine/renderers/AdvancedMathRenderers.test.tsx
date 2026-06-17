@@ -102,4 +102,20 @@ describe("advanced math renderers", () => {
       expect(markup).not.toContain("Unknown snapshot kind");
     }
   });
+
+  it("projects compact graph coordinates into the viewport", () => {
+    const markup = render({
+      kind: "graph_scene",
+      nodes: [
+        { id: "a", label: "A", x: 0, y: -2.4 },
+        { id: "b", label: "B", x: 2.4, y: 0 },
+      ],
+      edges: [{ source: "a", target: "b" }],
+      directed: false,
+    });
+
+    expect(markup).not.toContain('cx="0"');
+    expect(markup).not.toContain('cy="-2.4"');
+    expect(markup).toContain('cx="450"');
+  });
 });

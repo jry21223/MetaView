@@ -7,6 +7,7 @@ from app.domain.skills.algebra_core.normalization import normalize_math_text
 from app.domain.skills.elementary_algebra.problem_spec import ElementaryAlgebraProblemSpec
 
 _EQUATION_SEGMENT_RE = re.compile(r"[A-Za-z0-9_+\-*/().^]+(?:<=|>=|=|<|>)[A-Za-z0-9_+\-*/().^]+")
+_FACTOR_COMMAND_RE = re.compile(r"(?<![A-Za-z])factor(?![A-Za-z])", re.IGNORECASE)
 _CALCULUS_KEYWORDS = ("求导", "导数", "积分", "极限", "切线", "lim", "int_", "d/d")
 _GRAPH_TRANSFORM_KEYWORDS = ("图像变换", "开口", "平移", "顶点式")
 
@@ -19,7 +20,7 @@ def try_extract_elementary_algebra(prompt: str) -> ElementaryAlgebraProblemSpec 
     if "y=" in compact and any(keyword in compact for keyword in _GRAPH_TRANSFORM_KEYWORDS):
         return None
 
-    if "因式分解" in normalized or "factor" in normalized.lower():
+    if "因式分解" in normalized or _FACTOR_COMMAND_RE.search(normalized):
         expression = extract_expression_after(normalized, ("因式分解", "factor"))
         if expression is None:
             return None

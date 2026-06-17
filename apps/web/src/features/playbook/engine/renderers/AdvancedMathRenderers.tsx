@@ -408,12 +408,21 @@ export const GraphSceneRenderer: React.FC<RendererProps> = ({ step, frame, stepS
 function GraphSvg({ graph, theme, opacity = 1 }: { graph: GraphSceneSnapshot; theme: ThemeName; opacity?: number }) {
   const colors = PALETTE[theme];
   const nodes = graph.nodes ?? [];
+  const projectCompactCoords = shouldProjectCompactGraphCoords(nodes);
   const positioned = nodes.map((node, index) => {
     const angle = (index / Math.max(nodes.length, 1)) * Math.PI * 2 - Math.PI / 2;
+    const fallback = {
+      x: 450 + Math.cos(angle) * 260,
+      y: 245 + Math.sin(angle) * 170,
+    };
+    const hasExplicitPosition = typeof node.x === "number" && typeof node.y === "number";
+    const projected = hasExplicitPosition
+      ? projectGraphPoint(node.x as number, node.y as number, projectCompactCoords)
+      : fallback;
     return {
       ...node,
-      x: node.x ?? 450 + Math.cos(angle) * 260,
-      y: node.y ?? 245 + Math.sin(angle) * 170,
+      x: projected.x,
+      y: projected.y,
     };
   });
   const byId = new Map(positioned.map((node) => [node.id, node]));
@@ -462,6 +471,20 @@ function GraphSvg({ graph, theme, opacity = 1 }: { graph: GraphSceneSnapshot; th
       })}
     </svg>
   );
+}
+
+function shouldProjectCompactGraphCoords(nodes: GraphSceneSnapshot["nodes"]): boolean {
+  const positioned = nodes.filter((node) => typeof node.x === "number" && typeof node.y === "number");
+  if (!positioned.length) return false;
+  return positioned.every((node) => Math.abs(node.x as number) <= 12 && Math.abs(node.y as number) <= 12);
+}
+
+function projectGraphPoint(x: number, y: number, compact: boolean): { x: number; y: number } {
+  if (!compact) return { x, y };
+  return {
+    x: SVG_W / 2 + x * 120,
+    y: SVG_H / 2 + y * 82,
+  };
 }
 
 export const PhasePortraitSceneRenderer: React.FC<RendererProps> = ({ step, theme }) => {

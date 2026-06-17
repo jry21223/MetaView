@@ -20,7 +20,7 @@ prompts:
 
   - id: code-recursion-stack
     domain: code
-    expected_path: deterministic
+    expected_path: agent
     prompt: 逐行追踪 Python 函数 factorial(4) 的递归调用栈，展示压栈、base case 和回溯返回。
     showcase: code trace with stack frames
 

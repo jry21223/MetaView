@@ -92,8 +92,9 @@ def run_case(
         "expected_path": expected_path,
         "actual_path": actual_path,
         "path_ok": expected_path in {None, actual_path},
-        "score": score.total,
-        "passed_score": score.passed,
+        "contract_score": score.total,
+        "passed_contract_score": score.passed,
+        "score_kind": "structural_contract",
         "review_actions": review_actions,
         "error": last.get("error"),
         "playbook": playbook,
@@ -218,7 +219,7 @@ def main(argv: list[str] | None = None) -> int:
             results.append(result)
             print(
                 f"{result['id']}: {result['status']} path={result['actual_path']} "
-                f"score={result['score']:.1f}"
+                f"contract_score={result['contract_score']:.1f}"
             )
 
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -235,7 +236,9 @@ def main(argv: list[str] | None = None) -> int:
         "passed": sum(
             1
             for result in results
-            if result["status"] == "succeeded" and result["path_ok"] and result["passed_score"]
+            if result["status"] == "succeeded"
+            and result["path_ok"]
+            and result["passed_contract_score"]
         ),
         "results": [
             {key: value for key, value in result.items() if key != "playbook"}
