@@ -32,8 +32,8 @@ describe("IntakeScreen launch home", () => {
   it("renders only currently supported generation promises", () => {
     const { container, getByText, queryByText, getByRole } = renderIntake();
 
-    expect(getByText("把一道题变成可播放的理论画布")).toBeTruthy();
-    expect(getByText("输入数学题、物理题或算法/代码片段，生成分步可视化讲解。")).toBeTruthy();
+    expect(getByText("输入题目或代码，生成可播放的分步讲解")).toBeTruthy();
+    expect(getByText("支持数学、算法、物理和代码追踪；生成后可继续追问修改，也可导出视频。")).toBeTruthy();
     expect(queryByText(/截图/)).toBeNull();
     expect(queryByText(/翻译/)).toBeNull();
     expect(queryByText("英语拆解")).toBeNull();
@@ -47,7 +47,6 @@ describe("IntakeScreen launch home", () => {
     expect(getByText("算法代码")).toBeTruthy();
     expect(getByText("物理题")).toBeTruthy();
     expect(getByText("化学计量")).toBeTruthy();
-    expect(queryByText("代码文件")).toBeNull();
     expect(
       (getByRole("button", { name: "生成讲解" }) as HTMLButtonElement).disabled,
     ).toBe(true);
@@ -60,7 +59,8 @@ describe("IntakeScreen launch home", () => {
     const uploadButton = getByRole("button", { name: "上传代码文件" });
     expect(uploadButton.closest(".mv-intake-actions")).toBeTruthy();
     expect(uploadButton.classList.contains("mv-intake-action")).toBe(true);
-    expect(uploadButton.textContent).toContain("上传代码文件");
+    expect(uploadButton.classList.contains("mv-intake-attach")).toBe(true);
+    expect(uploadButton.textContent).toContain("代码文件");
   });
 
   it("submits math templates with a supported domain hint", () => {

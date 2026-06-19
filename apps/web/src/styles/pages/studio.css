@@ -2277,6 +2277,16 @@
   cursor: pointer;
 }
 
+.mv-intake-attach {
+  height: 30px;
+  gap: 6px;
+  padding: 0 8px;
+  border-color: color-mix(in srgb, var(--ink) 6%, transparent);
+  background: color-mix(in srgb, var(--surface) 52%, transparent);
+  color: color-mix(in srgb, var(--ink-3) 88%, var(--ink));
+  font-weight: 480;
+}
+
 .mv-intake-action:hover {
   background: color-mix(in srgb, var(--ink) 5%, transparent);
   color: var(--ink);

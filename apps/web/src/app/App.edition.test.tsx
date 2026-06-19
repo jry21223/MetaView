@@ -121,7 +121,7 @@ describe("App edition shells", () => {
 
     await waitFor(() => expect(accountHits).toBe(1));
     await waitFor(() => expect(dashboardHits).toBe(0));
-    expect(container.textContent).toContain("把一道题变成可播放的理论画布");
+    expect(container.textContent).toContain("输入题目或代码，生成可播放的分步讲解");
     expect(container.textContent).not.toContain("全局运营");
     expect(container.textContent).toContain("微信用户 · ¥ 5.00");
     expect(container.querySelectorAll(".mv-top")).toHaveLength(1);
