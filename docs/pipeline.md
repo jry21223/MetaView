@@ -225,6 +225,10 @@ Agent mode 是一等质量编排路径，不是备用渲染器。它用
 [pi-agent-core](https://github.com/earendil-works/pi) 做 agent runtime，通过细粒度
 **Drawing CLI** 工具一步步建出最终 PlaybookScript。
 
+合并或推广 agent mode 前，先按
+[`docs/agent-demo-acceptance.md`](agent-demo-acceptance.md) 跑 demo suite，
+确认核心 case 的 generation path、PlaybookScript contract score 和可选无音轨导出结果。
+
 Agent mode 不绕过规范化的 PlaybookScript 契约。它可以跳过 CIR parsing 和
 `playbook_builder`，但必须返回 schema-valid `PlaybookScript`，并且仍然走同一个
 **PlaybookScript → Remotion Player / Export** 渲染出口。

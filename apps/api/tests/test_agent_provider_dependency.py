@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from app.config import Settings
 from app.infrastructure.agent.codex_agent_provider import CodexAgentProvider
 from app.infrastructure.agent.http_agent_provider import HttpAgentProvider
@@ -32,4 +34,4 @@ def test_agent_provider_dependency_can_select_codex_sdk() -> None:
     provider = get_agent_provider(settings)
 
     assert isinstance(provider, CodexAgentProvider)
-    assert provider.skills_dir.endswith("skills/custom-agent")
+    assert Path(provider.skills_dir).parts[-2:] == ("skills", "custom-agent")
