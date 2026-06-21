@@ -5,7 +5,7 @@ interface FollowupCommitLogProps {
   versions: RunVersionRecord[];
   pending: boolean;
   canModify: boolean;
-  onRestore: (versionId: string) => void;
+  onRestore: (versionId: string) => void | Promise<void>;
 }
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -21,11 +21,32 @@ export function FollowupCommitLog({
   onRestore,
 }: FollowupCommitLogProps) {
   const [expanded, setExpanded] = useState(false);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [restoringVersionId, setRestoringVersionId] = useState<string | null>(null);
   if (versions.length === 0) return null;
   const ordered = [...versions].sort((a, b) => {
     const timeDelta = Date.parse(b.created_at) - Date.parse(a.created_at);
     return timeDelta || b.version_number - a.version_number;
   });
+  const restoreDisabled = pending || restoringVersionId !== null || !canModify;
+  const restoreVersion = (versionId: string) => {
+    setRestoreError(null);
+    setRestoringVersionId(versionId);
+    setExpanded(false);
+    try {
+      const maybePromise = onRestore(versionId);
+      void Promise.resolve(maybePromise)
+        .catch((err) => {
+          setRestoreError(formatRestoreError(err));
+        })
+        .finally(() => {
+          setRestoringVersionId(null);
+        });
+    } catch (err) {
+      setRestoreError(formatRestoreError(err));
+      setRestoringVersionId(null);
+    }
+  };
 
   return (
     <div className={`mv-commit-log${expanded ? " is-expanded" : " is-collapsed"}`} aria-label="版本记录">
@@ -39,6 +60,11 @@ export function FollowupCommitLog({
         <span>版本记录</span>
         <span>{versions.length} commits</span>
       </button>
+      {restoreError && (
+        <div className="mv-commit-log-error" role="alert">
+          {restoreError}
+        </div>
+      )}
       {expanded && (
         <div className="mv-commit-list">
           {ordered.map((version) => {
@@ -70,11 +96,8 @@ export function FollowupCommitLog({
                 key={version.version_id}
                 type="button"
                 className={className}
-                onClick={() => {
-                  onRestore(version.version_id);
-                  setExpanded(false);
-                }}
-                disabled={pending || !canModify}
+                onClick={() => restoreVersion(version.version_id)}
+                disabled={restoreDisabled}
                 aria-label={`恢复版本 ${version.short_id}`}
               >
                 {item}
@@ -97,4 +120,11 @@ function formatCommitTime(value: string): string {
     minute: "2-digit",
     hour12: false,
   });
+}
+
+function formatRestoreError(err: unknown): string {
+  if (err instanceof Error && err.message.trim()) {
+    return `恢复版本失败：${err.message}`;
+  }
+  return "恢复版本失败，请稍后重试。";
 }

@@ -133,7 +133,7 @@ make check
 | `METAVIEW_AGENT_BASE_URL` | `http://agent:8001` | agent sidecar 地址 |
 | `METAVIEW_AGENT_TIMEOUT_S` | `600` | agent 生成超时秒数 |
 | `METAVIEW_AGENT_SHARED_TOKEN` | - | API 调用 agent sidecar 的共享鉴权 token |
-| `METAVIEW_CODEX_MODEL` | - | Python Codex SDK 模型覆盖 |
+| `METAVIEW_CODEX_MODEL` | `gpt-5.5` | Python Codex SDK 模型覆盖 |
 | `METAVIEW_CODEX_EFFORT` | - | Python Codex SDK reasoning effort |
 | `METAVIEW_CODEX_CWD` | `.` | Codex thread 工作目录 |
 | `METAVIEW_GENERATION_COST_CENTS` | `10` | 运营版每次生成 / follow-up 预扣金额，失败会退款 |

@@ -116,6 +116,137 @@ def test_runtime_tool_hub_lists_core_animation_geometry_and_skill_tools() -> Non
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("tool", "args"),
+    [
+        (
+            "geometry.assert_orientation",
+            {"expression_x": "cos(t)", "expression_y": "sin(t)", "t_min": 0},
+        ),
+        (
+            "geometry.assert_passes_through",
+            {
+                "expression_x": "cos(t)",
+                "expression_y": "sin(t)",
+                "t_min": 0,
+                "t_max": 1,
+                "target_x": 1,
+            },
+        ),
+        (
+            "geometry.assert_monotonic",
+            {"expression": "x", "x_min": 0},
+        ),
+    ],
+)
+async def test_runtime_tool_hub_geometry_missing_args_return_structured_error(
+    tool: str,
+    args: dict[str, Any],
+) -> None:
+    hub = RuntimeToolHub(skill_registry=SkillRegistry([]))
+
+    result = await hub.execute_tool(tool, args)
+
+    assert result.ok is False
+    assert result.error is not None
+    assert result.error["code"] == "runtime_tool.invalid_args"
+    assert result.error["errors"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("tool", "args"),
+    [
+        (
+            "geometry.assert_orientation",
+            {
+                "expression_x": 123,
+                "expression_y": "sin(t)",
+                "t_min": 0,
+                "t_max": 1,
+            },
+        ),
+        (
+            "geometry.assert_passes_through",
+            {
+                "expression_x": "cos(t)",
+                "expression_y": "sin(t)",
+                "t_min": 0,
+                "t_max": 1,
+                "target_x": "left",
+                "target_y": 0,
+            },
+        ),
+        (
+            "geometry.assert_monotonic",
+            {"expression": ["x"], "x_min": 0, "x_max": 1},
+        ),
+    ],
+)
+async def test_runtime_tool_hub_geometry_bad_arg_types_return_structured_error(
+    tool: str,
+    args: dict[str, Any],
+) -> None:
+    hub = RuntimeToolHub(skill_registry=SkillRegistry([]))
+
+    result = await hub.execute_tool(tool, args)
+
+    assert result.ok is False
+    assert result.error is not None
+    assert result.error["code"] == "runtime_tool.invalid_args"
+    assert result.error["errors"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("tool", "args", "expected_key"),
+    [
+        (
+            "geometry.assert_orientation",
+            {
+                "expression_x": "cos(t)",
+                "expression_y": "sin(t)",
+                "t_min": 0,
+                "t_max": 6.283185307179586,
+            },
+            "direction",
+        ),
+        (
+            "geometry.assert_passes_through",
+            {
+                "expression_x": "cos(t)",
+                "expression_y": "sin(t)",
+                "t_min": 0,
+                "t_max": 0.5,
+                "target_x": 1,
+                "target_y": 0,
+                "tol": 0.05,
+            },
+            "passes",
+        ),
+        (
+            "geometry.assert_monotonic",
+            {"expression": "x", "x_min": 0, "x_max": 1},
+            "verdict",
+        ),
+    ],
+)
+async def test_runtime_tool_hub_geometry_tools_accept_valid_args(
+    tool: str,
+    args: dict[str, Any],
+    expected_key: str,
+) -> None:
+    hub = RuntimeToolHub(skill_registry=SkillRegistry([]))
+
+    result = await hub.execute_tool(tool, args)
+
+    assert result.ok is True
+    assert result.error is None
+    assert result.result is not None
+    assert expected_key in result.result
+
+
+@pytest.mark.asyncio
 async def test_runtime_tool_hub_unknown_tool_returns_structured_error() -> None:
     hub = RuntimeToolHub(skill_registry=SkillRegistry([]))
 

@@ -343,7 +343,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
             script,
             director,
             theme,
-            showSubtitles: false,
+            showSubtitles: true,
             swapDurationFrames,
           }}
           durationInFrames={script.total_frames}

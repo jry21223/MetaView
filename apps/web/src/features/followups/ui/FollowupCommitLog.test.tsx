@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FollowupCommitLog } from "./FollowupCommitLog";
@@ -79,6 +79,27 @@ describe("FollowupCommitLog", () => {
     fireEvent.click(getByRole("button", { name: "恢复版本 c0ffee12" }));
 
     expect(onRestore).toHaveBeenCalledWith("version-1");
+    expect(getByRole("button", { name: "展开版本记录" })).toBeTruthy();
+    expect(queryByText("c0ffee12")).toBeNull();
+  });
+
+  it("shows a visible error when restore fails", async () => {
+    const onRestore = vi.fn().mockRejectedValue(new Error("版本不存在"));
+    const { getByRole, queryByText } = render(
+      <FollowupCommitLog
+        versions={versions()}
+        pending={false}
+        canModify
+        onRestore={onRestore}
+      />,
+    );
+
+    fireEvent.click(getByRole("button", { name: "展开版本记录" }));
+    fireEvent.click(getByRole("button", { name: "恢复版本 c0ffee12" }));
+
+    await waitFor(() => {
+      expect(getByRole("alert").textContent ?? "").toContain("版本不存在");
+    });
     expect(getByRole("button", { name: "展开版本记录" })).toBeTruthy();
     expect(queryByText("c0ffee12")).toBeNull();
   });

@@ -18,6 +18,8 @@ type IntakeTemplate =
 
 const UNSUPPORTED_FILE_WARNING =
   "当前只支持上传代码文件。图片、PDF、课件暂未接入生成管线。";
+const DOMAIN_INFERENCE_ERROR =
+  "无法判断题目类型。请补充数学、物理、化学或算法/代码线索后再生成。";
 
 const TEMPLATE_GALLERY: Array<{
   id: IntakeTemplate;
@@ -232,6 +234,7 @@ export function IntakeScreen({
   const [files, setFiles] = useState<Array<{ name: string; size: number }>>([]);
   const [fileObjects, setFileObjects] = useState<File[]>([]);
   const [fileWarning, setFileWarning] = useState<string | null>(null);
+  const [domainError, setDomainError] = useState<string | null>(null);
   const [thinking, setThinking] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const pending = isSubmitting || Boolean(thinking);
@@ -245,6 +248,7 @@ export function IntakeScreen({
     setFileWarning(unsupportedCount > 0 ? UNSUPPORTED_FILE_WARNING : null);
     if (supported.length === 0) return;
 
+    setDomainError(null);
     setFileObjects((prev) => [...prev, ...supported]);
     setFiles((prev) => [
       ...prev,
@@ -260,6 +264,7 @@ export function IntakeScreen({
   const submit = async () => {
     if (!input.trim() && files.length === 0) return;
 
+    setDomainError(null);
     setThinking("正在理解题目…");
     const codeFile = fileObjects.find((f) => languageFromName(f.name));
     let sourceCode: string | undefined;
@@ -276,6 +281,11 @@ export function IntakeScreen({
     }
 
     const domain = inferDomain(input, codeFile);
+    if (!domain) {
+      setDomainError(DOMAIN_INFERENCE_ERROR);
+      setThinking("");
+      return;
+    }
     setThinking("提交中…");
 
     try {
@@ -333,9 +343,14 @@ export function IntakeScreen({
           </div>
         )}
 
-        {(fileWarning || submitError) && (
-          <div className={`mv-intake-warning${submitError ? " mv-intake-error" : ""}`}>
-            {submitError ?? fileWarning}
+        {(fileWarning || domainError || submitError) && (
+          <div
+            className={`mv-intake-warning${
+              submitError || domainError ? " mv-intake-error" : ""
+            }`}
+            role="alert"
+          >
+            {submitError ?? domainError ?? fileWarning}
           </div>
         )}
 
@@ -346,6 +361,7 @@ export function IntakeScreen({
           value={input}
           onChange={(e) => {
             setInput(e.target.value);
+            setDomainError(null);
             const el = e.target;
             el.style.height = "auto";
             el.style.height = `${el.scrollHeight}px`;

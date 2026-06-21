@@ -205,6 +205,7 @@ function ChatPanel({
         ...current,
         { from: "ai", text: formatChatError(err), error: true },
       ]);
+      throw err;
     } finally {
       setPending(false);
     }

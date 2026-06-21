@@ -406,6 +406,15 @@
 .mv-commit-log-head:hover {
   color: var(--ink-2);
 }
+.mv-commit-log-error {
+  border: 1px solid color-mix(in srgb, #b7664b 30%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, #b7664b 10%, transparent);
+  color: #b7664b;
+  font-size: 11px;
+  line-height: 1.45;
+  padding: 7px 8px;
+}
 .mv-commit-list {
   display: flex;
   flex-direction: column;

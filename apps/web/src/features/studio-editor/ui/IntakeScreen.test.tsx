@@ -133,4 +133,18 @@ describe("IntakeScreen launch home", () => {
 
     expect(getByText("提交失败，请重试")).toBeTruthy();
   });
+
+  it("blocks freeform submit when the subject domain cannot be inferred", async () => {
+    const { getByPlaceholderText, getByRole, props } = renderIntake();
+
+    fireEvent.change(getByPlaceholderText(/输入一道数学题/), {
+      target: { value: "帮我做一张社团活动宣传海报" },
+    });
+    fireEvent.click(getByRole("button", { name: "生成讲解" }));
+
+    await waitFor(() => {
+      expect(getByRole("alert").textContent ?? "").toMatch(/无法判断题目类型/);
+    });
+    expect(props.onSubmit).not.toHaveBeenCalled();
+  });
 });

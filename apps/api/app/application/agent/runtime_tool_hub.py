@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from typing import Any
+from typing import Any, TypeVar
 
-from pydantic import ValidationError
+from pydantic import BaseModel, Field, FiniteFloat, StrictStr, ValidationError
 
 from app.application.agent.types import ToolExecutionResult, ToolManifest
 from app.domain.animation_tools import list_animation_tools, safe_expand_animation_call
@@ -16,6 +16,31 @@ from app.domain.services.geometry_validators import (
 from app.domain.services.playbook_quality import self_check_playbook
 from app.domain.skills.base import SkillExecutionContext, SkillRouteInput, SkillRouteMatch
 from app.domain.skills.registry import SkillRegistry, build_default_skill_registry
+
+ArgModelT = TypeVar("ArgModelT", bound=BaseModel)
+
+
+class _OrientationArgs(BaseModel):
+    expression_x: StrictStr = Field(min_length=1)
+    expression_y: StrictStr = Field(min_length=1)
+    t_min: FiniteFloat
+    t_max: FiniteFloat
+
+
+class _PassesThroughArgs(BaseModel):
+    expression_x: StrictStr = Field(min_length=1)
+    expression_y: StrictStr = Field(min_length=1)
+    t_min: FiniteFloat
+    t_max: FiniteFloat
+    target_x: FiniteFloat
+    target_y: FiniteFloat
+    tol: FiniteFloat = 1e-2
+
+
+class _MonotonicArgs(BaseModel):
+    expression: StrictStr = Field(min_length=1)
+    x_min: FiniteFloat
+    x_max: FiniteFloat
 
 
 class RuntimeToolHub:
@@ -80,57 +105,21 @@ class RuntimeToolHub:
             ToolManifest(
                 name="geometry.assert_orientation",
                 description="Check parametric curve orientation using deterministic math.",
-                args_schema={
-                    "type": "object",
-                    "properties": {
-                        "expression_x": {"type": "string"},
-                        "expression_y": {"type": "string"},
-                        "t_min": {"type": "number"},
-                        "t_max": {"type": "number"},
-                    },
-                    "required": ["expression_x", "expression_y", "t_min", "t_max"],
-                },
+                args_schema=_OrientationArgs.model_json_schema(),
                 domain="geometry",
                 deterministic=True,
             ),
             ToolManifest(
                 name="geometry.assert_passes_through",
                 description="Check whether a parametric curve passes through a point.",
-                args_schema={
-                    "type": "object",
-                    "properties": {
-                        "expression_x": {"type": "string"},
-                        "expression_y": {"type": "string"},
-                        "t_min": {"type": "number"},
-                        "t_max": {"type": "number"},
-                        "target_x": {"type": "number"},
-                        "target_y": {"type": "number"},
-                        "tol": {"type": "number"},
-                    },
-                    "required": [
-                        "expression_x",
-                        "expression_y",
-                        "t_min",
-                        "t_max",
-                        "target_x",
-                        "target_y",
-                    ],
-                },
+                args_schema=_PassesThroughArgs.model_json_schema(),
                 domain="geometry",
                 deterministic=True,
             ),
             ToolManifest(
                 name="geometry.assert_monotonic",
                 description="Check monotonicity of a function on an interval.",
-                args_schema={
-                    "type": "object",
-                    "properties": {
-                        "expression": {"type": "string"},
-                        "x_min": {"type": "number"},
-                        "x_max": {"type": "number"},
-                    },
-                    "required": ["expression", "x_min", "x_max"],
-                },
+                args_schema=_MonotonicArgs.model_json_schema(),
                 domain="geometry",
                 deterministic=True,
             ),
@@ -190,29 +179,38 @@ class RuntimeToolHub:
             )
             return self._ok(name, result.model_dump(mode="json"))
         if name == "geometry.assert_orientation":
+            validated = self._validate_args(name, _OrientationArgs, args)
+            if isinstance(validated, ToolExecutionResult):
+                return validated
             result = check_orientation(
-                str(args.get("expression_x", "")),
-                str(args.get("expression_y", "")),
-                float(args.get("t_min")),
-                float(args.get("t_max")),
+                validated.expression_x,
+                validated.expression_y,
+                validated.t_min,
+                validated.t_max,
             )
             return self._ok(name, asdict(result))
         if name == "geometry.assert_passes_through":
+            validated = self._validate_args(name, _PassesThroughArgs, args)
+            if isinstance(validated, ToolExecutionResult):
+                return validated
             result = check_point_on_curve(
-                str(args.get("expression_x", "")),
-                str(args.get("expression_y", "")),
-                float(args.get("t_min")),
-                float(args.get("t_max")),
-                float(args.get("target_x")),
-                float(args.get("target_y")),
-                float(args.get("tol", 1e-2)),
+                validated.expression_x,
+                validated.expression_y,
+                validated.t_min,
+                validated.t_max,
+                validated.target_x,
+                validated.target_y,
+                validated.tol,
             )
             return self._ok(name, asdict(result))
         if name == "geometry.assert_monotonic":
+            validated = self._validate_args(name, _MonotonicArgs, args)
+            if isinstance(validated, ToolExecutionResult):
+                return validated
             result = check_monotonic(
-                str(args.get("expression", "")),
-                float(args.get("x_min")),
-                float(args.get("x_max")),
+                validated.expression,
+                validated.x_min,
+                validated.x_max,
             )
             return self._ok(name, asdict(result))
         return self._error(
@@ -308,6 +306,22 @@ class RuntimeToolHub:
                 {"errors": exc.errors()},
             )
         return self._ok(name, {"valid": True, "playbook": playbook.model_dump(mode="json")})
+
+    def _validate_args(
+        self,
+        name: str,
+        model: type[ArgModelT],
+        args: dict[str, Any],
+    ) -> ArgModelT | ToolExecutionResult:
+        try:
+            return model.model_validate(args)
+        except ValidationError as exc:
+            return self._error(
+                name,
+                "runtime_tool.invalid_args",
+                "Runtime tool arguments are invalid.",
+                {"errors": exc.errors(include_url=False)},
+            )
 
     def _self_check_playbook(
         self,
