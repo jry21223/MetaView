@@ -149,7 +149,7 @@ describe("PlaybookPlayer", () => {
     );
 
     expect(container.querySelector('[data-testid="mock-remotion-player"]')?.getAttribute("data-show-subtitles")).toBe(
-      "false",
+      "true",
     );
     const workspaceChildren = Array.from(
       container.querySelector(".playbook-player__workspace")!.children,

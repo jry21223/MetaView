@@ -1,0 +1,49 @@
+# MetaView Codex agent skill demo prompts.
+#
+# These cases are meant to exercise "LLM + local SKILL.md + runtime checks".
+# Run with:
+#   METAVIEW_GENERATION_MODE=agent METAVIEW_AGENT_PROVIDER=codex \
+#   METAVIEW_CODEX_MODEL=gpt-5.5 .venv/bin/python apps/api/scripts/run_agent_skill_demo.py
+
+prompts:
+  - id: math-derivative-guided
+    domain: math
+    expected_path: deterministic
+    prompt: 用引导式讲解导数的几何意义：曲线 y=x^2 在 x=1 附近的切线斜率为什么接近 2。
+    showcase: tangent visualization with a guided check question
+
+  - id: algorithm-bfs-runtime
+    domain: algorithm
+    expected_path: deterministic
+    prompt: 用 BFS 遍历图 A-B, A-C, B-D, C-D，从 A 开始，展示队列变化和访问顺序。
+    showcase: deterministic traversal state, queue, and visit order
+
+  - id: code-recursion-stack
+    domain: code
+    expected_path: agent
+    prompt: 逐行追踪 Python 函数 factorial(4) 的递归调用栈，展示压栈、base case 和回溯返回。
+    showcase: code trace with stack frames
+
+  - id: physics-projectile-guided
+    domain: physics
+    expected_path: agent
+    prompt: 用引导式动画解释平抛运动：水平速度不变，竖直方向匀加速，画出轨迹和分速度箭头。
+    showcase: trajectory plus component vectors
+
+  - id: chemistry-stoichiometry-runtime
+    domain: chemistry
+    expected_path: deterministic
+    prompt: 10g H2 与 80g O2 反应生成水，判断限量反应物并求理论产量。
+    showcase: deterministic stoichiometry table and conversion chain
+
+  - id: biology-punnett-runtime
+    domain: biology
+    expected_path: deterministic
+    prompt: A 对 a 显性，亲本 Aa x Aa，画 Punnett 表并引导学生判断基因型比例。
+    showcase: deterministic Punnett table and ratio explanation
+
+  - id: geography-monsoon-guided
+    domain: geography
+    expected_path: agent
+    prompt: 用引导式动画解释东亚季风：海陆热力差异如何让冬夏季风向反转，并影响降水。
+    showcase: causal arrows for pressure, wind, and rainfall

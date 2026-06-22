@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import sys
 import types
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
+from app.application.agent.types import AgentConstraints, AgentRequest, ToolManifest
 from app.application.ports.agent_provider import AgentProviderError
 from app.infrastructure.agent.codex_agent_provider import CodexAgentProvider
 
@@ -93,17 +95,110 @@ def _fake_openai_codex(monkeypatch: pytest.MonkeyPatch):
 
 @pytest.mark.asyncio
 async def test_codex_provider_returns_validated_playbook_dict() -> None:
-    provider = CodexAgentProvider(cwd=".", model="gpt-5.2-codex", effort="high")
+    provider = CodexAgentProvider(cwd=".", model="gpt-5.5", effort="high")
 
     out = await provider.generate("explain y=x")
 
     assert out["title"] == "Line"
     assert out["steps"][0]["snapshot"]["kind"] == "math_plot"
     fake = _FakeCodex.instances[0]
-    assert fake.thread_start_calls[0]["model"] == "gpt-5.2-codex"
+    assert fake.thread_start_calls[0]["model"] == "gpt-5.5"
     assert fake.thread.run_calls[0]["effort"] == "high"
     assert "JSON Schema" in fake.thread.run_calls[0]["input"]
     assert "output_schema" not in fake.thread.run_calls[0]
+
+
+@pytest.mark.asyncio
+async def test_codex_provider_run_includes_tool_manifests_and_returns_agent_result() -> None:
+    provider = CodexAgentProvider(cwd=".", model="gpt-5.5", effort="high")
+
+    result = await provider.run(
+        AgentRequest(
+            run_id="run-codex",
+            prompt="explain y=x",
+            source_code=None,
+            language=None,
+            route_decision={"destination": "generic_cir"},
+            provider_config=None,
+            playbook_schema={"type": "object"},
+            constraints=AgentConstraints(max_self_repair_attempts=2),
+            available_tools=[
+                ToolManifest(
+                    name="playbook.schema.validate",
+                    description="Validate PlaybookScript.",
+                    args_schema={"type": "object"},
+                    domain="playbook",
+                    deterministic=True,
+                )
+            ],
+        )
+    )
+
+    fake = _FakeCodex.instances[0]
+    prompt = fake.thread.run_calls[0]["input"]
+    assert "[MetaView runtime tools]" in prompt
+    assert "playbook.schema.validate" in prompt
+    assert result.provider == "codex"
+    assert result.playbook["title"] == "Line"
+    assert result.runtime_events[0]["event"] == "codex.tool_execution_unavailable"
+
+
+@pytest.mark.asyncio
+async def test_codex_provider_defaults_to_gpt_55() -> None:
+    provider = CodexAgentProvider(cwd=".")
+
+    await provider.generate("explain y=x")
+
+    fake = _FakeCodex.instances[0]
+    assert fake.thread_start_calls[0]["model"] == "gpt-5.5"
+    assert fake.thread.run_calls[0]["model"] == "gpt-5.5"
+
+
+@pytest.mark.asyncio
+async def test_codex_provider_loads_domain_skill_into_developer_instructions(
+    tmp_path: Path,
+) -> None:
+    skills_dir = tmp_path / "skills"
+    (skills_dir / "generic").mkdir(parents=True)
+    (skills_dir / "chemistry").mkdir(parents=True)
+    (skills_dir / "generic" / "SKILL.md").write_text(
+        "# Generic MetaView Teacher\nUse guided questions.",
+        encoding="utf-8",
+    )
+    (skills_dir / "chemistry" / "SKILL.md").write_text(
+        "# Chemistry Runtime Skill\nUse stoichiometry tools instead of mental math.",
+        encoding="utf-8",
+    )
+    provider = CodexAgentProvider(cwd=".", skills_dir=skills_dir)
+
+    await provider.generate(
+        "配平 H2 + O2 -> H2O",
+        route_decision={"domain": "chemistry", "skill_id": "chemistry_stoichiometry"},
+    )
+
+    instructions = _FakeCodex.instances[0].thread_start_calls[0]["developer_instructions"]
+    assert "# Generic MetaView Teacher" in instructions
+    assert "# Chemistry Runtime Skill" in instructions
+    assert "Use stoichiometry tools instead of mental math." in instructions
+
+
+@pytest.mark.asyncio
+async def test_codex_provider_falls_back_to_generic_skill_when_domain_skill_missing(
+    tmp_path: Path,
+) -> None:
+    skills_dir = tmp_path / "skills"
+    (skills_dir / "generic").mkdir(parents=True)
+    (skills_dir / "generic" / "SKILL.md").write_text(
+        "# Generic MetaView Teacher\nGuide before answering.",
+        encoding="utf-8",
+    )
+    provider = CodexAgentProvider(cwd=".", skills_dir=skills_dir)
+
+    await provider.generate("open ended", route_decision={"domain": "astronomy"})
+
+    instructions = _FakeCodex.instances[0].thread_start_calls[0]["developer_instructions"]
+    assert "# Generic MetaView Teacher" in instructions
+    assert "astronomy" not in instructions
 
 
 @pytest.mark.asyncio

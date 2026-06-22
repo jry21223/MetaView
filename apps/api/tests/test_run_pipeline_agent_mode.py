@@ -14,9 +14,11 @@ from typing import Any
 
 import pytest
 
+from app.application.agent.types import AgentRequest, AgentResult
 from app.application.dto.pipeline_dto import PipelineRequest
 from app.application.ports.agent_provider import AgentProviderError
 from app.application.use_cases.run_pipeline import RunPipelineUseCase
+from app.domain.skills.registry import SkillRegistry
 
 
 class _RecordingRepo:
@@ -72,6 +74,23 @@ class _FakeAgent:
             "route_decision": route_decision,
         })
         return self.playbook
+
+
+class _RunOnlyAgent:
+    def __init__(self, playbook: dict[str, Any]) -> None:
+        self.playbook = playbook
+        self.requests: list[AgentRequest] = []
+
+    async def run(self, request: AgentRequest) -> AgentResult:
+        self.requests.append(request)
+        return AgentResult(
+            playbook=self.playbook,
+            provider="test-run",
+            tool_events=[],
+            runtime_events=[],
+            review=None,
+            artifacts={},
+        )
 
 
 class _SequenceAgent:
@@ -289,10 +308,57 @@ async def test_agent_mode_routes_to_agent_provider() -> None:
     review = json.loads(last["review_json"])
     assert review["status"] == "clean"
     assert "agent:self_check:clean" in review["actions"]
+    assert "agent_skill:generic" in review["actions"]
     assert "reviewer:disabled" in review["actions"]
     assert "reviewer:unconfigured" not in review["actions"]
     assert director_repo.upserts[0]["director"].run_id == "run-1"
     assert director_repo.upserts[0]["director"].beats[0].step_id == "step_01"
+
+
+@pytest.mark.asyncio
+async def test_agent_mode_calls_wide_run_contract_when_available() -> None:
+    repo = _RecordingRepo()
+    agent = _RunOnlyAgent(_MIN_PLAYBOOK)
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        agent_provider=agent,
+        generation_mode="agent",
+        reviewer_mode="off",
+    )
+
+    await use_case.execute("run-wide", PipelineRequest(prompt="hello math"))
+
+    request = agent.requests[0]
+    assert request.run_id == "run-wide"
+    assert request.prompt == "hello math"
+    assert request.route_decision["destination"] == "generic_cir"
+    assert request.playbook_schema["title"] == "PlaybookScript"
+    assert "playbook.schema.validate" in {tool.name for tool in request.available_tools}
+    assert repo.updates[-1]["status"].value == "succeeded"
+
+
+@pytest.mark.asyncio
+async def test_agent_mode_records_domain_agent_skill_action() -> None:
+    repo = _RecordingRepo()
+    agent = _FakeAgent(_MIN_PLAYBOOK)
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        agent_provider=agent,
+        generation_mode="agent",
+        reviewer_mode="off",
+        skill_registry=SkillRegistry([]),
+    )
+
+    await use_case.execute(
+        "run-chemistry-agent",
+        PipelineRequest(prompt="讲解强酸强碱滴定曲线", domain="chemistry"),
+    )
+
+    review = json.loads(repo.updates[-1]["review_json"])
+    assert "router:domain:chemistry" in review["actions"]
+    assert "agent_skill:chemistry" in review["actions"]
 
 
 @pytest.mark.asyncio

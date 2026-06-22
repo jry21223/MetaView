@@ -128,12 +128,12 @@ make check
 | `METAVIEW_ROUTER_TIMEOUT_S` | `12` | 小模型路由超时秒数 |
 | `METAVIEW_ROUTER_MIN_CONFIDENCE` | `0.72` | 路由结果直接采用的最低置信度 |
 | `METAVIEW_ROUTER_REFINE_CONFIDENCE` | `0.55` | 预留 refinement 阈值，V1 低于采用阈值时 fallback |
-| `METAVIEW_GENERATION_MODE` | `single` | `single` 或 `agent` |
-| `METAVIEW_AGENT_PROVIDER` | `http` | `agent` 模式实现：`http` 或 `codex` |
+| `METAVIEW_GENERATION_MODE` | `single` | `single` 或 `agent`；`single` 当前仍是默认 rollback path，新的 runtime 能力应走 agent pipeline |
+| `METAVIEW_AGENT_PROVIDER` | `http` | `agent` 模式 provider adapter：`http`/pi sidecar 或 `codex` fallback |
 | `METAVIEW_AGENT_BASE_URL` | `http://agent:8001` | agent sidecar 地址 |
 | `METAVIEW_AGENT_TIMEOUT_S` | `600` | agent 生成超时秒数 |
 | `METAVIEW_AGENT_SHARED_TOKEN` | - | API 调用 agent sidecar 的共享鉴权 token |
-| `METAVIEW_CODEX_MODEL` | - | Python Codex SDK 模型覆盖 |
+| `METAVIEW_CODEX_MODEL` | `gpt-5.5` | Python Codex SDK 模型覆盖 |
 | `METAVIEW_CODEX_EFFORT` | - | Python Codex SDK reasoning effort |
 | `METAVIEW_CODEX_CWD` | `.` | Codex thread 工作目录 |
 | `METAVIEW_GENERATION_COST_CENTS` | `10` | 运营版每次生成 / follow-up 预扣金额，失败会退款 |

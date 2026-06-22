@@ -406,6 +406,15 @@
 .mv-commit-log-head:hover {
   color: var(--ink-2);
 }
+.mv-commit-log-error {
+  border: 1px solid color-mix(in srgb, #b7664b 30%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, #b7664b 10%, transparent);
+  color: #b7664b;
+  font-size: 11px;
+  line-height: 1.45;
+  padding: 7px 8px;
+}
 .mv-commit-list {
   display: flex;
   flex-direction: column;
@@ -2275,6 +2284,16 @@
   font-size: 12px;
   font-weight: 520;
   cursor: pointer;
+}
+
+.mv-intake-attach {
+  height: 30px;
+  gap: 6px;
+  padding: 0 8px;
+  border-color: color-mix(in srgb, var(--ink) 6%, transparent);
+  background: color-mix(in srgb, var(--surface) 52%, transparent);
+  color: color-mix(in srgb, var(--ink-3) 88%, var(--ink));
+  font-weight: 480;
 }
 
 .mv-intake-action:hover {

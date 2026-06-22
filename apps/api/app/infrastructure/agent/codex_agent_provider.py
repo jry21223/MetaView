@@ -8,8 +8,12 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from app.application.agent.types import AgentRequest, AgentResult
 from app.application.ports.agent_provider import AgentProviderError
 from app.domain.models.playbook import PlaybookScript
+
+DEFAULT_CODEX_MODEL = "gpt-5.5"
+DEFAULT_AGENT_SKILLS_DIR = "skills/metaview-agent"
 
 _SYSTEM_INSTRUCTIONS = """You generate MetaView PlaybookScript JSON.
 
@@ -38,14 +42,21 @@ class CodexAgentProvider:
         self,
         *,
         cwd: str | Path,
-        model: str | None = None,
+        model: str | None = DEFAULT_CODEX_MODEL,
         effort: str | None = None,
         timeout_s: float = 600.0,
+        skills_dir: str | Path = DEFAULT_AGENT_SKILLS_DIR,
     ) -> None:
-        self._cwd = str(Path(cwd).resolve())
+        cwd_path = Path(cwd).resolve()
+        self._cwd = str(cwd_path)
         self._model = model
         self._effort = effort
         self._timeout_s = timeout_s
+        self._skills_dir = _resolve_under_cwd(cwd_path, skills_dir)
+
+    @property
+    def skills_dir(self) -> str:
+        return str(self._skills_dir)
 
     async def generate(
         self,
@@ -65,6 +76,10 @@ class CodexAgentProvider:
         effort = _coerce_effort(provider_config) or self._effort
         api_key = _coerce_api_key(provider_config)
         schema = PlaybookScript.model_json_schema()
+        developer_instructions = _build_developer_instructions(
+            route_decision,
+            skills_dir=self._skills_dir,
+        )
 
         try:
             async with AsyncCodex() as codex:
@@ -72,7 +87,7 @@ class CodexAgentProvider:
                     await codex.login_api_key(api_key)
                 thread = await codex.thread_start(
                     cwd=self._cwd,
-                    developer_instructions=_SYSTEM_INSTRUCTIONS,
+                    developer_instructions=developer_instructions,
                     model=model,
                     sandbox=Sandbox.read_only,
                 )
@@ -105,6 +120,30 @@ class CodexAgentProvider:
         except ValidationError as exc:
             raise AgentProviderError(f"codex SDK playbook failed schema validation: {exc}") from exc
 
+    async def run(self, request: AgentRequest) -> AgentResult:
+        prompt = _build_runtime_user_prompt(request)
+        playbook = await self.generate(
+            prompt,
+            provider_config=request.provider_config,
+            route_decision=request.route_decision,
+        )
+        return AgentResult(
+            playbook=playbook,
+            provider="codex",
+            tool_events=[],
+            runtime_events=[
+                {
+                    "event": "codex.tool_execution_unavailable",
+                    "detail": {
+                        "available_tool_count": len(request.available_tools),
+                        "role": "repo-aware fallback/planner/repair provider",
+                    },
+                }
+            ],
+            review=None,
+            artifacts={},
+        )
+
 
 def _build_user_prompt(
     prompt: str,
@@ -125,6 +164,89 @@ def _build_user_prompt(
         "Validate against this JSON Schema and return only the JSON object:\n"
         f"{json.dumps(schema, ensure_ascii=False)}"
     )
+
+
+def _build_runtime_user_prompt(request: AgentRequest) -> str:
+    runtime_payload = {
+        "run_id": request.run_id,
+        "route_decision": request.route_decision,
+        "constraints": request.constraints.model_dump(mode="json"),
+        "tools": [tool.model_dump(mode="json") for tool in request.available_tools],
+        "note": (
+            "Codex can inspect these runtime tool manifests, but this provider "
+            "cannot execute tools yet. Prefer deterministic tool results when "
+            "they are already present in the prompt; do not invent exact "
+            "validator or kernel outputs."
+        ),
+    }
+    return (
+        "[MetaView runtime tools]\n"
+        f"{json.dumps(runtime_payload, ensure_ascii=False, indent=2)}\n\n"
+        "[user prompt]\n"
+        f"{request.prompt}"
+    )
+
+
+def _build_developer_instructions(
+    route_decision: dict[str, Any] | None,
+    *,
+    skills_dir: Path,
+) -> str:
+    skill_sections = _load_skill_sections(route_decision, skills_dir=skills_dir)
+    if not skill_sections:
+        return _SYSTEM_INSTRUCTIONS
+    return "\n\n".join([_SYSTEM_INSTRUCTIONS, *skill_sections])
+
+
+def _load_skill_sections(
+    route_decision: dict[str, Any] | None,
+    *,
+    skills_dir: Path,
+) -> list[str]:
+    sections: list[str] = []
+    for skill_name in _skill_candidates(route_decision):
+        text = _read_skill(skills_dir / skill_name / "SKILL.md")
+        if text is not None:
+            sections.append(
+                f"[MetaView local agent skill: {skill_name}]\n{text}"
+            )
+    return sections
+
+
+def _skill_candidates(route_decision: dict[str, Any] | None) -> list[str]:
+    candidates = ["generic"]
+    if route_decision:
+        for key in ("domain", "skill_id"):
+            value = route_decision.get(key)
+            if isinstance(value, str):
+                normalized = _normalize_skill_name(value)
+                if normalized and normalized not in candidates:
+                    candidates.append(normalized)
+    return candidates
+
+
+def _normalize_skill_name(value: str) -> str | None:
+    normalized = value.strip().lower().replace(" ", "_")
+    if not normalized:
+        return None
+    if not all(ch.isalnum() or ch in {"_", "-"} for ch in normalized):
+        return None
+    return normalized
+
+
+def _read_skill(path: Path) -> str | None:
+    try:
+        text = path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return text or None
+
+
+def _resolve_under_cwd(cwd: Path, value: str | Path) -> Path:
+    path = Path(value)
+    if path.is_absolute():
+        return path
+    return cwd / path
 
 
 def _coerce_api_key(provider_config: dict[str, Any] | None) -> str | None:

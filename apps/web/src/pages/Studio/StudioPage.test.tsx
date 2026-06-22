@@ -164,6 +164,33 @@ describe("StudioPage", () => {
     expect(onNavigate).not.toHaveBeenCalled();
   });
 
+  it("uses guided follow-up suggestions for study sessions", async () => {
+    mockUsePipelinePoller.mockReturnValue({
+      playbook: playbook("Guided lesson"),
+      director: null,
+      error: null,
+      isLoading: false,
+      status: "succeeded",
+    });
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/runs/run-1/follow-ups`, () =>
+        HttpResponse.json({ followups: [], versions: [] }),
+      ),
+    );
+
+    const { getByRole, queryByRole } = render(
+      <StudioPage
+        runId="run-1"
+        t={TWEAK_DEFAULTS}
+        onNavigate={vi.fn()}
+        isProviderConfigured
+      />,
+    );
+
+    expect(getByRole("button", { name: "你能指出关键量吗？" })).toBeTruthy();
+    expect(queryByRole("button", { name: "改变初始条件" })).toBeNull();
+  });
+
   it("checks out a historical version without rendering a revert change record", async () => {
     mockUsePipelinePoller.mockReturnValue({
       playbook: playbook("Updated lesson"),
@@ -211,6 +238,48 @@ describe("StudioPage", () => {
     });
     expect(getByText("已切换到选中的历史版本。")).toBeTruthy();
     expect(queryByText(/^revert: restore/)).toBeNull();
+  });
+
+  it("shows a visible commit-log error when restoring a historical version fails", async () => {
+    mockUsePipelinePoller.mockReturnValue({
+      playbook: playbook("Updated lesson"),
+      director: null,
+      error: null,
+      isLoading: false,
+      status: "succeeded",
+    });
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/runs/run-1/follow-ups`, () =>
+        HttpResponse.json({
+          followups: [],
+          versions: [
+            version("v0", "a1b2c3d4", 0, false, "initial", "initial playbook"),
+            version("v1", "c0ffee12", 1, true, "followup", "updated lesson"),
+          ],
+        }),
+      ),
+      http.post(`${API_BASE_URL}/api/v1/runs/run-1/versions/v0/restore`, () =>
+        HttpResponse.json({ detail: "版本不存在" }, { status: 404 }),
+      ),
+    );
+
+    const { getByRole, findByRole } = render(
+      <StudioPage
+        runId="run-1"
+        t={TWEAK_DEFAULTS}
+        onNavigate={vi.fn()}
+        isProviderConfigured
+      />,
+    );
+
+    await waitFor(() => {
+      expect(getByRole("button", { name: "展开版本记录" })).toBeTruthy();
+    });
+    fireEvent.click(getByRole("button", { name: "展开版本记录" }));
+    fireEvent.click(getByRole("button", { name: "恢复版本 a1b2c3d4" }));
+
+    const alert = await findByRole("alert");
+    expect(alert.textContent ?? "").toMatch(/版本不存在|恢复版本失败/);
   });
 });
 

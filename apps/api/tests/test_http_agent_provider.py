@@ -13,6 +13,7 @@ from typing import Any
 import httpx
 import pytest
 
+from app.application.agent.types import AgentConstraints, AgentRequest, ToolManifest
 from app.application.ports.agent_provider import AgentProviderError
 from app.infrastructure.agent.http_agent_provider import HttpAgentProvider
 
@@ -79,6 +80,67 @@ async def test_generate_returns_playbook_dict() -> None:
     provider = _make_provider_with_handler(handler)
     out = await provider.generate("hello")
     assert out == fake_playbook
+
+
+@pytest.mark.asyncio
+async def test_run_posts_wide_agent_request_and_returns_agent_result() -> None:
+    fake_playbook = {
+        "fps": 30,
+        "total_frames": 60,
+        "domain": "math",
+        "title": "x",
+        "summary": "y",
+        "steps": [],
+        "parameter_controls": [],
+    }
+    seen: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.update(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={
+                "playbook": fake_playbook,
+                "provider": "pi",
+                "tool_events": [{"tool": "runtime_tool_list", "ok": True}],
+                "runtime_events": [{"event": "sidecar.completed"}],
+                "review": None,
+                "artifacts": {},
+            },
+        )
+
+    provider = _make_provider_with_handler(handler, shared_token="shared-secret")
+    result = await provider.run(
+        AgentRequest(
+            run_id="run-http",
+            prompt="hello",
+            source_code=None,
+            language=None,
+            route_decision={"destination": "generic_cir"},
+            provider_config={"model": "gpt-4o-mini"},
+            playbook_schema={"type": "object"},
+            constraints=AgentConstraints(max_self_repair_attempts=2),
+            available_tools=[
+                ToolManifest(
+                    name="playbook.schema.validate",
+                    description="Validate PlaybookScript.",
+                    args_schema={"type": "object"},
+                    domain="playbook",
+                    deterministic=True,
+                )
+            ],
+        )
+    )
+
+    assert seen["run_id"] == "run-http"
+    assert seen["prompt"] == "hello"
+    assert seen["provider"] == {"model": "gpt-4o-mini"}
+    assert seen["route_decision"] == {"destination": "generic_cir"}
+    assert seen["playbook_schema"] == {"type": "object"}
+    assert seen["available_tools"][0]["name"] == "playbook.schema.validate"
+    assert result.provider == "pi"
+    assert result.playbook == fake_playbook
+    assert result.tool_events[0]["tool"] == "runtime_tool_list"
 
 
 @pytest.mark.asyncio

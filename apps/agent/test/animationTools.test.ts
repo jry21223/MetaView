@@ -187,4 +187,18 @@ describe("animation tool bridge", () => {
     expect(SYSTEM_PROMPT).toContain("args_schema");
     expect(SYSTEM_PROMPT).toContain("do not invent raw LayerSpec JSON");
   });
+
+  it("keeps the workflow prompt as a flat four-step checklist", () => {
+    const workflow = SYSTEM_PROMPT.match(
+      /Workflow you MUST follow:[\s\S]*?Output discipline:/,
+    )?.[0];
+
+    expect(workflow).toBeTruthy();
+    expect(workflow).toContain("1. Call `plan_outline` FIRST");
+    expect(workflow).toContain("2. Use deterministic runtime and animation tools");
+    expect(workflow).toContain("3. Build each visual step");
+    expect(workflow).toContain("4. Verify claims and finish");
+    expect(workflow).not.toMatch(/^\s+[a-d]\./m);
+    expect(workflow?.match(/^\d+\./gm)).toEqual(["1.", "2.", "3.", "4."]);
+  });
 });

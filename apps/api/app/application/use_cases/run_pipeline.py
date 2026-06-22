@@ -10,6 +10,8 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from app.application.agent.runtime_tool_hub import RuntimeToolHub
+from app.application.agent.types import AgentConstraints, AgentRequest
 from app.application.dto.pipeline_dto import PipelineRequest
 from app.application.ports.agent_provider import AgentProviderError, IAgentProvider
 from app.application.ports.director_repository import IRunDirectorRepository
@@ -116,6 +118,29 @@ class RunPipelineUseCase:
     async def execute(self, run_id: str, request: PipelineRequest) -> None:
         await self._repo.update(run_id, status=PipelineRunStatus.RUNNING)
         try:
+            if self._generation_mode == "agent" and self._agent_provider is not None:
+                from app.application.agent.pipeline import AgentPipeline
+
+                agent_pipeline = AgentPipeline(
+                    route_request=self._route_request,
+                    try_execute_skill=self._try_execute_skill,
+                    fail_skill_consistency=self._fail_skill_consistency,
+                    build_route_context=lambda req, match: self._generic_route_context(
+                        req,
+                        route_match=match,
+                    ),
+                    execute_agent=lambda rid, req, ctx: self._execute_agent(
+                        rid,
+                        req,
+                        route_context=ctx,  # type: ignore[arg-type]
+                    ),
+                )
+                await self._run_with_total_timeout(
+                    agent_pipeline.execute(run_id, request),
+                    run_id=run_id,
+                )
+                return
+
             route_match = await self._route_request(request)
             if route_match is not None:
                 try:
@@ -127,13 +152,6 @@ class RunPipelineUseCase:
                     return
 
             route_context = self._generic_route_context(request, route_match=route_match)
-            if self._generation_mode == "agent" and self._agent_provider is not None:
-                await self._run_with_total_timeout(
-                    self._execute_agent(run_id, request, route_context=route_context),
-                    run_id=run_id,
-                )
-                return
-
             await self._run_with_total_timeout(
                 self._execute_single(run_id, request, route_context=route_context),
                 run_id=run_id,
@@ -366,6 +384,7 @@ class RunPipelineUseCase:
         try:
             playbook, review_report = await self._generate_agent_playbook_with_self_check(
                 run_id,
+                request,
                 request.prompt,
                 provider_config=provider_config,
                 route_context=route_context,
@@ -373,7 +392,7 @@ class RunPipelineUseCase:
             )
             playbook, review_report = await self._review_agent_playbook(
                 run_id,
-                request.prompt,
+                request,
                 playbook,
                 provider_config=provider_config,
                 route_context=route_context,
@@ -422,6 +441,7 @@ class RunPipelineUseCase:
     async def _generate_agent_playbook_with_self_check(
         self,
         run_id: str,
+        request: PipelineRequest,
         prompt: str,
         *,
         provider_config: dict[str, Any] | None,
@@ -429,14 +449,15 @@ class RunPipelineUseCase:
         review_report: PlaybookReviewVerdict,
     ) -> tuple[PlaybookScript, PlaybookReviewVerdict]:
         assert self._agent_provider is not None
-        route_decision = route_context.decision.model_dump(mode="json")
         generation_prompt = prompt
         last_payload: dict[str, Any] | None = None
         for attempt in range(AGENT_SELF_REPAIR_ATTEMPTS + 1):
-            playbook_dict = await self._agent_provider.generate(
+            playbook_dict = await self._run_agent_provider(
+                run_id,
                 generation_prompt,
+                request=request,
                 provider_config=provider_config,
-                route_decision=route_decision,
+                route_context=route_context,
             )
             last_payload = playbook_dict
             # Validate the sidecar payload against the canonical PlaybookScript
@@ -499,7 +520,7 @@ class RunPipelineUseCase:
     async def _review_agent_playbook(
         self,
         run_id: str,
-        prompt: str,
+        request: PipelineRequest,
         playbook: PlaybookScript,
         *,
         provider_config: dict[str, Any] | None,
@@ -532,7 +553,7 @@ class RunPipelineUseCase:
         attempts_allowed = AGENT_REVIEWER_REPAIR_ATTEMPTS
         for attempt in range(attempts_allowed + 1):
             result = await self._call_agent_reviewer(
-                prompt,
+                request.prompt,
                 playbook,
                 review_report,
             )
@@ -563,7 +584,8 @@ class RunPipelineUseCase:
             )
 
             playbook, review_report = await self._repair_agent_playbook_from_reviewer(
-                prompt,
+                run_id,
+                request,
                 playbook,
                 blocking,
                 provider_config=provider_config,
@@ -590,7 +612,8 @@ class RunPipelineUseCase:
 
     async def _repair_agent_playbook_from_reviewer(
         self,
-        prompt: str,
+        run_id: str,
+        request: PipelineRequest,
         playbook: PlaybookScript,
         blocking: list[PlaybookReviewIssue],
         *,
@@ -599,10 +622,13 @@ class RunPipelineUseCase:
         review_report: PlaybookReviewVerdict,
     ) -> tuple[PlaybookScript, PlaybookReviewVerdict]:
         assert self._agent_provider is not None
-        repaired_payload = await self._agent_provider.generate(
-            _build_agent_reviewer_repair_prompt(prompt, playbook, blocking),
+        repair_prompt = _build_agent_reviewer_repair_prompt(request.prompt, playbook, blocking)
+        repaired_payload = await self._run_agent_provider(
+            run_id,
+            repair_prompt,
+            request=request,
             provider_config=provider_config,
-            route_decision=route_context.decision.model_dump(mode="json"),
+            route_context=route_context,
         )
         try:
             repaired = PlaybookScript.model_validate(repaired_payload)
@@ -613,7 +639,7 @@ class RunPipelineUseCase:
                     actions=[*review_report.actions, "agent:schema_validation:blocked"],
                 )
             ) from exc
-        check = self_check_playbook(repaired, prompt)
+        check = self_check_playbook(repaired, request.prompt)
         check = _with_playbook_review_actions(
             check,
             [*review_report.actions, *check.actions, f"agent:self_check:{check.status.value}"],
@@ -621,6 +647,43 @@ class RunPipelineUseCase:
         if check.status == PlaybookReviewStatus.BLOCKED:
             raise PipelineValidationError(check)
         return repaired, check
+
+    async def _run_agent_provider(
+        self,
+        run_id: str,
+        prompt: str,
+        *,
+        request: PipelineRequest,
+        provider_config: dict[str, Any] | None,
+        route_context: RouteContext,
+    ) -> dict[str, Any]:
+        assert self._agent_provider is not None
+        route_decision = route_context.decision.model_dump(mode="json")
+        agent_request = AgentRequest(
+            run_id=run_id,
+            prompt=prompt,
+            source_code=request.source_code,
+            language=request.language,
+            route_decision=route_decision,
+            provider_config=provider_config,
+            playbook_schema=PlaybookScript.model_json_schema(),
+            constraints=AgentConstraints(
+                max_self_repair_attempts=AGENT_SELF_REPAIR_ATTEMPTS,
+                max_reviewer_repair_attempts=AGENT_REVIEWER_REPAIR_ATTEMPTS,
+                legacy_single_enabled=True,
+                executable_tools_available=True,
+            ),
+            available_tools=RuntimeToolHub(self._skill_registry).list_tools(route_decision),
+        )
+        runner = getattr(self._agent_provider, "run", None)
+        if callable(runner):
+            result = await runner(agent_request)
+            return result.playbook
+        return await self._agent_provider.generate(
+            prompt,
+            provider_config=provider_config,
+            route_decision=route_decision,
+        )
 
     async def _execute_single(
         self,
@@ -1189,6 +1252,8 @@ def _route_review_actions(route_context: RouteContext, *, generator: str) -> lis
         actions.append(f"router:model:{route_context.router_model}")
     if route.domain:
         actions.append(f"router:domain:{route.domain}")
+    if generator == "agent":
+        actions.append(f"agent_skill:{route.domain or 'generic'}")
     if route.skill_id:
         actions.append(f"router:skill_id:{route.skill_id}")
     if route.matched_capability:

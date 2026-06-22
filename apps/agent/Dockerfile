@@ -1,10 +1,20 @@
+# syntax=docker/dockerfile:1.7
+
 FROM node:22-alpine AS build
 
 WORKDIR /app
 
+ARG NPM_REGISTRY=https://registry.npmmirror.com
+
 COPY apps/agent/package.json apps/agent/tsconfig.json ./apps/agent/
 COPY package.json ./
-RUN npm install --workspace=apps/agent --no-audit --no-fund
+RUN --mount=type=cache,id=metaview-npm,target=/root/.npm,sharing=locked \
+    npm install --workspace=apps/agent --no-audit --no-fund \
+        --registry="${NPM_REGISTRY}" \
+        --prefer-offline \
+        --fetch-retries=5 \
+        --fetch-retry-mintimeout=20000 \
+        --fetch-retry-maxtimeout=120000
 
 COPY apps/agent ./apps/agent
 RUN npm --workspace apps/agent run build

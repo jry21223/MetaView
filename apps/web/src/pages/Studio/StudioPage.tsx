@@ -20,16 +20,16 @@ import { FollowupCommitLog } from "../../features/followups/ui/FollowupCommitLog
 // ── Domain mapping ────────────────────────────────────────────────────────
 
 const DOMAIN_SUGGESTIONS: Record<string, string[]> = {
-  algorithm: ["换一组数据", "为什么这个复杂度", "对比其他方法"],
-  math: ["改变初始条件", "几何意义", "推导过程"],
-  physics: ["改变参数", "加上其他力", "受力分析"],
-  code: ["解释这段逻辑", "更好的写法", "边界情况"],
-  chemistry: ["换反应物", "反应机理", "平衡条件"],
-  biology: ["详细解释步骤", "实际应用", "相关知识点"],
-  geography: ["原因分析", "影响因素", "对比其他地区"],
+  algorithm: ["下一步会访问谁？", "当前不变量是什么？", "为什么这样更新状态？"],
+  math: ["你能指出关键量吗？", "这一步用了哪个性质？", "先说说几何意义"],
+  physics: ["这一步用了哪个定律？", "力应该怎样分解？", "单位说明了什么？"],
+  code: ["下一行会改变什么？", "当前变量值是多少？", "返回值从哪里来？"],
+  chemistry: ["守恒量是什么？", "转换因子是哪一个？", "哪一步决定比例？"],
+  biology: ["这一格怎么填？", "性状由什么决定？", "下一阶段变了什么？"],
+  geography: ["主要驱动力是什么？", "风向为什么改变？", "这个区域有何差异？"],
 };
 
-const FALLBACK_SUGGESTIONS = ["换个角度讲", "展开第一步", "总结要点"];
+const FALLBACK_SUGGESTIONS = ["先抓哪个关键点？", "这一步为什么必要？", "我来复述一遍"];
 
 // ── ChatPanel ─────────────────────────────────────────────────────────────
 
@@ -205,6 +205,7 @@ function ChatPanel({
         ...current,
         { from: "ai", text: formatChatError(err), error: true },
       ]);
+      throw err;
     } finally {
       setPending(false);
     }

@@ -14,7 +14,9 @@ from app.domain.skills.algorithm_graph_core.graph_kernel import solve_graph_prob
 from app.domain.skills.algorithm_graph_core.manifest import ALGORITHM_GRAPH_CORE_MANIFEST
 from app.domain.skills.algorithm_graph_core.skill_pack import AlgorithmGraphCoreSkillPack
 from app.domain.skills.base import SkillExecutionContext, SkillRouteInput
+from app.domain.skills.elementary_algebra.spec_extractor import try_extract_elementary_algebra
 from app.domain.skills.registry import SkillRegistry
+from eval.scorers import score_playbook
 
 
 class _RecordingRepo:
@@ -155,6 +157,12 @@ def test_heuristic_match_has_no_answer_fields() -> None:
     assert "solution" not in json.dumps(match.problem_spec)
 
 
+def test_factorial_prompt_does_not_route_to_algebra_factor_skill() -> None:
+    spec = try_extract_elementary_algebra("逐行追踪 Python 函数 factorial(4) 的递归调用栈")
+
+    assert spec is None
+
+
 @pytest.mark.asyncio
 async def test_execute_outputs_valid_playbook_with_graph_scene() -> None:
     skill = AlgorithmGraphCoreSkillPack()
@@ -174,10 +182,14 @@ async def test_execute_outputs_valid_playbook_with_graph_scene() -> None:
     assert result.playbook_json is not None
     playbook = PlaybookScript.model_validate_json(result.playbook_json)
     assert playbook.domain == TopicDomain.ALGORITHM
-    assert 3 <= len(playbook.steps) <= 5
+    assert 4 <= len(playbook.steps) <= 5
     assert "graph_scene" in {step.snapshot.kind for step in playbook.steps}
     assert "table_scene" in {step.snapshot.kind for step in playbook.steps}
+    assert all(len(step.voiceover_text) >= 20 for step in playbook.steps)
     assert all(step.layers for step in playbook.steps)
+
+    score = score_playbook("algorithm-bfs-runtime", result.playbook_json)
+    assert score.passed, [(dim.name, dim.score, dim.issues) for dim in score.dimensions]
 
 
 @pytest.mark.asyncio

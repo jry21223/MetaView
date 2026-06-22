@@ -200,3 +200,62 @@ def test_animation_tool_expand_reports_unknown_tool(
     payload = response.json()
     assert payload["layers"] == []
     assert payload["issues"][0]["code"] == "animation_tool.unknown_tool"
+
+
+def test_runtime_tool_list_requires_shared_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("METAVIEW_AGENT_SHARED_TOKEN", "secret")
+    get_settings.cache_clear()
+    client = TestClient(create_app())
+
+    missing = client.get("/api/v1/agent/runtime-tools")
+    ok = client.get(
+        "/api/v1/agent/runtime-tools",
+        headers={"X-MetaView-Agent-Token": "secret"},
+    )
+
+    assert missing.status_code == 401
+    assert ok.status_code == 200
+    names = {tool["name"] for tool in ok.json()["tools"]}
+    assert "playbook.schema.validate" in names
+    assert "geometry.assert_monotonic" in names
+
+
+def test_runtime_tool_execute_returns_structured_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("METAVIEW_AGENT_SHARED_TOKEN", "secret")
+    get_settings.cache_clear()
+    client = TestClient(create_app())
+
+    response = client.post(
+        "/api/v1/agent/runtime-tools/execute",
+        headers={"X-MetaView-Agent-Token": "secret"},
+        json={
+            "tool": "geometry.assert_monotonic",
+            "args": {"expression": "x**2", "x_min": 0.1, "x_max": 2.0},
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["result"]["verdict"] == "increasing"
+
+
+def test_runtime_tool_execute_unknown_tool_does_not_raise(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("METAVIEW_AGENT_SHARED_TOKEN", "secret")
+    get_settings.cache_clear()
+    client = TestClient(create_app())
+
+    response = client.post(
+        "/api/v1/agent/runtime-tools/execute",
+        headers={"X-MetaView-Agent-Token": "secret"},
+        json={"tool": "tool.nope", "args": {}},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is False
+    assert payload["error"]["code"] == "runtime_tool.unknown_tool"

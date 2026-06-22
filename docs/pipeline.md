@@ -1,10 +1,11 @@
 # 渲染管线
 
 > 唯一渲染出口：**PlaybookScript → Remotion Player / Export**
-> 生成路径可以有两条：`single mode` 走 **LLM → CIR + ExecutionMap → PlaybookScript**；`agent mode` 走 **Agent tool loop → self-check → PlaybookScript**。
+> 主生成方向是统一 **AgentPipeline → RuntimeToolHub → Agent Provider → PlaybookScript**。
+> `single mode` 仍保留为 legacy fallback：**LLM → CIR + ExecutionMap → PlaybookScript**。
 > 项目仍不引入 Manim、HTML iframe 或服务端 HTML 视频渲染；前端通过 Remotion 帧驱动渲染。
 
-## 1. Single generation path: LLM 输出契约
+## 1. Legacy single generation path: LLM 输出契约
 
 `METAVIEW_GENERATION_MODE=single` 时，LLM 必须输出**单一 JSON 对象**，包含两层：
 
@@ -224,6 +225,10 @@ Agent mode 是一等质量编排路径，不是备用渲染器。它用
 [pi-agent-core](https://github.com/earendil-works/pi) 做 agent runtime，通过细粒度
 **Drawing CLI** 工具一步步建出最终 PlaybookScript。
 
+合并或推广 agent mode 前，先按
+[`docs/agent-demo-acceptance.md`](agent-demo-acceptance.md) 跑 demo suite，
+确认核心 case 的 generation path、PlaybookScript contract score 和可选无音轨导出结果。
+
 Agent mode 不绕过规范化的 PlaybookScript 契约。它可以跳过 CIR parsing 和
 `playbook_builder`，但必须返回 schema-valid `PlaybookScript`，并且仍然走同一个
 **PlaybookScript → Remotion Player / Export** 渲染出口。
@@ -242,8 +247,10 @@ Required gates:
 launch-supported 产品承诺，按 [`docs/frontend-shell.md`](frontend-shell.md) 的 support
 level 处理。
 
-**默认仍是 `single` 模式**。agent 模式开启后，只允许替换生成路径；不能绕过
-PlaybookScript validation、renderer compatibility checks、self-check 或第三方 review。
+**当前默认仍是 `single` 模式，但它是 legacy fallback。** 新的 runtime、kernel、
+validator、SkillPack 能力应进入 AgentPipeline / RuntimeToolHub，而不是继续扩展
+single prompt。agent 模式开启后，只允许替换生成路径；不能绕过 PlaybookScript
+validation、renderer compatibility checks、self-check 或第三方 review。
 
 ### 切换
 
@@ -263,14 +270,38 @@ dev` 同样并行起三个进程。
 ```bash
 METAVIEW_GENERATION_MODE=agent
 METAVIEW_AGENT_PROVIDER=codex
-METAVIEW_CODEX_MODEL=gpt-5.2-codex
+METAVIEW_CODEX_MODEL=gpt-5.5
 METAVIEW_CODEX_EFFORT=high
 METAVIEW_CODEX_CWD=.
+METAVIEW_AGENT_SKILLS_DIR=skills/metaview-agent
 ```
 
 Python SDK 会复用本机已有 Codex 登录；请求里传入 `provider_api_key` 时会调用
 SDK 的 API-key 登录。该路径仍然只返回 PlaybookScript，并由后端 Pydantic 契约
 校验后必须继续通过 reviewer、compatibility gate，再进入同一个 Remotion exit。
+Codex provider 会按 route decision 加载 `skills/metaview-agent/generic/SKILL.md`
+和对应学科的 `SKILL.md`，并接收 RuntimeToolHub manifest。Codex 当前不能执行
+runtime tools，因此它定位为 repo-aware fallback / planner / repair provider，而不是
+第二套 single。可确定题型仍优先由 deterministic SkillPack 在 AgentPipeline /
+RuntimeToolHub 中处理；Codex agent 负责开放题、fallback、讲解导演和修复。
+
+### RuntimeToolHub
+
+`apps/api/app/application/agent/runtime_tool_hub.py` 是 agent runtime 工具入口。第一版
+暴露：
+
+- `skill.registry.list`
+- `skill.<skill_id>.solve`
+- `playbook.schema.validate`
+- `playbook.self_check`
+- `animation_tool.list` / `animation_tool.expand`
+- `geometry.assert_orientation`
+- `geometry.assert_passes_through`
+- `geometry.assert_monotonic`
+
+FastAPI 通过 `/api/v1/agent/runtime-tools` 和
+`/api/v1/agent/runtime-tools/execute` 暴露统一工具面。旧的 `/assert/*` 与
+`/animation-tools/*` endpoint 继续存在，但作为兼容 wrapper 调用 RuntimeToolHub。
 
 ### Drawing CLI 工具集
 
@@ -306,9 +337,13 @@ LLM 在 narration 里写「顺/逆时针」「递增/递减」之前，**必须*
 |---|---|
 | `apps/agent/src/server.ts` | Express，`POST /generate` 入口 |
 | `apps/agent/src/agent.ts` | `Agent` 实例 + 工具注册 + system prompt |
+| `apps/agent/src/tools/runtimeTools.ts` | RuntimeToolHub sidecar bridge |
 | `apps/agent/src/state/playbookEmitter.ts` | 累积工具调用 → PlaybookScript JSON |
+| `apps/api/app/application/agent/types.py` | `AgentRequest` / `AgentResult` contract |
+| `apps/api/app/application/agent/pipeline.py` | AgentPipeline 入口 |
+| `apps/api/app/application/agent/runtime_tool_hub.py` | RuntimeToolHub registry / executor |
 | `apps/api/app/application/ports/agent_provider.py` | `IAgentProvider` Protocol |
 | `apps/api/app/infrastructure/agent/http_agent_provider.py` | httpx 客户端 |
 | `apps/api/app/infrastructure/agent/codex_agent_provider.py` | OpenAI Codex Python SDK 客户端 |
 | `apps/api/app/domain/services/geometry_validators.py` | sympy 校验纯函数 |
-| `apps/api/app/presentation/router_agent.py` | `/api/v1/agent/assert/*` 路由 |
+| `apps/api/app/presentation/router_agent.py` | `/api/v1/agent/runtime-tools` 与兼容 agent routes |

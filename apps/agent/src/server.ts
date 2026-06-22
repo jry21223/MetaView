@@ -1,9 +1,11 @@
 /**
  * HTTP entry point for the MetaView agent sidecar.
  *
- * Exposes ``POST /generate`` with a JSON body ``{ prompt, provider?, route_decision? }`` and
- * returns ``{ playbook: PlaybookScript }`` once the pi-agent-core loop has
- * walked the entire Drawing CLI flow. Health probe at ``GET /healthz``.
+ * Exposes ``POST /generate`` with either the legacy body
+ * ``{ prompt, provider?, route_decision? }`` or the wider AgentRequest shape,
+ * then returns ``{ playbook: PlaybookScript, provider, tool_events,
+ * runtime_events }`` once the pi-agent-core loop has walked the Drawing CLI
+ * flow. Health probe at ``GET /healthz``.
  */
 
 import express, { type Request, type Response } from "express";
@@ -38,10 +40,28 @@ app.post("/generate", async (req: Request, res: Response) => {
     res.status(401).json({ detail: "missing or invalid agent token" });
     return;
   }
-  const { prompt, provider, route_decision } = (req.body ?? {}) as {
+  const {
+    run_id,
+    prompt,
+    source_code,
+    language,
+    provider,
+    provider_config,
+    route_decision,
+    playbook_schema,
+    constraints,
+    available_tools,
+  } = (req.body ?? {}) as {
+    run_id?: string;
     prompt?: string;
+    source_code?: string | null;
+    language?: string | null;
     provider?: { provider?: string; model?: string; api_key?: string; base_url?: string };
+    provider_config?: { provider?: string; model?: string; api_key?: string; base_url?: string };
     route_decision?: Record<string, unknown>;
+    playbook_schema?: Record<string, unknown>;
+    constraints?: Record<string, unknown>;
+    available_tools?: Array<Record<string, unknown>>;
   };
   if (!prompt || typeof prompt !== "string") {
     res.status(400).json({ detail: "missing or invalid 'prompt' field" });
@@ -57,8 +77,14 @@ app.post("/generate", async (req: Request, res: Response) => {
     const playbook = await Promise.race([
       runAgentGeneration({
         prompt,
-        provider,
+        runId: run_id,
+        sourceCode: source_code,
+        language,
+        provider: provider ?? provider_config,
         routeDecision: route_decision,
+        playbookSchema: playbook_schema,
+        constraints,
+        availableTools: available_tools,
         apiBaseUrl: API_BASE_URL,
         agentSharedToken: SHARED_TOKEN,
         defaultProvider: DEFAULT_PROVIDER,
@@ -67,7 +93,14 @@ app.post("/generate", async (req: Request, res: Response) => {
       }),
       timeout,
     ]);
-    res.json({ playbook });
+    res.json({
+      playbook,
+      provider: "pi",
+      tool_events: [],
+      runtime_events: [{ event: "sidecar.completed" }],
+      review: null,
+      artifacts: {},
+    });
   } catch (err) {
     log.error({ err }, "generate failed");
     if (err instanceof AgentSelfCheckError) {
