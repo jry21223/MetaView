@@ -1,8 +1,11 @@
 # Skill Sources
 
-Phase 0 skills use public references as source maps, not as text to copy. Each
-skill should summarize formulas and procedures into MetaView-owned
+Registered deterministic skills use public references as source maps, not as
+text to copy. Each skill should summarize formulas and procedures into MetaView-owned
 `ProblemSpec`, deterministic kernel, and `PlaybookScript` adapter code.
+This file documents source-backed expansion packs; compact algebra/calculus
+packs without external source requirements stay covered by their manifests and
+tests.
 
 ## Common Rules
 
@@ -27,7 +30,7 @@ Sources:
 - [OpenStax University Physics 1: 4.3 Projectile Motion](https://openstax.org/books/university-physics-volume-1/pages/4-3-projectile-motion)
 - [OpenStax University Physics 1: 5.6 Common Forces](https://openstax.org/books/university-physics-volume-1/pages/5-6-common-forces)
 
-Phase 0 scope:
+Registered V1 scope:
 
 - Constant-acceleration one-dimensional motion with known units and a single
   unknown.
@@ -70,7 +73,7 @@ Sources:
 - [Python `decimal`](https://docs.python.org/3/library/decimal.html)
 - [Python `fractions`](https://docs.python.org/3/library/fractions.html)
 
-Phase 0 scope:
+Registered V1 scope:
 
 - Parse common chemical formulas and reaction equations.
 - Balance equations with integer coefficients.
@@ -108,7 +111,7 @@ Sources:
 - [NetworkX Traversal](https://networkx.org/documentation/stable/reference/algorithms/traversal.html)
 - [NetworkX Directed Acyclic Graphs](https://networkx.org/documentation/stable/reference/algorithms/dag.html)
 
-Phase 0 scope:
+Registered V1 scope:
 
 - Parse small explicit graphs from edge lists, adjacency lists, or simple
   natural-language prompts.
@@ -148,7 +151,7 @@ Sources:
 - [OpenStax Biology 2e: 12.3 Laws of Inheritance](https://openstax.org/books/biology-2e/pages/12-3-laws-of-inheritance)
 - [Python `fractions`](https://docs.python.org/3/library/fractions.html)
 
-Phase 2 scope:
+Registered V1 scope:
 
 - One-trait and two-trait Mendelian crosses with explicit parent genotypes such
   as `Aa x Aa`, `Aa x aa`, and `AaBb x AaBb`.
@@ -191,7 +194,7 @@ Sources:
 - [Python `decimal`](https://docs.python.org/3/library/decimal.html)
 - [Python `fractions`](https://docs.python.org/3/library/fractions.html)
 
-Phase 2 scope:
+Registered V1 scope:
 
 - Descriptive statistics for explicit numeric lists.
 - Probability union and conditional probability from explicit event
@@ -232,7 +235,7 @@ Sources:
 
 - [NOAA U.S. Climate Normals](https://www.ncei.noaa.gov/products/land-based-station/us-climate-normals)
 
-Phase 2 scope:
+Registered V1 scope:
 
 - Offline educational normals for a tiny checked-in fixture, clearly labelled
   as teaching data and not live NOAA downloads.

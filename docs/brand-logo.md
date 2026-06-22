@@ -7,8 +7,12 @@ MetaView uses an MV viewport mark: a rounded frame with one continuous motion pa
 - `apps/web/public/brand/metaview-mark.svg`: icon mark for favicon, app icon, and avatar use.
 - `apps/web/public/brand/metaview-lockup-dark.svg`: dark-background horizontal lockup.
 - `apps/web/public/brand/metaview-lockup-light.svg`: light-background horizontal lockup.
+- `apps/web/public/brand/metaview-brand-logo.png`: raster lockup for static sharing surfaces.
+- `apps/web/public/brand/metaview-og-image.png`: Open Graph preview image referenced by `apps/web/index.html`.
 - `apps/web/public/brand/metaview-watermark-28.png`: WeChat website app watermark image, `28x28`, PNG.
 - `apps/web/public/brand/metaview-app-hd-108.png`: WeChat website app high-resolution image, `108x108`, PNG.
+- `apps/web/public/favicon.ico`, `apps/web/public/favicon-32x32.png`, and
+  `apps/web/public/apple-touch-icon.png`: browser and mobile home-screen icons.
 
 ## Colors
 

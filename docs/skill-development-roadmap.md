@@ -1,8 +1,9 @@
 # Skill Development Roadmap
 
-This roadmap covers Phase 0 SkillPack development. It keeps the first wave
-focused on deterministic parser and kernel work before any renderer-heavy
-expansion.
+This roadmap tracks the current deterministic SkillPack baseline. The first
+wave parser, kernel, and adapter work is now represented in
+`build_default_skill_registry()`; use this document as a maintenance status map
+and guardrail before any renderer-heavy expansion.
 
 ## Common Rules
 
@@ -21,32 +22,33 @@ expansion.
   through `build_default_skill_registry()`. Do not add skill-specific branches
   to `RunPipelineUseCase`.
 
-## Development Order
+## Registry Status
 
-1. `physics_mechanics`
-   - Start here because the first scope is formula-bound and can reuse existing
-     math/explanation snapshots.
-   - Deliver constant-acceleration, projectile, and simple force kernels before
-     any richer mechanics renderer.
+`build_default_skill_registry()` currently registers these deterministic packs:
 
-2. `chemistry_stoichiometry`
-   - Build next because equation parsing, balancing, and mole-ratio arithmetic
-     are deterministic and testable without new rendering.
-   - Ship a minimal reviewed atomic-mass table with no runtime source fetches.
+- `solid_geometry`
+- `quadratic_transform`
+- `elementary_algebra`
+- `linear_algebra`
+- `calculus_core`
+- `physics_mechanics`
+- `chemistry_stoichiometry`
+- `algorithm_graph_core`
+- `biology_genetics`
+- `probability_statistics_core`
+- `geography_climate`
 
-3. `algorithm_graph_core`
-   - Build after chemistry because it adds trace-style algorithm steps while
-     still avoiding heavy media work.
-   - Lock deterministic traversal, shortest-path, and DAG ordering rules in
-     handwritten fixtures.
+## Maintenance Priorities
 
-4. `biology_genetics`, `probability_statistics_core`, and `geography_climate`
-   - Start these after the first three packs establish the parser/kernel/test
-     pattern.
-   - Prioritize exact probability kernels for genetics and statistics.
-   - Keep geography climate work data-light with small offline fixtures.
+1. Keep each manifest's supported and unsupported notes aligned with its parser
+   and kernel tests.
+2. Preserve deterministic fallback behavior: unsafe parsing or solving returns
+   `handled=False` with a clear `fallback_reason`.
+3. Expand handwritten fixtures before broadening capability descriptions.
+4. Add renderer-heavy work only after the skill's `ProblemSpec`, kernel output,
+   and existing-renderer adapter tests are stable.
 
-## Phase 0 Gate For Each Skill
+## Gate For Each Skill
 
 Each skill should pass these gates before it is considered ready:
 
@@ -74,7 +76,7 @@ contract clear.
 
 These projects are useful reference material for a later renderer-heavy vector
 field or electromagnetism phase. They are not implementation dependencies for
-the Phase 1 SkillPacks.
+the current registered SkillPacks.
 
 - NablaVis: React and Three.js vector-calculus scenes for gradient, divergence,
   curl, path, surface, and theorem-oriented exploration.
