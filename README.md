@@ -1,32 +1,50 @@
 # MetaView v2
 
-MetaView v2 是一个教育可视化平台：后端用 FastAPI 生成结构化教学脚本，前端用 React 19 + Remotion 按帧播放教学动画。
+MetaView v2 是一个面向教育场景的 AI 可视化讲解平台。它不是普通 PPT 生成器，也不是只把文本变成视频的工具；核心架构是“内容生成 + 导演层 + 可渲染视频”。
 
-唯一渲染出口是 **PlaybookScript → Remotion Player / Export**。生成路径可以有两条：
+当前主线请先读 [`docs/START_HERE.md`](docs/START_HERE.md)。
 
-1. `single mode`: **LLM → CIR + ExecutionMap → PlaybookScript**
-2. `agent mode`: **Agent tool loop → self-check → PlaybookScript**
+## 核心管线
 
-项目仍不引入 Manim、HTML iframe 或服务端 HTML 视频渲染；管线契约见 [`docs/pipeline.md`](docs/pipeline.md)。
+```text
+User input
+  -> subject understanding / router / SkillPack / agent
+  -> PlaybookScript
+  -> DirectorScript
+  -> RenderPlan
+  -> Remotion preview / export
+```
+
+- `PlaybookScript` 是内容契约：负责教学步骤、snapshot、公式、画面对象、旁白、代码高亮和可渲染场景数据。
+- `DirectorScript` 是导演契约：负责镜头意图、shot type、camera motion、pacing、focus target、emphasis terms 和观看节奏。
+- `RenderPlan` 是渲染适配层：把 DirectorScript 转换为 Remotion 可消费的 scale、translate、opacity、timing 等参数。
+- Remotion 是唯一视频预览/导出出口。
+
+生成路径当前有两条：
+
+1. `single mode`: **LLM -> CIR + ExecutionMap -> PlaybookScript -> DirectorScript**
+2. `agent mode`: **Agent tool loop -> self-check -> PlaybookScript -> DirectorScript**
+
+项目仍不引入 Manim、HTML iframe 或服务端 HTML 视频渲染。管线契约见 [`docs/pipeline.md`](docs/pipeline.md)，Director 契约见 [`docs/director-layer.md`](docs/director-layer.md)。
 
 ## 功能概览
 
 - 支持 `algorithm`, `math`, `code`, `physics`, `chemistry`, `biology`, `geography` 七个教学领域。
 - 首发输入支持文本题目、粘贴代码和上传代码文件；暂不支持图片、截图、PDF、PPT/课件或任意附件生成。
-- 题目提交前会做 topic routing：高置信题目进入 specialized skill，未命中时走 generic skill 并由 LLM 决定最终 `cir.domain`。
-- 算法领域支持数组视图和 `algorithm_bars` 柱状视图，可回放冒泡、快排、插入、选择等排序过程。
-- 数学领域支持逐项代数和 `visual_kind="function"` 函数图，覆盖平移、缩放、导数切线、定积分阴影、三角波等场景。
+- 题目提交前会做 topic routing：高置信题目进入 specialized skill，未命中时走 generic skill 或 agent 路径。
+- deterministic SkillPack 用于把确定性学科问题转成可靠的 PlaybookScript。
+- Director 层为每个 run 生成独立 DirectorScript，当前已有 rule-based 默认导演，后续会进入可见、可渲染、可编辑阶段。
 - 播放器提供参数面板、字幕、TTS、速度控制、历史记录、视频导出和 provider 配置。
-- 运行历史保留原始 `prompt`，便于复盘不同输入与生成结果。
+- 运行历史保留原始 `prompt`、PlaybookScript 和 DirectorScript，便于复盘不同输入与生成结果。
 
 ## 目录结构
 
 | 路径 | 内容 |
 |------|------|
-| `apps/api` | FastAPI 后端：CIR 生成、PlaybookScript 装配、运行历史、支付/导出 API |
+| `apps/api` | FastAPI 后端：生成管线、PlaybookScript、DirectorScript、运行历史、支付/导出 API |
 | `apps/web` | React 19 + Vite + Remotion 前端，按 Feature-Sliced Design 分层 |
 | `apps/agent` | agent sidecar，用于 `generation_mode=agent` 的生成链路 |
-| `docs` | 管线、前端外壳、渲染器、路由、集成说明 |
+| `docs` | 当前主线文档、Director 架构、管线、渲染器、路由和验收说明 |
 | `skills` | 各学科 prompt reference |
 | `data` | 本地 SQLite、导出文件和调试数据 |
 | `docker-compose.yml` | API + Web + agent 联调入口 |
@@ -93,13 +111,15 @@ make check
 
 `make check` 会串联 ruff、eslint、pytest、tsc 和 Vite build。
 
+Agent demo 验收见 [`docs/agent-demo-acceptance.md`](docs/agent-demo-acceptance.md)。生成的 `eval/reports/`、`eval/videos/`、`eval/shots/` 是本地证据，不应提交。
+
 ## API 端点
 
 | Method | Path | 说明 |
 |--------|------|------|
 | `POST` | `/api/v1/pipeline` | 提交题目，返回 `run_id` |
 | `GET` | `/api/v1/runs` | 运行历史列表 |
-| `GET` | `/api/v1/runs/{run_id}` | 单次运行结果，含 PlaybookScript 与原始 `prompt` |
+| `GET` | `/api/v1/runs/{run_id}` | 单次运行结果，含 PlaybookScript、DirectorScript 与原始 `prompt` |
 | `POST` | `/api/v1/exports` | 创建视频导出任务 |
 | `GET` | `/api/v1/exports/{job_id}` | 查询导出任务状态 |
 | `GET` | `/health` | 健康检查 |
@@ -108,78 +128,28 @@ make check
 
 ## 配置
 
-后端配置统一使用 `METAVIEW_` 前缀环境变量，由 [`apps/api/app/config.py`](apps/api/app/config.py) 管理。前端配置集中在 [`apps/web/src/shared/config/constants.ts`](apps/web/src/shared/config/constants.ts)。
+后端配置统一使用 `METAVIEW_` 前缀环境变量，由 [`apps/api/app/config.py`](apps/api/app/config.py) 管理。前端配置集中在 [`apps/web/src/shared/config/constants.ts`](apps/web/src/shared/config/constants.ts)。完整变量列表见 [`.env.example`](.env.example)。
+
+关键变量：
 
 | 变量 | 默认 | 说明 |
 |------|------|------|
+| `METAVIEW_APP_EDITION` | `self` | 后端 edition：`self` / `ops` |
+| `VITE_APP_EDITION` | `self` | 前端 edition：`self` / `ops`，应与 `METAVIEW_APP_EDITION` 一致 |
+| `METAVIEW_GENERATION_MODE` | `single` | `single` 或 `agent`；`single` 当前仍是默认 rollback path |
+| `METAVIEW_AGENT_PROVIDER` | `http` | `agent` 模式 provider adapter：`http` sidecar 或 `codex` fallback |
+| `METAVIEW_AGENT_BASE_URL` | `http://agent:8001` | agent sidecar 地址 |
+| `METAVIEW_AGENT_SHARED_TOKEN` | - | API 调用 agent sidecar 的共享鉴权 token |
+| `METAVIEW_ROUTER_MODE` | `hybrid` | 路由模式：`off` / `heuristic` / `llm` / `hybrid` |
 | `METAVIEW_OPENAI_API_KEY` | - | 内置 OpenAI 兼容 provider 的 key |
 | `METAVIEW_OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI 兼容接口根地址 |
 | `METAVIEW_OPENAI_MODEL` | - | 默认模型名 |
-| `METAVIEW_OPENAI_SUPPORTS_VISION` | `false` | 是否走多模态请求 |
-| `METAVIEW_OPENAI_TIMEOUT_S` | `300` | 请求超时秒数 |
-| `METAVIEW_OPENAI_MAX_TOKENS` | `16000` | chat/completions 的 `max_tokens` |
-| `METAVIEW_OPENAI_REASONING_EFFORT` | - | gpt-5 / o-series 专用，支持 `minimal\|low\|medium\|high` |
-| `METAVIEW_APP_EDITION` | `self` | 后端 edition：`self` / `ops` |
-| `METAVIEW_TTS_API_KEY` | - | 平台托管 TTS key；为空时回退 `METAVIEW_OPENAI_API_KEY` |
-| `METAVIEW_TTS_BASE_URL` | `https://api.openai.com/v1` | 平台托管 TTS 兼容接口根地址 |
-| `METAVIEW_TTS_MODEL` | `tts-1` | 平台托管 TTS 模型 |
-| `METAVIEW_ROUTER_MODE` | `hybrid` | 路由模式：`off` / `heuristic` / `llm` / `hybrid` |
-| `METAVIEW_ROUTER_MODEL` | - | 小模型路由模型；为空时复用 router/openai/default 模型 |
-| `METAVIEW_ROUTER_TIMEOUT_S` | `12` | 小模型路由超时秒数 |
-| `METAVIEW_ROUTER_MIN_CONFIDENCE` | `0.72` | 路由结果直接采用的最低置信度 |
-| `METAVIEW_ROUTER_REFINE_CONFIDENCE` | `0.55` | 预留 refinement 阈值，V1 低于采用阈值时 fallback |
-| `METAVIEW_GENERATION_MODE` | `single` | `single` 或 `agent`；`single` 当前仍是默认 rollback path，新的 runtime 能力应走 agent pipeline |
-| `METAVIEW_AGENT_PROVIDER` | `http` | `agent` 模式 provider adapter：`http`/pi sidecar 或 `codex` fallback |
-| `METAVIEW_AGENT_BASE_URL` | `http://agent:8001` | agent sidecar 地址 |
-| `METAVIEW_AGENT_TIMEOUT_S` | `600` | agent 生成超时秒数 |
-| `METAVIEW_AGENT_SHARED_TOKEN` | - | API 调用 agent sidecar 的共享鉴权 token |
-| `METAVIEW_CODEX_MODEL` | `gpt-5.5` | Python Codex SDK 模型覆盖 |
-| `METAVIEW_CODEX_EFFORT` | - | Python Codex SDK reasoning effort |
-| `METAVIEW_CODEX_CWD` | `.` | Codex thread 工作目录 |
-| `METAVIEW_GENERATION_COST_CENTS` | `10` | 运营版每次生成 / follow-up 预扣金额，失败会退款 |
-| `METAVIEW_DEFAULT_PROVIDER` | - | 显式指定默认 provider |
-| `METAVIEW_MOCK_PROVIDER_ENABLED` | `true` | 是否暴露 `mock` provider |
-| `METAVIEW_ENABLED_DOMAINS` | 全部七项 | 启用的学科 |
-| `METAVIEW_MAX_REPAIR_ATTEMPTS` | `2` | CIR 自动修复轮数 |
-| `METAVIEW_HISTORY_DB_PATH` | `data/pipeline_runs.db` | SQLite 路径 |
-| `METAVIEW_WECHAT_NOTIFY_MAX_SKEW_S` | `300` | 微信支付回调时间戳允许偏移秒数 |
-| `METAVIEW_WECHAT_NOTIFY_REPLAY_TTL_S` | `600` | 微信支付回调重放缓存保留秒数 |
 | `METAVIEW_PAYMENT_GATEWAY` | `easypay` | 支付网关选择：`wechat` / `easypay`，主路径为 `easypay` |
-| `METAVIEW_EPAY_API_BASE` | - | 开启 `easypay` 时的网关基础域名（如 `https://pay.example.com`） |
-| `METAVIEW_EPAY_SUBMIT_PATH` | `/submit.php` | 开启 `easypay` 时的提交路径 |
-| `METAVIEW_EPAY_SUBMIT_URL` | - | 兼容字段（不作为主路径）：仅作为旧部署兜底，不设 `METAVIEW_EPAY_API_BASE` 时才会使用 |
-| `METAVIEW_EPAY_PID` / `METAVIEW_EPAY_MERCHANT_ID` | - | 开启 `easypay` 时的平台商户ID |
-| `METAVIEW_EPAY_KEY` / `METAVIEW_EPAY_API_KEY` | - | 开启 `easypay` 时的签名密钥 |
 | `METAVIEW_EPAY_PAY_TYPE` | `wxpay` | 开启 `easypay` 时创建订单的支付类型 |
-| `METAVIEW_EPAY_NOTIFY_URL` | - | 开启 `easypay` 时的回调通知地址（**必填，HTTPS，公网地址**） |
-| `METAVIEW_EPAY_RETURN_URL` | - | 开启 `easypay` 时的返回页跳转地址（**必填，HTTPS，公网地址**） |
 | `METAVIEW_PLAYBOOK_DEFAULT_FPS` | `30` | Remotion 默认帧率 |
 | `METAVIEW_PLAYBOOK_COMPOSITION_WIDTH` / `_HEIGHT` | `960` / `540` | 默认画布 |
-| `METAVIEW_CORS_ORIGIN_REGEX` | localhost 正则 | 允许的浏览器来源 |
-| `VITE_API_BASE_URL` | 同源 | 前端构建时 API 基地址 |
-| `VITE_APP_EDITION` | `self` | 前端 edition：`self` / `ops`，应与 `METAVIEW_APP_EDITION` 一致 |
 
-完整变量列表见 [`.env.example`](.env.example)。
-
-注意：生产环境请使用公网且 `https` 的回调/跳转地址（如 `https://your.domain/...`），禁止以 localhost / 127.0.0.1 作为公开回调域名。
-微信 APIv3 相关配置（`METAVIEW_WECHAT_*`）保留为 legacy/deprecated，仅用于兼容回滚，不是充值主路径。
-微信商户证书、APIv3 key、平台公钥与私钥请仅在易支付网关侧进行维护，`MetaView` 不持久存储这些敏感凭据。
-
-### 小模型路由配置
-
-MetaView 的生成入口先经过小模型路由，再进入确定性 skill、普通 CIR 或 agent。默认 `METAVIEW_ROUTER_MODE=hybrid`：有可用 router model 时优先用模型输出 `RouteDecision`，失败或低置信度时回退到确定性 parser / 旧 topic router。
-
-最小配置示例：
-
-```env
-METAVIEW_ROUTER_MODE=hybrid
-METAVIEW_ROUTER_MODEL=gpt-4o-mini
-METAVIEW_ROUTER_TIMEOUT_S=12
-METAVIEW_ROUTER_MIN_CONFIDENCE=0.72
-METAVIEW_ROUTER_REFINE_CONFIDENCE=0.55
-```
-
-新增 skill 时先在 `apps/api/app/domain/skills/*/manifest.py` 声明 capability 和 supported 状态，再让 router prompt 读取 manifest，而不是继续堆关键词。当前 `solid_geometry` skill 的结构参考 [wy51ai/edulab](https://github.com/wy51ai/edulab) 的 `edu-solid-geometry`：结构化题面 -> 确定性 kernel 精确计算 -> 可视化讲解输出。
+生产环境请使用公网且 `https` 的回调/跳转地址。微信 APIv3 相关配置保留为 legacy/deprecated，仅用于兼容回滚，不是充值主路径。
 
 ## 播放器快捷键
 
@@ -207,7 +177,7 @@ METAVIEW_ROUTER_REFINE_CONFIDENCE=0.55
 前端遵循 Feature-Sliced Design：
 
 - `shared/` 不得导入 `features/` 或 `pages/`。
-- `entities/` 不得导入 `features/`。
+- `entities/` 不得导入 `features`。
 - `features/` 之间禁止互相导入。
 - `engine/renderers/` 不得导入 `engine/player/` 或 `engine/composition/`。
 
@@ -218,7 +188,7 @@ METAVIEW_ROUTER_REFINE_CONFIDENCE=0.55
 3. 在 `renderers/registry.ts` 注册 renderer。
 4. 在 `apps/api/app/domain/models/playbook.py` 扩展 Python 类型。
 
-Remotion 尺寸和 FPS 必须从 `PLAYBOOK_DEFAULTS` 读取；组件内不要写死字面量。集成测试使用真实 SQLite，前端 API 测试使用 MSW 拦截网络。
+Director 相关字段不要塞回 Playbook step；DirectorScript 是独立契约。Remotion 尺寸和 FPS 必须从 `PLAYBOOK_DEFAULTS` 读取；组件内不要写死字面量。
 
 ## 关键文件
 
@@ -226,21 +196,24 @@ Remotion 尺寸和 FPS 必须从 `PLAYBOOK_DEFAULTS` 读取；组件内不要写
 |------|------|
 | `apps/api/app/config.py` | 后端配置入口 |
 | `apps/api/app/domain/models/playbook.py` | PlaybookScript, MetaStep, Snapshot 类型 |
-| `apps/api/app/domain/services/playbook_builder.py` | CIR → PlaybookScript 映射 |
+| `apps/api/app/domain/models/director.py` | DirectorScript, DirectorBeat, 镜头/节奏字段 |
+| `apps/api/app/domain/services/playbook_builder.py` | CIR -> PlaybookScript 映射 |
+| `apps/api/app/domain/services/director_builder.py` | PlaybookScript -> rule-based DirectorScript 映射 |
+| `apps/api/app/infrastructure/persistence/sqlite_director_repository.py` | DirectorScript 持久化 |
 | `apps/web/src/shared/config/constants.ts` | 前端配置常量 |
-| `apps/web/src/features/playbook/engine/types.ts` | 前端 PlaybookScript 类型 |
+| `apps/web/src/features/playbook/engine/types.ts` | 前端 PlaybookScript / DirectorScript 类型 |
 | `apps/web/src/features/playbook/engine/player/PlaybookPlayer.tsx` | Remotion 播放器入口 |
 | `apps/web/src/features/playbook/engine/renderers/registry.ts` | 渲染器注册表 |
 | `apps/web/src/features/playbook/engine/param-panels/registry.ts` | 参数面板注册表 |
 
 ## 文档
 
+- [`docs/START_HERE.md`](docs/START_HERE.md) - 当前项目入口
+- [`docs/director-layer.md`](docs/director-layer.md) - Director 独立导演层契约
 - [`docs/README.md`](docs/README.md) - 开发文档索引
-- [`docs/pipeline.md`](docs/pipeline.md) - CIR、PlaybookScript、时间轴和视频导出管线
+- [`docs/pipeline.md`](docs/pipeline.md) - 生成、PlaybookScript、DirectorScript 挂载点和导出管线
 - [`docs/frontend-shell.md`](docs/frontend-shell.md) - Stage 路由、GlobalTopbar、Studio 布局、Provider 配置
-- [`docs/html-css-implementation.md`](docs/html-css-implementation.md) - HTML/CSS 写法和项目对应关系
 - [`docs/remotion-skills.md`](docs/remotion-skills.md) - Remotion 组件、渲染器、注册表约定
 - [`docs/topic-routing.md`](docs/topic-routing.md) - 学科路由策略
-- [`docs/skill-ab-eval.md`](docs/skill-ab-eval.md) - specialized / generic skill 对比
-- [`docs/newapi-metaview-topup-integration.md`](docs/newapi-metaview-topup-integration.md) - NewAPI 跳转充值和 receipt 回兑接入
+- [`docs/agent-demo-acceptance.md`](docs/agent-demo-acceptance.md) - agent/runtime-tool 验收
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) - 分支策略、Conventional Commits、Hook
