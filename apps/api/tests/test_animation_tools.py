@@ -1,5 +1,7 @@
 """Tests for the Animation Tool Registry — macro expansion and CIR integration."""
 
+import pytest
+
 from app.domain.animation_tools import (
     expand_animation_call,
     expand_cir_animation_calls,
@@ -428,3 +430,27 @@ class TestRegistry:
         assert schema["properties"]["expression"]["minLength"] == 1
         assert "x_min" in schema["properties"]
         assert "x_max" in schema["properties"]
+
+    @pytest.mark.parametrize(
+        ("exc_type", "message"),
+        [(KeyboardInterrupt, "ctrl-c"), (SystemExit, "system exit")],
+    )
+    def test_safe_expand_animation_call_propagates_process_control_exceptions(
+        self,
+        exc_type: type[BaseException],
+        message: str,
+    ):
+        original = _REGISTRY.get("test.raise_base_exception")
+
+        def raise_base_exception(_args):
+            raise exc_type(message)
+
+        _REGISTRY["test.raise_base_exception"] = raise_base_exception
+        try:
+            with pytest.raises(exc_type, match=message):
+                safe_expand_animation_call("test.raise_base_exception", {})
+        finally:
+            if original is None:
+                _REGISTRY.pop("test.raise_base_exception", None)
+            else:
+                _REGISTRY["test.raise_base_exception"] = original

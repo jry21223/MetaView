@@ -1,28 +1,47 @@
 import React from "react";
-import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { PlaybookScript } from "../types";
 import { PlaybookPlayer } from "./PlaybookPlayer";
 
+const playerMockState = vi.hoisted(() => ({
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+  pause: vi.fn(),
+  play: vi.fn(),
+  seekTo: vi.fn(),
+}));
+
 vi.mock("@remotion/player", async () => {
   const React = await import("react");
   return {
     Player: React.forwardRef(function MockPlayer(
-      props: { inputProps?: { showSubtitles?: boolean } },
+      props: {
+        inputProps?: {
+          script?: PlaybookScript;
+          showSubtitles?: boolean;
+        };
+      },
       ref: React.ForwardedRef<unknown>,
     ) {
       React.useImperativeHandle(ref, () => ({
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        pause: vi.fn(),
-        play: vi.fn(),
-        seekTo: vi.fn(),
+        addEventListener: playerMockState.addEventListener,
+        removeEventListener: playerMockState.removeEventListener,
+        pause: playerMockState.pause,
+        play: playerMockState.play,
+        seekTo: playerMockState.seekTo,
       }));
+      const firstSnapshot = props.inputProps?.script?.steps[0]?.snapshot;
+      const arrayValues =
+        firstSnapshot?.kind === "algorithm_array" || firstSnapshot?.kind === "algorithm_bars"
+          ? firstSnapshot.array_values.join(",")
+          : "";
       return (
         <div
           data-testid="mock-remotion-player"
           data-show-subtitles={String(props.inputProps?.showSubtitles)}
+          data-array-values={arrayValues}
         />
       );
     }),
@@ -249,6 +268,21 @@ describe("PlaybookPlayer", () => {
     expect(container.querySelector(".playbook-player__mobile-sheet")).toBeTruthy();
   });
 
+  it("switches between desktop rail and portrait shell when layout mode changes", () => {
+    const { container, rerender } = render(
+      <PlaybookPlayer script={baseScript()} theme="light" layoutMode="desktop" />,
+    );
+
+    expect(container.querySelector(".playbook-player__rail")).toBeTruthy();
+    expect(container.querySelector(".playbook-player--portrait")).toBeNull();
+
+    rerender(<PlaybookPlayer script={baseScript()} theme="light" layoutMode="portrait" />);
+
+    expect(container.querySelector(".playbook-player__rail")).toBeNull();
+    expect(container.querySelector(".playbook-player--portrait")).toBeTruthy();
+    expect(container.querySelectorAll(".playbook-player__mobile-tabs button")).toHaveLength(5);
+  });
+
   it("shows only the active code context in the portrait code tab", () => {
     const script = baseScript({
       domain: "algorithm",
@@ -455,6 +489,71 @@ describe("PlaybookPlayer", () => {
     expect(getByText("Params")).toBeTruthy();
     expect(getByDisplayValue("3")).toBeTruthy();
     expect(getByDisplayValue("1")).toBeTruthy();
+  });
+
+  it("feeds replayed algorithm params back into the Remotion script props", async () => {
+    const script = baseScript({
+      domain: "algorithm",
+      algorithm_id: "bubble_sort",
+      initial_data: { array: ["3", "1", "2"] },
+      steps: [
+        {
+          ...baseScript().steps[0],
+          snapshot: {
+            kind: "algorithm_array",
+            array_values: ["3", "1", "2"],
+            active_indices: [],
+            swap_indices: [],
+            sorted_indices: [],
+            pointers: {},
+          },
+        },
+      ],
+    });
+    const { getByDisplayValue, getByTestId } = render(
+      <PlaybookPlayer script={script} theme="light" />,
+    );
+
+    expect(getByTestId("mock-remotion-player").getAttribute("data-array-values")).toBe(
+      "3,1,2",
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    fireEvent.change(getByDisplayValue("3"), { target: { value: "5" } });
+
+    await waitFor(() => {
+      expect(getByTestId("mock-remotion-player").getAttribute("data-array-values")).toBe(
+        "1,2,5",
+      );
+    });
+  });
+
+  it("wires mount play pause and unmount lifecycle to the Remotion player", async () => {
+    const { getByRole, unmount } = render(
+      <PlaybookPlayer script={baseScript()} theme="light" />,
+    );
+
+    await waitFor(() => {
+      expect(playerMockState.addEventListener).toHaveBeenCalledWith("play", expect.any(Function));
+      expect(playerMockState.addEventListener).toHaveBeenCalledWith("pause", expect.any(Function));
+    });
+
+    fireEvent.click(getByRole("button", { name: "播放" }));
+    expect(playerMockState.play).toHaveBeenCalledTimes(1);
+
+    const onPlay = playerMockState.addEventListener.mock.calls.find(
+      ([event]) => event === "play",
+    )?.[1] as (() => void) | undefined;
+    expect(onPlay).toBeTruthy();
+    act(() => onPlay?.());
+
+    fireEvent.click(getByRole("button", { name: "暂停" }));
+    expect(playerMockState.pause).toHaveBeenCalledTimes(1);
+
+    unmount();
+
+    expect(playerMockState.removeEventListener).toHaveBeenCalledWith("play", expect.any(Function));
+    expect(playerMockState.removeEventListener).toHaveBeenCalledWith("pause", expect.any(Function));
   });
 
   it("hides algorithm params when no replayable controls are available", () => {

@@ -29,21 +29,15 @@ export function FollowupCommitLog({
     return timeDelta || b.version_number - a.version_number;
   });
   const restoreDisabled = pending || restoringVersionId !== null || !canModify;
-  const restoreVersion = (versionId: string) => {
+  const restoreVersion = async (versionId: string) => {
     setRestoreError(null);
     setRestoringVersionId(versionId);
-    setExpanded(false);
     try {
-      const maybePromise = onRestore(versionId);
-      void Promise.resolve(maybePromise)
-        .catch((err) => {
-          setRestoreError(formatRestoreError(err));
-        })
-        .finally(() => {
-          setRestoringVersionId(null);
-        });
+      await onRestore(versionId);
+      setExpanded(false);
     } catch (err) {
       setRestoreError(formatRestoreError(err));
+    } finally {
       setRestoringVersionId(null);
     }
   };
@@ -96,7 +90,9 @@ export function FollowupCommitLog({
                 key={version.version_id}
                 type="button"
                 className={className}
-                onClick={() => restoreVersion(version.version_id)}
+                onClick={() => {
+                  void restoreVersion(version.version_id);
+                }}
                 disabled={restoreDisabled}
                 aria-label={`恢复版本 ${version.short_id}`}
               >
