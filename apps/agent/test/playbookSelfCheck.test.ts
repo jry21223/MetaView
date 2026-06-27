@@ -16,7 +16,7 @@ function makeStep(index: number): PlaybookOutput["steps"][number] {
   return {
     step_id: `step_${String(index).padStart(2, "0")}`,
     title: `Scan array ${index}`,
-    end_frame: index * 60,
+    end_frame: index * 300,
     narration_template: [`Scan the whole array in step ${index} and name the result.`],
     voiceover_text: `Scan the whole array in step ${index} and name the result.`,
     tokens: [],
@@ -85,6 +85,24 @@ describe("agent playbook self-check", () => {
     expect(codes).toContain("step.empty_voiceover");
     expect(codes).toContain("snapshot.empty_payload");
     expect(codes).toContain("timeline.exceeds_total_frames");
+  });
+
+  it("warns when narration is significantly longer than the step duration", () => {
+    const playbook = validPlaybook();
+    playbook.steps.forEach((step, index) => {
+      step.voiceover_text = index === playbook.steps.length - 1
+        ? `array ${"图".repeat(150)}`
+        : "array";
+      step.narration_template = ["array"];
+      step.end_frame = (index + 1) * 300;
+    });
+    playbook.total_frames = playbook.steps.at(-1)!.end_frame;
+
+    const report = selfCheckPlaybook(playbook, "Scan the array");
+    const codes = report.issues.map((issue) => issue.code);
+
+    expect(report.status).toBe("warnings");
+    expect(codes).toContain("timeline.voiceover_too_short");
   });
 
   it("blocks unsupported snapshot kinds and forbidden rendering paths", () => {

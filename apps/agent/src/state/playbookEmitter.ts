@@ -22,6 +22,12 @@ import type {
 
 const DEFAULT_FPS = 30;
 const DEFAULT_STEP_FRAMES = 120;
+const MIN_STEP_SECONDS = 5.5;
+const MAX_STEP_SECONDS = 12;
+const VOICEOVER_HOLD_SECONDS = 0.6;
+const CHINESE_CHAR_PER_SECOND = 4.8;
+const ENGLISH_WORD_PER_SECOND = 2.4;
+const FRAME_INCREMENT = 6;
 
 export class PlaybookEmitter {
   private skeleton: PlaybookSkeleton;
@@ -280,13 +286,12 @@ export class PlaybookEmitter {
       this.commitStep();
     }
     const fps = this.skeleton.fps;
-    const stepFrames = this.skeleton.step_frames;
     let cursor = 0;
     const steps = this.skeleton.steps.map((s) => {
-      cursor += stepFrames;
+      cursor += estimateStepFrames(s.voiceover_text, fps);
       return serializeStep(s, cursor);
     });
-    const total = Math.max(1, cursor);
+    const total = cursor;
     const out: PlaybookOutput = {
       fps,
       total_frames: total,
@@ -309,6 +314,26 @@ export class PlaybookEmitter {
     return this.currentStep;
   }
 
+}
+
+export function estimateStepFrames(text: string, fps: number): number {
+  if (!text.trim()) return DEFAULT_STEP_FRAMES;
+  const textFps = Number.isFinite(fps) && fps > 0 ? fps : DEFAULT_FPS;
+
+  const chineseChars = [...text.matchAll(/[\u4e00-\u9fff]/g)].length;
+  const englishWords = (text
+    .replace(/[\u4e00-\u9fff]/g, " ")
+    .match(/[A-Za-z0-9]+(?:['’][A-Za-z0-9]+)?/g)?.length) ?? 0;
+
+  const estimatedSeconds = Math.min(
+    MAX_STEP_SECONDS,
+    Math.max(
+      MIN_STEP_SECONDS,
+      chineseChars / CHINESE_CHAR_PER_SECOND + englishWords / ENGLISH_WORD_PER_SECOND + VOICEOVER_HOLD_SECONDS,
+    ),
+  );
+  const estimatedFrames = estimatedSeconds * textFps;
+  return Math.max(FRAME_INCREMENT, Math.ceil(estimatedFrames / FRAME_INCREMENT) * FRAME_INCREMENT);
 }
 
 /** Derive the rendered visual kind from a step's accumulated content. Pure,

@@ -1,4 +1,5 @@
 import type { PlaybookOutput } from "./types.js";
+import { estimateStepFrames } from "./playbookEmitter.js";
 
 export type SelfCheckStatus = "clean" | "warnings" | "blocked";
 export type SelfCheckSeverity = "warning" | "error";
@@ -126,6 +127,17 @@ function checkTiming(playbook: PlaybookOutput, issues: SelfCheckIssue[]): void {
         "Step end_frame values must be strictly increasing.",
         "Increase each step end_frame beyond the previous step.",
       ));
+    }
+    const stepDuration = step.end_frame - previousEnd;
+    const estimatedFrames = estimateStepFrames(step.voiceover_text, playbook.fps);
+    if (step.voiceover_text.trim() && stepDuration < estimatedFrames - 12) {
+      issues.push(issue(
+        "timeline.voiceover_too_short",
+        "warning",
+        `steps[${index}].end_frame`,
+        `Step duration (${stepDuration} frame${stepDuration === 1 ? "" : "s"}) appears shorter than the estimated narration requirement (${estimatedFrames} frames).`,
+        "Increase this step duration or shorten the narration_text so subtitles can remain aligned.",
+        ));
     }
     previousEnd = step.end_frame;
   });
