@@ -389,7 +389,9 @@ def test_ops_pipeline_refunds_balance_when_generation_fails(monkeypatch, tmp_pat
     assert _ledger_count(db, session.account.user_id, "refund") == 1
 
 
-def test_ops_agent_pipeline_fails_when_reviewer_missing(monkeypatch, tmp_path) -> None:
+def test_ops_agent_pipeline_skips_missing_reviewer_after_clean_self_check(
+    monkeypatch, tmp_path
+) -> None:
     get_settings.cache_clear()
     db = str(tmp_path / "ops-agent-reviewer.db")
     init_db(db)
@@ -420,14 +422,15 @@ def test_ops_agent_pipeline_fails_when_reviewer_missing(monkeypatch, tmp_path) -
     get_settings.cache_clear()
     assert resp.status_code == 202
     assert run is not None
-    assert run.status == PipelineRunStatus.FAILED
-    assert run.playbook is None
+    assert run.status == PipelineRunStatus.SUCCEEDED
+    assert run.playbook is not None
     assert run.review is not None
-    assert run.review.status == "blocked"
-    assert run.review.issues[0].code == "reviewer.unconfigured"
-    assert _balance(db, session.account.user_id) == 20
+    assert run.review.status in {"clean", "warnings"}
+    assert "reviewer:skipped_on_clean_self_check" in run.review.actions
+    assert all(issue.code != "reviewer.unconfigured" for issue in run.review.issues)
+    assert _balance(db, session.account.user_id) == 10
     assert _ledger_count(db, session.account.user_id, "consume") == 1
-    assert _ledger_count(db, session.account.user_id, "refund") == 1
+    assert _ledger_count(db, session.account.user_id, "refund") == 0
 
 
 def test_get_run_includes_active_director_after_success(client) -> None:
