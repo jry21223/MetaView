@@ -105,8 +105,9 @@
 .mv-main--player {
   grid-template-columns: minmax(0, 1fr);
   gap: 0;
+  --player-top-pad: 2px;
   padding:
-    clamp(10px, 1.6vw, 24px)
+    var(--player-top-pad)
     clamp(10px, 1.6vw, 24px)
     var(--mv-safe-bottom);
   background:

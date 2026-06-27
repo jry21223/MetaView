@@ -24,7 +24,14 @@
   border-radius: 0;
   box-shadow: none;
   overflow: visible;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    "Noto Sans SC",
+    sans-serif;
 }
 
 .playbook-player--no-console {
@@ -50,7 +57,7 @@
   height: 100%;
   color: var(--ink-3);
   font-size: 14px;
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
 }
 
 .playbook-player__rail {
@@ -135,7 +142,7 @@
   display: grid;
   gap: 6px;
   justify-items: center;
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
   color: var(--player-accent);
 }
 
@@ -188,7 +195,7 @@
 .playbook-player__rail-head span,
 .playbook-player__lesson-title span,
 .playbook-player__console-head small {
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 10px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -232,7 +239,7 @@
 }
 
 .playbook-player__rail-step span {
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 10px;
   color: var(--player-accent);
 }
@@ -381,7 +388,7 @@
   border-radius: 6px;
   background: var(--player-paper-strong);
   color: var(--player-ink-2);
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 10px;
   line-height: 1.2;
   text-transform: uppercase;
@@ -747,7 +754,7 @@
 }
 
 .playbook-player__code-empty span {
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
   color: var(--player-accent);
 }
 
@@ -1441,10 +1448,13 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
 
-.math-param-panel[data-theme='dark'] {
+.math-param-panel[data-theme="dark"] {
   --math-param-bg: #0e1513;
   --math-param-panel: rgba(255, 255, 255, 0.04);
   --math-param-border: rgba(255, 255, 255, 0.12);
@@ -1578,7 +1588,7 @@
   background: var(--math-param-panel);
   color: var(--math-param-text);
   padding: 4px 6px;
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 12px;
 }
 
@@ -1590,7 +1600,7 @@
 }
 
 .math-param-panel__value {
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 12px;
   width: 56px;
   text-align: right;
@@ -1624,7 +1634,10 @@
   justify-content: center;
   gap: 22px;
   padding: 40px 56px;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
   background: var(--mfr-bg);
   color: var(--mfr-text);
   position: relative;
@@ -1665,8 +1678,71 @@
     linear-gradient(var(--mfr-grid) 1px, transparent 1px),
     linear-gradient(90deg, var(--mfr-grid) 1px, transparent 1px);
   background-size: 64px 64px;
-  mask-image: linear-gradient(to bottom, transparent, black 18%, black 82%, transparent);
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    black 18%,
+    black 82%,
+    transparent
+  );
   pointer-events: none;
+}
+
+.math-formula-renderer__progressive {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: min(900px, 100%);
+  min-height: 210px;
+  font-size: 34px;
+  line-height: 1.3;
+  text-align: center;
+  will-change: opacity;
+  transform: translateZ(0);
+  z-index: 1;
+}
+
+.math-formula-renderer__progressive-line {
+  width: 100%;
+  min-height: 46px;
+  padding: 3px 12px;
+  border-radius: 6px;
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease;
+  will-change: opacity;
+}
+
+.math-formula-renderer__progressive-line .katex {
+  font-size: 1em;
+}
+
+.math-formula-renderer__progressive-line--highlighted {
+  background: color-mix(in srgb, var(--mfr-accent) 18%, transparent);
+  box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--mfr-accent) 70%, transparent);
+}
+
+.math-formula-renderer__debug-construction {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 3;
+  display: grid;
+  gap: 2px;
+  max-width: min(460px, calc(100% - 32px));
+  padding: 8px 10px;
+  border: 1px solid var(--mfr-panel-border);
+  border-radius: 6px;
+  background: var(--mfr-panel);
+  color: var(--mfr-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.35;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .math-formula-renderer::after {
@@ -1779,7 +1855,10 @@
   justify-content: stretch;
   padding: 28px 36px 24px;
   gap: 12px;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
   background: var(--msr-bg);
   color: var(--msr-text);
   position: relative;
@@ -1926,6 +2005,22 @@
   color: #141820;
 }
 
+.katex-overlay__progressive {
+  display: grid;
+  gap: 4px;
+}
+
+.katex-overlay__progressive-line {
+  border-radius: 4px;
+  padding: 1px 4px;
+  will-change: opacity;
+}
+
+.katex-overlay__progressive-line--highlighted {
+  background: rgba(255, 216, 77, 0.18);
+  box-shadow: inset 0 -2px 0 rgba(255, 216, 77, 0.7);
+}
+
 /* ── Narration Card (Layer kind=narration_card) ────────────────────────── */
 .narration-card {
   position: absolute;
@@ -1934,7 +2029,10 @@
   max-width: 70%;
   padding: 12px 18px;
   border-radius: 10px;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
   font-size: 16px;
   line-height: 1.5;
   pointer-events: none;
