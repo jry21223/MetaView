@@ -537,6 +537,18 @@ class RunPipelineUseCase:
             )
 
         if self._reviewer_llm is None:
+            should_require_reviewer = self._reviewer_mode == "always" or (
+                self._reviewer_mode == "math_always" and route_context.decision.domain == "math"
+            )
+            if (
+                not should_require_reviewer
+                and review_report.status
+                in {PlaybookReviewStatus.CLEAN, PlaybookReviewStatus.WARNINGS}
+            ):
+                return playbook, _with_playbook_review_actions(
+                    review_report,
+                    [*review_report.actions, "reviewer:skipped_on_clean_self_check"],
+                )
             raise PipelineValidationError(_missing_playbook_reviewer_verdict(review_report))
 
         review_report = _with_playbook_review_actions(

@@ -362,7 +362,31 @@ async def test_agent_mode_records_domain_agent_skill_action() -> None:
 
 
 @pytest.mark.asyncio
-async def test_agent_mode_missing_reviewer_fails_when_reviewer_enabled() -> None:
+async def test_agent_mode_missing_reviewer_fails_when_reviewer_always_enabled() -> None:
+    repo = _RecordingRepo()
+    agent = _FakeAgent(_MIN_PLAYBOOK)
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        agent_provider=agent,
+        generation_mode="agent",
+        reviewer_mode="always",
+    )
+
+    await use_case.execute("run-reviewer-missing", PipelineRequest(prompt="Show the array"))
+
+    last = repo.updates[-1]
+    assert last["status"].value == "failed"
+    assert "reviewer.unconfigured" in last["error"]
+    assert "playbook_json" not in last
+    review = json.loads(last["review_json"])
+    assert review["status"] == "blocked"
+    assert review["issues"][0]["code"] == "reviewer.unconfigured"
+    assert "reviewer:unconfigured" in review["actions"]
+
+
+@pytest.mark.asyncio
+async def test_agent_mode_on_failure_without_reviewer_skips_clean_self_check() -> None:
     repo = _RecordingRepo()
     agent = _FakeAgent(_MIN_PLAYBOOK)
     use_case = RunPipelineUseCase(
@@ -374,6 +398,34 @@ async def test_agent_mode_missing_reviewer_fails_when_reviewer_enabled() -> None
     )
 
     await use_case.execute("run-reviewer-missing", PipelineRequest(prompt="Show the array"))
+
+    last = repo.updates[-1]
+    assert last["status"].value == "succeeded"
+    assert "playbook_json" in last
+    review = json.loads(last["review_json"])
+    assert review["status"] == "clean"
+    assert "agent:self_check:clean" in review["actions"]
+    assert "reviewer:skipped_on_clean_self_check" in review["actions"]
+    assert "reviewer:unconfigured" not in review["actions"]
+    assert "reviewer:status:blocked" not in review["actions"]
+
+
+@pytest.mark.asyncio
+async def test_agent_mode_math_always_requires_reviewer_in_math_domain() -> None:
+    repo = _RecordingRepo()
+    agent = _FakeAgent(_MIN_PLAYBOOK)
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        agent_provider=agent,
+        generation_mode="agent",
+        reviewer_mode="math_always",
+    )
+
+    await use_case.execute(
+        "run-reviewer-math-requires-reviewer",
+        PipelineRequest(prompt="Show the integral", domain="math"),
+    )
 
     last = repo.updates[-1]
     assert last["status"].value == "failed"
