@@ -222,7 +222,13 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
   if (!step || !directorFrame) return null;
 
   const cameraTransform = directorFrame.stage.transform;
-  const subtitleText = directorFrame.voiceoverText ?? step.voiceover_text;
+  const directorVoiceoverText = directorFrame.voiceoverText;
+  const directorBeatHasVoiceover = Boolean(directorVoiceoverText?.trim());
+  const shouldShowDirectorVoiceover =
+    directorFrame.activeBeat != null &&
+    directorFrame.activeBeat.end_frame - directorFrame.activeBeat.start_frame >= 60 &&
+    directorBeatHasVoiceover;
+  const subtitleText = shouldShowDirectorVoiceover ? directorVoiceoverText : step.voiceover_text;
   const hasCodeTrack = showInlineCode && step.code_highlight != null;
   const subtitleHeight = PLAYBOOK_LAYOUT.SUBTITLE_HEIGHT;
   const vizRatio = PLAYBOOK_LAYOUT.VIZ_SPLIT_RATIO;

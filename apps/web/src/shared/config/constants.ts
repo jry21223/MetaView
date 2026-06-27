@@ -27,7 +27,7 @@ export const PLAYBOOK_LAYOUT = {
   /** Maximum number of subtitle lines before truncating with ellipsis. */
   SUBTITLE_MAX_LINES: 3,
   /** Frames for subtitle fade-in at the start of each step */
-  SUBTITLE_FADE_FRAMES: 6,
+  SUBTITLE_FADE_FRAMES: 12,
 } as const;
 
 /**
