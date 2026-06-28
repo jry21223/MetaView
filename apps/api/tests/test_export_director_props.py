@@ -89,6 +89,52 @@ async def test_export_input_props_omits_director_when_missing(tmp_path) -> None:
     assert "director" not in use_case.input_props
 
 
+@pytest.mark.asyncio
+async def test_export_input_props_uses_version_director_when_requested(tmp_path) -> None:
+    db = str(tmp_path / "export-version.db")
+    init_db(db)
+    run_repo = SqliteRunRepository(db)
+    director_repo = SqliteRunDirectorRepository(db)
+    export_repo = InMemoryExportJobRepository()
+    await _seed_run(run_repo, "run-3")
+    await director_repo.upsert(_director("run-3"), "2026-06-05T00:00:00+00:00")
+    version_director = _director("run-3", camera_motion="pan_right")
+    await run_repo.append_version(
+        "run-3",
+        version_id="version-1",
+        playbook_json=json.dumps(
+            {**_playbook(), "title": "Version export fixture"},
+            ensure_ascii=False,
+        ),
+        source="followup",
+        followup_id=None,
+        parent_version_id=None,
+        summary="director patch",
+        created_at="2026-06-05T00:01:00+00:00",
+        director_json=version_director.model_dump_json(),
+    )
+    await export_repo.create(_job("job-3", "run-3"))
+    use_case = RecordingExportVideoUseCase(
+        export_repo,
+        run_repo,
+        director_repo,
+        web_app_dir=tmp_path,
+        artifacts_dir=tmp_path / "artifacts",
+    )
+
+    await use_case.execute(
+        "job-3",
+        "run-3",
+        with_audio=False,
+        tts=None,
+        version_id="version-1",
+    )
+
+    assert use_case.input_props is not None
+    assert use_case.input_props["script"]["title"] == "Version export fixture"
+    assert use_case.input_props["director"]["beats"][0]["camera_motion"] == "pan_right"
+
+
 async def _seed_run(repo: SqliteRunRepository, run_id: str) -> None:
     await repo.create(run_id, "prompt", "2026-06-05T00:00:00+00:00")
     await repo.update(
@@ -98,7 +144,7 @@ async def _seed_run(repo: SqliteRunRepository, run_id: str) -> None:
     )
 
 
-def _director(run_id: str) -> DirectorScript:
+def _director(run_id: str, *, camera_motion: str = "push_in") -> DirectorScript:
     return DirectorScript(
         run_id=run_id,
         beats=[
@@ -109,7 +155,7 @@ def _director(run_id: str) -> DirectorScript:
                 end_frame=60,
                 intent="hook",
                 shot_type="medium",
-                camera_motion="push_in",
+                camera_motion=camera_motion,
                 pacing="normal",
                 voiceover_text="Director narration.",
             )

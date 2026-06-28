@@ -22,10 +22,12 @@ def test_export_request_accepts_explicit_options() -> None:
     req = ExportRequest.model_validate(
         {
             "run_id": "r1",
+            "version_id": "v1",
             "with_audio": False,
             "options": {"quality": "2k", "fps": 60, "format": "webm"},
         }
     )
+    assert req.version_id == "v1"
     assert req.options is not None
     assert req.options.quality == "2k"
     assert req.options.fps == 60

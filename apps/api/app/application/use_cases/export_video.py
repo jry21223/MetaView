@@ -28,7 +28,9 @@ import httpx
 from app.application.ports.director_repository import IRunDirectorRepository
 from app.application.ports.export_repository import IExportJobRepository
 from app.application.ports.run_repository import IRunRepository
+from app.domain.models.director import DirectorScript
 from app.domain.models.export_job import ExportJobStatus, ExportOptions, TtsConfig
+from app.domain.models.playbook import PlaybookScript
 
 _RENDER_TAIL_LINES = 40
 
@@ -65,14 +67,14 @@ class ExportVideoUseCase:
         with_audio: bool,
         tts: TtsConfig | None,
         options: ExportOptions | None = None,
+        version_id: str | None = None,
     ) -> None:
         try:
-            run = await self._runs.get(run_id)
-            if run is None or run.playbook is None:
-                raise ValueError(f"Run {run_id!r} has no playbook to export")
-
-            playbook = run.playbook.model_dump()
-            director = await self._get_export_director(run_id)
+            playbook_model, director = await self._get_export_payload(
+                run_id,
+                version_id=version_id,
+            )
+            playbook = playbook_model.model_dump()
 
             job_dir = self._artifacts / job_id
             job_dir.mkdir(parents=True, exist_ok=True)
@@ -134,7 +136,31 @@ class ExportVideoUseCase:
                 error=str(exc),
             )
 
-    async def _get_export_director(self, run_id: str):
+    async def _get_export_payload(
+        self,
+        run_id: str,
+        *,
+        version_id: str | None,
+    ) -> tuple[PlaybookScript, DirectorScript | None]:
+        if version_id is not None:
+            playbook_json = await self._runs.get_version_playbook(run_id, version_id)
+            if playbook_json is None:
+                raise ValueError(f"Version {version_id!r} not found for run {run_id!r}")
+            playbook = PlaybookScript.model_validate_json(playbook_json)
+            director_json = await self._runs.get_version_director(run_id, version_id)
+            director = (
+                DirectorScript.model_validate_json(director_json)
+                if director_json is not None
+                else await self._get_export_director(run_id)
+            )
+            return playbook, director
+
+        run = await self._runs.get(run_id)
+        if run is None or run.playbook is None:
+            raise ValueError(f"Run {run_id!r} has no playbook to export")
+        return run.playbook, await self._get_export_director(run_id)
+
+    async def _get_export_director(self, run_id: str) -> DirectorScript | None:
         try:
             return await self._directors.get(run_id)
         except Exception:  # noqa: BLE001 - export falls back to playbook-only props.

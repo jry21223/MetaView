@@ -29,6 +29,7 @@ export interface ExportOptions {
 
 export interface ExportRequestBody {
   run_id: string;
+  version_id?: string | null;
   with_audio: boolean;
   tts?: ExportTtsConfig;
   options?: ExportOptions;

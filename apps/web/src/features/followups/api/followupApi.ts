@@ -51,6 +51,7 @@ export async function submitRunFollowUp(
   messages: FollowUpChatMessage[],
   provider?: ProviderSettings,
   signal?: AbortSignal,
+  baseVersionId?: string | null,
 ): Promise<FollowUpResponse> {
   const response = await fetch(`${API_BASE_URL}/api/v1/runs/${runId}/follow-up`, {
     method: "POST",
@@ -59,6 +60,7 @@ export async function submitRunFollowUp(
     body: JSON.stringify({
       message,
       messages,
+      base_version_id: baseVersionId ?? null,
       provider_api_key: provider?.apiKey || null,
       provider_base_url: provider?.baseUrl || null,
       provider_model: provider?.model || null,
