@@ -19,6 +19,7 @@ def _create_pipeline_runs(conn: sqlite3.Connection) -> None:
         )
     """)
     _add_column_if_missing(conn, "pipeline_runs", "user_id", "TEXT")
+    _add_column_if_missing(conn, "pipeline_runs", "active_version_id", "TEXT")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS pipeline_run_followups (
             followup_id    TEXT PRIMARY KEY,
@@ -38,6 +39,7 @@ def _create_pipeline_runs(conn: sqlite3.Connection) -> None:
             run_id        TEXT NOT NULL,
             version_number INTEGER NOT NULL,
             playbook_json TEXT NOT NULL,
+            director_json TEXT,
             source        TEXT NOT NULL,
             followup_id   TEXT,
             parent_version_id TEXT,
@@ -50,6 +52,7 @@ def _create_pipeline_runs(conn: sqlite3.Connection) -> None:
     """)
     _add_column_if_missing(conn, "pipeline_run_versions", "parent_version_id", "TEXT")
     _add_column_if_missing(conn, "pipeline_run_versions", "summary", "TEXT")
+    _add_column_if_missing(conn, "pipeline_run_versions", "director_json", "TEXT")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS pipeline_run_directors (
             run_id        TEXT PRIMARY KEY,

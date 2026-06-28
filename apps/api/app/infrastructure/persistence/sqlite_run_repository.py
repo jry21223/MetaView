@@ -140,7 +140,11 @@ class SqliteRunRepository:
         return await asyncio.to_thread(_sync)
 
     async def ensure_initial_version(
-        self, run_id: str, playbook_json: str, created_at: str
+        self,
+        run_id: str,
+        playbook_json: str,
+        created_at: str,
+        director_json: str | None = None,
     ) -> str:
         def _sync() -> str:
             with self._connect() as conn:
@@ -154,10 +158,23 @@ class SqliteRunRepository:
                 version_id = f"{run_id}:v0"
                 conn.execute(
                     "INSERT INTO pipeline_run_versions"
-                    " (version_id, run_id, version_number, playbook_json,"
+                    " (version_id, run_id, version_number, playbook_json, director_json,"
                     " source, followup_id, parent_version_id, summary, created_at)"
-                    " VALUES (?, ?, 0, ?, 'initial', NULL, NULL, ?, ?)",
-                    (version_id, run_id, playbook_json, "initial playbook", created_at),
+                    " VALUES (?, ?, 0, ?, ?, 'initial', NULL, NULL, ?, ?)",
+                    (
+                        version_id,
+                        run_id,
+                        playbook_json,
+                        director_json,
+                        "initial playbook",
+                        created_at,
+                    ),
+                )
+                conn.execute(
+                    "UPDATE pipeline_runs"
+                    " SET active_version_id=COALESCE(active_version_id, ?)"
+                    " WHERE run_id=?",
+                    (version_id, run_id),
                 )
                 conn.commit()
                 return version_id
@@ -207,6 +224,7 @@ class SqliteRunRepository:
         parent_version_id: str | None,
         summary: str,
         created_at: str,
+        director_json: str | None = None,
     ) -> int:
         def _sync() -> int:
             with self._connect() as conn:
@@ -218,20 +236,25 @@ class SqliteRunRepository:
                 version_number = int(row["next_number"] if row is not None else 0)
                 conn.execute(
                     "INSERT INTO pipeline_run_versions"
-                    " (version_id, run_id, version_number, playbook_json,"
+                    " (version_id, run_id, version_number, playbook_json, director_json,"
                     " source, followup_id, parent_version_id, summary, created_at)"
-                    " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         version_id,
                         run_id,
                         version_number,
                         playbook_json,
+                        director_json,
                         source,
                         followup_id,
                         parent_version_id,
                         summary,
                         created_at,
                     ),
+                )
+                conn.execute(
+                    "UPDATE pipeline_runs SET active_version_id=? WHERE run_id=?",
+                    (version_id, run_id),
                 )
                 conn.commit()
                 return version_number
@@ -261,9 +284,32 @@ class SqliteRunRepository:
 
         return await asyncio.to_thread(_sync)
 
+    async def get_version_director(self, run_id: str, version_id: str) -> str | None:
+        def _sync() -> str | None:
+            with self._connect() as conn:
+                row = conn.execute(
+                    "SELECT director_json FROM pipeline_run_versions"
+                    " WHERE run_id=? AND version_id=?",
+                    (run_id, version_id),
+                ).fetchone()
+                if row is None or not row["director_json"]:
+                    return None
+                return str(row["director_json"])
+
+        return await asyncio.to_thread(_sync)
+
     async def get_head_version_id(self, run_id: str) -> str | None:
         def _sync() -> str | None:
             with self._connect() as conn:
+                active_version = conn.execute(
+                    "SELECT active_version_id FROM pipeline_runs WHERE run_id=?",
+                    (run_id,),
+                ).fetchone()
+                if (
+                    active_version is not None
+                    and active_version["active_version_id"]
+                ):
+                    return str(active_version["active_version_id"])
                 active = conn.execute(
                     "SELECT playbook_json FROM pipeline_runs WHERE run_id=?",
                     (run_id,),
@@ -291,6 +337,17 @@ class SqliteRunRepository:
 
         return await asyncio.to_thread(_sync)
 
+    async def set_head_version(self, run_id: str, version_id: str | None) -> None:
+        def _sync() -> None:
+            with self._connect() as conn:
+                conn.execute(
+                    "UPDATE pipeline_runs SET active_version_id=? WHERE run_id=?",
+                    (version_id, run_id),
+                )
+                conn.commit()
+
+        await asyncio.to_thread(_sync)
+
     async def list_followups(self, run_id: str) -> list[RunFollowUpRecord]:
         def _sync() -> list[sqlite3.Row]:
             with self._connect() as conn:
@@ -306,6 +363,15 @@ class SqliteRunRepository:
     async def list_versions(self, run_id: str) -> list[RunVersionRecord]:
         def _sync() -> tuple[list[sqlite3.Row], str | None]:
             with self._connect() as conn:
+                active_version = conn.execute(
+                    "SELECT active_version_id FROM pipeline_runs WHERE run_id=?",
+                    (run_id,),
+                ).fetchone()
+                active_version_id = (
+                    str(active_version["active_version_id"])
+                    if active_version is not None and active_version["active_version_id"]
+                    else None
+                )
                 active = conn.execute(
                     "SELECT playbook_json FROM pipeline_runs WHERE run_id=?",
                     (run_id,),
@@ -323,7 +389,7 @@ class SqliteRunRepository:
                         " ORDER BY version_number DESC LIMIT 1",
                         (run_id, active_playbook_json),
                     ).fetchone()
-                if head is None:
+                if head is None and active_version_id is None:
                     head = conn.execute(
                         "SELECT version_id FROM pipeline_run_versions"
                         " WHERE run_id=? ORDER BY version_number DESC LIMIT 1",
@@ -339,7 +405,11 @@ class SqliteRunRepository:
                     " WHERE v.run_id=? ORDER BY v.created_at ASC, v.version_number ASC",
                     (run_id,),
                 ).fetchall()
-                head_version_id = str(head["version_id"]) if head is not None else None
+                head_version_id = (
+                    active_version_id
+                    if active_version_id is not None
+                    else str(head["version_id"]) if head is not None else None
+                )
                 return rows, head_version_id
 
         rows, head_version_id = await asyncio.to_thread(_sync)

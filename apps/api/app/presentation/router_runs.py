@@ -25,6 +25,7 @@ from app.application.use_cases.account import AccountUseCase, InsufficientBalanc
 from app.application.use_cases.follow_up import FollowUpPatchError, FollowUpPatchUseCase
 from app.config import Settings, get_settings
 from app.domain.models.account import SessionAccount
+from app.domain.models.director import DirectorScript
 from app.domain.models.playbook import PlaybookScript
 from app.domain.services.director_builder import build_default_director
 from app.infrastructure.llm.openai_provider import OpenAIProvider
@@ -135,6 +136,11 @@ async def submit_followup(
                 status_code=404, detail=f"Run {run_id!r} has no playbook"
             )
         base_playbook = run.playbook
+        base_director = await _resolve_base_director(
+            run_id,
+            base_playbook,
+            director_repo,
+        )
         parent_version_id = payload.base_version_id
         if payload.base_version_id:
             base_json = await run_repo.get_version_playbook(run_id, payload.base_version_id)
@@ -147,6 +153,13 @@ async def submit_followup(
                 base_playbook = PlaybookScript.model_validate_json(base_json)
             except ValueError as exc:
                 raise HTTPException(status_code=422, detail="Stored version is invalid") from exc
+            base_director = await _resolve_base_director(
+                run_id,
+                base_playbook,
+                director_repo,
+                run_repo=run_repo,
+                version_id=payload.base_version_id,
+            )
 
         effective_llm = _resolve_followup_llm(payload, settings, llm)
         use_case = FollowUpPatchUseCase(
@@ -165,7 +178,7 @@ async def submit_followup(
                 raise HTTPException(status_code=402, detail=str(exc)) from exc
         try:
             try:
-                result = await use_case.execute(base_playbook, payload)
+                result = await use_case.execute(base_playbook, payload, base_director)
             except FollowUpPatchError as exc:
                 raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -182,13 +195,29 @@ async def submit_followup(
             )
             version_id = None
             director = None
-            if result.playbook is not None:
+            response_playbook = None
+            if result.playbook is not None or result.director is not None:
+                response_playbook = result.playbook or base_playbook
+                director = result.director or build_default_director(
+                    response_playbook,
+                    run_id,
+                )
                 current_json = run.playbook.model_dump_json()
-                await run_repo.ensure_initial_version(run_id, current_json, now)
+                current_director = await _resolve_base_director(
+                    run_id,
+                    run.playbook,
+                    director_repo,
+                )
+                await run_repo.ensure_initial_version(
+                    run_id,
+                    current_json,
+                    now,
+                    director_json=current_director.model_dump_json(),
+                )
                 if parent_version_id is None:
                     parent_version_id = await run_repo.get_head_version_id(run_id)
                 version_id = str(uuid.uuid4())
-                next_json = result.playbook.model_dump_json()
+                next_json = response_playbook.model_dump_json()
                 await run_repo.append_version(
                     run_id,
                     version_id=version_id,
@@ -198,10 +227,10 @@ async def submit_followup(
                     parent_version_id=parent_version_id,
                     summary=result.change_summary,
                     created_at=now,
+                    director_json=director.model_dump_json(),
                 )
                 await run_repo.attach_followup_version(followup_id, version_id)
                 await run_repo.update_playbook_json(run_id, next_json)
-                director = build_default_director(result.playbook, run_id)
                 await director_repo.upsert(director, now)
         except Exception:
             if owner is not None:
@@ -212,11 +241,11 @@ async def submit_followup(
             raise
 
     return FollowUpResponse(
-        kind="patch" if result.playbook is not None else "reply",
+        kind="patch" if response_playbook is not None else "reply",
         reply=result.reply,
         change_summary=result.change_summary,
         version_id=version_id,
-        playbook=result.playbook,
+        playbook=response_playbook,
         director=director,
     )
 
@@ -250,8 +279,15 @@ async def restore_version(
             raise HTTPException(status_code=422, detail="Stored version is invalid") from exc
         now = _now()
         await run_repo.update_playbook_json(run_id, playbook.model_dump_json())
-        director = build_default_director(playbook, run_id)
+        director = await _resolve_base_director(
+            run_id,
+            playbook,
+            director_repo,
+            run_repo=run_repo,
+            version_id=version_id,
+        )
         await director_repo.upsert(director, now)
+        await run_repo.set_head_version(run_id, version_id)
 
     return RestoreVersionResponse(
         version_id=version_id,
@@ -294,6 +330,30 @@ def _resolve_followup_llm(
         max_tokens=settings.openai_max_tokens,
         reasoning_effort=settings.openai_reasoning_effort,
     )
+
+
+async def _resolve_base_director(
+    run_id: str,
+    playbook: PlaybookScript,
+    director_repo: IRunDirectorRepository,
+    *,
+    run_repo: IRunRepository | None = None,
+    version_id: str | None = None,
+) -> DirectorScript:
+    if run_repo is not None and version_id is not None:
+        director_json = await run_repo.get_version_director(run_id, version_id)
+        if director_json is not None:
+            try:
+                return DirectorScript.model_validate_json(director_json)
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Stored version director is invalid",
+                ) from exc
+    active = await director_repo.get(run_id)
+    if active is not None:
+        return active
+    return build_default_director(playbook, run_id)
 
 
 def _now() -> str:
