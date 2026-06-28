@@ -2,7 +2,7 @@ import React from "react";
 import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { PlaybookScript } from "../types";
+import type { DirectorScript, PlaybookScript } from "../types";
 import { PlaybookPlayer } from "./PlaybookPlayer";
 
 vi.mock("@remotion/player", async () => {
@@ -82,6 +82,39 @@ function baseScript(overrides: Partial<PlaybookScript> = {}): PlaybookScript {
   };
 }
 
+function director(): DirectorScript {
+  return {
+    schema_version: "1.0.0",
+    source: "manual",
+    run_id: "run-1",
+    beats: [
+      {
+        beat_id: "beat_01",
+        step_id: "s1",
+        start_frame: 0,
+        end_frame: 45,
+        intent: "hook",
+        shot_type: "wide",
+        camera_motion: "hold",
+        pacing: "normal",
+        emphasis_terms: [],
+      },
+      {
+        beat_id: "beat_02",
+        step_id: "s2",
+        start_frame: 45,
+        end_frame: 90,
+        intent: "focus",
+        shot_type: "close",
+        camera_motion: "push_in",
+        pacing: "slow",
+        emphasis_terms: ["参数"],
+        focus_target: "formula",
+      },
+    ],
+  };
+}
+
 describe("PlaybookPlayer", () => {
   afterEach(() => {
     cleanup();
@@ -141,6 +174,19 @@ describe("PlaybookPlayer", () => {
     expect(getByText("Params")).toBeTruthy();
     expect(getByTestId("followup-slot")).toBeTruthy();
     expect(getByText("Ask a follow-up")).toBeTruthy();
+  });
+
+  it("shows the current Director beat in the learning console", () => {
+    const { getAllByText, getByText } = render(
+      <PlaybookPlayer script={baseScript()} director={director()} theme="light" />,
+    );
+
+    expect(getByText("Director")).toBeTruthy();
+    expect(getAllByText("manual").length).toBeGreaterThan(0);
+    expect(getByText("beat_01")).toBeTruthy();
+    expect(getByText("hook")).toBeTruthy();
+    expect(getByText("hold")).toBeTruthy();
+    expect(getByText("0-45")).toBeTruthy();
   });
 
   it("keeps the narration panel above controls and moves playback options into settings", () => {

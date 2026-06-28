@@ -7,6 +7,7 @@ import { resolveEffectiveVoiceover } from "./voiceover";
 
 export interface StageDirectorPlan {
   transform?: string;
+  pacing?: DirectorBeat["pacing"];
   reason: string;
 }
 
@@ -57,6 +58,7 @@ export function buildDirectorFramePlan(context: DirectorFrameContext): DirectorF
     localProgress,
     stage: {
       transform: result.stageTransform,
+      pacing: beat?.pacing,
       reason: result.reason,
     },
     mathScene: result.mathScene ?? null,

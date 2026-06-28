@@ -275,6 +275,7 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
         >
           <div
             data-camera-motion={directorFrame.activeBeat?.camera_motion}
+            data-director-pacing={directorFrame.stage.pacing}
             data-director-adapter={directorFrame.debug.adapter}
             style={{
               width: "100%",

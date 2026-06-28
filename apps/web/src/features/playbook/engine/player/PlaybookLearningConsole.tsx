@@ -1,9 +1,10 @@
 import React from "react";
 
-import type { CodeHighlightOverlay, PlaybookScript } from "../types";
+import type { CodeHighlightOverlay, DirectorScript, PlaybookScript } from "../types";
 import { CodeHighlightRenderer } from "../renderers/CodeHighlightRenderer";
 import type { ScriptOverrides } from "./useResolvedScript";
 import { ParamPanelSlot } from "./ParamPanelSlot";
+import { DirectorInspector } from "../director/DirectorInspector";
 
 interface PlaybookLearningConsoleProps {
   showCodePanelSlot: boolean;
@@ -16,6 +17,8 @@ interface PlaybookLearningConsoleProps {
   followupSlot?: React.ReactNode;
   relatedSlot?: React.ReactNode;
   relatedAlgorithmId?: string | null;
+  director?: DirectorScript | null;
+  currentStepId?: string | null;
 }
 
 export function PlaybookLearningConsole({
@@ -29,9 +32,19 @@ export function PlaybookLearningConsole({
   followupSlot,
   relatedSlot,
   relatedAlgorithmId,
+  director,
+  currentStepId,
 }: PlaybookLearningConsoleProps) {
   return (
     <aside className="playbook-player__console" aria-label="Learning console">
+      <section className="playbook-player__console-card playbook-player__director-card">
+        <div className="playbook-player__console-head">
+          <span>Director</span>
+          <small>{director?.source ?? "none"}</small>
+        </div>
+        <DirectorInspector director={director} currentStepId={currentStepId} />
+      </section>
+
       {showCodePanelSlot && (
         <section className="playbook-player__console-card playbook-player__code-card">
           <div className="playbook-player__console-head">

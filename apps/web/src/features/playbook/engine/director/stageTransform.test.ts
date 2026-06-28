@@ -23,12 +23,21 @@ describe("stageTransformForBeat", () => {
   });
 
   it("returns conservative push and pull scales", () => {
-    expect(stageTransformForBeat(beat("push_in"), 0.5)).toBe("scale(1.0125)");
-    expect(stageTransformForBeat(beat("pull_out"), 0.5)).toBe("scale(1.0125)");
+    expect(stageTransformForBeat(beat("push_in"), 0.5)).toBe("scale(1.0250)");
+    expect(stageTransformForBeat(beat("pull_out"), 0.5)).toBe("scale(1.0250)");
   });
 
   it("returns small pan transforms", () => {
-    expect(stageTransformForBeat(beat("pan_left"), 0.5)).toBe("translateX(-7.00px)");
-    expect(stageTransformForBeat(beat("pan_right"), 0.5)).toBe("translateX(7.00px)");
+    expect(stageTransformForBeat(beat("pan_left"), 0.5)).toBe("translateX(-12.00px)");
+    expect(stageTransformForBeat(beat("pan_right"), 0.5)).toBe("translateX(12.00px)");
+  });
+
+  it("maps pacing to deterministic motion progress", () => {
+    expect(stageTransformForBeat({ ...beat("push_in"), pacing: "fast" }, 0.25)).toBe(
+      "scale(1.0250)",
+    );
+    expect(stageTransformForBeat({ ...beat("push_in"), pacing: "slow" }, 0.25)).toBe(
+      "scale(1.0078)",
+    );
   });
 });

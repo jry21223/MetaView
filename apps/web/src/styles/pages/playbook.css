@@ -727,6 +727,68 @@
   font-weight: 560;
 }
 
+.playbook-player__director-card {
+  flex: 0 0 auto;
+}
+
+.director-inspector {
+  min-width: 0;
+  padding: 11px 13px 13px;
+  color: var(--player-ink-2);
+}
+
+.director-inspector__empty {
+  min-height: 42px;
+  display: grid;
+  place-items: center;
+  color: var(--player-ink-3);
+  font-size: 12px;
+}
+
+.director-inspector__summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 6px 8px;
+  align-items: center;
+  margin-bottom: 10px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+}
+
+.director-inspector__summary span,
+.director-inspector__field dt {
+  color: var(--player-ink-3);
+  text-transform: uppercase;
+}
+
+.director-inspector__summary strong,
+.director-inspector__field dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--player-ink);
+  overflow-wrap: anywhere;
+}
+
+.director-inspector__grid {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.director-inspector__field {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.director-inspector__field dt {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 9px;
+}
+
 .playbook-player__code-card {
   flex: 0 1 300px;
   min-height: 176px;
@@ -1376,6 +1438,7 @@
 
 .playbook-player__mobile-setting > span,
 .playbook-player__mobile-setting-row > span,
+.playbook-player__mobile-director > span,
 .playbook-player__mobile-related > span {
   color: var(--player-ink-3);
   font-size: 12px;
@@ -1415,6 +1478,19 @@
   display: grid;
   gap: 8px;
   padding-top: 4px;
+}
+
+.playbook-player__mobile-director {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.playbook-player__mobile-director .director-inspector {
+  border: 1px solid var(--player-line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--player-paper-strong) 72%, transparent);
 }
 
 /* ── TTS speaking pulse ───────────────────────────────────────────────────── */
