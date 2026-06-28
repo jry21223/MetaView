@@ -73,6 +73,12 @@ Director product-loop checks live in `eval/prompts/director_product_loop_cases.y
 They exercise generated PlaybookScript, generated DirectorScript, visible
 Inspector state, follow-up Director patches, and versioned export consistency.
 
+Run the local recorded product-loop check with:
+
+```bash
+make eval-director-product-loop
+```
+
 Reports should be written to:
 
 ```text

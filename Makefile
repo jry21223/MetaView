@@ -99,6 +99,11 @@ eval:
 	cd apps/api && uv run python -m eval.runner --recorded \
 		--prompts ../../eval/prompts/starter.yaml
 
+# Run Director product-loop local cases. Writes report under eval/reports/.
+eval-director-product-loop:
+	PYTHONPATH=apps/api .venv/bin/python apps/api/scripts/run_director_product_loop_cases.py \
+		--prompts eval/prompts/director_product_loop_cases.yaml
+
 # Render per-step PNG stills for one playbook fixture.
 # Usage: make eval-shots ID=sample_math_playbook
 eval-shots:
