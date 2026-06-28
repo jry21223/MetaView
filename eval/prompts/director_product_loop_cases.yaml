@@ -1,0 +1,40 @@
+# Director product-loop self-check prompts.
+# Reports are local evidence and should be written under eval/reports/.
+
+cases:
+  - id: math-quadratic-director
+    domain: math
+    prompt: 用图像讲解 f(x)=x^2-4x+3 的顶点、对称轴和单调性。
+    follow_up: 把第二步镜头推近关键公式，讲慢一点。
+    expected: Director patch，Playbook 不应被重写。
+
+  - id: algorithm-bfs-director
+    domain: algorithm
+    prompt: 讲解 BFS 如何从 A 点遍历一个无权图，展示队列变化和访问顺序。
+    follow_up: 把队列变化那一步讲得更慢，并突出当前出队节点。
+    expected: Director patch 或最小 Playbook patch。
+
+  - id: code-recursion-stack
+    domain: code
+    prompt: 讲解 fact(n) 递归函数的调用栈和返回过程。
+    follow_up: 把返回阶段单独放慢，强调每一层返回值。
+    expected: Director patch。
+
+  - id: physics-incline-motion
+    domain: physics
+    prompt: 讲解物体在光滑斜面上下滑时，重力如何分解，加速度如何产生。
+    follow_up: 把受力分解的镜头拉近，强调沿斜面方向的分力。
+    expected: Director patch 或最小 Playbook patch。
+
+report_fields:
+  - run_status
+  - has_playbook
+  - has_director
+  - step_count
+  - beat_count
+  - current_beat_visible_in_inspector
+  - followup_ok
+  - director_patch_ok
+  - playbook_unchanged_when_director_patch
+  - export_ok
+  - errors

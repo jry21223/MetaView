@@ -169,7 +169,8 @@ end_frame_i = (i+1) * 60                               # 无 execution_map（兼
 - `with_audio` 导出会尝试合成音频并按音频时长拉伸步骤，但除非对应 provider、时长探测和对齐路径已有测试覆盖，否则属于 beta。
 - 无音轨导出是稳定路径；当音频时序无法保证时，保持 silent export。
 
-1. 从 `IRunRepository` 取该 run 的 `PlaybookScript`，序列化为 `inputProps.json`。
+1. 默认从 `IRunRepository` 取该 run 的当前 `PlaybookScript`，并从 Director repository 取当前 DirectorScript。
+   当请求携带 `version_id` 时，优先读取该 version 保存的 `playbook_json` / `director_json`，确保 follow-up 后导出内容与当前预览版本一致。
 2. （可选 `with_audio`）调 TTS 代理 `POST {tts_base_url}/audio/speech` 逐步合成 mp3，
    再用 `ffprobe`（缺失时回退到 wave / 动画时长）测每段时长，按 `fps` 重新拉伸
    `step.end_frame` 让动画 ≥ 配音长度。
@@ -189,7 +190,7 @@ end_frame_i = (i+1) * 60                               # 无 execution_map（兼
 
 | Method | Path | 说明 |
 |--------|------|------|
-| `POST` | `/exports` | 提交导出任务（202） |
+| `POST` | `/exports` | 提交导出任务（202），可带 `version_id` 导出 follow-up revision |
 | `GET`  | `/exports/{job_id}` | 进度 + 状态 + `error` |
 | `GET`  | `/exports/{job_id}/download` | 下载 mp4 / webm / gif |
 

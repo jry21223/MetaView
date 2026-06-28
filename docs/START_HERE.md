@@ -59,8 +59,11 @@ Agent mode is an active verification path, not the default production claim. To 
 
 ## Current next milestones
 
-1. Make Director visible in the UI through a read-only Director Inspector.
-2. Add a frontend `buildRenderPlan(playbook, director)` pure adapter.
-3. Make Remotion preview visibly respond to `camera_motion` and `pacing`.
-4. Add a small Director patch API for camera/pacing changes without regenerating content.
-5. Only then add an LLM or agent DirectorPlanner.
+Done for the current MVP loop:
+
+1. Director is visible through a read-only Director Inspector.
+2. Remotion preview/export consumes Director camera motion and light pacing through the Director frame plan / adapter path.
+3. Follow-up can save DirectorScript patch revisions for camera, pacing, shot, emphasis, focus, and director narration changes.
+4. Export can target the active follow-up version instead of silently falling back to the original run.
+
+Next milestone: run the Director product-loop cases, then consider an LLM or agent DirectorPlanner only after the rule/manual loop passes.

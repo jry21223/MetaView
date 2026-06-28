@@ -16,11 +16,11 @@
 | 文档 | 内容 |
 |------|------|
 | [START_HERE.md](./START_HERE.md) | 当前唯一入门入口：产品主线、部署默认、Director/Playbook 边界、下一步优先级 |
-| [director-layer.md](./director-layer.md) | Director 独立导演层：运镜、节奏、镜头、强调、RenderPlan 和阶段路线 |
-| [pipeline.md](./pipeline.md) | single / agent 生成路径、PlaybookScript、DirectorScript 挂载点、视频导出管线 |
+| [director-layer.md](./director-layer.md) | Director 独立导演层：Inspector、运镜、节奏、follow-up patch、RenderPlan 和阶段路线 |
+| [pipeline.md](./pipeline.md) | single / agent 生成路径、PlaybookScript、DirectorScript 挂载点、version-aware 视频导出管线 |
 | [frontend-shell.md](./frontend-shell.md) | Stage 路由、GlobalTopbar、Studio 布局、Provider 配置、snapshot support levels |
 | [animation-tool-registry.md](./animation-tool-registry.md) | 后端 animation tool registry 的扩展流程、当前工具和新增规则 |
-| [topic-routing.md](./topic-routing.md) | topic routing 模式、自动路由、显式 domain 和 skill override |
+| [topic-routing.md](./topic-routing.md) | 后端 router small model / hybrid router、SkillPack fallback、前端 hint 边界 |
 | [remotion-skills.md](./remotion-skills.md) | Remotion 组件、渲染器、注册表和音频同步约定 |
 | [skill-pack-architecture.md](./skill-pack-architecture.md) | SkillPack 核心契约、registry、routing 和首个实现边界 |
 | [skill-pack-authoring.md](./skill-pack-authoring.md) | SkillPack 包结构、manifest、执行契约和 renderer contract |
@@ -43,7 +43,7 @@
 
 | 文档 | 内容 |
 |------|------|
-| [agent-demo-acceptance.md](./agent-demo-acceptance.md) | AgentPipeline / runtime-tool demo 的最小验收证据和失败排查 |
+| [agent-demo-acceptance.md](./agent-demo-acceptance.md) | AgentPipeline / runtime-tool demo 与 Director product-loop 的最小验收证据 |
 | [generation-review-workflow.md](./generation-review-workflow.md) | 本地和远端 generation review API 调用与输出位置 |
 | [skill-ab-eval.md](./skill-ab-eval.md) | Prompt-only 对比、真实 LLM 手工评估、输出和限制 |
 

@@ -31,11 +31,12 @@ User input
 
 - 支持 `algorithm`, `math`, `code`, `physics`, `chemistry`, `biology`, `geography` 七个教学领域。
 - 首发输入支持文本题目、粘贴代码和上传代码文件；暂不支持图片、截图、PDF、PPT/课件或任意附件生成。
-- 题目提交前会做 topic routing：高置信题目进入 specialized skill，未命中时走 generic skill 或 agent 路径。
+- 题目提交后由后端 router small model / hybrid router / SkillRegistry 决定学科路径；前端 domain 推断只作为 UX hint。
 - deterministic SkillPack 用于把确定性学科问题转成可靠的 PlaybookScript。
-- Director 层为每个 run 生成独立 DirectorScript，当前已有 rule-based 默认导演，后续会进入可见、可渲染、可编辑阶段。
-- 播放器提供参数面板、字幕、TTS、速度控制、历史记录、视频导出和 provider 配置。
-- 运行历史保留原始 `prompt`、PlaybookScript 和 DirectorScript，便于复盘不同输入与生成结果。
+- Director 层为每个 run 生成独立 DirectorScript；播放器提供只读 Director Inspector，并让 `camera_motion` / `pacing` 影响预览和导出。
+- Follow-up 可以 patch PlaybookScript 或 DirectorScript；镜头、节奏和强调调整优先保存为 Director revision。
+- 播放器提供参数面板、字幕、TTS、速度控制、历史记录、当前版本导出和 provider 配置。
+- 运行历史保留原始 `prompt`、PlaybookScript、DirectorScript 和 follow-up versions，便于复盘不同输入与生成结果。
 
 ## 目录结构
 
@@ -199,9 +200,12 @@ Director 相关字段不要塞回 Playbook step；DirectorScript 是独立契约
 | `apps/api/app/domain/models/director.py` | DirectorScript, DirectorBeat, 镜头/节奏字段 |
 | `apps/api/app/domain/services/playbook_builder.py` | CIR -> PlaybookScript 映射 |
 | `apps/api/app/domain/services/director_builder.py` | PlaybookScript -> rule-based DirectorScript 映射 |
+| `apps/api/app/application/use_cases/follow_up.py` | Follow-up reply / Playbook patch / Director patch |
+| `apps/api/app/application/use_cases/export_video.py` | 当前 run 或 version 的 Remotion 导出 |
 | `apps/api/app/infrastructure/persistence/sqlite_director_repository.py` | DirectorScript 持久化 |
 | `apps/web/src/shared/config/constants.ts` | 前端配置常量 |
 | `apps/web/src/features/playbook/engine/types.ts` | 前端 PlaybookScript / DirectorScript 类型 |
+| `apps/web/src/features/playbook/engine/director/DirectorInspector.tsx` | 只读 Director Inspector |
 | `apps/web/src/features/playbook/engine/player/PlaybookPlayer.tsx` | Remotion 播放器入口 |
 | `apps/web/src/features/playbook/engine/renderers/registry.ts` | 渲染器注册表 |
 | `apps/web/src/features/playbook/engine/param-panels/registry.ts` | 参数面板注册表 |
@@ -214,6 +218,6 @@ Director 相关字段不要塞回 Playbook step；DirectorScript 是独立契约
 - [`docs/pipeline.md`](docs/pipeline.md) - 生成、PlaybookScript、DirectorScript 挂载点和导出管线
 - [`docs/frontend-shell.md`](docs/frontend-shell.md) - Stage 路由、GlobalTopbar、Studio 布局、Provider 配置
 - [`docs/remotion-skills.md`](docs/remotion-skills.md) - Remotion 组件、渲染器、注册表约定
-- [`docs/topic-routing.md`](docs/topic-routing.md) - 学科路由策略
+- [`docs/topic-routing.md`](docs/topic-routing.md) - 后端 router / SkillPack 路由边界
 - [`docs/agent-demo-acceptance.md`](docs/agent-demo-acceptance.md) - agent/runtime-tool 验收
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) - 分支策略、Conventional Commits、Hook

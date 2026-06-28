@@ -66,3 +66,32 @@ and `passed_contract_score=true`.
 
 The acceptance suite should not change PlaybookScript schema or agent behavior.
 It only records whether the current pipeline is demonstrably usable.
+
+## Director Product Loop Cases
+
+Director product-loop checks live in `eval/prompts/director_product_loop_cases.yaml`.
+They exercise generated PlaybookScript, generated DirectorScript, visible
+Inspector state, follow-up Director patches, and versioned export consistency.
+
+Reports should be written to:
+
+```text
+eval/reports/director_product_loop_<timestamp>.json
+```
+
+Required report fields:
+
+- `run_status`
+- `has_playbook`
+- `has_director`
+- `step_count`
+- `beat_count`
+- `current_beat_visible_in_inspector`
+- `followup_ok`
+- `director_patch_ok`
+- `playbook_unchanged_when_director_patch`
+- `export_ok`
+- `errors`
+
+`eval/reports/`, `eval/videos/`, and `eval/shots/` remain local evidence only
+and must not be committed.
