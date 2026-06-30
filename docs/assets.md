@@ -36,6 +36,10 @@ is the narrow visual-compiler entrypoint for the current flagship subjects.
 It accepts intent-level fields such as `subject`, `sceneType`, `visualIntent`,
 and `emphasisPoints`, resolves assets through the shared asset resolver, applies
 deterministic layout defaults, and outputs normal `PlaybookScript`.
+Chemistry molecule scenes additionally hydrate structured JSON presets through
+`kits/chemistry/moleculePresetResolver.ts` before renderer asset ids are applied,
+so atom/bond/callout data comes from the asset pack rather than a hand-written
+water molecule inside the compiler.
 The current supported scene blueprints are `east_asia_monsoon`,
 `projectile_motion`, `cell_structure`, `molecule_2d_water`,
 `derivative_tangent`, and `bfs_graph`.

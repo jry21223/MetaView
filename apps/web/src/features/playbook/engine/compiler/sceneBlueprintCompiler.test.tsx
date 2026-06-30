@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { visualQualityGate } from "../assets/visualQualityGate";
 import { PlaybookComposition } from "../composition/PlaybookComposition";
+import { resolveMoleculePresetForRenderer } from "../kits/chemistry/moleculePresetResolver";
 import {
   compileSceneBlueprint,
   compileSceneBlueprintToPlaybookScript,
@@ -164,6 +165,7 @@ describe("sceneBlueprintCompiler", () => {
   });
 
   it("compiles a water molecule blueprint into a structured chemistry scene", () => {
+    const preset = resolveMoleculePresetForRenderer("chemistry-basic", "water");
     const script = compileSceneBlueprintToPlaybookScript({
       subject: "chemistry",
       sceneType: "molecule_2d_water",
@@ -179,6 +181,11 @@ describe("sceneBlueprintCompiler", () => {
     }
     expect(snapshot.pack_id).toBe("chemistry-basic");
     expect(snapshot.molecule_asset_id).toBe("water-molecule-preset");
+    expect(preset).toBeTruthy();
+    expect(snapshot.atoms).toEqual(preset!.atoms.map((atom) => ({ ...atom, asset_id: "atom-core" })));
+    expect(snapshot.bonds).toEqual(preset!.bonds.map((bond) => ({ ...bond, asset_id: "bond-line" })));
+    expect(snapshot.callouts).toEqual(preset!.callouts);
+    expect(snapshot.caption).toBe(preset!.caption);
     expect(snapshot.atoms.map((atom) => atom.asset_id)).toEqual(
       expect.arrayContaining(["atom-core"]),
     );

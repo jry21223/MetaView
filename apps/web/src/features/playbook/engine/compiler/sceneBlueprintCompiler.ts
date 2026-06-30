@@ -1,5 +1,6 @@
 import { resolveAssetById, resolveAssetByRole, resolveAssetForRenderer } from "../assets/assetResolver";
 import { visualQualityGate, type VisualQualityWarning } from "../assets/visualQualityGate";
+import { resolveMoleculePresetForRenderer } from "../kits/chemistry/moleculePresetResolver";
 import type { SubjectVisualKitSubject } from "../assets/assetRegistry";
 import type {
   AnySnapshot,
@@ -294,9 +295,25 @@ function compileBiologySnapshot(blueprint: BiologySceneBlueprint): BioCellSceneS
 function compileChemistrySnapshot(blueprint: ChemistrySceneBlueprint): Molecule2DSceneSnapshot {
   const packId = blueprint.packId ?? DEFAULT_CHEMISTRY_PACK_ID;
   const moleculeId = blueprint.moleculeId ?? "water";
-  const moleculeAssetId = resolveAssetIdByRole("molecule_2d_scene", "chemistry", packId, moleculeId, ["molecule"]);
+  const moleculePreset = resolveMoleculePresetForRenderer(packId, moleculeId);
+  const moleculeAssetId =
+    moleculePreset?.moleculeAssetId ??
+    resolveAssetIdByRole("molecule_2d_scene", "chemistry", packId, moleculeId, ["molecule"]);
   const atomAssetId = resolveAssetIdByRole("molecule_2d_scene", "chemistry", packId, "atom");
   const bondAssetId = resolveAssetIdByRole("molecule_2d_scene", "chemistry", packId, "bond");
+  if (moleculePreset) {
+    return {
+      kind: "molecule_2d_scene",
+      pack_id: packId,
+      molecule_id: moleculePreset.moleculeId,
+      molecule_asset_id: moleculeAssetId,
+      atoms: moleculePreset.atoms.map((atom) => ({ ...atom, asset_id: atomAssetId })),
+      bonds: moleculePreset.bonds.map((bond) => ({ ...bond, asset_id: bondAssetId })),
+      callouts: moleculePreset.callouts,
+      formula_latex: moleculePreset.formulaLatex,
+      caption: blueprint.caption ?? moleculePreset.caption,
+    };
+  }
 
   return {
     kind: "molecule_2d_scene",
