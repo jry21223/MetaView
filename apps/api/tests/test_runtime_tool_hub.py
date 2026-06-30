@@ -331,6 +331,19 @@ async def test_runtime_tool_hub_runs_self_check() -> None:
             "bio_process_scene",
             "biology-basic",
         ),
+        (
+            {
+                "id": "reaction_synthesis_water",
+                "subject": "chemistry",
+                "sceneType": "reaction_synthesis_water",
+                "title": "Water synthesis reaction",
+                "caption": "Balanced synthesis conserves atoms from reactants to product.",
+                "visualIntent": ["show_balanced_reaction", "show_electron_flow"],
+                "emphasisPoints": ["reactants", "products", "atom conservation"],
+            },
+            "reaction_scene",
+            "chemistry-basic",
+        ),
     ],
 )
 async def test_runtime_tool_hub_compiles_subject_scene_blueprints(

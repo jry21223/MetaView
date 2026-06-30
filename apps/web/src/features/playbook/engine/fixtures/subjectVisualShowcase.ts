@@ -23,6 +23,7 @@ export const SUBJECT_VISUAL_SHOWCASE_IDS: readonly SubjectVisualFixtureId[] = [
   "cell_structure",
   "dna_replication",
   "molecule_2d_water",
+  "reaction_synthesis_water",
   "derivative_tangent",
   "bfs_graph",
 ];
@@ -102,6 +103,23 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-molecule-id="water"',
       'data-asset-id="water-molecule-preset"',
       'data-structured-molecule="true"',
+    ],
+  },
+  {
+    id: "reaction_synthesis_water",
+    domain: "chemistry",
+    title: "Water synthesis reaction",
+    summary: "Chemistry reaction renderer consumes reaction-arrow and electron-flow assets.",
+    packId: "chemistry-basic",
+    rendererKind: "reaction_scene",
+    showInlineCode: false,
+    requiredMarkers: [
+      "reaction-scene",
+      'data-reaction-id="reaction_synthesis_water"',
+      'data-asset-id="reaction-arrow"',
+      'data-asset-id="electron-flow"',
+      'data-semantic-role="reactant"',
+      'data-semantic-role="product"',
     ],
   },
   {

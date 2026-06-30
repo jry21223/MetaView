@@ -17,12 +17,13 @@ import type {
   PhysicsForceSceneSnapshot,
   PhysicsSceneVector,
   PlaybookScript,
+  ReactionSceneSnapshot,
 } from "../types";
 
 type GeoSceneType = "geo_map_scene" | "east_asia_monsoon";
 type PhysicsSceneType = "physics_force_scene" | "projectile_motion";
 type BiologySceneType = "bio_cell_scene" | "bio_process_scene" | "cell_structure" | "dna_replication";
-type ChemistrySceneType = "molecule_2d_scene" | "molecule_2d_water";
+type ChemistrySceneType = "molecule_2d_scene" | "molecule_2d_water" | "reaction_scene" | "reaction_synthesis_water";
 type MathSceneType = "math_plot" | "derivative_tangent";
 type AlgorithmSceneType = "graph_scene" | "bfs_graph";
 type SceneBlueprintSubject = "algorithm" | "biology" | "chemistry" | "geography" | "math" | "physics";
@@ -33,6 +34,7 @@ type SupportedRendererKind =
   | "graph_scene"
   | "math_plot"
   | "molecule_2d_scene"
+  | "reaction_scene"
   | "physics_force_scene";
 
 interface SceneBlueprintBase {
@@ -413,6 +415,52 @@ function compileChemistrySnapshot(blueprint: ChemistrySceneBlueprint): Molecule2
   };
 }
 
+function compileChemistryReactionSnapshot(blueprint: ChemistrySceneBlueprint): ReactionSceneSnapshot {
+  const packId = blueprint.packId ?? DEFAULT_CHEMISTRY_PACK_ID;
+  const reactionArrowAssetId = resolveAssetIdByRole("reaction_scene", "chemistry", packId, "reaction_arrow");
+  const electronFlowAssetId = resolveAssetIdByRole("reaction_scene", "chemistry", packId, "electron_flow");
+
+  return {
+    kind: "reaction_scene",
+    pack_id: packId,
+    reaction_id: "reaction_synthesis_water",
+    reactants: [
+      { id: "h2", formula_latex: "H_2", label: "hydrogen", coefficient: 2, x: 18, y: 48 },
+      { id: "o2", formula_latex: "O_2", label: "oxygen", coefficient: 1, x: 38, y: 48 },
+    ],
+    products: [
+      { id: "h2o", formula_latex: "H_2O", label: "water", coefficient: 2, x: 78, y: 48 },
+    ],
+    arrows: [
+      {
+        id: "main-arrow",
+        semantic_role: "reaction_arrow",
+        from: [48, 48],
+        to: [66, 48],
+        label: "forms",
+        asset_id: reactionArrowAssetId,
+      },
+    ],
+    electron_flows: [
+      {
+        id: "electron-shift",
+        semantic_role: "electron_flow",
+        from: [39, 38],
+        to: [58, 36],
+        label: "bond rearrangement",
+        asset_id: electronFlowAssetId,
+      },
+    ],
+    callouts: [
+      { id: "balanced", target_id: "main-arrow", label: "balanced atoms", side: "top" },
+    ],
+    formula_latex: "2H_2 + O_2 \\rightarrow 2H_2O",
+    caption:
+      blueprint.caption ??
+      "A balanced reaction conserves each atom across reactants and products.",
+  };
+}
+
 function compileMathSnapshot(blueprint: MathSceneBlueprint): MathPlotSnapshot {
   const packId = blueprint.packId ?? DEFAULT_MATH_PACK_ID;
   const assetId = resolveAssetIdByRole("math_plot", "math", packId, "tangent", ["derivative", "plot"]);
@@ -543,6 +591,9 @@ function compileSnapshot(blueprint: SceneBlueprint): AnySnapshot {
     return compileBiologyProcessSnapshot(blueprint);
   }
   if (blueprint.subject === "biology") return compileBiologySnapshot(blueprint);
+  if (blueprint.subject === "chemistry" && (blueprint.sceneType === "reaction_synthesis_water" || blueprint.sceneType === "reaction_scene")) {
+    return compileChemistryReactionSnapshot(blueprint);
+  }
   if (blueprint.subject === "chemistry") return compileChemistrySnapshot(blueprint);
   if (blueprint.subject === "geography") return compileGeographySnapshot(blueprint);
   if (blueprint.subject === "math") return compileMathSnapshot(blueprint);

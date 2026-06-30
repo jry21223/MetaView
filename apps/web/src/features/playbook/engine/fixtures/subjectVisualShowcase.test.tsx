@@ -25,6 +25,7 @@ const FLAGSHIP_IDS = [
   "cell_structure",
   "dna_replication",
   "molecule_2d_water",
+  "reaction_synthesis_water",
   "derivative_tangent",
   "bfs_graph",
 ];
@@ -40,6 +41,7 @@ describe("subject visual showcase catalog", () => {
       "biology-basic",
       "biology-basic",
       "chemistry-basic",
+      "chemistry-basic",
       "math-basic",
       "algorithm-code-basic",
     ]);
@@ -49,6 +51,7 @@ describe("subject visual showcase catalog", () => {
       "bio_cell_scene",
       "bio_process_scene",
       "molecule_2d_scene",
+      "reaction_scene",
       "math_plot",
       "graph_scene",
     ]);

@@ -40,6 +40,8 @@ describe("assetRegistry", () => {
     expect(findAssetByRole("biology", "nucleus")?.id).toBe("nucleus");
     expect(findAssetByRole("chemistry", "molecule")?.id).toBe("water-molecule-preset");
     expect(findAssetByRole("chemistry", "bond")?.id).toBe("bond-line");
+    expect(findAssetByRole("chemistry", "reaction_arrow")?.id).toBe("reaction-arrow");
+    expect(findAssetByRole("chemistry", "electron_flow")?.id).toBe("electron-flow");
     expect(findAssetByRole("algorithm", "graph_node")?.id).toBe("graph-node");
     expect(findAssetByRole("algorithm", "queue")?.id).toBe("queue-frame");
     expect(findAssetByRole("core", "flow_arrow")?.id).toBe("core-flow-arrow");
@@ -53,7 +55,7 @@ describe("assetRegistry", () => {
 
   it("keeps rendererKinds aligned with the dedicated scene renderers", () => {
     expect(getAssetPack("biology-basic")?.rendererKinds).toEqual(["bio_cell_scene", "bio_process_scene"]);
-    expect(getAssetPack("chemistry-basic")?.rendererKinds).toEqual(["molecule_2d_scene"]);
+    expect(getAssetPack("chemistry-basic")?.rendererKinds).toEqual(["molecule_2d_scene", "reaction_scene"]);
     expect(getAssetPack("core-visual-basic")?.rendererKinds).toEqual([
       "geo_map_scene",
       "physics_force_scene",
@@ -152,6 +154,12 @@ describe("assetRegistry", () => {
       'data-asset-quality="v1"',
     );
     expect(readPublicAsset("/assets/metaview-kits/chemistry-basic/symbols/bond-line.svg")).toContain(
+      'data-asset-quality="v1"',
+    );
+    expect(readPublicAsset("/assets/metaview-kits/chemistry-basic/symbols/reaction-arrow.svg")).toContain(
+      'data-asset-quality="v1"',
+    );
+    expect(readPublicAsset("/assets/metaview-kits/chemistry-basic/symbols/electron-flow.svg")).toContain(
       'data-asset-quality="v1"',
     );
     expect(readPublicAsset("/assets/metaview-kits/chemistry-basic/molecule-presets/water.json")).toContain(

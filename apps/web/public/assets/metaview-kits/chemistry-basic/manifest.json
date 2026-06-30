@@ -6,8 +6,8 @@
   "license": "internal",
   "licenseMode": "single",
   "defaultLicense": "internal",
-  "sceneTemplates": ["molecule_2d_water"],
-  "rendererKinds": ["molecule_2d_scene"],
+  "sceneTemplates": ["molecule_2d_water", "reaction_synthesis_water"],
+  "rendererKinds": ["molecule_2d_scene", "reaction_scene"],
   "sources": [
     {
       "id": "metaview-internal",

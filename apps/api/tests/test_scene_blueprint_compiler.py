@@ -17,6 +17,7 @@ from app.domain.services.scene_blueprint_compiler import compile_scene_blueprint
         ("cell_structure", "biology", "bio_cell_scene", "biology-basic"),
         ("dna_replication", "biology", "bio_process_scene", "biology-basic"),
         ("molecule_2d_water", "chemistry", "molecule_2d_scene", "chemistry-basic"),
+        ("reaction_synthesis_water", "chemistry", "reaction_scene", "chemistry-basic"),
         ("derivative_tangent", "math", "math_plot", "math-basic"),
         ("bfs_graph", "algorithm", "graph_scene", "algorithm-code-basic"),
     ],
@@ -65,6 +66,7 @@ def test_scene_blueprint_compiler_preserves_flagship_asset_markers() -> None:
         "cell_structure": ("structures", "asset_id", "nucleus"),
         "dna_replication": ("steps", "asset_id", "replication-fork"),
         "molecule_2d_water": ("atoms", "asset_id", "atom-core"),
+        "reaction_synthesis_water": ("arrows", "asset_id", "reaction-arrow"),
         "derivative_tangent": ("", "asset_id", "derivative-tangent-preset"),
         "bfs_graph": ("", "asset_id", "bfs-graph-preset"),
     }
@@ -153,6 +155,36 @@ def test_scene_blueprint_compiler_builds_dna_replication_process_scene() -> None
     assert verdict.status == PlaybookReviewStatus.CLEAN
 
 
+def test_scene_blueprint_compiler_builds_water_synthesis_reaction_scene() -> None:
+    playbook = compile_scene_blueprint_to_playbook(
+        {
+            "id": "reaction_synthesis_water",
+            "subject": "chemistry",
+            "sceneType": "reaction_synthesis_water",
+            "title": "Water synthesis reaction",
+            "visualIntent": ["show_balanced_reaction", "show_electron_flow"],
+            "emphasisPoints": ["reactants", "products", "atom conservation"],
+        },
+    )
+
+    snapshot = playbook.steps[0].snapshot.model_dump(mode="json", by_alias=True)
+
+    assert snapshot["kind"] == "reaction_scene"
+    assert snapshot["pack_id"] == "chemistry-basic"
+    assert snapshot["reaction_id"] == "reaction_synthesis_water"
+    assert [participant["formula_latex"] for participant in snapshot["reactants"]] == [
+        "H_2",
+        "O_2",
+    ]
+    assert [participant["formula_latex"] for participant in snapshot["products"]] == ["H_2O"]
+    assert {arrow["asset_id"] for arrow in snapshot["arrows"]} == {"reaction-arrow"}
+    assert {flow["asset_id"] for flow in snapshot["electron_flows"]} == {"electron-flow"}
+    assert snapshot["formula_latex"] == "2H_2 + O_2 \\rightarrow 2H_2O"
+
+    verdict = self_check_playbook(playbook, "Explain water synthesis.")
+    assert verdict.status == PlaybookReviewStatus.CLEAN
+
+
 @pytest.mark.parametrize(
     ("scene_type", "subject", "prompt"),
     [
@@ -188,4 +220,5 @@ def _subject_for(scene_type: str) -> str:
         "east_asia_monsoon": "geography",
         "molecule_2d_water": "chemistry",
         "projectile_motion": "physics",
+        "reaction_synthesis_water": "chemistry",
     }[scene_type]

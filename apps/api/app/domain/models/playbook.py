@@ -30,6 +30,7 @@ class SnapshotKind(str, Enum):
     BIO_CELL_SCENE = "bio_cell_scene"
     BIO_PROCESS_SCENE = "bio_process_scene"
     MOLECULE_2D_SCENE = "molecule_2d_scene"
+    REACTION_SCENE = "reaction_scene"
     GEO_MAP_SCENE = "geo_map_scene"
     PHYSICS_FORCE_SCENE = "physics_force_scene"
     MOTION_SCENE = "motion_scene"
@@ -541,6 +542,51 @@ class Molecule2DSceneSnapshot(BaseModel):
     caption: str | None = None
 
 
+class ReactionParticipant(BaseModel):
+    id: str
+    formula_latex: str
+    label: str | None = None
+    coefficient: float | None = None
+    x: float
+    y: float
+    asset_id: str | None = None
+
+
+class ReactionArrow(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+    id: str
+    semantic_role: str = "reaction_arrow"
+    from_: tuple[float, float] = Field(alias="from")
+    to: tuple[float, float]
+    label: str | None = None
+    asset_id: str | None = None
+
+
+class ReactionElectronFlow(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+    id: str
+    semantic_role: str = "electron_flow"
+    from_: tuple[float, float] = Field(alias="from")
+    to: tuple[float, float]
+    label: str | None = None
+    asset_id: str | None = None
+
+
+class ReactionSceneSnapshot(BaseModel):
+    kind: Literal["reaction_scene"] = "reaction_scene"
+    pack_id: str | None = None
+    reaction_id: str
+    reactants: list[ReactionParticipant] = Field(default_factory=list)
+    products: list[ReactionParticipant] = Field(default_factory=list)
+    arrows: list[ReactionArrow] = Field(default_factory=list)
+    electron_flows: list[ReactionElectronFlow] = Field(default_factory=list)
+    callouts: list[Molecule2DCallout] = Field(default_factory=list)
+    formula_latex: str | None = None
+    caption: str | None = None
+
+
 class GeoMapLayer(BaseModel):
     id: str
     semantic_role: str
@@ -759,6 +805,7 @@ AnySnapshot = Annotated[
         BioCellSceneSnapshot,
         BioProcessSceneSnapshot,
         Molecule2DSceneSnapshot,
+        ReactionSceneSnapshot,
         GeoMapSceneSnapshot,
         PhysicsForceSceneSnapshot,
         MotionSceneSnapshot,

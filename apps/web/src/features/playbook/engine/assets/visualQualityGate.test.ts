@@ -241,6 +241,55 @@ describe("visualQualityGate", () => {
     );
   });
 
+  it("warns when a chemistry reaction asset_id cannot be resolved", () => {
+    const warnings = visualQualityGate(
+      script({
+        domain: "chemistry",
+        steps: [
+          {
+            step_id: "reaction_synthesis_water",
+            end_frame: 90,
+            title: "Water synthesis reaction",
+            voiceover_text: "",
+            tokens: [],
+            snapshot: {
+              kind: "reaction_scene",
+              pack_id: "chemistry-basic",
+              reaction_id: "reaction_synthesis_water",
+              reactants: [
+                { id: "h2", formula_latex: "H_2", label: "hydrogen", coefficient: 2, x: 18, y: 48 },
+              ],
+              products: [
+                { id: "h2o", formula_latex: "H_2O", label: "water", coefficient: 2, x: 78, y: 48 },
+              ],
+              arrows: [
+                {
+                  id: "main-arrow",
+                  semantic_role: "reaction_arrow",
+                  from: [48, 48],
+                  to: [66, 48],
+                  asset_id: "missing-reaction-arrow",
+                },
+              ],
+              electron_flows: [],
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "missing_asset",
+          step_id: "reaction_synthesis_water",
+          asset_id: "missing-reaction-arrow",
+          pack_id: "chemistry-basic",
+        }),
+      ]),
+    );
+  });
+
   it("warns when chemistry falls back to algorithm_array", () => {
     const warnings = visualQualityGate(
       script({

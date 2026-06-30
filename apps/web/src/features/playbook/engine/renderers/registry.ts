@@ -25,6 +25,7 @@ import { Molecule2DSceneRenderer } from "./Molecule2DSceneRenderer";
 import { MotionSceneRenderer } from "./MotionSceneRenderer";
 import { NarrationCardRenderer } from "./NarrationCardRenderer";
 import { PhysicsForceSceneRenderer } from "./PhysicsForceSceneRenderer";
+import { ReactionSceneRenderer } from "./ReactionSceneRenderer";
 import { SolidGeometrySceneRenderer } from "./SolidGeometrySceneRenderer";
 
 const registry = new Map<SnapshotKind, RendererComponent>([
@@ -48,6 +49,7 @@ const registry = new Map<SnapshotKind, RendererComponent>([
   ["bio_cell_scene", BioCellSceneRenderer],
   ["bio_process_scene", BioProcessSceneRenderer],
   ["molecule_2d_scene", Molecule2DSceneRenderer],
+  ["reaction_scene", ReactionSceneRenderer],
   ["geo_map_scene", GeoMapSceneRenderer],
   ["physics_force_scene", PhysicsForceSceneRenderer],
   ["motion_scene", MotionSceneRenderer],

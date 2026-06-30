@@ -302,6 +302,42 @@ describe("agent playbook self-check", () => {
     expect(report.status).toBe("clean");
   });
 
+  it("accepts chemistry reaction scenes produced by SceneBlueprint compiler output", () => {
+    const playbook = validPlaybook();
+    playbook.domain = "chemistry";
+    const snapshot = {
+      kind: "reaction_scene",
+      pack_id: "chemistry-basic",
+      reaction_id: "reaction_synthesis_water",
+      reactants: [
+        { id: "h2", formula_latex: "H_2", label: "hydrogen", coefficient: 2, x: 18, y: 48 },
+        { id: "o2", formula_latex: "O_2", label: "oxygen", coefficient: 1, x: 38, y: 48 },
+      ],
+      products: [
+        { id: "h2o", formula_latex: "H_2O", label: "water", coefficient: 2, x: 78, y: 48 },
+      ],
+      arrows: [
+        { id: "main-arrow", semantic_role: "reaction_arrow", from: [48, 48], to: [66, 48], asset_id: "reaction-arrow" },
+      ],
+      electron_flows: [
+        { id: "electron-shift", semantic_role: "electron_flow", from: [39, 38], to: [58, 36], asset_id: "electron-flow" },
+      ],
+      formula_latex: "2H_2 + O_2 \\rightarrow 2H_2O",
+    };
+    playbook.steps.forEach((step) => {
+      step.title = "Water synthesis reaction";
+      step.voiceover_text =
+        "The chemistry reaction scene shows reactants forming water while conserving atoms.";
+      step.narration_template = [step.voiceover_text];
+      step.snapshot = structuredClone(snapshot);
+      step.layers[0].body = structuredClone(snapshot);
+    });
+
+    const report = selfCheckPlaybook(playbook, "Explain water synthesis");
+
+    expect(report.status).toBe("clean");
+  });
+
   it("builds a structured repair prompt from blocked self-check output", () => {
     const playbook = validPlaybook();
     const report = {

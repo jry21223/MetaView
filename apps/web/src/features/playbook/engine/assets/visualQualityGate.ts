@@ -9,6 +9,7 @@ import type {
   Molecule2DSceneSnapshot,
   PhysicsForceSceneSnapshot,
   PlaybookScript,
+  ReactionSceneSnapshot,
   SnapshotKind,
 } from "../types";
 
@@ -19,6 +20,7 @@ export type VisualQualityWarningCode =
   | "low_biology_structure_assets"
   | "low_biology_process_assets"
   | "low_chemistry_structure_data"
+  | "low_chemistry_reaction_assets"
   | "low_algorithm_state_visuals"
   | "low_math_visual_richness"
   | "unsupported_array_fallback";
@@ -226,6 +228,37 @@ function checkMolecule2DScene(
   }
 }
 
+function checkReactionScene(
+  warnings: VisualQualityWarning[],
+  context: SnapshotContext,
+  snapshot: ReactionSceneSnapshot,
+) {
+  const hasParticipants = snapshot.reactants.length > 0 && snapshot.products.length > 0;
+  const hasReactionAsset = [...snapshot.arrows, ...(snapshot.electron_flows ?? [])].some((item) => {
+    if (item.asset_id) return assetResolves(item.asset_id, snapshot.pack_id);
+    return Boolean(findAssetByRole("chemistry", item.semantic_role, snapshot.pack_id));
+  });
+
+  if (!hasParticipants || !hasReactionAsset) {
+    warn(warnings, context, {
+      code: "low_chemistry_reaction_assets",
+      domain: context.domain,
+      pack_id: snapshot.pack_id,
+      message: "reaction_scene should include reactants, products, and at least one resolvable reaction asset.",
+    });
+  }
+
+  for (const participant of [...snapshot.reactants, ...snapshot.products]) {
+    checkAssetId(warnings, context, participant.asset_id, snapshot.pack_id);
+  }
+  for (const arrow of snapshot.arrows) {
+    checkAssetId(warnings, context, arrow.asset_id, snapshot.pack_id);
+  }
+  for (const electronFlow of snapshot.electron_flows ?? []) {
+    checkAssetId(warnings, context, electronFlow.asset_id, snapshot.pack_id);
+  }
+}
+
 function checkGraphScene(
   warnings: VisualQualityWarning[],
   context: SnapshotContext,
@@ -355,6 +388,9 @@ export function visualQualityGate(script: PlaybookScript): VisualQualityWarning[
       }
       if (snapshot.kind === "molecule_2d_scene") {
         checkMolecule2DScene(warnings, context, snapshot);
+      }
+      if (snapshot.kind === "reaction_scene") {
+        checkReactionScene(warnings, context, snapshot);
       }
       if (snapshot.kind === "graph_scene") {
         checkGraphScene(warnings, context, snapshot);

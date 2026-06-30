@@ -45,7 +45,7 @@ against the same public preset JSON before returning `PlaybookScript` to
 SkillPack/runtime-tool callers.
 The current supported scene blueprints are `east_asia_monsoon`,
 `projectile_motion`, `cell_structure`, `dna_replication`, `molecule_2d_water`,
-`derivative_tangent`, and `bfs_graph`.
+`reaction_synthesis_water`, `derivative_tangent`, and `bfs_graph`.
 The backend mirror lives at
 `apps/api/app/domain/services/scene_blueprint_compiler.py` so SkillPack or
 agent generation can adopt the same blueprint boundary before returning
@@ -75,8 +75,9 @@ Current backend SkillPack adoption:
   ramp, spring, and pulley roles.
 - `biology-basic`: internal organelle and DNA process SVGs for `bio_cell_scene`
   and `bio_process_scene`.
-- `chemistry-basic`: internal atom/bond SVGs plus structured molecule presets
-  for `molecule_2d_scene`.
+- `chemistry-basic`: internal atom/bond SVGs, reaction arrows, electron-flow
+  SVGs, and structured molecule presets for `molecule_2d_scene` and
+  `reaction_scene`.
 - `math-basic`: structured plot presets for math plot/formula scenes.
 - `algorithm-code-basic`: internal graph node, queue, visited, active-edge SVGs
   plus a BFS graph preset for `graph_scene`.
@@ -118,6 +119,7 @@ snapshot catalog.
 | `cell_structure` | biology | `biology-basic` | `bio_cell_scene` | cell, nucleus, mitochondrion assets plus callouts |
 | `dna_replication` | biology | `biology-basic` | `bio_process_scene` | DNA helix, replication fork, core flow arrow, process callout |
 | `molecule_2d_water` | chemistry | `chemistry-basic` | `molecule_2d_scene` | structured atoms/bonds and molecule preset |
+| `reaction_synthesis_water` | chemistry | `chemistry-basic` | `reaction_scene` | reactants/products plus reaction arrow and electron-flow assets |
 | `derivative_tangent` | math | `math-basic` | `math_plot` | formula plus curve/tangent plot markers |
 | `bfs_graph` | algorithm | `algorithm-code-basic` | `graph_scene` | graph node, queue, active-edge assets plus code track |
 

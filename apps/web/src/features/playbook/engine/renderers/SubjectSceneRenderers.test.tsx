@@ -9,12 +9,14 @@ import type {
   Molecule2DSceneSnapshot,
   PhysicsForceSceneSnapshot,
   PlaybookScript,
+  ReactionSceneSnapshot,
 } from "../types";
 import type { RendererProps } from "./types";
 import { BioCellSceneRenderer } from "./BioCellSceneRenderer";
 import { GeoMapSceneRenderer } from "./GeoMapSceneRenderer";
 import { Molecule2DSceneRenderer } from "./Molecule2DSceneRenderer";
 import { PhysicsForceSceneRenderer } from "./PhysicsForceSceneRenderer";
+import { ReactionSceneRenderer } from "./ReactionSceneRenderer";
 import { rendererRegistry } from "./registry";
 
 vi.mock("remotion", async () => {
@@ -110,7 +112,38 @@ function moleculeSnapshot(extra: Partial<Molecule2DSceneSnapshot> = {}): Molecul
   };
 }
 
-function step(snapshot: BioCellSceneSnapshot | GeoMapSceneSnapshot | Molecule2DSceneSnapshot | PhysicsForceSceneSnapshot): MetaStep {
+function reactionSnapshot(extra: Partial<ReactionSceneSnapshot> = {}): ReactionSceneSnapshot {
+  return {
+    kind: "reaction_scene",
+    pack_id: "chemistry-basic",
+    reaction_id: "reaction_synthesis_water",
+    reactants: [
+      { id: "h2", formula_latex: "H_2", label: "hydrogen", coefficient: 2, x: 18, y: 48 },
+      { id: "o2", formula_latex: "O_2", label: "oxygen", coefficient: 1, x: 38, y: 48 },
+    ],
+    products: [
+      { id: "h2o", formula_latex: "H_2O", label: "water", coefficient: 2, x: 78, y: 48 },
+    ],
+    arrows: [
+      { id: "main-arrow", semantic_role: "reaction_arrow", from: [48, 48], to: [66, 48], asset_id: "reaction-arrow" },
+    ],
+    electron_flows: [
+      { id: "electron-shift", semantic_role: "electron_flow", from: [39, 38], to: [58, 36], asset_id: "electron-flow" },
+    ],
+    formula_latex: "2H_2 + O_2 \\rightarrow 2H_2O",
+    caption: "A balanced reaction conserves atoms.",
+    ...extra,
+  };
+}
+
+type SubjectSnapshot =
+  | BioCellSceneSnapshot
+  | GeoMapSceneSnapshot
+  | Molecule2DSceneSnapshot
+  | PhysicsForceSceneSnapshot
+  | ReactionSceneSnapshot;
+
+function step(snapshot: SubjectSnapshot): MetaStep {
   return {
     step_id: "s1",
     end_frame: 90,
@@ -121,14 +154,16 @@ function step(snapshot: BioCellSceneSnapshot | GeoMapSceneSnapshot | Molecule2DS
           ? "细胞结构"
           : snapshot.kind === "molecule_2d_scene"
             ? "水分子"
-            : "平抛运动",
+            : snapshot.kind === "reaction_scene"
+              ? "合成水反应"
+              : "平抛运动",
     voiceover_text: snapshot.caption ?? "",
     snapshot,
     tokens: [],
   };
 }
 
-function props(snapshot: BioCellSceneSnapshot | GeoMapSceneSnapshot | Molecule2DSceneSnapshot | PhysicsForceSceneSnapshot): RendererProps {
+function props(snapshot: SubjectSnapshot): RendererProps {
   return {
     step: step(snapshot),
     prevStep: null,
@@ -140,7 +175,7 @@ function props(snapshot: BioCellSceneSnapshot | GeoMapSceneSnapshot | Molecule2D
   };
 }
 
-function script(snapshot: BioCellSceneSnapshot | GeoMapSceneSnapshot | Molecule2DSceneSnapshot | PhysicsForceSceneSnapshot): PlaybookScript {
+function script(snapshot: SubjectSnapshot): PlaybookScript {
   return {
     fps: 30,
     total_frames: 90,
@@ -151,7 +186,9 @@ function script(snapshot: BioCellSceneSnapshot | GeoMapSceneSnapshot | Molecule2
           ? "biology"
           : snapshot.kind === "molecule_2d_scene"
             ? "chemistry"
-            : "physics",
+            : snapshot.kind === "reaction_scene"
+              ? "chemistry"
+              : "physics",
     title:
       snapshot.kind === "geo_map_scene"
         ? "东亚季风"
@@ -159,7 +196,9 @@ function script(snapshot: BioCellSceneSnapshot | GeoMapSceneSnapshot | Molecule2
           ? "细胞结构"
           : snapshot.kind === "molecule_2d_scene"
             ? "水分子"
-            : "平抛运动",
+            : snapshot.kind === "reaction_scene"
+              ? "合成水反应"
+              : "平抛运动",
     summary: "subject fixture",
     parameter_controls: [],
     steps: [step(snapshot)],
@@ -170,6 +209,7 @@ describe("subject scene renderers", () => {
   it("registers dedicated geography and physics scene renderers", () => {
     expect(rendererRegistry.get("bio_cell_scene")).toBe(BioCellSceneRenderer);
     expect(rendererRegistry.get("molecule_2d_scene")).toBe(Molecule2DSceneRenderer);
+    expect(rendererRegistry.get("reaction_scene")).toBe(ReactionSceneRenderer);
     expect(rendererRegistry.get("geo_map_scene")).toBe(GeoMapSceneRenderer);
     expect(rendererRegistry.get("physics_force_scene")).toBe(PhysicsForceSceneRenderer);
   });
@@ -191,6 +231,17 @@ describe("subject scene renderers", () => {
     expect(markup).toContain('data-asset-id="water-molecule-preset"');
     expect(markup).toContain('data-structured-molecule="true"');
     expect(markup).toContain('data-element="O"');
+  });
+
+  it("renders chemistry reaction assets and participant roles", () => {
+    const markup = renderToStaticMarkup(<ReactionSceneRenderer {...props(reactionSnapshot())} />);
+
+    expect(markup).toContain("reaction-scene");
+    expect(markup).toContain('data-reaction-id="reaction_synthesis_water"');
+    expect(markup).toContain('data-asset-id="reaction-arrow"');
+    expect(markup).toContain('data-asset-id="electron-flow"');
+    expect(markup).toContain('data-semantic-role="reactant"');
+    expect(markup).toContain('data-semantic-role="product"');
   });
 
   it("renders geography map layers, wind flow, pressure centers, and particles", () => {
@@ -228,13 +279,18 @@ describe("subject scene renderers", () => {
     const chemistryMarkup = renderToStaticMarkup(
       <PlaybookComposition script={script(moleculeSnapshot())} showSubtitles={false} />,
     );
+    const reactionMarkup = renderToStaticMarkup(
+      <PlaybookComposition script={script(reactionSnapshot())} showSubtitles={false} />,
+    );
 
     expect(bioMarkup).toContain("bio-cell-scene");
     expect(chemistryMarkup).toContain("molecule-2d-scene");
+    expect(reactionMarkup).toContain("reaction-scene");
     expect(geoMarkup).toContain("geo-map-scene");
     expect(physicsMarkup).toContain("physics-force-scene");
     expect(bioMarkup).not.toContain("Unknown snapshot kind");
     expect(chemistryMarkup).not.toContain("Unknown snapshot kind");
+    expect(reactionMarkup).not.toContain("Unknown snapshot kind");
     expect(geoMarkup).not.toContain("Unknown snapshot kind");
     expect(physicsMarkup).not.toContain("Unknown snapshot kind");
   });

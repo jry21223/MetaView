@@ -22,6 +22,7 @@ export type SnapshotKind =
   | "bio_cell_scene"
   | "bio_process_scene"
   | "molecule_2d_scene"
+  | "reaction_scene"
   | "geo_map_scene"
   | "physics_force_scene"
   | "motion_scene"
@@ -538,6 +539,47 @@ export interface Molecule2DSceneSnapshot {
   caption?: string | null;
 }
 
+export interface ReactionParticipant {
+  id: string;
+  formula_latex: string;
+  label?: string | null;
+  coefficient?: number | null;
+  x: number;
+  y: number;
+  asset_id?: string | null;
+}
+
+export interface ReactionArrow {
+  id: string;
+  semantic_role: "reaction_arrow" | string;
+  from: [number, number];
+  to: [number, number];
+  label?: string | null;
+  asset_id?: string | null;
+}
+
+export interface ReactionElectronFlow {
+  id: string;
+  semantic_role: "electron_flow" | string;
+  from: [number, number];
+  to: [number, number];
+  label?: string | null;
+  asset_id?: string | null;
+}
+
+export interface ReactionSceneSnapshot {
+  kind: "reaction_scene";
+  pack_id?: string | null;
+  reaction_id: string;
+  reactants: ReactionParticipant[];
+  products: ReactionParticipant[];
+  arrows: ReactionArrow[];
+  electron_flows?: ReactionElectronFlow[];
+  callouts?: Molecule2DCallout[];
+  formula_latex?: string | null;
+  caption?: string | null;
+}
+
 export interface GeoMapLayer {
   id: string;
   semantic_role: "land" | "ocean" | "map_layer" | "pressure_high" | "pressure_low" | string;
@@ -650,6 +692,7 @@ export type AnySnapshot =
   | BioCellSceneSnapshot
   | BioProcessSceneSnapshot
   | Molecule2DSceneSnapshot
+  | ReactionSceneSnapshot
   | GeoMapSceneSnapshot
   | PhysicsForceSceneSnapshot
   | MotionSceneSnapshot

@@ -234,6 +234,44 @@ describe("sceneBlueprintCompiler", () => {
     expect(markup).not.toContain('data-missing-asset="true"');
   });
 
+  it("compiles a water synthesis blueprint into an asset-backed reaction scene", () => {
+    const script = compileSceneBlueprintToPlaybookScript({
+      subject: "chemistry",
+      sceneType: "reaction_synthesis_water",
+      title: "Water synthesis reaction",
+      visualIntent: ["show_balanced_reaction", "show_electron_flow"],
+      emphasisPoints: ["reactants", "products", "atom conservation"],
+    });
+
+    expect(script.domain).toBe("chemistry");
+    const snapshot = script.steps[0].snapshot;
+    if (snapshot.kind !== "reaction_scene") {
+      throw new Error(`Expected reaction_scene, got ${snapshot.kind}`);
+    }
+    expect(snapshot.pack_id).toBe("chemistry-basic");
+    expect(snapshot.reaction_id).toBe("reaction_synthesis_water");
+    expect(snapshot.arrows.map((arrow) => arrow.asset_id)).toEqual(
+      expect.arrayContaining(["reaction-arrow"]),
+    );
+    expect(snapshot.electron_flows.map((flow) => flow.asset_id)).toEqual(
+      expect.arrayContaining(["electron-flow"]),
+    );
+    expect(snapshot.reactants.map((participant) => participant.formula_latex)).toEqual(
+      expect.arrayContaining(["H_2", "O_2"]),
+    );
+    expect(snapshot.products.map((participant) => participant.formula_latex)).toEqual(
+      expect.arrayContaining(["H_2O"]),
+    );
+    expect(visualQualityGate(script)).toEqual([]);
+
+    const markup = renderToStaticMarkup(<PlaybookComposition script={script} showSubtitles={false} />);
+    expect(markup).toContain("reaction-scene");
+    expect(markup).toContain('data-reaction-id="reaction_synthesis_water"');
+    expect(markup).toContain('data-asset-id="reaction-arrow"');
+    expect(markup).toContain('data-asset-id="electron-flow"');
+    expect(markup).not.toContain('data-missing-asset="true"');
+  });
+
   it("compiles a derivative tangent blueprint into a math plot scene", () => {
     const script = compileSceneBlueprintToPlaybookScript({
       subject: "math",

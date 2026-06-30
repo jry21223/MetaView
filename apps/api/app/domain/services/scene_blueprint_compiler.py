@@ -30,6 +30,10 @@ from app.domain.models.playbook import (
     PhysicsSceneObject,
     PhysicsSceneVector,
     PlaybookScript,
+    ReactionArrow,
+    ReactionElectronFlow,
+    ReactionParticipant,
+    ReactionSceneSnapshot,
 )
 from app.domain.models.topic import TopicDomain
 from app.domain.services.molecule_preset_resolver import resolve_molecule_preset_for_renderer
@@ -194,6 +198,16 @@ def _step_captions(scene_type: str, title: str, base_caption: str) -> list[str]:
             "这一帧展示 atom、bond 和 formula 如何共同说明同一个水分子。",
             "结论回到水分子：结构化原子和化学键决定它的二维形状，也支持后续讨论极性和氢键。",
         ],
+        "reaction_synthesis_water": [
+            "合成水反应先看 reaction_scene，氢气和氧气作为 reactants 放在反应箭头左侧。",
+            "reaction_arrow 资产表示反应方向，从反应物指向生成物，避免用纯文字代替反应关系。",
+            "electron_flow 资产标出成键过程中的电子流向，让反应机制成为可见层。",
+            "生成物 H2O 放在 products 区域，和左侧反应物形成一条守恒关系。",
+            "balanced atoms callout 强调配平后的原子数守恒，不只是把公式背下来。",
+            "公式 2H2 + O2 -> 2H2O 与图中 reactants、arrow 和 products 一一对应。",
+            "这一帧把 reaction_scene 中的反应物、生成物、反应箭头和电子流合成一个确定性布局。",
+            "结论回到 Water synthesis reaction：反应式、箭头方向、电子流和原子守恒必须一起阅读。",
+        ],
         "derivative_tangent": [
             "导数切线先看 math_plot 上的函数曲线，它给斜率判断提供可视坐标。",
             "标记点 x=1 固定在曲线上，说明导数讨论的是某一点附近的瞬时变化。",
@@ -241,6 +255,8 @@ def _compile_snapshot(scene_type: str, blueprint: dict[str, Any]):
         return _dna_replication_snapshot(blueprint)
     if scene_type == "molecule_2d_water":
         return _water_molecule_snapshot(blueprint)
+    if scene_type == "reaction_synthesis_water":
+        return _water_synthesis_reaction_snapshot(blueprint)
     if scene_type == "derivative_tangent":
         return _derivative_tangent_snapshot(blueprint)
     if scene_type == "bfs_graph":
@@ -505,6 +521,71 @@ def _water_molecule_snapshot(blueprint: dict[str, Any]) -> Molecule2DSceneSnapsh
         caption=str(
             blueprint.get("caption")
             or "Water is a bent polar molecule built from structured atom and bond data."
+        ),
+    )
+
+
+def _water_synthesis_reaction_snapshot(blueprint: dict[str, Any]) -> ReactionSceneSnapshot:
+    return ReactionSceneSnapshot(
+        pack_id=str(blueprint.get("packId") or "chemistry-basic"),
+        reaction_id="reaction_synthesis_water",
+        reactants=[
+            ReactionParticipant(
+                id="h2",
+                formula_latex="H_2",
+                label="hydrogen",
+                coefficient=2,
+                x=18,
+                y=48,
+            ),
+            ReactionParticipant(
+                id="o2",
+                formula_latex="O_2",
+                label="oxygen",
+                coefficient=1,
+                x=38,
+                y=48,
+            ),
+        ],
+        products=[
+            ReactionParticipant(
+                id="h2o",
+                formula_latex="H_2O",
+                label="water",
+                coefficient=2,
+                x=78,
+                y=48,
+            ),
+        ],
+        arrows=[
+            ReactionArrow(
+                id="main-arrow",
+                semantic_role="reaction_arrow",
+                **{"from": (48, 48)},
+                to=(66, 48),
+                label="forms",
+                asset_id="reaction-arrow",
+            ),
+        ],
+        electron_flows=[
+            ReactionElectronFlow(
+                id="electron-shift",
+                semantic_role="electron_flow",
+                **{"from": (39, 38)},
+                to=(58, 36),
+                label="bond rearrangement",
+                asset_id="electron-flow",
+            ),
+        ],
+        callouts=[
+            Molecule2DCallout(
+                id="balanced", target_id="main-arrow", label="balanced atoms", side="top"
+            ),
+        ],
+        formula_latex="2H_2 + O_2 \\rightarrow 2H_2O",
+        caption=str(
+            blueprint.get("caption")
+            or "A balanced reaction conserves each atom across reactants and products."
         ),
     )
 
