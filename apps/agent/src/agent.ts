@@ -44,7 +44,8 @@ export interface GenerateOptions {
   defaultApiKey?: string;
 }
 
-export const SYSTEM_PROMPT = `You are MetaView's educational visual designer. You build a
+export const SYSTEM_PROMPT =
+  `You are MetaView's educational visual designer. You build a
 step-by-step playbook by calling drawing tools.
 
 Workflow you MUST follow:
@@ -53,7 +54,13 @@ Workflow you MUST follow:
 2. Use deterministic runtime and animation tools before guessing. Call
    \`runtime_tool_list\` when SkillPack kernels or validators may help, and use
    \`runtime_tool_execute\` for exact SkillPack/kernel/validator facts. For
-   common teaching animations (function plots, tangents, integral areas,
+   geography, physics, biology, and chemistry visual lessons, prefer the
+   matching SkillPack runtime tool or SceneBlueprint-backed subject renderer
+   path before any hand-built Drawing CLI fallback. Subject visual scenes must
+   use semantic renderer kinds such as \`geo_map_scene\`,
+   \`physics_force_scene\`, \`bio_cell_scene\`, or \`molecule_2d_scene\`.
+   Do not use algorithm_array or algorithm_bars as a geography, biology, or
+   chemistry placeholder. For common teaching animations, including function plots, tangents, integral areas,
    parametric curves, graph traversal, force diagrams, projectile motion,
    stoichiometry tables, distributions, inheritance grids), call
    \`animation_tool_list\` / \`animation_tool_expand\` before manually composing
@@ -84,6 +91,8 @@ Workflow you MUST follow:
 
 Output discipline:
 - Use the most specific tool available; do not try to write CIR JSON directly.
+- For subject visual scenes, use SceneBlueprint/SkillPack-backed renderer
+  outputs instead of array placeholders.
 - Per step, prefer 1 chart-like visual element + a focused narration over a
   cluttered canvas.
 - For math parametric trajectories, ALWAYS \`assert_orientation\` before
@@ -92,7 +101,9 @@ Output discipline:
 
 const MAX_SELF_REPAIR_ATTEMPTS = 2;
 
-export async function runAgentGeneration(opts: GenerateOptions): Promise<PlaybookOutput> {
+export async function runAgentGeneration(
+  opts: GenerateOptions,
+): Promise<PlaybookOutput> {
   let userPrompt = buildAgentPrompt(opts.prompt, opts.routeDecision);
   let lastReport: SelfCheckReport | null = null;
 
@@ -115,7 +126,9 @@ export async function runAgentGeneration(opts: GenerateOptions): Promise<Playboo
     });
   }
 
-  throw new AgentSelfCheckError(lastReport ?? { status: "blocked", issues: [] });
+  throw new AgentSelfCheckError(
+    lastReport ?? { status: "blocked", issues: [] },
+  );
 }
 
 async function runAgentAttempt(
@@ -153,10 +166,7 @@ async function runAgentAttempt(
   // registry. We deliberately cast through ``unknown`` because callers can
   // pass arbitrary OpenAI-compatible providers (DeepSeek / Qwen / vLLM) that
   // aren't in the static registry.
-  const model = getModel(
-    providerName as KnownProvider,
-    modelName as never,
-  );
+  const model = getModel(providerName as KnownProvider, modelName as never);
   if (baseUrl) {
     // Override the default base URL so OpenAI-compatible servers (DeepSeek,
     // local vLLM, OpenRouter, …) hit the right endpoint.
@@ -179,8 +189,10 @@ async function runAgentAttempt(
   return emitter.finalize();
 }
 
-
-function buildAgentPrompt(prompt: string, routeDecision?: Record<string, unknown>): string {
+function buildAgentPrompt(
+  prompt: string,
+  routeDecision?: Record<string, unknown>,
+): string {
   if (!routeDecision) {
     return prompt;
   }
@@ -199,7 +211,9 @@ interface SelfRepairPromptInput {
   repairAttempt: number;
 }
 
-export function buildAgentSelfRepairPrompt(input: SelfRepairPromptInput): string {
+export function buildAgentSelfRepairPrompt(
+  input: SelfRepairPromptInput,
+): string {
   const payload = {
     reason: "agent self-check blocked the candidate PlaybookScript",
     repair_attempt: input.repairAttempt,
@@ -213,6 +227,7 @@ export function buildAgentSelfRepairPrompt(input: SelfRepairPromptInput): string
       "Keep PlaybookScript as the only rendering exit.",
       "Do not introduce raw HTML, iframe, Manim, or server video rendering.",
       "Use only renderer-supported snapshot kinds.",
+      "For snapshot.domain_fallback, rebuild through the matching SkillPack runtime tool or a SceneBlueprint-backed subject renderer such as geo_map_scene, physics_force_scene, bio_cell_scene, or molecule_2d_scene. Do not repair this by renaming algorithm_array; replace the visual plan.",
       "Call finalize_playbook only after addressing all error-level self-check issues.",
     ],
   };
