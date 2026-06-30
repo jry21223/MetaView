@@ -23,19 +23,21 @@ const FLAGSHIP_IDS = [
   "east_asia_monsoon",
   "projectile_motion",
   "cell_structure",
+  "dna_replication",
   "molecule_2d_water",
   "derivative_tangent",
   "bfs_graph",
 ];
 
 describe("subject visual showcase catalog", () => {
-  it("lists the six roadmap flagship fixtures with renderer and asset pack metadata", () => {
+  it("lists the roadmap flagship fixtures with renderer and asset pack metadata", () => {
     const entries = listSubjectVisualShowcaseEntries();
 
     expect(entries.map((entry) => entry.id)).toEqual(FLAGSHIP_IDS);
     expect(entries.map((entry) => entry.packId)).toEqual([
       "geography-earth-basic",
       "physics-basic",
+      "biology-basic",
       "biology-basic",
       "chemistry-basic",
       "math-basic",
@@ -45,6 +47,7 @@ describe("subject visual showcase catalog", () => {
       "geo_map_scene",
       "physics_force_scene",
       "bio_cell_scene",
+      "bio_process_scene",
       "molecule_2d_scene",
       "math_plot",
       "graph_scene",

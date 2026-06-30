@@ -164,6 +164,37 @@ describe("sceneBlueprintCompiler", () => {
     expect(markup).not.toContain('data-missing-asset="true"');
   });
 
+  it("compiles a dna replication blueprint into an asset-backed biology process scene", () => {
+    const script = compileSceneBlueprintToPlaybookScript({
+      subject: "biology",
+      sceneType: "dna_replication",
+      title: "DNA replication",
+      visualIntent: ["show_process_steps", "show_complementary_base_pairing"],
+      emphasisPoints: ["template DNA", "replication fork", "new strands"],
+    });
+
+    expect(script.domain).toBe("biology");
+    const snapshot = script.steps[0].snapshot;
+    if (snapshot.kind !== "bio_process_scene") {
+      throw new Error(`Expected bio_process_scene, got ${snapshot.kind}`);
+    }
+    expect(snapshot.pack_id).toBe("biology-basic");
+    expect(snapshot.process_id).toBe("dna_replication");
+    expect(snapshot.steps.map((processStep) => processStep.asset_id)).toEqual(
+      expect.arrayContaining(["dna-helix", "replication-fork"]),
+    );
+    expect(snapshot.connections.map((connection) => connection.asset_id)).toEqual(
+      expect.arrayContaining(["core-flow-arrow"]),
+    );
+    expect(visualQualityGate(script)).toEqual([]);
+
+    const markup = renderToStaticMarkup(<PlaybookComposition script={script} showSubtitles={false} />);
+    expect(markup).toContain("bio-process-scene");
+    expect(markup).toContain('data-process-id="dna_replication"');
+    expect(markup).toContain('data-asset-id="replication-fork"');
+    expect(markup).not.toContain('data-missing-asset="true"');
+  });
+
   it("compiles a water molecule blueprint into a structured chemistry scene", () => {
     const preset = resolveMoleculePresetForRenderer("chemistry-basic", "water");
     const script = compileSceneBlueprintToPlaybookScript({

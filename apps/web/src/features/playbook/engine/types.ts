@@ -20,6 +20,7 @@ export type SnapshotKind =
   | "manifold_scene"
   | "solid_geometry_scene"
   | "bio_cell_scene"
+  | "bio_process_scene"
   | "molecule_2d_scene"
   | "geo_map_scene"
   | "physics_force_scene"
@@ -467,6 +468,37 @@ export interface BioCellSceneSnapshot {
   caption?: string | null;
 }
 
+export interface BioProcessStep {
+  id: string;
+  semantic_role: "dna" | "process_step" | "enzyme" | string;
+  label?: string | null;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  asset_id?: string | null;
+  description?: string | null;
+}
+
+export interface BioProcessConnection {
+  id: string;
+  from: string;
+  to: string;
+  semantic_role: "flow_arrow" | "causal_arrow" | "timeline_arrow" | string;
+  label?: string | null;
+  asset_id?: string | null;
+}
+
+export interface BioProcessSceneSnapshot {
+  kind: "bio_process_scene";
+  pack_id?: string | null;
+  process_id: string;
+  steps: BioProcessStep[];
+  connections?: BioProcessConnection[];
+  callouts?: BioCellCallout[];
+  caption?: string | null;
+}
+
 export interface Molecule2DAtom {
   id: string;
   element: string;
@@ -616,6 +648,7 @@ export type AnySnapshot =
   | ManifoldSceneSnapshot
   | SolidGeometrySceneSnapshot
   | BioCellSceneSnapshot
+  | BioProcessSceneSnapshot
   | Molecule2DSceneSnapshot
   | GeoMapSceneSnapshot
   | PhysicsForceSceneSnapshot

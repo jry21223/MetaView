@@ -3,6 +3,7 @@ import type { SceneBlueprint } from "../compiler/sceneBlueprintCompiler";
 export type SubjectVisualFixtureId =
   | "bfs_graph"
   | "cell_structure"
+  | "dna_replication"
   | "derivative_tangent"
   | "east_asia_monsoon"
   | "molecule_2d_water"
@@ -12,6 +13,7 @@ export const SUBJECT_VISUAL_BLUEPRINT_IDS: readonly SubjectVisualFixtureId[] = [
   "east_asia_monsoon",
   "projectile_motion",
   "cell_structure",
+  "dna_replication",
   "molecule_2d_water",
   "derivative_tangent",
   "bfs_graph",
@@ -33,6 +35,14 @@ export const subjectVisualBlueprints: Record<SubjectVisualFixtureId, SceneBluepr
     title: "Cell structure",
     visualIntent: ["show_cell_structure", "label_core_organelles"],
     emphasisPoints: ["nucleus", "mitochondrion", "cell membrane"],
+  },
+  dna_replication: {
+    id: "dna_replication",
+    subject: "biology",
+    sceneType: "dna_replication",
+    title: "DNA replication",
+    visualIntent: ["show_process_steps", "show_complementary_base_pairing"],
+    emphasisPoints: ["template DNA", "replication fork", "new strands"],
   },
   derivative_tangent: {
     id: "derivative_tangent",

@@ -36,6 +36,12 @@ describe("assetResolver", () => {
     expect(resolveAssetForRenderer("molecule_2d_scene", "molecule")).toMatchObject({
       id: "water-molecule-preset",
     });
+    expect(resolveAssetForRenderer("bio_process_scene", "process_step")).toMatchObject({
+      id: "replication-fork",
+    });
+    expect(resolveAssetForRenderer("bio_process_scene", "flow_arrow", "core-visual-basic")).toMatchObject({
+      id: "core-flow-arrow",
+    });
     expect(resolveAssetForRenderer("math_plot", "tangent")).toMatchObject({
       id: "derivative-tangent-preset",
     });

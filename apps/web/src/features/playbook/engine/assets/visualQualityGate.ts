@@ -2,6 +2,7 @@ import { findAssetById, findAssetByRole } from "./assetRegistry";
 import type {
   AnySnapshot,
   BioCellSceneSnapshot,
+  BioProcessSceneSnapshot,
   GeoMapSceneSnapshot,
   GraphSceneSnapshot,
   MetaStep,
@@ -16,6 +17,7 @@ export type VisualQualityWarningCode =
   | "empty_physics_force_scene"
   | "missing_asset"
   | "low_biology_structure_assets"
+  | "low_biology_process_assets"
   | "low_chemistry_structure_data"
   | "low_algorithm_state_visuals"
   | "low_math_visual_richness"
@@ -80,6 +82,22 @@ function checkAssetId(
     asset_id: assetId,
     pack_id: packId,
     message: `Asset "${assetId}" could not be resolved from pack "${packId ?? "any"}".`,
+  });
+}
+
+function checkAssetIdFromPackOrAny(
+  warnings: VisualQualityWarning[],
+  context: SnapshotContext,
+  assetId: string | null | undefined,
+  preferredPackId: string | null | undefined,
+) {
+  if (!assetId || assetResolves(assetId, preferredPackId) || assetResolves(assetId, undefined)) return;
+  warn(warnings, context, {
+    code: "missing_asset",
+    domain: context.domain,
+    asset_id: assetId,
+    pack_id: preferredPackId,
+    message: `Asset "${assetId}" could not be resolved from pack "${preferredPackId ?? "any"}" or any registered pack.`,
   });
 }
 
@@ -148,6 +166,36 @@ function checkBioCellScene(
 
   for (const structure of snapshot.structures) {
     checkAssetId(warnings, context, structure.asset_id, snapshot.pack_id);
+  }
+}
+
+function checkBioProcessScene(
+  warnings: VisualQualityWarning[],
+  context: SnapshotContext,
+  snapshot: BioProcessSceneSnapshot,
+) {
+  const assetBackedSteps = snapshot.steps.filter((processStep) => {
+    if (processStep.asset_id) {
+      return assetResolves(processStep.asset_id, snapshot.pack_id) || assetResolves(processStep.asset_id, undefined);
+    }
+    return Boolean(findAssetByRole("biology", processStep.semantic_role, snapshot.pack_id));
+  });
+
+  const hasProcessRelation = (snapshot.connections?.length ?? 0) > 0 || (snapshot.callouts?.length ?? 0) > 0;
+  if (assetBackedSteps.length < 2 || !hasProcessRelation) {
+    warn(warnings, context, {
+      code: "low_biology_process_assets",
+      domain: context.domain,
+      pack_id: snapshot.pack_id,
+      message: "bio_process_scene should include at least two resolvable process assets plus a connection or callout.",
+    });
+  }
+
+  for (const processStep of snapshot.steps) {
+    checkAssetId(warnings, context, processStep.asset_id, snapshot.pack_id);
+  }
+  for (const connection of snapshot.connections ?? []) {
+    checkAssetIdFromPackOrAny(warnings, context, connection.asset_id, snapshot.pack_id);
   }
 }
 
@@ -301,6 +349,9 @@ export function visualQualityGate(script: PlaybookScript): VisualQualityWarning[
       }
       if (snapshot.kind === "bio_cell_scene") {
         checkBioCellScene(warnings, context, snapshot);
+      }
+      if (snapshot.kind === "bio_process_scene") {
+        checkBioProcessScene(warnings, context, snapshot);
       }
       if (snapshot.kind === "molecule_2d_scene") {
         checkMolecule2DScene(warnings, context, snapshot);

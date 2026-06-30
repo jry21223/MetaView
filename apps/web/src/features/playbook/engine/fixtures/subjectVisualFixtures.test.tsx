@@ -19,6 +19,7 @@ const FLAGSHIP_IDS: SubjectVisualFixtureId[] = [
   "east_asia_monsoon",
   "projectile_motion",
   "cell_structure",
+  "dna_replication",
   "molecule_2d_water",
   "derivative_tangent",
   "bfs_graph",
@@ -95,6 +96,21 @@ describe("subject visual fixtures", () => {
     expect(markup).toContain('data-asset-id="cell-outline"');
     expect(markup).toContain('data-asset-id="nucleus"');
     expect(markup).toContain('data-asset-id="mitochondrion"');
+    expect(markup).toContain('data-semantic-role="callout"');
+    expect(markup).not.toContain("Unknown snapshot kind");
+    expect(markup).not.toContain('data-missing-asset="true"');
+  });
+
+  it("statically renders dna_replication through PlaybookComposition", () => {
+    const markup = renderToStaticMarkup(
+      <PlaybookComposition script={getSubjectVisualFixture("dna_replication")} showSubtitles={false} />,
+    );
+
+    expect(markup).toContain("bio-process-scene");
+    expect(markup).toContain('data-process-id="dna_replication"');
+    expect(markup).toContain('data-asset-id="dna-helix"');
+    expect(markup).toContain('data-asset-id="replication-fork"');
+    expect(markup).toContain('data-asset-id="core-flow-arrow"');
     expect(markup).toContain('data-semantic-role="callout"');
     expect(markup).not.toContain("Unknown snapshot kind");
     expect(markup).not.toContain('data-missing-asset="true"');

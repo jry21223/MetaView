@@ -158,6 +158,46 @@ describe("visualQualityGate", () => {
     );
   });
 
+  it("warns when a biology process asset_id cannot be resolved", () => {
+    const warnings = visualQualityGate(
+      script({
+        domain: "biology",
+        steps: [
+          {
+            step_id: "dna_replication",
+            end_frame: 90,
+            title: "DNA replication",
+            voiceover_text: "",
+            tokens: [],
+            snapshot: {
+              kind: "bio_process_scene",
+              pack_id: "biology-basic",
+              process_id: "dna_replication",
+              steps: [
+                { id: "template", semantic_role: "dna", label: "template", x: 22, y: 48, width: 18, height: 38, asset_id: "dna-helix" },
+                { id: "fork", semantic_role: "process_step", label: "fork", x: 50, y: 48, width: 24, height: 24, asset_id: "missing-fork" },
+              ],
+              connections: [
+                { id: "template-to-fork", from: "template", to: "fork", semantic_role: "flow_arrow", asset_id: "core-flow-arrow" },
+              ],
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "missing_asset",
+          step_id: "dna_replication",
+          asset_id: "missing-fork",
+          pack_id: "biology-basic",
+        }),
+      ]),
+    );
+  });
+
   it("warns when a chemistry molecule asset_id cannot be resolved", () => {
     const warnings = visualQualityGate(
       script({

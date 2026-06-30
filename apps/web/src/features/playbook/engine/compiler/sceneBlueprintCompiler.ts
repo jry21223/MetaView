@@ -5,6 +5,7 @@ import type { SubjectVisualKitSubject } from "../assets/assetRegistry";
 import type {
   AnySnapshot,
   BioCellSceneSnapshot,
+  BioProcessSceneSnapshot,
   CodeHighlightOverlay,
   GeoMapFlow,
   GeoMapSceneSnapshot,
@@ -20,13 +21,14 @@ import type {
 
 type GeoSceneType = "geo_map_scene" | "east_asia_monsoon";
 type PhysicsSceneType = "physics_force_scene" | "projectile_motion";
-type BiologySceneType = "bio_cell_scene" | "cell_structure";
+type BiologySceneType = "bio_cell_scene" | "bio_process_scene" | "cell_structure" | "dna_replication";
 type ChemistrySceneType = "molecule_2d_scene" | "molecule_2d_water";
 type MathSceneType = "math_plot" | "derivative_tangent";
 type AlgorithmSceneType = "graph_scene" | "bfs_graph";
 type SceneBlueprintSubject = "algorithm" | "biology" | "chemistry" | "geography" | "math" | "physics";
 type SupportedRendererKind =
   | "bio_cell_scene"
+  | "bio_process_scene"
   | "geo_map_scene"
   | "graph_scene"
   | "math_plot"
@@ -137,6 +139,7 @@ export interface SceneBlueprintCompileResult {
 const DEFAULT_GEO_PACK_ID = "geography-earth-basic";
 const DEFAULT_PHYSICS_PACK_ID = "physics-basic";
 const DEFAULT_BIOLOGY_PACK_ID = "biology-basic";
+const DEFAULT_CORE_PACK_ID = "core-visual-basic";
 const DEFAULT_CHEMISTRY_PACK_ID = "chemistry-basic";
 const DEFAULT_MATH_PACK_ID = "math-basic";
 const DEFAULT_ALGORITHM_PACK_ID = "algorithm-code-basic";
@@ -289,6 +292,78 @@ function compileBiologySnapshot(blueprint: BiologySceneBlueprint): BioCellSceneS
       { id: "mitochondrion-callout", target_id: "mitochondrion", label: "releases energy", side: "right" },
     ],
     caption: blueprint.caption ?? "Animal cells contain specialized organelles with distinct functions.",
+  };
+}
+
+function compileBiologyProcessSnapshot(blueprint: BiologySceneBlueprint): BioProcessSceneSnapshot {
+  const packId = blueprint.packId ?? DEFAULT_BIOLOGY_PACK_ID;
+  const dnaAssetId = resolveAssetIdByRole("bio_process_scene", "biology", packId, "dna");
+  const forkAssetId = resolveAssetIdByRole("bio_process_scene", "biology", packId, "process_step", [
+    "dna_replication",
+  ]);
+  const flowArrowAssetId = resolveAssetIdByRole("bio_process_scene", "core", DEFAULT_CORE_PACK_ID, "flow_arrow", [
+    "causal_arrow",
+  ]);
+
+  return {
+    kind: "bio_process_scene",
+    pack_id: packId,
+    process_id: "dna_replication",
+    steps: [
+      {
+        id: "template",
+        semantic_role: "dna",
+        label: "template DNA",
+        x: 22,
+        y: 48,
+        width: 18,
+        height: 38,
+        asset_id: dnaAssetId,
+      },
+      {
+        id: "fork",
+        semantic_role: "process_step",
+        label: "replication fork",
+        x: 50,
+        y: 48,
+        width: 24,
+        height: 24,
+        asset_id: forkAssetId,
+        description: "strand separation and base pairing",
+      },
+      {
+        id: "copy",
+        semantic_role: "dna",
+        label: "new strands",
+        x: 78,
+        y: 48,
+        width: 18,
+        height: 38,
+        asset_id: dnaAssetId,
+      },
+    ],
+    connections: [
+      {
+        id: "template-to-fork",
+        from: "template",
+        to: "fork",
+        semantic_role: "flow_arrow",
+        label: "unzip",
+        asset_id: flowArrowAssetId,
+      },
+      {
+        id: "fork-to-copy",
+        from: "fork",
+        to: "copy",
+        semantic_role: "flow_arrow",
+        label: "copy",
+        asset_id: flowArrowAssetId,
+      },
+    ],
+    callouts: [
+      { id: "base-pairing", target_id: "fork", label: "base pairing", side: "top" },
+    ],
+    caption: blueprint.caption ?? "DNA replication copies each strand by complementary base pairing.",
   };
 }
 
@@ -464,6 +539,9 @@ function compilePhysicsSnapshot(blueprint: PhysicsForceSceneBlueprint): PhysicsF
 
 function compileSnapshot(blueprint: SceneBlueprint): AnySnapshot {
   if (blueprint.subject === "algorithm") return compileAlgorithmSnapshot(blueprint);
+  if (blueprint.subject === "biology" && (blueprint.sceneType === "dna_replication" || blueprint.sceneType === "bio_process_scene")) {
+    return compileBiologyProcessSnapshot(blueprint);
+  }
   if (blueprint.subject === "biology") return compileBiologySnapshot(blueprint);
   if (blueprint.subject === "chemistry") return compileChemistrySnapshot(blueprint);
   if (blueprint.subject === "geography") return compileGeographySnapshot(blueprint);

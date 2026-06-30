@@ -46,17 +46,19 @@ describe("assetRegistry", () => {
     expect(findAssetByRole("core", "callout")?.id).toBe("core-callout-label");
     expect(findAssetByRole("core", "moisture_particles")?.id).toBe("core-moisture-particles");
     expect(findAssetByRole("geography", "wind")?.id).toBe("monsoon-wind-arrow");
+    expect(findAssetByRole("biology", "process_step")?.id).toBe("replication-fork");
     expect(findAssetByRole("math", "tangent")?.id).toBe("derivative-tangent-preset");
     expect(findAssetByRole("physics", "force")?.id).toBe("force-vector-arrow");
   });
 
   it("keeps rendererKinds aligned with the dedicated scene renderers", () => {
-    expect(getAssetPack("biology-basic")?.rendererKinds).toEqual(["bio_cell_scene"]);
+    expect(getAssetPack("biology-basic")?.rendererKinds).toEqual(["bio_cell_scene", "bio_process_scene"]);
     expect(getAssetPack("chemistry-basic")?.rendererKinds).toEqual(["molecule_2d_scene"]);
     expect(getAssetPack("core-visual-basic")?.rendererKinds).toEqual([
       "geo_map_scene",
       "physics_force_scene",
       "bio_cell_scene",
+      "bio_process_scene",
       "molecule_2d_scene",
       "math_plot",
       "math_formula",
@@ -141,6 +143,9 @@ describe("assetRegistry", () => {
       'data-asset-quality="v1"',
     );
     expect(readPublicAsset("/assets/metaview-kits/biology-basic/icons/mitochondrion.svg")).toContain(
+      'data-asset-quality="v1"',
+    );
+    expect(readPublicAsset("/assets/metaview-kits/biology-basic/icons/replication-fork.svg")).toContain(
       'data-asset-quality="v1"',
     );
     expect(readPublicAsset("/assets/metaview-kits/chemistry-basic/symbols/atom-core.svg")).toContain(

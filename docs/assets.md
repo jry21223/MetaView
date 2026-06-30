@@ -44,7 +44,7 @@ The backend mirror uses `apps/api/app/domain/services/molecule_preset_resolver.p
 against the same public preset JSON before returning `PlaybookScript` to
 SkillPack/runtime-tool callers.
 The current supported scene blueprints are `east_asia_monsoon`,
-`projectile_motion`, `cell_structure`, `molecule_2d_water`,
+`projectile_motion`, `cell_structure`, `dna_replication`, `molecule_2d_water`,
 `derivative_tangent`, and `bfs_graph`.
 The backend mirror lives at
 `apps/api/app/domain/services/scene_blueprint_compiler.py` so SkillPack or
@@ -73,7 +73,8 @@ Current backend SkillPack adoption:
   symbols for `geo_map_scene`.
 - `physics-basic`: internal SVGs for force vector, projectile object, block,
   ramp, spring, and pulley roles.
-- `biology-basic`: internal organelle SVGs for `bio_cell_scene`.
+- `biology-basic`: internal organelle and DNA process SVGs for `bio_cell_scene`
+  and `bio_process_scene`.
 - `chemistry-basic`: internal atom/bond SVGs plus structured molecule presets
   for `molecule_2d_scene`.
 - `math-basic`: structured plot presets for math plot/formula scenes.
@@ -115,6 +116,7 @@ snapshot catalog.
 | `east_asia_monsoon` | geography | `geography-earth-basic` | `geo_map_scene` | Natural Earth map layer, monsoon flow asset, pressure centers |
 | `projectile_motion` | physics | `physics-basic` | `physics_force_scene` | projectile asset, vector asset, trajectory, motion trail |
 | `cell_structure` | biology | `biology-basic` | `bio_cell_scene` | cell, nucleus, mitochondrion assets plus callouts |
+| `dna_replication` | biology | `biology-basic` | `bio_process_scene` | DNA helix, replication fork, core flow arrow, process callout |
 | `molecule_2d_water` | chemistry | `chemistry-basic` | `molecule_2d_scene` | structured atoms/bonds and molecule preset |
 | `derivative_tangent` | math | `math-basic` | `math_plot` | formula plus curve/tangent plot markers |
 | `bfs_graph` | algorithm | `algorithm-code-basic` | `graph_scene` | graph node, queue, active-edge assets plus code track |

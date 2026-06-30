@@ -7,7 +7,7 @@
   "licenseMode": "single",
   "defaultLicense": "internal",
   "sceneTemplates": ["cell_structure", "dna_replication"],
-  "rendererKinds": ["bio_cell_scene"],
+  "rendererKinds": ["bio_cell_scene", "bio_process_scene"],
   "sources": [
     {
       "id": "metaview-internal",
@@ -139,6 +139,31 @@
       "rendererHints": {
         "preferredRenderer": "bio_cell_scene",
         "defaultSize": [48, 72],
+        "anchor": "center",
+        "colorizable": true,
+        "strokeControlled": true
+      }
+    },
+    {
+      "id": "replication-fork",
+      "type": "svg",
+      "path": "/assets/metaview-kits/biology-basic/icons/replication-fork.svg",
+      "tags": ["dna", "replication", "process", "fork"],
+      "semanticRoles": ["process_step", "dna_replication"],
+      "sourceId": "metaview-internal",
+      "attribution": "MetaView internal SVG primitive",
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "commercialUseAllowed": true,
+      "requiresAttribution": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null,
+      "rendererHints": {
+        "preferredRenderer": "bio_process_scene",
+        "defaultSize": [72, 72],
         "anchor": "center",
         "colorizable": true,
         "strokeControlled": true
