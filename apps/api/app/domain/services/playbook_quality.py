@@ -37,10 +37,17 @@ SUPPORTED_FRONTEND_SNAPSHOT_KINDS = {
     "modeling_scene",
     "manifold_scene",
     "solid_geometry_scene",
+    "bio_cell_scene",
+    "molecule_2d_scene",
+    "geo_map_scene",
+    "physics_force_scene",
     "motion_scene",
     "katex_overlay",
     "narration_card",
 }
+
+_SUBJECT_VISUAL_DOMAINS = {"geography", "biology", "chemistry"}
+_ALGORITHM_FALLBACK_KINDS = {"algorithm_array", "algorithm_bars"}
 
 _FORBIDDEN_RENDERING_PATTERNS = (
     "<html",
@@ -74,55 +81,65 @@ def self_check_playbook(playbook: PlaybookScript, prompt: str) -> PlaybookCheckR
 
 def _check_structure(playbook: PlaybookScript, issues: list[PlaybookReviewIssue]) -> None:
     if not playbook.title.strip():
-        issues.append(_issue(
-            "step.too_shallow",
-            PlaybookIssueSeverity.ERROR,
-            "title",
-            "Playbook title is empty.",
-            "Set a short title that names the lesson.",
-        ))
+        issues.append(
+            _issue(
+                "step.too_shallow",
+                PlaybookIssueSeverity.ERROR,
+                "title",
+                "Playbook title is empty.",
+                "Set a short title that names the lesson.",
+            )
+        )
     if not playbook.summary.strip():
-        issues.append(_issue(
-            "step.too_shallow",
-            PlaybookIssueSeverity.WARNING,
-            "summary",
-            "Playbook summary is empty.",
-            "Add a one-sentence summary of the lesson.",
-        ))
+        issues.append(
+            _issue(
+                "step.too_shallow",
+                PlaybookIssueSeverity.WARNING,
+                "summary",
+                "Playbook summary is empty.",
+                "Add a one-sentence summary of the lesson.",
+            )
+        )
     if len(playbook.steps) < MIN_AGENT_STEPS or len(playbook.steps) > MAX_AGENT_STEPS:
-        issues.append(_issue(
-            "step.too_shallow",
-            PlaybookIssueSeverity.ERROR,
-            "steps",
-            (
-                f"Playbook has {len(playbook.steps)} step(s); launch-safe "
-                f"bounds are {MIN_AGENT_STEPS}-{MAX_AGENT_STEPS}."
-            ),
-            "Regenerate with a concise but complete step sequence.",
-        ))
+        issues.append(
+            _issue(
+                "step.too_shallow",
+                PlaybookIssueSeverity.ERROR,
+                "steps",
+                (
+                    f"Playbook has {len(playbook.steps)} step(s); launch-safe "
+                    f"bounds are {MIN_AGENT_STEPS}-{MAX_AGENT_STEPS}."
+                ),
+                "Regenerate with a concise but complete step sequence.",
+            )
+        )
 
 
 def _check_timing(playbook: PlaybookScript, issues: list[PlaybookReviewIssue]) -> None:
     previous_end = 0
     for index, step in enumerate(playbook.steps):
         if step.end_frame <= previous_end:
-            issues.append(_issue(
-                "timeline.non_monotonic",
-                PlaybookIssueSeverity.ERROR,
-                f"steps[{index}].end_frame",
-                "Step end_frame values must be strictly increasing.",
-                "Increase each step end_frame beyond the previous step.",
-            ))
+            issues.append(
+                _issue(
+                    "timeline.non_monotonic",
+                    PlaybookIssueSeverity.ERROR,
+                    f"steps[{index}].end_frame",
+                    "Step end_frame values must be strictly increasing.",
+                    "Increase each step end_frame beyond the previous step.",
+                )
+            )
         previous_end = step.end_frame
 
     if playbook.steps and playbook.total_frames < playbook.steps[-1].end_frame:
-        issues.append(_issue(
-            "timeline.exceeds_total_frames",
-            PlaybookIssueSeverity.ERROR,
-            "total_frames",
-            "total_frames does not cover the final step end_frame.",
-            "Set total_frames to at least the last step's end_frame.",
-        ))
+        issues.append(
+            _issue(
+                "timeline.exceeds_total_frames",
+                PlaybookIssueSeverity.ERROR,
+                "total_frames",
+                "total_frames does not cover the final step end_frame.",
+                "Set total_frames to at least the last step's end_frame.",
+            )
+        )
 
 
 def _check_steps(
@@ -132,22 +149,32 @@ def _check_steps(
 ) -> None:
     for index, step in enumerate(playbook.steps):
         if not step.voiceover_text.strip():
-            issues.append(_issue(
-                "step.empty_voiceover",
-                PlaybookIssueSeverity.ERROR,
-                f"steps[{index}].voiceover_text",
-                "Every step must have non-empty voiceover_text.",
-                "Write narration that explains why the step matters and what changes visually.",
-            ))
+            issues.append(
+                _issue(
+                    "step.empty_voiceover",
+                    PlaybookIssueSeverity.ERROR,
+                    f"steps[{index}].voiceover_text",
+                    "Every step must have non-empty voiceover_text.",
+                    "Write narration that explains why the step matters and what changes visually.",
+                )
+            )
         _check_snapshot(step.snapshot, f"steps[{index}].snapshot", issues)
+        _check_subject_visual_fallback(
+            playbook.domain,
+            step.snapshot,
+            f"steps[{index}].snapshot",
+            issues,
+        )
         if not step.layers:
-            issues.append(_issue(
-                "renderer.contract_risk",
-                PlaybookIssueSeverity.ERROR,
-                f"steps[{index}].layers",
-                "Every step must carry at least one renderer layer.",
-                "Mirror the primary snapshot into layers[0].body.",
-            ))
+            issues.append(
+                _issue(
+                    "renderer.contract_risk",
+                    PlaybookIssueSeverity.ERROR,
+                    f"steps[{index}].layers",
+                    "Every step must carry at least one renderer layer.",
+                    "Mirror the primary snapshot into layers[0].body.",
+                )
+            )
         else:
             _check_primary_layer_mirror(
                 step.snapshot,
@@ -177,51 +204,82 @@ def _check_primary_layer_mirror(
     snapshot_kind = getattr(snapshot, "kind", None)
     layer_kind = getattr(primary_layer_body, "kind", None)
     if layer_kind != snapshot_kind:
-        issues.append(_issue(
-            "renderer.contract_risk",
-            PlaybookIssueSeverity.ERROR,
-            f"{path}.kind",
-            (
-                "Primary renderer layer kind must match the step snapshot kind; "
-                f"got {layer_kind!r} for snapshot kind {snapshot_kind!r}."
-            ),
-            "Mirror the primary snapshot into layers[0].body before adding overlay layers.",
-        ))
+        issues.append(
+            _issue(
+                "renderer.contract_risk",
+                PlaybookIssueSeverity.ERROR,
+                f"{path}.kind",
+                (
+                    "Primary renderer layer kind must match the step snapshot kind; "
+                    f"got {layer_kind!r} for snapshot kind {snapshot_kind!r}."
+                ),
+                "Mirror the primary snapshot into layers[0].body before adding overlay layers.",
+            )
+        )
         return
 
     if _snapshot_json(primary_layer_body) != _snapshot_json(snapshot):
-        issues.append(_issue(
-            "renderer.contract_risk",
-            PlaybookIssueSeverity.ERROR,
-            path,
-            "Primary renderer layer body must deeply equal the step snapshot.",
-            "Copy the full primary snapshot into layers[0].body and put overlays after it.",
-        ))
+        issues.append(
+            _issue(
+                "renderer.contract_risk",
+                PlaybookIssueSeverity.ERROR,
+                path,
+                "Primary renderer layer body must deeply equal the step snapshot.",
+                "Copy the full primary snapshot into layers[0].body and put overlays after it.",
+            )
+        )
 
 
 def _check_snapshot(snapshot: Any, path: str, issues: list[PlaybookReviewIssue]) -> None:
     kind = getattr(snapshot, "kind", None)
     if kind not in SUPPORTED_FRONTEND_SNAPSHOT_KINDS:
-        issues.append(_issue(
-            "snapshot.unsupported_kind",
-            PlaybookIssueSeverity.ERROR,
-            f"{path}.kind",
-            f"Snapshot kind {kind!r} is not registered in the frontend renderer registry.",
-            "Use one of the existing renderer-backed snapshot kinds.",
-        ))
+        issues.append(
+            _issue(
+                "snapshot.unsupported_kind",
+                PlaybookIssueSeverity.ERROR,
+                f"{path}.kind",
+                f"Snapshot kind {kind!r} is not registered in the frontend renderer registry.",
+                "Use one of the existing renderer-backed snapshot kinds.",
+            )
+        )
         return
     if not _snapshot_has_meaningful_payload(snapshot):
-        issues.append(_issue(
-            "snapshot.empty_payload",
-            PlaybookIssueSeverity.ERROR,
-            path,
-            f"Snapshot {kind!r} has no meaningful visual payload.",
-            (
-                "Add renderer-visible data such as array values, curves, scene objects, "
-                "or formula text."
-            ),
-        ))
+        issues.append(
+            _issue(
+                "snapshot.empty_payload",
+                PlaybookIssueSeverity.ERROR,
+                path,
+                f"Snapshot {kind!r} has no meaningful visual payload.",
+                (
+                    "Add renderer-visible data such as array values, curves, scene objects, "
+                    "or formula text."
+                ),
+            )
+        )
     _check_algorithm_indices(snapshot, path, issues)
+
+
+def _check_subject_visual_fallback(
+    domain: str,
+    snapshot: Any,
+    path: str,
+    issues: list[PlaybookReviewIssue],
+) -> None:
+    normalized_domain = domain.strip().lower()
+    kind = getattr(snapshot, "kind", None)
+    if normalized_domain in _SUBJECT_VISUAL_DOMAINS and kind in _ALGORITHM_FALLBACK_KINDS:
+        issues.append(
+            _issue(
+                "snapshot.domain_fallback",
+                PlaybookIssueSeverity.ERROR,
+                f"{path}.kind",
+                f"{normalized_domain} playbooks must not fall back to {kind}.",
+                (
+                    "Use a SceneBlueprint or subject semantic renderer such as geo_map_scene, "
+                    "bio_cell_scene, or molecule_2d_scene instead of an algorithm array."
+                ),
+            )
+        )
 
 
 def _snapshot_json(snapshot: Any) -> dict[str, Any]:
@@ -282,9 +340,7 @@ def _snapshot_has_meaningful_payload(snapshot: Any) -> bool:
         return bool(data.get("variables") or data.get("relations") or data.get("simulation_series"))
     if kind == "manifold_scene":
         return bool(
-            data.get("chart_name")
-            or data.get("param_surface")
-            or data.get("tangent_vectors")
+            data.get("chart_name") or data.get("param_surface") or data.get("tangent_vectors")
         )
     if kind == "solid_geometry_scene":
         return bool(
@@ -294,6 +350,14 @@ def _snapshot_has_meaningful_payload(snapshot: Any) -> bool:
             or data.get("vectors")
             or data.get("visible_elements")
         )
+    if kind == "bio_cell_scene":
+        return bool(data.get("structures") or data.get("callouts"))
+    if kind == "molecule_2d_scene":
+        return bool(data.get("atoms") or data.get("bonds") or data.get("molecule_asset_id"))
+    if kind == "geo_map_scene":
+        return bool(data.get("layers") or data.get("flows") or data.get("pressure_centers"))
+    if kind == "physics_force_scene":
+        return bool(data.get("objects") or data.get("vectors") or data.get("trajectory"))
     if kind == "motion_scene":
         return bool(data.get("objects") or data.get("tracks"))
     if kind == "katex_overlay":
@@ -318,13 +382,15 @@ def _check_algorithm_indices(
         *snapshot.pointers.values(),
     ]
     if any(index < 0 or index >= count for index in indices):
-        issues.append(_issue(
-            "algorithm.invalid_state_transition",
-            PlaybookIssueSeverity.ERROR,
-            path,
-            "Algorithm snapshot references an array index outside array_values.",
-            "Keep active, swap, sorted, and pointer indices within the array length.",
-        ))
+        issues.append(
+            _issue(
+                "algorithm.invalid_state_transition",
+                PlaybookIssueSeverity.ERROR,
+                path,
+                "Algorithm snapshot references an array index outside array_values.",
+                "Keep active, swap, sorted, and pointer indices within the array length.",
+            )
+        )
 
 
 def _check_code_highlight(
@@ -335,13 +401,15 @@ def _check_code_highlight(
     line_count = len(code.lines)
     active_lines = [*code.active_lines, code.active_line]
     if any(line < 0 or line >= line_count for line in active_lines):
-        issues.append(_issue(
-            "code.line_out_of_range",
-            PlaybookIssueSeverity.ERROR,
-            f"steps[{step_index}].code_highlight.active_lines",
-            "Code highlight references a line outside the provided source lines.",
-            "Keep active_lines and active_line within the zero-based lines array.",
-        ))
+        issues.append(
+            _issue(
+                "code.line_out_of_range",
+                PlaybookIssueSeverity.ERROR,
+                f"steps[{step_index}].code_highlight.active_lines",
+                "Code highlight references a line outside the provided source lines.",
+                "Keep active_lines and active_line within the zero-based lines array.",
+            )
+        )
 
 
 def _check_narration_visual_match(
@@ -354,16 +422,18 @@ def _check_narration_visual_match(
     visual_tokens = _tokens_for_snapshot(snapshot) | _tokens_for_text(title)
     narration_tokens = _tokens_for_text(voiceover)
     if visual_tokens and narration_tokens and not (visual_tokens & narration_tokens):
-        issues.append(_issue(
-            "snapshot.narration_mismatch",
-            PlaybookIssueSeverity.WARNING,
-            f"steps[{index}].voiceover_text",
-            "Step narration does not appear to reference the visual snapshot.",
-            (
-                "Mention the key visual object, formula, array state, or scene element "
-                "in the narration."
-            ),
-        ))
+        issues.append(
+            _issue(
+                "snapshot.narration_mismatch",
+                PlaybookIssueSeverity.WARNING,
+                f"steps[{index}].voiceover_text",
+                "Step narration does not appear to reference the visual snapshot.",
+                (
+                    "Mention the key visual object, formula, array state, or scene element "
+                    "in the narration."
+                ),
+            )
+        )
 
 
 def _check_final_step_answers_prompt(
@@ -383,13 +453,15 @@ def _check_final_step_answers_prompt(
         | _tokens_for_text(playbook.summary)
     )
     if final_tokens and not (prompt_tokens & final_tokens):
-        issues.append(_issue(
-            "step.does_not_answer_prompt",
-            PlaybookIssueSeverity.WARNING,
-            "steps[-1]",
-            "The final step may not answer the user's prompt.",
-            "Make the final narration explicitly state the requested conclusion or result.",
-        ))
+        issues.append(
+            _issue(
+                "step.does_not_answer_prompt",
+                PlaybookIssueSeverity.WARNING,
+                "steps[-1]",
+                "The final step may not answer the user's prompt.",
+                "Make the final narration explicitly state the requested conclusion or result.",
+            )
+        )
 
 
 def _check_forbidden_rendering_paths(
@@ -399,13 +471,15 @@ def _check_forbidden_rendering_paths(
     raw = playbook.model_dump_json().lower()
     for pattern in _FORBIDDEN_RENDERING_PATTERNS:
         if pattern in raw:
-            issues.append(_issue(
-                "renderer.contract_risk",
-                PlaybookIssueSeverity.ERROR,
-                "playbook",
-                f"Playbook mentions forbidden rendering path {pattern!r}.",
-                "Use only PlaybookScript consumed by the frontend Remotion renderer.",
-            ))
+            issues.append(
+                _issue(
+                    "renderer.contract_risk",
+                    PlaybookIssueSeverity.ERROR,
+                    "playbook",
+                    f"Playbook mentions forbidden rendering path {pattern!r}.",
+                    "Use only PlaybookScript consumed by the frontend Remotion renderer.",
+                )
+            )
 
 
 def _tokens_for_snapshot(snapshot: Any) -> set[str]:

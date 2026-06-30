@@ -48,10 +48,17 @@ const SUPPORTED_FRONTEND_SNAPSHOT_KINDS = new Set([
   "modeling_scene",
   "manifold_scene",
   "solid_geometry_scene",
+  "bio_cell_scene",
+  "molecule_2d_scene",
+  "geo_map_scene",
+  "physics_force_scene",
   "motion_scene",
   "katex_overlay",
   "narration_card",
 ]);
+
+const SUBJECT_VISUAL_DOMAINS = new Set(["geography", "biology", "chemistry"]);
+const ALGORITHM_FALLBACK_KINDS = new Set(["algorithm_array", "algorithm_bars"]);
 
 const FORBIDDEN_RENDERING_PATTERNS = [
   "<html",
@@ -83,36 +90,45 @@ export function selfCheckPlaybook(
   return { status: "clean", issues: [] };
 }
 
-function checkStructure(playbook: PlaybookOutput, issues: SelfCheckIssue[]): void {
+function checkStructure(
+  playbook: PlaybookOutput,
+  issues: SelfCheckIssue[],
+): void {
   if (!playbook.title.trim()) {
-    issues.push(issue(
-      "step.too_shallow",
-      "error",
-      "title",
-      "Playbook title is empty.",
-      "Set a short title that names the lesson.",
-    ));
+    issues.push(
+      issue(
+        "step.too_shallow",
+        "error",
+        "title",
+        "Playbook title is empty.",
+        "Set a short title that names the lesson.",
+      ),
+    );
   }
   if (!playbook.summary.trim()) {
-    issues.push(issue(
-      "step.too_shallow",
-      "warning",
-      "summary",
-      "Playbook summary is empty.",
-      "Add a one-sentence summary of the lesson.",
-    ));
+    issues.push(
+      issue(
+        "step.too_shallow",
+        "warning",
+        "summary",
+        "Playbook summary is empty.",
+        "Add a one-sentence summary of the lesson.",
+      ),
+    );
   }
   if (
     playbook.steps.length < MIN_AGENT_STEPS ||
     playbook.steps.length > MAX_AGENT_STEPS
   ) {
-    issues.push(issue(
-      "step.too_shallow",
-      "error",
-      "steps",
-      `Playbook has ${playbook.steps.length} step(s); launch-safe bounds are ${MIN_AGENT_STEPS}-${MAX_AGENT_STEPS}.`,
-      "Regenerate with a concise but complete step sequence.",
-    ));
+    issues.push(
+      issue(
+        "step.too_shallow",
+        "error",
+        "steps",
+        `Playbook has ${playbook.steps.length} step(s); launch-safe bounds are ${MIN_AGENT_STEPS}-${MAX_AGENT_STEPS}.`,
+        "Regenerate with a concise but complete step sequence.",
+      ),
+    );
   }
 }
 
@@ -120,37 +136,46 @@ function checkTiming(playbook: PlaybookOutput, issues: SelfCheckIssue[]): void {
   let previousEnd = 0;
   playbook.steps.forEach((step, index) => {
     if (step.end_frame <= previousEnd) {
-      issues.push(issue(
-        "timeline.non_monotonic",
-        "error",
-        `steps[${index}].end_frame`,
-        "Step end_frame values must be strictly increasing.",
-        "Increase each step end_frame beyond the previous step.",
-      ));
+      issues.push(
+        issue(
+          "timeline.non_monotonic",
+          "error",
+          `steps[${index}].end_frame`,
+          "Step end_frame values must be strictly increasing.",
+          "Increase each step end_frame beyond the previous step.",
+        ),
+      );
     }
     const stepDuration = step.end_frame - previousEnd;
-    const estimatedFrames = estimateStepFrames(step.voiceover_text, playbook.fps);
+    const estimatedFrames = estimateStepFrames(
+      step.voiceover_text,
+      playbook.fps,
+    );
     if (step.voiceover_text.trim() && stepDuration < estimatedFrames - 12) {
-      issues.push(issue(
-        "timeline.voiceover_too_short",
-        "warning",
-        `steps[${index}].end_frame`,
-        `Step duration (${stepDuration} frame${stepDuration === 1 ? "" : "s"}) appears shorter than the estimated narration requirement (${estimatedFrames} frames).`,
-        "Increase this step duration or shorten the narration_text so subtitles can remain aligned.",
-        ));
+      issues.push(
+        issue(
+          "timeline.voiceover_too_short",
+          "warning",
+          `steps[${index}].end_frame`,
+          `Step duration (${stepDuration} frame${stepDuration === 1 ? "" : "s"}) appears shorter than the estimated narration requirement (${estimatedFrames} frames).`,
+          "Increase this step duration or shorten the narration_text so subtitles can remain aligned.",
+        ),
+      );
     }
     previousEnd = step.end_frame;
   });
 
   const lastStep = playbook.steps.at(-1);
   if (lastStep && playbook.total_frames < lastStep.end_frame) {
-    issues.push(issue(
-      "timeline.exceeds_total_frames",
-      "error",
-      "total_frames",
-      "total_frames does not cover the final step end_frame.",
-      "Set total_frames to at least the last step's end_frame.",
-    ));
+    issues.push(
+      issue(
+        "timeline.exceeds_total_frames",
+        "error",
+        "total_frames",
+        "total_frames does not cover the final step end_frame.",
+        "Set total_frames to at least the last step's end_frame.",
+      ),
+    );
   }
 }
 
@@ -161,23 +186,33 @@ function checkSteps(
 ): void {
   playbook.steps.forEach((step, index) => {
     if (!step.voiceover_text.trim()) {
-      issues.push(issue(
-        "step.empty_voiceover",
-        "error",
-        `steps[${index}].voiceover_text`,
-        "Every step must have non-empty voiceover_text.",
-        "Write narration that explains why the step matters and what changes visually.",
-      ));
+      issues.push(
+        issue(
+          "step.empty_voiceover",
+          "error",
+          `steps[${index}].voiceover_text`,
+          "Every step must have non-empty voiceover_text.",
+          "Write narration that explains why the step matters and what changes visually.",
+        ),
+      );
     }
     checkSnapshot(step.snapshot, `steps[${index}].snapshot`, issues);
+    checkSubjectVisualFallback(
+      playbook.domain,
+      step.snapshot,
+      `steps[${index}].snapshot`,
+      issues,
+    );
     if (!step.layers.length) {
-      issues.push(issue(
-        "renderer.contract_risk",
-        "error",
-        `steps[${index}].layers`,
-        "Every step must carry at least one renderer layer.",
-        "Mirror the primary snapshot into layers[0].body.",
-      ));
+      issues.push(
+        issue(
+          "renderer.contract_risk",
+          "error",
+          `steps[${index}].layers`,
+          "Every step must carry at least one renderer layer.",
+          "Mirror the primary snapshot into layers[0].body.",
+        ),
+      );
     } else {
       checkPrimaryLayerMirror(
         step.snapshot,
@@ -187,7 +222,11 @@ function checkSteps(
       );
     }
     step.layers.forEach((layer, layerIndex) => {
-      checkSnapshot(layer.body, `steps[${index}].layers[${layerIndex}].body`, issues);
+      checkSnapshot(
+        layer.body,
+        `steps[${index}].layers[${layerIndex}].body`,
+        issues,
+      );
     });
     checkNarrationVisualMatch(
       index,
@@ -208,25 +247,30 @@ function checkPrimaryLayerMirror(
   issues: SelfCheckIssue[],
 ): void {
   const snapshotKind = typeof snapshot.kind === "string" ? snapshot.kind : "";
-  const layerKind = typeof primaryLayerBody.kind === "string" ? primaryLayerBody.kind : "";
+  const layerKind =
+    typeof primaryLayerBody.kind === "string" ? primaryLayerBody.kind : "";
   if (layerKind !== snapshotKind) {
-    issues.push(issue(
-      "renderer.contract_risk",
-      "error",
-      `${path}.kind`,
-      `Primary renderer layer kind must match the step snapshot kind; got ${JSON.stringify(layerKind)} for snapshot kind ${JSON.stringify(snapshotKind)}.`,
-      "Mirror the primary snapshot into layers[0].body before adding overlay layers.",
-    ));
+    issues.push(
+      issue(
+        "renderer.contract_risk",
+        "error",
+        `${path}.kind`,
+        `Primary renderer layer kind must match the step snapshot kind; got ${JSON.stringify(layerKind)} for snapshot kind ${JSON.stringify(snapshotKind)}.`,
+        "Mirror the primary snapshot into layers[0].body before adding overlay layers.",
+      ),
+    );
     return;
   }
   if (!deepJsonEqual(primaryLayerBody, snapshot)) {
-    issues.push(issue(
-      "renderer.contract_risk",
-      "error",
-      path,
-      "Primary renderer layer body must deeply equal the step snapshot.",
-      "Copy the full primary snapshot into layers[0].body and put overlays after it.",
-    ));
+    issues.push(
+      issue(
+        "renderer.contract_risk",
+        "error",
+        path,
+        "Primary renderer layer body must deeply equal the step snapshot.",
+        "Copy the full primary snapshot into layers[0].body and put overlays after it.",
+      ),
+    );
   }
 }
 
@@ -237,27 +281,57 @@ function checkSnapshot(
 ): void {
   const kind = typeof snapshot.kind === "string" ? snapshot.kind : "";
   if (!SUPPORTED_FRONTEND_SNAPSHOT_KINDS.has(kind)) {
-    issues.push(issue(
-      "snapshot.unsupported_kind",
-      "error",
-      `${path}.kind`,
-      `Snapshot kind ${JSON.stringify(kind)} is not registered in the frontend renderer registry.`,
-      "Use one of the existing renderer-backed snapshot kinds.",
-    ));
+    issues.push(
+      issue(
+        "snapshot.unsupported_kind",
+        "error",
+        `${path}.kind`,
+        `Snapshot kind ${JSON.stringify(kind)} is not registered in the frontend renderer registry.`,
+        "Use one of the existing renderer-backed snapshot kinds.",
+      ),
+    );
     return;
   }
   if (!snapshotHasMeaningfulPayload(snapshot)) {
-    issues.push(issue(
-      "snapshot.empty_payload",
-      "error",
-      path,
-      `Snapshot ${JSON.stringify(kind)} has no meaningful visual payload.`,
-      "Add renderer-visible data such as array values, curves, scene objects, or formula text.",
-    ));
+    issues.push(
+      issue(
+        "snapshot.empty_payload",
+        "error",
+        path,
+        `Snapshot ${JSON.stringify(kind)} has no meaningful visual payload.`,
+        "Add renderer-visible data such as array values, curves, scene objects, or formula text.",
+      ),
+    );
   }
 }
 
-function snapshotHasMeaningfulPayload(snapshot: Record<string, unknown>): boolean {
+function checkSubjectVisualFallback(
+  domain: string,
+  snapshot: Record<string, unknown>,
+  path: string,
+  issues: SelfCheckIssue[],
+): void {
+  const normalizedDomain = domain.trim().toLowerCase();
+  const kind = typeof snapshot.kind === "string" ? snapshot.kind : "";
+  if (
+    SUBJECT_VISUAL_DOMAINS.has(normalizedDomain) &&
+    ALGORITHM_FALLBACK_KINDS.has(kind)
+  ) {
+    issues.push(
+      issue(
+        "snapshot.domain_fallback",
+        "error",
+        `${path}.kind`,
+        `${normalizedDomain} playbooks must not fall back to ${kind}.`,
+        "Use a SceneBlueprint or subject semantic renderer such as geo_map_scene, bio_cell_scene, or molecule_2d_scene instead of an algorithm array.",
+      ),
+    );
+  }
+}
+
+function snapshotHasMeaningfulPayload(
+  snapshot: Record<string, unknown>,
+): boolean {
   const kind = String(snapshot.kind ?? "");
   if (kind === "algorithm_array" || kind === "algorithm_bars") {
     return nonEmptyArray(snapshot.array_values);
@@ -283,7 +357,9 @@ function snapshotHasMeaningfulPayload(snapshot: Record<string, unknown>): boolea
   if (kind === "narration_card") {
     return nonEmptyString(snapshot.text);
   }
-  return Object.entries(snapshot).some(([key, value]) => key !== "kind" && isMeaningful(value));
+  return Object.entries(snapshot).some(
+    ([key, value]) => key !== "kind" && isMeaningful(value),
+  );
 }
 
 function checkNarrationVisualMatch(
@@ -303,13 +379,15 @@ function checkNarrationVisualMatch(
     narrationTokens.size > 0 &&
     !setsIntersect(visualTokens, narrationTokens)
   ) {
-    issues.push(issue(
-      "snapshot.narration_mismatch",
-      "warning",
-      `steps[${index}].voiceover_text`,
-      "Step narration does not appear to reference the visual snapshot.",
-      "Mention the key visual object, formula, array state, or scene element in the narration.",
-    ));
+    issues.push(
+      issue(
+        "snapshot.narration_mismatch",
+        "warning",
+        `steps[${index}].voiceover_text`,
+        "Step narration does not appear to reference the visual snapshot.",
+        "Mention the key visual object, formula, array state, or scene element in the narration.",
+      ),
+    );
   }
 }
 
@@ -328,13 +406,15 @@ function checkFinalStepAnswersPrompt(
     ...tokensForText(playbook.summary),
   ]);
   if (finalTokens.size > 0 && !setsIntersect(promptTokens, finalTokens)) {
-    issues.push(issue(
-      "step.does_not_answer_prompt",
-      "warning",
-      "steps[-1]",
-      "The final step may not answer the user's prompt.",
-      "Make the final narration explicitly state the requested conclusion or result.",
-    ));
+    issues.push(
+      issue(
+        "step.does_not_answer_prompt",
+        "warning",
+        "steps[-1]",
+        "The final step may not answer the user's prompt.",
+        "Make the final narration explicitly state the requested conclusion or result.",
+      ),
+    );
   }
 }
 
@@ -345,13 +425,15 @@ function checkForbiddenRenderingPaths(
   const raw = JSON.stringify(playbook).toLowerCase();
   for (const pattern of FORBIDDEN_RENDERING_PATTERNS) {
     if (raw.includes(pattern)) {
-      issues.push(issue(
-        "renderer.contract_risk",
-        "error",
-        "playbook",
-        `Playbook mentions forbidden rendering path ${JSON.stringify(pattern)}.`,
-        "Use only PlaybookScript consumed by the frontend Remotion renderer.",
-      ));
+      issues.push(
+        issue(
+          "renderer.contract_risk",
+          "error",
+          "playbook",
+          `Playbook mentions forbidden rendering path ${JSON.stringify(pattern)}.`,
+          "Use only PlaybookScript consumed by the frontend Remotion renderer.",
+        ),
+      );
     }
   }
 }
@@ -378,7 +460,9 @@ function textPayload(value: unknown): string {
 
 function tokensForText(text: string): Set<string> {
   return new Set([
-    ...(text.toLowerCase().match(/[a-z0-9_]+/g) ?? []).filter((token) => token.length >= 2),
+    ...(text.toLowerCase().match(/[a-z0-9_]+/g) ?? []).filter(
+      (token) => token.length >= 2,
+    ),
     ...(text.match(/[\u4e00-\u9fff]/g) ?? []),
   ]);
 }
@@ -406,7 +490,9 @@ function isMeaningful(value: unknown): boolean {
 }
 
 function deepJsonEqual(left: unknown, right: unknown): boolean {
-  return JSON.stringify(canonicalJson(left)) === JSON.stringify(canonicalJson(right));
+  return (
+    JSON.stringify(canonicalJson(left)) === JSON.stringify(canonicalJson(right))
+  );
 }
 
 function canonicalJson(value: unknown): unknown {

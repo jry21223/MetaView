@@ -187,3 +187,67 @@ def test_playbook_self_check_accepts_primary_layer_that_mirrors_snapshot() -> No
     verdict = review_playbook_script(playbook, prompt="Explain binary search.")
 
     assert verdict.status == PlaybookReviewStatus.CLEAN
+
+
+def test_playbook_self_check_blocks_subject_visual_algorithm_array_fallback() -> None:
+    payload = _valid_playbook().model_dump(mode="json")
+    payload["domain"] = "geography"
+    payload["title"] = "East Asia monsoon"
+    payload["summary"] = "Explain East Asia monsoon with a map."
+    for step in payload["steps"]:
+        step["title"] = "East Asia monsoon array fallback"
+        step["voiceover_text"] = "Use the East Asia monsoon map, not an array fallback."
+    playbook = PlaybookScript.model_validate(payload)
+
+    verdict = review_playbook_script(playbook, prompt="Explain the East Asia monsoon.")
+
+    assert verdict.status == PlaybookReviewStatus.BLOCKED
+    fallback_issues = [
+        issue for issue in verdict.issues if issue.code == "snapshot.domain_fallback"
+    ]
+    assert fallback_issues
+    assert fallback_issues[0].suggestion is not None
+    assert "SceneBlueprint" in fallback_issues[0].suggestion
+
+
+def test_playbook_self_check_accepts_scene_blueprint_subject_renderer_kind() -> None:
+    payload = _valid_playbook().model_dump(mode="json")
+    payload["domain"] = "geography"
+    payload["title"] = "East Asia monsoon"
+    payload["summary"] = "Explain East Asia monsoon with a map."
+    snapshot = {
+        "kind": "geo_map_scene",
+        "pack_id": "geography-earth-basic",
+        "map_region": "east_asia",
+        "layers": [
+            {
+                "id": "land",
+                "semantic_role": "map_layer",
+                "asset_id": "east-asia-land-110m",
+            }
+        ],
+        "flows": [
+            {
+                "id": "summer",
+                "semantic_role": "monsoon_flow",
+                "asset_id": "monsoon-wind-arrow",
+                "from": [78, 68],
+                "to": [42, 38],
+            }
+        ],
+        "pressure_centers": [
+            {"id": "land-low", "kind": "low", "x": 38, "y": 35, "label": "land low"}
+        ],
+        "particle_preset": "moisture_particles",
+        "caption": "East Asia monsoon map.",
+    }
+    for step in payload["steps"]:
+        step["title"] = "East Asia monsoon map"
+        step["voiceover_text"] = "The East Asia monsoon map shows land and ocean pressure."
+        step["snapshot"] = deepcopy(snapshot)
+        step["layers"] = [{"body": deepcopy(snapshot)}]
+    playbook = PlaybookScript.model_validate(payload)
+
+    verdict = review_playbook_script(playbook, prompt="Explain the East Asia monsoon.")
+
+    assert verdict.status == PlaybookReviewStatus.CLEAN

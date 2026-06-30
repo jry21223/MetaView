@@ -17,7 +17,9 @@ function makeStep(index: number): PlaybookOutput["steps"][number] {
     step_id: `step_${String(index).padStart(2, "0")}`,
     title: `Scan array ${index}`,
     end_frame: index * 300,
-    narration_template: [`Scan the whole array in step ${index} and name the result.`],
+    narration_template: [
+      `Scan the whole array in step ${index} and name the result.`,
+    ],
     voiceover_text: `Scan the whole array in step ${index} and name the result.`,
     tokens: [],
     code_highlight: null,
@@ -32,7 +34,9 @@ function makeStep(index: number): PlaybookOutput["steps"][number] {
 }
 
 function validPlaybook(stepCount = 8): PlaybookOutput {
-  const steps = Array.from({ length: stepCount }, (_, index) => makeStep(index + 1));
+  const steps = Array.from({ length: stepCount }, (_, index) =>
+    makeStep(index + 1),
+  );
   return {
     fps: 30,
     total_frames: steps.at(-1)?.end_frame ?? 0,
@@ -56,7 +60,9 @@ describe("agent playbook self-check", () => {
     const report = selfCheckPlaybook(validPlaybook(1), "Scan the array");
 
     expect(report.status).toBe("blocked");
-    expect(report.issues.map((issue) => issue.code)).toContain("step.too_shallow");
+    expect(report.issues.map((issue) => issue.code)).toContain(
+      "step.too_shallow",
+    );
   });
 
   it("accepts an eight-step product playbook", () => {
@@ -69,7 +75,9 @@ describe("agent playbook self-check", () => {
     const report = selfCheckPlaybook(validPlaybook(15), "Scan the array");
 
     expect(report.status).toBe("blocked");
-    expect(report.issues.map((issue) => issue.code)).toContain("step.too_shallow");
+    expect(report.issues.map((issue) => issue.code)).toContain(
+      "step.too_shallow",
+    );
   });
 
   it("blocks empty narration, empty snapshot payload, and invalid timing", () => {
@@ -90,9 +98,10 @@ describe("agent playbook self-check", () => {
   it("warns when narration is significantly longer than the step duration", () => {
     const playbook = validPlaybook();
     playbook.steps.forEach((step, index) => {
-      step.voiceover_text = index === playbook.steps.length - 1
-        ? `array ${"图".repeat(150)}`
-        : "array";
+      step.voiceover_text =
+        index === playbook.steps.length - 1
+          ? `array ${"图".repeat(150)}`
+          : "array";
       step.narration_template = ["array"];
       step.end_frame = (index + 1) * 300;
     });
@@ -127,7 +136,9 @@ describe("agent playbook self-check", () => {
     const report = selfCheckPlaybook(playbook, "Scan the array");
 
     expect(report.status).toBe("blocked");
-    expect(report.issues.map((issue) => issue.code)).toContain("renderer.contract_risk");
+    expect(report.issues.map((issue) => issue.code)).toContain(
+      "renderer.contract_risk",
+    );
   });
 
   it("blocks primary layer kind mismatch as a renderer contract risk", () => {
@@ -144,7 +155,9 @@ describe("agent playbook self-check", () => {
     const report = selfCheckPlaybook(playbook, "Scan the array");
 
     expect(report.status).toBe("blocked");
-    expect(report.issues.map((issue) => issue.code)).toContain("renderer.contract_risk");
+    expect(report.issues.map((issue) => issue.code)).toContain(
+      "renderer.contract_risk",
+    );
   });
 
   it("keeps mirrored primary layer snapshots clean", () => {
@@ -154,9 +167,76 @@ describe("agent playbook self-check", () => {
       curves: [{ expression: "x^2", label: "f" }],
     };
     playbook.steps[0].snapshot = snapshot;
-    playbook.steps[0].layers[0].body = { ...snapshot, curves: [...snapshot.curves] };
+    playbook.steps[0].layers[0].body = {
+      ...snapshot,
+      curves: [...snapshot.curves],
+    };
 
     const report = selfCheckPlaybook(playbook, "Scan the array");
+
+    expect(report.status).toBe("clean");
+  });
+
+  it("blocks subject visual playbooks that fall back to algorithm_array", () => {
+    const playbook = validPlaybook();
+    playbook.domain = "geography";
+    playbook.title = "East Asia monsoon";
+    playbook.summary = "Explain East Asia monsoon with a map.";
+    playbook.steps.forEach((step) => {
+      step.title = "East Asia monsoon array fallback";
+      step.voiceover_text =
+        "Use the East Asia monsoon map, not an array fallback.";
+      step.narration_template = [step.voiceover_text];
+    });
+
+    const report = selfCheckPlaybook(playbook, "Explain the East Asia monsoon");
+
+    expect(report.status).toBe("blocked");
+    expect(report.issues.map((issue) => issue.code)).toContain(
+      "snapshot.domain_fallback",
+    );
+    expect(
+      report.issues.find((issue) => issue.code === "snapshot.domain_fallback")
+        ?.suggestion,
+    ).toContain("SceneBlueprint");
+  });
+
+  it("accepts subject visual renderer kinds used by SceneBlueprint compiler output", () => {
+    const playbook = validPlaybook();
+    playbook.domain = "geography";
+    const snapshot = {
+      kind: "geo_map_scene",
+      pack_id: "geography-earth-basic",
+      map_region: "east_asia",
+      layers: [
+        {
+          id: "land",
+          semantic_role: "map_layer",
+          asset_id: "east-asia-land-110m",
+        },
+      ],
+      flows: [
+        {
+          id: "summer",
+          semantic_role: "monsoon_flow",
+          asset_id: "monsoon-wind-arrow",
+        },
+      ],
+      pressure_centers: [
+        { id: "land-low", kind: "low", x: 38, y: 35, label: "land low" },
+      ],
+      particle_preset: "moisture_particles",
+    };
+    playbook.steps.forEach((step) => {
+      step.title = "East Asia monsoon map";
+      step.voiceover_text =
+        "The East Asia monsoon map shows land and ocean pressure.";
+      step.narration_template = [step.voiceover_text];
+      step.snapshot = structuredClone(snapshot);
+      step.layers[0].body = structuredClone(snapshot);
+    });
+
+    const report = selfCheckPlaybook(playbook, "Explain the East Asia monsoon");
 
     expect(report.status).toBe("clean");
   });
@@ -184,8 +264,8 @@ describe("agent playbook self-check", () => {
     });
 
     expect(prompt).toContain("agent self-check blocked");
-    expect(prompt).toContain("\"repair_attempt\": 1");
-    expect(prompt).toContain("\"code\": \"step.empty_voiceover\"");
+    expect(prompt).toContain('"repair_attempt": 1');
+    expect(prompt).toContain('"code": "step.empty_voiceover"');
     expect(prompt).toContain("PlaybookScript");
   });
 });

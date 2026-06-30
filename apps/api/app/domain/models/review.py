@@ -48,6 +48,7 @@ SUPPORTED_PLAYBOOK_REVIEW_CODES: tuple[str, ...] = (
     "step.does_not_answer_prompt",
     "snapshot.unsupported_kind",
     "snapshot.empty_payload",
+    "snapshot.domain_fallback",
     "snapshot.narration_mismatch",
     "renderer.contract_risk",
     "math.inconsistent_formula",
