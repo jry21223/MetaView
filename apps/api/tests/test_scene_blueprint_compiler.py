@@ -105,6 +105,99 @@ def test_scene_blueprint_compiler_preserves_flagship_asset_markers() -> None:
             assert snapshot[field_name] == expected_value
 
 
+def test_scene_blueprint_compiler_builds_geography_from_structured_layout_input() -> None:
+    playbook = compile_scene_blueprint_to_playbook(
+        {
+            "id": "east_asia_custom_flow",
+            "subject": "geography",
+            "sceneType": "east_asia_monsoon",
+            "title": "Custom monsoon flow",
+            "visualIntent": ["seasonal_wind_reversal", "land_sea_thermal_contrast"],
+            "emphasisPoints": ["custom flow", "custom pressure"],
+            "mapRegion": "east_asia",
+            "flows": [
+                {
+                    "id": "winter-monsoon",
+                    "semanticRole": "wind",
+                    "from": [35, 30],
+                    "to": [76, 64],
+                    "label": "winter monsoon",
+                    "strength": 0.8,
+                },
+            ],
+            "pressureCenters": [
+                {"id": "siberian-high", "kind": "high", "x": 34, "y": 28, "label": "Siberian high"},
+                {"id": "pacific-low", "kind": "low", "x": 72, "y": 66, "label": "Pacific low"},
+            ],
+            "particlePreset": "wind_stream",
+        },
+    )
+
+    snapshot = playbook.steps[0].snapshot.model_dump(mode="json", by_alias=True)
+
+    assert snapshot["kind"] == "geo_map_scene"
+    assert snapshot["pack_id"] == "geography-earth-basic"
+    assert snapshot["map_region"] == "east_asia"
+    assert snapshot["flows"] == [
+        {
+            "id": "winter-monsoon",
+            "semantic_role": "wind",
+            "from": [35.0, 30.0],
+            "to": [76.0, 64.0],
+            "label": "winter monsoon",
+            "asset_id": "monsoon-wind-arrow",
+            "strength": 0.8,
+        }
+    ]
+    assert [center["id"] for center in snapshot["pressure_centers"]] == [
+        "siberian-high",
+        "pacific-low",
+    ]
+    assert snapshot["particle_preset"] == "wind_stream"
+
+    verdict = self_check_playbook(playbook, "Trace East Asia monsoon flow.")
+    assert verdict.status == PlaybookReviewStatus.CLEAN
+
+
+def test_scene_blueprint_compiler_builds_physics_from_structured_layout_input() -> None:
+    playbook = compile_scene_blueprint_to_playbook(
+        {
+            "id": "projectile_custom_layout",
+            "subject": "physics",
+            "sceneType": "projectile_motion",
+            "title": "Custom projectile layout",
+            "visualIntent": ["projectile_motion", "velocity_decomposition"],
+            "emphasisPoints": ["block object", "custom vector", "custom trajectory"],
+            "object": {"id": "cart", "label": "block", "semanticRole": "block", "x": 24, "y": 36, "radius": 8},
+            "vectors": [
+                {"id": "push", "target": "cart", "semanticRole": "force", "dx": 24, "dy": -6, "label": "F_push"},
+                {"id": "gravity", "target": "cart", "semanticRole": "acceleration", "dx": 0, "dy": 28, "label": "g"},
+            ],
+            "trajectory": [[20, 30], [34, 35], [48, 46], [62, 63]],
+            "formulaLatex": "x=v_xt,\\quad y=y_0+\\frac12gt^2",
+        },
+    )
+
+    snapshot = playbook.steps[0].snapshot.model_dump(mode="json", by_alias=True)
+
+    assert snapshot["kind"] == "physics_force_scene"
+    assert snapshot["pack_id"] == "physics-basic"
+    assert snapshot["objects"][0] == {
+        "id": "cart",
+        "label": "block",
+        "x": 24.0,
+        "y": 36.0,
+        "asset_id": "block-body",
+        "radius": 8.0,
+    }
+    assert [vector["id"] for vector in snapshot["vectors"]] == ["push", "gravity"]
+    assert snapshot["trajectory"] == [[20.0, 30.0], [34.0, 35.0], [48.0, 46.0], [62.0, 63.0]]
+    assert snapshot["formula_latex"] == "x=v_xt,\\quad y=y_0+\\frac12gt^2"
+
+    verdict = self_check_playbook(playbook, "Trace projectile motion vectors.")
+    assert verdict.status == PlaybookReviewStatus.CLEAN
+
+
 def test_scene_blueprint_compiler_hydrates_water_from_molecule_preset() -> None:
     preset = resolve_molecule_preset_for_renderer("chemistry-basic", "water")
     assert preset is not None

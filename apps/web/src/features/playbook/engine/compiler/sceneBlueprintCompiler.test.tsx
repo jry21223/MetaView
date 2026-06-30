@@ -63,6 +63,52 @@ describe("sceneBlueprintCompiler", () => {
     expect(markup).not.toContain('data-missing-asset="true"');
   });
 
+  it("compiles geography layout from structured flow and pressure input", () => {
+    const script = compileSceneBlueprintToPlaybookScript({
+      id: "east_asia_custom_flow",
+      subject: "geography",
+      sceneType: "east_asia_monsoon",
+      title: "Custom monsoon flow",
+      visualIntent: ["seasonal_wind_reversal", "land_sea_thermal_contrast"],
+      emphasisPoints: ["custom flow", "custom pressure"],
+      mapRegion: "east_asia",
+      flows: [
+        {
+          id: "winter-monsoon",
+          semanticRole: "wind",
+          from: [35, 30],
+          to: [76, 64],
+          label: "winter monsoon",
+          strength: 0.8,
+        },
+      ],
+      pressureCenters: [
+        { id: "siberian-high", kind: "high", x: 34, y: 28, label: "Siberian high" },
+        { id: "pacific-low", kind: "low", x: 72, y: 66, label: "Pacific low" },
+      ],
+      particlePreset: "wind_stream",
+    });
+
+    const snapshot = script.steps[0].snapshot;
+    if (snapshot.kind !== "geo_map_scene") {
+      throw new Error(`Expected geo_map_scene, got ${snapshot.kind}`);
+    }
+    expect(snapshot.flows).toEqual([
+      expect.objectContaining({
+        id: "winter-monsoon",
+        semantic_role: "wind",
+        from: [35, 30],
+        to: [76, 64],
+        label: "winter monsoon",
+        asset_id: "monsoon-wind-arrow",
+        strength: 0.8,
+      }),
+    ]);
+    expect(snapshot.pressure_centers?.map((center) => center.id)).toEqual(["siberian-high", "pacific-low"]);
+    expect(snapshot.particle_preset).toBe("wind_stream");
+    expect(visualQualityGate(script)).toEqual([]);
+  });
+
   it("compiles a minimal projectile blueprint into an asset-backed physics force scene", () => {
     const script = compileSceneBlueprintToPlaybookScript({
       id: "projectile_motion_blueprint",
@@ -95,6 +141,51 @@ describe("sceneBlueprintCompiler", () => {
     expect(markup).toContain('data-semantic-role="motion_trail"');
     expect(markup).not.toContain("Unknown snapshot kind");
     expect(markup).not.toContain('data-missing-asset="true"');
+  });
+
+  it("compiles physics layout from structured object, vector, trajectory, and formula input", () => {
+    const script = compileSceneBlueprintToPlaybookScript({
+      id: "projectile_custom_layout",
+      subject: "physics",
+      sceneType: "projectile_motion",
+      title: "Custom projectile layout",
+      visualIntent: ["projectile_motion", "velocity_decomposition"],
+      emphasisPoints: ["block object", "custom vector", "custom trajectory"],
+      object: { id: "cart", label: "block", semanticRole: "block", x: 24, y: 36, radius: 8 },
+      vectors: [
+        { id: "push", target: "cart", semanticRole: "force", dx: 24, dy: -6, label: "F_push" },
+        { id: "gravity", target: "cart", semanticRole: "acceleration", dx: 0, dy: 28, label: "g" },
+      ],
+      trajectory: [
+        [20, 30],
+        [34, 35],
+        [48, 46],
+        [62, 63],
+      ],
+      formulaLatex: "x=v_xt,\\quad y=y_0+\\frac12gt^2",
+    });
+
+    const snapshot = script.steps[0].snapshot;
+    if (snapshot.kind !== "physics_force_scene") {
+      throw new Error(`Expected physics_force_scene, got ${snapshot.kind}`);
+    }
+    expect(snapshot.objects[0]).toMatchObject({
+      id: "cart",
+      label: "block",
+      x: 24,
+      y: 36,
+      asset_id: "block-body",
+      radius: 8,
+    });
+    expect(snapshot.vectors.map((vector) => vector.id)).toEqual(["push", "gravity"]);
+    expect(snapshot.trajectory).toEqual([
+      [20, 30],
+      [34, 35],
+      [48, 46],
+      [62, 63],
+    ]);
+    expect(snapshot.formula_latex).toBe("x=v_xt,\\quad y=y_0+\\frac12gt^2");
+    expect(visualQualityGate(script)).toEqual([]);
   });
 
   it("reports quality warnings when a blueprint pins an unresolved asset id", () => {

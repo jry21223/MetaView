@@ -76,9 +76,12 @@ Current backend SkillPack adoption:
 - `core-visual-basic`: internal shared arrows, labels, icons, particle presets,
   and grid backgrounds for renderer adapters across subjects.
 - `geography-earth-basic`: Natural Earth-derived East Asia map GeoJSON and map
-  symbols for `geo_map_scene`.
+  symbols for `geo_map_scene`. The SceneBlueprint path routes map layers,
+  flow arrows, pressure centers, and particle presets through a geography layout
+  compiler so custom flow/pressure input compiles into renderer snapshots.
 - `physics-basic`: internal SVGs for force vector, projectile object, block,
-  ramp, spring, and pulley roles.
+  ramp, spring, and pulley roles. Projectile/object placement, vectors,
+  trajectories, and formulas now route through a physics layout compiler.
 - `biology-basic`: internal organelle and DNA process SVGs for `bio_cell_scene`
   and `bio_process_scene`.
 - `chemistry-basic`: internal atom/bond SVGs, reaction arrows, electron-flow

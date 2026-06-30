@@ -13,10 +13,7 @@ from app.domain.models.playbook import (
     CallStackFrame,
     CallStackSceneSnapshot,
     CodeHighlightOverlay,
-    GeoMapFlow,
-    GeoMapLayer,
     GeoMapSceneSnapshot,
-    GeoPressureCenter,
     GraphSceneSnapshot,
     Layer,
     LayerTiming,
@@ -27,9 +24,6 @@ from app.domain.models.playbook import (
     Molecule2DBond,
     Molecule2DCallout,
     Molecule2DSceneSnapshot,
-    PhysicsForceSceneSnapshot,
-    PhysicsSceneObject,
-    PhysicsSceneVector,
     PlaybookScript,
     ReactionArrow,
     ReactionElectronFlow,
@@ -42,10 +36,12 @@ from app.domain.services.algorithm_layout_compiler import (
     compile_binary_search_code_highlight,
     compile_binary_search_code_trace_snapshot,
 )
+from app.domain.services.geography_layout_compiler import compile_geo_map_snapshot
 from app.domain.services.molecule_preset_resolver import (
     resolve_molecule_preset_by_smiles_for_renderer,
     resolve_molecule_preset_for_renderer,
 )
+from app.domain.services.physics_layout_compiler import compile_physics_force_snapshot
 from app.domain.services.rdkit_molecule_compiler import compile_molecule_snapshot_from_smiles
 
 _FPS = 30
@@ -145,10 +141,10 @@ def _step_captions(scene_type: str, title: str, base_caption: str) -> list[str]:
             ),
             "map 上的陆地在夏季升温快，低压中心标出大陆一侧，说明近地面空气更容易向这里汇聚。",
             "map 上的西太平洋升温慢，海洋高压中心和海面图层一起说明海陆热力差异的方向。",
-            "monsoon_flow 箭头从海洋指向陆地，表示夏季风把暖湿空气推向东亚大陆。",
+            "wind flow 箭头表示季风把空气在海陆之间输送，方向由当前布局输入决定。",
             (
-                "moisture_particles 让水汽输送可见，学生能看到降水来源不是"
-                "凭空出现，而是随季风进入陆地。"
+                "wind_stream 或 moisture_particles 让空气/水汽输送可见，学生能看到"
+                "降水来源不是凭空出现，而是随季风进入陆地。"
             ),
             "map 上的高压和低压标签同时保留，帮助比较海洋向陆地输送空气的压力梯度。",
             "map 把海陆、气压和风向合在一起：东亚夏季风来自海陆热力差异驱动的环流。",
@@ -160,7 +156,7 @@ def _step_captions(scene_type: str, title: str, base_caption: str) -> list[str]:
         "projectile_motion": [
             "平抛运动先看 physics_force_scene 中的 projectile 物体，它是整个受力和轨迹分析的对象。",
             "projectile 的轨迹曲线显示物体一边水平前进，一边竖直下落，路径因此弯成抛物线。",
-            "速度矢量分解为水平 vx 和竖直 vy，水平分量保持稳定，竖直分量会随时间增大。",
+            "physics_force_scene 的 vector 层把速度、加速度或外力分开标出，帮助比较不同方向的量。",
             "projectile 旁边的 g 向下加速度箭头说明竖直变化来自重力，而不是水平速度突然改变。",
             "projectile 的 motion trail 历史点展示平抛过程，越往后竖直间隔越大，说明下落越来越快。",
             "projectile 附近的 force 矢量帮助区分速度方向、加速度方向和受力方向。",
@@ -336,76 +332,11 @@ def _compile_snapshot(scene_type: str, blueprint: dict[str, Any]):
 
 
 def _east_asia_monsoon_snapshot(blueprint: dict[str, Any]) -> GeoMapSceneSnapshot:
-    return GeoMapSceneSnapshot(
-        pack_id=str(blueprint.get("packId") or "geography-earth-basic"),
-        map_region="east_asia",
-        layers=[
-            GeoMapLayer(
-                id="map",
-                semantic_role="map_layer",
-                label="East Asia map",
-                asset_id="east-asia-land-110m",
-            ),
-            GeoMapLayer(id="land", semantic_role="land", label="heated continent"),
-            GeoMapLayer(
-                id="ocean",
-                semantic_role="ocean",
-                label="western Pacific",
-                asset_id="east-asia-ocean-background",
-            ),
-        ],
-        flows=[
-            GeoMapFlow(
-                id="summer-monsoon",
-                semantic_role="monsoon_flow",
-                **{"from": (78, 68)},
-                to=(42, 38),
-                label="summer monsoon",
-                asset_id="monsoon-wind-arrow",
-                strength=1.1,
-            ),
-        ],
-        pressure_centers=[
-            GeoPressureCenter(id="land-low", kind="low", x=38, y=35, label="land low"),
-            GeoPressureCenter(id="ocean-high", kind="high", x=76, y=64, label="ocean high"),
-        ],
-        particle_preset="moisture_particles",
-        caption=str(
-            blueprint.get("caption")
-            or "Land-sea thermal contrast reverses seasonal wind direction."
-        ),
-    )
+    return compile_geo_map_snapshot(blueprint)
 
 
-def _projectile_motion_snapshot(blueprint: dict[str, Any]) -> PhysicsForceSceneSnapshot:
-    return PhysicsForceSceneSnapshot(
-        pack_id=str(blueprint.get("packId") or "physics-basic"),
-        objects=[
-            PhysicsSceneObject(
-                id="body", label="projectile", x=30, y=42, asset_id="projectile-body-dot"
-            ),
-        ],
-        vectors=[
-            PhysicsSceneVector(
-                id="vx", target="body", semantic_role="velocity", dx=28, dy=0, label="v_x"
-            ),
-            PhysicsSceneVector(
-                id="vy", target="body", semantic_role="velocity", dx=0, dy=18, label="v_y"
-            ),
-            PhysicsSceneVector(
-                id="g", target="body", semantic_role="acceleration", dx=0, dy=24, label="g"
-            ),
-            PhysicsSceneVector(
-                id="force", target="body", semantic_role="force", dx=-16, dy=8, label="F"
-            ),
-        ],
-        trajectory=[(18, 34), (31.5, 36.8), (45, 45), (58.5, 58.8), (72, 78)],
-        formula_latex="x=v_0t,\\quad y=\\frac12gt^2",
-        caption=str(
-            blueprint.get("caption")
-            or "Horizontal velocity stays constant while vertical acceleration bends the path."
-        ),
-    )
+def _projectile_motion_snapshot(blueprint: dict[str, Any]):
+    return compile_physics_force_snapshot(blueprint)
 
 
 def _cell_structure_snapshot(blueprint: dict[str, Any]) -> BioCellSceneSnapshot:
