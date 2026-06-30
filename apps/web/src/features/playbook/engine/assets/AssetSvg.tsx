@@ -40,8 +40,8 @@ function resolveAsset({
   return undefined;
 }
 
-function canRenderAsStaticAsset(asset: AssetManifestEntry | undefined): asset is AssetManifestEntry {
-  return asset?.type === "svg" || asset?.type === "image";
+function canRenderAsStaticAsset(asset: AssetManifestEntry | undefined): asset is AssetManifestEntry & { path: string } {
+  return Boolean(asset?.path && (asset.type === "svg" || asset.type === "image"));
 }
 
 function MissingAssetFallback({

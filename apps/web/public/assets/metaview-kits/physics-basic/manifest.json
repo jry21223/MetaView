@@ -1,10 +1,23 @@
 {
+  "schemaVersion": "1.0.0",
   "packId": "physics-basic",
   "subject": "physics",
   "version": "0.1.0",
   "license": "internal",
+  "licenseMode": "single",
+  "defaultLicense": "internal",
   "sceneTemplates": ["physics_force_scene"],
   "rendererKinds": ["physics_force_scene"],
+  "sources": [
+    {
+      "id": "metaview-internal",
+      "label": "MetaView internal SVG primitives",
+      "license": "internal",
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "attribution": null
+    }
+  ],
   "assets": [
     {
       "id": "force-vector-arrow",
@@ -12,12 +25,24 @@
       "path": "/assets/metaview-kits/physics-basic/force-vector-arrow.svg",
       "tags": ["force", "vector", "arrow"],
       "semanticRoles": ["force"],
+      "sourceId": "metaview-internal",
       "attribution": "MetaView internal placeholder",
       "license": "internal",
       "commercialUseStatus": "allowed",
+      "commercialUseAllowed": true,
+      "requiresAttribution": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
       "sourceUrl": null,
       "licenseUrl": null,
-      "modifiedFrom": null
+      "modifiedFrom": null,
+      "rendererHints": {
+        "preferredRenderer": "physics_force_scene",
+        "defaultSize": [120, 32],
+        "anchor": "center",
+        "colorizable": true,
+        "strokeControlled": true
+      }
     },
     {
       "id": "projectile-body-dot",
@@ -25,12 +50,24 @@
       "path": "/assets/metaview-kits/physics-basic/projectile-body-dot.svg",
       "tags": ["object", "projectile", "motion"],
       "semanticRoles": ["object", "velocity"],
+      "sourceId": "metaview-internal",
       "attribution": "MetaView internal placeholder",
       "license": "internal",
       "commercialUseStatus": "allowed",
+      "commercialUseAllowed": true,
+      "requiresAttribution": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
       "sourceUrl": null,
       "licenseUrl": null,
-      "modifiedFrom": null
+      "modifiedFrom": null,
+      "rendererHints": {
+        "preferredRenderer": "physics_force_scene",
+        "defaultSize": [42, 42],
+        "anchor": "center",
+        "colorizable": false,
+        "strokeControlled": false
+      }
     }
   ]
 }

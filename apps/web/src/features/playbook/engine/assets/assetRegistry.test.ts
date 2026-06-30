@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import Ajv2020 from "ajv/dist/2020";
+import addFormats from "ajv-formats";
 
 import {
   findAssetByRole,
@@ -40,6 +42,7 @@ describe("assetRegistry", () => {
 
   it("keeps the public manifest schema aligned with source provenance metadata", () => {
     const schema = readPublicJson<{
+      required: string[];
       properties: {
         assets: {
           items: {
@@ -52,12 +55,38 @@ describe("assetRegistry", () => {
       };
     }>("/assets/metaview-kits/manifest.schema.json");
 
+    expect(schema.required).toEqual(expect.arrayContaining(["schemaVersion", "licenseMode", "sources"]));
     expect(schema.properties.assets.items.required).toEqual(
-      expect.arrayContaining(["commercialUseStatus", "sourceUrl", "licenseUrl", "modifiedFrom"]),
+      expect.arrayContaining([
+        "commercialUseStatus",
+        "sourceUrl",
+        "licenseUrl",
+        "modifiedFrom",
+        "sourceId",
+        "requiresAttribution",
+        "commercialUseAllowed",
+        "shareAlike",
+        "modificationAllowed",
+      ]),
     );
     expect(schema.properties.assets.items.properties.commercialUseStatus.enum).toEqual(
       expect.arrayContaining(["allowed", "allowed-with-attribution", "restricted", "unknown"]),
     );
+  });
+
+  it("validates starter manifests against the public schema", () => {
+    const schema = readPublicJson<unknown>("/assets/metaview-kits/manifest.schema.json");
+    const ajv = new Ajv2020({ allErrors: true, strict: false });
+    addFormats(ajv);
+    const validate = ajv.compile(schema);
+
+    for (const manifestPath of [
+      "/assets/metaview-kits/geography-basic/manifest.json",
+      "/assets/metaview-kits/physics-basic/manifest.json",
+    ]) {
+      const manifest = readPublicJson<unknown>(manifestPath);
+      expect(validate(manifest), ajv.errorsText(validate.errors)).toBe(true);
+    }
   });
 
   it("ships second-pass internal SVG quality markers for subject assets", () => {

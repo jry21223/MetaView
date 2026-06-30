@@ -9,15 +9,20 @@ without letting the agent hand-author SVG paths or frame coordinates.
 Public manifests live under `apps/web/public/assets/metaview-kits/`.
 Each pack follows `manifest.schema.json` and includes:
 
+- `schemaVersion`: currently `1.0.0`.
 - `packId`: stable pack id, for example `geography-basic`.
 - `subject`: one of `math`, `physics`, `chemistry`, `biology`, `geography`, `algorithm`, `code`.
 - `version`: pack version.
 - `license`: pack-level license.
+- `licenseMode`: `single` or `mixed`.
+- `sources`: source records with `id`, `label`, `license`, nullable `sourceUrl`, nullable `licenseUrl`, and optional `attribution`.
 - `sceneTemplates`: scene template ids that can use this pack.
 - `rendererKinds`: renderer snapshot kinds expected to consume it.
 - `assets`: asset entries with `id`, `type`, `path`, `tags`, `semanticRoles`,
-  `license`, `commercialUseStatus`, nullable `sourceUrl`, nullable
-  `licenseUrl`, nullable `modifiedFrom`, and optional `attribution`.
+  `sourceId`, `license`, `commercialUseStatus`, `requiresAttribution`,
+  `commercialUseAllowed`, `shareAlike`, `modificationAllowed`, nullable
+  `sourceUrl`, nullable `licenseUrl`, nullable `modifiedFrom`, optional
+  `attribution`, and optional `rendererHints`.
 
 The TypeScript registry is in
 `apps/web/src/features/playbook/engine/assets/assetRegistry.ts`.
@@ -40,6 +45,9 @@ attribution, commercial-use status, and provenance are recorded in the manifest.
 2. Add a manifest entry with semantic roles that match renderer needs.
 3. Record license, attribution, commercial-use status, source/license URLs,
    and `modifiedFrom` when the asset is derived from an external source.
-4. Add or update a focused registry test.
+4. Run `npm run asset:audit`.
+5. Add or update a focused registry test.
 
 Do not commit third-party binary assets without explicit license metadata.
+Assets with `license: "unknown"` fail audit and must not be exposed through MCP
+or commercial export paths.
