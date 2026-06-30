@@ -18,6 +18,10 @@ from app.domain.models.playbook import (
     AlgorithmBarsSnapshot,
     AlgorithmTreeSnapshot,
     CodeHighlightOverlay,
+    GeoMapFlow,
+    GeoMapLayer,
+    GeoMapSceneSnapshot,
+    GeoPressureCenter,
     KaTeXOverlaySnapshot,
     Layer,
     LayerTiming,
@@ -33,6 +37,9 @@ from app.domain.models.playbook import (
     MathSceneVectorField,
     MetaStep,
     NarrationCardSnapshot,
+    PhysicsForceSceneSnapshot,
+    PhysicsSceneObject,
+    PhysicsSceneVector,
     PlaybookScript,
 )
 from app.domain.models.topic import TopicDomain
@@ -386,6 +393,9 @@ def _build_snapshot(
     | MathPlotSnapshot
     | MathFormulaSnapshot
     | MathSceneSnapshot
+    | GeoMapSceneSnapshot
+    | PhysicsForceSceneSnapshot
+    | NarrationCardSnapshot
 ):
     if cir_step.visual_kind == VisualKind.GRAPH:
         return _build_tree_snapshot(cir_step, checkpoint)
@@ -446,8 +456,97 @@ def _build_snapshot(
             cir_step.visual_kind,
         )
         return _build_math_formula_snapshot(cir_step)
-    # ARRAY, FLOW, TEXT, MOTION, CIRCUIT, MOLECULE, MAP, CELL fall through to array
+    if domain == TopicDomain.GEOGRAPHY and cir_step.visual_kind == VisualKind.MAP:
+        return _build_geo_map_scene_snapshot(cir_step)
+    if domain == TopicDomain.PHYSICS and cir_step.visual_kind == VisualKind.MOTION:
+        return _build_physics_force_scene_snapshot(cir_step)
+    if cir_step.visual_kind in {
+        VisualKind.CIRCUIT,
+        VisualKind.MOLECULE,
+        VisualKind.CELL,
+    }:
+        logger.warning(
+            "Unsupported subject visual_kind fallback: step_id=%s domain=%s visual_kind=%s",
+            cir_step.id,
+            domain.value,
+            cir_step.visual_kind.value,
+        )
+        return NarrationCardSnapshot(
+            text=cir_step.narration or cir_step.title,
+            position="bottom",
+            emphasis="primary",
+        )
+    # ARRAY, FLOW, TEXT fall through to array for legacy non-math routes.
     return _build_array_snapshot(cir_step, checkpoint, execution_map)
+
+
+def _build_geo_map_scene_snapshot(cir_step: CirStep) -> GeoMapSceneSnapshot:
+    return GeoMapSceneSnapshot(
+        pack_id="geography-basic",
+        map_region="east_asia",
+        layers=[
+            GeoMapLayer(
+                id="land",
+                semantic_role="land",
+                label="大陆",
+                asset_id="east-asia-map-placeholder",
+            ),
+            GeoMapLayer(id="ocean", semantic_role="ocean", label="海洋"),
+        ],
+        flows=[
+            GeoMapFlow(
+                id="monsoon-wind",
+                semantic_role="wind",
+                from_=(78.0, 68.0),
+                to=(42.0, 38.0),
+                label="季风",
+                asset_id="monsoon-wind-arrow",
+                strength=1.0,
+            )
+        ],
+        pressure_centers=[
+            GeoPressureCenter(id="land-pressure", kind="low", x=38.0, y=35.0, label="陆地低压"),
+            GeoPressureCenter(id="ocean-pressure", kind="high", x=76.0, y=64.0, label="海洋高压"),
+        ],
+        particle_preset="moisture_particles",
+        caption=cir_step.narration or cir_step.title,
+    )
+
+
+def _build_physics_force_scene_snapshot(cir_step: CirStep) -> PhysicsForceSceneSnapshot:
+    return PhysicsForceSceneSnapshot(
+        pack_id="physics-basic",
+        objects=[
+            PhysicsSceneObject(
+                id="body",
+                label="物体",
+                x=30.0,
+                y=42.0,
+                asset_id="projectile-body-dot",
+            )
+        ],
+        vectors=[
+            PhysicsSceneVector(
+                id="velocity-x",
+                target="body",
+                semantic_role="velocity",
+                dx=28.0,
+                dy=0.0,
+                label="v_x",
+            ),
+            PhysicsSceneVector(
+                id="gravity",
+                target="body",
+                semantic_role="acceleration",
+                dx=0.0,
+                dy=24.0,
+                label="g",
+            ),
+        ],
+        trajectory=[(18.0, 34.0), (32.0, 42.0), (50.0, 57.0), (72.0, 78.0)],
+        formula_latex=r"x=v_0t,\quad y=\frac12gt^2",
+        caption=cir_step.narration or cir_step.title,
+    )
 
 
 def _sanitize_expression(expression: str | None) -> str | None:

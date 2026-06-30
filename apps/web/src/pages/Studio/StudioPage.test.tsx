@@ -191,6 +191,43 @@ describe("StudioPage", () => {
     expect(queryByRole("button", { name: "改变初始条件" })).toBeNull();
   });
 
+  it("collapses the empty follow-up panel when self provider is not configured", async () => {
+    mockUsePipelinePoller.mockReturnValue({
+      playbook: playbook("Provider setup lesson"),
+      director: null,
+      error: null,
+      isLoading: false,
+      status: "succeeded",
+    });
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/runs/run-1/follow-ups`, () =>
+        HttpResponse.json({ followups: [], versions: [] }),
+      ),
+    );
+    const onOpenProviderSettings = vi.fn();
+
+    const { getByRole, queryByPlaceholderText, queryByRole, queryByText } = render(
+      <StudioPage
+        runId="run-1"
+        t={TWEAK_DEFAULTS}
+        onNavigate={vi.fn()}
+        isProviderConfigured={false}
+        appEdition="self"
+        onOpenProviderSettings={onOpenProviderSettings}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(getByRole("button", { name: "配置本地 Provider" })).toBeTruthy();
+    });
+    expect(queryByPlaceholderText("还有什么想问的")).toBeNull();
+    expect(queryByRole("button", { name: "你能指出关键量吗？" })).toBeNull();
+    expect(queryByText("未配置本地 Provider 时将使用服务器模型。")).toBeNull();
+
+    fireEvent.click(getByRole("button", { name: "配置本地 Provider" }));
+    expect(onOpenProviderSettings).toHaveBeenCalledTimes(1);
+  });
+
   it("checks out a historical version without rendering a revert change record", async () => {
     mockUsePipelinePoller.mockReturnValue({
       playbook: playbook("Updated lesson"),

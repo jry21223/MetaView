@@ -35,6 +35,67 @@ function StatusBadge({ status }: { status: PipelineRunResult["status"] }) {
   );
 }
 
+function HistorySearchIcon() {
+  return (
+    <svg
+      className="mv-history-icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <circle cx="11" cy="11" r="6" />
+      <path d="m16 16 4 4" />
+    </svg>
+  );
+}
+
+function HistoryRefreshIcon() {
+  return (
+    <svg
+      className="mv-history-icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M20 12a8 8 0 0 1-13.7 5.6" />
+      <path d="M4 12A8 8 0 0 1 17.7 6.4" />
+      <path d="M17 3v4h4" />
+      <path d="M7 21v-4H3" />
+    </svg>
+  );
+}
+
+function HistoryChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      className={`mv-history-icon mv-history-chevron${open ? " is-open" : ""}`}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <path d="m9 6 6 6-6 6" />
+    </svg>
+  );
+}
+
+function HistoryPointerIcon() {
+  return (
+    <svg
+      className="mv-history-icon mv-history-pointer"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M19 12H5" />
+      <path d="m11 6-6 6 6 6" />
+    </svg>
+  );
+}
+
 interface RunItemProps {
   run: PipelineRunResult;
   isSelected: boolean;
@@ -250,15 +311,18 @@ export function HistoryPage({
           <StatsLine {...stats} />
 
           <div className="mv-history-toolbar">
-            <input
-              type="search"
-              className="mv-history-search"
-              placeholder="🔍 搜索标题 / 摘要 / prompt…"
-              value={filter.search}
-              onChange={(e) =>
-                setFilter((f) => ({ ...f, search: e.target.value }))
-              }
-            />
+            <div className="mv-history-search-wrap">
+              <HistorySearchIcon />
+              <input
+                type="search"
+                className="mv-history-search"
+                placeholder="搜索标题 / 摘要 / prompt..."
+                value={filter.search}
+                onChange={(e) =>
+                  setFilter((f) => ({ ...f, search: e.target.value }))
+                }
+              />
+            </div>
 
             <div
               className="mv-history-status-chips"
@@ -287,7 +351,8 @@ export function HistoryPage({
                 aria-expanded={moreFiltersOpen}
                 onClick={() => setMoreFiltersOpen((v) => !v)}
               >
-                更多筛选 {moreFiltersOpen ? "▾" : "▸"}
+                <span>更多筛选</span>
+                <HistoryChevronIcon open={moreFiltersOpen} />
               </button>
             </div>
 
@@ -351,7 +416,8 @@ export function HistoryPage({
             </span>
             <div className="mv-history-list-actions">
               <button type="button" className="mv-chip" onClick={refresh}>
-                ↻ 刷新
+                <HistoryRefreshIcon />
+                <span>刷新</span>
               </button>
             </div>
           </div>
@@ -386,7 +452,8 @@ export function HistoryPage({
         <div className="mv-history-detail">
           {!selectedRun && (
             <CenterHint>
-              ← 选择一条记录回放动画，或在工作台打开使用完整功能
+              <HistoryPointerIcon />
+              <span>选择一条记录回放动画，或在工作台打开使用完整功能</span>
             </CenterHint>
           )}
           {selectedRun && selectedRun.status === "failed" && (

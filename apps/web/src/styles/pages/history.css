@@ -138,10 +138,33 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   height: 100%;
   color: var(--ink-3);
   font-size: 13px;
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  padding: 0 18px;
+  text-align: center;
+}
+
+.mv-history-icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  stroke-width: 1.8;
+}
+
+.mv-history-pointer {
+  width: 16px;
+  height: 16px;
+}
+
+.mv-history-chevron {
+  transition: transform 0.12s ease;
+}
+
+.mv-history-chevron.is-open {
+  transform: rotate(90deg);
 }
 
 .mv-history-error {
@@ -423,6 +446,20 @@
   padding: 10px 12px;
 }
 
+.mv-history-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.mv-history-search-wrap .mv-history-icon {
+  position: absolute;
+  left: 8px;
+  color: var(--ink-3);
+  pointer-events: none;
+}
+
 .mv-history-search,
 .mv-history-filter {
   padding: 5px 8px;
@@ -433,6 +470,11 @@
   color: var(--ink);
   outline: none;
   min-width: 0;
+}
+
+.mv-history-search {
+  width: 100%;
+  padding-left: 28px;
 }
 
 .mv-history-search:focus,
@@ -456,6 +498,9 @@
   padding: 3px 9px;
   border-radius: 999px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   transition: border-color 0.12s, color 0.12s, background 0.12s;
 }
 
@@ -492,6 +537,12 @@
 .mv-history-list-actions {
   display: flex;
   gap: 6px;
+}
+
+.mv-history-list-actions .mv-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .mv-history-item {

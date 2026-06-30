@@ -1,0 +1,28 @@
+{
+  "packId": "geography-basic",
+  "subject": "geography",
+  "version": "0.1.0",
+  "license": "internal",
+  "sceneTemplates": ["geo_map_scene"],
+  "rendererKinds": ["narration_card"],
+  "assets": [
+    {
+      "id": "east-asia-map-placeholder",
+      "type": "svg",
+      "path": "/assets/metaview-kits/geography-basic/east-asia-map-placeholder.svg",
+      "tags": ["map", "land", "ocean", "monsoon"],
+      "semanticRoles": ["land", "ocean", "map_layer"],
+      "attribution": "MetaView internal placeholder",
+      "license": "internal"
+    },
+    {
+      "id": "monsoon-wind-arrow",
+      "type": "svg",
+      "path": "/assets/metaview-kits/geography-basic/monsoon-wind-arrow.svg",
+      "tags": ["wind", "monsoon", "arrow"],
+      "semanticRoles": ["wind"],
+      "attribution": "MetaView internal placeholder",
+      "license": "internal"
+    }
+  ]
+}

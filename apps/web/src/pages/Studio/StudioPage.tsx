@@ -211,7 +211,23 @@ function ChatPanel({
     }
   };
 
-  const followupSlot = (
+  const shouldCollapseEmptyProvider =
+    appEdition === "self" && !isProviderConfigured && msgs.length === 0;
+
+  const followupSlot = shouldCollapseEmptyProvider ? (
+    <div className="mv-followup-compact">
+      <span>配置本地 Provider 后可继续追问和调整当前讲解。</span>
+      {onOpenProviderSettings && (
+        <button
+          type="button"
+          className="mv-chip mv-chip-primary"
+          onClick={onOpenProviderSettings}
+        >
+          配置本地 Provider
+        </button>
+      )}
+    </div>
+  ) : (
     <div className="mv-followup-panel">
       <div className="mv-chat-stream" ref={scrollRef}>
         {msgs.length === 0 && !isProviderConfigured && (

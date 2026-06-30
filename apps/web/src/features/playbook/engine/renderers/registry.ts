@@ -14,12 +14,14 @@ import {
 } from "./AdvancedMathRenderers";
 import { BinaryTreeRenderer } from "./BinaryTreeRenderer";
 import { DomainArrayRenderer } from "./DomainArrayRenderer";
+import { GeoMapSceneRenderer } from "./GeoMapSceneRenderer";
 import { KaTeXOverlayRenderer } from "./KaTeXOverlayRenderer";
 import { MathFormulaRenderer } from "./MathFormulaRenderer";
 import { MathPlotRenderer } from "./MathPlotRenderer";
 import { MathSceneRenderer } from "./MathSceneRenderer";
 import { MotionSceneRenderer } from "./MotionSceneRenderer";
 import { NarrationCardRenderer } from "./NarrationCardRenderer";
+import { PhysicsForceSceneRenderer } from "./PhysicsForceSceneRenderer";
 import { SolidGeometrySceneRenderer } from "./SolidGeometrySceneRenderer";
 
 const registry = new Map<SnapshotKind, RendererComponent>([
@@ -40,6 +42,8 @@ const registry = new Map<SnapshotKind, RendererComponent>([
   ["modeling_scene", ModelingSceneRenderer],
   ["manifold_scene", ManifoldSceneRenderer],
   ["solid_geometry_scene", SolidGeometrySceneRenderer],
+  ["geo_map_scene", GeoMapSceneRenderer],
+  ["physics_force_scene", PhysicsForceSceneRenderer],
   ["motion_scene", MotionSceneRenderer],
   ["katex_overlay", KaTeXOverlayRenderer],
   ["narration_card", NarrationCardRenderer],

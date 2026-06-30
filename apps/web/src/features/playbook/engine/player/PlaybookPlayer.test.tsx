@@ -143,7 +143,7 @@ describe("PlaybookPlayer", () => {
     expect(getByText("Ask a follow-up")).toBeTruthy();
   });
 
-  it("keeps the narration panel above controls and moves playback options into settings", () => {
+  it("keeps subtitles inside the composition and moves playback options into settings", () => {
     const { container, getByRole, getByText, queryByText } = render(
       <PlaybookPlayer script={baseScript()} theme="light" />,
     );
@@ -151,18 +151,8 @@ describe("PlaybookPlayer", () => {
     expect(container.querySelector('[data-testid="mock-remotion-player"]')?.getAttribute("data-show-subtitles")).toBe(
       "true",
     );
-    const workspaceChildren = Array.from(
-      container.querySelector(".playbook-player__workspace")!.children,
-    );
-    expect(
-      workspaceChildren.findIndex((child) =>
-        child.classList.contains("playbook-player__caption"),
-      ),
-    ).toBeLessThan(
-      workspaceChildren.findIndex((child) =>
-        child.classList.contains("playbook-player__controls"),
-      ),
-    );
+    expect(container.querySelector(".playbook-player__caption")).toBeNull();
+    expect(queryByText("先观察函数的基础形态。")).toBeNull();
 
     const controls = container.querySelector(".playbook-player__controls");
     expect(controls).toBeTruthy();
@@ -228,7 +218,10 @@ describe("PlaybookPlayer", () => {
     expect(container.querySelector(".playbook-player__console")).toBeNull();
     expect(container.querySelector(".playbook-player__stage")).toBeTruthy();
     expect(container.querySelector(".playbook-player__controls")).toBeTruthy();
-    expect(container.querySelector(".playbook-player__caption--mobile")).toBeTruthy();
+    expect(container.querySelector(".playbook-player__caption--mobile")).toBeNull();
+    expect(container.querySelector(".playbook-player__mobile-narration")?.textContent).toContain(
+      "先观察函数的基础形态。",
+    );
 
     const tabs = container.querySelectorAll(".playbook-player__mobile-tabs button");
     expect(tabs).toHaveLength(5);

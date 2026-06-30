@@ -126,6 +126,55 @@ describe("MotionSceneRenderer", () => {
     expect(markup).toContain("translate(480, 270) scale(1.25) translate(-390, -295)");
   });
 
+  it("uses viewport world bounds for generated motion scenes", () => {
+    const markup = render(
+      makeScene({
+        viewport: {
+          width: 1280,
+          height: 720,
+          world: { xMin: -6, xMax: 6, yMin: -3.5, yMax: 3.5 },
+        },
+        objects: [
+          {
+            id: "triangle",
+            type: "polygon",
+            points: [
+              [-4, -2],
+              [0, -2],
+              [-4, 2],
+            ],
+            label: "triangle",
+            style: "primary",
+          },
+          {
+            id: "baseline",
+            type: "segment",
+            x1: -4,
+            y1: -2,
+            x2: 0,
+            y2: -2,
+            style: "accent",
+          },
+          {
+            id: "formula",
+            type: "text",
+            x: 2,
+            y: 2,
+            text: "a^2 + b^2 = c^2",
+            style: "title",
+          },
+        ],
+        camera: null,
+      }),
+      { progress: 0.5 },
+    );
+
+    expect(markup).toContain('viewBox="0 0 1280 720"');
+    expect(markup).toContain("213.33333333333334,565.7142857142858");
+    expect(markup).toContain("640,565.7142857142858");
+    expect(markup).toContain("translate(640, 360) scale(1) translate(-640, -360)");
+  });
+
   it("uses drawProgress to grow a segment", () => {
     const start = render(makeScene(), { progress: 0 });
     const middle = render(makeScene(), { progress: 0.5 });

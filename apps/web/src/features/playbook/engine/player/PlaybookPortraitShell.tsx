@@ -183,11 +183,6 @@ export function PlaybookPortraitShell({
       {stageSlot}
       {controlsSlot}
 
-      <div className="playbook-player__caption playbook-player__caption--mobile">
-        <span aria-hidden="true" />
-        <p>{currentNarration || currentStepTitle}</p>
-      </div>
-
       {showMobileConsole && (
         <section className="playbook-player__mobile-console" aria-label="移动学习面板">
           <div className="playbook-player__mobile-tabs" role="tablist" aria-label="移动学习面板">

@@ -13,7 +13,6 @@ import {
   IntakeScreen,
   IntakeContext,
 } from "../features/studio-editor/ui/IntakeScreen";
-import { TweaksPanel } from "../features/studio-editor/ui/TweaksPanel";
 import { StudioPage } from "../pages/Studio/StudioPage";
 import { HistoryPage } from "../pages/History/HistoryPage";
 import { TemplatesPage } from "../pages/Templates/TemplatesPage";
@@ -212,8 +211,6 @@ export function OpsAppShell() {
           />
         </ErrorBoundary>
       )}
-
-      <TweaksPanel t={t} setTweak={setTweak} />
 
       {accountModalOpen && (
         <RechargeModal

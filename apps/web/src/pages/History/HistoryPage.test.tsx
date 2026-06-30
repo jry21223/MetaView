@@ -194,6 +194,18 @@ describe("HistoryPage actions", () => {
     await waitFor(() => expect(hits).toBeGreaterThan(1));
   });
 
+  it("uses inline icons instead of character glyphs for history controls", async () => {
+    fixtureRuns([]);
+
+    const { container, getByRole, getByText } = renderHistoryPage();
+
+    await waitFor(() => expect(getByText("0 / 0 条")).toBeTruthy());
+    expect(getByRole("searchbox").getAttribute("placeholder")).toBe(
+      "搜索标题 / 摘要 / prompt...",
+    );
+    expect(container.textContent).not.toMatch(/[🔍↻▸▾←]/u);
+  });
+
   it("renders history playback without params, code sync, follow-up, or related panels", async () => {
     fixtureRuns([succeededRun]);
 

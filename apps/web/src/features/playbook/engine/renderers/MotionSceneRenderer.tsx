@@ -10,16 +10,92 @@ interface Point {
   y: number;
 }
 
-function cameraTransform(
-  camera: { x: number; y: number; zoom: number },
-  width: number,
-  height: number,
-): string {
-  return `translate(${width / 2}, ${height / 2}) scale(${camera.zoom}) translate(${-camera.x}, ${-camera.y})`;
+interface SceneBounds {
+  xMin: number;
+  xMax: number;
+  yMin: number;
+  yMax: number;
 }
 
-function objectTransform(state: ResolvedMotionObjectState): string {
-  return `translate(${state.x}, ${state.y}) rotate(${state.rotate}) scale(${state.scale})`;
+interface CoordinateMapper {
+  bounds: SceneBounds;
+  width: number;
+  height: number;
+  mapPoint(point: Point): Point;
+  mapDelta(delta: Point): Point;
+}
+
+function isPixelWorld(snap: MotionSceneSnapshot, bounds: SceneBounds): boolean {
+  return (
+    bounds.xMin === 0 &&
+    bounds.yMin === 0 &&
+    bounds.xMax === snap.viewport.width &&
+    bounds.yMax === snap.viewport.height
+  );
+}
+
+function resolveWorldBounds(snap: MotionSceneSnapshot): SceneBounds {
+  const world = snap.viewport.world;
+  if (
+    world &&
+    Number.isFinite(world.xMin) &&
+    Number.isFinite(world.xMax) &&
+    Number.isFinite(world.yMin) &&
+    Number.isFinite(world.yMax) &&
+    world.xMax > world.xMin &&
+    world.yMax > world.yMin
+  ) {
+    return world;
+  }
+  return {
+    xMin: 0,
+    xMax: snap.viewport.width,
+    yMin: 0,
+    yMax: snap.viewport.height,
+  };
+}
+
+function createCoordinateMapper(snap: MotionSceneSnapshot): CoordinateMapper {
+  const bounds = resolveWorldBounds(snap);
+  const width = snap.viewport.width;
+  const height = snap.viewport.height;
+  if (isPixelWorld(snap, bounds)) {
+    return {
+      bounds,
+      width,
+      height,
+      mapPoint: (point) => point,
+      mapDelta: (delta) => delta,
+    };
+  }
+  const xScale = width / (bounds.xMax - bounds.xMin);
+  const yScale = height / (bounds.yMax - bounds.yMin);
+  return {
+    bounds,
+    width,
+    height,
+    mapPoint: (point) => ({
+      x: (point.x - bounds.xMin) * xScale,
+      y: (bounds.yMax - point.y) * yScale,
+    }),
+    mapDelta: (delta) => ({
+      x: delta.x * xScale,
+      y: -delta.y * yScale,
+    }),
+  };
+}
+
+function cameraTransform(
+  camera: { x: number; y: number; zoom: number },
+  mapper: CoordinateMapper,
+): string {
+  const cameraPoint = mapper.mapPoint({ x: camera.x, y: camera.y });
+  return `translate(${mapper.width / 2}, ${mapper.height / 2}) scale(${camera.zoom}) translate(${-cameraPoint.x}, ${-cameraPoint.y})`;
+}
+
+function objectTransform(state: ResolvedMotionObjectState, mapper: CoordinateMapper): string {
+  const delta = mapper.mapDelta({ x: state.x, y: state.y });
+  return `translate(${delta.x}, ${delta.y}) rotate(${state.rotate}) scale(${state.scale})`;
 }
 
 function classFor(base: string, style: MotionStyle | undefined): string {
@@ -52,14 +128,19 @@ function renderLabel(label: string | undefined, at: Point, key = "label") {
   );
 }
 
-function renderObject(object: MotionObject, state: ResolvedMotionObjectState): React.ReactNode {
+function renderObject(
+  object: MotionObject,
+  state: ResolvedMotionObjectState,
+  mapper: CoordinateMapper,
+): React.ReactNode {
   switch (object.type) {
     case "polygon": {
-      const centroid = polygonCentroid(object.points);
+      const points = object.points.map(([x, y]) => mapper.mapPoint({ x, y }));
+      const centroid = polygonCentroid(points.map((point) => [point.x, point.y]));
       return (
         <>
           <polygon
-            points={object.points.map(([x, y]) => `${x},${y}`).join(" ")}
+            points={points.map(({ x, y }) => `${x},${y}`).join(" ")}
             className={classFor("motion-shape", object.style)}
           />
           {renderLabel(object.label, centroid)}
@@ -67,16 +148,18 @@ function renderObject(object: MotionObject, state: ResolvedMotionObjectState): R
       );
     }
     case "segment": {
-      const tip = interpolateLine(object.x1, object.y1, object.x2, object.y2, state.drawProgress);
+      const start = mapper.mapPoint({ x: object.x1, y: object.y1 });
+      const end = mapper.mapPoint({ x: object.x2, y: object.y2 });
+      const tip = interpolateLine(start.x, start.y, end.x, end.y, state.drawProgress);
       const labelPoint = {
-        x: (object.x1 + tip.x) / 2,
-        y: (object.y1 + tip.y) / 2 - 16,
+        x: (start.x + tip.x) / 2,
+        y: (start.y + tip.y) / 2 - 16,
       };
       return (
         <>
           <line
-            x1={object.x1}
-            y1={object.y1}
+            x1={start.x}
+            y1={start.y}
             x2={tip.x}
             y2={tip.y}
             markerEnd={object.arrow && state.drawProgress > 0.02 ? `url(#motion-arrow-${object.style ?? "primary"})` : undefined}
@@ -86,28 +169,32 @@ function renderObject(object: MotionObject, state: ResolvedMotionObjectState): R
         </>
       );
     }
-    case "point":
+    case "point": {
+      const point = mapper.mapPoint({ x: object.x, y: object.y });
       return (
         <>
           <circle
-            cx={object.x}
-            cy={object.y}
+            cx={point.x}
+            cy={point.y}
             r={object.r ?? 5}
             className={classFor("motion-point", object.style)}
           />
-          {renderLabel(object.label, { x: object.x + 18, y: object.y - 14 })}
+          {renderLabel(object.label, { x: point.x + 18, y: point.y - 14 })}
         </>
       );
-    case "text":
+    }
+    case "text": {
+      const point = mapper.mapPoint({ x: object.x, y: object.y });
       return (
         <text
-          x={object.x}
-          y={object.y}
+          x={point.x}
+          y={point.y}
           className={`motion-text motion-text--${object.style ?? "label"}`}
         >
           {object.text}
         </text>
       );
+    }
   }
 }
 
@@ -138,10 +225,12 @@ export const MotionSceneRenderer: React.FC<RendererProps> = ({
   theme,
 }) => {
   const snap = step.snapshot as MotionSceneSnapshot;
-  const { width, height } = snap.viewport;
+  const mapper = createCoordinateMapper(snap);
+  const worldCenterX = (mapper.bounds.xMin + mapper.bounds.xMax) / 2;
+  const worldCenterY = (mapper.bounds.yMin + mapper.bounds.yMax) / 2;
   const camera = evaluateCamera(snap.camera, progress, {
-    x: width / 2,
-    y: height / 2,
+    x: worldCenterX,
+    y: worldCenterY,
     zoom: 1,
   });
 
@@ -151,17 +240,17 @@ export const MotionSceneRenderer: React.FC<RendererProps> = ({
         className="motion-scene-renderer__svg"
         width="100%"
         height="100%"
-        viewBox={`0 0 ${width} ${height}`}
+        viewBox={`0 0 ${mapper.width} ${mapper.height}`}
         role="img"
         aria-label={step.title}
       >
         <ArrowDefs />
-        <rect width={width} height={height} className="motion-scene-renderer__bg" />
+        <rect width={mapper.width} height={mapper.height} className="motion-scene-renderer__bg" />
         <path
-          d={`M 0 ${height / 2} H ${width} M ${width / 2} 0 V ${height}`}
+          d={`M 0 ${mapper.height / 2} H ${mapper.width} M ${mapper.width / 2} 0 V ${mapper.height}`}
           className="motion-scene-renderer__grid"
         />
-        <g className="motion-scene-renderer__camera" transform={cameraTransform(camera, width, height)}>
+        <g className="motion-scene-renderer__camera" transform={cameraTransform(camera, mapper)}>
           {snap.objects.map((object) => {
             const state = resolveObjectState(object.id, snap.tracks, progress);
             return (
@@ -171,12 +260,12 @@ export const MotionSceneRenderer: React.FC<RendererProps> = ({
                 data-object-id={object.id}
                 data-highlight={state.highlight.toFixed(3)}
                 opacity={state.opacity}
-                transform={objectTransform(state)}
+                transform={objectTransform(state, mapper)}
                 style={{
                   filter: state.highlight > 0 ? `drop-shadow(0 0 ${8 + state.highlight * 10}px currentColor)` : undefined,
                 }}
               >
-                {renderObject(object, state)}
+                {renderObject(object, state, mapper)}
               </g>
             );
           })}

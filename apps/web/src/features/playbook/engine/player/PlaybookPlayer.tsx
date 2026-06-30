@@ -531,11 +531,6 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
 
         {stageSlot}
 
-        <div className="playbook-player__caption">
-          <span aria-hidden="true" />
-          <p>{currentNarration || currentStep.title}</p>
-        </div>
-
         {controlsSlot}
       </div>
       )}

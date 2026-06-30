@@ -19,6 +19,8 @@ export type SnapshotKind =
   | "modeling_scene"
   | "manifold_scene"
   | "solid_geometry_scene"
+  | "geo_map_scene"
+  | "physics_force_scene"
   | "motion_scene"
   | "katex_overlay"
   | "narration_card";
@@ -413,6 +415,71 @@ export interface SolidGeometrySceneSnapshot {
   caption?: string | null;
 }
 
+export interface GeoMapLayer {
+  id: string;
+  semantic_role: "land" | "ocean" | "map_layer" | "pressure_high" | "pressure_low" | string;
+  label?: string | null;
+  asset_id?: string | null;
+}
+
+export interface GeoMapFlow {
+  id: string;
+  semantic_role: "wind" | "current" | "moisture" | string;
+  from: [number, number];
+  to: [number, number];
+  label?: string | null;
+  asset_id?: string | null;
+  strength?: number | null;
+}
+
+export interface GeoPressureCenter {
+  id: string;
+  kind: "high" | "low";
+  x: number;
+  y: number;
+  label: string;
+}
+
+export interface GeoMapSceneSnapshot {
+  kind: "geo_map_scene";
+  pack_id?: string | null;
+  map_region?: "east_asia" | "world" | string;
+  layers: GeoMapLayer[];
+  flows: GeoMapFlow[];
+  pressure_centers?: GeoPressureCenter[];
+  particle_preset?: "moisture_particles" | "wind_stream" | "current_flow" | string | null;
+  caption?: string | null;
+}
+
+export interface PhysicsSceneObject {
+  id: string;
+  label?: string | null;
+  x: number;
+  y: number;
+  asset_id?: string | null;
+  radius?: number | null;
+}
+
+export interface PhysicsSceneVector {
+  id: string;
+  target: string;
+  semantic_role: "force" | "velocity" | "acceleration" | string;
+  dx: number;
+  dy: number;
+  label?: string | null;
+  magnitude?: string | null;
+}
+
+export interface PhysicsForceSceneSnapshot {
+  kind: "physics_force_scene";
+  pack_id?: string | null;
+  objects: PhysicsSceneObject[];
+  vectors: PhysicsSceneVector[];
+  trajectory?: Array<[number, number]>;
+  formula_latex?: string | null;
+  caption?: string | null;
+}
+
 /** Free-floating KaTeX label anchored at scene coordinates.
  *
  * `x_min/x_max/y_min/y_max` describe the parent scene's viewport so the
@@ -457,6 +524,8 @@ export type AnySnapshot =
   | ModelingSceneSnapshot
   | ManifoldSceneSnapshot
   | SolidGeometrySceneSnapshot
+  | GeoMapSceneSnapshot
+  | PhysicsForceSceneSnapshot
   | MotionSceneSnapshot
   | KaTeXOverlaySnapshot
   | NarrationCardSnapshot;

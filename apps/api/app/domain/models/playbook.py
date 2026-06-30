@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Annotated, Literal, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.models.execution import ExecutionParameterControl
 from app.domain.models.topic import TopicDomain
@@ -27,6 +27,8 @@ class SnapshotKind(str, Enum):
     MODELING_SCENE = "modeling_scene"
     MANIFOLD_SCENE = "manifold_scene"
     SOLID_GEOMETRY_SCENE = "solid_geometry_scene"
+    GEO_MAP_SCENE = "geo_map_scene"
+    PHYSICS_FORCE_SCENE = "physics_force_scene"
     MOTION_SCENE = "motion_scene"
     KATEX_OVERLAY = "katex_overlay"
     NARRATION_CARD = "narration_card"
@@ -426,6 +428,73 @@ class SolidGeometrySceneSnapshot(BaseModel):
     caption: str | None = None
 
 
+class GeoMapLayer(BaseModel):
+    id: str
+    semantic_role: str
+    label: str | None = None
+    asset_id: str | None = None
+
+
+class GeoMapFlow(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+    id: str
+    semantic_role: str = "wind"
+    from_: tuple[float, float] = Field(alias="from")
+    to: tuple[float, float]
+    label: str | None = None
+    asset_id: str | None = None
+    strength: float | None = None
+
+
+class GeoPressureCenter(BaseModel):
+    id: str
+    kind: Literal["high", "low"]
+    x: float
+    y: float
+    label: str
+
+
+class GeoMapSceneSnapshot(BaseModel):
+    kind: Literal["geo_map_scene"] = "geo_map_scene"
+    pack_id: str = "geography-basic"
+    map_region: str = "east_asia"
+    layers: list[GeoMapLayer] = Field(default_factory=list)
+    flows: list[GeoMapFlow] = Field(default_factory=list)
+    pressure_centers: list[GeoPressureCenter] = Field(default_factory=list)
+    particle_preset: str | None = None
+    caption: str | None = None
+
+
+class PhysicsSceneObject(BaseModel):
+    id: str
+    label: str | None = None
+    x: float
+    y: float
+    asset_id: str | None = None
+    radius: float | None = None
+
+
+class PhysicsSceneVector(BaseModel):
+    id: str
+    target: str
+    semantic_role: str
+    dx: float
+    dy: float
+    label: str | None = None
+    magnitude: str | None = None
+
+
+class PhysicsForceSceneSnapshot(BaseModel):
+    kind: Literal["physics_force_scene"] = "physics_force_scene"
+    pack_id: str = "physics-basic"
+    objects: list[PhysicsSceneObject] = Field(default_factory=list)
+    vectors: list[PhysicsSceneVector] = Field(default_factory=list)
+    trajectory: list[tuple[float, float]] = Field(default_factory=list)
+    formula_latex: str | None = None
+    caption: str | None = None
+
+
 MotionStyle = Literal["primary", "secondary", "accent", "muted"]
 MotionTextStyle = Literal["title", "label", "caption"]
 MotionEasing = Literal["linear", "easeOut", "easeInOut", "spring"]
@@ -574,6 +643,8 @@ AnySnapshot = Annotated[
         ModelingSceneSnapshot,
         ManifoldSceneSnapshot,
         SolidGeometrySceneSnapshot,
+        GeoMapSceneSnapshot,
+        PhysicsForceSceneSnapshot,
         MotionSceneSnapshot,
         KaTeXOverlaySnapshot,
         NarrationCardSnapshot,

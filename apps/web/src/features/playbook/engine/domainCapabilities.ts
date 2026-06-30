@@ -14,8 +14,8 @@ export const DOMAIN_CAPABILITIES: Record<string, DomainCapability> = {
   physics: {
     domain: "physics",
     support: "partial",
-    primaryRenderer: "math_scene/formula/domain_cards",
-    message: "Physics currently uses scene/formula/card renderers; dedicated physics renderer is not implemented yet.",
+    primaryRenderer: "physics_force_scene/math_scene/formula/domain_cards",
+    message: "Physics has a force-scene renderer for flagship motion cases and falls back to formula/card renderers.",
   },
   chemistry: {
     domain: "chemistry",
@@ -31,9 +31,9 @@ export const DOMAIN_CAPABILITIES: Record<string, DomainCapability> = {
   },
   geography: {
     domain: "geography",
-    support: "fallback",
-    primaryRenderer: "domain_cards",
-    message: "Geography currently uses fallback concept cards.",
+    support: "partial",
+    primaryRenderer: "geo_map_scene/motion_scene/domain_cards",
+    message: "Geography has a map-scene renderer for flagship map cases and falls back to motion/card renderers.",
   },
 };
 

@@ -57,13 +57,14 @@ describe("App edition shells", () => {
     vi.stubEnv("VITE_APP_EDITION", "self");
 
     const { App } = await import("./App");
-    const { container } = render(<App />);
+    const { container, queryByLabelText } = render(<App />);
 
     expect(container.textContent).toContain("MetaView");
     expect(
       container.querySelector('[data-testid="meta-particle-field"][data-variant="canvas"]'),
     ).toBeTruthy();
     expect(container.querySelector('[aria-label="MetaView logo animation"]')).toBeNull();
+    expect(queryByLabelText("打开设计调节面板")).toBeNull();
   }, 10000);
 
   it("ops edition shows the login gate when account session is missing", async () => {

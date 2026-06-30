@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://metaview.local/schemas/asset-manifest.schema.json",
+  "title": "MetaView Subject Visual Kit Manifest",
+  "type": "object",
+  "required": ["packId", "subject", "version", "license", "assets"],
+  "properties": {
+    "packId": { "type": "string", "minLength": 1 },
+    "subject": {
+      "type": "string",
+      "enum": ["math", "physics", "chemistry", "biology", "geography", "algorithm", "code"]
+    },
+    "version": { "type": "string", "minLength": 1 },
+    "license": {
+      "type": "string",
+      "enum": ["public-domain", "cc0", "cc-by", "mit", "internal"]
+    },
+    "sceneTemplates": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "rendererKinds": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "path", "tags", "semanticRoles", "license"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "type": {
+            "type": "string",
+            "enum": ["svg", "image", "lottie", "json"]
+          },
+          "path": { "type": "string", "minLength": 1 },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "semanticRoles": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "attribution": { "type": ["string", "null"] },
+          "license": {
+            "type": "string",
+            "enum": ["public-domain", "cc0", "cc-by", "mit", "internal"]
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

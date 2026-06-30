@@ -1,0 +1,28 @@
+{
+  "packId": "physics-basic",
+  "subject": "physics",
+  "version": "0.1.0",
+  "license": "internal",
+  "sceneTemplates": ["physics_force_scene"],
+  "rendererKinds": ["motion_scene"],
+  "assets": [
+    {
+      "id": "force-vector-arrow",
+      "type": "svg",
+      "path": "/assets/metaview-kits/physics-basic/force-vector-arrow.svg",
+      "tags": ["force", "vector", "arrow"],
+      "semanticRoles": ["force"],
+      "attribution": "MetaView internal placeholder",
+      "license": "internal"
+    },
+    {
+      "id": "projectile-body-dot",
+      "type": "svg",
+      "path": "/assets/metaview-kits/physics-basic/projectile-body-dot.svg",
+      "tags": ["object", "projectile", "motion"],
+      "semanticRoles": ["object", "velocity"],
+      "attribution": "MetaView internal placeholder",
+      "license": "internal"
+    }
+  ]
+}

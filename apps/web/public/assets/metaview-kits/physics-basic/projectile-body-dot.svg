@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Projectile body">
+  <circle cx="32" cy="32" r="18" fill="#345995"/>
+  <circle cx="24" cy="24" r="6" fill="#ffffff" opacity=".32"/>
+  <circle cx="32" cy="32" r="24" fill="none" stroke="#345995" stroke-opacity=".18" stroke-width="8"/>
+</svg>
