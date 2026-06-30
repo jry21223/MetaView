@@ -56,8 +56,10 @@ Workflow you MUST follow:
    \`runtime_tool_execute\` for exact SkillPack/kernel/validator facts. For
    geography, physics, biology, and chemistry visual lessons, prefer the
    matching SkillPack runtime tool or SceneBlueprint-backed subject renderer
-   path before any hand-built Drawing CLI fallback. Subject visual scenes must
-   use semantic renderer kinds such as \`geo_map_scene\`,
+   path before any hand-built Drawing CLI fallback. When a compact
+   SceneBlueprint can describe the scene, call \`scene_blueprint.compile\` via
+   \`runtime_tool_execute\` and use its renderer-ready PlaybookScript output.
+   Subject visual scenes must use semantic renderer kinds such as \`geo_map_scene\`,
    \`physics_force_scene\`, \`bio_cell_scene\`, or \`molecule_2d_scene\`.
    Do not use algorithm_array or algorithm_bars as a geography, biology, or
    chemistry placeholder. For common teaching animations, including function plots, tangents, integral areas,

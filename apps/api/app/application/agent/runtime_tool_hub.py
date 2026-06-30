@@ -14,6 +14,7 @@ from app.domain.services.geometry_validators import (
     check_point_on_curve,
 )
 from app.domain.services.playbook_quality import self_check_playbook
+from app.domain.services.scene_blueprint_compiler import compile_scene_blueprint_to_playbook
 from app.domain.skills.base import SkillExecutionContext, SkillRouteInput, SkillRouteMatch
 from app.domain.skills.registry import SkillRegistry, build_default_skill_registry
 
@@ -79,6 +80,43 @@ class RuntimeToolHub:
                     "required": ["playbook", "prompt"],
                 },
                 domain="playbook",
+                deterministic=True,
+            ),
+            ToolManifest(
+                name="scene_blueprint.compile",
+                description=(
+                    "Compile a controlled SceneBlueprint into a renderer-ready "
+                    "PlaybookScript."
+                ),
+                args_schema={
+                    "type": "object",
+                    "properties": {
+                        "blueprint": {
+                            "type": "object",
+                            "properties": {
+                                "id": {"type": "string"},
+                                "subject": {"type": "string"},
+                                "sceneType": {"type": "string"},
+                                "title": {"type": "string"},
+                                "caption": {"type": "string"},
+                                "packId": {"type": "string"},
+                                "visualIntent": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                },
+                                "emphasisPoints": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                },
+                                "durationFrames": {"type": "number"},
+                                "durationSeconds": {"type": "number"},
+                            },
+                            "required": ["subject", "sceneType"],
+                        }
+                    },
+                    "required": ["blueprint"],
+                },
+                domain="scene_blueprint",
                 deterministic=True,
             ),
             ToolManifest(
@@ -167,6 +205,8 @@ class RuntimeToolHub:
             return self._validate_playbook(name, args)
         if name == "playbook.self_check":
             return self._self_check_playbook(name, args)
+        if name == "scene_blueprint.compile":
+            return self._compile_scene_blueprint(name, args)
         if name == "animation_tool.list":
             return self._ok(name, {
                 "tools": [tool.model_dump(mode="json") for tool in list_animation_tools()]
@@ -339,6 +379,35 @@ class RuntimeToolHub:
             )
         verdict = self_check_playbook(playbook, str(args.get("prompt", "")))
         return self._ok(name, verdict.model_dump(mode="json"))
+
+    def _compile_scene_blueprint(
+        self,
+        name: str,
+        args: dict[str, Any],
+    ) -> ToolExecutionResult:
+        blueprint = args.get("blueprint")
+        if not isinstance(blueprint, dict):
+            return self._error(
+                name,
+                "scene_blueprint.invalid_args",
+                "scene_blueprint.compile requires a blueprint object.",
+            )
+        try:
+            playbook = compile_scene_blueprint_to_playbook(blueprint)
+        except (ValueError, ValidationError) as exc:
+            return self._error(
+                name,
+                "scene_blueprint.compile_failed",
+                str(exc),
+            )
+        return self._ok(
+            name,
+            {
+                "valid": True,
+                "sceneType": blueprint.get("sceneType"),
+                "playbook": playbook.model_dump(mode="json"),
+            },
+        )
 
     def _ok(self, tool: str, result: Any) -> ToolExecutionResult:
         return ToolExecutionResult(tool=tool, ok=True, result=result)

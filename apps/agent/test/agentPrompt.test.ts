@@ -46,6 +46,7 @@ function fallbackPlaybook(): PlaybookOutput {
 describe("agent prompt contracts", () => {
   it("steers subject visual scenes through SceneBlueprint and semantic renderer paths", () => {
     expect(SYSTEM_PROMPT).toContain("SceneBlueprint");
+    expect(SYSTEM_PROMPT).toContain("scene_blueprint.compile");
     expect(SYSTEM_PROMPT).toContain("SkillPack runtime tool");
     expect(SYSTEM_PROMPT).toContain("geo_map_scene");
     expect(SYSTEM_PROMPT).toContain("physics_force_scene");

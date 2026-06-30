@@ -107,6 +107,7 @@ def test_runtime_tool_hub_lists_core_animation_geometry_and_skill_tools() -> Non
     names = {tool.name for tool in hub.list_tools()}
 
     assert "skill.registry.list" in names
+    assert "scene_blueprint.compile" in names
     assert "skill.fake_skill.solve" in names
     assert "playbook.schema.validate" in names
     assert "playbook.self_check" in names
@@ -285,6 +286,58 @@ async def test_runtime_tool_hub_runs_self_check() -> None:
     assert result.result is not None
     assert result.result["status"] == "blocked"
     assert result.result["issues"][0]["code"] == "step.too_shallow"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("blueprint", "expected_kind", "expected_pack"),
+    [
+        (
+            {
+                "id": "east_asia_monsoon",
+                "subject": "geography",
+                "sceneType": "east_asia_monsoon",
+                "title": "东亚季风",
+                "caption": "海陆热力差异驱动季风环流。",
+                "visualIntent": ["land_sea_contrast", "monsoon_flow"],
+                "emphasisPoints": ["land_low", "ocean_high"],
+            },
+            "geo_map_scene",
+            "geography-earth-basic",
+        ),
+        (
+            {
+                "id": "projectile_motion",
+                "subject": "physics",
+                "sceneType": "projectile_motion",
+                "title": "平抛运动",
+                "caption": "水平速度不变，竖直方向受重力加速度影响。",
+                "visualIntent": ["projectile_motion", "velocity_decomposition"],
+                "emphasisPoints": ["trajectory", "gravity"],
+            },
+            "physics_force_scene",
+            "physics-basic",
+        ),
+    ],
+)
+async def test_runtime_tool_hub_compiles_subject_scene_blueprints(
+    blueprint: dict[str, Any],
+    expected_kind: str,
+    expected_pack: str,
+) -> None:
+    hub = RuntimeToolHub(skill_registry=SkillRegistry([]))
+
+    result = await hub.execute_tool("scene_blueprint.compile", {"blueprint": blueprint})
+
+    assert result.ok is True
+    assert result.result is not None
+    assert result.result["playbook"]["initial_data"]["scene_blueprint"] == [
+        blueprint["sceneType"]
+    ]
+    snapshot = result.result["playbook"]["steps"][0]["snapshot"]
+    assert snapshot["kind"] == expected_kind
+    assert snapshot["pack_id"] == expected_pack
+    assert snapshot["kind"] not in {"algorithm_array", "algorithm_bars"}
 
 
 @pytest.mark.asyncio
