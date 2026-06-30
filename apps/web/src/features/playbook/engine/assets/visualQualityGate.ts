@@ -16,6 +16,7 @@ export type VisualQualityWarningCode =
   | "missing_asset"
   | "low_biology_structure_assets"
   | "low_chemistry_structure_data"
+  | "low_math_visual_richness"
   | "unsupported_array_fallback";
 
 export interface VisualQualityWarning {
@@ -175,6 +176,56 @@ function checkMolecule2DScene(
   }
 }
 
+function hasMathFormula(snapshot: AnySnapshot): boolean {
+  if (snapshot.kind === "math_formula") return Boolean(snapshot.formula_latex?.trim());
+  if (snapshot.kind === "katex_overlay") return Boolean(snapshot.latex?.trim());
+  if (snapshot.kind === "math_plot" || snapshot.kind === "math_scene") {
+    return Boolean(snapshot.formula_latex?.trim());
+  }
+  return false;
+}
+
+function hasMathVisual(snapshot: AnySnapshot): boolean {
+  if (snapshot.kind === "math_plot") return snapshot.curves.length > 0;
+  if (snapshot.kind === "math_scene") {
+    return Boolean(
+      (snapshot.curves?.length ?? 0) > 0 ||
+        (snapshot.points?.length ?? 0) > 0 ||
+        (snapshot.regions?.length ?? 0) > 0 ||
+        (snapshot.segments?.length ?? 0) > 0 ||
+        snapshot.vector_field,
+    );
+  }
+  return false;
+}
+
+function checkMathStep(
+  warnings: VisualQualityWarning[],
+  domain: string,
+  step: MetaStep,
+  snapshots: Array<{ snapshot: AnySnapshot; snapshotPath: string }>,
+) {
+  if (domain !== "math") return;
+  const hasFormula = snapshots.some(({ snapshot }) => hasMathFormula(snapshot));
+  const hasVisual = snapshots.some(({ snapshot }) => hasMathVisual(snapshot));
+  if (hasFormula && hasVisual) return;
+
+  warn(
+    warnings,
+    {
+      domain,
+      step,
+      snapshot: step.snapshot,
+      snapshotPath: "snapshot",
+    },
+    {
+      code: "low_math_visual_richness",
+      domain,
+      message: "math steps should include both a formula and a plot or math scene.",
+    },
+  );
+}
+
 function checkUnsupportedArrayFallback(
   warnings: VisualQualityWarning[],
   context: SnapshotContext,
@@ -193,7 +244,10 @@ export function visualQualityGate(script: PlaybookScript): VisualQualityWarning[
   const warnings: VisualQualityWarning[] = [];
 
   for (const step of script.steps) {
-    for (const { snapshot, snapshotPath } of collectStepSnapshots(step)) {
+    const stepSnapshots = collectStepSnapshots(step);
+    checkMathStep(warnings, script.domain, step, stepSnapshots);
+
+    for (const { snapshot, snapshotPath } of stepSnapshots) {
       const context: SnapshotContext = {
         domain: script.domain,
         step,

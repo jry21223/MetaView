@@ -2,6 +2,7 @@ import biologyBasicManifest from "../../../../../public/assets/metaview-kits/bio
 import chemistryBasicManifest from "../../../../../public/assets/metaview-kits/chemistry-basic/manifest.json";
 import geographyBasicManifest from "../../../../../public/assets/metaview-kits/geography-basic/manifest.json";
 import geographyEarthBasicManifest from "../../../../../public/assets/metaview-kits/geography-earth-basic/manifest.json";
+import mathBasicManifest from "../../../../../public/assets/metaview-kits/math-basic/manifest.json";
 import physicsBasicManifest from "../../../../../public/assets/metaview-kits/physics-basic/manifest.json";
 
 export type SubjectVisualKitSubject =
@@ -87,6 +88,7 @@ const ASSET_PACKS: SubjectVisualKit[] = [
   chemistryBasicManifest as SubjectVisualKit,
   geographyBasicManifest as SubjectVisualKit,
   geographyEarthBasicManifest as SubjectVisualKit,
+  mathBasicManifest as SubjectVisualKit,
   physicsBasicManifest as SubjectVisualKit,
 ];
 

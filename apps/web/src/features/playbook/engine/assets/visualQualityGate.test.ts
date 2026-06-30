@@ -234,4 +234,71 @@ describe("visualQualityGate", () => {
       },
     ]);
   });
+
+  it("warns when a math step has formula without plot or scene", () => {
+    const warnings = visualQualityGate(
+      script({
+        domain: "math",
+        steps: [
+          {
+            step_id: "formula-only",
+            end_frame: 90,
+            title: "Formula only",
+            voiceover_text: "",
+            tokens: [],
+            snapshot: {
+              kind: "math_formula",
+              formula_latex: "f'(x)=2x",
+              caption: "Derivative rule",
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "low_math_visual_richness",
+          step_id: "formula-only",
+          domain: "math",
+        }),
+      ]),
+    );
+  });
+
+  it("warns when a math plot has no formula", () => {
+    const warnings = visualQualityGate(
+      script({
+        domain: "math",
+        steps: [
+          {
+            step_id: "plot-without-formula",
+            end_frame: 90,
+            title: "Plot without formula",
+            voiceover_text: "",
+            tokens: [],
+            snapshot: {
+              kind: "math_plot",
+              curves: [{ expression: "x^2", label: "f(x)" }],
+              x_min: -2,
+              x_max: 2,
+              x_label: "x",
+              y_label: "y",
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "low_math_visual_richness",
+          step_id: "plot-without-formula",
+          domain: "math",
+        }),
+      ]),
+    );
+  });
 });

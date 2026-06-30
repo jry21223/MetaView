@@ -147,6 +147,31 @@ describe("MathPlotRenderer", () => {
     expect(markup).toContain("#7db8ff");
   });
 
+  it("marks derivative tangent curves and formula cards for visual quality checks", () => {
+    const markup = render(
+      makeSnap({
+        pack_id: "math-basic",
+        asset_id: "derivative-tangent-preset",
+        curves: [
+          { expression: "x^2", label: "f(x)=x^2", emphasis: "primary", semantic_role: "curve" },
+          { expression: "2*x - 1", label: "tangent slope = 2", emphasis: "accent", semantic_role: "tangent" },
+        ],
+        marker_x: 1,
+        shade_from: 0.85,
+        shade_to: 1.15,
+        formula_latex: "f'(1)=2",
+      }),
+    );
+
+    expect(markup).toContain('class="math-plot-renderer"');
+    expect(markup).toContain('data-pack-id="math-basic"');
+    expect(markup).toContain('data-plot-asset-id="derivative-tangent-preset"');
+    expect(markup).toContain('data-semantic-role="tangent"');
+    expect(markup).toContain('data-semantic-role="formula"');
+    expect(markup).toContain("tangent slope = 2");
+    expect(markup).toContain("(1, 1)");
+  });
+
   it("shade top edge shares every interior x with the curve polyline (issue #44)", () => {
     const markup = render(
       makeSnap({

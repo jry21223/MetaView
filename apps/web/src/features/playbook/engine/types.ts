@@ -65,11 +65,15 @@ export interface MathPlotCurve {
   label?: string | null;
   /** `primary` = curve in focus, `secondary` = context, `accent` = result. */
   emphasis?: string;
+  /** Semantic role for asset/preset-aware renderers, e.g. curve, tangent, asymptote. */
+  semantic_role?: "curve" | "tangent" | "normal" | "slope" | string;
 }
 
 /** Cartesian function / curve plot (math domain). */
 export interface MathPlotSnapshot {
   kind: "math_plot";
+  pack_id?: string | null;
+  asset_id?: string | null;
   curves: MathPlotCurve[];
   /** Runtime numeric parameter scope used by curve expressions, e.g. `{ a: 2 }` for `a*x`. */
   params?: Record<string, number>;
@@ -86,6 +90,8 @@ export interface MathPlotSnapshot {
   y_label: string;
   /** Optional KaTeX label, e.g. `"f(x) = x^2"`. */
   formula_latex?: string | null;
+  /** Plain-language caption shown by composition/subtitle flows. */
+  caption?: string | null;
 }
 
 /** Static math formula display (math domain — non-graphable content). */

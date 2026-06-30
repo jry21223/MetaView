@@ -24,6 +24,9 @@ describe("assetResolver", () => {
     expect(resolveAssetForRenderer("molecule_2d_scene", "molecule")).toMatchObject({
       id: "water-molecule-preset",
     });
+    expect(resolveAssetForRenderer("math_plot", "tangent")).toMatchObject({
+      id: "derivative-tangent-preset",
+    });
     expect(resolveAssetForRenderer("geo_map_scene", "monsoon_flow")).toMatchObject({
       id: "monsoon-wind-arrow",
     });

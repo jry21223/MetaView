@@ -14,6 +14,20 @@ vi.mock("remotion", async () => {
 });
 
 describe("subject visual fixtures", () => {
+  it("statically renders derivative_tangent through PlaybookComposition", () => {
+    const markup = renderToStaticMarkup(
+      <PlaybookComposition script={getSubjectVisualFixture("derivative_tangent")} showSubtitles={false} />,
+    );
+
+    expect(markup).toContain("math-plot-renderer");
+    expect(markup).toContain('data-pack-id="math-basic"');
+    expect(markup).toContain('data-plot-asset-id="derivative-tangent-preset"');
+    expect(markup).toContain('data-semantic-role="tangent"');
+    expect(markup).toContain('data-semantic-role="formula"');
+    expect(markup).toContain("(1, 1)");
+    expect(markup).not.toContain("Unknown snapshot kind");
+  });
+
   it("statically renders molecule_2d_water through PlaybookComposition", () => {
     const markup = renderToStaticMarkup(
       <PlaybookComposition script={getSubjectVisualFixture("molecule_2d_water")} showSubtitles={false} />,

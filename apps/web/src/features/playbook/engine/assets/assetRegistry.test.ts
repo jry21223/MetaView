@@ -29,6 +29,7 @@ describe("assetRegistry", () => {
     expect(packs).toContain("chemistry-basic");
     expect(packs).toContain("geography-basic");
     expect(packs).toContain("geography-earth-basic");
+    expect(packs).toContain("math-basic");
     expect(packs).toContain("physics-basic");
   });
 
@@ -38,6 +39,7 @@ describe("assetRegistry", () => {
     expect(findAssetByRole("chemistry", "molecule")?.id).toBe("water-molecule-preset");
     expect(findAssetByRole("chemistry", "bond")?.id).toBe("bond-line");
     expect(findAssetByRole("geography", "wind")?.id).toBe("monsoon-wind-arrow");
+    expect(findAssetByRole("math", "tangent")?.id).toBe("derivative-tangent-preset");
     expect(findAssetByRole("physics", "force")?.id).toBe("force-vector-arrow");
   });
 
@@ -46,6 +48,7 @@ describe("assetRegistry", () => {
     expect(getAssetPack("chemistry-basic")?.rendererKinds).toEqual(["molecule_2d_scene"]);
     expect(getAssetPack("geography-basic")?.rendererKinds).toEqual(["geo_map_scene"]);
     expect(getAssetPack("geography-earth-basic")?.rendererKinds).toEqual(["geo_map_scene"]);
+    expect(getAssetPack("math-basic")?.rendererKinds).toEqual(["math_plot", "math_scene", "math_formula", "katex_overlay"]);
     expect(getAssetPack("physics-basic")?.rendererKinds).toEqual(["physics_force_scene"]);
   });
 
@@ -94,6 +97,7 @@ describe("assetRegistry", () => {
       "/assets/metaview-kits/chemistry-basic/manifest.json",
       "/assets/metaview-kits/geography-basic/manifest.json",
       "/assets/metaview-kits/geography-earth-basic/manifest.json",
+      "/assets/metaview-kits/math-basic/manifest.json",
       "/assets/metaview-kits/physics-basic/manifest.json",
     ]) {
       const manifest = readPublicJson<unknown>(manifestPath);
@@ -118,6 +122,9 @@ describe("assetRegistry", () => {
       'data-asset-quality="v1"',
     );
     expect(readPublicAsset("/assets/metaview-kits/chemistry-basic/molecule-presets/water.json")).toContain(
+      '"source": "structured-preset"',
+    );
+    expect(readPublicAsset("/assets/metaview-kits/math-basic/plot-presets/derivative-tangent.json")).toContain(
       '"source": "structured-preset"',
     );
     expect(readPublicAsset("/assets/metaview-kits/geography-basic/east-asia-map-placeholder.svg")).toContain(

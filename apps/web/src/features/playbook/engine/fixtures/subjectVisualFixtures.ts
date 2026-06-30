@@ -1,12 +1,18 @@
 import type {
   BioCellSceneSnapshot,
   GeoMapSceneSnapshot,
+  MathPlotSnapshot,
   Molecule2DSceneSnapshot,
   PhysicsForceSceneSnapshot,
   PlaybookScript,
 } from "../types";
 
-export type SubjectVisualFixtureId = "cell_structure" | "east_asia_monsoon" | "molecule_2d_water" | "projectile_motion";
+export type SubjectVisualFixtureId =
+  | "cell_structure"
+  | "derivative_tangent"
+  | "east_asia_monsoon"
+  | "molecule_2d_water"
+  | "projectile_motion";
 
 function cellStructureSnapshot(): BioCellSceneSnapshot {
   return {
@@ -82,6 +88,29 @@ function molecule2DWaterSnapshot(): Molecule2DSceneSnapshot {
   };
 }
 
+function derivativeTangentSnapshot(): MathPlotSnapshot {
+  return {
+    kind: "math_plot",
+    pack_id: "math-basic",
+    asset_id: "derivative-tangent-preset",
+    curves: [
+      { expression: "x^2", label: "f(x)=x^2", emphasis: "primary", semantic_role: "curve" },
+      { expression: "2*x - 1", label: "tangent slope = 2", emphasis: "accent", semantic_role: "tangent" },
+    ],
+    x_min: -1,
+    x_max: 3,
+    y_min: -1,
+    y_max: 5,
+    marker_x: 1,
+    shade_from: 0.85,
+    shade_to: 1.15,
+    x_label: "x",
+    y_label: "f(x)",
+    formula_latex: "f'(1)=2",
+    caption: "The derivative at x=1 is the slope of the tangent line.",
+  };
+}
+
 function projectileMotionSnapshot(): PhysicsForceSceneSnapshot {
   return {
     kind: "physics_force_scene",
@@ -103,9 +132,9 @@ function projectileMotionSnapshot(): PhysicsForceSceneSnapshot {
 
 function scriptFor(
   id: SubjectVisualFixtureId,
-  domain: "biology" | "chemistry" | "geography" | "physics",
+  domain: "biology" | "chemistry" | "geography" | "math" | "physics",
   title: string,
-  snapshot: BioCellSceneSnapshot | GeoMapSceneSnapshot | Molecule2DSceneSnapshot | PhysicsForceSceneSnapshot,
+  snapshot: BioCellSceneSnapshot | GeoMapSceneSnapshot | MathPlotSnapshot | Molecule2DSceneSnapshot | PhysicsForceSceneSnapshot,
 ): PlaybookScript {
   return {
     schema_version: "1.0.0",
@@ -134,6 +163,12 @@ export const subjectVisualFixtures: Record<SubjectVisualFixtureId, PlaybookScrip
     "biology",
     "Cell structure",
     cellStructureSnapshot(),
+  ),
+  derivative_tangent: scriptFor(
+    "derivative_tangent",
+    "math",
+    "Derivative tangent",
+    derivativeTangentSnapshot(),
   ),
   east_asia_monsoon: scriptFor(
     "east_asia_monsoon",
