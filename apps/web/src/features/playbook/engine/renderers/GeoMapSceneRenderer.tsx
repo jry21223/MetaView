@@ -1,10 +1,19 @@
 import React from "react";
 
-import { findAssetByRole, getAssetPack } from "../assets/assetRegistry";
-import type { GeoMapFlow, GeoMapSceneSnapshot } from "../types";
+import { AssetSvg } from "../assets/AssetSvg";
+import {
+  findAssetById,
+  findAssetByRole,
+  findAssetInPackByRole,
+  getAssetPack,
+  type AssetManifestEntry,
+  type SubjectVisualKit,
+} from "../assets/assetRegistry";
+import type { GeoMapFlow, GeoMapSceneSnapshot, GeoPressureCenter } from "../types";
 import type { RendererProps } from "./types";
 
 const VIEWBOX = "0 0 100 100";
+const DEFAULT_GEO_PACK_ID = "geography-basic";
 
 function clampPercent(value: number): number {
   return Math.max(4, Math.min(96, value));
@@ -25,13 +34,84 @@ function pressureClass(kind: "high" | "low"): string {
   return kind === "high" ? "#2f80c9" : "#d55343";
 }
 
+function resolveMapAsset(snap: GeoMapSceneSnapshot, pack: SubjectVisualKit | undefined): AssetManifestEntry | undefined {
+  const explicitLayer = snap.layers.find(
+    (layer) =>
+      (layer.semantic_role === "map_layer" || layer.semantic_role === "land" || layer.semantic_role === "ocean") &&
+      layer.asset_id,
+  );
+  const explicitAsset = findAssetById(explicitLayer?.asset_id, pack?.packId);
+  if (explicitAsset) return explicitAsset;
+
+  return (
+    findAssetInPackByRole(pack, "map_layer") ??
+    findAssetInPackByRole(pack, "land") ??
+    findAssetInPackByRole(pack, "ocean") ??
+    findAssetByRole("geography", "map_layer", pack?.packId)
+  );
+}
+
+function resolveFlowAsset(flow: GeoMapFlow, pack: SubjectVisualKit | undefined): AssetManifestEntry | undefined {
+  const semanticAsset =
+    findAssetInPackByRole(pack, flow.semantic_role) ??
+    findAssetInPackByRole(pack, "wind") ??
+    findAssetByRole("geography", flow.semantic_role, pack?.packId) ??
+    findAssetByRole("geography", "wind", pack?.packId);
+  const explicitAsset = findAssetById(flow.asset_id, pack?.packId);
+  return explicitAsset ?? semanticAsset;
+}
+
+function particlePresetPoints(
+  preset: GeoMapSceneSnapshot["particle_preset"],
+  progress: number,
+): Array<{ x: number; y: number; r: number; opacity: number }> {
+  if (!preset) return [];
+  const p = Math.max(0, Math.min(1, progress));
+  const baseCount = preset === "moisture_particles" ? 9 : 7;
+  return Array.from({ length: baseCount }, (_, index) => ({
+    x: 62 - index * 3.8 + p * 8,
+    y: 62 - (index % 3) * 8 + (preset === "wind_stream" ? Math.sin(index + p * Math.PI) * 1.4 : 0),
+    r: preset === "moisture_particles" ? 1.1 : 0.9,
+    opacity: preset === "current_flow" ? 0.5 : 0.68,
+  }));
+}
+
+function pressureLabelPosition(
+  center: GeoPressureCenter,
+  centers: GeoPressureCenter[],
+  index: number,
+): { x: number; y: number; textAnchor: "middle" | "start" | "end" } {
+  const overlapsEarlier = centers
+    .slice(0, index)
+    .some((other) => Math.abs(center.x - other.x) < 18 && Math.abs(center.y - other.y) < 14);
+  if (!overlapsEarlier) {
+    return { x: clampPercent(center.x), y: clampPercent(center.y - 8.2), textAnchor: "middle" };
+  }
+
+  const side = index % 2 === 0 ? -1 : 1;
+  return {
+    x: clampPercent(center.x + side * 11),
+    y: clampPercent(center.y + (center.y < 52 ? 10 : -10)),
+    textAnchor: side > 0 ? "start" : "end",
+  };
+}
+
+function layerLabelPosition(index: number, total: number): { x: number; y: number } {
+  const safeTotal = Math.max(1, total);
+  const spacing = safeTotal === 1 ? 0 : 64 / (safeTotal - 1);
+  return {
+    x: safeTotal === 1 ? 50 : 18 + spacing * index,
+    y: 83 + (index % 2) * 4,
+  };
+}
+
 export const GeoMapSceneRenderer: React.FC<RendererProps> = ({ step, progress, theme }) => {
   const snap = step.snapshot as GeoMapSceneSnapshot;
-  const pack = getAssetPack(snap.pack_id ?? "geography-basic");
-  const windAsset = snap.flows[0]?.asset_id
-    ? pack?.assets.find((asset) => asset.id === snap.flows[0]?.asset_id)
-    : findAssetByRole("geography", "wind");
-  const particleCount = snap.particle_preset ? 9 : 0;
+  const packId = snap.pack_id ?? DEFAULT_GEO_PACK_ID;
+  const pack = getAssetPack(packId);
+  const mapAsset = resolveMapAsset(snap, pack);
+  const particles = particlePresetPoints(snap.particle_preset, progress);
+  const pressureCenters = snap.pressure_centers ?? [];
 
   return (
     <div
@@ -76,82 +156,102 @@ export const GeoMapSceneRenderer: React.FC<RendererProps> = ({ step, progress, t
           {snap.map_region ?? "world"}
         </text>
 
-        <path
-          d="M18 26 C33 19 50 24 61 36 C73 49 66 68 50 76 C35 83 19 75 12 59 C6 45 8 32 18 26 Z"
-          fill="#d8e6c0"
-          stroke="#8fac6b"
-          strokeWidth="0.9"
-          data-semantic-role="land"
-        />
-        <path
-          d="M62 35 C77 38 90 49 94 64 C86 79 71 86 53 82 C66 72 72 52 62 35 Z"
-          fill="#a9cfe7"
-          opacity="0.8"
-          data-semantic-role="ocean"
+        <AssetSvg
+          asset={mapAsset}
+          assetId={mapAsset?.id}
+          packId={packId}
+          subject="geography"
+          semanticRole="map_layer"
+          x={8}
+          y={21}
+          width={84}
+          height={58}
+          fallbackShape="rect"
         />
 
-        {snap.pressure_centers?.map((center) => (
-          <g key={center.id} data-pressure-kind={center.kind}>
-            <circle cx={center.x} cy={center.y} r="5.6" fill={pressureClass(center.kind)} opacity="0.92" />
-            <text x={center.x} y={center.y + 1.6} textAnchor="middle" fontSize="5.2" fontWeight="800" fill="#fff">
-              {center.kind === "high" ? "H" : "L"}
-            </text>
-            <text x={center.x} y={center.y - 8.2} textAnchor="middle" fontSize="3.3" fontWeight="700" fill="#26384a">
-              {center.label}
-            </text>
-          </g>
-        ))}
+        {pressureCenters.map((center, index) => {
+          const label = pressureLabelPosition(center, pressureCenters, index);
+          return (
+            <g key={center.id} data-pressure-kind={center.kind}>
+              <circle cx={center.x} cy={center.y} r="5.6" fill={pressureClass(center.kind)} opacity="0.92" />
+              <text x={center.x} y={center.y + 1.6} textAnchor="middle" fontSize="5.2" fontWeight="800" fill="#fff">
+                {center.kind === "high" ? "H" : "L"}
+              </text>
+              <text
+                x={label.x}
+                y={label.y}
+                textAnchor={label.textAnchor}
+                fontSize="3.3"
+                fontWeight="700"
+                fill="#26384a"
+              >
+                {center.label}
+              </text>
+            </g>
+          );
+        })}
 
-        {snap.flows.map((flow) => (
-          <g key={flow.id} data-semantic-role={flow.semantic_role} data-asset-id={windAsset?.id}>
-            <path
-              d={flowPath(flow, progress)}
-              fill="none"
-              stroke="#1f8abd"
-              strokeWidth={2.6 + Math.min(1.2, flow.strength ?? 1)}
-              strokeLinecap="round"
-              markerEnd="url(#geo-flow-arrow)"
-              opacity="0.9"
-            />
-            <text
-              x={(flow.from[0] + flow.to[0]) / 2}
-              y={Math.min(flow.from[1], flow.to[1]) - 15}
-              textAnchor="middle"
-              fontSize="4"
-              fontWeight="760"
-              fill="#176d9d"
+        {snap.flows.map((flow) => {
+          const flowAsset = resolveFlowAsset(flow, pack);
+          return (
+            <g
+              key={flow.id}
+              data-semantic-role={flow.semantic_role}
+              data-asset-id={flowAsset?.id ?? flow.asset_id ?? undefined}
+              data-asset-path={flowAsset?.path}
             >
-              {flow.label}
-            </text>
-          </g>
-        ))}
+              <path
+                d={flowPath(flow, progress)}
+                fill="none"
+                stroke="#1f8abd"
+                strokeWidth={2.6 + Math.min(1.2, flow.strength ?? 1)}
+                strokeLinecap="round"
+                markerEnd="url(#geo-flow-arrow)"
+                opacity="0.9"
+              />
+              <text
+                x={(flow.from[0] + flow.to[0]) / 2}
+                y={Math.min(flow.from[1], flow.to[1]) - 15}
+                textAnchor="middle"
+                fontSize="4"
+                fontWeight="760"
+                fill="#176d9d"
+              >
+                {flow.label}
+              </text>
+            </g>
+          );
+        })}
 
-        {Array.from({ length: particleCount }).map((_, index) => (
+        {particles.map((particle, index) => (
           <circle
             key={index}
-            cx={62 - index * 3.8 + progress * 8}
-            cy={62 - (index % 3) * 8}
-            r="1.1"
+            cx={particle.x}
+            cy={particle.y}
+            r={particle.r}
             fill="#ffffff"
-            opacity="0.68"
+            opacity={particle.opacity}
             data-particle-preset={snap.particle_preset ?? undefined}
           />
         ))}
 
-        {snap.layers.map((layer, index) => (
-          <text
-            key={layer.id}
-            x={index === 0 ? 23 : 78}
-            y={index === 0 ? 82 : 86}
-            textAnchor="middle"
-            fontSize="3.4"
-            fontWeight="700"
-            fill="#466172"
-            data-semantic-role={layer.semantic_role}
-          >
-            {layer.label}
-          </text>
-        ))}
+        {snap.layers.map((layer, index) => {
+          const label = layerLabelPosition(index, snap.layers.length);
+          return (
+            <text
+              key={layer.id}
+              x={label.x}
+              y={label.y}
+              textAnchor="middle"
+              fontSize="3.4"
+              fontWeight="700"
+              fill="#466172"
+              data-semantic-role={layer.semantic_role}
+            >
+              {layer.label}
+            </text>
+          );
+        })}
 
         {snap.caption ? (
           <text x="50" y="95" textAnchor="middle" fontSize="3.8" fill="#466172">

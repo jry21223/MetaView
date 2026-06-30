@@ -1,8 +1,11 @@
 import React from "react";
 
-import { getAssetPack } from "../assets/assetRegistry";
+import { AssetSvg } from "../assets/AssetSvg";
+import { findAssetById, findAssetByRole, getAssetPack, type AssetManifestEntry } from "../assets/assetRegistry";
 import type { PhysicsForceSceneSnapshot, PhysicsSceneObject, PhysicsSceneVector } from "../types";
 import type { RendererProps } from "./types";
+
+const DEFAULT_PHYSICS_PACK_ID = "physics-basic";
 
 function objectById(objects: PhysicsSceneObject[], id: string): PhysicsSceneObject | undefined {
   return objects.find((object) => object.id === id);
@@ -28,6 +31,28 @@ function compactFormula(formula: string | null | undefined): string {
     .replace(/\\frac12/g, "1/2")
     .replace(/\\frac\{1\}\{2\}/g, "1/2")
     .replace(/[{}]/g, "");
+}
+
+function resolveObjectAsset(object: PhysicsSceneObject, packId: string | undefined): AssetManifestEntry | undefined {
+  return findAssetById(object.asset_id, packId) ?? findAssetByRole("physics", "object", packId) ?? findAssetByRole("physics", "object");
+}
+
+function motionTrailDots(
+  points: Array<[number, number]> | undefined,
+  progress: number,
+): Array<{ x: number; y: number; r: number; opacity: number }> {
+  if (!points?.length) return [];
+  const p = Math.max(0, Math.min(1, progress));
+  const visibleCount = Math.max(1, Math.ceil(points.length * p));
+  return points.slice(0, visibleCount).map(([x, y], index) => {
+    const age = visibleCount <= 1 ? 1 : index / (visibleCount - 1);
+    return {
+      x,
+      y,
+      r: 0.8 + age * 0.7,
+      opacity: 0.28 + age * 0.42,
+    };
+  });
 }
 
 function renderVector(vector: PhysicsSceneVector, target: PhysicsSceneObject | undefined, progress: number) {
@@ -68,8 +93,10 @@ function renderVector(vector: PhysicsSceneVector, target: PhysicsSceneObject | u
 
 export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({ step, progress, theme }) => {
   const snap = step.snapshot as PhysicsForceSceneSnapshot;
-  const pack = getAssetPack(snap.pack_id ?? "physics-basic");
+  const packId = snap.pack_id ?? DEFAULT_PHYSICS_PACK_ID;
+  const pack = getAssetPack(packId);
   const formulaText = compactFormula(snap.formula_latex);
+  const trailDots = motionTrailDots(snap.trajectory, progress);
 
   return (
     <div
@@ -128,17 +155,37 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({ step, progr
           />
         ) : null}
 
-        {snap.objects.map((object) => {
-          const asset = object.asset_id ? pack?.assets.find((item) => item.id === object.asset_id) : undefined;
-          return (
-            <g key={object.id} data-object-id={object.id} data-asset-id={asset?.id}>
+        {trailDots.length ? (
+          <g data-semantic-role="motion_trail">
+            {trailDots.map((dot, index) => (
               <circle
-                cx={object.x}
-                cy={object.y}
-                r={object.radius ?? 4.6}
-                fill="#345995"
-                stroke="#ffffff"
-                strokeWidth="1.4"
+                key={`${dot.x}-${dot.y}-${index}`}
+                cx={dot.x}
+                cy={dot.y}
+                r={dot.r}
+                fill="#d69e2e"
+                opacity={dot.opacity}
+              />
+            ))}
+          </g>
+        ) : null}
+
+        {snap.objects.map((object) => {
+          const asset = resolveObjectAsset(object, pack?.packId);
+          const radius = object.radius ?? 4.6;
+          return (
+            <g key={object.id} data-object-id={object.id}>
+              <AssetSvg
+                asset={asset}
+                assetId={object.asset_id ?? asset?.id}
+                packId={pack?.packId ?? packId}
+                subject="physics"
+                semanticRole="object"
+                x={object.x - radius}
+                y={object.y - radius}
+                width={radius * 2}
+                height={radius * 2}
+                fallbackShape="circle"
               />
               <text x={object.x} y={object.y - 7} textAnchor="middle" fontSize="3.8" fontWeight="700" fill="#345995">
                 {object.label}

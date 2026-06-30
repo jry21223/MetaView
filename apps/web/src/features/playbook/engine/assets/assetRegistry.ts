@@ -1,3 +1,6 @@
+import geographyBasicManifest from "../../../../../public/assets/metaview-kits/geography-basic/manifest.json";
+import physicsBasicManifest from "../../../../../public/assets/metaview-kits/physics-basic/manifest.json";
+
 export type SubjectVisualKitSubject =
   | "math"
   | "physics"
@@ -35,62 +38,8 @@ export interface SubjectVisualKit {
 }
 
 const ASSET_PACKS: SubjectVisualKit[] = [
-  {
-    packId: "geography-basic",
-    subject: "geography",
-    version: "0.1.0",
-    license: "internal",
-    sceneTemplates: ["geo_map_scene"],
-    rendererKinds: ["narration_card"],
-    assets: [
-      {
-        id: "east-asia-map-placeholder",
-        type: "svg",
-        path: "/assets/metaview-kits/geography-basic/east-asia-map-placeholder.svg",
-        tags: ["map", "land", "ocean", "monsoon"],
-        semanticRoles: ["land", "ocean", "map_layer"],
-        attribution: "MetaView internal placeholder",
-        license: "internal",
-      },
-      {
-        id: "monsoon-wind-arrow",
-        type: "svg",
-        path: "/assets/metaview-kits/geography-basic/monsoon-wind-arrow.svg",
-        tags: ["wind", "monsoon", "arrow"],
-        semanticRoles: ["wind"],
-        attribution: "MetaView internal placeholder",
-        license: "internal",
-      },
-    ],
-  },
-  {
-    packId: "physics-basic",
-    subject: "physics",
-    version: "0.1.0",
-    license: "internal",
-    sceneTemplates: ["physics_force_scene"],
-    rendererKinds: ["motion_scene"],
-    assets: [
-      {
-        id: "force-vector-arrow",
-        type: "svg",
-        path: "/assets/metaview-kits/physics-basic/force-vector-arrow.svg",
-        tags: ["force", "vector", "arrow"],
-        semanticRoles: ["force"],
-        attribution: "MetaView internal placeholder",
-        license: "internal",
-      },
-      {
-        id: "projectile-body-dot",
-        type: "svg",
-        path: "/assets/metaview-kits/physics-basic/projectile-body-dot.svg",
-        tags: ["object", "projectile", "motion"],
-        semanticRoles: ["object", "velocity"],
-        attribution: "MetaView internal placeholder",
-        license: "internal",
-      },
-    ],
-  },
+  geographyBasicManifest as SubjectVisualKit,
+  physicsBasicManifest as SubjectVisualKit,
 ];
 
 export function listAssetPacks(): SubjectVisualKit[] {
@@ -101,11 +50,36 @@ export function getAssetPack(packId: string): SubjectVisualKit | undefined {
   return ASSET_PACKS.find((pack) => pack.packId === packId);
 }
 
+export function findAssetById(
+  assetId: string | null | undefined,
+  packId?: string | null,
+): AssetManifestEntry | undefined {
+  if (!assetId) return undefined;
+  const packs = packId ? ASSET_PACKS.filter((pack) => pack.packId === packId) : ASSET_PACKS;
+  for (const pack of packs) {
+    const asset = pack.assets.find((item) => item.id === assetId);
+    if (asset) return asset;
+  }
+  return undefined;
+}
+
+export function findAssetInPackByRole(
+  pack: SubjectVisualKit | undefined,
+  semanticRole: string | null | undefined,
+): AssetManifestEntry | undefined {
+  if (!pack || !semanticRole) return undefined;
+  return pack.assets.find((asset) => asset.semanticRoles.includes(semanticRole));
+}
+
 export function findAssetByRole(
   subject: SubjectVisualKitSubject,
   semanticRole: string,
+  packId?: string | null,
 ): AssetManifestEntry | undefined {
-  return ASSET_PACKS.find((pack) => pack.subject === subject)?.assets.find((asset) =>
-    asset.semanticRoles.includes(semanticRole),
-  );
+  const packs = ASSET_PACKS.filter((pack) => pack.subject === subject && (!packId || pack.packId === packId));
+  for (const pack of packs) {
+    const asset = findAssetInPackByRole(pack, semanticRole);
+    if (asset) return asset;
+  }
+  return undefined;
 }

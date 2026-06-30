@@ -19,4 +19,9 @@ describe("assetRegistry", () => {
     expect(findAssetByRole("geography", "wind")?.id).toBe("monsoon-wind-arrow");
     expect(findAssetByRole("physics", "force")?.id).toBe("force-vector-arrow");
   });
+
+  it("keeps rendererKinds aligned with the dedicated scene renderers", () => {
+    expect(getAssetPack("geography-basic")?.rendererKinds).toEqual(["geo_map_scene"]);
+    expect(getAssetPack("physics-basic")?.rendererKinds).toEqual(["physics_force_scene"]);
+  });
 });

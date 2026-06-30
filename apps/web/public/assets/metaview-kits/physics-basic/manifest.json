@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "license": "internal",
   "sceneTemplates": ["physics_force_scene"],
-  "rendererKinds": ["motion_scene"],
+  "rendererKinds": ["physics_force_scene"],
   "assets": [
     {
       "id": "force-vector-arrow",

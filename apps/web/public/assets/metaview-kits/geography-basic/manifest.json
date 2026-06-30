@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "license": "internal",
   "sceneTemplates": ["geo_map_scene"],
-  "rendererKinds": ["narration_card"],
+  "rendererKinds": ["geo_map_scene"],
   "assets": [
     {
       "id": "east-asia-map-placeholder",
@@ -20,7 +20,7 @@
       "type": "svg",
       "path": "/assets/metaview-kits/geography-basic/monsoon-wind-arrow.svg",
       "tags": ["wind", "monsoon", "arrow"],
-      "semanticRoles": ["wind"],
+      "semanticRoles": ["wind", "monsoon_flow"],
       "attribution": "MetaView internal placeholder",
       "license": "internal"
     }
