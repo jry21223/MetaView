@@ -14,6 +14,27 @@ vi.mock("remotion", async () => {
 });
 
 describe("subject visual fixtures", () => {
+  it("statically renders bfs_graph through PlaybookComposition with graph and code tracks", () => {
+    const markup = renderToStaticMarkup(
+      <PlaybookComposition
+        script={getSubjectVisualFixture("bfs_graph")}
+        showInlineCode={true}
+        showSubtitles={false}
+      />,
+    );
+
+    expect(markup).toContain("graph-scene-renderer");
+    expect(markup).toContain('data-pack-id="algorithm-code-basic"');
+    expect(markup).toContain('data-graph-asset-id="bfs-graph-preset"');
+    expect(markup).toContain('data-node-state="current"');
+    expect(markup).toContain('data-node-state="visited"');
+    expect(markup).toContain('data-node-state="queue"');
+    expect(markup).toContain('data-edge-state="active"');
+    expect(markup).toContain("BFS");
+    expect(markup).toContain("queue");
+    expect(markup).not.toContain("Unknown snapshot kind");
+  });
+
   it("statically renders derivative_tangent through PlaybookComposition", () => {
     const markup = renderToStaticMarkup(
       <PlaybookComposition script={getSubjectVisualFixture("derivative_tangent")} showSubtitles={false} />,

@@ -21,6 +21,9 @@ describe("assetResolver", () => {
   });
 
   it("resolves assets constrained to rendererKinds", () => {
+    expect(resolveAssetForRenderer("graph_scene", "graph_node")).toMatchObject({
+      id: "graph-node",
+    });
     expect(resolveAssetForRenderer("molecule_2d_scene", "molecule")).toMatchObject({
       id: "water-molecule-preset",
     });

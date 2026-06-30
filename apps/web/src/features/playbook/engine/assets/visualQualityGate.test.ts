@@ -301,4 +301,39 @@ describe("visualQualityGate", () => {
       ]),
     );
   });
+
+  it("warns when an algorithm graph has no active state change", () => {
+    const warnings = visualQualityGate(
+      script({
+        domain: "algorithm",
+        steps: [
+          {
+            step_id: "bfs_graph",
+            end_frame: 90,
+            title: "BFS graph",
+            voiceover_text: "",
+            tokens: [],
+            snapshot: {
+              kind: "graph_scene",
+              pack_id: "algorithm-code-basic",
+              asset_id: "bfs-graph-preset",
+              nodes: [{ id: "A" }, { id: "B" }],
+              edges: [{ id: "A-B", source: "A", target: "B" }],
+              directed: true,
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "low_algorithm_state_visuals",
+          step_id: "bfs_graph",
+          domain: "algorithm",
+        }),
+      ]),
+    );
+  });
 });

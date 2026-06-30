@@ -1,0 +1,6 @@
+{
+  "source": "structured-preset",
+  "template": "bfs_graph",
+  "states": ["current", "visited", "queue", "active_edge"],
+  "rendererKind": "graph_scene"
+}

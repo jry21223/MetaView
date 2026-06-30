@@ -4,6 +4,7 @@ import { DOMAIN_CAPABILITIES, domainCapability } from "./domainCapabilities";
 describe("domainCapabilities", () => {
   it("marks algorithm and math as fully supported", () => {
     expect(DOMAIN_CAPABILITIES.algorithm.support).toBe("full");
+    expect(DOMAIN_CAPABILITIES.algorithm.primaryRenderer).toContain("graph_scene");
     expect(DOMAIN_CAPABILITIES.math.support).toBe("full");
   });
 

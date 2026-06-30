@@ -1,6 +1,8 @@
 import type {
   BioCellSceneSnapshot,
+  CodeHighlightOverlay,
   GeoMapSceneSnapshot,
+  GraphSceneSnapshot,
   MathPlotSnapshot,
   Molecule2DSceneSnapshot,
   PhysicsForceSceneSnapshot,
@@ -8,6 +10,7 @@ import type {
 } from "../types";
 
 export type SubjectVisualFixtureId =
+  | "bfs_graph"
   | "cell_structure"
   | "derivative_tangent"
   | "east_asia_monsoon"
@@ -31,6 +34,59 @@ function cellStructureSnapshot(): BioCellSceneSnapshot {
       { id: "mitochondrion-callout", target_id: "mitochondrion", label: "releases energy", side: "right" },
     ],
     caption: "Animal cells contain specialized organelles with distinct functions.",
+  };
+}
+
+function bfsGraphSnapshot(): GraphSceneSnapshot {
+  return {
+    kind: "graph_scene",
+    pack_id: "algorithm-code-basic",
+    asset_id: "bfs-graph-preset",
+    nodes: [
+      { id: "S", label: "S", x: -3, y: 0 },
+      { id: "A", label: "A", x: -1, y: 0 },
+      { id: "B", label: "B", x: 1.1, y: -1.3 },
+      { id: "C", label: "C", x: 1.1, y: 1.3 },
+      { id: "D", label: "D", x: 3, y: 0 },
+    ],
+    edges: [
+      { id: "S-A", source: "S", target: "A" },
+      { id: "A-B", source: "A", target: "B" },
+      { id: "A-C", source: "A", target: "C" },
+      { id: "B-D", source: "B", target: "D" },
+      { id: "C-D", source: "C", target: "D" },
+    ],
+    directed: true,
+    current_node_id: "A",
+    active_node_ids: ["A"],
+    visited_node_ids: ["S"],
+    queue_node_ids: ["B", "C"],
+    active_edge_ids: ["A-B"],
+    caption: "BFS expands the current node and appends unvisited neighbors to the queue.",
+  };
+}
+
+function bfsCodeHighlight(): CodeHighlightOverlay {
+  return {
+    language: "typescript",
+    lines: [
+      "function BFS(start) {",
+      "  const queue = [start];",
+      "  const visited = new Set([start]);",
+      "  const node = queue.shift();",
+      "  for (const next of graph[node]) {",
+      "    if (!visited.has(next)) queue.push(next);",
+      "  }",
+      "}",
+    ],
+    active_lines: [4, 5, 6],
+    active_line: 6,
+    variables: {
+      current: "A",
+      queue: "[B, C]",
+      visited: "{S, A}",
+    },
+    operation_label: "enqueue neighbors",
   };
 }
 
@@ -132,9 +188,10 @@ function projectileMotionSnapshot(): PhysicsForceSceneSnapshot {
 
 function scriptFor(
   id: SubjectVisualFixtureId,
-  domain: "biology" | "chemistry" | "geography" | "math" | "physics",
+  domain: "algorithm" | "biology" | "chemistry" | "geography" | "math" | "physics",
   title: string,
-  snapshot: BioCellSceneSnapshot | GeoMapSceneSnapshot | MathPlotSnapshot | Molecule2DSceneSnapshot | PhysicsForceSceneSnapshot,
+  snapshot: BioCellSceneSnapshot | GeoMapSceneSnapshot | GraphSceneSnapshot | MathPlotSnapshot | Molecule2DSceneSnapshot | PhysicsForceSceneSnapshot,
+  codeHighlight?: CodeHighlightOverlay | null,
 ): PlaybookScript {
   return {
     schema_version: "1.0.0",
@@ -151,6 +208,7 @@ function scriptFor(
         title,
         voiceover_text: snapshot.caption ?? title,
         snapshot,
+        code_highlight: codeHighlight ?? null,
         tokens: [],
       },
     ],
@@ -158,6 +216,13 @@ function scriptFor(
 }
 
 export const subjectVisualFixtures: Record<SubjectVisualFixtureId, PlaybookScript> = {
+  bfs_graph: scriptFor(
+    "bfs_graph",
+    "algorithm",
+    "BFS graph",
+    bfsGraphSnapshot(),
+    bfsCodeHighlight(),
+  ),
   cell_structure: scriptFor(
     "cell_structure",
     "biology",

@@ -27,6 +27,7 @@ describe("assetRegistry", () => {
 
     expect(packs).toContain("biology-basic");
     expect(packs).toContain("chemistry-basic");
+    expect(packs).toContain("algorithm-code-basic");
     expect(packs).toContain("geography-basic");
     expect(packs).toContain("geography-earth-basic");
     expect(packs).toContain("math-basic");
@@ -38,6 +39,8 @@ describe("assetRegistry", () => {
     expect(findAssetByRole("biology", "nucleus")?.id).toBe("nucleus");
     expect(findAssetByRole("chemistry", "molecule")?.id).toBe("water-molecule-preset");
     expect(findAssetByRole("chemistry", "bond")?.id).toBe("bond-line");
+    expect(findAssetByRole("algorithm", "graph_node")?.id).toBe("graph-node");
+    expect(findAssetByRole("algorithm", "queue")?.id).toBe("queue-frame");
     expect(findAssetByRole("geography", "wind")?.id).toBe("monsoon-wind-arrow");
     expect(findAssetByRole("math", "tangent")?.id).toBe("derivative-tangent-preset");
     expect(findAssetByRole("physics", "force")?.id).toBe("force-vector-arrow");
@@ -46,6 +49,11 @@ describe("assetRegistry", () => {
   it("keeps rendererKinds aligned with the dedicated scene renderers", () => {
     expect(getAssetPack("biology-basic")?.rendererKinds).toEqual(["bio_cell_scene"]);
     expect(getAssetPack("chemistry-basic")?.rendererKinds).toEqual(["molecule_2d_scene"]);
+    expect(getAssetPack("algorithm-code-basic")?.rendererKinds).toEqual([
+      "graph_scene",
+      "algorithm_array",
+      "algorithm_tree",
+    ]);
     expect(getAssetPack("geography-basic")?.rendererKinds).toEqual(["geo_map_scene"]);
     expect(getAssetPack("geography-earth-basic")?.rendererKinds).toEqual(["geo_map_scene"]);
     expect(getAssetPack("math-basic")?.rendererKinds).toEqual(["math_plot", "math_scene", "math_formula", "katex_overlay"]);
@@ -95,6 +103,7 @@ describe("assetRegistry", () => {
     for (const manifestPath of [
       "/assets/metaview-kits/biology-basic/manifest.json",
       "/assets/metaview-kits/chemistry-basic/manifest.json",
+      "/assets/metaview-kits/algorithm-code-basic/manifest.json",
       "/assets/metaview-kits/geography-basic/manifest.json",
       "/assets/metaview-kits/geography-earth-basic/manifest.json",
       "/assets/metaview-kits/math-basic/manifest.json",
@@ -123,6 +132,12 @@ describe("assetRegistry", () => {
     );
     expect(readPublicAsset("/assets/metaview-kits/chemistry-basic/molecule-presets/water.json")).toContain(
       '"source": "structured-preset"',
+    );
+    expect(readPublicAsset("/assets/metaview-kits/algorithm-code-basic/graph/graph-node.svg")).toContain(
+      'data-asset-quality="v1"',
+    );
+    expect(readPublicAsset("/assets/metaview-kits/algorithm-code-basic/graph/queue-frame.svg")).toContain(
+      'data-asset-quality="v1"',
     );
     expect(readPublicAsset("/assets/metaview-kits/math-basic/plot-presets/derivative-tangent.json")).toContain(
       '"source": "structured-preset"',

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 64" data-asset-quality="v1" role="img" aria-label="Queue frame asset">
+  <rect x="6" y="10" width="84" height="44" rx="12" fill="#fff7ed" stroke="#c27803" stroke-width="5"/>
+  <path d="M22 23 H74 M22 41 H74" fill="none" stroke="#fbbf24" stroke-width="4" stroke-linecap="round"/>
+  <path d="M70 20 L79 32 L70 44" fill="none" stroke="#c27803" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

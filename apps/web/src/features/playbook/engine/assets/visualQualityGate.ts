@@ -3,6 +3,7 @@ import type {
   AnySnapshot,
   BioCellSceneSnapshot,
   GeoMapSceneSnapshot,
+  GraphSceneSnapshot,
   MetaStep,
   Molecule2DSceneSnapshot,
   PhysicsForceSceneSnapshot,
@@ -16,6 +17,7 @@ export type VisualQualityWarningCode =
   | "missing_asset"
   | "low_biology_structure_assets"
   | "low_chemistry_structure_data"
+  | "low_algorithm_state_visuals"
   | "low_math_visual_richness"
   | "unsupported_array_fallback";
 
@@ -176,6 +178,41 @@ function checkMolecule2DScene(
   }
 }
 
+function checkGraphScene(
+  warnings: VisualQualityWarning[],
+  context: SnapshotContext,
+  snapshot: GraphSceneSnapshot,
+) {
+  if (context.domain !== "algorithm") return;
+
+  checkAssetId(warnings, context, snapshot.asset_id, snapshot.pack_id);
+  for (const node of snapshot.nodes ?? []) {
+    checkAssetId(warnings, context, node.asset_id, snapshot.pack_id);
+  }
+  for (const edge of snapshot.edges ?? []) {
+    checkAssetId(warnings, context, edge.asset_id, snapshot.pack_id);
+  }
+
+  const hasGraphStructure = (snapshot.nodes?.length ?? 0) > 0 && (snapshot.edges?.length ?? 0) > 0;
+  const hasStateChange = Boolean(
+    snapshot.current_node_id ||
+      (snapshot.active_node_ids?.length ?? 0) > 0 ||
+      (snapshot.active_edge_ids?.length ?? 0) > 0 ||
+      (snapshot.visited_node_ids?.length ?? 0) > 0 ||
+      (snapshot.queue_node_ids?.length ?? 0) > 0 ||
+      (snapshot.frontier_node_ids?.length ?? 0) > 0,
+  );
+
+  if (hasGraphStructure && !hasStateChange) {
+    warn(warnings, context, {
+      code: "low_algorithm_state_visuals",
+      domain: context.domain,
+      pack_id: snapshot.pack_id,
+      message: "algorithm graph_scene should show an active, visited, queued, or frontier state change.",
+    });
+  }
+}
+
 function hasMathFormula(snapshot: AnySnapshot): boolean {
   if (snapshot.kind === "math_formula") return Boolean(snapshot.formula_latex?.trim());
   if (snapshot.kind === "katex_overlay") return Boolean(snapshot.latex?.trim());
@@ -267,6 +304,9 @@ export function visualQualityGate(script: PlaybookScript): VisualQualityWarning[
       }
       if (snapshot.kind === "molecule_2d_scene") {
         checkMolecule2DScene(warnings, context, snapshot);
+      }
+      if (snapshot.kind === "graph_scene") {
+        checkGraphScene(warnings, context, snapshot);
       }
     }
   }

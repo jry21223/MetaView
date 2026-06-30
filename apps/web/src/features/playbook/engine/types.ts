@@ -219,24 +219,33 @@ export interface GraphSceneNode {
   x?: number | null;
   y?: number | null;
   emphasis?: SceneEmphasis;
+  asset_id?: string | null;
 }
 
 export interface GraphSceneEdge {
+  id?: string | null;
   source: string;
   target: string;
   label?: string | null;
   weight?: number | null;
   emphasis?: SceneEmphasis;
+  asset_id?: string | null;
 }
 
 export interface GraphSceneSnapshot {
   kind: "graph_scene";
+  pack_id?: string | null;
+  asset_id?: string | null;
   nodes: GraphSceneNode[];
   edges: GraphSceneEdge[];
   directed?: boolean;
   weighted?: boolean;
+  current_node_id?: string | null;
   active_node_ids?: string[];
   active_edge_ids?: string[];
+  visited_node_ids?: string[];
+  queue_node_ids?: string[];
+  frontier_node_ids?: string[];
   caption?: string | null;
 }
 

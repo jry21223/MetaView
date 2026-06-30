@@ -1,0 +1,148 @@
+{
+  "schemaVersion": "1.0.0",
+  "packId": "algorithm-code-basic",
+  "subject": "algorithm",
+  "version": "0.1.0",
+  "license": "internal",
+  "licenseMode": "single",
+  "defaultLicense": "internal",
+  "sceneTemplates": ["bfs_graph", "recursion_stack", "binary_search"],
+  "rendererKinds": ["graph_scene", "algorithm_array", "algorithm_tree"],
+  "sources": [
+    {
+      "id": "metaview-internal",
+      "label": "MetaView internal algorithm SVG primitives and structured presets",
+      "license": "internal",
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "attribution": null
+    }
+  ],
+  "assets": [
+    {
+      "id": "graph-node",
+      "type": "svg",
+      "path": "/assets/metaview-kits/algorithm-code-basic/graph/graph-node.svg",
+      "tags": ["graph", "node", "algorithm"],
+      "semanticRoles": ["graph_node", "node", "data_structure"],
+      "sourceId": "metaview-internal",
+      "attribution": "MetaView internal SVG primitive",
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "commercialUseAllowed": true,
+      "requiresAttribution": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null,
+      "rendererHints": {
+        "preferredRenderer": "graph_scene",
+        "defaultSize": [64, 64],
+        "anchor": "center",
+        "colorizable": false,
+        "strokeControlled": false
+      }
+    },
+    {
+      "id": "queue-frame",
+      "type": "svg",
+      "path": "/assets/metaview-kits/algorithm-code-basic/graph/queue-frame.svg",
+      "tags": ["queue", "frontier", "algorithm", "bfs"],
+      "semanticRoles": ["queue", "frontier"],
+      "sourceId": "metaview-internal",
+      "attribution": "MetaView internal SVG primitive",
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "commercialUseAllowed": true,
+      "requiresAttribution": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null,
+      "rendererHints": {
+        "preferredRenderer": "graph_scene",
+        "defaultSize": [76, 52],
+        "anchor": "center",
+        "colorizable": false,
+        "strokeControlled": false
+      }
+    },
+    {
+      "id": "visited-node",
+      "type": "svg",
+      "path": "/assets/metaview-kits/algorithm-code-basic/graph/visited-node.svg",
+      "tags": ["visited", "graph", "node", "algorithm"],
+      "semanticRoles": ["visited", "node_visited"],
+      "sourceId": "metaview-internal",
+      "attribution": "MetaView internal SVG primitive",
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "commercialUseAllowed": true,
+      "requiresAttribution": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null,
+      "rendererHints": {
+        "preferredRenderer": "graph_scene",
+        "defaultSize": [64, 64],
+        "anchor": "center",
+        "colorizable": false,
+        "strokeControlled": false
+      }
+    },
+    {
+      "id": "edge-active",
+      "type": "svg",
+      "path": "/assets/metaview-kits/algorithm-code-basic/graph/edge-active.svg",
+      "tags": ["graph", "edge", "active", "algorithm"],
+      "semanticRoles": ["graph_edge", "active_edge"],
+      "sourceId": "metaview-internal",
+      "attribution": "MetaView internal SVG primitive",
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "commercialUseAllowed": true,
+      "requiresAttribution": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null,
+      "rendererHints": {
+        "preferredRenderer": "graph_scene",
+        "defaultSize": [120, 28],
+        "anchor": "center",
+        "colorizable": true,
+        "strokeControlled": true
+      }
+    },
+    {
+      "id": "bfs-graph-preset",
+      "type": "json",
+      "path": "/assets/metaview-kits/algorithm-code-basic/graph/bfs-graph-preset.json",
+      "tags": ["bfs", "graph", "queue", "structured_preset"],
+      "semanticRoles": ["bfs", "graph", "graph_scene"],
+      "sourceId": "metaview-internal",
+      "attribution": "MetaView internal structured algorithm preset",
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "commercialUseAllowed": true,
+      "requiresAttribution": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null,
+      "rendererHints": {
+        "preferredRenderer": "graph_scene",
+        "defaultSize": [640, 360],
+        "anchor": "center",
+        "colorizable": true,
+        "strokeControlled": true
+      }
+    }
+  ]
+}
