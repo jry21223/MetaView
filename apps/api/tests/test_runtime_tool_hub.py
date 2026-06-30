@@ -334,6 +334,9 @@ async def test_runtime_tool_hub_compiles_subject_scene_blueprints(
     assert result.result["playbook"]["initial_data"]["scene_blueprint"] == [
         blueprint["sceneType"]
     ]
+    assert result.result["self_check"]["status"] == "clean"
+    assert result.result["visual_quality"]["pass"] is True
+    assert result.result["visual_quality"]["warnings"] == []
     steps = result.result["playbook"]["steps"]
     assert 8 <= len(steps) <= 14
     for step in steps:

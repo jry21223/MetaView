@@ -3,6 +3,8 @@ from __future__ import annotations
 import pytest
 
 from app.domain.models.playbook import PlaybookScript
+from app.domain.models.review import PlaybookReviewStatus
+from app.domain.services.playbook_quality import self_check_playbook
 from app.domain.services.scene_blueprint_compiler import compile_scene_blueprint_to_playbook
 
 
@@ -83,6 +85,32 @@ def test_scene_blueprint_compiler_preserves_flagship_asset_markers() -> None:
             ), scene_type
         else:
             assert snapshot[field_name] == expected_value
+
+
+@pytest.mark.parametrize(
+    ("scene_type", "subject", "prompt"),
+    [
+        ("east_asia_monsoon", "geography", "讲解东亚夏季风的海陆热力差异"),
+        ("projectile_motion", "physics", "讲解平抛运动的速度分解和重力加速度"),
+    ],
+)
+def test_scene_blueprint_compiler_outputs_launch_safe_self_check_clean_playbooks(
+    scene_type: str,
+    subject: str,
+    prompt: str,
+) -> None:
+    playbook = compile_scene_blueprint_to_playbook(
+        {
+            "id": scene_type,
+            "subject": subject,
+            "sceneType": scene_type,
+            "title": scene_type,
+        },
+    )
+
+    verdict = self_check_playbook(playbook, prompt)
+
+    assert verdict.status == PlaybookReviewStatus.CLEAN
 
 
 def _subject_for(scene_type: str) -> str:

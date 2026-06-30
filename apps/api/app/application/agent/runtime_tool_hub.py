@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
 from dataclasses import asdict
+from functools import lru_cache
+from pathlib import Path
 from typing import Any, TypeVar
 
 from pydantic import BaseModel, Field, FiniteFloat, StrictStr, ValidationError
@@ -13,12 +16,22 @@ from app.domain.services.geometry_validators import (
     check_orientation,
     check_point_on_curve,
 )
+from app.domain.services.metaview_core import MetaViewCoreService
 from app.domain.services.playbook_quality import self_check_playbook
 from app.domain.services.scene_blueprint_compiler import compile_scene_blueprint_to_playbook
 from app.domain.skills.base import SkillExecutionContext, SkillRouteInput, SkillRouteMatch
 from app.domain.skills.registry import SkillRegistry, build_default_skill_registry
 
 ArgModelT = TypeVar("ArgModelT", bound=BaseModel)
+
+ASSET_MANIFEST_ROOT = (
+    Path(__file__).resolve().parents[5]
+    / "apps"
+    / "web"
+    / "public"
+    / "assets"
+    / "metaview-kits"
+)
 
 
 class _OrientationArgs(BaseModel):
@@ -400,12 +413,22 @@ class RuntimeToolHub:
                 "scene_blueprint.compile_failed",
                 str(exc),
             )
+        playbook_json = playbook.model_dump(mode="json")
+        self_check = self_check_playbook(
+            playbook,
+            str(args.get("prompt") or blueprint.get("caption") or blueprint.get("title") or ""),
+        )
+        visual_quality = _metaview_core().validate_visual_quality(
+            playbook_script=playbook_json,
+        )
         return self._ok(
             name,
             {
                 "valid": True,
                 "sceneType": blueprint.get("sceneType"),
-                "playbook": playbook.model_dump(mode="json"),
+                "playbook": playbook_json,
+                "self_check": self_check.model_dump(mode="json"),
+                "visual_quality": visual_quality,
             },
         )
 
@@ -431,3 +454,11 @@ def _dict_arg(value: Any) -> dict[str, Any]:
 
 def _optional_str(value: Any) -> str | None:
     return value if isinstance(value, str) else None
+
+
+@lru_cache
+def _metaview_core() -> MetaViewCoreService:
+    asset_packs: list[dict[str, Any]] = []
+    for manifest_path in sorted(ASSET_MANIFEST_ROOT.glob("*/manifest.json")):
+        asset_packs.append(json.loads(manifest_path.read_text(encoding="utf-8")))
+    return MetaViewCoreService(asset_packs=asset_packs)
