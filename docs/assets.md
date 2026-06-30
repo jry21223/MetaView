@@ -146,14 +146,26 @@ Local preview helpers:
    npm --workspace apps/web run showcase:export
    ```
 
-2. Render a fixture through the existing Remotion composition:
+2. Render and validate every flagship fixture through the existing Remotion
+   composition:
+
+   ```bash
+   npm --workspace apps/web run showcase:smoke
+   ```
+
+   The smoke gate writes ignored PNG evidence to
+   `eval/shots/subject-visual-showcase-smoke/` and fails if a fixture produces a
+   missing, tiny, or visually blank PNG.
+
+3. Render a single fixture through the existing Remotion composition:
 
    ```bash
    node apps/web/scripts/render-shots.mjs eval/reports/subject-visual-fixtures/east_asia_monsoon.json eval/shots/east_asia_monsoon
    ```
 
-3. Open the local showcase page in the web app at `/asset-showcase`.
+4. Open the local showcase page in the web app at `/asset-showcase`.
 
 The visual quality gate is non-blocking at runtime, but showcase tests require
 these flagship fixtures to produce no warnings, no missing asset fallback, and
-no unknown snapshot renderer.
+no unknown snapshot renderer. The root `make check` path also runs the showcase
+smoke render so flagship assets must keep producing nonblank Remotion output.

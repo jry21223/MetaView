@@ -67,8 +67,9 @@ asset-audit:
 
 asset-showcase:
 	npm --workspace apps/web run showcase:export
+	npm --workspace apps/web run showcase:smoke
 
-check: asset-audit lint test build
+check: asset-audit asset-showcase lint test build
 
 docker-check:
 	@if [ -z "$(DOCKER_COMPOSE_CMD)" ]; then \

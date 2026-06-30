@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "asset:audit": "vite-node scripts/asset-audit.mjs",
     "showcase:export": "vite-node scripts/export-subject-visual-fixtures.mjs",
+    "showcase:smoke": "vite-node scripts/render-showcase-smoke.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
