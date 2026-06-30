@@ -40,6 +40,7 @@ describe("assetRegistry", () => {
     expect(findAssetByRole("biology", "nucleus")?.id).toBe("nucleus");
     expect(findAssetByRole("chemistry", "molecule")?.id).toBe("water-molecule-preset");
     expect(findAssetByRole("chemistry", "methane")?.id).toBe("methane-molecule-preset");
+    expect(findAssetByRole("chemistry", "glucose")?.id).toBe("rdkit-smiles-glucose");
     expect(findAssetByRole("chemistry", "bond")?.id).toBe("bond-line");
     expect(findAssetByRole("chemistry", "reaction_arrow")?.id).toBe("reaction-arrow");
     expect(findAssetByRole("chemistry", "electron_flow")?.id).toBe("electron-flow");
@@ -168,6 +169,9 @@ describe("assetRegistry", () => {
     );
     expect(readPublicAsset("/assets/metaview-kits/chemistry-basic/molecule-presets/methane.json")).toContain(
       '"smiles": "C"',
+    );
+    expect(readPublicAsset("/assets/metaview-kits/chemistry-basic/smiles/glucose.smi")).toContain(
+      "OC[C@H]1O",
     );
     expect(readPublicAsset("/assets/metaview-kits/core-visual-basic/arrows/flow-arrow.svg")).toContain(
       'data-asset-quality="v1"',

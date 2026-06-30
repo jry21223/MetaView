@@ -70,6 +70,31 @@
       }
     },
     {
+      "id": "rdkit-smiles-glucose",
+      "type": "smiles",
+      "path": "/assets/metaview-kits/chemistry-basic/smiles/glucose.smi",
+      "tags": ["molecule", "glucose", "c6h12o6", "smiles", "rdkit"],
+      "semanticRoles": ["molecule", "glucose", "smiles", "molecule_preset"],
+      "sourceId": "metaview-internal",
+      "attribution": "MetaView internal SMILES teaching fixture for RDKit compilation",
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "commercialUseAllowed": true,
+      "requiresAttribution": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null,
+      "rendererHints": {
+        "preferredRenderer": "molecule_2d_scene",
+        "defaultSize": [180, 130],
+        "anchor": "center",
+        "colorizable": false,
+        "strokeControlled": false
+      }
+    },
+    {
       "id": "atom-core",
       "type": "svg",
       "path": "/assets/metaview-kits/chemistry-basic/symbols/atom-core.svg",

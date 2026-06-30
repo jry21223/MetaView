@@ -113,6 +113,7 @@ class RuntimeToolHub:
                                 "title": {"type": "string"},
                                 "caption": {"type": "string"},
                                 "packId": {"type": "string"},
+                                "smiles": {"type": "string"},
                                 "visualIntent": {
                                     "type": "array",
                                     "items": {"type": "string"},

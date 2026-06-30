@@ -11,6 +11,8 @@ from app.domain.services.molecule_preset_resolver import (
 from app.domain.services.playbook_quality import self_check_playbook
 from app.domain.services.scene_blueprint_compiler import compile_scene_blueprint_to_playbook
 
+GLUCOSE_SMILES = "OC[C@H]1O[C@@H](O)[C@H](O)[C@H](O)[C@@H]1O"
+
 
 @pytest.mark.parametrize(
     ("scene_type", "subject", "snapshot_kind", "pack_id"),
@@ -21,6 +23,7 @@ from app.domain.services.scene_blueprint_compiler import compile_scene_blueprint
         ("dna_replication", "biology", "bio_process_scene", "biology-basic"),
         ("molecule_2d_water", "chemistry", "molecule_2d_scene", "chemistry-basic"),
         ("molecule_2d_methane", "chemistry", "molecule_2d_scene", "chemistry-basic"),
+        ("molecule_2d_glucose", "chemistry", "molecule_2d_scene", "chemistry-basic"),
         ("reaction_synthesis_water", "chemistry", "reaction_scene", "chemistry-basic"),
         ("derivative_tangent", "math", "math_plot", "math-basic"),
         ("bfs_graph", "algorithm", "graph_scene", "algorithm-code-basic"),
@@ -71,6 +74,7 @@ def test_scene_blueprint_compiler_preserves_flagship_asset_markers() -> None:
         "dna_replication": ("steps", "asset_id", "replication-fork"),
         "molecule_2d_water": ("atoms", "asset_id", "atom-core"),
         "molecule_2d_methane": ("atoms", "asset_id", "atom-core"),
+        "molecule_2d_glucose": ("atoms", "asset_id", "atom-core"),
         "reaction_synthesis_water": ("arrows", "asset_id", "reaction-arrow"),
         "derivative_tangent": ("", "asset_id", "derivative-tangent-preset"),
         "bfs_graph": ("", "asset_id", "bfs-graph-preset"),
@@ -162,6 +166,37 @@ def test_scene_blueprint_compiler_hydrates_methane_from_smiles_preset() -> None:
     ]
 
     verdict = self_check_playbook(playbook, "Explain methane molecule geometry.")
+    assert verdict.status == PlaybookReviewStatus.CLEAN
+
+
+def test_scene_blueprint_compiler_builds_glucose_from_rdkit_smiles() -> None:
+    playbook = compile_scene_blueprint_to_playbook(
+        {
+            "id": "molecule_2d_glucose",
+            "subject": "chemistry",
+            "sceneType": "molecule_2d_glucose",
+            "title": "Glucose molecule",
+            "visualIntent": ["render_structured_molecule", "use_rdkit_smiles"],
+            "emphasisPoints": ["SMILES", "atoms", "bonds"],
+            "smiles": GLUCOSE_SMILES,
+        },
+    )
+
+    snapshot = playbook.steps[0].snapshot.model_dump(mode="json", by_alias=True)
+
+    assert snapshot["kind"] == "molecule_2d_scene"
+    assert snapshot["pack_id"] == "chemistry-basic"
+    assert snapshot["molecule_id"] == "glucose"
+    assert snapshot["smiles"] == GLUCOSE_SMILES
+    assert snapshot["molecule_asset_id"] == "rdkit-smiles-glucose"
+    assert snapshot["formula_latex"] == "C_6H_12O_6"
+    assert len(snapshot["atoms"]) == 12
+    assert len(snapshot["bonds"]) >= 12
+    assert {atom["element"] for atom in snapshot["atoms"]} == {"C", "O"}
+    assert all(atom["asset_id"] == "atom-core" for atom in snapshot["atoms"])
+    assert all(bond["asset_id"] == "bond-line" for bond in snapshot["bonds"])
+
+    verdict = self_check_playbook(playbook, "Explain glucose molecule from SMILES.")
     assert verdict.status == PlaybookReviewStatus.CLEAN
 
 
@@ -260,6 +295,7 @@ def _subject_for(scene_type: str) -> str:
         "dna_replication": "biology",
         "derivative_tangent": "math",
         "east_asia_monsoon": "geography",
+        "molecule_2d_glucose": "chemistry",
         "molecule_2d_methane": "chemistry",
         "molecule_2d_water": "chemistry",
         "projectile_motion": "physics",

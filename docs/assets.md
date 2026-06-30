@@ -43,10 +43,15 @@ water molecule inside the compiler.
 The backend mirror uses `apps/api/app/domain/services/molecule_preset_resolver.py`
 against the same public preset JSON before returning `PlaybookScript` to
 SkillPack/runtime-tool callers.
+For larger molecule inputs, the API also exposes
+`apps/api/app/domain/services/rdkit_molecule_compiler.py`, which converts
+SMILES strings such as glucose into the same `molecule_2d_scene` atom/bond
+snapshot contract using RDKit 2D coordinates.
 The current supported scene blueprints are `east_asia_monsoon`,
 `projectile_motion`, `cell_structure`, `dna_replication`, `molecule_2d_water`,
 `molecule_2d_methane`, `reaction_synthesis_water`, `derivative_tangent`, and
-`bfs_graph`.
+`bfs_graph`; the API runtime compiler additionally supports
+`molecule_2d_glucose` from SMILES/RDKit.
 The backend mirror lives at
 `apps/api/app/domain/services/scene_blueprint_compiler.py` so SkillPack or
 agent generation can adopt the same blueprint boundary before returning
@@ -77,8 +82,9 @@ Current backend SkillPack adoption:
 - `biology-basic`: internal organelle and DNA process SVGs for `bio_cell_scene`
   and `bio_process_scene`.
 - `chemistry-basic`: internal atom/bond SVGs, reaction arrows, electron-flow
-  SVGs, and SMILES-addressable structured molecule presets for
-  `molecule_2d_scene` and `reaction_scene`.
+  SVGs, SMILES-addressable structured molecule presets, and a glucose SMILES
+  fixture for API RDKit compilation into `molecule_2d_scene` and
+  `reaction_scene`.
 - `math-basic`: structured plot presets for math plot/formula scenes.
 - `algorithm-code-basic`: internal graph node, queue, visited, active-edge SVGs
   plus a BFS graph preset for `graph_scene`.

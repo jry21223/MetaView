@@ -40,10 +40,12 @@ from app.domain.services.molecule_preset_resolver import (
     resolve_molecule_preset_by_smiles_for_renderer,
     resolve_molecule_preset_for_renderer,
 )
+from app.domain.services.rdkit_molecule_compiler import compile_molecule_snapshot_from_smiles
 
 _FPS = 30
 _DEFAULT_STEP_FRAMES = 180
 _SCENE_BLUEPRINT_STEP_COUNT = 8
+_GLUCOSE_SMILES = "OC[C@H]1O[C@@H](O)[C@H](O)[C@H](O)[C@@H]1O"
 
 
 def compile_scene_blueprint_to_playbook(blueprint: dict[str, Any]) -> PlaybookScript:
@@ -214,6 +216,16 @@ def _step_captions(scene_type: str, title: str, base_caption: str) -> list[str]:
                 "结构数据渲染，而不是靠 LLM 手画。"
             ),
         ],
+        "molecule_2d_glucose": [
+            "葡萄糖分子先看 molecule_2d_scene，SMILES 输入由 RDKit 解析成结构化分子图。",
+            "RDKit 给出 C6H12O6 分子式，并生成可缩放到 renderer 视口的二维坐标。",
+            "图中的碳原子和氧原子来自 RDKit atom graph，氢原子通过分子式体现为隐式氢。",
+            "每条 bond 都来自 RDKit 连接关系，renderer 只负责把结构数据画出来。",
+            "SMILES 字段留在 snapshot 中，说明这个分子不是手写 SVG 或图片资产。",
+            "atom-core 和 bond-line 仍然来自 chemistry-basic，保证视觉语言统一。",
+            "这一帧把 glucose molecule、SMILES、atoms 和 bonds 放进同一个 deterministic layout。",
+            "结论回到 Glucose molecule：复杂分子应从 SMILES/RDKit 结构数据渲染。",
+        ],
         "reaction_synthesis_water": [
             "合成水反应先看 reaction_scene，氢气和氧气作为 reactants 放在反应箭头左侧。",
             "reaction_arrow 资产表示反应方向，从反应物指向生成物，避免用纯文字代替反应关系。",
@@ -273,6 +285,8 @@ def _compile_snapshot(scene_type: str, blueprint: dict[str, Any]):
         return _water_molecule_snapshot(blueprint)
     if scene_type == "molecule_2d_methane":
         return _methane_molecule_snapshot(blueprint)
+    if scene_type == "molecule_2d_glucose":
+        return _glucose_molecule_snapshot(blueprint)
     if scene_type == "reaction_synthesis_water":
         return _water_synthesis_reaction_snapshot(blueprint)
     if scene_type == "derivative_tangent":
@@ -558,6 +572,19 @@ def _water_molecule_snapshot(blueprint: dict[str, Any]) -> Molecule2DSceneSnapsh
 
 def _methane_molecule_snapshot(blueprint: dict[str, Any]) -> Molecule2DSceneSnapshot:
     return _molecule_snapshot({**blueprint, "smiles": blueprint.get("smiles") or "C"}, "methane")
+
+
+def _glucose_molecule_snapshot(blueprint: dict[str, Any]) -> Molecule2DSceneSnapshot:
+    return compile_molecule_snapshot_from_smiles(
+        pack_id=str(blueprint.get("packId") or "chemistry-basic"),
+        molecule_id=str(blueprint.get("moleculeId") or "glucose"),
+        smiles=str(blueprint.get("smiles") or _GLUCOSE_SMILES),
+        atom_asset_id="atom-core",
+        bond_asset_id="bond-line",
+        caption=str(
+            blueprint.get("caption") or "Glucose is rendered from RDKit SMILES structure data."
+        ),
+    )
 
 
 def _water_synthesis_reaction_snapshot(blueprint: dict[str, Any]) -> ReactionSceneSnapshot:

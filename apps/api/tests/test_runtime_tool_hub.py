@@ -18,6 +18,8 @@ from app.domain.skills.base import (
 )
 from app.domain.skills.registry import SkillRegistry
 
+GLUCOSE_SMILES = "OC[C@H]1O[C@@H](O)[C@H](O)[C@H](O)[C@@H]1O"
+
 
 class FakeSpec(BaseModel):
     text: str
@@ -354,6 +356,20 @@ async def test_runtime_tool_hub_runs_self_check() -> None:
                 "visualIntent": ["render_structured_molecule", "show_tetrahedral_geometry"],
                 "emphasisPoints": ["carbon", "hydrogen", "tetrahedral geometry"],
                 "smiles": "C",
+            },
+            "molecule_2d_scene",
+            "chemistry-basic",
+        ),
+        (
+            {
+                "id": "molecule_2d_glucose",
+                "subject": "chemistry",
+                "sceneType": "molecule_2d_glucose",
+                "title": "Glucose molecule",
+                "caption": "Glucose is compiled from an RDKit SMILES layout.",
+                "visualIntent": ["render_structured_molecule", "use_rdkit_smiles"],
+                "emphasisPoints": ["SMILES", "atoms", "bonds"],
+                "smiles": GLUCOSE_SMILES,
             },
             "molecule_2d_scene",
             "chemistry-basic",
