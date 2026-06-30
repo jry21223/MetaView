@@ -54,7 +54,7 @@
     {
       "id": "east-asia-land-110m",
       "type": "geojson",
-      "path": "/assets/metaview-kits/geography-earth-basic/natural-earth/east-asia-land-110m.geojson",
+      "path": "/assets/metaview-kits/geography-earth-basic/natural-earth/east-asia-land-110m.json",
       "tags": ["map", "land", "country", "east_asia", "western_pacific", "natural-earth"],
       "semanticRoles": ["land", "map_layer"],
       "sourceId": "natural-earth",
@@ -79,7 +79,7 @@
     {
       "id": "east-asia-country-boundary-110m",
       "type": "geojson",
-      "path": "/assets/metaview-kits/geography-earth-basic/natural-earth/east-asia-land-110m.geojson",
+      "path": "/assets/metaview-kits/geography-earth-basic/natural-earth/east-asia-land-110m.json",
       "tags": ["map", "boundary", "country", "east_asia", "natural-earth"],
       "semanticRoles": ["country_boundary"],
       "sourceId": "natural-earth",
@@ -104,7 +104,7 @@
     {
       "id": "east-asia-coastline-110m",
       "type": "geojson",
-      "path": "/assets/metaview-kits/geography-earth-basic/natural-earth/east-asia-coastline-110m.geojson",
+      "path": "/assets/metaview-kits/geography-earth-basic/natural-earth/east-asia-coastline-110m.json",
       "tags": ["map", "coastline", "east_asia", "western_pacific", "natural-earth"],
       "semanticRoles": ["coastline"],
       "sourceId": "natural-earth",

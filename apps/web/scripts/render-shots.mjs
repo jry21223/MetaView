@@ -14,6 +14,7 @@
  *   SHOT_FRAME       fixed frame to render once instead of per-step shots
  *   SHOT_LABEL       output label when SHOT_FRAME is set (default mcp-preview)
  *   REMOTION_ENTRY   override entry path (default apps/web/src/remotion/index.ts from cwd)
+ *   REMOTION_PUBLIC_DIR override public assets dir (default apps/web/public from cwd)
  */
 import { bundle } from "@remotion/bundler";
 import { renderStill, selectComposition } from "@remotion/renderer";
@@ -29,12 +30,13 @@ if (!playbookPath) {
 
 const theme = process.env.SHOT_THEME ?? "dark";
 const entry = process.env.REMOTION_ENTRY ?? path.resolve("apps/web/src/remotion/index.ts");
+const publicDir = process.env.REMOTION_PUBLIC_DIR ?? path.resolve("apps/web/public");
 
 const script = JSON.parse(fs.readFileSync(playbookPath, "utf8"));
 fs.mkdirSync(outDir, { recursive: true });
 
 console.log(`[render-shots] bundling ${entry} ...`);
-const serveUrl = await bundle({ entryPoint: entry });
+const serveUrl = await bundle({ entryPoint: entry, publicDir });
 
 const inputProps = { script, theme, showSubtitles: true, audioFiles: [] };
 const composition = await selectComposition({ serveUrl, id: "playbook", inputProps });

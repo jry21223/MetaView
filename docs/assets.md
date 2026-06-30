@@ -31,9 +31,17 @@ instead of hard-coding asset URLs.
 
 ## Starter Packs
 
-- `geography-basic`: Natural Earth-derived map-layer SVG plus internal placeholder
-  monsoon wind SVG.
-- `physics-basic`: internal placeholder SVGs for force vector and projectile object roles.
+- `geography-basic`: starter map-layer SVG plus internal monsoon wind SVG.
+- `geography-earth-basic`: Natural Earth-derived East Asia map GeoJSON and map
+  symbols for `geo_map_scene`.
+- `physics-basic`: internal SVGs for force vector, projectile object, block,
+  ramp, spring, and pulley roles.
+- `biology-basic`: internal organelle SVGs for `bio_cell_scene`.
+- `chemistry-basic`: internal atom/bond SVGs plus structured molecule presets
+  for `molecule_2d_scene`.
+- `math-basic`: structured plot presets for math plot/formula scenes.
+- `algorithm-code-basic`: internal graph node, queue, visited, active-edge SVGs
+  plus a BFS graph preset for `graph_scene`.
 
 Starter assets can be internal placeholders or durable third-party/public-domain
 derivatives. Replace or add durable assets only when the source license,
@@ -51,3 +59,40 @@ attribution, commercial-use status, and provenance are recorded in the manifest.
 Do not commit third-party binary assets without explicit license metadata.
 Assets with `license: "unknown"` fail audit and must not be exposed through MCP
 or commercial export paths.
+
+## Flagship Fixture Matrix
+
+The checked-in showcase catalog lives in
+`apps/web/src/features/playbook/engine/fixtures/subjectVisualShowcase.ts`.
+It is the source of truth for Day-21 demo coverage and keeps fixture ids,
+asset packs, renderer kinds, code-track settings, and required static-render
+markers in one place.
+
+| Fixture | Domain | Asset pack | Renderer | Quality target |
+| --- | --- | --- | --- | --- |
+| `east_asia_monsoon` | geography | `geography-earth-basic` | `geo_map_scene` | Natural Earth map layer, monsoon flow asset, pressure centers |
+| `projectile_motion` | physics | `physics-basic` | `physics_force_scene` | projectile asset, vector asset, trajectory, motion trail |
+| `cell_structure` | biology | `biology-basic` | `bio_cell_scene` | cell, nucleus, mitochondrion assets plus callouts |
+| `molecule_2d_water` | chemistry | `chemistry-basic` | `molecule_2d_scene` | structured atoms/bonds and molecule preset |
+| `derivative_tangent` | math | `math-basic` | `math_plot` | formula plus curve/tangent plot markers |
+| `bfs_graph` | algorithm | `algorithm-code-basic` | `graph_scene` | graph node, queue, active-edge assets plus code track |
+
+Local preview helpers:
+
+1. Export JSON fixtures:
+
+   ```bash
+   npm --workspace apps/web run showcase:export
+   ```
+
+2. Render a fixture through the existing Remotion composition:
+
+   ```bash
+   node apps/web/scripts/render-shots.mjs eval/reports/subject-visual-fixtures/east_asia_monsoon.json eval/shots/east_asia_monsoon
+   ```
+
+3. Open the local showcase page in the web app at `/asset-showcase`.
+
+The visual quality gate is non-blocking at runtime, but showcase tests require
+these flagship fixtures to produce no warnings, no missing asset fallback, and
+no unknown snapshot renderer.

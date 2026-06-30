@@ -197,7 +197,7 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({ step, progr
           <g data-semantic-role="formula_card">
             <rect
               x="57"
-              y="4.4"
+              y="14.5"
               width="37"
               height="9"
               rx="2.2"
@@ -208,7 +208,7 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({ step, progr
             />
             <text
               x="92"
-              y="10.5"
+              y="20.6"
               textAnchor="end"
               fontSize="4.2"
               fontWeight="760"

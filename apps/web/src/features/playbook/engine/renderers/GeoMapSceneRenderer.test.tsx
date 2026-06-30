@@ -67,7 +67,7 @@ describe("GeoMapSceneRenderer", () => {
     expect(markup).toContain("geo-map-scene");
     expect(markup).toContain('data-asset-id="east-asia-land-110m"');
     expect(markup).toContain(
-      'data-asset-path="/assets/metaview-kits/geography-earth-basic/natural-earth/east-asia-land-110m.geojson"',
+      'data-asset-path="/assets/metaview-kits/geography-earth-basic/natural-earth/east-asia-land-110m.json"',
     );
     expect(markup).toContain('data-natural-earth-layer="admin_0_countries"');
     expect(markup).toContain('data-map-path-class="land"');

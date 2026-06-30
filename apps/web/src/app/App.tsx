@@ -3,6 +3,7 @@ import { OpsAppShell } from './OpsAppShell';
 import { SelfAppShell } from './SelfAppShell';
 import { PaymentResultPage } from '../pages/PaymentResultPage';
 import { OpsDashboardPage } from '../pages/OpsDashboard/OpsDashboardPage';
+import { AssetShowcasePage } from '../pages/AssetShowcase/AssetShowcasePage';
 
 function resolveAppEdition(): AppEdition {
   return import.meta.env.VITE_APP_EDITION === 'ops' ? 'ops' : 'self';
@@ -28,6 +29,9 @@ export function App() {
         </section>
       </main>
     );
+  }
+  if (window.location.pathname === '/asset-showcase') {
+    return <AssetShowcasePage />;
   }
 
   return appEdition === 'ops' ? <OpsAppShell /> : <SelfAppShell />;

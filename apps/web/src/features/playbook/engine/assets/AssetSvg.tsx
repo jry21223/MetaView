@@ -1,4 +1,5 @@
 import React from "react";
+import { staticFile } from "remotion";
 
 import type { AssetManifestEntry, SubjectVisualKitSubject } from "./assetRegistry";
 import { resolveAssetById, resolveAssetByRole } from "./assetResolver";
@@ -37,6 +38,13 @@ function resolveAsset({
 
 function canRenderAsStaticAsset(asset: AssetManifestEntry | undefined): asset is AssetManifestEntry & { path: string } {
   return Boolean(asset?.path && (asset.type === "svg" || asset.type === "image"));
+}
+
+function resolveStaticAssetHref(assetPath: string): string {
+  if (assetPath.startsWith("http://") || assetPath.startsWith("https://")) {
+    return assetPath;
+  }
+  return staticFile(assetPath.replace(/^\/+/, ""));
 }
 
 function MissingAssetFallback({
@@ -127,7 +135,7 @@ export function AssetSvg({
     >
       {renderable ? (
         <image
-          href={resolvedAsset.path}
+          href={resolveStaticAssetHref(resolvedAsset.path)}
           x={x}
           y={y}
           width={width}

@@ -1,5 +1,5 @@
-import eastAsiaCoastlineRaw from "../../../../../public/assets/metaview-kits/geography-earth-basic/natural-earth/east-asia-coastline-110m.geojson?raw";
-import eastAsiaLandRaw from "../../../../../public/assets/metaview-kits/geography-earth-basic/natural-earth/east-asia-land-110m.geojson?raw";
+import eastAsiaCoastlineData from "../../../../../public/assets/metaview-kits/geography-earth-basic/natural-earth/east-asia-coastline-110m.json";
+import eastAsiaLandData from "../../../../../public/assets/metaview-kits/geography-earth-basic/natural-earth/east-asia-land-110m.json";
 import type { AssetManifestEntry } from "./assetRegistry";
 
 export interface GeoJsonFeature {
@@ -28,9 +28,9 @@ export interface GeoJsonFeatureCollection {
 }
 
 const GEOJSON_ASSETS: Record<string, GeoJsonFeatureCollection> = {
-  "east-asia-land-110m": JSON.parse(eastAsiaLandRaw) as GeoJsonFeatureCollection,
-  "east-asia-country-boundary-110m": JSON.parse(eastAsiaLandRaw) as GeoJsonFeatureCollection,
-  "east-asia-coastline-110m": JSON.parse(eastAsiaCoastlineRaw) as GeoJsonFeatureCollection,
+  "east-asia-land-110m": eastAsiaLandData as GeoJsonFeatureCollection,
+  "east-asia-country-boundary-110m": eastAsiaLandData as GeoJsonFeatureCollection,
+  "east-asia-coastline-110m": eastAsiaCoastlineData as GeoJsonFeatureCollection,
 };
 
 export function resolveGeoJsonAssetData(asset: AssetManifestEntry | undefined): GeoJsonFeatureCollection | undefined {
