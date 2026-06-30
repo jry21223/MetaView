@@ -366,4 +366,77 @@ describe("sceneBlueprintCompiler", () => {
     expect(markup).toContain('data-node-state="queue"');
     expect(markup).toContain('data-edge-state="active"');
   });
+
+  it("compiles BFS graph layout from structured blueprint input", () => {
+    const script = compileSceneBlueprintToPlaybookScript({
+      subject: "algorithm",
+      sceneType: "bfs_graph",
+      title: "BFS custom graph",
+      visualIntent: ["show_graph_traversal", "show_queue_state", "highlight_active_edge"],
+      emphasisPoints: ["current node", "queue", "visited set"],
+      graphNodes: [
+        { id: "root", label: "R", x: -2, y: 0 },
+        { id: "left", label: "L", x: 0, y: -1 },
+        { id: "right", label: "Q", x: 2, y: 1 },
+      ],
+      graphEdges: [
+        { id: "root-left", source: "root", target: "left" },
+        { id: "root-right", source: "root", target: "right" },
+      ],
+      currentNodeId: "left",
+      visitedNodeIds: ["root"],
+      queueNodeIds: ["right"],
+      activeEdgeIds: ["root-left"],
+    });
+
+    const snapshot = script.steps[0].snapshot;
+    if (snapshot.kind !== "graph_scene") {
+      throw new Error(`Expected graph_scene, got ${snapshot.kind}`);
+    }
+    expect(snapshot.nodes.map((node) => node.id)).toEqual(["root", "left", "right"]);
+    expect(snapshot.edges.map((edge) => edge.id)).toEqual(["root-left", "root-right"]);
+    expect(snapshot.current_node_id).toBe("left");
+    expect(snapshot.visited_node_ids).toEqual(["root"]);
+    expect(snapshot.queue_node_ids).toEqual(["right"]);
+    expect(snapshot.active_edge_ids).toEqual(["root-left"]);
+    expect(visualQualityGate(script)).toEqual([]);
+  });
+
+  it("compiles binary search layout from structured blueprint input", () => {
+    const script = compileSceneBlueprintToPlaybookScript({
+      subject: "algorithm",
+      sceneType: "binary_search",
+      title: "Binary search custom target",
+      visualIntent: ["show_search_window", "highlight_midpoint", "trace_branch"],
+      emphasisPoints: ["low pointer", "mid pointer", "high pointer"],
+      arrayValues: ["1", "3", "8", "13", "21", "34", "55", "89"],
+      target: "21",
+    });
+
+    expect(script.domain).toBe("algorithm");
+    const snapshot = script.steps[0].snapshot;
+    if (snapshot.kind !== "code_trace_scene") {
+      throw new Error(`Expected code_trace_scene, got ${snapshot.kind}`);
+    }
+    expect(snapshot.pack_id).toBe("algorithm-code-basic");
+    expect(snapshot.asset_id).toBe("binary-search-trace-preset");
+    expect(snapshot.array_values).toEqual(["1", "3", "8", "13", "21", "34", "55", "89"]);
+    expect(snapshot.variables?.target).toBe("21");
+    expect(snapshot.search_range).toEqual([0, 7]);
+    expect(snapshot.pointers?.map((pointer) => [pointer.id, pointer.index])).toEqual([
+      ["low", 0],
+      ["mid", 3],
+      ["high", 7],
+    ]);
+    expect(snapshot.active_indices).toEqual([3]);
+    expect(snapshot.active_line).toBe(2);
+    expect(script.steps[0].code_highlight?.variables?.target).toBe("21");
+    expect(visualQualityGate(script)).toEqual([]);
+
+    const markup = renderToStaticMarkup(<PlaybookComposition script={script} showInlineCode={true} showSubtitles={false} />);
+    expect(markup).toContain("code-trace-scene");
+    expect(markup).toContain('data-trace-asset-id="binary-search-trace-preset"');
+    expect(markup).toContain('data-pointer-id="mid"');
+    expect(markup).toContain("21");
+  });
 });

@@ -5,6 +5,8 @@ import {
   resolveMoleculePresetForRenderer,
 } from "../kits/chemistry/moleculePresetResolver";
 import type { SubjectVisualKitSubject } from "../assets/assetRegistry";
+import { compileBinarySearchCodeTraceLayout } from "../kits/algorithm/BinarySearchLayoutCompiler";
+import { compileBfsGraphLayout, type GraphLayoutEdgeInput, type GraphLayoutNodeInput } from "../kits/algorithm/GraphLayoutCompiler";
 import type {
   AnySnapshot,
   BioCellSceneSnapshot,
@@ -136,6 +138,16 @@ export interface MathSceneBlueprint extends SceneBlueprintBase {
 export interface AlgorithmSceneBlueprint extends SceneBlueprintBase {
   subject: "algorithm";
   sceneType: AlgorithmSceneType;
+  graphNodes?: GraphLayoutNodeInput[];
+  graphEdges?: GraphLayoutEdgeInput[];
+  currentNodeId?: string;
+  activeNodeIds?: string[];
+  activeEdgeIds?: string[];
+  visitedNodeIds?: string[];
+  queueNodeIds?: string[];
+  frontierNodeIds?: string[];
+  arrayValues?: Array<string | number>;
+  target?: string | number;
 }
 
 export type SceneBlueprint =
@@ -506,34 +518,18 @@ function compileMathSnapshot(blueprint: MathSceneBlueprint): MathPlotSnapshot {
 
 function compileAlgorithmSnapshot(blueprint: AlgorithmSceneBlueprint): GraphSceneSnapshot {
   const packId = blueprint.packId ?? DEFAULT_ALGORITHM_PACK_ID;
-  const assetId = resolveAssetIdByRole("graph_scene", "algorithm", packId, "bfs", ["graph_scene", "graph"]);
-
-  return {
-    kind: "graph_scene",
-    pack_id: packId,
-    asset_id: assetId,
-    nodes: [
-      { id: "S", label: "S", x: -3, y: 0 },
-      { id: "A", label: "A", x: -1, y: 0 },
-      { id: "B", label: "B", x: 1.1, y: -1.3 },
-      { id: "C", label: "C", x: 1.1, y: 1.3 },
-      { id: "D", label: "D", x: 3, y: 0 },
-    ],
-    edges: [
-      { id: "S-A", source: "S", target: "A" },
-      { id: "A-B", source: "A", target: "B" },
-      { id: "A-C", source: "A", target: "C" },
-      { id: "B-D", source: "B", target: "D" },
-      { id: "C-D", source: "C", target: "D" },
-    ],
-    directed: true,
-    current_node_id: "A",
-    active_node_ids: ["A"],
-    visited_node_ids: ["S"],
-    queue_node_ids: ["B", "C"],
-    active_edge_ids: ["A-B"],
-    caption: blueprint.caption ?? "BFS expands the current node and appends unvisited neighbors to the queue.",
-  };
+  return compileBfsGraphLayout({
+    packId,
+    nodes: blueprint.graphNodes,
+    edges: blueprint.graphEdges,
+    currentNodeId: blueprint.currentNodeId,
+    activeNodeIds: blueprint.activeNodeIds,
+    activeEdgeIds: blueprint.activeEdgeIds,
+    visitedNodeIds: blueprint.visitedNodeIds,
+    queueNodeIds: blueprint.queueNodeIds,
+    frontierNodeIds: blueprint.frontierNodeIds,
+    caption: blueprint.caption,
+  });
 }
 
 function compileCallStackSnapshot(blueprint: AlgorithmSceneBlueprint): CallStackSceneSnapshot {
@@ -599,56 +595,14 @@ function compileCallStackSnapshot(blueprint: AlgorithmSceneBlueprint): CallStack
   };
 }
 
-function binarySearchLines(): string[] {
-  return [
-    "function binarySearch(nums, target) {",
-    "  let low = 0, high = nums.length - 1;",
-    "  const mid = Math.floor((low + high) / 2);",
-    "  if (nums[mid] === target) return mid;",
-    "  return nums[mid] < target ? searchRight() : searchLeft();",
-    "}",
-  ];
-}
-
 function compileCodeTraceSnapshot(blueprint: AlgorithmSceneBlueprint): CodeTraceSceneSnapshot {
   const packId = blueprint.packId ?? DEFAULT_ALGORITHM_PACK_ID;
-  const traceAssetId = resolveAssetIdByRole("code_trace_scene", "algorithm", packId, "binary_search", [
-    "code_trace_scene",
-    "code_trace",
-  ]);
-  const activeLineAssetId = resolveAssetIdByRole("code_trace_scene", "algorithm", packId, "active_line", [
-    "code_trace",
-  ]);
-  const pointerAssetId = resolveAssetIdByRole("code_trace_scene", "algorithm", packId, "pointer", [
-    "active_pointer",
-    "index_pointer",
-  ]);
-
-  return {
-    kind: "code_trace_scene",
-    pack_id: packId,
-    asset_id: traceAssetId,
-    language: "typescript",
-    lines: binarySearchLines(),
-    active_lines: [2, 3],
-    active_line: 2,
-    active_line_asset_id: activeLineAssetId,
-    array_values: ["2", "4", "7", "11", "18", "25", "31"],
-    active_indices: [3],
-    search_range: [0, 6],
-    pointers: [
-      { id: "low", label: "low", index: 0, asset_id: pointerAssetId },
-      { id: "mid", label: "mid", index: 3, asset_id: pointerAssetId },
-      { id: "high", label: "high", index: 6, asset_id: pointerAssetId },
-    ],
-    variables: {
-      target: "11",
-      low: "0",
-      mid: "3",
-      high: "6",
-    },
-    caption: blueprint.caption ?? "Binary search checks the middle element before discarding half the range.",
-  };
+  return compileBinarySearchCodeTraceLayout({
+    packId,
+    arrayValues: blueprint.arrayValues,
+    target: blueprint.target,
+    caption: blueprint.caption,
+  }).snapshot;
 }
 
 function roundToOneDecimal(value: number): number {
@@ -740,20 +694,13 @@ function compileSnapshot(blueprint: SceneBlueprint): AnySnapshot {
 
 function compileAlgorithmCodeHighlight(blueprint: AlgorithmSceneBlueprint): CodeHighlightOverlay {
   if (blueprint.sceneType === "binary_search" || blueprint.sceneType === "code_trace_scene") {
-    return {
-      language: "typescript",
-      lines: binarySearchLines(),
-      active_lines: [2, 3],
-      active_line: 2,
-      variables: {
-        intent: blueprint.visualIntent.join(", "),
-        target: "11",
-        low: "0",
-        mid: "3",
-        high: "6",
-      },
-      operation_label: "compare midpoint",
-    };
+    return compileBinarySearchCodeTraceLayout({
+      packId: blueprint.packId ?? DEFAULT_ALGORITHM_PACK_ID,
+      arrayValues: blueprint.arrayValues,
+      target: blueprint.target,
+      caption: blueprint.caption,
+      visualIntent: blueprint.visualIntent,
+    }).codeHighlight;
   }
 
   if (blueprint.sceneType === "recursion_stack" || blueprint.sceneType === "call_stack_scene") {

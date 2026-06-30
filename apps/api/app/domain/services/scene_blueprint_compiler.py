@@ -13,14 +13,10 @@ from app.domain.models.playbook import (
     CallStackFrame,
     CallStackSceneSnapshot,
     CodeHighlightOverlay,
-    CodeTracePointer,
-    CodeTraceSceneSnapshot,
     GeoMapFlow,
     GeoMapLayer,
     GeoMapSceneSnapshot,
     GeoPressureCenter,
-    GraphSceneEdge,
-    GraphSceneNode,
     GraphSceneSnapshot,
     Layer,
     LayerTiming,
@@ -41,6 +37,11 @@ from app.domain.models.playbook import (
     ReactionSceneSnapshot,
 )
 from app.domain.models.topic import TopicDomain
+from app.domain.services.algorithm_layout_compiler import (
+    compile_bfs_graph_snapshot,
+    compile_binary_search_code_highlight,
+    compile_binary_search_code_trace_snapshot,
+)
 from app.domain.services.molecule_preset_resolver import (
     resolve_molecule_preset_by_smiles_for_renderer,
     resolve_molecule_preset_for_renderer,
@@ -253,12 +254,12 @@ def _step_captions(scene_type: str, title: str, base_caption: str) -> list[str]:
         ],
         "bfs_graph": [
             "BFS 图先看 graph_scene 中的节点和边，起点 S 是遍历过程的入口。",
-            "当前节点高亮表示算法正在处理的位置，visited 集合记录已经确认访问的节点。",
-            "队列显示 frontier，说明 BFS 按先进先出的顺序扩展下一层节点。",
-            "从当前节点伸出的 active edge 表示本轮要检查的相邻关系。",
-            "新节点进入队列后，图上的状态变化和代码行可以同步解释。",
-            "visited 集合不断增长，帮助区分已经处理过和等待处理的节点。",
-            "这一帧把图结构、队列和访问状态放在同一个可视布局里。",
+            "BFS graph 的当前节点高亮表示算法正在处理的位置，visited 集合记录已经确认访问的节点。",
+            "BFS graph 的队列显示 frontier，说明 BFS 按先进先出的顺序扩展下一层节点。",
+            "BFS graph 从当前节点伸出的 active edge 表示本轮要检查的相邻关系。",
+            "BFS graph 新节点进入队列后，图上的状态变化和代码行可以同步解释。",
+            "BFS graph 的 visited 集合不断增长，帮助区分已经处理过和等待处理的节点。",
+            "BFS graph 这一帧把图结构、队列和访问状态放在同一个可视布局里。",
             "结论回到 BFS：它按层扩展图节点，用队列保证先发现的节点先被处理。",
         ],
         "recursion_stack": [
@@ -330,7 +331,7 @@ def _compile_snapshot(scene_type: str, blueprint: dict[str, Any]):
     if scene_type == "recursion_stack":
         return _recursion_stack_snapshot(blueprint)
     if scene_type == "binary_search":
-        return _binary_search_snapshot(blueprint)
+        return compile_binary_search_code_trace_snapshot(blueprint)
     raise ValueError(f"Unsupported SceneBlueprint sceneType: {scene_type}")
 
 
@@ -722,34 +723,7 @@ def _derivative_tangent_snapshot(blueprint: dict[str, Any]) -> MathPlotSnapshot:
 
 
 def _bfs_graph_snapshot(blueprint: dict[str, Any]) -> GraphSceneSnapshot:
-    return GraphSceneSnapshot(
-        pack_id=str(blueprint.get("packId") or "algorithm-code-basic"),
-        asset_id="bfs-graph-preset",
-        nodes=[
-            GraphSceneNode(id="S", label="S", x=-3, y=0),
-            GraphSceneNode(id="A", label="A", x=-1, y=0),
-            GraphSceneNode(id="B", label="B", x=1.1, y=-1.3),
-            GraphSceneNode(id="C", label="C", x=1.1, y=1.3),
-            GraphSceneNode(id="D", label="D", x=3, y=0),
-        ],
-        edges=[
-            GraphSceneEdge(id="S-A", source="S", target="A"),
-            GraphSceneEdge(id="A-B", source="A", target="B"),
-            GraphSceneEdge(id="A-C", source="A", target="C"),
-            GraphSceneEdge(id="B-D", source="B", target="D"),
-            GraphSceneEdge(id="C-D", source="C", target="D"),
-        ],
-        directed=True,
-        current_node_id="A",
-        active_node_ids=["A"],
-        visited_node_ids=["S"],
-        queue_node_ids=["B", "C"],
-        active_edge_ids=["A-B"],
-        caption=str(
-            blueprint.get("caption")
-            or "BFS expands the current node and appends unvisited neighbors to the queue."
-        ),
-    )
+    return compile_bfs_graph_snapshot(blueprint)
 
 
 def _recursion_stack_snapshot(blueprint: dict[str, Any]) -> CallStackSceneSnapshot:
@@ -802,59 +776,10 @@ def _recursion_stack_snapshot(blueprint: dict[str, Any]) -> CallStackSceneSnapsh
     )
 
 
-def _binary_search_lines() -> list[str]:
-    return [
-        "function binarySearch(nums, target) {",
-        "  let low = 0, high = nums.length - 1;",
-        "  const mid = Math.floor((low + high) / 2);",
-        "  if (nums[mid] === target) return mid;",
-        "  return nums[mid] < target ? searchRight() : searchLeft();",
-        "}",
-    ]
-
-
-def _binary_search_snapshot(blueprint: dict[str, Any]) -> CodeTraceSceneSnapshot:
-    return CodeTraceSceneSnapshot(
-        pack_id=str(blueprint.get("packId") or "algorithm-code-basic"),
-        asset_id="binary-search-trace-preset",
-        language="typescript",
-        lines=_binary_search_lines(),
-        active_lines=[2, 3],
-        active_line=2,
-        active_line_asset_id="active-line",
-        array_values=["2", "4", "7", "11", "18", "25", "31"],
-        active_indices=[3],
-        search_range=(0, 6),
-        pointers=[
-            CodeTracePointer(id="low", label="low", index=0, asset_id="pointer-marker"),
-            CodeTracePointer(id="mid", label="mid", index=3, asset_id="pointer-marker"),
-            CodeTracePointer(id="high", label="high", index=6, asset_id="pointer-marker"),
-        ],
-        variables={"target": "11", "low": "0", "mid": "3", "high": "6"},
-        caption=str(
-            blueprint.get("caption")
-            or "Binary search checks the middle element before discarding half the range."
-        ),
-    )
-
-
 def _code_highlight(scene_type: str, blueprint: dict[str, Any]) -> CodeHighlightOverlay | None:
     visual_intent = ", ".join(str(item) for item in blueprint.get("visualIntent") or [])
     if scene_type == "binary_search":
-        return CodeHighlightOverlay(
-            language="typescript",
-            lines=_binary_search_lines(),
-            active_lines=[2, 3],
-            active_line=2,
-            variables={
-                "intent": visual_intent,
-                "target": "11",
-                "low": "0",
-                "mid": "3",
-                "high": "6",
-            },
-            operation_label="compare midpoint",
-        )
+        return compile_binary_search_code_highlight(blueprint)
     if scene_type == "recursion_stack":
         return CodeHighlightOverlay(
             language="python",

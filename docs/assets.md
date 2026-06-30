@@ -93,6 +93,10 @@ Current backend SkillPack adoption:
   `algorithm_graph_core` SkillPack emits runtime `graph_scene` snapshots with
   `pack_id`, `asset_id`, queue-node, visited-node, and active-edge asset refs so
   generated BFS playbooks use the same assets as the showcase fixture.
+  The SceneBlueprint path now routes BFS graph and binary-search code traces
+  through small layout compilers, so structured blueprint input such as custom
+  graph nodes or binary-search arrays is compiled into deterministic renderer
+  snapshots instead of being ignored by fixture-specific constants.
 
 Starter assets can be internal placeholders or durable third-party/public-domain
 derivatives. Replace or add durable assets only when the source license,

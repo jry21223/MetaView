@@ -270,6 +270,45 @@ def test_scene_blueprint_compiler_builds_recursion_call_stack_scene() -> None:
     assert verdict.status == PlaybookReviewStatus.CLEAN
 
 
+def test_scene_blueprint_compiler_builds_bfs_graph_from_structured_input() -> None:
+    playbook = compile_scene_blueprint_to_playbook(
+        {
+            "id": "bfs_graph_custom",
+            "subject": "algorithm",
+            "sceneType": "bfs_graph",
+            "title": "BFS custom graph",
+            "visualIntent": ["show_graph_traversal", "show_queue_state"],
+            "emphasisPoints": ["current node", "queue", "visited set"],
+            "graphNodes": [
+                {"id": "root", "label": "R", "x": -2, "y": 0},
+                {"id": "left", "label": "L", "x": 0, "y": -1},
+                {"id": "right", "label": "Q", "x": 2, "y": 1},
+            ],
+            "graphEdges": [
+                {"id": "root-left", "source": "root", "target": "left"},
+                {"id": "root-right", "source": "root", "target": "right"},
+            ],
+            "currentNodeId": "left",
+            "visitedNodeIds": ["root"],
+            "queueNodeIds": ["right"],
+            "activeEdgeIds": ["root-left"],
+        },
+    )
+
+    snapshot = playbook.steps[0].snapshot.model_dump(mode="json", by_alias=True)
+
+    assert snapshot["kind"] == "graph_scene"
+    assert [node["id"] for node in snapshot["nodes"]] == ["root", "left", "right"]
+    assert [edge["id"] for edge in snapshot["edges"]] == ["root-left", "root-right"]
+    assert snapshot["current_node_id"] == "left"
+    assert snapshot["visited_node_ids"] == ["root"]
+    assert snapshot["queue_node_ids"] == ["right"]
+    assert snapshot["active_edge_ids"] == ["root-left"]
+
+    verdict = self_check_playbook(playbook, "Trace BFS graph state.")
+    assert verdict.status == PlaybookReviewStatus.CLEAN
+
+
 def test_scene_blueprint_compiler_builds_binary_search_code_trace_scene() -> None:
     playbook = compile_scene_blueprint_to_playbook(
         {
@@ -296,6 +335,41 @@ def test_scene_blueprint_compiler_builds_binary_search_code_trace_scene() -> Non
     assert "binarySearch" in snapshot["lines"][0]
     assert playbook.steps[0].code_highlight is not None
     assert playbook.steps[0].code_highlight.active_line == 2
+
+    verdict = self_check_playbook(playbook, "Trace binary search midpoint narrowing.")
+    assert verdict.status == PlaybookReviewStatus.CLEAN
+
+
+def test_scene_blueprint_compiler_builds_binary_search_from_structured_input() -> None:
+    playbook = compile_scene_blueprint_to_playbook(
+        {
+            "id": "binary_search_custom",
+            "subject": "algorithm",
+            "sceneType": "binary_search",
+            "title": "Binary search custom target",
+            "visualIntent": ["show_search_window", "highlight_midpoint", "trace_branch"],
+            "emphasisPoints": ["low pointer", "mid pointer", "high pointer"],
+            "arrayValues": ["1", "3", "8", "13", "21", "34", "55", "89"],
+            "target": "21",
+        },
+    )
+
+    snapshot = playbook.steps[0].snapshot.model_dump(mode="json", by_alias=True)
+
+    assert snapshot["kind"] == "code_trace_scene"
+    assert snapshot["asset_id"] == "binary-search-trace-preset"
+    assert snapshot["array_values"] == ["1", "3", "8", "13", "21", "34", "55", "89"]
+    assert snapshot["variables"]["target"] == "21"
+    assert snapshot["search_range"] == [0, 7]
+    assert [(pointer["id"], pointer["index"]) for pointer in snapshot["pointers"]] == [
+        ("low", 0),
+        ("mid", 3),
+        ("high", 7),
+    ]
+    assert snapshot["active_indices"] == [3]
+    assert snapshot["active_line"] == 2
+    assert playbook.steps[0].code_highlight is not None
+    assert playbook.steps[0].code_highlight.variables["target"] == "21"
 
     verdict = self_check_playbook(playbook, "Trace binary search midpoint narrowing.")
     assert verdict.status == PlaybookReviewStatus.CLEAN
