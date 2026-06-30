@@ -40,6 +40,9 @@ Chemistry molecule scenes additionally hydrate structured JSON presets through
 `kits/chemistry/moleculePresetResolver.ts` before renderer asset ids are applied,
 so atom/bond/callout data comes from the asset pack rather than a hand-written
 water molecule inside the compiler.
+The backend mirror uses `apps/api/app/domain/services/molecule_preset_resolver.py`
+against the same public preset JSON before returning `PlaybookScript` to
+SkillPack/runtime-tool callers.
 The current supported scene blueprints are `east_asia_monsoon`,
 `projectile_motion`, `cell_structure`, `molecule_2d_water`,
 `derivative_tangent`, and `bfs_graph`.

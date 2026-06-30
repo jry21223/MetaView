@@ -29,6 +29,7 @@ from app.domain.models.playbook import (
     PlaybookScript,
 )
 from app.domain.models.topic import TopicDomain
+from app.domain.services.molecule_preset_resolver import resolve_molecule_preset_for_renderer
 
 _FPS = 30
 _DEFAULT_STEP_FRAMES = 180
@@ -371,9 +372,28 @@ def _cell_structure_snapshot(blueprint: dict[str, Any]) -> BioCellSceneSnapshot:
 
 
 def _water_molecule_snapshot(blueprint: dict[str, Any]) -> Molecule2DSceneSnapshot:
+    pack_id = str(blueprint.get("packId") or "chemistry-basic")
+    molecule_id = str(blueprint.get("moleculeId") or "water")
+    preset = resolve_molecule_preset_for_renderer(pack_id, molecule_id)
+    if preset is not None:
+        return Molecule2DSceneSnapshot(
+            pack_id=pack_id,
+            molecule_id=preset.molecule_id,
+            molecule_asset_id=preset.molecule_asset_id,
+            atoms=[
+                atom.model_copy(update={"asset_id": "atom-core"}) for atom in preset.atoms
+            ],
+            bonds=[
+                bond.model_copy(update={"asset_id": "bond-line"}) for bond in preset.bonds
+            ],
+            callouts=preset.callouts,
+            formula_latex=preset.formula_latex,
+            caption=str(blueprint.get("caption") or preset.caption),
+        )
+
     return Molecule2DSceneSnapshot(
-        pack_id=str(blueprint.get("packId") or "chemistry-basic"),
-        molecule_id="water",
+        pack_id=pack_id,
+        molecule_id=molecule_id,
         molecule_asset_id="water-molecule-preset",
         atoms=[
             Molecule2DAtom(id="o", element="O", x=50, y=42, asset_id="atom-core", label="oxygen"),

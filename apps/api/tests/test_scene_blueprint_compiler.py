@@ -4,6 +4,7 @@ import pytest
 
 from app.domain.models.playbook import PlaybookScript
 from app.domain.models.review import PlaybookReviewStatus
+from app.domain.services.molecule_preset_resolver import resolve_molecule_preset_for_renderer
 from app.domain.services.playbook_quality import self_check_playbook
 from app.domain.services.scene_blueprint_compiler import compile_scene_blueprint_to_playbook
 
@@ -85,6 +86,37 @@ def test_scene_blueprint_compiler_preserves_flagship_asset_markers() -> None:
             ), scene_type
         else:
             assert snapshot[field_name] == expected_value
+
+
+def test_scene_blueprint_compiler_hydrates_water_from_molecule_preset() -> None:
+    preset = resolve_molecule_preset_for_renderer("chemistry-basic", "water")
+    assert preset is not None
+
+    playbook = compile_scene_blueprint_to_playbook(
+        {
+            "id": "molecule_2d_water",
+            "subject": "chemistry",
+            "sceneType": "molecule_2d_water",
+            "title": "Water molecule",
+            "visualIntent": ["render_structured_molecule"],
+        },
+    )
+
+    snapshot = playbook.steps[0].snapshot.model_dump(mode="json", by_alias=True)
+
+    assert snapshot["molecule_asset_id"] == preset.molecule_asset_id
+    assert snapshot["formula_latex"] == preset.formula_latex
+    assert snapshot["caption"] == preset.caption
+    assert snapshot["callouts"] == [
+        callout.model_dump(mode="json") for callout in preset.callouts
+    ]
+    assert snapshot["atoms"] == [
+        {**atom.model_dump(mode="json"), "asset_id": "atom-core"} for atom in preset.atoms
+    ]
+    assert snapshot["bonds"] == [
+        {**bond.model_dump(mode="json", by_alias=True), "asset_id": "bond-line"}
+        for bond in preset.bonds
+    ]
 
 
 @pytest.mark.parametrize(
