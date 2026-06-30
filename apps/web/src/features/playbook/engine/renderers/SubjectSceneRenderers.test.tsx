@@ -3,12 +3,14 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { PlaybookComposition } from "../composition/PlaybookComposition";
 import type {
+  BioCellSceneSnapshot,
   GeoMapSceneSnapshot,
   MetaStep,
   PhysicsForceSceneSnapshot,
   PlaybookScript,
 } from "../types";
 import type { RendererProps } from "./types";
+import { BioCellSceneRenderer } from "./BioCellSceneRenderer";
 import { GeoMapSceneRenderer } from "./GeoMapSceneRenderer";
 import { PhysicsForceSceneRenderer } from "./PhysicsForceSceneRenderer";
 import { rendererRegistry } from "./registry";
@@ -69,18 +71,34 @@ function physicsSnapshot(extra: Partial<PhysicsForceSceneSnapshot> = {}): Physic
   };
 }
 
-function step(snapshot: GeoMapSceneSnapshot | PhysicsForceSceneSnapshot): MetaStep {
+function bioSnapshot(extra: Partial<BioCellSceneSnapshot> = {}): BioCellSceneSnapshot {
+  return {
+    kind: "bio_cell_scene",
+    pack_id: "biology-basic",
+    cell_type: "animal",
+    structures: [
+      { id: "cell", semantic_role: "cell", label: "cell", x: 50, y: 52, width: 66, height: 50 },
+      { id: "nucleus", semantic_role: "nucleus", label: "nucleus", x: 49, y: 50, width: 20, height: 18 },
+      { id: "mitochondrion", semantic_role: "mitochondrion", label: "mitochondrion", x: 67, y: 58, width: 16, height: 10 },
+    ],
+    callouts: [{ id: "nucleus-callout", target_id: "nucleus", label: "stores DNA", side: "left" }],
+    caption: "Animal cells contain specialized organelles.",
+    ...extra,
+  };
+}
+
+function step(snapshot: BioCellSceneSnapshot | GeoMapSceneSnapshot | PhysicsForceSceneSnapshot): MetaStep {
   return {
     step_id: "s1",
     end_frame: 90,
-    title: snapshot.kind === "geo_map_scene" ? "东亚季风" : "平抛运动",
+    title: snapshot.kind === "geo_map_scene" ? "东亚季风" : snapshot.kind === "bio_cell_scene" ? "细胞结构" : "平抛运动",
     voiceover_text: snapshot.caption ?? "",
     snapshot,
     tokens: [],
   };
 }
 
-function props(snapshot: GeoMapSceneSnapshot | PhysicsForceSceneSnapshot): RendererProps {
+function props(snapshot: BioCellSceneSnapshot | GeoMapSceneSnapshot | PhysicsForceSceneSnapshot): RendererProps {
   return {
     step: step(snapshot),
     prevStep: null,
@@ -92,12 +110,12 @@ function props(snapshot: GeoMapSceneSnapshot | PhysicsForceSceneSnapshot): Rende
   };
 }
 
-function script(snapshot: GeoMapSceneSnapshot | PhysicsForceSceneSnapshot): PlaybookScript {
+function script(snapshot: BioCellSceneSnapshot | GeoMapSceneSnapshot | PhysicsForceSceneSnapshot): PlaybookScript {
   return {
     fps: 30,
     total_frames: 90,
-    domain: snapshot.kind === "geo_map_scene" ? "geography" : "physics",
-    title: snapshot.kind === "geo_map_scene" ? "东亚季风" : "平抛运动",
+    domain: snapshot.kind === "geo_map_scene" ? "geography" : snapshot.kind === "bio_cell_scene" ? "biology" : "physics",
+    title: snapshot.kind === "geo_map_scene" ? "东亚季风" : snapshot.kind === "bio_cell_scene" ? "细胞结构" : "平抛运动",
     summary: "subject fixture",
     parameter_controls: [],
     steps: [step(snapshot)],
@@ -106,8 +124,18 @@ function script(snapshot: GeoMapSceneSnapshot | PhysicsForceSceneSnapshot): Play
 
 describe("subject scene renderers", () => {
   it("registers dedicated geography and physics scene renderers", () => {
+    expect(rendererRegistry.get("bio_cell_scene")).toBe(BioCellSceneRenderer);
     expect(rendererRegistry.get("geo_map_scene")).toBe(GeoMapSceneRenderer);
     expect(rendererRegistry.get("physics_force_scene")).toBe(PhysicsForceSceneRenderer);
+  });
+
+  it("renders biology cell structures and callouts", () => {
+    const markup = renderToStaticMarkup(<BioCellSceneRenderer {...props(bioSnapshot())} />);
+
+    expect(markup).toContain("bio-cell-scene");
+    expect(markup).toContain('data-asset-id="cell-outline"');
+    expect(markup).toContain('data-asset-id="nucleus"');
+    expect(markup).toContain('data-semantic-role="callout"');
   });
 
   it("renders geography map layers, wind flow, pressure centers, and particles", () => {
@@ -133,6 +161,9 @@ describe("subject scene renderers", () => {
   });
 
   it("renders both scene kinds through PlaybookComposition", () => {
+    const bioMarkup = renderToStaticMarkup(
+      <PlaybookComposition script={script(bioSnapshot())} showSubtitles={false} />,
+    );
     const geoMarkup = renderToStaticMarkup(
       <PlaybookComposition script={script(geoSnapshot())} showSubtitles={false} />,
     );
@@ -140,8 +171,10 @@ describe("subject scene renderers", () => {
       <PlaybookComposition script={script(physicsSnapshot())} showSubtitles={false} />,
     );
 
+    expect(bioMarkup).toContain("bio-cell-scene");
     expect(geoMarkup).toContain("geo-map-scene");
     expect(physicsMarkup).toContain("physics-force-scene");
+    expect(bioMarkup).not.toContain("Unknown snapshot kind");
     expect(geoMarkup).not.toContain("Unknown snapshot kind");
     expect(physicsMarkup).not.toContain("Unknown snapshot kind");
   });

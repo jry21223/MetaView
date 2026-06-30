@@ -19,6 +19,7 @@ export type SnapshotKind =
   | "modeling_scene"
   | "manifold_scene"
   | "solid_geometry_scene"
+  | "bio_cell_scene"
   | "geo_map_scene"
   | "physics_force_scene"
   | "motion_scene"
@@ -415,6 +416,41 @@ export interface SolidGeometrySceneSnapshot {
   caption?: string | null;
 }
 
+export interface BioCellStructure {
+  id: string;
+  semantic_role:
+    | "cell"
+    | "membrane"
+    | "nucleus"
+    | "mitochondrion"
+    | "ribosome"
+    | "dna"
+    | "chloroplast"
+    | string;
+  label?: string | null;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  asset_id?: string | null;
+}
+
+export interface BioCellCallout {
+  id: string;
+  target_id: string;
+  label: string;
+  side?: "left" | "right" | "top" | "bottom";
+}
+
+export interface BioCellSceneSnapshot {
+  kind: "bio_cell_scene";
+  pack_id?: string | null;
+  cell_type?: "animal" | "plant" | "bacteria" | string | null;
+  structures: BioCellStructure[];
+  callouts?: BioCellCallout[];
+  caption?: string | null;
+}
+
 export interface GeoMapLayer {
   id: string;
   semantic_role: "land" | "ocean" | "map_layer" | "pressure_high" | "pressure_low" | string;
@@ -524,6 +560,7 @@ export type AnySnapshot =
   | ModelingSceneSnapshot
   | ManifoldSceneSnapshot
   | SolidGeometrySceneSnapshot
+  | BioCellSceneSnapshot
   | GeoMapSceneSnapshot
   | PhysicsForceSceneSnapshot
   | MotionSceneSnapshot

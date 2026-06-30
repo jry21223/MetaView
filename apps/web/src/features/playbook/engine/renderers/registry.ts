@@ -12,6 +12,7 @@ import {
   StatsChartSceneRenderer,
   TableSceneRenderer,
 } from "./AdvancedMathRenderers";
+import { BioCellSceneRenderer } from "./BioCellSceneRenderer";
 import { BinaryTreeRenderer } from "./BinaryTreeRenderer";
 import { DomainArrayRenderer } from "./DomainArrayRenderer";
 import { GeoMapSceneRenderer } from "./GeoMapSceneRenderer";
@@ -42,6 +43,7 @@ const registry = new Map<SnapshotKind, RendererComponent>([
   ["modeling_scene", ModelingSceneRenderer],
   ["manifold_scene", ManifoldSceneRenderer],
   ["solid_geometry_scene", SolidGeometrySceneRenderer],
+  ["bio_cell_scene", BioCellSceneRenderer],
   ["geo_map_scene", GeoMapSceneRenderer],
   ["physics_force_scene", PhysicsForceSceneRenderer],
   ["motion_scene", MotionSceneRenderer],

@@ -1,6 +1,7 @@
-import { findAssetById } from "./assetRegistry";
+import { findAssetById, findAssetByRole } from "./assetRegistry";
 import type {
   AnySnapshot,
+  BioCellSceneSnapshot,
   GeoMapSceneSnapshot,
   MetaStep,
   PhysicsForceSceneSnapshot,
@@ -12,6 +13,7 @@ export type VisualQualityWarningCode =
   | "missing_pack_id"
   | "empty_physics_force_scene"
   | "missing_asset"
+  | "low_biology_structure_assets"
   | "unsupported_array_fallback";
 
 export interface VisualQualityWarning {
@@ -120,6 +122,30 @@ function checkPhysicsForceScene(
   }
 }
 
+function checkBioCellScene(
+  warnings: VisualQualityWarning[],
+  context: SnapshotContext,
+  snapshot: BioCellSceneSnapshot,
+) {
+  const assetBackedStructures = snapshot.structures.filter((structure) => {
+    if (structure.asset_id) return assetResolves(structure.asset_id, snapshot.pack_id);
+    return Boolean(findAssetByRole("biology", structure.semantic_role, snapshot.pack_id));
+  });
+
+  if (assetBackedStructures.length < 2) {
+    warn(warnings, context, {
+      code: "low_biology_structure_assets",
+      domain: context.domain,
+      pack_id: snapshot.pack_id,
+      message: "bio_cell_scene should include at least two resolvable biology structure assets.",
+    });
+  }
+
+  for (const structure of snapshot.structures) {
+    checkAssetId(warnings, context, structure.asset_id, snapshot.pack_id);
+  }
+}
+
 function checkUnsupportedArrayFallback(
   warnings: VisualQualityWarning[],
   context: SnapshotContext,
@@ -152,6 +178,9 @@ export function visualQualityGate(script: PlaybookScript): VisualQualityWarning[
       }
       if (snapshot.kind === "physics_force_scene") {
         checkPhysicsForceScene(warnings, context, snapshot);
+      }
+      if (snapshot.kind === "bio_cell_scene") {
+        checkBioCellScene(warnings, context, snapshot);
       }
     }
   }

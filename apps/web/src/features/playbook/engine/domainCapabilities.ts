@@ -25,9 +25,9 @@ export const DOMAIN_CAPABILITIES: Record<string, DomainCapability> = {
   },
   biology: {
     domain: "biology",
-    support: "fallback",
-    primaryRenderer: "domain_cards",
-    message: "Biology currently uses fallback concept cards.",
+    support: "partial",
+    primaryRenderer: "bio_cell_scene/domain_cards",
+    message: "Biology has a cell-scene renderer for flagship structure cases and falls back to concept cards.",
   },
   geography: {
     domain: "geography",

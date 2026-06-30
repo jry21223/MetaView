@@ -82,4 +82,79 @@ describe("visualQualityGate", () => {
       },
     ]);
   });
+
+  it("warns when biology cell scene has too few semantic assets", () => {
+    const warnings = visualQualityGate(
+      script({
+        domain: "biology",
+        steps: [
+          {
+            step_id: "cell_structure",
+            end_frame: 90,
+            title: "Cell structure",
+            voiceover_text: "",
+            tokens: [],
+            snapshot: {
+              kind: "bio_cell_scene",
+              pack_id: "biology-basic",
+              cell_type: "animal",
+              structures: [
+                { id: "cell", semantic_role: "cell", label: "cell", x: 50, y: 52, width: 66, height: 50 },
+              ],
+              callouts: [],
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "low_biology_structure_assets",
+          step_id: "cell_structure",
+          domain: "biology",
+          snapshot_kind: "bio_cell_scene",
+        }),
+      ]),
+    );
+  });
+
+  it("warns when a biology asset_id cannot be resolved", () => {
+    const warnings = visualQualityGate(
+      script({
+        domain: "biology",
+        steps: [
+          {
+            step_id: "cell_structure",
+            end_frame: 90,
+            title: "Cell structure",
+            voiceover_text: "",
+            tokens: [],
+            snapshot: {
+              kind: "bio_cell_scene",
+              pack_id: "biology-basic",
+              cell_type: "animal",
+              structures: [
+                { id: "cell", semantic_role: "cell", label: "cell", x: 50, y: 52, width: 66, height: 50, asset_id: "missing-cell" },
+                { id: "nucleus", semantic_role: "nucleus", label: "nucleus", x: 49, y: 50, width: 20, height: 18, asset_id: "nucleus" },
+              ],
+              callouts: [],
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "missing_asset",
+          step_id: "cell_structure",
+          asset_id: "missing-cell",
+          pack_id: "biology-basic",
+        }),
+      ]),
+    );
+  });
 });

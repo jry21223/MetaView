@@ -1,3 +1,4 @@
+import biologyBasicManifest from "../../../../../public/assets/metaview-kits/biology-basic/manifest.json";
 import geographyBasicManifest from "../../../../../public/assets/metaview-kits/geography-basic/manifest.json";
 import geographyEarthBasicManifest from "../../../../../public/assets/metaview-kits/geography-earth-basic/manifest.json";
 import physicsBasicManifest from "../../../../../public/assets/metaview-kits/physics-basic/manifest.json";
@@ -81,6 +82,7 @@ export interface SubjectVisualKit {
 }
 
 const ASSET_PACKS: SubjectVisualKit[] = [
+  biologyBasicManifest as SubjectVisualKit,
   geographyBasicManifest as SubjectVisualKit,
   geographyEarthBasicManifest as SubjectVisualKit,
   physicsBasicManifest as SubjectVisualKit,

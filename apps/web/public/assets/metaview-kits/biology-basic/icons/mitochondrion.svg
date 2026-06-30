@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 44" role="img" aria-label="Mitochondrion" data-asset-id="mitochondrion" data-asset-quality="v1">
+  <path d="M9 22 C9 8 23 3 38 7 C56 12 66 20 62 31 C57 44 37 42 21 36 C13 33 9 29 9 22Z" fill="#f7c77b" stroke="#b96d2d" stroke-width="4"/>
+  <path d="M20 25 C27 13 34 33 42 21 S54 24 56 17" fill="none" stroke="#8f4c1f" stroke-width="3" stroke-linecap="round"/>
+  <path d="M17 16 C25 10 39 10 51 18" fill="none" stroke="#fff1cf" stroke-width="2" stroke-linecap="round" opacity=".8"/>
+</svg>

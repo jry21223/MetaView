@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 64" role="img" aria-label="Nucleus" data-asset-id="nucleus" data-asset-quality="v1">
+  <ellipse cx="36" cy="32" rx="27" ry="23" fill="#b7a2e0" stroke="#6d5a9f" stroke-width="4"/>
+  <ellipse cx="31" cy="29" rx="10" ry="8" fill="#f5ecff" opacity=".65"/>
+  <path d="M20 39 C28 29 38 46 50 34" fill="none" stroke="#6d5a9f" stroke-width="3" stroke-linecap="round" opacity=".65"/>
+</svg>

@@ -1,0 +1,173 @@
+{
+  "schemaVersion": "1.0.0",
+  "packId": "biology-basic",
+  "subject": "biology",
+  "version": "0.1.0",
+  "license": "internal",
+  "licenseMode": "single",
+  "defaultLicense": "internal",
+  "sceneTemplates": ["cell_structure", "dna_replication"],
+  "rendererKinds": ["bio_cell_scene"],
+  "sources": [
+    {
+      "id": "metaview-internal",
+      "label": "MetaView internal biology SVG primitives",
+      "license": "internal",
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "attribution": null
+    }
+  ],
+  "assets": [
+    {
+      "id": "cell-outline",
+      "type": "svg",
+      "path": "/assets/metaview-kits/biology-basic/icons/cell-outline.svg",
+      "tags": ["cell", "animal_cell", "structure"],
+      "semanticRoles": ["cell"],
+      "sourceId": "metaview-internal",
+      "attribution": "MetaView internal SVG primitive",
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "commercialUseAllowed": true,
+      "requiresAttribution": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null,
+      "rendererHints": {
+        "preferredRenderer": "bio_cell_scene",
+        "defaultSize": [220, 160],
+        "anchor": "center",
+        "colorizable": false,
+        "strokeControlled": false
+      }
+    },
+    {
+      "id": "cell-membrane",
+      "type": "svg",
+      "path": "/assets/metaview-kits/biology-basic/icons/cell-membrane.svg",
+      "tags": ["cell", "membrane", "boundary"],
+      "semanticRoles": ["membrane"],
+      "sourceId": "metaview-internal",
+      "attribution": "MetaView internal SVG primitive",
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "commercialUseAllowed": true,
+      "requiresAttribution": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null,
+      "rendererHints": {
+        "preferredRenderer": "bio_cell_scene",
+        "defaultSize": [220, 160],
+        "anchor": "center",
+        "colorizable": false,
+        "strokeControlled": true
+      }
+    },
+    {
+      "id": "nucleus",
+      "type": "svg",
+      "path": "/assets/metaview-kits/biology-basic/icons/nucleus.svg",
+      "tags": ["organelle", "nucleus", "dna"],
+      "semanticRoles": ["nucleus"],
+      "sourceId": "metaview-internal",
+      "attribution": "MetaView internal SVG primitive",
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "commercialUseAllowed": true,
+      "requiresAttribution": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null,
+      "rendererHints": {
+        "preferredRenderer": "bio_cell_scene",
+        "defaultSize": [72, 64],
+        "anchor": "center",
+        "colorizable": false,
+        "strokeControlled": false
+      }
+    },
+    {
+      "id": "mitochondrion",
+      "type": "svg",
+      "path": "/assets/metaview-kits/biology-basic/icons/mitochondrion.svg",
+      "tags": ["organelle", "mitochondrion", "energy"],
+      "semanticRoles": ["mitochondrion"],
+      "sourceId": "metaview-internal",
+      "attribution": "MetaView internal SVG primitive",
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "commercialUseAllowed": true,
+      "requiresAttribution": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null,
+      "rendererHints": {
+        "preferredRenderer": "bio_cell_scene",
+        "defaultSize": [72, 44],
+        "anchor": "center",
+        "colorizable": false,
+        "strokeControlled": false
+      }
+    },
+    {
+      "id": "dna-helix",
+      "type": "svg",
+      "path": "/assets/metaview-kits/biology-basic/icons/dna-helix.svg",
+      "tags": ["dna", "genetics", "nucleus"],
+      "semanticRoles": ["dna"],
+      "sourceId": "metaview-internal",
+      "attribution": "MetaView internal SVG primitive",
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "commercialUseAllowed": true,
+      "requiresAttribution": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null,
+      "rendererHints": {
+        "preferredRenderer": "bio_cell_scene",
+        "defaultSize": [48, 72],
+        "anchor": "center",
+        "colorizable": true,
+        "strokeControlled": true
+      }
+    },
+    {
+      "id": "ribosome",
+      "type": "svg",
+      "path": "/assets/metaview-kits/biology-basic/icons/ribosome.svg",
+      "tags": ["organelle", "ribosome", "protein"],
+      "semanticRoles": ["ribosome"],
+      "sourceId": "metaview-internal",
+      "attribution": "MetaView internal SVG primitive",
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "commercialUseAllowed": true,
+      "requiresAttribution": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null,
+      "rendererHints": {
+        "preferredRenderer": "bio_cell_scene",
+        "defaultSize": [34, 28],
+        "anchor": "center",
+        "colorizable": false,
+        "strokeControlled": false
+      }
+    }
+  ]
+}

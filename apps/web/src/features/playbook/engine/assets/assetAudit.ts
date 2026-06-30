@@ -25,6 +25,7 @@ export interface AssetAuditReport {
 }
 
 const REQUIRED_RENDERER_KINDS_BY_PACK: Record<string, string[]> = {
+  "biology-basic": ["bio_cell_scene"],
   "geography-basic": ["geo_map_scene"],
   "geography-earth-basic": ["geo_map_scene"],
   "physics-basic": ["physics_force_scene"],

@@ -7,11 +7,11 @@ describe("domainCapabilities", () => {
     expect(DOMAIN_CAPABILITIES.math.support).toBe("full");
   });
 
-  it("marks physics/geography as partial and unsupported science domains as fallback", () => {
+  it("marks biology/physics/geography as partial and unsupported science domains as fallback", () => {
+    expect(DOMAIN_CAPABILITIES.biology.support).toBe("partial");
     expect(DOMAIN_CAPABILITIES.physics.support).toBe("partial");
     expect(DOMAIN_CAPABILITIES.geography.support).toBe("partial");
     expect(DOMAIN_CAPABILITIES.chemistry.support).toBe("fallback");
-    expect(DOMAIN_CAPABILITIES.biology.support).toBe("fallback");
   });
 
   it("returns a fallback capability for unknown domains", () => {

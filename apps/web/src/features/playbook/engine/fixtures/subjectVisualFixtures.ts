@@ -1,6 +1,26 @@
-import type { GeoMapSceneSnapshot, PhysicsForceSceneSnapshot, PlaybookScript } from "../types";
+import type { BioCellSceneSnapshot, GeoMapSceneSnapshot, PhysicsForceSceneSnapshot, PlaybookScript } from "../types";
 
-export type SubjectVisualFixtureId = "east_asia_monsoon" | "projectile_motion";
+export type SubjectVisualFixtureId = "cell_structure" | "east_asia_monsoon" | "projectile_motion";
+
+function cellStructureSnapshot(): BioCellSceneSnapshot {
+  return {
+    kind: "bio_cell_scene",
+    pack_id: "biology-basic",
+    cell_type: "animal",
+    structures: [
+      { id: "cell", semantic_role: "cell", label: "cell membrane", x: 50, y: 52, width: 66, height: 50, asset_id: "cell-outline" },
+      { id: "nucleus", semantic_role: "nucleus", label: "nucleus", x: 47, y: 48, width: 20, height: 18, asset_id: "nucleus" },
+      { id: "mitochondrion", semantic_role: "mitochondrion", label: "mitochondrion", x: 67, y: 59, width: 16, height: 10, asset_id: "mitochondrion" },
+      { id: "ribosome", semantic_role: "ribosome", label: "ribosome", x: 36, y: 61, width: 8, height: 7, asset_id: "ribosome" },
+      { id: "dna", semantic_role: "dna", label: "DNA", x: 47, y: 48, width: 8, height: 12, asset_id: "dna-helix" },
+    ],
+    callouts: [
+      { id: "nucleus-callout", target_id: "nucleus", label: "stores DNA", side: "left" },
+      { id: "mitochondrion-callout", target_id: "mitochondrion", label: "releases energy", side: "right" },
+    ],
+    caption: "Animal cells contain specialized organelles with distinct functions.",
+  };
+}
 
 function eastAsiaMonsoonSnapshot(): GeoMapSceneSnapshot {
   return {
@@ -53,9 +73,9 @@ function projectileMotionSnapshot(): PhysicsForceSceneSnapshot {
 
 function scriptFor(
   id: SubjectVisualFixtureId,
-  domain: "geography" | "physics",
+  domain: "biology" | "geography" | "physics",
   title: string,
-  snapshot: GeoMapSceneSnapshot | PhysicsForceSceneSnapshot,
+  snapshot: BioCellSceneSnapshot | GeoMapSceneSnapshot | PhysicsForceSceneSnapshot,
 ): PlaybookScript {
   return {
     schema_version: "1.0.0",
@@ -79,6 +99,12 @@ function scriptFor(
 }
 
 export const subjectVisualFixtures: Record<SubjectVisualFixtureId, PlaybookScript> = {
+  cell_structure: scriptFor(
+    "cell_structure",
+    "biology",
+    "Cell structure",
+    cellStructureSnapshot(),
+  ),
   east_asia_monsoon: scriptFor(
     "east_asia_monsoon",
     "geography",

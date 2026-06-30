@@ -25,6 +25,7 @@ describe("assetRegistry", () => {
   it("registers geography and physics starter visual kits", () => {
     const packs = listAssetPacks().map((pack) => pack.packId);
 
+    expect(packs).toContain("biology-basic");
     expect(packs).toContain("geography-basic");
     expect(packs).toContain("geography-earth-basic");
     expect(packs).toContain("physics-basic");
@@ -32,11 +33,13 @@ describe("assetRegistry", () => {
 
   it("finds subject assets by semantic role", () => {
     expect(getAssetPack("geography-basic")?.subject).toBe("geography");
+    expect(findAssetByRole("biology", "nucleus")?.id).toBe("nucleus");
     expect(findAssetByRole("geography", "wind")?.id).toBe("monsoon-wind-arrow");
     expect(findAssetByRole("physics", "force")?.id).toBe("force-vector-arrow");
   });
 
   it("keeps rendererKinds aligned with the dedicated scene renderers", () => {
+    expect(getAssetPack("biology-basic")?.rendererKinds).toEqual(["bio_cell_scene"]);
     expect(getAssetPack("geography-basic")?.rendererKinds).toEqual(["geo_map_scene"]);
     expect(getAssetPack("geography-earth-basic")?.rendererKinds).toEqual(["geo_map_scene"]);
     expect(getAssetPack("physics-basic")?.rendererKinds).toEqual(["physics_force_scene"]);
@@ -83,6 +86,7 @@ describe("assetRegistry", () => {
     const validate = ajv.compile(schema);
 
     for (const manifestPath of [
+      "/assets/metaview-kits/biology-basic/manifest.json",
       "/assets/metaview-kits/geography-basic/manifest.json",
       "/assets/metaview-kits/geography-earth-basic/manifest.json",
       "/assets/metaview-kits/physics-basic/manifest.json",
@@ -93,6 +97,15 @@ describe("assetRegistry", () => {
   });
 
   it("ships second-pass internal SVG quality markers for subject assets", () => {
+    expect(readPublicAsset("/assets/metaview-kits/biology-basic/icons/cell-outline.svg")).toContain(
+      'data-asset-quality="v1"',
+    );
+    expect(readPublicAsset("/assets/metaview-kits/biology-basic/icons/nucleus.svg")).toContain(
+      'data-asset-quality="v1"',
+    );
+    expect(readPublicAsset("/assets/metaview-kits/biology-basic/icons/mitochondrion.svg")).toContain(
+      'data-asset-quality="v1"',
+    );
     expect(readPublicAsset("/assets/metaview-kits/geography-basic/east-asia-map-placeholder.svg")).toContain(
       'data-asset-quality="v2"',
     );

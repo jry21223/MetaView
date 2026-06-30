@@ -14,6 +14,20 @@ vi.mock("remotion", async () => {
 });
 
 describe("subject visual fixtures", () => {
+  it("statically renders cell_structure through PlaybookComposition", () => {
+    const markup = renderToStaticMarkup(
+      <PlaybookComposition script={getSubjectVisualFixture("cell_structure")} showSubtitles={false} />,
+    );
+
+    expect(markup).toContain("bio-cell-scene");
+    expect(markup).toContain('data-asset-id="cell-outline"');
+    expect(markup).toContain('data-asset-id="nucleus"');
+    expect(markup).toContain('data-asset-id="mitochondrion"');
+    expect(markup).toContain('data-semantic-role="callout"');
+    expect(markup).not.toContain("Unknown snapshot kind");
+    expect(markup).not.toContain('data-missing-asset="true"');
+  });
+
   it("statically renders east_asia_monsoon through PlaybookComposition", () => {
     const markup = renderToStaticMarkup(
       <PlaybookComposition script={getSubjectVisualFixture("east_asia_monsoon")} showSubtitles={false} />,
