@@ -18,6 +18,9 @@ describe("assetResolver", () => {
     expect(resolveAssetByRole("geography", "map_layer")).toMatchObject({
       id: "east-asia-map-placeholder",
     });
+    expect(resolveAssetByRole("physics", "projectile", "physics-basic")).toMatchObject({
+      id: "projectile-body-dot",
+    });
   });
 
   it("resolves assets constrained to rendererKinds", () => {

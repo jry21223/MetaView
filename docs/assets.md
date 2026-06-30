@@ -29,6 +29,20 @@ The TypeScript registry is in
 Renderers should use `getAssetPack(packId)` or `findAssetByRole(subject, semanticRole)`
 instead of hard-coding asset URLs.
 
+## Scene Blueprint Compiler
+
+`apps/web/src/features/playbook/engine/compiler/sceneBlueprintCompiler.ts`
+is the narrow visual-compiler entrypoint for the current flagship subjects.
+It accepts intent-level fields such as `subject`, `sceneType`, `visualIntent`,
+and `emphasisPoints`, resolves assets through the shared asset resolver, applies
+deterministic layout defaults, and outputs normal `PlaybookScript`.
+
+This is not a second rendering contract. The compiler must not pass raw SVG
+paths, arbitrary renderer code, or LLM-selected coordinates through to renderers.
+Geo and physics output still flows through `geo_map_scene` and
+`physics_force_scene`, then through the same Remotion composition and
+`visualQualityGate`.
+
 ## Starter Packs
 
 - `geography-basic`: starter map-layer SVG plus internal monsoon wind SVG.
