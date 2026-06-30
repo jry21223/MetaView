@@ -15,7 +15,9 @@ Each pack follows `manifest.schema.json` and includes:
 - `license`: pack-level license.
 - `sceneTemplates`: scene template ids that can use this pack.
 - `rendererKinds`: renderer snapshot kinds expected to consume it.
-- `assets`: asset entries with `id`, `type`, `path`, `tags`, `semanticRoles`, `license`, and optional `attribution`.
+- `assets`: asset entries with `id`, `type`, `path`, `tags`, `semanticRoles`,
+  `license`, `commercialUseStatus`, nullable `sourceUrl`, nullable
+  `licenseUrl`, nullable `modifiedFrom`, and optional `attribution`.
 
 The TypeScript registry is in
 `apps/web/src/features/playbook/engine/assets/assetRegistry.ts`.
@@ -24,17 +26,20 @@ instead of hard-coding asset URLs.
 
 ## Starter Packs
 
-- `geography-basic`: internal placeholder SVGs for map-layer and monsoon wind roles.
+- `geography-basic`: Natural Earth-derived map-layer SVG plus internal placeholder
+  monsoon wind SVG.
 - `physics-basic`: internal placeholder SVGs for force vector and projectile object roles.
 
-These starter SVGs are internal placeholders. Replace them with durable assets only when
-the source license, attribution, and commercial-use status are recorded in the manifest.
+Starter assets can be internal placeholders or durable third-party/public-domain
+derivatives. Replace or add durable assets only when the source license,
+attribution, commercial-use status, and provenance are recorded in the manifest.
 
 ## Adding Assets
 
 1. Add the file under a pack directory in `apps/web/public/assets/metaview-kits/`.
 2. Add a manifest entry with semantic roles that match renderer needs.
-3. Record license and attribution in the manifest before using the asset.
+3. Record license, attribution, commercial-use status, source/license URLs,
+   and `modifiedFrom` when the asset is derived from an external source.
 4. Add or update a focused registry test.
 
 Do not commit third-party binary assets without explicit license metadata.

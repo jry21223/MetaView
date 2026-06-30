@@ -17,6 +17,8 @@ export type AssetLicense =
   | "mit"
   | "internal";
 
+export type AssetCommercialUseStatus = "allowed" | "allowed-with-attribution" | "restricted" | "unknown";
+
 export interface AssetManifestEntry {
   id: string;
   type: "svg" | "image" | "lottie" | "json";
@@ -25,6 +27,10 @@ export interface AssetManifestEntry {
   semanticRoles: string[];
   attribution?: string | null;
   license: AssetLicense;
+  commercialUseStatus: AssetCommercialUseStatus;
+  sourceUrl: string | null;
+  licenseUrl: string | null;
+  modifiedFrom: string | null;
 }
 
 export interface SubjectVisualKit {

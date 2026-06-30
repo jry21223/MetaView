@@ -29,7 +29,18 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "type", "path", "tags", "semanticRoles", "license"],
+        "required": [
+          "id",
+          "type",
+          "path",
+          "tags",
+          "semanticRoles",
+          "license",
+          "commercialUseStatus",
+          "sourceUrl",
+          "licenseUrl",
+          "modifiedFrom"
+        ],
         "properties": {
           "id": { "type": "string", "minLength": 1 },
           "type": {
@@ -49,7 +60,14 @@
           "license": {
             "type": "string",
             "enum": ["public-domain", "cc0", "cc-by", "mit", "internal"]
-          }
+          },
+          "commercialUseStatus": {
+            "type": "string",
+            "enum": ["allowed", "allowed-with-attribution", "restricted", "unknown"]
+          },
+          "sourceUrl": { "type": ["string", "null"], "format": "uri" },
+          "licenseUrl": { "type": ["string", "null"], "format": "uri" },
+          "modifiedFrom": { "type": ["string", "null"] }
         },
         "additionalProperties": false
       }

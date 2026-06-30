@@ -12,8 +12,12 @@
       "path": "/assets/metaview-kits/geography-basic/east-asia-map-placeholder.svg",
       "tags": ["map", "land", "ocean", "monsoon"],
       "semanticRoles": ["land", "ocean", "map_layer"],
-      "attribution": "MetaView internal placeholder",
-      "license": "internal"
+      "attribution": "Natural Earth public domain map data; styled by MetaView",
+      "license": "public-domain",
+      "commercialUseStatus": "allowed",
+      "sourceUrl": "https://github.com/nvkelso/natural-earth-vector",
+      "licenseUrl": "https://www.naturalearthdata.com/about/terms-of-use/",
+      "modifiedFrom": "Natural Earth 1:110m Admin 0 Countries, selected East Asia features"
     },
     {
       "id": "monsoon-wind-arrow",
@@ -22,7 +26,11 @@
       "tags": ["wind", "monsoon", "arrow"],
       "semanticRoles": ["wind", "monsoon_flow"],
       "attribution": "MetaView internal placeholder",
-      "license": "internal"
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null
     }
   ]
 }

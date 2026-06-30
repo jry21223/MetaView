@@ -13,7 +13,11 @@
       "tags": ["force", "vector", "arrow"],
       "semanticRoles": ["force"],
       "attribution": "MetaView internal placeholder",
-      "license": "internal"
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null
     },
     {
       "id": "projectile-body-dot",
@@ -22,7 +26,11 @@
       "tags": ["object", "projectile", "motion"],
       "semanticRoles": ["object", "velocity"],
       "attribution": "MetaView internal placeholder",
-      "license": "internal"
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null
     }
   ]
 }

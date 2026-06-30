@@ -35,12 +35,14 @@ review-real-generation:
 lint:
 	npm --workspace apps/web run lint
 	npm --workspace apps/agent run lint
+	npm --workspace apps/mcp-server run typecheck
 	.venv/bin/ruff check apps/api/app apps/api/tests
 
 test:
 	.venv/bin/pytest apps/api/tests -q
 	npm --workspace apps/web run test
 	npm --workspace apps/agent run test
+	npm --workspace apps/mcp-server run test
 
 # Issue #66 — coverage reporting + per-side thresholds. Kept off the
 # default ``check`` target so CI fast path stays fast; opt in via
