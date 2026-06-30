@@ -60,6 +60,8 @@ Current backend SkillPack adoption:
 ## Starter Packs
 
 - `geography-basic`: starter map-layer SVG plus internal monsoon wind SVG.
+- `core-visual-basic`: internal shared arrows, labels, icons, particle presets,
+  and grid backgrounds for renderer adapters across subjects.
 - `geography-earth-basic`: Natural Earth-derived East Asia map GeoJSON and map
   symbols for `geo_map_scene`.
 - `physics-basic`: internal SVGs for force vector, projectile object, block,

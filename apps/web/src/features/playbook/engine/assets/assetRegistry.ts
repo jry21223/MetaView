@@ -1,6 +1,7 @@
 import biologyBasicManifest from "../../../../../public/assets/metaview-kits/biology-basic/manifest.json";
 import algorithmCodeBasicManifest from "../../../../../public/assets/metaview-kits/algorithm-code-basic/manifest.json";
 import chemistryBasicManifest from "../../../../../public/assets/metaview-kits/chemistry-basic/manifest.json";
+import coreVisualBasicManifest from "../../../../../public/assets/metaview-kits/core-visual-basic/manifest.json";
 import geographyBasicManifest from "../../../../../public/assets/metaview-kits/geography-basic/manifest.json";
 import geographyEarthBasicManifest from "../../../../../public/assets/metaview-kits/geography-earth-basic/manifest.json";
 import mathBasicManifest from "../../../../../public/assets/metaview-kits/math-basic/manifest.json";
@@ -88,6 +89,7 @@ const ASSET_PACKS: SubjectVisualKit[] = [
   algorithmCodeBasicManifest as SubjectVisualKit,
   biologyBasicManifest as SubjectVisualKit,
   chemistryBasicManifest as SubjectVisualKit,
+  coreVisualBasicManifest as SubjectVisualKit,
   geographyBasicManifest as SubjectVisualKit,
   geographyEarthBasicManifest as SubjectVisualKit,
   mathBasicManifest as SubjectVisualKit,

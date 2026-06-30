@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" role="img" aria-label="Light lab grid" data-asset-quality="v1">
+  <rect width="320" height="180" fill="#f7f9fc"/>
+  <path d="M0 30h320M0 60h320M0 90h320M0 120h320M0 150h320M40 0v180M80 0v180M120 0v180M160 0v180M200 0v180M240 0v180M280 0v180" fill="none" stroke="#d8e1ea" stroke-width="1"/>
+  <path d="M0 90h320M160 0v180" fill="none" stroke="#b9c7d4" stroke-width="1.4"/>
+</svg>

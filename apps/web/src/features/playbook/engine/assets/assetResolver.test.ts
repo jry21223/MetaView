@@ -24,6 +24,12 @@ describe("assetResolver", () => {
   });
 
   it("resolves assets constrained to rendererKinds", () => {
+    expect(resolveAssetForRenderer("geo_map_scene", "flow_arrow", "core-visual-basic")).toMatchObject({
+      id: "core-flow-arrow",
+    });
+    expect(resolveAssetForRenderer("physics_force_scene", "callout", "core-visual-basic")).toMatchObject({
+      id: "core-callout-label",
+    });
     expect(resolveAssetForRenderer("graph_scene", "graph_node")).toMatchObject({
       id: "graph-node",
     });

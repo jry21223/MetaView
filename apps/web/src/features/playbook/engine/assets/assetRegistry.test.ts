@@ -22,11 +22,12 @@ function readPublicJson<T>(assetPath: string): T {
 }
 
 describe("assetRegistry", () => {
-  it("registers geography and physics starter visual kits", () => {
+  it("registers the roadmap starter visual kits", () => {
     const packs = listAssetPacks().map((pack) => pack.packId);
 
     expect(packs).toContain("biology-basic");
     expect(packs).toContain("chemistry-basic");
+    expect(packs).toContain("core-visual-basic");
     expect(packs).toContain("algorithm-code-basic");
     expect(packs).toContain("geography-basic");
     expect(packs).toContain("geography-earth-basic");
@@ -41,6 +42,9 @@ describe("assetRegistry", () => {
     expect(findAssetByRole("chemistry", "bond")?.id).toBe("bond-line");
     expect(findAssetByRole("algorithm", "graph_node")?.id).toBe("graph-node");
     expect(findAssetByRole("algorithm", "queue")?.id).toBe("queue-frame");
+    expect(findAssetByRole("core", "flow_arrow")?.id).toBe("core-flow-arrow");
+    expect(findAssetByRole("core", "callout")?.id).toBe("core-callout-label");
+    expect(findAssetByRole("core", "moisture_particles")?.id).toBe("core-moisture-particles");
     expect(findAssetByRole("geography", "wind")?.id).toBe("monsoon-wind-arrow");
     expect(findAssetByRole("math", "tangent")?.id).toBe("derivative-tangent-preset");
     expect(findAssetByRole("physics", "force")?.id).toBe("force-vector-arrow");
@@ -49,6 +53,20 @@ describe("assetRegistry", () => {
   it("keeps rendererKinds aligned with the dedicated scene renderers", () => {
     expect(getAssetPack("biology-basic")?.rendererKinds).toEqual(["bio_cell_scene"]);
     expect(getAssetPack("chemistry-basic")?.rendererKinds).toEqual(["molecule_2d_scene"]);
+    expect(getAssetPack("core-visual-basic")?.rendererKinds).toEqual([
+      "geo_map_scene",
+      "physics_force_scene",
+      "bio_cell_scene",
+      "molecule_2d_scene",
+      "math_plot",
+      "math_formula",
+      "math_scene",
+      "katex_overlay",
+      "graph_scene",
+      "algorithm_array",
+      "algorithm_tree",
+      "motion_scene",
+    ]);
     expect(getAssetPack("algorithm-code-basic")?.rendererKinds).toEqual([
       "graph_scene",
       "algorithm_array",
@@ -103,6 +121,7 @@ describe("assetRegistry", () => {
     for (const manifestPath of [
       "/assets/metaview-kits/biology-basic/manifest.json",
       "/assets/metaview-kits/chemistry-basic/manifest.json",
+      "/assets/metaview-kits/core-visual-basic/manifest.json",
       "/assets/metaview-kits/algorithm-code-basic/manifest.json",
       "/assets/metaview-kits/geography-basic/manifest.json",
       "/assets/metaview-kits/geography-earth-basic/manifest.json",
@@ -131,6 +150,15 @@ describe("assetRegistry", () => {
       'data-asset-quality="v1"',
     );
     expect(readPublicAsset("/assets/metaview-kits/chemistry-basic/molecule-presets/water.json")).toContain(
+      '"source": "structured-preset"',
+    );
+    expect(readPublicAsset("/assets/metaview-kits/core-visual-basic/arrows/flow-arrow.svg")).toContain(
+      'data-asset-quality="v1"',
+    );
+    expect(readPublicAsset("/assets/metaview-kits/core-visual-basic/labels/callout-label.svg")).toContain(
+      'data-asset-quality="v1"',
+    );
+    expect(readPublicAsset("/assets/metaview-kits/core-visual-basic/particles/moisture-particles.json")).toContain(
       '"source": "structured-preset"',
     );
     expect(readPublicAsset("/assets/metaview-kits/algorithm-code-basic/graph/graph-node.svg")).toContain(

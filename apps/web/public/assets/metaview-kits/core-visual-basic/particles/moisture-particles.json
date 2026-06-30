@@ -1,0 +1,11 @@
+{
+  "source": "structured-preset",
+  "id": "core-moisture-particles",
+  "particleRole": "moisture_particles",
+  "count": 9,
+  "radius": [0.9, 1.5],
+  "color": "#ffffff",
+  "opacity": [0.38, 0.72],
+  "pathBias": "flow",
+  "jitter": [2.5, 5.5]
+}
