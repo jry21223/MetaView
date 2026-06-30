@@ -78,4 +78,16 @@ describe("PhysicsForceSceneRenderer", () => {
       'data-asset-path="/assets/metaview-kits/physics-basic/projectile-body-dot.svg"',
     );
   });
+
+  it("uses deterministic circle fallback when explicit object.asset_id is missing", () => {
+    const snapshot = projectileMotionSnapshot({
+      objects: [{ id: "body", label: "小球", x: 30, y: 42, asset_id: "missing-projectile" }],
+    });
+    const markup = renderToStaticMarkup(<PhysicsForceSceneRenderer {...props(snapshot)} />);
+
+    expect(markup).toContain('data-asset-id="missing-projectile"');
+    expect(markup).toContain('data-missing-asset="true"');
+    expect(markup).toContain("<circle");
+    expect(markup).not.toContain('data-asset-id="projectile-body-dot"');
+  });
 });

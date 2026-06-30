@@ -74,4 +74,29 @@ describe("GeoMapSceneRenderer", () => {
     expect(markup).toContain('data-asset-id="monsoon-wind-arrow"');
     expect(markup).not.toContain('data-missing-asset="true"');
   });
+
+  it("resolves the geography map asset by semantic role when layer asset_id is absent", () => {
+    const snapshot = eastAsiaMonsoonSnapshot({
+      layers: [
+        { id: "map", semantic_role: "map_layer", label: "东亚底图" },
+        { id: "land", semantic_role: "land", label: "亚洲大陆" },
+        { id: "ocean", semantic_role: "ocean", label: "太平洋" },
+      ],
+      flows: [
+        {
+          id: "summer-monsoon",
+          semantic_role: "monsoon_flow",
+          from: [78, 68],
+          to: [42, 38],
+          label: "夏季风",
+          strength: 1.1,
+        },
+      ],
+    });
+    const markup = renderToStaticMarkup(<GeoMapSceneRenderer {...props(snapshot)} />);
+
+    expect(markup).toContain('data-asset-id="east-asia-map-placeholder"');
+    expect(markup).toContain('data-asset-id="monsoon-wind-arrow"');
+    expect(markup).not.toContain('data-missing-asset="true"');
+  });
 });

@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 
-.PHONY: bootstrap bootstrap-manim setup-hooks dev-web dev-api dev-agent dev review-real-generation start stop lint test test-coverage build check docker-build docker-up docker-down eval eval-shots eval-generate
+.PHONY: bootstrap bootstrap-manim setup-hooks dev-web dev-api dev-agent dev review-real-generation start stop lint test test-coverage build asset-audit check docker-build docker-up docker-down eval eval-shots eval-generate
 
 DOCKER_COMPOSE_CMD := $(shell sh -lc 'if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then printf "%s" "docker compose"; elif command -v docker-compose >/dev/null 2>&1; then printf "%s" "docker-compose"; fi')
 
@@ -62,7 +62,10 @@ build:
 	npm --workspace apps/web run build
 	npm --workspace apps/agent run build
 
-check: lint test build
+asset-audit:
+	npm run asset:audit
+
+check: asset-audit lint test build
 
 docker-check:
 	@if [ -z "$(DOCKER_COMPOSE_CMD)" ]; then \

@@ -1,11 +1,7 @@
 import React from "react";
 
-import {
-  findAssetById,
-  findAssetByRole,
-  type AssetManifestEntry,
-  type SubjectVisualKitSubject,
-} from "./assetRegistry";
+import type { AssetManifestEntry, SubjectVisualKitSubject } from "./assetRegistry";
+import { resolveAssetById, resolveAssetByRole } from "./assetResolver";
 
 type AssetFallbackShape = "rect" | "circle";
 
@@ -34,9 +30,8 @@ function resolveAsset({
   semanticRole,
 }: Pick<AssetSvgProps, "asset" | "assetId" | "packId" | "subject" | "semanticRole">): AssetManifestEntry | undefined {
   if (asset) return asset;
-  const byId = findAssetById(assetId, packId);
-  if (byId) return byId;
-  if (subject && semanticRole) return findAssetByRole(subject, semanticRole, packId);
+  if (assetId) return resolveAssetById(packId, assetId);
+  if (subject && semanticRole) return resolveAssetByRole(subject, semanticRole, packId);
   return undefined;
 }
 

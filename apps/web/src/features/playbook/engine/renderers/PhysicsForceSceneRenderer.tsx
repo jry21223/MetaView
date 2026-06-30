@@ -1,7 +1,8 @@
 import React from "react";
 
 import { AssetSvg } from "../assets/AssetSvg";
-import { findAssetById, findAssetByRole, getAssetPack, type AssetManifestEntry } from "../assets/assetRegistry";
+import type { AssetManifestEntry } from "../assets/assetRegistry";
+import { resolveAssetById, resolveAssetByRole, resolveAssetForRenderer } from "../assets/assetResolver";
 import type { PhysicsForceSceneSnapshot, PhysicsSceneObject, PhysicsSceneVector } from "../types";
 import type { RendererProps } from "./types";
 
@@ -34,7 +35,14 @@ function compactFormula(formula: string | null | undefined): string {
 }
 
 function resolveObjectAsset(object: PhysicsSceneObject, packId: string | undefined): AssetManifestEntry | undefined {
-  return findAssetById(object.asset_id, packId) ?? findAssetByRole("physics", "object", packId) ?? findAssetByRole("physics", "object");
+  if (object.asset_id) {
+    return resolveAssetById(packId, object.asset_id);
+  }
+  return (
+    resolveAssetForRenderer("physics_force_scene", "object", packId) ??
+    resolveAssetByRole("physics", "object", packId) ??
+    resolveAssetByRole("physics", "object")
+  );
 }
 
 function isVectorAsset(asset: AssetManifestEntry | undefined): asset is AssetManifestEntry {
@@ -42,10 +50,16 @@ function isVectorAsset(asset: AssetManifestEntry | undefined): asset is AssetMan
 }
 
 function resolveVectorAsset(vector: PhysicsSceneVector, packId: string | undefined): AssetManifestEntry | undefined {
-  const roleAsset = findAssetByRole("physics", vector.semantic_role, packId) ?? findAssetByRole("physics", vector.semantic_role);
+  const roleAsset =
+    resolveAssetForRenderer("physics_force_scene", vector.semantic_role, packId) ??
+    resolveAssetByRole("physics", vector.semantic_role, packId) ??
+    resolveAssetByRole("physics", vector.semantic_role);
   if (isVectorAsset(roleAsset)) return roleAsset;
   if (vector.semantic_role === "force") {
-    const forceAsset = findAssetByRole("physics", "force", packId) ?? findAssetByRole("physics", "force");
+    const forceAsset =
+      resolveAssetForRenderer("physics_force_scene", "force", packId) ??
+      resolveAssetByRole("physics", "force", packId) ??
+      resolveAssetByRole("physics", "force");
     if (isVectorAsset(forceAsset)) return forceAsset;
   }
   return undefined;
@@ -131,7 +145,6 @@ function renderVector(
 export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({ step, progress, theme }) => {
   const snap = step.snapshot as PhysicsForceSceneSnapshot;
   const packId = snap.pack_id ?? DEFAULT_PHYSICS_PACK_ID;
-  const pack = getAssetPack(packId);
   const formulaText = compactFormula(snap.formula_latex);
   const trailDots = motionTrailDots(snap.trajectory, progress);
 
@@ -208,14 +221,14 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({ step, progr
         ) : null}
 
         {snap.objects.map((object) => {
-          const asset = resolveObjectAsset(object, pack?.packId);
+          const asset = resolveObjectAsset(object, packId);
           const radius = object.radius ?? 4.6;
           return (
             <g key={object.id} data-object-id={object.id}>
               <AssetSvg
                 asset={asset}
                 assetId={object.asset_id ?? asset?.id}
-                packId={pack?.packId ?? packId}
+                packId={packId}
                 subject="physics"
                 semanticRole="object"
                 x={object.x - radius}
@@ -231,7 +244,7 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({ step, progr
           );
         })}
 
-        {snap.vectors.map((vector) => renderVector(vector, objectById(snap.objects, vector.target), progress, pack?.packId))}
+        {snap.vectors.map((vector) => renderVector(vector, objectById(snap.objects, vector.target), progress, packId))}
 
         {snap.caption ? (
           <text x="50" y="94" textAnchor="middle" fontSize="3.8" fill={theme === "dark" ? "#cbd5e1" : "#64748b"}>

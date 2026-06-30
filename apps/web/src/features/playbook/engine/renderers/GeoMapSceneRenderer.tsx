@@ -1,14 +1,8 @@
 import React from "react";
 
 import { AssetSvg } from "../assets/AssetSvg";
-import {
-  findAssetById,
-  findAssetByRole,
-  findAssetInPackByRole,
-  getAssetPack,
-  type AssetManifestEntry,
-  type SubjectVisualKit,
-} from "../assets/assetRegistry";
+import type { AssetManifestEntry } from "../assets/assetRegistry";
+import { resolveAssetById, resolveAssetByRole, resolveAssetForRenderer } from "../assets/assetResolver";
 import type { GeoMapFlow, GeoMapSceneSnapshot, GeoPressureCenter } from "../types";
 import type { RendererProps } from "./types";
 
@@ -34,30 +28,30 @@ function pressureClass(kind: "high" | "low"): string {
   return kind === "high" ? "#2f80c9" : "#d55343";
 }
 
-function resolveMapAsset(snap: GeoMapSceneSnapshot, pack: SubjectVisualKit | undefined): AssetManifestEntry | undefined {
+function resolveMapAsset(snap: GeoMapSceneSnapshot, packId: string): AssetManifestEntry | undefined {
   const explicitLayer = snap.layers.find(
     (layer) =>
       (layer.semantic_role === "map_layer" || layer.semantic_role === "land" || layer.semantic_role === "ocean") &&
       layer.asset_id,
   );
-  const explicitAsset = findAssetById(explicitLayer?.asset_id, pack?.packId);
+  const explicitAsset = resolveAssetById(packId, explicitLayer?.asset_id);
   if (explicitAsset) return explicitAsset;
 
   return (
-    findAssetInPackByRole(pack, "map_layer") ??
-    findAssetInPackByRole(pack, "land") ??
-    findAssetInPackByRole(pack, "ocean") ??
-    findAssetByRole("geography", "map_layer", pack?.packId)
+    resolveAssetForRenderer("geo_map_scene", "map_layer", packId) ??
+    resolveAssetForRenderer("geo_map_scene", "land", packId) ??
+    resolveAssetForRenderer("geo_map_scene", "ocean", packId) ??
+    resolveAssetByRole("geography", "map_layer", packId)
   );
 }
 
-function resolveFlowAsset(flow: GeoMapFlow, pack: SubjectVisualKit | undefined): AssetManifestEntry | undefined {
+function resolveFlowAsset(flow: GeoMapFlow, packId: string): AssetManifestEntry | undefined {
   const semanticAsset =
-    findAssetInPackByRole(pack, flow.semantic_role) ??
-    findAssetInPackByRole(pack, "wind") ??
-    findAssetByRole("geography", flow.semantic_role, pack?.packId) ??
-    findAssetByRole("geography", "wind", pack?.packId);
-  const explicitAsset = findAssetById(flow.asset_id, pack?.packId);
+    resolveAssetForRenderer("geo_map_scene", flow.semantic_role, packId) ??
+    resolveAssetForRenderer("geo_map_scene", "wind", packId) ??
+    resolveAssetByRole("geography", flow.semantic_role, packId) ??
+    resolveAssetByRole("geography", "wind", packId);
+  const explicitAsset = resolveAssetById(packId, flow.asset_id);
   return explicitAsset ?? semanticAsset;
 }
 
@@ -108,8 +102,7 @@ function layerLabelPosition(index: number, total: number): { x: number; y: numbe
 export const GeoMapSceneRenderer: React.FC<RendererProps> = ({ step, progress, theme }) => {
   const snap = step.snapshot as GeoMapSceneSnapshot;
   const packId = snap.pack_id ?? DEFAULT_GEO_PACK_ID;
-  const pack = getAssetPack(packId);
-  const mapAsset = resolveMapAsset(snap, pack);
+  const mapAsset = resolveMapAsset(snap, packId);
   const particles = particlePresetPoints(snap.particle_preset, progress);
   const pressureCenters = snap.pressure_centers ?? [];
 
@@ -192,7 +185,7 @@ export const GeoMapSceneRenderer: React.FC<RendererProps> = ({ step, progress, t
         })}
 
         {snap.flows.map((flow) => {
-          const flowAsset = resolveFlowAsset(flow, pack);
+          const flowAsset = resolveFlowAsset(flow, packId);
           return (
             <g
               key={flow.id}
