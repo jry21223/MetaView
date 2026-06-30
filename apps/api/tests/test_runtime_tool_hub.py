@@ -334,10 +334,13 @@ async def test_runtime_tool_hub_compiles_subject_scene_blueprints(
     assert result.result["playbook"]["initial_data"]["scene_blueprint"] == [
         blueprint["sceneType"]
     ]
-    snapshot = result.result["playbook"]["steps"][0]["snapshot"]
-    assert snapshot["kind"] == expected_kind
-    assert snapshot["pack_id"] == expected_pack
-    assert snapshot["kind"] not in {"algorithm_array", "algorithm_bars"}
+    steps = result.result["playbook"]["steps"]
+    assert 8 <= len(steps) <= 14
+    for step in steps:
+        snapshot = step["snapshot"]
+        assert snapshot["kind"] == expected_kind
+        assert snapshot["pack_id"] == expected_pack
+        assert snapshot["kind"] not in {"algorithm_array", "algorithm_bars"}
 
 
 @pytest.mark.asyncio

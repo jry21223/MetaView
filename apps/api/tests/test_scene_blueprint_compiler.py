@@ -42,11 +42,13 @@ def test_scene_blueprint_compiler_builds_asset_backed_playbook(
         "use_semantic_assets",
         "compile_deterministic_layout",
     ]
-    assert len(playbook.steps) == 1
+    assert 8 <= len(playbook.steps) <= 14
 
-    snapshot = playbook.steps[0].snapshot.model_dump(mode="json", by_alias=True)
-    assert snapshot["kind"] == snapshot_kind
-    assert snapshot["pack_id"] == pack_id
+    for step in playbook.steps:
+        snapshot = step.snapshot.model_dump(mode="json", by_alias=True)
+        assert snapshot["kind"] == snapshot_kind
+        assert snapshot["pack_id"] == pack_id
+        assert step.layers[0].body == step.snapshot
 
     serialized = playbook.model_dump(mode="json", by_alias=True)
     assert "algorithm_array" not in str(serialized)
@@ -72,6 +74,7 @@ def test_scene_blueprint_compiler_preserves_flagship_asset_markers() -> None:
                 "visualIntent": ["asset_resolution"],
             },
         )
+        assert 8 <= len(playbook.steps) <= 14
         snapshot = playbook.steps[0].snapshot.model_dump(mode="json", by_alias=True)
 
         if collection_name:

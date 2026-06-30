@@ -31,36 +31,32 @@ from app.domain.models.playbook import (
 from app.domain.models.topic import TopicDomain
 
 _FPS = 30
-_DEFAULT_FRAMES = 90
+_DEFAULT_STEP_FRAMES = 180
+_SCENE_BLUEPRINT_STEP_COUNT = 8
 
 
 def compile_scene_blueprint_to_playbook(blueprint: dict[str, Any]) -> PlaybookScript:
     scene_type = _required_str(blueprint, "sceneType")
     title = str(blueprint.get("title") or scene_type.replace("_", " ").title())
-    duration_frames = _duration_frames(blueprint)
+    step_frames = _step_frames(blueprint)
     snapshot = _compile_snapshot(scene_type, blueprint)
     code_highlight = _code_highlight(scene_type, blueprint)
-
-    step = MetaStep(
-        step_id=str(blueprint.get("id") or scene_type),
-        end_frame=duration_frames,
+    steps = _compile_steps(
+        scene_type=scene_type,
         title=title,
-        voiceover_text=getattr(snapshot, "caption", None) or title,
-        animation_hint=snapshot.kind,
         snapshot=snapshot,
-        layers=[Layer(timing=LayerTiming(), body=snapshot)],
         code_highlight=code_highlight,
-        tokens=[],
+        step_frames=step_frames,
     )
     visual_intent = [str(item) for item in blueprint.get("visualIntent") or []]
     emphasis_points = [str(item) for item in blueprint.get("emphasisPoints") or []]
     return PlaybookScript(
         fps=_FPS,
-        total_frames=duration_frames,
+        total_frames=steps[-1].end_frame,
         domain=TopicDomain(_required_str(blueprint, "subject")),
         title=title,
         summary=str(blueprint.get("caption") or title),
-        steps=[step],
+        steps=steps,
         parameter_controls=[],
         algorithm_id=scene_type,
         initial_data={
@@ -78,14 +74,134 @@ def _required_str(payload: dict[str, Any], key: str) -> str:
     return value
 
 
-def _duration_frames(blueprint: dict[str, Any]) -> int:
+def _step_frames(blueprint: dict[str, Any]) -> int:
     duration_frames = blueprint.get("durationFrames")
     if isinstance(duration_frames, int | float):
         return max(1, round(duration_frames))
     duration_seconds = blueprint.get("durationSeconds")
     if isinstance(duration_seconds, int | float):
         return max(1, round(duration_seconds * _FPS))
-    return _DEFAULT_FRAMES
+    return _DEFAULT_STEP_FRAMES
+
+
+def _compile_steps(
+    scene_type: str,
+    title: str,
+    snapshot: Any,
+    code_highlight: CodeHighlightOverlay | None,
+    step_frames: int,
+) -> list[MetaStep]:
+    base_caption = str(getattr(snapshot, "caption", "") or title)
+    captions = _step_captions(scene_type, title, base_caption)
+    captions = [*captions, *([base_caption] * _SCENE_BLUEPRINT_STEP_COUNT)][
+        :_SCENE_BLUEPRINT_STEP_COUNT
+    ]
+    steps: list[MetaStep] = []
+    for index, caption in enumerate(captions, start=1):
+        step_snapshot = snapshot.model_copy(deep=True)
+        step_code_highlight = code_highlight.model_copy(deep=True) if code_highlight else None
+        steps.append(
+            MetaStep(
+                step_id=f"{scene_type}_{index:02d}",
+                end_frame=index * step_frames,
+                title=f"{title} · {index}",
+                voiceover_text=caption,
+                animation_hint=step_snapshot.kind,
+                snapshot=step_snapshot,
+                layers=[Layer(timing=LayerTiming(), body=step_snapshot)],
+                code_highlight=step_code_highlight,
+                tokens=[],
+            )
+        )
+    return steps
+
+
+def _step_captions(scene_type: str, title: str, base_caption: str) -> list[str]:
+    scene_label = title.replace("_", " ")
+    presets: dict[str, list[str]] = {
+        "east_asia_monsoon": [
+            (
+                "东亚季风先看底图：东亚大陆和西太平洋被放在同一张 "
+                "geo_map_scene 上，海陆位置是后续判断的坐标基准。"
+            ),
+            "陆地在夏季升温快，地图上的低压中心标出大陆一侧，说明近地面空气更容易向这里汇聚。",
+            "西太平洋升温慢，海洋一侧的高压中心和海面图层一起说明海陆热力差异的方向。",
+            "monsoon_flow 箭头从海洋指向陆地，表示夏季风把暖湿空气推向东亚大陆。",
+            (
+                "moisture_particles 让水汽输送可见，学生能看到降水来源不是"
+                "凭空出现，而是随季风进入陆地。"
+            ),
+            "高压和低压标签同时保留，帮助比较海洋向陆地输送空气的压力梯度。",
+            "这一帧把海陆、气压和风向合在一起：东亚夏季风来自海陆热力差异驱动的环流。",
+            "结论回到东亚季风：大陆低压吸引海洋湿空气，西太平洋高压提供输送方向，所以夏季风带来水汽和降水。",
+        ],
+        "projectile_motion": [
+            "平抛运动先看 physics_force_scene 中的 projectile 物体，它是整个受力和轨迹分析的对象。",
+            "轨迹曲线显示物体一边水平前进，一边竖直下落，路径因此弯成抛物线。",
+            "速度矢量分解为水平 vx 和竖直 vy，水平分量保持稳定，竖直分量会随时间增大。",
+            "g 向下的加速度箭头说明竖直方向的变化来自重力，而不是水平速度突然改变。",
+            "motion trail 上的历史点展示平抛过程，越往后竖直间隔越大，说明下落越来越快。",
+            "力矢量保留在物体附近，帮助区分速度方向、加速度方向和受力方向。",
+            "公式 x=v0t 与 y=1/2gt^2 对应同一条轨迹：水平匀速，竖直匀加速。",
+            (
+                "结论回到平抛运动：projectile 同时遵守水平匀速和竖直重力加速，"
+                "所以轨迹、vx、vy 和 g 必须一起读。"
+            ),
+        ],
+        "cell_structure": [
+            "细胞结构先看 bio_cell_scene 的整体轮廓，细胞膜定义了细胞内部与外部的边界。",
+            "细胞核位于细胞内部，callout 标出它储存 DNA，是遗传信息的核心位置。",
+            "DNA 资产放在细胞核附近，说明遗传信息不是抽象文字，而是细胞结构中的实际内容。",
+            "线粒体结构被单独标注，用来说明细胞能量释放与细胞器分工有关。",
+            "核糖体显示蛋白质合成的工作点，和细胞核中的遗传信息形成过程关系。",
+            "多个结构同时出现时，callout 帮助学生把名称、位置和功能一一对应。",
+            "这一帧把膜、核、线粒体、核糖体和 DNA 放在同一层级中，形成细胞结构地图。",
+            "结论回到细胞结构：细胞不是文字列表，而是由多个有位置、有功能的结构协同工作。",
+        ],
+        "molecule_2d_water": [
+            "水分子先看 molecule_2d_scene，氧原子和氢原子来自结构化 atom 数据。",
+            "两个 O-H 键由 bond 数据生成，分子图不是手画 SVG，而是结构数据驱动的结果。",
+            "弯曲构型让水分子的极性有了几何基础，H2O 不是一条直线。",
+            "氧原子处于中心位置，两个氢原子形成夹角，学生可以直接读出连接关系。",
+            "highlight 强调极性部分，说明电荷分布与分子形状相关。",
+            "公式 H2O 与二维结构同时出现，把符号表达和空间结构连起来。",
+            "这一帧展示 atom、bond 和 formula 如何共同说明同一个水分子。",
+            "结论回到水分子：结构化原子和化学键决定它的二维形状，也支持后续讨论极性和氢键。",
+        ],
+        "derivative_tangent": [
+            "导数切线先看 math_plot 上的函数曲线，它给斜率判断提供可视坐标。",
+            "标记点 x=1 固定在曲线上，说明导数讨论的是某一点附近的瞬时变化。",
+            "切线穿过该点，它的倾斜程度就是这个点的局部变化率。",
+            "曲线和切线放在同一坐标系中，帮助比较整体函数和局部线性近似。",
+            "公式 f'(1)=2 对应切线斜率，学生能把代数结果映射到图像角度。",
+            "如果观察点移动，切线方向会改变，这说明导数是随位置变化的函数。",
+            "这一帧把函数、点、切线和公式合成一个确定性布局。",
+            "结论回到导数切线：导数就是曲线在指定点的切线斜率，而不是整条曲线的平均变化。",
+        ],
+        "bfs_graph": [
+            "BFS 图先看 graph_scene 中的节点和边，起点 S 是遍历过程的入口。",
+            "当前节点高亮表示算法正在处理的位置，visited 集合记录已经确认访问的节点。",
+            "队列显示 frontier，说明 BFS 按先进先出的顺序扩展下一层节点。",
+            "从当前节点伸出的 active edge 表示本轮要检查的相邻关系。",
+            "新节点进入队列后，图上的状态变化和代码行可以同步解释。",
+            "visited 集合不断增长，帮助区分已经处理过和等待处理的节点。",
+            "这一帧把图结构、队列和访问状态放在同一个可视布局里。",
+            "结论回到 BFS：它按层扩展图节点，用队列保证先发现的节点先被处理。",
+        ],
+    }
+    return presets.get(
+        scene_type,
+        [
+            f"{scene_label} 先建立主要视觉对象，{base_caption}",
+            f"{scene_label} 的第二步强调核心资产和布局关系，避免用占位数组替代学科图像。",
+            f"{scene_label} 的第三步把关键标签和主题层连接起来，让读者知道应该看哪里。",
+            f"{scene_label} 的第四步展示主要变化方向，保持 renderer 输出和语义角色一致。",
+            f"{scene_label} 的第五步解释数据或结构之间的因果关系。",
+            f"{scene_label} 的第六步把公式、标签或 callout 与主视觉对应起来。",
+            f"{scene_label} 的第七步复核视觉结论，确认没有偏离主题。",
+            f"{scene_label} 的结论回到问题本身：{base_caption}",
+        ],
+    )
 
 
 def _compile_snapshot(scene_type: str, blueprint: dict[str, Any]):

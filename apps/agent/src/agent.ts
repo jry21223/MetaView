@@ -138,6 +138,7 @@ async function runAgentAttempt(
   userPrompt: string,
 ): Promise<PlaybookOutput> {
   const emitter = new PlaybookEmitter();
+  let runtimePlaybook: PlaybookOutput | null = null;
 
   const drawingTools = makeDrawingTools({ emitter });
   const assertTools = makeAssertTools({ emitter, apiBaseUrl: opts.apiBaseUrl });
@@ -182,13 +183,52 @@ async function runAgentAttempt(
       tools,
     },
     getApiKey: () => apiKey,
+    afterToolCall: async (context) => {
+      const playbook = extractRuntimePlaybook(context.result.details);
+      if (!playbook) {
+        return undefined;
+      }
+      runtimePlaybook = playbook;
+      return { terminate: true };
+    },
   });
 
   await agent.prompt(userPrompt);
 
+  if (runtimePlaybook) {
+    return runtimePlaybook;
+  }
   // The emitter has all committed steps by now even if finalize_playbook
   // wasn't explicitly called — its idempotent ``finalize`` covers the case.
   return emitter.finalize();
+}
+
+function extractRuntimePlaybook(details: unknown): PlaybookOutput | null {
+  if (!isRecord(details) || details.ok !== true || !isRecord(details.result)) {
+    return null;
+  }
+  const playbook = details.result.playbook;
+  if (!isPlaybookOutput(playbook)) {
+    return null;
+  }
+  return playbook;
+}
+
+function isPlaybookOutput(value: unknown): value is PlaybookOutput {
+  return (
+    isRecord(value) &&
+    typeof value.fps === "number" &&
+    typeof value.total_frames === "number" &&
+    typeof value.domain === "string" &&
+    typeof value.title === "string" &&
+    typeof value.summary === "string" &&
+    Array.isArray(value.steps) &&
+    Array.isArray(value.parameter_controls)
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function buildAgentPrompt(
