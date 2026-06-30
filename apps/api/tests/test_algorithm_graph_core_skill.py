@@ -187,6 +187,26 @@ async def test_execute_outputs_valid_playbook_with_graph_scene() -> None:
     assert "table_scene" in {step.snapshot.kind for step in playbook.steps}
     assert all(len(step.voiceover_text) >= 20 for step in playbook.steps)
     assert all(step.layers for step in playbook.steps)
+    graph_snapshot = next(
+        step.snapshot for step in playbook.steps if step.snapshot.kind == "graph_scene"
+    )
+    assert graph_snapshot.pack_id == "algorithm-code-basic"
+    assert graph_snapshot.asset_id == "bfs-graph-preset"
+    assert graph_snapshot.current_node_id == "A"
+    assert graph_snapshot.active_node_ids == ["A"]
+    assert graph_snapshot.visited_node_ids == ["A"]
+    assert graph_snapshot.queue_node_ids == ["B", "C"]
+    assert set(graph_snapshot.active_edge_ids) == {"A->B", "A->C"}
+    node_asset_ids = {node.id: node.asset_id for node in graph_snapshot.nodes}
+    assert node_asset_ids == {
+        "A": "graph-node",
+        "B": "queue-frame",
+        "C": "queue-frame",
+        "D": "graph-node",
+    }
+    edge_asset_ids = {edge.id: edge.asset_id for edge in graph_snapshot.edges}
+    assert edge_asset_ids["A->B"] == "edge-active"
+    assert edge_asset_ids["A->C"] == "edge-active"
 
     score = score_playbook("algorithm-bfs-runtime", result.playbook_json)
     assert score.passed, [(dim.name, dim.score, dim.issues) for dim in score.dimensions]

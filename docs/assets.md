@@ -87,7 +87,10 @@ Current backend SkillPack adoption:
   `reaction_scene`.
 - `math-basic`: structured plot presets for math plot/formula scenes.
 - `algorithm-code-basic`: internal graph node, queue, visited, active-edge SVGs
-  plus a BFS graph preset for `graph_scene`.
+  plus a BFS graph preset for `graph_scene`. The deterministic
+  `algorithm_graph_core` SkillPack emits runtime `graph_scene` snapshots with
+  `pack_id`, `asset_id`, queue-node, visited-node, and active-edge asset refs so
+  generated BFS playbooks use the same assets as the showcase fixture.
 
 Starter assets can be internal placeholders or durable third-party/public-domain
 derivatives. Replace or add durable assets only when the source license,
