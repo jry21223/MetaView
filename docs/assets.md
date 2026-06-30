@@ -36,12 +36,14 @@ is the narrow visual-compiler entrypoint for the current flagship subjects.
 It accepts intent-level fields such as `subject`, `sceneType`, `visualIntent`,
 and `emphasisPoints`, resolves assets through the shared asset resolver, applies
 deterministic layout defaults, and outputs normal `PlaybookScript`.
+The current supported scene blueprints are `east_asia_monsoon`,
+`projectile_motion`, `cell_structure`, `molecule_2d_water`,
+`derivative_tangent`, and `bfs_graph`.
 
 This is not a second rendering contract. The compiler must not pass raw SVG
 paths, arbitrary renderer code, or LLM-selected coordinates through to renderers.
-Geo and physics output still flows through `geo_map_scene` and
-`physics_force_scene`, then through the same Remotion composition and
-`visualQualityGate`.
+Compiled output still flows through the existing renderer snapshot kinds, then
+through the same Remotion composition and `visualQualityGate`.
 
 ## Starter Packs
 

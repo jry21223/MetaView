@@ -134,4 +134,120 @@ describe("sceneBlueprintCompiler", () => {
     expect(JSON.stringify(script)).not.toContain("M 0 0 L 100 100");
     expect(script.steps[0].snapshot.kind).toBe("geo_map_scene");
   });
+
+  it("compiles a cell structure blueprint into an asset-backed biology scene", () => {
+    const script = compileSceneBlueprintToPlaybookScript({
+      subject: "biology",
+      sceneType: "cell_structure",
+      title: "Cell structure",
+      visualIntent: ["show_cell_structure", "label_core_organelles"],
+      emphasisPoints: ["nucleus", "mitochondrion", "cell membrane"],
+    });
+
+    expect(script.domain).toBe("biology");
+    const snapshot = script.steps[0].snapshot;
+    if (snapshot.kind !== "bio_cell_scene") {
+      throw new Error(`Expected bio_cell_scene, got ${snapshot.kind}`);
+    }
+    expect(snapshot.pack_id).toBe("biology-basic");
+    expect(snapshot.structures.map((structure) => structure.asset_id)).toEqual(
+      expect.arrayContaining(["cell-outline", "nucleus", "mitochondrion"]),
+    );
+    expect(visualQualityGate(script)).toEqual([]);
+
+    const markup = renderToStaticMarkup(<PlaybookComposition script={script} showSubtitles={false} />);
+    expect(markup).toContain("bio-cell-scene");
+    expect(markup).toContain('data-asset-id="cell-outline"');
+    expect(markup).toContain('data-asset-id="nucleus"');
+    expect(markup).toContain('data-semantic-role="callout"');
+    expect(markup).not.toContain('data-missing-asset="true"');
+  });
+
+  it("compiles a water molecule blueprint into a structured chemistry scene", () => {
+    const script = compileSceneBlueprintToPlaybookScript({
+      subject: "chemistry",
+      sceneType: "molecule_2d_water",
+      title: "Water molecule",
+      visualIntent: ["render_structured_molecule", "show_polar_bonds"],
+      emphasisPoints: ["oxygen", "hydrogen", "bent geometry"],
+    });
+
+    expect(script.domain).toBe("chemistry");
+    const snapshot = script.steps[0].snapshot;
+    if (snapshot.kind !== "molecule_2d_scene") {
+      throw new Error(`Expected molecule_2d_scene, got ${snapshot.kind}`);
+    }
+    expect(snapshot.pack_id).toBe("chemistry-basic");
+    expect(snapshot.molecule_asset_id).toBe("water-molecule-preset");
+    expect(snapshot.atoms.map((atom) => atom.asset_id)).toEqual(
+      expect.arrayContaining(["atom-core"]),
+    );
+    expect(snapshot.bonds.map((bond) => bond.asset_id)).toEqual(
+      expect.arrayContaining(["bond-line"]),
+    );
+    expect(visualQualityGate(script)).toEqual([]);
+
+    const markup = renderToStaticMarkup(<PlaybookComposition script={script} showSubtitles={false} />);
+    expect(markup).toContain("molecule-2d-scene");
+    expect(markup).toContain('data-structured-molecule="true"');
+    expect(markup).toContain('data-asset-id="water-molecule-preset"');
+    expect(markup).toContain('data-element="O"');
+    expect(markup).toContain('data-element="H"');
+    expect(markup).not.toContain('data-missing-asset="true"');
+  });
+
+  it("compiles a derivative tangent blueprint into a math plot scene", () => {
+    const script = compileSceneBlueprintToPlaybookScript({
+      subject: "math",
+      sceneType: "derivative_tangent",
+      title: "Derivative tangent",
+      visualIntent: ["show_function_curve", "highlight_tangent_slope"],
+      emphasisPoints: ["formula", "curve", "tangent"],
+    });
+
+    expect(script.domain).toBe("math");
+    const snapshot = script.steps[0].snapshot;
+    if (snapshot.kind !== "math_plot") {
+      throw new Error(`Expected math_plot, got ${snapshot.kind}`);
+    }
+    expect(snapshot.pack_id).toBe("math-basic");
+    expect(snapshot.asset_id).toBe("derivative-tangent-preset");
+    expect(snapshot.curves.map((curve) => curve.semantic_role)).toEqual(
+      expect.arrayContaining(["curve", "tangent"]),
+    );
+    expect(visualQualityGate(script)).toEqual([]);
+
+    const markup = renderToStaticMarkup(<PlaybookComposition script={script} showSubtitles={false} />);
+    expect(markup).toContain("math-plot-renderer");
+    expect(markup).toContain('data-plot-asset-id="derivative-tangent-preset"');
+    expect(markup).toContain('data-semantic-role="tangent"');
+  });
+
+  it("compiles a BFS blueprint into a graph scene with algorithm state", () => {
+    const script = compileSceneBlueprintToPlaybookScript({
+      subject: "algorithm",
+      sceneType: "bfs_graph",
+      title: "BFS graph",
+      visualIntent: ["show_graph_traversal", "show_queue_state", "highlight_active_edge"],
+      emphasisPoints: ["current node", "queue", "visited set"],
+    });
+
+    expect(script.domain).toBe("algorithm");
+    const snapshot = script.steps[0].snapshot;
+    if (snapshot.kind !== "graph_scene") {
+      throw new Error(`Expected graph_scene, got ${snapshot.kind}`);
+    }
+    expect(snapshot.pack_id).toBe("algorithm-code-basic");
+    expect(snapshot.asset_id).toBe("bfs-graph-preset");
+    expect(snapshot.current_node_id).toBe("A");
+    expect(snapshot.queue_node_ids).toEqual(["B", "C"]);
+    expect(visualQualityGate(script)).toEqual([]);
+
+    const markup = renderToStaticMarkup(<PlaybookComposition script={script} showInlineCode={true} showSubtitles={false} />);
+    expect(markup).toContain("graph-scene-renderer");
+    expect(markup).toContain('data-graph-asset-id="bfs-graph-preset"');
+    expect(markup).toContain('data-node-state="current"');
+    expect(markup).toContain('data-node-state="queue"');
+    expect(markup).toContain('data-edge-state="active"');
+  });
 });
