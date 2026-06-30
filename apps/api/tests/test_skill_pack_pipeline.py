@@ -46,23 +46,25 @@ class _FailingLLM:
 
 class _WorkingLLM:
     async def complete(self, system: str, user: str) -> str:  # noqa: ARG002
-        return json.dumps({
-            "version": "0.1.0",
-            "title": "Generic",
-            "domain": "math",
-            "summary": "Generic fallback.",
-            "steps": [
-                {
-                    "id": "step_01",
-                    "title": "解释概念",
-                    "narration": "用通用数学解释路径说明这个概念，不调用任何测试 skill。",
-                    "visual_kind": "formula",
-                    "tokens": [],
-                    "plot": {"formula_latex": "f(x)"},
-                    "annotations": [],
-                }
-            ],
-        })
+        return json.dumps(
+            {
+                "version": "0.1.0",
+                "title": "Generic",
+                "domain": "math",
+                "summary": "Generic fallback.",
+                "steps": [
+                    {
+                        "id": "step_01",
+                        "title": "解释概念",
+                        "narration": "用通用数学解释路径说明这个概念，不调用任何测试 skill。",
+                        "visual_kind": "formula",
+                        "tokens": [],
+                        "plot": {"formula_latex": "f(x)"},
+                        "annotations": [],
+                    }
+                ],
+            }
+        )
 
 
 class _FailingAgentProvider:
@@ -131,6 +133,7 @@ def test_run_pipeline_does_not_import_solid_geometry_directly() -> None:
     assert "app.domain.skills.biology_genetics" not in source
     assert "app.domain.skills.probability_statistics_core" not in source
     assert "app.domain.skills.geography_climate" not in source
+    assert "app.domain.skills.geography_earth" not in source
 
 
 def test_default_registry_contains_subject_skills_and_routes_prompts() -> None:
@@ -144,6 +147,7 @@ def test_default_registry_contains_subject_skills_and_routes_prompts() -> None:
         "biology_genetics",
         "probability_statistics_core",
         "geography_climate",
+        "geography_earth",
     } <= manifests
 
     physics_route = registry.heuristic_match(
@@ -162,13 +166,17 @@ def test_default_registry_contains_subject_skills_and_routes_prompts() -> None:
     geography_route = registry.heuristic_match(
         SkillRouteInput(prompt="离线教学站点 EDU_TEMPERATE 的气候常年值摘要")
     )
+    monsoon_route = registry.heuristic_match(SkillRouteInput(prompt="讲解东亚夏季风的海陆热力差异"))
 
     assert physics_route is not None and physics_route.skill_id == "physics_mechanics"
     assert chemistry_route is not None and chemistry_route.skill_id == "chemistry_stoichiometry"
     assert graph_route is not None and graph_route.skill_id == "algorithm_graph_core"
     assert biology_route is not None and biology_route.skill_id == "biology_genetics"
-    assert statistics_route is not None and statistics_route.skill_id == "probability_statistics_core"
+    assert (
+        statistics_route is not None and statistics_route.skill_id == "probability_statistics_core"
+    )
     assert geography_route is not None and geography_route.skill_id == "geography_climate"
+    assert monsoon_route is not None and monsoon_route.skill_id == "geography_earth"
 
 
 @pytest.mark.asyncio
@@ -219,6 +227,28 @@ async def test_agent_mode_routes_registered_skill_before_agent() -> None:
 
 
 @pytest.mark.asyncio
+async def test_geography_earth_scene_blueprint_runs_through_default_registry() -> None:
+    repo = _RecordingRepo()
+    use_case = RunPipelineUseCase(
+        repo, _FailingLLM(), skill_registry=build_default_skill_registry()
+    )
+
+    await use_case.execute("run-monsoon", PipelineRequest(prompt="讲解东亚夏季风的海陆热力差异"))
+
+    assert repo.final_status == PipelineRunStatus.SUCCEEDED
+    assert "skill:geography_earth" in repo.review_json
+    playbook = json.loads(repo.updates[-1]["playbook_json"])
+    assert playbook["domain"] == "geography"
+    assert playbook["initial_data"]["scene_blueprint"] == ["east_asia_monsoon"]
+    assert playbook["steps"][0]["snapshot"]["kind"] == "geo_map_scene"
+    assert playbook["steps"][0]["snapshot"]["pack_id"] == "geography-earth-basic"
+    assert any(
+        layer.get("asset_id") == "east-asia-land-110m"
+        for layer in playbook["steps"][0]["snapshot"]["layers"]
+    )
+
+
+@pytest.mark.asyncio
 async def test_no_skill_match_falls_back_to_generic_or_agent() -> None:
     registry = SkillRegistry([FakeSkillPack()])
     repo = _RecordingRepo()
@@ -231,35 +261,37 @@ async def test_no_skill_match_falls_back_to_generic_or_agent() -> None:
 
 
 def _fake_playbook_json(text: str) -> str:
-    playbook = PlaybookScript.model_validate({
-        "fps": 30,
-        "total_frames": 60,
-        "domain": "math",
-        "title": "Fake Skill",
-        "summary": text,
-        "steps": [
-            {
-                "step_id": "fake_01",
-                "end_frame": 60,
-                "title": "Echo",
-                "voiceover_text": "Echo the fake skill input.",
-                "tokens": [],
-                "snapshot": {
-                    "kind": "math_formula",
-                    "formula_latex": "x=x",
-                    "caption": text,
-                },
-                "layers": [
-                    {
-                        "body": {
-                            "kind": "math_formula",
-                            "formula_latex": "x=x",
-                            "caption": text,
+    playbook = PlaybookScript.model_validate(
+        {
+            "fps": 30,
+            "total_frames": 60,
+            "domain": "math",
+            "title": "Fake Skill",
+            "summary": text,
+            "steps": [
+                {
+                    "step_id": "fake_01",
+                    "end_frame": 60,
+                    "title": "Echo",
+                    "voiceover_text": "Echo the fake skill input.",
+                    "tokens": [],
+                    "snapshot": {
+                        "kind": "math_formula",
+                        "formula_latex": "x=x",
+                        "caption": text,
+                    },
+                    "layers": [
+                        {
+                            "body": {
+                                "kind": "math_formula",
+                                "formula_latex": "x=x",
+                                "caption": text,
+                            }
                         }
-                    }
-                ],
-            }
-        ],
-        "parameter_controls": [],
-    })
+                    ],
+                }
+            ],
+            "parameter_controls": [],
+        }
+    )
     return playbook.model_dump_json()

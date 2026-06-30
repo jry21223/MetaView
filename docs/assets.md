@@ -49,6 +49,14 @@ paths, arbitrary renderer code, or LLM-selected coordinates through to renderers
 Compiled output still flows through the existing renderer snapshot kinds, then
 through the same Remotion composition and `visualQualityGate`.
 
+Current backend SkillPack adoption:
+
+- `geography_earth` compiles East Asia monsoon prompts to `geo_map_scene` with
+  `geography-earth-basic`.
+- `physics_mechanics` compiles projectile-motion visual steps to
+  `physics_force_scene` with `physics-basic` while preserving formula, table,
+  and answer steps from the deterministic mechanics kernel.
+
 ## Starter Packs
 
 - `geography-basic`: starter map-layer SVG plus internal monsoon wind SVG.

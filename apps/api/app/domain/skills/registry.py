@@ -23,9 +23,7 @@ class SkillRegistry:
 
     def heuristic_match(self, request: SkillRouteInput) -> SkillRouteMatch | None:
         matches = [
-            match
-            for skill in self.all()
-            if (match := skill.heuristic_match(request)) is not None
+            match for skill in self.all() if (match := skill.heuristic_match(request)) is not None
         ]
         if not matches:
             return None
@@ -39,6 +37,7 @@ def build_default_skill_registry() -> SkillRegistry:
     from app.domain.skills.chemistry_stoichiometry.skill_pack import ChemistryStoichiometrySkillPack
     from app.domain.skills.elementary_algebra.skill_pack import ElementaryAlgebraSkillPack
     from app.domain.skills.geography_climate.skill_pack import GeographyClimateSkillPack
+    from app.domain.skills.geography_earth.skill_pack import GeographyEarthSkillPack
     from app.domain.skills.linear_algebra.skill_pack import LinearAlgebraSkillPack
     from app.domain.skills.physics_mechanics.skill_pack import PhysicsMechanicsSkillPack
     from app.domain.skills.probability_statistics_core.skill_pack import (
@@ -47,19 +46,22 @@ def build_default_skill_registry() -> SkillRegistry:
     from app.domain.skills.quadratic_transform.skill_pack import QuadraticTransformSkillPack
     from app.domain.skills.solid_geometry.skill_pack import SolidGeometrySkillPack
 
-    return SkillRegistry([
-        SolidGeometrySkillPack(),
-        QuadraticTransformSkillPack(),
-        ElementaryAlgebraSkillPack(),
-        LinearAlgebraSkillPack(),
-        CalculusCoreSkillPack(),
-        PhysicsMechanicsSkillPack(),
-        ChemistryStoichiometrySkillPack(),
-        AlgorithmGraphCoreSkillPack(),
-        BiologyGeneticsSkillPack(),
-        ProbabilityStatisticsCoreSkillPack(),
-        GeographyClimateSkillPack(),
-    ])
+    return SkillRegistry(
+        [
+            SolidGeometrySkillPack(),
+            QuadraticTransformSkillPack(),
+            ElementaryAlgebraSkillPack(),
+            LinearAlgebraSkillPack(),
+            CalculusCoreSkillPack(),
+            PhysicsMechanicsSkillPack(),
+            ChemistryStoichiometrySkillPack(),
+            AlgorithmGraphCoreSkillPack(),
+            BiologyGeneticsSkillPack(),
+            ProbabilityStatisticsCoreSkillPack(),
+            GeographyEarthSkillPack(),
+            GeographyClimateSkillPack(),
+        ]
+    )
 
 
 def get_skill_manifests() -> list[SkillManifest]:
