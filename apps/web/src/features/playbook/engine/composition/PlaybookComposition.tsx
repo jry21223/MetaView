@@ -10,6 +10,7 @@ import { appearTransform, useTimeline } from "../foundation";
 import { compileVisualTimeline, type VisualLayerState, type VisualStepState } from "./visualContinuity";
 import { snapshotSurface } from "./snapshotSurface";
 import { buildDirectorFramePlan } from "../director";
+import { visualQualityGate } from "../assets/visualQualityGate";
 
 interface PlaybookCompositionProps {
   script: PlaybookScript;
@@ -194,6 +195,13 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
 }) => {
   const frame = useCurrentFrame();
   const visualTimeline = React.useMemo(() => compileVisualTimeline(script), [script]);
+  const visualQualityWarnings = React.useMemo(() => visualQualityGate(script), [script]);
+
+  React.useEffect(() => {
+    if (visualQualityWarnings.length > 0) {
+      console.warn("[MetaView visualQualityGate]", visualQualityWarnings);
+    }
+  }, [visualQualityWarnings]);
 
   const stepIndex = script.steps.findIndex((s) => frame < s.end_frame);
   const activeIndex = stepIndex === -1 ? script.steps.length - 1 : stepIndex;
@@ -261,7 +269,16 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
   };
 
   return (
-    <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
+    <div
+      data-visual-quality-warning-count={visualQualityWarnings.length || undefined}
+      data-visual-quality-warning-codes={
+        visualQualityWarnings.length ? visualQualityWarnings.map((warning) => warning.code).join(",") : undefined
+      }
+      data-visual-quality-warning-steps={
+        visualQualityWarnings.length ? visualQualityWarnings.map((warning) => warning.step_id).join(",") : undefined
+      }
+      style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}
+    >
       {/* Main content area */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
         {/* Visual track */}

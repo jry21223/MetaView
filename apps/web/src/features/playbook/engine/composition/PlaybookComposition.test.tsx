@@ -152,6 +152,34 @@ function motionScript(): PlaybookScript {
   };
 }
 
+function geographyArrayFallbackScript(): PlaybookScript {
+  return {
+    fps: 30,
+    total_frames: 60,
+    domain: "geography",
+    title: "数组兜底",
+    summary: "Unsupported geography fallback",
+    parameter_controls: [],
+    steps: [
+      {
+        step_id: "array-fallback",
+        end_frame: 60,
+        title: "数组兜底",
+        voiceover_text: "不应使用算法数组表现地理图层。",
+        tokens: [],
+        snapshot: {
+          kind: "algorithm_array",
+          array_values: ["land", "ocean"],
+          active_indices: [],
+          swap_indices: [],
+          sorted_indices: [],
+          pointers: {},
+        },
+      },
+    ],
+  };
+}
+
 function directorFor(
   script: PlaybookScript,
   cameraMotion: DirectorCameraMotion,
@@ -369,6 +397,17 @@ describe("PlaybookComposition", () => {
     expect(markup).toContain('data-object-id="triangle_fill"');
     expect(markup).toContain('data-object-id="base_edge"');
     expect(markup).not.toContain("Unknown snapshot kind");
+  });
+
+  it("exposes non-blocking visual quality warning metadata", () => {
+    const markup = renderToStaticMarkup(
+      <PlaybookComposition script={geographyArrayFallbackScript()} showSubtitles={false} />,
+    );
+
+    expect(markup).toContain('data-visual-quality-warning-count="1"');
+    expect(markup).toContain('data-visual-quality-warning-codes="unsupported_array_fallback"');
+    expect(markup).toContain('data-visual-quality-warning-steps="array-fallback"');
+    expect(markup).toContain("domain-array-renderer");
   });
 
   it("renders narration only in the shared subtitle row", () => {

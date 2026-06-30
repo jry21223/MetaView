@@ -15,6 +15,7 @@ function projectileMotionSnapshot(extra: Partial<PhysicsForceSceneSnapshot> = {}
     vectors: [
       { id: "vx", target: "body", semantic_role: "velocity", dx: 28, dy: 0, label: "v_x" },
       { id: "g", target: "body", semantic_role: "acceleration", dx: 0, dy: 24, label: "g" },
+      { id: "drag", target: "body", semantic_role: "force", dx: -18, dy: 8, label: "F" },
     ],
     trajectory: [[18, 34], [32, 42], [50, 57], [72, 78]],
     formula_latex: "x=v_0t,\\quad y=\\frac12gt^2",
@@ -59,6 +60,10 @@ describe("PhysicsForceSceneRenderer", () => {
     );
     expect(markup).toContain("<image");
     expect(markup).toContain('data-semantic-role="motion_trail"');
+    expect(markup).toContain('data-asset-id="force-vector-arrow"');
+    expect(markup).toContain(
+      'data-asset-path="/assets/metaview-kits/physics-basic/force-vector-arrow.svg"',
+    );
     expect(markup).not.toContain('data-missing-asset="true"');
   });
 

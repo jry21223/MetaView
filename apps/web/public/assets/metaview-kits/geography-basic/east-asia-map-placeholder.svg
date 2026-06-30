@@ -1,6 +1,43 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" role="img" aria-label="East Asia map placeholder">
-  <rect width="320" height="180" rx="12" fill="#dff3fb"/>
-  <path d="M88 24c42-8 84 8 104 38 21 32 9 70-24 85-32 14-75 4-102-20-27-25-39-62-24-82 9-12 25-18 46-21z" fill="#d8e6c0"/>
-  <path d="M192 52c30 10 48 31 48 56 0 18-10 34-25 43 34-4 62-19 78-43-18-30-55-51-101-56z" fill="#b9d9ef" opacity=".9"/>
-  <path d="M62 122c31 24 73 33 107 22" fill="none" stroke="#6c8f3d" stroke-width="4" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" role="img" aria-label="East Asia monsoon map asset" data-asset-quality="v2">
+  <defs>
+    <linearGradient id="ocean-v2" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#e3f6fb"/>
+      <stop offset=".58" stop-color="#b9dff1"/>
+      <stop offset="1" stop-color="#93c4de"/>
+    </linearGradient>
+    <linearGradient id="land-v2" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#e7efc8"/>
+      <stop offset=".62" stop-color="#c8dca2"/>
+      <stop offset="1" stop-color="#9dbd75"/>
+    </linearGradient>
+    <filter id="map-shadow-v2" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#2f5d73" flood-opacity=".18"/>
+    </filter>
+  </defs>
+  <rect width="320" height="180" rx="12" fill="url(#ocean-v2)"/>
+  <g opacity=".28" stroke="#ffffff" stroke-width="1">
+    <path d="M0 45h320M0 90h320M0 135h320"/>
+    <path d="M64 0v180M128 0v180M192 0v180M256 0v180"/>
+  </g>
+  <g filter="url(#map-shadow-v2)">
+    <path d="M34 22c35-17 78-14 111-1 35 13 57 37 67 68 9 27-3 54-31 69-34 18-88 6-119-22-23-21-36-51-34-80 1-14 2-25 6-34z" fill="url(#land-v2)" stroke="#7c9b55" stroke-width="2"/>
+    <path d="M87 25c30 18 48 42 55 69 6 23 2 44-13 65" fill="none" stroke="#769352" stroke-width="2.2" stroke-linecap="round" opacity=".55"/>
+    <path d="M121 20c4 27 17 42 39 55 21 13 33 28 34 50" fill="none" stroke="#769352" stroke-width="1.7" stroke-linecap="round" opacity=".5"/>
+  </g>
+  <g fill="#a7c77f" stroke="#6f8f54" stroke-width="1.2" opacity=".96">
+    <path d="M219 72c13 6 22 15 25 27 3 14-2 27-14 39 20-5 38-20 45-39-8-14-27-24-56-27z" fill="#bdd49d"/>
+    <path d="M237 38c7 8 11 17 10 27-1 9-7 15-16 18 18 3 35-7 42-22-8-12-20-20-36-23z"/>
+    <path d="M206 111c9 3 14 8 14 15-1 7-7 12-18 15 14 4 27-3 34-15-5-8-15-13-30-15z"/>
+  </g>
+  <g fill="#f7fbfd" opacity=".86">
+    <ellipse cx="244" cy="103" rx="7" ry="3" transform="rotate(-28 244 103)"/>
+    <ellipse cx="263" cy="116" rx="5" ry="2.4" transform="rotate(-26 263 116)"/>
+    <ellipse cx="224" cy="132" rx="5.5" ry="2.5" transform="rotate(-22 224 132)"/>
+  </g>
+  <path d="M43 125c32 24 78 32 118 18 21-7 35-21 42-41" fill="none" stroke="#4b7f4b" stroke-width="3" stroke-linecap="round" opacity=".72"/>
+  <path d="M205 44c31 8 55 23 73 44" fill="none" stroke="#5ca7c8" stroke-width="3.4" stroke-linecap="round" opacity=".6"/>
+  <g fill="#2d5567" font-family="Inter, Arial, sans-serif" font-weight="700">
+    <text x="59" y="48" font-size="12" opacity=".72">continent</text>
+    <text x="210" y="154" font-size="11" opacity=".64">western Pacific</text>
+  </g>
 </svg>

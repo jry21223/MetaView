@@ -23,6 +23,7 @@ interface AssetSvgProps {
   preserveAspectRatio?: string;
   fallbackShape?: AssetFallbackShape;
   className?: string;
+  transform?: string;
 }
 
 function resolveAsset({
@@ -111,6 +112,7 @@ export function AssetSvg({
   preserveAspectRatio = "xMidYMid meet",
   fallbackShape = "rect",
   className,
+  transform,
 }: AssetSvgProps) {
   const resolvedAsset = resolveAsset({ asset, assetId, packId, subject, semanticRole });
   const renderable = canRenderAsStaticAsset(resolvedAsset);
@@ -121,6 +123,7 @@ export function AssetSvg({
     <g
       className={className}
       opacity={opacity}
+      transform={transform}
       data-asset-id={resolvedAsset?.id ?? requestedAssetId ?? undefined}
       data-asset-path={resolvedAsset?.path}
       data-asset-type={resolvedAsset?.type}

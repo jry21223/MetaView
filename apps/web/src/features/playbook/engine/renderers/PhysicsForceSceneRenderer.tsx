@@ -37,6 +37,20 @@ function resolveObjectAsset(object: PhysicsSceneObject, packId: string | undefin
   return findAssetById(object.asset_id, packId) ?? findAssetByRole("physics", "object", packId) ?? findAssetByRole("physics", "object");
 }
 
+function isVectorAsset(asset: AssetManifestEntry | undefined): asset is AssetManifestEntry {
+  return Boolean(asset && (asset.tags.includes("vector") || asset.tags.includes("arrow")));
+}
+
+function resolveVectorAsset(vector: PhysicsSceneVector, packId: string | undefined): AssetManifestEntry | undefined {
+  const roleAsset = findAssetByRole("physics", vector.semantic_role, packId) ?? findAssetByRole("physics", vector.semantic_role);
+  if (isVectorAsset(roleAsset)) return roleAsset;
+  if (vector.semantic_role === "force") {
+    const forceAsset = findAssetByRole("physics", "force", packId) ?? findAssetByRole("physics", "force");
+    if (isVectorAsset(forceAsset)) return forceAsset;
+  }
+  return undefined;
+}
+
 function motionTrailDots(
   points: Array<[number, number]> | undefined,
   progress: number,
@@ -55,14 +69,37 @@ function motionTrailDots(
   });
 }
 
-function renderVector(vector: PhysicsSceneVector, target: PhysicsSceneObject | undefined, progress: number) {
+function renderVector(
+  vector: PhysicsSceneVector,
+  target: PhysicsSceneObject | undefined,
+  progress: number,
+  packId: string | undefined,
+) {
   if (!target) return null;
   const p = Math.max(0, Math.min(1, progress));
   const endX = target.x + vector.dx * p;
   const endY = target.y + vector.dy * p;
   const color = vectorColor(vector.semantic_role);
+  const vectorAsset = resolveVectorAsset(vector, packId);
+  const length = Math.max(8, Math.hypot(endX - target.x, endY - target.y));
+  const angle = (Math.atan2(endY - target.y, endX - target.x) * 180) / Math.PI;
   return (
     <g key={vector.id} data-semantic-role={vector.semantic_role}>
+      {vectorAsset ? (
+        <AssetSvg
+          asset={vectorAsset}
+          packId={packId}
+          subject="physics"
+          semanticRole={vector.semantic_role}
+          x={target.x}
+          y={target.y - 3.2}
+          width={length}
+          height={6.4}
+          preserveAspectRatio="none"
+          opacity="0.24"
+          transform={`rotate(${angle} ${target.x} ${target.y})`}
+        />
+      ) : null}
       <line
         x1={target.x}
         y1={target.y}
@@ -194,7 +231,7 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({ step, progr
           );
         })}
 
-        {snap.vectors.map((vector) => renderVector(vector, objectById(snap.objects, vector.target), progress))}
+        {snap.vectors.map((vector) => renderVector(vector, objectById(snap.objects, vector.target), progress, pack?.packId))}
 
         {snap.caption ? (
           <text x="50" y="94" textAnchor="middle" fontSize="3.8" fill={theme === "dark" ? "#cbd5e1" : "#64748b"}>
