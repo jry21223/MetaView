@@ -38,6 +38,7 @@ SUPPORTED_FRONTEND_SNAPSHOT_KINDS = {
     "manifold_scene",
     "solid_geometry_scene",
     "bio_cell_scene",
+    "bio_process_scene",
     "molecule_2d_scene",
     "geo_map_scene",
     "physics_force_scene",
@@ -276,7 +277,8 @@ def _check_subject_visual_fallback(
                 f"{normalized_domain} playbooks must not fall back to {kind}.",
                 (
                     "Use a SceneBlueprint or subject semantic renderer such as geo_map_scene, "
-                    "bio_cell_scene, or molecule_2d_scene instead of an algorithm array."
+                    "bio_cell_scene, bio_process_scene, or molecule_2d_scene instead of an "
+                    "algorithm array."
                 ),
             )
         )
@@ -352,6 +354,8 @@ def _snapshot_has_meaningful_payload(snapshot: Any) -> bool:
         )
     if kind == "bio_cell_scene":
         return bool(data.get("structures") or data.get("callouts"))
+    if kind == "bio_process_scene":
+        return bool(data.get("steps") or data.get("connections") or data.get("callouts"))
     if kind == "molecule_2d_scene":
         return bool(data.get("atoms") or data.get("bonds") or data.get("molecule_asset_id"))
     if kind == "geo_map_scene":

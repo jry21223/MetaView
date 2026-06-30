@@ -28,6 +28,7 @@ class SnapshotKind(str, Enum):
     MANIFOLD_SCENE = "manifold_scene"
     SOLID_GEOMETRY_SCENE = "solid_geometry_scene"
     BIO_CELL_SCENE = "bio_cell_scene"
+    BIO_PROCESS_SCENE = "bio_process_scene"
     MOLECULE_2D_SCENE = "molecule_2d_scene"
     GEO_MAP_SCENE = "geo_map_scene"
     PHYSICS_FORCE_SCENE = "physics_force_scene"
@@ -470,6 +471,37 @@ class BioCellSceneSnapshot(BaseModel):
     caption: str | None = None
 
 
+class BioProcessStep(BaseModel):
+    id: str
+    semantic_role: str
+    label: str | None = None
+    x: float
+    y: float
+    width: float
+    height: float
+    asset_id: str | None = None
+    description: str | None = None
+
+
+class BioProcessConnection(BaseModel):
+    id: str
+    from_: str = Field(alias="from")
+    to: str
+    semantic_role: str
+    label: str | None = None
+    asset_id: str | None = None
+
+
+class BioProcessSceneSnapshot(BaseModel):
+    kind: Literal["bio_process_scene"] = "bio_process_scene"
+    pack_id: str | None = None
+    process_id: str
+    steps: list[BioProcessStep] = Field(default_factory=list)
+    connections: list[BioProcessConnection] = Field(default_factory=list)
+    callouts: list[BioCellCallout] = Field(default_factory=list)
+    caption: str | None = None
+
+
 class Molecule2DAtom(BaseModel):
     id: str
     element: str
@@ -725,6 +757,7 @@ AnySnapshot = Annotated[
         ManifoldSceneSnapshot,
         SolidGeometrySceneSnapshot,
         BioCellSceneSnapshot,
+        BioProcessSceneSnapshot,
         Molecule2DSceneSnapshot,
         GeoMapSceneSnapshot,
         PhysicsForceSceneSnapshot,

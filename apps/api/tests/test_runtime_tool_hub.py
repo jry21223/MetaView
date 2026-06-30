@@ -318,6 +318,19 @@ async def test_runtime_tool_hub_runs_self_check() -> None:
             "physics_force_scene",
             "physics-basic",
         ),
+        (
+            {
+                "id": "dna_replication",
+                "subject": "biology",
+                "sceneType": "dna_replication",
+                "title": "DNA replication",
+                "caption": "DNA replication copies each strand by complementary base pairing.",
+                "visualIntent": ["show_process_steps", "show_complementary_base_pairing"],
+                "emphasisPoints": ["template DNA", "replication fork", "new strands"],
+            },
+            "bio_process_scene",
+            "biology-basic",
+        ),
     ],
 )
 async def test_runtime_tool_hub_compiles_subject_scene_blueprints(

@@ -241,6 +241,67 @@ describe("agent playbook self-check", () => {
     expect(report.status).toBe("clean");
   });
 
+  it("accepts biology process scenes produced by SceneBlueprint compiler output", () => {
+    const playbook = validPlaybook();
+    playbook.domain = "biology";
+    const snapshot = {
+      kind: "bio_process_scene",
+      pack_id: "biology-basic",
+      process_id: "dna_replication",
+      steps: [
+        {
+          id: "template",
+          semantic_role: "dna",
+          label: "template DNA",
+          x: 22,
+          y: 48,
+          width: 18,
+          height: 38,
+          asset_id: "dna-helix",
+        },
+        {
+          id: "fork",
+          semantic_role: "process_step",
+          label: "replication fork",
+          x: 50,
+          y: 48,
+          width: 24,
+          height: 24,
+          asset_id: "replication-fork",
+        },
+      ],
+      connections: [
+        {
+          id: "template-to-fork",
+          from: "template",
+          to: "fork",
+          semantic_role: "flow_arrow",
+          asset_id: "core-flow-arrow",
+        },
+      ],
+      callouts: [
+        {
+          id: "base-pairing",
+          target_id: "fork",
+          label: "base pairing",
+          side: "top",
+        },
+      ],
+    };
+    playbook.steps.forEach((step) => {
+      step.title = "DNA replication process";
+      step.voiceover_text =
+        "DNA replication copies template strands through a replication fork.";
+      step.narration_template = [step.voiceover_text];
+      step.snapshot = structuredClone(snapshot);
+      step.layers[0].body = structuredClone(snapshot);
+    });
+
+    const report = selfCheckPlaybook(playbook, "Explain DNA replication");
+
+    expect(report.status).toBe("clean");
+  });
+
   it("builds a structured repair prompt from blocked self-check output", () => {
     const playbook = validPlaybook();
     const report = {

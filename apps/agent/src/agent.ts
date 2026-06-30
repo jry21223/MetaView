@@ -60,7 +60,8 @@ Workflow you MUST follow:
    SceneBlueprint can describe the scene, call \`scene_blueprint.compile\` via
    \`runtime_tool_execute\` and use its renderer-ready PlaybookScript output.
    Subject visual scenes must use semantic renderer kinds such as \`geo_map_scene\`,
-   \`physics_force_scene\`, \`bio_cell_scene\`, or \`molecule_2d_scene\`.
+   \`physics_force_scene\`, \`bio_cell_scene\`, \`bio_process_scene\`, or
+   \`molecule_2d_scene\`.
    Do not use algorithm_array or algorithm_bars as a geography, biology, or
    chemistry placeholder. For common teaching animations, including function plots, tangents, integral areas,
    parametric curves, graph traversal, force diagrams, projectile motion,
@@ -269,7 +270,7 @@ export function buildAgentSelfRepairPrompt(
       "Keep PlaybookScript as the only rendering exit.",
       "Do not introduce raw HTML, iframe, Manim, or server video rendering.",
       "Use only renderer-supported snapshot kinds.",
-      "For snapshot.domain_fallback, rebuild through the matching SkillPack runtime tool or a SceneBlueprint-backed subject renderer such as geo_map_scene, physics_force_scene, bio_cell_scene, or molecule_2d_scene. Do not repair this by renaming algorithm_array; replace the visual plan.",
+      "For snapshot.domain_fallback, rebuild through the matching SkillPack runtime tool or a SceneBlueprint-backed subject renderer such as geo_map_scene, physics_force_scene, bio_cell_scene, bio_process_scene, or molecule_2d_scene. Do not repair this by renaming algorithm_array; replace the visual plan.",
       "Call finalize_playbook only after addressing all error-level self-check issues.",
     ],
   };

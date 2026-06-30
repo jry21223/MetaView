@@ -51,6 +51,7 @@ describe("agent prompt contracts", () => {
     expect(SYSTEM_PROMPT).toContain("geo_map_scene");
     expect(SYSTEM_PROMPT).toContain("physics_force_scene");
     expect(SYSTEM_PROMPT).toContain("bio_cell_scene");
+    expect(SYSTEM_PROMPT).toContain("bio_process_scene");
     expect(SYSTEM_PROMPT).toContain("molecule_2d_scene");
     expect(SYSTEM_PROMPT).toContain("Do not use algorithm_array");
   });

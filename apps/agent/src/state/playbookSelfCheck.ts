@@ -49,6 +49,7 @@ const SUPPORTED_FRONTEND_SNAPSHOT_KINDS = new Set([
   "manifold_scene",
   "solid_geometry_scene",
   "bio_cell_scene",
+  "bio_process_scene",
   "molecule_2d_scene",
   "geo_map_scene",
   "physics_force_scene",
@@ -323,7 +324,7 @@ function checkSubjectVisualFallback(
         "error",
         `${path}.kind`,
         `${normalizedDomain} playbooks must not fall back to ${kind}.`,
-        "Use a SceneBlueprint or subject semantic renderer such as geo_map_scene, bio_cell_scene, or molecule_2d_scene instead of an algorithm array.",
+        "Use a SceneBlueprint or subject semantic renderer such as geo_map_scene, bio_cell_scene, bio_process_scene, or molecule_2d_scene instead of an algorithm array.",
       ),
     );
   }

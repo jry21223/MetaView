@@ -6,6 +6,9 @@ from app.domain.models.playbook import (
     BioCellCallout,
     BioCellSceneSnapshot,
     BioCellStructure,
+    BioProcessConnection,
+    BioProcessSceneSnapshot,
+    BioProcessStep,
     CodeHighlightOverlay,
     GeoMapFlow,
     GeoMapLayer,
@@ -162,6 +165,25 @@ def _step_captions(scene_type: str, title: str, base_caption: str) -> list[str]:
             "这一帧把膜、核、线粒体、核糖体和 DNA 放在同一层级中，形成细胞结构地图。",
             "结论回到细胞结构：细胞不是文字列表，而是由多个有位置、有功能的结构协同工作。",
         ],
+        "dna_replication": [
+            (
+                "DNA 复制先看 bio_process_scene 的三段过程：模板 DNA、复制叉和新链"
+                "被放在同一条流程线上。"
+            ),
+            "template DNA 资产表示被读取的原始双链，它提供后续互补配对的结构基础。",
+            (
+                "replication fork 资产标出双链打开的位置，说明复制不是整条链瞬间完成，"
+                "而是从复制叉推进。"
+            ),
+            "flow_arrow 从模板指向复制叉，表示解旋和读取方向，过程关系不再靠文字猜测。",
+            "复制叉到 new strands 的 flow_arrow 表示互补碱基配对后形成新链。",
+            "base pairing callout 固定在复制叉上，把关键规则和发生位置连起来。",
+            "三段 DNA 资产共同说明复制结果：每条原链都作为模板生成一条互补新链。",
+            (
+                "结论回到 DNA replication：模板链、复制叉、碱基配对和新链生成"
+                "必须作为一个连续过程阅读。"
+            ),
+        ],
         "molecule_2d_water": [
             "水分子先看 molecule_2d_scene，氧原子和氢原子来自结构化 atom 数据。",
             "两个 O-H 键由 bond 数据生成，分子图不是手画 SVG，而是结构数据驱动的结果。",
@@ -215,6 +237,8 @@ def _compile_snapshot(scene_type: str, blueprint: dict[str, Any]):
         return _projectile_motion_snapshot(blueprint)
     if scene_type == "cell_structure":
         return _cell_structure_snapshot(blueprint)
+    if scene_type == "dna_replication":
+        return _dna_replication_snapshot(blueprint)
     if scene_type == "molecule_2d_water":
         return _water_molecule_snapshot(blueprint)
     if scene_type == "derivative_tangent":
@@ -367,6 +391,71 @@ def _cell_structure_snapshot(blueprint: dict[str, Any]) -> BioCellSceneSnapshot:
         caption=str(
             blueprint.get("caption")
             or "Animal cells contain specialized organelles with distinct functions."
+        ),
+    )
+
+
+def _dna_replication_snapshot(blueprint: dict[str, Any]) -> BioProcessSceneSnapshot:
+    return BioProcessSceneSnapshot(
+        pack_id=str(blueprint.get("packId") or "biology-basic"),
+        process_id="dna_replication",
+        steps=[
+            BioProcessStep(
+                id="template",
+                semantic_role="dna",
+                label="template DNA",
+                x=22,
+                y=48,
+                width=18,
+                height=38,
+                asset_id="dna-helix",
+            ),
+            BioProcessStep(
+                id="fork",
+                semantic_role="process_step",
+                label="replication fork",
+                x=50,
+                y=48,
+                width=24,
+                height=24,
+                asset_id="replication-fork",
+                description="strand separation and base pairing",
+            ),
+            BioProcessStep(
+                id="copy",
+                semantic_role="dna",
+                label="new strands",
+                x=78,
+                y=48,
+                width=18,
+                height=38,
+                asset_id="dna-helix",
+            ),
+        ],
+        connections=[
+            BioProcessConnection(
+                id="template-to-fork",
+                **{"from": "template"},
+                to="fork",
+                semantic_role="flow_arrow",
+                label="unzip",
+                asset_id="core-flow-arrow",
+            ),
+            BioProcessConnection(
+                id="fork-to-copy",
+                **{"from": "fork"},
+                to="copy",
+                semantic_role="flow_arrow",
+                label="copy",
+                asset_id="core-flow-arrow",
+            ),
+        ],
+        callouts=[
+            BioCellCallout(id="base-pairing", target_id="fork", label="base pairing", side="top"),
+        ],
+        caption=str(
+            blueprint.get("caption")
+            or "DNA replication copies each strand by complementary base pairing."
         ),
     )
 

@@ -15,6 +15,7 @@ from app.domain.services.scene_blueprint_compiler import compile_scene_blueprint
         ("east_asia_monsoon", "geography", "geo_map_scene", "geography-earth-basic"),
         ("projectile_motion", "physics", "physics_force_scene", "physics-basic"),
         ("cell_structure", "biology", "bio_cell_scene", "biology-basic"),
+        ("dna_replication", "biology", "bio_process_scene", "biology-basic"),
         ("molecule_2d_water", "chemistry", "molecule_2d_scene", "chemistry-basic"),
         ("derivative_tangent", "math", "math_plot", "math-basic"),
         ("bfs_graph", "algorithm", "graph_scene", "algorithm-code-basic"),
@@ -62,6 +63,7 @@ def test_scene_blueprint_compiler_preserves_flagship_asset_markers() -> None:
         "east_asia_monsoon": ("layers", "asset_id", "east-asia-land-110m"),
         "projectile_motion": ("objects", "asset_id", "projectile-body-dot"),
         "cell_structure": ("structures", "asset_id", "nucleus"),
+        "dna_replication": ("steps", "asset_id", "replication-fork"),
         "molecule_2d_water": ("atoms", "asset_id", "atom-core"),
         "derivative_tangent": ("", "asset_id", "derivative-tangent-preset"),
         "bfs_graph": ("", "asset_id", "bfs-graph-preset"),
@@ -119,6 +121,38 @@ def test_scene_blueprint_compiler_hydrates_water_from_molecule_preset() -> None:
     ]
 
 
+def test_scene_blueprint_compiler_builds_dna_replication_process_scene() -> None:
+    playbook = compile_scene_blueprint_to_playbook(
+        {
+            "id": "dna_replication",
+            "subject": "biology",
+            "sceneType": "dna_replication",
+            "title": "DNA replication",
+            "visualIntent": ["show_process_steps", "show_complementary_base_pairing"],
+            "emphasisPoints": ["template DNA", "replication fork", "new strands"],
+        },
+    )
+
+    snapshot = playbook.steps[0].snapshot.model_dump(mode="json", by_alias=True)
+
+    assert snapshot["kind"] == "bio_process_scene"
+    assert snapshot["pack_id"] == "biology-basic"
+    assert snapshot["process_id"] == "dna_replication"
+    assert [step["asset_id"] for step in snapshot["steps"]] == [
+        "dna-helix",
+        "replication-fork",
+        "dna-helix",
+    ]
+    assert {connection["asset_id"] for connection in snapshot["connections"]} == {
+        "core-flow-arrow"
+    }
+    assert snapshot["callouts"][0]["target_id"] == "fork"
+    assert "base pairing" in snapshot["callouts"][0]["label"]
+
+    verdict = self_check_playbook(playbook, "Explain DNA replication.")
+    assert verdict.status == PlaybookReviewStatus.CLEAN
+
+
 @pytest.mark.parametrize(
     ("scene_type", "subject", "prompt"),
     [
@@ -149,6 +183,7 @@ def _subject_for(scene_type: str) -> str:
     return {
         "bfs_graph": "algorithm",
         "cell_structure": "biology",
+        "dna_replication": "biology",
         "derivative_tangent": "math",
         "east_asia_monsoon": "geography",
         "molecule_2d_water": "chemistry",
