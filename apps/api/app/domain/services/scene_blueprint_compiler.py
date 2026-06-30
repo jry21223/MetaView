@@ -9,6 +9,9 @@ from app.domain.models.playbook import (
     BioProcessConnection,
     BioProcessSceneSnapshot,
     BioProcessStep,
+    CallStackCodeTrace,
+    CallStackFrame,
+    CallStackSceneSnapshot,
     CodeHighlightOverlay,
     GeoMapFlow,
     GeoMapLayer,
@@ -256,6 +259,16 @@ def _step_captions(scene_type: str, title: str, base_caption: str) -> list[str]:
             "这一帧把图结构、队列和访问状态放在同一个可视布局里。",
             "结论回到 BFS：它按层扩展图节点，用队列保证先发现的节点先被处理。",
         ],
+        "recursion_stack": [
+            "递归栈先看 call_stack_scene：每一次 factorial 调用都会压入一个 call frame。",
+            "factorial(4) 是当前 active frame，call-frame 资产标出正在执行的调用。",
+            "factorial(3) 和 factorial(2) 是等待返回的 stack frames，说明乘法还没有结算。",
+            "右侧 active-line 资产高亮 return n * factorial(n - 1)，对应新的递归调用。",
+            "每个 frame 的 n 值显示当前调用保存的局部变量，避免把所有 n 混成同一个值。",
+            "递归继续向 base case 推进，直到 factorial(1) 返回后才逐层弹栈。",
+            "代码轨道和 call stack 同步，帮助学生把源代码行和运行时栈帧对应起来。",
+            "结论回到递归栈：递归不是重复文字，而是一组等待返回的 call frames。",
+        ],
     }
     return presets.get(
         scene_type,
@@ -293,6 +306,8 @@ def _compile_snapshot(scene_type: str, blueprint: dict[str, Any]):
         return _derivative_tangent_snapshot(blueprint)
     if scene_type == "bfs_graph":
         return _bfs_graph_snapshot(blueprint)
+    if scene_type == "recursion_stack":
+        return _recursion_stack_snapshot(blueprint)
     raise ValueError(f"Unsupported SceneBlueprint sceneType: {scene_type}")
 
 
@@ -714,10 +729,78 @@ def _bfs_graph_snapshot(blueprint: dict[str, Any]) -> GraphSceneSnapshot:
     )
 
 
+def _recursion_stack_snapshot(blueprint: dict[str, Any]) -> CallStackSceneSnapshot:
+    return CallStackSceneSnapshot(
+        pack_id=str(blueprint.get("packId") or "algorithm-code-basic"),
+        asset_id="recursion-stack-preset",
+        frames=[
+            CallStackFrame(
+                id="factorial-4",
+                label="factorial(4)",
+                depth=0,
+                state="active",
+                asset_id="call-frame",
+                variables={"n": "4"},
+            ),
+            CallStackFrame(
+                id="factorial-3",
+                label="factorial(3)",
+                depth=1,
+                state="waiting",
+                asset_id="stack-frame",
+                variables={"n": "3"},
+            ),
+            CallStackFrame(
+                id="factorial-2",
+                label="factorial(2)",
+                depth=2,
+                state="waiting",
+                asset_id="stack-frame",
+                variables={"n": "2"},
+            ),
+        ],
+        code_trace=CallStackCodeTrace(
+            language="python",
+            lines=[
+                "def factorial(n):",
+                "    if n == 1:",
+                "        return 1",
+                "    return n * factorial(n - 1)",
+            ],
+            active_lines=[3],
+            active_line=3,
+            asset_id="active-line",
+        ),
+        current_frame_id="factorial-4",
+        caption=str(
+            blueprint.get("caption")
+            or "Recursive calls form a stack frame for each pending multiplication."
+        ),
+    )
+
+
 def _code_highlight(scene_type: str, blueprint: dict[str, Any]) -> CodeHighlightOverlay | None:
+    visual_intent = ", ".join(str(item) for item in blueprint.get("visualIntent") or [])
+    if scene_type == "recursion_stack":
+        return CodeHighlightOverlay(
+            language="python",
+            lines=[
+                "def factorial(n):",
+                "    if n == 1:",
+                "        return 1",
+                "    return n * factorial(n - 1)",
+            ],
+            active_lines=[3],
+            active_line=3,
+            variables={
+                "intent": visual_intent,
+                "n": "4",
+                "pending": "4 * factorial(3)",
+            },
+            operation_label="recursive call",
+        )
     if scene_type != "bfs_graph":
         return None
-    visual_intent = ", ".join(str(item) for item in blueprint.get("visualIntent") or [])
     return CodeHighlightOverlay(
         language="typescript",
         lines=[

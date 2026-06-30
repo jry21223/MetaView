@@ -49,7 +49,7 @@ SMILES strings such as glucose into the same `molecule_2d_scene` atom/bond
 snapshot contract using RDKit 2D coordinates.
 The current supported scene blueprints are `east_asia_monsoon`,
 `projectile_motion`, `cell_structure`, `dna_replication`, `molecule_2d_water`,
-`molecule_2d_methane`, `reaction_synthesis_water`, `derivative_tangent`, and
+`molecule_2d_methane`, `reaction_synthesis_water`, `derivative_tangent`,
 `bfs_graph`, and `recursion_stack`; the API runtime compiler additionally supports
 `molecule_2d_glucose` from SMILES/RDKit.
 The backend mirror lives at

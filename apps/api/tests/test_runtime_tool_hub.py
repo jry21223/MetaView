@@ -374,6 +374,19 @@ async def test_runtime_tool_hub_runs_self_check() -> None:
             "molecule_2d_scene",
             "chemistry-basic",
         ),
+        (
+            {
+                "id": "recursion_stack",
+                "subject": "algorithm",
+                "sceneType": "recursion_stack",
+                "title": "Recursion stack",
+                "caption": "Recursive calls push call frames until the base case returns.",
+                "visualIntent": ["show_call_stack", "highlight_active_line"],
+                "emphasisPoints": ["active call frame", "pending multiplication"],
+            },
+            "call_stack_scene",
+            "algorithm-code-basic",
+        ),
     ],
 )
 async def test_runtime_tool_hub_compiles_subject_scene_blueprints(
@@ -400,6 +413,9 @@ async def test_runtime_tool_hub_compiles_subject_scene_blueprints(
         assert snapshot["kind"] == expected_kind
         assert snapshot["pack_id"] == expected_pack
         assert snapshot["kind"] not in {"algorithm_array", "algorithm_bars"}
+        if blueprint["sceneType"] == "recursion_stack":
+            assert snapshot["asset_id"] == "recursion-stack-preset"
+            assert snapshot["code_trace"]["asset_id"] == "active-line"
 
 
 @pytest.mark.asyncio

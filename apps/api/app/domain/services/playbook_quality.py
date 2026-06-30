@@ -29,6 +29,7 @@ SUPPORTED_FRONTEND_SNAPSHOT_KINDS = {
     "matrix_scene",
     "table_scene",
     "graph_scene",
+    "call_stack_scene",
     "stats_chart_scene",
     "iteration_trace_scene",
     "phase_portrait_scene",
@@ -324,6 +325,8 @@ def _snapshot_has_meaningful_payload(snapshot: Any) -> bool:
         return bool(data.get("columns") or data.get("rows"))
     if kind == "graph_scene":
         return bool(data.get("nodes") or data.get("edges"))
+    if kind == "call_stack_scene":
+        return bool(data.get("frames") or data.get("code_trace"))
     if kind == "stats_chart_scene":
         return bool(data.get("series"))
     if kind == "iteration_trace_scene":

@@ -19,6 +19,7 @@ class SnapshotKind(str, Enum):
     MATRIX_SCENE = "matrix_scene"
     TABLE_SCENE = "table_scene"
     GRAPH_SCENE = "graph_scene"
+    CALL_STACK_SCENE = "call_stack_scene"
     STATS_CHART_SCENE = "stats_chart_scene"
     ITERATION_TRACE_SCENE = "iteration_trace_scene"
     PHASE_PORTRAIT_SCENE = "phase_portrait_scene"
@@ -256,6 +257,33 @@ class GraphSceneSnapshot(BaseModel):
     visited_node_ids: list[str] = Field(default_factory=list)
     queue_node_ids: list[str] = Field(default_factory=list)
     frontier_node_ids: list[str] = Field(default_factory=list)
+    caption: str | None = None
+
+
+class CallStackFrame(BaseModel):
+    id: str
+    label: str
+    depth: int = 0
+    state: str = "waiting"
+    asset_id: str | None = None
+    variables: dict[str, str] = Field(default_factory=dict)
+
+
+class CallStackCodeTrace(BaseModel):
+    language: str
+    lines: list[str] = Field(default_factory=list)
+    active_lines: list[int] = Field(default_factory=list)
+    active_line: int = 0
+    asset_id: str | None = None
+
+
+class CallStackSceneSnapshot(BaseModel):
+    kind: Literal["call_stack_scene"] = "call_stack_scene"
+    pack_id: str | None = None
+    asset_id: str | None = None
+    frames: list[CallStackFrame] = Field(default_factory=list)
+    code_trace: CallStackCodeTrace | None = None
+    current_frame_id: str | None = None
     caption: str | None = None
 
 
@@ -795,6 +823,7 @@ AnySnapshot = Annotated[
         MatrixSceneSnapshot,
         TableSceneSnapshot,
         GraphSceneSnapshot,
+        CallStackSceneSnapshot,
         StatsChartSceneSnapshot,
         IterationTraceSceneSnapshot,
         PhasePortraitSceneSnapshot,

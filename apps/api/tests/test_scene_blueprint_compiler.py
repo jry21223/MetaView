@@ -27,6 +27,7 @@ GLUCOSE_SMILES = "OC[C@H]1O[C@@H](O)[C@H](O)[C@H](O)[C@@H]1O"
         ("reaction_synthesis_water", "chemistry", "reaction_scene", "chemistry-basic"),
         ("derivative_tangent", "math", "math_plot", "math-basic"),
         ("bfs_graph", "algorithm", "graph_scene", "algorithm-code-basic"),
+        ("recursion_stack", "algorithm", "call_stack_scene", "algorithm-code-basic"),
     ],
 )
 def test_scene_blueprint_compiler_builds_asset_backed_playbook(
@@ -78,6 +79,7 @@ def test_scene_blueprint_compiler_preserves_flagship_asset_markers() -> None:
         "reaction_synthesis_water": ("arrows", "asset_id", "reaction-arrow"),
         "derivative_tangent": ("", "asset_id", "derivative-tangent-preset"),
         "bfs_graph": ("", "asset_id", "bfs-graph-preset"),
+        "recursion_stack": ("", "asset_id", "recursion-stack-preset"),
     }
 
     for scene_type, (collection_name, field_name, expected_value) in cases.items():
@@ -232,6 +234,40 @@ def test_scene_blueprint_compiler_builds_dna_replication_process_scene() -> None
     assert verdict.status == PlaybookReviewStatus.CLEAN
 
 
+def test_scene_blueprint_compiler_builds_recursion_call_stack_scene() -> None:
+    playbook = compile_scene_blueprint_to_playbook(
+        {
+            "id": "recursion_stack",
+            "subject": "algorithm",
+            "sceneType": "recursion_stack",
+            "title": "Recursion stack",
+            "visualIntent": ["show_call_stack", "highlight_active_line"],
+            "emphasisPoints": ["active call frame", "pending multiplication"],
+        },
+    )
+
+    snapshot = playbook.steps[0].snapshot.model_dump(mode="json", by_alias=True)
+
+    assert snapshot["kind"] == "call_stack_scene"
+    assert snapshot["pack_id"] == "algorithm-code-basic"
+    assert snapshot["asset_id"] == "recursion-stack-preset"
+    assert snapshot["current_frame_id"] == "factorial-4"
+    assert [frame["asset_id"] for frame in snapshot["frames"]] == [
+        "call-frame",
+        "stack-frame",
+        "stack-frame",
+    ]
+    assert snapshot["frames"][0]["variables"] == {"n": "4"}
+    assert snapshot["code_trace"]["asset_id"] == "active-line"
+    assert snapshot["code_trace"]["active_lines"] == [3]
+    assert "factorial(n - 1)" in snapshot["code_trace"]["lines"][3]
+    assert playbook.steps[0].code_highlight is not None
+    assert playbook.steps[0].code_highlight.active_line == 3
+
+    verdict = self_check_playbook(playbook, "Trace factorial recursion stack.")
+    assert verdict.status == PlaybookReviewStatus.CLEAN
+
+
 def test_scene_blueprint_compiler_builds_water_synthesis_reaction_scene() -> None:
     playbook = compile_scene_blueprint_to_playbook(
         {
@@ -291,6 +327,7 @@ def test_scene_blueprint_compiler_outputs_launch_safe_self_check_clean_playbooks
 def _subject_for(scene_type: str) -> str:
     return {
         "bfs_graph": "algorithm",
+        "recursion_stack": "algorithm",
         "cell_structure": "biology",
         "dna_replication": "biology",
         "derivative_tangent": "math",
