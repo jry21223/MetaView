@@ -1,13 +1,16 @@
 import React from "react";
 
+import { resolveGeoJsonAssetData, type GeoJsonFeatureCollection } from "../assets/assetGeoJson";
 import { AssetSvg } from "../assets/AssetSvg";
 import type { AssetManifestEntry } from "../assets/assetRegistry";
 import { resolveAssetById, resolveAssetByRole, resolveAssetForRenderer } from "../assets/assetResolver";
+import { compileGeoJsonToSvgPaths } from "../kits/geography/MapProjectionCompiler";
 import type { GeoMapFlow, GeoMapSceneSnapshot, GeoPressureCenter } from "../types";
 import type { RendererProps } from "./types";
 
 const VIEWBOX = "0 0 100 100";
-const DEFAULT_GEO_PACK_ID = "geography-basic";
+const DEFAULT_GEO_PACK_ID = "geography-earth-basic";
+const MAP_VIEWPORT = { x: 8, y: 21, width: 84, height: 58 };
 
 function clampPercent(value: number): number {
   return Math.max(4, Math.min(96, value));
@@ -28,21 +31,59 @@ function pressureClass(kind: "high" | "low"): string {
   return kind === "high" ? "#2f80c9" : "#d55343";
 }
 
-function resolveMapAsset(snap: GeoMapSceneSnapshot, packId: string): AssetManifestEntry | undefined {
-  const explicitLayer = snap.layers.find(
-    (layer) =>
-      (layer.semantic_role === "map_layer" || layer.semantic_role === "land" || layer.semantic_role === "ocean") &&
-      layer.asset_id,
-  );
-  const explicitAsset = resolveAssetById(packId, explicitLayer?.asset_id);
-  if (explicitAsset) return explicitAsset;
+function explicitLayerAsset(
+  snap: GeoMapSceneSnapshot,
+  packId: string,
+  semanticRoles: string[],
+): AssetManifestEntry | undefined {
+  for (const layer of snap.layers) {
+    if (!semanticRoles.includes(layer.semantic_role) || !layer.asset_id) continue;
+    const asset = resolveAssetById(packId, layer.asset_id);
+    if (asset) return asset;
+  }
+  return undefined;
+}
 
+function resolveLayerAsset(
+  snap: GeoMapSceneSnapshot,
+  packId: string,
+  semanticRole: string,
+  fallbacks: string[] = [],
+): AssetManifestEntry | undefined {
+  const roles = [semanticRole, ...fallbacks];
   return (
-    resolveAssetForRenderer("geo_map_scene", "map_layer", packId) ??
-    resolveAssetForRenderer("geo_map_scene", "land", packId) ??
-    resolveAssetForRenderer("geo_map_scene", "ocean", packId) ??
-    resolveAssetByRole("geography", "map_layer", packId)
+    explicitLayerAsset(snap, packId, roles) ??
+    roles.reduce<AssetManifestEntry | undefined>(
+      (resolved, role) =>
+        resolved ??
+        resolveAssetForRenderer("geo_map_scene", role, packId) ??
+        resolveAssetByRole("geography", role, packId),
+      undefined,
+    )
   );
+}
+
+function uniqueAssets(assets: Array<AssetManifestEntry | undefined>): AssetManifestEntry[] {
+  const seen = new Set<string>();
+  return assets.filter((asset): asset is AssetManifestEntry => {
+    if (!asset || seen.has(asset.id)) return false;
+    seen.add(asset.id);
+    return true;
+  });
+}
+
+function resolveMapAssets(snap: GeoMapSceneSnapshot, packId: string): {
+  ocean?: AssetManifestEntry;
+  overlays: AssetManifestEntry[];
+} {
+  const ocean = resolveLayerAsset(snap, packId, "ocean");
+  const land = resolveLayerAsset(snap, packId, "land", ["map_layer"]);
+  const boundary = resolveLayerAsset(snap, packId, "country_boundary");
+  const coastline = resolveLayerAsset(snap, packId, "coastline");
+  return {
+    ocean,
+    overlays: uniqueAssets([land, boundary, coastline]),
+  };
 }
 
 function resolveFlowAsset(flow: GeoMapFlow, packId: string): AssetManifestEntry | undefined {
@@ -99,10 +140,81 @@ function layerLabelPosition(index: number, total: number): { x: number; y: numbe
   };
 }
 
+function geoJsonLayerStyle(asset: AssetManifestEntry): {
+  className: string;
+  fill: string;
+  stroke: string;
+  strokeWidth: number;
+  opacity: number;
+} {
+  if (asset.semanticRoles.includes("country_boundary")) {
+    return { className: "country_boundary", fill: "none", stroke: "#6f7d58", strokeWidth: 0.34, opacity: 0.72 };
+  }
+  if (asset.semanticRoles.includes("coastline")) {
+    return { className: "coastline", fill: "none", stroke: "#4a758f", strokeWidth: 0.72, opacity: 0.82 };
+  }
+  return { className: "land", fill: "#d6e6bf", stroke: "#78935a", strokeWidth: 0.42, opacity: 0.98 };
+}
+
+function naturalEarthLayer(data: GeoJsonFeatureCollection, asset: AssetManifestEntry): string {
+  return data.metadata?.natural_earth_layer ?? asset.semanticRoles[0] ?? asset.id;
+}
+
+function renderMapAsset(asset: AssetManifestEntry, packId: string) {
+  const geojson = resolveGeoJsonAssetData(asset);
+  if (!geojson) {
+    return (
+      <AssetSvg
+        key={asset.id}
+        asset={asset}
+        assetId={asset.id}
+        packId={packId}
+        subject="geography"
+        semanticRole={asset.semanticRoles[0]}
+        x={MAP_VIEWPORT.x}
+        y={MAP_VIEWPORT.y}
+        width={MAP_VIEWPORT.width}
+        height={MAP_VIEWPORT.height}
+        fallbackShape="rect"
+      />
+    );
+  }
+
+  const style = geoJsonLayerStyle(asset);
+  const compiled = compileGeoJsonToSvgPaths(geojson, {
+    viewport: MAP_VIEWPORT,
+    className: style.className,
+    precision: 3,
+  });
+  return (
+    <g
+      key={asset.id}
+      data-asset-id={asset.id}
+      data-asset-path={asset.path}
+      data-asset-type={asset.type}
+      data-semantic-role={asset.semanticRoles[0]}
+      data-natural-earth-layer={naturalEarthLayer(geojson, asset)}
+    >
+      {compiled.paths.map((path) => (
+        <path
+          key={path.id}
+          d={path.d}
+          fill={style.fill}
+          stroke={style.stroke}
+          strokeWidth={style.strokeWidth}
+          opacity={style.opacity}
+          data-feature-name={path.sourceName}
+          data-map-path-class={path.className}
+        />
+      ))}
+    </g>
+  );
+}
+
 export const GeoMapSceneRenderer: React.FC<RendererProps> = ({ step, progress, theme }) => {
   const snap = step.snapshot as GeoMapSceneSnapshot;
   const packId = snap.pack_id ?? DEFAULT_GEO_PACK_ID;
-  const mapAsset = resolveMapAsset(snap, packId);
+  const mapAssets = resolveMapAssets(snap, packId);
   const particles = particlePresetPoints(snap.particle_preset, progress);
   const pressureCenters = snap.pressure_centers ?? [];
 
@@ -141,6 +253,21 @@ export const GeoMapSceneRenderer: React.FC<RendererProps> = ({ step, progress, t
         </defs>
 
         <rect x="0" y="0" width="100" height="100" rx="3" fill="url(#geo-ocean)" />
+        {mapAssets.ocean ? (
+          <AssetSvg
+            asset={mapAssets.ocean}
+            assetId={mapAssets.ocean.id}
+            packId={packId}
+            subject="geography"
+            semanticRole="ocean"
+            x={0}
+            y={0}
+            width={100}
+            height={100}
+            preserveAspectRatio="none"
+            fallbackShape="rect"
+          />
+        ) : null}
         <rect x="4" y="5" width="92" height="14" rx="3" fill="rgba(255,255,255,0.72)" />
         <text x="8" y="14" fontSize="5.2" fontWeight="760" fill="#182235">
           {step.title}
@@ -149,18 +276,20 @@ export const GeoMapSceneRenderer: React.FC<RendererProps> = ({ step, progress, t
           {snap.map_region ?? "world"}
         </text>
 
-        <AssetSvg
-          asset={mapAsset}
-          assetId={mapAsset?.id}
-          packId={packId}
-          subject="geography"
-          semanticRole="map_layer"
-          x={8}
-          y={21}
-          width={84}
-          height={58}
-          fallbackShape="rect"
-        />
+        {mapAssets.overlays.length ? (
+          mapAssets.overlays.map((asset) => renderMapAsset(asset, packId))
+        ) : (
+          <AssetSvg
+            packId={packId}
+            subject="geography"
+            semanticRole="map_layer"
+            x={MAP_VIEWPORT.x}
+            y={MAP_VIEWPORT.y}
+            width={MAP_VIEWPORT.width}
+            height={MAP_VIEWPORT.height}
+            fallbackShape="rect"
+          />
+        )}
 
         {pressureCenters.map((center, index) => {
           const label = pressureLabelPosition(center, pressureCenters, index);

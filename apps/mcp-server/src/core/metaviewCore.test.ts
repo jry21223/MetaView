@@ -13,7 +13,7 @@ describe("MetaView MCP core discovery", () => {
         id: "geography",
         support: "partial",
         renderers: expect.arrayContaining(["geo_map_scene"]),
-        assetPacks: ["geography-basic"],
+        assetPacks: expect.arrayContaining(["geography-basic", "geography-earth-basic"]),
         flagshipCases: ["east_asia_monsoon"],
       }),
     );
@@ -33,15 +33,24 @@ describe("MetaView MCP core discovery", () => {
 
     const result = core.listAssetPacks({ subject: "geography" });
 
-    expect(result.packs).toEqual([
-      expect.objectContaining({
-        packId: "geography-basic",
-        subject: "geography",
-        version: "0.1.0",
-        semanticRoles: expect.arrayContaining(["land", "ocean", "map_layer", "wind"]),
-        resourceUri: "metaview://kits/geography-basic/manifest",
-      }),
-    ]);
+    expect(result.packs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          packId: "geography-basic",
+          subject: "geography",
+          version: "0.1.0",
+          semanticRoles: expect.arrayContaining(["land", "ocean", "map_layer", "wind"]),
+          resourceUri: "metaview://kits/geography-basic/manifest",
+        }),
+        expect.objectContaining({
+          packId: "geography-earth-basic",
+          subject: "geography",
+          version: "0.1.0",
+          semanticRoles: expect.arrayContaining(["land", "coastline", "country_boundary", "monsoon_flow"]),
+          resourceUri: "metaview://kits/geography-earth-basic/manifest",
+        }),
+      ]),
+    );
     expect(JSON.stringify(result)).not.toContain("<svg");
   });
 

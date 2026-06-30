@@ -8,10 +8,10 @@ import { GeoMapSceneRenderer } from "./GeoMapSceneRenderer";
 function eastAsiaMonsoonSnapshot(extra: Partial<GeoMapSceneSnapshot> = {}): GeoMapSceneSnapshot {
   return {
     kind: "geo_map_scene",
-    pack_id: "geography-basic",
+    pack_id: "geography-earth-basic",
     map_region: "east_asia",
     layers: [
-      { id: "map", semantic_role: "map_layer", label: "东亚底图", asset_id: "east-asia-map-placeholder" },
+      { id: "map", semantic_role: "map_layer", label: "东亚底图", asset_id: "east-asia-land-110m" },
       { id: "land", semantic_role: "land", label: "亚洲大陆" },
       { id: "ocean", semantic_role: "ocean", label: "太平洋" },
     ],
@@ -65,11 +65,13 @@ describe("GeoMapSceneRenderer", () => {
     const markup = renderToStaticMarkup(<GeoMapSceneRenderer {...props(eastAsiaMonsoonSnapshot())} />);
 
     expect(markup).toContain("geo-map-scene");
-    expect(markup).toContain('data-asset-id="east-asia-map-placeholder"');
+    expect(markup).toContain('data-asset-id="east-asia-land-110m"');
     expect(markup).toContain(
-      'data-asset-path="/assets/metaview-kits/geography-basic/east-asia-map-placeholder.svg"',
+      'data-asset-path="/assets/metaview-kits/geography-earth-basic/natural-earth/east-asia-land-110m.geojson"',
     );
-    expect(markup).toContain("<image");
+    expect(markup).toContain('data-natural-earth-layer="admin_0_countries"');
+    expect(markup).toContain('data-map-path-class="land"');
+    expect(markup).toContain("<path");
     expect(markup).toContain('data-semantic-role="monsoon_flow"');
     expect(markup).toContain('data-asset-id="monsoon-wind-arrow"');
     expect(markup).not.toContain('data-missing-asset="true"');
@@ -95,7 +97,7 @@ describe("GeoMapSceneRenderer", () => {
     });
     const markup = renderToStaticMarkup(<GeoMapSceneRenderer {...props(snapshot)} />);
 
-    expect(markup).toContain('data-asset-id="east-asia-map-placeholder"');
+    expect(markup).toContain('data-asset-id="east-asia-land-110m"');
     expect(markup).toContain('data-asset-id="monsoon-wind-arrow"');
     expect(markup).not.toContain('data-missing-asset="true"');
   });

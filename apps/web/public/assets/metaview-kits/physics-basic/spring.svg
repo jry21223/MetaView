@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 36" role="img" aria-label="Spring" data-asset-id="spring" data-asset-quality="v1">
+  <path d="M8 18 H20 C24 3 32 33 36 18 S48 3 52 18 S64 33 68 18 S80 3 84 18 S96 33 100 18 H112" fill="none" stroke="#345995" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="8" cy="18" r="4" fill="#d69e2e"/>
+  <circle cx="112" cy="18" r="4" fill="#d69e2e"/>
+</svg>

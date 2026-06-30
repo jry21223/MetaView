@@ -68,6 +68,106 @@
         "colorizable": false,
         "strokeControlled": false
       }
+    },
+    {
+      "id": "block-body",
+      "type": "svg",
+      "path": "/assets/metaview-kits/physics-basic/block-body.svg",
+      "tags": ["object", "block", "mechanics"],
+      "semanticRoles": ["block"],
+      "sourceId": "metaview-internal",
+      "attribution": "MetaView internal SVG primitive",
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "commercialUseAllowed": true,
+      "requiresAttribution": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null,
+      "rendererHints": {
+        "preferredRenderer": "physics_force_scene",
+        "defaultSize": [64, 48],
+        "anchor": "center",
+        "colorizable": false,
+        "strokeControlled": false
+      }
+    },
+    {
+      "id": "ramp-surface",
+      "type": "svg",
+      "path": "/assets/metaview-kits/physics-basic/ramp-surface.svg",
+      "tags": ["object", "ramp", "inclined_plane", "mechanics"],
+      "semanticRoles": ["ramp"],
+      "sourceId": "metaview-internal",
+      "attribution": "MetaView internal SVG primitive",
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "commercialUseAllowed": true,
+      "requiresAttribution": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null,
+      "rendererHints": {
+        "preferredRenderer": "physics_force_scene",
+        "defaultSize": [120, 64],
+        "anchor": "topLeft",
+        "colorizable": false,
+        "strokeControlled": false
+      }
+    },
+    {
+      "id": "spring",
+      "type": "svg",
+      "path": "/assets/metaview-kits/physics-basic/spring.svg",
+      "tags": ["object", "spring", "oscillation", "mechanics"],
+      "semanticRoles": ["spring"],
+      "sourceId": "metaview-internal",
+      "attribution": "MetaView internal SVG primitive",
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "commercialUseAllowed": true,
+      "requiresAttribution": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null,
+      "rendererHints": {
+        "preferredRenderer": "physics_force_scene",
+        "defaultSize": [120, 36],
+        "anchor": "center",
+        "colorizable": true,
+        "strokeControlled": true
+      }
+    },
+    {
+      "id": "pulley",
+      "type": "svg",
+      "path": "/assets/metaview-kits/physics-basic/pulley.svg",
+      "tags": ["object", "pulley", "mechanics"],
+      "semanticRoles": ["pulley"],
+      "sourceId": "metaview-internal",
+      "attribution": "MetaView internal SVG primitive",
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "commercialUseAllowed": true,
+      "requiresAttribution": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null,
+      "rendererHints": {
+        "preferredRenderer": "physics_force_scene",
+        "defaultSize": [64, 64],
+        "anchor": "center",
+        "colorizable": false,
+        "strokeControlled": false
+      }
     }
   ]
 }

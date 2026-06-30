@@ -26,6 +26,7 @@ describe("assetRegistry", () => {
     const packs = listAssetPacks().map((pack) => pack.packId);
 
     expect(packs).toContain("geography-basic");
+    expect(packs).toContain("geography-earth-basic");
     expect(packs).toContain("physics-basic");
   });
 
@@ -37,6 +38,7 @@ describe("assetRegistry", () => {
 
   it("keeps rendererKinds aligned with the dedicated scene renderers", () => {
     expect(getAssetPack("geography-basic")?.rendererKinds).toEqual(["geo_map_scene"]);
+    expect(getAssetPack("geography-earth-basic")?.rendererKinds).toEqual(["geo_map_scene"]);
     expect(getAssetPack("physics-basic")?.rendererKinds).toEqual(["physics_force_scene"]);
   });
 
@@ -82,6 +84,7 @@ describe("assetRegistry", () => {
 
     for (const manifestPath of [
       "/assets/metaview-kits/geography-basic/manifest.json",
+      "/assets/metaview-kits/geography-earth-basic/manifest.json",
       "/assets/metaview-kits/physics-basic/manifest.json",
     ]) {
       const manifest = readPublicJson<unknown>(manifestPath);
@@ -95,6 +98,18 @@ describe("assetRegistry", () => {
     );
     expect(readPublicAsset("/assets/metaview-kits/physics-basic/projectile-body-dot.svg")).toContain(
       'data-asset-quality="v2"',
+    );
+    expect(readPublicAsset("/assets/metaview-kits/physics-basic/block-body.svg")).toContain(
+      'data-asset-quality="v1"',
+    );
+    expect(readPublicAsset("/assets/metaview-kits/physics-basic/ramp-surface.svg")).toContain(
+      'data-asset-quality="v1"',
+    );
+    expect(readPublicAsset("/assets/metaview-kits/physics-basic/spring.svg")).toContain(
+      'data-asset-quality="v1"',
+    );
+    expect(readPublicAsset("/assets/metaview-kits/physics-basic/pulley.svg")).toContain(
+      'data-asset-quality="v1"',
     );
     expect(readPublicAsset("/assets/metaview-kits/physics-basic/force-vector-arrow.svg")).toContain(
       'data-asset-quality="v2"',
@@ -118,21 +133,22 @@ describe("assetRegistry", () => {
   });
 
   it("uses Natural Earth public-domain data for the geography map asset", () => {
-    const asset = getAssetPack("geography-basic")?.assets.find((item) =>
+    const asset = getAssetPack("geography-earth-basic")?.assets.find((item) =>
       item.semanticRoles.includes("map_layer"),
     );
 
     expect(asset).toMatchObject({
       license: "public-domain",
-      attribution: "Natural Earth public domain map data; styled by MetaView",
+      type: "geojson",
+      attribution: "Natural Earth public domain map data; simplified for MetaView East Asia map rendering",
       commercialUseStatus: "allowed",
       sourceUrl: "https://github.com/nvkelso/natural-earth-vector",
       licenseUrl: "https://www.naturalearthdata.com/about/terms-of-use/",
-      modifiedFrom: "Natural Earth 1:110m Admin 0 Countries, selected East Asia features",
+      modifiedFrom: "Natural Earth 1:110m Admin 0 Countries, selected East Asia and Western Pacific features",
     });
 
-    const svg = readPublicAsset(asset?.path ?? "");
-    expect(svg).toContain('data-source="natural-earth"');
-    expect(svg).toContain('data-natural-earth-layer="land"');
+    const geojson = readPublicJson<{ type: string; features: unknown[] }>(asset?.path ?? "");
+    expect(geojson.type).toBe("FeatureCollection");
+    expect(geojson.features.length).toBeGreaterThan(3);
   });
 });

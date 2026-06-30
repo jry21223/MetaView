@@ -5,10 +5,10 @@ export type SubjectVisualFixtureId = "east_asia_monsoon" | "projectile_motion";
 function eastAsiaMonsoonSnapshot(): GeoMapSceneSnapshot {
   return {
     kind: "geo_map_scene",
-    pack_id: "geography-basic",
+    pack_id: "geography-earth-basic",
     map_region: "east_asia",
     layers: [
-      { id: "map", semantic_role: "map_layer", label: "East Asia map", asset_id: "east-asia-map-placeholder" },
+      { id: "map", semantic_role: "map_layer", label: "East Asia map", asset_id: "east-asia-land-110m" },
       { id: "land", semantic_role: "land", label: "heated continent" },
       { id: "ocean", semantic_role: "ocean", label: "western Pacific" },
     ],
@@ -41,6 +41,7 @@ function projectileMotionSnapshot(): PhysicsForceSceneSnapshot {
     ],
     vectors: [
       { id: "vx", target: "body", semantic_role: "velocity", dx: 28, dy: 0, label: "v_x" },
+      { id: "vy", target: "body", semantic_role: "velocity", dx: 0, dy: 18, label: "v_y" },
       { id: "g", target: "body", semantic_role: "acceleration", dx: 0, dy: 24, label: "g" },
       { id: "force", target: "body", semantic_role: "force", dx: -16, dy: 8, label: "F" },
     ],

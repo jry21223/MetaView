@@ -19,6 +19,12 @@ function vectorColor(role: string): string {
   return "#466172";
 }
 
+function vectorComponent(vector: PhysicsSceneVector): "horizontal" | "vertical" | "diagonal" {
+  if (Math.abs(vector.dy) < 0.001) return "horizontal";
+  if (Math.abs(vector.dx) < 0.001) return "vertical";
+  return "diagonal";
+}
+
 function trajectoryPath(points: Array<[number, number]>, progress: number): string {
   if (points.length === 0) return "";
   const count = Math.max(1, Math.ceil(points.length * Math.max(0, Math.min(1, progress))));
@@ -98,7 +104,7 @@ function renderVector(
   const length = Math.max(8, Math.hypot(endX - target.x, endY - target.y));
   const angle = (Math.atan2(endY - target.y, endX - target.x) * 180) / Math.PI;
   return (
-    <g key={vector.id} data-semantic-role={vector.semantic_role}>
+    <g key={vector.id} data-semantic-role={vector.semantic_role} data-vector-component={vectorComponent(vector)}>
       {vectorAsset ? (
         <AssetSvg
           asset={vectorAsset}
@@ -188,9 +194,29 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({ step, progr
           {step.title}
         </text>
         {formulaText ? (
-          <text x="94" y="10.5" textAnchor="end" fontSize="4.2" fontWeight="760" fill={theme === "dark" ? "#f8fafc" : "#182235"}>
-            {formulaText}
-          </text>
+          <g data-semantic-role="formula_card">
+            <rect
+              x="57"
+              y="4.4"
+              width="37"
+              height="9"
+              rx="2.2"
+              fill={theme === "dark" ? "#1e293b" : "#ffffff"}
+              stroke={theme === "dark" ? "#334155" : "#d8e1ea"}
+              strokeWidth="0.5"
+              opacity="0.94"
+            />
+            <text
+              x="92"
+              y="10.5"
+              textAnchor="end"
+              fontSize="4.2"
+              fontWeight="760"
+              fill={theme === "dark" ? "#f8fafc" : "#182235"}
+            >
+              {formulaText}
+            </text>
+          </g>
         ) : null}
 
         {snap.trajectory?.length ? (

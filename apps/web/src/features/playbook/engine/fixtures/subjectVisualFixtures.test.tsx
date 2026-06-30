@@ -20,7 +20,9 @@ describe("subject visual fixtures", () => {
     );
 
     expect(markup).toContain("geo-map-scene");
-    expect(markup).toContain('data-asset-id="east-asia-map-placeholder"');
+    expect(markup).toContain('data-asset-id="east-asia-land-110m"');
+    expect(markup).toContain('data-natural-earth-layer="admin_0_countries"');
+    expect(markup).toContain('data-map-path-class="land"');
     expect(markup).toContain('data-asset-id="monsoon-wind-arrow"');
     expect(markup).not.toContain("Unknown snapshot kind");
     expect(markup).not.toContain('data-missing-asset="true"');
@@ -35,6 +37,9 @@ describe("subject visual fixtures", () => {
     expect(markup).toContain('data-asset-id="projectile-body-dot"');
     expect(markup).toContain('data-asset-id="force-vector-arrow"');
     expect(markup).toContain('data-semantic-role="motion_trail"');
+    expect(markup).toContain('data-semantic-role="formula_card"');
+    expect(markup).toContain('data-vector-component="vertical"');
+    expect(markup).toContain("v_y");
     expect(markup).not.toContain("Unknown snapshot kind");
     expect(markup).not.toContain('data-missing-asset="true"');
   });

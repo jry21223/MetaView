@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Pulley" data-asset-id="pulley" data-asset-quality="v1">
+  <circle cx="32" cy="28" r="19" fill="#dbe7f2" stroke="#345995" stroke-width="4"/>
+  <circle cx="32" cy="28" r="6" fill="#345995"/>
+  <path d="M14 28 C14 12 50 12 50 28" fill="none" stroke="#1d335e" stroke-width="3" stroke-linecap="round" opacity=".42"/>
+  <path d="M13 28 V58 M51 28 V58" stroke="#6f7d58" stroke-width="4" stroke-linecap="round"/>
+</svg>

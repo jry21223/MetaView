@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="Low pressure" data-asset-id="pressure-low-symbol" data-asset-quality="v1">
+  <circle cx="24" cy="24" r="20" fill="#d55343"/>
+  <circle cx="24" cy="24" r="17" fill="none" stroke="#ffffff" stroke-width="2" opacity=".65"/>
+  <text x="24" y="31" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="800" fill="#ffffff">L</text>
+</svg>
