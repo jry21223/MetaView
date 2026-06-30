@@ -27,6 +27,8 @@ class SnapshotKind(str, Enum):
     MODELING_SCENE = "modeling_scene"
     MANIFOLD_SCENE = "manifold_scene"
     SOLID_GEOMETRY_SCENE = "solid_geometry_scene"
+    BIO_CELL_SCENE = "bio_cell_scene"
+    MOLECULE_2D_SCENE = "molecule_2d_scene"
     GEO_MAP_SCENE = "geo_map_scene"
     PHYSICS_FORCE_SCENE = "physics_force_scene"
     MOTION_SCENE = "motion_scene"
@@ -78,6 +80,7 @@ class MathPlotCurve(BaseModel):
     expression: str
     label: str | None = None
     emphasis: str = "primary"  # primary | secondary | accent
+    semantic_role: str | None = None
 
 
 class MathPlotSnapshot(BaseModel):
@@ -88,6 +91,8 @@ class MathPlotSnapshot(BaseModel):
     """
 
     kind: Literal["math_plot"] = "math_plot"
+    pack_id: str | None = None
+    asset_id: str | None = None
     curves: list[MathPlotCurve] = Field(default_factory=list)
     x_min: float = -10.0
     x_max: float = 10.0
@@ -99,6 +104,7 @@ class MathPlotSnapshot(BaseModel):
     x_label: str = "x"
     y_label: str = "y"
     formula_latex: str | None = None  # optional KaTeX label, e.g. "f(x) = x^2"
+    caption: str | None = None
 
 
 class MathFormulaSnapshot(BaseModel):
@@ -221,24 +227,33 @@ class GraphSceneNode(BaseModel):
     x: float | None = None
     y: float | None = None
     emphasis: SceneEmphasis = "secondary"
+    asset_id: str | None = None
 
 
 class GraphSceneEdge(BaseModel):
+    id: str | None = None
     source: str
     target: str
     label: str | None = None
     weight: float | None = None
     emphasis: SceneEmphasis = "secondary"
+    asset_id: str | None = None
 
 
 class GraphSceneSnapshot(BaseModel):
     kind: Literal["graph_scene"] = "graph_scene"
+    pack_id: str | None = None
+    asset_id: str | None = None
     nodes: list[GraphSceneNode] = Field(default_factory=list)
     edges: list[GraphSceneEdge] = Field(default_factory=list)
     directed: bool = False
     weighted: bool = False
+    current_node_id: str | None = None
     active_node_ids: list[str] = Field(default_factory=list)
     active_edge_ids: list[str] = Field(default_factory=list)
+    visited_node_ids: list[str] = Field(default_factory=list)
+    queue_node_ids: list[str] = Field(default_factory=list)
+    frontier_node_ids: list[str] = Field(default_factory=list)
     caption: str | None = None
 
 
@@ -424,6 +439,72 @@ class SolidGeometrySceneSnapshot(BaseModel):
     vectors: list[SolidGeometryVector] = Field(default_factory=list)
     visible_elements: list[str] = Field(default_factory=list)
     focus_target: str | None = None
+    formula_latex: str | None = None
+    caption: str | None = None
+
+
+class BioCellStructure(BaseModel):
+    id: str
+    semantic_role: str
+    label: str | None = None
+    x: float
+    y: float
+    width: float
+    height: float
+    asset_id: str | None = None
+
+
+class BioCellCallout(BaseModel):
+    id: str
+    target_id: str
+    label: str
+    side: Literal["left", "right", "top", "bottom"] | None = None
+
+
+class BioCellSceneSnapshot(BaseModel):
+    kind: Literal["bio_cell_scene"] = "bio_cell_scene"
+    pack_id: str | None = None
+    cell_type: str | None = None
+    structures: list[BioCellStructure] = Field(default_factory=list)
+    callouts: list[BioCellCallout] = Field(default_factory=list)
+    caption: str | None = None
+
+
+class Molecule2DAtom(BaseModel):
+    id: str
+    element: str
+    x: float
+    y: float
+    charge: str | None = None
+    label: str | None = None
+    asset_id: str | None = None
+
+
+class Molecule2DBond(BaseModel):
+    id: str
+    from_: str = Field(alias="from")
+    to: str
+    order: Literal[1, 2, 3] = 1
+    label: str | None = None
+    asset_id: str | None = None
+
+
+class Molecule2DCallout(BaseModel):
+    id: str
+    target_id: str
+    label: str
+    side: Literal["left", "right", "top", "bottom"] | None = None
+
+
+class Molecule2DSceneSnapshot(BaseModel):
+    kind: Literal["molecule_2d_scene"] = "molecule_2d_scene"
+    pack_id: str | None = None
+    molecule_id: str
+    molecule_asset_id: str | None = None
+    atoms: list[Molecule2DAtom] = Field(default_factory=list)
+    bonds: list[Molecule2DBond] = Field(default_factory=list)
+    highlights: list[str] = Field(default_factory=list)
+    callouts: list[Molecule2DCallout] = Field(default_factory=list)
     formula_latex: str | None = None
     caption: str | None = None
 
@@ -643,6 +724,8 @@ AnySnapshot = Annotated[
         ModelingSceneSnapshot,
         ManifoldSceneSnapshot,
         SolidGeometrySceneSnapshot,
+        BioCellSceneSnapshot,
+        Molecule2DSceneSnapshot,
         GeoMapSceneSnapshot,
         PhysicsForceSceneSnapshot,
         MotionSceneSnapshot,

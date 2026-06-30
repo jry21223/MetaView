@@ -39,6 +39,10 @@ deterministic layout defaults, and outputs normal `PlaybookScript`.
 The current supported scene blueprints are `east_asia_monsoon`,
 `projectile_motion`, `cell_structure`, `molecule_2d_water`,
 `derivative_tangent`, and `bfs_graph`.
+The backend mirror lives at
+`apps/api/app/domain/services/scene_blueprint_compiler.py` so SkillPack or
+agent generation can adopt the same blueprint boundary before returning
+`PlaybookScript`; it is not an MCP exposure layer.
 
 This is not a second rendering contract. The compiler must not pass raw SVG
 paths, arbitrary renderer code, or LLM-selected coordinates through to renderers.
