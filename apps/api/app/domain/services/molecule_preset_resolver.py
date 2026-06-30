@@ -23,6 +23,7 @@ class ResolvedMoleculePreset(BaseModel):
     molecule_id: str
     molecule_asset_id: str
     source: str
+    smiles: str | None = None
     formula: str
     formula_latex: str
     geometry: str | None = None
@@ -47,6 +48,10 @@ def _load_molecule_preset(pack_id: str, molecule_id: str) -> dict[str, Any] | No
     return json.loads(preset_path.read_text(encoding="utf-8"))
 
 
+def _normalize_smiles(smiles: str) -> str:
+    return smiles.strip()
+
+
 def resolve_molecule_preset_for_renderer(
     pack_id: str,
     molecule_id: str,
@@ -59,6 +64,7 @@ def resolve_molecule_preset_for_renderer(
         molecule_id=str(raw["id"]),
         molecule_asset_id=f"{molecule_id}-molecule-preset",
         source=str(raw["source"]),
+        smiles=str(raw["smiles"]) if raw.get("smiles") else None,
         formula=str(raw["formula"]),
         formula_latex=str(raw.get("formulaLatex") or _formula_to_latex(str(raw["formula"]))),
         geometry=str(raw["geometry"]) if raw.get("geometry") else None,
@@ -97,3 +103,20 @@ def resolve_molecule_preset_for_renderer(
             for callout in raw.get("callouts", [])
         ],
     )
+
+
+def resolve_molecule_preset_by_smiles_for_renderer(
+    pack_id: str,
+    smiles: str | None,
+) -> ResolvedMoleculePreset | None:
+    if not smiles:
+        return None
+    normalized_smiles = _normalize_smiles(smiles)
+    preset_dir = ASSET_ROOT / pack_id / "molecule-presets"
+    if not preset_dir.exists():
+        return None
+    for preset_path in sorted(preset_dir.glob("*.json")):
+        raw = json.loads(preset_path.read_text(encoding="utf-8"))
+        if raw.get("smiles") == normalized_smiles:
+            return resolve_molecule_preset_for_renderer(pack_id, str(raw["id"]))
+    return None

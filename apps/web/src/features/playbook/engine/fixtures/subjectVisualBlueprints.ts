@@ -6,6 +6,7 @@ export type SubjectVisualFixtureId =
   | "dna_replication"
   | "derivative_tangent"
   | "east_asia_monsoon"
+  | "molecule_2d_methane"
   | "molecule_2d_water"
   | "projectile_motion"
   | "reaction_synthesis_water";
@@ -16,6 +17,7 @@ export const SUBJECT_VISUAL_BLUEPRINT_IDS: readonly SubjectVisualFixtureId[] = [
   "cell_structure",
   "dna_replication",
   "molecule_2d_water",
+  "molecule_2d_methane",
   "reaction_synthesis_water",
   "derivative_tangent",
   "bfs_graph",
@@ -69,6 +71,15 @@ export const subjectVisualBlueprints: Record<SubjectVisualFixtureId, SceneBluepr
     title: "Water molecule",
     visualIntent: ["render_structured_molecule", "show_polar_bonds"],
     emphasisPoints: ["oxygen", "hydrogen", "bent geometry"],
+  },
+  molecule_2d_methane: {
+    id: "molecule_2d_methane",
+    subject: "chemistry",
+    sceneType: "molecule_2d_methane",
+    title: "Methane molecule",
+    visualIntent: ["render_structured_molecule", "show_tetrahedral_geometry"],
+    emphasisPoints: ["carbon", "hydrogen", "tetrahedral geometry"],
+    smiles: "C",
   },
   reaction_synthesis_water: {
     id: "reaction_synthesis_water",

@@ -1,3 +1,4 @@
+import methanePreset from "../../../../../../public/assets/metaview-kits/chemistry-basic/molecule-presets/methane.json";
 import waterPreset from "../../../../../../public/assets/metaview-kits/chemistry-basic/molecule-presets/water.json";
 
 import { resolveAssetForRenderer } from "../../assets/assetResolver";
@@ -23,6 +24,7 @@ interface RawMoleculePresetBond {
 interface RawMoleculePreset {
   id: string;
   source: "structured-preset";
+  smiles?: string;
   formula: string;
   formulaLatex?: string;
   geometry?: string;
@@ -36,6 +38,7 @@ export interface ResolvedMoleculePreset {
   moleculeId: string;
   moleculeAssetId: string;
   source: RawMoleculePreset["source"];
+  smiles?: string;
   formula: string;
   formulaLatex: string;
   geometry?: string;
@@ -46,6 +49,7 @@ export interface ResolvedMoleculePreset {
 }
 
 const PRESETS_BY_ID: Record<string, RawMoleculePreset> = {
+  methane: methanePreset as RawMoleculePreset,
   water: waterPreset as RawMoleculePreset,
 };
 
@@ -67,6 +71,7 @@ export function resolveMoleculePresetForRenderer(
     moleculeId: rawPreset.id,
     moleculeAssetId: moleculeAsset.id,
     source: rawPreset.source,
+    smiles: rawPreset.smiles,
     formula: rawPreset.formula,
     formulaLatex: rawPreset.formulaLatex ?? formulaToLatex(rawPreset.formula),
     geometry: rawPreset.geometry,
@@ -90,4 +95,19 @@ export function resolveMoleculePresetForRenderer(
     })),
     callouts: rawPreset.callouts ?? [],
   };
+}
+
+function normalizeSmiles(smiles: string): string {
+  return smiles.trim();
+}
+
+export function resolveMoleculePresetBySmilesForRenderer(
+  packId: string,
+  smiles: string | null | undefined,
+): ResolvedMoleculePreset | undefined {
+  if (!smiles) return undefined;
+  const normalizedSmiles = normalizeSmiles(smiles);
+  const rawPreset = Object.values(PRESETS_BY_ID).find((preset) => preset.smiles === normalizedSmiles);
+  if (!rawPreset) return undefined;
+  return resolveMoleculePresetForRenderer(packId, rawPreset.id);
 }

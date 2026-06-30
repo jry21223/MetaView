@@ -344,6 +344,20 @@ async def test_runtime_tool_hub_runs_self_check() -> None:
             "reaction_scene",
             "chemistry-basic",
         ),
+        (
+            {
+                "id": "molecule_2d_methane",
+                "subject": "chemistry",
+                "sceneType": "molecule_2d_methane",
+                "title": "Methane molecule",
+                "caption": "Methane geometry comes from a SMILES-addressable structured preset.",
+                "visualIntent": ["render_structured_molecule", "show_tetrahedral_geometry"],
+                "emphasisPoints": ["carbon", "hydrogen", "tetrahedral geometry"],
+                "smiles": "C",
+            },
+            "molecule_2d_scene",
+            "chemistry-basic",
+        ),
     ],
 )
 async def test_runtime_tool_hub_compiles_subject_scene_blueprints(

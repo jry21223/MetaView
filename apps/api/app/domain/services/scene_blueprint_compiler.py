@@ -36,7 +36,10 @@ from app.domain.models.playbook import (
     ReactionSceneSnapshot,
 )
 from app.domain.models.topic import TopicDomain
-from app.domain.services.molecule_preset_resolver import resolve_molecule_preset_for_renderer
+from app.domain.services.molecule_preset_resolver import (
+    resolve_molecule_preset_by_smiles_for_renderer,
+    resolve_molecule_preset_for_renderer,
+)
 
 _FPS = 30
 _DEFAULT_STEP_FRAMES = 180
@@ -198,6 +201,19 @@ def _step_captions(scene_type: str, title: str, base_caption: str) -> list[str]:
             "这一帧展示 atom、bond 和 formula 如何共同说明同一个水分子。",
             "结论回到水分子：结构化原子和化学键决定它的二维形状，也支持后续讨论极性和氢键。",
         ],
+        "molecule_2d_methane": [
+            "甲烷分子先看 molecule_2d_scene，SMILES C 被解析到 methane structured preset。",
+            "中心碳原子和四个氢原子来自结构化 atom 数据，不是手画分子图。",
+            "四条 C-H 键由 bond 数据生成，说明甲烷的连接关系由结构数据决定。",
+            "tetrahedral geometry callout 把甲烷的空间构型和二维教学图对应起来。",
+            "公式 CH4 与 SMILES C 同时出现，帮助学生连接结构式和机器可读输入。",
+            "renderer 只消费 atom、bond 和 callout 数据，具体布局由 deterministic preset 给出。",
+            "这一帧把 methane molecule、SMILES C 和 tetrahedral geometry 放在同一视觉解释中。",
+            (
+                "结论回到 Methane molecule：SMILES-addressable preset 让甲烷通过"
+                "结构数据渲染，而不是靠 LLM 手画。"
+            ),
+        ],
         "reaction_synthesis_water": [
             "合成水反应先看 reaction_scene，氢气和氧气作为 reactants 放在反应箭头左侧。",
             "reaction_arrow 资产表示反应方向，从反应物指向生成物，避免用纯文字代替反应关系。",
@@ -255,6 +271,8 @@ def _compile_snapshot(scene_type: str, blueprint: dict[str, Any]):
         return _dna_replication_snapshot(blueprint)
     if scene_type == "molecule_2d_water":
         return _water_molecule_snapshot(blueprint)
+    if scene_type == "molecule_2d_methane":
+        return _methane_molecule_snapshot(blueprint)
     if scene_type == "reaction_synthesis_water":
         return _water_synthesis_reaction_snapshot(blueprint)
     if scene_type == "derivative_tangent":
@@ -476,14 +494,22 @@ def _dna_replication_snapshot(blueprint: dict[str, Any]) -> BioProcessSceneSnaps
     )
 
 
-def _water_molecule_snapshot(blueprint: dict[str, Any]) -> Molecule2DSceneSnapshot:
+def _molecule_snapshot(
+    blueprint: dict[str, Any],
+    default_molecule_id: str,
+) -> Molecule2DSceneSnapshot:
     pack_id = str(blueprint.get("packId") or "chemistry-basic")
-    molecule_id = str(blueprint.get("moleculeId") or "water")
-    preset = resolve_molecule_preset_for_renderer(pack_id, molecule_id)
+    molecule_id = str(blueprint.get("moleculeId") or default_molecule_id)
+    smiles = str(blueprint["smiles"]) if blueprint.get("smiles") else None
+    preset = (
+        resolve_molecule_preset_by_smiles_for_renderer(pack_id, smiles)
+        or resolve_molecule_preset_for_renderer(pack_id, molecule_id)
+    )
     if preset is not None:
         return Molecule2DSceneSnapshot(
             pack_id=pack_id,
             molecule_id=preset.molecule_id,
+            smiles=preset.smiles or smiles,
             molecule_asset_id=preset.molecule_asset_id,
             atoms=[
                 atom.model_copy(update={"asset_id": "atom-core"}) for atom in preset.atoms
@@ -499,6 +525,7 @@ def _water_molecule_snapshot(blueprint: dict[str, Any]) -> Molecule2DSceneSnapsh
     return Molecule2DSceneSnapshot(
         pack_id=pack_id,
         molecule_id=molecule_id,
+        smiles=smiles,
         molecule_asset_id="water-molecule-preset",
         atoms=[
             Molecule2DAtom(id="o", element="O", x=50, y=42, asset_id="atom-core", label="oxygen"),
@@ -523,6 +550,14 @@ def _water_molecule_snapshot(blueprint: dict[str, Any]) -> Molecule2DSceneSnapsh
             or "Water is a bent polar molecule built from structured atom and bond data."
         ),
     )
+
+
+def _water_molecule_snapshot(blueprint: dict[str, Any]) -> Molecule2DSceneSnapshot:
+    return _molecule_snapshot(blueprint, "water")
+
+
+def _methane_molecule_snapshot(blueprint: dict[str, Any]) -> Molecule2DSceneSnapshot:
+    return _molecule_snapshot({**blueprint, "smiles": blueprint.get("smiles") or "C"}, "methane")
 
 
 def _water_synthesis_reaction_snapshot(blueprint: dict[str, Any]) -> ReactionSceneSnapshot:

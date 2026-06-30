@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from app.domain.services.molecule_preset_resolver import resolve_molecule_preset_for_renderer
+from app.domain.services.molecule_preset_resolver import (
+    resolve_molecule_preset_by_smiles_for_renderer,
+    resolve_molecule_preset_for_renderer,
+)
 
 
 def test_resolve_molecule_preset_for_renderer_hydrates_water_public_asset() -> None:
@@ -44,5 +47,25 @@ def test_resolve_molecule_preset_for_renderer_hydrates_water_public_asset() -> N
     ]
 
 
+def test_resolve_molecule_preset_for_renderer_hydrates_methane_by_smiles() -> None:
+    by_id = resolve_molecule_preset_for_renderer("chemistry-basic", "methane")
+    by_smiles = resolve_molecule_preset_by_smiles_for_renderer("chemistry-basic", "C")
+
+    assert by_id is not None
+    assert by_smiles == by_id
+    assert by_id.molecule_id == "methane"
+    assert by_id.molecule_asset_id == "methane-molecule-preset"
+    assert by_id.smiles == "C"
+    assert by_id.formula_latex == "CH_4"
+    assert by_id.geometry == "tetrahedral"
+    assert (
+        by_id.caption
+        == "Methane is a tetrahedral molecule loaded from a SMILES-addressable structured preset."
+    )
+    assert len(by_id.atoms) == 5
+    assert len(by_id.bonds) == 4
+
+
 def test_resolve_molecule_preset_for_renderer_does_not_fabricate_unknown_molecule() -> None:
-    assert resolve_molecule_preset_for_renderer("chemistry-basic", "methane") is None
+    assert resolve_molecule_preset_for_renderer("chemistry-basic", "ethane") is None
+    assert resolve_molecule_preset_by_smiles_for_renderer("chemistry-basic", "CC") is None

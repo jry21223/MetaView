@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveMoleculePresetForRenderer } from "./moleculePresetResolver";
+import {
+  resolveMoleculePresetBySmilesForRenderer,
+  resolveMoleculePresetForRenderer,
+} from "./moleculePresetResolver";
 
 describe("moleculePresetResolver", () => {
   it("hydrates the water molecule preset from chemistry-basic structured JSON", () => {
@@ -29,7 +32,26 @@ describe("moleculePresetResolver", () => {
     ]);
   });
 
+  it("hydrates the methane molecule preset from a SMILES-addressable structured JSON asset", () => {
+    const byId = resolveMoleculePresetForRenderer("chemistry-basic", "methane");
+    const bySmiles = resolveMoleculePresetBySmilesForRenderer("chemistry-basic", "C");
+
+    expect(byId).toMatchObject({
+      moleculeId: "methane",
+      moleculeAssetId: "methane-molecule-preset",
+      source: "structured-preset",
+      smiles: "C",
+      formulaLatex: "CH_4",
+      geometry: "tetrahedral",
+      caption: "Methane is a tetrahedral molecule loaded from a SMILES-addressable structured preset.",
+    });
+    expect(bySmiles).toEqual(byId);
+    expect(byId?.atoms).toHaveLength(5);
+    expect(byId?.bonds).toHaveLength(4);
+  });
+
   it("does not fabricate a molecule preset when the pack has no exact structured asset", () => {
-    expect(resolveMoleculePresetForRenderer("chemistry-basic", "methane")).toBeUndefined();
+    expect(resolveMoleculePresetForRenderer("chemistry-basic", "ethane")).toBeUndefined();
+    expect(resolveMoleculePresetBySmilesForRenderer("chemistry-basic", "CC")).toBeUndefined();
   });
 });

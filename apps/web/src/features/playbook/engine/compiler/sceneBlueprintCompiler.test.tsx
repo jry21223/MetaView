@@ -3,7 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { visualQualityGate } from "../assets/visualQualityGate";
 import { PlaybookComposition } from "../composition/PlaybookComposition";
-import { resolveMoleculePresetForRenderer } from "../kits/chemistry/moleculePresetResolver";
+import {
+  resolveMoleculePresetBySmilesForRenderer,
+  resolveMoleculePresetForRenderer,
+} from "../kits/chemistry/moleculePresetResolver";
 import {
   compileSceneBlueprint,
   compileSceneBlueprintToPlaybookScript,
@@ -230,6 +233,43 @@ describe("sceneBlueprintCompiler", () => {
     expect(markup).toContain('data-structured-molecule="true"');
     expect(markup).toContain('data-asset-id="water-molecule-preset"');
     expect(markup).toContain('data-element="O"');
+    expect(markup).toContain('data-element="H"');
+    expect(markup).not.toContain('data-missing-asset="true"');
+  });
+
+  it("compiles a methane molecule blueprint from a SMILES-addressable structured preset", () => {
+    const preset = resolveMoleculePresetBySmilesForRenderer("chemistry-basic", "C");
+    const script = compileSceneBlueprintToPlaybookScript({
+      subject: "chemistry",
+      sceneType: "molecule_2d_methane",
+      title: "Methane molecule",
+      visualIntent: ["render_structured_molecule", "show_tetrahedral_geometry"],
+      emphasisPoints: ["carbon", "hydrogen", "tetrahedral geometry"],
+      smiles: "C",
+    });
+
+    expect(script.domain).toBe("chemistry");
+    const snapshot = script.steps[0].snapshot;
+    if (snapshot.kind !== "molecule_2d_scene") {
+      throw new Error(`Expected molecule_2d_scene, got ${snapshot.kind}`);
+    }
+    expect(snapshot.pack_id).toBe("chemistry-basic");
+    expect(snapshot.molecule_id).toBe("methane");
+    expect(snapshot.smiles).toBe("C");
+    expect(snapshot.molecule_asset_id).toBe("methane-molecule-preset");
+    expect(preset).toBeTruthy();
+    expect(snapshot.atoms).toEqual(preset!.atoms.map((atom) => ({ ...atom, asset_id: "atom-core" })));
+    expect(snapshot.bonds).toEqual(preset!.bonds.map((bond) => ({ ...bond, asset_id: "bond-line" })));
+    expect(snapshot.atoms).toHaveLength(5);
+    expect(snapshot.bonds).toHaveLength(4);
+    expect(visualQualityGate(script)).toEqual([]);
+
+    const markup = renderToStaticMarkup(<PlaybookComposition script={script} showSubtitles={false} />);
+    expect(markup).toContain("molecule-2d-scene");
+    expect(markup).toContain('data-molecule-id="methane"');
+    expect(markup).toContain('data-smiles="C"');
+    expect(markup).toContain('data-asset-id="methane-molecule-preset"');
+    expect(markup).toContain('data-element="C"');
     expect(markup).toContain('data-element="H"');
     expect(markup).not.toContain('data-missing-asset="true"');
   });

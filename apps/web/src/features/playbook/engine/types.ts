@@ -530,6 +530,7 @@ export interface Molecule2DSceneSnapshot {
   kind: "molecule_2d_scene";
   pack_id?: string | null;
   molecule_id: string;
+  smiles?: string | null;
   molecule_asset_id?: string | null;
   atoms: Molecule2DAtom[];
   bonds: Molecule2DBond[];

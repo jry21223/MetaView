@@ -533,6 +533,7 @@ class Molecule2DSceneSnapshot(BaseModel):
     kind: Literal["molecule_2d_scene"] = "molecule_2d_scene"
     pack_id: str | None = None
     molecule_id: str
+    smiles: str | None = None
     molecule_asset_id: str | None = None
     atoms: list[Molecule2DAtom] = Field(default_factory=list)
     bonds: list[Molecule2DBond] = Field(default_factory=list)

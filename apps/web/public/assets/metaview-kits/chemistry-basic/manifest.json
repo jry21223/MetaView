@@ -6,7 +6,7 @@
   "license": "internal",
   "licenseMode": "single",
   "defaultLicense": "internal",
-  "sceneTemplates": ["molecule_2d_water", "reaction_synthesis_water"],
+  "sceneTemplates": ["molecule_2d_water", "molecule_2d_methane", "reaction_synthesis_water"],
   "rendererKinds": ["molecule_2d_scene", "reaction_scene"],
   "sources": [
     {
@@ -27,6 +27,31 @@
       "semanticRoles": ["molecule", "water", "molecule_preset"],
       "sourceId": "metaview-internal",
       "attribution": "MetaView internal structured molecule preset",
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "commercialUseAllowed": true,
+      "requiresAttribution": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null,
+      "rendererHints": {
+        "preferredRenderer": "molecule_2d_scene",
+        "defaultSize": [180, 130],
+        "anchor": "center",
+        "colorizable": false,
+        "strokeControlled": false
+      }
+    },
+    {
+      "id": "methane-molecule-preset",
+      "type": "json",
+      "path": "/assets/metaview-kits/chemistry-basic/molecule-presets/methane.json",
+      "tags": ["molecule", "methane", "ch4", "smiles", "structured_preset"],
+      "semanticRoles": ["molecule", "methane", "smiles", "molecule_preset"],
+      "sourceId": "metaview-internal",
+      "attribution": "MetaView internal SMILES-addressable structured molecule preset",
       "license": "internal",
       "commercialUseStatus": "allowed",
       "commercialUseAllowed": true,

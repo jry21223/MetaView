@@ -1,6 +1,9 @@
 import { resolveAssetById, resolveAssetByRole, resolveAssetForRenderer } from "../assets/assetResolver";
 import { visualQualityGate, type VisualQualityWarning } from "../assets/visualQualityGate";
-import { resolveMoleculePresetForRenderer } from "../kits/chemistry/moleculePresetResolver";
+import {
+  resolveMoleculePresetBySmilesForRenderer,
+  resolveMoleculePresetForRenderer,
+} from "../kits/chemistry/moleculePresetResolver";
 import type { SubjectVisualKitSubject } from "../assets/assetRegistry";
 import type {
   AnySnapshot,
@@ -23,7 +26,12 @@ import type {
 type GeoSceneType = "geo_map_scene" | "east_asia_monsoon";
 type PhysicsSceneType = "physics_force_scene" | "projectile_motion";
 type BiologySceneType = "bio_cell_scene" | "bio_process_scene" | "cell_structure" | "dna_replication";
-type ChemistrySceneType = "molecule_2d_scene" | "molecule_2d_water" | "reaction_scene" | "reaction_synthesis_water";
+type ChemistrySceneType =
+  | "molecule_2d_scene"
+  | "molecule_2d_water"
+  | "molecule_2d_methane"
+  | "reaction_scene"
+  | "reaction_synthesis_water";
 type MathSceneType = "math_plot" | "derivative_tangent";
 type AlgorithmSceneType = "graph_scene" | "bfs_graph";
 type SceneBlueprintSubject = "algorithm" | "biology" | "chemistry" | "geography" | "math" | "physics";
@@ -113,6 +121,7 @@ export interface ChemistrySceneBlueprint extends SceneBlueprintBase {
   subject: "chemistry";
   sceneType: ChemistrySceneType;
   moleculeId?: string;
+  smiles?: string;
 }
 
 export interface MathSceneBlueprint extends SceneBlueprintBase {
@@ -371,8 +380,10 @@ function compileBiologyProcessSnapshot(blueprint: BiologySceneBlueprint): BioPro
 
 function compileChemistrySnapshot(blueprint: ChemistrySceneBlueprint): Molecule2DSceneSnapshot {
   const packId = blueprint.packId ?? DEFAULT_CHEMISTRY_PACK_ID;
-  const moleculeId = blueprint.moleculeId ?? "water";
-  const moleculePreset = resolveMoleculePresetForRenderer(packId, moleculeId);
+  const moleculeId = blueprint.moleculeId ?? (blueprint.sceneType === "molecule_2d_methane" ? "methane" : "water");
+  const moleculePreset =
+    resolveMoleculePresetBySmilesForRenderer(packId, blueprint.smiles) ??
+    resolveMoleculePresetForRenderer(packId, moleculeId);
   const moleculeAssetId =
     moleculePreset?.moleculeAssetId ??
     resolveAssetIdByRole("molecule_2d_scene", "chemistry", packId, moleculeId, ["molecule"]);
@@ -383,6 +394,7 @@ function compileChemistrySnapshot(blueprint: ChemistrySceneBlueprint): Molecule2
       kind: "molecule_2d_scene",
       pack_id: packId,
       molecule_id: moleculePreset.moleculeId,
+      smiles: moleculePreset.smiles ?? blueprint.smiles,
       molecule_asset_id: moleculeAssetId,
       atoms: moleculePreset.atoms.map((atom) => ({ ...atom, asset_id: atomAssetId })),
       bonds: moleculePreset.bonds.map((bond) => ({ ...bond, asset_id: bondAssetId })),
@@ -396,6 +408,7 @@ function compileChemistrySnapshot(blueprint: ChemistrySceneBlueprint): Molecule2
     kind: "molecule_2d_scene",
     pack_id: packId,
     molecule_id: moleculeId,
+    smiles: blueprint.smiles,
     molecule_asset_id: moleculeAssetId,
     atoms: [
       { id: "o", element: "O", x: 50, y: 42, asset_id: atomAssetId, label: "oxygen" },

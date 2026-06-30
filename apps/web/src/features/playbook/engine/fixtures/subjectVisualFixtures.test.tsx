@@ -21,6 +21,7 @@ const FLAGSHIP_IDS: SubjectVisualFixtureId[] = [
   "cell_structure",
   "dna_replication",
   "molecule_2d_water",
+  "molecule_2d_methane",
   "reaction_synthesis_water",
   "derivative_tangent",
   "bfs_graph",
@@ -83,6 +84,21 @@ describe("subject visual fixtures", () => {
     expect(markup).toContain('data-asset-id="water-molecule-preset"');
     expect(markup).toContain('data-structured-molecule="true"');
     expect(markup).toContain('data-element="O"');
+    expect(markup).toContain('data-element="H"');
+    expect(markup).not.toContain("Unknown snapshot kind");
+    expect(markup).not.toContain('data-missing-asset="true"');
+  });
+
+  it("statically renders molecule_2d_methane through PlaybookComposition", () => {
+    const markup = renderToStaticMarkup(
+      <PlaybookComposition script={getSubjectVisualFixture("molecule_2d_methane")} showSubtitles={false} />,
+    );
+
+    expect(markup).toContain("molecule-2d-scene");
+    expect(markup).toContain('data-molecule-id="methane"');
+    expect(markup).toContain('data-smiles="C"');
+    expect(markup).toContain('data-asset-id="methane-molecule-preset"');
+    expect(markup).toContain('data-element="C"');
     expect(markup).toContain('data-element="H"');
     expect(markup).not.toContain("Unknown snapshot kind");
     expect(markup).not.toContain('data-missing-asset="true"');

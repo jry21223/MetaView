@@ -192,6 +192,7 @@ export const Molecule2DSceneRenderer: React.FC<RendererProps> = ({ step, theme }
       className="molecule-2d-scene"
       data-theme={theme}
       data-molecule-id={snap.molecule_id}
+      data-smiles={snap.smiles ?? undefined}
       style={{
         width: "100%",
         height: "100%",
@@ -221,6 +222,7 @@ export const Molecule2DSceneRenderer: React.FC<RendererProps> = ({ step, theme }
         <g
           data-semantic-role="molecule"
           data-structured-molecule="true"
+          data-smiles={snap.smiles ?? undefined}
           data-asset-id={moleculeAsset?.id ?? snap.molecule_asset_id ?? undefined}
           data-asset-path={moleculeAsset?.path}
           data-asset-type={moleculeAsset?.type}
