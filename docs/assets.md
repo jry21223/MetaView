@@ -50,8 +50,8 @@ snapshot contract using RDKit 2D coordinates.
 The current supported scene blueprints are `east_asia_monsoon`,
 `projectile_motion`, `cell_structure`, `dna_replication`, `molecule_2d_water`,
 `molecule_2d_methane`, `reaction_synthesis_water`, `derivative_tangent`,
-`bfs_graph`, and `recursion_stack`; the API runtime compiler additionally supports
-`molecule_2d_glucose` from SMILES/RDKit.
+`bfs_graph`, `recursion_stack`, and `binary_search`; the API runtime compiler
+additionally supports `molecule_2d_glucose` from SMILES/RDKit.
 The backend mirror lives at
 `apps/api/app/domain/services/scene_blueprint_compiler.py` so SkillPack or
 agent generation can adopt the same blueprint boundary before returning
@@ -86,9 +86,10 @@ Current backend SkillPack adoption:
   fixture for API RDKit compilation into `molecule_2d_scene` and
   `reaction_scene`.
 - `math-basic`: structured plot presets for math plot/formula scenes.
-- `algorithm-code-basic`: internal graph node, queue, visited, active-edge SVGs
-  plus BFS graph and recursion-stack presets for `graph_scene` and
-  `call_stack_scene`. The deterministic
+- `algorithm-code-basic`: internal graph node, queue, visited, active-edge,
+  active-line, and pointer SVGs plus BFS graph, recursion-stack, and
+  binary-search presets for `graph_scene`, `call_stack_scene`, and
+  `code_trace_scene`. The deterministic
   `algorithm_graph_core` SkillPack emits runtime `graph_scene` snapshots with
   `pack_id`, `asset_id`, queue-node, visited-node, and active-edge asset refs so
   generated BFS playbooks use the same assets as the showcase fixture.
@@ -135,6 +136,7 @@ snapshot catalog.
 | `derivative_tangent` | math | `math-basic` | `math_plot` | formula plus curve/tangent plot markers |
 | `bfs_graph` | algorithm | `algorithm-code-basic` | `graph_scene` | graph node, queue, active-edge assets plus code track |
 | `recursion_stack` | algorithm | `algorithm-code-basic` | `call_stack_scene` | call frames, waiting stack frames, active code-line asset plus code track |
+| `binary_search` | algorithm | `algorithm-code-basic` | `code_trace_scene` | binary-search preset, active code-line asset, array window, low/mid/high pointer assets |
 
 Local preview helpers:
 

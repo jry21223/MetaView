@@ -28,6 +28,7 @@ export const SUBJECT_VISUAL_SHOWCASE_IDS: readonly SubjectVisualFixtureId[] = [
   "derivative_tangent",
   "bfs_graph",
   "recursion_stack",
+  "binary_search",
 ];
 
 const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
@@ -189,6 +190,25 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-asset-id="active-line"',
       'data-frame-state="active"',
       "factorial(4)",
+    ],
+  },
+  {
+    id: "binary_search",
+    domain: "algorithm",
+    title: "Binary search",
+    summary: "Code trace renderer consumes binary-search preset, active line, and pointer assets.",
+    packId: "algorithm-code-basic",
+    rendererKind: "code_trace_scene",
+    showInlineCode: true,
+    requiredMarkers: [
+      "code-trace-scene",
+      'data-pack-id="algorithm-code-basic"',
+      'data-trace-asset-id="binary-search-trace-preset"',
+      'data-asset-id="active-line"',
+      'data-asset-id="pointer-marker"',
+      'data-pointer-id="mid"',
+      'data-array-cell-state="active"',
+      "binarySearch",
     ],
   },
 ];

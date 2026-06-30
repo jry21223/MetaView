@@ -220,6 +220,56 @@
       }
     },
     {
+      "id": "pointer-marker",
+      "type": "svg",
+      "path": "/assets/metaview-kits/algorithm-code-basic/code/pointer-marker.svg",
+      "tags": ["code", "trace", "pointer", "index", "algorithm"],
+      "semanticRoles": ["pointer", "active_pointer", "index_pointer"],
+      "sourceId": "metaview-internal",
+      "attribution": "MetaView internal SVG primitive",
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "commercialUseAllowed": true,
+      "requiresAttribution": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null,
+      "rendererHints": {
+        "preferredRenderer": "code_trace_scene",
+        "defaultSize": [36, 32],
+        "anchor": "center",
+        "colorizable": false,
+        "strokeControlled": false
+      }
+    },
+    {
+      "id": "binary-search-trace-preset",
+      "type": "json",
+      "path": "/assets/metaview-kits/algorithm-code-basic/code/binary-search-trace-preset.json",
+      "tags": ["binary-search", "code", "trace", "structured_preset", "algorithm"],
+      "semanticRoles": ["binary_search", "code_trace_scene", "code_trace"],
+      "sourceId": "metaview-internal",
+      "attribution": "MetaView internal structured algorithm preset",
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "commercialUseAllowed": true,
+      "requiresAttribution": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null,
+      "rendererHints": {
+        "preferredRenderer": "code_trace_scene",
+        "defaultSize": [640, 360],
+        "anchor": "center",
+        "colorizable": true,
+        "strokeControlled": true
+      }
+    },
+    {
       "id": "recursion-stack-preset",
       "type": "json",
       "path": "/assets/metaview-kits/algorithm-code-basic/code/recursion-stack-preset.json",

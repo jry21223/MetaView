@@ -387,6 +387,19 @@ async def test_runtime_tool_hub_runs_self_check() -> None:
             "call_stack_scene",
             "algorithm-code-basic",
         ),
+        (
+            {
+                "id": "binary_search",
+                "subject": "algorithm",
+                "sceneType": "binary_search",
+                "title": "Binary search",
+                "caption": "Binary search narrows the sorted range around a midpoint.",
+                "visualIntent": ["show_search_window", "highlight_midpoint", "trace_branch"],
+                "emphasisPoints": ["low pointer", "mid pointer", "high pointer"],
+            },
+            "code_trace_scene",
+            "algorithm-code-basic",
+        ),
     ],
 )
 async def test_runtime_tool_hub_compiles_subject_scene_blueprints(
@@ -416,6 +429,12 @@ async def test_runtime_tool_hub_compiles_subject_scene_blueprints(
         if blueprint["sceneType"] == "recursion_stack":
             assert snapshot["asset_id"] == "recursion-stack-preset"
             assert snapshot["code_trace"]["asset_id"] == "active-line"
+        if blueprint["sceneType"] == "binary_search":
+            assert snapshot["asset_id"] == "binary-search-trace-preset"
+            assert snapshot["active_line_asset_id"] == "active-line"
+            assert {pointer["asset_id"] for pointer in snapshot["pointers"]} == {
+                "pointer-marker"
+            }
 
 
 @pytest.mark.asyncio

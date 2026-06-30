@@ -28,6 +28,7 @@ GLUCOSE_SMILES = "OC[C@H]1O[C@@H](O)[C@H](O)[C@H](O)[C@@H]1O"
         ("derivative_tangent", "math", "math_plot", "math-basic"),
         ("bfs_graph", "algorithm", "graph_scene", "algorithm-code-basic"),
         ("recursion_stack", "algorithm", "call_stack_scene", "algorithm-code-basic"),
+        ("binary_search", "algorithm", "code_trace_scene", "algorithm-code-basic"),
     ],
 )
 def test_scene_blueprint_compiler_builds_asset_backed_playbook(
@@ -80,6 +81,7 @@ def test_scene_blueprint_compiler_preserves_flagship_asset_markers() -> None:
         "derivative_tangent": ("", "asset_id", "derivative-tangent-preset"),
         "bfs_graph": ("", "asset_id", "bfs-graph-preset"),
         "recursion_stack": ("", "asset_id", "recursion-stack-preset"),
+        "binary_search": ("", "asset_id", "binary-search-trace-preset"),
     }
 
     for scene_type, (collection_name, field_name, expected_value) in cases.items():
@@ -268,6 +270,37 @@ def test_scene_blueprint_compiler_builds_recursion_call_stack_scene() -> None:
     assert verdict.status == PlaybookReviewStatus.CLEAN
 
 
+def test_scene_blueprint_compiler_builds_binary_search_code_trace_scene() -> None:
+    playbook = compile_scene_blueprint_to_playbook(
+        {
+            "id": "binary_search",
+            "subject": "algorithm",
+            "sceneType": "binary_search",
+            "title": "Binary search",
+            "visualIntent": ["show_search_window", "highlight_midpoint", "trace_branch"],
+            "emphasisPoints": ["low pointer", "mid pointer", "high pointer"],
+        },
+    )
+
+    snapshot = playbook.steps[0].snapshot.model_dump(mode="json", by_alias=True)
+
+    assert snapshot["kind"] == "code_trace_scene"
+    assert snapshot["pack_id"] == "algorithm-code-basic"
+    assert snapshot["asset_id"] == "binary-search-trace-preset"
+    assert snapshot["active_line_asset_id"] == "active-line"
+    assert snapshot["array_values"] == ["2", "4", "7", "11", "18", "25", "31"]
+    assert snapshot["active_indices"] == [3]
+    assert snapshot["search_range"] == [0, 6]
+    assert [pointer["id"] for pointer in snapshot["pointers"]] == ["low", "mid", "high"]
+    assert {pointer["asset_id"] for pointer in snapshot["pointers"]} == {"pointer-marker"}
+    assert "binarySearch" in snapshot["lines"][0]
+    assert playbook.steps[0].code_highlight is not None
+    assert playbook.steps[0].code_highlight.active_line == 2
+
+    verdict = self_check_playbook(playbook, "Trace binary search midpoint narrowing.")
+    assert verdict.status == PlaybookReviewStatus.CLEAN
+
+
 def test_scene_blueprint_compiler_builds_water_synthesis_reaction_scene() -> None:
     playbook = compile_scene_blueprint_to_playbook(
         {
@@ -328,6 +361,7 @@ def _subject_for(scene_type: str) -> str:
     return {
         "bfs_graph": "algorithm",
         "recursion_stack": "algorithm",
+        "binary_search": "algorithm",
         "cell_structure": "biology",
         "dna_replication": "biology",
         "derivative_tangent": "math",

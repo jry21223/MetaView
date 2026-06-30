@@ -20,6 +20,7 @@ class SnapshotKind(str, Enum):
     TABLE_SCENE = "table_scene"
     GRAPH_SCENE = "graph_scene"
     CALL_STACK_SCENE = "call_stack_scene"
+    CODE_TRACE_SCENE = "code_trace_scene"
     STATS_CHART_SCENE = "stats_chart_scene"
     ITERATION_TRACE_SCENE = "iteration_trace_scene"
     PHASE_PORTRAIT_SCENE = "phase_portrait_scene"
@@ -284,6 +285,30 @@ class CallStackSceneSnapshot(BaseModel):
     frames: list[CallStackFrame] = Field(default_factory=list)
     code_trace: CallStackCodeTrace | None = None
     current_frame_id: str | None = None
+    caption: str | None = None
+
+
+class CodeTracePointer(BaseModel):
+    id: str
+    label: str
+    index: int
+    asset_id: str | None = None
+
+
+class CodeTraceSceneSnapshot(BaseModel):
+    kind: Literal["code_trace_scene"] = "code_trace_scene"
+    pack_id: str | None = None
+    asset_id: str | None = None
+    language: str
+    lines: list[str] = Field(default_factory=list)
+    active_lines: list[int] = Field(default_factory=list)
+    active_line: int = 0
+    active_line_asset_id: str | None = None
+    array_values: list[str] = Field(default_factory=list)
+    active_indices: list[int] = Field(default_factory=list)
+    search_range: tuple[int, int] | None = None
+    pointers: list[CodeTracePointer] = Field(default_factory=list)
+    variables: dict[str, str] = Field(default_factory=dict)
     caption: str | None = None
 
 
@@ -824,6 +849,7 @@ AnySnapshot = Annotated[
         TableSceneSnapshot,
         GraphSceneSnapshot,
         CallStackSceneSnapshot,
+        CodeTraceSceneSnapshot,
         StatsChartSceneSnapshot,
         IterationTraceSceneSnapshot,
         PhasePortraitSceneSnapshot,

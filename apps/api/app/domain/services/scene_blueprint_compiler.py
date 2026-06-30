@@ -13,6 +13,8 @@ from app.domain.models.playbook import (
     CallStackFrame,
     CallStackSceneSnapshot,
     CodeHighlightOverlay,
+    CodeTracePointer,
+    CodeTraceSceneSnapshot,
     GeoMapFlow,
     GeoMapLayer,
     GeoMapSceneSnapshot,
@@ -269,6 +271,25 @@ def _step_captions(scene_type: str, title: str, base_caption: str) -> list[str]:
             "代码轨道和 call stack 同步，帮助学生把源代码行和运行时栈帧对应起来。",
             "结论回到递归栈：递归不是重复文字，而是一组等待返回的 call frames。",
         ],
+        "binary_search": [
+            "Binary search 先看 code_trace_scene：数组窗口、代码行和指针状态在同一帧同步。",
+            "Binary search 的 low 和 high 指针标出当前仍可能包含目标值的有序区间。",
+            (
+                "Binary search 的 mid 指针落在中点 11 上，"
+                "active-line 资产高亮本轮计算 midpoint 的代码。"
+            ),
+            (
+                "Binary search 的当前 active index 对应 nums[mid]，"
+                "它把代码里的下标访问映射到数组格子。"
+            ),
+            (
+                "Binary search 如果 nums[mid] 小于 target，下一轮会丢弃左半区间；"
+                "大于 target 则丢弃右半区间。"
+            ),
+            "Binary search 的变量面板显示 target、low、mid 和 high，避免把控制流藏在文字讲解里。",
+            "Binary search 这一帧把搜索窗口、指针和分支判断编译成确定性布局。",
+            "结论回到 Binary search：每次比较中点后，搜索范围都会缩小一半。",
+        ],
     }
     return presets.get(
         scene_type,
@@ -308,6 +329,8 @@ def _compile_snapshot(scene_type: str, blueprint: dict[str, Any]):
         return _bfs_graph_snapshot(blueprint)
     if scene_type == "recursion_stack":
         return _recursion_stack_snapshot(blueprint)
+    if scene_type == "binary_search":
+        return _binary_search_snapshot(blueprint)
     raise ValueError(f"Unsupported SceneBlueprint sceneType: {scene_type}")
 
 
@@ -779,8 +802,59 @@ def _recursion_stack_snapshot(blueprint: dict[str, Any]) -> CallStackSceneSnapsh
     )
 
 
+def _binary_search_lines() -> list[str]:
+    return [
+        "function binarySearch(nums, target) {",
+        "  let low = 0, high = nums.length - 1;",
+        "  const mid = Math.floor((low + high) / 2);",
+        "  if (nums[mid] === target) return mid;",
+        "  return nums[mid] < target ? searchRight() : searchLeft();",
+        "}",
+    ]
+
+
+def _binary_search_snapshot(blueprint: dict[str, Any]) -> CodeTraceSceneSnapshot:
+    return CodeTraceSceneSnapshot(
+        pack_id=str(blueprint.get("packId") or "algorithm-code-basic"),
+        asset_id="binary-search-trace-preset",
+        language="typescript",
+        lines=_binary_search_lines(),
+        active_lines=[2, 3],
+        active_line=2,
+        active_line_asset_id="active-line",
+        array_values=["2", "4", "7", "11", "18", "25", "31"],
+        active_indices=[3],
+        search_range=(0, 6),
+        pointers=[
+            CodeTracePointer(id="low", label="low", index=0, asset_id="pointer-marker"),
+            CodeTracePointer(id="mid", label="mid", index=3, asset_id="pointer-marker"),
+            CodeTracePointer(id="high", label="high", index=6, asset_id="pointer-marker"),
+        ],
+        variables={"target": "11", "low": "0", "mid": "3", "high": "6"},
+        caption=str(
+            blueprint.get("caption")
+            or "Binary search checks the middle element before discarding half the range."
+        ),
+    )
+
+
 def _code_highlight(scene_type: str, blueprint: dict[str, Any]) -> CodeHighlightOverlay | None:
     visual_intent = ", ".join(str(item) for item in blueprint.get("visualIntent") or [])
+    if scene_type == "binary_search":
+        return CodeHighlightOverlay(
+            language="typescript",
+            lines=_binary_search_lines(),
+            active_lines=[2, 3],
+            active_line=2,
+            variables={
+                "intent": visual_intent,
+                "target": "11",
+                "low": "0",
+                "mid": "3",
+                "high": "6",
+            },
+            operation_label="compare midpoint",
+        )
     if scene_type == "recursion_stack":
         return CodeHighlightOverlay(
             language="python",

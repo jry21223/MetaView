@@ -3,6 +3,7 @@ import type {
   AnySnapshot,
   BioCellSceneSnapshot,
   BioProcessSceneSnapshot,
+  CodeTraceSceneSnapshot,
   GeoMapSceneSnapshot,
   GraphSceneSnapshot,
   MetaStep,
@@ -294,6 +295,34 @@ function checkGraphScene(
   }
 }
 
+function checkCodeTraceScene(
+  warnings: VisualQualityWarning[],
+  context: SnapshotContext,
+  snapshot: CodeTraceSceneSnapshot,
+) {
+  if (context.domain !== "algorithm") return;
+
+  checkAssetId(warnings, context, snapshot.asset_id, snapshot.pack_id);
+  checkAssetId(warnings, context, snapshot.active_line_asset_id, snapshot.pack_id);
+  for (const pointer of snapshot.pointers ?? []) {
+    checkAssetId(warnings, context, pointer.asset_id, snapshot.pack_id);
+  }
+
+  const hasTraceState = Boolean(
+    (snapshot.active_lines?.length ?? 0) > 0 ||
+      (snapshot.active_indices?.length ?? 0) > 0 ||
+      (snapshot.pointers?.length ?? 0) > 0,
+  );
+  if ((snapshot.lines?.length ?? 0) > 0 && !hasTraceState) {
+    warn(warnings, context, {
+      code: "low_algorithm_state_visuals",
+      domain: context.domain,
+      pack_id: snapshot.pack_id,
+      message: "algorithm code_trace_scene should show an active line, active index, or pointer state.",
+    });
+  }
+}
+
 function hasMathFormula(snapshot: AnySnapshot): boolean {
   if (snapshot.kind === "math_formula") return Boolean(snapshot.formula_latex?.trim());
   if (snapshot.kind === "katex_overlay") return Boolean(snapshot.latex?.trim());
@@ -394,6 +423,9 @@ export function visualQualityGate(script: PlaybookScript): VisualQualityWarning[
       }
       if (snapshot.kind === "graph_scene") {
         checkGraphScene(warnings, context, snapshot);
+      }
+      if (snapshot.kind === "code_trace_scene") {
+        checkCodeTraceScene(warnings, context, snapshot);
       }
     }
   }

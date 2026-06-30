@@ -10,6 +10,7 @@ import type {
   BioCellSceneSnapshot,
   BioProcessSceneSnapshot,
   CallStackSceneSnapshot,
+  CodeTraceSceneSnapshot,
   CodeHighlightOverlay,
   GeoMapFlow,
   GeoMapSceneSnapshot,
@@ -34,7 +35,7 @@ type ChemistrySceneType =
   | "reaction_scene"
   | "reaction_synthesis_water";
 type MathSceneType = "math_plot" | "derivative_tangent";
-type AlgorithmSceneType = "graph_scene" | "bfs_graph" | "call_stack_scene" | "recursion_stack";
+type AlgorithmSceneType = "graph_scene" | "bfs_graph" | "call_stack_scene" | "recursion_stack" | "code_trace_scene" | "binary_search";
 type SceneBlueprintSubject = "algorithm" | "biology" | "chemistry" | "geography" | "math" | "physics";
 type SupportedRendererKind =
   | "bio_cell_scene"
@@ -42,6 +43,7 @@ type SupportedRendererKind =
   | "geo_map_scene"
   | "graph_scene"
   | "call_stack_scene"
+  | "code_trace_scene"
   | "math_plot"
   | "molecule_2d_scene"
   | "reaction_scene"
@@ -597,6 +599,58 @@ function compileCallStackSnapshot(blueprint: AlgorithmSceneBlueprint): CallStack
   };
 }
 
+function binarySearchLines(): string[] {
+  return [
+    "function binarySearch(nums, target) {",
+    "  let low = 0, high = nums.length - 1;",
+    "  const mid = Math.floor((low + high) / 2);",
+    "  if (nums[mid] === target) return mid;",
+    "  return nums[mid] < target ? searchRight() : searchLeft();",
+    "}",
+  ];
+}
+
+function compileCodeTraceSnapshot(blueprint: AlgorithmSceneBlueprint): CodeTraceSceneSnapshot {
+  const packId = blueprint.packId ?? DEFAULT_ALGORITHM_PACK_ID;
+  const traceAssetId = resolveAssetIdByRole("code_trace_scene", "algorithm", packId, "binary_search", [
+    "code_trace_scene",
+    "code_trace",
+  ]);
+  const activeLineAssetId = resolveAssetIdByRole("code_trace_scene", "algorithm", packId, "active_line", [
+    "code_trace",
+  ]);
+  const pointerAssetId = resolveAssetIdByRole("code_trace_scene", "algorithm", packId, "pointer", [
+    "active_pointer",
+    "index_pointer",
+  ]);
+
+  return {
+    kind: "code_trace_scene",
+    pack_id: packId,
+    asset_id: traceAssetId,
+    language: "typescript",
+    lines: binarySearchLines(),
+    active_lines: [2, 3],
+    active_line: 2,
+    active_line_asset_id: activeLineAssetId,
+    array_values: ["2", "4", "7", "11", "18", "25", "31"],
+    active_indices: [3],
+    search_range: [0, 6],
+    pointers: [
+      { id: "low", label: "low", index: 0, asset_id: pointerAssetId },
+      { id: "mid", label: "mid", index: 3, asset_id: pointerAssetId },
+      { id: "high", label: "high", index: 6, asset_id: pointerAssetId },
+    ],
+    variables: {
+      target: "11",
+      low: "0",
+      mid: "3",
+      high: "6",
+    },
+    caption: blueprint.caption ?? "Binary search checks the middle element before discarding half the range.",
+  };
+}
+
 function roundToOneDecimal(value: number): number {
   return Math.round(value * 10) / 10;
 }
@@ -667,6 +721,9 @@ function compileSnapshot(blueprint: SceneBlueprint): AnySnapshot {
   if (blueprint.subject === "algorithm" && (blueprint.sceneType === "recursion_stack" || blueprint.sceneType === "call_stack_scene")) {
     return compileCallStackSnapshot(blueprint);
   }
+  if (blueprint.subject === "algorithm" && (blueprint.sceneType === "binary_search" || blueprint.sceneType === "code_trace_scene")) {
+    return compileCodeTraceSnapshot(blueprint);
+  }
   if (blueprint.subject === "algorithm") return compileAlgorithmSnapshot(blueprint);
   if (blueprint.subject === "biology" && (blueprint.sceneType === "dna_replication" || blueprint.sceneType === "bio_process_scene")) {
     return compileBiologyProcessSnapshot(blueprint);
@@ -682,6 +739,23 @@ function compileSnapshot(blueprint: SceneBlueprint): AnySnapshot {
 }
 
 function compileAlgorithmCodeHighlight(blueprint: AlgorithmSceneBlueprint): CodeHighlightOverlay {
+  if (blueprint.sceneType === "binary_search" || blueprint.sceneType === "code_trace_scene") {
+    return {
+      language: "typescript",
+      lines: binarySearchLines(),
+      active_lines: [2, 3],
+      active_line: 2,
+      variables: {
+        intent: blueprint.visualIntent.join(", "),
+        target: "11",
+        low: "0",
+        mid: "3",
+        high: "6",
+      },
+      operation_label: "compare midpoint",
+    };
+  }
+
   if (blueprint.sceneType === "recursion_stack" || blueprint.sceneType === "call_stack_scene") {
     return {
       language: "python",

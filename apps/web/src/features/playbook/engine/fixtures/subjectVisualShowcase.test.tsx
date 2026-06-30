@@ -30,6 +30,7 @@ const FLAGSHIP_IDS = [
   "derivative_tangent",
   "bfs_graph",
   "recursion_stack",
+  "binary_search",
 ];
 
 describe("subject visual showcase catalog", () => {
@@ -48,6 +49,7 @@ describe("subject visual showcase catalog", () => {
       "math-basic",
       "algorithm-code-basic",
       "algorithm-code-basic",
+      "algorithm-code-basic",
     ]);
     expect(entries.map((entry) => entry.rendererKind)).toEqual([
       "geo_map_scene",
@@ -60,6 +62,7 @@ describe("subject visual showcase catalog", () => {
       "math_plot",
       "graph_scene",
       "call_stack_scene",
+      "code_trace_scene",
     ]);
     expect(getSubjectVisualShowcaseEntry("bfs_graph")?.showInlineCode).toBe(true);
   });

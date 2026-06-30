@@ -1,6 +1,7 @@
 import type { SceneBlueprint } from "../compiler/sceneBlueprintCompiler";
 
 export type SubjectVisualFixtureId =
+  | "binary_search"
   | "bfs_graph"
   | "cell_structure"
   | "dna_replication"
@@ -23,9 +24,18 @@ export const SUBJECT_VISUAL_BLUEPRINT_IDS: readonly SubjectVisualFixtureId[] = [
   "derivative_tangent",
   "bfs_graph",
   "recursion_stack",
+  "binary_search",
 ];
 
 export const subjectVisualBlueprints: Record<SubjectVisualFixtureId, SceneBlueprint> = {
+  binary_search: {
+    id: "binary_search",
+    subject: "algorithm",
+    sceneType: "binary_search",
+    title: "Binary search",
+    visualIntent: ["show_search_window", "highlight_midpoint", "trace_branch"],
+    emphasisPoints: ["low pointer", "mid pointer", "high pointer"],
+  },
   bfs_graph: {
     id: "bfs_graph",
     subject: "algorithm",

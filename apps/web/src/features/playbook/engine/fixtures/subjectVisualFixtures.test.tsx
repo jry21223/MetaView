@@ -26,6 +26,7 @@ const FLAGSHIP_IDS: SubjectVisualFixtureId[] = [
   "derivative_tangent",
   "bfs_graph",
   "recursion_stack",
+  "binary_search",
 ];
 
 describe("subject visual fixtures", () => {
@@ -78,6 +79,27 @@ describe("subject visual fixtures", () => {
     expect(markup).toContain('data-asset-id="active-line"');
     expect(markup).toContain('data-frame-state="active"');
     expect(markup).toContain("factorial(4)");
+    expect(markup).not.toContain("Unknown snapshot kind");
+    expect(markup).not.toContain('data-missing-asset="true"');
+  });
+
+  it("statically renders binary_search through PlaybookComposition with code trace assets", () => {
+    const markup = renderToStaticMarkup(
+      <PlaybookComposition
+        script={getSubjectVisualFixture("binary_search")}
+        showInlineCode={true}
+        showSubtitles={false}
+      />,
+    );
+
+    expect(markup).toContain("code-trace-scene");
+    expect(markup).toContain('data-pack-id="algorithm-code-basic"');
+    expect(markup).toContain('data-trace-asset-id="binary-search-trace-preset"');
+    expect(markup).toContain('data-asset-id="active-line"');
+    expect(markup).toContain('data-asset-id="pointer-marker"');
+    expect(markup).toContain('data-pointer-id="mid"');
+    expect(markup).toContain('data-array-cell-state="active"');
+    expect(markup).toContain("binarySearch");
     expect(markup).not.toContain("Unknown snapshot kind");
     expect(markup).not.toContain('data-missing-asset="true"');
   });

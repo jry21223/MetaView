@@ -49,6 +49,8 @@ describe("assetRegistry", () => {
     expect(findAssetByRole("algorithm", "call_frame")?.id).toBe("call-frame");
     expect(findAssetByRole("algorithm", "stack_frame")?.id).toBe("stack-frame");
     expect(findAssetByRole("algorithm", "active_line")?.id).toBe("active-line");
+    expect(findAssetByRole("algorithm", "binary_search")?.id).toBe("binary-search-trace-preset");
+    expect(findAssetByRole("algorithm", "pointer")?.id).toBe("pointer-marker");
     expect(findAssetByRole("core", "flow_arrow")?.id).toBe("core-flow-arrow");
     expect(findAssetByRole("core", "callout")?.id).toBe("core-callout-label");
     expect(findAssetByRole("core", "moisture_particles")?.id).toBe("core-moisture-particles");

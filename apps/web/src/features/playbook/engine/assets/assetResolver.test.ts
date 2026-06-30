@@ -39,6 +39,12 @@ describe("assetResolver", () => {
     expect(resolveAssetForRenderer("code_trace_scene", "active_line")).toMatchObject({
       id: "active-line",
     });
+    expect(resolveAssetForRenderer("code_trace_scene", "binary_search")).toMatchObject({
+      id: "binary-search-trace-preset",
+    });
+    expect(resolveAssetForRenderer("code_trace_scene", "pointer")).toMatchObject({
+      id: "pointer-marker",
+    });
     expect(resolveAssetForRenderer("molecule_2d_scene", "molecule")).toMatchObject({
       id: "water-molecule-preset",
     });

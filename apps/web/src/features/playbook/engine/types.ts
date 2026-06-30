@@ -12,6 +12,7 @@ export type SnapshotKind =
   | "table_scene"
   | "graph_scene"
   | "call_stack_scene"
+  | "code_trace_scene"
   | "stats_chart_scene"
   | "iteration_trace_scene"
   | "phase_portrait_scene"
@@ -276,6 +277,30 @@ export interface CallStackSceneSnapshot {
   frames: CallStackFrame[];
   code_trace?: CallStackCodeTrace | null;
   current_frame_id?: string | null;
+  caption?: string | null;
+}
+
+export interface CodeTracePointer {
+  id: string;
+  label: string;
+  index: number;
+  asset_id?: string | null;
+}
+
+export interface CodeTraceSceneSnapshot {
+  kind: "code_trace_scene";
+  pack_id?: string | null;
+  asset_id?: string | null;
+  language: string;
+  lines: string[];
+  active_lines: number[];
+  active_line: number;
+  active_line_asset_id?: string | null;
+  array_values?: string[];
+  active_indices?: number[];
+  search_range?: [number, number] | null;
+  pointers?: CodeTracePointer[];
+  variables?: Record<string, string>;
   caption?: string | null;
 }
 
@@ -711,6 +736,7 @@ export type AnySnapshot =
   | TableSceneSnapshot
   | GraphSceneSnapshot
   | CallStackSceneSnapshot
+  | CodeTraceSceneSnapshot
   | StatsChartSceneSnapshot
   | IterationTraceSceneSnapshot
   | PhasePortraitSceneSnapshot
