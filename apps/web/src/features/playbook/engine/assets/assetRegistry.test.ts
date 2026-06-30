@@ -26,6 +26,7 @@ describe("assetRegistry", () => {
     const packs = listAssetPacks().map((pack) => pack.packId);
 
     expect(packs).toContain("biology-basic");
+    expect(packs).toContain("chemistry-basic");
     expect(packs).toContain("geography-basic");
     expect(packs).toContain("geography-earth-basic");
     expect(packs).toContain("physics-basic");
@@ -34,12 +35,15 @@ describe("assetRegistry", () => {
   it("finds subject assets by semantic role", () => {
     expect(getAssetPack("geography-basic")?.subject).toBe("geography");
     expect(findAssetByRole("biology", "nucleus")?.id).toBe("nucleus");
+    expect(findAssetByRole("chemistry", "molecule")?.id).toBe("water-molecule-preset");
+    expect(findAssetByRole("chemistry", "bond")?.id).toBe("bond-line");
     expect(findAssetByRole("geography", "wind")?.id).toBe("monsoon-wind-arrow");
     expect(findAssetByRole("physics", "force")?.id).toBe("force-vector-arrow");
   });
 
   it("keeps rendererKinds aligned with the dedicated scene renderers", () => {
     expect(getAssetPack("biology-basic")?.rendererKinds).toEqual(["bio_cell_scene"]);
+    expect(getAssetPack("chemistry-basic")?.rendererKinds).toEqual(["molecule_2d_scene"]);
     expect(getAssetPack("geography-basic")?.rendererKinds).toEqual(["geo_map_scene"]);
     expect(getAssetPack("geography-earth-basic")?.rendererKinds).toEqual(["geo_map_scene"]);
     expect(getAssetPack("physics-basic")?.rendererKinds).toEqual(["physics_force_scene"]);
@@ -87,6 +91,7 @@ describe("assetRegistry", () => {
 
     for (const manifestPath of [
       "/assets/metaview-kits/biology-basic/manifest.json",
+      "/assets/metaview-kits/chemistry-basic/manifest.json",
       "/assets/metaview-kits/geography-basic/manifest.json",
       "/assets/metaview-kits/geography-earth-basic/manifest.json",
       "/assets/metaview-kits/physics-basic/manifest.json",
@@ -105,6 +110,15 @@ describe("assetRegistry", () => {
     );
     expect(readPublicAsset("/assets/metaview-kits/biology-basic/icons/mitochondrion.svg")).toContain(
       'data-asset-quality="v1"',
+    );
+    expect(readPublicAsset("/assets/metaview-kits/chemistry-basic/symbols/atom-core.svg")).toContain(
+      'data-asset-quality="v1"',
+    );
+    expect(readPublicAsset("/assets/metaview-kits/chemistry-basic/symbols/bond-line.svg")).toContain(
+      'data-asset-quality="v1"',
+    );
+    expect(readPublicAsset("/assets/metaview-kits/chemistry-basic/molecule-presets/water.json")).toContain(
+      '"source": "structured-preset"',
     );
     expect(readPublicAsset("/assets/metaview-kits/geography-basic/east-asia-map-placeholder.svg")).toContain(
       'data-asset-quality="v2"',

@@ -14,6 +14,21 @@ vi.mock("remotion", async () => {
 });
 
 describe("subject visual fixtures", () => {
+  it("statically renders molecule_2d_water through PlaybookComposition", () => {
+    const markup = renderToStaticMarkup(
+      <PlaybookComposition script={getSubjectVisualFixture("molecule_2d_water")} showSubtitles={false} />,
+    );
+
+    expect(markup).toContain("molecule-2d-scene");
+    expect(markup).toContain('data-molecule-id="water"');
+    expect(markup).toContain('data-asset-id="water-molecule-preset"');
+    expect(markup).toContain('data-structured-molecule="true"');
+    expect(markup).toContain('data-element="O"');
+    expect(markup).toContain('data-element="H"');
+    expect(markup).not.toContain("Unknown snapshot kind");
+    expect(markup).not.toContain('data-missing-asset="true"');
+  });
+
   it("statically renders cell_structure through PlaybookComposition", () => {
     const markup = renderToStaticMarkup(
       <PlaybookComposition script={getSubjectVisualFixture("cell_structure")} showSubtitles={false} />,

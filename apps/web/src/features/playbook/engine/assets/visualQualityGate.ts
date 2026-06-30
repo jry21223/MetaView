@@ -4,6 +4,7 @@ import type {
   BioCellSceneSnapshot,
   GeoMapSceneSnapshot,
   MetaStep,
+  Molecule2DSceneSnapshot,
   PhysicsForceSceneSnapshot,
   PlaybookScript,
   SnapshotKind,
@@ -14,6 +15,7 @@ export type VisualQualityWarningCode =
   | "empty_physics_force_scene"
   | "missing_asset"
   | "low_biology_structure_assets"
+  | "low_chemistry_structure_data"
   | "unsupported_array_fallback";
 
 export interface VisualQualityWarning {
@@ -146,6 +148,33 @@ function checkBioCellScene(
   }
 }
 
+function checkMolecule2DScene(
+  warnings: VisualQualityWarning[],
+  context: SnapshotContext,
+  snapshot: Molecule2DSceneSnapshot,
+) {
+  const moleculeAssetResolves = snapshot.molecule_asset_id
+    ? assetResolves(snapshot.molecule_asset_id, snapshot.pack_id)
+    : Boolean(findAssetByRole("chemistry", "molecule", snapshot.pack_id));
+
+  if (snapshot.atoms.length < 2 || snapshot.bonds.length < 1 || !moleculeAssetResolves) {
+    warn(warnings, context, {
+      code: "low_chemistry_structure_data",
+      domain: context.domain,
+      pack_id: snapshot.pack_id,
+      message: "molecule_2d_scene should include structured atoms, bonds, and a resolvable molecule preset asset.",
+    });
+  }
+
+  checkAssetId(warnings, context, snapshot.molecule_asset_id, snapshot.pack_id);
+  for (const atom of snapshot.atoms) {
+    checkAssetId(warnings, context, atom.asset_id, snapshot.pack_id);
+  }
+  for (const bond of snapshot.bonds) {
+    checkAssetId(warnings, context, bond.asset_id, snapshot.pack_id);
+  }
+}
+
 function checkUnsupportedArrayFallback(
   warnings: VisualQualityWarning[],
   context: SnapshotContext,
@@ -181,6 +210,9 @@ export function visualQualityGate(script: PlaybookScript): VisualQualityWarning[
       }
       if (snapshot.kind === "bio_cell_scene") {
         checkBioCellScene(warnings, context, snapshot);
+      }
+      if (snapshot.kind === "molecule_2d_scene") {
+        checkMolecule2DScene(warnings, context, snapshot);
       }
     }
   }

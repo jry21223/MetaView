@@ -20,6 +20,7 @@ import { KaTeXOverlayRenderer } from "./KaTeXOverlayRenderer";
 import { MathFormulaRenderer } from "./MathFormulaRenderer";
 import { MathPlotRenderer } from "./MathPlotRenderer";
 import { MathSceneRenderer } from "./MathSceneRenderer";
+import { Molecule2DSceneRenderer } from "./Molecule2DSceneRenderer";
 import { MotionSceneRenderer } from "./MotionSceneRenderer";
 import { NarrationCardRenderer } from "./NarrationCardRenderer";
 import { PhysicsForceSceneRenderer } from "./PhysicsForceSceneRenderer";
@@ -44,6 +45,7 @@ const registry = new Map<SnapshotKind, RendererComponent>([
   ["manifold_scene", ManifoldSceneRenderer],
   ["solid_geometry_scene", SolidGeometrySceneRenderer],
   ["bio_cell_scene", BioCellSceneRenderer],
+  ["molecule_2d_scene", Molecule2DSceneRenderer],
   ["geo_map_scene", GeoMapSceneRenderer],
   ["physics_force_scene", PhysicsForceSceneRenderer],
   ["motion_scene", MotionSceneRenderer],

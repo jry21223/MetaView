@@ -6,12 +6,14 @@ import type {
   BioCellSceneSnapshot,
   GeoMapSceneSnapshot,
   MetaStep,
+  Molecule2DSceneSnapshot,
   PhysicsForceSceneSnapshot,
   PlaybookScript,
 } from "../types";
 import type { RendererProps } from "./types";
 import { BioCellSceneRenderer } from "./BioCellSceneRenderer";
 import { GeoMapSceneRenderer } from "./GeoMapSceneRenderer";
+import { Molecule2DSceneRenderer } from "./Molecule2DSceneRenderer";
 import { PhysicsForceSceneRenderer } from "./PhysicsForceSceneRenderer";
 import { rendererRegistry } from "./registry";
 
@@ -87,18 +89,46 @@ function bioSnapshot(extra: Partial<BioCellSceneSnapshot> = {}): BioCellSceneSna
   };
 }
 
-function step(snapshot: BioCellSceneSnapshot | GeoMapSceneSnapshot | PhysicsForceSceneSnapshot): MetaStep {
+function moleculeSnapshot(extra: Partial<Molecule2DSceneSnapshot> = {}): Molecule2DSceneSnapshot {
+  return {
+    kind: "molecule_2d_scene",
+    pack_id: "chemistry-basic",
+    molecule_id: "water",
+    molecule_asset_id: "water-molecule-preset",
+    atoms: [
+      { id: "o", element: "O", x: 50, y: 42 },
+      { id: "h1", element: "H", x: 35, y: 62 },
+      { id: "h2", element: "H", x: 65, y: 62 },
+    ],
+    bonds: [
+      { id: "oh1", from: "o", to: "h1", order: 1 },
+      { id: "oh2", from: "o", to: "h2", order: 1 },
+    ],
+    formula_latex: "H_2O",
+    caption: "Water is a bent polar molecule.",
+    ...extra,
+  };
+}
+
+function step(snapshot: BioCellSceneSnapshot | GeoMapSceneSnapshot | Molecule2DSceneSnapshot | PhysicsForceSceneSnapshot): MetaStep {
   return {
     step_id: "s1",
     end_frame: 90,
-    title: snapshot.kind === "geo_map_scene" ? "东亚季风" : snapshot.kind === "bio_cell_scene" ? "细胞结构" : "平抛运动",
+    title:
+      snapshot.kind === "geo_map_scene"
+        ? "东亚季风"
+        : snapshot.kind === "bio_cell_scene"
+          ? "细胞结构"
+          : snapshot.kind === "molecule_2d_scene"
+            ? "水分子"
+            : "平抛运动",
     voiceover_text: snapshot.caption ?? "",
     snapshot,
     tokens: [],
   };
 }
 
-function props(snapshot: BioCellSceneSnapshot | GeoMapSceneSnapshot | PhysicsForceSceneSnapshot): RendererProps {
+function props(snapshot: BioCellSceneSnapshot | GeoMapSceneSnapshot | Molecule2DSceneSnapshot | PhysicsForceSceneSnapshot): RendererProps {
   return {
     step: step(snapshot),
     prevStep: null,
@@ -110,12 +140,26 @@ function props(snapshot: BioCellSceneSnapshot | GeoMapSceneSnapshot | PhysicsFor
   };
 }
 
-function script(snapshot: BioCellSceneSnapshot | GeoMapSceneSnapshot | PhysicsForceSceneSnapshot): PlaybookScript {
+function script(snapshot: BioCellSceneSnapshot | GeoMapSceneSnapshot | Molecule2DSceneSnapshot | PhysicsForceSceneSnapshot): PlaybookScript {
   return {
     fps: 30,
     total_frames: 90,
-    domain: snapshot.kind === "geo_map_scene" ? "geography" : snapshot.kind === "bio_cell_scene" ? "biology" : "physics",
-    title: snapshot.kind === "geo_map_scene" ? "东亚季风" : snapshot.kind === "bio_cell_scene" ? "细胞结构" : "平抛运动",
+    domain:
+      snapshot.kind === "geo_map_scene"
+        ? "geography"
+        : snapshot.kind === "bio_cell_scene"
+          ? "biology"
+          : snapshot.kind === "molecule_2d_scene"
+            ? "chemistry"
+            : "physics",
+    title:
+      snapshot.kind === "geo_map_scene"
+        ? "东亚季风"
+        : snapshot.kind === "bio_cell_scene"
+          ? "细胞结构"
+          : snapshot.kind === "molecule_2d_scene"
+            ? "水分子"
+            : "平抛运动",
     summary: "subject fixture",
     parameter_controls: [],
     steps: [step(snapshot)],
@@ -125,6 +169,7 @@ function script(snapshot: BioCellSceneSnapshot | GeoMapSceneSnapshot | PhysicsFo
 describe("subject scene renderers", () => {
   it("registers dedicated geography and physics scene renderers", () => {
     expect(rendererRegistry.get("bio_cell_scene")).toBe(BioCellSceneRenderer);
+    expect(rendererRegistry.get("molecule_2d_scene")).toBe(Molecule2DSceneRenderer);
     expect(rendererRegistry.get("geo_map_scene")).toBe(GeoMapSceneRenderer);
     expect(rendererRegistry.get("physics_force_scene")).toBe(PhysicsForceSceneRenderer);
   });
@@ -136,6 +181,16 @@ describe("subject scene renderers", () => {
     expect(markup).toContain('data-asset-id="cell-outline"');
     expect(markup).toContain('data-asset-id="nucleus"');
     expect(markup).toContain('data-semantic-role="callout"');
+  });
+
+  it("renders chemistry molecule assets and structured atom-bond data", () => {
+    const markup = renderToStaticMarkup(<Molecule2DSceneRenderer {...props(moleculeSnapshot())} />);
+
+    expect(markup).toContain("molecule-2d-scene");
+    expect(markup).toContain('data-molecule-id="water"');
+    expect(markup).toContain('data-asset-id="water-molecule-preset"');
+    expect(markup).toContain('data-structured-molecule="true"');
+    expect(markup).toContain('data-element="O"');
   });
 
   it("renders geography map layers, wind flow, pressure centers, and particles", () => {
@@ -170,11 +225,16 @@ describe("subject scene renderers", () => {
     const physicsMarkup = renderToStaticMarkup(
       <PlaybookComposition script={script(physicsSnapshot())} showSubtitles={false} />,
     );
+    const chemistryMarkup = renderToStaticMarkup(
+      <PlaybookComposition script={script(moleculeSnapshot())} showSubtitles={false} />,
+    );
 
     expect(bioMarkup).toContain("bio-cell-scene");
+    expect(chemistryMarkup).toContain("molecule-2d-scene");
     expect(geoMarkup).toContain("geo-map-scene");
     expect(physicsMarkup).toContain("physics-force-scene");
     expect(bioMarkup).not.toContain("Unknown snapshot kind");
+    expect(chemistryMarkup).not.toContain("Unknown snapshot kind");
     expect(geoMarkup).not.toContain("Unknown snapshot kind");
     expect(physicsMarkup).not.toContain("Unknown snapshot kind");
   });

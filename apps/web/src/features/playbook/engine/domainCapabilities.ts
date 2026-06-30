@@ -19,9 +19,9 @@ export const DOMAIN_CAPABILITIES: Record<string, DomainCapability> = {
   },
   chemistry: {
     domain: "chemistry",
-    support: "fallback",
-    primaryRenderer: "domain_cards",
-    message: "Chemistry currently uses fallback concept cards.",
+    support: "partial",
+    primaryRenderer: "molecule_2d_scene/domain_cards",
+    message: "Chemistry has a structured 2D molecule renderer for flagship molecule cases and falls back to concept cards.",
   },
   biology: {
     domain: "biology",

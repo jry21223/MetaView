@@ -20,6 +20,7 @@ export type SnapshotKind =
   | "manifold_scene"
   | "solid_geometry_scene"
   | "bio_cell_scene"
+  | "molecule_2d_scene"
   | "geo_map_scene"
   | "physics_force_scene"
   | "motion_scene"
@@ -451,6 +452,45 @@ export interface BioCellSceneSnapshot {
   caption?: string | null;
 }
 
+export interface Molecule2DAtom {
+  id: string;
+  element: string;
+  x: number;
+  y: number;
+  charge?: string | null;
+  label?: string | null;
+  asset_id?: string | null;
+}
+
+export interface Molecule2DBond {
+  id: string;
+  from: string;
+  to: string;
+  order: 1 | 2 | 3;
+  label?: string | null;
+  asset_id?: string | null;
+}
+
+export interface Molecule2DCallout {
+  id: string;
+  target_id: string;
+  label: string;
+  side?: "left" | "right" | "top" | "bottom";
+}
+
+export interface Molecule2DSceneSnapshot {
+  kind: "molecule_2d_scene";
+  pack_id?: string | null;
+  molecule_id: string;
+  molecule_asset_id?: string | null;
+  atoms: Molecule2DAtom[];
+  bonds: Molecule2DBond[];
+  highlights?: string[];
+  callouts?: Molecule2DCallout[];
+  formula_latex?: string | null;
+  caption?: string | null;
+}
+
 export interface GeoMapLayer {
   id: string;
   semantic_role: "land" | "ocean" | "map_layer" | "pressure_high" | "pressure_low" | string;
@@ -561,6 +601,7 @@ export type AnySnapshot =
   | ManifoldSceneSnapshot
   | SolidGeometrySceneSnapshot
   | BioCellSceneSnapshot
+  | Molecule2DSceneSnapshot
   | GeoMapSceneSnapshot
   | PhysicsForceSceneSnapshot
   | MotionSceneSnapshot

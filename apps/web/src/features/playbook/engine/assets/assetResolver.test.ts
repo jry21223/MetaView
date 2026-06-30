@@ -21,6 +21,9 @@ describe("assetResolver", () => {
   });
 
   it("resolves assets constrained to rendererKinds", () => {
+    expect(resolveAssetForRenderer("molecule_2d_scene", "molecule")).toMatchObject({
+      id: "water-molecule-preset",
+    });
     expect(resolveAssetForRenderer("geo_map_scene", "monsoon_flow")).toMatchObject({
       id: "monsoon-wind-arrow",
     });

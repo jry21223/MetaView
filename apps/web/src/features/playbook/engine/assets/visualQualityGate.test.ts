@@ -157,4 +157,81 @@ describe("visualQualityGate", () => {
       ]),
     );
   });
+
+  it("warns when a chemistry molecule asset_id cannot be resolved", () => {
+    const warnings = visualQualityGate(
+      script({
+        domain: "chemistry",
+        steps: [
+          {
+            step_id: "molecule_2d_water",
+            end_frame: 90,
+            title: "Water molecule",
+            voiceover_text: "",
+            tokens: [],
+            snapshot: {
+              kind: "molecule_2d_scene",
+              pack_id: "chemistry-basic",
+              molecule_id: "water",
+              molecule_asset_id: "missing-water-preset",
+              atoms: [
+                { id: "o", element: "O", x: 50, y: 45 },
+                { id: "h1", element: "H", x: 37, y: 60 },
+                { id: "h2", element: "H", x: 63, y: 60 },
+              ],
+              bonds: [
+                { id: "oh1", from: "o", to: "h1", order: 1 },
+                { id: "oh2", from: "o", to: "h2", order: 1 },
+              ],
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "missing_asset",
+          step_id: "molecule_2d_water",
+          asset_id: "missing-water-preset",
+          pack_id: "chemistry-basic",
+        }),
+      ]),
+    );
+  });
+
+  it("warns when chemistry falls back to algorithm_array", () => {
+    const warnings = visualQualityGate(
+      script({
+        domain: "chemistry",
+        steps: [
+          {
+            step_id: "chemistry-array-fallback",
+            end_frame: 90,
+            title: "Unsupported chemistry fallback",
+            voiceover_text: "",
+            tokens: [],
+            snapshot: {
+              kind: "algorithm_array",
+              array_values: ["H", "O", "H"],
+              active_indices: [],
+              swap_indices: [],
+              sorted_indices: [],
+              pointers: {},
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(warnings).toMatchObject([
+      {
+        code: "unsupported_array_fallback",
+        step_id: "chemistry-array-fallback",
+        domain: "chemistry",
+        snapshot_kind: "algorithm_array",
+      },
+    ]);
+  });
 });

@@ -1,6 +1,12 @@
-import type { BioCellSceneSnapshot, GeoMapSceneSnapshot, PhysicsForceSceneSnapshot, PlaybookScript } from "../types";
+import type {
+  BioCellSceneSnapshot,
+  GeoMapSceneSnapshot,
+  Molecule2DSceneSnapshot,
+  PhysicsForceSceneSnapshot,
+  PlaybookScript,
+} from "../types";
 
-export type SubjectVisualFixtureId = "cell_structure" | "east_asia_monsoon" | "projectile_motion";
+export type SubjectVisualFixtureId = "cell_structure" | "east_asia_monsoon" | "molecule_2d_water" | "projectile_motion";
 
 function cellStructureSnapshot(): BioCellSceneSnapshot {
   return {
@@ -52,6 +58,30 @@ function eastAsiaMonsoonSnapshot(): GeoMapSceneSnapshot {
   };
 }
 
+function molecule2DWaterSnapshot(): Molecule2DSceneSnapshot {
+  return {
+    kind: "molecule_2d_scene",
+    pack_id: "chemistry-basic",
+    molecule_id: "water",
+    molecule_asset_id: "water-molecule-preset",
+    atoms: [
+      { id: "o", element: "O", x: 50, y: 42, asset_id: "atom-core", label: "oxygen" },
+      { id: "h1", element: "H", x: 35, y: 62, asset_id: "atom-core", label: "hydrogen" },
+      { id: "h2", element: "H", x: 65, y: 62, asset_id: "atom-core", label: "hydrogen" },
+    ],
+    bonds: [
+      { id: "oh1", from: "o", to: "h1", order: 1, asset_id: "bond-line" },
+      { id: "oh2", from: "o", to: "h2", order: 1, asset_id: "bond-line" },
+    ],
+    callouts: [
+      { id: "bent-shape", target_id: "o", label: "bent geometry", side: "top" },
+      { id: "polar-bond", target_id: "h2", label: "polar bonds", side: "right" },
+    ],
+    formula_latex: "H_2O",
+    caption: "Water is a bent polar molecule built from structured atom and bond data.",
+  };
+}
+
 function projectileMotionSnapshot(): PhysicsForceSceneSnapshot {
   return {
     kind: "physics_force_scene",
@@ -73,9 +103,9 @@ function projectileMotionSnapshot(): PhysicsForceSceneSnapshot {
 
 function scriptFor(
   id: SubjectVisualFixtureId,
-  domain: "biology" | "geography" | "physics",
+  domain: "biology" | "chemistry" | "geography" | "physics",
   title: string,
-  snapshot: BioCellSceneSnapshot | GeoMapSceneSnapshot | PhysicsForceSceneSnapshot,
+  snapshot: BioCellSceneSnapshot | GeoMapSceneSnapshot | Molecule2DSceneSnapshot | PhysicsForceSceneSnapshot,
 ): PlaybookScript {
   return {
     schema_version: "1.0.0",
@@ -110,6 +140,12 @@ export const subjectVisualFixtures: Record<SubjectVisualFixtureId, PlaybookScrip
     "geography",
     "East Asia monsoon",
     eastAsiaMonsoonSnapshot(),
+  ),
+  molecule_2d_water: scriptFor(
+    "molecule_2d_water",
+    "chemistry",
+    "Water molecule",
+    molecule2DWaterSnapshot(),
   ),
   projectile_motion: scriptFor(
     "projectile_motion",
