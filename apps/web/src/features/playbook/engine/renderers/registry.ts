@@ -14,6 +14,7 @@ import {
 } from "./AdvancedMathRenderers";
 import { BioCellSceneRenderer } from "./BioCellSceneRenderer";
 import { BioProcessSceneRenderer } from "./BioProcessSceneRenderer";
+import { CallStackSceneRenderer } from "./CallStackSceneRenderer";
 import { BinaryTreeRenderer } from "./BinaryTreeRenderer";
 import { DomainArrayRenderer } from "./DomainArrayRenderer";
 import { GeoMapSceneRenderer } from "./GeoMapSceneRenderer";
@@ -38,6 +39,7 @@ const registry = new Map<SnapshotKind, RendererComponent>([
   ["matrix_scene", MatrixSceneRenderer],
   ["table_scene", TableSceneRenderer],
   ["graph_scene", GraphSceneRenderer],
+  ["call_stack_scene", CallStackSceneRenderer],
   ["stats_chart_scene", StatsChartSceneRenderer],
   ["iteration_trace_scene", IterationTraceSceneRenderer],
   ["phase_portrait_scene", PhasePortraitSceneRenderer],

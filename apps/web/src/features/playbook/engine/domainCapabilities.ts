@@ -8,7 +8,7 @@ export interface DomainCapability {
 }
 
 export const DOMAIN_CAPABILITIES: Record<string, DomainCapability> = {
-  algorithm: { domain: "algorithm", support: "full", primaryRenderer: "graph_scene/algorithm_array/algorithm_tree/code_highlight" },
+  algorithm: { domain: "algorithm", support: "full", primaryRenderer: "graph_scene/call_stack_scene/code_trace_scene/algorithm_array/algorithm_tree/code_highlight" },
   code: { domain: "code", support: "partial", primaryRenderer: "algorithm/code" },
   math: { domain: "math", support: "full", primaryRenderer: "math_scene/math_plot/math_formula" },
   physics: {

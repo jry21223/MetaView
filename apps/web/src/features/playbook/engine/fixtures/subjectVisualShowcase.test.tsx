@@ -29,6 +29,7 @@ const FLAGSHIP_IDS = [
   "reaction_synthesis_water",
   "derivative_tangent",
   "bfs_graph",
+  "recursion_stack",
 ];
 
 describe("subject visual showcase catalog", () => {
@@ -46,6 +47,7 @@ describe("subject visual showcase catalog", () => {
       "chemistry-basic",
       "math-basic",
       "algorithm-code-basic",
+      "algorithm-code-basic",
     ]);
     expect(entries.map((entry) => entry.rendererKind)).toEqual([
       "geo_map_scene",
@@ -57,6 +59,7 @@ describe("subject visual showcase catalog", () => {
       "reaction_scene",
       "math_plot",
       "graph_scene",
+      "call_stack_scene",
     ]);
     expect(getSubjectVisualShowcaseEntry("bfs_graph")?.showInlineCode).toBe(true);
   });

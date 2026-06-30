@@ -25,7 +25,7 @@ export interface AssetAuditReport {
 }
 
 const REQUIRED_RENDERER_KINDS_BY_PACK: Record<string, string[]> = {
-  "algorithm-code-basic": ["graph_scene", "algorithm_array", "algorithm_tree"],
+  "algorithm-code-basic": ["graph_scene", "call_stack_scene", "code_trace_scene", "algorithm_array", "algorithm_tree"],
   "biology-basic": ["bio_cell_scene", "bio_process_scene"],
   "chemistry-basic": ["molecule_2d_scene", "reaction_scene"],
   "core-visual-basic": [

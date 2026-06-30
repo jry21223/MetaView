@@ -46,6 +46,9 @@ describe("assetRegistry", () => {
     expect(findAssetByRole("chemistry", "electron_flow")?.id).toBe("electron-flow");
     expect(findAssetByRole("algorithm", "graph_node")?.id).toBe("graph-node");
     expect(findAssetByRole("algorithm", "queue")?.id).toBe("queue-frame");
+    expect(findAssetByRole("algorithm", "call_frame")?.id).toBe("call-frame");
+    expect(findAssetByRole("algorithm", "stack_frame")?.id).toBe("stack-frame");
+    expect(findAssetByRole("algorithm", "active_line")?.id).toBe("active-line");
     expect(findAssetByRole("core", "flow_arrow")?.id).toBe("core-flow-arrow");
     expect(findAssetByRole("core", "callout")?.id).toBe("core-callout-label");
     expect(findAssetByRole("core", "moisture_particles")?.id).toBe("core-moisture-particles");
@@ -75,6 +78,8 @@ describe("assetRegistry", () => {
     ]);
     expect(getAssetPack("algorithm-code-basic")?.rendererKinds).toEqual([
       "graph_scene",
+      "call_stack_scene",
+      "code_trace_scene",
       "algorithm_array",
       "algorithm_tree",
     ]);

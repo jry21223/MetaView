@@ -9,6 +9,7 @@ import type {
   AnySnapshot,
   BioCellSceneSnapshot,
   BioProcessSceneSnapshot,
+  CallStackSceneSnapshot,
   CodeHighlightOverlay,
   GeoMapFlow,
   GeoMapSceneSnapshot,
@@ -33,13 +34,14 @@ type ChemistrySceneType =
   | "reaction_scene"
   | "reaction_synthesis_water";
 type MathSceneType = "math_plot" | "derivative_tangent";
-type AlgorithmSceneType = "graph_scene" | "bfs_graph";
+type AlgorithmSceneType = "graph_scene" | "bfs_graph" | "call_stack_scene" | "recursion_stack";
 type SceneBlueprintSubject = "algorithm" | "biology" | "chemistry" | "geography" | "math" | "physics";
 type SupportedRendererKind =
   | "bio_cell_scene"
   | "bio_process_scene"
   | "geo_map_scene"
   | "graph_scene"
+  | "call_stack_scene"
   | "math_plot"
   | "molecule_2d_scene"
   | "reaction_scene"
@@ -532,6 +534,69 @@ function compileAlgorithmSnapshot(blueprint: AlgorithmSceneBlueprint): GraphScen
   };
 }
 
+function compileCallStackSnapshot(blueprint: AlgorithmSceneBlueprint): CallStackSceneSnapshot {
+  const packId = blueprint.packId ?? DEFAULT_ALGORITHM_PACK_ID;
+  const stackAssetId = resolveAssetIdByRole("call_stack_scene", "algorithm", packId, "recursion_stack", [
+    "call_stack_scene",
+    "call_stack",
+  ]);
+  const callFrameAssetId = resolveAssetIdByRole("call_stack_scene", "algorithm", packId, "call_frame", [
+    "active_frame",
+  ]);
+  const stackFrameAssetId = resolveAssetIdByRole("call_stack_scene", "algorithm", packId, "stack_frame", [
+    "waiting_frame",
+  ]);
+  const activeLineAssetId = resolveAssetIdByRole("call_stack_scene", "algorithm", packId, "active_line", [
+    "code_trace",
+  ]);
+
+  return {
+    kind: "call_stack_scene",
+    pack_id: packId,
+    asset_id: stackAssetId,
+    frames: [
+      {
+        id: "factorial-4",
+        label: "factorial(4)",
+        depth: 0,
+        state: "active",
+        asset_id: callFrameAssetId,
+        variables: { n: "4" },
+      },
+      {
+        id: "factorial-3",
+        label: "factorial(3)",
+        depth: 1,
+        state: "waiting",
+        asset_id: stackFrameAssetId,
+        variables: { n: "3" },
+      },
+      {
+        id: "factorial-2",
+        label: "factorial(2)",
+        depth: 2,
+        state: "waiting",
+        asset_id: stackFrameAssetId,
+        variables: { n: "2" },
+      },
+    ],
+    code_trace: {
+      language: "python",
+      lines: [
+        "def factorial(n):",
+        "    if n == 1:",
+        "        return 1",
+        "    return n * factorial(n - 1)",
+      ],
+      active_lines: [3],
+      active_line: 3,
+      asset_id: activeLineAssetId,
+    },
+    current_frame_id: "factorial-4",
+    caption: blueprint.caption ?? "Recursive calls form a stack frame for each pending multiplication.",
+  };
+}
+
 function roundToOneDecimal(value: number): number {
   return Math.round(value * 10) / 10;
 }
@@ -599,6 +664,9 @@ function compilePhysicsSnapshot(blueprint: PhysicsForceSceneBlueprint): PhysicsF
 }
 
 function compileSnapshot(blueprint: SceneBlueprint): AnySnapshot {
+  if (blueprint.subject === "algorithm" && (blueprint.sceneType === "recursion_stack" || blueprint.sceneType === "call_stack_scene")) {
+    return compileCallStackSnapshot(blueprint);
+  }
   if (blueprint.subject === "algorithm") return compileAlgorithmSnapshot(blueprint);
   if (blueprint.subject === "biology" && (blueprint.sceneType === "dna_replication" || blueprint.sceneType === "bio_process_scene")) {
     return compileBiologyProcessSnapshot(blueprint);
@@ -614,6 +682,26 @@ function compileSnapshot(blueprint: SceneBlueprint): AnySnapshot {
 }
 
 function compileAlgorithmCodeHighlight(blueprint: AlgorithmSceneBlueprint): CodeHighlightOverlay {
+  if (blueprint.sceneType === "recursion_stack" || blueprint.sceneType === "call_stack_scene") {
+    return {
+      language: "python",
+      lines: [
+        "def factorial(n):",
+        "    if n == 1:",
+        "        return 1",
+        "    return n * factorial(n - 1)",
+      ],
+      active_lines: [3],
+      active_line: 3,
+      variables: {
+        intent: blueprint.visualIntent.join(", "),
+        n: "4",
+        pending: "4 * factorial(3)",
+      },
+      operation_label: "recursive call",
+    };
+  }
+
   return {
     language: "typescript",
     lines: [

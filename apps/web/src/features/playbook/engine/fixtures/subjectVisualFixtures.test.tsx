@@ -25,6 +25,7 @@ const FLAGSHIP_IDS: SubjectVisualFixtureId[] = [
   "reaction_synthesis_water",
   "derivative_tangent",
   "bfs_graph",
+  "recursion_stack",
 ];
 
 describe("subject visual fixtures", () => {
@@ -58,6 +59,27 @@ describe("subject visual fixtures", () => {
     expect(markup).toContain("BFS");
     expect(markup).toContain("queue");
     expect(markup).not.toContain("Unknown snapshot kind");
+  });
+
+  it("statically renders recursion_stack through PlaybookComposition with call stack assets", () => {
+    const markup = renderToStaticMarkup(
+      <PlaybookComposition
+        script={getSubjectVisualFixture("recursion_stack")}
+        showInlineCode={true}
+        showSubtitles={false}
+      />,
+    );
+
+    expect(markup).toContain("call-stack-scene");
+    expect(markup).toContain('data-pack-id="algorithm-code-basic"');
+    expect(markup).toContain('data-stack-asset-id="recursion-stack-preset"');
+    expect(markup).toContain('data-asset-id="call-frame"');
+    expect(markup).toContain('data-asset-id="stack-frame"');
+    expect(markup).toContain('data-asset-id="active-line"');
+    expect(markup).toContain('data-frame-state="active"');
+    expect(markup).toContain("factorial(4)");
+    expect(markup).not.toContain("Unknown snapshot kind");
+    expect(markup).not.toContain('data-missing-asset="true"');
   });
 
   it("statically renders derivative_tangent through PlaybookComposition", () => {

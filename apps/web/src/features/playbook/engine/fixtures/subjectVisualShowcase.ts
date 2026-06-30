@@ -27,6 +27,7 @@ export const SUBJECT_VISUAL_SHOWCASE_IDS: readonly SubjectVisualFixtureId[] = [
   "reaction_synthesis_water",
   "derivative_tangent",
   "bfs_graph",
+  "recursion_stack",
 ];
 
 const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
@@ -169,6 +170,25 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-node-state="queue"',
       'data-edge-state="active"',
       "BFS",
+    ],
+  },
+  {
+    id: "recursion_stack",
+    domain: "algorithm",
+    title: "Recursion stack",
+    summary: "Call stack renderer consumes recursion frame and active code-line assets.",
+    packId: "algorithm-code-basic",
+    rendererKind: "call_stack_scene",
+    showInlineCode: true,
+    requiredMarkers: [
+      "call-stack-scene",
+      'data-pack-id="algorithm-code-basic"',
+      'data-stack-asset-id="recursion-stack-preset"',
+      'data-asset-id="call-frame"',
+      'data-asset-id="stack-frame"',
+      'data-asset-id="active-line"',
+      'data-frame-state="active"',
+      "factorial(4)",
     ],
   },
 ];

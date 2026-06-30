@@ -9,7 +9,8 @@ export type SubjectVisualFixtureId =
   | "molecule_2d_methane"
   | "molecule_2d_water"
   | "projectile_motion"
-  | "reaction_synthesis_water";
+  | "reaction_synthesis_water"
+  | "recursion_stack";
 
 export const SUBJECT_VISUAL_BLUEPRINT_IDS: readonly SubjectVisualFixtureId[] = [
   "east_asia_monsoon",
@@ -21,6 +22,7 @@ export const SUBJECT_VISUAL_BLUEPRINT_IDS: readonly SubjectVisualFixtureId[] = [
   "reaction_synthesis_water",
   "derivative_tangent",
   "bfs_graph",
+  "recursion_stack",
 ];
 
 export const subjectVisualBlueprints: Record<SubjectVisualFixtureId, SceneBlueprint> = {
@@ -31,6 +33,14 @@ export const subjectVisualBlueprints: Record<SubjectVisualFixtureId, SceneBluepr
     title: "BFS graph",
     visualIntent: ["show_graph_traversal", "show_queue_state", "highlight_active_edge"],
     emphasisPoints: ["current node", "queue", "visited set"],
+  },
+  recursion_stack: {
+    id: "recursion_stack",
+    subject: "algorithm",
+    sceneType: "recursion_stack",
+    title: "Recursion stack",
+    visualIntent: ["show_call_stack", "highlight_active_line", "trace_pending_return"],
+    emphasisPoints: ["active call frame", "pending multiplication", "base case path"],
   },
   cell_structure: {
     id: "cell_structure",

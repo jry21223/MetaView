@@ -11,6 +11,7 @@ export type SnapshotKind =
   | "matrix_scene"
   | "table_scene"
   | "graph_scene"
+  | "call_stack_scene"
   | "stats_chart_scene"
   | "iteration_trace_scene"
   | "phase_portrait_scene"
@@ -248,6 +249,33 @@ export interface GraphSceneSnapshot {
   visited_node_ids?: string[];
   queue_node_ids?: string[];
   frontier_node_ids?: string[];
+  caption?: string | null;
+}
+
+export interface CallStackFrame {
+  id: string;
+  label: string;
+  depth: number;
+  state?: "active" | "waiting" | "returned" | string;
+  asset_id?: string | null;
+  variables?: Record<string, string>;
+}
+
+export interface CallStackCodeTrace {
+  language: string;
+  lines: string[];
+  active_lines: number[];
+  active_line: number;
+  asset_id?: string | null;
+}
+
+export interface CallStackSceneSnapshot {
+  kind: "call_stack_scene";
+  pack_id?: string | null;
+  asset_id?: string | null;
+  frames: CallStackFrame[];
+  code_trace?: CallStackCodeTrace | null;
+  current_frame_id?: string | null;
   caption?: string | null;
 }
 
@@ -682,6 +710,7 @@ export type AnySnapshot =
   | MatrixSceneSnapshot
   | TableSceneSnapshot
   | GraphSceneSnapshot
+  | CallStackSceneSnapshot
   | StatsChartSceneSnapshot
   | IterationTraceSceneSnapshot
   | PhasePortraitSceneSnapshot

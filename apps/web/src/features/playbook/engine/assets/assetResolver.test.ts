@@ -33,6 +33,12 @@ describe("assetResolver", () => {
     expect(resolveAssetForRenderer("graph_scene", "graph_node")).toMatchObject({
       id: "graph-node",
     });
+    expect(resolveAssetForRenderer("call_stack_scene", "call_frame")).toMatchObject({
+      id: "call-frame",
+    });
+    expect(resolveAssetForRenderer("code_trace_scene", "active_line")).toMatchObject({
+      id: "active-line",
+    });
     expect(resolveAssetForRenderer("molecule_2d_scene", "molecule")).toMatchObject({
       id: "water-molecule-preset",
     });
