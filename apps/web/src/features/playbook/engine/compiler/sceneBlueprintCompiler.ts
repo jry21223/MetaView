@@ -515,6 +515,12 @@ export function compileSceneBlueprintToPlaybookScript(blueprint: SceneBlueprint)
     summary: blueprint.caption ?? blueprint.title,
     parameter_controls: [],
     steps: [step],
+    algorithm_id: blueprint.sceneType,
+    initial_data: {
+      scene_blueprint: [blueprint.sceneType],
+      visual_intent: blueprint.visualIntent,
+      emphasis_points: blueprint.emphasisPoints ?? [],
+    },
   };
 }
 

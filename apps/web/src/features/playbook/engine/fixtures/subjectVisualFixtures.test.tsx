@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { compileSceneBlueprintToPlaybookScript } from "../compiler/sceneBlueprintCompiler";
 import { PlaybookComposition } from "../composition/PlaybookComposition";
-import { getSubjectVisualFixture } from "./subjectVisualFixtures";
+import { getSubjectVisualBlueprint } from "./subjectVisualBlueprints";
+import { getSubjectVisualFixture, type SubjectVisualFixtureId } from "./subjectVisualFixtures";
 
 vi.mock("remotion", async () => {
   const actual = await vi.importActual<typeof import("remotion")>("remotion");
@@ -13,7 +15,27 @@ vi.mock("remotion", async () => {
   };
 });
 
+const FLAGSHIP_IDS: SubjectVisualFixtureId[] = [
+  "east_asia_monsoon",
+  "projectile_motion",
+  "cell_structure",
+  "molecule_2d_water",
+  "derivative_tangent",
+  "bfs_graph",
+];
+
 describe("subject visual fixtures", () => {
+  it("keeps flagship fixtures tied to their source SceneBlueprint", () => {
+    for (const fixtureId of FLAGSHIP_IDS) {
+      const script = getSubjectVisualFixture(fixtureId);
+      const blueprint = getSubjectVisualBlueprint(fixtureId);
+
+      expect(script.algorithm_id, fixtureId).toBe(fixtureId);
+      expect(script.initial_data?.scene_blueprint, fixtureId).toEqual([fixtureId]);
+      expect(script, fixtureId).toEqual(compileSceneBlueprintToPlaybookScript(blueprint));
+    }
+  });
+
   it("statically renders bfs_graph through PlaybookComposition with graph and code tracks", () => {
     const markup = renderToStaticMarkup(
       <PlaybookComposition

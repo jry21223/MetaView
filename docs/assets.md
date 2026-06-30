@@ -83,6 +83,11 @@ The checked-in showcase catalog lives in
 It is the source of truth for Day-21 demo coverage and keeps fixture ids,
 asset packs, renderer kinds, code-track settings, and required static-render
 markers in one place.
+The actual flagship playbooks are generated from
+`apps/web/src/features/playbook/engine/fixtures/subjectVisualBlueprints.ts`
+through `sceneBlueprintCompiler`, so the demo matrix exercises the
+intent-to-asset-to-renderer compiler path instead of a duplicate hand-written
+snapshot catalog.
 
 | Fixture | Domain | Asset pack | Renderer | Quality target |
 | --- | --- | --- | --- | --- |
