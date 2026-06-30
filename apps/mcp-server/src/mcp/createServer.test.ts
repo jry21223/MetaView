@@ -6,8 +6,88 @@ import { createMetaViewMcpServer } from "./createServer";
 import type { MetaViewApiClient } from "../core/metaviewApiClient";
 import type { RenderPreviewService } from "../core/renderPreview";
 
+type McpCoreClient = Pick<
+  MetaViewApiClient,
+  | "listCapabilities"
+  | "listAssetPacks"
+  | "resolveAssets"
+  | "compileSceneBlueprint"
+  | "validateVisualQuality"
+  | "buildPlaybook"
+  | "buildDirectorScript"
+>;
+
+function fakeCoreClient(overrides: Partial<McpCoreClient> = {}): McpCoreClient {
+  return {
+    async listCapabilities() {
+      return {
+        generatedBy: "metaview-core" as const,
+        subjects: [
+          { id: "fake", support: "partial" as const, renderers: ["fake_renderer"], assetPacks: [], flagshipCases: [] },
+        ],
+      };
+    },
+    async listAssetPacks() {
+      return { generatedBy: "metaview-core" as const, packs: [] };
+    },
+    async resolveAssets() {
+      return {
+        generatedBy: "metaview-core" as const,
+        subject: "geography",
+        sceneType: "east_asia_monsoon",
+        assets: [{ semanticRole: "wind", assetId: "api-wind", packId: "geography-basic", resourceUri: "metaview://assets/geography-basic/api-wind.svg", license: "internal", commercialUseStatus: "allowed" }],
+        missing: ["pressure_high"],
+      };
+    },
+    async compileSceneBlueprint() {
+      return {
+        generatedBy: "metaview-core" as const,
+        sceneBlueprint: {
+          subject: "geography",
+          sceneType: "api_monsoon",
+          topic: "东亚季风",
+          visualIntent: [],
+          requiredAssets: [],
+          emphasisPoints: [],
+          provenance: { generatedBy: "metaview-core" as const, route: "deterministic-blueprint" as const, renderingContract: "PlaybookScript" as const },
+        },
+        warnings: [],
+      };
+    },
+    async validateVisualQuality() {
+      return {
+        generatedBy: "metaview-core" as const,
+        score: 0.65,
+        pass: false,
+        warnings: [
+          { severity: "high" as const, code: "api_quality_warning", message: "blocked by api" },
+        ],
+        provenance: { renderingContract: "PlaybookScript" as const, qualityGate: "visualQualityGate" as const },
+      };
+    },
+    async buildPlaybook() {
+      return {
+        generatedBy: "metaview-core" as const,
+        runId: "run-1",
+        playbookScript: { fps: 30, total_frames: 1, domain: "geography", title: "东亚季风", summary: "", parameter_controls: [], steps: [] },
+        directorScript: { schema_version: "1.0.0" as const, source: "rule" as const, run_id: "run-1", beats: [] },
+        warnings: [],
+        provenance: { adapter: "rest" as const, endpoint: "/api/v1/pipeline" as const, renderingContract: "PlaybookScript" as const },
+      };
+    },
+    async buildDirectorScript() {
+      return {
+        generatedBy: "metaview-core" as const,
+        directorScript: { schema_version: "1.0.0" as const, source: "rule" as const, run_id: "mcp-director", beats: [] },
+        provenance: { builder: "build_default_director" },
+      };
+    },
+    ...overrides,
+  };
+}
+
 async function connectTestClient(
-  apiClient?: Pick<MetaViewApiClient, "buildPlaybook" | "buildDirectorScript">,
+  apiClient: McpCoreClient = fakeCoreClient(),
   previewRenderer?: RenderPreviewService,
 ) {
   const server = createMetaViewMcpServer(undefined, apiClient, previewRenderer);
@@ -50,7 +130,7 @@ describe("createMetaViewMcpServer", () => {
   });
 
   it("calls compile_scene_blueprint and resolve_assets through MCP", async () => {
-    const client = await connectTestClient();
+    const client = await connectTestClient(fakeCoreClient());
 
     const blueprint = textResultJson(
       await client.callTool({
@@ -73,16 +153,16 @@ describe("createMetaViewMcpServer", () => {
       }),
     );
 
-    expect(blueprint.sceneBlueprint.sceneType).toBe("east_asia_monsoon");
+    expect(blueprint.sceneBlueprint.sceneType).toBe("api_monsoon");
     expect(assets.assets).toEqual([
-      expect.objectContaining({ semanticRole: "wind", assetId: "monsoon-wind-arrow" }),
+      expect.objectContaining({ semanticRole: "wind", assetId: "api-wind" }),
     ]);
     expect(assets.missing).toEqual(["pressure_high"]);
     await client.close();
   });
 
   it("calls validate_visual_quality through MCP", async () => {
-    const client = await connectTestClient();
+    const client = await connectTestClient(fakeCoreClient());
 
     const report = textResultJson(
       await client.callTool({
@@ -121,14 +201,14 @@ describe("createMetaViewMcpServer", () => {
     expect(report.warnings[0]).toEqual(
       expect.objectContaining({
         severity: "high",
-        code: "unsupported_array_fallback",
+        code: "api_quality_warning",
       }),
     );
     await client.close();
   });
 
   it("calls build_playbook through the injected REST client", async () => {
-    const apiClient = {
+    const apiClient = fakeCoreClient({
       async buildPlaybook() {
         return {
           generatedBy: "metaview-core" as const,
@@ -142,7 +222,7 @@ describe("createMetaViewMcpServer", () => {
       async buildDirectorScript() {
         throw new Error("not used");
       },
-    };
+    });
     const client = await connectTestClient(apiClient);
 
     const result = textResultJson(
@@ -168,7 +248,7 @@ describe("createMetaViewMcpServer", () => {
   });
 
   it("calls build_director_script through the injected REST client", async () => {
-    const apiClient = {
+    const apiClient = fakeCoreClient({
       async buildPlaybook() {
         throw new Error("not used");
       },
@@ -179,7 +259,7 @@ describe("createMetaViewMcpServer", () => {
           provenance: { builder: "build_default_director" },
         };
       },
-    };
+    });
     const client = await connectTestClient(apiClient);
 
     const result = textResultJson(
@@ -203,7 +283,7 @@ describe("createMetaViewMcpServer", () => {
         throw new Error("quality gate should block rendering");
       },
     };
-    const client = await connectTestClient(undefined, previewRenderer);
+    const client = await connectTestClient(fakeCoreClient(), previewRenderer);
 
     const result = textResultJson(
       await client.callTool({
@@ -238,6 +318,7 @@ describe("createMetaViewMcpServer", () => {
     expect(result.error).toBe("VISUAL_QUALITY_GATE_FAILED");
     expect(result.preview).toBeNull();
     expect(result.quality.pass).toBe(false);
+    expect(result.quality.warnings[0].code).toBe("api_quality_warning");
     await client.close();
   });
 
@@ -264,7 +345,20 @@ describe("createMetaViewMcpServer", () => {
         };
       },
     };
-    const client = await connectTestClient(undefined, previewRenderer);
+    const client = await connectTestClient(
+      fakeCoreClient({
+        async validateVisualQuality() {
+          return {
+            generatedBy: "metaview-core" as const,
+            score: 1,
+            pass: true,
+            warnings: [],
+            provenance: { renderingContract: "PlaybookScript" as const, qualityGate: "visualQualityGate" as const },
+          };
+        },
+      }),
+      previewRenderer,
+    );
 
     const result = textResultJson(
       await client.callTool({

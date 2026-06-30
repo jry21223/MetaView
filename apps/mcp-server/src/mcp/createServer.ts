@@ -105,10 +105,20 @@ function readMetaViewResource(core: MetaViewCore, uri: URL) {
 
 type JsonToolHandler = (args: Record<string, unknown>) => ReturnType<typeof textJson> | Promise<ReturnType<typeof textJson>>;
 type PromptHandler = (args: Record<string, unknown>) => ReturnType<typeof createVisualLessonPrompt> | Promise<ReturnType<typeof createVisualLessonPrompt>>;
+type MetaViewCoreClient = Pick<
+  MetaViewApiClient,
+  | "listCapabilities"
+  | "listAssetPacks"
+  | "resolveAssets"
+  | "compileSceneBlueprint"
+  | "validateVisualQuality"
+  | "buildPlaybook"
+  | "buildDirectorScript"
+>;
 
 export function createMetaViewMcpServer(
   core: MetaViewCore = createMetaViewCore(),
-  apiClient: Pick<MetaViewApiClient, "buildPlaybook" | "buildDirectorScript"> = new MetaViewApiClient(),
+  apiClient: MetaViewCoreClient = new MetaViewApiClient(),
   previewRenderer: RenderPreviewService = new MetaViewPreviewRenderer(),
 ): McpServer {
   const server = new McpServer({
@@ -141,7 +151,7 @@ export function createMetaViewMcpServer(
       description: "List supported MetaView subjects, renderer kinds, starter asset packs, and flagship cases.",
       inputSchema: {},
     },
-    async () => textJson(core.listCapabilities()),
+    async () => textJson(await apiClient.listCapabilities()),
   );
 
   registerTool(
@@ -152,7 +162,7 @@ export function createMetaViewMcpServer(
       inputSchema: listAssetPacksInputSchema,
     },
     async ({ subject }) =>
-      textJson(core.listAssetPacks({ subject: subject as SubjectVisualKitSubject | undefined })),
+      textJson(await apiClient.listAssetPacks({ subject: subject as SubjectVisualKitSubject | undefined })),
   );
 
   registerTool(
@@ -164,7 +174,7 @@ export function createMetaViewMcpServer(
     },
     async ({ subject, sceneType, semanticRoles }) =>
       textJson(
-        core.resolveAssets({
+        await apiClient.resolveAssets({
           subject: subject as SubjectVisualKitSubject,
           sceneType: String(sceneType),
           semanticRoles: Array.isArray(semanticRoles) ? semanticRoles.map(String) : [],
@@ -181,7 +191,7 @@ export function createMetaViewMcpServer(
     },
     async ({ topic, subject, audience, durationSeconds, style, language }) =>
       textJson(
-        core.compileSceneBlueprint({
+        await apiClient.compileSceneBlueprint({
           topic: String(topic),
           subject: subject as SubjectVisualKitSubject | undefined,
           audience: audience ? String(audience) : undefined,
@@ -201,9 +211,9 @@ export function createMetaViewMcpServer(
     },
     async ({ playbookScript, directorScript }) =>
       textJson(
-        core.validateVisualQuality({
-          playbookScript: playbookScript as Parameters<MetaViewCore["validateVisualQuality"]>[0]["playbookScript"],
-          directorScript: directorScript as Parameters<MetaViewCore["validateVisualQuality"]>[0]["directorScript"],
+        await apiClient.validateVisualQuality({
+          playbookScript: playbookScript as Parameters<MetaViewApiClient["validateVisualQuality"]>[0]["playbookScript"],
+          directorScript: directorScript as Parameters<MetaViewApiClient["validateVisualQuality"]>[0]["directorScript"],
         }),
       ),
   );
@@ -250,9 +260,9 @@ export function createMetaViewMcpServer(
       inputSchema: renderPreviewInputSchema,
     },
     async ({ playbookScript, directorScript, format, frame, theme }) => {
-      const quality = core.validateVisualQuality({
-        playbookScript: playbookScript as Parameters<MetaViewCore["validateVisualQuality"]>[0]["playbookScript"],
-        directorScript: directorScript as Parameters<MetaViewCore["validateVisualQuality"]>[0]["directorScript"],
+      const quality = await apiClient.validateVisualQuality({
+        playbookScript: playbookScript as Parameters<MetaViewApiClient["validateVisualQuality"]>[0]["playbookScript"],
+        directorScript: directorScript as Parameters<MetaViewApiClient["validateVisualQuality"]>[0]["directorScript"],
       });
       if (!quality.pass) {
         return textJson({

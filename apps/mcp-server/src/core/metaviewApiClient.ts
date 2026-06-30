@@ -1,5 +1,16 @@
 import type { DirectorScript, PlaybookScript } from "../../../web/src/features/playbook/engine/types";
-import type { SceneBlueprint } from "./metaviewCore";
+import type {
+  AssetResolutionInput,
+  AssetResolutionResult,
+  CompileSceneBlueprintInput,
+  CompileSceneBlueprintResult,
+  ListAssetPacksInput,
+  ListAssetPacksResult,
+  ListCapabilitiesResult,
+  SceneBlueprint,
+  ValidateVisualQualityInput,
+  VisualQualityReport,
+} from "./metaviewCore";
 
 export interface BuildPlaybookOptions {
   target?: "preview" | "export";
@@ -93,6 +104,68 @@ export class MetaViewApiClient {
     this.fetchFn = options.fetchFn ?? fetch;
     this.pollIntervalMs = options.pollIntervalMs ?? 500;
     this.timeoutMs = options.timeoutMs ?? 120_000;
+  }
+
+  async listCapabilities(): Promise<ListCapabilitiesResult> {
+    return readJson<ListCapabilitiesResult>(
+      await this.fetchFn(`${this.baseUrl}/api/v1/mcp/capabilities`),
+      "list capabilities",
+    );
+  }
+
+  async listAssetPacks(input: ListAssetPacksInput = {}): Promise<ListAssetPacksResult> {
+    const query = input.subject ? `?${new URLSearchParams({ subject: input.subject }).toString()}` : "";
+    return readJson<ListAssetPacksResult>(
+      await this.fetchFn(`${this.baseUrl}/api/v1/mcp/asset-packs${query}`),
+      "list asset packs",
+    );
+  }
+
+  async resolveAssets(input: AssetResolutionInput): Promise<AssetResolutionResult> {
+    return readJson<AssetResolutionResult>(
+      await this.fetchFn(`${this.baseUrl}/api/v1/mcp/resolve-assets`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          subject: input.subject,
+          sceneType: input.sceneType,
+          semanticRoles: input.semanticRoles,
+        }),
+      }),
+      "resolve assets",
+    );
+  }
+
+  async compileSceneBlueprint(input: CompileSceneBlueprintInput): Promise<CompileSceneBlueprintResult> {
+    return readJson<CompileSceneBlueprintResult>(
+      await this.fetchFn(`${this.baseUrl}/api/v1/mcp/scene-blueprint`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          topic: input.topic,
+          subject: input.subject,
+          audience: input.audience,
+          durationSeconds: input.durationSeconds,
+          style: input.style,
+          language: input.language,
+        }),
+      }),
+      "compile scene blueprint",
+    );
+  }
+
+  async validateVisualQuality(input: ValidateVisualQualityInput): Promise<VisualQualityReport> {
+    return readJson<VisualQualityReport>(
+      await this.fetchFn(`${this.baseUrl}/api/v1/mcp/visual-quality`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          playbookScript: input.playbookScript,
+          directorScript: input.directorScript,
+        }),
+      }),
+      "validate visual quality",
+    );
   }
 
   async buildPlaybook(input: BuildPlaybookInput): Promise<BuildPlaybookResult> {

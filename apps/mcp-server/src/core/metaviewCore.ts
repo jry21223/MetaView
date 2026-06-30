@@ -4,14 +4,12 @@ import { fileURLToPath } from "node:url";
 
 import { DOMAIN_CAPABILITIES, domainCapability, type DomainSupportLevel } from "../../../web/src/features/playbook/engine/domainCapabilities";
 import {
-  findAssetByRole,
   listAssetPacks as listRegistryAssetPacks,
   type AssetLicense,
   type AssetManifestEntry,
   type SubjectVisualKit,
   type SubjectVisualKitSubject,
 } from "../../../web/src/features/playbook/engine/assets/assetRegistry";
-import { visualQualityGate, type VisualQualityWarning } from "../../../web/src/features/playbook/engine/assets/visualQualityGate";
 import type { DirectorScript, PlaybookScript } from "../../../web/src/features/playbook/engine/types";
 import assetManifestSchema from "../../../web/public/assets/metaview-kits/manifest.schema.json";
 
@@ -149,9 +147,6 @@ export interface ValidateVisualQualityInput {
 export interface MetaViewCore {
   listCapabilities(): ListCapabilitiesResult;
   listAssetPacks(input?: ListAssetPacksInput): ListAssetPacksResult;
-  resolveAssets(input: AssetResolutionInput): AssetResolutionResult;
-  compileSceneBlueprint(input: CompileSceneBlueprintInput): CompileSceneBlueprintResult;
-  validateVisualQuality(input: ValidateVisualQualityInput): VisualQualityReport;
   listResources(): ListedMetaViewResource[];
   readResource(uri: string): MetaViewResource;
 }
@@ -204,12 +199,15 @@ function resourceUriForPack(packId: string): string {
   return `metaview://kits/${packId}/manifest`;
 }
 
-function resourceUriForAsset(pack: SubjectVisualKit, asset: AssetManifestEntry): string {
-  return `metaview://assets/${pack.packId}/${basename(asset.path)}`;
+function assetBasename(asset: AssetManifestEntry): string {
+  if (!asset.path) {
+    throw new Error(`MetaView asset is missing a path: ${asset.id}`);
+  }
+  return basename(asset.path);
 }
 
-function packForAsset(asset: AssetManifestEntry): SubjectVisualKit | undefined {
-  return listRegistryAssetPacks().find((pack) => pack.assets.some((candidate) => candidate.id === asset.id));
+function resourceUriForAsset(pack: SubjectVisualKit, asset: AssetManifestEntry): string {
+  return `metaview://assets/${pack.packId}/${assetBasename(asset)}`;
 }
 
 function semanticRolesForPack(pack: SubjectVisualKit): string[] {
@@ -266,186 +264,6 @@ function parseResourceUri(uri: string): URL {
   return parsed;
 }
 
-function inferSubject(topic: string, subject: SubjectVisualKitSubject | undefined): SubjectVisualKitSubject | undefined {
-  if (subject) return subject;
-  const normalized = topic.toLowerCase();
-  if (/季风|海陆|气压|风向|monsoon|climate/.test(normalized)) return "geography";
-  if (/平抛| projectile|force|velocity|acceleration|motion|力|速度|加速度/.test(normalized)) return "physics";
-  return undefined;
-}
-
-function monsoonBlueprint(input: CompileSceneBlueprintInput): SceneBlueprint {
-  return {
-    subject: "geography",
-    sceneType: "east_asia_monsoon",
-    topic: input.topic,
-    audience: input.audience,
-    durationSeconds: input.durationSeconds,
-    style: input.style,
-    language: input.language,
-    visualIntent: [
-      "land_ocean_thermal_contrast",
-      "pressure_gradient",
-      "seasonal_wind_reversal",
-      "moisture_transport",
-    ],
-    requiredAssets: ["land", "ocean", "wind", "pressure_high", "pressure_low"],
-    emphasisPoints: [
-      "冬夏海陆温差方向相反",
-      "气压梯度决定近地面风向",
-      "夏季风从海洋吹向陆地并带来水汽",
-    ],
-    provenance: {
-      generatedBy: "metaview-core",
-      route: "deterministic-blueprint",
-      renderingContract: "PlaybookScript",
-    },
-  };
-}
-
-function projectileBlueprint(input: CompileSceneBlueprintInput): SceneBlueprint {
-  return {
-    subject: "physics",
-    sceneType: "projectile_motion",
-    topic: input.topic,
-    audience: input.audience,
-    durationSeconds: input.durationSeconds,
-    style: input.style,
-    language: input.language,
-    visualIntent: [
-      "horizontal_uniform_motion",
-      "vertical_free_fall",
-      "velocity_decomposition",
-      "gravity_acceleration",
-    ],
-    requiredAssets: ["object", "velocity", "force"],
-    emphasisPoints: [
-      "水平方向速度保持不变",
-      "竖直方向只受重力并做自由落体",
-      "轨迹由两个独立分运动叠加形成",
-    ],
-    provenance: {
-      generatedBy: "metaview-core",
-      route: "deterministic-blueprint",
-      renderingContract: "PlaybookScript",
-    },
-  };
-}
-
-function fallbackBlueprint(input: CompileSceneBlueprintInput): SceneBlueprint {
-  const inferredSubject = inferSubject(input.topic, input.subject);
-  const capability = domainCapability(inferredSubject);
-  const subject = (inferredSubject ?? "unknown") as SubjectVisualKitSubject | "unknown";
-  return {
-    subject,
-    sceneType: capability.primaryRenderer.split("/")[0] || "domain_cards",
-    topic: input.topic,
-    audience: input.audience,
-    durationSeconds: input.durationSeconds,
-    style: input.style,
-    language: input.language,
-    visualIntent: ["explain_core_concept", "show_key_relationships"],
-    requiredAssets: [],
-    emphasisPoints: [input.topic],
-    provenance: {
-      generatedBy: "metaview-core",
-      route: "deterministic-blueprint",
-      renderingContract: "PlaybookScript",
-    },
-  };
-}
-
-function compileBlueprint(input: CompileSceneBlueprintInput): CompileSceneBlueprintResult {
-  const subject = inferSubject(input.topic, input.subject);
-  const topic = input.topic.toLowerCase();
-  const sceneBlueprint =
-    subject === "geography" && /季风|monsoon|海陆|风向/.test(topic)
-      ? monsoonBlueprint(input)
-      : subject === "physics" && /平抛|projectile|motion|速度|重力/.test(topic)
-        ? projectileBlueprint(input)
-        : fallbackBlueprint(input);
-
-  const resolved = sceneBlueprint.subject === "unknown"
-    ? { missing: sceneBlueprint.requiredAssets }
-    : createAssetResolution({
-      subject: sceneBlueprint.subject,
-      sceneType: sceneBlueprint.sceneType,
-      semanticRoles: sceneBlueprint.requiredAssets,
-    });
-
-  return {
-    generatedBy: "metaview-core",
-    sceneBlueprint,
-    warnings: resolved.missing.map((role) => `No registered asset currently resolves semantic role "${role}".`),
-  };
-}
-
-function warningSeverity(warning: VisualQualityWarning): VisualQualityReportWarning["severity"] {
-  if (warning.code === "missing_pack_id" || warning.code === "unsupported_array_fallback") return "high";
-  if (warning.code === "missing_asset" || warning.code === "empty_physics_force_scene") return "medium";
-  return "low";
-}
-
-function createAssetResolution(input: AssetResolutionInput): AssetResolutionResult {
-  const assets: ResolvedAsset[] = [];
-  const missing: string[] = [];
-
-  for (const semanticRole of input.semanticRoles) {
-    const asset = findAssetByRole(input.subject, semanticRole);
-    const pack = asset ? packForAsset(asset) : undefined;
-    if (!asset || !pack) {
-      missing.push(semanticRole);
-      continue;
-    }
-    assets.push({
-      semanticRole,
-      assetId: asset.id,
-      packId: pack.packId,
-      resourceUri: resourceUriForAsset(pack, asset),
-      license: asset.license,
-      attribution: asset.attribution,
-      commercialUseStatus: asset.commercialUseStatus,
-      sourceUrl: asset.sourceUrl,
-      licenseUrl: asset.licenseUrl,
-    });
-  }
-
-  return {
-    generatedBy: "metaview-core",
-    subject: input.subject,
-    sceneType: input.sceneType,
-    assets,
-    missing,
-  };
-}
-
-function createVisualQualityReport(input: ValidateVisualQualityInput): VisualQualityReport {
-  const gateWarnings = visualQualityGate(input.playbookScript);
-  const warnings = gateWarnings.map((warning) => ({
-    severity: warningSeverity(warning),
-    code: warning.code,
-    message: warning.message,
-    stepId: warning.step_id,
-    snapshotKind: warning.snapshot_kind,
-    path: warning.snapshot_path,
-  }));
-  const highCount = warnings.filter((warning) => warning.severity === "high").length;
-  const mediumCount = warnings.filter((warning) => warning.severity === "medium").length;
-  const penalty = highCount * 0.35 + mediumCount * 0.2 + Math.max(0, warnings.length - highCount - mediumCount) * 0.1;
-  const score = Math.max(0, Number((1 - penalty).toFixed(2)));
-
-  return {
-    generatedBy: "metaview-core",
-    score,
-    pass: warnings.length === 0,
-    warnings,
-    provenance: {
-      renderingContract: "PlaybookScript",
-      qualityGate: "visualQualityGate",
-    },
-  };
-}
-
 export function createMetaViewCore(): MetaViewCore {
   return {
     listCapabilities(): ListCapabilitiesResult {
@@ -475,18 +293,6 @@ export function createMetaViewCore(): MetaViewCore {
         .map(packSummary);
 
       return { generatedBy: "metaview-core", packs };
-    },
-
-    resolveAssets(input: AssetResolutionInput): AssetResolutionResult {
-      return createAssetResolution(input);
-    },
-
-    compileSceneBlueprint(input: CompileSceneBlueprintInput): CompileSceneBlueprintResult {
-      return compileBlueprint(input);
-    },
-
-    validateVisualQuality(input: ValidateVisualQualityInput): VisualQualityReport {
-      return createVisualQualityReport(input);
     },
 
     listResources(): ListedMetaViewResource[] {
@@ -561,9 +367,9 @@ export function createMetaViewCore(): MetaViewCore {
       }
 
       if (parsed.hostname === "assets" && pathParts.length === 2) {
-        const [packId, assetFileName] = pathParts;
+        const [packId, assetFileName] = pathParts as [string, string];
         const pack = findPack(packId);
-        const asset = pack.assets.find((item) => basename(item.path) === assetFileName);
+        const asset = pack.assets.find((item) => assetBasename(item) === assetFileName);
         if (!asset) {
           throw new Error(`Unknown MetaView asset: ${packId}/${assetFileName}`);
         }
