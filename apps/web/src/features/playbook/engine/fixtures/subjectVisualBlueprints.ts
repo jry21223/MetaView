@@ -1,4 +1,7 @@
 import type { SceneBlueprint } from "../compiler/sceneBlueprintCompiler";
+import glucoseContractJson from "../../../../../public/assets/metaview-kits/chemistry-basic/contracts/glucose.contract.json";
+
+const GLUCOSE_CONTRACT = glucoseContractJson as { smiles: string };
 
 export type SubjectVisualFixtureId =
   | "binary_search"
@@ -160,7 +163,7 @@ export const subjectVisualBlueprints: Record<SubjectVisualFixtureId, SceneBluepr
     title: "Glucose molecule",
     visualIntent: ["render_structured_molecule", "use_smiles_asset"],
     emphasisPoints: ["glucose ring", "hydroxyl groups", "C6H12O6"],
-    smiles: "C(C1C(C(C(C(O1)O)O)O)O)O",
+    smiles: GLUCOSE_CONTRACT.smiles,
   },
   carbon_dioxide_molecule: {
     id: "carbon_dioxide_molecule",

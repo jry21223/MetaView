@@ -1,4 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import { visualQualityGate } from "../assets/visualQualityGate";
@@ -21,6 +23,35 @@ vi.mock("remotion", async () => {
     useVideoConfig: () => ({ fps: 30 }),
   };
 });
+
+interface MoleculeContract {
+  moleculeId: string;
+  assetId: string;
+  smiles: string;
+  formula: string;
+  formulaLatex: string;
+  elementCounts: Record<string, number>;
+  minBondCount: number;
+}
+
+function readGlucoseContract(): MoleculeContract {
+  return JSON.parse(
+    readFileSync(
+      path.resolve(
+        process.cwd(),
+        "public/assets/metaview-kits/chemistry-basic/contracts/glucose.contract.json",
+      ),
+      "utf8",
+    ),
+  ) as MoleculeContract;
+}
+
+function elementCounts(atoms: Array<{ element: string }>): Record<string, number> {
+  return atoms.reduce<Record<string, number>>((counts, atom) => {
+    counts[atom.element] = (counts[atom.element] ?? 0) + 1;
+    return counts;
+  }, {});
+}
 
 describe("sceneBlueprintCompiler", () => {
   it("compiles a minimal East Asia monsoon blueprint into an asset-backed geo map scene", () => {
@@ -446,13 +477,14 @@ describe("sceneBlueprintCompiler", () => {
   });
 
   it("compiles a glucose molecule blueprint from the chemistry SMILES asset without falling back to water", () => {
+    const contract = readGlucoseContract();
     const script = compileSceneBlueprintToPlaybookScript({
       subject: "chemistry",
       sceneType: "molecule_2d_glucose",
       title: "Glucose molecule",
       visualIntent: ["render_structured_molecule", "use_smiles_asset"],
       emphasisPoints: ["glucose ring", "hydroxyl groups", "C6H12O6"],
-      smiles: "C(C1C(C(C(C(O1)O)O)O)O)O",
+      smiles: contract.smiles,
     });
 
     expect(script.domain).toBe("chemistry");
@@ -462,25 +494,24 @@ describe("sceneBlueprintCompiler", () => {
     }
 
     expect(snapshot.pack_id).toBe("chemistry-basic");
-    expect(snapshot.molecule_id).toBe("glucose");
-    expect(snapshot.smiles).toBe("C(C1C(C(C(C(O1)O)O)O)O)O");
-    expect(snapshot.molecule_asset_id).toBe("rdkit-smiles-glucose");
-    expect(snapshot.formula_latex).toBe("C_6H_{12}O_6");
+    expect(snapshot.molecule_id).toBe(contract.moleculeId);
+    expect(snapshot.smiles).toBe(contract.smiles);
+    expect(snapshot.molecule_asset_id).toBe(contract.assetId);
+    expect(snapshot.formula_latex).toBe(contract.formulaLatex);
     expect(snapshot.caption).toContain("glucose");
     expect(snapshot.caption).not.toContain("Water");
-    expect(snapshot.atoms.filter((atom) => atom.element === "C")).toHaveLength(6);
-    expect(snapshot.atoms.filter((atom) => atom.element === "O")).toHaveLength(6);
-    expect(snapshot.bonds.length).toBeGreaterThanOrEqual(11);
+    expect(elementCounts(snapshot.atoms)).toEqual(contract.elementCounts);
+    expect(snapshot.bonds.length).toBeGreaterThanOrEqual(contract.minBondCount);
     expect(visualQualityGate(script)).toEqual([]);
 
     const markup = renderToStaticMarkup(<PlaybookComposition script={script} showSubtitles={false} />);
     expect(markup).toContain("molecule-2d-scene");
-    expect(markup).toContain('data-molecule-id="glucose"');
-    expect(markup).toContain('data-smiles="C(C1C(C(C(C(O1)O)O)O)O)O"');
-    expect(markup).toContain('data-asset-id="rdkit-smiles-glucose"');
+    expect(markup).toContain(`data-molecule-id="${contract.moleculeId}"`);
+    expect(markup).toContain(`data-smiles="${contract.smiles}"`);
+    expect(markup).toContain(`data-asset-id="${contract.assetId}"`);
     expect(markup).toContain('data-element="C"');
     expect(markup).toContain('data-element="O"');
-    expect(markup).toContain("C6H{12}O6");
+    expect(markup).toContain(contract.formula);
     expect(markup).not.toContain("H2O");
     expect(markup).not.toContain('data-missing-asset="true"');
   });

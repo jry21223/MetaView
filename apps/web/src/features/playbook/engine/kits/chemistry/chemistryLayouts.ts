@@ -13,9 +13,15 @@ import {
   resolveMoleculePresetBySmilesForRenderer,
   resolveMoleculePresetForRenderer,
 } from "./moleculePresetResolver";
+import glucoseContractJson from "../../../../../../public/assets/metaview-kits/chemistry-basic/contracts/glucose.contract.json";
 
 const DEFAULT_CHEMISTRY_PACK_ID = "chemistry-basic";
-const GLUCOSE_SMILES = "C(C1C(C(C(C(O1)O)O)O)O)O";
+const GLUCOSE_CONTRACT = glucoseContractJson as {
+  moleculeId: string;
+  assetId: string;
+  smiles: string;
+  formulaLatex: string;
+};
 
 export type Molecule2DLayoutInput = {
   packId?: string;
@@ -183,10 +189,11 @@ function compileGlucoseLayout(input: Molecule2DLayoutInput, packId: string): Mol
   return {
     kind: "molecule_2d_scene",
     pack_id: packId,
-    molecule_id: "glucose",
-    smiles: input.smiles ?? GLUCOSE_SMILES,
+    molecule_id: GLUCOSE_CONTRACT.moleculeId,
+    smiles: input.smiles ?? GLUCOSE_CONTRACT.smiles,
     molecule_asset_id:
       input.moleculeAssetId ??
+      GLUCOSE_CONTRACT.assetId ??
       resolveAssetForRenderer("molecule_2d_scene", "glucose", packId)?.id ??
       resolveChemistryAssetId("molecule_2d_scene", "glucose", packId),
     atoms: [
@@ -223,7 +230,7 @@ function compileGlucoseLayout(input: Molecule2DLayoutInput, packId: string): Mol
       { id: "glucose-hydroxyls", target_id: "o3", label: "hydroxyl groups", side: "right" },
       { id: "glucose-formula", target_id: "c2", label: "C6H12O6", side: "top" },
     ],
-    formula_latex: input.formulaLatex ?? "C_6H_{12}O_6",
+    formula_latex: input.formulaLatex ?? GLUCOSE_CONTRACT.formulaLatex,
     caption:
       input.caption ??
       "glucose is compiled from the chemistry-basic SMILES asset into a structured ring layout.",

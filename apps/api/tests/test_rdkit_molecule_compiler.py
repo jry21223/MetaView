@@ -1,17 +1,44 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
 from app.domain.services.rdkit_molecule_compiler import compile_molecule_snapshot_from_smiles
 
 GLUCOSE_SMILES = "OC[C@H]1O[C@@H](O)[C@H](O)[C@H](O)[C@@H]1O"
+CONTRACT_PATH = (
+    Path(__file__).resolve().parents[3]
+    / "apps"
+    / "web"
+    / "public"
+    / "assets"
+    / "metaview-kits"
+    / "chemistry-basic"
+    / "contracts"
+    / "glucose.contract.json"
+)
+
+
+def _glucose_contract() -> dict:
+    return json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+
+
+def _element_counts(atoms: list[dict]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for atom in atoms:
+        element = str(atom["element"])
+        counts[element] = counts.get(element, 0) + 1
+    return counts
 
 
 def test_compile_molecule_snapshot_from_smiles_uses_rdkit_structure_data() -> None:
+    contract = _glucose_contract()
     snapshot = compile_molecule_snapshot_from_smiles(
         pack_id="chemistry-basic",
-        molecule_id="glucose",
-        smiles=GLUCOSE_SMILES,
+        molecule_id=contract["moleculeId"],
+        smiles=contract["smiles"],
         atom_asset_id="atom-core",
         bond_asset_id="bond-line",
         caption="Glucose is rendered from an RDKit SMILES layout.",
@@ -20,14 +47,13 @@ def test_compile_molecule_snapshot_from_smiles_uses_rdkit_structure_data() -> No
 
     assert data["kind"] == "molecule_2d_scene"
     assert data["pack_id"] == "chemistry-basic"
-    assert data["molecule_id"] == "glucose"
-    assert data["smiles"] == GLUCOSE_SMILES
-    assert data["formula_latex"] == "C_6H_12O_6"
+    assert data["molecule_id"] == contract["moleculeId"]
+    assert data["smiles"] == contract["smiles"]
+    assert data["formula_latex"] == contract["formulaLatex"]
     assert data["caption"] == "Glucose is rendered from an RDKit SMILES layout."
-    assert data["molecule_asset_id"] == "rdkit-smiles-glucose"
-    assert len(data["atoms"]) == 12
-    assert len(data["bonds"]) >= 12
-    assert {atom["element"] for atom in data["atoms"]} == {"C", "O"}
+    assert data["molecule_asset_id"] == contract["assetId"]
+    assert _element_counts(data["atoms"]) == contract["elementCounts"]
+    assert len(data["bonds"]) >= contract["minBondCount"]
     assert all(atom["asset_id"] == "atom-core" for atom in data["atoms"])
     assert all(8 <= atom["x"] <= 92 and 18 <= atom["y"] <= 82 for atom in data["atoms"])
     assert all(bond["asset_id"] == "bond-line" for bond in data["bonds"])

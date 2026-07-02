@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from app.domain.models.playbook import (
@@ -13,6 +14,7 @@ from app.domain.models.playbook import (
     ReactionSceneSnapshot,
 )
 from app.domain.services.asset_manifest_resolver import (
+    ASSET_MANIFEST_ROOT,
     resolve_asset_by_role,
     resolve_asset_for_renderer,
 )
@@ -23,7 +25,15 @@ from app.domain.services.molecule_preset_resolver import (
 from app.domain.services.rdkit_molecule_compiler import compile_molecule_snapshot_from_smiles
 
 DEFAULT_CHEMISTRY_PACK_ID = "chemistry-basic"
-GLUCOSE_SMILES = "OC[C@H]1O[C@@H](O)[C@H](O)[C@H](O)[C@@H]1O"
+
+
+def _load_glucose_contract() -> dict[str, Any]:
+    contract_path = ASSET_MANIFEST_ROOT / "chemistry-basic" / "contracts" / "glucose.contract.json"
+    return json.loads(contract_path.read_text(encoding="utf-8"))
+
+
+GLUCOSE_CONTRACT = _load_glucose_contract()
+GLUCOSE_SMILES = str(GLUCOSE_CONTRACT["smiles"])
 
 
 def _asset_id_for_role(renderer_kind: str, semantic_role: str, pack_id: str) -> str | None:
