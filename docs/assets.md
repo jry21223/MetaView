@@ -289,8 +289,20 @@ Local preview helpers:
 
    That opt-in gate fails unless every fixture reports
    `approved_reference_current`.
-   To create an approved reference, keep the reviewed report out of the generated
-   smoke directory and add `review` to each approved entry:
+   To create an approved reference after reviewing the generated PNGs, run:
+
+   ```bash
+   SHOWCASE_REFERENCE_REVIEWER=visual-reviewer \
+   SHOWCASE_REFERENCE_NOTES="All flagship screenshots reviewed." \
+   npm --workspace apps/web run showcase:approve-reference
+   ```
+
+   The command refuses to stamp a reference unless `SHOWCASE_REFERENCE_REVIEWER`
+   is set and the current baseline report is ready for review. It writes the
+   ignored reference file to
+   `eval/reports/subject-visual-showcase-approved-reference.json` by default.
+   Manual reference files use the same shape; keep reviewed references out of
+   the generated smoke directory and add `review` to each approved entry:
 
    ```json
    {

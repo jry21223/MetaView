@@ -16,6 +16,7 @@ describe("asset check targets", () => {
     expect(makefile).toMatch(/^check: .*asset-showcase/m);
     expect(webPackage).toContain('"showcase:smoke"');
     expect(webPackage).toContain('"showcase:baseline"');
+    expect(webPackage).toContain('"showcase:approve-reference"');
     expect(makefile).toMatch(/npm --workspace apps\/web run showcase:smoke\n\tnpm --workspace apps\/web run showcase:baseline/);
   });
 });
