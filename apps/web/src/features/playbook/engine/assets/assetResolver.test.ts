@@ -54,6 +54,9 @@ describe("assetResolver", () => {
     expect(resolveAssetForRenderer("reaction_scene", "electron_flow", "chemistry-basic")).toMatchObject({
       id: "electron-flow",
     });
+    expect(resolveAssetForRenderer("reaction_scene", "formula_tag", "core-visual-basic")).toMatchObject({
+      id: "core-formula-tag",
+    });
     expect(resolveAssetForRenderer("bio_process_scene", "process_step")).toMatchObject({
       id: "replication-fork",
     });

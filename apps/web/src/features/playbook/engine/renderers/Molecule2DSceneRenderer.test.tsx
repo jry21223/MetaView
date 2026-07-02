@@ -62,6 +62,7 @@ describe("Molecule2DSceneRenderer", () => {
     expect(markup).toContain('data-asset-id="atom-core"');
     expect(markup).toContain('data-asset-id="bond-line"');
     expect(markup).toContain('data-asset-id="core-callout-label"');
+    expect(markup).toContain('data-asset-id="core-formula-tag"');
     expect(markup).toContain('data-element="O"');
     expect(markup).toContain('data-element="H"');
     expect(markup).not.toContain('data-missing-asset="true"');

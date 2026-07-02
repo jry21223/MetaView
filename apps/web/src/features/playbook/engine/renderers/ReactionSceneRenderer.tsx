@@ -11,6 +11,7 @@ import type {
   ReactionSceneSnapshot,
 } from "../types";
 import { CoreCalloutLabel } from "./CoreCalloutLabel";
+import { CoreFormulaTag } from "./CoreFormulaTag";
 import type { RendererProps } from "./types";
 
 const DEFAULT_CHEMISTRY_PACK_ID = "chemistry-basic";
@@ -259,9 +260,17 @@ export const ReactionSceneRenderer: React.FC<RendererProps> = ({ step, theme }) 
         <text x="8" y="12" fontSize="5.6" fontWeight="780" fill={theme === "dark" ? "#f8fafc" : "#172033"}>
           {step.title}
         </text>
-        <text x="50" y="19" textAnchor="middle" fontSize="3.4" fontWeight="760" fill="#4f6f82">
-          {displayFormula(snap.formula_latex ?? snap.reaction_id)}
-        </text>
+        <CoreFormulaTag
+          id={`${snap.reaction_id}-formula`}
+          text={displayFormula(snap.formula_latex ?? snap.reaction_id)}
+          rendererKind="reaction_scene"
+          x={30}
+          y={14.2}
+          width={40}
+          height={7.4}
+          textY={19}
+          textFill="#4f6f82"
+        />
 
         <g data-semantic-role="reaction" data-reaction-id={snap.reaction_id}>
           {snap.reactants.map((participant) => renderParticipant(participant, "reactant"))}

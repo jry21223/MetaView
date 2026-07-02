@@ -53,6 +53,7 @@ describe("assetRegistry", () => {
     expect(findAssetByRole("algorithm", "pointer")?.id).toBe("pointer-marker");
     expect(findAssetByRole("core", "flow_arrow")?.id).toBe("core-flow-arrow");
     expect(findAssetByRole("core", "callout")?.id).toBe("core-callout-label");
+    expect(findAssetByRole("core", "formula_tag")?.id).toBe("core-formula-tag");
     expect(findAssetByRole("core", "moisture_particles")?.id).toBe("core-moisture-particles");
     expect(findAssetByRole("geography", "wind")?.id).toBe("monsoon-wind-arrow");
     expect(findAssetByRole("biology", "process_step")?.id).toBe("replication-fork");
@@ -69,6 +70,7 @@ describe("assetRegistry", () => {
       "bio_cell_scene",
       "bio_process_scene",
       "molecule_2d_scene",
+      "reaction_scene",
       "math_plot",
       "math_formula",
       "math_scene",

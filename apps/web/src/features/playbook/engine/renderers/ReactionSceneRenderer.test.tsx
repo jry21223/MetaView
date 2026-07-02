@@ -79,6 +79,7 @@ describe("ReactionSceneRenderer", () => {
     expect(markup).toContain('data-asset-id="reaction-arrow"');
     expect(markup).toContain('data-asset-id="electron-flow"');
     expect(markup).toContain('data-asset-id="core-callout-label"');
+    expect(markup).toContain('data-asset-id="core-formula-tag"');
     expect(markup).toContain('data-semantic-role="reactant"');
     expect(markup).toContain('data-semantic-role="product"');
     expect(markup).toContain('data-semantic-role="reaction_arrow"');

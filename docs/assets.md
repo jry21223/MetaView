@@ -97,7 +97,9 @@ Current backend SkillPack adoption:
   and grid backgrounds for renderer adapters across subjects. Shared callouts
   render through the core callout adapter, so biology and chemistry scenes
   consume `core-callout-label` instead of drawing independent label boxes in
-  each renderer.
+  each renderer. Shared formula cards render through `core-formula-tag` in
+  physics and chemistry renderers instead of hand-drawn per-renderer formula
+  boxes.
 - `geography-earth-basic`: Natural Earth-derived East Asia map GeoJSON and map
   symbols for `geo_map_scene`. The SceneBlueprint path routes map layers,
   flow arrows, pressure centers, and particle presets through a geography layout

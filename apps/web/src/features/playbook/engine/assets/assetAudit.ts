@@ -43,6 +43,7 @@ const REQUIRED_RENDERER_KINDS_BY_PACK: Record<string, string[]> = {
     "bio_cell_scene",
     "bio_process_scene",
     "molecule_2d_scene",
+    "reaction_scene",
     "math_plot",
     "math_formula",
     "math_scene",

@@ -4,6 +4,7 @@ import { AssetSvg } from "../assets/AssetSvg";
 import type { AssetManifestEntry } from "../assets/assetRegistry";
 import { resolveAssetById, resolveAssetByRole, resolveAssetForRenderer } from "../assets/assetResolver";
 import type { PhysicsForceSceneSnapshot, PhysicsSceneObject, PhysicsSceneVector } from "../types";
+import { CoreFormulaTag } from "./CoreFormulaTag";
 import type { RendererProps } from "./types";
 
 const DEFAULT_PHYSICS_PACK_ID = "physics-basic";
@@ -194,29 +195,21 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({ step, progr
           {step.title}
         </text>
         {formulaText ? (
-          <g data-semantic-role="formula_card">
-            <rect
-              x="57"
-              y="14.5"
-              width="37"
-              height="9"
-              rx="2.2"
-              fill={theme === "dark" ? "#1e293b" : "#ffffff"}
-              stroke={theme === "dark" ? "#334155" : "#d8e1ea"}
-              strokeWidth="0.5"
-              opacity="0.94"
-            />
-            <text
-              x="92"
-              y="20.6"
-              textAnchor="end"
-              fontSize="4.2"
-              fontWeight="760"
-              fill={theme === "dark" ? "#f8fafc" : "#182235"}
-            >
-              {formulaText}
-            </text>
-          </g>
+          <CoreFormulaTag
+            id="physics-formula"
+            text={formulaText}
+            rendererKind="physics_force_scene"
+            x={57}
+            y={14.5}
+            width={37}
+            height={9}
+            textAnchor="end"
+            textX={92}
+            textY={20.6}
+            fontSize={4.2}
+            textFill={theme === "dark" ? "#f8fafc" : "#182235"}
+            opacity={0.94}
+          />
         ) : null}
 
         {snap.trajectory?.length ? (

@@ -62,6 +62,7 @@ describe("PhysicsForceSceneRenderer", () => {
     expect(markup).toContain("<image");
     expect(markup).toContain('data-semantic-role="motion_trail"');
     expect(markup).toContain('data-semantic-role="formula_card"');
+    expect(markup).toContain('data-asset-id="core-formula-tag"');
     expect(markup).toContain('data-vector-component="horizontal"');
     expect(markup).toContain('data-vector-component="vertical"');
     expect(markup).toContain("v_y");
