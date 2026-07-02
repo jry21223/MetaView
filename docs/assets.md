@@ -28,6 +28,10 @@ The TypeScript registry is in
 `apps/web/src/features/playbook/engine/assets/assetRegistry.ts`.
 Renderers should use `getAssetPack(packId)` or `findAssetByRole(subject, semanticRole)`
 instead of hard-coding asset URLs.
+The API mirror uses
+`apps/api/app/domain/services/asset_manifest_resolver.py` against the same
+public manifest files. Backend layout compilers should resolve asset ids through
+that helper rather than carrying a second hard-coded role-to-asset table.
 
 ## Scene Blueprint Compiler
 
@@ -56,6 +60,9 @@ The backend mirror lives at
 `apps/api/app/domain/services/scene_blueprint_compiler.py` so SkillPack or
 agent generation can adopt the same blueprint boundary before returning
 `PlaybookScript`; it is not an MCP exposure layer.
+Subject-specific API layout compilers under `apps/api/app/domain/services/`
+must consume manifest-backed asset resolution before emitting snapshot asset ids,
+matching the web compiler path as closely as possible.
 
 This is not a second rendering contract. The compiler must not pass raw SVG
 paths, arbitrary renderer code, or LLM-selected coordinates through to renderers.

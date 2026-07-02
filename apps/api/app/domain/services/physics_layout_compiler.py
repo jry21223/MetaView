@@ -7,31 +7,47 @@ from app.domain.models.playbook import (
     PhysicsSceneObject,
     PhysicsSceneVector,
 )
+from app.domain.services.asset_manifest_resolver import (
+    resolve_asset_by_role,
+    resolve_asset_for_renderer,
+)
 
 
-def _role_asset_id(role: str) -> str:
-    if role == "block":
-        return "block-body"
-    if role == "force":
-        return "force-vector-arrow"
-    if role in {"projectile", "object", "velocity"}:
-        return "projectile-body-dot"
-    return "projectile-body-dot"
+def _asset_id_for_renderer(
+    pack_id: str,
+    semantic_role: str,
+    fallbacks: list[str] | None = None,
+) -> str | None:
+    for role in [semantic_role, *(fallbacks or [])]:
+        asset = (
+            resolve_asset_for_renderer("physics_force_scene", role, pack_id=pack_id)
+            or resolve_asset_by_role("physics", role, pack_id=pack_id)
+            or resolve_asset_for_renderer("physics_force_scene", role)
+            or resolve_asset_by_role("physics", role)
+        )
+        if asset:
+            return str(asset["id"])
+    return None
 
 
 def _number(value: Any, default: float) -> float:
     return float(value) if isinstance(value, int | float) else default
 
 
-def _object(blueprint: dict[str, Any]) -> PhysicsSceneObject:
+def _object(blueprint: dict[str, Any], pack_id: str) -> PhysicsSceneObject:
     source = blueprint.get("object") if isinstance(blueprint.get("object"), dict) else {}
     role = str(source.get("semanticRole") or source.get("semantic_role") or "projectile")
+    explicit_asset_id = source.get("assetId") or source.get("asset_id")
     return PhysicsSceneObject(
         id=str(source.get("id") or "body"),
         label=str(source.get("label") or role),
         x=_number(source.get("x"), 30.0),
         y=_number(source.get("y"), 42.0),
-        asset_id=str(source.get("assetId") or source.get("asset_id") or _role_asset_id(role)),
+        asset_id=(
+            str(explicit_asset_id)
+            if explicit_asset_id
+            else _asset_id_for_renderer(pack_id, role, ["object", "projectile"])
+        ),
         radius=_number(source.get("radius"), 0.0) if source.get("radius") is not None else None,
     )
 
@@ -112,9 +128,10 @@ def _trajectory(blueprint: dict[str, Any]) -> list[tuple[float, float]]:
 
 
 def compile_physics_force_snapshot(blueprint: dict[str, Any]) -> PhysicsForceSceneSnapshot:
-    object_item = _object(blueprint)
+    pack_id = str(blueprint.get("packId") or "physics-basic")
+    object_item = _object(blueprint, pack_id)
     return PhysicsForceSceneSnapshot(
-        pack_id=str(blueprint.get("packId") or "physics-basic"),
+        pack_id=pack_id,
         objects=[object_item],
         vectors=_vectors(blueprint, object_item.id),
         trajectory=_trajectory(blueprint),

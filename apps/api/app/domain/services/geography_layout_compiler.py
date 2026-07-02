@@ -8,6 +8,10 @@ from app.domain.models.playbook import (
     GeoMapSceneSnapshot,
     GeoPressureCenter,
 )
+from app.domain.services.asset_manifest_resolver import (
+    resolve_asset_by_role,
+    resolve_asset_for_renderer,
+)
 
 
 def _point(value: Any, default: tuple[float, float]) -> tuple[float, float]:
@@ -18,13 +22,24 @@ def _point(value: Any, default: tuple[float, float]) -> tuple[float, float]:
     return default
 
 
-def _flow_asset_id(role: str) -> str:
-    if role in {"wind", "monsoon_flow"}:
-        return "monsoon-wind-arrow"
-    return "monsoon-wind-arrow"
+def _asset_id_for_renderer(
+    pack_id: str,
+    semantic_role: str,
+    fallbacks: list[str] | None = None,
+) -> str | None:
+    for role in [semantic_role, *(fallbacks or [])]:
+        asset = (
+            resolve_asset_for_renderer("geo_map_scene", role, pack_id=pack_id)
+            or resolve_asset_by_role("geography", role, pack_id=pack_id)
+            or resolve_asset_for_renderer("geo_map_scene", role)
+            or resolve_asset_by_role("geography", role)
+        )
+        if asset:
+            return str(asset["id"])
+    return None
 
 
-def _flows(blueprint: dict[str, Any]) -> list[GeoMapFlow]:
+def _flows(blueprint: dict[str, Any], pack_id: str) -> list[GeoMapFlow]:
     source = blueprint.get("flows")
     if not isinstance(source, list) or not source:
         source = [
@@ -43,8 +58,10 @@ def _flows(blueprint: dict[str, Any]) -> list[GeoMapFlow]:
         if not isinstance(flow, dict):
             continue
         semantic_role = str(flow.get("semanticRole") or flow.get("semantic_role") or "monsoon_flow")
-        asset_id = str(
-            flow.get("assetId") or flow.get("asset_id") or _flow_asset_id(semantic_role)
+        asset_id = (
+            str(flow.get("assetId") or flow.get("asset_id"))
+            if flow.get("assetId") or flow.get("asset_id")
+            else _asset_id_for_renderer(pack_id, semantic_role, ["wind"])
         )
         strength = (
             float(flow.get("strength"))
@@ -96,6 +113,9 @@ def _pressure_centers(blueprint: dict[str, Any]) -> list[GeoPressureCenter]:
 def compile_geo_map_snapshot(blueprint: dict[str, Any]) -> GeoMapSceneSnapshot:
     pack_id = str(blueprint.get("packId") or "geography-earth-basic")
     map_region = str(blueprint.get("mapRegion") or blueprint.get("map_region") or "east_asia")
+    map_asset_id = _asset_id_for_renderer(pack_id, "map_layer", ["land"])
+    land_asset_id = _asset_id_for_renderer(pack_id, "land", ["map_layer"])
+    ocean_asset_id = _asset_id_for_renderer(pack_id, "ocean")
     return GeoMapSceneSnapshot(
         pack_id=pack_id,
         map_region=map_region,
@@ -104,17 +124,22 @@ def compile_geo_map_snapshot(blueprint: dict[str, Any]) -> GeoMapSceneSnapshot:
                 id="map",
                 semantic_role="map_layer",
                 label="East Asia map" if map_region == "east_asia" else f"{map_region} map",
-                asset_id="east-asia-land-110m",
+                asset_id=map_asset_id,
             ),
-            GeoMapLayer(id="land", semantic_role="land", label="heated continent"),
+            GeoMapLayer(
+                id="land",
+                semantic_role="land",
+                label="heated continent",
+                asset_id=None if land_asset_id == map_asset_id else land_asset_id,
+            ),
             GeoMapLayer(
                 id="ocean",
                 semantic_role="ocean",
                 label="western Pacific",
-                asset_id="east-asia-ocean-background",
+                asset_id=ocean_asset_id,
             ),
         ],
-        flows=_flows(blueprint),
+        flows=_flows(blueprint, pack_id),
         pressure_centers=_pressure_centers(blueprint),
         particle_preset=str(
             blueprint.get("particlePreset")
