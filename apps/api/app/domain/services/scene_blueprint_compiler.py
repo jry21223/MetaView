@@ -13,7 +13,6 @@ from app.domain.models.playbook import (
     GraphSceneSnapshot,
     Layer,
     LayerTiming,
-    MathPlotCurve,
     MathPlotSnapshot,
     MetaStep,
     Molecule2DSceneSnapshot,
@@ -35,6 +34,7 @@ from app.domain.services.chemistry_layout_compiler import (
     compile_reaction_snapshot,
 )
 from app.domain.services.geography_layout_compiler import compile_geo_map_snapshot
+from app.domain.services.math_layout_compiler import compile_math_plot_snapshot
 from app.domain.services.physics_layout_compiler import compile_physics_force_snapshot
 
 _FPS = 30
@@ -312,7 +312,7 @@ def _compile_snapshot(scene_type: str, blueprint: dict[str, Any]):
         return _glucose_molecule_snapshot(blueprint)
     if scene_type in {"reaction_scene", "reaction_synthesis_water"}:
         return _water_synthesis_reaction_snapshot(blueprint)
-    if scene_type == "derivative_tangent":
+    if scene_type in {"math_plot", "derivative_tangent"}:
         return _derivative_tangent_snapshot(blueprint)
     if scene_type == "bfs_graph":
         return _bfs_graph_snapshot(blueprint)
@@ -363,34 +363,7 @@ def _water_synthesis_reaction_snapshot(blueprint: dict[str, Any]) -> ReactionSce
 
 
 def _derivative_tangent_snapshot(blueprint: dict[str, Any]) -> MathPlotSnapshot:
-    return MathPlotSnapshot(
-        pack_id=str(blueprint.get("packId") or "math-basic"),
-        asset_id="derivative-tangent-preset",
-        curves=[
-            MathPlotCurve(
-                expression="x^2", label="f(x)=x^2", emphasis="primary", semantic_role="curve"
-            ),
-            MathPlotCurve(
-                expression="2*x - 1",
-                label="tangent slope = 2",
-                emphasis="accent",
-                semantic_role="tangent",
-            ),
-        ],
-        x_min=-1,
-        x_max=3,
-        y_min=-1,
-        y_max=5,
-        marker_x=1,
-        shade_from=0.85,
-        shade_to=1.15,
-        x_label="x",
-        y_label="f(x)",
-        formula_latex="f'(1)=2",
-        caption=str(
-            blueprint.get("caption") or "The derivative at x=1 is the slope of the tangent line."
-        ),
-    )
+    return compile_math_plot_snapshot(blueprint)
 
 
 def _bfs_graph_snapshot(blueprint: dict[str, Any]) -> GraphSceneSnapshot:

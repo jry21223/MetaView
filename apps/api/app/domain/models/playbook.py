@@ -98,6 +98,7 @@ class MathPlotSnapshot(BaseModel):
     pack_id: str | None = None
     asset_id: str | None = None
     curves: list[MathPlotCurve] = Field(default_factory=list)
+    params: dict[str, float] = Field(default_factory=dict)
     x_min: float = -10.0
     x_max: float = 10.0
     y_min: float | None = None

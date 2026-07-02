@@ -48,12 +48,14 @@ and `emphasisPoints`, resolves assets through the shared asset resolver, applies
 deterministic layout defaults, and outputs normal `PlaybookScript`.
 Biology scenes can now accept `structures`, `steps`, `connections`, and
 `callouts`; chemistry scenes can accept `atoms`, `bonds`, `reactants`,
-`products`, `arrows`, and `electronFlows`. Subject layout helpers consume those
-inputs first, then fall back to deterministic flagship defaults when the fields
-are absent. Chemistry molecule scenes additionally hydrate structured JSON
-presets through `kits/chemistry/moleculePresetResolver.ts` before renderer asset
-ids are applied, so atom/bond/callout data comes from either the blueprint or
-the asset pack rather than a hand-written water molecule inside the compiler.
+`products`, `arrows`, and `electronFlows`; math plots can accept `curves`,
+`params`, plot bounds, marker/shade controls, and formula labels. Subject layout
+helpers consume those inputs first, then fall back to deterministic flagship
+defaults when the fields are absent. Chemistry molecule scenes additionally
+hydrate structured JSON presets through `kits/chemistry/moleculePresetResolver.ts`
+before renderer asset ids are applied, so atom/bond/callout data comes from
+either the blueprint or the asset pack rather than a hand-written water molecule
+inside the compiler.
 The backend mirror uses `apps/api/app/domain/services/molecule_preset_resolver.py`
 against the same public preset JSON before returning `PlaybookScript` to
 SkillPack/runtime-tool callers.
@@ -109,7 +111,9 @@ Current backend SkillPack adoption:
   `reaction_scene`. The SceneBlueprint path routes custom atom/bond layouts and
   reaction participants through chemistry layout compilers while preserving
   preset/RDKit fallbacks.
-- `math-basic`: structured plot presets for math plot/formula scenes.
+- `math-basic`: structured plot presets for math plot/formula scenes. The
+  SceneBlueprint path routes custom curve expressions, numeric params, plot
+  bounds, markers, shaded regions, and labels through a math layout compiler.
 - `algorithm-code-basic`: internal graph node, queue, visited, active-edge,
   active-line, and pointer SVGs plus BFS graph, recursion-stack, and
   binary-search presets for `graph_scene`, `call_stack_scene`, and

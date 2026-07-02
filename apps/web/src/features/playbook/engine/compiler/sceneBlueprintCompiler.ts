@@ -21,6 +21,10 @@ import {
   type ReactionElectronFlowInput,
   type ReactionParticipantInput,
 } from "../kits/chemistry/chemistryLayouts";
+import {
+  compileMathPlotLayout,
+  type MathPlotCurveInput,
+} from "../kits/math/mathLayouts";
 import type {
   AnySnapshot,
   BioCellSceneSnapshot,
@@ -165,6 +169,19 @@ export interface ChemistrySceneBlueprint extends SceneBlueprintBase {
 export interface MathSceneBlueprint extends SceneBlueprintBase {
   subject: "math";
   sceneType: MathSceneType;
+  assetId?: string | null;
+  curves?: MathPlotCurveInput[];
+  params?: Record<string, number>;
+  xMin?: number;
+  xMax?: number;
+  yMin?: number | null;
+  yMax?: number | null;
+  markerX?: number | null;
+  shadeFrom?: number | null;
+  shadeTo?: number | null;
+  xLabel?: string;
+  yLabel?: string;
+  formulaLatex?: string | null;
 }
 
 export interface AlgorithmSceneBlueprint extends SceneBlueprintBase {
@@ -304,28 +321,23 @@ function compileChemistryReactionSnapshot(blueprint: ChemistrySceneBlueprint): R
 
 function compileMathSnapshot(blueprint: MathSceneBlueprint): MathPlotSnapshot {
   const packId = blueprint.packId ?? DEFAULT_MATH_PACK_ID;
-  const assetId = resolveAssetIdByRole("math_plot", "math", packId, "tangent", ["derivative", "plot"]);
-
-  return {
-    kind: "math_plot",
-    pack_id: packId,
-    asset_id: assetId,
-    curves: [
-      { expression: "x^2", label: "f(x)=x^2", emphasis: "primary", semantic_role: "curve" },
-      { expression: "2*x - 1", label: "tangent slope = 2", emphasis: "accent", semantic_role: "tangent" },
-    ],
-    x_min: -1,
-    x_max: 3,
-    y_min: -1,
-    y_max: 5,
-    marker_x: 1,
-    shade_from: 0.85,
-    shade_to: 1.15,
-    x_label: "x",
-    y_label: "f(x)",
-    formula_latex: "f'(1)=2",
-    caption: blueprint.caption ?? "The derivative at x=1 is the slope of the tangent line.",
-  };
+  return compileMathPlotLayout({
+    packId,
+    assetId: blueprint.assetId,
+    curves: blueprint.curves,
+    params: blueprint.params,
+    xMin: blueprint.xMin,
+    xMax: blueprint.xMax,
+    yMin: blueprint.yMin,
+    yMax: blueprint.yMax,
+    markerX: blueprint.markerX,
+    shadeFrom: blueprint.shadeFrom,
+    shadeTo: blueprint.shadeTo,
+    xLabel: blueprint.xLabel,
+    yLabel: blueprint.yLabel,
+    formulaLatex: blueprint.formulaLatex,
+    caption: blueprint.caption,
+  });
 }
 
 function compileAlgorithmSnapshot(blueprint: AlgorithmSceneBlueprint): GraphSceneSnapshot {

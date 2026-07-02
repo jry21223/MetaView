@@ -603,6 +603,62 @@ def test_scene_blueprint_compiler_builds_water_synthesis_reaction_scene() -> Non
     assert verdict.status == PlaybookReviewStatus.CLEAN
 
 
+def test_scene_blueprint_compiler_builds_math_plot_from_structured_layout_input() -> None:
+    playbook = compile_scene_blueprint_to_playbook(
+        {
+            "id": "cubic_tangent",
+            "subject": "math",
+            "sceneType": "math_plot",
+            "title": "Cubic tangent",
+            "visualIntent": ["show_function_curve", "highlight_tangent_slope"],
+            "assetId": "derivative-tangent-preset",
+            "curves": [
+                {"expression": "x^3", "label": "f(x)=x^3", "emphasis": "primary", "semanticRole": "curve"},
+                {"expression": "3*x - 2", "label": "tangent slope = 3", "emphasis": "accent", "semanticRole": "tangent"},
+            ],
+            "params": {"a": 3},
+            "xMin": -2,
+            "xMax": 2,
+            "yMin": -4,
+            "yMax": 4,
+            "markerX": 1,
+            "shadeFrom": 0.9,
+            "shadeTo": 1.1,
+            "xLabel": "x",
+            "yLabel": "f(x)",
+            "formulaLatex": "f'(1)=3",
+            "caption": "The cubic tangent slope at x=1 is 3.",
+        },
+    )
+
+    snapshot = playbook.steps[0].snapshot.model_dump(mode="json", by_alias=True)
+
+    assert snapshot == {
+        "kind": "math_plot",
+        "pack_id": "math-basic",
+        "asset_id": "derivative-tangent-preset",
+        "curves": [
+            {"expression": "x^3", "label": "f(x)=x^3", "emphasis": "primary", "semantic_role": "curve"},
+            {"expression": "3*x - 2", "label": "tangent slope = 3", "emphasis": "accent", "semantic_role": "tangent"},
+        ],
+        "params": {"a": 3.0},
+        "x_min": -2.0,
+        "x_max": 2.0,
+        "y_min": -4.0,
+        "y_max": 4.0,
+        "marker_x": 1.0,
+        "shade_from": 0.9,
+        "shade_to": 1.1,
+        "x_label": "x",
+        "y_label": "f(x)",
+        "formula_latex": "f'(1)=3",
+        "caption": "The cubic tangent slope at x=1 is 3.",
+    }
+
+    verdict = self_check_playbook(playbook, "Explain the cubic tangent slope.")
+    assert verdict.status == PlaybookReviewStatus.CLEAN
+
+
 @pytest.mark.parametrize(
     ("scene_type", "subject", "prompt"),
     [

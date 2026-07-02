@@ -79,6 +79,24 @@
       "type": "array",
       "items": { "$ref": "#/$defs/point" }
     },
+    "assetId": { "type": ["string", "null"], "minLength": 1 },
+    "curves": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/mathCurve" }
+    },
+    "params": {
+      "type": "object",
+      "additionalProperties": { "type": "number" }
+    },
+    "xMin": { "type": "number" },
+    "xMax": { "type": "number" },
+    "yMin": { "type": ["number", "null"] },
+    "yMax": { "type": ["number", "null"] },
+    "markerX": { "type": ["number", "null"] },
+    "shadeFrom": { "type": ["number", "null"] },
+    "shadeTo": { "type": ["number", "null"] },
+    "xLabel": { "type": "string", "minLength": 1 },
+    "yLabel": { "type": "string", "minLength": 1 },
     "formulaLatex": { "type": "string", "minLength": 1 },
     "cellType": { "type": "string", "minLength": 1 },
     "processId": { "type": "string", "minLength": 1 },
@@ -231,6 +249,17 @@
         "dy": { "type": "number" },
         "label": { "type": "string", "minLength": 1 },
         "magnitude": { "type": "string", "minLength": 1 }
+      }
+    },
+    "mathCurve": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expression"],
+      "properties": {
+        "expression": { "type": "string", "minLength": 1 },
+        "label": { "type": ["string", "null"], "minLength": 1 },
+        "emphasis": { "type": "string", "minLength": 1 },
+        "semanticRole": { "type": "string", "minLength": 1 }
       }
     },
     "callout": {
