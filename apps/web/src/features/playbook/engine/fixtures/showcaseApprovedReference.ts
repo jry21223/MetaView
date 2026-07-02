@@ -48,6 +48,10 @@ export function createApprovedShowcaseReference(
   if (!report.reviewReady) {
     throw new Error("Showcase baseline report is not ready for approval.");
   }
+  if (!report.contractOk) {
+    const blockedIds = report.contractIssues.map((issue) => issue.id).join(", ");
+    throw new Error(`Showcase baseline report is missing scene contract assets: ${blockedIds}`);
+  }
 
   const reviewer = normalizedReviewer(options.reviewer);
   const review: ShowcaseScreenshotReferenceReview = {

@@ -59,6 +59,8 @@ describe("showcaseBaselineReport", () => {
     );
 
     expect(report.ok).toBe(true);
+    expect(report.contractOk).toBe(true);
+    expect(report.contractIssues).toEqual([]);
     expect(report.reviewReady).toBe(true);
     expect(report.missingSummaryIds).toEqual([]);
     expect(report.unexpectedSummaryIds).toEqual([]);

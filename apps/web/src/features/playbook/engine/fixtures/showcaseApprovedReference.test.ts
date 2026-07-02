@@ -118,4 +118,44 @@ describe("createApprovedShowcaseReference", () => {
       }),
     ).toThrow("not ready");
   });
+
+  it("rejects reports with missing scene contract assets before stamping references", () => {
+    const contractBlockedReport = createShowcaseBaselineReport(
+      [
+        {
+          id: "projectile_motion",
+          domain: "physics",
+          packId: "physics-basic",
+          rendererKind: "physics_force_scene",
+          requiredMarkers: ['data-asset-id="projectile-body-dot"'],
+          imageQuality: thresholds,
+          contractCoverage: {
+            status: "missing",
+            contractIds: ["projectile-contract"],
+            requiredAssetIds: ["projectile-body-dot", "force-vector-arrow"],
+            renderedAssetIds: ["force-vector-arrow"],
+            missingAssetIds: ["projectile-body-dot"],
+          },
+        },
+      ],
+      [
+        {
+          id: "projectile_motion",
+          frame: 77,
+          output: "/tmp/projectile_motion.png",
+          imageQuality: thresholds,
+          ...passingStats,
+        },
+      ],
+    );
+
+    expect(contractBlockedReport.reviewReady).toBe(true);
+    expect(contractBlockedReport.contractOk).toBe(false);
+    expect(() =>
+      createApprovedShowcaseReference(contractBlockedReport, {
+        reviewer: "visual-reviewer",
+        approvedAt: "2026-07-02T00:00:00.000Z",
+      }),
+    ).toThrow("scene contract assets");
+  });
 });

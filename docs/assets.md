@@ -177,9 +177,11 @@ Phase 1 acceptance evidence:
   `blockingIssues`, `driftIssues`, and `contractCoverage` so release handoffs
   can distinguish screenshots that are ready for human review from screenshots
   blocked by missing output, weak image quality, or reference drift while also
-  seeing which scene asset contracts were matched. In the current matrix, all 15
-  showcase fixtures expose matched contract coverage when their renderer consumes
-  the required assets.
+  seeing which scene asset contracts were matched. The baseline report also
+  exposes `contractOk` and `contractIssues`; release readiness and approved
+  reference stamping fail when any fixture is missing a required contract asset.
+  In the current matrix, all 15 showcase fixtures expose matched contract
+  coverage when their renderer consumes the required assets.
 
 Before treating this phase as closed in a release or branch handoff, run:
 
@@ -276,7 +278,10 @@ Local preview helpers:
    fixture's baseline, measured screenshot stats, safety margins, and
    `screenshotReview` metadata. It also records `contractCoverage`, including
    matched contract ids, required asset ids, rendered asset ids, and missing
-   contract assets when a scene has an asset contract. A `ready_for_review`
+   contract assets when a scene has an asset contract. Top-level `contractOk`
+   and `contractIssues` fields make missing contract assets block release
+   readiness and approved reference stamping even when the PNG quality thresholds
+   pass. A `ready_for_review`
    status means the PNG passed automated quality gates and includes the required
    static markers; `blocked` records missing-summary or under-baseline blockers;
    `drift_review_needed` records reference drift that should be visually checked

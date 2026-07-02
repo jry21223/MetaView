@@ -112,4 +112,46 @@ describe("createShowcaseReviewPacket", () => {
     expect(packet).toContain("Screenshot: missing");
     expect(packet).toContain("Contract coverage: not_applicable");
   });
+
+  it("blocks human review packets when scene contract assets are missing", () => {
+    const report = createShowcaseBaselineReport(
+      [
+        {
+          id: "projectile_motion",
+          domain: "physics",
+          packId: "physics-basic",
+          rendererKind: "physics_force_scene",
+          requiredMarkers: ['data-asset-id="projectile-body-dot"'],
+          imageQuality: thresholds,
+          contractCoverage: {
+            status: "missing",
+            contractIds: ["projectile-contract"],
+            requiredAssetIds: ["projectile-body-dot", "force-vector-arrow"],
+            renderedAssetIds: ["force-vector-arrow"],
+            missingAssetIds: ["projectile-body-dot"],
+          },
+        },
+      ],
+      [
+        {
+          id: "projectile_motion",
+          frame: 77,
+          output: "/tmp/projectile_motion.png",
+          imageQuality: thresholds,
+          ...passingStats,
+        },
+      ],
+      "2026-07-02T00:00:00.000Z",
+    );
+
+    const packet = createShowcaseReviewPacket(report, {
+      generatedAt: "2026-07-02T01:00:00.000Z",
+    });
+
+    expect(packet).toContain("Review readiness: `blocked`");
+    expect(packet).toContain("Contract coverage: missing (`projectile-contract`)");
+    expect(packet).toContain("Contract missing assets: `projectile-body-dot`");
+    expect(packet).toContain("## Blocked Fixtures");
+    expect(packet).toContain("- `projectile_motion`: contract_missing_assets: projectile-body-dot");
+  });
 });

@@ -15,7 +15,7 @@ const DEFAULT_REFERENCE_COMMAND =
   "SHOWCASE_REFERENCE_REVIEWER=visual-reviewer npm --workspace apps/web run showcase:approve-reference";
 
 function statusLabel(report: ShowcaseBaselineReport) {
-  if (!report.ok || !report.reviewReady) return "blocked";
+  if (!report.ok || !report.contractOk || !report.reviewReady) return "blocked";
   if (report.approvedReferenceReady) return "approved_reference_current";
   return "ready_for_review";
 }
@@ -73,13 +73,27 @@ function imageStats(entry: ShowcaseBaselineReportEntry) {
   ].join(", ");
 }
 
+function contractIssue(entry: ShowcaseBaselineReportEntry) {
+  const coverage = contractCoverage(entry);
+  if (coverage.status !== "missing" || coverage.missingAssetIds.length === 0) return null;
+  return `contract_missing_assets: ${coverage.missingAssetIds.join(", ")}`;
+}
+
 function entryIssues(entry: ShowcaseBaselineReportEntry) {
-  return listValue([...entry.screenshotReview.blockingIssues, ...entry.screenshotReview.driftIssues]);
+  const contract = contractIssue(entry);
+  return listValue([
+    ...entry.screenshotReview.blockingIssues,
+    ...entry.screenshotReview.driftIssues,
+    ...(contract ? [contract] : []),
+  ]);
 }
 
 function blockedEntries(report: ShowcaseBaselineReport) {
   return report.entries.filter(
-    (entry) => entry.screenshotReview.blockingIssues.length > 0 || entry.screenshotReview.driftIssues.length > 0,
+    (entry) =>
+      entry.screenshotReview.blockingIssues.length > 0 ||
+      entry.screenshotReview.driftIssues.length > 0 ||
+      contractIssue(entry) !== null,
   );
 }
 
