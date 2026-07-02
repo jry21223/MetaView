@@ -14,6 +14,10 @@ import path from "node:path";
 import zlib from "node:zlib";
 
 import { visualQualityGate } from "../src/features/playbook/engine/assets/visualQualityGate.ts";
+import {
+  analyzeShowcaseImageQuality,
+  getShowcaseImageQualityIssues,
+} from "../src/features/playbook/engine/fixtures/showcaseImageQuality.ts";
 import { listSubjectVisualShowcaseEntries } from "../src/features/playbook/engine/fixtures/subjectVisualShowcase.ts";
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -99,26 +103,13 @@ function readPng(buffer) {
 function pngStats(filePath) {
   const file = fs.readFileSync(filePath);
   const png = readPng(file);
-  const colors = new Set();
-  let nonTransparent = 0;
-  let samples = 0;
-  const step = Math.max(1, Math.floor((png.width * png.height) / 5000));
-
-  for (let pixel = 0; pixel < png.width * png.height; pixel += step) {
-    const index = pixel * png.channels;
-    const alpha = png.channels === 4 ? png.pixels[index + 3] : 255;
-    if (alpha > 8) nonTransparent += 1;
-    colors.add(`${png.pixels[index]},${png.pixels[index + 1]},${png.pixels[index + 2]},${alpha}`);
-    samples += 1;
-  }
-
-  return {
+  return analyzeShowcaseImageQuality({
     width: png.width,
     height: png.height,
+    channels: png.channels,
+    pixels: png.pixels,
     bytes: file.length,
-    uniqueColors: colors.size,
-    nonTransparentRatio: samples > 0 ? nonTransparent / samples : 0,
-  };
+  });
 }
 
 function representativeFrame(script) {
@@ -167,14 +158,21 @@ for (const showcaseEntry of selectedEntries) {
   await renderStill({ composition, serveUrl, output, frame, inputProps });
 
   const stats = pngStats(output);
-  if (stats.width < 400 || stats.height < 250 || stats.bytes < 20000 || stats.uniqueColors < 24 || stats.nonTransparentRatio < 0.95) {
-    throw new Error(`[showcase:smoke] ${showcaseEntry.id} rendered suspicious PNG: ${JSON.stringify(stats)}`);
+  const imageQualityIssues = getShowcaseImageQualityIssues(stats);
+  if (imageQualityIssues.length > 0) {
+    throw new Error(
+      `[showcase:smoke] ${showcaseEntry.id} rendered suspicious PNG: ${JSON.stringify({
+        issues: imageQualityIssues,
+        stats,
+      })}`,
+    );
   }
 
   summary.push({ id: showcaseEntry.id, frame, output, ...stats });
   console.log(
     `[showcase:smoke] ${showcaseEntry.id} @frame ${frame} -> ${output} ` +
-      `(${stats.width}x${stats.height}, ${stats.uniqueColors} colors)`,
+      `(${stats.width}x${stats.height}, ${stats.uniqueColors} colors, ` +
+      `${(stats.contentPixelRatio * 100).toFixed(1)}% content)`,
   );
 }
 
