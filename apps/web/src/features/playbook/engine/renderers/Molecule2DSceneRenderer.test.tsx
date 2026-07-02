@@ -20,6 +20,7 @@ function waterSnapshot(extra: Partial<Molecule2DSceneSnapshot> = {}): Molecule2D
       { id: "oh1", from: "o", to: "h1", order: 1, asset_id: "bond-line" },
       { id: "oh2", from: "o", to: "h2", order: 1, asset_id: "bond-line" },
     ],
+    callouts: [{ id: "polar-callout", target_id: "o", label: "partial negative", side: "top" }],
     formula_latex: "H_2O",
     caption: "Water is a bent polar molecule.",
     ...extra,
@@ -60,6 +61,7 @@ describe("Molecule2DSceneRenderer", () => {
     expect(markup).toContain('data-structured-molecule="true"');
     expect(markup).toContain('data-asset-id="atom-core"');
     expect(markup).toContain('data-asset-id="bond-line"');
+    expect(markup).toContain('data-asset-id="core-callout-label"');
     expect(markup).toContain('data-element="O"');
     expect(markup).toContain('data-element="H"');
     expect(markup).not.toContain('data-missing-asset="true"');

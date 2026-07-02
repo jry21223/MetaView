@@ -10,6 +10,7 @@ import type {
   ReactionParticipant,
   ReactionSceneSnapshot,
 } from "../types";
+import { CoreCalloutLabel } from "./CoreCalloutLabel";
 import type { RendererProps } from "./types";
 
 const DEFAULT_CHEMISTRY_PACK_ID = "chemistry-basic";
@@ -185,22 +186,25 @@ function renderCallout(
 ) {
   const point = targetPoint(callout.target_id, snap.reactants, snap.products, snap.arrows);
   const anchor = calloutAnchor(point, callout);
-  const textX =
-    anchor.anchor === "end" ? anchor.end[0] - 2 : anchor.anchor === "start" ? anchor.end[0] + 2 : anchor.end[0];
 
   return (
-    <g key={callout.id} data-semantic-role="callout" data-callout-id={callout.id} data-target-id={callout.target_id}>
-      <path
-        d={`M ${anchor.start[0]} ${anchor.start[1]} L ${anchor.end[0]} ${anchor.end[1]}`}
-        fill="none"
-        stroke="#64748b"
-        strokeWidth="0.7"
-      />
-      <circle cx={anchor.start[0]} cy={anchor.start[1]} r="1.1" fill="#64748b" />
-      <text x={textX} y={anchor.end[1] - 1.4} textAnchor={anchor.anchor} fontSize="3" fontWeight="760" fill="#243447">
-        {callout.label}
-      </text>
-    </g>
+    <CoreCalloutLabel
+      key={callout.id}
+      id={callout.id}
+      targetId={callout.target_id}
+      label={callout.label}
+      anchor={{
+        x1: anchor.start[0],
+        y1: anchor.start[1],
+        x2: anchor.end[0],
+        y2: anchor.end[1],
+        textAnchor: anchor.anchor,
+      }}
+      rendererKind="reaction_scene"
+      stroke="#64748b"
+      textFill="#243447"
+      dotRadius={1.1}
+    />
   );
 }
 

@@ -4,6 +4,7 @@ import { AssetSvg } from "../assets/AssetSvg";
 import type { AssetManifestEntry } from "../assets/assetRegistry";
 import { resolveAssetById, resolveAssetByRole, resolveAssetForRenderer } from "../assets/assetResolver";
 import type { Molecule2DAtom, Molecule2DBond, Molecule2DCallout, Molecule2DSceneSnapshot } from "../types";
+import { CoreCalloutLabel } from "./CoreCalloutLabel";
 import type { RendererProps } from "./types";
 
 const DEFAULT_CHEMISTRY_PACK_ID = "chemistry-basic";
@@ -169,20 +170,16 @@ function renderCallout(callout: Molecule2DCallout, atoms: Molecule2DAtom[]) {
   if (!atom) return null;
   const anchor = calloutAnchor(atom, callout);
   return (
-    <g key={callout.id} data-semantic-role="callout" data-target-id={callout.target_id}>
-      <path d={`M ${anchor.x1} ${anchor.y1} L ${anchor.x2} ${anchor.y2}`} fill="none" stroke="#6b7280" strokeWidth="0.7" />
-      <circle cx={anchor.x1} cy={anchor.y1} r="1.2" fill="#6b7280" />
-      <text
-        x={anchor.textAnchor === "end" ? anchor.x2 - 2 : anchor.textAnchor === "middle" ? anchor.x2 : anchor.x2 + 2}
-        y={anchor.y2 - 1.6}
-        textAnchor={anchor.textAnchor}
-        fontSize="3"
-        fontWeight="740"
-        fill="#2f3c50"
-      >
-        {callout.label}
-      </text>
-    </g>
+    <CoreCalloutLabel
+      key={callout.id}
+      id={callout.id}
+      targetId={callout.target_id}
+      label={callout.label}
+      anchor={anchor}
+      rendererKind="molecule_2d_scene"
+      stroke="#6b7280"
+      textFill="#2f3c50"
+    />
   );
 }
 

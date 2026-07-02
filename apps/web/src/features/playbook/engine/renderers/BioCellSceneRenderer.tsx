@@ -4,6 +4,7 @@ import { AssetSvg } from "../assets/AssetSvg";
 import type { AssetManifestEntry } from "../assets/assetRegistry";
 import { resolveAssetById, resolveAssetByRole, resolveAssetForRenderer } from "../assets/assetResolver";
 import type { BioCellCallout, BioCellSceneSnapshot, BioCellStructure } from "../types";
+import { CoreCalloutLabel } from "./CoreCalloutLabel";
 import type { RendererProps } from "./types";
 
 const DEFAULT_BIOLOGY_PACK_ID = "biology-basic";
@@ -43,36 +44,17 @@ function renderCallout(callout: BioCellCallout, structures: BioCellStructure[]) 
   if (!target) return null;
   const anchor = calloutAnchor(target, callout);
   return (
-    <g key={callout.id} data-semantic-role="callout" data-target-id={callout.target_id}>
-      <path
-        d={`M ${anchor.x1} ${anchor.y1} L ${anchor.x2} ${anchor.y2}`}
-        fill="none"
-        stroke="#4f6f5a"
-        strokeWidth="0.8"
-        strokeLinecap="round"
-      />
-      <circle cx={anchor.x1} cy={anchor.y1} r="1.3" fill="#4f6f5a" />
-      <rect
-        x={anchor.textAnchor === "end" ? anchor.x2 - 25 : anchor.textAnchor === "middle" ? anchor.x2 - 14 : anchor.x2}
-        y={anchor.y2 - 6.2}
-        width={anchor.textAnchor === "middle" ? 28 : 25}
-        height="8.2"
-        rx="2"
-        fill="#ffffff"
-        stroke="#d8e1d7"
-        opacity="0.96"
-      />
-      <text
-        x={anchor.textAnchor === "end" ? anchor.x2 - 2 : anchor.textAnchor === "middle" ? anchor.x2 : anchor.x2 + 2}
-        y={anchor.y2 - 1.2}
-        textAnchor={anchor.textAnchor}
-        fontSize="2.8"
-        fontWeight="760"
-        fill="#26384a"
-      >
-        {callout.label}
-      </text>
-    </g>
+    <CoreCalloutLabel
+      key={callout.id}
+      id={callout.id}
+      targetId={callout.target_id}
+      label={callout.label}
+      anchor={anchor}
+      rendererKind="bio_cell_scene"
+      stroke="#4f6f5a"
+      textFill="#26384a"
+      dotRadius={1.3}
+    />
   );
 }
 

@@ -94,7 +94,10 @@ Current backend SkillPack adoption:
 
 - `geography-basic`: starter map-layer SVG plus internal monsoon wind SVG.
 - `core-visual-basic`: internal shared arrows, labels, icons, particle presets,
-  and grid backgrounds for renderer adapters across subjects.
+  and grid backgrounds for renderer adapters across subjects. Shared callouts
+  render through the core callout adapter, so biology and chemistry scenes
+  consume `core-callout-label` instead of drawing independent label boxes in
+  each renderer.
 - `geography-earth-basic`: Natural Earth-derived East Asia map GeoJSON and map
   symbols for `geo_map_scene`. The SceneBlueprint path routes map layers,
   flow arrows, pressure centers, and particle presets through a geography layout
