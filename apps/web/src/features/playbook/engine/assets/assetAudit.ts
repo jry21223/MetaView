@@ -72,6 +72,45 @@ const REQUIRED_SCENE_TEMPLATE_CONTRACTS_BY_PACK: Record<
     pathSuffix: string;
   }>
 > = {
+  "algorithm-code-basic": [
+    {
+      sceneTemplate: "bfs_graph",
+      assetId: "bfs-graph-contract",
+      semanticRole: "bfs_graph_contract",
+      rendererKind: "graph_scene",
+      pathSuffix: "/contracts/bfs-graph.contract.json",
+    },
+    {
+      sceneTemplate: "recursion_stack",
+      assetId: "recursion-stack-contract",
+      semanticRole: "recursion_stack_contract",
+      rendererKind: "call_stack_scene",
+      pathSuffix: "/contracts/recursion-stack.contract.json",
+    },
+    {
+      sceneTemplate: "binary_search",
+      assetId: "binary-search-contract",
+      semanticRole: "binary_search_contract",
+      rendererKind: "code_trace_scene",
+      pathSuffix: "/contracts/binary-search.contract.json",
+    },
+  ],
+  "biology-basic": [
+    {
+      sceneTemplate: "cell_structure",
+      assetId: "cell-structure-contract",
+      semanticRole: "cell_structure_contract",
+      rendererKind: "bio_cell_scene",
+      pathSuffix: "/contracts/cell-structure.contract.json",
+    },
+    {
+      sceneTemplate: "dna_replication",
+      assetId: "dna-replication-contract",
+      semanticRole: "dna_replication_contract",
+      rendererKind: "bio_process_scene",
+      pathSuffix: "/contracts/dna-replication.contract.json",
+    },
+  ],
   "chemistry-basic": [
     {
       sceneTemplate: "molecule_2d_water",
@@ -165,10 +204,7 @@ function auditSceneTemplateContracts(errors: AssetAuditIssue[], pack: SubjectVis
     if (!sceneTemplates.has(requirement.sceneTemplate)) continue;
 
     const asset = pack.assets.find((item) => item.id === requirement.assetId);
-    const hasContractRole =
-      asset?.semanticRoles.includes("molecule_contract") ||
-      asset?.semanticRoles.includes("reaction_contract") ||
-      false;
+    const hasContractRole = asset?.semanticRoles.some((role) => role.endsWith("_contract")) ?? false;
     const validContract =
       asset?.type === "json" &&
       asset.path?.endsWith(requirement.pathSuffix) &&

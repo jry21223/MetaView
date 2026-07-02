@@ -197,4 +197,71 @@ describe("assetAudit", () => {
       }),
     );
   });
+
+  it("fails biology scene templates without matching compiler contract assets", () => {
+    const biologyPack = basePack({
+      packId: "biology-basic",
+      subject: "biology",
+      sceneTemplates: ["cell_structure"],
+      rendererKinds: ["bio_cell_scene", "bio_process_scene"],
+      assets: [
+        {
+          ...basePack().assets[0],
+          id: "cell-outline",
+          path: "/assets/metaview-kits/biology-basic/icons/cell-outline.svg",
+          semanticRoles: ["cell"],
+        },
+      ],
+    });
+
+    const report = auditAssetPacks([biologyPack], {
+      pathExists: () => true,
+    });
+
+    expect(report.ok).toBe(false);
+    expect(report.errors).toContainEqual(
+      expect.objectContaining({
+        code: "missing_scene_template_contract",
+        packId: "biology-basic",
+        assetId: "cell-structure-contract",
+      }),
+    );
+  });
+
+  it("fails algorithm scene templates without matching compiler contract assets", () => {
+    const algorithmPack = basePack({
+      packId: "algorithm-code-basic",
+      subject: "algorithm",
+      sceneTemplates: ["bfs_graph"],
+      rendererKinds: [
+        "graph_scene",
+        "call_stack_scene",
+        "code_trace_scene",
+        "algorithm_array",
+        "algorithm_tree",
+      ],
+      assets: [
+        {
+          ...basePack().assets[0],
+          id: "bfs-graph-preset",
+          type: "json",
+          path: "/assets/metaview-kits/algorithm-code-basic/graph/bfs-graph-preset.json",
+          semanticRoles: ["bfs", "graph", "graph_scene"],
+        },
+      ],
+    });
+
+    const report = auditAssetPacks([algorithmPack], {
+      pathExists: () => true,
+    });
+
+    expect(report.ok).toBe(false);
+    expect(report.errors).toContainEqual(
+      expect.objectContaining({
+        code: "missing_scene_template_contract",
+        packId: "algorithm-code-basic",
+        assetId: "bfs-graph-contract",
+      }),
+    );
+  });
 });
