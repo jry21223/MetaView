@@ -441,11 +441,64 @@ function addCodeTraceRenderedAssetIds(
   }
 }
 
+function addMoleculeRenderedAssetIds(
+  assetIds: Set<string>,
+  context: SnapshotContext,
+  snapshot: Molecule2DSceneSnapshot,
+) {
+  if (snapshot.molecule_asset_id) {
+    assetIds.add(snapshot.molecule_asset_id);
+  } else {
+    addResolvedRoleAssetId(assetIds, context, "chemistry", snapshot.molecule_id, snapshot.pack_id, ["molecule"]);
+  }
+
+  for (const atom of snapshot.atoms) {
+    if (atom.asset_id) {
+      assetIds.add(atom.asset_id);
+      continue;
+    }
+    addResolvedRoleAssetId(assetIds, context, "chemistry", "atom", snapshot.pack_id);
+  }
+  for (const bond of snapshot.bonds) {
+    if (bond.asset_id) {
+      assetIds.add(bond.asset_id);
+      continue;
+    }
+    addResolvedRoleAssetId(assetIds, context, "chemistry", "bond", snapshot.pack_id);
+  }
+}
+
+function addReactionRenderedAssetIds(
+  assetIds: Set<string>,
+  context: SnapshotContext,
+  snapshot: ReactionSceneSnapshot,
+) {
+  for (const participant of [...snapshot.reactants, ...snapshot.products]) {
+    addAssetId(assetIds, participant.asset_id);
+  }
+  for (const arrow of snapshot.arrows) {
+    if (arrow.asset_id) {
+      assetIds.add(arrow.asset_id);
+      continue;
+    }
+    addResolvedRoleAssetId(assetIds, context, "chemistry", arrow.semantic_role, snapshot.pack_id);
+  }
+  for (const electronFlow of snapshot.electron_flows ?? []) {
+    if (electronFlow.asset_id) {
+      assetIds.add(electronFlow.asset_id);
+      continue;
+    }
+    addResolvedRoleAssetId(assetIds, context, "chemistry", electronFlow.semantic_role, snapshot.pack_id);
+  }
+}
+
 function collectRenderedAssetIds(context: SnapshotContext): Set<string> {
   const assetIds = new Set<string>();
   const { snapshot } = context;
   if (snapshot.kind === "bio_cell_scene") addBioCellRenderedAssetIds(assetIds, context, snapshot);
   if (snapshot.kind === "bio_process_scene") addBioProcessRenderedAssetIds(assetIds, context, snapshot);
+  if (snapshot.kind === "molecule_2d_scene") addMoleculeRenderedAssetIds(assetIds, context, snapshot);
+  if (snapshot.kind === "reaction_scene") addReactionRenderedAssetIds(assetIds, context, snapshot);
   if (snapshot.kind === "graph_scene") addGraphRenderedAssetIds(assetIds, context, snapshot);
   if (snapshot.kind === "call_stack_scene") addCallStackRenderedAssetIds(assetIds, context, snapshot);
   if (snapshot.kind === "code_trace_scene") addCodeTraceRenderedAssetIds(assetIds, context, snapshot);

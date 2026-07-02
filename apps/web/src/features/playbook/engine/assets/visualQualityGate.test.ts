@@ -482,6 +482,52 @@ describe("visualQualityGate", () => {
     );
   });
 
+  it("warns when a chemistry molecule scene uses the wrong contract asset", () => {
+    const warnings = visualQualityGate(
+      script({
+        domain: "chemistry",
+        steps: [
+          {
+            step_id: "molecule_2d_water",
+            end_frame: 90,
+            title: "Water molecule",
+            voiceover_text: "",
+            tokens: [],
+            snapshot: {
+              kind: "molecule_2d_scene",
+              pack_id: "chemistry-basic",
+              molecule_id: "water",
+              molecule_asset_id: "methane-molecule-preset",
+              atoms: [
+                { id: "o", element: "O", x: 50, y: 45 },
+                { id: "h1", element: "H", x: 37, y: 60 },
+                { id: "h2", element: "H", x: 63, y: 60 },
+              ],
+              bonds: [
+                { id: "oh1", from: "o", to: "h1", order: 1 },
+                { id: "oh2", from: "o", to: "h2", order: 1 },
+              ],
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "scene_contract_missing_asset",
+          step_id: "molecule_2d_water",
+          domain: "chemistry",
+          snapshot_kind: "molecule_2d_scene",
+          pack_id: "chemistry-basic",
+          contract_id: "water-molecule-contract",
+          asset_id: "water-molecule-preset",
+        }),
+      ]),
+    );
+  });
+
   it("warns when a chemistry reaction asset_id cannot be resolved", () => {
     const warnings = visualQualityGate(
       script({
@@ -526,6 +572,59 @@ describe("visualQualityGate", () => {
           step_id: "reaction_synthesis_water",
           asset_id: "missing-reaction-arrow",
           pack_id: "chemistry-basic",
+        }),
+      ]),
+    );
+  });
+
+  it("warns when a chemistry reaction scene misses a contract-required flow asset", () => {
+    const warnings = visualQualityGate(
+      script({
+        domain: "chemistry",
+        steps: [
+          {
+            step_id: "reaction_synthesis_water",
+            end_frame: 90,
+            title: "Water synthesis reaction",
+            voiceover_text: "",
+            tokens: [],
+            snapshot: {
+              kind: "reaction_scene",
+              pack_id: "chemistry-basic",
+              reaction_id: "reaction_synthesis_water",
+              reactants: [
+                { id: "h2", formula_latex: "H_2", label: "hydrogen", coefficient: 2, x: 18, y: 48 },
+                { id: "o2", formula_latex: "O_2", label: "oxygen", coefficient: 1, x: 38, y: 48 },
+              ],
+              products: [
+                { id: "h2o", formula_latex: "H_2O", label: "water", coefficient: 2, x: 78, y: 48 },
+              ],
+              arrows: [
+                {
+                  id: "main-arrow",
+                  semantic_role: "reaction_arrow",
+                  from: [48, 48],
+                  to: [66, 48],
+                  asset_id: "reaction-arrow",
+                },
+              ],
+              electron_flows: [],
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "scene_contract_missing_asset",
+          step_id: "reaction_synthesis_water",
+          domain: "chemistry",
+          snapshot_kind: "reaction_scene",
+          pack_id: "chemistry-basic",
+          contract_id: "reaction-synthesis-water-contract",
+          asset_id: "electron-flow",
         }),
       ]),
     );
