@@ -1,4 +1,9 @@
-import { findAssetById, findAssetByRole } from "./assetRegistry";
+import {
+  findAssetById as findRegisteredAssetById,
+  findAssetByRole as findRegisteredAssetByRole,
+  type AssetManifestEntry,
+} from "./assetRegistry";
+import { getLicenseRule, isKnownAssetLicense } from "./licenseRegistry";
 import type {
   AlgorithmArraySnapshot,
   AlgorithmBarsSnapshot,
@@ -22,6 +27,10 @@ export type VisualQualityWarningCode =
   | "missing_pack_id"
   | "empty_physics_force_scene"
   | "missing_asset"
+  | "asset_requires_attribution"
+  | "asset_commercial_use_restricted"
+  | "asset_share_alike"
+  | "asset_unknown_license"
   | "low_biology_structure_assets"
   | "low_biology_process_assets"
   | "low_chemistry_structure_data"
@@ -39,17 +48,34 @@ export interface VisualQualityWarning {
   domain?: string;
   asset_id?: string;
   pack_id?: string | null;
+  license?: AssetManifestEntry["license"];
+  commercialUseStatus?: AssetManifestEntry["commercialUseStatus"];
+  attribution?: string | null;
+  sourceUrl?: string | null;
+  licenseUrl?: string | null;
+  shareAlike?: boolean;
   label_ids?: [string, string];
   snapshot_path?: string;
 }
 
 const ARRAY_FALLBACK_BLOCKED_DOMAINS = new Set(["geography", "biology", "chemistry"]);
 
+export interface VisualQualityGateOptions {
+  findAssetById?: typeof findRegisteredAssetById;
+  findAssetByRole?: typeof findRegisteredAssetByRole;
+}
+
+interface AssetLookup {
+  findAssetById: typeof findRegisteredAssetById;
+  findAssetByRole: typeof findRegisteredAssetByRole;
+}
+
 interface SnapshotContext {
   domain: string;
   step: MetaStep;
   snapshot: AnySnapshot;
   snapshotPath: string;
+  assets: AssetLookup;
 }
 
 function warn(
@@ -73,9 +99,65 @@ function collectStepSnapshots(step: MetaStep): Array<{ snapshot: AnySnapshot; sn
   return snapshots;
 }
 
-function assetResolves(assetId: string | null | undefined, packId: string | null | undefined): boolean {
-  if (!assetId) return true;
-  return Boolean(findAssetById(assetId, packId));
+function resolveAsset(
+  context: SnapshotContext,
+  assetId: string | null | undefined,
+  packId: string | null | undefined,
+): AssetManifestEntry | undefined {
+  if (!assetId) return undefined;
+  return context.assets.findAssetById(assetId, packId);
+}
+
+function checkAssetPolicy(
+  warnings: VisualQualityWarning[],
+  context: SnapshotContext,
+  asset: AssetManifestEntry,
+  packId: string | null | undefined,
+) {
+  const licenseRule = getLicenseRule(asset.license);
+  const warningBase = {
+    domain: context.domain,
+    asset_id: asset.id,
+    pack_id: packId,
+    license: asset.license,
+    commercialUseStatus: asset.commercialUseStatus,
+    attribution: asset.attribution,
+    sourceUrl: asset.sourceUrl,
+    licenseUrl: asset.licenseUrl,
+  };
+
+  if (!isKnownAssetLicense(asset.license)) {
+    warn(warnings, context, {
+      ...warningBase,
+      code: "asset_unknown_license",
+      message: `Asset "${asset.id}" uses an unknown license and must not enter commercial export or external exposure.`,
+    });
+  }
+
+  if (!asset.commercialUseAllowed || !licenseRule.commercialUseAllowed || asset.commercialUseStatus === "restricted") {
+    warn(warnings, context, {
+      ...warningBase,
+      code: "asset_commercial_use_restricted",
+      message: `Asset "${asset.id}" is not marked safe for commercial use.`,
+    });
+  }
+
+  if (asset.requiresAttribution || licenseRule.requiresAttribution) {
+    warn(warnings, context, {
+      ...warningBase,
+      code: "asset_requires_attribution",
+      message: `Asset "${asset.id}" requires attribution before export.`,
+    });
+  }
+
+  if (asset.shareAlike || licenseRule.shareAlike) {
+    warn(warnings, context, {
+      ...warningBase,
+      code: "asset_share_alike",
+      shareAlike: true,
+      message: `Asset "${asset.id}" carries share-alike obligations.`,
+    });
+  }
 }
 
 function checkAssetId(
@@ -84,7 +166,12 @@ function checkAssetId(
   assetId: string | null | undefined,
   packId: string | null | undefined,
 ) {
-  if (!assetId || assetResolves(assetId, packId)) return;
+  if (!assetId) return;
+  const asset = resolveAsset(context, assetId, packId);
+  if (asset) {
+    checkAssetPolicy(warnings, context, asset, packId);
+    return;
+  }
   warn(warnings, context, {
     code: "missing_asset",
     domain: context.domain,
@@ -100,7 +187,12 @@ function checkAssetIdFromPackOrAny(
   assetId: string | null | undefined,
   preferredPackId: string | null | undefined,
 ) {
-  if (!assetId || assetResolves(assetId, preferredPackId) || assetResolves(assetId, undefined)) return;
+  if (!assetId) return;
+  const asset = resolveAsset(context, assetId, preferredPackId) ?? resolveAsset(context, assetId, undefined);
+  if (asset) {
+    checkAssetPolicy(warnings, context, asset, preferredPackId);
+    return;
+  }
   warn(warnings, context, {
     code: "missing_asset",
     domain: context.domain,
@@ -266,8 +358,8 @@ function checkBioCellScene(
   snapshot: BioCellSceneSnapshot,
 ) {
   const assetBackedStructures = snapshot.structures.filter((structure) => {
-    if (structure.asset_id) return assetResolves(structure.asset_id, snapshot.pack_id);
-    return Boolean(findAssetByRole("biology", structure.semantic_role, snapshot.pack_id));
+    if (structure.asset_id) return Boolean(resolveAsset(context, structure.asset_id, snapshot.pack_id));
+    return Boolean(context.assets.findAssetByRole("biology", structure.semantic_role, snapshot.pack_id));
   });
 
   if (assetBackedStructures.length < 2) {
@@ -299,9 +391,12 @@ function checkBioProcessScene(
 ) {
   const assetBackedSteps = snapshot.steps.filter((processStep) => {
     if (processStep.asset_id) {
-      return assetResolves(processStep.asset_id, snapshot.pack_id) || assetResolves(processStep.asset_id, undefined);
+      return (
+        Boolean(resolveAsset(context, processStep.asset_id, snapshot.pack_id)) ||
+        Boolean(resolveAsset(context, processStep.asset_id, undefined))
+      );
     }
-    return Boolean(findAssetByRole("biology", processStep.semantic_role, snapshot.pack_id));
+    return Boolean(context.assets.findAssetByRole("biology", processStep.semantic_role, snapshot.pack_id));
   });
 
   const hasProcessRelation = (snapshot.connections?.length ?? 0) > 0 || (snapshot.callouts?.length ?? 0) > 0;
@@ -328,8 +423,8 @@ function checkMolecule2DScene(
   snapshot: Molecule2DSceneSnapshot,
 ) {
   const moleculeAssetResolves = snapshot.molecule_asset_id
-    ? assetResolves(snapshot.molecule_asset_id, snapshot.pack_id)
-    : Boolean(findAssetByRole("chemistry", "molecule", snapshot.pack_id));
+    ? Boolean(resolveAsset(context, snapshot.molecule_asset_id, snapshot.pack_id))
+    : Boolean(context.assets.findAssetByRole("chemistry", "molecule", snapshot.pack_id));
 
   if (snapshot.atoms.length < 2 || snapshot.bonds.length < 1 || !moleculeAssetResolves) {
     warn(warnings, context, {
@@ -364,8 +459,8 @@ function checkReactionScene(
 ) {
   const hasParticipants = snapshot.reactants.length > 0 && snapshot.products.length > 0;
   const hasReactionAsset = [...snapshot.arrows, ...(snapshot.electron_flows ?? [])].some((item) => {
-    if (item.asset_id) return assetResolves(item.asset_id, snapshot.pack_id);
-    return Boolean(findAssetByRole("chemistry", item.semantic_role, snapshot.pack_id));
+    if (item.asset_id) return Boolean(resolveAsset(context, item.asset_id, snapshot.pack_id));
+    return Boolean(context.assets.findAssetByRole("chemistry", item.semantic_role, snapshot.pack_id));
   });
 
   if (!hasParticipants || !hasReactionAsset) {
@@ -550,6 +645,7 @@ function checkMathStep(
   domain: string,
   step: MetaStep,
   snapshots: Array<{ snapshot: AnySnapshot; snapshotPath: string }>,
+  assets: AssetLookup,
 ) {
   if (domain !== "math") return;
   const hasFormula = snapshots.some(({ snapshot }) => hasMathFormula(snapshot));
@@ -563,6 +659,7 @@ function checkMathStep(
       step,
       snapshot: step.snapshot,
       snapshotPath: "snapshot",
+      assets,
     },
     {
       code: "low_math_visual_richness",
@@ -586,12 +683,23 @@ function checkUnsupportedArrayFallback(
   });
 }
 
-export function visualQualityGate(script: PlaybookScript): VisualQualityWarning[] {
+function buildAssetLookup(options: VisualQualityGateOptions = {}): AssetLookup {
+  return {
+    findAssetById: options.findAssetById ?? findRegisteredAssetById,
+    findAssetByRole: options.findAssetByRole ?? findRegisteredAssetByRole,
+  };
+}
+
+export function visualQualityGate(
+  script: PlaybookScript,
+  options: VisualQualityGateOptions = {},
+): VisualQualityWarning[] {
   const warnings: VisualQualityWarning[] = [];
+  const assets = buildAssetLookup(options);
 
   for (const step of script.steps) {
     const stepSnapshots = collectStepSnapshots(step);
-    checkMathStep(warnings, script.domain, step, stepSnapshots);
+    checkMathStep(warnings, script.domain, step, stepSnapshots, assets);
 
     for (const { snapshot, snapshotPath } of stepSnapshots) {
       const context: SnapshotContext = {
@@ -599,6 +707,7 @@ export function visualQualityGate(script: PlaybookScript): VisualQualityWarning[
         step,
         snapshot,
         snapshotPath,
+        assets,
       };
 
       checkUnsupportedArrayFallback(warnings, context);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { AssetManifestEntry } from "./assetRegistry";
 import type { PlaybookScript } from "../types";
 import { visualQualityGate } from "./visualQualityGate";
 
@@ -17,6 +18,122 @@ function script(overrides: Partial<PlaybookScript> = {}): PlaybookScript {
 }
 
 describe("visualQualityGate", () => {
+  it("warns when a resolved asset requires attribution", () => {
+    const attributionAsset: AssetManifestEntry = {
+      id: "cc-by-diagram",
+      type: "svg",
+      path: "/assets/test/cc-by-diagram.svg",
+      tags: ["test"],
+      semanticRoles: ["object"],
+      sourceId: "cc-by-source",
+      attribution: "Example Creator, CC BY 4.0",
+      license: "cc-by-4.0",
+      commercialUseStatus: "allowed-with-attribution",
+      commercialUseAllowed: true,
+      requiresAttribution: true,
+      shareAlike: false,
+      modificationAllowed: true,
+      sourceUrl: "https://example.test/asset",
+      licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
+      modifiedFrom: null,
+    };
+
+    const warnings = visualQualityGate(
+      script({
+        steps: [
+          {
+            step_id: "cc-by-physics",
+            end_frame: 90,
+            title: "CC BY asset",
+            voiceover_text: "",
+            tokens: [],
+            snapshot: {
+              kind: "physics_force_scene",
+              pack_id: "physics-basic",
+              objects: [{ id: "body", label: "body", x: 30, y: 42, asset_id: "cc-by-diagram" }],
+              vectors: [],
+              trajectory: [[18, 34], [32, 42]],
+            },
+          },
+        ],
+      }),
+      {
+        findAssetById: (assetId) => (assetId === "cc-by-diagram" ? attributionAsset : undefined),
+      },
+    );
+
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "asset_requires_attribution",
+          step_id: "cc-by-physics",
+          asset_id: "cc-by-diagram",
+          pack_id: "physics-basic",
+          license: "cc-by-4.0",
+          attribution: "Example Creator, CC BY 4.0",
+        }),
+      ]),
+    );
+  });
+
+  it("warns when a resolved asset is not commercial-use safe", () => {
+    const restrictedAsset: AssetManifestEntry = {
+      id: "restricted-diagram",
+      type: "svg",
+      path: "/assets/test/restricted-diagram.svg",
+      tags: ["test"],
+      semanticRoles: ["object"],
+      sourceId: "restricted-source",
+      attribution: "Restricted teaching asset",
+      license: "unknown",
+      commercialUseStatus: "restricted",
+      commercialUseAllowed: false,
+      requiresAttribution: true,
+      shareAlike: false,
+      modificationAllowed: false,
+      sourceUrl: "https://example.test/restricted",
+      licenseUrl: null,
+      modifiedFrom: null,
+    };
+
+    const warnings = visualQualityGate(
+      script({
+        steps: [
+          {
+            step_id: "restricted-physics",
+            end_frame: 90,
+            title: "Restricted asset",
+            voiceover_text: "",
+            tokens: [],
+            snapshot: {
+              kind: "physics_force_scene",
+              pack_id: "physics-basic",
+              objects: [{ id: "body", label: "body", x: 30, y: 42, asset_id: "restricted-diagram" }],
+              vectors: [],
+              trajectory: [[18, 34], [32, 42]],
+            },
+          },
+        ],
+      }),
+      {
+        findAssetById: (assetId) => (assetId === "restricted-diagram" ? restrictedAsset : undefined),
+      },
+    );
+
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "asset_commercial_use_restricted",
+          step_id: "restricted-physics",
+          asset_id: "restricted-diagram",
+          pack_id: "physics-basic",
+          license: "unknown",
+          commercialUseStatus: "restricted",
+        }),
+      ]),
+    );
+  });
+
   it("warns when an asset_id cannot be resolved", () => {
     const warnings = visualQualityGate(
       script({

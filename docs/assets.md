@@ -224,6 +224,7 @@ The visual quality gate is non-blocking at runtime, but showcase tests require
 these flagship fixtures to produce no warnings, no missing asset fallback, and
 no unknown snapshot renderer. It also emits warning metadata for deterministic
 issues such as missing assets, forbidden array fallback, low visual richness,
-and possible label/callout overlap. The root `make check` path also runs the
-showcase smoke render so flagship assets must keep producing nonblank Remotion
-output.
+possible label/callout overlap, and asset usage that requires attribution,
+carries share-alike obligations, has unknown licensing, or is not marked safe
+for commercial use. The root `make check` path also runs the showcase smoke
+render so flagship assets must keep producing nonblank Remotion output.
