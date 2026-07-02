@@ -33,6 +33,9 @@ describe("assetResolver", () => {
     expect(resolveAssetForRenderer("physics_force_scene", "light_lab_grid", "core-visual-basic")).toMatchObject({
       id: "core-light-lab-grid",
     });
+    expect(resolveAssetForRenderer("algorithm_array", "warning", "core-visual-basic")).toMatchObject({
+      id: "core-warning-icon",
+    });
     expect(resolveAssetForRenderer("graph_scene", "graph_node")).toMatchObject({
       id: "graph-node",
     });

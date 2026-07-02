@@ -407,6 +407,9 @@ describe("PlaybookComposition", () => {
     expect(markup).toContain('data-visual-quality-warning-count="1"');
     expect(markup).toContain('data-visual-quality-warning-codes="unsupported_array_fallback"');
     expect(markup).toContain('data-visual-quality-warning-steps="array-fallback"');
+    expect(markup).toContain('data-visual-quality-warning-icon="true"');
+    expect(markup).toContain('data-asset-id="core-warning-icon"');
+    expect(markup).not.toContain('data-missing-asset="true"');
     expect(markup).toContain("domain-array-renderer");
   });
 
@@ -508,7 +511,7 @@ describe("PlaybookComposition", () => {
   it("merges simultaneous math plot layers into one scene", () => {
     remotionState.frame = 60;
     const markup = renderToStaticMarkup(<PlaybookComposition script={layeredMathScript()} showSubtitles={false} />);
-    expect(markup.match(/<svg/g)).toHaveLength(1);
+    expect(markup.match(/class="math-plot-renderer"/g)).toHaveLength(1);
     expect(markup).toContain("tangent");
     expect(markup).toContain("<polygon");
   });

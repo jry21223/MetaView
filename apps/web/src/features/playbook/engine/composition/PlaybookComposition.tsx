@@ -10,6 +10,7 @@ import { appearTransform, useTimeline } from "../foundation";
 import { compileVisualTimeline, type VisualLayerState, type VisualStepState } from "./visualContinuity";
 import { snapshotSurface } from "./snapshotSurface";
 import { buildDirectorFramePlan } from "../director";
+import { AssetSvg } from "../assets/AssetSvg";
 import { visualQualityGate } from "../assets/visualQualityGate";
 import { assetAttributionEntryId, createAssetAttributionSummary } from "../assets/assetAttributionSummary";
 
@@ -46,6 +47,37 @@ function SnapshotRenderer(props: RendererProps) {
     >
       Unknown snapshot kind
     </div>
+  );
+}
+
+function VisualQualityWarningIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      data-visual-quality-warning-icon="true"
+      viewBox="0 0 36 32"
+      style={{
+        position: "absolute",
+        top: 10,
+        right: 10,
+        width: 36,
+        height: 32,
+        zIndex: 30,
+        pointerEvents: "none",
+        opacity: 0.9,
+        filter: "drop-shadow(0 2px 6px rgba(0, 0, 0, 0.26))",
+      }}
+    >
+      <AssetSvg
+        assetId="core-warning-icon"
+        packId="core-visual-basic"
+        semanticRole="warning"
+        x={4}
+        y={2}
+        width={28}
+        height={28}
+      />
+    </svg>
   );
 }
 
@@ -307,6 +339,7 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
             width: hasCodeTrack ? `${vizRatio * 100}%` : "100%",
             height: "100%",
             overflow: "hidden",
+            position: "relative",
             background: visualBackground,
           }}
         >
@@ -330,6 +363,7 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
               frame={frame}
             />
           </div>
+          {visualQualityWarnings.length > 0 ? <VisualQualityWarningIcon /> : null}
         </div>
 
         {/* Code track */}
