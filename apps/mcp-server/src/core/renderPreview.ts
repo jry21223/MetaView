@@ -27,6 +27,7 @@ export interface RenderPreviewResult {
     scriptPath: string;
     outputPath: string;
     frame: number;
+    directorProvided: boolean;
     snapshotKinds: string[];
     assetPacks: string[];
     warnings: string[];
@@ -130,11 +131,15 @@ export class MetaViewPreviewRenderer implements RenderPreviewService {
       return mkdtemp(join(tmpdir(), "metaview-mcp-preview-"));
     });
     const playbookPath = join(runDir, "playbook.json");
+    const directorPath = input.directorScript ? join(runDir, "director.json") : undefined;
     const outDir = join(runDir, "out");
     const scriptPath = join(this.repoRoot, "apps", "web", "scripts", "render-shots.mjs");
 
     await mkdir(outDir, { recursive: true });
     await writeFile(playbookPath, `${JSON.stringify(input.playbookScript, null, 2)}\n`, "utf8");
+    if (directorPath) {
+      await writeFile(directorPath, `${JSON.stringify(input.directorScript, null, 2)}\n`, "utf8");
+    }
 
     try {
       await this.execFileFn(process.execPath, [scriptPath, playbookPath, outDir], {
@@ -144,6 +149,7 @@ export class MetaViewPreviewRenderer implements RenderPreviewService {
           SHOT_FRAME: String(frame),
           SHOT_LABEL: "mcp-preview",
           SHOT_THEME: input.theme ?? "dark",
+          ...(directorPath ? { SHOT_DIRECTOR_PATH: directorPath } : {}),
         },
         maxBuffer: 20 * 1024 * 1024,
       });
@@ -171,6 +177,7 @@ export class MetaViewPreviewRenderer implements RenderPreviewService {
         scriptPath,
         outputPath,
         frame,
+        directorProvided: Boolean(input.directorScript),
         snapshotKinds: snapshotKinds(input.playbookScript),
         assetPacks: uniqueSorted(collectAssetPacks(input.playbookScript)),
         warnings: input.directorScript ? [] : ["No DirectorScript was provided; preview used PlaybookScript timing only."],

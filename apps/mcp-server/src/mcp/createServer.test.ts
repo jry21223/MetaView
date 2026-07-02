@@ -334,6 +334,7 @@ describe("createMetaViewMcpServer", () => {
             scriptPath: "apps/web/scripts/render-shots.mjs",
             outputPath: "eval/shots/mcp-preview/out/mcp-preview.png",
             frame: input.frame ?? 0,
+            directorProvided: Boolean(input.directorScript),
             snapshotKinds: ["math_formula"],
             assetPacks: [],
             warnings: [],

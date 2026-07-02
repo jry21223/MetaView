@@ -189,10 +189,18 @@ class MetaViewCoreService:
             ],
         }
 
-    def validate_visual_quality(self, *, playbook_script: dict[str, Any]) -> dict[str, Any]:
+    def validate_visual_quality(
+        self,
+        *,
+        playbook_script: dict[str, Any],
+        director_script: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         warnings = [
             _report_warning(warning)
-            for warning in self._visual_quality_warnings(playbook_script)
+            for warning in [
+                *self._visual_quality_warnings(playbook_script),
+                *self._director_quality_warnings(playbook_script, director_script),
+            ]
         ]
         high_count = sum(1 for warning in warnings if warning["severity"] == "high")
         medium_count = sum(1 for warning in warnings if warning["severity"] == "medium")
@@ -264,6 +272,59 @@ class MetaViewCoreService:
                     self._check_geo_map_scene(warnings, context, snapshot)
                 if kind == "physics_force_scene":
                     self._check_physics_force_scene(warnings, context, snapshot)
+        return warnings
+
+    def _director_quality_warnings(
+        self,
+        playbook_script: dict[str, Any],
+        director_script: dict[str, Any] | None,
+    ) -> list[dict[str, Any]]:
+        if not director_script:
+            return []
+
+        warnings: list[dict[str, Any]] = []
+        domain = str(playbook_script.get("domain") or "")
+        step_ids = {
+            step.get("step_id")
+            for step in playbook_script.get("steps", [])
+            if isinstance(step, dict) and step.get("step_id")
+        }
+        total_frames = playbook_script.get("total_frames")
+
+        for index, beat in enumerate(director_script.get("beats") or []):
+            if not isinstance(beat, dict):
+                continue
+            step_id = str(beat.get("step_id") or "")
+            context = {
+                "domain": domain,
+                "step_id": step_id,
+                "snapshot_kind": "director_beat",
+                "snapshot_path": f"director.beats[{index}]",
+            }
+            if step_id not in step_ids:
+                warnings.append(
+                    _warning(
+                        context,
+                        code="director_step_missing",
+                        message=f'Director beat references missing playbook step "{step_id}".',
+                    ),
+                )
+            end_frame = beat.get("end_frame")
+            if (
+                isinstance(total_frames, int)
+                and isinstance(end_frame, int)
+                and end_frame > total_frames
+            ):
+                warnings.append(
+                    _warning(
+                        context,
+                        code="director_frame_out_of_range",
+                        message=(
+                            f"Director beat end_frame {end_frame} exceeds playbook "
+                            f"total_frames {total_frames}."
+                        ),
+                    ),
+                )
         return warnings
 
     def _check_geo_map_scene(
@@ -502,7 +563,12 @@ def _warning(context: dict[str, Any], **warning: Any) -> dict[str, Any]:
 
 
 def _warning_severity(code: str) -> str:
-    if code in {"missing_pack_id", "unsupported_array_fallback"}:
+    if code in {
+        "missing_pack_id",
+        "unsupported_array_fallback",
+        "director_step_missing",
+        "director_frame_out_of_range",
+    }:
         return "high"
     if code in {"missing_asset", "empty_physics_force_scene"}:
         return "medium"

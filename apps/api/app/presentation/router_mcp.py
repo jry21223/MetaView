@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import json
 from functools import lru_cache
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter
@@ -10,36 +8,19 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.models.director import DirectorScript
 from app.domain.models.playbook import PlaybookScript
+from app.domain.services.asset_manifest_resolver import (
+    list_asset_packs as discover_asset_packs,
+)
 from app.domain.services.director_builder import build_default_director
 from app.domain.services.metaview_core import MetaViewCoreService
 
 router = APIRouter(prefix="/mcp", tags=["mcp"])
 
-ASSET_MANIFEST_ROOT = (
-    Path(__file__).resolve().parents[4]
-    / "apps"
-    / "web"
-    / "public"
-    / "assets"
-    / "metaview-kits"
-)
-
 
 @lru_cache
 def _metaview_core() -> MetaViewCoreService:
     return MetaViewCoreService(
-        asset_packs=[
-            json.loads(
-                (ASSET_MANIFEST_ROOT / "geography-basic" / "manifest.json").read_text(
-                    encoding="utf-8",
-                ),
-            ),
-            json.loads(
-                (ASSET_MANIFEST_ROOT / "physics-basic" / "manifest.json").read_text(
-                    encoding="utf-8",
-                ),
-            ),
-        ],
+        asset_packs=list(discover_asset_packs()),
     )
 
 
@@ -112,7 +93,10 @@ async def compile_scene_blueprint(payload: CompileSceneBlueprintRequest) -> dict
 
 @router.post("/visual-quality")
 async def validate_visual_quality(payload: VisualQualityRequest) -> dict[str, Any]:
-    return _metaview_core().validate_visual_quality(playbook_script=payload.playbook_script)
+    return _metaview_core().validate_visual_quality(
+        playbook_script=payload.playbook_script,
+        director_script=payload.director_script,
+    )
 
 
 @router.post("/director-script", response_model=BuildDirectorScriptResponse)
