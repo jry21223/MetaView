@@ -7,12 +7,15 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from app.application.dto.pipeline_dto import PipelineRunResponse
 from app.domain.models.export_job import ExportAssetReport, ExportJob, ExportJobStatus
+from app.domain.models.pipeline_run import PipelineRunStatus
 from app.infrastructure.persistence.in_memory_export_repository import (
     InMemoryExportJobRepository,
 )
 from app.main import create_app
-from app.presentation.dependencies import get_export_repo
+from app.presentation import router_exports
+from app.presentation.dependencies import get_export_repo, get_run_director_repo, get_run_repo
 
 
 @pytest.fixture
@@ -62,6 +65,78 @@ async def test_completed_export_exposes_downloadable_asset_report(
     assert report_resp.headers["content-type"].startswith("application/json")
     assert report_resp.json() == payload
     assert 'filename="metaview-run-repo-asset-report.json"' in report_resp.headers["content-disposition"]
+
+
+def test_submit_export_without_asset_report_returns_warning_metadata(monkeypatch) -> None:
+    repo = InMemoryExportJobRepository()
+    app = create_app()
+    app.state.limiter.enabled = False
+    app.dependency_overrides[get_export_repo] = lambda: repo
+    app.dependency_overrides[get_run_repo] = lambda: _FakeRunRepo()
+    app.dependency_overrides[get_run_director_repo] = lambda: _FakeDirectorRepo()
+
+    class NoopExportVideoUseCase:
+        def __init__(self, *args, **kwargs) -> None:  # noqa: ANN002, ANN003
+            pass
+
+        async def execute(self, *args, **kwargs) -> None:  # noqa: ANN002, ANN003
+            return None
+
+    monkeypatch.setattr(router_exports, "ExportVideoUseCase", NoopExportVideoUseCase)
+
+    with TestClient(app) as client:
+        resp = client.post(
+            "/api/v1/exports",
+            json={"run_id": "run-with-playbook", "with_audio": False},
+        )
+
+    assert resp.status_code == 202
+    body = resp.json()
+    assert body["asset_report_url"] is None
+    assert body["asset_report_warning"] == (
+        "asset_report metadata was not provided; export will not include an asset attribution sidecar"
+    )
+
+
+class _FakeRunRepo:
+    async def get(self, run_id: str, user_id: str | None = None) -> PipelineRunResponse | None:
+        if run_id != "run-with-playbook":
+            return None
+        return PipelineRunResponse.model_validate(
+            {
+                "run_id": run_id,
+                "status": PipelineRunStatus.SUCCEEDED,
+                "prompt": "fixture",
+                "created_at": "2026-07-02T00:00:00+00:00",
+                "playbook": {
+                    "schema_version": "1.0.0",
+                    "fps": 30,
+                    "total_frames": 60,
+                    "domain": "math",
+                    "title": "Fixture",
+                    "summary": "Fixture",
+                    "steps": [
+                        {
+                            "step_id": "s1",
+                            "end_frame": 60,
+                            "title": "Formula",
+                            "voiceover_text": "",
+                            "snapshot": {
+                                "kind": "math_formula",
+                                "formula_latex": "x^2",
+                            },
+                            "tokens": [],
+                        }
+                    ],
+                    "parameter_controls": [],
+                },
+            }
+        )
+
+
+class _FakeDirectorRepo:
+    async def get(self, run_id: str):  # noqa: ANN201
+        return None
 
 
 def _asset_report() -> ExportAssetReport:

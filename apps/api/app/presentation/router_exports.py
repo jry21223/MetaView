@@ -19,6 +19,9 @@ from app.presentation.dependencies import get_export_repo, get_run_director_repo
 from app.presentation.rate_limit import read_limit, write_limit
 
 router = APIRouter(prefix="/exports", tags=["exports"])
+_MISSING_ASSET_REPORT_WARNING = (
+    "asset_report metadata was not provided; export will not include an asset attribution sidecar"
+)
 
 _DOWNLOAD_MEDIA_TYPES = {
     ".mp4": "video/mp4",
@@ -50,6 +53,7 @@ def _to_response(job: ExportJob, request: Request, api_prefix: str) -> ExportJob
         message=job.message,
         output_url=output_url,
         asset_report_url=asset_report_url,
+        asset_report_warning=job.asset_report_warning,
         error=job.error,
         with_audio=job.with_audio,
         created_at=job.created_at,
@@ -88,6 +92,9 @@ async def submit_export(
         run_id=payload.run_id,
         with_audio=payload.with_audio,
         asset_report=payload.asset_report,
+        asset_report_warning=(
+            _MISSING_ASSET_REPORT_WARNING if payload.asset_report is None else None
+        ),
         created_at=datetime.now(timezone.utc).isoformat(),
     )
     await export_repo.create(job)

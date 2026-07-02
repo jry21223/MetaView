@@ -154,9 +154,8 @@ function toReportEntry(entry: AssetAttributionSummaryEntry): AssetAttributionRep
   };
 }
 
-export function createAssetAttributionReport(warnings: readonly VisualQualityWarning[]): AssetAttributionReport | null {
+export function createAssetAttributionReport(warnings: readonly VisualQualityWarning[]): AssetAttributionReport {
   const summary = createAssetAttributionSummary(warnings);
-  if (summary.entries.length === 0) return null;
   return {
     generated_by: "visual_quality_gate",
     entries: summary.entries.map(toReportEntry),
@@ -165,6 +164,6 @@ export function createAssetAttributionReport(warnings: readonly VisualQualityWar
   };
 }
 
-export function createAssetAttributionReportForScript(script: PlaybookScript): AssetAttributionReport | null {
+export function createAssetAttributionReportForScript(script: PlaybookScript): AssetAttributionReport {
   return createAssetAttributionReport(visualQualityGate(script));
 }

@@ -161,6 +161,61 @@ describe("ExportModal (issue #14 / #58 / #69 / #70 / #72 / #75)", () => {
     });
   });
 
+  it("shows an attribution and license-risk summary before export starts", () => {
+    const { getByText } = render(
+      <ExportModal
+        runId="r1"
+        isDark
+        previewTitle="x"
+        assetReport={{
+          generated_by: "visual_quality_gate",
+          entries: [
+            {
+              asset_id: "cc-by-diagram",
+              pack_id: "physics-basic",
+              license: "cc-by-4.0",
+              commercial_use_status: "allowed-with-attribution",
+              attribution: "Example Creator",
+              source_url: "https://example.test/asset",
+              license_url: "https://creativecommons.org/licenses/by/4.0/",
+              requires_attribution: true,
+              commercial_use_restricted: false,
+              share_alike: false,
+              unknown_license: false,
+              warning_codes: ["asset_requires_attribution"],
+              step_ids: ["s1"],
+            },
+            {
+              asset_id: "restricted-map",
+              pack_id: "geography-basic",
+              license: "unknown",
+              commercial_use_status: "restricted",
+              attribution: "Unknown source",
+              source_url: null,
+              license_url: null,
+              requires_attribution: false,
+              commercial_use_restricted: true,
+              share_alike: false,
+              unknown_license: true,
+              warning_codes: ["asset_unknown_license", "asset_commercial_use_restricted"],
+              step_ids: ["s2"],
+            },
+          ],
+          attribution_required: ["physics-basic/cc-by-diagram"],
+          license_risk: ["geography-basic/restricted-map"],
+        }}
+        onClose={() => undefined}
+      />,
+    );
+
+    expect(getByText("资产授权检查")).toBeTruthy();
+    expect(getByText("需署名 1")).toBeTruthy();
+    expect(getByText("授权风险 1")).toBeTruthy();
+    expect(getByText("physics-basic/cc-by-diagram")).toBeTruthy();
+    expect(getByText("Example Creator")).toBeTruthy();
+    expect(getByText("geography-basic/restricted-map")).toBeTruthy();
+  });
+
   it("renders an asset report download link when the completed job exposes one", async () => {
     server.use(
       http.post(`${API_BASE_URL}/api/v1/exports`, () =>

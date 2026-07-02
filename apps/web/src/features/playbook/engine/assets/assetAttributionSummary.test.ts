@@ -141,4 +141,26 @@ describe("createAssetAttributionSummary", () => {
       license_risk: [],
     });
   });
+
+  it("returns an empty export report when the visual gate found no asset policy warnings", () => {
+    const report = createAssetAttributionReport([
+      {
+        code: "missing_asset",
+        step_id: "s1",
+        snapshot_kind: "physics_force_scene",
+        snapshot_path: "snapshot",
+        domain: "physics",
+        asset_id: "missing",
+        pack_id: "physics-basic",
+        message: "missing",
+      },
+    ]);
+
+    expect(report).toEqual({
+      generated_by: "visual_quality_gate",
+      entries: [],
+      attribution_required: [],
+      license_risk: [],
+    });
+  });
 });

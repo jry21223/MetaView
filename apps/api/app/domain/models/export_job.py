@@ -78,6 +78,7 @@ class ExportJob(BaseModel):
     output_path: str | None = None
     asset_report: ExportAssetReport | None = None
     asset_report_path: str | None = None
+    asset_report_warning: str | None = None
     error: str | None = None
     with_audio: bool = False
     created_at: str

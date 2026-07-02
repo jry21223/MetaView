@@ -66,6 +66,7 @@ export interface ExportJobResponse {
   message: string | null;
   output_url: string | null;
   asset_report_url: string | null;
+  asset_report_warning: string | null;
   error: string | null;
   with_audio: boolean;
   created_at: string;

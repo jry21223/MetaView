@@ -92,6 +92,10 @@ function readJobStartedAt(job: ExportJobResponse | null): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function assetReportEntryId(entry: ExportAssetReport["entries"][number]): string {
+  return `${entry.pack_id ?? "any"}/${entry.asset_id}`;
+}
+
 export const ExportModal: React.FC<ExportModalProps> = ({
   runId,
   isDark,
@@ -137,6 +141,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   const progressPct = Math.max(0, Math.min(1, job?.progress ?? 0)) * 100;
   const fileExtension = format.toUpperCase();
   const canDownload = job?.status === "completed" && job.output_url;
+  const previewAssetReportEntries = assetReport?.entries.slice(0, 2) ?? [];
 
   useEffect(
     () => () => {
@@ -370,6 +375,72 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         {!job && (
           <>
             {previewCard}
+            {assetReport && (
+              <div
+                style={{
+                  border: `1px solid ${assetReport.license_risk.length > 0 ? c.warn : c.border}`,
+                  borderRadius: 8,
+                  padding: "10px 12px",
+                  background: c.inputBg,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 8,
+                    fontSize: 12,
+                    color: c.text,
+                    fontWeight: 600,
+                  }}
+                >
+                  <span>资产授权检查</span>
+                  <span style={{ color: c.muted, fontWeight: 500 }}>
+                    {assetReport.entries.length} 项资产
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <span style={{ ...reportBadgeStyle(c.border, c.text), color: c.text }}>
+                    需署名 {assetReport.attribution_required.length}
+                  </span>
+                  <span
+                    style={{
+                      ...reportBadgeStyle(assetReport.license_risk.length > 0 ? c.warn : c.border, c.text),
+                      color: assetReport.license_risk.length > 0 ? c.warn : c.text,
+                    }}
+                  >
+                    授权风险 {assetReport.license_risk.length}
+                  </span>
+                </div>
+                {previewAssetReportEntries.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {previewAssetReportEntries.map((entry) => (
+                      <div
+                        key={assetReportEntryId(entry)}
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+                          gap: 8,
+                          fontSize: 11,
+                          color: c.muted,
+                        }}
+                      >
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {assetReportEntryId(entry)}
+                        </span>
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {entry.attribution ?? entry.license ?? "无署名要求"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <OptionRow label="画质" muted={c.muted}>
               <ChipGroup
                 items={QUALITY_OPTIONS}
@@ -612,6 +683,18 @@ const OptionRow: React.FC<OptionRowProps> = ({ label, muted, children }) => (
     {children}
   </div>
 );
+
+function reportBadgeStyle(border: string, text: string): React.CSSProperties {
+  return {
+    border: `1px solid ${border}`,
+    color: text,
+    borderRadius: 6,
+    padding: "3px 7px",
+    fontSize: 11,
+    lineHeight: 1.2,
+  };
+}
+
 interface ChipGroupItem<T extends string | number> {
   id: T;
   label: string;

@@ -26,6 +26,7 @@ class ExportJobResponse(BaseModel):
     message: str | None = None
     output_url: str | None = None
     asset_report_url: str | None = None
+    asset_report_warning: str | None = None
     error: str | None = None
     with_audio: bool
     created_at: str
