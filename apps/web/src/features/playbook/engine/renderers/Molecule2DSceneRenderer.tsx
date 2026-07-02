@@ -6,6 +6,7 @@ import { resolveAssetById, resolveAssetByRole, resolveAssetForRenderer } from ".
 import type { Molecule2DAtom, Molecule2DBond, Molecule2DCallout, Molecule2DSceneSnapshot } from "../types";
 import { CoreCalloutLabel } from "./CoreCalloutLabel";
 import { CoreFormulaTag } from "./CoreFormulaTag";
+import { CoreLabGrid } from "./CoreLabGrid";
 import type { RendererProps } from "./types";
 
 const DEFAULT_CHEMISTRY_PACK_ID = "chemistry-basic";
@@ -206,14 +207,7 @@ export const Molecule2DSceneRenderer: React.FC<RendererProps> = ({ step, theme }
       }}
     >
       <svg width="100%" height="100%" viewBox="0 0 100 100" role="img" aria-label={step.title}>
-        <defs>
-          <linearGradient id="chemistry-lab-grid" x1="0" x2="1" y1="0" y2="1">
-            <stop offset="0" stopColor="#fbfdff" />
-            <stop offset="1" stopColor="#edf5f8" />
-          </linearGradient>
-        </defs>
-        <rect x="0" y="0" width="100" height="100" rx="3" fill={theme === "dark" ? "#111827" : "url(#chemistry-lab-grid)"} />
-        <path d="M 10 24 H 90 M 10 42 H 90 M 10 60 H 90 M 10 78 H 90 M 24 14 V 84 M 44 14 V 84 M 64 14 V 84 M 84 14 V 84" fill="none" stroke="#bdd0dd" strokeWidth="0.28" opacity="0.3" />
+        <CoreLabGrid rendererKind="molecule_2d_scene" theme={theme} lightFill="#f8fbff" />
         <text x="8" y="12" fontSize="5.6" fontWeight="780" fill={theme === "dark" ? "#f8fafc" : "#172033"}>
           {step.title}
         </text>

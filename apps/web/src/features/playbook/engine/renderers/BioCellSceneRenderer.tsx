@@ -5,6 +5,7 @@ import type { AssetManifestEntry } from "../assets/assetRegistry";
 import { resolveAssetById, resolveAssetByRole, resolveAssetForRenderer } from "../assets/assetResolver";
 import type { BioCellCallout, BioCellSceneSnapshot, BioCellStructure } from "../types";
 import { CoreCalloutLabel } from "./CoreCalloutLabel";
+import { CoreLabGrid } from "./CoreLabGrid";
 import type { RendererProps } from "./types";
 
 const DEFAULT_BIOLOGY_PACK_ID = "biology-basic";
@@ -84,14 +85,7 @@ export const BioCellSceneRenderer: React.FC<RendererProps> = ({ step, progress, 
       }}
     >
       <svg width="100%" height="100%" viewBox="0 0 100 100" role="img" aria-label={step.title}>
-        <defs>
-          <linearGradient id="bio-lab-grid" x1="0" x2="1" y1="0" y2="1">
-            <stop offset="0" stopColor="#f8fff6" />
-            <stop offset="1" stopColor="#e5f1ea" />
-          </linearGradient>
-        </defs>
-        <rect x="0" y="0" width="100" height="100" rx="3" fill={theme === "dark" ? "#111827" : "url(#bio-lab-grid)"} />
-        <path d="M 8 24 H 92 M 8 42 H 92 M 8 60 H 92 M 8 78 H 92 M 22 16 V 84 M 42 16 V 84 M 62 16 V 84 M 82 16 V 84" fill="none" stroke="#b8c8bd" strokeWidth="0.28" opacity="0.28" />
+        <CoreLabGrid rendererKind="bio_cell_scene" theme={theme} lightFill="#f7fbf7" />
         <text x="8" y="12" fontSize="5.6" fontWeight="780" fill={theme === "dark" ? "#f8fafc" : "#182235"}>
           {step.title}
         </text>

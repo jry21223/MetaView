@@ -30,6 +30,9 @@ describe("assetResolver", () => {
     expect(resolveAssetForRenderer("physics_force_scene", "callout", "core-visual-basic")).toMatchObject({
       id: "core-callout-label",
     });
+    expect(resolveAssetForRenderer("physics_force_scene", "light_lab_grid", "core-visual-basic")).toMatchObject({
+      id: "core-light-lab-grid",
+    });
     expect(resolveAssetForRenderer("graph_scene", "graph_node")).toMatchObject({
       id: "graph-node",
     });

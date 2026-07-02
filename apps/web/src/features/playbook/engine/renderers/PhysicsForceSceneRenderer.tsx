@@ -5,6 +5,7 @@ import type { AssetManifestEntry } from "../assets/assetRegistry";
 import { resolveAssetById, resolveAssetByRole, resolveAssetForRenderer } from "../assets/assetResolver";
 import type { PhysicsForceSceneSnapshot, PhysicsSceneObject, PhysicsSceneVector } from "../types";
 import { CoreFormulaTag } from "./CoreFormulaTag";
+import { CoreLabGrid } from "./CoreLabGrid";
 import type { RendererProps } from "./types";
 
 const DEFAULT_PHYSICS_PACK_ID = "physics-basic";
@@ -187,9 +188,7 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({ step, progr
           ))}
         </defs>
 
-        <rect x="0" y="0" width="100" height="100" rx="3" fill={theme === "dark" ? "#111827" : "#f7f9fc"} />
-        <path d="M 8 82 H 94 M 10 18 V 84" fill="none" stroke="#9aa9b8" strokeWidth="0.7" opacity="0.55" />
-        <path d="M 8 66 H 94 M 8 50 H 94 M 8 34 H 94 M 28 18 V 84 M 46 18 V 84 M 64 18 V 84 M 82 18 V 84" fill="none" stroke="#9aa9b8" strokeWidth="0.35" opacity="0.32" />
+        <CoreLabGrid rendererKind="physics_force_scene" theme={theme} />
 
         <text x="8" y="11" fontSize="5.6" fontWeight="760" fill={theme === "dark" ? "#f8fafc" : "#182235"}>
           {step.title}

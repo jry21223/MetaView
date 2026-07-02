@@ -60,6 +60,7 @@ describe("PhysicsForceSceneRenderer", () => {
       'data-asset-path="/assets/metaview-kits/physics-basic/projectile-body-dot.svg"',
     );
     expect(markup).toContain("<image");
+    expect(markup).toContain('data-asset-id="core-light-lab-grid"');
     expect(markup).toContain('data-semantic-role="motion_trail"');
     expect(markup).toContain('data-semantic-role="formula_card"');
     expect(markup).toContain('data-asset-id="core-formula-tag"');

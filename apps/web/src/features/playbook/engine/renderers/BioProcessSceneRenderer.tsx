@@ -5,6 +5,7 @@ import type { AssetManifestEntry } from "../assets/assetRegistry";
 import { resolveAssetById, resolveAssetByRole, resolveAssetForRenderer } from "../assets/assetResolver";
 import type { BioCellCallout, BioProcessConnection, BioProcessSceneSnapshot, BioProcessStep } from "../types";
 import { CoreCalloutLabel } from "./CoreCalloutLabel";
+import { CoreLabGrid } from "./CoreLabGrid";
 import type { RendererProps } from "./types";
 
 const DEFAULT_BIOLOGY_PACK_ID = "biology-basic";
@@ -165,14 +166,7 @@ export const BioProcessSceneRenderer: React.FC<RendererProps> = ({ step, progres
       }}
     >
       <svg width="100%" height="100%" viewBox="0 0 100 100" role="img" aria-label={step.title}>
-        <defs>
-          <linearGradient id="bio-process-grid" x1="0" x2="1" y1="0" y2="1">
-            <stop offset="0" stopColor="#fbfff8" />
-            <stop offset="1" stopColor="#e8f3ed" />
-          </linearGradient>
-        </defs>
-        <rect x="0" y="0" width="100" height="100" rx="3" fill={theme === "dark" ? "#111827" : "url(#bio-process-grid)"} />
-        <path d="M 8 26 H 92 M 8 44 H 92 M 8 62 H 92 M 8 80 H 92 M 18 18 V 86 M 38 18 V 86 M 58 18 V 86 M 78 18 V 86" fill="none" stroke="#b8c8bd" strokeWidth="0.28" opacity="0.28" />
+        <CoreLabGrid rendererKind="bio_process_scene" theme={theme} lightFill="#f7fbf7" />
         <text x="8" y="12" fontSize="5.6" fontWeight="780" fill={theme === "dark" ? "#f8fafc" : "#182235"}>
           {step.title}
         </text>

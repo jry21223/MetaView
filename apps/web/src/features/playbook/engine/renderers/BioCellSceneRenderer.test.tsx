@@ -66,6 +66,7 @@ describe("BioCellSceneRenderer", () => {
     expect(markup).toContain('data-asset-id="cell-outline"');
     expect(markup).toContain('data-asset-id="nucleus"');
     expect(markup).toContain('data-asset-id="mitochondrion"');
+    expect(markup).toContain('data-asset-id="core-light-lab-grid"');
     expect(markup).toContain('data-asset-id="core-callout-label"');
     expect(markup).toContain('data-semantic-role="callout"');
     expect(markup).toContain("stores DNA");

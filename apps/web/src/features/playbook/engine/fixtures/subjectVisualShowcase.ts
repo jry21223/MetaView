@@ -84,6 +84,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
     requiredMarkers: [
       "physics-force-scene",
       'data-asset-id="projectile-body-dot"',
+      'data-asset-id="core-light-lab-grid"',
       'data-asset-id="force-vector-arrow"',
       'data-asset-id="core-formula-tag"',
       'data-semantic-role="motion_trail"',
@@ -100,6 +101,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
     showInlineCode: false,
     requiredMarkers: [
       "bio-cell-scene",
+      'data-asset-id="core-light-lab-grid"',
       'data-asset-id="cell-outline"',
       'data-asset-id="nucleus"',
       'data-asset-id="mitochondrion"',
@@ -117,6 +119,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
     requiredMarkers: [
       "bio-cell-scene",
       'data-cell-type="plant"',
+      'data-asset-id="core-light-lab-grid"',
       'data-structure-id="cell-wall"',
       'data-structure-id="mitochondrion-right"',
       'data-target-id="mitochondrion-right"',
@@ -136,6 +139,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
     requiredMarkers: [
       "bio-process-scene",
       'data-process-id="dna_replication"',
+      'data-asset-id="core-light-lab-grid"',
       'data-asset-id="dna-helix"',
       'data-asset-id="replication-fork"',
       'data-asset-id="core-flow-arrow"',
@@ -154,6 +158,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       "molecule-2d-scene",
       'data-molecule-id="water"',
       'data-asset-id="water-molecule-preset"',
+      'data-asset-id="core-light-lab-grid"',
       'data-asset-id="core-formula-tag"',
       'data-structured-molecule="true"',
     ],
@@ -172,6 +177,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-molecule-id="methane"',
       'data-smiles="C"',
       'data-asset-id="methane-molecule-preset"',
+      'data-asset-id="core-light-lab-grid"',
       'data-asset-id="core-formula-tag"',
       'data-structured-molecule="true"',
     ],
@@ -189,6 +195,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       "molecule-2d-scene",
       'data-molecule-id="carbon_dioxide"',
       'data-smiles="O=C=O"',
+      'data-asset-id="core-light-lab-grid"',
       'data-bond-id="o1-c"',
       'data-bond-order="2"',
       'data-element="C"',
@@ -211,6 +218,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-reaction-id="reaction_synthesis_water"',
       'data-asset-id="reaction-arrow"',
       'data-asset-id="electron-flow"',
+      'data-asset-id="core-light-lab-grid"',
       'data-asset-id="core-formula-tag"',
       'data-semantic-role="reactant"',
       'data-semantic-role="product"',

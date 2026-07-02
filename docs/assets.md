@@ -99,7 +99,9 @@ Current backend SkillPack adoption:
   consume `core-callout-label` instead of drawing independent label boxes in
   each renderer. Shared formula cards render through `core-formula-tag` in
   physics and chemistry renderers instead of hand-drawn per-renderer formula
-  boxes.
+  boxes. Shared light lab backgrounds render through `core-light-lab-grid` in
+  physics, biology, and chemistry scenes so subject renderers no longer carry
+  separate hand-drawn grid paths for the main teaching surface.
 - `geography-earth-basic`: Natural Earth-derived East Asia map GeoJSON and map
   symbols for `geo_map_scene`. The SceneBlueprint path routes map layers,
   flow arrows, pressure centers, and particle presets through a geography layout

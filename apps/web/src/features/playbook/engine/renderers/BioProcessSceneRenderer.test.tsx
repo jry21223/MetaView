@@ -101,6 +101,7 @@ describe("BioProcessSceneRenderer", () => {
     expect(markup).toContain('data-asset-id="dna-helix"');
     expect(markup).toContain('data-asset-id="replication-fork"');
     expect(markup).toContain('data-asset-id="core-flow-arrow"');
+    expect(markup).toContain('data-asset-id="core-light-lab-grid"');
     expect(markup).toContain('data-asset-id="core-callout-label"');
     expect(markup).toContain('data-semantic-role="process_step"');
     expect(markup).toContain('data-semantic-role="callout"');
