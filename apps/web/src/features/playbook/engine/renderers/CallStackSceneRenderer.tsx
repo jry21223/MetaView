@@ -5,6 +5,7 @@ import type { RendererProps } from "./types";
 
 const SVG_W = 900;
 const SVG_H = 506;
+const CORE_PACK_ID = "core-visual-basic";
 
 const COLORS = {
   dark: {
@@ -39,6 +40,21 @@ function shortLine(line: string): string {
   return line.length > 58 ? `${line.slice(0, 55)}...` : line;
 }
 
+function frameLayout(frame: CallStackFrame, index: number) {
+  const frameX = 74;
+  const frameY = 92;
+  const frameW = 250;
+  const frameH = 64;
+  const frameGap = 18;
+  const x = frameX + Math.min(3, Math.max(0, frame.depth)) * 22;
+  const y = frameY + 38 + index * (frameH + frameGap);
+  return { x, y, width: frameW, height: frameH };
+}
+
+function frameTransitionKey(from: CallStackFrame, to: CallStackFrame): string {
+  return `${from.id}-to-${to.id}`;
+}
+
 export const CallStackSceneRenderer: React.FC<RendererProps> = ({ step, theme }) => {
   const snap = step.snapshot as CallStackSceneSnapshot;
   const colors = COLORS[theme];
@@ -46,11 +62,6 @@ export const CallStackSceneRenderer: React.FC<RendererProps> = ({ step, theme })
   const frames = snap.frames ?? [];
   const codeTrace = snap.code_trace;
   const activeLines = new Set(codeTrace?.active_lines ?? []);
-  const frameX = 74;
-  const frameY = 92;
-  const frameW = 250;
-  const frameH = 64;
-  const frameGap = 18;
   const codeX = 410;
   const codeY = 88;
   const codeW = 420;
@@ -84,9 +95,35 @@ export const CallStackSceneRenderer: React.FC<RendererProps> = ({ step, theme })
         <text x="72" y="112" fill={colors.muted} fontSize="14" fontWeight="700">
           call stack
         </text>
+        {frames.slice(0, -1).map((frame, index) => {
+          const nextFrame = frames[index + 1];
+          const fromLayout = frameLayout(frame, index);
+          const toLayout = frameLayout(nextFrame, index + 1);
+          const midX = (fromLayout.x + toLayout.x) / 2 + 30;
+          const midY = (fromLayout.y + fromLayout.height + toLayout.y) / 2;
+          return (
+            <g
+              key={frameTransitionKey(frame, nextFrame)}
+              data-frame-transition={frameTransitionKey(frame, nextFrame)}
+            >
+              <AssetSvg
+                assetId="core-timeline-arrow"
+                packId={CORE_PACK_ID}
+                subject="core"
+                semanticRole="timeline_arrow"
+                x={midX - 22}
+                y={midY - 5}
+                width={44}
+                height={10}
+                opacity="0.82"
+                transform={`rotate(90 ${midX} ${midY})`}
+                fallbackShape="rect"
+              />
+            </g>
+          );
+        })}
         {frames.map((frame, index) => {
-          const x = frameX + Math.min(3, Math.max(0, frame.depth)) * 22;
-          const y = frameY + 38 + index * (frameH + frameGap);
+          const { x, y, width, height } = frameLayout(frame, index);
           const assetId = frameAssetId(frame, snap.current_frame_id);
           const state = frame.id === snap.current_frame_id ? "active" : frame.state ?? "waiting";
           return (
@@ -98,8 +135,8 @@ export const CallStackSceneRenderer: React.FC<RendererProps> = ({ step, theme })
                 semanticRole={frameRole(frame, snap.current_frame_id)}
                 x={x}
                 y={y}
-                width={frameW}
-                height={frameH}
+                width={width}
+                height={height}
                 fallbackShape="rect"
               />
               <text x={x + 22} y={y + 29} fill={colors.ink} fontSize="18" fontWeight="740">

@@ -69,6 +69,9 @@ describe("assetResolver", () => {
     expect(resolveAssetForRenderer("bio_process_scene", "flow_arrow", "core-visual-basic")).toMatchObject({
       id: "core-flow-arrow",
     });
+    expect(resolveAssetForRenderer("call_stack_scene", "timeline_arrow", "core-visual-basic")).toMatchObject({
+      id: "core-timeline-arrow",
+    });
     expect(resolveAssetForRenderer("math_plot", "tangent")).toMatchObject({
       id: "derivative-tangent-preset",
     });

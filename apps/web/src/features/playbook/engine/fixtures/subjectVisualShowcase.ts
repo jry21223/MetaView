@@ -292,6 +292,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-asset-id="call-frame"',
       'data-asset-id="stack-frame"',
       'data-asset-id="active-line"',
+      'data-asset-id="core-timeline-arrow"',
       'data-frame-state="active"',
       "factorial(4)",
     ],

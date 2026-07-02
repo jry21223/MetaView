@@ -65,6 +65,7 @@ describe("subject visual fixtures", () => {
     expect(markup).toContain('data-asset-id="call-frame"');
     expect(markup).toContain('data-asset-id="stack-frame"');
     expect(markup).toContain('data-asset-id="active-line"');
+    expect(markup).toContain('data-asset-id="core-timeline-arrow"');
     expect(markup).toContain('data-frame-state="active"');
     expect(markup).toContain("factorial(4)");
     expect(markup).not.toContain("Unknown snapshot kind");

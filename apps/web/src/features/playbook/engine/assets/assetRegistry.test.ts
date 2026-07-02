@@ -52,6 +52,7 @@ describe("assetRegistry", () => {
     expect(findAssetByRole("algorithm", "binary_search")?.id).toBe("binary-search-trace-preset");
     expect(findAssetByRole("algorithm", "pointer")?.id).toBe("pointer-marker");
     expect(findAssetByRole("core", "flow_arrow")?.id).toBe("core-flow-arrow");
+    expect(findAssetByRole("core", "timeline_arrow")?.id).toBe("core-timeline-arrow");
     expect(findAssetByRole("core", "callout")?.id).toBe("core-callout-label");
     expect(findAssetByRole("core", "formula_tag")?.id).toBe("core-formula-tag");
     expect(findAssetByRole("core", "moisture_particles")?.id).toBe("core-moisture-particles");
@@ -76,6 +77,7 @@ describe("assetRegistry", () => {
       "math_scene",
       "katex_overlay",
       "graph_scene",
+      "call_stack_scene",
       "algorithm_array",
       "algorithm_tree",
       "motion_scene",

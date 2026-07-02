@@ -60,6 +60,9 @@ describe("CallStackSceneRenderer", () => {
     expect(markup).toContain('data-asset-id="call-frame"');
     expect(markup).toContain('data-asset-id="stack-frame"');
     expect(markup).toContain('data-asset-id="active-line"');
+    expect(markup).toContain('data-asset-id="core-timeline-arrow"');
+    expect(markup).toContain('data-semantic-role="timeline_arrow"');
+    expect(markup).toContain('data-frame-transition="f4-to-f3"');
     expect(markup).toContain('data-frame-state="active"');
     expect(markup).toContain("factorial(3)");
     expect(markup).not.toContain('data-missing-asset="true"');

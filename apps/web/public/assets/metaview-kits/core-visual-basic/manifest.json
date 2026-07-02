@@ -27,6 +27,7 @@
     "math_scene",
     "katex_overlay",
     "graph_scene",
+    "call_stack_scene",
     "algorithm_array",
     "algorithm_tree",
     "motion_scene"
