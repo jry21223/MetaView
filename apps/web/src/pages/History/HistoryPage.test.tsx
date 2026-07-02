@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import React from "react";
 import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -137,25 +137,42 @@ describe("HistoryPage actions", () => {
     expect(submitHits).toBe(0);
   });
 
-  it("does not delete when confirmation is cancelled", async () => {
+  it("does not delete when the confirm dialog is cancelled", async () => {
     const api = fixtureRuns();
-    vi.spyOn(window, "confirm").mockReturnValue(false);
-    const { getByText, getAllByRole } = renderHistoryPage();
+    const { getByText, getAllByRole, getByRole, queryByRole } = renderHistoryPage();
 
     await waitFor(() => expect(getByText("讲解格林公式")).toBeTruthy());
     fireEvent.click(getAllByRole("button", { name: "删除历史记录" })[0]);
 
+    const dialog = getByRole("dialog");
+    expect(dialog.textContent).toContain("确定删除这条历史记录吗");
+    fireEvent.click(within(dialog).getByRole("button", { name: "取消" }));
+
+    expect(queryByRole("dialog")).toBeNull();
     expect(api.deleteHits).toBe(0);
     expect(getByText("讲解格林公式")).toBeTruthy();
   });
 
-  it("deletes confirmed history runs and refreshes the list", async () => {
+  it("closes the confirm dialog with Escape without deleting", async () => {
     const api = fixtureRuns();
-    vi.spyOn(window, "confirm").mockReturnValue(true);
-    const { getByText, getAllByRole, queryByText } = renderHistoryPage();
+    const { getByText, getAllByRole, getByRole, queryByRole } = renderHistoryPage();
 
     await waitFor(() => expect(getByText("讲解格林公式")).toBeTruthy());
     fireEvent.click(getAllByRole("button", { name: "删除历史记录" })[0]);
+
+    fireEvent.keyDown(getByRole("dialog"), { key: "Escape" });
+
+    expect(queryByRole("dialog")).toBeNull();
+    expect(api.deleteHits).toBe(0);
+  });
+
+  it("deletes confirmed history runs and refreshes the list", async () => {
+    const api = fixtureRuns();
+    const { getByText, getAllByRole, getByRole, queryByText } = renderHistoryPage();
+
+    await waitFor(() => expect(getByText("讲解格林公式")).toBeTruthy());
+    fireEvent.click(getAllByRole("button", { name: "删除历史记录" })[0]);
+    fireEvent.click(within(getByRole("dialog")).getByRole("button", { name: "删除" }));
 
     await waitFor(() => expect(api.deleteHits).toBe(1));
     await waitFor(() => expect(queryByText("讲解格林公式")).toBeNull());
@@ -166,14 +183,27 @@ describe("HistoryPage actions", () => {
     fixtureRuns(runsFixture, () =>
       HttpResponse.json({ detail: "删除失败" }, { status: 500 }),
     );
-    vi.spyOn(window, "confirm").mockReturnValue(true);
-    const { getByText, getAllByRole } = renderHistoryPage();
+    const { getByText, getAllByRole, getByRole } = renderHistoryPage();
 
     await waitFor(() => expect(getByText("讲解格林公式")).toBeTruthy());
     fireEvent.click(getAllByRole("button", { name: "删除历史记录" })[0]);
+    fireEvent.click(within(getByRole("dialog")).getByRole("button", { name: "删除" }));
 
     await waitFor(() => expect(getByText("删除失败")).toBeTruthy());
     expect(getByText("讲解格林公式")).toBeTruthy();
+  });
+
+  it("shows shimmer placeholder cards during the initial sync", async () => {
+    fixtureRuns();
+    const { container, getByText, queryByText } = renderHistoryPage();
+
+    expect(
+      container.querySelectorAll(".mv-history-skeleton-item").length,
+    ).toBeGreaterThanOrEqual(4);
+    expect(queryByText("正在同步历史记录")).toBeNull();
+
+    await waitFor(() => expect(getByText("讲解格林公式")).toBeTruthy());
+    expect(container.querySelector(".mv-history-skeleton-item")).toBeNull();
   });
 
   it("shows a helpful load-error state instead of raw fetch text", async () => {

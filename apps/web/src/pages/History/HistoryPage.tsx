@@ -12,6 +12,8 @@ import {
   type TimeWindow,
 } from "../../features/history/lib/historyFilters";
 import { PlaybookPlayer } from "../../features/playbook/engine/player/PlaybookPlayer";
+import { ConfirmDialog } from "../../shared/ui/ConfirmDialog";
+import { HistoryListSkeleton } from "./HistoryListSkeleton";
 import { AutoRefinedBadge } from "../../features/runs/AutoRefinedBadge";
 import { PromptDoctor } from "../../features/runs/PromptDoctor";
 import { RunProgressStepper } from "../../features/runs/RunProgressStepper";
@@ -99,6 +101,8 @@ function HistoryPointerIcon() {
 interface RunItemProps {
   run: PipelineRunResult;
   isSelected: boolean;
+  /** Stagger slot for the mount-time enter animation. */
+  enterIndex: number;
   onClick: () => void;
   onOpenInWorkbench: () => void;
   onDelete: () => void;
@@ -108,11 +112,16 @@ interface RunItemProps {
 function RunItem({
   run,
   isSelected,
+  enterIndex,
   onClick,
   onOpenInWorkbench,
   onDelete,
   isDeleting,
 }: RunItemProps) {
+  // Latch the mount-time stagger slot: list reorders after a background
+  // refresh must not shift the delay of an animation that already played.
+  // Stable keys keep existing nodes mounted, so the animation runs once.
+  const [mountEnterIndex] = useState(enterIndex);
   const title = run.playbook?.title ?? run.prompt ?? "未命名";
   const domain = run.playbook?.domain ?? "—";
   const date = new Date(run.created_at).toLocaleString("zh-CN", {
@@ -123,12 +132,19 @@ function RunItem({
   });
   const stepCount = run.playbook?.steps?.length ?? "—";
   const showPromptSubtitle = !!run.playbook?.title && !!run.prompt;
-  const itemClassName = ["mv-history-item", isSelected ? "is-selected" : ""]
+  const itemClassName = [
+    "mv-history-item",
+    "is-entering",
+    isSelected ? "is-selected" : "",
+  ]
     .filter(Boolean)
     .join(" ");
 
   return (
-    <div className={itemClassName}>
+    <div
+      className={itemClassName}
+      style={{ animationDelay: `${Math.min(mountEnterIndex, 10) * 30}ms` }}
+    >
       <button
         type="button"
         className="mv-history-item__main"
@@ -261,6 +277,9 @@ export function HistoryPage({
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const [deletingRunId, setDeletingRunId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [confirmingRun, setConfirmingRun] = useState<PipelineRunResult | null>(
+    null,
+  );
   const hasExtraStatusFilter =
     filter.status === "queued" || filter.status === "reviewing";
   const hasExtraFilter =
@@ -281,8 +300,9 @@ export function HistoryPage({
   );
   const stats = useMemo(() => computeHistoryStats(filtered), [filtered]);
 
+
   const handleDelete = async (run: PipelineRunResult) => {
-    if (!window.confirm("确定删除这条历史记录吗？")) return;
+    setConfirmingRun(null);
     setDeletingRunId(run.run_id);
     setDeleteError(null);
     try {
@@ -429,20 +449,19 @@ export function HistoryPage({
             {deleteError && (
               <div className="mv-history-error">{deleteError}</div>
             )}
-            {isLoading && runs.length === 0 && (
-              <CenterHint>正在同步历史记录</CenterHint>
-            )}
+            {isLoading && runs.length === 0 && !error && <HistoryListSkeleton />}
             {!isLoading && !error && filtered.length === 0 && (
               <CenterHint>没有匹配的记录</CenterHint>
             )}
-            {filtered.map((run) => (
+            {filtered.map((run, index) => (
               <RunItem
                 key={run.run_id}
                 run={run}
                 isSelected={run.run_id === effectiveSelectedRunId}
+                enterIndex={index}
                 onClick={() => setSelectedRunId(run.run_id)}
                 onOpenInWorkbench={() => onOpenInWorkbench?.(run.run_id)}
-                onDelete={() => void handleDelete(run)}
+                onDelete={() => setConfirmingRun(run)}
                 isDeleting={deletingRunId === run.run_id}
               />
             ))}
@@ -492,6 +511,18 @@ export function HistoryPage({
           )}
         </div>
       </main>
+
+      {confirmingRun && (
+        <ConfirmDialog
+          title="确定删除这条历史记录吗？"
+          description={confirmingRun.playbook?.title ?? confirmingRun.prompt ?? undefined}
+          confirmLabel="删除"
+          danger
+          busy={deletingRunId !== null}
+          onConfirm={() => void handleDelete(confirmingRun)}
+          onCancel={() => setConfirmingRun(null)}
+        />
+      )}
     </>
   );
 }

@@ -703,3 +703,54 @@
   color: var(--ink-2);
   word-break: break-word;
 }
+
+/* ───── Initial-load skeleton ───── */
+.mv-history-skeleton {
+  display: flex;
+  flex-direction: column;
+}
+
+.mv-history-skeleton-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  animation: mv-history-item-enter 0.3s ease both;
+}
+
+.mv-history-skeleton-line {
+  height: 12px;
+}
+
+.mv-history-skeleton-line--title {
+  width: 72%;
+}
+
+.mv-history-skeleton-line--meta {
+  height: 9px;
+  width: 46%;
+}
+
+/* ───── List enter / hover polish ───── */
+@keyframes mv-history-item-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.mv-history-item.is-entering {
+  animation: mv-history-item-enter 0.25s ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mv-history-item.is-entering,
+  .mv-history-skeleton-item {
+    animation: none;
+  }
+}
