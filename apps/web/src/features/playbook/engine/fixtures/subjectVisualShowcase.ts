@@ -1,4 +1,8 @@
 import type { PlaybookScript, SnapshotKind } from "../types";
+import {
+  DEFAULT_SHOWCASE_IMAGE_QUALITY_THRESHOLDS,
+  type ShowcaseImageQualityThresholds,
+} from "./showcaseImageQuality";
 import { getSubjectVisualFixture, type SubjectVisualFixtureId } from "./subjectVisualFixtures";
 
 export interface SubjectVisualShowcaseEntry {
@@ -10,12 +14,30 @@ export interface SubjectVisualShowcaseEntry {
   rendererKind: SnapshotKind;
   showInlineCode: boolean;
   requiredMarkers: string[];
+  imageQuality: ShowcaseImageQualityThresholds;
   script: PlaybookScript;
 }
 
 type SubjectVisualShowcaseMeta = Omit<SubjectVisualShowcaseEntry, "domain" | "script"> & {
   domain: PlaybookScript["domain"];
 };
+
+function imageQuality(
+  minBytes: number,
+  minUniqueColors: number,
+  minContentPixelRatio: number,
+  minContentWidthRatio: number,
+  minContentHeightRatio: number,
+): ShowcaseImageQualityThresholds {
+  return {
+    ...DEFAULT_SHOWCASE_IMAGE_QUALITY_THRESHOLDS,
+    minBytes,
+    minUniqueColors,
+    minContentPixelRatio,
+    minContentWidthRatio,
+    minContentHeightRatio,
+  };
+}
 
 export const SUBJECT_VISUAL_SHOWCASE_IDS: readonly SubjectVisualFixtureId[] = [
   "east_asia_monsoon",
@@ -49,6 +71,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-natural-earth-layer="admin_0_countries"',
       'data-asset-id="monsoon-wind-arrow"',
     ],
+    imageQuality: imageQuality(220000, 300, 0.3, 0.5, 0.8),
   },
   {
     id: "projectile_motion",
@@ -64,6 +87,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-asset-id="force-vector-arrow"',
       'data-semantic-role="motion_trail"',
     ],
+    imageQuality: imageQuality(40000, 80, 0.035, 0.68, 0.72),
   },
   {
     id: "cell_structure",
@@ -79,6 +103,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-asset-id="nucleus"',
       'data-asset-id="mitochondrion"',
     ],
+    imageQuality: imageQuality(210000, 250, 0.055, 0.58, 0.7),
   },
   {
     id: "cell_structure_custom",
@@ -97,6 +122,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-asset-id="cell-outline"',
       'data-asset-id="mitochondrion"',
     ],
+    imageQuality: imageQuality(210000, 250, 0.06, 0.64, 0.7),
   },
   {
     id: "dna_replication",
@@ -113,6 +139,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-asset-id="replication-fork"',
       'data-asset-id="core-flow-arrow"',
     ],
+    imageQuality: imageQuality(170000, 180, 0.035, 0.54, 0.7),
   },
   {
     id: "molecule_2d_water",
@@ -128,6 +155,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-asset-id="water-molecule-preset"',
       'data-structured-molecule="true"',
     ],
+    imageQuality: imageQuality(190000, 130, 0.025, 0.7, 0.7),
   },
   {
     id: "molecule_2d_methane",
@@ -144,6 +172,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-asset-id="methane-molecule-preset"',
       'data-structured-molecule="true"',
     ],
+    imageQuality: imageQuality(190000, 150, 0.03, 0.74, 0.7),
   },
   {
     id: "carbon_dioxide_molecule",
@@ -163,6 +192,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-element="O"',
       'data-structured-molecule="true"',
     ],
+    imageQuality: imageQuality(185000, 110, 0.025, 0.6, 0.7),
   },
   {
     id: "reaction_synthesis_water",
@@ -180,6 +210,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-semantic-role="reactant"',
       'data-semantic-role="product"',
     ],
+    imageQuality: imageQuality(170000, 150, 0.05, 0.58, 0.7),
   },
   {
     id: "derivative_tangent",
@@ -195,6 +226,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-plot-asset-id="derivative-tangent-preset"',
       'data-semantic-role="tangent"',
     ],
+    imageQuality: imageQuality(35000, 60, 0.018, 0.88, 0.85),
   },
   {
     id: "cubic_tangent",
@@ -212,6 +244,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-semantic-role="formula"',
       "Cubic tangent",
     ],
+    imageQuality: imageQuality(35000, 45, 0.016, 0.88, 0.85),
   },
   {
     id: "bfs_graph",
@@ -229,6 +262,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-edge-state="active"',
       "BFS",
     ],
+    imageQuality: imageQuality(33000, 50, 0.014, 0.7, 0.8),
   },
   {
     id: "recursion_stack",
@@ -248,6 +282,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-frame-state="active"',
       "factorial(4)",
     ],
+    imageQuality: imageQuality(48000, 90, 0.06, 0.8, 0.8),
   },
   {
     id: "binary_search",
@@ -267,6 +302,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-array-cell-state="active"',
       "binarySearch",
     ],
+    imageQuality: imageQuality(65000, 150, 0.09, 0.82, 0.8),
   },
 ];
 

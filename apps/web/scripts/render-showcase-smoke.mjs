@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Render every subject-visual showcase fixture once and fail if the PNG output
- * is missing, tiny, or visually blank.
+ * is missing, tiny, visually blank, or below its fixture-specific baseline.
  *
  * This is a smoke/golden-adjacent gate: it does not compare committed images,
  * but it proves every flagship fixture still reaches the Remotion renderer and
@@ -158,17 +158,18 @@ for (const showcaseEntry of selectedEntries) {
   await renderStill({ composition, serveUrl, output, frame, inputProps });
 
   const stats = pngStats(output);
-  const imageQualityIssues = getShowcaseImageQualityIssues(stats);
+  const imageQualityIssues = getShowcaseImageQualityIssues(stats, showcaseEntry.imageQuality);
   if (imageQualityIssues.length > 0) {
     throw new Error(
       `[showcase:smoke] ${showcaseEntry.id} rendered suspicious PNG: ${JSON.stringify({
         issues: imageQualityIssues,
+        thresholds: showcaseEntry.imageQuality,
         stats,
       })}`,
     );
   }
 
-  summary.push({ id: showcaseEntry.id, frame, output, ...stats });
+  summary.push({ id: showcaseEntry.id, frame, output, imageQuality: showcaseEntry.imageQuality, ...stats });
   console.log(
     `[showcase:smoke] ${showcaseEntry.id} @frame ${frame} -> ${output} ` +
       `(${stats.width}x${stats.height}, ${stats.uniqueColors} colors, ` +

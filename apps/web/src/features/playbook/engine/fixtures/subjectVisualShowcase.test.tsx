@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { PlaybookComposition } from "../composition/PlaybookComposition";
 import { visualQualityGate } from "../assets/visualQualityGate";
+import { DEFAULT_SHOWCASE_IMAGE_QUALITY_THRESHOLDS } from "./showcaseImageQuality";
 import {
   SUBJECT_VISUAL_SHOWCASE_IDS,
   getSubjectVisualShowcaseEntry,
@@ -62,6 +63,30 @@ describe("subject visual showcase catalog", () => {
     expect(getSubjectVisualShowcaseEntry("bfs_graph")?.showInlineCode).toBe(true);
   });
 
+  it.each(SHOWCASE_IDS)("declares screenshot quality baselines for %s", (fixtureId) => {
+    const entry = getSubjectVisualShowcaseEntry(fixtureId);
+    expect(entry, fixtureId).toBeTruthy();
+
+    expect(entry!.imageQuality).toMatchObject({
+      minWidth: DEFAULT_SHOWCASE_IMAGE_QUALITY_THRESHOLDS.minWidth,
+      minHeight: DEFAULT_SHOWCASE_IMAGE_QUALITY_THRESHOLDS.minHeight,
+      minNonTransparentRatio: DEFAULT_SHOWCASE_IMAGE_QUALITY_THRESHOLDS.minNonTransparentRatio,
+    });
+    expect(entry!.imageQuality.minBytes).toBeGreaterThanOrEqual(DEFAULT_SHOWCASE_IMAGE_QUALITY_THRESHOLDS.minBytes);
+    expect(entry!.imageQuality.minUniqueColors).toBeGreaterThanOrEqual(
+      DEFAULT_SHOWCASE_IMAGE_QUALITY_THRESHOLDS.minUniqueColors,
+    );
+    expect(entry!.imageQuality.minContentPixelRatio).toBeGreaterThanOrEqual(
+      DEFAULT_SHOWCASE_IMAGE_QUALITY_THRESHOLDS.minContentPixelRatio,
+    );
+    expect(entry!.imageQuality.minContentWidthRatio).toBeGreaterThanOrEqual(
+      DEFAULT_SHOWCASE_IMAGE_QUALITY_THRESHOLDS.minContentWidthRatio,
+    );
+    expect(entry!.imageQuality.minContentHeightRatio).toBeGreaterThanOrEqual(
+      DEFAULT_SHOWCASE_IMAGE_QUALITY_THRESHOLDS.minContentHeightRatio,
+    );
+  });
+
   it.each(SHOWCASE_IDS)("passes visual quality gate for %s", (fixtureId) => {
     const entry = getSubjectVisualShowcaseEntry(fixtureId);
     expect(entry, fixtureId).toBeTruthy();
@@ -97,6 +122,7 @@ describe("subject visual showcase catalog", () => {
     expect(docs).toContain("npm --workspace apps/web run showcase:export");
     expect(docs).toContain("npm --workspace apps/web run showcase:smoke");
     expect(docs).toContain("node apps/web/scripts/render-shots.mjs");
+    expect(docs).toContain("per-fixture screenshot baseline");
     for (const fixtureId of SHOWCASE_IDS) {
       expect(docs).toContain(fixtureId);
     }

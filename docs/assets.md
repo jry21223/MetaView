@@ -191,7 +191,11 @@ Local preview helpers:
 
    The smoke gate writes ignored PNG evidence to
    `eval/shots/subject-visual-showcase-smoke/` and fails if a fixture produces a
-   missing, tiny, or visually blank PNG.
+   missing, tiny, visually blank, or under-baseline PNG. The
+   `per-fixture screenshot baseline` lives in `subjectVisualShowcase.ts` next to
+   the static marker requirements, so geography, physics, biology, chemistry,
+   math, and algorithm fixtures can enforce different content coverage,
+   color-count, and layout-spread floors.
 
 3. Render a single fixture through the existing Remotion composition:
 
