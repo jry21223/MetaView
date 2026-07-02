@@ -290,6 +290,33 @@ async def test_runtime_tool_hub_runs_self_check() -> None:
     assert result.result["issues"][0]["code"] == "step.too_shallow"
 
 
+def test_runtime_tool_hub_scene_blueprint_tool_uses_shared_schema_contract() -> None:
+    hub = RuntimeToolHub(skill_registry=SkillRegistry([]))
+
+    tool = hub.get_tool("scene_blueprint.compile")
+
+    assert tool is not None
+    blueprint_schema = tool.args_schema["properties"]["blueprint"]
+    assert blueprint_schema["$id"].endswith("/scene-blueprint.schema.json")
+    assert blueprint_schema["required"] == ["subject", "sceneType", "title", "visualIntent"]
+    assert "east_asia_monsoon" in blueprint_schema["properties"]["sceneType"]["enum"]
+
+
+@pytest.mark.asyncio
+async def test_runtime_tool_hub_rejects_invalid_scene_blueprint_before_compile() -> None:
+    hub = RuntimeToolHub(skill_registry=SkillRegistry([]))
+
+    result = await hub.execute_tool(
+        "scene_blueprint.compile",
+        {"blueprint": {"subject": "geography", "sceneType": "east_asia_monsoon"}},
+    )
+
+    assert result.ok is False
+    assert result.error is not None
+    assert result.error["code"] == "scene_blueprint.schema_invalid"
+    assert {error["path"] for error in result.error["errors"]} == {"title", "visualIntent"}
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("blueprint", "expected_kind", "expected_pack"),
@@ -413,6 +440,9 @@ async def test_runtime_tool_hub_compiles_subject_scene_blueprints(
 
     assert result.ok is True
     assert result.result is not None
+    assert result.result["scene_blueprint_schema"]["valid"] is True
+    assert result.result["scene_blueprint_schema"]["id"].endswith("/scene-blueprint.schema.json")
+    assert result.result["scene_blueprint"] == blueprint
     assert result.result["playbook"]["initial_data"]["scene_blueprint"] == [
         blueprint["sceneType"]
     ]

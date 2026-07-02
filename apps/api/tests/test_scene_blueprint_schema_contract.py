@@ -90,3 +90,8 @@ def test_core_scene_blueprint_service_returns_schema_required_fields() -> None:
 
     missing = [field for field in schema["required"] if not blueprint.get(field)]
     assert missing == []
+    assert response["sceneBlueprintSchema"] == {
+        "id": schema["$id"],
+        "valid": True,
+        "resourceUri": "metaview://schemas/scene-blueprint",
+    }

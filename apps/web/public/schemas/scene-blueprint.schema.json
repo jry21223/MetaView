@@ -25,6 +25,7 @@
         "molecule_2d_scene",
         "molecule_2d_water",
         "molecule_2d_methane",
+        "molecule_2d_glucose",
         "reaction_scene",
         "reaction_synthesis_water",
         "math_plot",

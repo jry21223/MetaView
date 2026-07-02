@@ -5,6 +5,11 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any
 
+from app.domain.services.scene_blueprint_schema import (
+    scene_blueprint_schema_metadata,
+    validate_scene_blueprint,
+)
+
 DOMAIN_CAPABILITIES: dict[str, dict[str, str]] = {
     "algorithm": {"domain": "algorithm", "support": "full", "primaryRenderer": "algorithm"},
     "code": {"domain": "code", "support": "partial", "primaryRenderer": "algorithm/code"},
@@ -166,12 +171,21 @@ class MetaViewCoreService:
                 semantic_roles=blueprint["requiredAssets"],
             )
             missing = resolved["missing"]
+        schema_errors = validate_scene_blueprint(blueprint)
         return {
             "generatedBy": "metaview-core",
             "sceneBlueprint": blueprint,
+            "sceneBlueprintSchema": scene_blueprint_schema_metadata(
+                valid=len(schema_errors) == 0,
+                errors=schema_errors,
+            ),
             "warnings": [
                 f'No registered asset currently resolves semantic role "{role}".'
                 for role in missing
+            ]
+            + [
+                f"SceneBlueprint schema warning at {error['path']}: {error['message']}"
+                for error in schema_errors
             ],
         }
 

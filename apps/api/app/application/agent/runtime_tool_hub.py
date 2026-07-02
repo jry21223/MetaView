@@ -19,6 +19,11 @@ from app.domain.services.geometry_validators import (
 from app.domain.services.metaview_core import MetaViewCoreService
 from app.domain.services.playbook_quality import self_check_playbook
 from app.domain.services.scene_blueprint_compiler import compile_scene_blueprint_to_playbook
+from app.domain.services.scene_blueprint_schema import (
+    scene_blueprint_schema_metadata,
+    scene_blueprint_tool_schema,
+    validate_scene_blueprint,
+)
 from app.domain.skills.base import SkillExecutionContext, SkillRouteInput, SkillRouteMatch
 from app.domain.skills.registry import SkillRegistry, build_default_skill_registry
 
@@ -104,29 +109,7 @@ class RuntimeToolHub:
                 args_schema={
                     "type": "object",
                     "properties": {
-                        "blueprint": {
-                            "type": "object",
-                            "properties": {
-                                "id": {"type": "string"},
-                                "subject": {"type": "string"},
-                                "sceneType": {"type": "string"},
-                                "title": {"type": "string"},
-                                "caption": {"type": "string"},
-                                "packId": {"type": "string"},
-                                "smiles": {"type": "string"},
-                                "visualIntent": {
-                                    "type": "array",
-                                    "items": {"type": "string"},
-                                },
-                                "emphasisPoints": {
-                                    "type": "array",
-                                    "items": {"type": "string"},
-                                },
-                                "durationFrames": {"type": "number"},
-                                "durationSeconds": {"type": "number"},
-                            },
-                            "required": ["subject", "sceneType"],
-                        }
+                        "blueprint": scene_blueprint_tool_schema(),
                     },
                     "required": ["blueprint"],
                 },
@@ -406,6 +389,14 @@ class RuntimeToolHub:
                 "scene_blueprint.invalid_args",
                 "scene_blueprint.compile requires a blueprint object.",
             )
+        schema_errors = validate_scene_blueprint(blueprint)
+        if schema_errors:
+            return self._error(
+                name,
+                "scene_blueprint.schema_invalid",
+                "SceneBlueprint schema validation failed.",
+                {"errors": schema_errors},
+            )
         try:
             playbook = compile_scene_blueprint_to_playbook(blueprint)
         except (ValueError, ValidationError) as exc:
@@ -427,6 +418,8 @@ class RuntimeToolHub:
             {
                 "valid": True,
                 "sceneType": blueprint.get("sceneType"),
+                "scene_blueprint": blueprint,
+                "scene_blueprint_schema": scene_blueprint_schema_metadata(valid=True),
                 "playbook": playbook_json,
                 "self_check": self_check.model_dump(mode="json"),
                 "visual_quality": visual_quality,
