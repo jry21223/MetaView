@@ -3,6 +3,7 @@ import type {
   AnySnapshot,
   BioCellSceneSnapshot,
   BioProcessSceneSnapshot,
+  CallStackSceneSnapshot,
   CodeTraceSceneSnapshot,
   GeoMapSceneSnapshot,
   GraphSceneSnapshot,
@@ -419,6 +420,33 @@ function checkGraphScene(
   }
 }
 
+function checkCallStackScene(
+  warnings: VisualQualityWarning[],
+  context: SnapshotContext,
+  snapshot: CallStackSceneSnapshot,
+) {
+  if (context.domain !== "algorithm") return;
+
+  checkAssetId(warnings, context, snapshot.asset_id, snapshot.pack_id);
+  for (const frame of snapshot.frames ?? []) {
+    checkAssetId(warnings, context, frame.asset_id, snapshot.pack_id);
+  }
+  checkAssetId(warnings, context, snapshot.code_trace?.asset_id, snapshot.pack_id);
+
+  const hasFrames = (snapshot.frames?.length ?? 0) > 0;
+  const hasActiveFrame = Boolean(
+    snapshot.current_frame_id || (snapshot.frames ?? []).some((frame) => frame.state === "active"),
+  );
+  if (hasFrames && !hasActiveFrame) {
+    warn(warnings, context, {
+      code: "low_algorithm_state_visuals",
+      domain: context.domain,
+      pack_id: snapshot.pack_id,
+      message: "algorithm call_stack_scene should show a current or active stack frame.",
+    });
+  }
+}
+
 function checkCodeTraceScene(
   warnings: VisualQualityWarning[],
   context: SnapshotContext,
@@ -547,6 +575,9 @@ export function visualQualityGate(script: PlaybookScript): VisualQualityWarning[
       }
       if (snapshot.kind === "graph_scene") {
         checkGraphScene(warnings, context, snapshot);
+      }
+      if (snapshot.kind === "call_stack_scene") {
+        checkCallStackScene(warnings, context, snapshot);
       }
       if (snapshot.kind === "code_trace_scene") {
         checkCodeTraceScene(warnings, context, snapshot);

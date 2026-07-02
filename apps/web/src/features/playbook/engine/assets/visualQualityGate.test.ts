@@ -467,4 +467,88 @@ describe("visualQualityGate", () => {
       ]),
     );
   });
+
+  it("warns when a call stack scene frame asset_id cannot be resolved", () => {
+    const warnings = visualQualityGate(
+      script({
+        domain: "algorithm",
+        steps: [
+          {
+            step_id: "recursion_stack",
+            end_frame: 90,
+            title: "Recursion stack",
+            voiceover_text: "",
+            tokens: [],
+            snapshot: {
+              kind: "call_stack_scene",
+              pack_id: "algorithm-code-basic",
+              asset_id: "recursion-stack-preset",
+              frames: [
+                { id: "f4", label: "factorial(4)", depth: 0, state: "waiting", asset_id: "stack-frame" },
+                { id: "f3", label: "factorial(3)", depth: 1, state: "active", asset_id: "missing-call-frame" },
+              ],
+              code_trace: {
+                language: "python",
+                lines: ["def factorial(n):", "    return n * factorial(n - 1)"],
+                active_lines: [1],
+                active_line: 1,
+                asset_id: "active-line",
+              },
+              current_frame_id: "f3",
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "missing_asset",
+          step_id: "recursion_stack",
+          asset_id: "missing-call-frame",
+          pack_id: "algorithm-code-basic",
+        }),
+      ]),
+    );
+  });
+
+  it("warns when a call stack scene has frames but no active frame state", () => {
+    const warnings = visualQualityGate(
+      script({
+        domain: "algorithm",
+        steps: [
+          {
+            step_id: "recursion_stack",
+            end_frame: 90,
+            title: "Recursion stack",
+            voiceover_text: "",
+            tokens: [],
+            snapshot: {
+              kind: "call_stack_scene",
+              pack_id: "algorithm-code-basic",
+              asset_id: "recursion-stack-preset",
+              frames: [
+                { id: "f4", label: "factorial(4)", depth: 0, state: "waiting", asset_id: "stack-frame" },
+                { id: "f3", label: "factorial(3)", depth: 1, state: "waiting", asset_id: "stack-frame" },
+              ],
+              code_trace: null,
+              current_frame_id: null,
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "low_algorithm_state_visuals",
+          step_id: "recursion_stack",
+          domain: "algorithm",
+          snapshot_kind: "call_stack_scene",
+        }),
+      ]),
+    );
+  });
 });
