@@ -66,9 +66,11 @@ snapshot contract using RDKit 2D coordinates.
 The current supported scene blueprints are `east_asia_monsoon`,
 `projectile_motion`, `cell_structure`, `cell_structure_custom`,
 `dna_replication`, `molecule_2d_water`, `molecule_2d_methane`,
-`carbon_dioxide_molecule`, `reaction_synthesis_water`, `derivative_tangent`,
-`cubic_tangent`, `bfs_graph`, `recursion_stack`, and `binary_search`; the API
-runtime compiler additionally supports `molecule_2d_glucose` from SMILES/RDKit.
+`molecule_2d_glucose`, `carbon_dioxide_molecule`,
+`reaction_synthesis_water`, `derivative_tangent`, `cubic_tangent`,
+`bfs_graph`, `recursion_stack`, and `binary_search`. The API runtime compiler
+uses RDKit for `molecule_2d_glucose`; the web showcase renders the same
+chemistry-basic SMILES asset through a deterministic structured layout.
 The backend mirror lives at
 `apps/api/app/domain/services/scene_blueprint_compiler.py` so SkillPack or
 agent generation can adopt the same blueprint boundary before returning
@@ -167,7 +169,7 @@ Phase 1 acceptance evidence:
   tests cover missing asset resolution, forbidden array fallback, asset policy
   warnings, and clean flagship fixtures.
 - `subjectVisualShowcase.ts` is the durable self-test matrix. It currently
-  covers 14 flagship fixtures across geography, physics, biology, chemistry,
+  covers 15 flagship fixtures across geography, physics, biology, chemistry,
   math, and algorithm, with required static markers and per-fixture screenshot
   quality thresholds.
 - `showcase:baseline` writes a golden-review queue for the generated PNGs:
@@ -228,6 +230,7 @@ snapshot catalog.
 | `dna_replication` | biology | `biology-basic` | `bio_process_scene` | DNA helix, replication fork, core flow arrow, process callout |
 | `molecule_2d_water` | chemistry | `chemistry-basic` | `molecule_2d_scene` | structured atoms/bonds and molecule preset |
 | `molecule_2d_methane` | chemistry | `chemistry-basic` | `molecule_2d_scene` | SMILES C, structured atoms/bonds, tetrahedral callout |
+| `molecule_2d_glucose` | chemistry | `chemistry-basic` | `molecule_2d_scene` | glucose SMILES asset, structured ring layout, C6H12O6 formula |
 | `carbon_dioxide_molecule` | chemistry | `chemistry-basic` | `molecule_2d_scene` | structured atom/bond input, double bonds, CO2 formula |
 | `reaction_synthesis_water` | chemistry | `chemistry-basic` | `reaction_scene` | reactants/products plus reaction arrow and electron-flow assets |
 | `derivative_tangent` | math | `math-basic` | `math_plot` | formula plus curve/tangent plot markers |

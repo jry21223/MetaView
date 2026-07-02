@@ -15,6 +15,7 @@ import {
 } from "./moleculePresetResolver";
 
 const DEFAULT_CHEMISTRY_PACK_ID = "chemistry-basic";
+const GLUCOSE_SMILES = "C(C1C(C(C(C(O1)O)O)O)O)O";
 
 export type Molecule2DLayoutInput = {
   packId?: string;
@@ -160,6 +161,75 @@ function compileBond(input: Molecule2DBondInput, packId: string, index: number):
   );
 }
 
+function compileGlucoseLayout(input: Molecule2DLayoutInput, packId: string): Molecule2DSceneSnapshot {
+  const atomAssetId = resolveChemistryAssetId("molecule_2d_scene", "atom", packId);
+  const bondAssetId = resolveChemistryAssetId("molecule_2d_scene", "bond", packId);
+  const atom = (id: string, element: string, x: number, y: number, label: string): Molecule2DAtom => ({
+    id,
+    element,
+    x,
+    y,
+    label,
+    asset_id: atomAssetId,
+  });
+  const bond = (id: string, from: string, to: string): Molecule2DBond => ({
+    id,
+    from,
+    to,
+    order: 1,
+    asset_id: bondAssetId,
+  });
+
+  return {
+    kind: "molecule_2d_scene",
+    pack_id: packId,
+    molecule_id: "glucose",
+    smiles: input.smiles ?? GLUCOSE_SMILES,
+    molecule_asset_id:
+      input.moleculeAssetId ??
+      resolveAssetForRenderer("molecule_2d_scene", "glucose", packId)?.id ??
+      resolveChemistryAssetId("molecule_2d_scene", "glucose", packId),
+    atoms: [
+      atom("c1", "C", 42, 40, "C1"),
+      atom("c2", "C", 58, 40, "C2"),
+      atom("c3", "C", 68, 52, "C3"),
+      atom("c4", "C", 58, 65, "C4"),
+      atom("c5", "C", 42, 65, "C5"),
+      atom("c6", "C", 31, 75, "C6"),
+      atom("o-ring", "O", 32, 52, "ring oxygen"),
+      atom("o1", "O", 42, 27, "OH"),
+      atom("o2", "O", 75, 41, "OH"),
+      atom("o3", "O", 80, 64, "OH"),
+      atom("o4", "O", 58, 80, "OH"),
+      atom("o5", "O", 22, 84, "OH"),
+    ],
+    bonds: [
+      bond("c1-c2", "c1", "c2"),
+      bond("c2-c3", "c2", "c3"),
+      bond("c3-c4", "c3", "c4"),
+      bond("c4-c5", "c4", "c5"),
+      bond("c5-o-ring", "c5", "o-ring"),
+      bond("o-ring-c1", "o-ring", "c1"),
+      bond("c5-c6", "c5", "c6"),
+      bond("c1-o1", "c1", "o1"),
+      bond("c2-o2", "c2", "o2"),
+      bond("c3-o3", "c3", "o3"),
+      bond("c4-o4", "c4", "o4"),
+      bond("c6-o5", "c6", "o5"),
+    ],
+    highlights: input.highlights ?? ["glucose_ring", "hydroxyl_groups"],
+    callouts: input.callouts?.map(compileCallout) ?? [
+      { id: "glucose-ring", target_id: "o-ring", label: "pyranose ring", side: "left" },
+      { id: "glucose-hydroxyls", target_id: "o3", label: "hydroxyl groups", side: "right" },
+      { id: "glucose-formula", target_id: "c2", label: "C6H12O6", side: "top" },
+    ],
+    formula_latex: input.formulaLatex ?? "C_6H_{12}O_6",
+    caption:
+      input.caption ??
+      "glucose is compiled from the chemistry-basic SMILES asset into a structured ring layout.",
+  };
+}
+
 function compileCallout(input: Molecule2DCalloutInput, index: number): Molecule2DCallout {
   const targetId = input.targetId ?? input.target_id ?? "molecule";
   return {
@@ -192,6 +262,10 @@ export function compileMolecule2DLayout(input: Molecule2DLayoutInput): Molecule2
       formula_latex: input.formulaLatex,
       caption: input.caption ?? `${moleculeId} molecule compiled from structured atom and bond input.`,
     };
+  }
+
+  if (moleculeId === "glucose") {
+    return compileGlucoseLayout(input, packId);
   }
 
   const moleculePreset =

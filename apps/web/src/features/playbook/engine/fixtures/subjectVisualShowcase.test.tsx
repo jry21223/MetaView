@@ -28,12 +28,14 @@ describe("subject visual showcase catalog", () => {
     const entries = listSubjectVisualShowcaseEntries();
 
     expect(entries.map((entry) => entry.id)).toEqual(SHOWCASE_IDS);
+    expect(entries.map((entry) => entry.id)).toContain("molecule_2d_glucose");
     expect(entries.map((entry) => entry.packId)).toEqual([
       "geography-earth-basic",
       "physics-basic",
       "biology-basic",
       "biology-basic",
       "biology-basic",
+      "chemistry-basic",
       "chemistry-basic",
       "chemistry-basic",
       "chemistry-basic",
@@ -50,6 +52,7 @@ describe("subject visual showcase catalog", () => {
       "bio_cell_scene",
       "bio_cell_scene",
       "bio_process_scene",
+      "molecule_2d_scene",
       "molecule_2d_scene",
       "molecule_2d_scene",
       "molecule_2d_scene",
@@ -119,6 +122,7 @@ describe("subject visual showcase catalog", () => {
     const docs = readFileSync(path.resolve(process.cwd(), "../../docs/assets.md"), "utf8");
 
     expect(docs).toContain("Flagship Fixture Matrix");
+    expect(docs).toContain("molecule_2d_glucose");
     expect(docs).toContain("npm --workspace apps/web run showcase:export");
     expect(docs).toContain("npm --workspace apps/web run showcase:smoke");
     expect(docs).toContain("npm --workspace apps/web run showcase:baseline");

@@ -6,7 +6,7 @@
   "license": "internal",
   "licenseMode": "single",
   "defaultLicense": "internal",
-  "sceneTemplates": ["molecule_2d_water", "molecule_2d_methane", "reaction_synthesis_water"],
+  "sceneTemplates": ["molecule_2d_water", "molecule_2d_methane", "molecule_2d_glucose", "reaction_synthesis_water"],
   "rendererKinds": ["molecule_2d_scene", "reaction_scene"],
   "sources": [
     {

@@ -445,6 +445,46 @@ describe("sceneBlueprintCompiler", () => {
     expect(markup).not.toContain('data-missing-asset="true"');
   });
 
+  it("compiles a glucose molecule blueprint from the chemistry SMILES asset without falling back to water", () => {
+    const script = compileSceneBlueprintToPlaybookScript({
+      subject: "chemistry",
+      sceneType: "molecule_2d_glucose",
+      title: "Glucose molecule",
+      visualIntent: ["render_structured_molecule", "use_smiles_asset"],
+      emphasisPoints: ["glucose ring", "hydroxyl groups", "C6H12O6"],
+      smiles: "C(C1C(C(C(C(O1)O)O)O)O)O",
+    });
+
+    expect(script.domain).toBe("chemistry");
+    const snapshot = script.steps[0].snapshot;
+    if (snapshot.kind !== "molecule_2d_scene") {
+      throw new Error(`Expected molecule_2d_scene, got ${snapshot.kind}`);
+    }
+
+    expect(snapshot.pack_id).toBe("chemistry-basic");
+    expect(snapshot.molecule_id).toBe("glucose");
+    expect(snapshot.smiles).toBe("C(C1C(C(C(C(O1)O)O)O)O)O");
+    expect(snapshot.molecule_asset_id).toBe("rdkit-smiles-glucose");
+    expect(snapshot.formula_latex).toBe("C_6H_{12}O_6");
+    expect(snapshot.caption).toContain("glucose");
+    expect(snapshot.caption).not.toContain("Water");
+    expect(snapshot.atoms.filter((atom) => atom.element === "C")).toHaveLength(6);
+    expect(snapshot.atoms.filter((atom) => atom.element === "O")).toHaveLength(6);
+    expect(snapshot.bonds.length).toBeGreaterThanOrEqual(11);
+    expect(visualQualityGate(script)).toEqual([]);
+
+    const markup = renderToStaticMarkup(<PlaybookComposition script={script} showSubtitles={false} />);
+    expect(markup).toContain("molecule-2d-scene");
+    expect(markup).toContain('data-molecule-id="glucose"');
+    expect(markup).toContain('data-smiles="C(C1C(C(C(C(O1)O)O)O)O)O"');
+    expect(markup).toContain('data-asset-id="rdkit-smiles-glucose"');
+    expect(markup).toContain('data-element="C"');
+    expect(markup).toContain('data-element="O"');
+    expect(markup).toContain("C6H{12}O6");
+    expect(markup).not.toContain("H2O");
+    expect(markup).not.toContain('data-missing-asset="true"');
+  });
+
   it("compiles a water synthesis blueprint into an asset-backed reaction scene", () => {
     const script = compileSceneBlueprintToPlaybookScript({
       subject: "chemistry",

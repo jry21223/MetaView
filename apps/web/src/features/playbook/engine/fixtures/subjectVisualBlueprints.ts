@@ -11,6 +11,7 @@ export type SubjectVisualFixtureId =
   | "derivative_tangent"
   | "east_asia_monsoon"
   | "molecule_2d_methane"
+  | "molecule_2d_glucose"
   | "molecule_2d_water"
   | "projectile_motion"
   | "reaction_synthesis_water"
@@ -24,6 +25,7 @@ export const SUBJECT_VISUAL_BLUEPRINT_IDS: readonly SubjectVisualFixtureId[] = [
   "dna_replication",
   "molecule_2d_water",
   "molecule_2d_methane",
+  "molecule_2d_glucose",
   "carbon_dioxide_molecule",
   "reaction_synthesis_water",
   "derivative_tangent",
@@ -150,6 +152,15 @@ export const subjectVisualBlueprints: Record<SubjectVisualFixtureId, SceneBluepr
     visualIntent: ["render_structured_molecule", "show_tetrahedral_geometry"],
     emphasisPoints: ["carbon", "hydrogen", "tetrahedral geometry"],
     smiles: "C",
+  },
+  molecule_2d_glucose: {
+    id: "molecule_2d_glucose",
+    subject: "chemistry",
+    sceneType: "molecule_2d_glucose",
+    title: "Glucose molecule",
+    visualIntent: ["render_structured_molecule", "use_smiles_asset"],
+    emphasisPoints: ["glucose ring", "hydroxyl groups", "C6H12O6"],
+    smiles: "C(C1C(C(C(C(O1)O)O)O)O)O",
   },
   carbon_dioxide_molecule: {
     id: "carbon_dioxide_molecule",
