@@ -2802,3 +2802,51 @@
   height: 14px;
   width: 70%;
 }
+
+/* Pipeline error card — replaces the skeleton when a run fails */
+.mv-pipeline-error {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(560px, 100%);
+  margin: auto;
+  padding: 28px 32px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+}
+
+.mv-pipeline-error__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.mv-pipeline-error__mark {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mv-status-failed, #ff9e8a);
+}
+
+.mv-pipeline-error__message {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.mv-pipeline-error__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.mv-pipeline-error__hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-3);
+}

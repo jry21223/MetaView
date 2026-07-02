@@ -75,6 +75,8 @@ interface IntakeScreenProps {
   onSubmit: (ctx: IntakeContext) => void | Promise<void>;
   isSubmitting?: boolean;
   submitError?: string | null;
+  /** Seeds the composer once on mount (e.g. editing a failed run's prompt). */
+  initialPrompt?: string;
 }
 
 function Icon({ kind }: { kind: (typeof TEMPLATE_GALLERY)[number]["icon"] }) {
@@ -229,8 +231,9 @@ export function IntakeScreen({
   onSubmit,
   isSubmitting = false,
   submitError = null,
+  initialPrompt = "",
 }: IntakeScreenProps) {
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(initialPrompt);
   const [files, setFiles] = useState<Array<{ name: string; size: number }>>([]);
   const [fileObjects, setFileObjects] = useState<File[]>([]);
   const [fileWarning, setFileWarning] = useState<string | null>(null);

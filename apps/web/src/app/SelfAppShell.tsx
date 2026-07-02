@@ -33,6 +33,7 @@ export function SelfAppShell() {
   const [topbarCollapsed, setTopbarCollapsed] = useState(false);
   const [providerModalOpen, setProviderModalOpen] = useState(false);
   const [openedRunId, setOpenedRunId] = useState<string | null>(null);
+  const [intakePrefill, setIntakePrefill] = useState<string>("");
   const {
     submit,
     runId,
@@ -94,6 +95,7 @@ export function SelfAppShell() {
 
   const handleSubmit = async (ctx: IntakeContext) => {
     setOpenedRunId(null);
+    setIntakePrefill("");
     await submitWithProvider(
       ctx.raw || ctx.title,
       ctx.domain,
@@ -101,6 +103,16 @@ export function SelfAppShell() {
       ctx.language,
     );
     enterWorkbench();
+  };
+
+  const handleResubmitPrompt = (prompt: string) => {
+    setOpenedRunId(null);
+    void submitWithProvider(prompt, null);
+  };
+
+  const handleEditPrompt = (prompt: string) => {
+    setIntakePrefill(prompt);
+    navigate("intake");
   };
 
   const handleUseTemplate = async (prompt: string) => {
@@ -134,9 +146,11 @@ export function SelfAppShell() {
 
       {stage === "intake" && (
         <IntakeScreen
+          key={intakePrefill}
           onSubmit={handleSubmit}
           isSubmitting={isSubmitting}
           submitError={submitError}
+          initialPrompt={intakePrefill}
         />
       )}
 
@@ -150,6 +164,8 @@ export function SelfAppShell() {
             isProviderConfigured={isConfigured}
             providerSettings={providerSettings}
             onOpenProviderSettings={() => setProviderModalOpen(true)}
+            onResubmitPrompt={handleResubmitPrompt}
+            onEditPrompt={handleEditPrompt}
             topbarCollapsed={effectiveTopbarCollapsed}
             onToggleTopbar={() => setTopbarCollapsed((value) => !value)}
           />

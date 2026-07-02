@@ -9,6 +9,7 @@ import type {
   PlaybookScript,
 } from "../../features/playbook/engine/types";
 import { ExportModal } from "../../features/export/ui/ExportModal";
+import { PipelineErrorCard } from "../../features/pipeline/ui/PipelineErrorCard";
 import { createAssetAttributionReportForScript } from "../../features/playbook/engine/assets/assetAttributionSummary";
 import {
   listRunFollowUps,
@@ -436,6 +437,10 @@ export interface StudioPageProps {
   isProviderConfigured: boolean;
   providerSettings?: ProviderSettings | null;
   onOpenProviderSettings?: () => void;
+  /** Resubmit the failed run's prompt as a brand-new run. */
+  onResubmitPrompt?: (prompt: string) => void;
+  /** Return to intake with the failed run's prompt prefilled. */
+  onEditPrompt?: (prompt: string) => void;
   topbarCollapsed?: boolean;
   onToggleTopbar?: () => void;
 }
@@ -448,12 +453,22 @@ export function StudioPage({
   isProviderConfigured,
   providerSettings = null,
   onOpenProviderSettings,
+  onResubmitPrompt,
+  onEditPrompt,
   topbarCollapsed = false,
   onToggleTopbar,
 }: StudioPageProps) {
   const isDark = t.theme === "dark";
-  const { playbook, director, error, isLoading, status } =
-    usePipelinePoller(runId);
+  const {
+    playbook,
+    director,
+    error,
+    errorKind,
+    prompt,
+    isLoading,
+    status,
+    retry,
+  } = usePipelinePoller(runId);
 
   const [exportOpen, setExportOpen] = useState(false);
   const [patchedPlaybook, setPatchedPlaybook] = useState<{
@@ -473,9 +488,13 @@ export function StudioPage({
     [activePlaybook],
   );
 
-  useEffect(() => {
-    if (error) onNavigate("intake");
-  }, [error, onNavigate]);
+  const handleBackToIntake = () => {
+    if (prompt && onEditPrompt) {
+      onEditPrompt(prompt);
+      return;
+    }
+    onNavigate("intake");
+  };
 
   return (
     <>
@@ -493,7 +512,19 @@ export function StudioPage({
       )}
       <main className="mv-main mv-main--player">
         <section className="mv-right">
-          {activePlaybook ? (
+          {error && errorKind ? (
+            <PipelineErrorCard
+              errorKind={errorKind}
+              message={error}
+              onRetryPolling={retry}
+              onResubmit={
+                errorKind === "run_failed" && prompt && onResubmitPrompt
+                  ? () => onResubmitPrompt(prompt)
+                  : null
+              }
+              onBackToIntake={handleBackToIntake}
+            />
+          ) : activePlaybook ? (
             <ChatPanel
               appEdition={appEdition}
               runId={runId}
@@ -527,7 +558,7 @@ export function StudioPage({
             </ChatPanel>
           ) : isLoading ? (
             <PipelineSkeleton status={status} />
-          ) : !error ? (
+          ) : (
             <div className="mv-right-placeholder">
               <span>暂无任务</span>
               <button
@@ -538,7 +569,7 @@ export function StudioPage({
                 先提交一个题目
               </button>
             </div>
-          ) : null}
+          )}
         </section>
       </main>
     </>

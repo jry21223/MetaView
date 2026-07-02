@@ -35,6 +35,7 @@ export function OpsAppShell() {
   const [topbarCollapsed, setTopbarCollapsed] = useState(false);
   const [accountModalOpen, setAccountModalOpen] = useState(false);
   const [openedRunId, setOpenedRunId] = useState<string | null>(null);
+  const [intakePrefill, setIntakePrefill] = useState<string>("");
   const {
     submit,
     runId,
@@ -94,6 +95,7 @@ export function OpsAppShell() {
 
   const handleSubmit = async (ctx: IntakeContext) => {
     setOpenedRunId(null);
+    setIntakePrefill("");
     await submitWithPlatformProvider(
       ctx.raw || ctx.title,
       ctx.domain,
@@ -101,6 +103,16 @@ export function OpsAppShell() {
       ctx.language,
     );
     enterWorkbench();
+  };
+
+  const handleResubmitPrompt = (prompt: string) => {
+    setOpenedRunId(null);
+    void submitWithPlatformProvider(prompt, null);
+  };
+
+  const handleEditPrompt = (prompt: string) => {
+    setIntakePrefill(prompt);
+    navigate("intake");
   };
 
   const handleUseTemplate = async (prompt: string) => {
@@ -164,9 +176,11 @@ export function OpsAppShell() {
 
       {stage === "intake" && (
         <IntakeScreen
+          key={intakePrefill}
           onSubmit={handleSubmit}
           isSubmitting={isSubmitting}
           submitError={submitError}
+          initialPrompt={intakePrefill}
         />
       )}
 
@@ -179,6 +193,8 @@ export function OpsAppShell() {
             onNavigate={navigate}
             isProviderConfigured
             onOpenProviderSettings={openAccountPanel}
+            onResubmitPrompt={handleResubmitPrompt}
+            onEditPrompt={handleEditPrompt}
             topbarCollapsed={effectiveTopbarCollapsed}
             onToggleTopbar={() => setTopbarCollapsed((value) => !value)}
           />
