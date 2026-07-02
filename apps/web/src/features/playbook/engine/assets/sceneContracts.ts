@@ -2,7 +2,9 @@ import bfsGraphContractJson from "../../../../../public/assets/metaview-kits/alg
 import binarySearchContractJson from "../../../../../public/assets/metaview-kits/algorithm-code-basic/contracts/binary-search.contract.json";
 import recursionStackContractJson from "../../../../../public/assets/metaview-kits/algorithm-code-basic/contracts/recursion-stack.contract.json";
 import cellStructureContractJson from "../../../../../public/assets/metaview-kits/biology-basic/contracts/cell-structure.contract.json";
+import customCellLayoutContractJson from "../../../../../public/assets/metaview-kits/biology-basic/contracts/custom-cell-layout.contract.json";
 import dnaReplicationContractJson from "../../../../../public/assets/metaview-kits/biology-basic/contracts/dna-replication.contract.json";
+import carbonDioxideContractJson from "../../../../../public/assets/metaview-kits/chemistry-basic/contracts/carbon-dioxide.contract.json";
 import glucoseContractJson from "../../../../../public/assets/metaview-kits/chemistry-basic/contracts/glucose.contract.json";
 import methaneContractJson from "../../../../../public/assets/metaview-kits/chemistry-basic/contracts/methane.contract.json";
 import reactionSynthesisWaterContractJson from "../../../../../public/assets/metaview-kits/chemistry-basic/contracts/reaction-synthesis-water.contract.json";
@@ -58,7 +60,9 @@ const SCENE_ASSET_CONTRACTS: readonly SceneAssetContract[] = [
   eastAsiaMonsoonContractJson,
   projectileMotionContractJson,
   cellStructureContractJson,
+  customCellLayoutContractJson,
   dnaReplicationContractJson,
+  carbonDioxideContractJson,
   chemistryMoleculeContract(waterContractJson),
   chemistryMoleculeContract(methaneContractJson),
   chemistryMoleculeContract(glucoseContractJson),

@@ -177,9 +177,9 @@ Phase 1 acceptance evidence:
   `blockingIssues`, `driftIssues`, and `contractCoverage` so release handoffs
   can distinguish screenshots that are ready for human review from screenshots
   blocked by missing output, weak image quality, or reference drift while also
-  seeing which scene asset contracts were matched. The primary geography,
-  physics, math, biology, chemistry, and algorithm flagship fixtures expose
-  matched contract coverage when their renderer consumes the required assets.
+  seeing which scene asset contracts were matched. In the current matrix, all 15
+  showcase fixtures expose matched contract coverage when their renderer consumes
+  the required assets.
 
 Before treating this phase as closed in a release or branch handoff, run:
 

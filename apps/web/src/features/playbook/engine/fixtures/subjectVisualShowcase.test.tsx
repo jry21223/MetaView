@@ -116,6 +116,18 @@ describe("subject visual showcase catalog", () => {
       contractIds: ["water-molecule-contract"],
       missingAssetIds: [],
     });
+    expect(getSubjectVisualShowcaseEntry("cell_structure_custom")?.contractCoverage).toMatchObject({
+      status: "matched",
+      contractIds: ["custom-cell-layout-contract"],
+      requiredAssetIds: ["cell-outline", "mitochondrion", "nucleus"],
+      missingAssetIds: [],
+    });
+    expect(getSubjectVisualShowcaseEntry("carbon_dioxide_molecule")?.contractCoverage).toMatchObject({
+      status: "matched",
+      contractIds: ["carbon-dioxide-structure-contract"],
+      requiredAssetIds: ["atom-core", "bond-line"],
+      missingAssetIds: [],
+    });
     expect(getSubjectVisualShowcaseEntry("derivative_tangent")?.contractCoverage).toMatchObject({
       status: "matched",
       contractIds: ["derivative-tangent-contract"],
@@ -169,6 +181,7 @@ describe("subject visual showcase catalog", () => {
     expect(docs).toContain("per-fixture screenshot baseline");
     expect(docs).toContain("screenshotReview");
     expect(docs).toContain("contractCoverage");
+    expect(docs).toMatch(/all 15\s+showcase fixtures/);
     expect(docs).toContain("approved_reference_current");
     expect(docs).toContain("SHOWCASE_BASELINE_REQUIRE_APPROVED=1");
     for (const fixtureId of SHOWCASE_IDS) {
