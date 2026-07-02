@@ -50,6 +50,7 @@ const REQUIRED_RENDERER_KINDS_BY_PACK: Record<string, string[]> = {
     "katex_overlay",
     "graph_scene",
     "call_stack_scene",
+    "code_trace_scene",
     "algorithm_array",
     "algorithm_tree",
     "motion_scene",

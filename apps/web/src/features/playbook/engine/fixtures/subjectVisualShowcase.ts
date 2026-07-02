@@ -310,6 +310,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       "code-trace-scene",
       'data-pack-id="algorithm-code-basic"',
       'data-trace-asset-id="binary-search-trace-preset"',
+      'data-asset-id="core-flow-arrow"',
       'data-asset-id="active-line"',
       'data-asset-id="pointer-marker"',
       'data-pointer-id="mid"',

@@ -78,6 +78,7 @@ describe("assetRegistry", () => {
       "katex_overlay",
       "graph_scene",
       "call_stack_scene",
+      "code_trace_scene",
       "algorithm_array",
       "algorithm_tree",
       "motion_scene",

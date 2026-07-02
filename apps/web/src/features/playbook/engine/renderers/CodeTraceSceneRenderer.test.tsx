@@ -65,6 +65,9 @@ describe("CodeTraceSceneRenderer", () => {
     expect(markup).toContain("code-trace-scene");
     expect(markup).toContain('data-pack-id="algorithm-code-basic"');
     expect(markup).toContain('data-trace-asset-id="binary-search-trace-preset"');
+    expect(markup).toContain('data-asset-id="core-flow-arrow"');
+    expect(markup).toContain('data-semantic-role="flow_arrow"');
+    expect(markup).toContain('data-search-range-flow="0-6"');
     expect(markup).toContain('data-asset-id="active-line"');
     expect(markup).toContain('data-asset-id="pointer-marker"');
     expect(markup).toContain('data-code-line-state="active"');

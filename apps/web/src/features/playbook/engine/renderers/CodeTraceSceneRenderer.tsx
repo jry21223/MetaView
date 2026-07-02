@@ -5,6 +5,7 @@ import type { RendererProps } from "./types";
 
 const SVG_W = 900;
 const SVG_H = 506;
+const CORE_PACK_ID = "core-visual-basic";
 
 const COLORS = {
   dark: {
@@ -43,6 +44,10 @@ function pointerY(pointer: CodeTracePointer): number {
   return 266;
 }
 
+function clampIndex(index: number, maxIndex: number): number {
+  return Math.max(0, Math.min(maxIndex, index));
+}
+
 export const CodeTraceSceneRenderer: React.FC<RendererProps> = ({ step, theme }) => {
   const snap = step.snapshot as CodeTraceSceneSnapshot;
   const colors = COLORS[theme];
@@ -52,6 +57,8 @@ export const CodeTraceSceneRenderer: React.FC<RendererProps> = ({ step, theme })
   const arrayValues = snap.array_values ?? [];
   const pointers = snap.pointers ?? [];
   const [rangeStart, rangeEnd] = snap.search_range ?? [0, Math.max(0, arrayValues.length - 1)];
+  const rangeMin = arrayValues.length > 0 ? clampIndex(Math.min(rangeStart, rangeEnd), arrayValues.length - 1) : 0;
+  const rangeMax = arrayValues.length > 0 ? clampIndex(Math.max(rangeStart, rangeEnd), arrayValues.length - 1) : 0;
 
   const codeX = 56;
   const codeY = 88;
@@ -135,6 +142,23 @@ export const CodeTraceSceneRenderer: React.FC<RendererProps> = ({ step, theme })
         ))}
 
         <g data-search-range={`${rangeStart}-${rangeEnd}`}>
+          {arrayValues.length > 0 ? (
+            <g data-search-range-flow={`${rangeStart}-${rangeEnd}`}>
+              <AssetSvg
+                assetId="core-flow-arrow"
+                packId={CORE_PACK_ID}
+                subject="core"
+                semanticRole="flow_arrow"
+                x={arrayX + rangeMin * cellW + 4}
+                y={arrayY - 24}
+                width={Math.max(44, (rangeMax - rangeMin + 1) * cellW - 14)}
+                height={16}
+                opacity="0.76"
+                preserveAspectRatio="none"
+                fallbackShape="rect"
+              />
+            </g>
+          ) : null}
           {arrayValues.map((value, index) => {
             const x = arrayX + index * cellW;
             const inRange = index >= rangeStart && index <= rangeEnd;
