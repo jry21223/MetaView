@@ -278,6 +278,17 @@ Local preview helpers:
    the command will emit `driftOk` and per-fixture drift warnings separately from
    under-baseline failures. Script path inputs accept either workspace-relative
    paths such as `../../eval/...` or repo-root-relative paths such as `eval/...`.
+   Release checks can require a fully approved reference set without changing
+   the daily `make check` path:
+
+   ```bash
+   SHOWCASE_BASELINE_REFERENCE=eval/reports/subject-visual-showcase-approved-reference.json \
+   SHOWCASE_BASELINE_REQUIRE_APPROVED=1 \
+   npm --workspace apps/web run showcase:baseline
+   ```
+
+   That opt-in gate fails unless every fixture reports
+   `approved_reference_current`.
    To create an approved reference, keep the reviewed report out of the generated
    smoke directory and add `review` to each approved entry:
 

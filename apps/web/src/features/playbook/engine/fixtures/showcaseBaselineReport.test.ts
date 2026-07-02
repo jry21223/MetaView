@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createShowcaseBaselineReport } from "./showcaseBaselineReport";
+import { createShowcaseBaselineReport, isShowcaseBaselineReleaseReady } from "./showcaseBaselineReport";
 import type { ShowcaseImageQualityThresholds } from "./showcaseImageQuality";
 
 const thresholds: ShowcaseImageQualityThresholds = {
@@ -241,5 +241,34 @@ describe("showcaseBaselineReport", () => {
         notes: "Projectile asset, trail, vectors, and formula card reviewed.",
       },
     });
+  });
+
+  it("supports an opt-in release gate that requires approved screenshot references", () => {
+    const report = createShowcaseBaselineReport(
+      [
+        {
+          id: "projectile_motion",
+          domain: "physics",
+          packId: "physics-basic",
+          rendererKind: "physics_force_scene",
+          requiredMarkers: ['data-asset-id="projectile-body-dot"'],
+          imageQuality: thresholds,
+        },
+      ],
+      [
+        {
+          id: "projectile_motion",
+          frame: 77,
+          output: "/tmp/projectile_motion.png",
+          imageQuality: thresholds,
+          ...passingStats,
+        },
+      ],
+    );
+
+    expect(report.ok).toBe(true);
+    expect(report.approvedReferenceReady).toBe(false);
+    expect(isShowcaseBaselineReleaseReady(report)).toBe(true);
+    expect(isShowcaseBaselineReleaseReady(report, { requireApprovedReference: true })).toBe(false);
   });
 });

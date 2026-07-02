@@ -113,6 +113,10 @@ export interface ShowcaseBaselineReport {
   entries: ShowcaseBaselineReportEntry[];
 }
 
+export interface ShowcaseBaselineReleaseGateOptions {
+  requireApprovedReference?: boolean;
+}
+
 export const DEFAULT_SHOWCASE_BASELINE_DRIFT_POLICY: ShowcaseBaselineDriftPolicy = {
   maxBytesDrop: 5000,
   maxUniqueColorsDrop: 12,
@@ -270,4 +274,11 @@ export function createShowcaseBaselineReport(
     unexpectedSummaryIds,
     entries,
   };
+}
+
+export function isShowcaseBaselineReleaseReady(
+  report: ShowcaseBaselineReport,
+  options: ShowcaseBaselineReleaseGateOptions = {},
+): boolean {
+  return report.ok && (!options.requireApprovedReference || report.approvedReferenceReady);
 }

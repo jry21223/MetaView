@@ -1,7 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { createShowcaseBaselineReport } from "../src/features/playbook/engine/fixtures/showcaseBaselineReport.ts";
+import {
+  createShowcaseBaselineReport,
+  isShowcaseBaselineReleaseReady,
+} from "../src/features/playbook/engine/fixtures/showcaseBaselineReport.ts";
 import { listSubjectVisualShowcaseEntries } from "../src/features/playbook/engine/fixtures/subjectVisualShowcase.ts";
 
 function resolveRepoAwarePath(inputPath) {
@@ -21,6 +24,7 @@ const outputPath = resolveRepoAwarePath(
 const referencePath = process.env.SHOWCASE_BASELINE_REFERENCE
   ? resolveRepoAwarePath(process.env.SHOWCASE_BASELINE_REFERENCE)
   : null;
+const requireApprovedReference = process.env.SHOWCASE_BASELINE_REQUIRE_APPROVED === "1";
 
 if (!fs.existsSync(summaryPath)) {
   console.error(`[showcase:baseline] missing smoke summary: ${summaryPath}`);
@@ -82,7 +86,18 @@ if (!report.driftOk) {
   }
 }
 
+if (!isShowcaseBaselineReleaseReady(report, { requireApprovedReference })) {
+  const pendingIds = report.entries
+    .filter((entry) => entry.screenshotReview.status !== "approved_reference_current")
+    .map((entry) => entry.id);
+  console.error(
+    `[showcase:baseline] approved reference required but not current for: ${pendingIds.join(", ")}`,
+  );
+  process.exit(1);
+}
+
 console.log(
   `[showcase:baseline] passed ${report.fixtureCount} fixtures` +
-    `${reference ? `, driftOk=${report.driftOk}` : ""} -> ${outputPath}`,
+    `${reference ? `, driftOk=${report.driftOk}` : ""}` +
+    `${requireApprovedReference ? `, approvedReferenceReady=${report.approvedReferenceReady}` : ""} -> ${outputPath}`,
 );

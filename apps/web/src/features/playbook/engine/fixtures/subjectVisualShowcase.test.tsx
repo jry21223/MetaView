@@ -126,6 +126,7 @@ describe("subject visual showcase catalog", () => {
     expect(docs).toContain("per-fixture screenshot baseline");
     expect(docs).toContain("screenshotReview");
     expect(docs).toContain("approved_reference_current");
+    expect(docs).toContain("SHOWCASE_BASELINE_REQUIRE_APPROVED=1");
     for (const fixtureId of SHOWCASE_IDS) {
       expect(docs).toContain(fixtureId);
     }
