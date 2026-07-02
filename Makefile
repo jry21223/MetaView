@@ -68,6 +68,7 @@ asset-audit:
 asset-showcase:
 	npm --workspace apps/web run showcase:export
 	npm --workspace apps/web run showcase:smoke
+	npm --workspace apps/web run showcase:baseline
 
 check: asset-audit asset-showcase lint test build
 

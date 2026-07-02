@@ -121,6 +121,7 @@ describe("subject visual showcase catalog", () => {
     expect(docs).toContain("Flagship Fixture Matrix");
     expect(docs).toContain("npm --workspace apps/web run showcase:export");
     expect(docs).toContain("npm --workspace apps/web run showcase:smoke");
+    expect(docs).toContain("npm --workspace apps/web run showcase:baseline");
     expect(docs).toContain("node apps/web/scripts/render-shots.mjs");
     expect(docs).toContain("per-fixture screenshot baseline");
     for (const fixtureId of SHOWCASE_IDS) {

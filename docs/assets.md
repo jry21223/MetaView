@@ -197,13 +197,23 @@ Local preview helpers:
    math, and algorithm fixtures can enforce different content coverage,
    color-count, and layout-spread floors.
 
-3. Render a single fixture through the existing Remotion composition:
+3. Generate the ignored baseline audit report from the latest smoke summary:
+
+   ```bash
+   npm --workspace apps/web run showcase:baseline
+   ```
+
+   The report is written to
+   `eval/reports/subject-visual-showcase-baseline.json` and records each
+   fixture's baseline, measured screenshot stats, and safety margins.
+
+4. Render a single fixture through the existing Remotion composition:
 
    ```bash
    node apps/web/scripts/render-shots.mjs eval/reports/subject-visual-fixtures/east_asia_monsoon.json eval/shots/east_asia_monsoon
    ```
 
-4. Open the local showcase page in the web app at `/asset-showcase`.
+5. Open the local showcase page in the web app at `/asset-showcase`.
 
 The visual quality gate is non-blocking at runtime, but showcase tests require
 these flagship fixtures to produce no warnings, no missing asset fallback, and
