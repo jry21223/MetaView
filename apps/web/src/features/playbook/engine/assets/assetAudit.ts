@@ -13,7 +13,8 @@ export type AssetAuditIssueCode =
   | "missing_asset_file"
   | "missing_attribution"
   | "license_rule_mismatch"
-  | "renderer_kind_mismatch";
+  | "renderer_kind_mismatch"
+  | "missing_scene_template_contract";
 
 export interface AssetAuditIssue {
   code: AssetAuditIssueCode;
@@ -59,6 +60,48 @@ const REQUIRED_RENDERER_KINDS_BY_PACK: Record<string, string[]> = {
   "geography-earth-basic": ["geo_map_scene"],
   "math-basic": ["math_plot", "math_scene", "math_formula", "katex_overlay"],
   "physics-basic": ["physics_force_scene"],
+};
+
+const REQUIRED_SCENE_TEMPLATE_CONTRACTS_BY_PACK: Record<
+  string,
+  Array<{
+    sceneTemplate: string;
+    assetId: string;
+    semanticRole: string;
+    rendererKind: string;
+    pathSuffix: string;
+  }>
+> = {
+  "chemistry-basic": [
+    {
+      sceneTemplate: "molecule_2d_water",
+      assetId: "water-molecule-contract",
+      semanticRole: "water_contract",
+      rendererKind: "molecule_2d_scene",
+      pathSuffix: "/contracts/water.contract.json",
+    },
+    {
+      sceneTemplate: "molecule_2d_methane",
+      assetId: "methane-molecule-contract",
+      semanticRole: "methane_contract",
+      rendererKind: "molecule_2d_scene",
+      pathSuffix: "/contracts/methane.contract.json",
+    },
+    {
+      sceneTemplate: "molecule_2d_glucose",
+      assetId: "glucose-smiles-contract",
+      semanticRole: "glucose_contract",
+      rendererKind: "molecule_2d_scene",
+      pathSuffix: "/contracts/glucose.contract.json",
+    },
+    {
+      sceneTemplate: "reaction_synthesis_water",
+      assetId: "reaction-synthesis-water-contract",
+      semanticRole: "reaction_synthesis_water_contract",
+      rendererKind: "reaction_scene",
+      pathSuffix: "/contracts/reaction-synthesis-water.contract.json",
+    },
+  ],
 };
 
 function sameStringSet(actual: string[], expected: string[]): boolean {
@@ -111,6 +154,37 @@ function auditRendererKinds(errors: AssetAuditIssue[], pack: SubjectVisualKit) {
     packId: pack.packId,
     message: `Asset pack "${pack.packId}" rendererKinds must be ${JSON.stringify(expected)}.`,
   });
+}
+
+function auditSceneTemplateContracts(errors: AssetAuditIssue[], pack: SubjectVisualKit) {
+  const requirements = REQUIRED_SCENE_TEMPLATE_CONTRACTS_BY_PACK[pack.packId];
+  if (!requirements) return;
+
+  const sceneTemplates = new Set(pack.sceneTemplates);
+  for (const requirement of requirements) {
+    if (!sceneTemplates.has(requirement.sceneTemplate)) continue;
+
+    const asset = pack.assets.find((item) => item.id === requirement.assetId);
+    const hasContractRole =
+      asset?.semanticRoles.includes("molecule_contract") ||
+      asset?.semanticRoles.includes("reaction_contract") ||
+      false;
+    const validContract =
+      asset?.type === "json" &&
+      asset.path?.endsWith(requirement.pathSuffix) &&
+      hasContractRole;
+    const hasSpecificRole = asset?.semanticRoles.includes(requirement.semanticRole) ?? false;
+    const hasRenderer = asset?.rendererHints?.preferredRenderer === requirement.rendererKind;
+
+    if (validContract && hasSpecificRole && hasRenderer) continue;
+
+    pushError(errors, {
+      code: "missing_scene_template_contract",
+      packId: pack.packId,
+      assetId: requirement.assetId,
+      message: `Asset pack "${pack.packId}" sceneTemplate "${requirement.sceneTemplate}" must declare contract asset "${requirement.assetId}".`,
+    });
+  }
 }
 
 function auditSource(
@@ -208,6 +282,7 @@ export function auditAssetPacks(packs: SubjectVisualKit[], options: AssetAuditOp
   for (const pack of packs) {
     auditPackShape(errors, pack);
     auditRendererKinds(errors, pack);
+    auditSceneTemplateContracts(errors, pack);
     for (const source of pack.sources ?? []) {
       auditSource(errors, pack, source.id, source.license);
     }

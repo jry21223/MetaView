@@ -166,4 +166,35 @@ describe("assetAudit", () => {
       }),
     );
   });
+
+  it("fails chemistry scene templates without matching compiler contract assets", () => {
+    const chemistryPack = basePack({
+      packId: "chemistry-basic",
+      subject: "chemistry",
+      sceneTemplates: ["molecule_2d_water"],
+      rendererKinds: ["molecule_2d_scene", "reaction_scene"],
+      assets: [
+        {
+          ...basePack().assets[0],
+          id: "water-molecule-preset",
+          type: "json",
+          path: "/assets/metaview-kits/chemistry-basic/molecule-presets/water.json",
+          semanticRoles: ["molecule", "water", "molecule_preset"],
+        },
+      ],
+    });
+
+    const report = auditAssetPacks([chemistryPack], {
+      pathExists: () => true,
+    });
+
+    expect(report.ok).toBe(false);
+    expect(report.errors).toContainEqual(
+      expect.objectContaining({
+        code: "missing_scene_template_contract",
+        packId: "chemistry-basic",
+        assetId: "water-molecule-contract",
+      }),
+    );
+  });
 });
