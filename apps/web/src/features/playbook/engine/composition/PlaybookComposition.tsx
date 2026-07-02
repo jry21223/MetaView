@@ -11,6 +11,7 @@ import { compileVisualTimeline, type VisualLayerState, type VisualStepState } fr
 import { snapshotSurface } from "./snapshotSurface";
 import { buildDirectorFramePlan } from "../director";
 import { visualQualityGate } from "../assets/visualQualityGate";
+import { assetAttributionEntryId, createAssetAttributionSummary } from "../assets/assetAttributionSummary";
 
 interface PlaybookCompositionProps {
   script: PlaybookScript;
@@ -196,6 +197,10 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
   const frame = useCurrentFrame();
   const visualTimeline = React.useMemo(() => compileVisualTimeline(script), [script]);
   const visualQualityWarnings = React.useMemo(() => visualQualityGate(script), [script]);
+  const assetAttributionSummary = React.useMemo(
+    () => createAssetAttributionSummary(visualQualityWarnings),
+    [visualQualityWarnings],
+  );
 
   React.useEffect(() => {
     if (visualQualityWarnings.length > 0) {
@@ -276,6 +281,21 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
       }
       data-visual-quality-warning-steps={
         visualQualityWarnings.length ? visualQualityWarnings.map((warning) => warning.step_id).join(",") : undefined
+      }
+      data-asset-attribution-count={assetAttributionSummary.attributionRequired.length || undefined}
+      data-asset-attribution-ids={
+        assetAttributionSummary.attributionRequired.length
+          ? assetAttributionSummary.attributionRequired.map(assetAttributionEntryId).join(",")
+          : undefined
+      }
+      data-asset-license-risk-count={assetAttributionSummary.licenseRisk.length || undefined}
+      data-asset-license-risk-ids={
+        assetAttributionSummary.licenseRisk.length
+          ? assetAttributionSummary.licenseRisk.map(assetAttributionEntryId).join(",")
+          : undefined
+      }
+      data-asset-attribution-summary={
+        assetAttributionSummary.entries.length ? JSON.stringify(assetAttributionSummary.entries) : undefined
       }
       style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}
     >

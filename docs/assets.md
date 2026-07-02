@@ -226,5 +226,9 @@ no unknown snapshot renderer. It also emits warning metadata for deterministic
 issues such as missing assets, forbidden array fallback, low visual richness,
 possible label/callout overlap, and asset usage that requires attribution,
 carries share-alike obligations, has unknown licensing, or is not marked safe
-for commercial use. The root `make check` path also runs the showcase smoke
-render so flagship assets must keep producing nonblank Remotion output.
+for commercial use. `PlaybookComposition` exposes those asset policy warnings as
+machine-readable root attributes (`data-asset-attribution-*` and
+`data-asset-license-risk-*`) so preview/export callers can build attribution and
+commercial-use reports without parsing renderer internals. The root `make check`
+path also runs the showcase smoke render so flagship assets must keep producing
+nonblank Remotion output.
