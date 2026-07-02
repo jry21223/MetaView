@@ -47,7 +47,12 @@ if (referencePath) {
   reference = {
     entries: parsedReference.entries
       .filter((entry) => entry?.id && entry?.stats)
-      .map((entry) => ({ id: entry.id, stats: entry.stats })),
+      .map((entry) => ({
+        id: entry.id,
+        stats: entry.stats,
+        ...(entry.review && { review: entry.review }),
+        ...(entry.screenshotReview?.referenceReview && { review: entry.screenshotReview.referenceReview }),
+      })),
   };
 }
 

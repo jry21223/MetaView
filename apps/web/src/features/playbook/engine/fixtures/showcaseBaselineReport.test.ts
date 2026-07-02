@@ -187,4 +187,59 @@ describe("showcaseBaselineReport", () => {
       },
     });
   });
+
+  it("marks a human-approved screenshot reference as current when no drift is detected", () => {
+    const report = createShowcaseBaselineReport(
+      [
+        {
+          id: "projectile_motion",
+          domain: "physics",
+          packId: "physics-basic",
+          rendererKind: "physics_force_scene",
+          requiredMarkers: ['data-asset-id="projectile-body-dot"'],
+          imageQuality: thresholds,
+        },
+      ],
+      [
+        {
+          id: "projectile_motion",
+          frame: 77,
+          output: "/tmp/projectile_motion.png",
+          imageQuality: thresholds,
+          ...passingStats,
+        },
+      ],
+      "2026-07-02T00:00:00.000Z",
+      {
+        entries: [
+          {
+            id: "projectile_motion",
+            stats: passingStats,
+            review: {
+              status: "approved",
+              reviewer: "visual-reviewer",
+              approvedAt: "2026-07-02T00:00:00.000Z",
+              notes: "Projectile asset, trail, vectors, and formula card reviewed.",
+            },
+          },
+        ],
+      },
+    );
+
+    expect(report.ok).toBe(true);
+    expect(report.driftOk).toBe(true);
+    expect(report.reviewReady).toBe(true);
+    expect(report.approvedReferenceReady).toBe(true);
+    expect(report.entries[0].screenshotReview).toMatchObject({
+      status: "approved_reference_current",
+      blockingIssues: [],
+      driftIssues: [],
+      referenceReview: {
+        status: "approved",
+        reviewer: "visual-reviewer",
+        approvedAt: "2026-07-02T00:00:00.000Z",
+        notes: "Projectile asset, trail, vectors, and formula card reviewed.",
+      },
+    });
+  });
 });

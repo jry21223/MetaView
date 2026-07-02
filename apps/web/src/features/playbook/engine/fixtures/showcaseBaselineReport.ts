@@ -28,9 +28,20 @@ export type ShowcaseBaselineDriftIssue =
   | "content_width_ratio_drop"
   | "content_height_ratio_drop";
 
-export type ShowcaseScreenshotReviewStatus = "ready_for_review" | "blocked" | "drift_review_needed";
+export type ShowcaseScreenshotReviewStatus =
+  | "ready_for_review"
+  | "approved_reference_current"
+  | "blocked"
+  | "drift_review_needed";
 
 export type ShowcaseScreenshotReviewBlocker = ShowcaseImageQualityIssue | "missing_summary";
+
+export interface ShowcaseScreenshotReferenceReview {
+  status: "approved";
+  reviewer: string;
+  approvedAt: string;
+  notes?: string;
+}
 
 export interface ShowcaseScreenshotReview {
   status: ShowcaseScreenshotReviewStatus;
@@ -40,6 +51,7 @@ export interface ShowcaseScreenshotReview {
   requiredMarkers: readonly string[];
   blockingIssues: ShowcaseScreenshotReviewBlocker[];
   driftIssues: ShowcaseBaselineDriftIssue[];
+  referenceReview: ShowcaseScreenshotReferenceReview | null;
 }
 
 export interface ShowcaseBaselineDriftPolicy {
@@ -56,6 +68,7 @@ export interface ShowcaseBaselineReferenceEntry {
     ShowcaseImageQualityStats,
     "bytes" | "uniqueColors" | "contentPixelRatio" | "contentWidthRatio" | "contentHeightRatio"
   >;
+  review?: ShowcaseScreenshotReferenceReview;
 }
 
 export interface ShowcaseBaselineReference {
@@ -91,6 +104,7 @@ export interface ShowcaseBaselineReport {
   ok: boolean;
   driftOk: boolean;
   reviewReady: boolean;
+  approvedReferenceReady: boolean;
   generatedAt: string;
   fixtureCount: number;
   renderedCount: number;
@@ -151,9 +165,16 @@ function screenshotReview(
   output: string | null,
   blockingIssues: ShowcaseScreenshotReviewBlocker[],
   driftIssues: ShowcaseBaselineDriftIssue[],
+  referenceReview: ShowcaseScreenshotReferenceReview | undefined,
 ): ShowcaseScreenshotReview {
   const status: ShowcaseScreenshotReviewStatus =
-    blockingIssues.length > 0 ? "blocked" : driftIssues.length > 0 ? "drift_review_needed" : "ready_for_review";
+    blockingIssues.length > 0
+      ? "blocked"
+      : driftIssues.length > 0
+        ? "drift_review_needed"
+        : referenceReview?.status === "approved"
+          ? "approved_reference_current"
+          : "ready_for_review";
 
   return {
     status,
@@ -163,6 +184,7 @@ function screenshotReview(
     requiredMarkers,
     blockingIssues,
     driftIssues,
+    referenceReview: referenceReview ?? null,
   };
 }
 
@@ -175,12 +197,13 @@ export function createShowcaseBaselineReport(
 ): ShowcaseBaselineReport {
   const summaryById = new Map(summaryEntries.map((entry) => [entry.id, entry]));
   const catalogIds = new Set(catalogEntries.map((entry) => entry.id));
-  const referenceById = new Map((reference?.entries ?? []).map((entry) => [entry.id, entry.stats]));
+  const referenceEntryById = new Map((reference?.entries ?? []).map((entry) => [entry.id, entry]));
   const missingSummaryIds = catalogEntries.filter((entry) => !summaryById.has(entry.id)).map((entry) => entry.id);
   const unexpectedSummaryIds = summaryEntries.filter((entry) => !catalogIds.has(entry.id)).map((entry) => entry.id);
 
   const entries = catalogEntries.map((entry): ShowcaseBaselineReportEntry => {
     const summary = summaryById.get(entry.id);
+    const referenceEntry = referenceEntryById.get(entry.id);
     if (!summary) {
       return {
         id: entry.id,
@@ -193,12 +216,12 @@ export function createShowcaseBaselineReport(
         stats: null,
         margins: null,
         issues: [],
-        referenceStats: referenceById.get(entry.id) ?? null,
+        referenceStats: referenceEntry?.stats ?? null,
         driftIssues: [],
-        screenshotReview: screenshotReview(entry.requiredMarkers, null, ["missing_summary"], []),
+        screenshotReview: screenshotReview(entry.requiredMarkers, null, ["missing_summary"], [], referenceEntry?.review),
       };
     }
-    const referenceStats = referenceById.get(entry.id);
+    const referenceStats = referenceEntry?.stats;
     const issues = getShowcaseImageQualityIssues(summary, entry.imageQuality);
     const entryDriftIssues = driftIssues(summary, referenceStats, driftPolicy);
 
@@ -226,7 +249,7 @@ export function createShowcaseBaselineReport(
       issues,
       referenceStats: referenceStats ?? null,
       driftIssues: entryDriftIssues,
-      screenshotReview: screenshotReview(entry.requiredMarkers, summary.output, issues, entryDriftIssues),
+      screenshotReview: screenshotReview(entry.requiredMarkers, summary.output, issues, entryDriftIssues, referenceEntry?.review),
     };
   });
 
@@ -236,7 +259,10 @@ export function createShowcaseBaselineReport(
       unexpectedSummaryIds.length === 0 &&
       entries.every((entry) => entry.issues.length === 0),
     driftOk: entries.every((entry) => entry.driftIssues.length === 0),
-    reviewReady: entries.every((entry) => entry.screenshotReview.status === "ready_for_review"),
+    reviewReady: entries.every((entry) =>
+      ["ready_for_review", "approved_reference_current"].includes(entry.screenshotReview.status),
+    ),
+    approvedReferenceReady: entries.every((entry) => entry.screenshotReview.status === "approved_reference_current"),
     generatedAt,
     fixtureCount: catalogEntries.length,
     renderedCount: summaryEntries.length,

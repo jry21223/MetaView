@@ -270,13 +270,29 @@ Local preview helpers:
    `screenshotReview` metadata. A `ready_for_review` status means the PNG passed
    automated quality gates and includes the required static markers; `blocked`
    records missing-summary or under-baseline blockers; `drift_review_needed`
-   records reference drift that should be visually checked before release. To
-   compare against a previous report without changing the hard failure contract,
-   pass
+   records reference drift that should be visually checked before release;
+   `approved_reference_current` means the render still matches a reference entry
+   that carries explicit human-review metadata. To compare against a previous
+   report without changing the hard failure contract, pass
    `SHOWCASE_BASELINE_REFERENCE=eval/reports/subject-visual-showcase-baseline.json`;
    the command will emit `driftOk` and per-fixture drift warnings separately from
    under-baseline failures. Script path inputs accept either workspace-relative
    paths such as `../../eval/...` or repo-root-relative paths such as `eval/...`.
+   To create an approved reference, keep the reviewed report out of the generated
+   smoke directory and add `review` to each approved entry:
+
+   ```json
+   {
+     "id": "projectile_motion",
+     "stats": { "...": "measured screenshot stats" },
+     "review": {
+       "status": "approved",
+       "reviewer": "visual-reviewer",
+       "approvedAt": "2026-07-02T00:00:00.000Z",
+       "notes": "Projectile asset, trail, vectors, and formula card reviewed."
+     }
+   }
+   ```
 
 4. Render a single fixture through the existing Remotion composition:
 
