@@ -19,9 +19,8 @@ function resolveMoleculeAsset(snapshot: Molecule2DSceneSnapshot, packId: string)
   if (snapshot.molecule_asset_id) return resolveAssetById(packId, snapshot.molecule_asset_id);
   return (
     resolveAssetForRenderer("molecule_2d_scene", snapshot.molecule_id, packId) ??
-    resolveAssetForRenderer("molecule_2d_scene", "molecule", packId) ??
     resolveAssetByRole("chemistry", snapshot.molecule_id, packId) ??
-    resolveAssetByRole("chemistry", "molecule", packId)
+    resolveAssetByRole("chemistry", snapshot.molecule_id)
   );
 }
 

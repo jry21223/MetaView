@@ -462,7 +462,7 @@ function addMoleculeRenderedAssetIds(
   if (snapshot.molecule_asset_id) {
     assetIds.add(snapshot.molecule_asset_id);
   } else {
-    addResolvedRoleAssetId(assetIds, context, "chemistry", snapshot.molecule_id, snapshot.pack_id, ["molecule"]);
+    addResolvedRoleAssetId(assetIds, context, "chemistry", snapshot.molecule_id, snapshot.pack_id);
   }
 
   for (const atom of snapshot.atoms) {

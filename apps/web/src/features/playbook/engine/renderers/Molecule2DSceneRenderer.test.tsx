@@ -88,4 +88,34 @@ describe("Molecule2DSceneRenderer", () => {
     expect(markup).toContain('data-asset-id="bond-line"');
     expect(markup).not.toContain('data-missing-asset="true"');
   });
+
+  it("does not mark a generic molecule preset when a structured molecule has no molecule asset", () => {
+    const markup = renderToStaticMarkup(
+      <Molecule2DSceneRenderer
+        {...props(
+          waterSnapshot({
+            molecule_id: "carbon_dioxide",
+            molecule_asset_id: undefined,
+            smiles: "O=C=O",
+            atoms: [
+              { id: "o1", element: "O", x: 30, y: 50 },
+              { id: "c", element: "C", x: 50, y: 50 },
+              { id: "o2", element: "O", x: 70, y: 50 },
+            ],
+            bonds: [
+              { id: "o1-c", from: "o1", to: "c", order: 2 },
+              { id: "c-o2", from: "c", to: "o2", order: 2 },
+            ],
+          }),
+        )}
+      />,
+    );
+
+    expect(markup).toContain('data-molecule-id="carbon_dioxide"');
+    expect(markup).toContain('data-structured-molecule="true"');
+    expect(markup).toContain('data-asset-id="atom-core"');
+    expect(markup).toContain('data-asset-id="bond-line"');
+    expect(markup).not.toContain('data-asset-id="water-molecule-preset"');
+    expect(markup).not.toContain('data-missing-asset="true"');
+  });
 });

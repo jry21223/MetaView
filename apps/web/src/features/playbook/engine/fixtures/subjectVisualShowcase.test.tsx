@@ -126,6 +126,7 @@ describe("subject visual showcase catalog", () => {
       status: "matched",
       contractIds: ["carbon-dioxide-structure-contract"],
       requiredAssetIds: ["atom-core", "bond-line"],
+      renderedAssetIds: ["atom-core", "bond-line"],
       missingAssetIds: [],
     });
     expect(getSubjectVisualShowcaseEntry("derivative_tangent")?.contractCoverage).toMatchObject({
