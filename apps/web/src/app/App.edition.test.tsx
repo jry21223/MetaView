@@ -158,7 +158,7 @@ describe("App edition shells", () => {
     const { container, getByRole, getByText } = render(<App />);
 
     expect(container.querySelectorAll(".mv-top")).toHaveLength(1);
-    fireEvent.click(getByRole("button", { name: /数学题/ }));
+    fireEvent.click(getByRole("button", { name: /二分查找/ }));
 
     await waitFor(() =>
       expect(getByRole("button", { name: "显示顶部栏" })).toBeTruthy(),

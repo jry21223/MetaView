@@ -33,7 +33,11 @@ describe("IntakeScreen launch home", () => {
     const { container, getByText, queryByText, getByRole } = renderIntake();
 
     expect(getByText("输入题目或代码，生成可播放的分步讲解")).toBeTruthy();
-    expect(getByText("支持数学、算法、物理和代码追踪；生成后可继续追问修改，也可导出视频。")).toBeTruthy();
+    expect(
+      getByText(
+        "覆盖数学、物理、化学、生物、地理与算法代码；生成后可继续追问，也可导出视频。",
+      ),
+    ).toBeTruthy();
     expect(queryByText(/截图/)).toBeNull();
     expect(queryByText(/翻译/)).toBeNull();
     expect(queryByText("英语拆解")).toBeNull();
@@ -43,13 +47,22 @@ describe("IntakeScreen launch home", () => {
         '[data-testid="meta-particle-field"][data-variant="canvas"]',
       ),
     ).toBeTruthy();
-    expect(getByText("数学题")).toBeTruthy();
-    expect(getByText("算法代码")).toBeTruthy();
-    expect(getByText("物理题")).toBeTruthy();
-    expect(getByText("化学计量")).toBeTruthy();
+    expect(getByText("二分查找")).toBeTruthy();
+    expect(getByText("抛体运动")).toBeTruthy();
+    expect(getByText("配平方程")).toBeTruthy();
+    expect(getByText("孟德尔遗传")).toBeTruthy();
     expect(
       (getByRole("button", { name: "生成讲解" }) as HTMLButtonElement).disabled,
     ).toBe(true);
+  });
+
+  it("drops duplicate hero copy and composer hints for a calmer intake", () => {
+    const { queryByText } = renderIntake();
+
+    expect(queryByText(/THEORETICAL CANVAS/)).toBeNull();
+    expect(queryByText("支持代码片段和代码文件")).toBeNull();
+    expect(queryByText("数学题")).toBeNull();
+    expect(queryByText("化学计量")).toBeNull();
   });
 
   it("keeps code upload as a secondary composer action instead of a persistent tab", () => {
@@ -63,30 +76,28 @@ describe("IntakeScreen launch home", () => {
     expect(uploadButton.textContent).toContain("代码文件");
   });
 
-  it("submits math templates with a supported domain hint", () => {
+  it("submits physics examples with a supported domain hint", () => {
     const { getByRole, props } = renderIntake();
 
-    fireEvent.click(getByRole("button", { name: /数学题/ }));
+    fireEvent.click(getByRole("button", { name: /抛体运动/ }));
 
     expect(props.onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({
-        domain: "math",
-        template: "math-problem",
-        title: "数学题",
+        domain: "physics",
+        title: "抛体运动",
       }),
     );
   });
 
-  it("submits chemistry templates with a supported domain hint", () => {
+  it("submits biology examples with a supported domain hint", () => {
     const { getByRole, props } = renderIntake();
 
-    fireEvent.click(getByRole("button", { name: /化学计量/ }));
+    fireEvent.click(getByRole("button", { name: /孟德尔遗传/ }));
 
     expect(props.onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({
-        domain: "chemistry",
-        template: "chemistry-stoichiometry",
-        title: "化学计量",
+        domain: "biology",
+        title: "孟德尔遗传",
       }),
     );
   });

@@ -120,7 +120,7 @@ describe("mobile web smoke", () => {
       expect(container.querySelector(".mv-intake-hero")).toBeTruthy();
       expect(container.querySelector(".mv-intake-composer")).toBeTruthy();
       expect(container.querySelector(".mv-intake-send")).toBeTruthy();
-      expect(container.querySelectorAll(".mv-tpl-card")).toHaveLength(4);
+      expect(container.querySelectorAll(".mv-intake-example")).toHaveLength(4);
       expect(
         container.querySelector('[data-testid="meta-particle-field"][data-variant="canvas"]'),
       ).toBeTruthy();

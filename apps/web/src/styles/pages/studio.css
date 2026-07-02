@@ -1789,7 +1789,7 @@
 
 .mv-intake-hero,
 .mv-intake-composer,
-.mv-intake-templates {
+.mv-intake-examples {
   position: relative;
   z-index: 1;
 }
@@ -1805,12 +1805,18 @@
 .mv-intake-hero-visual {
   position: relative;
   width: min(680px, calc(100vw - 48px));
-  height: clamp(96px, 14vw, 128px);
+  height: clamp(56px, 8vw, 76px);
   display: grid;
   place-items: center;
   margin: 0 auto 4px;
   overflow: visible;
-  opacity: 0.62;
+  opacity: 0.32;
+}
+
+/* Calm intake: drop the grid and dashed-path layers, keep the node accents. */
+.mv-intake-hero-visual .mv-meta-particle__canvas-grid,
+.mv-intake-hero-visual .mv-meta-particle__canvas-path {
+  display: none;
 }
 
 .mv-meta-particle {
@@ -2167,7 +2173,7 @@
 }
 
 .mv-intake-composer {
-  width: min(640px, calc(100vw - 40px));
+  width: min(720px, calc(100vw - 40px));
   margin-top: 22px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
@@ -2321,12 +2327,6 @@
   display: inline;
 }
 
-.mv-intake-hint {
-  color: color-mix(in srgb, var(--ink-3) 76%, transparent);
-  font-size: 12px;
-  line-height: 1;
-}
-
 .mv-intake-action svg,
 .mv-intake-send svg,
 .mv-tpl-card svg {
@@ -2386,14 +2386,27 @@
   opacity: 0.52;
 }
 
-.mv-intake-templates {
-  width: min(640px, calc(100vw - 40px));
+.mv-intake-examples {
+  width: min(720px, calc(100vw - 40px));
   max-width: none;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
   gap: 8px;
   margin-top: 0;
   opacity: 0.86;
+}
+
+.mv-intake-examples__label {
+  color: color-mix(in srgb, var(--ink-3) 82%, transparent);
+  font-size: 12px;
+}
+
+.mv-intake-example {
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 999px;
 }
 
 .mv-tpl-card {
@@ -2455,7 +2468,7 @@
   }
 
   .mv-intake-composer,
-  .mv-intake-templates {
+  .mv-intake-examples {
     width: min(640px, calc(100vw - 40px));
   }
 }
@@ -2497,10 +2510,6 @@
     padding: 8px 6px;
   }
 
-  .mv-intake-hint {
-    display: none;
-  }
-
   .mv-intake-body {
     align-content: start;
     gap: 10px;
@@ -2537,7 +2546,7 @@
   }
 
   .mv-intake-composer,
-  .mv-intake-templates {
+  .mv-intake-examples {
     width: 100%;
   }
 
@@ -2559,8 +2568,7 @@
     justify-content: space-between;
   }
 
-  .mv-intake-action span,
-  .mv-intake-hint {
+  .mv-intake-action span {
     display: none;
   }
 
@@ -2574,9 +2582,8 @@
     min-height: 38px;
   }
 
-  .mv-intake-templates {
+  .mv-intake-examples {
     gap: 8px;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .mv-tpl-card {
@@ -2625,13 +2632,6 @@
 
   .mv-intake-input {
     min-height: 92px;
-  }
-
-  .mv-intake-hint {
-    max-width: 170px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 }
 

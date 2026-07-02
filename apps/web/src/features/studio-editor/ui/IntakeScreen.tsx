@@ -10,60 +10,45 @@ type IntakeDomain =
   | "biology"
   | "geography";
 
-type IntakeTemplate =
-  | "math-problem"
-  | "algorithm-code"
-  | "physics-problem"
-  | "chemistry-stoichiometry";
-
 const UNSUPPORTED_FILE_WARNING =
   "当前只支持上传代码文件。图片、PDF、课件暂未接入生成管线。";
 
-const TEMPLATE_GALLERY: Array<{
-  id: IntakeTemplate;
-  domain: IntakeDomain | null;
-  title: string;
-  desc: string;
+/** One-line example prompts under the composer; the full gallery lives on the 模板 page. */
+const EXAMPLE_PROMPTS: Array<{
+  id: string;
+  domain: IntakeDomain;
+  label: string;
   prompt: string;
-  icon: "math" | "code" | "physics" | "chemistry";
 }> = [
   {
-    id: "math-problem",
-    domain: "math",
-    title: "数学题",
-    desc: "函数、极限、积分、公式推导",
-    prompt: "生成一个数学题讲解：用步骤和图像解释函数、极限、积分或公式推导。",
-    icon: "math",
-  },
-  {
-    id: "algorithm-code",
+    id: "binary-search",
     domain: "algorithm",
-    title: "算法代码",
-    desc: "排序、指针、变量变化、代码同步",
-    prompt: "生成一个算法代码讲解：展示代码同步高亮、变量变化和指针移动。",
-    icon: "code",
+    label: "二分查找",
+    prompt: "生成一个算法讲解：演示二分查找的指针移动和区间收缩过程。",
   },
   {
-    id: "physics-problem",
+    id: "projectile-motion",
     domain: "physics",
-    title: "物理题",
-    desc: "受力、运动、能量过程",
-    prompt: "生成一个物理题讲解：展示受力、运动过程或能量变化。",
-    icon: "physics",
+    label: "抛体运动",
+    prompt: "生成一个物理题讲解：演示抛体运动的受力分析、速度分解和轨迹。",
   },
   {
-    id: "chemistry-stoichiometry",
+    id: "balance-equation",
     domain: "chemistry",
-    title: "化学计量",
-    desc: "配平、物质的量、反应比例关系",
-    prompt: "生成一个化学计量题讲解：展示方程式配平、物质的量换算和反应比例推导。",
-    icon: "chemistry",
+    label: "配平方程",
+    prompt: "生成一个化学讲解：演示化学方程式配平和物质的量换算。",
+  },
+  {
+    id: "mendel-genetics",
+    domain: "biology",
+    label: "孟德尔遗传",
+    prompt: "生成一个生物讲解：演示孟德尔豌豆杂交实验的显隐性遗传规律。",
   },
 ];
 
 export interface IntakeContext {
   domain: IntakeDomain | null;
-  template: IntakeTemplate | "freeform";
+  template: string;
   title: string;
   raw: string;
   files: Array<{ name: string; size: number }>;
@@ -77,46 +62,6 @@ interface IntakeScreenProps {
   submitError?: string | null;
   /** Seeds the composer once on mount (e.g. editing a failed run's prompt). */
   initialPrompt?: string;
-}
-
-function Icon({ kind }: { kind: (typeof TEMPLATE_GALLERY)[number]["icon"] }) {
-  if (kind === "code") {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-        <path d="m8 9-4 3 4 3" />
-        <path d="m16 9 4 3-4 3" />
-        <path d="m14 5-4 14" />
-      </svg>
-    );
-  }
-  if (kind === "physics") {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-        <path d="M4 18h16" />
-        <path d="M7 18 17 6" />
-        <path d="m14 6 3 0 0 3" />
-        <circle cx="9" cy="15" r="2" />
-      </svg>
-    );
-  }
-  if (kind === "chemistry") {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-        <path d="M9 3h6" />
-        <path d="M10 3v5l-4.8 8.3A3.2 3.2 0 0 0 8 21h8a3.2 3.2 0 0 0 2.8-4.7L14 8V3" />
-        <path d="M7.5 16h9" />
-        <circle cx="10" cy="18" r="0.8" />
-        <circle cx="14" cy="18" r="0.8" />
-      </svg>
-    );
-  }
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-      <path d="M4 18c4-10 8-10 12 0" />
-      <path d="M4 6h16" />
-      <path d="M6 14h12" />
-    </svg>
-  );
 }
 
 function readFileAsText(file: File): Promise<string> {
@@ -300,13 +245,13 @@ export function IntakeScreen({
     }
   };
 
-  const pickTemplate = (tpl: (typeof TEMPLATE_GALLERY)[number]) => {
+  const pickExample = (example: (typeof EXAMPLE_PROMPTS)[number]) => {
     if (pending) return;
     void Promise.resolve(onSubmit({
-      domain: tpl.domain,
-      template: tpl.id,
-      title: tpl.title,
-      raw: tpl.prompt,
+      domain: example.domain,
+      template: example.id,
+      title: example.label,
+      raw: example.prompt,
       files: [],
     })).catch(() => undefined);
   };
@@ -317,10 +262,9 @@ export function IntakeScreen({
         <div className="mv-intake-hero-visual">
           <MetaParticleField variant="canvas" className="mv-motion-decorative" />
         </div>
-        <div className="mv-eyebrow-mini">THEORETICAL CANVAS / 学习过程可视化</div>
         <h1 className="mv-intake-title">输入题目或代码，生成可播放的分步讲解</h1>
         <p className="mv-intake-sub">
-          支持数学、算法、物理和代码追踪；生成后可继续追问修改，也可导出视频。
+          覆盖数学、物理、化学、生物、地理与算法代码；生成后可继续追问，也可导出视频。
         </p>
       </section>
 
@@ -364,7 +308,7 @@ export function IntakeScreen({
               void submit();
             }
           }}
-          style={{ resize: "none", overflow: "hidden", minHeight: 108 }}
+          style={{ resize: "none", overflow: "hidden", minHeight: 132 }}
         />
 
         <div className="mv-intake-actions">
@@ -395,7 +339,6 @@ export function IntakeScreen({
                 e.target.value = "";
               }}
             />
-            <span className="mv-intake-hint">支持代码片段和代码文件</span>
           </div>
 
           <div className="mv-intake-submitrow">
@@ -416,20 +359,17 @@ export function IntakeScreen({
         </div>
       </section>
 
-      <section className="mv-intake-templates" aria-label="常用模板">
-        {TEMPLATE_GALLERY.map((tpl) => (
+      <section className="mv-intake-examples" aria-label="示例题目">
+        <span className="mv-intake-examples__label">试试：</span>
+        {EXAMPLE_PROMPTS.map((example) => (
           <button
-            key={tpl.id}
-            className="mv-tpl-card"
+            key={example.id}
+            className="mv-chip mv-intake-example"
             type="button"
             disabled={pending}
-            onClick={() => pickTemplate(tpl)}
+            onClick={() => pickExample(example)}
           >
-            <span className="mv-tpl-head">
-              <span className="mv-tpl-title">{tpl.title}</span>
-              <Icon kind={tpl.icon} />
-            </span>
-            <span className="mv-tpl-desc">{tpl.desc}</span>
+            {example.label}
           </button>
         ))}
       </section>
