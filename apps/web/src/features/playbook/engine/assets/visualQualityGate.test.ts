@@ -120,6 +120,48 @@ describe("visualQualityGate", () => {
     );
   });
 
+  it("warns when biology callout labels may overlap", () => {
+    const warnings = visualQualityGate(
+      script({
+        domain: "biology",
+        steps: [
+          {
+            step_id: "cell_overlap",
+            end_frame: 90,
+            title: "Cell callout overlap",
+            voiceover_text: "",
+            tokens: [],
+            snapshot: {
+              kind: "bio_cell_scene",
+              pack_id: "biology-basic",
+              cell_type: "animal",
+              structures: [
+                { id: "nucleus", semantic_role: "nucleus", label: "nucleus", x: 50, y: 48, width: 20, height: 18, asset_id: "nucleus" },
+                { id: "mitochondrion", semantic_role: "mitochondrion", label: "mitochondrion", x: 52, y: 49, width: 16, height: 10, asset_id: "mitochondrion" },
+              ],
+              callouts: [
+                { id: "nucleus-note", target_id: "nucleus", label: "stores DNA", side: "right" },
+                { id: "energy-note", target_id: "mitochondrion", label: "energy release", side: "right" },
+              ],
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "possible_label_overlap",
+          step_id: "cell_overlap",
+          domain: "biology",
+          snapshot_kind: "bio_cell_scene",
+          label_ids: ["callout:nucleus-note", "callout:energy-note"],
+        }),
+      ]),
+    );
+  });
+
   it("warns when a biology asset_id cannot be resolved", () => {
     const warnings = visualQualityGate(
       script({

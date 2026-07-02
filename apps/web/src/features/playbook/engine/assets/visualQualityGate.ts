@@ -24,6 +24,7 @@ export type VisualQualityWarningCode =
   | "low_chemistry_reaction_assets"
   | "low_algorithm_state_visuals"
   | "low_math_visual_richness"
+  | "possible_label_overlap"
   | "unsupported_array_fallback";
 
 export interface VisualQualityWarning {
@@ -34,6 +35,7 @@ export interface VisualQualityWarning {
   domain?: string;
   asset_id?: string;
   pack_id?: string | null;
+  label_ids?: [string, string];
   snapshot_path?: string;
 }
 
@@ -104,6 +106,103 @@ function checkAssetIdFromPackOrAny(
   });
 }
 
+interface LabelRect {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+function labelRect(
+  id: string,
+  label: string | null | undefined,
+  x: number,
+  y: number,
+  anchor: "start" | "middle" | "end" = "middle",
+): LabelRect | undefined {
+  const trimmed = label?.trim();
+  if (!trimmed) return undefined;
+  const width = Math.max(8, Math.min(34, trimmed.length * 1.35 + 4));
+  const height = 5.4;
+  const left = anchor === "start" ? x : anchor === "end" ? x - width : x - width / 2;
+  return { id, label: trimmed, x: left, y: y - height, width, height };
+}
+
+function rectsOverlap(first: LabelRect, second: LabelRect): boolean {
+  return (
+    first.x < second.x + second.width &&
+    first.x + first.width > second.x &&
+    first.y < second.y + second.height &&
+    first.y + first.height > second.y
+  );
+}
+
+function checkLabelOverlaps(
+  warnings: VisualQualityWarning[],
+  context: SnapshotContext,
+  rects: Array<LabelRect | undefined>,
+) {
+  const labels = rects.filter((rect): rect is LabelRect => Boolean(rect));
+  for (let firstIndex = 0; firstIndex < labels.length; firstIndex += 1) {
+    for (let secondIndex = firstIndex + 1; secondIndex < labels.length; secondIndex += 1) {
+      const first = labels[firstIndex];
+      const second = labels[secondIndex];
+      if (!rectsOverlap(first, second)) continue;
+      warn(warnings, context, {
+        code: "possible_label_overlap",
+        domain: context.domain,
+        label_ids: [first.id, second.id],
+        message: `Labels "${first.label}" and "${second.label}" may overlap in ${context.snapshot.kind}.`,
+      });
+      return;
+    }
+  }
+}
+
+function clampPercent(value: number): number {
+  return Math.max(4, Math.min(96, value));
+}
+
+function geoPressureLabelPosition(
+  center: { x: number; y: number },
+  centers: Array<{ x: number; y: number }>,
+  index: number,
+): { x: number; y: number; anchor: "middle" | "start" | "end" } {
+  const overlapsEarlier = centers
+    .slice(0, index)
+    .some((other) => Math.abs(center.x - other.x) < 18 && Math.abs(center.y - other.y) < 14);
+  if (!overlapsEarlier) {
+    return { x: clampPercent(center.x), y: clampPercent(center.y - 8.2), anchor: "middle" };
+  }
+
+  const side = index % 2 === 0 ? -1 : 1;
+  return {
+    x: clampPercent(center.x + side * 11),
+    y: clampPercent(center.y + (center.y < 52 ? 10 : -10)),
+    anchor: side > 0 ? "start" : "end",
+  };
+}
+
+function bioCalloutLabelRect(
+  callout: { id: string; target_id: string; label: string; side?: "left" | "right" | "top" | "bottom" },
+  target: { x: number; y: number } | undefined,
+): LabelRect | undefined {
+  if (!target) return undefined;
+  const side = callout.side ?? (target.x < 50 ? "left" : "right");
+  if (side === "left") {
+    return labelRect(`callout:${callout.id}`, callout.label, Math.max(7, target.x - 32) - 2, target.y - 7, "end");
+  }
+  if (side === "top") {
+    return labelRect(`callout:${callout.id}`, callout.label, target.x, Math.max(20, target.y - 24), "middle");
+  }
+  if (side === "bottom") {
+    return labelRect(`callout:${callout.id}`, callout.label, target.x, Math.min(86, target.y + 24), "middle");
+  }
+  return labelRect(`callout:${callout.id}`, callout.label, Math.min(93, target.x + 32) + 2, target.y - 7, "start");
+}
+
 function checkGeoMapScene(
   warnings: VisualQualityWarning[],
   context: SnapshotContext,
@@ -124,6 +223,15 @@ function checkGeoMapScene(
   for (const flow of snapshot.flows) {
     checkAssetId(warnings, context, flow.asset_id, snapshot.pack_id);
   }
+
+  checkLabelOverlaps(
+    warnings,
+    context,
+    (snapshot.pressure_centers ?? []).map((center, index, centers) => {
+      const position = geoPressureLabelPosition(center, centers, index);
+      return labelRect(`pressure:${center.id}`, center.label, position.x, position.y, position.anchor);
+    }),
+  );
 }
 
 function checkPhysicsForceScene(
@@ -170,6 +278,14 @@ function checkBioCellScene(
   for (const structure of snapshot.structures) {
     checkAssetId(warnings, context, structure.asset_id, snapshot.pack_id);
   }
+
+  checkLabelOverlaps(
+    warnings,
+    context,
+    (snapshot.callouts ?? []).map((callout) =>
+      bioCalloutLabelRect(callout, snapshot.structures.find((structure) => structure.id === callout.target_id)),
+    ),
+  );
 }
 
 function checkBioProcessScene(
@@ -227,6 +343,14 @@ function checkMolecule2DScene(
   for (const bond of snapshot.bonds) {
     checkAssetId(warnings, context, bond.asset_id, snapshot.pack_id);
   }
+
+  checkLabelOverlaps(
+    warnings,
+    context,
+    (snapshot.callouts ?? []).map((callout) =>
+      bioCalloutLabelRect(callout, snapshot.atoms.find((atom) => atom.id === callout.target_id)),
+    ),
+  );
 }
 
 function checkReactionScene(
