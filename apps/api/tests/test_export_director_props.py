@@ -9,7 +9,7 @@ import pytest
 
 from app.application.use_cases.export_video import ExportVideoUseCase
 from app.domain.models.director import DirectorBeat, DirectorScript
-from app.domain.models.export_job import ExportJob, ExportOptions
+from app.domain.models.export_job import ExportAssetReport, ExportJob, ExportOptions
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.infrastructure.persistence.db_init import init_db
 from app.infrastructure.persistence.in_memory_export_repository import (
@@ -89,6 +89,40 @@ async def test_export_input_props_omits_director_when_missing(tmp_path) -> None:
     assert "director" not in use_case.input_props
 
 
+@pytest.mark.asyncio
+async def test_export_writes_asset_report_sidecar_when_job_has_report(tmp_path) -> None:
+    db = str(tmp_path / "export-asset-report.db")
+    init_db(db)
+    run_repo = SqliteRunRepository(db)
+    director_repo = SqliteRunDirectorRepository(db)
+    export_repo = InMemoryExportJobRepository()
+    await _seed_run(run_repo, "run-report")
+    await export_repo.create(
+        _job("job-report", "run-report").model_copy(update={"asset_report": _asset_report()})
+    )
+    use_case = RecordingExportVideoUseCase(
+        export_repo,
+        run_repo,
+        director_repo,
+        web_app_dir=tmp_path,
+        artifacts_dir=tmp_path / "artifacts",
+    )
+
+    await use_case.execute("job-report", "run-report", with_audio=False, tts=None)
+
+    job = await export_repo.get("job-report")
+    assert job is not None
+    assert job.asset_report_path is not None
+    report_path = Path(job.asset_report_path)
+    assert report_path.exists()
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report == {
+        "job_id": "job-report",
+        "run_id": "run-report",
+        "asset_report": _asset_report().model_dump(mode="json"),
+    }
+
+
 async def _seed_run(repo: SqliteRunRepository, run_id: str) -> None:
     await repo.create(run_id, "prompt", "2026-06-05T00:00:00+00:00")
     await repo.update(
@@ -122,6 +156,33 @@ def _job(job_id: str, run_id: str) -> ExportJob:
         job_id=job_id,
         run_id=run_id,
         created_at=datetime.now(timezone.utc).isoformat(),
+    )
+
+
+def _asset_report() -> ExportAssetReport:
+    return ExportAssetReport.model_validate(
+        {
+            "generated_by": "visual_quality_gate",
+            "entries": [
+                {
+                    "asset_id": "cc-by-diagram",
+                    "pack_id": "physics-basic",
+                    "license": "cc-by-4.0",
+                    "commercial_use_status": "allowed-with-attribution",
+                    "attribution": "Example Creator",
+                    "source_url": "https://example.test/asset",
+                    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+                    "requires_attribution": True,
+                    "commercial_use_restricted": False,
+                    "share_alike": False,
+                    "unknown_license": False,
+                    "warning_codes": ["asset_requires_attribution"],
+                    "step_ids": ["s1"],
+                }
+            ],
+            "attribution_required": ["physics-basic/cc-by-diagram"],
+            "license_risk": [],
+        }
     )
 
 

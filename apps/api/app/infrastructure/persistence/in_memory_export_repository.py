@@ -32,6 +32,7 @@ class InMemoryExportJobRepository:
         progress: float | None = None,
         message: str | None = None,
         output_path: str | None = None,
+        asset_report_path: str | None = None,
         error: str | None = None,
     ) -> None:
         async with self._lock:
@@ -47,6 +48,8 @@ class InMemoryExportJobRepository:
                 patch["message"] = message
             if output_path is not None:
                 patch["output_path"] = output_path
+            if asset_report_path is not None:
+                patch["asset_report_path"] = asset_report_path
             if error is not None:
                 patch["error"] = error
             self._jobs[job_id] = existing.model_copy(update=patch)

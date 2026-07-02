@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { TweakValues } from "../../features/studio-editor/hooks/useTweaks";
 import { usePipelinePoller } from "../../features/pipeline/hooks/usePipelinePoller";
 import { PlaybookPlayer } from "../../features/playbook/engine/player/PlaybookPlayer";
@@ -9,6 +9,7 @@ import type {
   PlaybookScript,
 } from "../../features/playbook/engine/types";
 import { ExportModal } from "../../features/export/ui/ExportModal";
+import { createAssetAttributionReportForScript } from "../../features/playbook/engine/assets/assetAttributionSummary";
 import {
   listRunFollowUps,
   restoreRunVersion,
@@ -467,6 +468,10 @@ export function StudioPage({
     ? (activePatchedRun.director ?? null)
     : director;
   const canExport = !!playbook && !!runId;
+  const exportAssetReport = useMemo(
+    () => (activePlaybook ? createAssetAttributionReportForScript(activePlaybook) : null),
+    [activePlaybook],
+  );
 
   useEffect(() => {
     if (error) onNavigate("intake");
@@ -482,6 +487,7 @@ export function StudioPage({
             activePlaybook?.steps?.[0]?.title ?? activePlaybook?.title ?? null
           }
           accentColor={t.accent}
+          assetReport={exportAssetReport}
           onClose={() => setExportOpen(false)}
         />
       )}

@@ -1,4 +1,5 @@
-import type { VisualQualityWarning, VisualQualityWarningCode } from "./visualQualityGate";
+import { visualQualityGate, type VisualQualityWarning, type VisualQualityWarningCode } from "./visualQualityGate";
+import type { PlaybookScript } from "../types";
 
 const ASSET_POLICY_WARNING_CODES = new Set<VisualQualityWarningCode>([
   "asset_requires_attribution",
@@ -30,6 +31,29 @@ export interface AssetAttributionSummary {
   shareAlike: AssetAttributionSummaryEntry[];
   unknownLicense: AssetAttributionSummaryEntry[];
   licenseRisk: AssetAttributionSummaryEntry[];
+}
+
+export interface AssetAttributionReportEntry {
+  asset_id: string;
+  pack_id: string | null;
+  license: VisualQualityWarning["license"];
+  commercial_use_status: VisualQualityWarning["commercialUseStatus"];
+  attribution: string | null;
+  source_url: string | null;
+  license_url: string | null;
+  requires_attribution: boolean;
+  commercial_use_restricted: boolean;
+  share_alike: boolean;
+  unknown_license: boolean;
+  warning_codes: VisualQualityWarningCode[];
+  step_ids: string[];
+}
+
+export interface AssetAttributionReport {
+  generated_by: "visual_quality_gate";
+  entries: AssetAttributionReportEntry[];
+  attribution_required: string[];
+  license_risk: string[];
 }
 
 function stableEntryKey(warning: VisualQualityWarning): string | null {
@@ -110,4 +134,37 @@ export function createAssetAttributionSummary(warnings: readonly VisualQualityWa
 
 export function assetAttributionEntryId(entry: Pick<AssetAttributionSummaryEntry, "pack_id" | "asset_id">): string {
   return entryId(entry);
+}
+
+function toReportEntry(entry: AssetAttributionSummaryEntry): AssetAttributionReportEntry {
+  return {
+    asset_id: entry.asset_id,
+    pack_id: entry.pack_id,
+    license: entry.license,
+    commercial_use_status: entry.commercialUseStatus,
+    attribution: entry.attribution,
+    source_url: entry.sourceUrl,
+    license_url: entry.licenseUrl,
+    requires_attribution: entry.requiresAttribution,
+    commercial_use_restricted: entry.commercialUseRestricted,
+    share_alike: entry.shareAlike,
+    unknown_license: entry.unknownLicense,
+    warning_codes: entry.warningCodes,
+    step_ids: entry.stepIds,
+  };
+}
+
+export function createAssetAttributionReport(warnings: readonly VisualQualityWarning[]): AssetAttributionReport | null {
+  const summary = createAssetAttributionSummary(warnings);
+  if (summary.entries.length === 0) return null;
+  return {
+    generated_by: "visual_quality_gate",
+    entries: summary.entries.map(toReportEntry),
+    attribution_required: summary.attributionRequired.map(assetAttributionEntryId),
+    license_risk: summary.licenseRisk.map(assetAttributionEntryId),
+  };
+}
+
+export function createAssetAttributionReportForScript(script: PlaybookScript): AssetAttributionReport | null {
+  return createAssetAttributionReport(visualQualityGate(script));
 }

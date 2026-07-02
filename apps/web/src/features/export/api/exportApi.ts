@@ -27,11 +27,35 @@ export interface ExportOptions {
   format?: ExportFormat;
 }
 
+export interface ExportAssetReportEntry {
+  asset_id: string;
+  pack_id: string | null;
+  license?: string | null;
+  commercial_use_status?: string | null;
+  attribution: string | null;
+  source_url: string | null;
+  license_url: string | null;
+  requires_attribution: boolean;
+  commercial_use_restricted: boolean;
+  share_alike: boolean;
+  unknown_license: boolean;
+  warning_codes: string[];
+  step_ids: string[];
+}
+
+export interface ExportAssetReport {
+  generated_by: "visual_quality_gate";
+  entries: ExportAssetReportEntry[];
+  attribution_required: string[];
+  license_risk: string[];
+}
+
 export interface ExportRequestBody {
   run_id: string;
   with_audio: boolean;
   tts?: ExportTtsConfig;
   options?: ExportOptions;
+  asset_report?: ExportAssetReport;
 }
 
 export interface ExportJobResponse {
@@ -41,6 +65,7 @@ export interface ExportJobResponse {
   progress: number;
   message: string | null;
   output_url: string | null;
+  asset_report_url: string | null;
   error: string | null;
   with_audio: boolean;
   created_at: string;

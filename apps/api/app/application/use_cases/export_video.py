@@ -28,7 +28,12 @@ import httpx
 from app.application.ports.director_repository import IRunDirectorRepository
 from app.application.ports.export_repository import IExportJobRepository
 from app.application.ports.run_repository import IRunRepository
-from app.domain.models.export_job import ExportJobStatus, ExportOptions, TtsConfig
+from app.domain.models.export_job import (
+    ExportAssetReport,
+    ExportJobStatus,
+    ExportOptions,
+    TtsConfig,
+)
 
 _RENDER_TAIL_LINES = 40
 
@@ -70,6 +75,7 @@ class ExportVideoUseCase:
             run = await self._runs.get(run_id)
             if run is None or run.playbook is None:
                 raise ValueError(f"Run {run_id!r} has no playbook to export")
+            job = await self._exports.get(job_id)
 
             playbook = run.playbook.model_dump()
             director = await self._get_export_director(run_id)
@@ -119,12 +125,22 @@ class ExportVideoUseCase:
 
             await self._run_remotion_render(job_id, props_path, output_path, opts)
 
+            asset_report_path = None
+            if job is not None and job.asset_report is not None:
+                asset_report_path = _write_asset_report_sidecar(
+                    job_dir,
+                    job_id=job_id,
+                    run_id=run_id,
+                    asset_report=job.asset_report,
+                )
+
             await self._exports.update(
                 job_id,
                 status=ExportJobStatus.COMPLETED,
                 progress=1.0,
                 message="完成",
                 output_path=str(output_path),
+                asset_report_path=str(asset_report_path) if asset_report_path else None,
             )
         except Exception as exc:  # noqa: BLE001
             logger.exception("export job %s failed", job_id)
@@ -292,6 +308,23 @@ def _resolve_remotion_bin(web_dir: Path) -> Path:
         "remotion CLI not found; run npm install for the web workspace or include "
         "node_modules/.bin/remotion in the deployment image"
     )
+
+
+def _write_asset_report_sidecar(
+    job_dir: Path,
+    *,
+    job_id: str,
+    run_id: str,
+    asset_report: ExportAssetReport,
+) -> Path:
+    report_path = job_dir / "asset-report.json"
+    payload = {
+        "job_id": job_id,
+        "run_id": run_id,
+        "asset_report": asset_report.model_dump(mode="json"),
+    }
+    report_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return report_path
 
 
 def _stretch_end_frames(playbook: dict[str, Any], audio_files: list[str]) -> dict[str, Any]:

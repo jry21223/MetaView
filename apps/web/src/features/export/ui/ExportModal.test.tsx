@@ -105,6 +105,104 @@ describe("ExportModal (issue #14 / #58 / #69 / #70 / #72 / #75)", () => {
     });
   });
 
+  it("forwards the asset attribution report to the submitted request body", async () => {
+    const captured = fixtureExportPipeline();
+
+    const { getByText } = render(
+      <ExportModal
+        runId="r1"
+        isDark
+        previewTitle="x"
+        assetReport={{
+          generated_by: "visual_quality_gate",
+          entries: [
+            {
+              asset_id: "cc-by-diagram",
+              pack_id: "physics-basic",
+              license: "cc-by-4.0",
+              commercial_use_status: "allowed-with-attribution",
+              attribution: "Example Creator",
+              source_url: "https://example.test/asset",
+              license_url: "https://creativecommons.org/licenses/by/4.0/",
+              requires_attribution: true,
+              commercial_use_restricted: false,
+              share_alike: false,
+              unknown_license: false,
+              warning_codes: ["asset_requires_attribution"],
+              step_ids: ["s1"],
+            },
+          ],
+          attribution_required: ["physics-basic/cc-by-diagram"],
+          license_risk: [],
+        }}
+        onClose={() => undefined}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.click(getByText("开始导出"));
+    });
+
+    await waitFor(() => expect(captured.body).not.toBeNull());
+    expect(captured.body).toMatchObject({
+      asset_report: {
+        generated_by: "visual_quality_gate",
+        entries: [
+          {
+            asset_id: "cc-by-diagram",
+            pack_id: "physics-basic",
+            attribution: "Example Creator",
+            requires_attribution: true,
+          },
+        ],
+        attribution_required: ["physics-basic/cc-by-diagram"],
+        license_risk: [],
+      },
+    });
+  });
+
+  it("renders an asset report download link when the completed job exposes one", async () => {
+    server.use(
+      http.post(`${API_BASE_URL}/api/v1/exports`, () =>
+        HttpResponse.json({
+          job_id: "j1",
+          run_id: "r1",
+          status: "queued",
+          progress: 0,
+          message: null,
+          output_url: null,
+          asset_report_url: null,
+          error: null,
+          with_audio: false,
+          created_at: "now",
+        }),
+      ),
+      http.get(`${API_BASE_URL}/api/v1/exports/j1`, () =>
+        HttpResponse.json({
+          job_id: "j1",
+          run_id: "r1",
+          status: "completed",
+          progress: 1,
+          message: null,
+          output_url: "/api/v1/exports/j1/download",
+          asset_report_url: "/api/v1/exports/j1/asset-report",
+          error: null,
+          with_audio: false,
+          created_at: "now",
+        }),
+      ),
+    );
+    const { getByText, findByText } = render(
+      <ExportModal runId="r1" isDark previewTitle="x" onClose={() => undefined} />,
+    );
+    await act(async () => {
+      fireEvent.click(getByText("开始导出"));
+    });
+
+    const link = await findByText(/下载授权报告/, {}, { timeout: 4000 });
+    expect((link as HTMLAnchorElement).href).toContain("/api/v1/exports/j1/asset-report");
+  });
+
   it("blocks audio export when TTS backend is still 'system'", async () => {
     const { getByText, findByRole } = render(
       <ExportModal runId="r1" isDark previewTitle="x" onClose={() => undefined} />,

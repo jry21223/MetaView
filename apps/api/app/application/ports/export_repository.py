@@ -18,5 +18,6 @@ class IExportJobRepository(Protocol):
         progress: float | None = None,
         message: str | None = None,
         output_path: str | None = None,
+        asset_report_path: str | None = None,
         error: str | None = None,
     ) -> None: ...

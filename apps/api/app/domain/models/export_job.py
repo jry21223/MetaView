@@ -31,6 +31,29 @@ class ExportOptions(BaseModel):
     format: ExportFormat = "mp4"
 
 
+class ExportAssetReportEntry(BaseModel):
+    asset_id: str
+    pack_id: str | None = None
+    license: str | None = None
+    commercial_use_status: str | None = None
+    attribution: str | None = None
+    source_url: str | None = None
+    license_url: str | None = None
+    requires_attribution: bool = False
+    commercial_use_restricted: bool = False
+    share_alike: bool = False
+    unknown_license: bool = False
+    warning_codes: list[str] = Field(default_factory=list)
+    step_ids: list[str] = Field(default_factory=list)
+
+
+class ExportAssetReport(BaseModel):
+    generated_by: Literal["visual_quality_gate"] = "visual_quality_gate"
+    entries: list[ExportAssetReportEntry] = Field(default_factory=list)
+    attribution_required: list[str] = Field(default_factory=list)
+    license_risk: list[str] = Field(default_factory=list)
+
+
 class TtsConfig(BaseModel):
     """Caller-supplied TTS provider config (LLM provider config is unrelated).
 
@@ -53,6 +76,8 @@ class ExportJob(BaseModel):
     progress: float = Field(default=0.0, ge=0.0, le=1.0)
     message: str | None = None
     output_path: str | None = None
+    asset_report: ExportAssetReport | None = None
+    asset_report_path: str | None = None
     error: str | None = None
     with_audio: bool = False
     created_at: str

@@ -5,6 +5,7 @@ import {
   buildDownloadUrl,
   getExportStatus,
   submitExport,
+  type ExportAssetReport,
   type ExportFormat,
   type ExportJobResponse,
   type ExportJobStatus,
@@ -16,6 +17,7 @@ interface ExportModalProps {
   isDark: boolean;
   previewTitle?: string | null;
   accentColor?: string;
+  assetReport?: ExportAssetReport | null;
   onClose: () => void;
 }
 
@@ -95,6 +97,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   isDark,
   previewTitle,
   accentColor,
+  assetReport,
   onClose,
 }) => {
   const [withAudio, setWithAudio] = useState(false);
@@ -234,6 +237,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         run_id: runId,
         with_audio: withAudio,
         options: { quality, fps, format },
+        ...(assetReport && { asset_report: assetReport }),
         ...(withAudio &&
           ttsConfig && {
             tts: {
@@ -557,6 +561,22 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   }}
                 >
                   下载 {fileExtension} ↓
+                </a>
+              )}
+              {job.asset_report_url && (
+                <a
+                  href={buildDownloadUrl(job.asset_report_url)}
+                  download
+                  style={{
+                    ...buttonBase,
+                    textDecoration: "none",
+                    border: `1px solid ${c.border}`,
+                    background: "transparent",
+                    color: c.text,
+                    fontWeight: 600,
+                  }}
+                >
+                  下载授权报告
                 </a>
               )}
               <button

@@ -229,6 +229,8 @@ carries share-alike obligations, has unknown licensing, or is not marked safe
 for commercial use. `PlaybookComposition` exposes those asset policy warnings as
 machine-readable root attributes (`data-asset-attribution-*` and
 `data-asset-license-risk-*`) so preview/export callers can build attribution and
-commercial-use reports without parsing renderer internals. The root `make check`
-path also runs the showcase smoke render so flagship assets must keep producing
-nonblank Remotion output.
+commercial-use reports without parsing renderer internals. Web export submits
+that report as structured `asset_report` metadata, and the API writes it as an
+`asset-report.json` sidecar with a dedicated download URL once rendering
+completes. The root `make check` path also runs the showcase smoke render so
+flagship assets must keep producing nonblank Remotion output.

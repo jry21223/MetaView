@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { VisualQualityWarning } from "./visualQualityGate";
-import { createAssetAttributionSummary } from "./assetAttributionSummary";
+import { createAssetAttributionReport, createAssetAttributionSummary } from "./assetAttributionSummary";
 
 describe("createAssetAttributionSummary", () => {
   it("deduplicates asset policy warnings into exportable attribution entries", () => {
@@ -87,5 +87,58 @@ describe("createAssetAttributionSummary", () => {
     expect(summary.commercialUseRestricted.map((entry) => entry.asset_id)).toEqual(["restricted-map"]);
     expect(summary.shareAlike.map((entry) => entry.asset_id)).toEqual(["cc-by-diagram"]);
     expect(summary.unknownLicense.map((entry) => entry.asset_id)).toEqual([]);
+  });
+
+  it("serializes asset policy warnings into a snake_case export report", () => {
+    const report = createAssetAttributionReport([
+      {
+        code: "asset_requires_attribution",
+        step_id: "s1",
+        snapshot_kind: "physics_force_scene",
+        snapshot_path: "snapshot",
+        domain: "physics",
+        asset_id: "cc-by-diagram",
+        pack_id: "physics-basic",
+        license: "cc-by-4.0",
+        commercialUseStatus: "allowed-with-attribution",
+        attribution: "Example Creator",
+        sourceUrl: "https://example.test/asset",
+        licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
+        message: "requires attribution",
+      },
+      {
+        code: "missing_asset",
+        step_id: "s2",
+        snapshot_kind: "physics_force_scene",
+        snapshot_path: "snapshot",
+        domain: "physics",
+        asset_id: "missing",
+        pack_id: "physics-basic",
+        message: "missing",
+      },
+    ]);
+
+    expect(report).toEqual({
+      generated_by: "visual_quality_gate",
+      entries: [
+        {
+          asset_id: "cc-by-diagram",
+          pack_id: "physics-basic",
+          license: "cc-by-4.0",
+          commercial_use_status: "allowed-with-attribution",
+          attribution: "Example Creator",
+          source_url: "https://example.test/asset",
+          license_url: "https://creativecommons.org/licenses/by/4.0/",
+          requires_attribution: true,
+          commercial_use_restricted: false,
+          share_alike: false,
+          unknown_license: false,
+          warning_codes: ["asset_requires_attribution"],
+          step_ids: ["s1"],
+        },
+      ],
+      attribution_required: ["physics-basic/cc-by-diagram"],
+      license_risk: [],
+    });
   });
 });
