@@ -198,6 +198,111 @@ def test_scene_blueprint_compiler_builds_physics_from_structured_layout_input() 
     assert verdict.status == PlaybookReviewStatus.CLEAN
 
 
+def test_scene_blueprint_compiler_builds_biology_from_structured_layout_input() -> None:
+    playbook = compile_scene_blueprint_to_playbook(
+        {
+            "id": "custom_cell_layout",
+            "subject": "biology",
+            "sceneType": "cell_structure",
+            "title": "Custom cell layout",
+            "visualIntent": ["show_cell_structure", "use_structured_layout"],
+            "cellType": "plant",
+            "structures": [
+                {"id": "cell-wall", "semanticRole": "cell", "label": "cell wall", "x": 48, "y": 52, "width": 72, "height": 54},
+                {"id": "nucleus", "semanticRole": "nucleus", "label": "nucleus", "x": 38, "y": 44, "width": 18, "height": 16},
+                {
+                    "id": "mitochondrion-right",
+                    "semanticRole": "mitochondrion",
+                    "label": "mitochondrion",
+                    "x": 65,
+                    "y": 60,
+                    "width": 14,
+                    "height": 9,
+                },
+            ],
+            "callouts": [
+                {"id": "nucleus-note", "targetId": "nucleus", "label": "controls gene expression", "side": "left"},
+            ],
+        },
+    )
+
+    snapshot = playbook.steps[0].snapshot.model_dump(mode="json", by_alias=True)
+
+    assert snapshot["kind"] == "bio_cell_scene"
+    assert snapshot["pack_id"] == "biology-basic"
+    assert snapshot["cell_type"] == "plant"
+    assert snapshot["structures"] == [
+        {"id": "cell-wall", "semantic_role": "cell", "label": "cell wall", "x": 48.0, "y": 52.0, "width": 72.0, "height": 54.0, "asset_id": "cell-outline"},
+        {"id": "nucleus", "semantic_role": "nucleus", "label": "nucleus", "x": 38.0, "y": 44.0, "width": 18.0, "height": 16.0, "asset_id": "nucleus"},
+        {
+            "id": "mitochondrion-right",
+            "semantic_role": "mitochondrion",
+            "label": "mitochondrion",
+            "x": 65.0,
+            "y": 60.0,
+            "width": 14.0,
+            "height": 9.0,
+            "asset_id": "mitochondrion",
+        },
+    ]
+    assert snapshot["callouts"] == [
+        {"id": "nucleus-note", "target_id": "nucleus", "label": "controls gene expression", "side": "left"},
+    ]
+
+    verdict = self_check_playbook(playbook, "Explain custom cell layout.")
+    assert verdict.status == PlaybookReviewStatus.CLEAN
+
+
+def test_scene_blueprint_compiler_builds_molecule_from_structured_layout_input() -> None:
+    playbook = compile_scene_blueprint_to_playbook(
+        {
+            "id": "carbon_dioxide",
+            "subject": "chemistry",
+            "sceneType": "molecule_2d_scene",
+            "title": "Carbon dioxide molecule",
+            "visualIntent": ["render_structured_molecule", "use_structured_layout"],
+            "moleculeId": "carbon_dioxide",
+            "smiles": "O=C=O",
+            "atoms": [
+                {"id": "o1", "element": "O", "x": 30, "y": 50, "label": "oxygen"},
+                {"id": "c", "element": "C", "x": 50, "y": 50, "label": "carbon"},
+                {"id": "o2", "element": "O", "x": 70, "y": 50, "label": "oxygen"},
+            ],
+            "bonds": [
+                {"id": "o1-c", "from": "o1", "to": "c", "order": 2},
+                {"id": "c-o2", "from": "c", "to": "o2", "order": 2},
+            ],
+            "callouts": [
+                {"id": "linear", "targetId": "c", "label": "linear geometry", "side": "top"},
+            ],
+            "formulaLatex": "CO_2",
+        },
+    )
+
+    snapshot = playbook.steps[0].snapshot.model_dump(mode="json", by_alias=True)
+
+    assert snapshot["kind"] == "molecule_2d_scene"
+    assert snapshot["pack_id"] == "chemistry-basic"
+    assert snapshot["molecule_id"] == "carbon_dioxide"
+    assert snapshot["smiles"] == "O=C=O"
+    assert snapshot["atoms"] == [
+        {"id": "o1", "element": "O", "x": 30.0, "y": 50.0, "charge": None, "label": "oxygen", "asset_id": "atom-core"},
+        {"id": "c", "element": "C", "x": 50.0, "y": 50.0, "charge": None, "label": "carbon", "asset_id": "atom-core"},
+        {"id": "o2", "element": "O", "x": 70.0, "y": 50.0, "charge": None, "label": "oxygen", "asset_id": "atom-core"},
+    ]
+    assert snapshot["bonds"] == [
+        {"id": "o1-c", "from": "o1", "to": "c", "order": 2, "label": None, "asset_id": "bond-line"},
+        {"id": "c-o2", "from": "c", "to": "o2", "order": 2, "label": None, "asset_id": "bond-line"},
+    ]
+    assert snapshot["callouts"] == [
+        {"id": "linear", "target_id": "c", "label": "linear geometry", "side": "top"},
+    ]
+    assert snapshot["formula_latex"] == "CO_2"
+
+    verdict = self_check_playbook(playbook, "Explain carbon dioxide structure.")
+    assert verdict.status == PlaybookReviewStatus.CLEAN
+
+
 def test_scene_blueprint_compiler_hydrates_water_from_molecule_preset() -> None:
     preset = resolve_molecule_preset_for_renderer("chemistry-basic", "water")
     assert preset is not None

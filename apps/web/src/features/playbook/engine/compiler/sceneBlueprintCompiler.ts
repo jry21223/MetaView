@@ -1,12 +1,26 @@
 import { resolveAssetByRole, resolveAssetForRenderer } from "../assets/assetResolver";
 import { visualQualityGate, type VisualQualityWarning } from "../assets/visualQualityGate";
-import {
-  resolveMoleculePresetBySmilesForRenderer,
-  resolveMoleculePresetForRenderer,
-} from "../kits/chemistry/moleculePresetResolver";
 import type { SubjectVisualKitSubject } from "../assets/assetRegistry";
 import { compileBinarySearchCodeTraceLayout } from "../kits/algorithm/BinarySearchLayoutCompiler";
 import { compileBfsGraphLayout, type GraphLayoutEdgeInput, type GraphLayoutNodeInput } from "../kits/algorithm/GraphLayoutCompiler";
+import {
+  compileBioCellLayout,
+  compileBioProcessLayout,
+  type BioCalloutInput,
+  type BioCellStructureInput,
+  type BioProcessConnectionInput,
+  type BioProcessStepInput,
+} from "../kits/biology/biologyLayouts";
+import {
+  compileMolecule2DLayout,
+  compileReactionLayout,
+  type Molecule2DAtomInput,
+  type Molecule2DBondInput,
+  type Molecule2DCalloutInput,
+  type ReactionArrowInput,
+  type ReactionElectronFlowInput,
+  type ReactionParticipantInput,
+} from "../kits/chemistry/chemistryLayouts";
 import type {
   AnySnapshot,
   BioCellSceneSnapshot,
@@ -34,6 +48,7 @@ type ChemistrySceneType =
   | "molecule_2d_scene"
   | "molecule_2d_water"
   | "molecule_2d_methane"
+  | "molecule_2d_glucose"
   | "reaction_scene"
   | "reaction_synthesis_water";
 type MathSceneType = "math_plot" | "derivative_tangent";
@@ -121,6 +136,12 @@ export interface BiologySceneBlueprint extends SceneBlueprintBase {
   subject: "biology";
   sceneType: BiologySceneType;
   cellType?: BioCellSceneSnapshot["cell_type"];
+  processId?: string;
+  structures?: BioCellStructureInput[];
+  steps?: BioProcessStepInput[];
+  processSteps?: BioProcessStepInput[];
+  connections?: BioProcessConnectionInput[];
+  callouts?: BioCalloutInput[];
 }
 
 export interface ChemistrySceneBlueprint extends SceneBlueprintBase {
@@ -128,6 +149,17 @@ export interface ChemistrySceneBlueprint extends SceneBlueprintBase {
   sceneType: ChemistrySceneType;
   moleculeId?: string;
   smiles?: string;
+  moleculeAssetId?: string | null;
+  atoms?: Molecule2DAtomInput[];
+  bonds?: Molecule2DBondInput[];
+  highlights?: string[];
+  callouts?: Molecule2DCalloutInput[];
+  formulaLatex?: string;
+  reactionId?: string;
+  reactants?: ReactionParticipantInput[];
+  products?: ReactionParticipantInput[];
+  arrows?: ReactionArrowInput[];
+  electronFlows?: ReactionElectronFlowInput[];
 }
 
 export interface MathSceneBlueprint extends SceneBlueprintBase {
@@ -166,7 +198,6 @@ export interface SceneBlueprintCompileResult {
 const DEFAULT_GEO_PACK_ID = "geography-earth-basic";
 const DEFAULT_PHYSICS_PACK_ID = "physics-basic";
 const DEFAULT_BIOLOGY_PACK_ID = "biology-basic";
-const DEFAULT_CORE_PACK_ID = "core-visual-basic";
 const DEFAULT_CHEMISTRY_PACK_ID = "chemistry-basic";
 const DEFAULT_MATH_PACK_ID = "math-basic";
 const DEFAULT_ALGORITHM_PACK_ID = "algorithm-code-basic";
@@ -218,197 +249,57 @@ function compileGeographySnapshot(blueprint: GeographySceneBlueprint): GeoMapSce
 
 function compileBiologySnapshot(blueprint: BiologySceneBlueprint): BioCellSceneSnapshot {
   const packId = blueprint.packId ?? DEFAULT_BIOLOGY_PACK_ID;
-  const cellAssetId = resolveAssetIdByRole("bio_cell_scene", "biology", packId, "cell");
-  const nucleusAssetId = resolveAssetIdByRole("bio_cell_scene", "biology", packId, "nucleus");
-  const mitochondrionAssetId = resolveAssetIdByRole("bio_cell_scene", "biology", packId, "mitochondrion");
-  const ribosomeAssetId = resolveAssetIdByRole("bio_cell_scene", "biology", packId, "ribosome");
-  const dnaAssetId = resolveAssetIdByRole("bio_cell_scene", "biology", packId, "dna");
-
-  return {
-    kind: "bio_cell_scene",
-    pack_id: packId,
-    cell_type: blueprint.cellType ?? "animal",
-    structures: [
-      { id: "cell", semantic_role: "cell", label: "cell membrane", x: 50, y: 52, width: 66, height: 50, asset_id: cellAssetId },
-      { id: "nucleus", semantic_role: "nucleus", label: "nucleus", x: 47, y: 48, width: 20, height: 18, asset_id: nucleusAssetId },
-      { id: "mitochondrion", semantic_role: "mitochondrion", label: "mitochondrion", x: 67, y: 59, width: 16, height: 10, asset_id: mitochondrionAssetId },
-      { id: "ribosome", semantic_role: "ribosome", label: "ribosome", x: 36, y: 61, width: 8, height: 7, asset_id: ribosomeAssetId },
-      { id: "dna", semantic_role: "dna", label: "DNA", x: 47, y: 48, width: 8, height: 12, asset_id: dnaAssetId },
-    ],
-    callouts: [
-      { id: "nucleus-callout", target_id: "nucleus", label: "stores DNA", side: "left" },
-      { id: "mitochondrion-callout", target_id: "mitochondrion", label: "releases energy", side: "right" },
-    ],
-    caption: blueprint.caption ?? "Animal cells contain specialized organelles with distinct functions.",
-  };
+  return compileBioCellLayout({
+    packId,
+    cellType: blueprint.cellType,
+    structures: blueprint.structures,
+    callouts: blueprint.callouts,
+    caption: blueprint.caption,
+  });
 }
 
 function compileBiologyProcessSnapshot(blueprint: BiologySceneBlueprint): BioProcessSceneSnapshot {
   const packId = blueprint.packId ?? DEFAULT_BIOLOGY_PACK_ID;
-  const dnaAssetId = resolveAssetIdByRole("bio_process_scene", "biology", packId, "dna");
-  const forkAssetId = resolveAssetIdByRole("bio_process_scene", "biology", packId, "process_step", [
-    "dna_replication",
-  ]);
-  const flowArrowAssetId = resolveAssetIdByRole("bio_process_scene", "core", DEFAULT_CORE_PACK_ID, "flow_arrow", [
-    "causal_arrow",
-  ]);
-
-  return {
-    kind: "bio_process_scene",
-    pack_id: packId,
-    process_id: "dna_replication",
-    steps: [
-      {
-        id: "template",
-        semantic_role: "dna",
-        label: "template DNA",
-        x: 22,
-        y: 48,
-        width: 18,
-        height: 38,
-        asset_id: dnaAssetId,
-      },
-      {
-        id: "fork",
-        semantic_role: "process_step",
-        label: "replication fork",
-        x: 50,
-        y: 48,
-        width: 24,
-        height: 24,
-        asset_id: forkAssetId,
-        description: "strand separation and base pairing",
-      },
-      {
-        id: "copy",
-        semantic_role: "dna",
-        label: "new strands",
-        x: 78,
-        y: 48,
-        width: 18,
-        height: 38,
-        asset_id: dnaAssetId,
-      },
-    ],
-    connections: [
-      {
-        id: "template-to-fork",
-        from: "template",
-        to: "fork",
-        semantic_role: "flow_arrow",
-        label: "unzip",
-        asset_id: flowArrowAssetId,
-      },
-      {
-        id: "fork-to-copy",
-        from: "fork",
-        to: "copy",
-        semantic_role: "flow_arrow",
-        label: "copy",
-        asset_id: flowArrowAssetId,
-      },
-    ],
-    callouts: [
-      { id: "base-pairing", target_id: "fork", label: "base pairing", side: "top" },
-    ],
-    caption: blueprint.caption ?? "DNA replication copies each strand by complementary base pairing.",
-  };
+  return compileBioProcessLayout({
+    packId,
+    processId: blueprint.processId,
+    steps: blueprint.steps ?? blueprint.processSteps,
+    connections: blueprint.connections,
+    callouts: blueprint.callouts,
+    caption: blueprint.caption,
+  });
 }
 
 function compileChemistrySnapshot(blueprint: ChemistrySceneBlueprint): Molecule2DSceneSnapshot {
   const packId = blueprint.packId ?? DEFAULT_CHEMISTRY_PACK_ID;
-  const moleculeId = blueprint.moleculeId ?? (blueprint.sceneType === "molecule_2d_methane" ? "methane" : "water");
-  const moleculePreset =
-    resolveMoleculePresetBySmilesForRenderer(packId, blueprint.smiles) ??
-    resolveMoleculePresetForRenderer(packId, moleculeId);
-  const moleculeAssetId =
-    moleculePreset?.moleculeAssetId ??
-    resolveAssetIdByRole("molecule_2d_scene", "chemistry", packId, moleculeId, ["molecule"]);
-  const atomAssetId = resolveAssetIdByRole("molecule_2d_scene", "chemistry", packId, "atom");
-  const bondAssetId = resolveAssetIdByRole("molecule_2d_scene", "chemistry", packId, "bond");
-  if (moleculePreset) {
-    return {
-      kind: "molecule_2d_scene",
-      pack_id: packId,
-      molecule_id: moleculePreset.moleculeId,
-      smiles: moleculePreset.smiles ?? blueprint.smiles,
-      molecule_asset_id: moleculeAssetId,
-      atoms: moleculePreset.atoms.map((atom) => ({ ...atom, asset_id: atomAssetId })),
-      bonds: moleculePreset.bonds.map((bond) => ({ ...bond, asset_id: bondAssetId })),
-      callouts: moleculePreset.callouts,
-      formula_latex: moleculePreset.formulaLatex,
-      caption: blueprint.caption ?? moleculePreset.caption,
-    };
-  }
-
-  return {
-    kind: "molecule_2d_scene",
-    pack_id: packId,
-    molecule_id: moleculeId,
+  return compileMolecule2DLayout({
+    packId,
+    sceneType: blueprint.sceneType,
+    moleculeId: blueprint.moleculeId,
     smiles: blueprint.smiles,
-    molecule_asset_id: moleculeAssetId,
-    atoms: [
-      { id: "o", element: "O", x: 50, y: 42, asset_id: atomAssetId, label: "oxygen" },
-      { id: "h1", element: "H", x: 35, y: 62, asset_id: atomAssetId, label: "hydrogen" },
-      { id: "h2", element: "H", x: 65, y: 62, asset_id: atomAssetId, label: "hydrogen" },
-    ],
-    bonds: [
-      { id: "oh1", from: "o", to: "h1", order: 1, asset_id: bondAssetId },
-      { id: "oh2", from: "o", to: "h2", order: 1, asset_id: bondAssetId },
-    ],
-    callouts: [
-      { id: "bent-shape", target_id: "o", label: "bent geometry", side: "top" },
-      { id: "polar-bond", target_id: "h2", label: "polar bonds", side: "right" },
-    ],
-    formula_latex: "H_2O",
-    caption: blueprint.caption ?? "Water is a bent polar molecule built from structured atom and bond data.",
-  };
+    moleculeAssetId: blueprint.moleculeAssetId,
+    atoms: blueprint.atoms,
+    bonds: blueprint.bonds,
+    highlights: blueprint.highlights,
+    callouts: blueprint.callouts,
+    formulaLatex: blueprint.formulaLatex,
+    caption: blueprint.caption,
+  });
 }
 
 function compileChemistryReactionSnapshot(blueprint: ChemistrySceneBlueprint): ReactionSceneSnapshot {
   const packId = blueprint.packId ?? DEFAULT_CHEMISTRY_PACK_ID;
-  const reactionArrowAssetId = resolveAssetIdByRole("reaction_scene", "chemistry", packId, "reaction_arrow");
-  const electronFlowAssetId = resolveAssetIdByRole("reaction_scene", "chemistry", packId, "electron_flow");
-
-  return {
-    kind: "reaction_scene",
-    pack_id: packId,
-    reaction_id: "reaction_synthesis_water",
-    reactants: [
-      { id: "h2", formula_latex: "H_2", label: "hydrogen", coefficient: 2, x: 18, y: 48 },
-      { id: "o2", formula_latex: "O_2", label: "oxygen", coefficient: 1, x: 38, y: 48 },
-    ],
-    products: [
-      { id: "h2o", formula_latex: "H_2O", label: "water", coefficient: 2, x: 78, y: 48 },
-    ],
-    arrows: [
-      {
-        id: "main-arrow",
-        semantic_role: "reaction_arrow",
-        from: [48, 48],
-        to: [66, 48],
-        label: "forms",
-        asset_id: reactionArrowAssetId,
-      },
-    ],
-    electron_flows: [
-      {
-        id: "electron-shift",
-        semantic_role: "electron_flow",
-        from: [39, 38],
-        to: [58, 36],
-        label: "bond rearrangement",
-        asset_id: electronFlowAssetId,
-      },
-    ],
-    callouts: [
-      { id: "balanced", target_id: "main-arrow", label: "balanced atoms", side: "top" },
-    ],
-    formula_latex: "2H_2 + O_2 \\rightarrow 2H_2O",
-    caption:
-      blueprint.caption ??
-      "A balanced reaction conserves each atom across reactants and products.",
-  };
+  return compileReactionLayout({
+    packId,
+    reactionId: blueprint.reactionId,
+    reactants: blueprint.reactants,
+    products: blueprint.products,
+    arrows: blueprint.arrows,
+    electronFlows: blueprint.electronFlows,
+    callouts: blueprint.callouts,
+    formulaLatex: blueprint.formulaLatex,
+    caption: blueprint.caption,
+  });
 }
 
 function compileMathSnapshot(blueprint: MathSceneBlueprint): MathPlotSnapshot {

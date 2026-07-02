@@ -46,10 +46,14 @@ is the narrow visual-compiler entrypoint for the current flagship subjects.
 It accepts intent-level fields such as `subject`, `sceneType`, `visualIntent`,
 and `emphasisPoints`, resolves assets through the shared asset resolver, applies
 deterministic layout defaults, and outputs normal `PlaybookScript`.
-Chemistry molecule scenes additionally hydrate structured JSON presets through
-`kits/chemistry/moleculePresetResolver.ts` before renderer asset ids are applied,
-so atom/bond/callout data comes from the asset pack rather than a hand-written
-water molecule inside the compiler.
+Biology scenes can now accept `structures`, `steps`, `connections`, and
+`callouts`; chemistry scenes can accept `atoms`, `bonds`, `reactants`,
+`products`, `arrows`, and `electronFlows`. Subject layout helpers consume those
+inputs first, then fall back to deterministic flagship defaults when the fields
+are absent. Chemistry molecule scenes additionally hydrate structured JSON
+presets through `kits/chemistry/moleculePresetResolver.ts` before renderer asset
+ids are applied, so atom/bond/callout data comes from either the blueprint or
+the asset pack rather than a hand-written water molecule inside the compiler.
 The backend mirror uses `apps/api/app/domain/services/molecule_preset_resolver.py`
 against the same public preset JSON before returning `PlaybookScript` to
 SkillPack/runtime-tool callers.
@@ -96,11 +100,15 @@ Current backend SkillPack adoption:
   ramp, spring, and pulley roles. Projectile/object placement, vectors,
   trajectories, and formulas now route through a physics layout compiler.
 - `biology-basic`: internal organelle and DNA process SVGs for `bio_cell_scene`
-  and `bio_process_scene`.
+  and `bio_process_scene`. The SceneBlueprint path routes custom cell
+  structures, process steps, connections, and callouts through a biology layout
+  compiler before emitting renderer snapshots.
 - `chemistry-basic`: internal atom/bond SVGs, reaction arrows, electron-flow
   SVGs, SMILES-addressable structured molecule presets, and a glucose SMILES
   fixture for API RDKit compilation into `molecule_2d_scene` and
-  `reaction_scene`.
+  `reaction_scene`. The SceneBlueprint path routes custom atom/bond layouts and
+  reaction participants through chemistry layout compilers while preserving
+  preset/RDKit fallbacks.
 - `math-basic`: structured plot presets for math plot/formula scenes.
 - `algorithm-code-basic`: internal graph node, queue, visited, active-edge,
   active-line, and pointer SVGs plus BFS graph, recursion-stack, and

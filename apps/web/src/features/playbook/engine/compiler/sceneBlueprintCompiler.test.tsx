@@ -258,6 +258,40 @@ describe("sceneBlueprintCompiler", () => {
     expect(markup).not.toContain('data-missing-asset="true"');
   });
 
+  it("compiles biology cell layout from structured input", () => {
+    const script = compileSceneBlueprintToPlaybookScript({
+      subject: "biology",
+      sceneType: "cell_structure",
+      title: "Custom cell layout",
+      visualIntent: ["show_cell_structure", "use_structured_layout"],
+      cellType: "plant",
+      structures: [
+        { id: "cell-wall", semanticRole: "cell", label: "cell wall", x: 48, y: 52, width: 72, height: 54 },
+        { id: "nucleus", semanticRole: "nucleus", label: "nucleus", x: 38, y: 44, width: 18, height: 16 },
+        { id: "mitochondrion-right", semanticRole: "mitochondrion", label: "mitochondrion", x: 65, y: 60, width: 14, height: 9 },
+      ],
+      callouts: [
+        { id: "nucleus-note", targetId: "nucleus", label: "controls gene expression", side: "left" },
+      ],
+    } as SceneBlueprint);
+
+    const snapshot = script.steps[0].snapshot;
+    if (snapshot.kind !== "bio_cell_scene") {
+      throw new Error(`Expected bio_cell_scene, got ${snapshot.kind}`);
+    }
+
+    expect(snapshot.cell_type).toBe("plant");
+    expect(snapshot.structures).toEqual([
+      { id: "cell-wall", semantic_role: "cell", label: "cell wall", x: 48, y: 52, width: 72, height: 54, asset_id: "cell-outline" },
+      { id: "nucleus", semantic_role: "nucleus", label: "nucleus", x: 38, y: 44, width: 18, height: 16, asset_id: "nucleus" },
+      { id: "mitochondrion-right", semantic_role: "mitochondrion", label: "mitochondrion", x: 65, y: 60, width: 14, height: 9, asset_id: "mitochondrion" },
+    ]);
+    expect(snapshot.callouts).toEqual([
+      { id: "nucleus-note", target_id: "nucleus", label: "controls gene expression", side: "left" },
+    ]);
+    expect(visualQualityGate(script)).toEqual([]);
+  });
+
   it("compiles a dna replication blueprint into an asset-backed biology process scene", () => {
     const script = compileSceneBlueprintToPlaybookScript({
       subject: "biology",
@@ -287,6 +321,52 @@ describe("sceneBlueprintCompiler", () => {
     expect(markup).toContain('data-process-id="dna_replication"');
     expect(markup).toContain('data-asset-id="replication-fork"');
     expect(markup).not.toContain('data-missing-asset="true"');
+  });
+
+  it("compiles molecule layout from structured atoms and bonds", () => {
+    const script = compileSceneBlueprintToPlaybookScript({
+      subject: "chemistry",
+      sceneType: "molecule_2d_scene",
+      title: "Carbon dioxide molecule",
+      visualIntent: ["render_structured_molecule", "use_structured_layout"],
+      moleculeId: "carbon_dioxide",
+      smiles: "O=C=O",
+      atoms: [
+        { id: "o1", element: "O", x: 30, y: 50, label: "oxygen" },
+        { id: "c", element: "C", x: 50, y: 50, label: "carbon" },
+        { id: "o2", element: "O", x: 70, y: 50, label: "oxygen" },
+      ],
+      bonds: [
+        { id: "o1-c", from: "o1", to: "c", order: 2 },
+        { id: "c-o2", from: "c", to: "o2", order: 2 },
+      ],
+      callouts: [
+        { id: "linear", targetId: "c", label: "linear geometry", side: "top" },
+      ],
+      formulaLatex: "CO_2",
+    } as SceneBlueprint);
+
+    const snapshot = script.steps[0].snapshot;
+    if (snapshot.kind !== "molecule_2d_scene") {
+      throw new Error(`Expected molecule_2d_scene, got ${snapshot.kind}`);
+    }
+
+    expect(snapshot.molecule_id).toBe("carbon_dioxide");
+    expect(snapshot.smiles).toBe("O=C=O");
+    expect(snapshot.atoms).toEqual([
+      { id: "o1", element: "O", x: 30, y: 50, label: "oxygen", asset_id: "atom-core" },
+      { id: "c", element: "C", x: 50, y: 50, label: "carbon", asset_id: "atom-core" },
+      { id: "o2", element: "O", x: 70, y: 50, label: "oxygen", asset_id: "atom-core" },
+    ]);
+    expect(snapshot.bonds).toEqual([
+      { id: "o1-c", from: "o1", to: "c", order: 2, asset_id: "bond-line" },
+      { id: "c-o2", from: "c", to: "o2", order: 2, asset_id: "bond-line" },
+    ]);
+    expect(snapshot.callouts).toEqual([
+      { id: "linear", target_id: "c", label: "linear geometry", side: "top" },
+    ]);
+    expect(snapshot.formula_latex).toBe("CO_2");
+    expect(visualQualityGate(script)).toEqual([]);
   });
 
   it("compiles a water molecule blueprint into a structured chemistry scene", () => {

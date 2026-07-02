@@ -81,8 +81,59 @@
     },
     "formulaLatex": { "type": "string", "minLength": 1 },
     "cellType": { "type": "string", "minLength": 1 },
+    "processId": { "type": "string", "minLength": 1 },
+    "structures": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/bioStructure" }
+    },
+    "steps": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/bioProcessStep" }
+    },
+    "processSteps": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/bioProcessStep" }
+    },
+    "connections": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/bioProcessConnection" }
+    },
+    "callouts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/callout" }
+    },
     "moleculeId": { "type": "string", "minLength": 1 },
+    "moleculeAssetId": { "type": ["string", "null"], "minLength": 1 },
     "smiles": { "type": "string", "minLength": 1 },
+    "atoms": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/moleculeAtom" }
+    },
+    "bonds": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/moleculeBond" }
+    },
+    "highlights": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "reactionId": { "type": "string", "minLength": 1 },
+    "reactants": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/reactionParticipant" }
+    },
+    "products": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/reactionParticipant" }
+    },
+    "arrows": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/reactionArrow" }
+    },
+    "electronFlows": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/reactionArrow" }
+    },
     "graphNodes": {
       "type": "array",
       "items": { "$ref": "#/$defs/graphNode" }
@@ -180,6 +231,109 @@
         "dy": { "type": "number" },
         "label": { "type": "string", "minLength": 1 },
         "magnitude": { "type": "string", "minLength": 1 }
+      }
+    },
+    "callout": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "targetId": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "side": { "type": "string", "enum": ["left", "right", "top", "bottom"] }
+      }
+    },
+    "bioStructure": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "semanticRole": { "type": "string", "minLength": 1 },
+        "label": { "type": ["string", "null"], "minLength": 1 },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "height": { "type": "number", "exclusiveMinimum": 0 },
+        "assetId": { "type": ["string", "null"], "minLength": 1 }
+      }
+    },
+    "bioProcessStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "semanticRole": { "type": "string", "minLength": 1 },
+        "label": { "type": ["string", "null"], "minLength": 1 },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "height": { "type": "number", "exclusiveMinimum": 0 },
+        "assetId": { "type": ["string", "null"], "minLength": 1 },
+        "description": { "type": ["string", "null"], "minLength": 1 }
+      }
+    },
+    "bioProcessConnection": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "from": { "type": "string", "minLength": 1 },
+        "to": { "type": "string", "minLength": 1 },
+        "semanticRole": { "type": "string", "minLength": 1 },
+        "label": { "type": ["string", "null"], "minLength": 1 },
+        "assetId": { "type": ["string", "null"], "minLength": 1 }
+      }
+    },
+    "moleculeAtom": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["element"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "element": { "type": "string", "minLength": 1 },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "charge": { "type": ["string", "null"], "minLength": 1 },
+        "label": { "type": ["string", "null"], "minLength": 1 },
+        "assetId": { "type": ["string", "null"], "minLength": 1 }
+      }
+    },
+    "moleculeBond": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "from": { "type": "string", "minLength": 1 },
+        "to": { "type": "string", "minLength": 1 },
+        "order": { "type": "number", "enum": [1, 2, 3] },
+        "label": { "type": ["string", "null"], "minLength": 1 },
+        "assetId": { "type": ["string", "null"], "minLength": 1 }
+      }
+    },
+    "reactionParticipant": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "formulaLatex": { "type": "string", "minLength": 1 },
+        "label": { "type": ["string", "null"], "minLength": 1 },
+        "coefficient": { "type": ["number", "null"] },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "assetId": { "type": ["string", "null"], "minLength": 1 }
+      }
+    },
+    "reactionArrow": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "semanticRole": { "type": "string", "minLength": 1 },
+        "from": { "$ref": "#/$defs/point" },
+        "to": { "$ref": "#/$defs/point" },
+        "label": { "type": ["string", "null"], "minLength": 1 },
+        "assetId": { "type": ["string", "null"], "minLength": 1 }
       }
     },
     "graphNode": {

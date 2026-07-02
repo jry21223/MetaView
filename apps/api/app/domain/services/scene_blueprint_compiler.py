@@ -3,12 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 from app.domain.models.playbook import (
-    BioCellCallout,
     BioCellSceneSnapshot,
-    BioCellStructure,
-    BioProcessConnection,
     BioProcessSceneSnapshot,
-    BioProcessStep,
     CallStackCodeTrace,
     CallStackFrame,
     CallStackSceneSnapshot,
@@ -20,14 +16,8 @@ from app.domain.models.playbook import (
     MathPlotCurve,
     MathPlotSnapshot,
     MetaStep,
-    Molecule2DAtom,
-    Molecule2DBond,
-    Molecule2DCallout,
     Molecule2DSceneSnapshot,
     PlaybookScript,
-    ReactionArrow,
-    ReactionElectronFlow,
-    ReactionParticipant,
     ReactionSceneSnapshot,
 )
 from app.domain.models.topic import TopicDomain
@@ -36,18 +26,20 @@ from app.domain.services.algorithm_layout_compiler import (
     compile_binary_search_code_highlight,
     compile_binary_search_code_trace_snapshot,
 )
-from app.domain.services.geography_layout_compiler import compile_geo_map_snapshot
-from app.domain.services.molecule_preset_resolver import (
-    resolve_molecule_preset_by_smiles_for_renderer,
-    resolve_molecule_preset_for_renderer,
+from app.domain.services.biology_layout_compiler import (
+    compile_bio_cell_snapshot,
+    compile_bio_process_snapshot,
 )
+from app.domain.services.chemistry_layout_compiler import (
+    compile_molecule_2d_snapshot,
+    compile_reaction_snapshot,
+)
+from app.domain.services.geography_layout_compiler import compile_geo_map_snapshot
 from app.domain.services.physics_layout_compiler import compile_physics_force_snapshot
-from app.domain.services.rdkit_molecule_compiler import compile_molecule_snapshot_from_smiles
 
 _FPS = 30
 _DEFAULT_STEP_FRAMES = 180
 _SCENE_BLUEPRINT_STEP_COUNT = 8
-_GLUCOSE_SMILES = "OC[C@H]1O[C@@H](O)[C@H](O)[C@H](O)[C@@H]1O"
 
 
 def compile_scene_blueprint_to_playbook(blueprint: dict[str, Any]) -> PlaybookScript:
@@ -167,14 +159,14 @@ def _step_captions(scene_type: str, title: str, base_caption: str) -> list[str]:
             ),
         ],
         "cell_structure": [
-            "细胞结构先看 bio_cell_scene 的整体轮廓，细胞膜定义了细胞内部与外部的边界。",
-            "细胞核位于细胞内部，callout 标出它储存 DNA，是遗传信息的核心位置。",
-            "DNA 资产放在细胞核附近，说明遗传信息不是抽象文字，而是细胞结构中的实际内容。",
-            "线粒体结构被单独标注，用来说明细胞能量释放与细胞器分工有关。",
-            "核糖体显示蛋白质合成的工作点，和细胞核中的遗传信息形成过程关系。",
-            "多个结构同时出现时，callout 帮助学生把名称、位置和功能一一对应。",
-            "这一帧把膜、核、线粒体、核糖体和 DNA 放在同一层级中，形成细胞结构地图。",
-            "结论回到细胞结构：细胞不是文字列表，而是由多个有位置、有功能的结构协同工作。",
+            "cell 结构先看 bio_cell_scene 的整体轮廓，细胞膜定义了细胞内部与外部的边界。",
+            "cell 的细胞核位于内部，callout 标出它储存 DNA，是遗传信息的核心位置。",
+            "cell 中的 DNA 资产放在细胞核附近，说明遗传信息不是抽象文字。",
+            "cell 的线粒体结构被单独标注，用来说明细胞能量释放与细胞器分工有关。",
+            "cell 里的核糖体显示蛋白质合成的工作点，和细胞核中的遗传信息形成过程关系。",
+            "cell 多个结构同时出现时，callout 帮助学生把名称、位置和功能一一对应。",
+            "这一帧把 cell 的膜、核、线粒体、核糖体和 DNA 放在同一层级中。",
+            "结论回到 cell 结构：细胞不是文字列表，而是由多个有位置、有功能的结构协同工作。",
         ],
         "dna_replication": [
             (
@@ -308,17 +300,17 @@ def _compile_snapshot(scene_type: str, blueprint: dict[str, Any]):
         return _east_asia_monsoon_snapshot(blueprint)
     if scene_type == "projectile_motion":
         return _projectile_motion_snapshot(blueprint)
-    if scene_type == "cell_structure":
+    if scene_type in {"cell_structure", "bio_cell_scene"}:
         return _cell_structure_snapshot(blueprint)
-    if scene_type == "dna_replication":
+    if scene_type in {"dna_replication", "bio_process_scene"}:
         return _dna_replication_snapshot(blueprint)
-    if scene_type == "molecule_2d_water":
+    if scene_type in {"molecule_2d_scene", "molecule_2d_water"}:
         return _water_molecule_snapshot(blueprint)
     if scene_type == "molecule_2d_methane":
         return _methane_molecule_snapshot(blueprint)
     if scene_type == "molecule_2d_glucose":
         return _glucose_molecule_snapshot(blueprint)
-    if scene_type == "reaction_synthesis_water":
+    if scene_type in {"reaction_scene", "reaction_synthesis_water"}:
         return _water_synthesis_reaction_snapshot(blueprint)
     if scene_type == "derivative_tangent":
         return _derivative_tangent_snapshot(blueprint)
@@ -340,200 +332,18 @@ def _projectile_motion_snapshot(blueprint: dict[str, Any]):
 
 
 def _cell_structure_snapshot(blueprint: dict[str, Any]) -> BioCellSceneSnapshot:
-    return BioCellSceneSnapshot(
-        pack_id=str(blueprint.get("packId") or "biology-basic"),
-        cell_type="animal",
-        structures=[
-            BioCellStructure(
-                id="cell",
-                semantic_role="cell",
-                label="cell membrane",
-                x=50,
-                y=52,
-                width=66,
-                height=50,
-                asset_id="cell-outline",
-            ),
-            BioCellStructure(
-                id="nucleus",
-                semantic_role="nucleus",
-                label="nucleus",
-                x=47,
-                y=48,
-                width=20,
-                height=18,
-                asset_id="nucleus",
-            ),
-            BioCellStructure(
-                id="mitochondrion",
-                semantic_role="mitochondrion",
-                label="mitochondrion",
-                x=67,
-                y=59,
-                width=16,
-                height=10,
-                asset_id="mitochondrion",
-            ),
-            BioCellStructure(
-                id="ribosome",
-                semantic_role="ribosome",
-                label="ribosome",
-                x=36,
-                y=61,
-                width=8,
-                height=7,
-                asset_id="ribosome",
-            ),
-            BioCellStructure(
-                id="dna",
-                semantic_role="dna",
-                label="DNA",
-                x=47,
-                y=48,
-                width=8,
-                height=12,
-                asset_id="dna-helix",
-            ),
-        ],
-        callouts=[
-            BioCellCallout(
-                id="nucleus-callout", target_id="nucleus", label="stores DNA", side="left"
-            ),
-            BioCellCallout(
-                id="mitochondrion-callout",
-                target_id="mitochondrion",
-                label="releases energy",
-                side="right",
-            ),
-        ],
-        caption=str(
-            blueprint.get("caption")
-            or "Animal cells contain specialized organelles with distinct functions."
-        ),
-    )
+    return compile_bio_cell_snapshot(blueprint)
 
 
 def _dna_replication_snapshot(blueprint: dict[str, Any]) -> BioProcessSceneSnapshot:
-    return BioProcessSceneSnapshot(
-        pack_id=str(blueprint.get("packId") or "biology-basic"),
-        process_id="dna_replication",
-        steps=[
-            BioProcessStep(
-                id="template",
-                semantic_role="dna",
-                label="template DNA",
-                x=22,
-                y=48,
-                width=18,
-                height=38,
-                asset_id="dna-helix",
-            ),
-            BioProcessStep(
-                id="fork",
-                semantic_role="process_step",
-                label="replication fork",
-                x=50,
-                y=48,
-                width=24,
-                height=24,
-                asset_id="replication-fork",
-                description="strand separation and base pairing",
-            ),
-            BioProcessStep(
-                id="copy",
-                semantic_role="dna",
-                label="new strands",
-                x=78,
-                y=48,
-                width=18,
-                height=38,
-                asset_id="dna-helix",
-            ),
-        ],
-        connections=[
-            BioProcessConnection(
-                id="template-to-fork",
-                **{"from": "template"},
-                to="fork",
-                semantic_role="flow_arrow",
-                label="unzip",
-                asset_id="core-flow-arrow",
-            ),
-            BioProcessConnection(
-                id="fork-to-copy",
-                **{"from": "fork"},
-                to="copy",
-                semantic_role="flow_arrow",
-                label="copy",
-                asset_id="core-flow-arrow",
-            ),
-        ],
-        callouts=[
-            BioCellCallout(id="base-pairing", target_id="fork", label="base pairing", side="top"),
-        ],
-        caption=str(
-            blueprint.get("caption")
-            or "DNA replication copies each strand by complementary base pairing."
-        ),
-    )
+    return compile_bio_process_snapshot(blueprint)
 
 
 def _molecule_snapshot(
     blueprint: dict[str, Any],
     default_molecule_id: str,
 ) -> Molecule2DSceneSnapshot:
-    pack_id = str(blueprint.get("packId") or "chemistry-basic")
-    molecule_id = str(blueprint.get("moleculeId") or default_molecule_id)
-    smiles = str(blueprint["smiles"]) if blueprint.get("smiles") else None
-    preset = (
-        resolve_molecule_preset_by_smiles_for_renderer(pack_id, smiles)
-        or resolve_molecule_preset_for_renderer(pack_id, molecule_id)
-    )
-    if preset is not None:
-        return Molecule2DSceneSnapshot(
-            pack_id=pack_id,
-            molecule_id=preset.molecule_id,
-            smiles=preset.smiles or smiles,
-            molecule_asset_id=preset.molecule_asset_id,
-            atoms=[
-                atom.model_copy(update={"asset_id": "atom-core"}) for atom in preset.atoms
-            ],
-            bonds=[
-                bond.model_copy(update={"asset_id": "bond-line"}) for bond in preset.bonds
-            ],
-            callouts=preset.callouts,
-            formula_latex=preset.formula_latex,
-            caption=str(blueprint.get("caption") or preset.caption),
-        )
-
-    return Molecule2DSceneSnapshot(
-        pack_id=pack_id,
-        molecule_id=molecule_id,
-        smiles=smiles,
-        molecule_asset_id="water-molecule-preset",
-        atoms=[
-            Molecule2DAtom(id="o", element="O", x=50, y=42, asset_id="atom-core", label="oxygen"),
-            Molecule2DAtom(
-                id="h1", element="H", x=35, y=62, asset_id="atom-core", label="hydrogen"
-            ),
-            Molecule2DAtom(
-                id="h2", element="H", x=65, y=62, asset_id="atom-core", label="hydrogen"
-            ),
-        ],
-        bonds=[
-            Molecule2DBond(id="oh1", **{"from": "o"}, to="h1", order=1, asset_id="bond-line"),
-            Molecule2DBond(id="oh2", **{"from": "o"}, to="h2", order=1, asset_id="bond-line"),
-        ],
-        callouts=[
-            Molecule2DCallout(id="bent-shape", target_id="o", label="bent geometry", side="top"),
-            Molecule2DCallout(id="polar-bond", target_id="h2", label="polar bonds", side="right"),
-        ],
-        formula_latex="H_2O",
-        caption=str(
-            blueprint.get("caption")
-            or "Water is a bent polar molecule built from structured atom and bond data."
-        ),
-    )
+    return compile_molecule_2d_snapshot(blueprint, default_molecule_id=default_molecule_id)
 
 
 def _water_molecule_snapshot(blueprint: dict[str, Any]) -> Molecule2DSceneSnapshot:
@@ -545,81 +355,11 @@ def _methane_molecule_snapshot(blueprint: dict[str, Any]) -> Molecule2DSceneSnap
 
 
 def _glucose_molecule_snapshot(blueprint: dict[str, Any]) -> Molecule2DSceneSnapshot:
-    return compile_molecule_snapshot_from_smiles(
-        pack_id=str(blueprint.get("packId") or "chemistry-basic"),
-        molecule_id=str(blueprint.get("moleculeId") or "glucose"),
-        smiles=str(blueprint.get("smiles") or _GLUCOSE_SMILES),
-        atom_asset_id="atom-core",
-        bond_asset_id="bond-line",
-        caption=str(
-            blueprint.get("caption") or "Glucose is rendered from RDKit SMILES structure data."
-        ),
-    )
+    return compile_molecule_2d_snapshot(blueprint, default_molecule_id="glucose")
 
 
 def _water_synthesis_reaction_snapshot(blueprint: dict[str, Any]) -> ReactionSceneSnapshot:
-    return ReactionSceneSnapshot(
-        pack_id=str(blueprint.get("packId") or "chemistry-basic"),
-        reaction_id="reaction_synthesis_water",
-        reactants=[
-            ReactionParticipant(
-                id="h2",
-                formula_latex="H_2",
-                label="hydrogen",
-                coefficient=2,
-                x=18,
-                y=48,
-            ),
-            ReactionParticipant(
-                id="o2",
-                formula_latex="O_2",
-                label="oxygen",
-                coefficient=1,
-                x=38,
-                y=48,
-            ),
-        ],
-        products=[
-            ReactionParticipant(
-                id="h2o",
-                formula_latex="H_2O",
-                label="water",
-                coefficient=2,
-                x=78,
-                y=48,
-            ),
-        ],
-        arrows=[
-            ReactionArrow(
-                id="main-arrow",
-                semantic_role="reaction_arrow",
-                **{"from": (48, 48)},
-                to=(66, 48),
-                label="forms",
-                asset_id="reaction-arrow",
-            ),
-        ],
-        electron_flows=[
-            ReactionElectronFlow(
-                id="electron-shift",
-                semantic_role="electron_flow",
-                **{"from": (39, 38)},
-                to=(58, 36),
-                label="bond rearrangement",
-                asset_id="electron-flow",
-            ),
-        ],
-        callouts=[
-            Molecule2DCallout(
-                id="balanced", target_id="main-arrow", label="balanced atoms", side="top"
-            ),
-        ],
-        formula_latex="2H_2 + O_2 \\rightarrow 2H_2O",
-        caption=str(
-            blueprint.get("caption")
-            or "A balanced reaction conserves each atom across reactants and products."
-        ),
-    )
+    return compile_reaction_snapshot(blueprint)
 
 
 def _derivative_tangent_snapshot(blueprint: dict[str, Any]) -> MathPlotSnapshot:
