@@ -134,17 +134,32 @@ describe("IntakeScreen launch home", () => {
     expect(getByText("提交失败，请重试")).toBeTruthy();
   });
 
-  it("blocks freeform submit when the subject domain cannot be inferred", async () => {
-    const { getByPlaceholderText, getByRole, props } = renderIntake();
+  it("submits freeform prompts with a null domain when inference misses", async () => {
+    const { getByPlaceholderText, getByRole, queryByRole, props } = renderIntake();
 
     fireEvent.change(getByPlaceholderText(/输入一道数学题/), {
-      target: { value: "帮我做一张社团活动宣传海报" },
+      target: { value: "孟德尔豌豆杂交实验的显隐性遗传规律" },
     });
     fireEvent.click(getByRole("button", { name: "生成讲解" }));
 
-    await waitFor(() => {
-      expect(getByRole("alert").textContent ?? "").toMatch(/无法判断题目类型/);
+    await waitFor(() => expect(props.onSubmit).toHaveBeenCalledTimes(1));
+    expect(props.onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ domain: null, template: "freeform" }),
+    );
+    expect(queryByRole("alert")).toBeNull();
+  });
+
+  it("still forwards the inferred domain hint when keywords match", async () => {
+    const { getByPlaceholderText, getByRole, props } = renderIntake();
+
+    fireEvent.change(getByPlaceholderText(/输入一道数学题/), {
+      target: { value: "求函数 f(x)=x^2 在 x=1 处的导数" },
     });
-    expect(props.onSubmit).not.toHaveBeenCalled();
+    fireEvent.click(getByRole("button", { name: "生成讲解" }));
+
+    await waitFor(() => expect(props.onSubmit).toHaveBeenCalledTimes(1));
+    expect(props.onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ domain: "math" }),
+    );
   });
 });
