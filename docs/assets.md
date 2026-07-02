@@ -35,6 +35,12 @@ that helper rather than carrying a second hard-coded role-to-asset table.
 
 ## Scene Blueprint Compiler
 
+The shared input contract lives at
+`apps/web/public/schemas/scene-blueprint.schema.json`. Web fixtures validate
+against this schema with Ajv, and API tests read the same file before compiling
+representative blueprints. This schema describes the visual intent input to the
+compiler; it is not a replacement for `PlaybookScript`.
+
 `apps/web/src/features/playbook/engine/compiler/sceneBlueprintCompiler.ts`
 is the narrow visual-compiler entrypoint for the current flagship subjects.
 It accepts intent-level fields such as `subject`, `sceneType`, `visualIntent`,

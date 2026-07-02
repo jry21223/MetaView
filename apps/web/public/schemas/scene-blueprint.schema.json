@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://metaview.local/schemas/scene-blueprint.schema.json",
+  "title": "MetaView SceneBlueprint",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["subject", "sceneType", "title", "visualIntent"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "subject": {
+      "type": "string",
+      "enum": ["algorithm", "biology", "chemistry", "geography", "math", "physics"]
+    },
+    "sceneType": {
+      "type": "string",
+      "enum": [
+        "bio_cell_scene",
+        "bio_process_scene",
+        "cell_structure",
+        "dna_replication",
+        "geo_map_scene",
+        "east_asia_monsoon",
+        "physics_force_scene",
+        "projectile_motion",
+        "molecule_2d_scene",
+        "molecule_2d_water",
+        "molecule_2d_methane",
+        "reaction_scene",
+        "reaction_synthesis_water",
+        "math_plot",
+        "derivative_tangent",
+        "graph_scene",
+        "bfs_graph",
+        "call_stack_scene",
+        "recursion_stack",
+        "code_trace_scene",
+        "binary_search"
+      ]
+    },
+    "title": { "type": "string", "minLength": 1 },
+    "topic": { "type": "string", "minLength": 1 },
+    "audience": { "type": ["string", "null"] },
+    "style": { "type": ["string", "null"] },
+    "language": { "type": ["string", "null"] },
+    "visualIntent": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "emphasisPoints": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "requiredAssets": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "packId": { "type": "string", "minLength": 1 },
+    "durationFrames": { "type": "number", "exclusiveMinimum": 0 },
+    "durationSeconds": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+    "caption": { "type": "string", "minLength": 1 },
+    "mapRegion": { "type": "string", "minLength": 1 },
+    "flows": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/geoFlow" }
+    },
+    "pressureCenters": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/pressureCenter" }
+    },
+    "particlePreset": { "type": "string", "minLength": 1 },
+    "object": { "$ref": "#/$defs/physicsObject" },
+    "vectors": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/physicsVector" }
+    },
+    "trajectory": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/point" }
+    },
+    "formulaLatex": { "type": "string", "minLength": 1 },
+    "cellType": { "type": "string", "minLength": 1 },
+    "moleculeId": { "type": "string", "minLength": 1 },
+    "smiles": { "type": "string", "minLength": 1 },
+    "graphNodes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/graphNode" }
+    },
+    "graphEdges": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/graphEdge" }
+    },
+    "currentNodeId": { "type": "string", "minLength": 1 },
+    "activeNodeIds": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "activeEdgeIds": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "visitedNodeIds": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "queueNodeIds": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "frontierNodeIds": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "arrayValues": {
+      "type": "array",
+      "items": { "type": ["string", "number"] }
+    },
+    "target": { "type": ["string", "number"] },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": { "type": ["string", "number", "boolean", "null"] }
+    }
+  },
+  "$defs": {
+    "point": {
+      "type": "array",
+      "prefixItems": [{ "type": "number" }, { "type": "number" }],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "geoFlow": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "semanticRole": { "type": "string", "minLength": 1 },
+        "from": { "$ref": "#/$defs/point" },
+        "to": { "$ref": "#/$defs/point" },
+        "label": { "type": "string", "minLength": 1 },
+        "assetId": { "type": "string", "minLength": 1 },
+        "strength": { "type": "number" }
+      }
+    },
+    "pressureCenter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "x", "y", "label"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "enum": ["high", "low"] },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "label": { "type": "string", "minLength": 1 }
+      }
+    },
+    "physicsObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "semanticRole": { "type": "string", "minLength": 1 },
+        "assetId": { "type": "string", "minLength": 1 },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "radius": { "type": "number", "minimum": 0 }
+      }
+    },
+    "physicsVector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["semanticRole", "dx", "dy"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "target": { "type": "string", "minLength": 1 },
+        "semanticRole": { "type": "string", "minLength": 1 },
+        "dx": { "type": "number" },
+        "dy": { "type": "number" },
+        "label": { "type": "string", "minLength": 1 },
+        "magnitude": { "type": "string", "minLength": 1 }
+      }
+    },
+    "graphNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
+    "graphEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "target"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "target": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "weight": { "type": "number" }
+      }
+    }
+  }
+}

@@ -389,6 +389,7 @@ def _monsoon_blueprint(
     return {
         "subject": "geography",
         "sceneType": "east_asia_monsoon",
+        "title": "East Asia monsoon",
         "topic": topic,
         "audience": audience,
         "durationSeconds": duration_seconds,
@@ -420,6 +421,7 @@ def _projectile_blueprint(
     return {
         "subject": "physics",
         "sceneType": "projectile_motion",
+        "title": "Projectile motion",
         "topic": topic,
         "audience": audience,
         "durationSeconds": duration_seconds,
@@ -462,6 +464,7 @@ def _fallback_blueprint(
     return {
         "subject": normalized_subject,
         "sceneType": capability["primaryRenderer"].split("/")[0] or "domain_cards",
+        "title": topic,
         "topic": topic,
         "audience": audience,
         "durationSeconds": duration_seconds,
