@@ -110,4 +110,51 @@ describe("showcaseBaselineReport", () => {
       "content_pixel_ratio",
     );
   });
+
+  it("reports drift from a previous screenshot reference separately from hard baseline issues", () => {
+    const report = createShowcaseBaselineReport(
+      [
+        {
+          id: "projectile_motion",
+          domain: "physics",
+          packId: "physics-basic",
+          rendererKind: "physics_force_scene",
+          imageQuality: thresholds,
+        },
+      ],
+      [
+        {
+          id: "projectile_motion",
+          frame: 77,
+          output: "/tmp/projectile_motion.png",
+          imageQuality: thresholds,
+          ...passingStats,
+          uniqueColors: 70,
+          contentPixelRatio: 0.085,
+          contentWidthRatio: 0.53,
+        },
+      ],
+      "2026-07-02T00:00:00.000Z",
+      {
+        entries: [
+          {
+            id: "projectile_motion",
+            stats: {
+              ...passingStats,
+              uniqueColors: 100,
+              contentPixelRatio: 0.12,
+              contentWidthRatio: 0.625,
+            },
+          },
+        ],
+      },
+    );
+
+    expect(report.ok).toBe(true);
+    expect(report.driftOk).toBe(false);
+    expect(report.entries[0]).toMatchObject({
+      issues: [],
+      driftIssues: ["unique_colors_drop", "content_pixel_ratio_drop", "content_width_ratio_drop"],
+    });
+  });
 });

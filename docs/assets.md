@@ -205,7 +205,12 @@ Local preview helpers:
 
    The report is written to
    `eval/reports/subject-visual-showcase-baseline.json` and records each
-   fixture's baseline, measured screenshot stats, and safety margins.
+   fixture's baseline, measured screenshot stats, and safety margins. To compare
+   against a previous report without changing the hard failure contract, pass
+   `SHOWCASE_BASELINE_REFERENCE=eval/reports/subject-visual-showcase-baseline.json`;
+   the command will emit `driftOk` and per-fixture drift warnings separately from
+   under-baseline failures. Script path inputs accept either workspace-relative
+   paths such as `../../eval/...` or repo-root-relative paths such as `eval/...`.
 
 4. Render a single fixture through the existing Remotion composition:
 
