@@ -99,19 +99,38 @@ describe("subject visual showcase catalog", () => {
   });
 
   it("exposes scene contract coverage for contract-backed showcase fixtures", () => {
+    expect(getSubjectVisualShowcaseEntry("east_asia_monsoon")?.contractCoverage).toMatchObject({
+      status: "matched",
+      contractIds: ["east-asia-monsoon-contract"],
+      requiredAssetIds: ["east-asia-land-110m", "east-asia-ocean-background", "monsoon-wind-arrow"],
+      missingAssetIds: [],
+    });
+    expect(getSubjectVisualShowcaseEntry("projectile_motion")?.contractCoverage).toMatchObject({
+      status: "matched",
+      contractIds: ["projectile-motion-contract"],
+      requiredAssetIds: ["force-vector-arrow", "projectile-body-dot"],
+      missingAssetIds: [],
+    });
     expect(getSubjectVisualShowcaseEntry("molecule_2d_water")?.contractCoverage).toMatchObject({
       status: "matched",
       contractIds: ["water-molecule-contract"],
       missingAssetIds: [],
     });
+    expect(getSubjectVisualShowcaseEntry("derivative_tangent")?.contractCoverage).toMatchObject({
+      status: "matched",
+      contractIds: ["derivative-tangent-contract"],
+      requiredAssetIds: ["derivative-tangent-preset"],
+      missingAssetIds: [],
+    });
+    expect(getSubjectVisualShowcaseEntry("cubic_tangent")?.contractCoverage).toMatchObject({
+      status: "matched",
+      contractIds: ["derivative-tangent-contract"],
+      requiredAssetIds: ["derivative-tangent-preset"],
+      missingAssetIds: [],
+    });
     expect(getSubjectVisualShowcaseEntry("bfs_graph")?.contractCoverage).toMatchObject({
       status: "matched",
       contractIds: ["bfs-graph-contract"],
-      missingAssetIds: [],
-    });
-    expect(getSubjectVisualShowcaseEntry("projectile_motion")?.contractCoverage).toMatchObject({
-      status: "not_applicable",
-      contractIds: [],
       missingAssetIds: [],
     });
   });

@@ -18,6 +18,7 @@ import type {
   CodeTraceSceneSnapshot,
   GeoMapSceneSnapshot,
   GraphSceneSnapshot,
+  MathPlotSnapshot,
   MetaStep,
   Molecule2DSceneSnapshot,
   PhysicsForceSceneSnapshot,
@@ -504,9 +505,65 @@ function addReactionRenderedAssetIds(
   }
 }
 
+function addGeoMapRenderedAssetIds(
+  assetIds: Set<string>,
+  context: SnapshotContext,
+  snapshot: GeoMapSceneSnapshot,
+) {
+  for (const layer of snapshot.layers) {
+    if (layer.asset_id) {
+      assetIds.add(layer.asset_id);
+      continue;
+    }
+    addResolvedRoleAssetId(assetIds, context, "geography", layer.semantic_role, snapshot.pack_id);
+  }
+  for (const flow of snapshot.flows) {
+    if (flow.asset_id) {
+      assetIds.add(flow.asset_id);
+      continue;
+    }
+    addResolvedRoleAssetId(assetIds, context, "geography", flow.semantic_role, snapshot.pack_id, ["wind"]);
+  }
+}
+
+function addPhysicsRenderedAssetIds(
+  assetIds: Set<string>,
+  context: SnapshotContext,
+  snapshot: PhysicsForceSceneSnapshot,
+) {
+  for (const object of snapshot.objects) {
+    if (object.asset_id) {
+      assetIds.add(object.asset_id);
+      continue;
+    }
+    addResolvedRoleAssetId(assetIds, context, "physics", "object", snapshot.pack_id);
+  }
+  for (const vector of snapshot.vectors) {
+    addResolvedRoleAssetId(assetIds, context, "physics", vector.semantic_role, snapshot.pack_id);
+  }
+}
+
+function addMathPlotRenderedAssetIds(
+  assetIds: Set<string>,
+  context: SnapshotContext,
+  snapshot: MathPlotSnapshot,
+) {
+  if (snapshot.asset_id) {
+    assetIds.add(snapshot.asset_id);
+    return;
+  }
+  for (const curve of snapshot.curves) {
+    if (!curve.semantic_role) continue;
+    addResolvedRoleAssetId(assetIds, context, "math", curve.semantic_role, snapshot.pack_id);
+  }
+}
+
 function collectRenderedAssetIds(context: SnapshotContext): Set<string> {
   const assetIds = new Set<string>();
   const { snapshot } = context;
+  if (snapshot.kind === "geo_map_scene") addGeoMapRenderedAssetIds(assetIds, context, snapshot);
+  if (snapshot.kind === "physics_force_scene") addPhysicsRenderedAssetIds(assetIds, context, snapshot);
+  if (snapshot.kind === "math_plot") addMathPlotRenderedAssetIds(assetIds, context, snapshot);
   if (snapshot.kind === "bio_cell_scene") addBioCellRenderedAssetIds(assetIds, context, snapshot);
   if (snapshot.kind === "bio_process_scene") addBioProcessRenderedAssetIds(assetIds, context, snapshot);
   if (snapshot.kind === "molecule_2d_scene") addMoleculeRenderedAssetIds(assetIds, context, snapshot);

@@ -156,14 +156,30 @@ describe("visualQualityGate", () => {
       }),
     );
 
-    expect(warnings).toMatchObject([
-      {
-        code: "missing_asset",
-        step_id: "projectile_motion",
-        asset_id: "missing-projectile",
-        pack_id: "physics-basic",
-      },
-    ]);
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "missing_asset",
+          step_id: "projectile_motion",
+          asset_id: "missing-projectile",
+          pack_id: "physics-basic",
+        }),
+        expect.objectContaining({
+          code: "scene_contract_missing_asset",
+          step_id: "projectile_motion",
+          contract_id: "projectile-motion-contract",
+          asset_id: "projectile-body-dot",
+          rendered_asset_ids: ["missing-projectile"],
+        }),
+        expect.objectContaining({
+          code: "scene_contract_missing_asset",
+          step_id: "projectile_motion",
+          contract_id: "projectile-motion-contract",
+          asset_id: "force-vector-arrow",
+          rendered_asset_ids: ["missing-projectile"],
+        }),
+      ]),
+    );
   });
 
   it("warns when geography falls back to algorithm_array", () => {

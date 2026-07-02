@@ -7,6 +7,9 @@ import glucoseContractJson from "../../../../../public/assets/metaview-kits/chem
 import methaneContractJson from "../../../../../public/assets/metaview-kits/chemistry-basic/contracts/methane.contract.json";
 import reactionSynthesisWaterContractJson from "../../../../../public/assets/metaview-kits/chemistry-basic/contracts/reaction-synthesis-water.contract.json";
 import waterContractJson from "../../../../../public/assets/metaview-kits/chemistry-basic/contracts/water.contract.json";
+import eastAsiaMonsoonContractJson from "../../../../../public/assets/metaview-kits/geography-earth-basic/contracts/east-asia-monsoon.contract.json";
+import derivativeTangentContractJson from "../../../../../public/assets/metaview-kits/math-basic/contracts/derivative-tangent.contract.json";
+import projectileMotionContractJson from "../../../../../public/assets/metaview-kits/physics-basic/contracts/projectile-motion.contract.json";
 
 import type { AnySnapshot, SnapshotKind } from "../types";
 
@@ -52,12 +55,15 @@ function chemistryReactionContract(contract: ChemistryReactionContractJson): Sce
 }
 
 const SCENE_ASSET_CONTRACTS: readonly SceneAssetContract[] = [
+  eastAsiaMonsoonContractJson,
+  projectileMotionContractJson,
   cellStructureContractJson,
   dnaReplicationContractJson,
   chemistryMoleculeContract(waterContractJson),
   chemistryMoleculeContract(methaneContractJson),
   chemistryMoleculeContract(glucoseContractJson),
   chemistryReactionContract(reactionSynthesisWaterContractJson),
+  derivativeTangentContractJson,
   bfsGraphContractJson,
   recursionStackContractJson,
   binarySearchContractJson,
@@ -75,6 +81,10 @@ function sceneTemplateCandidates(stepId: string, snapshot: AnySnapshot): Set<str
     candidates.add(`molecule_2d_${snapshot.molecule_id}`);
   }
   if (snapshot.kind === "reaction_scene") candidates.add(snapshot.reaction_id);
+  if (snapshot.kind === "math_plot") {
+    candidates.add("math_plot");
+    if (snapshot.asset_id === "derivative-tangent-preset") candidates.add("derivative_tangent");
+  }
   return candidates;
 }
 

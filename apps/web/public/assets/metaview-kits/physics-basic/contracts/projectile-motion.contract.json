@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "projectile-motion-contract",
+  "sceneTemplate": "projectile_motion",
+  "rendererKind": "physics_force_scene",
+  "packId": "physics-basic",
+  "requiredAssetIds": ["projectile-body-dot", "force-vector-arrow"],
+  "requiredSemanticRoles": ["object", "force"],
+  "caption": "Projectile motion must render the projectile object asset and at least one vector arrow asset."
+}
