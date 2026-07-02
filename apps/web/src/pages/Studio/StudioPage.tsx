@@ -10,6 +10,7 @@ import type {
 } from "../../features/playbook/engine/types";
 import { ExportModal } from "../../features/export/ui/ExportModal";
 import { PipelineErrorCard } from "../../features/pipeline/ui/PipelineErrorCard";
+import { PipelineSkeleton } from "../../features/pipeline/ui/PipelineSkeleton";
 import { createAssetAttributionReportForScript } from "../../features/playbook/engine/assets/assetAttributionSummary";
 import {
   listRunFollowUps,
@@ -343,90 +344,6 @@ function ChatPanel({
   return <>{children({ followupSlot, relatedSlot })}</>;
 }
 
-// ── PipelineSkeleton ──────────────────────────────────────────────────────
-
-type PipelineStatus =
-  | "queued"
-  | "running"
-  | "reviewing"
-  | "succeeded"
-  | "failed"
-  | null;
-
-interface PipelineSkeletonProps {
-  status: PipelineStatus;
-}
-
-const STAGES: { key: PipelineStatus; label: string }[] = [
-  { key: "queued", label: "排队中" },
-  { key: "running", label: "脚本生成" },
-  { key: "reviewing", label: "审核与修正" },
-  { key: "succeeded", label: "渲染完成" },
-];
-
-const STATUS_ORDER: Record<NonNullable<PipelineStatus>, number> = {
-  queued: 0,
-  running: 1,
-  reviewing: 2,
-  succeeded: 3,
-  failed: 3,
-};
-
-const STATUS_LOADER_LABEL: Record<NonNullable<PipelineStatus>, string> = {
-  queued: "排队等待生成",
-  running: "正在生成脚本",
-  reviewing: "正在审核与修正",
-  succeeded: "渲染完成",
-  failed: "生成失败",
-};
-
-function PipelineSkeleton({ status }: PipelineSkeletonProps) {
-  const currentOrder = status !== null ? STATUS_ORDER[status] : -1;
-  const loaderLabel =
-    status !== null ? STATUS_LOADER_LABEL[status] : "正在准备生成";
-
-  return (
-    <div className="mv-pipeline-skeleton">
-      <div className="mv-pipeline-stages">
-        {STAGES.map((stage, i) => {
-          const stageOrder = STATUS_ORDER[stage.key!]!;
-          const isDone = currentOrder > stageOrder;
-          const isActive = currentOrder === stageOrder;
-          return (
-            <React.Fragment key={stage.key}>
-              <div
-                className={`mv-stage${isActive ? " is-active" : isDone ? " is-done" : ""}`}
-              >
-                <span className="mv-stage-dot" />
-                <span>{stage.label}</span>
-              </div>
-              {i < STAGES.length - 1 && <div className="mv-stage-line" />}
-            </React.Fragment>
-          );
-        })}
-      </div>
-
-      <div className="mv-skeleton-area">
-        <div className="mv-pipeline-status" role="status" aria-live="polite">
-          {loaderLabel}
-        </div>
-        <div className="mv-skeleton-bar mv-skeleton-title" />
-        <div className="mv-skeleton-cells">
-          {Array.from({ length: 8 }, (_, i) => (
-            <div
-              key={i}
-              className="mv-skeleton-bar mv-skeleton-cell"
-              style={{ animationDelay: `${i * 0.1}s` }}
-            />
-          ))}
-        </div>
-        <div className="mv-skeleton-bar mv-skeleton-narration" />
-        <div className="mv-skeleton-bar mv-skeleton-narration-short" />
-      </div>
-    </div>
-  );
-}
-
 // ── StudioPage ────────────────────────────────────────────────────────────
 
 export interface StudioPageProps {
@@ -465,6 +382,7 @@ export function StudioPage({
     error,
     errorKind,
     prompt,
+    createdAt,
     isLoading,
     status,
     retry,
@@ -557,7 +475,7 @@ export function StudioPage({
               )}
             </ChatPanel>
           ) : isLoading ? (
-            <PipelineSkeleton status={status} />
+            <PipelineSkeleton status={status} createdAt={createdAt} />
           ) : (
             <div className="mv-right-placeholder">
               <span>暂无任务</span>
