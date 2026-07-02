@@ -112,9 +112,16 @@ export interface ShowcaseBaselineReportEntry {
   contractCoverage: ShowcaseSceneContractCoverage;
 }
 
+export interface ShowcaseBaselineContractIssue {
+  id: string;
+  contractIds: readonly string[];
+  missingAssetIds: readonly string[];
+}
+
 export interface ShowcaseBaselineReport {
   ok: boolean;
   driftOk: boolean;
+  contractOk: boolean;
   reviewReady: boolean;
   approvedReferenceReady: boolean;
   generatedAt: string;
@@ -122,6 +129,7 @@ export interface ShowcaseBaselineReport {
   renderedCount: number;
   missingSummaryIds: string[];
   unexpectedSummaryIds: string[];
+  contractIssues: ShowcaseBaselineContractIssue[];
   entries: ShowcaseBaselineReportEntry[];
 }
 
@@ -285,12 +293,21 @@ export function createShowcaseBaselineReport(
     };
   });
 
+  const contractIssues = entries
+    .filter((entry) => entry.contractCoverage.status === "missing" && entry.contractCoverage.missingAssetIds.length > 0)
+    .map((entry) => ({
+      id: entry.id,
+      contractIds: entry.contractCoverage.contractIds,
+      missingAssetIds: entry.contractCoverage.missingAssetIds,
+    }));
+
   return {
     ok:
       missingSummaryIds.length === 0 &&
       unexpectedSummaryIds.length === 0 &&
       entries.every((entry) => entry.issues.length === 0),
     driftOk: entries.every((entry) => entry.driftIssues.length === 0),
+    contractOk: contractIssues.length === 0,
     reviewReady: entries.every((entry) =>
       ["ready_for_review", "approved_reference_current"].includes(entry.screenshotReview.status),
     ),
@@ -300,6 +317,7 @@ export function createShowcaseBaselineReport(
     renderedCount: summaryEntries.length,
     missingSummaryIds,
     unexpectedSummaryIds,
+    contractIssues,
     entries,
   };
 }
@@ -308,5 +326,5 @@ export function isShowcaseBaselineReleaseReady(
   report: ShowcaseBaselineReport,
   options: ShowcaseBaselineReleaseGateOptions = {},
 ): boolean {
-  return report.ok && (!options.requireApprovedReference || report.approvedReferenceReady);
+  return report.ok && report.contractOk && (!options.requireApprovedReference || report.approvedReferenceReady);
 }

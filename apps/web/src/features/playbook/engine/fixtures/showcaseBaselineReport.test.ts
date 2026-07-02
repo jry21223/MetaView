@@ -285,4 +285,61 @@ describe("showcaseBaselineReport", () => {
     expect(isShowcaseBaselineReleaseReady(report)).toBe(true);
     expect(isShowcaseBaselineReleaseReady(report, { requireApprovedReference: true })).toBe(false);
   });
+
+  it("blocks release readiness when a fixture is missing required scene contract assets", () => {
+    const report = createShowcaseBaselineReport(
+      [
+        {
+          id: "projectile_motion",
+          domain: "physics",
+          packId: "physics-basic",
+          rendererKind: "physics_force_scene",
+          requiredMarkers: ['data-asset-id="projectile-body-dot"'],
+          imageQuality: thresholds,
+          contractCoverage: {
+            status: "missing",
+            contractIds: ["projectile-contract"],
+            requiredAssetIds: ["projectile-body-dot", "force-vector-arrow"],
+            renderedAssetIds: ["force-vector-arrow"],
+            missingAssetIds: ["projectile-body-dot"],
+          },
+        },
+      ],
+      [
+        {
+          id: "projectile_motion",
+          frame: 77,
+          output: "/tmp/projectile_motion.png",
+          imageQuality: thresholds,
+          ...passingStats,
+        },
+      ],
+      "2026-07-02T00:00:00.000Z",
+      {
+        entries: [
+          {
+            id: "projectile_motion",
+            stats: passingStats,
+            review: {
+              status: "approved",
+              reviewer: "visual-reviewer",
+              approvedAt: "2026-07-02T00:00:00.000Z",
+            },
+          },
+        ],
+      },
+    );
+
+    expect(report.ok).toBe(true);
+    expect(report.approvedReferenceReady).toBe(true);
+    expect(report.contractOk).toBe(false);
+    expect(report.contractIssues).toEqual([
+      {
+        id: "projectile_motion",
+        contractIds: ["projectile-contract"],
+        missingAssetIds: ["projectile-body-dot"],
+      },
+    ]);
+    expect(isShowcaseBaselineReleaseReady(report, { requireApprovedReference: true })).toBe(false);
+  });
 });
