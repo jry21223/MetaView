@@ -1,3 +1,6 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
+
 import { listAssetPacks, type AssetManifestEntry, type SubjectVisualKit } from "./assetRegistry";
 import { getLicenseRule, isKnownAssetLicense } from "./licenseRegistry";
 
@@ -7,6 +10,7 @@ export type AssetAuditIssueCode =
   | "missing_sources"
   | "unknown_license"
   | "missing_source"
+  | "missing_asset_file"
   | "missing_attribution"
   | "license_rule_mismatch"
   | "renderer_kind_mismatch";
@@ -22,6 +26,11 @@ export interface AssetAuditIssue {
 export interface AssetAuditReport {
   ok: boolean;
   errors: AssetAuditIssue[];
+}
+
+export interface AssetAuditOptions {
+  publicRoot?: string;
+  pathExists?: (assetPath: string) => boolean;
 }
 
 const REQUIRED_RENDERER_KINDS_BY_PACK: Record<string, string[]> = {
@@ -57,6 +66,14 @@ function sameStringSet(actual: string[], expected: string[]): boolean {
 
 function pushError(errors: AssetAuditIssue[], issue: AssetAuditIssue) {
   errors.push(issue);
+}
+
+function assetPathExists(assetPath: string, publicRoot: string) {
+  const root = path.resolve(publicRoot);
+  const localPath = path.resolve(root, assetPath.replace(/^\/+/, ""));
+  const relativePath = path.relative(root, localPath);
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) return false;
+  return existsSync(localPath);
 }
 
 function auditPackShape(errors: AssetAuditIssue[], pack: SubjectVisualKit) {
@@ -168,7 +185,22 @@ function auditAsset(errors: AssetAuditIssue[], pack: SubjectVisualKit, asset: As
   }
 }
 
-export function auditAssetPacks(packs: SubjectVisualKit[]): AssetAuditReport {
+function auditAssetFile(errors: AssetAuditIssue[], pack: SubjectVisualKit, asset: AssetManifestEntry, options: AssetAuditOptions) {
+  if (!asset.path) return;
+
+  const publicRoot = options.publicRoot ?? path.resolve(process.cwd(), "public");
+  const pathExists = options.pathExists ?? ((assetPath: string) => assetPathExists(assetPath, publicRoot));
+  if (pathExists(asset.path)) return;
+
+  pushError(errors, {
+    code: "missing_asset_file",
+    packId: pack.packId,
+    assetId: asset.id,
+    message: `Asset "${asset.id}" path "${asset.path}" does not exist under the public asset root.`,
+  });
+}
+
+export function auditAssetPacks(packs: SubjectVisualKit[], options: AssetAuditOptions = {}): AssetAuditReport {
   const errors: AssetAuditIssue[] = [];
   for (const pack of packs) {
     auditPackShape(errors, pack);
@@ -178,6 +210,7 @@ export function auditAssetPacks(packs: SubjectVisualKit[]): AssetAuditReport {
     }
     for (const asset of pack.assets) {
       auditAsset(errors, pack, asset);
+      auditAssetFile(errors, pack, asset, options);
     }
   }
   return {
@@ -186,6 +219,6 @@ export function auditAssetPacks(packs: SubjectVisualKit[]): AssetAuditReport {
   };
 }
 
-export function auditRegisteredAssetPacks(): AssetAuditReport {
-  return auditAssetPacks(listAssetPacks());
+export function auditRegisteredAssetPacks(options: AssetAuditOptions = {}): AssetAuditReport {
+  return auditAssetPacks(listAssetPacks(), options);
 }

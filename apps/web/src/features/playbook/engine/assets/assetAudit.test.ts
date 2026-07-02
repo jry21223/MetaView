@@ -138,4 +138,32 @@ describe("assetAudit", () => {
       }),
     );
   });
+
+  it("fails asset paths that do not exist under the public asset root", () => {
+    const missingPath = "/assets/metaview-kits/test-basic/missing.svg";
+    const report = auditAssetPacks(
+      [
+        basePack({
+          assets: [
+            {
+              ...basePack().assets[0],
+              path: missingPath,
+            },
+          ],
+        }),
+      ],
+      {
+        pathExists: (assetPath) => assetPath !== missingPath,
+      },
+    );
+
+    expect(report.ok).toBe(false);
+    expect(report.errors).toContainEqual(
+      expect.objectContaining({
+        code: "missing_asset_file",
+        packId: "test-basic",
+        assetId: "projectile",
+      }),
+    );
+  });
 });
