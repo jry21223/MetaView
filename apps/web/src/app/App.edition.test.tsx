@@ -138,7 +138,7 @@ describe("App edition shells", () => {
     vi.stubEnv("VITE_APP_EDITION", "self");
     vi.doMock("../features/pipeline/hooks/usePipelineSubmit", () => ({
       usePipelineSubmit: () => ({
-        submit: vi.fn().mockResolvedValue(undefined),
+        submit: vi.fn().mockResolvedValue("run-shell"),
         runId: "run-shell",
         isSubmitting: false,
         error: null,
@@ -163,6 +163,7 @@ describe("App edition shells", () => {
     await waitFor(() =>
       expect(getByRole("button", { name: "显示顶部栏" })).toBeTruthy(),
     );
+    expect(window.location.pathname).toBe("/run/run-shell");
     const shell = container.querySelector(".mv-top-shell");
     expect(shell).toBeTruthy();
     expect(container.querySelectorAll(".mv-top")).toHaveLength(1);

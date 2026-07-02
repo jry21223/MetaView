@@ -10,6 +10,7 @@ import { usePipelineSubmit } from "./usePipelineSubmit";
 function SubmitHarness() {
   const { submit, runId, error } = usePipelineSubmit();
   const [caught, setCaught] = useState(false);
+  const [resolvedRunId, setResolvedRunId] = useState<string | null>(null);
 
   return (
     <div>
@@ -21,12 +22,15 @@ function SubmitHarness() {
             domain: "algorithm",
             sourceCode: "while left < right:\n    right -= 1",
             language: "python",
-          }).catch(() => setCaught(true))
+          })
+            .then((newRunId) => setResolvedRunId(newRunId))
+            .catch(() => setCaught(true))
         }
       >
         submit
       </button>
       <span>{runId ?? "no-run"}</span>
+      <span>{resolvedRunId ? `resolved:${resolvedRunId}` : "no-resolved-run"}</span>
       <span>{error ?? "no-error"}</span>
       <span>{caught ? "caught" : "not-caught"}</span>
     </div>
@@ -60,6 +64,7 @@ describe("usePipelineSubmit", () => {
     fireEvent.click(getByRole("button", { name: "submit" }));
 
     await waitFor(() => expect(getByText("run-code")).toBeTruthy());
+    expect(getByText("resolved:run-code")).toBeTruthy();
   });
 
   it("keeps submission failures visible to callers", async () => {
