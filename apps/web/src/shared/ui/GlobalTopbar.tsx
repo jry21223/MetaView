@@ -150,9 +150,25 @@ export function GlobalTopbar({
             {appEdition === "ops" ? "¥" : <ProviderSettingsIcon />}
           </button>
         )}
-        <div className="mv-status">
-          {appEdition === "ops" ? (
-            accountBalanceYuan != null ? (
+        {(appEdition === "ops" ||
+          accountBalanceYuan != null ||
+          isProviderConfigured) && (
+          <div className="mv-status">
+            {appEdition === "ops" ? (
+              accountBalanceYuan != null ? (
+                <>
+                  <span className="mv-pulse" />
+                  <span>
+                    {accountName ?? "ACCOUNT"} · ¥ {accountBalanceYuan}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="mv-pulse" />
+                  <span>账户同步中</span>
+                </>
+              )
+            ) : accountBalanceYuan != null ? (
               <>
                 <span className="mv-pulse" />
                 <span>
@@ -160,30 +176,18 @@ export function GlobalTopbar({
                 </span>
               </>
             ) : (
-              <>
-                <span className="mv-pulse" />
-                <span>账户同步中</span>
-              </>
-            )
-          ) : accountBalanceYuan != null ? (
-            <>
-              <span className="mv-pulse" />
-              <span>
-                {accountName ?? "ACCOUNT"} · ¥ {accountBalanceYuan}
-              </span>
-            </>
-          ) : isProviderConfigured ? (
-            <>
-              <span className="mv-pulse" />
-              <span>模型已配置</span>
-            </>
-          ) : (
-            <>
-              <span className="mv-pulse-offline" />
-              <span>未配置模型</span>
-            </>
-          )}
-        </div>
+              // Configured self edition: a quiet dot is enough. The
+              // unconfigured state stays silent here — provider onboarding
+              // lives in the follow-up panel and submit flow instead.
+              <span
+                className="mv-pulse"
+                role="img"
+                title="模型已配置"
+                aria-label="模型已配置"
+              />
+            )}
+          </div>
+        )}
         <button
           className="mv-icon-btn"
           title="切换主题"
@@ -208,17 +212,18 @@ export function GlobalTopbar({
             </svg>
           )}
         </button>
-        {avatarUrl ? (
-          <img
-            className="mv-avatar mv-avatar-img"
-            src={avatarUrl}
-            alt={`${accountName ?? "微信用户"}头像`}
-            referrerPolicy="no-referrer"
-            onError={() => setFailedAvatarUrl(avatarUrl)}
-          />
-        ) : (
-          <div className="mv-avatar">MV</div>
-        )}
+        {appEdition === "ops" &&
+          (avatarUrl ? (
+            <img
+              className="mv-avatar mv-avatar-img"
+              src={avatarUrl}
+              alt={`${accountName ?? "微信用户"}头像`}
+              referrerPolicy="no-referrer"
+              onError={() => setFailedAvatarUrl(avatarUrl)}
+            />
+          ) : (
+            <div className="mv-avatar">MV</div>
+          ))}
       </div>
     </header>
   );
