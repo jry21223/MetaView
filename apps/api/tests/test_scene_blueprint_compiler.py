@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
 from app.domain.models.playbook import PlaybookScript
@@ -11,7 +14,35 @@ from app.domain.services.molecule_preset_resolver import (
 from app.domain.services.playbook_quality import self_check_playbook
 from app.domain.services.scene_blueprint_compiler import compile_scene_blueprint_to_playbook
 
-GLUCOSE_SMILES = "OC[C@H]1O[C@@H](O)[C@H](O)[C@H](O)[C@@H]1O"
+CHEMISTRY_CONTRACT_ROOT = (
+    Path(__file__).resolve().parents[3]
+    / "apps"
+    / "web"
+    / "public"
+    / "assets"
+    / "metaview-kits"
+    / "chemistry-basic"
+    / "contracts"
+)
+
+
+def _read_chemistry_contract(contract_name: str) -> dict:
+    return json.loads(
+        (CHEMISTRY_CONTRACT_ROOT / f"{contract_name}.contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+
+def _element_counts(atoms: list[dict]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for atom in atoms:
+        element = str(atom["element"])
+        counts[element] = counts.get(element, 0) + 1
+    return counts
+
+
+GLUCOSE_SMILES = str(_read_chemistry_contract("glucose")["smiles"])
 
 
 @pytest.mark.parametrize(
@@ -304,6 +335,7 @@ def test_scene_blueprint_compiler_builds_molecule_from_structured_layout_input()
 
 
 def test_scene_blueprint_compiler_hydrates_water_from_molecule_preset() -> None:
+    contract = _read_chemistry_contract("water")
     preset = resolve_molecule_preset_for_renderer("chemistry-basic", "water")
     assert preset is not None
 
@@ -319,8 +351,11 @@ def test_scene_blueprint_compiler_hydrates_water_from_molecule_preset() -> None:
 
     snapshot = playbook.steps[0].snapshot.model_dump(mode="json", by_alias=True)
 
-    assert snapshot["molecule_asset_id"] == preset.molecule_asset_id
-    assert snapshot["formula_latex"] == preset.formula_latex
+    assert snapshot["molecule_id"] == contract["moleculeId"]
+    assert snapshot["molecule_asset_id"] == contract["assetId"]
+    assert snapshot["formula_latex"] == contract["formulaLatex"]
+    assert _element_counts(snapshot["atoms"]) == contract["elementCounts"]
+    assert len(snapshot["bonds"]) >= contract["minBondCount"]
     assert snapshot["caption"] == preset.caption
     assert snapshot["callouts"] == [
         callout.model_dump(mode="json") for callout in preset.callouts
@@ -335,7 +370,10 @@ def test_scene_blueprint_compiler_hydrates_water_from_molecule_preset() -> None:
 
 
 def test_scene_blueprint_compiler_hydrates_methane_from_smiles_preset() -> None:
-    preset = resolve_molecule_preset_by_smiles_for_renderer("chemistry-basic", "C")
+    contract = _read_chemistry_contract("methane")
+    preset = resolve_molecule_preset_by_smiles_for_renderer(
+        "chemistry-basic", contract["smiles"]
+    )
     assert preset is not None
 
     playbook = compile_scene_blueprint_to_playbook(
@@ -345,7 +383,7 @@ def test_scene_blueprint_compiler_hydrates_methane_from_smiles_preset() -> None:
             "sceneType": "molecule_2d_methane",
             "title": "Methane molecule",
             "visualIntent": ["render_structured_molecule", "show_tetrahedral_geometry"],
-            "smiles": "C",
+            "smiles": contract["smiles"],
         },
     )
 
@@ -353,12 +391,12 @@ def test_scene_blueprint_compiler_hydrates_methane_from_smiles_preset() -> None:
 
     assert snapshot["kind"] == "molecule_2d_scene"
     assert snapshot["pack_id"] == "chemistry-basic"
-    assert snapshot["molecule_id"] == "methane"
-    assert snapshot["smiles"] == "C"
-    assert snapshot["molecule_asset_id"] == preset.molecule_asset_id
-    assert snapshot["formula_latex"] == "CH_4"
-    assert len(snapshot["atoms"]) == 5
-    assert len(snapshot["bonds"]) == 4
+    assert snapshot["molecule_id"] == contract["moleculeId"]
+    assert snapshot["smiles"] == contract["smiles"]
+    assert snapshot["molecule_asset_id"] == contract["assetId"]
+    assert snapshot["formula_latex"] == contract["formulaLatex"]
+    assert _element_counts(snapshot["atoms"]) == contract["elementCounts"]
+    assert len(snapshot["bonds"]) >= contract["minBondCount"]
     assert snapshot["atoms"] == [
         {**atom.model_dump(mode="json"), "asset_id": "atom-core"} for atom in preset.atoms
     ]
@@ -574,6 +612,7 @@ def test_scene_blueprint_compiler_builds_binary_search_from_structured_input() -
 
 
 def test_scene_blueprint_compiler_builds_water_synthesis_reaction_scene() -> None:
+    contract = _read_chemistry_contract("reaction-synthesis-water")
     playbook = compile_scene_blueprint_to_playbook(
         {
             "id": "reaction_synthesis_water",
@@ -589,15 +628,20 @@ def test_scene_blueprint_compiler_builds_water_synthesis_reaction_scene() -> Non
 
     assert snapshot["kind"] == "reaction_scene"
     assert snapshot["pack_id"] == "chemistry-basic"
-    assert snapshot["reaction_id"] == "reaction_synthesis_water"
+    assert snapshot["reaction_id"] == contract["reactionId"]
     assert [participant["formula_latex"] for participant in snapshot["reactants"]] == [
-        "H_2",
-        "O_2",
+        *contract["reactantFormulas"],
     ]
-    assert [participant["formula_latex"] for participant in snapshot["products"]] == ["H_2O"]
-    assert {arrow["asset_id"] for arrow in snapshot["arrows"]} == {"reaction-arrow"}
-    assert {flow["asset_id"] for flow in snapshot["electron_flows"]} == {"electron-flow"}
-    assert snapshot["formula_latex"] == "2H_2 + O_2 \\rightarrow 2H_2O"
+    assert [participant["formula_latex"] for participant in snapshot["products"]] == [
+        *contract["productFormulas"],
+    ]
+    assert {arrow["asset_id"] for arrow in snapshot["arrows"]} == {
+        contract["arrowAssetId"]
+    }
+    assert {flow["asset_id"] for flow in snapshot["electron_flows"]} == {
+        contract["electronFlowAssetId"]
+    }
+    assert snapshot["formula_latex"] == contract["formulaLatex"]
 
     verdict = self_check_playbook(playbook, "Explain water synthesis.")
     assert verdict.status == PlaybookReviewStatus.CLEAN

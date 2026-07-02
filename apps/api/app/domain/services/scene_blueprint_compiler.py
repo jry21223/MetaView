@@ -351,7 +351,7 @@ def _water_molecule_snapshot(blueprint: dict[str, Any]) -> Molecule2DSceneSnapsh
 
 
 def _methane_molecule_snapshot(blueprint: dict[str, Any]) -> Molecule2DSceneSnapshot:
-    return _molecule_snapshot({**blueprint, "smiles": blueprint.get("smiles") or "C"}, "methane")
+    return _molecule_snapshot(blueprint, "methane")
 
 
 def _glucose_molecule_snapshot(blueprint: dict[str, Any]) -> Molecule2DSceneSnapshot:

@@ -45,6 +45,31 @@
       }
     },
     {
+      "id": "water-molecule-contract",
+      "type": "json",
+      "path": "/assets/metaview-kits/chemistry-basic/contracts/water.contract.json",
+      "tags": ["molecule", "water", "h2o", "contract"],
+      "semanticRoles": ["molecule_contract", "water_contract"],
+      "sourceId": "metaview-internal",
+      "attribution": "MetaView internal molecule contract for web/API compiler alignment",
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "commercialUseAllowed": true,
+      "requiresAttribution": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null,
+      "rendererHints": {
+        "preferredRenderer": "molecule_2d_scene",
+        "defaultSize": [180, 130],
+        "anchor": "center",
+        "colorizable": false,
+        "strokeControlled": false
+      }
+    },
+    {
       "id": "methane-molecule-preset",
       "type": "json",
       "path": "/assets/metaview-kits/chemistry-basic/molecule-presets/methane.json",
@@ -52,6 +77,31 @@
       "semanticRoles": ["molecule", "methane", "smiles", "molecule_preset"],
       "sourceId": "metaview-internal",
       "attribution": "MetaView internal SMILES-addressable structured molecule preset",
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "commercialUseAllowed": true,
+      "requiresAttribution": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null,
+      "rendererHints": {
+        "preferredRenderer": "molecule_2d_scene",
+        "defaultSize": [180, 130],
+        "anchor": "center",
+        "colorizable": false,
+        "strokeControlled": false
+      }
+    },
+    {
+      "id": "methane-molecule-contract",
+      "type": "json",
+      "path": "/assets/metaview-kits/chemistry-basic/contracts/methane.contract.json",
+      "tags": ["molecule", "methane", "ch4", "smiles", "contract"],
+      "semanticRoles": ["molecule_contract", "methane_contract"],
+      "sourceId": "metaview-internal",
+      "attribution": "MetaView internal molecule contract for web/API compiler alignment",
       "license": "internal",
       "commercialUseStatus": "allowed",
       "commercialUseAllowed": true,
@@ -114,6 +164,31 @@
       "rendererHints": {
         "preferredRenderer": "molecule_2d_scene",
         "defaultSize": [180, 130],
+        "anchor": "center",
+        "colorizable": false,
+        "strokeControlled": false
+      }
+    },
+    {
+      "id": "reaction-synthesis-water-contract",
+      "type": "json",
+      "path": "/assets/metaview-kits/chemistry-basic/contracts/reaction-synthesis-water.contract.json",
+      "tags": ["reaction", "water", "synthesis", "balanced", "contract"],
+      "semanticRoles": ["reaction_contract", "reaction_synthesis_water_contract"],
+      "sourceId": "metaview-internal",
+      "attribution": "MetaView internal reaction contract for web/API compiler alignment",
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "commercialUseAllowed": true,
+      "requiresAttribution": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null,
+      "rendererHints": {
+        "preferredRenderer": "reaction_scene",
+        "defaultSize": [260, 120],
         "anchor": "center",
         "colorizable": false,
         "strokeControlled": false

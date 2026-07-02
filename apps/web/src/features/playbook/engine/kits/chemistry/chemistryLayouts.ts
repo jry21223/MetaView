@@ -13,15 +13,14 @@ import {
   resolveMoleculePresetBySmilesForRenderer,
   resolveMoleculePresetForRenderer,
 } from "./moleculePresetResolver";
-import glucoseContractJson from "../../../../../../public/assets/metaview-kits/chemistry-basic/contracts/glucose.contract.json";
+import {
+  resolveMoleculeContract,
+  WATER_SYNTHESIS_REACTION_CONTRACT,
+  type ChemistryReactionParticipantContract,
+} from "./chemistryContracts";
 
 const DEFAULT_CHEMISTRY_PACK_ID = "chemistry-basic";
-const GLUCOSE_CONTRACT = glucoseContractJson as {
-  moleculeId: string;
-  assetId: string;
-  smiles: string;
-  formulaLatex: string;
-};
+const GLUCOSE_CONTRACT = resolveMoleculeContract("glucose")!;
 
 export type Molecule2DLayoutInput = {
   packId?: string;
@@ -123,9 +122,9 @@ function numberOr(value: number | undefined, fallback: number): number {
 
 function moleculeIdFor(input: Molecule2DLayoutInput): string {
   if (input.moleculeId) return input.moleculeId;
-  if (input.sceneType === "molecule_2d_methane") return "methane";
-  if (input.sceneType === "molecule_2d_glucose") return "glucose";
-  return "water";
+  if (input.sceneType === "molecule_2d_methane") return resolveMoleculeContract("methane")?.moleculeId ?? "methane";
+  if (input.sceneType === "molecule_2d_glucose") return GLUCOSE_CONTRACT.moleculeId;
+  return resolveMoleculeContract("water")?.moleculeId ?? "water";
 }
 
 function withOptionalAtomFields(atom: Molecule2DAtom, input: Molecule2DAtomInput): Molecule2DAtom {
@@ -250,6 +249,8 @@ function compileCallout(input: Molecule2DCalloutInput, index: number): Molecule2
 export function compileMolecule2DLayout(input: Molecule2DLayoutInput): Molecule2DSceneSnapshot {
   const packId = input.packId ?? DEFAULT_CHEMISTRY_PACK_ID;
   const moleculeId = moleculeIdFor(input);
+  const moleculeContract = resolveMoleculeContract(moleculeId);
+  const resolvedSmiles = input.smiles ?? moleculeContract?.smiles;
   const atomAssetId = resolveChemistryAssetId("molecule_2d_scene", "atom", packId);
   const bondAssetId = resolveChemistryAssetId("molecule_2d_scene", "bond", packId);
   const hasStructuredInput = (input.atoms?.length ?? 0) > 0 && (input.bonds?.length ?? 0) > 0;
@@ -259,14 +260,14 @@ export function compileMolecule2DLayout(input: Molecule2DLayoutInput): Molecule2
       kind: "molecule_2d_scene",
       pack_id: packId,
       molecule_id: moleculeId,
-      smiles: input.smiles,
+      smiles: resolvedSmiles,
       molecule_asset_id:
-        input.moleculeAssetId ?? resolveAssetForRenderer("molecule_2d_scene", moleculeId, packId)?.id,
+        input.moleculeAssetId ?? moleculeContract?.assetId ?? resolveAssetForRenderer("molecule_2d_scene", moleculeId, packId)?.id,
       atoms: input.atoms!.map((atom, index) => compileAtom(atom, packId, index)),
       bonds: input.bonds!.map((bond, index) => compileBond(bond, packId, index)),
       highlights: input.highlights,
       callouts: input.callouts?.map(compileCallout),
-      formula_latex: input.formulaLatex,
+      formula_latex: input.formulaLatex ?? moleculeContract?.formulaLatex,
       caption: input.caption ?? `${moleculeId} molecule compiled from structured atom and bond input.`,
     };
   }
@@ -276,22 +277,24 @@ export function compileMolecule2DLayout(input: Molecule2DLayoutInput): Molecule2
   }
 
   const moleculePreset =
-    resolveMoleculePresetBySmilesForRenderer(packId, input.smiles) ??
+    resolveMoleculePresetBySmilesForRenderer(packId, resolvedSmiles) ??
     resolveMoleculePresetForRenderer(packId, moleculeId);
   const moleculeAssetId =
+    input.moleculeAssetId ??
+    moleculeContract?.assetId ??
     moleculePreset?.moleculeAssetId ??
     resolveChemistryAssetId("molecule_2d_scene", moleculeId, packId);
   if (moleculePreset) {
     return {
       kind: "molecule_2d_scene",
       pack_id: packId,
-      molecule_id: moleculePreset.moleculeId,
-      smiles: moleculePreset.smiles ?? input.smiles,
+      molecule_id: moleculeContract?.moleculeId ?? moleculePreset.moleculeId,
+      smiles: resolvedSmiles ?? moleculePreset.smiles,
       molecule_asset_id: moleculeAssetId,
       atoms: moleculePreset.atoms.map((atom) => ({ ...atom, asset_id: atomAssetId })),
       bonds: moleculePreset.bonds.map((bond) => ({ ...bond, asset_id: bondAssetId })),
       callouts: moleculePreset.callouts,
-      formula_latex: moleculePreset.formulaLatex,
+      formula_latex: input.formulaLatex ?? moleculeContract?.formulaLatex ?? moleculePreset.formulaLatex,
       caption: input.caption ?? moleculePreset.caption,
     };
   }
@@ -300,7 +303,7 @@ export function compileMolecule2DLayout(input: Molecule2DLayoutInput): Molecule2
     kind: "molecule_2d_scene",
     pack_id: packId,
     molecule_id: moleculeId,
-    smiles: input.smiles,
+    smiles: resolvedSmiles,
     molecule_asset_id: moleculeAssetId,
     atoms: [
       { id: "o", element: "O", x: 50, y: 42, asset_id: atomAssetId, label: "oxygen" },
@@ -315,8 +318,19 @@ export function compileMolecule2DLayout(input: Molecule2DLayoutInput): Molecule2
       { id: "bent-shape", target_id: "o", label: "bent geometry", side: "top" },
       { id: "polar-bond", target_id: "h2", label: "polar bonds", side: "right" },
     ],
-    formula_latex: "H_2O",
+    formula_latex: input.formulaLatex ?? moleculeContract?.formulaLatex ?? "H_2O",
     caption: input.caption ?? "Water is a bent polar molecule built from structured atom and bond data.",
+  };
+}
+
+function contractParticipant(input: ChemistryReactionParticipantContract): ReactionParticipant {
+  return {
+    id: input.id,
+    formula_latex: input.formulaLatex,
+    label: input.label,
+    coefficient: input.coefficient,
+    x: input.x,
+    y: input.y,
   };
 }
 
@@ -359,47 +373,49 @@ function compileElectronFlow(input: ReactionElectronFlowInput, packId: string, i
 export function compileReactionLayout(input: ReactionLayoutInput): ReactionSceneSnapshot {
   const packId = input.packId ?? DEFAULT_CHEMISTRY_PACK_ID;
   const electronFlows = input.electronFlows ?? input.electron_flows;
+  const reactionContract = WATER_SYNTHESIS_REACTION_CONTRACT;
   return {
     kind: "reaction_scene",
     pack_id: packId,
-    reaction_id: input.reactionId ?? "reaction_synthesis_water",
+    reaction_id: input.reactionId ?? reactionContract.reactionId,
     reactants: input.reactants?.length
       ? input.reactants.map(compileParticipant)
-      : [
-          { id: "h2", formula_latex: "H_2", label: "hydrogen", coefficient: 2, x: 18, y: 48 },
-          { id: "o2", formula_latex: "O_2", label: "oxygen", coefficient: 1, x: 38, y: 48 },
-        ],
+      : reactionContract.reactants.map(contractParticipant),
     products: input.products?.length
       ? input.products.map(compileParticipant)
-      : [{ id: "h2o", formula_latex: "H_2O", label: "water", coefficient: 2, x: 78, y: 48 }],
+      : reactionContract.products.map(contractParticipant),
     arrows: input.arrows?.length
       ? input.arrows.map((arrow, index) => compileArrow(arrow, packId, index))
       : [
           {
-            id: "main-arrow",
-            semantic_role: "reaction_arrow",
-            from: [48, 48],
-            to: [66, 48],
-            label: "forms",
-            asset_id: resolveChemistryAssetId("reaction_scene", "reaction_arrow", packId),
+            id: reactionContract.arrow.id,
+            semantic_role: reactionContract.arrow.semanticRole,
+            from: reactionContract.arrow.from,
+            to: reactionContract.arrow.to,
+            label: reactionContract.arrow.label,
+            asset_id:
+              resolveChemistryAssetId("reaction_scene", reactionContract.arrow.semanticRole, packId) ??
+              reactionContract.arrowAssetId,
           },
         ],
     electron_flows: electronFlows?.length
       ? electronFlows.map((flow, index) => compileElectronFlow(flow, packId, index))
       : [
           {
-            id: "electron-shift",
-            semantic_role: "electron_flow",
-            from: [39, 38],
-            to: [58, 36],
-            label: "bond rearrangement",
-            asset_id: resolveChemistryAssetId("reaction_scene", "electron_flow", packId),
+            id: reactionContract.electronFlow.id,
+            semantic_role: reactionContract.electronFlow.semanticRole,
+            from: reactionContract.electronFlow.from,
+            to: reactionContract.electronFlow.to,
+            label: reactionContract.electronFlow.label,
+            asset_id:
+              resolveChemistryAssetId("reaction_scene", reactionContract.electronFlow.semanticRole, packId) ??
+              reactionContract.electronFlowAssetId,
           },
         ],
     callouts: input.callouts?.length
       ? input.callouts.map(compileCallout)
       : [{ id: "balanced", target_id: "main-arrow", label: "balanced atoms", side: "top" }],
-    formula_latex: input.formulaLatex ?? "2H_2 + O_2 \\rightarrow 2H_2O",
-    caption: input.caption ?? "A balanced reaction conserves each atom across reactants and products.",
+    formula_latex: input.formulaLatex ?? reactionContract.formulaLatex,
+    caption: input.caption ?? reactionContract.caption,
   };
 }

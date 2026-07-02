@@ -1,7 +1,8 @@
 import type { SceneBlueprint } from "../compiler/sceneBlueprintCompiler";
-import glucoseContractJson from "../../../../../public/assets/metaview-kits/chemistry-basic/contracts/glucose.contract.json";
+import { resolveMoleculeContract } from "../kits/chemistry/chemistryContracts";
 
-const GLUCOSE_CONTRACT = glucoseContractJson as { smiles: string };
+const GLUCOSE_CONTRACT = resolveMoleculeContract("glucose")!;
+const METHANE_CONTRACT = resolveMoleculeContract("methane")!;
 
 export type SubjectVisualFixtureId =
   | "binary_search"
@@ -154,7 +155,7 @@ export const subjectVisualBlueprints: Record<SubjectVisualFixtureId, SceneBluepr
     title: "Methane molecule",
     visualIntent: ["render_structured_molecule", "show_tetrahedral_geometry"],
     emphasisPoints: ["carbon", "hydrogen", "tetrahedral geometry"],
-    smiles: "C",
+    smiles: METHANE_CONTRACT.smiles,
   },
   molecule_2d_glucose: {
     id: "molecule_2d_glucose",

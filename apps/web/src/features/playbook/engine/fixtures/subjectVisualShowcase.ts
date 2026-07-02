@@ -4,6 +4,14 @@ import {
   type ShowcaseImageQualityThresholds,
 } from "./showcaseImageQuality";
 import { getSubjectVisualFixture, type SubjectVisualFixtureId } from "./subjectVisualFixtures";
+import {
+  resolveMoleculeContract,
+  WATER_SYNTHESIS_REACTION_CONTRACT,
+} from "../kits/chemistry/chemistryContracts";
+
+const WATER_CONTRACT = resolveMoleculeContract("water")!;
+const METHANE_CONTRACT = resolveMoleculeContract("methane")!;
+const GLUCOSE_CONTRACT = resolveMoleculeContract("glucose")!;
 
 export interface SubjectVisualShowcaseEntry {
   id: SubjectVisualFixtureId;
@@ -157,11 +165,12 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
     showInlineCode: false,
     requiredMarkers: [
       "molecule-2d-scene",
-      'data-molecule-id="water"',
-      'data-asset-id="water-molecule-preset"',
+      `data-molecule-id="${WATER_CONTRACT.moleculeId}"`,
+      `data-asset-id="${WATER_CONTRACT.assetId}"`,
       'data-asset-id="core-light-lab-grid"',
       'data-asset-id="core-formula-tag"',
       'data-structured-molecule="true"',
+      WATER_CONTRACT.formula,
     ],
     imageQuality: imageQuality(190000, 130, 0.025, 0.7, 0.7),
   },
@@ -175,12 +184,13 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
     showInlineCode: false,
     requiredMarkers: [
       "molecule-2d-scene",
-      'data-molecule-id="methane"',
-      'data-smiles="C"',
-      'data-asset-id="methane-molecule-preset"',
+      `data-molecule-id="${METHANE_CONTRACT.moleculeId}"`,
+      `data-smiles="${METHANE_CONTRACT.smiles}"`,
+      `data-asset-id="${METHANE_CONTRACT.assetId}"`,
       'data-asset-id="core-light-lab-grid"',
       'data-asset-id="core-formula-tag"',
       'data-structured-molecule="true"',
+      METHANE_CONTRACT.formula,
     ],
     imageQuality: imageQuality(190000, 150, 0.03, 0.74, 0.7),
   },
@@ -194,15 +204,15 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
     showInlineCode: false,
     requiredMarkers: [
       "molecule-2d-scene",
-      'data-molecule-id="glucose"',
-      'data-smiles="OC[C@H]1O[C@@H](O)[C@H](O)[C@H](O)[C@@H]1O"',
-      'data-asset-id="rdkit-smiles-glucose"',
+      `data-molecule-id="${GLUCOSE_CONTRACT.moleculeId}"`,
+      `data-smiles="${GLUCOSE_CONTRACT.smiles}"`,
+      `data-asset-id="${GLUCOSE_CONTRACT.assetId}"`,
       'data-asset-id="core-light-lab-grid"',
       'data-asset-id="core-formula-tag"',
       'data-structured-molecule="true"',
       'data-element="C"',
       'data-element="O"',
-      "C6H12O6",
+      GLUCOSE_CONTRACT.formula,
     ],
     imageQuality: imageQuality(210000, 150, 0.055, 0.72, 0.72),
   },
@@ -238,9 +248,9 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
     showInlineCode: false,
     requiredMarkers: [
       "reaction-scene",
-      'data-reaction-id="reaction_synthesis_water"',
-      'data-asset-id="reaction-arrow"',
-      'data-asset-id="electron-flow"',
+      `data-reaction-id="${WATER_SYNTHESIS_REACTION_CONTRACT.reactionId}"`,
+      `data-asset-id="${WATER_SYNTHESIS_REACTION_CONTRACT.arrowAssetId}"`,
+      `data-asset-id="${WATER_SYNTHESIS_REACTION_CONTRACT.electronFlowAssetId}"`,
       'data-asset-id="core-light-lab-grid"',
       'data-asset-id="core-formula-tag"',
       'data-semantic-role="reactant"',

@@ -27,13 +27,24 @@ from app.domain.services.rdkit_molecule_compiler import compile_molecule_snapsho
 DEFAULT_CHEMISTRY_PACK_ID = "chemistry-basic"
 
 
-def _load_glucose_contract() -> dict[str, Any]:
-    contract_path = ASSET_MANIFEST_ROOT / "chemistry-basic" / "contracts" / "glucose.contract.json"
+def _load_chemistry_contract(contract_name: str) -> dict[str, Any]:
+    contract_path = (
+        ASSET_MANIFEST_ROOT
+        / "chemistry-basic"
+        / "contracts"
+        / f"{contract_name}.contract.json"
+    )
     return json.loads(contract_path.read_text(encoding="utf-8"))
 
 
-GLUCOSE_CONTRACT = _load_glucose_contract()
+MOLECULE_CONTRACTS = {
+    "glucose": _load_chemistry_contract("glucose"),
+    "methane": _load_chemistry_contract("methane"),
+    "water": _load_chemistry_contract("water"),
+}
+GLUCOSE_CONTRACT = MOLECULE_CONTRACTS["glucose"]
 GLUCOSE_SMILES = str(GLUCOSE_CONTRACT["smiles"])
+WATER_SYNTHESIS_REACTION_CONTRACT = _load_chemistry_contract("reaction-synthesis-water")
 
 
 def _asset_id_for_role(renderer_kind: str, semantic_role: str, pack_id: str) -> str | None:
@@ -62,10 +73,10 @@ def _molecule_id(blueprint: dict[str, Any], default_molecule_id: str | None) -> 
         return default_molecule_id
     scene_type = str(blueprint.get("sceneType") or "")
     if scene_type == "molecule_2d_methane":
-        return "methane"
+        return str(MOLECULE_CONTRACTS["methane"]["moleculeId"])
     if scene_type == "molecule_2d_glucose":
-        return "glucose"
-    return "water"
+        return str(MOLECULE_CONTRACTS["glucose"]["moleculeId"])
+    return str(MOLECULE_CONTRACTS["water"]["moleculeId"])
 
 
 def _callout(raw: dict[str, Any], index: int) -> Molecule2DCallout:
@@ -115,7 +126,14 @@ def compile_molecule_2d_snapshot(
 ) -> Molecule2DSceneSnapshot:
     pack_id = str(blueprint.get("packId") or DEFAULT_CHEMISTRY_PACK_ID)
     molecule_id = _molecule_id(blueprint, default_molecule_id)
-    smiles = str(blueprint["smiles"]) if blueprint.get("smiles") else None
+    molecule_contract = MOLECULE_CONTRACTS.get(molecule_id)
+    smiles = (
+        str(blueprint["smiles"])
+        if blueprint.get("smiles")
+        else str(molecule_contract["smiles"])
+        if molecule_contract and molecule_contract.get("smiles")
+        else None
+    )
     atom_asset_id = _asset_id_for_role("molecule_2d_scene", "atom", pack_id)
     bond_asset_id = _asset_id_for_role("molecule_2d_scene", "bond", pack_id)
     raw_atoms = blueprint.get("atoms") or []
@@ -126,6 +144,7 @@ def compile_molecule_2d_snapshot(
             molecule_id=molecule_id,
             smiles=smiles,
             molecule_asset_id=blueprint.get("moleculeAssetId")
+            or (str(molecule_contract["assetId"]) if molecule_contract else None)
             or _direct_asset_id_for_role("molecule_2d_scene", molecule_id, pack_id),
             atoms=[_atom(atom, pack_id, index) for index, atom in enumerate(raw_atoms)],
             bonds=[_bond(bond, pack_id, index) for index, bond in enumerate(raw_bonds)],
@@ -134,7 +153,8 @@ def compile_molecule_2d_snapshot(
                 _callout(callout, index)
                 for index, callout in enumerate(blueprint.get("callouts") or [])
             ],
-            formula_latex=blueprint.get("formulaLatex"),
+            formula_latex=blueprint.get("formulaLatex")
+            or (str(molecule_contract["formulaLatex"]) if molecule_contract else None),
             caption=str(
                 blueprint.get("caption")
                 or f"{molecule_id} molecule compiled from structured atom and bond input."
@@ -161,9 +181,15 @@ def compile_molecule_2d_snapshot(
     if preset is not None:
         return Molecule2DSceneSnapshot(
             pack_id=pack_id,
-            molecule_id=preset.molecule_id,
-            smiles=preset.smiles or smiles,
-            molecule_asset_id=preset.molecule_asset_id,
+            molecule_id=(
+                str(molecule_contract["moleculeId"])
+                if molecule_contract
+                else preset.molecule_id
+            ),
+            smiles=smiles or preset.smiles,
+            molecule_asset_id=blueprint.get("moleculeAssetId")
+            or (str(molecule_contract["assetId"]) if molecule_contract else None)
+            or preset.molecule_asset_id,
             atoms=[
                 atom.model_copy(update={"asset_id": atom_asset_id}) for atom in preset.atoms
             ],
@@ -171,7 +197,9 @@ def compile_molecule_2d_snapshot(
                 bond.model_copy(update={"asset_id": bond_asset_id}) for bond in preset.bonds
             ],
             callouts=preset.callouts,
-            formula_latex=preset.formula_latex,
+            formula_latex=blueprint.get("formulaLatex")
+            or (str(molecule_contract["formulaLatex"]) if molecule_contract else None)
+            or preset.formula_latex,
             caption=str(blueprint.get("caption") or preset.caption),
         )
 
@@ -197,7 +225,10 @@ def compile_molecule_2d_snapshot(
             Molecule2DCallout(id="bent-shape", target_id="o", label="bent geometry", side="top"),
             Molecule2DCallout(id="polar-bond", target_id="h2", label="polar bonds", side="right"),
         ],
-        formula_latex="H_2O",
+        formula_latex=str(
+            blueprint.get("formulaLatex")
+            or (molecule_contract["formulaLatex"] if molecule_contract else "H_2O")
+        ),
         caption=str(
             blueprint.get("caption")
             or "Water is a bent polar molecule built from structured atom and bond data."
@@ -248,57 +279,38 @@ def _electron_flow(raw: dict[str, Any], pack_id: str, index: int) -> ReactionEle
 def compile_reaction_snapshot(blueprint: dict[str, Any]) -> ReactionSceneSnapshot:
     pack_id = str(blueprint.get("packId") or DEFAULT_CHEMISTRY_PACK_ID)
     raw_electron_flows = blueprint.get("electronFlows") or blueprint.get("electron_flows") or []
+    reaction_contract = WATER_SYNTHESIS_REACTION_CONTRACT
     return ReactionSceneSnapshot(
         pack_id=pack_id,
-        reaction_id=str(blueprint.get("reactionId") or "reaction_synthesis_water"),
+        reaction_id=str(blueprint.get("reactionId") or reaction_contract["reactionId"]),
         reactants=[
             _participant(participant, index)
             for index, participant in enumerate(blueprint.get("reactants") or [])
         ]
         or [
-            ReactionParticipant(
-                id="h2",
-                formula_latex="H_2",
-                label="hydrogen",
-                coefficient=2,
-                x=18,
-                y=48,
-            ),
-            ReactionParticipant(
-                id="o2",
-                formula_latex="O_2",
-                label="oxygen",
-                coefficient=1,
-                x=38,
-                y=48,
-            ),
+            _participant(participant, index)
+            for index, participant in enumerate(reaction_contract["reactants"])
         ],
         products=[
             _participant(product, index)
             for index, product in enumerate(blueprint.get("products") or [])
         ]
         or [
-            ReactionParticipant(
-                id="h2o",
-                formula_latex="H_2O",
-                label="water",
-                coefficient=2,
-                x=78,
-                y=48,
-            ),
+            _participant(product, index)
+            for index, product in enumerate(reaction_contract["products"])
         ],
         arrows=[
             _arrow(arrow, pack_id, index)
             for index, arrow in enumerate(blueprint.get("arrows") or [])
         ]
         or [
-            ReactionArrow(
-                id="main-arrow",
-                semantic_role="reaction_arrow",
-                **{"from": (48, 48)},
-                to=(66, 48),
-                label="forms",
-                asset_id=_asset_id_for_role("reaction_scene", "reaction_arrow", pack_id),
+            _arrow(
+                {
+                    **reaction_contract["arrow"],
+                    "assetId": reaction_contract["arrowAssetId"],
+                },
+                pack_id,
+                0,
             ),
         ],
         electron_flows=[
@@ -306,13 +318,13 @@ def compile_reaction_snapshot(blueprint: dict[str, Any]) -> ReactionSceneSnapsho
             for index, flow in enumerate(raw_electron_flows)
         ]
         or [
-            ReactionElectronFlow(
-                id="electron-shift",
-                semantic_role="electron_flow",
-                **{"from": (39, 38)},
-                to=(58, 36),
-                label="bond rearrangement",
-                asset_id=_asset_id_for_role("reaction_scene", "electron_flow", pack_id),
+            _electron_flow(
+                {
+                    **reaction_contract["electronFlow"],
+                    "assetId": reaction_contract["electronFlowAssetId"],
+                },
+                pack_id,
+                0,
             ),
         ],
         callouts=[
@@ -325,10 +337,10 @@ def compile_reaction_snapshot(blueprint: dict[str, Any]) -> ReactionSceneSnapsho
             ),
         ],
         formula_latex=str(
-            blueprint.get("formulaLatex") or "2H_2 + O_2 \\rightarrow 2H_2O"
+            blueprint.get("formulaLatex") or reaction_contract["formulaLatex"]
         ),
         caption=str(
             blueprint.get("caption")
-            or "A balanced reaction conserves each atom across reactants and products."
+            or reaction_contract["caption"]
         ),
     )

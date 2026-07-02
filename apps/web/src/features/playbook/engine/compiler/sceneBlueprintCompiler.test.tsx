@@ -27,23 +27,40 @@ vi.mock("remotion", async () => {
 interface MoleculeContract {
   moleculeId: string;
   assetId: string;
-  smiles: string;
+  smiles?: string;
   formula: string;
   formulaLatex: string;
   elementCounts: Record<string, number>;
   minBondCount: number;
 }
 
-function readGlucoseContract(): MoleculeContract {
+interface ReactionContract {
+  reactionId: string;
+  formulaLatex: string;
+  reactantFormulas: string[];
+  productFormulas: string[];
+  arrowAssetId: string;
+  electronFlowAssetId: string;
+}
+
+function readChemistryContract<T>(contractName: string): T {
   return JSON.parse(
     readFileSync(
       path.resolve(
         process.cwd(),
-        "public/assets/metaview-kits/chemistry-basic/contracts/glucose.contract.json",
+        `public/assets/metaview-kits/chemistry-basic/contracts/${contractName}.contract.json`,
       ),
       "utf8",
     ),
-  ) as MoleculeContract;
+  ) as T;
+}
+
+function readMoleculeContract(contractName: string): MoleculeContract {
+  return readChemistryContract<MoleculeContract>(contractName);
+}
+
+function readReactionContract(contractName: string): ReactionContract {
+  return readChemistryContract<ReactionContract>(contractName);
 }
 
 function elementCounts(atoms: Array<{ element: string }>): Record<string, number> {
@@ -401,6 +418,7 @@ describe("sceneBlueprintCompiler", () => {
   });
 
   it("compiles a water molecule blueprint into a structured chemistry scene", () => {
+    const contract = readMoleculeContract("water");
     const preset = resolveMoleculePresetForRenderer("chemistry-basic", "water");
     const script = compileSceneBlueprintToPlaybookScript({
       subject: "chemistry",
@@ -416,7 +434,11 @@ describe("sceneBlueprintCompiler", () => {
       throw new Error(`Expected molecule_2d_scene, got ${snapshot.kind}`);
     }
     expect(snapshot.pack_id).toBe("chemistry-basic");
-    expect(snapshot.molecule_asset_id).toBe("water-molecule-preset");
+    expect(snapshot.molecule_id).toBe(contract.moleculeId);
+    expect(snapshot.molecule_asset_id).toBe(contract.assetId);
+    expect(snapshot.formula_latex).toBe(contract.formulaLatex);
+    expect(elementCounts(snapshot.atoms)).toEqual(contract.elementCounts);
+    expect(snapshot.bonds.length).toBeGreaterThanOrEqual(contract.minBondCount);
     expect(preset).toBeTruthy();
     expect(snapshot.atoms).toEqual(preset!.atoms.map((atom) => ({ ...atom, asset_id: "atom-core" })));
     expect(snapshot.bonds).toEqual(preset!.bonds.map((bond) => ({ ...bond, asset_id: "bond-line" })));
@@ -433,21 +455,24 @@ describe("sceneBlueprintCompiler", () => {
     const markup = renderToStaticMarkup(<PlaybookComposition script={script} showSubtitles={false} />);
     expect(markup).toContain("molecule-2d-scene");
     expect(markup).toContain('data-structured-molecule="true"');
-    expect(markup).toContain('data-asset-id="water-molecule-preset"');
+    expect(markup).toContain(`data-molecule-id="${contract.moleculeId}"`);
+    expect(markup).toContain(`data-asset-id="${contract.assetId}"`);
+    expect(markup).toContain(contract.formula);
     expect(markup).toContain('data-element="O"');
     expect(markup).toContain('data-element="H"');
     expect(markup).not.toContain('data-missing-asset="true"');
   });
 
   it("compiles a methane molecule blueprint from a SMILES-addressable structured preset", () => {
-    const preset = resolveMoleculePresetBySmilesForRenderer("chemistry-basic", "C");
+    const contract = readMoleculeContract("methane");
+    const preset = resolveMoleculePresetBySmilesForRenderer("chemistry-basic", contract.smiles);
     const script = compileSceneBlueprintToPlaybookScript({
       subject: "chemistry",
       sceneType: "molecule_2d_methane",
       title: "Methane molecule",
       visualIntent: ["render_structured_molecule", "show_tetrahedral_geometry"],
       emphasisPoints: ["carbon", "hydrogen", "tetrahedral geometry"],
-      smiles: "C",
+      smiles: contract.smiles,
     });
 
     expect(script.domain).toBe("chemistry");
@@ -456,9 +481,12 @@ describe("sceneBlueprintCompiler", () => {
       throw new Error(`Expected molecule_2d_scene, got ${snapshot.kind}`);
     }
     expect(snapshot.pack_id).toBe("chemistry-basic");
-    expect(snapshot.molecule_id).toBe("methane");
-    expect(snapshot.smiles).toBe("C");
-    expect(snapshot.molecule_asset_id).toBe("methane-molecule-preset");
+    expect(snapshot.molecule_id).toBe(contract.moleculeId);
+    expect(snapshot.smiles).toBe(contract.smiles);
+    expect(snapshot.molecule_asset_id).toBe(contract.assetId);
+    expect(snapshot.formula_latex).toBe(contract.formulaLatex);
+    expect(elementCounts(snapshot.atoms)).toEqual(contract.elementCounts);
+    expect(snapshot.bonds.length).toBeGreaterThanOrEqual(contract.minBondCount);
     expect(preset).toBeTruthy();
     expect(snapshot.atoms).toEqual(preset!.atoms.map((atom) => ({ ...atom, asset_id: "atom-core" })));
     expect(snapshot.bonds).toEqual(preset!.bonds.map((bond) => ({ ...bond, asset_id: "bond-line" })));
@@ -468,16 +496,17 @@ describe("sceneBlueprintCompiler", () => {
 
     const markup = renderToStaticMarkup(<PlaybookComposition script={script} showSubtitles={false} />);
     expect(markup).toContain("molecule-2d-scene");
-    expect(markup).toContain('data-molecule-id="methane"');
-    expect(markup).toContain('data-smiles="C"');
-    expect(markup).toContain('data-asset-id="methane-molecule-preset"');
+    expect(markup).toContain(`data-molecule-id="${contract.moleculeId}"`);
+    expect(markup).toContain(`data-smiles="${contract.smiles}"`);
+    expect(markup).toContain(`data-asset-id="${contract.assetId}"`);
+    expect(markup).toContain(contract.formula);
     expect(markup).toContain('data-element="C"');
     expect(markup).toContain('data-element="H"');
     expect(markup).not.toContain('data-missing-asset="true"');
   });
 
   it("compiles a glucose molecule blueprint from the chemistry SMILES asset without falling back to water", () => {
-    const contract = readGlucoseContract();
+    const contract = readMoleculeContract("glucose");
     const script = compileSceneBlueprintToPlaybookScript({
       subject: "chemistry",
       sceneType: "molecule_2d_glucose",
@@ -517,6 +546,7 @@ describe("sceneBlueprintCompiler", () => {
   });
 
   it("compiles a water synthesis blueprint into an asset-backed reaction scene", () => {
+    const contract = readReactionContract("reaction-synthesis-water");
     const script = compileSceneBlueprintToPlaybookScript({
       subject: "chemistry",
       sceneType: "reaction_synthesis_water",
@@ -531,26 +561,27 @@ describe("sceneBlueprintCompiler", () => {
       throw new Error(`Expected reaction_scene, got ${snapshot.kind}`);
     }
     expect(snapshot.pack_id).toBe("chemistry-basic");
-    expect(snapshot.reaction_id).toBe("reaction_synthesis_water");
+    expect(snapshot.reaction_id).toBe(contract.reactionId);
     expect(snapshot.arrows.map((arrow) => arrow.asset_id)).toEqual(
-      expect.arrayContaining(["reaction-arrow"]),
+      expect.arrayContaining([contract.arrowAssetId]),
     );
     expect(snapshot.electron_flows.map((flow) => flow.asset_id)).toEqual(
-      expect.arrayContaining(["electron-flow"]),
+      expect.arrayContaining([contract.electronFlowAssetId]),
     );
     expect(snapshot.reactants.map((participant) => participant.formula_latex)).toEqual(
-      expect.arrayContaining(["H_2", "O_2"]),
+      contract.reactantFormulas,
     );
     expect(snapshot.products.map((participant) => participant.formula_latex)).toEqual(
-      expect.arrayContaining(["H_2O"]),
+      contract.productFormulas,
     );
+    expect(snapshot.formula_latex).toBe(contract.formulaLatex);
     expect(visualQualityGate(script)).toEqual([]);
 
     const markup = renderToStaticMarkup(<PlaybookComposition script={script} showSubtitles={false} />);
     expect(markup).toContain("reaction-scene");
-    expect(markup).toContain('data-reaction-id="reaction_synthesis_water"');
-    expect(markup).toContain('data-asset-id="reaction-arrow"');
-    expect(markup).toContain('data-asset-id="electron-flow"');
+    expect(markup).toContain(`data-reaction-id="${contract.reactionId}"`);
+    expect(markup).toContain(`data-asset-id="${contract.arrowAssetId}"`);
+    expect(markup).toContain(`data-asset-id="${contract.electronFlowAssetId}"`);
     expect(markup).not.toContain('data-missing-asset="true"');
   });
 
