@@ -138,6 +138,55 @@ Starter assets can be internal placeholders or durable third-party/public-domain
 derivatives. Replace or add durable assets only when the source license,
 attribution, commercial-use status, and provenance are recorded in the manifest.
 
+## Phase 1 Closeout
+
+Phase 1 is the current checked-in baseline for the asset roadmap: governance,
+Core Visual Kit reuse, geography/physics flagship scenes, warning-only quality
+gates, and showcase self-tests. It is intentionally not the MCP exposure layer.
+
+Phase 1 acceptance evidence:
+
+- Governance is enforced by `npm --workspace apps/web run asset:audit`, and the
+  root `make check` target runs that audit before showcase rendering, linting,
+  tests, and builds.
+- Registry data is single-sourced from public manifests through
+  `assetRegistry.ts`; `assetRegistry.test.ts` validates all registered roadmap
+  starter packs, schema conformance, rendererKinds, source metadata, commercial
+  status, and Natural Earth provenance.
+- `AssetSvg` is the reusable renderer adapter for SVG/image assets. Missing
+  assets render deterministic fallback markup with `data-missing-asset="true"`.
+- `core-visual-basic` is consumed by subject renderers for shared callouts,
+  formula tags, lab grids, warning icons, flow arrows, and timeline arrows
+  instead of remaining passive metadata.
+- `geography-earth-basic` powers `east_asia_monsoon` through Natural
+  Earth-derived land/coastline/map-layer assets, monsoon flow assets, pressure
+  centers, and moisture particles.
+- `physics-basic` powers `projectile_motion` through projectile/object assets,
+  vector arrow assets, trajectory, formula tag, and motion trail markers.
+- `visualQualityGate` is non-blocking at runtime but exposes warning metadata;
+  tests cover missing asset resolution, forbidden array fallback, asset policy
+  warnings, and clean flagship fixtures.
+- `subjectVisualShowcase.ts` is the durable self-test matrix. It currently
+  covers 14 flagship fixtures across geography, physics, biology, chemistry,
+  math, and algorithm, with required static markers and per-fixture screenshot
+  quality thresholds.
+
+Before treating this phase as closed in a release or branch handoff, run:
+
+```bash
+npm --workspace apps/web run asset:audit
+npm --workspace apps/web run showcase:export
+npm --workspace apps/web run showcase:smoke
+npm --workspace apps/web run showcase:baseline
+METAVIEW_GENERATION_MODE=single make check
+```
+
+The next phase should focus on productionizing the multi-subject asset compiler:
+expand stable biology/chemistry/math/algorithm layout compilers, add golden
+screenshot review for every flagship fixture, tighten attribution/export policy
+around non-internal assets, and only then prepare the separate MCP read-only
+asset exposure work.
+
 ## Adding Assets
 
 1. Add the file under a pack directory in `apps/web/public/assets/metaview-kits/`.
