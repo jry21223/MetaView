@@ -62,7 +62,7 @@ is_metaview_process() {
 stop_known_metaview_processes() {
   local port="$1"
   local pids
-  pids="$(lsof -ti "tcp:$port" 2>/dev/null || true)"
+  pids="$(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)"
   [ -z "$pids" ] && return 0
 
   for pid in $pids; do
