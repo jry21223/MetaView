@@ -49,7 +49,6 @@ function useElapsedSeconds(createdAt: string | null | undefined): number | null 
 
   useEffect(() => {
     if (!createdAt) return;
-    setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, [createdAt]);
@@ -63,13 +62,23 @@ function useRotatingHint(status: PipelineStatus): string | null {
   const hints =
     status && status !== "failed" ? PIPELINE_STAGE_HINTS[status] : null;
   const hintCount = hints?.length ?? 0;
-  const [hintIndex, setHintIndex] = useState(0);
+  const [rotation, setRotation] = useState<{
+    status: PipelineStatus;
+    index: number;
+  }>({ status: null, index: 0 });
+  const hintIndex = rotation.status === status ? rotation.index : 0;
 
   useEffect(() => {
-    setHintIndex(0);
     if (prefersReducedMotion || hintCount <= 1) return;
     const timer = setInterval(
-      () => setHintIndex((index) => (index + 1) % hintCount),
+      () =>
+        setRotation((current) => ({
+          status,
+          index:
+            current.status === status
+              ? (current.index + 1) % hintCount
+              : 1 % hintCount,
+        })),
       HINT_ROTATE_MS,
     );
     return () => clearInterval(timer);
