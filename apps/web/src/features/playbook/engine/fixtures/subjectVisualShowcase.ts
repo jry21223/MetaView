@@ -1,9 +1,11 @@
 import type { PlaybookScript, SnapshotKind } from "../types";
+import { getSceneContractCoverage } from "../assets/visualQualityGate";
 import {
   DEFAULT_SHOWCASE_IMAGE_QUALITY_THRESHOLDS,
   type ShowcaseImageQualityThresholds,
 } from "./showcaseImageQuality";
 import { getSubjectVisualFixture, type SubjectVisualFixtureId } from "./subjectVisualFixtures";
+import type { ShowcaseSceneContractCoverage } from "./showcaseBaselineReport";
 import {
   resolveMoleculeContract,
   WATER_SYNTHESIS_REACTION_CONTRACT,
@@ -23,10 +25,11 @@ export interface SubjectVisualShowcaseEntry {
   showInlineCode: boolean;
   requiredMarkers: string[];
   imageQuality: ShowcaseImageQualityThresholds;
+  contractCoverage: ShowcaseSceneContractCoverage;
   script: PlaybookScript;
 }
 
-type SubjectVisualShowcaseMeta = Omit<SubjectVisualShowcaseEntry, "domain" | "script"> & {
+type SubjectVisualShowcaseMeta = Omit<SubjectVisualShowcaseEntry, "domain" | "script" | "contractCoverage"> & {
   domain: PlaybookScript["domain"];
 };
 
@@ -44,6 +47,32 @@ function imageQuality(
     minContentPixelRatio,
     minContentWidthRatio,
     minContentHeightRatio,
+  };
+}
+
+function uniqueSorted(values: readonly string[]): string[] {
+  return [...new Set(values)].sort();
+}
+
+function summarizeContractCoverage(script: PlaybookScript): ShowcaseSceneContractCoverage {
+  const coverage = getSceneContractCoverage(script);
+  if (coverage.length === 0) {
+    return {
+      status: "not_applicable",
+      contractIds: [],
+      requiredAssetIds: [],
+      renderedAssetIds: [],
+      missingAssetIds: [],
+    };
+  }
+
+  const missingAssetIds = uniqueSorted(coverage.flatMap((entry) => entry.missingAssetIds));
+  return {
+    status: missingAssetIds.length > 0 ? "missing" : "matched",
+    contractIds: uniqueSorted(coverage.map((entry) => entry.contractId)),
+    requiredAssetIds: uniqueSorted(coverage.flatMap((entry) => entry.requiredAssetIds)),
+    renderedAssetIds: uniqueSorted(coverage.flatMap((entry) => entry.renderedAssetIds)),
+    missingAssetIds,
   };
 }
 
@@ -354,10 +383,14 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
   },
 ];
 
-const subjectVisualShowcaseEntries: readonly SubjectVisualShowcaseEntry[] = SUBJECT_VISUAL_SHOWCASE_META.map((meta) => ({
-  ...meta,
-  script: getSubjectVisualFixture(meta.id),
-}));
+const subjectVisualShowcaseEntries: readonly SubjectVisualShowcaseEntry[] = SUBJECT_VISUAL_SHOWCASE_META.map((meta) => {
+  const script = getSubjectVisualFixture(meta.id);
+  return {
+    ...meta,
+    script,
+    contractCoverage: summarizeContractCoverage(script),
+  };
+});
 
 export function listSubjectVisualShowcaseEntries(): readonly SubjectVisualShowcaseEntry[] {
   return subjectVisualShowcaseEntries;

@@ -98,6 +98,24 @@ describe("subject visual showcase catalog", () => {
     expect(warnings, fixtureId).toEqual([]);
   });
 
+  it("exposes scene contract coverage for contract-backed showcase fixtures", () => {
+    expect(getSubjectVisualShowcaseEntry("molecule_2d_water")?.contractCoverage).toMatchObject({
+      status: "matched",
+      contractIds: ["water-molecule-contract"],
+      missingAssetIds: [],
+    });
+    expect(getSubjectVisualShowcaseEntry("bfs_graph")?.contractCoverage).toMatchObject({
+      status: "matched",
+      contractIds: ["bfs-graph-contract"],
+      missingAssetIds: [],
+    });
+    expect(getSubjectVisualShowcaseEntry("projectile_motion")?.contractCoverage).toMatchObject({
+      status: "not_applicable",
+      contractIds: [],
+      missingAssetIds: [],
+    });
+  });
+
   it.each(SHOWCASE_IDS)("statically renders showcase fixture %s with required visual markers", (fixtureId) => {
     const entry = getSubjectVisualShowcaseEntry(fixtureId);
     if (!entry) throw new Error(`Missing showcase entry ${fixtureId}`);
@@ -131,6 +149,7 @@ describe("subject visual showcase catalog", () => {
     expect(docs).toContain("node apps/web/scripts/render-shots.mjs");
     expect(docs).toContain("per-fixture screenshot baseline");
     expect(docs).toContain("screenshotReview");
+    expect(docs).toContain("contractCoverage");
     expect(docs).toContain("approved_reference_current");
     expect(docs).toContain("SHOWCASE_BASELINE_REQUIRE_APPROVED=1");
     for (const fixtureId of SHOWCASE_IDS) {

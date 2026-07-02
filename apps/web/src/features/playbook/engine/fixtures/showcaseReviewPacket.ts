@@ -1,4 +1,8 @@
-import type { ShowcaseBaselineReport, ShowcaseBaselineReportEntry } from "./showcaseBaselineReport";
+import type {
+  ShowcaseBaselineReport,
+  ShowcaseBaselineReportEntry,
+  ShowcaseSceneContractCoverage,
+} from "./showcaseBaselineReport";
 
 export interface ShowcaseReviewPacketOptions {
   generatedAt?: string;
@@ -22,6 +26,32 @@ function listValue(values: readonly string[]) {
 
 function markerList(values: readonly string[]) {
   return values.length > 0 ? values.map((value) => `\`${value}\``).join(", ") : "none";
+}
+
+const NO_SCENE_CONTRACT_COVERAGE: ShowcaseSceneContractCoverage = {
+  status: "not_applicable",
+  contractIds: [],
+  requiredAssetIds: [],
+  renderedAssetIds: [],
+  missingAssetIds: [],
+};
+
+function contractCoverage(entry: ShowcaseBaselineReportEntry): ShowcaseSceneContractCoverage {
+  return entry.contractCoverage ?? NO_SCENE_CONTRACT_COVERAGE;
+}
+
+function contractCoverageLabel(entry: ShowcaseBaselineReportEntry) {
+  const coverage = contractCoverage(entry);
+  if (coverage.status === "not_applicable") return "not_applicable";
+  if (coverage.status === "missing") return `missing: ${markerList(coverage.missingAssetIds)}`;
+  return `matched: ${markerList(coverage.contractIds)}`;
+}
+
+function contractCoverageChecklistLabel(entry: ShowcaseBaselineReportEntry) {
+  const coverage = contractCoverage(entry);
+  if (coverage.status === "not_applicable") return "not_applicable";
+  if (coverage.status === "missing") return `missing (${markerList(coverage.contractIds)})`;
+  return `matched (${markerList(coverage.contractIds)})`;
 }
 
 function screenshotLink(entry: ShowcaseBaselineReportEntry) {
@@ -85,11 +115,11 @@ export function createShowcaseReviewPacket(
     "",
     "## Fixture Summary",
     "",
-    "| Fixture | Domain | Renderer | Pack | Status | Screenshot | Issues |",
-    "| --- | --- | --- | --- | --- | --- | --- |",
+    "| Fixture | Domain | Renderer | Pack | Contract | Status | Screenshot | Issues |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ...report.entries.map(
       (entry) =>
-        `| \`${entry.id}\` | ${entry.domain} | ${entry.rendererKind} | ${entry.packId} | ${entry.screenshotReview.status} | ${screenshotLink(entry)} | ${entryIssues(entry)} |`,
+        `| \`${entry.id}\` | ${entry.domain} | ${entry.rendererKind} | ${entry.packId} | ${contractCoverageLabel(entry)} | ${entry.screenshotReview.status} | ${screenshotLink(entry)} | ${entryIssues(entry)} |`,
     ),
     "",
   ];
@@ -109,9 +139,20 @@ export function createShowcaseReviewPacket(
       `- [ ] \`${entry.id}\``,
       `  - Screenshot: ${entry.output ? entry.output : "missing"}`,
       `  - Status: ${entry.screenshotReview.status}`,
+      `  - Contract coverage: ${contractCoverageChecklistLabel(entry)}`,
       `  - Required markers: ${markerList(entry.screenshotReview.requiredMarkers)}`,
       `  - Image stats: ${imageStats(entry)}`,
     );
+    const coverage = contractCoverage(entry);
+    if (coverage.status !== "not_applicable") {
+      lines.push(
+        `  - Contract required assets: ${markerList(coverage.requiredAssetIds)}`,
+        `  - Contract rendered assets: ${markerList(coverage.renderedAssetIds)}`,
+      );
+    }
+    if (coverage.missingAssetIds.length > 0) {
+      lines.push(`  - Contract missing assets: ${markerList(coverage.missingAssetIds)}`);
+    }
     if (entryIssues(entry) !== "none") {
       lines.push(`  - Issues: ${entryIssues(entry)}`);
     }

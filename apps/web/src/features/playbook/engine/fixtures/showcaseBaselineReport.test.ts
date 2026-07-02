@@ -38,6 +38,13 @@ describe("showcaseBaselineReport", () => {
           rendererKind: "physics_force_scene",
           requiredMarkers: ['data-asset-id="projectile-body-dot"', 'data-semantic-role="motion_trail"'],
           imageQuality: thresholds,
+          contractCoverage: {
+            status: "matched",
+            contractIds: ["projectile-contract"],
+            requiredAssetIds: ["projectile-body-dot"],
+            renderedAssetIds: ["projectile-body-dot", "force-vector-arrow"],
+            missingAssetIds: [],
+          },
         },
       ],
       [
@@ -73,6 +80,13 @@ describe("showcaseBaselineReport", () => {
         requiredMarkers: ['data-asset-id="projectile-body-dot"', 'data-semantic-role="motion_trail"'],
         blockingIssues: [],
         driftIssues: [],
+      },
+      contractCoverage: {
+        status: "matched",
+        contractIds: ["projectile-contract"],
+        requiredAssetIds: ["projectile-body-dot"],
+        renderedAssetIds: ["projectile-body-dot", "force-vector-arrow"],
+        missingAssetIds: [],
       },
     });
   });

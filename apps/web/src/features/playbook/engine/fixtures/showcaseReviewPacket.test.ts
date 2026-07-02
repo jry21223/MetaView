@@ -39,6 +39,13 @@ describe("createShowcaseReviewPacket", () => {
           rendererKind: "physics_force_scene",
           requiredMarkers: ['data-asset-id="projectile-body-dot"', 'data-semantic-role="motion_trail"'],
           imageQuality: thresholds,
+          contractCoverage: {
+            status: "matched",
+            contractIds: ["projectile-contract"],
+            requiredAssetIds: ["projectile-body-dot"],
+            renderedAssetIds: ["projectile-body-dot", "force-vector-arrow"],
+            missingAssetIds: [],
+          },
         },
       ],
       [
@@ -62,9 +69,14 @@ describe("createShowcaseReviewPacket", () => {
     expect(packet).toContain("Baseline report generated at: `2026-07-02T00:00:00.000Z`");
     expect(packet).toContain("Packet generated at: `2026-07-02T01:00:00.000Z`");
     expect(packet).toContain("Review readiness: `ready_for_review`");
-    expect(packet).toContain("| `projectile_motion` | physics | physics_force_scene | physics-basic | ready_for_review |");
+    expect(packet).toContain(
+      "| `projectile_motion` | physics | physics_force_scene | physics-basic | matched: `projectile-contract` | ready_for_review |",
+    );
     expect(packet).toContain("[open screenshot](/tmp/projectile_motion.png)");
     expect(packet).toContain("- [ ] `projectile_motion`");
+    expect(packet).toContain("Contract coverage: matched (`projectile-contract`)");
+    expect(packet).toContain('Contract required assets: `projectile-body-dot`');
+    expect(packet).toContain('Contract rendered assets: `projectile-body-dot`, `force-vector-arrow`');
     expect(packet).toContain('Required markers: `data-asset-id="projectile-body-dot"`, `data-semantic-role="motion_trail"`');
     expect(packet).toContain("Image stats: 960x540, 50000 bytes, 100 colors, 12.0% content.");
     expect(packet).toContain("SHOWCASE_REFERENCE_REVIEWER=visual-reviewer npm --workspace apps/web run showcase:approve-reference");
@@ -93,8 +105,11 @@ describe("createShowcaseReviewPacket", () => {
     expect(packet).toContain("Review readiness: `blocked`");
     expect(packet).toContain("## Blocked Fixtures");
     expect(packet).toContain("- `east_asia_monsoon`: missing_summary");
-    expect(packet).toContain("| `east_asia_monsoon` | geography | geo_map_scene | geography-earth-basic | blocked | missing screenshot |");
+    expect(packet).toContain(
+      "| `east_asia_monsoon` | geography | geo_map_scene | geography-earth-basic | not_applicable | blocked | missing screenshot |",
+    );
     expect(packet).toContain("- [ ] `east_asia_monsoon`");
     expect(packet).toContain("Screenshot: missing");
+    expect(packet).toContain("Contract coverage: not_applicable");
   });
 });

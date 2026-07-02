@@ -5,6 +5,16 @@ import {
   type ShowcaseImageQualityThresholds,
 } from "./showcaseImageQuality";
 
+export type ShowcaseSceneContractCoverageStatus = "matched" | "missing" | "not_applicable";
+
+export interface ShowcaseSceneContractCoverage {
+  status: ShowcaseSceneContractCoverageStatus;
+  contractIds: readonly string[];
+  requiredAssetIds: readonly string[];
+  renderedAssetIds: readonly string[];
+  missingAssetIds: readonly string[];
+}
+
 export interface ShowcaseBaselineCatalogEntry {
   id: string;
   domain: string;
@@ -12,6 +22,7 @@ export interface ShowcaseBaselineCatalogEntry {
   rendererKind: string;
   requiredMarkers: readonly string[];
   imageQuality: ShowcaseImageQualityThresholds;
+  contractCoverage?: ShowcaseSceneContractCoverage;
 }
 
 export interface ShowcaseBaselineSummaryEntry extends ShowcaseImageQualityStats {
@@ -98,6 +109,7 @@ export interface ShowcaseBaselineReportEntry {
   referenceStats: ShowcaseBaselineReferenceEntry["stats"] | null;
   driftIssues: ShowcaseBaselineDriftIssue[];
   screenshotReview: ShowcaseScreenshotReview;
+  contractCoverage: ShowcaseSceneContractCoverage;
 }
 
 export interface ShowcaseBaselineReport {
@@ -124,6 +136,20 @@ export const DEFAULT_SHOWCASE_BASELINE_DRIFT_POLICY: ShowcaseBaselineDriftPolicy
   maxContentWidthRatioDrop: 0.05,
   maxContentHeightRatioDrop: 0.05,
 };
+
+const NO_SCENE_CONTRACT_COVERAGE: ShowcaseSceneContractCoverage = {
+  status: "not_applicable",
+  contractIds: [],
+  requiredAssetIds: [],
+  renderedAssetIds: [],
+  missingAssetIds: [],
+};
+
+function sceneContractCoverage(
+  coverage: ShowcaseSceneContractCoverage | undefined,
+): ShowcaseSceneContractCoverage {
+  return coverage ?? NO_SCENE_CONTRACT_COVERAGE;
+}
 
 function roundMargin(value: number) {
   return Number(value.toFixed(6));
@@ -223,6 +249,7 @@ export function createShowcaseBaselineReport(
         referenceStats: referenceEntry?.stats ?? null,
         driftIssues: [],
         screenshotReview: screenshotReview(entry.requiredMarkers, null, ["missing_summary"], [], referenceEntry?.review),
+        contractCoverage: sceneContractCoverage(entry.contractCoverage),
       };
     }
     const referenceStats = referenceEntry?.stats;
@@ -254,6 +281,7 @@ export function createShowcaseBaselineReport(
       referenceStats: referenceStats ?? null,
       driftIssues: entryDriftIssues,
       screenshotReview: screenshotReview(entry.requiredMarkers, summary.output, issues, entryDriftIssues, referenceEntry?.review),
+      contractCoverage: sceneContractCoverage(entry.contractCoverage),
     };
   });
 

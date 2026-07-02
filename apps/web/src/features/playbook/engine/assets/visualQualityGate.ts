@@ -72,6 +72,18 @@ export interface VisualQualityGateOptions {
   findAssetByRole?: typeof findRegisteredAssetByRole;
 }
 
+export interface SceneContractCoverage {
+  contractId: string;
+  sceneTemplate: string;
+  rendererKind: SnapshotKind;
+  packId: string;
+  stepId: string;
+  snapshotPath: string;
+  requiredAssetIds: string[];
+  renderedAssetIds: string[];
+  missingAssetIds: string[];
+}
+
 interface AssetLookup {
   findAssetById: typeof findRegisteredAssetById;
   findAssetByRole: typeof findRegisteredAssetByRole;
@@ -959,6 +971,46 @@ function buildAssetLookup(options: VisualQualityGateOptions = {}): AssetLookup {
     findAssetById: options.findAssetById ?? findRegisteredAssetById,
     findAssetByRole: options.findAssetByRole ?? findRegisteredAssetByRole,
   };
+}
+
+export function getSceneContractCoverage(
+  script: PlaybookScript,
+  options: VisualQualityGateOptions = {},
+): SceneContractCoverage[] {
+  const assets = buildAssetLookup(options);
+  const coverage: SceneContractCoverage[] = [];
+
+  for (const step of script.steps) {
+    for (const { snapshot, snapshotPath } of collectStepSnapshots(step)) {
+      const contract = resolveSceneAssetContract(step.step_id, snapshot);
+      if (!contract) continue;
+
+      const context: SnapshotContext = {
+        domain: script.domain,
+        step,
+        snapshot,
+        snapshotPath,
+        assets,
+      };
+      const renderedAssetIds = [...collectRenderedAssetIds(context)].sort();
+      const renderedAssetIdSet = new Set(renderedAssetIds);
+      const requiredAssetIds = [...contract.requiredAssetIds];
+
+      coverage.push({
+        contractId: contract.id,
+        sceneTemplate: contract.sceneTemplate,
+        rendererKind: contract.rendererKind,
+        packId: contract.packId,
+        stepId: step.step_id,
+        snapshotPath,
+        requiredAssetIds,
+        renderedAssetIds,
+        missingAssetIds: requiredAssetIds.filter((assetId) => !renderedAssetIdSet.has(assetId)),
+      });
+    }
+  }
+
+  return coverage;
 }
 
 export function visualQualityGate(

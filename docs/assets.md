@@ -174,9 +174,10 @@ Phase 1 acceptance evidence:
   quality thresholds.
 - `showcase:baseline` writes a golden-review queue for the generated PNGs:
   each fixture gets `screenshotReview.status`, `requiredMarkers`,
-  `blockingIssues`, and `driftIssues` so release handoffs can distinguish
-  screenshots that are ready for human review from screenshots blocked by
-  missing output, weak image quality, or reference drift.
+  `blockingIssues`, `driftIssues`, and `contractCoverage` so release handoffs
+  can distinguish screenshots that are ready for human review from screenshots
+  blocked by missing output, weak image quality, or reference drift while also
+  seeing which scene asset contracts were matched.
 
 Before treating this phase as closed in a release or branch handoff, run:
 
@@ -271,12 +272,15 @@ Local preview helpers:
    The report is written to
    `eval/reports/subject-visual-showcase-baseline.json` and records each
    fixture's baseline, measured screenshot stats, safety margins, and
-   `screenshotReview` metadata. A `ready_for_review` status means the PNG passed
-   automated quality gates and includes the required static markers; `blocked`
-   records missing-summary or under-baseline blockers; `drift_review_needed`
-   records reference drift that should be visually checked before release;
-   `approved_reference_current` means the render still matches a reference entry
-   that carries explicit human-review metadata. To compare against a previous
+   `screenshotReview` metadata. It also records `contractCoverage`, including
+   matched contract ids, required asset ids, rendered asset ids, and missing
+   contract assets when a scene has an asset contract. A `ready_for_review`
+   status means the PNG passed automated quality gates and includes the required
+   static markers; `blocked` records missing-summary or under-baseline blockers;
+   `drift_review_needed` records reference drift that should be visually checked
+   before release; `approved_reference_current` means the render still matches a
+   reference entry that carries explicit human-review metadata. To compare
+   against a previous
    report without changing the hard failure contract, pass
    `SHOWCASE_BASELINE_REFERENCE=eval/reports/subject-visual-showcase-baseline.json`;
    the command will emit `driftOk` and per-fixture drift warnings separately from
@@ -294,8 +298,8 @@ Local preview helpers:
    That opt-in gate fails unless every fixture reports
    `approved_reference_current`.
    To package the current baseline into a human-review checklist with screenshot
-   links, status, blocker metadata, required markers, and the approval command,
-   run:
+   links, status, blocker metadata, contract coverage, required markers, and the
+   approval command, run:
 
    ```bash
    npm --workspace apps/web run showcase:review-packet
