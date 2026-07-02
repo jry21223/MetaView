@@ -468,6 +468,81 @@ describe("visualQualityGate", () => {
     );
   });
 
+  it("warns when an algorithm array has no active state change", () => {
+    const warnings = visualQualityGate(
+      script({
+        domain: "algorithm",
+        steps: [
+          {
+            step_id: "binary_search_static_array",
+            end_frame: 90,
+            title: "Binary search static array",
+            voiceover_text: "",
+            tokens: [],
+            snapshot: {
+              kind: "algorithm_array",
+              array_values: ["2", "5", "9", "12"],
+              active_indices: [],
+              swap_indices: [],
+              sorted_indices: [],
+              pointers: {},
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "low_algorithm_state_visuals",
+          step_id: "binary_search_static_array",
+          domain: "algorithm",
+          snapshot_kind: "algorithm_array",
+        }),
+      ]),
+    );
+  });
+
+  it("warns when an algorithm tree has no active traversal state", () => {
+    const warnings = visualQualityGate(
+      script({
+        domain: "algorithm",
+        steps: [
+          {
+            step_id: "static_tree",
+            end_frame: 90,
+            title: "Static tree",
+            voiceover_text: "",
+            tokens: [],
+            snapshot: {
+              kind: "algorithm_tree",
+              nodes: [
+                { id: "root", label: "8" },
+                { id: "left", label: "3" },
+              ],
+              edges: [{ from_id: "root", to_id: "left" }],
+              active_node_ids: [],
+              visited_node_ids: [],
+              path_edge_ids: [],
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "low_algorithm_state_visuals",
+          step_id: "static_tree",
+          domain: "algorithm",
+          snapshot_kind: "algorithm_tree",
+        }),
+      ]),
+    );
+  });
+
   it("warns when a call stack scene frame asset_id cannot be resolved", () => {
     const warnings = visualQualityGate(
       script({

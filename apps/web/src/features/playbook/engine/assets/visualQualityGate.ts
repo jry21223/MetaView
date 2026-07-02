@@ -1,5 +1,8 @@
 import { findAssetById, findAssetByRole } from "./assetRegistry";
 import type {
+  AlgorithmArraySnapshot,
+  AlgorithmBarsSnapshot,
+  AlgorithmTreeSnapshot,
   AnySnapshot,
   BioCellSceneSnapshot,
   BioProcessSceneSnapshot,
@@ -385,6 +388,50 @@ function checkReactionScene(
   }
 }
 
+function checkAlgorithmLinearScene(
+  warnings: VisualQualityWarning[],
+  context: SnapshotContext,
+  snapshot: AlgorithmArraySnapshot | AlgorithmBarsSnapshot,
+) {
+  if (context.domain !== "algorithm") return;
+
+  const hasDataStructure =
+    snapshot.kind === "algorithm_bars" ? snapshot.numeric_values.length > 0 : snapshot.array_values.length > 0;
+  const hasStateChange = Boolean(
+    snapshot.active_indices.length > 0 ||
+      snapshot.swap_indices.length > 0 ||
+      snapshot.sorted_indices.length > 0 ||
+      Object.keys(snapshot.pointers).length > 0,
+  );
+  if (hasDataStructure && !hasStateChange) {
+    warn(warnings, context, {
+      code: "low_algorithm_state_visuals",
+      domain: context.domain,
+      message: `algorithm ${snapshot.kind} should show an active index, pointer, swap, or sorted state.`,
+    });
+  }
+}
+
+function checkAlgorithmTreeScene(
+  warnings: VisualQualityWarning[],
+  context: SnapshotContext,
+  snapshot: AlgorithmTreeSnapshot,
+) {
+  if (context.domain !== "algorithm") return;
+
+  const hasTreeStructure = snapshot.nodes.length > 0 && snapshot.edges.length > 0;
+  const hasTraversalState = Boolean(
+    snapshot.active_node_ids.length > 0 || snapshot.visited_node_ids.length > 0 || snapshot.path_edge_ids.length > 0,
+  );
+  if (hasTreeStructure && !hasTraversalState) {
+    warn(warnings, context, {
+      code: "low_algorithm_state_visuals",
+      domain: context.domain,
+      message: "algorithm algorithm_tree should show an active node, visited node, or highlighted path edge.",
+    });
+  }
+}
+
 function checkGraphScene(
   warnings: VisualQualityWarning[],
   context: SnapshotContext,
@@ -572,6 +619,12 @@ export function visualQualityGate(script: PlaybookScript): VisualQualityWarning[
       }
       if (snapshot.kind === "reaction_scene") {
         checkReactionScene(warnings, context, snapshot);
+      }
+      if (snapshot.kind === "algorithm_array" || snapshot.kind === "algorithm_bars") {
+        checkAlgorithmLinearScene(warnings, context, snapshot);
+      }
+      if (snapshot.kind === "algorithm_tree") {
+        checkAlgorithmTreeScene(warnings, context, snapshot);
       }
       if (snapshot.kind === "graph_scene") {
         checkGraphScene(warnings, context, snapshot);
