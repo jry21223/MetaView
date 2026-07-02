@@ -64,10 +64,11 @@ For larger molecule inputs, the API also exposes
 SMILES strings such as glucose into the same `molecule_2d_scene` atom/bond
 snapshot contract using RDKit 2D coordinates.
 The current supported scene blueprints are `east_asia_monsoon`,
-`projectile_motion`, `cell_structure`, `dna_replication`, `molecule_2d_water`,
-`molecule_2d_methane`, `reaction_synthesis_water`, `derivative_tangent`,
-`bfs_graph`, `recursion_stack`, and `binary_search`; the API runtime compiler
-additionally supports `molecule_2d_glucose` from SMILES/RDKit.
+`projectile_motion`, `cell_structure`, `cell_structure_custom`,
+`dna_replication`, `molecule_2d_water`, `molecule_2d_methane`,
+`carbon_dioxide_molecule`, `reaction_synthesis_water`, `derivative_tangent`,
+`cubic_tangent`, `bfs_graph`, `recursion_stack`, and `binary_search`; the API
+runtime compiler additionally supports `molecule_2d_glucose` from SMILES/RDKit.
 The backend mirror lives at
 `apps/api/app/domain/services/scene_blueprint_compiler.py` so SkillPack or
 agent generation can adopt the same blueprint boundary before returning
@@ -161,11 +162,14 @@ snapshot catalog.
 | `east_asia_monsoon` | geography | `geography-earth-basic` | `geo_map_scene` | Natural Earth map layer, monsoon flow asset, pressure centers |
 | `projectile_motion` | physics | `physics-basic` | `physics_force_scene` | projectile asset, vector asset, trajectory, motion trail |
 | `cell_structure` | biology | `biology-basic` | `bio_cell_scene` | cell, nucleus, mitochondrion assets plus callouts |
+| `cell_structure_custom` | biology | `biology-basic` | `bio_cell_scene` | structured cell positions and external callout input |
 | `dna_replication` | biology | `biology-basic` | `bio_process_scene` | DNA helix, replication fork, core flow arrow, process callout |
 | `molecule_2d_water` | chemistry | `chemistry-basic` | `molecule_2d_scene` | structured atoms/bonds and molecule preset |
 | `molecule_2d_methane` | chemistry | `chemistry-basic` | `molecule_2d_scene` | SMILES C, structured atoms/bonds, tetrahedral callout |
+| `carbon_dioxide_molecule` | chemistry | `chemistry-basic` | `molecule_2d_scene` | structured atom/bond input, double bonds, CO2 formula |
 | `reaction_synthesis_water` | chemistry | `chemistry-basic` | `reaction_scene` | reactants/products plus reaction arrow and electron-flow assets |
 | `derivative_tangent` | math | `math-basic` | `math_plot` | formula plus curve/tangent plot markers |
+| `cubic_tangent` | math | `math-basic` | `math_plot` | structured curve expressions, plot bounds, marker, shaded region |
 | `bfs_graph` | algorithm | `algorithm-code-basic` | `graph_scene` | graph node, queue, active-edge assets plus code track |
 | `recursion_stack` | algorithm | `algorithm-code-basic` | `call_stack_scene` | call frames, waiting stack frames, active code-line asset plus code track |
 | `binary_search` | algorithm | `algorithm-code-basic` | `code_trace_scene` | binary-search preset, active code-line asset, array window, low/mid/high pointer assets |

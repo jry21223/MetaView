@@ -3,8 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { compileSceneBlueprintToPlaybookScript } from "../compiler/sceneBlueprintCompiler";
 import { PlaybookComposition } from "../composition/PlaybookComposition";
-import { getSubjectVisualBlueprint } from "./subjectVisualBlueprints";
-import { getSubjectVisualFixture, type SubjectVisualFixtureId } from "./subjectVisualFixtures";
+import { SUBJECT_VISUAL_BLUEPRINT_IDS, getSubjectVisualBlueprint } from "./subjectVisualBlueprints";
+import { getSubjectVisualFixture } from "./subjectVisualFixtures";
 
 vi.mock("remotion", async () => {
   const actual = await vi.importActual<typeof import("remotion")>("remotion");
@@ -15,28 +15,16 @@ vi.mock("remotion", async () => {
   };
 });
 
-const FLAGSHIP_IDS: SubjectVisualFixtureId[] = [
-  "east_asia_monsoon",
-  "projectile_motion",
-  "cell_structure",
-  "dna_replication",
-  "molecule_2d_water",
-  "molecule_2d_methane",
-  "reaction_synthesis_water",
-  "derivative_tangent",
-  "bfs_graph",
-  "recursion_stack",
-  "binary_search",
-];
+const FIXTURE_IDS = [...SUBJECT_VISUAL_BLUEPRINT_IDS];
 
 describe("subject visual fixtures", () => {
   it("keeps flagship fixtures tied to their source SceneBlueprint", () => {
-    for (const fixtureId of FLAGSHIP_IDS) {
+    for (const fixtureId of FIXTURE_IDS) {
       const script = getSubjectVisualFixture(fixtureId);
       const blueprint = getSubjectVisualBlueprint(fixtureId);
 
-      expect(script.algorithm_id, fixtureId).toBe(fixtureId);
-      expect(script.initial_data?.scene_blueprint, fixtureId).toEqual([fixtureId]);
+      expect(script.algorithm_id, fixtureId).toBe(blueprint.sceneType);
+      expect(script.initial_data?.scene_blueprint, fixtureId).toEqual([blueprint.sceneType]);
       expect(script, fixtureId).toEqual(compileSceneBlueprintToPlaybookScript(blueprint));
     }
   });

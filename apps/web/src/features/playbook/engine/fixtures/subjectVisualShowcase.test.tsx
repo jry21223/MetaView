@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { PlaybookComposition } from "../composition/PlaybookComposition";
 import { visualQualityGate } from "../assets/visualQualityGate";
 import {
+  SUBJECT_VISUAL_SHOWCASE_IDS,
   getSubjectVisualShowcaseEntry,
   listSubjectVisualShowcaseEntries,
 } from "./subjectVisualShowcase";
@@ -19,33 +20,24 @@ vi.mock("remotion", async () => {
   };
 });
 
-const FLAGSHIP_IDS = [
-  "east_asia_monsoon",
-  "projectile_motion",
-  "cell_structure",
-  "dna_replication",
-  "molecule_2d_water",
-  "molecule_2d_methane",
-  "reaction_synthesis_water",
-  "derivative_tangent",
-  "bfs_graph",
-  "recursion_stack",
-  "binary_search",
-];
+const SHOWCASE_IDS = [...SUBJECT_VISUAL_SHOWCASE_IDS];
 
 describe("subject visual showcase catalog", () => {
   it("lists the roadmap flagship fixtures with renderer and asset pack metadata", () => {
     const entries = listSubjectVisualShowcaseEntries();
 
-    expect(entries.map((entry) => entry.id)).toEqual(FLAGSHIP_IDS);
+    expect(entries.map((entry) => entry.id)).toEqual(SHOWCASE_IDS);
     expect(entries.map((entry) => entry.packId)).toEqual([
       "geography-earth-basic",
       "physics-basic",
       "biology-basic",
       "biology-basic",
+      "biology-basic",
       "chemistry-basic",
       "chemistry-basic",
       "chemistry-basic",
+      "chemistry-basic",
+      "math-basic",
       "math-basic",
       "algorithm-code-basic",
       "algorithm-code-basic",
@@ -55,10 +47,13 @@ describe("subject visual showcase catalog", () => {
       "geo_map_scene",
       "physics_force_scene",
       "bio_cell_scene",
+      "bio_cell_scene",
       "bio_process_scene",
       "molecule_2d_scene",
       "molecule_2d_scene",
+      "molecule_2d_scene",
       "reaction_scene",
+      "math_plot",
       "math_plot",
       "graph_scene",
       "call_stack_scene",
@@ -67,7 +62,7 @@ describe("subject visual showcase catalog", () => {
     expect(getSubjectVisualShowcaseEntry("bfs_graph")?.showInlineCode).toBe(true);
   });
 
-  it.each(FLAGSHIP_IDS)("passes visual quality gate for %s", (fixtureId) => {
+  it.each(SHOWCASE_IDS)("passes visual quality gate for %s", (fixtureId) => {
     const entry = getSubjectVisualShowcaseEntry(fixtureId);
     expect(entry, fixtureId).toBeTruthy();
 
@@ -75,7 +70,7 @@ describe("subject visual showcase catalog", () => {
     expect(warnings, fixtureId).toEqual([]);
   });
 
-  it.each(FLAGSHIP_IDS)("statically renders showcase fixture %s with required visual markers", (fixtureId) => {
+  it.each(SHOWCASE_IDS)("statically renders showcase fixture %s with required visual markers", (fixtureId) => {
     const entry = getSubjectVisualShowcaseEntry(fixtureId);
     if (!entry) throw new Error(`Missing showcase entry ${fixtureId}`);
 
@@ -102,7 +97,7 @@ describe("subject visual showcase catalog", () => {
     expect(docs).toContain("npm --workspace apps/web run showcase:export");
     expect(docs).toContain("npm --workspace apps/web run showcase:smoke");
     expect(docs).toContain("node apps/web/scripts/render-shots.mjs");
-    for (const fixtureId of FLAGSHIP_IDS) {
+    for (const fixtureId of SHOWCASE_IDS) {
       expect(docs).toContain(fixtureId);
     }
   });
