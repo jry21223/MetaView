@@ -183,6 +183,7 @@ npm --workspace apps/web run asset:audit
 npm --workspace apps/web run showcase:export
 npm --workspace apps/web run showcase:smoke
 npm --workspace apps/web run showcase:baseline
+npm --workspace apps/web run showcase:review-packet
 METAVIEW_GENERATION_MODE=single make check
 ```
 
@@ -289,6 +290,18 @@ Local preview helpers:
 
    That opt-in gate fails unless every fixture reports
    `approved_reference_current`.
+   To package the current baseline into a human-review checklist with screenshot
+   links, status, blocker metadata, required markers, and the approval command,
+   run:
+
+   ```bash
+   npm --workspace apps/web run showcase:review-packet
+   ```
+
+   The command writes
+   `eval/reports/subject-visual-showcase-review-packet.md` by default. It is an
+   ignored handoff artifact for visual review, not a replacement for
+   `showcase:approve-reference`.
    To create an approved reference after reviewing the generated PNGs, run:
 
    ```bash
