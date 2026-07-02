@@ -11,7 +11,7 @@ export interface PipelineSubmitInput {
 }
 
 export interface UsePipelineSubmitResult {
-  submit: (input: PipelineSubmitInput) => Promise<void>;
+  submit: (input: PipelineSubmitInput) => Promise<string>;
   runId: string | null;
   isSubmitting: boolean;
   error: string | null;
@@ -42,6 +42,7 @@ export function usePipelineSubmit(): UsePipelineSubmitResult {
         router_timeout_s: provider?.routerTimeoutS ?? null,
       });
       setRunId(result.run_id);
+      return result.run_id;
     } catch (err) {
       const message = err instanceof Error ? err.message : "提交失败，请重试";
       setError(message);
