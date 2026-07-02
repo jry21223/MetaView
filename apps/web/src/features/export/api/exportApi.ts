@@ -48,6 +48,12 @@ export interface ExportAssetReport {
   entries: ExportAssetReportEntry[];
   attribution_required: string[];
   license_risk: string[];
+  commercial_export: {
+    allowed: boolean;
+    blockers: string[];
+    review_required: string[];
+    attribution_required: string[];
+  };
 }
 
 export interface ExportRequestBody {

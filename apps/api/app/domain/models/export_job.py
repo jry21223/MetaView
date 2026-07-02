@@ -47,11 +47,19 @@ class ExportAssetReportEntry(BaseModel):
     step_ids: list[str] = Field(default_factory=list)
 
 
+class ExportCommercialPolicy(BaseModel):
+    allowed: bool = True
+    blockers: list[str] = Field(default_factory=list)
+    review_required: list[str] = Field(default_factory=list)
+    attribution_required: list[str] = Field(default_factory=list)
+
+
 class ExportAssetReport(BaseModel):
     generated_by: Literal["visual_quality_gate"] = "visual_quality_gate"
     entries: list[ExportAssetReportEntry] = Field(default_factory=list)
     attribution_required: list[str] = Field(default_factory=list)
     license_risk: list[str] = Field(default_factory=list)
+    commercial_export: ExportCommercialPolicy = Field(default_factory=ExportCommercialPolicy)
 
 
 class TtsConfig(BaseModel):

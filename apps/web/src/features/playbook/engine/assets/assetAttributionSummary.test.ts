@@ -107,8 +107,35 @@ describe("createAssetAttributionSummary", () => {
         message: "requires attribution",
       },
       {
-        code: "missing_asset",
+        code: "asset_share_alike",
         step_id: "s2",
+        snapshot_kind: "physics_force_scene",
+        snapshot_path: "snapshot",
+        domain: "physics",
+        asset_id: "cc-by-sa-diagram",
+        pack_id: "physics-basic",
+        license: "cc-by-sa-4.0",
+        commercialUseStatus: "allowed-with-attribution",
+        attribution: "Share Alike Creator",
+        shareAlike: true,
+        message: "share alike",
+      },
+      {
+        code: "asset_unknown_license",
+        step_id: "s3",
+        snapshot_kind: "geo_map_scene",
+        snapshot_path: "snapshot",
+        domain: "geography",
+        asset_id: "unknown-map",
+        pack_id: "geography-basic",
+        license: "unknown",
+        commercialUseStatus: "restricted",
+        attribution: "Unknown Source",
+        message: "unknown license",
+      },
+      {
+        code: "missing_asset",
+        step_id: "s4",
         snapshot_kind: "physics_force_scene",
         snapshot_path: "snapshot",
         domain: "physics",
@@ -121,6 +148,21 @@ describe("createAssetAttributionSummary", () => {
     expect(report).toEqual({
       generated_by: "visual_quality_gate",
       entries: [
+        {
+          asset_id: "unknown-map",
+          pack_id: "geography-basic",
+          license: "unknown",
+          commercial_use_status: "restricted",
+          attribution: "Unknown Source",
+          source_url: null,
+          license_url: null,
+          requires_attribution: false,
+          commercial_use_restricted: false,
+          share_alike: false,
+          unknown_license: true,
+          warning_codes: ["asset_unknown_license"],
+          step_ids: ["s3"],
+        },
         {
           asset_id: "cc-by-diagram",
           pack_id: "physics-basic",
@@ -136,9 +178,30 @@ describe("createAssetAttributionSummary", () => {
           warning_codes: ["asset_requires_attribution"],
           step_ids: ["s1"],
         },
+        {
+          asset_id: "cc-by-sa-diagram",
+          pack_id: "physics-basic",
+          license: "cc-by-sa-4.0",
+          commercial_use_status: "allowed-with-attribution",
+          attribution: "Share Alike Creator",
+          source_url: null,
+          license_url: null,
+          requires_attribution: false,
+          commercial_use_restricted: false,
+          share_alike: true,
+          unknown_license: false,
+          warning_codes: ["asset_share_alike"],
+          step_ids: ["s2"],
+        },
       ],
       attribution_required: ["physics-basic/cc-by-diagram"],
-      license_risk: [],
+      license_risk: ["geography-basic/unknown-map", "physics-basic/cc-by-sa-diagram"],
+      commercial_export: {
+        allowed: false,
+        blockers: ["geography-basic/unknown-map"],
+        review_required: ["physics-basic/cc-by-sa-diagram"],
+        attribution_required: ["physics-basic/cc-by-diagram"],
+      },
     });
   });
 
@@ -161,6 +224,12 @@ describe("createAssetAttributionSummary", () => {
       entries: [],
       attribution_required: [],
       license_risk: [],
+      commercial_export: {
+        allowed: true,
+        blockers: [],
+        review_required: [],
+        attribution_required: [],
+      },
     });
   });
 });

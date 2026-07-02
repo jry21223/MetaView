@@ -242,6 +242,12 @@ describe("StudioPage", () => {
       ],
       attribution_required: ["physics-basic/cc-by-diagram"],
       license_risk: [],
+      commercial_export: {
+        allowed: true,
+        blockers: [],
+        review_required: [],
+        attribution_required: ["physics-basic/cc-by-diagram"],
+      },
     });
     let submittedBody: Record<string, unknown> | null = null;
     server.use(

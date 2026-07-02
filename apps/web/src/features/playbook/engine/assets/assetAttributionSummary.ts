@@ -54,6 +54,14 @@ export interface AssetAttributionReport {
   entries: AssetAttributionReportEntry[];
   attribution_required: string[];
   license_risk: string[];
+  commercial_export: AssetCommercialExportPolicy;
+}
+
+export interface AssetCommercialExportPolicy {
+  allowed: boolean;
+  blockers: string[];
+  review_required: string[];
+  attribution_required: string[];
 }
 
 function stableEntryKey(warning: VisualQualityWarning): string | null {
@@ -156,11 +164,21 @@ function toReportEntry(entry: AssetAttributionSummaryEntry): AssetAttributionRep
 
 export function createAssetAttributionReport(warnings: readonly VisualQualityWarning[]): AssetAttributionReport {
   const summary = createAssetAttributionSummary(warnings);
+  const commercialExportBlockers = sortedUnique([
+    ...summary.commercialUseRestricted.map(assetAttributionEntryId),
+    ...summary.unknownLicense.map(assetAttributionEntryId),
+  ]);
   return {
     generated_by: "visual_quality_gate",
     entries: summary.entries.map(toReportEntry),
     attribution_required: summary.attributionRequired.map(assetAttributionEntryId),
     license_risk: summary.licenseRisk.map(assetAttributionEntryId),
+    commercial_export: {
+      allowed: commercialExportBlockers.length === 0,
+      blockers: commercialExportBlockers,
+      review_required: summary.shareAlike.map(assetAttributionEntryId),
+      attribution_required: summary.attributionRequired.map(assetAttributionEntryId),
+    },
   };
 }
 

@@ -134,6 +134,12 @@ describe("ExportModal (issue #14 / #58 / #69 / #70 / #72 / #75)", () => {
           ],
           attribution_required: ["physics-basic/cc-by-diagram"],
           license_risk: [],
+          commercial_export: {
+            allowed: true,
+            blockers: [],
+            review_required: [],
+            attribution_required: ["physics-basic/cc-by-diagram"],
+          },
         }}
         onClose={() => undefined}
       />,
@@ -157,6 +163,12 @@ describe("ExportModal (issue #14 / #58 / #69 / #70 / #72 / #75)", () => {
         ],
         attribution_required: ["physics-basic/cc-by-diagram"],
         license_risk: [],
+        commercial_export: {
+          allowed: true,
+          blockers: [],
+          review_required: [],
+          attribution_required: ["physics-basic/cc-by-diagram"],
+        },
       },
     });
   });
@@ -203,6 +215,12 @@ describe("ExportModal (issue #14 / #58 / #69 / #70 / #72 / #75)", () => {
           ],
           attribution_required: ["physics-basic/cc-by-diagram"],
           license_risk: ["geography-basic/restricted-map"],
+          commercial_export: {
+            allowed: false,
+            blockers: ["geography-basic/restricted-map"],
+            review_required: [],
+            attribution_required: ["physics-basic/cc-by-diagram"],
+          },
         }}
         onClose={() => undefined}
       />,

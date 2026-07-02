@@ -298,7 +298,11 @@ machine-readable root attributes (`data-asset-attribution-*` and
 commercial-use reports without parsing renderer internals. Web export submits
 that report as structured `asset_report` metadata, and the API writes it as an
 `asset-report.json` sidecar with a dedicated download URL once rendering
-completes. The export modal shows the same attribution/risk summary before
+completes. The sidecar includes `commercial_export.allowed`,
+`commercial_export.blockers`, `commercial_export.review_required`, and
+`commercial_export.attribution_required`, separating unknown/restricted-license
+blockers from share-alike review obligations and ordinary attribution
+requirements. The export modal shows the same attribution/risk summary before
 submission. API callers that omit `asset_report` are not blocked, but the job
 response includes `asset_report_warning` so missing audit metadata is visible.
 The root `make check` path also runs the showcase smoke render so flagship

@@ -98,6 +98,30 @@ def test_submit_export_without_asset_report_returns_warning_metadata(monkeypatch
     )
 
 
+def test_asset_report_serializes_commercial_export_policy() -> None:
+    report = ExportAssetReport.model_validate(
+        {
+            "generated_by": "visual_quality_gate",
+            "entries": [],
+            "attribution_required": ["physics-basic/cc-by-diagram"],
+            "license_risk": ["geography-basic/unknown-map", "physics-basic/cc-by-sa-diagram"],
+            "commercial_export": {
+                "allowed": False,
+                "blockers": ["geography-basic/unknown-map"],
+                "review_required": ["physics-basic/cc-by-sa-diagram"],
+                "attribution_required": ["physics-basic/cc-by-diagram"],
+            },
+        }
+    )
+
+    assert report.model_dump(mode="json")["commercial_export"] == {
+        "allowed": False,
+        "blockers": ["geography-basic/unknown-map"],
+        "review_required": ["physics-basic/cc-by-sa-diagram"],
+        "attribution_required": ["physics-basic/cc-by-diagram"],
+    }
+
+
 class _FakeRunRepo:
     async def get(self, run_id: str, user_id: str | None = None) -> PipelineRunResponse | None:
         if run_id != "run-with-playbook":
