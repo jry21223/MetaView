@@ -2,8 +2,10 @@ import {
   findAssetById as findRegisteredAssetById,
   findAssetByRole as findRegisteredAssetByRole,
   type AssetManifestEntry,
+  type SubjectVisualKitSubject,
 } from "./assetRegistry";
 import { getLicenseRule, isKnownAssetLicense } from "./licenseRegistry";
+import { resolveSceneAssetContract } from "./sceneContracts";
 import type {
   AlgorithmArraySnapshot,
   AlgorithmBarsSnapshot,
@@ -11,6 +13,7 @@ import type {
   AnySnapshot,
   BioCellSceneSnapshot,
   BioProcessSceneSnapshot,
+  CallStackFrame,
   CallStackSceneSnapshot,
   CodeTraceSceneSnapshot,
   GeoMapSceneSnapshot,
@@ -38,6 +41,7 @@ export type VisualQualityWarningCode =
   | "low_algorithm_state_visuals"
   | "low_math_visual_richness"
   | "possible_label_overlap"
+  | "scene_contract_missing_asset"
   | "unsupported_array_fallback";
 
 export interface VisualQualityWarning {
@@ -55,6 +59,9 @@ export interface VisualQualityWarning {
   licenseUrl?: string | null;
   shareAlike?: boolean;
   label_ids?: [string, string];
+  contract_id?: string;
+  scene_template?: string;
+  rendered_asset_ids?: string[];
   snapshot_path?: string;
 }
 
@@ -254,6 +261,217 @@ function checkLabelOverlaps(
       });
       return;
     }
+  }
+}
+
+function addAssetId(assetIds: Set<string>, assetId: string | null | undefined) {
+  if (assetId) assetIds.add(assetId);
+}
+
+function addResolvedRoleAssetId(
+  assetIds: Set<string>,
+  context: SnapshotContext,
+  subject: SubjectVisualKitSubject,
+  semanticRole: string,
+  packId: string | null | undefined,
+  fallbacks: string[] = [],
+) {
+  for (const role of [semanticRole, ...fallbacks]) {
+    const asset =
+      context.assets.findAssetByRole(subject, role, packId) ?? context.assets.findAssetByRole(subject, role);
+    if (asset) {
+      assetIds.add(asset.id);
+      return;
+    }
+  }
+}
+
+function addBioCellRenderedAssetIds(
+  assetIds: Set<string>,
+  context: SnapshotContext,
+  snapshot: BioCellSceneSnapshot,
+) {
+  for (const structure of snapshot.structures) {
+    if (structure.asset_id) {
+      assetIds.add(structure.asset_id);
+      continue;
+    }
+    addResolvedRoleAssetId(assetIds, context, "biology", structure.semantic_role, snapshot.pack_id);
+  }
+}
+
+function addBioProcessRenderedAssetIds(
+  assetIds: Set<string>,
+  context: SnapshotContext,
+  snapshot: BioProcessSceneSnapshot,
+) {
+  for (const processStep of snapshot.steps) {
+    if (processStep.asset_id) {
+      assetIds.add(processStep.asset_id);
+      continue;
+    }
+    addResolvedRoleAssetId(assetIds, context, "biology", processStep.semantic_role, snapshot.pack_id, ["process_step"]);
+  }
+  for (const connection of snapshot.connections ?? []) {
+    if (connection.asset_id) {
+      assetIds.add(connection.asset_id);
+      continue;
+    }
+    addResolvedRoleAssetId(assetIds, context, "core", connection.semantic_role, "core-visual-basic", [
+      "flow_arrow",
+      "causal_arrow",
+    ]);
+  }
+}
+
+type GraphNodeVisualState = "current" | "queue" | "visited" | "default";
+
+function graphNodeVisualState(
+  nodeId: string,
+  currentNodes: Set<string>,
+  visitedNodes: Set<string>,
+  queueNodes: Set<string>,
+): GraphNodeVisualState {
+  if (currentNodes.has(nodeId)) return "current";
+  if (queueNodes.has(nodeId)) return "queue";
+  if (visitedNodes.has(nodeId)) return "visited";
+  return "default";
+}
+
+function graphNodeRoleForState(state: GraphNodeVisualState): string {
+  if (state === "queue") return "queue";
+  if (state === "visited") return "visited";
+  return "graph_node";
+}
+
+function addGraphRenderedAssetIds(
+  assetIds: Set<string>,
+  context: SnapshotContext,
+  snapshot: GraphSceneSnapshot,
+) {
+  addAssetId(assetIds, snapshot.asset_id);
+  const currentNodes = new Set([
+    ...(snapshot.active_node_ids ?? []),
+    ...(snapshot.current_node_id ? [snapshot.current_node_id] : []),
+  ]);
+  const visitedNodes = new Set(snapshot.visited_node_ids ?? []);
+  const queueNodes = new Set([...(snapshot.queue_node_ids ?? []), ...(snapshot.frontier_node_ids ?? [])]);
+  const activeEdges = new Set(snapshot.active_edge_ids ?? []);
+
+  for (const node of snapshot.nodes ?? []) {
+    if (node.asset_id) {
+      assetIds.add(node.asset_id);
+      continue;
+    }
+    const state = graphNodeVisualState(node.id, currentNodes, visitedNodes, queueNodes);
+    addResolvedRoleAssetId(assetIds, context, "algorithm", graphNodeRoleForState(state), snapshot.pack_id, [
+      "graph_node",
+    ]);
+  }
+
+  for (const edge of snapshot.edges ?? []) {
+    if (edge.asset_id) {
+      assetIds.add(edge.asset_id);
+      continue;
+    }
+    const edgeId = edge.id ?? `${edge.source}-${edge.target}`;
+    const active = edge.emphasis === "accent" || activeEdges.has(edgeId);
+    addResolvedRoleAssetId(assetIds, context, "algorithm", active ? "active_edge" : "graph_edge", snapshot.pack_id);
+  }
+}
+
+function callStackFrameRole(frame: CallStackFrame, currentFrameId: string | null | undefined): string {
+  if (frame.asset_id) return frame.asset_id === "call-frame" ? "call_frame" : "stack_frame";
+  return frame.state === "active" || frame.id === currentFrameId ? "call_frame" : "stack_frame";
+}
+
+function addCallStackRenderedAssetIds(
+  assetIds: Set<string>,
+  context: SnapshotContext,
+  snapshot: CallStackSceneSnapshot,
+) {
+  addAssetId(assetIds, snapshot.asset_id);
+  for (const frame of snapshot.frames ?? []) {
+    if (frame.asset_id) {
+      assetIds.add(frame.asset_id);
+      continue;
+    }
+    addResolvedRoleAssetId(
+      assetIds,
+      context,
+      "algorithm",
+      callStackFrameRole(frame, snapshot.current_frame_id),
+      snapshot.pack_id,
+    );
+  }
+  if ((snapshot.code_trace?.active_lines?.length ?? 0) > 0 || snapshot.code_trace?.active_line !== undefined) {
+    if (snapshot.code_trace?.asset_id) {
+      assetIds.add(snapshot.code_trace.asset_id);
+    } else {
+      addResolvedRoleAssetId(assetIds, context, "algorithm", "active_line", snapshot.pack_id);
+    }
+  }
+}
+
+function addCodeTraceRenderedAssetIds(
+  assetIds: Set<string>,
+  context: SnapshotContext,
+  snapshot: CodeTraceSceneSnapshot,
+) {
+  addAssetId(assetIds, snapshot.asset_id);
+  if ((snapshot.active_lines?.length ?? 0) > 0 || snapshot.active_line !== undefined) {
+    if (snapshot.active_line_asset_id) {
+      assetIds.add(snapshot.active_line_asset_id);
+    } else {
+      addResolvedRoleAssetId(assetIds, context, "algorithm", "active_line", snapshot.pack_id);
+    }
+  }
+  for (const pointer of snapshot.pointers ?? []) {
+    if (pointer.asset_id) {
+      assetIds.add(pointer.asset_id);
+      continue;
+    }
+    addResolvedRoleAssetId(assetIds, context, "algorithm", "pointer", snapshot.pack_id, [
+      "active_pointer",
+      "index_pointer",
+    ]);
+  }
+  if ((snapshot.array_values?.length ?? 0) > 0) {
+    addResolvedRoleAssetId(assetIds, context, "core", "flow_arrow", "core-visual-basic");
+  }
+}
+
+function collectRenderedAssetIds(context: SnapshotContext): Set<string> {
+  const assetIds = new Set<string>();
+  const { snapshot } = context;
+  if (snapshot.kind === "bio_cell_scene") addBioCellRenderedAssetIds(assetIds, context, snapshot);
+  if (snapshot.kind === "bio_process_scene") addBioProcessRenderedAssetIds(assetIds, context, snapshot);
+  if (snapshot.kind === "graph_scene") addGraphRenderedAssetIds(assetIds, context, snapshot);
+  if (snapshot.kind === "call_stack_scene") addCallStackRenderedAssetIds(assetIds, context, snapshot);
+  if (snapshot.kind === "code_trace_scene") addCodeTraceRenderedAssetIds(assetIds, context, snapshot);
+  return assetIds;
+}
+
+function checkSceneAssetContract(
+  warnings: VisualQualityWarning[],
+  context: SnapshotContext,
+) {
+  const contract = resolveSceneAssetContract(context.step.step_id, context.snapshot);
+  if (!contract) return;
+
+  const renderedAssetIds = collectRenderedAssetIds(context);
+  for (const assetId of contract.requiredAssetIds) {
+    if (renderedAssetIds.has(assetId)) continue;
+    warn(warnings, context, {
+      code: "scene_contract_missing_asset",
+      domain: context.domain,
+      asset_id: assetId,
+      pack_id: contract.packId,
+      contract_id: contract.id,
+      scene_template: contract.sceneTemplate,
+      rendered_asset_ids: [...renderedAssetIds].sort(),
+      message: `Scene contract "${contract.id}" requires rendered asset "${assetId}".`,
+    });
   }
 }
 
@@ -711,6 +929,7 @@ export function visualQualityGate(
       };
 
       checkUnsupportedArrayFallback(warnings, context);
+      checkSceneAssetContract(warnings, context);
       if (snapshot.kind === "geo_map_scene") {
         checkGeoMapScene(warnings, context, snapshot);
       }

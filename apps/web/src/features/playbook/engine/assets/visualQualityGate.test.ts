@@ -317,6 +317,88 @@ describe("visualQualityGate", () => {
     );
   });
 
+  it("warns when a biology flagship scene misses a contract-required rendered asset", () => {
+    const warnings = visualQualityGate(
+      script({
+        domain: "biology",
+        steps: [
+          {
+            step_id: "cell_structure",
+            end_frame: 90,
+            title: "Cell structure",
+            voiceover_text: "",
+            tokens: [],
+            snapshot: {
+              kind: "bio_cell_scene",
+              pack_id: "biology-basic",
+              cell_type: "animal",
+              structures: [
+                {
+                  id: "cell",
+                  semantic_role: "cell",
+                  label: "cell",
+                  x: 50,
+                  y: 52,
+                  width: 66,
+                  height: 50,
+                  asset_id: "cell-outline",
+                },
+                {
+                  id: "nucleus",
+                  semantic_role: "nucleus",
+                  label: "nucleus",
+                  x: 47,
+                  y: 48,
+                  width: 20,
+                  height: 18,
+                  asset_id: "nucleus",
+                },
+                {
+                  id: "mitochondrion",
+                  semantic_role: "mitochondrion",
+                  label: "mitochondrion",
+                  x: 67,
+                  y: 59,
+                  width: 16,
+                  height: 10,
+                  asset_id: "mitochondrion",
+                },
+                {
+                  id: "dna",
+                  semantic_role: "dna",
+                  label: "DNA",
+                  x: 47,
+                  y: 48,
+                  width: 8,
+                  height: 12,
+                  asset_id: "dna-helix",
+                },
+              ],
+              callouts: [
+                { id: "nucleus-callout", target_id: "nucleus", label: "stores DNA", side: "left" },
+                { id: "mitochondrion-callout", target_id: "mitochondrion", label: "releases energy", side: "right" },
+              ],
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "scene_contract_missing_asset",
+          step_id: "cell_structure",
+          domain: "biology",
+          snapshot_kind: "bio_cell_scene",
+          pack_id: "biology-basic",
+          contract_id: "cell-structure-contract",
+          asset_id: "ribosome",
+        }),
+      ]),
+    );
+  });
+
   it("warns when a biology process asset_id cannot be resolved", () => {
     const warnings = visualQualityGate(
       script({
@@ -580,6 +662,53 @@ describe("visualQualityGate", () => {
           code: "low_algorithm_state_visuals",
           step_id: "bfs_graph",
           domain: "algorithm",
+        }),
+      ]),
+    );
+  });
+
+  it("warns when an algorithm flagship scene misses a contract-required rendered asset", () => {
+    const warnings = visualQualityGate(
+      script({
+        domain: "algorithm",
+        steps: [
+          {
+            step_id: "bfs_graph",
+            end_frame: 90,
+            title: "BFS graph",
+            voiceover_text: "",
+            tokens: [],
+            snapshot: {
+              kind: "graph_scene",
+              pack_id: "algorithm-code-basic",
+              asset_id: "bfs-graph-preset",
+              nodes: [{ id: "S" }, { id: "A" }, { id: "B" }],
+              edges: [
+                { id: "S-A", source: "S", target: "A" },
+                { id: "A-B", source: "A", target: "B" },
+              ],
+              directed: true,
+              current_node_id: "A",
+              active_node_ids: ["A"],
+              visited_node_ids: ["S"],
+              active_edge_ids: ["A-B"],
+              queue_node_ids: [],
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "scene_contract_missing_asset",
+          step_id: "bfs_graph",
+          domain: "algorithm",
+          snapshot_kind: "graph_scene",
+          pack_id: "algorithm-code-basic",
+          contract_id: "bfs-graph-contract",
+          asset_id: "queue-frame",
         }),
       ]),
     );
