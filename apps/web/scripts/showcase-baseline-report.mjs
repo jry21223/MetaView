@@ -51,7 +51,7 @@ if (referencePath) {
   };
 }
 
-const catalog = listSubjectVisualShowcaseEntries().map(({ script: _script, requiredMarkers: _requiredMarkers, ...entry }) => entry);
+const catalog = listSubjectVisualShowcaseEntries().map(({ script: _script, ...entry }) => entry);
 const report = createShowcaseBaselineReport(catalog, summary, new Date().toISOString(), reference);
 
 fs.mkdirSync(path.dirname(outputPath), { recursive: true });

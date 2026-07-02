@@ -170,6 +170,11 @@ Phase 1 acceptance evidence:
   covers 14 flagship fixtures across geography, physics, biology, chemistry,
   math, and algorithm, with required static markers and per-fixture screenshot
   quality thresholds.
+- `showcase:baseline` writes a golden-review queue for the generated PNGs:
+  each fixture gets `screenshotReview.status`, `requiredMarkers`,
+  `blockingIssues`, and `driftIssues` so release handoffs can distinguish
+  screenshots that are ready for human review from screenshots blocked by
+  missing output, weak image quality, or reference drift.
 
 Before treating this phase as closed in a release or branch handoff, run:
 
@@ -182,10 +187,10 @@ METAVIEW_GENERATION_MODE=single make check
 ```
 
 The next phase should focus on productionizing the multi-subject asset compiler:
-expand stable biology/chemistry/math/algorithm layout compilers, add golden
-screenshot review for every flagship fixture, tighten attribution/export policy
-around non-internal assets, and only then prepare the separate MCP read-only
-asset exposure work.
+expand stable biology/chemistry/math/algorithm layout compilers, turn the
+generated `screenshotReview` queue into human-approved screenshot references,
+tighten attribution/export policy around non-internal assets, and only then
+prepare the separate MCP read-only asset exposure work.
 
 ## Adding Assets
 
@@ -261,8 +266,13 @@ Local preview helpers:
 
    The report is written to
    `eval/reports/subject-visual-showcase-baseline.json` and records each
-   fixture's baseline, measured screenshot stats, and safety margins. To compare
-   against a previous report without changing the hard failure contract, pass
+   fixture's baseline, measured screenshot stats, safety margins, and
+   `screenshotReview` metadata. A `ready_for_review` status means the PNG passed
+   automated quality gates and includes the required static markers; `blocked`
+   records missing-summary or under-baseline blockers; `drift_review_needed`
+   records reference drift that should be visually checked before release. To
+   compare against a previous report without changing the hard failure contract,
+   pass
    `SHOWCASE_BASELINE_REFERENCE=eval/reports/subject-visual-showcase-baseline.json`;
    the command will emit `driftOk` and per-fixture drift warnings separately from
    under-baseline failures. Script path inputs accept either workspace-relative

@@ -36,6 +36,7 @@ describe("showcaseBaselineReport", () => {
           domain: "physics",
           packId: "physics-basic",
           rendererKind: "physics_force_scene",
+          requiredMarkers: ['data-asset-id="projectile-body-dot"', 'data-semantic-role="motion_trail"'],
           imageQuality: thresholds,
         },
       ],
@@ -51,6 +52,7 @@ describe("showcaseBaselineReport", () => {
     );
 
     expect(report.ok).toBe(true);
+    expect(report.reviewReady).toBe(true);
     expect(report.missingSummaryIds).toEqual([]);
     expect(report.unexpectedSummaryIds).toEqual([]);
     expect(report.entries[0]).toMatchObject({
@@ -63,6 +65,15 @@ describe("showcaseBaselineReport", () => {
         contentWidthRatio: 0.375,
         contentHeightRatio: 0.487,
       },
+      screenshotReview: {
+        status: "ready_for_review",
+        gate: "showcase_baseline",
+        output: "/tmp/projectile_motion.png",
+        requiredMarkerCount: 2,
+        requiredMarkers: ['data-asset-id="projectile-body-dot"', 'data-semantic-role="motion_trail"'],
+        blockingIssues: [],
+        driftIssues: [],
+      },
     });
   });
 
@@ -74,6 +85,7 @@ describe("showcaseBaselineReport", () => {
           domain: "geography",
           packId: "geography-earth-basic",
           rendererKind: "geo_map_scene",
+          requiredMarkers: ['data-asset-id="east-asia-land-110m"'],
           imageQuality: thresholds,
         },
         {
@@ -81,6 +93,7 @@ describe("showcaseBaselineReport", () => {
           domain: "physics",
           packId: "physics-basic",
           rendererKind: "physics_force_scene",
+          requiredMarkers: ['data-asset-id="projectile-body-dot"'],
           imageQuality: thresholds,
         },
       ],
@@ -104,11 +117,21 @@ describe("showcaseBaselineReport", () => {
     );
 
     expect(report.ok).toBe(false);
+    expect(report.reviewReady).toBe(false);
     expect(report.missingSummaryIds).toEqual(["east_asia_monsoon"]);
     expect(report.unexpectedSummaryIds).toEqual(["unexpected_fixture"]);
+    expect(report.entries.find((entry) => entry.id === "east_asia_monsoon")?.screenshotReview).toMatchObject({
+      status: "blocked",
+      output: null,
+      blockingIssues: ["missing_summary"],
+    });
     expect(report.entries.find((entry) => entry.id === "projectile_motion")?.issues).toContain(
       "content_pixel_ratio",
     );
+    expect(report.entries.find((entry) => entry.id === "projectile_motion")?.screenshotReview).toMatchObject({
+      status: "blocked",
+      blockingIssues: ["content_pixel_ratio"],
+    });
   });
 
   it("reports drift from a previous screenshot reference separately from hard baseline issues", () => {
@@ -119,6 +142,7 @@ describe("showcaseBaselineReport", () => {
           domain: "physics",
           packId: "physics-basic",
           rendererKind: "physics_force_scene",
+          requiredMarkers: ['data-asset-id="projectile-body-dot"'],
           imageQuality: thresholds,
         },
       ],
@@ -152,9 +176,15 @@ describe("showcaseBaselineReport", () => {
 
     expect(report.ok).toBe(true);
     expect(report.driftOk).toBe(false);
+    expect(report.reviewReady).toBe(false);
     expect(report.entries[0]).toMatchObject({
       issues: [],
       driftIssues: ["unique_colors_drop", "content_pixel_ratio_drop", "content_width_ratio_drop"],
+      screenshotReview: {
+        status: "drift_review_needed",
+        blockingIssues: [],
+        driftIssues: ["unique_colors_drop", "content_pixel_ratio_drop", "content_width_ratio_drop"],
+      },
     });
   });
 });

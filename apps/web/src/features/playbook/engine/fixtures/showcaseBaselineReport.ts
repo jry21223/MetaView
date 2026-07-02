@@ -10,6 +10,7 @@ export interface ShowcaseBaselineCatalogEntry {
   domain: string;
   packId: string;
   rendererKind: string;
+  requiredMarkers: readonly string[];
   imageQuality: ShowcaseImageQualityThresholds;
 }
 
@@ -26,6 +27,20 @@ export type ShowcaseBaselineDriftIssue =
   | "content_pixel_ratio_drop"
   | "content_width_ratio_drop"
   | "content_height_ratio_drop";
+
+export type ShowcaseScreenshotReviewStatus = "ready_for_review" | "blocked" | "drift_review_needed";
+
+export type ShowcaseScreenshotReviewBlocker = ShowcaseImageQualityIssue | "missing_summary";
+
+export interface ShowcaseScreenshotReview {
+  status: ShowcaseScreenshotReviewStatus;
+  gate: "showcase_baseline";
+  output: string | null;
+  requiredMarkerCount: number;
+  requiredMarkers: readonly string[];
+  blockingIssues: ShowcaseScreenshotReviewBlocker[];
+  driftIssues: ShowcaseBaselineDriftIssue[];
+}
 
 export interface ShowcaseBaselineDriftPolicy {
   maxBytesDrop: number;
@@ -69,11 +84,13 @@ export interface ShowcaseBaselineReportEntry {
   issues: ShowcaseImageQualityIssue[];
   referenceStats: ShowcaseBaselineReferenceEntry["stats"] | null;
   driftIssues: ShowcaseBaselineDriftIssue[];
+  screenshotReview: ShowcaseScreenshotReview;
 }
 
 export interface ShowcaseBaselineReport {
   ok: boolean;
   driftOk: boolean;
+  reviewReady: boolean;
   generatedAt: string;
   fixtureCount: number;
   renderedCount: number;
@@ -129,6 +146,26 @@ function driftIssues(
   return issues;
 }
 
+function screenshotReview(
+  requiredMarkers: readonly string[],
+  output: string | null,
+  blockingIssues: ShowcaseScreenshotReviewBlocker[],
+  driftIssues: ShowcaseBaselineDriftIssue[],
+): ShowcaseScreenshotReview {
+  const status: ShowcaseScreenshotReviewStatus =
+    blockingIssues.length > 0 ? "blocked" : driftIssues.length > 0 ? "drift_review_needed" : "ready_for_review";
+
+  return {
+    status,
+    gate: "showcase_baseline",
+    output,
+    requiredMarkerCount: requiredMarkers.length,
+    requiredMarkers,
+    blockingIssues,
+    driftIssues,
+  };
+}
+
 export function createShowcaseBaselineReport(
   catalogEntries: readonly ShowcaseBaselineCatalogEntry[],
   summaryEntries: readonly ShowcaseBaselineSummaryEntry[],
@@ -158,9 +195,12 @@ export function createShowcaseBaselineReport(
         issues: [],
         referenceStats: referenceById.get(entry.id) ?? null,
         driftIssues: [],
+        screenshotReview: screenshotReview(entry.requiredMarkers, null, ["missing_summary"], []),
       };
     }
     const referenceStats = referenceById.get(entry.id);
+    const issues = getShowcaseImageQualityIssues(summary, entry.imageQuality);
+    const entryDriftIssues = driftIssues(summary, referenceStats, driftPolicy);
 
     return {
       id: entry.id,
@@ -183,9 +223,10 @@ export function createShowcaseBaselineReport(
         contentHeightRatio: summary.contentHeightRatio,
       },
       margins: margin(summary, entry.imageQuality),
-      issues: getShowcaseImageQualityIssues(summary, entry.imageQuality),
+      issues,
       referenceStats: referenceStats ?? null,
-      driftIssues: driftIssues(summary, referenceStats, driftPolicy),
+      driftIssues: entryDriftIssues,
+      screenshotReview: screenshotReview(entry.requiredMarkers, summary.output, issues, entryDriftIssues),
     };
   });
 
@@ -195,6 +236,7 @@ export function createShowcaseBaselineReport(
       unexpectedSummaryIds.length === 0 &&
       entries.every((entry) => entry.issues.length === 0),
     driftOk: entries.every((entry) => entry.driftIssues.length === 0),
+    reviewReady: entries.every((entry) => entry.screenshotReview.status === "ready_for_review"),
     generatedAt,
     fixtureCount: catalogEntries.length,
     renderedCount: summaryEntries.length,

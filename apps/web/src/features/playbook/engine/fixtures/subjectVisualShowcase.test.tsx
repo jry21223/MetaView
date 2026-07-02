@@ -124,6 +124,7 @@ describe("subject visual showcase catalog", () => {
     expect(docs).toContain("npm --workspace apps/web run showcase:baseline");
     expect(docs).toContain("node apps/web/scripts/render-shots.mjs");
     expect(docs).toContain("per-fixture screenshot baseline");
+    expect(docs).toContain("screenshotReview");
     for (const fixtureId of SHOWCASE_IDS) {
       expect(docs).toContain(fixtureId);
     }
