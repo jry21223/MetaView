@@ -16,10 +16,16 @@ describe("asset check targets", () => {
     expect(makefile).toMatch(/^check: .*asset-showcase/m);
     expect(webPackage).toContain('"showcase:smoke"');
     expect(webPackage).toContain('"showcase:baseline"');
+    expect(webPackage).toContain('"showcase:baseline:release"');
+    expect(webPackage).toContain("SHOWCASE_BASELINE_REQUIRE_APPROVED=1");
     expect(webPackage).toContain('"showcase:review-packet"');
     expect(webPackage).toContain('"showcase:approve-reference"');
     expect(makefile).toMatch(
       /npm --workspace apps\/web run showcase:smoke\n\tnpm --workspace apps\/web run showcase:baseline\n\tnpm --workspace apps\/web run showcase:review-packet/,
+    );
+    expect(makefile).toMatch(/^asset-showcase-release:/m);
+    expect(makefile).toMatch(
+      /npm --workspace apps\/web run showcase:smoke\n\tnpm --workspace apps\/web run showcase:baseline:release\n\tnpm --workspace apps\/web run showcase:review-packet/,
     );
   });
 });
