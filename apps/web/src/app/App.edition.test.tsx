@@ -53,7 +53,7 @@ describe("App edition shells", () => {
     expect(opsHits).toBe(0);
   }, 20000);
 
-  it("self edition shows the canvas particle field on the intake screen", async () => {
+  it("self edition keeps the intake hero calm without decorative debug controls", async () => {
     vi.stubEnv("VITE_APP_EDITION", "self");
 
     const { App } = await import("./App");
@@ -62,7 +62,7 @@ describe("App edition shells", () => {
     expect(container.textContent).toContain("MetaView");
     expect(
       container.querySelector('[data-testid="meta-particle-field"][data-variant="canvas"]'),
-    ).toBeTruthy();
+    ).toBeNull();
     expect(container.querySelector('[aria-label="MetaView logo animation"]')).toBeNull();
     expect(queryByLabelText("打开设计调节面板")).toBeNull();
   }, 10000);

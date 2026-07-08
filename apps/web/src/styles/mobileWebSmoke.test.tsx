@@ -122,9 +122,6 @@ describe("mobile web smoke", () => {
       expect(container.querySelector(".mv-intake-send")).toBeTruthy();
       expect(container.querySelectorAll(".mv-intake-example")).toHaveLength(4);
       expect(
-        container.querySelector('[data-testid="meta-particle-field"][data-variant="canvas"]'),
-      ).toBeTruthy();
-      expect(
         container.querySelector<HTMLInputElement>('input[type="file"]')?.accept,
       ).toContain(".py");
       expect(container.textContent).not.toMatch(/截图|PDF|课件|翻译|英语/);

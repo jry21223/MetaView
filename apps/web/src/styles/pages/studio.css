@@ -1802,22 +1802,6 @@
   padding-top: 0;
 }
 
-.mv-intake-hero-visual {
-  position: relative;
-  width: min(680px, calc(100vw - 48px));
-  height: clamp(56px, 8vw, 76px);
-  display: grid;
-  place-items: center;
-  margin: 0 auto 4px;
-  overflow: visible;
-  opacity: 0.32;
-}
-
-/* Calm intake: drop the grid and dashed-path layers, keep the node accents. */
-.mv-intake-hero-visual .mv-meta-particle__canvas-grid,
-.mv-intake-hero-visual .mv-meta-particle__canvas-path {
-  display: none;
-}
 
 .mv-meta-particle {
   position: absolute;
@@ -2158,18 +2142,20 @@
 .mv-intake-title {
   margin: 0;
   color: color-mix(in srgb, var(--ink) 82%, transparent);
-  font-size: clamp(26px, 3vw, 40px);
+  font-size: clamp(24px, 2.4vw, 32px);
   font-weight: 650;
   letter-spacing: 0;
-  line-height: 1.2;
+  line-height: 1.3;
+  text-wrap: balance;
 }
 
 .mv-intake-sub {
-  max-width: 520px;
-  margin: 7px auto 0;
+  max-width: 560px;
+  margin: 10px auto 0;
   color: color-mix(in srgb, var(--ink-2) 78%, transparent);
   font-size: 14px;
   line-height: 1.62;
+  text-wrap: balance;
 }
 
 .mv-intake-composer {
@@ -2462,11 +2448,6 @@
     padding: 44px 18px 42px;
   }
 
-  .mv-intake-hero-visual {
-    width: min(640px, calc(100vw - 28px));
-    height: 96px;
-  }
-
   .mv-intake-composer,
   .mv-intake-examples {
     width: min(640px, calc(100vw - 40px));
@@ -2520,13 +2501,6 @@
 
   .mv-intake-hero {
     max-width: 100%;
-  }
-
-  .mv-intake-hero-visual {
-    width: 100%;
-    height: 76px;
-    margin-bottom: 2px;
-    opacity: 0.62;
   }
 
   .mv-intake-title {
@@ -2624,10 +2598,6 @@
   .mv-intake-body {
     padding-left: 12px;
     padding-right: 12px;
-  }
-
-  .mv-intake-hero-visual {
-    height: 62px;
   }
 
   .mv-intake-input {

@@ -1,5 +1,4 @@
 import { useRef, useState } from "react";
-import { MetaParticleField } from "../../../shared/ui/MetaParticleField";
 
 type IntakeDomain =
   | "algorithm"
@@ -259,9 +258,6 @@ export function IntakeScreen({
   return (
     <main className="mv-intake-body">
       <section className="mv-intake-hero" aria-label="MetaView intake">
-        <div className="mv-intake-hero-visual">
-          <MetaParticleField variant="canvas" className="mv-motion-decorative" />
-        </div>
         <h1 className="mv-intake-title">输入题目或代码，生成可播放的分步讲解</h1>
         <p className="mv-intake-sub">
           覆盖数学、物理、化学、生物、地理与算法代码；生成后可继续追问，也可导出视频。

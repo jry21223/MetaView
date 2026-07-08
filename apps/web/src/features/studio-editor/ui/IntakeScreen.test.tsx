@@ -30,7 +30,7 @@ describe("IntakeScreen launch home", () => {
   });
 
   it("renders only currently supported generation promises", () => {
-    const { container, getByText, queryByText, getByRole } = renderIntake();
+    const { getByText, queryByText, getByRole } = renderIntake();
 
     expect(getByText("输入题目或代码，生成可播放的分步讲解")).toBeTruthy();
     expect(
@@ -42,11 +42,6 @@ describe("IntakeScreen launch home", () => {
     expect(queryByText(/翻译/)).toBeNull();
     expect(queryByText("英语拆解")).toBeNull();
     expect(queryByText("空白课件")).toBeNull();
-    expect(
-      container.querySelector(
-        '[data-testid="meta-particle-field"][data-variant="canvas"]',
-      ),
-    ).toBeTruthy();
     expect(getByText("二分查找")).toBeTruthy();
     expect(getByText("抛体运动")).toBeTruthy();
     expect(getByText("配平方程")).toBeTruthy();
