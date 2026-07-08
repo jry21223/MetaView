@@ -152,5 +152,13 @@ describe("advanced math renderers", () => {
     expect(markup).toContain('data-node-state="visited"');
     expect(markup).toContain('data-node-state="queue"');
     expect(markup).toContain('data-edge-state="active"');
+    expect(markup).toContain('data-semantic-role="queue_panel"');
+    expect(markup).toContain('data-queue-node-id="B"');
+    expect(markup).toContain('data-queue-node-id="C"');
+    expect(markup).toContain('data-semantic-role="visited_set"');
+    expect(markup).toContain('data-visited-node-id="S"');
+    expect(markup).toContain('data-semantic-role="code_trace"');
+    expect(markup).toContain('data-code-line-state="active"');
+    expect(markup).toContain('data-asset-id="active-line"');
   });
 });
