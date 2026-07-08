@@ -5,7 +5,7 @@
  */
 
 import { Agent, type AgentTool } from "@earendil-works/pi-agent-core";
-import { getModel, type KnownProvider } from "@earendil-works/pi-ai";
+import { getModel, type Api, type KnownProvider, type Model } from "@earendil-works/pi-ai";
 
 import { PlaybookEmitter } from "./state/playbookEmitter.js";
 import {
@@ -42,6 +42,7 @@ export interface GenerateOptions {
   defaultProvider: string;
   defaultModel: string;
   defaultApiKey?: string;
+  defaultBaseUrl?: string;
 }
 
 export const SYSTEM_PROMPT =
@@ -164,18 +165,9 @@ async function runAgentAttempt(
     (opts.provider?.provider as string | undefined) ?? opts.defaultProvider;
   const modelName = opts.provider?.model ?? opts.defaultModel;
   const apiKey = opts.provider?.api_key ?? opts.defaultApiKey;
-  const baseUrl = opts.provider?.base_url;
+  const baseUrl = opts.provider?.base_url ?? opts.defaultBaseUrl;
 
-  // pi-ai's getModel is strongly typed against the built-in provider/model
-  // registry. We deliberately cast through ``unknown`` because callers can
-  // pass arbitrary OpenAI-compatible providers (DeepSeek / Qwen / vLLM) that
-  // aren't in the static registry.
-  const model = getModel(providerName as KnownProvider, modelName as never);
-  if (baseUrl) {
-    // Override the default base URL so OpenAI-compatible servers (DeepSeek,
-    // local vLLM, OpenRouter, …) hit the right endpoint.
-    model.baseUrl = baseUrl;
-  }
+  const model = resolveModel(providerName, modelName, baseUrl);
 
   const agent = new Agent({
     initialState: {
@@ -202,6 +194,48 @@ async function runAgentAttempt(
   // The emitter has all committed steps by now even if finalize_playbook
   // wasn't explicitly called — its idempotent ``finalize`` covers the case.
   return emitter.finalize();
+}
+
+function resolveModel(
+  providerName: string,
+  modelName: string,
+  baseUrl: string | undefined,
+): Model<Api> {
+  // pi-ai's getModel is strongly typed against the built-in provider/model
+  // registry, but runtime config can point at OpenAI-compatible providers
+  // with model IDs not present in that registry.
+  const registered = getModel(
+    providerName as KnownProvider,
+    modelName as never,
+  ) as Model<Api> | undefined;
+  if (registered) {
+    return {
+      ...registered,
+      baseUrl: baseUrl ?? registered.baseUrl,
+    };
+  }
+  if (!baseUrl) {
+    throw new Error(
+      `Unsupported agent model ${providerName}/${modelName}; set AGENT_DEFAULT_BASE_URL or provider.base_url for OpenAI-compatible custom models.`,
+    );
+  }
+  return {
+    id: modelName,
+    name: modelName,
+    api: "openai-completions",
+    provider: providerName,
+    baseUrl,
+    reasoning: false,
+    input: ["text"],
+    cost: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+    },
+    contextWindow: 128000,
+    maxTokens: 8192,
+  };
 }
 
 function extractRuntimePlaybook(details: unknown): PlaybookOutput | null {

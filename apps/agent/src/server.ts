@@ -24,6 +24,8 @@ const DEFAULT_API_KEY =
   process.env.AGENT_DEFAULT_API_KEY ??
   process.env.METAVIEW_OPENAI_API_KEY ??
   process.env.OPENAI_API_KEY;
+const DEFAULT_BASE_URL =
+  process.env.AGENT_DEFAULT_BASE_URL ?? process.env.METAVIEW_OPENAI_BASE_URL;
 const SHARED_TOKEN = process.env.AGENT_SHARED_TOKEN ?? process.env.METAVIEW_AGENT_SHARED_TOKEN;
 // Hard ceiling so a hung agent loop can't block the worker indefinitely.
 const GENERATE_TIMEOUT_MS = Number(process.env.AGENT_TIMEOUT_MS ?? 540_000);
@@ -32,7 +34,12 @@ const app = express();
 app.use(express.json({ limit: "2mb" }));
 
 app.get("/healthz", (_req: Request, res: Response) => {
-  res.json({ status: "ok", provider: DEFAULT_PROVIDER, model: DEFAULT_MODEL });
+  res.json({
+    status: "ok",
+    provider: DEFAULT_PROVIDER,
+    model: DEFAULT_MODEL,
+    base_url: DEFAULT_BASE_URL ?? null,
+  });
 });
 
 app.post("/generate", async (req: Request, res: Response) => {
@@ -90,6 +97,7 @@ app.post("/generate", async (req: Request, res: Response) => {
         defaultProvider: DEFAULT_PROVIDER,
         defaultModel: DEFAULT_MODEL,
         defaultApiKey: DEFAULT_API_KEY,
+        defaultBaseUrl: DEFAULT_BASE_URL,
       }),
       timeout,
     ]);
@@ -117,7 +125,13 @@ app.post("/generate", async (req: Request, res: Response) => {
 
 app.listen(PORT, () => {
   log.info(
-    { port: PORT, api_base: API_BASE_URL, provider: DEFAULT_PROVIDER, model: DEFAULT_MODEL },
+    {
+      port: PORT,
+      api_base: API_BASE_URL,
+      provider: DEFAULT_PROVIDER,
+      model: DEFAULT_MODEL,
+      base_url: DEFAULT_BASE_URL ?? null,
+    },
     "agent sidecar listening",
   );
 });

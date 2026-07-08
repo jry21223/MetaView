@@ -144,6 +144,7 @@ Agent demo 验收见 [`docs/agent-demo-acceptance.md`](docs/agent-demo-acceptanc
 | `METAVIEW_OPENAI_API_KEY` | - | 内置 OpenAI 兼容 provider 的 key |
 | `METAVIEW_OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI 兼容接口根地址 |
 | `METAVIEW_OPENAI_MODEL` | - | 默认模型名 |
+| `AGENT_DEFAULT_BASE_URL` | - | agent sidecar 默认 OpenAI 兼容接口根地址；未设置时读取 `METAVIEW_OPENAI_BASE_URL` |
 | `METAVIEW_PAYMENT_GATEWAY` | `easypay` | 支付网关选择：`wechat` / `easypay`，主路径为 `easypay` |
 | `METAVIEW_EPAY_PAY_TYPE` | `wxpay` | 开启 `easypay` 时创建订单的支付类型 |
 | `METAVIEW_PLAYBOOK_DEFAULT_FPS` | `30` | Remotion 默认帧率 |

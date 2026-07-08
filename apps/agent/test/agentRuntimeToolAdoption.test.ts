@@ -3,17 +3,25 @@ import type { PlaybookOutput } from "../src/state/types.js";
 
 const agentMock = vi.hoisted(() => ({
   prompts: [] as string[],
+  models: [] as Array<{ provider: string; id: string; baseUrl: string }>,
+  getModelCalls: [] as Array<{ provider: string; model: string }>,
 }));
 
 vi.mock("@earendil-works/pi-ai", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@earendil-works/pi-ai")>();
   return {
     ...actual,
-    getModel: vi.fn(() => ({
-      provider: "test",
-      id: "test-model",
-      baseUrl: "",
-    })),
+    getModel: vi.fn((provider: string, modelId: string) => {
+      agentMock.getModelCalls.push({ provider, model: modelId });
+      if (modelId === "deepseek-v4-pro") {
+        return undefined;
+      }
+      return {
+        provider: "test",
+        id: "test-model",
+        baseUrl: "",
+      };
+    }),
   };
 });
 
@@ -21,6 +29,7 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
   Agent: class MockAgent {
     private readonly options: {
       initialState: {
+        model: unknown;
         tools: Array<{
           name: string;
           execute: (id: string, args: unknown) => Promise<unknown>;
@@ -35,6 +44,11 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
 
     constructor(options: MockAgent["options"]) {
       this.options = options;
+      agentMock.models.push(options.initialState.model as {
+        provider: string;
+        id: string;
+        baseUrl: string;
+      });
     }
 
     async prompt(prompt: string): Promise<void> {
@@ -125,6 +139,8 @@ describe("agent runtime SceneBlueprint adoption", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     agentMock.prompts = [];
+    agentMock.models = [];
+    agentMock.getModelCalls = [];
   });
 
   it("returns the PlaybookScript produced by scene_blueprint.compile", async () => {
@@ -162,5 +178,41 @@ describe("agent runtime SceneBlueprint adoption", () => {
     expect(result).toEqual(playbook);
     expect(result.steps[0].snapshot.kind).toBe("geo_map_scene");
     expect(JSON.stringify(result)).not.toContain("algorithm_array");
+  });
+
+  it("creates an OpenAI-compatible fallback model for unregistered custom models", async () => {
+    vi.spyOn(global, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        tool: "scene_blueprint.compile",
+        ok: true,
+        result: {
+          valid: true,
+          sceneType: "east_asia_monsoon",
+          playbook: sceneBlueprintPlaybook(),
+        },
+        error: null,
+      }),
+    } as Response);
+    const { runAgentGeneration } = await import("../src/agent.js");
+
+    await runAgentGeneration({
+      prompt: "讲解东亚夏季风的海陆热力差异",
+      apiBaseUrl: "http://api.test",
+      agentSharedToken: "secret",
+      defaultProvider: "deepseek",
+      defaultModel: "deepseek-v4-pro",
+      defaultApiKey: "test-key",
+      defaultBaseUrl: "https://api.deepseek.com/v1",
+    });
+
+    expect(agentMock.getModelCalls).toEqual([
+      { provider: "deepseek", model: "deepseek-v4-pro" },
+    ]);
+    expect(agentMock.models[0]).toMatchObject({
+      provider: "deepseek",
+      id: "deepseek-v4-pro",
+      baseUrl: "https://api.deepseek.com/v1",
+    });
   });
 });
