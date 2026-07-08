@@ -54,4 +54,48 @@ describe("sceneBlueprint schema", () => {
       ]),
     );
   });
+
+  it("accepts structured recursion stack blueprint input", () => {
+    const schema = readPublicJson<unknown>("/schemas/scene-blueprint.schema.json");
+    const ajv = new Ajv2020({ allErrors: true, strict: false });
+    addFormats(ajv);
+    const validate = ajv.compile(schema);
+
+    const blueprint = {
+      subject: "algorithm",
+      sceneType: "recursion_stack",
+      title: "Fibonacci recursion stack",
+      visualIntent: ["show_call_stack"],
+      stackFrames: [
+        {
+          id: "fib-5",
+          label: "fib(5)",
+          depth: 0,
+          state: "waiting",
+          variables: { n: "5", pending: "fib(4)+fib(3)" },
+        },
+        {
+          id: "fib-4",
+          label: "fib(4)",
+          depth: 1,
+          state: "active",
+          variables: { n: "4" },
+        },
+      ],
+      currentFrameId: "fib-4",
+      codeTrace: {
+        language: "python",
+        lines: [
+          "def fib(n):",
+          "    if n <= 1:",
+          "        return n",
+          "    return fib(n - 1) + fib(n - 2)",
+        ],
+        activeLines: [3],
+        activeLine: 3,
+      },
+    };
+
+    expect(validate(blueprint), ajv.errorsText(validate.errors)).toBe(true);
+  });
 });

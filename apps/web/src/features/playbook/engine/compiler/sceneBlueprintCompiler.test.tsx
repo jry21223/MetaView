@@ -765,4 +765,106 @@ describe("sceneBlueprintCompiler", () => {
     expect(markup).toContain('data-pointer-id="mid"');
     expect(markup).toContain("21");
   });
+
+  it("compiles recursion stack layout from structured blueprint input", () => {
+    const script = compileSceneBlueprintToPlaybookScript({
+      subject: "algorithm",
+      sceneType: "recursion_stack",
+      title: "Fibonacci recursion stack",
+      visualIntent: ["show_call_stack", "trace_active_recursive_call"],
+      emphasisPoints: ["active frame", "waiting frame", "return line"],
+      stackFrames: [
+        {
+          id: "fib-5",
+          label: "fib(5)",
+          depth: 0,
+          state: "waiting",
+          variables: { n: "5", pending: "fib(4)+fib(3)" },
+        },
+        {
+          id: "fib-4",
+          label: "fib(4)",
+          depth: 1,
+          state: "active",
+          variables: { n: "4", branch: "left" },
+        },
+      ],
+      currentFrameId: "fib-4",
+      codeTrace: {
+        language: "python",
+        lines: [
+          "def fib(n):",
+          "    if n <= 1:",
+          "        return n",
+          "    return fib(n - 1) + fib(n - 2)",
+        ],
+        activeLines: [3],
+        activeLine: 3,
+      },
+      caption: "Custom recursion stack should come from the blueprint, not the factorial demo.",
+    } as SceneBlueprint & {
+      stackFrames: Array<{
+        id: string;
+        label: string;
+        depth: number;
+        state: string;
+        variables: Record<string, string>;
+      }>;
+      currentFrameId: string;
+      codeTrace: {
+        language: string;
+        lines: string[];
+        activeLines: number[];
+        activeLine: number;
+      };
+    });
+
+    const snapshot = script.steps[0].snapshot;
+    if (snapshot.kind !== "call_stack_scene") {
+      throw new Error(`Expected call_stack_scene, got ${snapshot.kind}`);
+    }
+    expect(snapshot.pack_id).toBe("algorithm-code-basic");
+    expect(snapshot.asset_id).toBe("recursion-stack-preset");
+    expect(snapshot.frames).toEqual([
+      {
+        id: "fib-5",
+        label: "fib(5)",
+        depth: 0,
+        state: "waiting",
+        asset_id: "stack-frame",
+        variables: { n: "5", pending: "fib(4)+fib(3)" },
+      },
+      {
+        id: "fib-4",
+        label: "fib(4)",
+        depth: 1,
+        state: "active",
+        asset_id: "call-frame",
+        variables: { n: "4", branch: "left" },
+      },
+    ]);
+    expect(snapshot.current_frame_id).toBe("fib-4");
+    expect(snapshot.code_trace).toEqual({
+      language: "python",
+      lines: [
+        "def fib(n):",
+        "    if n <= 1:",
+        "        return n",
+        "    return fib(n - 1) + fib(n - 2)",
+      ],
+      active_lines: [3],
+      active_line: 3,
+      asset_id: "active-line",
+    });
+    expect(visualQualityGate(script)).toEqual([]);
+
+    const markup = renderToStaticMarkup(<PlaybookComposition script={script} showInlineCode={true} showSubtitles={false} />);
+    expect(markup).toContain("call-stack-scene");
+    expect(markup).toContain('data-stack-asset-id="recursion-stack-preset"');
+    expect(markup).toContain('data-frame-id="fib-4"');
+    expect(markup).toContain("fib(4)");
+    expect(markup).toContain("return fib(n - 1) + fib(n - 2)");
+    expect(markup).not.toContain("factorial(4)");
+    expect(markup).not.toContain('data-missing-asset="true"');
+  });
 });

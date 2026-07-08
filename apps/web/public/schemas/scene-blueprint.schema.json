@@ -181,6 +181,12 @@
       "type": "array",
       "items": { "type": "string", "minLength": 1 }
     },
+    "stackFrames": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/callStackFrame" }
+    },
+    "currentFrameId": { "type": "string", "minLength": 1 },
+    "codeTrace": { "$ref": "#/$defs/callStackCodeTrace" },
     "arrayValues": {
       "type": "array",
       "items": { "type": ["string", "number"] }
@@ -386,6 +392,39 @@
         "target": { "type": "string", "minLength": 1 },
         "label": { "type": "string", "minLength": 1 },
         "weight": { "type": "number" }
+      }
+    },
+    "callStackFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": ["string", "null"], "minLength": 1 },
+        "depth": { "type": ["number", "null"], "minimum": 0 },
+        "state": { "type": ["string", "null"], "minLength": 1 },
+        "assetId": { "type": ["string", "null"], "minLength": 1 },
+        "variables": {
+          "type": ["object", "null"],
+          "additionalProperties": { "type": ["string", "number", "boolean", "null"] }
+        }
+      }
+    },
+    "callStackCodeTrace": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "language": { "type": ["string", "null"], "minLength": 1 },
+        "lines": {
+          "type": ["array", "null"],
+          "items": { "type": "string" }
+        },
+        "activeLines": {
+          "type": ["array", "null"],
+          "items": { "type": "number", "minimum": 0 }
+        },
+        "activeLine": { "type": ["number", "null"], "minimum": 0 },
+        "assetId": { "type": ["string", "null"], "minLength": 1 }
       }
     }
   }

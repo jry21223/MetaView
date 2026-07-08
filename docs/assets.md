@@ -200,6 +200,10 @@ generated `screenshotReview` queue into human-approved screenshot references,
 tighten attribution/export policy around non-internal assets, and only then
 prepare the separate MCP read-only asset exposure work.
 
+Phase 2 has started with the algorithm call-stack compiler: `recursion_stack`
+now accepts structured `stackFrames`, `currentFrameId`, and `codeTrace` blueprint
+input instead of always rendering the built-in factorial demo.
+
 ## Adding Assets
 
 1. Add the file under a pack directory in `apps/web/public/assets/metaview-kits/`.
@@ -241,7 +245,7 @@ snapshot catalog.
 | `derivative_tangent` | math | `math-basic` | `math_plot` | formula plus curve/tangent plot markers |
 | `cubic_tangent` | math | `math-basic` | `math_plot` | structured curve expressions, plot bounds, marker, shaded region |
 | `bfs_graph` | algorithm | `algorithm-code-basic` | `graph_scene` | graph node, queue, active-edge assets plus code track |
-| `recursion_stack` | algorithm | `algorithm-code-basic` | `call_stack_scene` | call frames, waiting stack frames, active code-line asset plus code track |
+| `recursion_stack` | algorithm | `algorithm-code-basic` | `call_stack_scene` | structured stackFrames/codeTrace input, call frames, waiting stack frames, active code-line asset |
 | `binary_search` | algorithm | `algorithm-code-basic` | `code_trace_scene` | binary-search preset, active code-line asset, array window, low/mid/high pointer assets |
 
 Local preview helpers:

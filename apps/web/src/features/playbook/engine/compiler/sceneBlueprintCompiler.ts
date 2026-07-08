@@ -1,7 +1,10 @@
-import { resolveAssetByRole, resolveAssetForRenderer } from "../assets/assetResolver";
 import { visualQualityGate, type VisualQualityWarning } from "../assets/visualQualityGate";
-import type { SubjectVisualKitSubject } from "../assets/assetRegistry";
 import { compileBinarySearchCodeTraceLayout } from "../kits/algorithm/BinarySearchLayoutCompiler";
+import {
+  compileCallStackLayout,
+  type CallStackCodeTraceInput,
+  type CallStackFrameInput,
+} from "../kits/algorithm/CallStackLayoutCompiler";
 import { compileBfsGraphLayout, type GraphLayoutEdgeInput, type GraphLayoutNodeInput } from "../kits/algorithm/GraphLayoutCompiler";
 import {
   compileBioCellLayout,
@@ -58,17 +61,6 @@ type ChemistrySceneType =
 type MathSceneType = "math_plot" | "derivative_tangent";
 type AlgorithmSceneType = "graph_scene" | "bfs_graph" | "call_stack_scene" | "recursion_stack" | "code_trace_scene" | "binary_search";
 type SceneBlueprintSubject = "algorithm" | "biology" | "chemistry" | "geography" | "math" | "physics";
-type SupportedRendererKind =
-  | "bio_cell_scene"
-  | "bio_process_scene"
-  | "geo_map_scene"
-  | "graph_scene"
-  | "call_stack_scene"
-  | "code_trace_scene"
-  | "math_plot"
-  | "molecule_2d_scene"
-  | "reaction_scene"
-  | "physics_force_scene";
 
 interface SceneBlueprintBase {
   id?: string;
@@ -195,6 +187,9 @@ export interface AlgorithmSceneBlueprint extends SceneBlueprintBase {
   visitedNodeIds?: string[];
   queueNodeIds?: string[];
   frontierNodeIds?: string[];
+  stackFrames?: CallStackFrameInput[];
+  currentFrameId?: string;
+  codeTrace?: CallStackCodeTraceInput;
   arrayValues?: Array<string | number>;
   target?: string | number;
 }
@@ -232,24 +227,6 @@ function stepIdFor(blueprint: SceneBlueprint): string {
     .toLowerCase()
     .replace(/[^a-z0-9_-]+/g, "_")
     .replace(/^_+|_+$/g, "") || `${blueprint.subject}_scene`;
-}
-
-function resolveAssetIdByRole(
-  rendererKind: SupportedRendererKind,
-  subject: SubjectVisualKitSubject,
-  packId: string,
-  semanticRole: string,
-  fallbacks: string[] = [],
-): string | undefined {
-  for (const role of [semanticRole, ...fallbacks]) {
-    const asset =
-      resolveAssetForRenderer(rendererKind, role, packId) ??
-      resolveAssetByRole(subject, role, packId) ??
-      resolveAssetForRenderer(rendererKind, role) ??
-      resolveAssetByRole(subject, role);
-    if (asset) return asset.id;
-  }
-  return undefined;
 }
 
 function compileGeographySnapshot(blueprint: GeographySceneBlueprint): GeoMapSceneSnapshot {
@@ -358,65 +335,13 @@ function compileAlgorithmSnapshot(blueprint: AlgorithmSceneBlueprint): GraphScen
 
 function compileCallStackSnapshot(blueprint: AlgorithmSceneBlueprint): CallStackSceneSnapshot {
   const packId = blueprint.packId ?? DEFAULT_ALGORITHM_PACK_ID;
-  const stackAssetId = resolveAssetIdByRole("call_stack_scene", "algorithm", packId, "recursion_stack", [
-    "call_stack_scene",
-    "call_stack",
-  ]);
-  const callFrameAssetId = resolveAssetIdByRole("call_stack_scene", "algorithm", packId, "call_frame", [
-    "active_frame",
-  ]);
-  const stackFrameAssetId = resolveAssetIdByRole("call_stack_scene", "algorithm", packId, "stack_frame", [
-    "waiting_frame",
-  ]);
-  const activeLineAssetId = resolveAssetIdByRole("call_stack_scene", "algorithm", packId, "active_line", [
-    "code_trace",
-  ]);
-
-  return {
-    kind: "call_stack_scene",
-    pack_id: packId,
-    asset_id: stackAssetId,
-    frames: [
-      {
-        id: "factorial-4",
-        label: "factorial(4)",
-        depth: 0,
-        state: "active",
-        asset_id: callFrameAssetId,
-        variables: { n: "4" },
-      },
-      {
-        id: "factorial-3",
-        label: "factorial(3)",
-        depth: 1,
-        state: "waiting",
-        asset_id: stackFrameAssetId,
-        variables: { n: "3" },
-      },
-      {
-        id: "factorial-2",
-        label: "factorial(2)",
-        depth: 2,
-        state: "waiting",
-        asset_id: stackFrameAssetId,
-        variables: { n: "2" },
-      },
-    ],
-    code_trace: {
-      language: "python",
-      lines: [
-        "def factorial(n):",
-        "    if n == 1:",
-        "        return 1",
-        "    return n * factorial(n - 1)",
-      ],
-      active_lines: [3],
-      active_line: 3,
-      asset_id: activeLineAssetId,
-    },
-    current_frame_id: "factorial-4",
-    caption: blueprint.caption ?? "Recursive calls form a stack frame for each pending multiplication.",
-  };
+  return compileCallStackLayout({
+    packId,
+    frames: blueprint.stackFrames,
+    currentFrameId: blueprint.currentFrameId,
+    codeTrace: blueprint.codeTrace,
+    caption: blueprint.caption,
+  }).snapshot;
 }
 
 function compileCodeTraceSnapshot(blueprint: AlgorithmSceneBlueprint): CodeTraceSceneSnapshot {
@@ -474,23 +399,14 @@ function compileAlgorithmCodeHighlight(blueprint: AlgorithmSceneBlueprint): Code
   }
 
   if (blueprint.sceneType === "recursion_stack" || blueprint.sceneType === "call_stack_scene") {
-    return {
-      language: "python",
-      lines: [
-        "def factorial(n):",
-        "    if n == 1:",
-        "        return 1",
-        "    return n * factorial(n - 1)",
-      ],
-      active_lines: [3],
-      active_line: 3,
-      variables: {
-        intent: blueprint.visualIntent.join(", "),
-        n: "4",
-        pending: "4 * factorial(3)",
-      },
-      operation_label: "recursive call",
-    };
+    return compileCallStackLayout({
+      packId: blueprint.packId ?? DEFAULT_ALGORITHM_PACK_ID,
+      frames: blueprint.stackFrames,
+      currentFrameId: blueprint.currentFrameId,
+      codeTrace: blueprint.codeTrace,
+      caption: blueprint.caption,
+      visualIntent: blueprint.visualIntent,
+    }).codeHighlight;
   }
 
   return {
