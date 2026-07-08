@@ -18,6 +18,7 @@ describe("asset check targets", () => {
     expect(webPackage).toContain('"showcase:baseline"');
     expect(webPackage).toContain('"showcase:baseline:release"');
     expect(webPackage).toContain("SHOWCASE_BASELINE_REQUIRE_APPROVED=1");
+    expect(webPackage).toContain("SHOWCASE_BASELINE_REFERENCE=../../eval/reports/subject-visual-showcase-approved-reference.json");
     expect(webPackage).toContain('"showcase:review-packet"');
     expect(webPackage).toContain('"showcase:approve-reference"');
     expect(makefile).toMatch(

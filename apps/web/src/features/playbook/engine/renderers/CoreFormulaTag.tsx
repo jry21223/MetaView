@@ -39,6 +39,42 @@ function defaultTextX(x: number, width: number, textAnchor: CoreFormulaTagProps[
   return x + width / 2;
 }
 
+function numericFontSize(fontSize: CoreFormulaTagProps["fontSize"]): number | null {
+  if (typeof fontSize === "number") return fontSize;
+  if (typeof fontSize === "string") {
+    const parsed = Number(fontSize);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function fittedFontSize(text: string, width: number, fontSize: CoreFormulaTagProps["fontSize"]): number | string {
+  const requested = numericFontSize(fontSize);
+  if (requested == null) return fontSize ?? 3.4;
+  const max = (width - 7) / Math.max(1, text.length * 0.64);
+  return Number(Math.max(2.4, Math.min(requested, max)).toFixed(2));
+}
+
+function textMaskGeometry(
+  text: string,
+  textX: number,
+  textY: number,
+  width: number,
+  fontSize: number | string,
+  textAnchor: CoreFormulaTagProps["textAnchor"],
+) {
+  const size = numericFontSize(fontSize) ?? 3.4;
+  const maskWidth = Math.min(width - 2.4, Math.max(8, text.length * size * 0.58 + 3.8));
+  const x = textAnchor === "end" ? textX - maskWidth : textAnchor === "middle" ? textX - maskWidth / 2 : textX;
+  return {
+    x,
+    y: textY - size * 0.78,
+    width: maskWidth,
+    height: size * 1.18,
+    rx: Math.max(0.8, size * 0.32),
+  };
+}
+
 export function CoreFormulaTag({
   id,
   text,
@@ -56,6 +92,10 @@ export function CoreFormulaTag({
   opacity = 0.96,
 }: CoreFormulaTagProps) {
   const asset = resolveCoreFormulaAsset(rendererKind);
+  const renderedTextX = textX ?? defaultTextX(x, width, textAnchor);
+  const renderedTextY = textY ?? y + height * 0.66;
+  const renderedFontSize = fittedFontSize(text, width, fontSize);
+  const mask = textMaskGeometry(text, renderedTextX, renderedTextY, width, renderedFontSize, textAnchor);
 
   return (
     <g data-semantic-role="formula_card" data-formula-tag-id={id}>
@@ -72,11 +112,22 @@ export function CoreFormulaTag({
         opacity={opacity}
         preserveAspectRatio="none"
       />
+      <rect
+        data-formula-text-mask="true"
+        x={mask.x}
+        y={mask.y}
+        width={mask.width}
+        height={mask.height}
+        rx={mask.rx}
+        fill="#f7fbff"
+        opacity="0.94"
+      />
       <text
-        x={textX ?? defaultTextX(x, width, textAnchor)}
-        y={textY ?? y + height * 0.66}
+        x={renderedTextX}
+        y={renderedTextY}
         textAnchor={textAnchor}
-        fontSize={fontSize}
+        fontSize={renderedFontSize}
+        data-fitted-font-size={String(renderedFontSize)}
         fontWeight={fontWeight}
         fill={textFill}
       >

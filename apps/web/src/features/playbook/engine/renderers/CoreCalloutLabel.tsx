@@ -59,6 +59,18 @@ function calloutGeometry(anchor: CoreCalloutAnchor, label: string) {
   };
 }
 
+function calloutTextMask(anchor: CoreCalloutAnchor, textX: number, textY: number, label: string) {
+  const width = Math.max(8, Math.min(32, label.length * 1.35 + 3.8));
+  const x =
+    anchor.textAnchor === "end" ? textX - width : anchor.textAnchor === "middle" ? textX - width / 2 : textX;
+  return {
+    x,
+    y: textY - 3.1,
+    width,
+    height: 4.1,
+  };
+}
+
 export function CoreCalloutLabel({
   id,
   targetId,
@@ -71,6 +83,7 @@ export function CoreCalloutLabel({
 }: CoreCalloutLabelProps) {
   const asset = resolveCoreCalloutAsset(rendererKind);
   const geometry = calloutGeometry(anchor, label);
+  const mask = calloutTextMask(anchor, geometry.textX, geometry.textY, label);
 
   return (
     <g key={id} data-semantic-role="callout" data-callout-id={id} data-target-id={targetId}>
@@ -93,6 +106,16 @@ export function CoreCalloutLabel({
         width={geometry.width}
         height={geometry.height}
         preserveAspectRatio="none"
+      />
+      <rect
+        data-callout-text-mask="true"
+        x={mask.x}
+        y={mask.y}
+        width={mask.width}
+        height={mask.height}
+        rx="1"
+        fill="#ffffff"
+        opacity="0.95"
       />
       <text
         x={geometry.textX}
