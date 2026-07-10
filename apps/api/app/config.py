@@ -115,6 +115,7 @@ class Settings(BaseSettings):
     codex_model: str | None = "gpt-5.5"
     codex_effort: str | None = None
     codex_cwd: str = "."
+    codex_bin: str | None = None
     agent_skills_dir: str = "skills/metaview-agent"
 
     # Account / recharge

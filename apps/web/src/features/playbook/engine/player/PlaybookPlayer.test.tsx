@@ -9,7 +9,7 @@ vi.mock("@remotion/player", async () => {
   const React = await import("react");
   return {
     Player: React.forwardRef(function MockPlayer(
-      props: { inputProps?: { showSubtitles?: boolean } },
+      props: { inputProps?: { showSubtitles?: boolean; showInlineCode?: boolean } },
       ref: React.ForwardedRef<unknown>,
     ) {
       React.useImperativeHandle(ref, () => ({
@@ -23,6 +23,7 @@ vi.mock("@remotion/player", async () => {
         <div
           data-testid="mock-remotion-player"
           data-show-subtitles={String(props.inputProps?.showSubtitles)}
+          data-show-inline-code={String(props.inputProps?.showInlineCode)}
         />
       );
     }),
@@ -128,6 +129,45 @@ describe("PlaybookPlayer", () => {
     expect(getByText("Ask this step")).toBeTruthy();
   });
 
+  it("shows legacy call-stack code sync in the desktop learning console", () => {
+    const script = baseScript({
+      domain: "code",
+      title: "Recursive factorial",
+      steps: [
+        {
+          ...baseScript().steps[0],
+          snapshot: {
+            kind: "call_stack_scene",
+            frames: [
+              {
+                id: "factorial-3",
+                function_name: "factorial",
+                arguments: { n: "3" },
+                variables: { n: "3" },
+                state: "active",
+              },
+            ],
+            current_frame_id: "factorial-3",
+            code_trace: {
+              language: "python",
+              lines: ["def factorial(n):", "    return n * factorial(n - 1)"],
+              active_line: 1,
+              active_lines: [1],
+            },
+          },
+          code_highlight: undefined,
+        },
+      ],
+    });
+
+    const { getByRole, getByText } = render(<PlaybookPlayer script={script} theme="light" />);
+    const learningConsole = getByRole("complementary", { name: "Learning console" });
+
+    expect(getByText("Code Sync")).toBeTruthy();
+    expect(learningConsole.textContent).toContain("def factorial(n):");
+    expect(learningConsole.textContent).toContain("n = 3");
+  });
+
   it("hides code sync for non-code lessons while keeping params above follow-up", () => {
     const { queryByText, getByText, getByTestId } = render(
       <PlaybookPlayer
@@ -150,6 +190,9 @@ describe("PlaybookPlayer", () => {
 
     expect(container.querySelector('[data-testid="mock-remotion-player"]')?.getAttribute("data-show-subtitles")).toBe(
       "true",
+    );
+    expect(container.querySelector('[data-testid="mock-remotion-player"]')?.getAttribute("data-show-inline-code")).toBe(
+      "false",
     );
     expect(container.querySelector(".playbook-player__caption")).toBeNull();
     expect(queryByText("先观察函数的基础形态。")).toBeNull();
@@ -222,9 +265,17 @@ describe("PlaybookPlayer", () => {
     expect(container.querySelector(".playbook-player__mobile-narration")?.textContent).toContain(
       "先观察函数的基础形态。",
     );
+    const player = container.querySelector('[data-testid="mock-remotion-player"]');
+    expect(player?.getAttribute("data-show-subtitles")).toBe("false");
 
     const tabs = container.querySelectorAll(".playbook-player__mobile-tabs button");
     expect(tabs).toHaveLength(5);
+
+    fireEvent.click(tabs[1]);
+    expect(player?.getAttribute("data-show-subtitles")).toBe("true");
+
+    fireEvent.click(tabs[0]);
+    expect(player?.getAttribute("data-show-subtitles")).toBe("false");
 
     const exportButton = container.querySelector<HTMLButtonElement>(
       ".playbook-player__header-actions .playbook-player__export-btn",
@@ -291,6 +342,24 @@ describe("PlaybookPlayer", () => {
     expect(getByText("line7")).toBeTruthy();
     expect(queryByText("line1")).toBeNull();
     expect(queryByText("line8")).toBeNull();
+  });
+
+  it("keeps stage subtitles when the portrait learning console is hidden", () => {
+    const { container } = render(
+      <PlaybookPlayer
+        script={baseScript()}
+        theme="light"
+        layoutMode="portrait"
+        showLearningConsole={false}
+      />,
+    );
+
+    expect(container.querySelector(".playbook-player__mobile-narration")).toBeNull();
+    expect(
+      container
+        .querySelector('[data-testid="mock-remotion-player"]')
+        ?.getAttribute("data-show-subtitles"),
+    ).toBe("true");
   });
 
   it("opens follow-up content in a portrait bottom sheet", () => {

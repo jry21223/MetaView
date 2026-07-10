@@ -107,9 +107,13 @@ make lint
 make test
 make build
 make check
+make visual-check
+make eval-gold
 ```
 
-`make check` 会串联 ruff、eslint、pytest、tsc 和 Vite build。
+`make check` 串联 ruff、eslint、pytest、tsc 和 Vite build；Remotion 静帧、资产审计与
+showcase 基线放在独立的 `make visual-check`。`make eval-gold` 对四个 Gold Case 执行
+严格 Benchmark V2；使用 `LIVE=1` 时会真实生成每例三次。
 
 Agent demo 验收见 [`docs/agent-demo-acceptance.md`](docs/agent-demo-acceptance.md)。生成的 `eval/reports/`、`eval/videos/`、`eval/shots/` 是本地证据，不应提交。
 
@@ -140,6 +144,7 @@ Agent demo 验收见 [`docs/agent-demo-acceptance.md`](docs/agent-demo-acceptanc
 | `METAVIEW_AGENT_PROVIDER` | `http` | `agent` 模式 provider adapter：`http` sidecar 或 `codex` fallback |
 | `METAVIEW_AGENT_BASE_URL` | `http://agent:8001` | agent sidecar 地址 |
 | `METAVIEW_AGENT_SHARED_TOKEN` | - | API 调用 agent sidecar 的共享鉴权 token |
+| `METAVIEW_CODEX_BIN` | - | Codex SDK 可选 CLI 路径；留空使用 SDK 固定 runtime |
 | `METAVIEW_ROUTER_MODE` | `hybrid` | 路由模式：`off` / `heuristic` / `llm` / `hybrid` |
 | `METAVIEW_OPENAI_API_KEY` | - | 内置 OpenAI 兼容 provider 的 key |
 | `METAVIEW_OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI 兼容接口根地址 |

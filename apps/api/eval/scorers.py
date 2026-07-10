@@ -21,12 +21,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from app.domain.models.playbook import (
-    MathFormulaSnapshot,
-    MetaStep,
-    PlaybookScript,
-)
-
+from app.domain.models.playbook import MathFormulaSnapshot, PlaybookScript
 
 # ---------------------------------------------------------------------------
 # Result types
@@ -257,15 +252,21 @@ def score_diversity(script: PlaybookScript) -> DimensionResult:
 # ---------------------------------------------------------------------------
 
 
-def score_playbook(prompt_id: str, raw_json: str) -> ScoreCard:
-    """Run all seven scorers and return a populated ScoreCard."""
+def score_playbook_legacy(prompt_id: str, raw_json: str) -> ScoreCard:
+    """Run the legacy structural scorer and return a populated ScoreCard.
+
+    This name is deliberately explicit so Benchmark V2 reports cannot mistake
+    schema/shape quality for product quality.
+    """
     card = ScoreCard(prompt_id=prompt_id)
 
     schema_result, script = score_schema(raw_json)
     card.dimensions.append(schema_result)
 
     if script is None:
-        card.parse_error = schema_result.issues[0] if schema_result.issues else "unknown parse error"
+        card.parse_error = (
+            schema_result.issues[0] if schema_result.issues else "unknown parse error"
+        )
         # Pad remaining dimensions with 0 so card.max_total is always 100
         _zero_remaining(card)
         return card
@@ -279,6 +280,12 @@ def score_playbook(prompt_id: str, raw_json: str) -> ScoreCard:
         score_diversity(script),
     ]
     return card
+
+
+def score_playbook(prompt_id: str, raw_json: str) -> ScoreCard:
+    """Backward-compatible alias for :func:`score_playbook_legacy`."""
+
+    return score_playbook_legacy(prompt_id, raw_json)
 
 
 def _zero_remaining(card: ScoreCard) -> None:

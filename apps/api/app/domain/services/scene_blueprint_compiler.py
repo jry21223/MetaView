@@ -36,6 +36,7 @@ from app.domain.services.chemistry_layout_compiler import (
 from app.domain.services.geography_layout_compiler import compile_geo_map_snapshot
 from app.domain.services.math_layout_compiler import compile_math_plot_snapshot
 from app.domain.services.physics_layout_compiler import compile_physics_force_snapshot
+from app.domain.services.playbook_quality import estimate_step_frames
 
 _FPS = 30
 _DEFAULT_STEP_FRAMES = 180
@@ -81,14 +82,14 @@ def _required_str(payload: dict[str, Any], key: str) -> str:
     return value
 
 
-def _step_frames(blueprint: dict[str, Any]) -> int:
+def _step_frames(blueprint: dict[str, Any]) -> int | None:
     duration_frames = blueprint.get("durationFrames")
     if isinstance(duration_frames, int | float):
         return max(1, round(duration_frames))
     duration_seconds = blueprint.get("durationSeconds")
     if isinstance(duration_seconds, int | float):
         return max(1, round(duration_seconds * _FPS))
-    return _DEFAULT_STEP_FRAMES
+    return None
 
 
 def _compile_steps(
@@ -96,7 +97,7 @@ def _compile_steps(
     title: str,
     snapshot: Any,
     code_highlight: CodeHighlightOverlay | None,
-    step_frames: int,
+    step_frames: int | None,
 ) -> list[MetaStep]:
     base_caption = str(getattr(snapshot, "caption", "") or title)
     captions = _step_captions(scene_type, title, base_caption)
@@ -104,13 +105,26 @@ def _compile_steps(
         :_SCENE_BLUEPRINT_STEP_COUNT
     ]
     steps: list[MetaStep] = []
+    frame_cursor = 0
     for index, caption in enumerate(captions, start=1):
         step_snapshot = snapshot.model_copy(deep=True)
         step_code_highlight = code_highlight.model_copy(deep=True) if code_highlight else None
+        if step_code_highlight is not None:
+            step_code_highlight = _sync_code_highlight_state(
+                scene_type,
+                step_snapshot,
+                step_code_highlight,
+            )
+        duration = (
+            step_frames
+            if step_frames is not None
+            else max(_DEFAULT_STEP_FRAMES, estimate_step_frames(caption, _FPS))
+        )
+        frame_cursor += duration
         steps.append(
             MetaStep(
                 step_id=f"{scene_type}_{index:02d}",
-                end_frame=index * step_frames,
+                end_frame=frame_cursor,
                 title=f"{title} · {index}",
                 voiceover_text=caption,
                 animation_hint=step_snapshot.kind,
@@ -121,6 +135,32 @@ def _compile_steps(
             )
         )
     return steps
+
+
+def _sync_code_highlight_state(
+    scene_type: str,
+    snapshot: Any,
+    code_highlight: CodeHighlightOverlay,
+) -> CodeHighlightOverlay:
+    variables = dict(code_highlight.variables)
+    if scene_type == "bfs_graph" and isinstance(snapshot, GraphSceneSnapshot):
+        current = snapshot.current_node_id or next(iter(snapshot.active_node_ids), "done")
+        queue = list(dict.fromkeys([*snapshot.queue_node_ids, *snapshot.frontier_node_ids]))
+        variables.update(
+            {
+                "current": current,
+                "queue": f"[{', '.join(queue)}]",
+                "visited": f"{{{', '.join(snapshot.visited_node_ids)}}}",
+            }
+        )
+    elif scene_type == "recursion_stack" and isinstance(snapshot, CallStackSceneSnapshot):
+        current_frame = next(
+            (frame for frame in snapshot.frames if frame.id == snapshot.current_frame_id),
+            None,
+        )
+        if current_frame is not None:
+            variables.update(current_frame.variables)
+    return code_highlight.model_copy(update={"variables": variables})
 
 
 def _step_captions(scene_type: str, title: str, base_caption: str) -> list[str]:

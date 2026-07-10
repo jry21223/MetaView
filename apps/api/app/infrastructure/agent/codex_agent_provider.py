@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +13,7 @@ from pydantic import ValidationError
 from app.application.agent.types import AgentRequest, AgentResult
 from app.application.ports.agent_provider import AgentProviderError
 from app.domain.models.playbook import PlaybookScript
+from app.domain.services.generated_playbook_normalizer import normalize_generated_playbook
 
 DEFAULT_CODEX_MODEL = "gpt-5.5"
 DEFAULT_AGENT_SKILLS_DIR = "skills/metaview-agent"
@@ -29,8 +32,14 @@ Hard contract:
 - every snapshot.kind must match one of the schema discriminator values.
 - mirror snapshot as layers[0].body when layers are present.
 - math domain should prefer math_plot, math_scene, math_formula, or motion_scene.
-- algorithm/code explanations should use algorithm_array, algorithm_bars, or
-  algorithm_tree.
+- graph traversal should use graph_scene or algorithm_tree and preserve stable
+  node/edge ids plus current, visited, and queue/frontier state.
+- recursion should use call_stack_scene with an embedded code_trace when
+  line-by-line execution matters; show active frames and returned values, and
+  remove returned child frames as the visible stack unwinds.
+- projectile explanations should use physics_force_scene with a stable object,
+  a curved trajectory, horizontal/vertical velocity arrows, and gravity; for a
+  horizontal launch, start with zero vertical velocity and no upward phase.
 - Keep JSON values renderer-ready; do not include Markdown fences.
 """
 
@@ -46,6 +55,7 @@ class CodexAgentProvider:
         effort: str | None = None,
         timeout_s: float = 600.0,
         skills_dir: str | Path = DEFAULT_AGENT_SKILLS_DIR,
+        codex_bin: str | Path | None = None,
     ) -> None:
         cwd_path = Path(cwd).resolve()
         self._cwd = str(cwd_path)
@@ -53,6 +63,9 @@ class CodexAgentProvider:
         self._effort = effort
         self._timeout_s = timeout_s
         self._skills_dir = _resolve_under_cwd(cwd_path, skills_dir)
+        self._codex_bin = (
+            str(_resolve_under_cwd(cwd_path, codex_bin).resolve()) if codex_bin else None
+        )
 
     @property
     def skills_dir(self) -> str:
@@ -63,9 +76,11 @@ class CodexAgentProvider:
         prompt: str,
         provider_config: dict[str, Any] | None = None,
         route_decision: dict[str, Any] | None = None,
+        *,
+        intent_prompt: str | None = None,
     ) -> dict[str, Any]:
         try:
-            from openai_codex import AsyncCodex, Sandbox
+            from openai_codex import AsyncCodex, CodexConfig, Sandbox
         except ImportError as exc:
             raise AgentProviderError(
                 "openai-codex SDK is not installed; install the optional Codex SDK "
@@ -81,23 +96,38 @@ class CodexAgentProvider:
             skills_dir=self._skills_dir,
         )
 
-        try:
-            async with AsyncCodex() as codex:
+        async def run_codex_lifecycle() -> Any:
+            codex_config = CodexConfig(codex_bin=self._codex_bin) if self._codex_bin else None
+            async with AsyncCodex(codex_config) as codex:
                 if api_key:
                     await codex.login_api_key(api_key)
                 thread = await codex.thread_start(
                     cwd=self._cwd,
                     developer_instructions=developer_instructions,
+                    ephemeral=True,
                     model=model,
                     sandbox=Sandbox.read_only,
                 )
-                result = await thread.run(
+                turn = thread.run(
                     _build_user_prompt(prompt, schema, route_decision=route_decision),
                     cwd=self._cwd,
                     effort=effort,
                     model=model,
                     sandbox=Sandbox.read_only,
                 )
+                return await turn
+
+        try:
+            lifecycle = run_codex_lifecycle()
+            result = (
+                await asyncio.wait_for(lifecycle, timeout=self._timeout_s)
+                if self._timeout_s > 0
+                else await lifecycle
+            )
+        except TimeoutError as exc:
+            raise AgentProviderError(
+                f"codex SDK generation timed out after {self._timeout_s:.1f}s"
+            ) from exc
         except Exception as exc:
             raise AgentProviderError(f"codex SDK generation failed: {exc}") from exc
 
@@ -116,7 +146,16 @@ class CodexAgentProvider:
             )
 
         try:
-            return PlaybookScript.model_validate(payload).model_dump(mode="json")
+            playbook = PlaybookScript.model_validate(payload)
+            requested_scene_types = _requested_scene_types(
+                intent_prompt or prompt,
+                route_decision,
+                playbook,
+            )
+            return normalize_generated_playbook(
+                playbook,
+                requested_scene_types=requested_scene_types,
+            ).model_dump(mode="json")
         except ValidationError as exc:
             raise AgentProviderError(f"codex SDK playbook failed schema validation: {exc}") from exc
 
@@ -126,6 +165,7 @@ class CodexAgentProvider:
             prompt,
             provider_config=request.provider_config,
             route_decision=request.route_decision,
+            intent_prompt=request.prompt,
         )
         return AgentResult(
             playbook=playbook,
@@ -185,6 +225,52 @@ def _build_runtime_user_prompt(request: AgentRequest) -> str:
         "[user prompt]\n"
         f"{request.prompt}"
     )
+
+
+def _requested_scene_types(
+    prompt: str,
+    route_decision: dict[str, Any] | None,
+    playbook: PlaybookScript,
+) -> set[str]:
+    explicit_values: list[str] = []
+    if route_decision:
+        for key in ("scene_type", "preferred_scene_type", "algorithm_id", "capability_id"):
+            value = route_decision.get(key)
+            if isinstance(value, str):
+                explicit_values.append(value)
+    if playbook.algorithm_id:
+        explicit_values.append(playbook.algorithm_id)
+    scene_blueprint = playbook.initial_data.get("scene_blueprint")
+    if isinstance(scene_blueprint, list):
+        explicit_values.extend(item for item in scene_blueprint if isinstance(item, str))
+
+    explicit = {value.strip().casefold() for value in explicit_values}
+    prompt_text = prompt.casefold()
+    requested: set[str] = set()
+    if explicit & {"bfs_graph", "breadth_first_search", "bfs"} or (
+        re.search(r"\b(?:bfs|breadth[ -]first)\b", prompt_text)
+        or any(alias in prompt_text for alias in ("广度优先", "层序遍历"))
+    ):
+        requested.add("bfs_graph")
+    factorial_match = re.search(r"factorial\s*\(\s*(\d+)\s*\)", prompt_text)
+    if explicit & {"recursion_stack", "factorial_recursion"} or (
+        any(alias in prompt_text for alias in ("factorial", "阶乘"))
+        and any(alias in prompt_text for alias in ("recursion", "recursive", "递归", "调用栈"))
+    ):
+        requested.add("recursion_stack")
+        if factorial_match and 1 <= int(factorial_match.group(1)) <= 8:
+            requested.add(f"factorial_recursion:{int(factorial_match.group(1))}")
+    if explicit & {"horizontal_projectile", "horizontal_projectile_motion"} or (
+        re.search(r"\bhorizontal[ -]projectile(?: motion)?\b", prompt_text)
+        or "平抛" in prompt_text
+    ):
+        requested.update({"horizontal_projectile", "projectile_motion"})
+    if explicit & {"projectile_motion", "projectile"} or (
+        re.search(r"\bprojectile(?: motion)?\b", prompt_text)
+        or any(alias in prompt_text for alias in ("抛体", "平抛", "斜抛"))
+    ):
+        requested.add("projectile_motion")
+    return requested
 
 
 def _build_developer_instructions(

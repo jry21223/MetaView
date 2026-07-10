@@ -190,6 +190,7 @@ async def test_execute_outputs_valid_playbook_with_graph_scene() -> None:
     graph_snapshot = next(
         step.snapshot for step in playbook.steps if step.snapshot.kind == "graph_scene"
     )
+    graph_step = next(step for step in playbook.steps if step.snapshot.kind == "graph_scene")
     assert graph_snapshot.pack_id == "algorithm-code-basic"
     assert graph_snapshot.asset_id == "bfs-graph-preset"
     assert graph_snapshot.current_node_id == "A"
@@ -197,6 +198,13 @@ async def test_execute_outputs_valid_playbook_with_graph_scene() -> None:
     assert graph_snapshot.visited_node_ids == ["A"]
     assert graph_snapshot.queue_node_ids == ["B", "C"]
     assert set(graph_snapshot.active_edge_ids) == {"A->B", "A->C"}
+    assert graph_step.code_highlight is not None
+    assert graph_step.code_highlight.language == "pseudocode"
+    assert graph_step.code_highlight.variables == {
+        "current": "A",
+        "queue": "[B, C]",
+        "visited": "{A}",
+    }
     node_asset_ids = {node.id: node.asset_id for node in graph_snapshot.nodes}
     assert node_asset_ids == {
         "A": "graph-node",

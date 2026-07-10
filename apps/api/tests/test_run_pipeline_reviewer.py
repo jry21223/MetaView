@@ -321,7 +321,7 @@ async def test_execution_map_error_fails_when_reviewer_mode_off(repo) -> None:
 
 
 @pytest.mark.asyncio
-async def test_execution_map_warnings_do_not_block_pipeline(repo) -> None:
+async def test_canonical_gate_blocks_invalid_state_from_execution_map_warnings(repo) -> None:
     cir = {
         "version": "0.1.0",
         "title": "数组",
@@ -368,8 +368,8 @@ async def test_execution_map_warnings_do_not_block_pipeline(repo) -> None:
 
     result = await repo.get("run-6")
     assert result is not None
-    assert result.status == PipelineRunStatus.SUCCEEDED
-    assert result.playbook is not None
+    assert result.status == PipelineRunStatus.FAILED
+    assert result.playbook is None
     assert result.review is not None
     assert result.review.status == "warnings"
     assert {issue.code for issue in result.review.issues} >= {
@@ -377,3 +377,77 @@ async def test_execution_map_warnings_do_not_block_pipeline(repo) -> None:
         "execution_map_array_index_out_of_range",
         "execution_map_code_line_out_of_range",
     }
+    assert result.quality_report is not None
+    assert result.quality_report.status == "blocked"
+    assert {issue.code for issue in result.quality_report.issues} >= {
+        "algorithm.invalid_state_transition",
+        "quality.repair_exhausted",
+    }
+
+
+@pytest.mark.asyncio
+async def test_canonical_gate_repairs_with_generator_when_reviewer_is_off(repo) -> None:
+    cir = {
+        "version": "0.1.0",
+        "title": "数组",
+        "domain": "algorithm",
+        "summary": "演示数组。",
+        "steps": [
+            {
+                "id": "s1",
+                "title": "看数组",
+                "narration": "观察当前数组。",
+                "visual_kind": "array",
+                "tokens": [
+                    {"id": "t0", "label": "3", "value": "3", "emphasis": "primary"},
+                    {"id": "t1", "label": "1", "value": "1", "emphasis": "secondary"},
+                ],
+                "annotations": [],
+            }
+        ],
+    }
+    invalid_map = {
+        "duration_s": 2,
+        "algorithm_code": ["line 0"],
+        "checkpoints": [
+            {
+                "id": "cp1",
+                "step_index": 0,
+                "step_id": "s1",
+                "visual_kind": "array",
+                "title": "bad",
+                "summary": "bad",
+                "start_s": 0,
+                "end_s": 2,
+                "array_focus_indices": [9],
+            }
+        ],
+    }
+    fixed_map = {
+        **invalid_map,
+        "checkpoints": [
+            {
+                **invalid_map["checkpoints"][0],
+                "title": "fixed",
+                "summary": "fixed",
+                "array_focus_indices": [0],
+            }
+        ],
+    }
+    generator = SequenceLLM([_combined(cir, invalid_map), _combined(cir, fixed_map)])
+    use_case = RunPipelineUseCase(repo, generator, reviewer_mode="off")
+    await repo.create("run-quality-repair", "看数组", "2024-01-01T00:00:00+00:00")
+
+    await use_case.execute(
+        "run-quality-repair",
+        PipelineRequest(prompt="看数组", domain="algorithm"),
+    )
+
+    result = await repo.get("run-quality-repair")
+    assert result is not None
+    assert result.status == PipelineRunStatus.SUCCEEDED
+    assert len(generator.calls) == 2
+    assert result.quality_report is not None
+    assert result.quality_report.status in {"clean", "warnings"}
+    assert result.quality_report.attempts == 1
+    assert "quality:repair_attempt:1" in result.quality_report.actions

@@ -19,6 +19,8 @@ interface PlaybookCompositionProps {
   director?: DirectorScript | null;
   theme?: "dark" | "light";
   showSubtitles?: boolean;
+  /** Render diagnostic metadata and warning overlays for teacher/review surfaces. */
+  showDiagnostics?: boolean;
   showInlineCode?: boolean;
   /** Total frames for the bar-swap animation; forwarded to renderers. */
   swapDurationFrames?: number;
@@ -221,8 +223,9 @@ function SceneCompositor({
 export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
   script,
   director = null,
-  theme = "dark",
+  theme = "light",
   showSubtitles = true,
+  showDiagnostics = false,
   showInlineCode = false,
   swapDurationFrames,
 }) => {
@@ -235,10 +238,10 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
   );
 
   React.useEffect(() => {
-    if (visualQualityWarnings.length > 0) {
+    if (showDiagnostics && visualQualityWarnings.length > 0) {
       console.warn("[MetaView visualQualityGate]", visualQualityWarnings);
     }
-  }, [visualQualityWarnings]);
+  }, [showDiagnostics, visualQualityWarnings]);
 
   const stepIndex = script.steps.findIndex((s) => frame < s.end_frame);
   const activeIndex = stepIndex === -1 ? script.steps.length - 1 : stepIndex;
@@ -307,12 +310,12 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
 
   return (
     <div
-      data-visual-quality-warning-count={visualQualityWarnings.length || undefined}
+      data-visual-quality-warning-count={showDiagnostics ? visualQualityWarnings.length || undefined : undefined}
       data-visual-quality-warning-codes={
-        visualQualityWarnings.length ? visualQualityWarnings.map((warning) => warning.code).join(",") : undefined
+        showDiagnostics && visualQualityWarnings.length ? visualQualityWarnings.map((warning) => warning.code).join(",") : undefined
       }
       data-visual-quality-warning-steps={
-        visualQualityWarnings.length ? visualQualityWarnings.map((warning) => warning.step_id).join(",") : undefined
+        showDiagnostics && visualQualityWarnings.length ? visualQualityWarnings.map((warning) => warning.step_id).join(",") : undefined
       }
       data-asset-attribution-count={assetAttributionSummary.attributionRequired.length || undefined}
       data-asset-attribution-ids={
@@ -363,7 +366,7 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
               frame={frame}
             />
           </div>
-          {visualQualityWarnings.length > 0 ? <VisualQualityWarningIcon /> : null}
+          {showDiagnostics && visualQualityWarnings.length > 0 ? <VisualQualityWarningIcon /> : null}
         </div>
 
         {/* Code track */}

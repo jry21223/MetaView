@@ -540,6 +540,15 @@ def test_scene_blueprint_compiler_builds_bfs_graph_from_structured_input() -> No
     assert snapshot["visited_node_ids"] == ["root"]
     assert snapshot["queue_node_ids"] == ["right"]
     assert snapshot["active_edge_ids"] == ["root-left"]
+    assert playbook.steps[0].code_highlight is not None
+    assert {
+        key: playbook.steps[0].code_highlight.variables[key]
+        for key in ("current", "queue", "visited")
+    } == {
+        "current": "left",
+        "queue": "[right]",
+        "visited": "{root}",
+    }
 
     verdict = self_check_playbook(playbook, "Trace BFS graph state.")
     assert verdict.status == PlaybookReviewStatus.CLEAN

@@ -28,6 +28,7 @@ def test_agent_provider_dependency_can_select_codex_sdk() -> None:
         agent_provider="codex",
         codex_model="gpt-5.5",
         codex_effort="high",
+        codex_bin="/opt/codex/bin/codex",
         agent_skills_dir="skills/custom-agent",
     )
 

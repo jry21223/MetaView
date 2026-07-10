@@ -241,7 +241,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       const created = await submitExport({
         run_id: runId,
         with_audio: withAudio,
-        options: { quality, fps, format },
+        options: { quality, fps, format, theme: isDark ? "dark" : "light" },
         ...(assetReport && { asset_report: assetReport }),
         ...(withAudio &&
           ttsConfig && {

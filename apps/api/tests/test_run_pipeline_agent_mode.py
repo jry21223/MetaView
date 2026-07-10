@@ -24,6 +24,7 @@ from app.domain.skills.registry import SkillRegistry
 class _RecordingRepo:
     def __init__(self) -> None:
         self.updates: list[dict[str, Any]] = []
+        self.quality_reports: list[dict[str, Any]] = []
 
     async def create(self, run_id: str, prompt: str, created_at: str) -> None:
         return None
@@ -36,6 +37,11 @@ class _RecordingRepo:
 
     async def update(self, run_id: str, **kwargs: Any) -> None:
         self.updates.append({"run_id": run_id, **kwargs})
+
+    async def update_quality_report(self, run_id: str, quality_report_json: str) -> None:
+        self.quality_reports.append(
+            {"run_id": run_id, "report": json.loads(quality_report_json)}
+        )
 
 
 class _RecordingDirectorRepo:
@@ -167,7 +173,7 @@ def _algorithm_step(index: int) -> dict[str, Any]:
     }
     return {
         "step_id": f"step_{index:02d}",
-        "end_frame": index * 60,
+        "end_frame": index * 180,
         "title": f"Array state {index}",
         "voiceover_text": f"Show the array state {index} and explain the array result.",
         "tokens": [
@@ -227,7 +233,7 @@ def _motion_step(index: int) -> dict[str, Any]:
     }
     return {
         "step_id": f"motion_{index:02d}",
-        "end_frame": index * 60,
+        "end_frame": index * 180,
         "title": f"Move point {index}",
         "voiceover_text": f"Track the motion scene point across the canvas in step {index}.",
         "tokens": [],
@@ -256,7 +262,7 @@ def _blocking_issue(code: str = "review.final_answer_missing") -> dict[str, Any]
 
 _MIN_PLAYBOOK: dict[str, Any] = {
     "fps": 30,
-    "total_frames": 480,
+    "total_frames": 1440,
     "domain": "algorithm",
     "title": "Sample",
     "summary": "From agent",
@@ -267,7 +273,7 @@ _MIN_PLAYBOOK: dict[str, Any] = {
 
 _MOTION_SCENE_PLAYBOOK: dict[str, Any] = {
     "fps": 30,
-    "total_frames": 480,
+    "total_frames": 1440,
     "domain": "math",
     "title": "Motion Scene",
     "summary": "Agent-authored object motion scene",
@@ -311,6 +317,8 @@ async def test_agent_mode_routes_to_agent_provider() -> None:
     assert "agent_skill:generic" in review["actions"]
     assert "reviewer:disabled" in review["actions"]
     assert "reviewer:unconfigured" not in review["actions"]
+    assert repo.quality_reports[-1]["report"]["status"] == "clean"
+    assert repo.quality_reports[-1]["report"]["generator_path"] == "agent"
     assert director_repo.upserts[0]["director"].run_id == "run-1"
     assert director_repo.upserts[0]["director"].beats[0].step_id == "step_01"
 
@@ -424,7 +432,7 @@ async def test_agent_mode_math_always_requires_reviewer_in_math_domain() -> None
 
     await use_case.execute(
         "run-reviewer-math-requires-reviewer",
-        PipelineRequest(prompt="Show the integral", domain="math"),
+        PipelineRequest(prompt="Show the array", domain="math"),
     )
 
     last = repo.updates[-1]
@@ -597,6 +605,12 @@ async def test_agent_mode_structured_sidecar_self_check_failure_is_reviewed() ->
     assert review["status"] == "blocked"
     assert review["issues"][0]["code"] == "step.empty_voiceover"
     assert "agent:self_check:blocked" in review["actions"]
+    quality = repo.quality_reports[-1]["report"]
+    assert quality["status"] == "blocked"
+    assert {issue["code"] for issue in quality["issues"]} >= {
+        "step.empty_voiceover",
+        "quality.repair_unavailable",
+    }
 
 
 @pytest.mark.asyncio

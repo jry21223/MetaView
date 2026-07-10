@@ -6,13 +6,32 @@ export interface ReviewIssue {
   path: string;
   message: string;
   suggestion?: string | null;
+  requires_repair?: boolean;
 }
 
 export interface ReviewReport {
-  status: "clean" | "warnings" | "repaired" | "failed";
+  status:
+    | "clean"
+    | "warnings"
+    | "repaired"
+    | "failed"
+    | "repairable"
+    | "blocked";
   attempts: number;
   issues: ReviewIssue[];
   actions: string[];
+}
+
+export interface QualityReport {
+  status: "clean" | "warnings" | "repairable" | "blocked";
+  generator_path: string;
+  coverage_mode: string;
+  issues: ReviewIssue[];
+  scores: Record<string, number>;
+  repair_targets: string[];
+  summary: string;
+  actions: string[];
+  attempts: number;
 }
 
 export type PipelineRunStatus =
@@ -31,4 +50,5 @@ export interface PipelineRunResult {
   error?: string | null;
   created_at: string;
   review?: ReviewReport | null;
+  quality_report?: QualityReport | null;
 }

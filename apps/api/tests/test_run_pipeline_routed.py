@@ -11,7 +11,7 @@ from app.domain.models.pipeline_run import PipelineRunStatus
 from app.domain.skills.base import SkillRouteMatch
 
 
-def _generic_cir_json(domain: str = "geography") -> str:
+def _generic_cir_json(domain: str = "algorithm") -> str:
     return json.dumps({
         "version": "0.1.0",
         "title": "Generic Route",

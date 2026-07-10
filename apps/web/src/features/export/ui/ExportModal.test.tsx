@@ -101,7 +101,7 @@ describe("ExportModal (issue #14 / #58 / #69 / #70 / #72 / #75)", () => {
     expect(captured.body).toMatchObject({
       run_id: "r1",
       with_audio: false,
-      options: { quality: "2k", fps: 60, format: "webm" },
+      options: { quality: "2k", fps: 60, format: "webm", theme: "dark" },
     });
   });
 

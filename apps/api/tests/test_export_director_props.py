@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,12 @@ from app.application.use_cases.export_video import ExportVideoUseCase
 from app.domain.models.director import DirectorBeat, DirectorScript
 from app.domain.models.export_job import ExportAssetReport, ExportJob, ExportOptions
 from app.domain.models.pipeline_run import PipelineRunStatus
+from app.domain.models.quality_report import QualityReport
+from app.domain.models.review import (
+    PlaybookReviewIssue,
+    PlaybookReviewStatus,
+    PlaybookReviewVerdict,
+)
 from app.infrastructure.persistence.db_init import init_db
 from app.infrastructure.persistence.in_memory_export_repository import (
     InMemoryExportJobRepository,
@@ -37,6 +44,11 @@ class RecordingExportVideoUseCase(ExportVideoUseCase):
         output_path.write_bytes(b"fake video")
 
 
+class FailingDirectorRepository:
+    async def get(self, run_id: str):
+        raise RuntimeError(f"director db unavailable for {run_id}")
+
+
 @pytest.mark.asyncio
 async def test_export_input_props_includes_active_director_when_available(tmp_path) -> None:
     db = str(tmp_path / "export.db")
@@ -61,9 +73,39 @@ async def test_export_input_props_includes_active_director_when_available(tmp_pa
     assert use_case.input_props["script"]["title"] == "Export fixture"
     assert use_case.input_props["director"]["run_id"] == "run-1"
     assert use_case.input_props["director"]["beats"][0]["camera_motion"] == "push_in"
+    assert use_case.input_props["theme"] == "light"
     job = await export_repo.get("job-1")
     assert job is not None
     assert job.output_path is not None
+
+
+@pytest.mark.asyncio
+async def test_export_input_props_preserves_requested_dark_theme(tmp_path) -> None:
+    db = str(tmp_path / "export-dark.db")
+    init_db(db)
+    run_repo = SqliteRunRepository(db)
+    director_repo = SqliteRunDirectorRepository(db)
+    export_repo = InMemoryExportJobRepository()
+    await _seed_run(run_repo, "run-dark")
+    await export_repo.create(_job("job-dark", "run-dark"))
+    use_case = RecordingExportVideoUseCase(
+        export_repo,
+        run_repo,
+        director_repo,
+        web_app_dir=tmp_path,
+        artifacts_dir=tmp_path / "artifacts",
+    )
+
+    await use_case.execute(
+        "job-dark",
+        "run-dark",
+        with_audio=False,
+        tts=None,
+        options=ExportOptions(theme="dark"),
+    )
+
+    assert use_case.input_props is not None
+    assert use_case.input_props["theme"] == "dark"
 
 
 @pytest.mark.asyncio
@@ -87,6 +129,85 @@ async def test_export_input_props_omits_director_when_missing(tmp_path) -> None:
 
     assert use_case.input_props is not None
     assert "director" not in use_case.input_props
+
+
+@pytest.mark.asyncio
+async def test_export_blocks_when_persisted_director_cannot_be_loaded(tmp_path) -> None:
+    db = str(tmp_path / "export-director-failure.db")
+    init_db(db)
+    run_repo = SqliteRunRepository(db)
+    export_repo = InMemoryExportJobRepository()
+    await _seed_run(run_repo, "run-director-failure")
+    await export_repo.create(_job("job-director-failure", "run-director-failure"))
+    use_case = RecordingExportVideoUseCase(
+        export_repo,
+        run_repo,
+        FailingDirectorRepository(),  # type: ignore[arg-type]
+        web_app_dir=tmp_path,
+        artifacts_dir=tmp_path / "artifacts",
+    )
+
+    await use_case.execute(
+        "job-director-failure",
+        "run-director-failure",
+        with_audio=False,
+        tts=None,
+    )
+
+    job = await export_repo.get("job-director-failure")
+    run = await run_repo.get("run-director-failure")
+    assert job is not None and job.status == "failed"
+    assert "persisted DirectorScript" in (job.error or "")
+    assert run is not None and run.quality_report is not None
+    assert run.quality_report.status == "blocked"
+    assert "director.persistence_failed" in {issue.code for issue in run.quality_report.issues}
+
+
+@pytest.mark.asyncio
+async def test_export_blocks_and_reports_corrupt_persisted_director(tmp_path) -> None:
+    db = str(tmp_path / "export-corrupt-director.db")
+    init_db(db)
+    run_repo = SqliteRunRepository(db)
+    director_repo = SqliteRunDirectorRepository(db)
+    export_repo = InMemoryExportJobRepository()
+    await _seed_run(run_repo, "run-corrupt-director")
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            "INSERT INTO pipeline_run_directors"
+            " (run_id, director_json, source, created_at, updated_at)"
+            " VALUES (?, ?, ?, ?, ?)",
+            (
+                "run-corrupt-director",
+                '{"run_id": ""}',
+                "rule",
+                "2026-06-05T00:00:00+00:00",
+                "2026-06-05T00:00:00+00:00",
+            ),
+        )
+    await export_repo.create(_job("job-corrupt-director", "run-corrupt-director"))
+    use_case = RecordingExportVideoUseCase(
+        export_repo,
+        run_repo,
+        director_repo,
+        web_app_dir=tmp_path,
+        artifacts_dir=tmp_path / "artifacts",
+    )
+
+    await use_case.execute(
+        "job-corrupt-director",
+        "run-corrupt-director",
+        with_audio=False,
+        tts=None,
+    )
+
+    job = await export_repo.get("job-corrupt-director")
+    run = await run_repo.get("run-corrupt-director")
+    assert job is not None and job.status == "failed"
+    assert "persisted DirectorScript" in (job.error or "")
+    assert use_case.input_props is None
+    assert run is not None and run.quality_report is not None
+    assert run.quality_report.status == "blocked"
+    assert "director.persistence_failed" in {issue.code for issue in run.quality_report.issues}
 
 
 @pytest.mark.asyncio
@@ -121,6 +242,141 @@ async def test_export_writes_asset_report_sidecar_when_job_has_report(tmp_path) 
         "run_id": "run-report",
         "asset_report": _asset_report().model_dump(mode="json"),
     }
+
+
+@pytest.mark.asyncio
+async def test_export_rechecks_quality_and_blocks_missing_asset(tmp_path) -> None:
+    db = str(tmp_path / "export-quality.db")
+    init_db(db)
+    run_repo = SqliteRunRepository(db)
+    director_repo = SqliteRunDirectorRepository(db)
+    export_repo = InMemoryExportJobRepository()
+    await run_repo.create("run-invalid", "plot x", "2026-06-05T00:00:00+00:00")
+    invalid = _playbook()
+    invalid["domain"] = "math"
+    snapshot = {
+        "kind": "math_plot",
+        "pack_id": "math-basic",
+        "asset_id": "missing-export-asset",
+        "curves": [{"expression": "x", "label": "f"}],
+    }
+    invalid["steps"][0]["snapshot"] = snapshot
+    invalid["steps"][0]["layers"] = [{"body": snapshot}]
+    await run_repo.update(
+        "run-invalid",
+        status=PipelineRunStatus.SUCCEEDED,
+        playbook_json=json.dumps(invalid),
+    )
+    await export_repo.create(_job("job-invalid", "run-invalid"))
+    use_case = RecordingExportVideoUseCase(
+        export_repo,
+        run_repo,
+        director_repo,
+        web_app_dir=tmp_path,
+        artifacts_dir=tmp_path / "artifacts",
+    )
+
+    await use_case.execute("job-invalid", "run-invalid", with_audio=False, tts=None)
+
+    job = await export_repo.get("job-invalid")
+    run = await run_repo.get("run-invalid")
+    assert job is not None and job.status.value == "failed"
+    assert "asset.missing" in (job.error or "")
+    assert run is not None and run.quality_report is not None
+    assert run.quality_report.status == "blocked"
+    assert {issue.code for issue in run.quality_report.issues} >= {
+        "asset.missing",
+        "export.not_ready",
+    }
+
+
+@pytest.mark.asyncio
+async def test_export_recheck_preserves_existing_quality_warnings(tmp_path) -> None:
+    db = str(tmp_path / "export-warning.db")
+    init_db(db)
+    run_repo = SqliteRunRepository(db)
+    director_repo = SqliteRunDirectorRepository(db)
+    export_repo = InMemoryExportJobRepository()
+    await _seed_run(run_repo, "run-warning")
+    warning = QualityReport.from_review_verdict(
+        PlaybookReviewVerdict(
+            status=PlaybookReviewStatus.WARNINGS,
+            summary="Knowledge warning",
+            issues=[
+                PlaybookReviewIssue(
+                    code="knowledge.source_unverified",
+                    severity="warning",
+                    path="steps[0]",
+                    message="Knowledge source was not independently verified.",
+                )
+            ],
+            actions=["reviewer:status:warnings"],
+        ),
+        generator_path="agent",
+        coverage_mode="experimental",
+    )
+    await run_repo.update_quality_report("run-warning", warning.model_dump_json())
+    await export_repo.create(_job("job-warning", "run-warning"))
+    use_case = RecordingExportVideoUseCase(
+        export_repo,
+        run_repo,
+        director_repo,
+        web_app_dir=tmp_path,
+        artifacts_dir=tmp_path / "artifacts",
+    )
+
+    await use_case.execute("job-warning", "run-warning", with_audio=False, tts=None)
+
+    run = await run_repo.get("run-warning")
+    assert run is not None and run.quality_report is not None
+    assert run.quality_report.status == "warnings"
+    assert {issue.code for issue in run.quality_report.issues} >= {"knowledge.source_unverified"}
+    assert "reviewer:status:warnings" in run.quality_report.actions
+    assert any(action.startswith("export:readiness:") for action in run.quality_report.actions)
+
+
+@pytest.mark.asyncio
+async def test_export_recheck_drops_stale_blocking_issues(tmp_path) -> None:
+    db = str(tmp_path / "export-stale-block.db")
+    init_db(db)
+    run_repo = SqliteRunRepository(db)
+    director_repo = SqliteRunDirectorRepository(db)
+    export_repo = InMemoryExportJobRepository()
+    await _seed_run(run_repo, "run-stale")
+    stale = QualityReport.from_review_verdict(
+        PlaybookReviewVerdict(
+            status=PlaybookReviewStatus.BLOCKED,
+            summary="Old export failure",
+            issues=[
+                PlaybookReviewIssue(
+                    code="export.not_ready",
+                    severity="error",
+                    path="playbook",
+                    message="A previous version was not export ready.",
+                    requires_repair=False,
+                )
+            ],
+        ),
+        generator_path="agent",
+        coverage_mode="experimental",
+    )
+    await run_repo.update_quality_report("run-stale", stale.model_dump_json())
+    await export_repo.create(_job("job-stale", "run-stale"))
+    use_case = RecordingExportVideoUseCase(
+        export_repo,
+        run_repo,
+        director_repo,
+        web_app_dir=tmp_path,
+        artifacts_dir=tmp_path / "artifacts",
+    )
+
+    await use_case.execute("job-stale", "run-stale", with_audio=False, tts=None)
+
+    job = await export_repo.get("job-stale")
+    run = await run_repo.get("run-stale")
+    assert job is not None and job.status == "completed"
+    assert run is not None and run.quality_report is not None
+    assert "export.not_ready" not in {issue.code for issue in run.quality_report.issues}
 
 
 async def _seed_run(repo: SqliteRunRepository, run_id: str) -> None:

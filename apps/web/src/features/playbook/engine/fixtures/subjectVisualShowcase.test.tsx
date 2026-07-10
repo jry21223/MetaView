@@ -63,7 +63,7 @@ describe("subject visual showcase catalog", () => {
       "call_stack_scene",
       "code_trace_scene",
     ]);
-    expect(getSubjectVisualShowcaseEntry("bfs_graph")?.showInlineCode).toBe(true);
+    expect(getSubjectVisualShowcaseEntry("bfs_graph")?.showInlineCode).toBe(false);
   });
 
   it.each(SHOWCASE_IDS)("declares screenshot quality baselines for %s", (fixtureId) => {

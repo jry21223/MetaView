@@ -5,6 +5,32 @@
 > `single mode` 仍保留为 legacy fallback：**LLM → CIR + ExecutionMap → PlaybookScript**。
 > 项目仍不引入 Manim、HTML iframe 或服务端 HTML 视频渲染；前端通过 Remotion 帧驱动渲染。
 
+## 0. 当前成功语义与契约同步
+
+SkillPack、Agent、legacy single 三条生成路径在写入 `succeeded` 前都会调用 API 侧
+`quality_gate_playbook(...)`。候选结果按以下状态处理：
+
+```text
+candidate PlaybookScript
+  -> Canonical QualityReport
+  -> clean / warnings: persist DirectorScript, then succeed
+  -> repairable: one path-appropriate repair attempt
+  -> blocked or repair exhausted: fail closed
+```
+
+`QualityReport` 独立持久化在 `pipeline_runs.quality_report_json`，运行历史只读展示后端
+结果，前端 `visualQualityGate` 不再决定 pipeline 是否成功。空步骤、无效 timeline、空
+narration/payload、renderer contract、missing asset、学科 fallback、数学视觉不足、算法
+状态不足、递归/平抛最低语义场景、final answer 等规则由后端裁决。Director 持久化失败
+同样会形成 blocking issue，不能继续宣称完整成功。
+
+snapshot kind 的 canonical source 是 API `SnapshotKind` 判别联合。合同测试同时核对
+Pydantic `AnySnapshot` discriminator、Agent self-check allow-list、Web `SnapshotKind` union
+与 renderer registry，并检查共享 issue 的 severity 语义。`call_stack_scene` 与
+`code_trace_scene` 均在该合同内。
+
+详见 [`quality-gate.md`](./quality-gate.md)。
+
 ## 1. Legacy single generation path: LLM 输出契约
 
 `METAVIEW_GENERATION_MODE=single` 时，LLM 必须输出**单一 JSON 对象**，包含两层：
@@ -82,6 +108,10 @@
 3. `build_cir_prompt` 在 system prompt 里以行号方式嵌入源码（`_number_source`，0-indexed）。
 4. LLM 在每个 checkpoint 的 `code_lines` 填入相关行号。
 5. `playbook_builder._build_code_highlight` 过滤越界行号，构造 `CodeHighlightOverlay`。
+
+`CodeHighlightOverlay` 是与视觉 snapshot 并行的工作台轨道。BFS 与递归的
+Agent 结果缺少该轨道时，后端会从 canonical 算法代码和结构化状态确定性补齐；
+Web 只在右侧 Code Sync 面板展示，主舞台与 Remotion 导出显式关闭 inline code。
 
 **幻觉防御**：超出源码行数范围的 `code_lines` 索引会被静默丢弃，全部越界则该步骤无 highlight。
 
@@ -170,6 +200,9 @@ end_frame_i = (i+1) * 60                               # 无 execution_map（兼
 - 无音轨导出是稳定路径；当音频时序无法保证时，保持 silent export。
 
 1. 从 `IRunRepository` 取该 run 的 `PlaybookScript`，序列化为 `inputProps.json`。
+   开始渲染前会重新执行 canonical export-readiness gate；Director 读取失败、资产失效或
+   其他 blocking issue 会让 export job 失败。导出主题由当前 preview 的 light/dark
+   选项随请求传入，`showDiagnostics` 在 export composition 中始终为 `false`。
 2. （可选 `with_audio`）调 TTS 代理 `POST {tts_base_url}/audio/speech` 逐步合成 mp3，
    再用 `ffprobe`（缺失时回退到 wave / 动画时长）测每段时长，按 `fps` 重新拉伸
    `step.end_frame` 让动画 ≥ 配音长度。
@@ -273,12 +306,15 @@ METAVIEW_AGENT_PROVIDER=codex
 METAVIEW_CODEX_MODEL=gpt-5.5
 METAVIEW_CODEX_EFFORT=high
 METAVIEW_CODEX_CWD=.
+METAVIEW_CODEX_BIN=                    # 可选：指定本机较新的 Codex CLI
 METAVIEW_AGENT_SKILLS_DIR=skills/metaview-agent
 ```
 
 Python SDK 会复用本机已有 Codex 登录；请求里传入 `provider_api_key` 时会调用
 SDK 的 API-key 登录。该路径仍然只返回 PlaybookScript，并由后端 Pydantic 契约
 校验后必须继续通过 reviewer、compatibility gate，再进入同一个 Remotion exit。
+SDK 默认使用随包固定的 Codex runtime；只有本机模型明确要求更新版本时才设置
+`METAVIEW_CODEX_BIN`，并指向已经安装且经过验证的 Codex CLI。
 Codex provider 会按 route decision 加载 `skills/metaview-agent/generic/SKILL.md`
 和对应学科的 `SKILL.md`，并接收 RuntimeToolHub manifest。Codex 当前不能执行
 runtime tools，因此它定位为 repo-aware fallback / planner / repair provider，而不是

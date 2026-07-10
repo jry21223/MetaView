@@ -1,14 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import sqlite3
 
-from pydantic import ValidationError
-
 from app.domain.models.director import DirectorScript
-
-logger = logging.getLogger(__name__)
 
 
 class SqliteRunDirectorRepository:
@@ -58,11 +53,7 @@ class SqliteRunDirectorRepository:
         row = await asyncio.to_thread(_sync)
         if row is None or not row["director_json"]:
             return None
-        try:
-            return DirectorScript.model_validate_json(row["director_json"])
-        except ValidationError:
-            logger.warning("Ignoring invalid active director for run %s", run_id, exc_info=True)
-            return None
+        return DirectorScript.model_validate_json(row["director_json"])
 
     async def delete(self, run_id: str) -> bool:
         def _sync() -> bool:

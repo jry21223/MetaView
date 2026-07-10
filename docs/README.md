@@ -18,6 +18,7 @@
 | [START_HERE.md](./START_HERE.md) | 当前唯一入门入口：产品主线、部署默认、Director/Playbook 边界、下一步优先级 |
 | [director-layer.md](./director-layer.md) | Director 独立导演层：运镜、节奏、镜头、强调、RenderPlan 和阶段路线 |
 | [pipeline.md](./pipeline.md) | single / agent 生成路径、PlaybookScript、DirectorScript 挂载点、视频导出管线 |
+| [quality-gate.md](./quality-gate.md) | 后端 Canonical QualityReport、修复、持久化、Director 与导出阻断语义 |
 | [frontend-shell.md](./frontend-shell.md) | Stage 路由、GlobalTopbar、Studio 布局、Provider 配置、snapshot support levels |
 | [animation-tool-registry.md](./animation-tool-registry.md) | 后端 animation tool registry 的扩展流程、当前工具和新增规则 |
 | [topic-routing.md](./topic-routing.md) | topic routing 模式、自动路由、显式 domain 和 skill override |
@@ -46,6 +47,7 @@
 | [agent-demo-acceptance.md](./agent-demo-acceptance.md) | AgentPipeline / runtime-tool demo 的最小验收证据和失败排查 |
 | [generation-review-workflow.md](./generation-review-workflow.md) | 本地和远端 generation review API 调用与输出位置 |
 | [skill-ab-eval.md](./skill-ab-eval.md) | Prompt-only 对比、真实 LLM 手工评估、输出和限制 |
+| [benchmark-v2.md](./benchmark-v2.md) | 四个 Gold Case、六维评分、稳定性统计与 recorded/live 命令 |
 
 ## Reference
 

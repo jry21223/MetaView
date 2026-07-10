@@ -25,6 +25,7 @@ export interface ExportOptions {
   quality?: ExportQuality;
   fps?: number;
   format?: ExportFormat;
+  theme?: "light" | "dark";
 }
 
 export interface ExportAssetReportEntry {

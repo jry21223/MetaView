@@ -56,6 +56,72 @@ describe("agent playbook self-check", () => {
     expect(report.issues).toEqual([]);
   });
 
+  it.each([
+    {
+      kind: "call_stack_scene",
+      snapshot: {
+        kind: "call_stack_scene",
+        frames: [
+          {
+            id: "factorial-3",
+            label: "factorial(3)",
+            depth: 0,
+            state: "active",
+            variables: { n: "3" },
+          },
+        ],
+        code_trace: {
+          language: "python",
+          lines: ["def factorial(n):", "    return n * factorial(n - 1)"],
+          active_lines: [1],
+          active_line: 1,
+        },
+        current_frame_id: "factorial-3",
+        caption: "Factorial call stack",
+      },
+      title: "Factorial call stack",
+      voiceover:
+        "The factorial call stack shows the active frame and its return value.",
+      prompt: "Explain the factorial call stack.",
+    },
+    {
+      kind: "code_trace_scene",
+      snapshot: {
+        kind: "code_trace_scene",
+        language: "python",
+        lines: ["mid = (left + right) // 2", "if target < values[mid]:"],
+        active_lines: [0],
+        active_line: 0,
+        array_values: ["1", "3", "5", "7"],
+        active_indices: [1],
+        search_range: [0, 3],
+        pointers: [{ id: "mid", label: "mid", index: 1 }],
+        variables: { target: "5" },
+        caption: "Binary search code trace",
+      },
+      title: "Binary search code trace",
+      voiceover:
+        "The binary search code trace shows the active line and search pointers.",
+      prompt: "Explain the binary search code trace.",
+    },
+  ])("accepts $kind through the clean path", ({ snapshot, title, voiceover, prompt }) => {
+    const playbook = validPlaybook();
+    playbook.title = title;
+    playbook.summary = voiceover;
+    playbook.steps.forEach((step) => {
+      step.title = title;
+      step.voiceover_text = voiceover;
+      step.narration_template = [voiceover];
+      step.snapshot = structuredClone(snapshot);
+      step.layers[0].body = structuredClone(snapshot);
+    });
+
+    const report = selfCheckPlaybook(playbook, prompt);
+
+    expect(report.status).toBe("clean");
+    expect(report.issues).toEqual([]);
+  });
+
   it("blocks one-step product playbooks as too shallow", () => {
     const report = selfCheckPlaybook(validPlaybook(1), "Scan the array");
 
@@ -336,6 +402,23 @@ describe("agent playbook self-check", () => {
     const report = selfCheckPlaybook(playbook, "Explain water synthesis");
 
     expect(report.status).toBe("clean");
+  });
+
+  it("does not treat summary or a generic Chinese final step as the answer", () => {
+    const playbook = validPlaybook();
+    const prompt = "用二叉树演示广度优先遍历的访问顺序，逐层点亮节点。";
+    playbook.summary = prompt;
+    const finalStep = playbook.steps.at(-1)!;
+    finalStep.title = "课程结束";
+    finalStep.voiceover_text = "这就是最后的结果。";
+    finalStep.narration_template = [finalStep.voiceover_text];
+
+    const report = selfCheckPlaybook(playbook, prompt);
+
+    expect(report.status).toBe("blocked");
+    expect(report.issues.map((issue) => issue.code)).toContain(
+      "step.does_not_answer_prompt",
+    );
   });
 
   it("builds a structured repair prompt from blocked self-check output", () => {
