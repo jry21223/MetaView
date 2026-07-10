@@ -148,9 +148,9 @@ gates, and showcase self-tests. It is intentionally not the MCP exposure layer.
 
 Phase 1 acceptance evidence:
 
-- Governance is enforced by `npm --workspace apps/web run asset:audit`, and the
-  root `make check` target runs that audit before showcase rendering, linting,
-  tests, and builds.
+- Governance is enforced by `npm --workspace apps/web run asset:audit`; the
+  heavy asset audit and Remotion showcase render run through `make visual-check`,
+  while `make check` stays on lint, unit/contract tests, typecheck, and builds.
 - Registry data is single-sourced from public manifests through
   `assetRegistry.ts`; `assetRegistry.test.ts` validates all registered roadmap
   starter packs, schema conformance, rendererKinds, source metadata, commercial
@@ -191,6 +191,7 @@ npm --workspace apps/web run showcase:export
 npm --workspace apps/web run showcase:smoke
 npm --workspace apps/web run showcase:baseline
 npm --workspace apps/web run showcase:review-packet
+make visual-check
 METAVIEW_GENERATION_MODE=single make check
 ```
 
@@ -356,9 +357,11 @@ Local preview helpers:
 
 5. Open the local showcase page in the web app at `/asset-showcase`.
 
-The visual quality gate is non-blocking at runtime, but showcase tests require
-these flagship fixtures to produce no warnings, no missing asset fallback, and
-no unknown snapshot renderer. It also emits warning metadata for deterministic
+The frontend `visualQualityGate` is a diagnostics/attribution display layer;
+pipeline success is decided by the backend Canonical QualityReport. Missing
+assets and unsupported renderer contracts are blocking backend issues, while
+showcase tests additionally require flagship fixtures to produce no warnings,
+missing fallback, or unknown snapshot renderer. The frontend layer still emits metadata for deterministic
 issues such as missing assets, forbidden array fallback, low visual richness,
 possible label/callout overlap, and asset usage that requires attribution,
 carries share-alike obligations, has unknown licensing, or is not marked safe
@@ -375,5 +378,6 @@ blockers from share-alike review obligations and ordinary attribution
 requirements. The export modal shows the same attribution/risk summary before
 submission. API callers that omit `asset_report` are not blocked, but the job
 response includes `asset_report_warning` so missing audit metadata is visible.
-The root `make check` path also runs the showcase smoke render so flagship
-assets must keep producing nonblank Remotion output.
+The root `make visual-check` path runs the showcase smoke render so flagship
+assets must keep producing nonblank Remotion output without slowing the normal
+unit/contract `make check` path.

@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from app.domain.models.quality_report import QualityReport
-from app.domain.models.review import PlaybookReviewIssue, PlaybookReviewStatus, PlaybookReviewVerdict
+from app.domain.models.review import (
+    PlaybookReviewIssue,
+    PlaybookReviewStatus,
+    PlaybookReviewVerdict,
+)
 
 
 def test_quality_report_maps_clean_review_to_clean_gate() -> None:
@@ -33,3 +37,32 @@ def test_quality_report_marks_repairable_error_targets() -> None:
     assert report.status == "repairable"
     assert report.repair_targets == ["steps[0].snapshot"]
     assert report.scores["visual_structure"] < 1.0
+
+
+def test_quality_report_non_repairable_error_takes_precedence() -> None:
+    verdict = PlaybookReviewVerdict(
+        status=PlaybookReviewStatus.BLOCKED,
+        summary="blocked",
+        issues=[
+            PlaybookReviewIssue(
+                code="asset.missing",
+                severity="error",
+                path="steps[0].snapshot.asset_id",
+                message="missing",
+                requires_repair=True,
+            ),
+            PlaybookReviewIssue(
+                code="quality.repair_exhausted",
+                severity="error",
+                path="playbook",
+                message="exhausted",
+                requires_repair=False,
+            ),
+        ],
+    )
+
+    report = QualityReport.from_review_verdict(verdict, generator_path="agent")
+
+    assert report.status == "blocked"
+    assert report.scores["asset_license"] < 1.0
+    assert report.scores["export_readiness"] < 1.0

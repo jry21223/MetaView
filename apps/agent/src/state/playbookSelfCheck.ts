@@ -63,6 +63,66 @@ const SUPPORTED_FRONTEND_SNAPSHOT_KINDS = new Set([
 
 const SUBJECT_VISUAL_DOMAINS = new Set(["geography", "biology", "chemistry"]);
 const ALGORITHM_FALLBACK_KINDS = new Set(["algorithm_array", "algorithm_bars"]);
+const ANSWER_PROMPT_MARKERS = [
+  "explain",
+  "show",
+  "calculate",
+  "derive",
+  "compare",
+  "why",
+  "how",
+  "what",
+  "解释",
+  "讲解",
+  "演示",
+  "展示",
+  "说明",
+  "追踪",
+  "求",
+  "计算",
+  "推导",
+  "比较",
+  "为什么",
+  "如何",
+];
+const ANSWER_STOPWORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "calculate",
+  "compare",
+  "derive",
+  "explain",
+  "for",
+  "how",
+  "in",
+  "is",
+  "of",
+  "please",
+  "show",
+  "the",
+  "to",
+  "what",
+  "why",
+  "with",
+  "解释",
+  "讲解",
+  "演示",
+  "展示",
+  "说明",
+  "追踪",
+  "计算",
+  "推导",
+  "比较",
+  "为什么",
+  "如何",
+  "结果",
+  "总结",
+  "结论",
+  "结束",
+  "完成",
+  "最后",
+]);
 
 const FORBIDDEN_RENDERING_PATTERNS = [
   "<html",
@@ -400,20 +460,24 @@ function checkFinalStepAnswersPrompt(
   prompt: string,
   issues: SelfCheckIssue[],
 ): void {
-  const promptTokens = tokensForText(prompt);
-  if (promptTokens.size < 3) return;
+  if (!ANSWER_PROMPT_MARKERS.some((marker) => prompt.trim().toLowerCase().includes(marker))) {
+    return;
+  }
+  const promptTokens = new Set(
+    [...tokensForText(prompt)].filter((token) => !ANSWER_STOPWORDS.has(token)),
+  );
+  if (promptTokens.size === 0) return;
   const finalStep = playbook.steps.at(-1);
   if (!finalStep) return;
   const finalTokens = new Set([
     ...tokensForText(finalStep.title),
     ...tokensForText(finalStep.voiceover_text),
-    ...tokensForText(playbook.summary),
   ]);
-  if (finalTokens.size > 0 && !setsIntersect(promptTokens, finalTokens)) {
+  if (finalTokens.size === 0 || !setsIntersect(promptTokens, finalTokens)) {
     issues.push(
       issue(
         "step.does_not_answer_prompt",
-        "warning",
+        "error",
         "steps[-1]",
         "The final step may not answer the user's prompt.",
         "Make the final narration explicitly state the requested conclusion or result.",
@@ -463,11 +527,17 @@ function textPayload(value: unknown): string {
 }
 
 function tokensForText(text: string): Set<string> {
-  return new Set([
-    ...(text.toLowerCase().match(/[a-z0-9_]+/g) ?? []).filter(
-      (token) => token.length >= 2,
+  const latinTokens = (text.toLowerCase().match(/[a-z0-9_]+/g) ?? [])
+    .flatMap((token) => token.split("_"))
+    .filter((token) => token.length >= 2);
+  const cjkTokens = (text.match(/[\u4e00-\u9fff]+/g) ?? []).flatMap((segment) =>
+    Array.from({ length: Math.max(0, segment.length - 1) }, (_, index) =>
+      segment.slice(index, index + 2),
     ),
-    ...(text.match(/[\u4e00-\u9fff]/g) ?? []),
+  );
+  return new Set([
+    ...latinTokens,
+    ...cjkTokens,
   ]);
 }
 

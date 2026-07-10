@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from json import JSONDecodeError
@@ -22,6 +23,7 @@ from app.config import GenerationMode, RouterMode
 from app.domain.models.cir import CirDocument, ExecutionMap
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.domain.models.playbook import PlaybookScript
+from app.domain.models.quality_report import QualityReport
 from app.domain.models.review import (
     CirReviewIssue,
     CirReviewReport,
@@ -40,6 +42,7 @@ from app.domain.services.model_router import topic_route_from_decision
 from app.domain.services.playbook_builder import build_playbook
 from app.domain.services.playbook_quality import (
     playbook_review_verdict_from_issues,
+    quality_gate_playbook,
     self_check_playbook,
 )
 from app.domain.services.reviewer_prompt import (
@@ -60,6 +63,7 @@ logger = logging.getLogger(__name__)
 
 AGENT_SELF_REPAIR_ATTEMPTS = 2
 AGENT_REVIEWER_REPAIR_ATTEMPTS = 1
+CANONICAL_QUALITY_REPAIR_ATTEMPTS = 1
 
 
 @dataclass(frozen=True)
@@ -159,10 +163,35 @@ class RunPipelineUseCase:
         except TimeoutError:
             timeout = self._pipeline_timeout_s
             logger.exception("Pipeline run %s timed out after %.1fs", run_id, timeout)
+            quality_report = _terminal_quality_report(
+                generator_path=("agent" if self._generation_mode == "agent" else "generic_cir"),
+                coverage_mode="experimental",
+                code="pipeline.timeout",
+                path="pipeline",
+                message=f"Pipeline timed out after {timeout:.1f}s",
+                suggestion="Retry the run or reduce generation complexity.",
+            )
+            await self._persist_quality_report(run_id, quality_report)
             await self._repo.update(
                 run_id,
                 status=PipelineRunStatus.FAILED,
                 error=f"Pipeline timed out after {timeout:.1f}s",
+            )
+        except Exception as exc:  # noqa: BLE001 - terminal state must always be persisted.
+            logger.exception("Pipeline run %s failed before candidate finalization", run_id)
+            quality_report = _terminal_quality_report(
+                generator_path=("agent" if self._generation_mode == "agent" else "generic_cir"),
+                coverage_mode="experimental",
+                code="quality.generation_failed",
+                path="pipeline",
+                message=f"Pipeline failed before producing a valid candidate: {exc}",
+                suggestion="Inspect the provider or SkillPack failure and retry.",
+            )
+            await self._persist_quality_report(run_id, quality_report)
+            await self._repo.update(
+                run_id,
+                status=PipelineRunStatus.FAILED,
+                error=str(exc),
             )
 
     async def _run_with_total_timeout(self, operation, *, run_id: str) -> None:
@@ -303,7 +332,35 @@ class RunPipelineUseCase:
         if not result.handled or result.playbook_json is None:
             return False
 
-        playbook = PlaybookScript.model_validate_json(result.playbook_json)
+        try:
+            playbook = PlaybookScript.model_validate_json(result.playbook_json)
+        except ValidationError as exc:
+            verdict = _playbook_schema_error_verdict(
+                exc,
+                actions=[
+                    "router:skill_pack",
+                    f"router:skill_id:{route_match.skill_id}",
+                    "skill:schema_validation:blocked",
+                ],
+            )
+            failure_quality = QualityReport.from_review_verdict(
+                verdict,
+                generator_path="skill_pack",
+                coverage_mode="specialized",
+            )
+            if failure_quality.status == "repairable":
+                failure_quality = _mark_quality_repair_unavailable(
+                    failure_quality,
+                    message="SkillPack output did not match the PlaybookScript schema.",
+                )
+            await self._persist_quality_report(run_id, failure_quality)
+            await self._repo.update(
+                run_id,
+                status=PipelineRunStatus.FAILED,
+                error=humanize_issues(verdict),
+                review_json=verdict.model_dump_json(),
+            )
+            return True
         review_report = CirReviewReport(status="clean")
         review_report.actions.extend([
             "router:skill_pack",
@@ -317,13 +374,34 @@ class RunPipelineUseCase:
             ),
             *result.review_actions,
         ])
-        await self._repo.update(
+        quality_report = quality_gate_playbook(
+            playbook,
+            request.prompt,
+            generator_path="skill_pack",
+            coverage_mode="specialized",
+        )
+        quality_report.actions = list(review_report.actions)
+        if quality_report.status == "repairable":
+            quality_report = quality_report.with_issue(
+                PlaybookReviewIssue(
+                    code="quality.repair_unavailable",
+                    severity=PlaybookIssueSeverity.ERROR,
+                    path="playbook",
+                    message=(
+                        "Deterministic SkillPack output failed the canonical gate and "
+                        "has no runtime repair path."
+                    ),
+                    suggestion="Fix the SkillPack compiler and rerun the deterministic skill.",
+                    requires_repair=False,
+                ),
+                action="quality:repair_unavailable:skill_pack",
+            )
+        await self._finalize_candidate(
             run_id,
-            status=PipelineRunStatus.SUCCEEDED,
-            playbook_json=result.playbook_json,
+            playbook,
+            quality_report,
             review_json=review_report.model_dump_json(),
         )
-        await self._upsert_default_director(run_id, playbook)
         return True
 
     async def _fail_skill_consistency(
@@ -348,6 +426,20 @@ class RunPipelineUseCase:
                     message=message or "Deterministic skill output failed consistency validation.",
                 )
             ],
+        )
+        await self._persist_quality_report(
+            run_id,
+            _terminal_quality_report(
+                generator_path="skill_pack",
+                coverage_mode="specialized",
+                code="skill.consistency_failed",
+                path="playbook",
+                message=(
+                    message or "Deterministic skill output failed consistency validation."
+                ),
+                suggestion="Fix the deterministic SkillPack output before retrying.",
+                actions=list(review_report.actions),
+            ),
         )
         await self._repo.update(
             run_id,
@@ -398,15 +490,74 @@ class RunPipelineUseCase:
                 route_context=route_context,
                 review_report=review_report,
             )
-            await self._repo.update(
+            quality_report = _quality_report_with_review(
+                playbook,
+                request.prompt,
+                review_report,
+                generator_path="agent",
+                coverage_mode="experimental",
+            )
+            if quality_report.status == "repairable":
+                review_report = _with_playbook_review_actions(
+                    review_report,
+                    [*review_report.actions, "quality:repair_attempt:1"],
+                )
+                await self._persist_quality_report(run_id, quality_report)
+                await self._repo.update(
+                    run_id,
+                    status=PipelineRunStatus.REVIEWING,
+                    review_json=review_report.model_dump_json(),
+                )
+                playbook, review_report = await self._repair_agent_playbook_from_reviewer(
+                    run_id,
+                    request,
+                    playbook,
+                    [
+                        issue
+                        for issue in quality_report.issues
+                        if issue.severity == PlaybookIssueSeverity.ERROR
+                    ],
+                    provider_config=provider_config,
+                    route_context=route_context,
+                    review_report=review_report,
+                )
+                playbook, review_report = await self._review_agent_playbook(
+                    run_id,
+                    request,
+                    playbook,
+                    provider_config=provider_config,
+                    route_context=route_context,
+                    review_report=review_report,
+                )
+                quality_report = _quality_report_with_review(
+                    playbook,
+                    request.prompt,
+                    review_report,
+                    generator_path="agent",
+                    coverage_mode="experimental",
+                )
+            if quality_report.status == "repairable":
+                quality_report = _mark_quality_repair_exhausted(quality_report)
+            await self._finalize_candidate(
                 run_id,
-                status=PipelineRunStatus.SUCCEEDED,
-                playbook_json=playbook.model_dump_json(),
+                playbook,
+                quality_report,
                 review_json=review_report.model_dump_json(),
             )
-            await self._upsert_default_director(run_id, playbook)
         except PipelineValidationError as exc:
             logger.exception("Pipeline run %s (agent mode) failed review", run_id)
+            failure_quality = QualityReport.from_review_verdict(
+                exc.report,
+                generator_path="agent",
+                coverage_mode="experimental",
+                attempts=_playbook_repair_attempts(exc.report.actions),
+            )
+            if failure_quality.status == "repairable":
+                failure_quality = _mark_quality_repair_exhausted(failure_quality)
+            await self._persist_quality_report(
+                run_id,
+                failure_quality,
+            )
             await self._repo.update(
                 run_id,
                 status=PipelineRunStatus.FAILED,
@@ -419,6 +570,17 @@ class RunPipelineUseCase:
                 exc,
                 actions=review_report.actions,
             )
+            failure_quality = QualityReport.from_review_verdict(
+                failure_review,
+                generator_path="agent",
+                coverage_mode="experimental",
+            )
+            if failure_quality.status == "repairable":
+                failure_quality = _mark_quality_repair_unavailable(
+                    failure_quality,
+                    message="Agent provider failed before a candidate could be repaired.",
+                )
+            await self._persist_quality_report(run_id, failure_quality)
             await self._repo.update(
                 run_id,
                 status=PipelineRunStatus.FAILED,
@@ -431,6 +593,17 @@ class RunPipelineUseCase:
                 exc,
                 actions=[*review_report.actions, "agent:schema_validation:blocked"],
             )
+            failure_quality = QualityReport.from_review_verdict(
+                failure_review,
+                generator_path="agent",
+                coverage_mode="experimental",
+            )
+            if failure_quality.status == "repairable":
+                failure_quality = _mark_quality_repair_unavailable(
+                    failure_quality,
+                    message="Unexpected agent failure prevented runtime repair.",
+                )
+            await self._persist_quality_report(run_id, failure_quality)
             await self._repo.update(
                 run_id,
                 status=PipelineRunStatus.FAILED,
@@ -744,15 +917,77 @@ class RunPipelineUseCase:
                 source_code=request.source_code,
                 source_language=request.language,
             )
-            await self._repo.update(
+            quality_report = _quality_report_for_single(
+                playbook,
+                request.prompt,
+                review_report,
+            )
+
+            quality_attempts_allowed = CANONICAL_QUALITY_REPAIR_ATTEMPTS
+            for attempt in range(quality_attempts_allowed):
+                if quality_report.status != "repairable":
+                    break
+                review_report.attempts += 1
+                review_report.actions.append(f"quality:repair_attempt:{attempt + 1}")
+                quality_report.attempts = review_report.attempts
+                quality_report.actions = list(review_report.actions)
+                await self._persist_quality_report(run_id, quality_report)
+                await self._repo.update(
+                    run_id,
+                    status=PipelineRunStatus.REVIEWING,
+                    review_json=review_report.model_dump_json(),
+                )
+                raw = await self._regenerate(
+                    system,
+                    user,
+                    raw,
+                    _quality_issues_as_cir(quality_report.issues),
+                    "Repair the canonical Playbook quality issues before rebuilding the scene.",
+                )
+                previous_attempts = review_report.attempts
+                parsed, review_report = await self._review_output(
+                    run_id=run_id,
+                    request=request,
+                    system=system,
+                    user=user,
+                    raw=raw,
+                    initial_actions=list(review_report.actions),
+                )
+                review_report.attempts += previous_attempts
+                if parsed.cir is None:
+                    review_report.status = "failed"
+                    raise PipelineValidationError(review_report)
+                playbook = build_playbook(
+                    parsed.cir,
+                    execution_map=parsed.execution_map,
+                    source_code=request.source_code,
+                    source_language=request.language,
+                )
+                quality_report = _quality_report_for_single(
+                    playbook,
+                    request.prompt,
+                    review_report,
+                )
+
+            if quality_report.status == "repairable":
+                quality_report = _mark_quality_repair_exhausted(quality_report)
+
+            await self._finalize_candidate(
                 run_id,
-                status=PipelineRunStatus.SUCCEEDED,
-                playbook_json=playbook.model_dump_json(),
+                playbook,
+                quality_report,
                 review_json=review_report.model_dump_json(),
             )
-            await self._upsert_default_director(run_id, playbook)
         except PipelineValidationError as exc:
             logger.exception("Pipeline run %s failed review", run_id)
+            await self._persist_quality_report(
+                run_id,
+                _quality_report_from_cir_failure(
+                    exc.report,
+                    generator_path="generic_cir",
+                    coverage_mode="experimental",
+                ),
+            )
             await self._repo.update(
                 run_id,
                 status=PipelineRunStatus.FAILED,
@@ -761,6 +996,18 @@ class RunPipelineUseCase:
             )
         except Exception as exc:
             logger.exception("Pipeline run %s failed", run_id)
+            await self._persist_quality_report(
+                run_id,
+                _terminal_quality_report(
+                    generator_path="generic_cir",
+                    coverage_mode="experimental",
+                    code="quality.generation_failed",
+                    path="pipeline",
+                    message=f"Generic CIR generation failed: {exc}",
+                    suggestion="Inspect the CIR generator output and retry.",
+                    actions=list(review_report.actions),
+                ),
+            )
             await self._repo.update(
                 run_id,
                 status=PipelineRunStatus.FAILED,
@@ -772,17 +1019,73 @@ class RunPipelineUseCase:
         self,
         run_id: str,
         playbook: PlaybookScript,
-    ) -> None:
+    ) -> PlaybookReviewIssue | None:
         if self._director_repo is None:
-            return
+            return None
         director = build_default_director(playbook, run_id)
         try:
             await self._director_repo.upsert(
                 director,
                 datetime.now(timezone.utc).isoformat(),
             )
-        except Exception:  # noqa: BLE001 - hidden metadata must not fail generation.
+        except Exception as exc:  # noqa: BLE001 - surfaced through the quality report.
             logger.warning("Failed to persist default director for run %s", run_id, exc_info=True)
+            return PlaybookReviewIssue(
+                code="director.persistence_failed",
+                severity=PlaybookIssueSeverity.ERROR,
+                path="director",
+                message=f"Default DirectorScript could not be persisted: {exc}",
+                suggestion="Retry Director persistence before declaring the run complete.",
+                requires_repair=False,
+            )
+        return None
+
+    async def _persist_quality_report(self, run_id: str, report: QualityReport) -> None:
+        update_quality_report = getattr(self._repo, "update_quality_report", None)
+        if callable(update_quality_report):
+            await update_quality_report(run_id, report.model_dump_json())
+
+    async def _finalize_candidate(
+        self,
+        run_id: str,
+        playbook: PlaybookScript,
+        quality_report: QualityReport,
+        *,
+        review_json: str,
+    ) -> bool:
+        if quality_report.status in {"repairable", "blocked"}:
+            await self._persist_quality_report(run_id, quality_report)
+            await self._repo.update(
+                run_id,
+                status=PipelineRunStatus.FAILED,
+                error=_humanize_quality_report(quality_report),
+                review_json=review_json,
+            )
+            return False
+
+        director_issue = await self._upsert_default_director(run_id, playbook)
+        if director_issue is not None:
+            quality_report = quality_report.with_issue(
+                director_issue,
+                action="director:persistence_failed",
+            )
+            await self._persist_quality_report(run_id, quality_report)
+            await self._repo.update(
+                run_id,
+                status=PipelineRunStatus.FAILED,
+                error=director_issue.message,
+                review_json=review_json,
+            )
+            return False
+
+        await self._persist_quality_report(run_id, quality_report)
+        await self._repo.update(
+            run_id,
+            status=PipelineRunStatus.SUCCEEDED,
+            playbook_json=playbook.model_dump_json(),
+            review_json=review_json,
+        )
+        return True
 
     async def _review_output(
         self,
@@ -1111,6 +1414,220 @@ def _build_agent_repair_prompt(
         "PlaybookScript through the normal agent generation path:\n"
         f"{json.dumps(repair_payload, ensure_ascii=False, indent=2)}"
     )
+
+
+def _quality_report_with_review(
+    playbook: PlaybookScript,
+    prompt: str,
+    review: PlaybookReviewVerdict,
+    *,
+    generator_path: str,
+    coverage_mode: str,
+) -> QualityReport:
+    canonical = quality_gate_playbook(
+        playbook,
+        prompt,
+        generator_path=generator_path,
+        coverage_mode=coverage_mode,
+    )
+    unique: dict[tuple[str, str, str], PlaybookReviewIssue] = {}
+    for issue in [*canonical.issues, *review.issues]:
+        unique[(issue.code, issue.path, issue.message)] = issue
+    merged = playbook_review_verdict_from_issues(
+        list(unique.values()),
+        clean_summary="Playbook passed the canonical backend quality gate.",
+        warning_summary="Playbook passed the canonical backend quality gate with warnings.",
+        blocked_summary="Playbook failed the canonical backend quality gate.",
+        actions=list(review.actions),
+    )
+    return QualityReport.from_review_verdict(
+        merged,
+        generator_path=generator_path,
+        coverage_mode=coverage_mode,
+        attempts=_playbook_repair_attempts(review.actions),
+    )
+
+
+def _quality_report_for_single(
+    playbook: PlaybookScript,
+    prompt: str,
+    review: CirReviewReport,
+) -> QualityReport:
+    report = quality_gate_playbook(
+        playbook,
+        prompt,
+        generator_path="generic_cir",
+        coverage_mode="experimental",
+    )
+    report.actions = list(review.actions)
+    report.attempts = review.attempts
+    return report
+
+
+def _playbook_repair_attempts(actions: list[str]) -> int:
+    return sum(
+        1
+        for action in actions
+        if action.startswith(
+            (
+                "agent:self_repair_attempt:",
+                "reviewer:repair_attempt:",
+                "quality:repair_attempt:",
+            )
+        )
+    )
+
+
+def _quality_issues_as_cir(
+    issues: list[PlaybookReviewIssue],
+) -> list[CirReviewIssue]:
+    return [
+        CirReviewIssue(
+            code=issue.code,
+            severity=(
+                ReviewSeverity.ERROR
+                if issue.severity == PlaybookIssueSeverity.ERROR
+                else ReviewSeverity.WARNING
+            ),
+            path=issue.path,
+            message=issue.message,
+            suggestion=issue.suggestion,
+        )
+        for issue in issues
+        if issue.severity == PlaybookIssueSeverity.ERROR
+    ]
+
+
+def _humanize_quality_report(report: QualityReport) -> str:
+    if not report.issues:
+        return "Pipeline output failed the canonical quality gate."
+    shown = report.issues[:5]
+    details = "; ".join(
+        f"{issue.code} at {issue.path}: {issue.message}" for issue in shown
+    )
+    suffix = "" if len(report.issues) <= 5 else f" (+{len(report.issues) - 5} more)"
+    return f"Canonical quality gate {report.status}: {details}{suffix}"
+
+
+def _mark_quality_repair_exhausted(report: QualityReport) -> QualityReport:
+    return report.with_issue(
+        PlaybookReviewIssue(
+            code="quality.repair_exhausted",
+            severity=PlaybookIssueSeverity.ERROR,
+            path="playbook",
+            message="Canonical quality repair attempts were exhausted.",
+            suggestion="Regenerate from a corrected prompt or fix the generator/compiler.",
+            requires_repair=False,
+        ),
+        action="quality:repair_exhausted",
+    )
+
+
+def _mark_quality_repair_unavailable(
+    report: QualityReport,
+    *,
+    message: str,
+) -> QualityReport:
+    return report.with_issue(
+        PlaybookReviewIssue(
+            code="quality.repair_unavailable",
+            severity=PlaybookIssueSeverity.ERROR,
+            path="playbook",
+            message=message,
+            suggestion="Fix the provider or generator failure before retrying.",
+            requires_repair=False,
+        ),
+        action="quality:repair_unavailable",
+    )
+
+
+def _terminal_quality_report(
+    *,
+    generator_path: str,
+    coverage_mode: str,
+    code: str,
+    path: str,
+    message: str,
+    suggestion: str,
+    actions: list[str] | None = None,
+) -> QualityReport:
+    verdict = PlaybookReviewVerdict(
+        status=PlaybookReviewStatus.BLOCKED,
+        summary=message,
+        issues=[
+            PlaybookReviewIssue(
+                code=code,
+                severity=PlaybookIssueSeverity.ERROR,
+                path=path,
+                message=message,
+                suggestion=suggestion,
+                requires_repair=False,
+            )
+        ],
+        actions=list(actions or []),
+    )
+    return QualityReport.from_review_verdict(
+        verdict,
+        generator_path=generator_path,
+        coverage_mode=coverage_mode,
+    )
+
+
+def _quality_report_from_cir_failure(
+    report: CirReviewReport,
+    *,
+    generator_path: str,
+    coverage_mode: str,
+) -> QualityReport:
+    issues = [
+        PlaybookReviewIssue(
+            code=_canonical_cir_quality_code(issue.code),
+            severity=(
+                PlaybookIssueSeverity.ERROR
+                if issue.severity == ReviewSeverity.ERROR
+                else PlaybookIssueSeverity.WARNING
+            ),
+            path=issue.path or "playbook",
+            message=issue.message,
+            suggestion=issue.suggestion,
+            requires_repair=False,
+        )
+        for issue in report.issues
+    ]
+    if not any(issue.severity == PlaybookIssueSeverity.ERROR for issue in issues):
+        issues.append(
+            PlaybookReviewIssue(
+                code="quality.generation_failed",
+                severity=PlaybookIssueSeverity.ERROR,
+                path="pipeline",
+                message="Generic CIR generation ended without a valid Playbook candidate.",
+                suggestion="Inspect the CIR output and retry generation.",
+                requires_repair=False,
+            )
+        )
+    verdict = playbook_review_verdict_from_issues(
+        issues,
+        clean_summary="Generic CIR generation failed.",
+        warning_summary="Generic CIR generation failed with warnings.",
+        blocked_summary="Generic CIR generation failed before candidate finalization.",
+        actions=list(report.actions),
+    )
+    return QualityReport.from_review_verdict(
+        verdict,
+        generator_path=generator_path,
+        coverage_mode=coverage_mode,
+        attempts=report.attempts,
+    )
+
+
+def _canonical_cir_quality_code(code: str) -> str:
+    normalized = re.sub(r"[^a-z0-9_]+", "_", code.strip().lower()).strip("_")
+    if "." in code and re.fullmatch(
+        r"[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+",
+        code,
+    ):
+        return code
+    return f"cir.{normalized or 'generation_failed'}"
 
 
 def try_parse_combined_output(raw: str) -> ParseResult:

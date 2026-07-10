@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from copy import deepcopy
 
+import pytest
+
 from app.domain.models.playbook import PlaybookScript
 from app.domain.models.review import PlaybookReviewStatus
+from app.domain.services.playbook_quality import quality_gate_playbook
 from app.domain.services.playbook_review import review_playbook_script
 
 
@@ -19,9 +22,9 @@ def _array_step(index: int) -> dict:
     }
     return {
         "step_id": f"step_{index:02d}",
-        "end_frame": index * 60,
-        "title": f"Array interval {index}",
-        "voiceover_text": f"Inspect the sorted array interval {index}.",
+        "end_frame": index * 180,
+        "title": f"Binary search interval {index}",
+        "voiceover_text": f"Inspect the binary search array interval {index}.",
         "snapshot": deepcopy(snapshot),
         "layers": [{"body": deepcopy(snapshot)}],
     }
@@ -38,7 +41,7 @@ def _valid_playbook() -> PlaybookScript:
     return PlaybookScript.model_validate(
         {
             "fps": 30,
-            "total_frames": 480,
+            "total_frames": 1440,
             "domain": "algorithm",
             "title": "Binary search",
             "summary": "Show a search interval.",
@@ -50,6 +53,79 @@ def _valid_playbook() -> PlaybookScript:
 
 def test_playbook_self_check_returns_clean_for_renderer_ready_script() -> None:
     verdict = review_playbook_script(_valid_playbook(), prompt="Explain binary search.")
+
+    assert verdict.status == PlaybookReviewStatus.CLEAN
+    assert verdict.issues == []
+
+
+@pytest.mark.parametrize(
+    ("snapshot", "title", "voiceover", "prompt"),
+    [
+        (
+            {
+                "kind": "call_stack_scene",
+                "frames": [
+                    {
+                        "id": "factorial-3",
+                        "label": "factorial(3)",
+                        "depth": 0,
+                        "state": "active",
+                        "variables": {"n": "3"},
+                    }
+                ],
+                "code_trace": {
+                    "language": "python",
+                    "lines": ["def factorial(n):", "    return n * factorial(n - 1)"],
+                    "active_lines": [1],
+                    "active_line": 1,
+                },
+                "current_frame_id": "factorial-3",
+                "caption": "Factorial call stack",
+            },
+            "Factorial call stack",
+            "The factorial call stack shows the active frame and its return value.",
+            "Explain the factorial call stack.",
+        ),
+        (
+            {
+                "kind": "code_trace_scene",
+                "language": "python",
+                "lines": ["mid = (left + right) // 2", "if target < values[mid]:"],
+                "active_lines": [0],
+                "active_line": 0,
+                "array_values": ["1", "3", "5", "7"],
+                "active_indices": [1],
+                "search_range": [0, 3],
+                "pointers": [
+                    {"id": "mid", "label": "mid", "index": 1},
+                ],
+                "variables": {"target": "5"},
+                "caption": "Binary search code trace",
+            },
+            "Binary search code trace",
+            "The binary search code trace shows the active line and search pointers.",
+            "Explain the binary search code trace.",
+        ),
+    ],
+    ids=["call_stack_scene", "code_trace_scene"],
+)
+def test_playbook_self_check_accepts_recursion_and_code_trace_scenes(
+    snapshot: dict,
+    title: str,
+    voiceover: str,
+    prompt: str,
+) -> None:
+    payload = _valid_playbook().model_dump(mode="json")
+    payload["title"] = title
+    payload["summary"] = voiceover
+    for step in payload["steps"]:
+        step["title"] = title
+        step["voiceover_text"] = voiceover
+        step["snapshot"] = deepcopy(snapshot)
+        step["layers"] = [{"body": deepcopy(snapshot)}]
+    playbook = PlaybookScript.model_validate(payload)
+
+    verdict = review_playbook_script(playbook, prompt=prompt)
 
     assert verdict.status == PlaybookReviewStatus.CLEAN
     assert verdict.issues == []
@@ -251,3 +327,216 @@ def test_playbook_self_check_accepts_scene_blueprint_subject_renderer_kind() -> 
     verdict = review_playbook_script(playbook, prompt="Explain the East Asia monsoon.")
 
     assert verdict.status == PlaybookReviewStatus.CLEAN
+
+
+def test_canonical_gate_blocks_unresolved_asset() -> None:
+    payload = _valid_playbook().model_dump(mode="json")
+    payload["domain"] = "math"
+    snapshot = {
+        "kind": "math_plot",
+        "pack_id": "math-basic",
+        "asset_id": "missing-asset",
+        "curves": [{"expression": "x", "label": "f"}],
+    }
+    payload["steps"][0]["snapshot"] = snapshot
+    payload["steps"][0]["layers"] = [{"body": deepcopy(snapshot)}]
+    playbook = PlaybookScript.model_validate(payload)
+
+    report = quality_gate_playbook(
+        playbook,
+        "Explain the function",
+        generator_path="skill_pack",
+    )
+
+    assert report.status == "repairable"
+    assert {issue.code for issue in report.issues} >= {"asset.missing"}
+    assert report.scores["asset_license"] < 1.0
+    assert report.scores["export_readiness"] < 1.0
+
+
+def test_canonical_gate_blocks_asset_from_a_different_pack() -> None:
+    payload = _valid_playbook().model_dump(mode="json")
+    payload["domain"] = "math"
+    snapshot = {
+        "kind": "math_plot",
+        "pack_id": "math-basic",
+        "asset_id": "east-asia-land-110m",
+        "curves": [{"expression": "x", "label": "f"}],
+    }
+    payload["steps"][0]["snapshot"] = snapshot
+    payload["steps"][0]["layers"] = [{"body": deepcopy(snapshot)}]
+    playbook = PlaybookScript.model_validate(payload)
+
+    report = quality_gate_playbook(
+        playbook,
+        "Explain the function",
+        generator_path="skill_pack",
+    )
+
+    assert report.status == "repairable"
+    assert {issue.code for issue in report.issues} >= {"asset.missing"}
+    assert report.scores["asset_license"] < 1.0
+    assert report.scores["export_readiness"] < 1.0
+
+
+def test_canonical_gate_requires_algorithm_state_for_bfs_prompt() -> None:
+    payload = _valid_playbook().model_dump(mode="json")
+    for step in payload["steps"]:
+        snapshot = step["snapshot"]
+        snapshot["active_indices"] = []
+        snapshot["swap_indices"] = []
+        snapshot["sorted_indices"] = []
+        snapshot["pointers"] = {}
+        step["layers"] = [{"body": deepcopy(snapshot)}]
+    playbook = PlaybookScript.model_validate(payload)
+
+    report = quality_gate_playbook(
+        playbook,
+        "Explain BFS traversal and its queue state",
+        generator_path="agent",
+    )
+
+    assert report.status == "repairable"
+    assert {issue.code for issue in report.issues} >= {"algorithm.state_missing"}
+
+
+def test_canonical_gate_requires_algorithm_scene_for_bfs_prompt() -> None:
+    payload = _valid_playbook().model_dump(mode="json")
+    snapshot = {"kind": "narration_card", "text": "Breadth first search"}
+    for step in payload["steps"]:
+        step["snapshot"] = deepcopy(snapshot)
+        step["layers"] = [{"body": deepcopy(snapshot)}]
+    playbook = PlaybookScript.model_validate(payload)
+
+    report = quality_gate_playbook(
+        playbook,
+        "Explain BFS traversal and its queue state",
+        generator_path="agent",
+    )
+
+    assert report.status == "repairable"
+    assert {issue.code for issue in report.issues} >= {"algorithm.state_missing"}
+
+
+def test_canonical_gate_blocks_formula_only_plot_request() -> None:
+    payload = _valid_playbook().model_dump(mode="json")
+    payload["domain"] = "math"
+    snapshot = {"kind": "math_formula", "formula_latex": "f(x)=x^2"}
+    for step in payload["steps"]:
+        step["snapshot"] = deepcopy(snapshot)
+        step["layers"] = [{"body": deepcopy(snapshot)}]
+    playbook = PlaybookScript.model_validate(payload)
+
+    report = quality_gate_playbook(
+        playbook,
+        "Plot the curve and show its tangent",
+        generator_path="agent",
+    )
+
+    assert report.status == "repairable"
+    assert {issue.code for issue in report.issues} >= {"math.low_visual_richness"}
+
+
+def test_canonical_gate_requires_final_step_to_answer_explicit_question() -> None:
+    playbook = _valid_playbook()
+
+    report = quality_gate_playbook(
+        playbook,
+        "Calculate the orbital velocity",
+        generator_path="generic_cir",
+    )
+
+    assert report.status == "repairable"
+    assert {issue.code for issue in report.issues} >= {"step.does_not_answer_prompt"}
+
+
+def test_canonical_gate_does_not_treat_summary_or_generic_chinese_final_as_answer() -> None:
+    payload = _valid_playbook().model_dump(mode="json")
+    prompt = "用二叉树演示广度优先遍历的访问顺序，逐层点亮节点。"
+    payload["summary"] = prompt
+    payload["steps"][-1]["title"] = "课程结束"
+    payload["steps"][-1]["voiceover_text"] = "这就是最后的结果。"
+    playbook = PlaybookScript.model_validate(payload)
+
+    report = quality_gate_playbook(
+        playbook,
+        prompt,
+        generator_path="agent",
+    )
+
+    assert report.status == "repairable"
+    assert {issue.code for issue in report.issues} >= {"step.does_not_answer_prompt"}
+
+
+def test_canonical_gate_rejects_empty_playbook() -> None:
+    payload = _valid_playbook().model_dump(mode="json")
+    payload["steps"] = []
+    payload["total_frames"] = 1
+    playbook = PlaybookScript.model_validate(payload)
+
+    report = quality_gate_playbook(
+        playbook,
+        "Explain binary search",
+        generator_path="generic_cir",
+    )
+
+    assert report.status == "repairable"
+    assert "scene.required_contract_missing" in {issue.code for issue in report.issues}
+
+
+def test_canonical_gate_rejects_array_fallback_for_bfs() -> None:
+    report = quality_gate_playbook(
+        _valid_playbook(),
+        "Explain BFS traversal with the visited set and FIFO queue",
+        generator_path="generic_cir",
+    )
+
+    assert report.status == "repairable"
+    assert "algorithm.state_missing" in {issue.code for issue in report.issues}
+
+
+def test_canonical_gate_requires_call_stack_for_recursion() -> None:
+    payload = _valid_playbook().model_dump(mode="json")
+    payload["domain"] = "code"
+    playbook = PlaybookScript.model_validate(payload)
+
+    report = quality_gate_playbook(
+        playbook,
+        "Explain recursion and show the call stack",
+        generator_path="generic_cir",
+    )
+
+    assert report.status == "repairable"
+    assert "code.execution_state_missing" in {issue.code for issue in report.issues}
+
+
+def test_canonical_gate_requires_projectile_semantics() -> None:
+    payload = _valid_playbook().model_dump(mode="json")
+    payload["domain"] = "physics"
+    playbook = PlaybookScript.model_validate(payload)
+
+    report = quality_gate_playbook(
+        playbook,
+        "Explain projectile horizontal velocity and vertical velocity under gravity",
+        generator_path="generic_cir",
+    )
+
+    assert report.status == "repairable"
+    assert "physics.state_missing" in {issue.code for issue in report.issues}
+
+
+def test_canonical_gate_reports_voiceover_timing_warning() -> None:
+    payload = _valid_playbook().model_dump(mode="json")
+    for index, step in enumerate(payload["steps"], start=1):
+        step["end_frame"] = index * 30
+    payload["total_frames"] = payload["steps"][-1]["end_frame"]
+    playbook = PlaybookScript.model_validate(payload)
+
+    report = quality_gate_playbook(
+        playbook,
+        "Inspect an array",
+        generator_path="generic_cir",
+    )
+
+    assert report.status == "warnings"
+    assert "timeline.voiceover_too_short" in {issue.code for issue in report.issues}

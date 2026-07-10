@@ -26,20 +26,40 @@ from app.presentation.dependencies import (
 )
 
 _VALID_CIR = json.dumps({
-    "version": "0.1.0",
-    "title": "Test",
-    "domain": "algorithm",
-    "summary": "Test summary.",
-    "steps": [
-        {
-            "id": "step_01",
-            "title": "Step 1",
-            "narration": "Test narration.",
-            "visual_kind": "array",
-            "tokens": [{"id": "t0", "label": "A", "value": None, "emphasis": "primary"}],
-            "annotations": [],
-        }
-    ],
+    "cir": {
+        "version": "0.1.0",
+        "title": "Test",
+        "domain": "algorithm",
+        "summary": "Test summary.",
+        "steps": [
+            {
+                "id": "step_01",
+                "title": "Step 1",
+                "narration": "Test narration.",
+                "visual_kind": "array",
+                "tokens": [
+                    {"id": "t0", "label": "A", "value": None, "emphasis": "primary"}
+                ],
+                "annotations": [],
+            }
+        ],
+    },
+    "execution_map": {
+        "duration_s": 2,
+        "checkpoints": [
+            {
+                "id": "cp1",
+                "step_index": 0,
+                "step_id": "step_01",
+                "visual_kind": "array",
+                "title": "Step 1",
+                "summary": "Show the active array state.",
+                "start_s": 0,
+                "end_s": 2,
+                "array_focus_indices": [0],
+            }
+        ],
+    },
 })
 
 
@@ -141,6 +161,8 @@ def test_get_run_returns_run_after_creation(client) -> None:
     assert get_resp.status_code == 200
     data = get_resp.json()
     assert data["run_id"] == run_id
+    assert data["quality_report"]["status"] in {"clean", "warnings"}
+    assert data["quality_report"]["generator_path"] == "generic_cir"
 
 
 def test_list_runs_returns_array(client) -> None:

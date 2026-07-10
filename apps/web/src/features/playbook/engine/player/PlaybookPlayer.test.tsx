@@ -222,9 +222,17 @@ describe("PlaybookPlayer", () => {
     expect(container.querySelector(".playbook-player__mobile-narration")?.textContent).toContain(
       "先观察函数的基础形态。",
     );
+    const player = container.querySelector('[data-testid="mock-remotion-player"]');
+    expect(player?.getAttribute("data-show-subtitles")).toBe("false");
 
     const tabs = container.querySelectorAll(".playbook-player__mobile-tabs button");
     expect(tabs).toHaveLength(5);
+
+    fireEvent.click(tabs[1]);
+    expect(player?.getAttribute("data-show-subtitles")).toBe("true");
+
+    fireEvent.click(tabs[0]);
+    expect(player?.getAttribute("data-show-subtitles")).toBe("false");
 
     const exportButton = container.querySelector<HTMLButtonElement>(
       ".playbook-player__header-actions .playbook-player__export-btn",
@@ -291,6 +299,24 @@ describe("PlaybookPlayer", () => {
     expect(getByText("line7")).toBeTruthy();
     expect(queryByText("line1")).toBeNull();
     expect(queryByText("line8")).toBeNull();
+  });
+
+  it("keeps stage subtitles when the portrait learning console is hidden", () => {
+    const { container } = render(
+      <PlaybookPlayer
+        script={baseScript()}
+        theme="light"
+        layoutMode="portrait"
+        showLearningConsole={false}
+      />,
+    );
+
+    expect(container.querySelector(".playbook-player__mobile-narration")).toBeNull();
+    expect(
+      container
+        .querySelector('[data-testid="mock-remotion-player"]')
+        ?.getAttribute("data-show-subtitles"),
+    ).toBe("true");
   });
 
   it("opens follow-up content in a portrait bottom sheet", () => {

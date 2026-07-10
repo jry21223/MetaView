@@ -107,9 +107,13 @@ make lint
 make test
 make build
 make check
+make visual-check
+make eval-gold
 ```
 
-`make check` 会串联 ruff、eslint、pytest、tsc 和 Vite build。
+`make check` 串联 ruff、eslint、pytest、tsc 和 Vite build；Remotion 静帧、资产审计与
+showcase 基线放在独立的 `make visual-check`。`make eval-gold` 对四个 Gold Case 执行
+严格 Benchmark V2；使用 `LIVE=1` 时会真实生成每例三次。
 
 Agent demo 验收见 [`docs/agent-demo-acceptance.md`](docs/agent-demo-acceptance.md)。生成的 `eval/reports/`、`eval/videos/`、`eval/shots/` 是本地证据，不应提交。
 

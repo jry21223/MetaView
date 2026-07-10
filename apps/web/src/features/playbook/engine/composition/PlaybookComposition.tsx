@@ -232,10 +232,9 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
   const frame = useCurrentFrame();
   const visualTimeline = React.useMemo(() => compileVisualTimeline(script), [script]);
   const visualQualityWarnings = React.useMemo(() => visualQualityGate(script), [script]);
-  const visibleDiagnosticWarnings = showDiagnostics ? visualQualityWarnings : [];
   const assetAttributionSummary = React.useMemo(
-    () => createAssetAttributionSummary(visibleDiagnosticWarnings),
-    [visibleDiagnosticWarnings],
+    () => createAssetAttributionSummary(visualQualityWarnings),
+    [visualQualityWarnings],
   );
 
   React.useEffect(() => {

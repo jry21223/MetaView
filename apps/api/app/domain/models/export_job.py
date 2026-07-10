@@ -17,6 +17,7 @@ class ExportJobStatus(str, Enum):
 
 ExportQuality = Literal["720p", "1080p", "2k"]
 ExportFormat = Literal["mp4", "webm", "gif"]
+ExportTheme = Literal["light", "dark"]
 
 
 class ExportOptions(BaseModel):
@@ -29,6 +30,7 @@ class ExportOptions(BaseModel):
     quality: ExportQuality = "1080p"
     fps: int = Field(default=30, ge=15, le=60)
     format: ExportFormat = "mp4"
+    theme: ExportTheme = "light"
 
 
 class ExportAssetReportEntry(BaseModel):

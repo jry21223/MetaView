@@ -408,6 +408,89 @@
   overflow: auto;
 }
 
+/* ───── Canonical backend quality report ─────────────────────────────── */
+.mv-quality-report {
+  flex: 0 0 auto;
+  margin: 16px 24px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--mv-status-succeeded);
+  border-radius: var(--radius, 12px);
+  background: var(--surface);
+  color: var(--ink-2);
+}
+
+.mv-quality-report[data-quality-status='warnings'],
+.mv-quality-report[data-quality-status='repairable'] {
+  border-left-color: var(--warn, #d89b3c);
+}
+
+.mv-quality-report[data-quality-status='blocked'] {
+  border-left-color: var(--mv-status-failed);
+}
+
+.mv-quality-report__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.mv-quality-report__header strong {
+  color: var(--ink);
+}
+
+.mv-quality-report__header span,
+.mv-quality-report__issues span {
+  color: var(--ink-3);
+  font: 10px/1.4 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+.mv-quality-report__summary {
+  margin: 8px 0 0;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.mv-quality-report__issues {
+  display: grid;
+  gap: 8px;
+  max-height: 170px;
+  margin: 12px 0 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.mv-quality-report__issues li {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.mv-quality-report__issues li[data-severity='error'] {
+  border-color: color-mix(in srgb, var(--mv-status-failed) 45%, var(--line));
+}
+
+.mv-quality-report__issues li > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mv-quality-report__issues code {
+  color: var(--accent);
+  font: 10px/1.4 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+.mv-quality-report__issues p {
+  margin: 4px 0 0;
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .mv-history-detail__stepper {
   padding: 18px 24px;
 }

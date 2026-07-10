@@ -4,62 +4,173 @@
     {
       "id": "math-derivative-tangent",
       "expected_domains": ["math"],
-      "required_snapshot_kinds": ["math_plot", "math_scene"],
+      "required_snapshot_kinds": ["math_plot"],
       "forbidden_snapshot_kinds": ["algorithm_array", "narration_card"],
       "required_scene_types": ["derivative_tangent"],
       "required_semantic_roles": ["curve", "target_point", "tangent", "slope"],
-      "required_asset_ids": [],
-      "required_text_facts": ["derivative", "tangent", "slope"],
-      "forbidden_text_facts": [],
+      "required_asset_ids": ["derivative-tangent-preset"],
+      "required_text_facts": [
+        {"id": "derivative", "any_of": ["derivative", "导数", "f'("]},
+        {"id": "tangent", "any_of": ["tangent", "切线"]},
+        {"id": "slope", "any_of": ["slope", "斜率"]}
+      ],
+      "forbidden_text_facts": [
+        {"id": "wrong_slope_three", "any_of": ["slope = 3", "slope is 3", "斜率为 3", "斜率等于 3", "f'(1)=3"]}
+      ],
       "required_state_fields": ["curves", "marker_x"],
-      "expected_conclusion": "The derivative at the point equals the tangent slope.",
+      "required_state_values": {"marker_x": 1.0},
+      "expected_conclusion": {
+        "statement": "The derivative at x=1 equals the tangent slope 2.",
+        "all_of": [
+          ["derivative", "导数", "f'(1)"],
+          ["tangent", "切线"],
+          ["slope", "斜率"],
+          ["=2", "= 2", "equals 2", "等于 2", "为 2", "为2"]
+        ],
+        "none_of": ["slope = 3", "slope is 3", "斜率为 3", "斜率等于 3", "f'(1)=3"]
+      },
       "maximum_warning_count": 0,
-      "hard_fail_conditions": ["missing_curve", "missing_tangent", "wrong_derivative_conclusion", "forbidden_fallback"]
+      "hard_fail_conditions": [
+        "schema_invalid", "unexpected_domain", "missing_required_snapshot_kind",
+        "forbidden_snapshot_kind", "missing_required_scene_type",
+        "missing_required_semantic_role", "missing_required_asset",
+        "missing_required_text_fact", "forbidden_text_fact",
+        "missing_required_state_field", "expected_conclusion_not_met",
+        "warning_count_exceeded", "invalid_timeline", "empty_narration",
+        "final_step_does_not_answer", "required_state_value_mismatch",
+        "invalid_state_reference", "invalid_state_transition",
+        "incorrect_state_order", "missing_visual_transition",
+        "invalid_semantic_evidence"
+      ]
     },
     {
       "id": "algorithm-bfs-tree",
       "expected_domains": ["algorithm", "computer_science"],
-      "required_snapshot_kinds": ["graph_scene", "algorithm_tree"],
-      "forbidden_snapshot_kinds": ["narration_card"],
-      "required_scene_types": ["bfs_graph_traversal"],
+      "required_snapshot_kinds": ["graph_scene"],
+      "forbidden_snapshot_kinds": ["algorithm_array", "narration_card"],
+      "required_scene_types": ["bfs_graph"],
       "required_semantic_roles": ["node", "edge", "current_node", "visited", "queue"],
-      "required_asset_ids": [],
-      "required_text_facts": ["breadth-first", "queue", "visited"],
-      "forbidden_text_facts": [],
-      "required_state_fields": ["nodes", "edges", "active_node_ids", "visited_node_ids"],
-      "expected_conclusion": "BFS visits nodes in breadth-first order using a queue/frontier.",
+      "required_asset_ids": ["bfs-graph-preset"],
+      "required_text_facts": [
+        {"id": "breadth_first", "any_of": ["breadth-first", "breadth first", "BFS", "广度优先"]},
+        {"id": "queue", "any_of": ["queue", "frontier", "队列"]},
+        {"id": "visited", "any_of": ["visited", "已访问", "访问状态"]},
+        {"id": "order", "any_of": ["order", "FIFO", "先进先出", "按层", "逐层"]}
+      ],
+      "forbidden_text_facts": [
+        {"id": "depth_first_fallback", "any_of": ["depth-first", "depth first", "DFS", "深度优先"]}
+      ],
+      "required_state_fields": ["nodes", "edges", "current_node_id", "visited_node_ids", "queue_node_ids"],
+      "required_state_values": {},
+      "expected_conclusion": {
+        "statement": "BFS visits nodes layer by layer using a FIFO queue.",
+        "all_of": [
+          ["BFS", "breadth-first", "breadth first", "广度优先"],
+          ["queue", "frontier", "队列"],
+          ["layer", "breadth", "按层", "逐层"],
+          ["FIFO", "first-in", "先进先出", "先发现的节点先"]
+        ],
+        "none_of": ["depth-first", "depth first", "DFS", "深度优先"]
+      },
       "maximum_warning_count": 0,
-      "hard_fail_conditions": ["missing_graph", "missing_queue_state", "wrong_visit_order", "forbidden_fallback"]
+      "hard_fail_conditions": [
+        "schema_invalid", "unexpected_domain", "missing_required_snapshot_kind",
+        "forbidden_snapshot_kind", "missing_required_scene_type",
+        "missing_required_semantic_role", "missing_required_asset",
+        "missing_required_text_fact", "forbidden_text_fact",
+        "missing_required_state_field", "expected_conclusion_not_met",
+        "warning_count_exceeded", "invalid_timeline", "empty_narration",
+        "final_step_does_not_answer", "required_state_value_mismatch",
+        "invalid_state_reference", "invalid_state_transition",
+        "incorrect_state_order", "missing_visual_transition",
+        "invalid_semantic_evidence"
+      ]
     },
     {
       "id": "code-recursion-factorial",
-      "expected_domains": ["code", "computer_science"],
-      "required_snapshot_kinds": ["call_stack_scene", "code_trace_scene"],
+      "expected_domains": ["code", "computer_science", "algorithm"],
+      "required_snapshot_kinds": ["call_stack_scene"],
       "forbidden_snapshot_kinds": ["algorithm_array", "narration_card"],
-      "required_scene_types": ["recursion_call_stack"],
+      "required_scene_types": ["recursion_stack"],
       "required_semantic_roles": ["stack_frame", "active_frame", "code_line", "return_value"],
-      "required_asset_ids": [],
-      "required_text_facts": ["base case", "recursive call", "return"],
-      "forbidden_text_facts": [],
-      "required_state_fields": ["frames", "active_frame_id", "highlighted_lines"],
-      "expected_conclusion": "factorial returns by multiplying values as recursive frames unwind.",
+      "required_asset_ids": ["recursion-stack-preset", "active-line"],
+      "required_text_facts": [
+        {"id": "factorial", "any_of": ["factorial", "阶乘"]},
+        {"id": "base_case", "any_of": ["base case", "基例", "终止条件", "n == 1"]},
+        {"id": "recursive_call", "any_of": ["recursive call", "递归调用", "factorial(n - 1)"]},
+        {"id": "return_unwind", "any_of": ["return", "unwind", "返回", "回溯", "弹栈"]},
+        {"id": "factorial_result", "any_of": ["factorial(4)=24", "factorial(4) = 24", "4! = 24", "4!=24", "阶乘 4 等于 24", "4 的阶乘是 24"]}
+      ],
+      "forbidden_text_facts": [
+        {"id": "wrong_factorial_four", "any_of": ["factorial(4) = 12", "factorial(4)=12", "阶乘 4 等于 12", "4 的阶乘是 12"]}
+      ],
+      "required_state_fields": ["frames", "current_frame_id", "code_trace"],
+      "required_state_values": {},
+      "expected_conclusion": {
+        "statement": "factorial multiplies pending values while recursive frames return and unwind.",
+        "all_of": [
+          ["factorial", "阶乘"],
+          ["multiply", "multiplying", " * ", "乘法", "相乘"],
+          ["return", "unwind", "返回", "回溯", "弹栈"],
+          ["factorial(4)=24", "factorial(4) = 24", "4! = 24", "4!=24", "阶乘 4 等于 24", "4 的阶乘是 24"]
+        ],
+        "none_of": ["factorial(4) = 12", "factorial(4)=12", "阶乘 4 等于 12", "4 的阶乘是 12"]
+      },
       "maximum_warning_count": 0,
-      "hard_fail_conditions": ["missing_stack_frames", "missing_code_trace", "missing_unwind_state", "wrong_return_value"]
+      "hard_fail_conditions": [
+        "schema_invalid", "unexpected_domain", "missing_required_snapshot_kind",
+        "forbidden_snapshot_kind", "missing_required_scene_type",
+        "missing_required_semantic_role", "missing_required_asset",
+        "missing_required_text_fact", "forbidden_text_fact",
+        "missing_required_state_field", "expected_conclusion_not_met",
+        "warning_count_exceeded", "invalid_timeline", "empty_narration",
+        "final_step_does_not_answer", "required_state_value_mismatch",
+        "invalid_state_reference", "invalid_state_transition",
+        "incorrect_state_order", "missing_visual_transition",
+        "invalid_semantic_evidence"
+      ]
     },
     {
       "id": "physics-projectile",
       "expected_domains": ["physics"],
-      "required_snapshot_kinds": ["motion_scene", "physics_force_scene"],
+      "required_snapshot_kinds": ["physics_force_scene"],
       "forbidden_snapshot_kinds": ["algorithm_array", "narration_card"],
       "required_scene_types": ["projectile_motion"],
       "required_semantic_roles": ["object", "trajectory", "horizontal_velocity", "vertical_velocity", "gravity"],
-      "required_asset_ids": [],
-      "required_text_facts": ["parabolic", "gravity", "horizontal velocity", "vertical velocity"],
-      "forbidden_text_facts": [],
+      "required_asset_ids": ["projectile-body-dot"],
+      "required_text_facts": [
+        {"id": "parabolic", "any_of": ["parabolic", "parabola", "抛物线"]},
+        {"id": "gravity", "any_of": ["gravity", "gravitational", "重力"]},
+        {"id": "horizontal_velocity", "any_of": ["horizontal velocity", "v_x", "vx", "水平速度", "水平匀速"]},
+        {"id": "vertical_velocity", "any_of": ["vertical velocity", "v_y", "vy", "竖直速度", "竖直加速", "竖直重力加速"]}
+      ],
+      "forbidden_text_facts": [
+        {"id": "wrong_horizontal_acceleration", "any_of": ["horizontal acceleration from gravity", "gravity accelerates horizontal", "水平方向受重力加速", "水平速度因重力增加"]}
+      ],
       "required_state_fields": ["objects", "vectors", "trajectory"],
-      "expected_conclusion": "Projectile motion combines constant horizontal velocity with vertical acceleration from gravity.",
+      "required_state_values": {},
+      "expected_conclusion": {
+        "statement": "Projectile motion combines constant horizontal velocity and vertical acceleration from gravity.",
+        "all_of": [
+          ["horizontal velocity", "v_x", "vx", "水平速度", "水平匀速"],
+          ["vertical acceleration", "vertical velocity", "v_y", "vy", "竖直加速", "竖直重力加速"],
+          ["gravity", "gravitational", "g 向下", "重力"]
+        ],
+        "none_of": ["horizontal acceleration from gravity", "gravity accelerates horizontal", "水平方向受重力加速", "水平速度因重力增加"]
+      },
       "maximum_warning_count": 0,
-      "hard_fail_conditions": ["missing_projectile", "missing_trajectory", "missing_velocity_components", "wrong_motion_law"]
+      "hard_fail_conditions": [
+        "schema_invalid", "unexpected_domain", "missing_required_snapshot_kind",
+        "forbidden_snapshot_kind", "missing_required_scene_type",
+        "missing_required_semantic_role", "missing_required_asset",
+        "missing_required_text_fact", "forbidden_text_fact",
+        "missing_required_state_field", "expected_conclusion_not_met",
+        "warning_count_exceeded", "invalid_timeline", "empty_narration",
+        "final_step_does_not_answer", "required_state_value_mismatch",
+        "invalid_state_reference", "invalid_state_transition",
+        "incorrect_state_order", "missing_visual_transition",
+        "invalid_semantic_evidence"
+      ]
     }
   ]
 }

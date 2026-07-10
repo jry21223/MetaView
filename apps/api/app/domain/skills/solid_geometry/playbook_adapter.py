@@ -34,18 +34,19 @@ def build_solid_geometry_playbook(
     steps: list[MetaStep] = []
     cumulative = 0
     for index, solution_step in enumerate(solution.steps):
+        is_final = index == len(solution.steps) - 1
         cumulative += _STEP_FRAMES
         snapshot = _build_snapshot(
             solution,
             solution_step,
-            is_final=index == len(solution.steps) - 1,
+            is_final=is_final,
         )
         steps.append(
             MetaStep(
                 step_id=f"solid_geometry_{index + 1:02d}",
                 end_frame=cumulative,
                 title=solution_step.title,
-                voiceover_text=_voiceover(solution_step),
+                voiceover_text=_voiceover(solution, solution_step, is_final=is_final),
                 animation_hint="solid_geometry_scene",
                 snapshot=snapshot,
                 layers=[
@@ -192,10 +193,20 @@ def _scaled_direction(direction: tuple[sp.Expr, sp.Expr, sp.Expr]) -> tuple[floa
     return to_three(unit)
 
 
-def _voiceover(step: SolidGeometrySolutionStep) -> str:
-    if step.latex:
-        return f"{step.explanation} {step.latex}"
-    return step.explanation
+def _voiceover(
+    solution: SolidGeometrySolution,
+    step: SolidGeometrySolutionStep,
+    *,
+    is_final: bool,
+) -> str:
+    narration = f"{step.explanation} {step.latex}" if step.latex else step.explanation
+    if not is_final:
+        return narration
+    if solution.query_kind == "line_plane_angle":
+        return f"{narration} 因此目标直线与底面所成的角（线面角）为 {solution.answer_latex}。"
+    if solution.query_kind == "volume":
+        return f"{narration} 因此立体的体积为 {solution.answer_latex}。"
+    return narration
 
 
 def _title_for(solution: SolidGeometrySolution, prompt: str) -> str:

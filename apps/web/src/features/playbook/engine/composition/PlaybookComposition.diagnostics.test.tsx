@@ -22,7 +22,7 @@ function scriptWithQualityWarning(): PlaybookScript {
     total_frames: 120,
     steps: [
       {
-        id: "step-1",
+        step_id: "step-1",
         title: "Asset warning",
         voiceover_text: "Show the curve with an unresolved asset marker.",
         narration_template: ["Show the curve with an unresolved asset marker."],

@@ -16,6 +16,7 @@ import { ConfirmDialog } from "../../shared/ui/ConfirmDialog";
 import { HistoryListSkeleton } from "./HistoryListSkeleton";
 import { AutoRefinedBadge } from "../../features/runs/AutoRefinedBadge";
 import { PromptDoctor } from "../../features/runs/PromptDoctor";
+import { QualityReportSummary } from "../../features/runs/QualityReportSummary";
 import { RunProgressStepper } from "../../features/runs/RunProgressStepper";
 import { themeMode } from "../../features/studio-editor/hooks/useTweaks";
 import type { PipelineRunResult } from "../../entities/pipeline/types";
@@ -477,9 +478,12 @@ export function HistoryPage({
           )}
           {selectedRun && selectedRun.status === "failed" && (
             <PromptDoctor
-              report={selectedRun.review ?? null}
+              report={selectedRun.review ?? selectedRun.quality_report ?? null}
               error={selectedRun.error}
             />
+          )}
+          {selectedRun && (
+            <QualityReportSummary report={selectedRun.quality_report ?? null} />
           )}
           {selectedRun &&
             (selectedRun.status === "queued" ||

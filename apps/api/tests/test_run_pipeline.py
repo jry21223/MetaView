@@ -57,6 +57,11 @@ class MockLLMSlow:
         return _VALID_CIR
 
 
+class FailingDirectorRepository:
+    async def upsert(self, director, updated_at: str) -> None:  # noqa: ARG002
+        raise RuntimeError("director database unavailable")
+
+
 @pytest.fixture
 def repo(tmp_path):
     db = str(tmp_path / "test.db")
@@ -83,6 +88,12 @@ async def test_successful_pipeline_run(repo) -> None:
     assert result.playbook is not None
     assert result.playbook.title == "Binary Search"
     assert result.error is None
+    assert result.quality_report is not None
+    assert result.quality_report.status == "warnings"
+    assert {issue.code for issue in result.quality_report.issues} == {
+        "timeline.voiceover_too_short"
+    }
+    assert result.quality_report.generator_path == "generic_cir"
 
 
 @pytest.mark.asyncio
@@ -101,6 +112,27 @@ async def test_successful_pipeline_run_persists_active_director(repos) -> None:
 
 
 @pytest.mark.asyncio
+async def test_director_persistence_failure_blocks_run_completion(repo) -> None:
+    use_case = RunPipelineUseCase(
+        repo,
+        MockLLMSuccess(),
+        director_repo=FailingDirectorRepository(),
+    )
+    await repo.create("run-director-fail", "test prompt", "2024-01-01T00:00:00+00:00")
+
+    await use_case.execute("run-director-fail", PipelineRequest(prompt="test prompt"))
+
+    result = await repo.get("run-director-fail")
+    assert result is not None
+    assert result.status == PipelineRunStatus.FAILED
+    assert result.quality_report is not None
+    assert result.quality_report.status == "blocked"
+    assert {issue.code for issue in result.quality_report.issues} >= {
+        "director.persistence_failed"
+    }
+
+
+@pytest.mark.asyncio
 async def test_failed_pipeline_run_on_invalid_json(repo) -> None:
     use_case = RunPipelineUseCase(repo, MockLLMFailure())
     await repo.create("run-2", "test prompt", "2024-01-01T00:00:00+00:00")
@@ -111,6 +143,11 @@ async def test_failed_pipeline_run_on_invalid_json(repo) -> None:
     assert result.status == PipelineRunStatus.FAILED
     assert result.playbook is None
     assert result.error is not None
+    assert result.quality_report is not None
+    assert result.quality_report.status == "blocked"
+    assert {issue.code for issue in result.quality_report.issues} >= {
+        "parse.invalid_json"
+    }
 
 
 @pytest.mark.asyncio
@@ -150,3 +187,8 @@ async def test_pipeline_total_timeout_marks_run_failed(repo) -> None:
     assert result is not None
     assert result.status == PipelineRunStatus.FAILED
     assert result.error == "Pipeline timed out after 0.0s"
+    assert result.quality_report is not None
+    assert result.quality_report.status == "blocked"
+    assert {issue.code for issue in result.quality_report.issues} == {
+        "pipeline.timeout"
+    }

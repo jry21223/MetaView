@@ -26,9 +26,13 @@ from app.domain.skills.solid_geometry.skill_pack import SolidGeometrySkillPack
 class _RecordingRepo:
     def __init__(self) -> None:
         self.updates: list[dict[str, Any]] = []
+        self.quality_reports: list[dict[str, Any]] = []
 
     async def update(self, run_id: str, **kwargs: Any) -> None:
         self.updates.append({"run_id": run_id, **kwargs})
+
+    async def update_quality_report(self, run_id: str, quality_report_json: str) -> None:
+        self.quality_reports.append({"run_id": run_id, "report": json.loads(quality_report_json)})
 
     @property
     def final_status(self) -> PipelineRunStatus:
@@ -123,6 +127,54 @@ class FakeSkillPack:
         )
 
 
+class MissingAssetSkillPack(FakeSkillPack):
+    manifest = SkillManifest(
+        skill_id="missing_asset_skill",
+        domain="math",
+        name="Missing Asset Skill",
+        description="Returns a renderer-valid playbook with an unresolved asset.",
+        execution_mode="deterministic",
+        capabilities=[
+            SkillCapability(
+                capability_id="missing.asset",
+                description="Missing asset regression fixture",
+                examples=["missing asset skill test"],
+            )
+        ],
+    )
+
+    def heuristic_match(self, request: SkillRouteInput) -> SkillRouteMatch | None:
+        if "missing asset skill test" not in request.prompt:
+            return None
+        return SkillRouteMatch(
+            skill_id=self.manifest.skill_id,
+            domain="math",
+            confidence=0.99,
+            capability_id="missing.asset",
+            problem_spec={"text": request.prompt},
+        )
+
+    async def execute(
+        self,
+        context: SkillExecutionContext,
+        problem_spec: BaseModel | None,
+    ) -> SkillExecutionResult:
+        payload = json.loads(_fake_playbook_json(context.prompt))
+        snapshot = {
+            "kind": "math_plot",
+            "pack_id": "math-basic",
+            "asset_id": "does-not-exist",
+            "curves": [{"expression": "x", "label": "f"}],
+        }
+        payload["steps"][0]["snapshot"] = snapshot
+        payload["steps"][0]["layers"] = [{"body": snapshot}]
+        return SkillExecutionResult(
+            handled=True,
+            playbook_json=json.dumps(payload),
+            review_actions=["skill:missing_asset_skill"],
+        )
+
+
 def test_run_pipeline_does_not_import_solid_geometry_directly() -> None:
     source = Path("apps/api/app/application/use_cases/run_pipeline.py").read_text(encoding="utf-8")
 
@@ -205,6 +257,30 @@ async def test_new_skill_can_run_without_pipeline_changes() -> None:
 
     assert repo.final_status == PipelineRunStatus.SUCCEEDED
     assert "skill:fake_skill" in repo.review_json
+    assert repo.quality_reports[-1]["report"]["status"] == "clean"
+
+
+@pytest.mark.asyncio
+async def test_specialized_skill_quality_error_cannot_succeed() -> None:
+    repo = _RecordingRepo()
+    use_case = RunPipelineUseCase(
+        repo,
+        _FailingLLM(),
+        skill_registry=SkillRegistry([MissingAssetSkillPack()]),
+    )
+
+    await use_case.execute(
+        "run-missing-asset",
+        PipelineRequest(prompt="missing asset skill test"),
+    )
+
+    assert repo.final_status == PipelineRunStatus.FAILED
+    report = repo.quality_reports[-1]["report"]
+    assert report["status"] == "blocked"
+    assert {issue["code"] for issue in report["issues"]} >= {
+        "asset.missing",
+        "quality.repair_unavailable",
+    }
 
 
 @pytest.mark.asyncio
@@ -249,29 +325,31 @@ async def test_geography_earth_scene_blueprint_runs_through_default_registry() -
 
 
 @pytest.mark.asyncio
-async def test_no_skill_match_falls_back_to_generic_or_agent() -> None:
+async def test_no_skill_match_blocks_generic_output_that_does_not_cover_prompt() -> None:
     registry = SkillRegistry([FakeSkillPack()])
     repo = _RecordingRepo()
     use_case = RunPipelineUseCase(repo, _WorkingLLM(), skill_registry=registry)
 
     await use_case.execute("run-generic", PipelineRequest(prompt="解释一下概率密度函数"))
 
-    assert repo.final_status == PipelineRunStatus.SUCCEEDED
+    assert repo.final_status == PipelineRunStatus.FAILED
     assert "skill:fake_skill" not in repo.review_json
+    issue_codes = {issue["code"] for issue in repo.quality_reports[-1]["report"]["issues"]}
+    assert "step.does_not_answer_prompt" in issue_codes
 
 
 def _fake_playbook_json(text: str) -> str:
     playbook = PlaybookScript.model_validate(
         {
             "fps": 30,
-            "total_frames": 60,
+            "total_frames": 180,
             "domain": "math",
             "title": "Fake Skill",
             "summary": text,
             "steps": [
                 {
                     "step_id": "fake_01",
-                    "end_frame": 60,
+                    "end_frame": 180,
                     "title": "Echo",
                     "voiceover_text": "Echo the fake skill input.",
                     "tokens": [],

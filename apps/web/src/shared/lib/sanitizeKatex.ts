@@ -92,9 +92,16 @@ export function sanitizeKatex(
   } catch {
     return "";
   }
-  return DOMPurify.sanitize(html, {
+  const sanitized = DOMPurify.sanitize(html, {
     FORBID_TAGS: KATEX_FORBID_TAGS,
     FORBID_ATTR: KATEX_FORBID_ATTR,
     KEEP_CONTENT: true,
   });
+  // DOMPurify may unwrap KaTeX's harmless outer display container in JSDOM
+  // while retaining the MathML ``display=block`` payload. Restore that fixed
+  // wrapper so display-mode layout remains stable after sanitization.
+  if (options.displayMode && !sanitized.includes('class="katex-display"')) {
+    return `<span class="katex-display">${sanitized}</span>`;
+  }
+  return sanitized;
 }

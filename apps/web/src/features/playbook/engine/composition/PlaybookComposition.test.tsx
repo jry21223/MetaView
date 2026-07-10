@@ -399,9 +399,13 @@ describe("PlaybookComposition", () => {
     expect(markup).not.toContain("Unknown snapshot kind");
   });
 
-  it("exposes non-blocking visual quality warning metadata", () => {
+  it("exposes non-blocking visual quality warning metadata only in diagnostics mode", () => {
     const markup = renderToStaticMarkup(
-      <PlaybookComposition script={geographyArrayFallbackScript()} showSubtitles={false} />,
+      <PlaybookComposition
+        script={geographyArrayFallbackScript()}
+        showSubtitles={false}
+        showDiagnostics
+      />,
     );
 
     expect(markup).toContain('data-visual-quality-warning-count="1"');

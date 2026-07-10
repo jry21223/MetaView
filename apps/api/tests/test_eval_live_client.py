@@ -3,7 +3,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from eval.live_client import generate_live_playbook
+from eval.live_client import generate_live_playbook, generate_live_playbook_with_metadata
 
 
 class _Response:
@@ -34,7 +34,12 @@ def test_generate_live_playbook_submits_and_polls_current_api(monkeypatch) -> No
 
     statuses = iter([
         {"run_id": "run-1", "status": "running"},
-        {"run_id": "run-1", "status": "succeeded", "playbook": {"title": "ok"}},
+        {
+            "run_id": "run-1",
+            "status": "succeeded",
+            "playbook": {"title": "ok"},
+            "quality_report": {"attempts": 0, "issues": []},
+        },
     ])
 
     def get(url: str, *, timeout: int) -> _Response:
@@ -62,3 +67,81 @@ def test_generate_live_playbook_surfaces_failed_run(monkeypatch) -> None:
 
     with pytest.raises(RuntimeError, match="boom"):
         generate_live_playbook("hello", "http://localhost:8000", poll_interval=0)
+
+
+def test_generate_live_playbook_preserves_available_metrics_and_nulls(monkeypatch) -> None:
+    monkeypatch.setattr(httpx, "post", lambda *_, **__: _Response({"run_id": "run-2"}))
+    monkeypatch.setattr(
+        httpx,
+        "get",
+        lambda *_, **__: _Response(
+            {
+                "run_id": "run-2",
+                "status": "succeeded",
+                "playbook": {"title": "ok"},
+                "review": {"attempts": 2, "issues": [{"severity": "warning"}]},
+                "telemetry": {"input_tokens": 123, "outputTokens": 45},
+            }
+        ),
+    )
+
+    result = generate_live_playbook_with_metadata(
+        "hello",
+        "http://localhost:8000",
+        poll_interval=0,
+    )
+
+    assert result.run_id == "run-2"
+    assert result.latency_ms >= 0
+    assert result.repair_count == 2
+    assert result.input_tokens == 123
+    assert result.output_tokens == 45
+    assert result.warning_count == 1
+    assert result.estimated_cost is None
+
+
+def test_generate_live_playbook_rejects_missing_warning_telemetry(monkeypatch) -> None:
+    monkeypatch.setattr(httpx, "post", lambda *_, **__: _Response({"run_id": "run-3"}))
+    monkeypatch.setattr(
+        httpx,
+        "get",
+        lambda *_, **__: _Response(
+            {"run_id": "run-3", "status": "succeeded", "playbook": {"title": "ok"}}
+        ),
+    )
+
+    with pytest.raises(ValueError, match="warning telemetry"):
+        generate_live_playbook_with_metadata(
+            "hello",
+            "http://localhost:8000",
+            poll_interval=0,
+        )
+
+
+def test_generate_live_playbook_reads_repair_count_from_quality_report(monkeypatch) -> None:
+    monkeypatch.setattr(httpx, "post", lambda *_, **__: _Response({"run_id": "run-4"}))
+    monkeypatch.setattr(
+        httpx,
+        "get",
+        lambda *_, **__: _Response(
+            {
+                "run_id": "run-4",
+                "status": "succeeded",
+                "playbook": {"title": "ok"},
+                "review": {"issues": []},
+                "quality_report": {"attempts": 3, "issues": []},
+            }
+        ),
+    )
+
+    result = generate_live_playbook_with_metadata(
+        "hello",
+        "http://localhost:8000",
+        poll_interval=0,
+    )
+
+    assert result.repair_count == 3
+    assert result.input_tokens is None
+    assert result.output_tokens is None
+    assert result.estimated_cost is None
+    assert result.warning_count == 0

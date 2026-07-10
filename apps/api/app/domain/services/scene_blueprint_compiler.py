@@ -36,6 +36,7 @@ from app.domain.services.chemistry_layout_compiler import (
 from app.domain.services.geography_layout_compiler import compile_geo_map_snapshot
 from app.domain.services.math_layout_compiler import compile_math_plot_snapshot
 from app.domain.services.physics_layout_compiler import compile_physics_force_snapshot
+from app.domain.services.playbook_quality import estimate_step_frames
 
 _FPS = 30
 _DEFAULT_STEP_FRAMES = 180
@@ -81,14 +82,14 @@ def _required_str(payload: dict[str, Any], key: str) -> str:
     return value
 
 
-def _step_frames(blueprint: dict[str, Any]) -> int:
+def _step_frames(blueprint: dict[str, Any]) -> int | None:
     duration_frames = blueprint.get("durationFrames")
     if isinstance(duration_frames, int | float):
         return max(1, round(duration_frames))
     duration_seconds = blueprint.get("durationSeconds")
     if isinstance(duration_seconds, int | float):
         return max(1, round(duration_seconds * _FPS))
-    return _DEFAULT_STEP_FRAMES
+    return None
 
 
 def _compile_steps(
@@ -96,7 +97,7 @@ def _compile_steps(
     title: str,
     snapshot: Any,
     code_highlight: CodeHighlightOverlay | None,
-    step_frames: int,
+    step_frames: int | None,
 ) -> list[MetaStep]:
     base_caption = str(getattr(snapshot, "caption", "") or title)
     captions = _step_captions(scene_type, title, base_caption)
@@ -104,13 +105,20 @@ def _compile_steps(
         :_SCENE_BLUEPRINT_STEP_COUNT
     ]
     steps: list[MetaStep] = []
+    frame_cursor = 0
     for index, caption in enumerate(captions, start=1):
         step_snapshot = snapshot.model_copy(deep=True)
         step_code_highlight = code_highlight.model_copy(deep=True) if code_highlight else None
+        duration = (
+            step_frames
+            if step_frames is not None
+            else max(_DEFAULT_STEP_FRAMES, estimate_step_frames(caption, _FPS))
+        )
+        frame_cursor += duration
         steps.append(
             MetaStep(
                 step_id=f"{scene_type}_{index:02d}",
-                end_frame=index * step_frames,
+                end_frame=frame_cursor,
                 title=f"{title} · {index}",
                 voiceover_text=caption,
                 animation_hint=step_snapshot.kind,

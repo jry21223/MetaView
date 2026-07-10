@@ -6,14 +6,15 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 describe("asset check targets", () => {
-  it("includes asset gates in the root make check path", () => {
+  it("keeps asset and Remotion gates in the dedicated visual-check path", () => {
     const makefile = readFileSync(path.resolve(__dirname, "../../../../../../../Makefile"), "utf8");
     const webPackage = readFileSync(path.resolve(__dirname, "../../../../../package.json"), "utf8");
 
     expect(makefile).toMatch(/^asset-audit:/m);
     expect(makefile).toMatch(/^asset-showcase:/m);
-    expect(makefile).toMatch(/^check: .*asset-audit/m);
-    expect(makefile).toMatch(/^check: .*asset-showcase/m);
+    expect(makefile).toMatch(/^check: lint test build$/m);
+    expect(makefile).toMatch(/^visual-check: .*asset-audit/m);
+    expect(makefile).toMatch(/^visual-check: .*asset-showcase/m);
     expect(webPackage).toContain('"showcase:smoke"');
     expect(webPackage).toContain('"showcase:baseline"');
     expect(webPackage).toContain('"showcase:baseline:release"');

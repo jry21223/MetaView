@@ -14,11 +14,13 @@ def _create_pipeline_runs(conn: sqlite3.Connection) -> None:
             playbook_json TEXT,
             error       TEXT,
             review_json TEXT,
+            quality_report_json TEXT,
             created_at  TEXT NOT NULL,
             FOREIGN KEY(user_id) REFERENCES accounts(user_id)
         )
     """)
     _add_column_if_missing(conn, "pipeline_runs", "user_id", "TEXT")
+    _add_column_if_missing(conn, "pipeline_runs", "quality_report_json", "TEXT")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS pipeline_run_followups (
             followup_id    TEXT PRIMARY KEY,

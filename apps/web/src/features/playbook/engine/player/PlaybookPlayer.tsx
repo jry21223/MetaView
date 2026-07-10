@@ -78,7 +78,7 @@ interface PlaybookPlayerProps {
 export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   script: baseScript,
   director = null,
-  theme = "dark",
+  theme = "light",
   swapDurationFrames = 24,
   onOpenExport,
   followupSlot,
@@ -262,6 +262,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     currentNarrationFallback,
   );
   const showMobileConsole = isPortraitLayout && showLearningConsole;
+  const showStageSubtitles = !(showMobileConsole && mobileTab === "narration");
   const mobileSheetTitle =
     mobileSheet === "code"
       ? "全部代码"
@@ -343,7 +344,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
             script,
             director,
             theme,
-            showSubtitles: true,
+            showSubtitles: showStageSubtitles,
             swapDurationFrames,
           }}
           durationInFrames={script.total_frames}

@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 
-.PHONY: bootstrap bootstrap-manim setup-hooks dev-web dev-api dev-agent dev review-real-generation start stop lint test test-coverage build asset-audit asset-showcase asset-showcase-release check docker-build docker-up docker-down eval eval-shots eval-generate
+.PHONY: bootstrap bootstrap-manim setup-hooks dev-web dev-api dev-agent dev review-real-generation start stop lint test test-coverage build asset-audit asset-showcase asset-showcase-release check visual-check docker-build docker-up docker-down eval eval-gold eval-shots eval-generate
 
 DOCKER_COMPOSE_CMD := $(shell sh -lc 'if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then printf "%s" "docker compose"; elif command -v docker-compose >/dev/null 2>&1; then printf "%s" "docker-compose"; fi')
 
@@ -77,7 +77,11 @@ asset-showcase-release:
 	npm --workspace apps/web run showcase:baseline:release
 	npm --workspace apps/web run showcase:review-packet
 
-check: asset-audit asset-showcase lint test build
+check: lint test build
+
+# Existing renderer/asset visual checks remain independent from the fast
+# contract/unit gate so CI and local development can opt into the heavier path.
+visual-check: asset-audit asset-showcase
 
 docker-check:
 	@if [ -z "$(DOCKER_COMPOSE_CMD)" ]; then \
@@ -115,6 +119,16 @@ eval-generate:
 eval:
 	cd apps/api && uv run python -m eval.runner --recorded \
 		--prompts ../../eval/prompts/starter.yaml
+
+# Benchmark V2 is a strict gate: every Gold Case attempt must pass.  Recorded
+# mode evaluates the checked-in baseline fixtures; LIVE=1 performs three real
+# generations per case and records stability/latency/telemetry when available.
+eval-gold:
+	cd apps/api && ../../.venv/bin/python -m eval.runner --benchmark-v2 \
+		$(if $(LIVE),--live --api $(or $(API),http://localhost:8000),--recorded) \
+		--repeat $(or $(REPEAT),3) \
+		--prompts ../../eval/prompts/starter.yaml \
+		--expectations ../../eval/benchmark_v2/gold_cases.json
 
 # Render per-step PNG stills for one playbook fixture.
 # Usage: make eval-shots ID=sample_math_playbook

@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 from app.domain.models.director import DirectorScript
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.domain.models.playbook import PlaybookScript
+from app.domain.models.quality_report import QualityReport
 from app.domain.models.review import CirReviewReport, PlaybookReviewVerdict
 
 
@@ -73,3 +74,4 @@ class PipelineRunResponse(BaseModel):
     error: str | None = None
     created_at: str
     review: CirReviewReport | PlaybookReviewVerdict | None = None
+    quality_report: QualityReport | None = None

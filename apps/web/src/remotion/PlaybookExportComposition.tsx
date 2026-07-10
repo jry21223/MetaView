@@ -35,6 +35,7 @@ export const PlaybookExportComposition: React.FC<PlaybookExportProps> = ({
         director={director}
         theme={theme}
         showSubtitles={showSubtitles}
+        showDiagnostics={false}
       />
       {audioFiles.map((src, i) => {
         if (!src) return null;
