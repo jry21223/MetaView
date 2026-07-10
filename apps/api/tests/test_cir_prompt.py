@@ -1,3 +1,4 @@
+from app.application.services.lesson_planner import build_rule_based_lesson_plan
 from app.domain.models.topic import TopicDomain
 from app.domain.services.cir_prompt import build_cir_prompt
 from app.domain.services.domain_router import SkillMode
@@ -13,6 +14,23 @@ def test_user_prompt_equals_original_input() -> None:
     prompt = "请可视化二分查找"
     _, user = build_cir_prompt(prompt, TopicDomain.ALGORITHM)
     assert user == prompt
+
+
+def test_canonical_lesson_plan_guides_cir_without_changing_user_prompt() -> None:
+    prompt = "用 BFS 解释广度优先遍历为什么需要队列"
+    lesson_plan = build_rule_based_lesson_plan(prompt=prompt, domain="algorithm")
+
+    system, user = build_cir_prompt(
+        prompt,
+        TopicDomain.ALGORITHM,
+        lesson_plan=lesson_plan,
+    )
+
+    assert user == prompt
+    assert "Canonical LessonPlan" in system
+    assert '"preferred_scene_type": "bfs_graph"' in system
+    assert '"required_fact_ids"' in system
+    assert "Do not copy LessonPlan into renderer payloads" in system
 
 
 def test_system_prompt_contains_domain_hint() -> None:

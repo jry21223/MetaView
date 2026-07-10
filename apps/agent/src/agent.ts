@@ -34,6 +34,7 @@ export interface GenerateOptions {
   language?: string | null;
   provider?: ProviderConfig;
   routeDecision?: Record<string, unknown>;
+  lessonPlan?: Record<string, unknown>;
   playbookSchema?: Record<string, unknown>;
   constraints?: Record<string, unknown>;
   availableTools?: Array<Record<string, unknown>>;
@@ -48,6 +49,13 @@ export interface GenerateOptions {
 export const SYSTEM_PROMPT =
   `You are MetaView's educational visual designer. You build a
 step-by-step playbook by calling drawing tools.
+
+When the user prompt contains a \`[MetaView LessonPlan]\`, it is a BINDING,
+read-only teaching contract. Derive \`plan_outline\` from its SceneIntents in
+order, expanding one intent into multiple steps when needed to reach 8-14
+steps. Every required fact, visual role, preferred scene type, narration goal,
+and expected conclusion must be covered. Do not replace the plan with a new
+teaching arc, and do not copy LessonPlan fields into the final PlaybookScript.
 
 Workflow you MUST follow:
 
@@ -108,7 +116,11 @@ const MAX_SELF_REPAIR_ATTEMPTS = 2;
 export async function runAgentGeneration(
   opts: GenerateOptions,
 ): Promise<PlaybookOutput> {
-  let userPrompt = buildAgentPrompt(opts.prompt, opts.routeDecision);
+  let userPrompt = buildAgentPrompt(
+    opts.prompt,
+    opts.routeDecision,
+    opts.lessonPlan,
+  );
   let lastReport: SelfCheckReport | null = null;
 
   for (let attempt = 0; attempt <= MAX_SELF_REPAIR_ATTEMPTS; attempt++) {
@@ -124,6 +136,7 @@ export async function runAgentGeneration(
     userPrompt = buildAgentSelfRepairPrompt({
       originalPrompt: opts.prompt,
       routeDecision: opts.routeDecision,
+      lessonPlan: opts.lessonPlan,
       previousPlaybook: playbook,
       report,
       repairAttempt: attempt + 1,
@@ -266,23 +279,33 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function buildAgentPrompt(
+export function buildAgentPrompt(
   prompt: string,
   routeDecision?: Record<string, unknown>,
+  lessonPlan?: Record<string, unknown>,
 ): string {
-  if (!routeDecision) {
+  if (!routeDecision && !lessonPlan) {
     return prompt;
   }
-  return `[MetaView route decision]
-${JSON.stringify(routeDecision, null, 2)}
-
-[user prompt]
-${prompt}`;
+  const sections: string[] = [];
+  if (lessonPlan) {
+    sections.push(
+      `[MetaView LessonPlan]\nBINDING read-only teaching contract: preserve SceneIntent order and cover every required fact, visual role, narration goal, and expected conclusion. Expand intents into 8-14 Playbook steps; do not emit LessonPlan inside PlaybookScript.\n${JSON.stringify(lessonPlan, null, 2)}`,
+    );
+  }
+  if (routeDecision) {
+    sections.push(
+      `[MetaView route decision]\n${JSON.stringify(routeDecision, null, 2)}`,
+    );
+  }
+  sections.push(`[user prompt]\n${prompt}`);
+  return sections.join("\n\n");
 }
 
 interface SelfRepairPromptInput {
   originalPrompt: string;
   routeDecision?: Record<string, unknown>;
+  lessonPlan?: Record<string, unknown>;
   previousPlaybook: PlaybookOutput;
   report: SelfCheckReport;
   repairAttempt: number;
@@ -297,10 +320,12 @@ export function buildAgentSelfRepairPrompt(
     max_self_repair_attempts: MAX_SELF_REPAIR_ATTEMPTS,
     original_prompt: input.originalPrompt,
     route_decision: input.routeDecision ?? null,
+    lesson_plan: input.lessonPlan ?? null,
     previous_playbook: input.previousPlaybook,
     self_check: input.report,
     instructions: [
       "Repair by building a complete PlaybookScript through the Drawing CLI tools.",
+      "Treat lesson_plan as binding: preserve SceneIntent order and cover every required fact, visual role, narration goal, and expected conclusion.",
       "Keep PlaybookScript as the only rendering exit.",
       "Do not introduce raw HTML, iframe, Manim, or server video rendering.",
       "Use only renderer-supported snapshot kinds.",

@@ -16,11 +16,14 @@ from app.application.agent.types import AgentConstraints, AgentRequest
 from app.application.dto.pipeline_dto import PipelineRequest
 from app.application.ports.agent_provider import AgentProviderError, IAgentProvider
 from app.application.ports.director_repository import IRunDirectorRepository
+from app.application.ports.lesson_planner import ILessonPlanner
 from app.application.ports.llm_provider import ILLMProvider
 from app.application.ports.router_provider import IRouterProvider
 from app.application.ports.run_repository import IRunRepository
+from app.application.services.lesson_planner import RuleBasedLessonPlanner
 from app.config import GenerationMode, RouterMode
 from app.domain.models.cir import CirDocument, ExecutionMap
+from app.domain.models.lesson_plan import LessonPlan
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.domain.models.playbook import PlaybookScript
 from app.domain.models.quality_report import QualityReport
@@ -99,6 +102,7 @@ class RunPipelineUseCase:
         router_mode: RouterMode | str = "hybrid",
         router_min_confidence: float = 0.72,
         router_refine_confidence: float = 0.55,
+        lesson_planner: ILessonPlanner | None = None,
     ) -> None:
         self._repo = run_repo
         self._llm = llm
@@ -118,6 +122,7 @@ class RunPipelineUseCase:
         )
         self._router_min_confidence = router_min_confidence
         self._router_refine_confidence = router_refine_confidence
+        self._lesson_planner = lesson_planner or RuleBasedLessonPlanner()
 
     async def execute(self, run_id: str, request: PipelineRequest) -> None:
         await self._repo.update(run_id, status=PipelineRunStatus.RUNNING)
@@ -127,16 +132,27 @@ class RunPipelineUseCase:
 
                 agent_pipeline = AgentPipeline(
                     route_request=self._route_request,
-                    try_execute_skill=self._try_execute_skill,
+                    try_execute_skill=lambda rid, req, match, plan: self._try_execute_skill(
+                        rid,
+                        req,
+                        match,
+                        lesson_plan=plan,
+                    ),
                     fail_skill_consistency=self._fail_skill_consistency,
                     build_route_context=lambda req, match: self._generic_route_context(
                         req,
                         route_match=match,
                     ),
-                    execute_agent=lambda rid, req, ctx: self._execute_agent(
+                    prepare_lesson_plan=lambda rid, req, ctx: self._prepare_lesson_plan(
                         rid,
                         req,
                         route_context=ctx,  # type: ignore[arg-type]
+                    ),
+                    execute_agent=lambda rid, req, ctx, plan: self._execute_agent(
+                        rid,
+                        req,
+                        route_context=ctx,  # type: ignore[arg-type]
+                        lesson_plan=plan,
                     ),
                 )
                 await self._run_with_total_timeout(
@@ -145,19 +161,8 @@ class RunPipelineUseCase:
                 )
                 return
 
-            route_match = await self._route_request(request)
-            if route_match is not None:
-                try:
-                    handled = await self._try_execute_skill(run_id, request, route_match)
-                except AssertionError as exc:
-                    await self._fail_skill_consistency(run_id, route_match, str(exc))
-                    return
-                if handled:
-                    return
-
-            route_context = self._generic_route_context(request, route_match=route_match)
             await self._run_with_total_timeout(
-                self._execute_single(run_id, request, route_context=route_context),
+                self._execute_routed_single_pipeline(run_id, request),
                 run_id=run_id,
             )
         except TimeoutError:
@@ -193,6 +198,38 @@ class RunPipelineUseCase:
                 status=PipelineRunStatus.FAILED,
                 error=str(exc),
             )
+
+    async def _execute_routed_single_pipeline(
+        self,
+        run_id: str,
+        request: PipelineRequest,
+    ) -> None:
+        route_match = await self._route_request(request)
+        route_context = self._generic_route_context(request, route_match=route_match)
+        lesson_plan = await self._prepare_lesson_plan(
+            run_id,
+            request,
+            route_context=route_context,
+        )
+        if route_match is not None:
+            try:
+                handled = await self._try_execute_skill(
+                    run_id,
+                    request,
+                    route_match,
+                    lesson_plan=lesson_plan,
+                )
+            except AssertionError as exc:
+                await self._fail_skill_consistency(run_id, route_match, str(exc))
+                return
+            if handled:
+                return
+        await self._execute_single(
+            run_id,
+            request,
+            route_context=route_context,
+            lesson_plan=lesson_plan,
+        )
 
     async def _run_with_total_timeout(self, operation, *, run_id: str) -> None:
         timeout = self._pipeline_timeout_s
@@ -292,11 +329,32 @@ class RunPipelineUseCase:
             router_model=getattr(self._router_provider, "model_name", None),
         )
 
+    async def _prepare_lesson_plan(
+        self,
+        run_id: str,
+        request: PipelineRequest,
+        *,
+        route_context: RouteContext,
+    ) -> LessonPlan:
+        lesson_plan = await self._lesson_planner.plan(
+            prompt=request.prompt,
+            domain=route_context.decision.domain or request.domain,
+            route_decision=route_context.decision,
+            source_code=request.source_code,
+            language=request.language,
+        )
+        update_lesson_plan = getattr(self._repo, "update_lesson_plan", None)
+        if callable(update_lesson_plan):
+            await update_lesson_plan(run_id, lesson_plan.model_dump_json())
+        return lesson_plan
+
     async def _try_execute_skill(
         self,
         run_id: str,
         request: PipelineRequest,
         route_match: SkillRouteMatch,
+        *,
+        lesson_plan: LessonPlan,
     ) -> bool:
         skill = self._skill_registry.get(route_match.skill_id)
         if skill is None:
@@ -326,11 +384,21 @@ class RunPipelineUseCase:
                 run_id=run_id,
                 prompt=request.prompt,
                 route_match=route_match,
+                lesson_plan=lesson_plan,
             ),
             problem_spec,
         )
         if not result.handled or result.playbook_json is None:
             return False
+        if result.lesson_plan is not None:
+            if result.lesson_plan.domain != lesson_plan.domain:
+                raise AssertionError(
+                    "SkillPack LessonPlan domain does not match the routed LessonPlan domain."
+                )
+            lesson_plan = result.lesson_plan
+            update_lesson_plan = getattr(self._repo, "update_lesson_plan", None)
+            if callable(update_lesson_plan):
+                await update_lesson_plan(run_id, lesson_plan.model_dump_json())
 
         try:
             playbook = PlaybookScript.model_validate_json(result.playbook_json)
@@ -379,6 +447,7 @@ class RunPipelineUseCase:
             request.prompt,
             generator_path="skill_pack",
             coverage_mode="specialized",
+            lesson_plan=lesson_plan,
         )
         quality_report.actions = list(review_report.actions)
         if quality_report.status == "repairable":
@@ -454,6 +523,7 @@ class RunPipelineUseCase:
         request: PipelineRequest,
         *,
         route_context: RouteContext,
+        lesson_plan: LessonPlan,
     ) -> None:
         """Generate via the Node sidecar (pi-agent-core) and persist the
         resulting PlaybookScript verbatim. Skips CIR parsing / playbook_builder
@@ -481,6 +551,7 @@ class RunPipelineUseCase:
                 provider_config=provider_config,
                 route_context=route_context,
                 review_report=review_report,
+                lesson_plan=lesson_plan,
             )
             playbook, review_report = await self._review_agent_playbook(
                 run_id,
@@ -489,6 +560,7 @@ class RunPipelineUseCase:
                 provider_config=provider_config,
                 route_context=route_context,
                 review_report=review_report,
+                lesson_plan=lesson_plan,
             )
             quality_report = _quality_report_with_review(
                 playbook,
@@ -496,6 +568,7 @@ class RunPipelineUseCase:
                 review_report,
                 generator_path="agent",
                 coverage_mode="experimental",
+                lesson_plan=lesson_plan,
             )
             if quality_report.status == "repairable":
                 review_report = _with_playbook_review_actions(
@@ -520,6 +593,7 @@ class RunPipelineUseCase:
                     provider_config=provider_config,
                     route_context=route_context,
                     review_report=review_report,
+                    lesson_plan=lesson_plan,
                 )
                 playbook, review_report = await self._review_agent_playbook(
                     run_id,
@@ -528,6 +602,7 @@ class RunPipelineUseCase:
                     provider_config=provider_config,
                     route_context=route_context,
                     review_report=review_report,
+                    lesson_plan=lesson_plan,
                 )
                 quality_report = _quality_report_with_review(
                     playbook,
@@ -535,6 +610,7 @@ class RunPipelineUseCase:
                     review_report,
                     generator_path="agent",
                     coverage_mode="experimental",
+                    lesson_plan=lesson_plan,
                 )
             if quality_report.status == "repairable":
                 quality_report = _mark_quality_repair_exhausted(quality_report)
@@ -620,6 +696,7 @@ class RunPipelineUseCase:
         provider_config: dict[str, Any] | None,
         route_context: RouteContext,
         review_report: PlaybookReviewVerdict,
+        lesson_plan: LessonPlan,
     ) -> tuple[PlaybookScript, PlaybookReviewVerdict]:
         assert self._agent_provider is not None
         generation_prompt = prompt
@@ -631,6 +708,7 @@ class RunPipelineUseCase:
                 request=request,
                 provider_config=provider_config,
                 route_context=route_context,
+                lesson_plan=lesson_plan,
             )
             last_payload = playbook_dict
             # Validate the sidecar payload against the canonical PlaybookScript
@@ -661,7 +739,7 @@ class RunPipelineUseCase:
                 )
                 continue
 
-            check = self_check_playbook(playbook, prompt)
+            check = self_check_playbook(playbook, prompt, lesson_plan=lesson_plan)
             check = _with_playbook_review_actions(
                 check,
                 [*review_report.actions, *check.actions, f"agent:self_check:{check.status.value}"],
@@ -699,6 +777,7 @@ class RunPipelineUseCase:
         provider_config: dict[str, Any] | None,
         route_context: RouteContext,
         review_report: PlaybookReviewVerdict,
+        lesson_plan: LessonPlan,
     ) -> tuple[PlaybookScript, PlaybookReviewVerdict]:
         if self._reviewer_mode == "off":
             return playbook, _with_playbook_review_actions(
@@ -776,6 +855,7 @@ class RunPipelineUseCase:
                 provider_config=provider_config,
                 route_context=route_context,
                 review_report=review_report,
+                lesson_plan=lesson_plan,
             )
 
         raise PipelineValidationError(review_report)
@@ -805,6 +885,7 @@ class RunPipelineUseCase:
         provider_config: dict[str, Any] | None,
         route_context: RouteContext,
         review_report: PlaybookReviewVerdict,
+        lesson_plan: LessonPlan,
     ) -> tuple[PlaybookScript, PlaybookReviewVerdict]:
         assert self._agent_provider is not None
         repair_prompt = _build_agent_reviewer_repair_prompt(request.prompt, playbook, blocking)
@@ -814,6 +895,7 @@ class RunPipelineUseCase:
             request=request,
             provider_config=provider_config,
             route_context=route_context,
+            lesson_plan=lesson_plan,
         )
         try:
             repaired = PlaybookScript.model_validate(repaired_payload)
@@ -824,7 +906,11 @@ class RunPipelineUseCase:
                     actions=[*review_report.actions, "agent:schema_validation:blocked"],
                 )
             ) from exc
-        check = self_check_playbook(repaired, request.prompt)
+        check = self_check_playbook(
+            repaired,
+            request.prompt,
+            lesson_plan=lesson_plan,
+        )
         check = _with_playbook_review_actions(
             check,
             [*review_report.actions, *check.actions, f"agent:self_check:{check.status.value}"],
@@ -841,6 +927,7 @@ class RunPipelineUseCase:
         request: PipelineRequest,
         provider_config: dict[str, Any] | None,
         route_context: RouteContext,
+        lesson_plan: LessonPlan,
     ) -> dict[str, Any]:
         assert self._agent_provider is not None
         route_decision = route_context.decision.model_dump(mode="json")
@@ -850,6 +937,7 @@ class RunPipelineUseCase:
             source_code=request.source_code,
             language=request.language,
             route_decision=route_decision,
+            lesson_plan=lesson_plan,
             provider_config=provider_config,
             playbook_schema=PlaybookScript.model_json_schema(),
             constraints=AgentConstraints(
@@ -865,7 +953,7 @@ class RunPipelineUseCase:
             result = await runner(agent_request)
             return result.playbook
         return await self._agent_provider.generate(
-            prompt,
+            _build_agent_generation_prompt(prompt, lesson_plan),
             provider_config=provider_config,
             route_decision=route_decision,
         )
@@ -876,6 +964,7 @@ class RunPipelineUseCase:
         request: PipelineRequest,
         *,
         route_context: RouteContext,
+        lesson_plan: LessonPlan,
     ) -> None:
         """Original single-shot pipeline: prompt → LLM → CIR JSON → builder."""
         review_report = CirReviewReport(
@@ -897,6 +986,7 @@ class RunPipelineUseCase:
                 language=request.language,
                 skill_mode=route.skill_mode,
                 route_decision=route_context.decision,
+                lesson_plan=lesson_plan,
             )
             raw = await self._llm.complete(system, user)
             parsed, review_report = await self._review_output(
@@ -921,6 +1011,7 @@ class RunPipelineUseCase:
                 playbook,
                 request.prompt,
                 review_report,
+                lesson_plan=lesson_plan,
             )
 
             quality_attempts_allowed = CANONICAL_QUALITY_REPAIR_ATTEMPTS
@@ -967,6 +1058,7 @@ class RunPipelineUseCase:
                     playbook,
                     request.prompt,
                     review_report,
+                    lesson_plan=lesson_plan,
                 )
 
             if quality_report.status == "repairable":
@@ -1363,6 +1455,15 @@ def _blocking_playbook_review_issues(
     return [issue for issue in result.issues if issue.severity == PlaybookIssueSeverity.ERROR]
 
 
+def _build_agent_generation_prompt(prompt: str, lesson_plan: LessonPlan) -> str:
+    return (
+        "[MetaView LessonPlan]\n"
+        f"{lesson_plan.model_dump_json(indent=2)}\n\n"
+        "[user prompt]\n"
+        f"{prompt}"
+    )
+
+
 def _build_agent_self_repair_prompt(
     original_prompt: str,
     previous_payload: dict[str, Any] | None,
@@ -1423,12 +1524,14 @@ def _quality_report_with_review(
     *,
     generator_path: str,
     coverage_mode: str,
+    lesson_plan: LessonPlan,
 ) -> QualityReport:
     canonical = quality_gate_playbook(
         playbook,
         prompt,
         generator_path=generator_path,
         coverage_mode=coverage_mode,
+        lesson_plan=lesson_plan,
     )
     unique: dict[tuple[str, str, str], PlaybookReviewIssue] = {}
     for issue in [*canonical.issues, *review.issues]:
@@ -1452,12 +1555,15 @@ def _quality_report_for_single(
     playbook: PlaybookScript,
     prompt: str,
     review: CirReviewReport,
+    *,
+    lesson_plan: LessonPlan,
 ) -> QualityReport:
     report = quality_gate_playbook(
         playbook,
         prompt,
         generator_path="generic_cir",
         coverage_mode="experimental",
+        lesson_plan=lesson_plan,
     )
     report.actions = list(review.actions)
     report.attempts = review.attempts

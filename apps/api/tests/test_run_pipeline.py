@@ -6,6 +6,7 @@ import json
 import pytest
 
 from app.application.dto.pipeline_dto import PipelineRequest
+from app.application.services.lesson_planner import build_rule_based_lesson_plan
 from app.application.use_cases.run_pipeline import RunPipelineUseCase, _strip_markdown_fences
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.infrastructure.persistence.db_init import init_db
@@ -57,6 +58,15 @@ class MockLLMSlow:
         return _VALID_CIR
 
 
+class SlowLessonPlanner:
+    async def plan(self, **kwargs):
+        await asyncio.sleep(0.08)
+        return build_rule_based_lesson_plan(
+            prompt=kwargs["prompt"],
+            domain=kwargs.get("domain"),
+        )
+
+
 class FailingDirectorRepository:
     async def upsert(self, director, updated_at: str) -> None:  # noqa: ARG002
         raise RuntimeError("director database unavailable")
@@ -94,6 +104,9 @@ async def test_successful_pipeline_run(repo) -> None:
         "timeline.voiceover_too_short"
     }
     assert result.quality_report.generator_path == "generic_cir"
+    assert result.lesson_plan is not None
+    assert result.lesson_plan.schema_version == "1.0.0"
+    assert result.lesson_plan.domain == "general"
 
 
 @pytest.mark.asyncio
@@ -142,12 +155,33 @@ async def test_failed_pipeline_run_on_invalid_json(repo) -> None:
     assert result is not None
     assert result.status == PipelineRunStatus.FAILED
     assert result.playbook is None
+    assert result.lesson_plan is not None
     assert result.error is not None
     assert result.quality_report is not None
     assert result.quality_report.status == "blocked"
     assert {issue.code for issue in result.quality_report.issues} >= {
         "parse.invalid_json"
     }
+
+
+@pytest.mark.asyncio
+async def test_pipeline_timeout_includes_lesson_planning(repo) -> None:
+    use_case = RunPipelineUseCase(
+        repo,
+        MockLLMSuccess(),
+        lesson_planner=SlowLessonPlanner(),
+        pipeline_timeout_s=0.01,
+    )
+    await repo.create("run-plan-timeout", "test prompt", "2024-01-01T00:00:00+00:00")
+
+    await use_case.execute("run-plan-timeout", PipelineRequest(prompt="test prompt"))
+
+    result = await repo.get("run-plan-timeout")
+    assert result is not None
+    assert result.status == PipelineRunStatus.FAILED
+    assert result.lesson_plan is None
+    assert result.quality_report is not None
+    assert {issue.code for issue in result.quality_report.issues} == {"pipeline.timeout"}
 
 
 @pytest.mark.asyncio

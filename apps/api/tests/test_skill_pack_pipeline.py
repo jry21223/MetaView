@@ -27,12 +27,18 @@ class _RecordingRepo:
     def __init__(self) -> None:
         self.updates: list[dict[str, Any]] = []
         self.quality_reports: list[dict[str, Any]] = []
+        self.lesson_plans: list[dict[str, Any]] = []
 
     async def update(self, run_id: str, **kwargs: Any) -> None:
         self.updates.append({"run_id": run_id, **kwargs})
 
     async def update_quality_report(self, run_id: str, quality_report_json: str) -> None:
         self.quality_reports.append({"run_id": run_id, "report": json.loads(quality_report_json)})
+
+    async def update_lesson_plan(self, run_id: str, lesson_plan_json: str) -> None:
+        self.lesson_plans.append(
+            {"run_id": run_id, "lesson_plan": json.loads(lesson_plan_json)}
+        )
 
     @property
     def final_status(self) -> PipelineRunStatus:
@@ -100,6 +106,9 @@ class FakeSkillPack:
         ],
     )
 
+    def __init__(self) -> None:
+        self.contexts: list[SkillExecutionContext] = []
+
     def heuristic_match(self, request: SkillRouteInput) -> SkillRouteMatch | None:
         if "fake skill test" not in request.prompt:
             return None
@@ -119,6 +128,7 @@ class FakeSkillPack:
         context: SkillExecutionContext,
         problem_spec: BaseModel | None,
     ) -> SkillExecutionResult:
+        self.contexts.append(context)
         assert isinstance(problem_spec, FakeSpec)
         return SkillExecutionResult(
             handled=True,
@@ -249,7 +259,8 @@ async def test_solid_geometry_runs_through_skill_registry() -> None:
 
 @pytest.mark.asyncio
 async def test_new_skill_can_run_without_pipeline_changes() -> None:
-    registry = SkillRegistry([FakeSkillPack()])
+    skill = FakeSkillPack()
+    registry = SkillRegistry([skill])
     repo = _RecordingRepo()
     use_case = RunPipelineUseCase(repo, _FailingLLM(), skill_registry=registry)
 
@@ -258,6 +269,11 @@ async def test_new_skill_can_run_without_pipeline_changes() -> None:
     assert repo.final_status == PipelineRunStatus.SUCCEEDED
     assert "skill:fake_skill" in repo.review_json
     assert repo.quality_reports[-1]["report"]["status"] == "clean"
+    assert skill.contexts[0].lesson_plan is not None
+    assert skill.contexts[0].lesson_plan.domain == "math"
+    assert repo.lesson_plans[-1]["lesson_plan"] == (
+        skill.contexts[0].lesson_plan.model_dump(mode="json")
+    )
 
 
 @pytest.mark.asyncio

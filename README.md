@@ -8,22 +8,28 @@ MetaView v2 是一个面向教育场景的 AI 可视化讲解平台。它不是�
 
 ```text
 User input
-  -> subject understanding / router / SkillPack / agent
+  -> subject understanding / router
+  -> LessonPlan
+  -> SkillPack / agent / legacy CIR
   -> PlaybookScript
   -> DirectorScript
   -> RenderPlan
   -> Remotion preview / export
 ```
 
-- `PlaybookScript` 是内容契约：负责教学步骤、snapshot、公式、画面对象、旁白、代码高亮和可渲染场景数据。
+- `LessonPlan` 是教学决策契约：负责学习目标、误区、结论、教学弧线与 SceneIntent，不包含 renderer 私有数据。
+- `PlaybookScript` 是内容渲染契约：负责教学步骤、snapshot、公式、画面对象、旁白、代码高亮和可渲染场景数据。
 - `DirectorScript` 是导演契约：负责镜头意图、shot type、camera motion、pacing、focus target、emphasis terms 和观看节奏。
 - `RenderPlan` 是渲染适配层：把 DirectorScript 转换为 Remotion 可消费的 scale、translate、opacity、timing 等参数。
 - Remotion 是唯一视频预览/导出出口。
 
 生成路径当前有两条：
 
-1. `single mode`: **LLM -> CIR + ExecutionMap -> PlaybookScript -> DirectorScript**
-2. `agent mode`: **Agent tool loop -> self-check -> PlaybookScript -> DirectorScript**
+1. `single mode`: **LessonPlan -> LLM -> CIR + ExecutionMap -> PlaybookScript -> DirectorScript**
+2. `agent mode`: **LessonPlan -> Agent tool loop -> self-check -> PlaybookScript -> DirectorScript**
+
+确定性 SkillPack 同样通过 `SkillExecutionContext` 接收这份 LessonPlan。运行历史会独立
+保存计划、PlaybookScript 和 QualityReport；LessonPlan 不会被塞入最终视频契约。
 
 项目仍不引入 Manim、HTML iframe 或服务端 HTML 视频渲染。管线契约见 [`docs/pipeline.md`](docs/pipeline.md)，Director 契约见 [`docs/director-layer.md`](docs/director-layer.md)。
 
@@ -123,7 +129,7 @@ Agent demo 验收见 [`docs/agent-demo-acceptance.md`](docs/agent-demo-acceptanc
 |--------|------|------|
 | `POST` | `/api/v1/pipeline` | 提交题目，返回 `run_id` |
 | `GET` | `/api/v1/runs` | 运行历史列表 |
-| `GET` | `/api/v1/runs/{run_id}` | 单次运行结果，含 PlaybookScript、DirectorScript 与原始 `prompt` |
+| `GET` | `/api/v1/runs/{run_id}` | 单次运行结果，含 LessonPlan、PlaybookScript、DirectorScript 与原始 `prompt` |
 | `POST` | `/api/v1/exports` | 创建视频导出任务 |
 | `GET` | `/api/v1/exports/{job_id}` | 查询导出任务状态 |
 | `GET` | `/health` | 健康检查 |
@@ -218,6 +224,7 @@ Director 相关字段不要塞回 Playbook step；DirectorScript 是独立契约
 - [`docs/director-layer.md`](docs/director-layer.md) - Director 独立导演层契约
 - [`docs/README.md`](docs/README.md) - 开发文档索引
 - [`docs/pipeline.md`](docs/pipeline.md) - 生成、PlaybookScript、DirectorScript 挂载点和导出管线
+- [`docs/lesson-plan.md`](docs/lesson-plan.md) - 教学规划契约、三路径接线、持久化与边界
 - [`docs/frontend-shell.md`](docs/frontend-shell.md) - Stage 路由、GlobalTopbar、Studio 布局、Provider 配置
 - [`docs/remotion-skills.md`](docs/remotion-skills.md) - Remotion 组件、渲染器、注册表约定
 - [`docs/topic-routing.md`](docs/topic-routing.md) - 学科路由策略

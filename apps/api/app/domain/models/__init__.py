@@ -8,6 +8,7 @@ from app.domain.models.cir import (
     VisualToken,
 )
 from app.domain.models.execution import ExecutionParameterControl
+from app.domain.models.lesson_plan import LessonPlan, SceneIntent
 from app.domain.models.pipeline_run import (
     PipelineRunStatus,
     SandboxMode,
@@ -55,6 +56,7 @@ from app.domain.models.topic import TopicDomain, VisualKind
 __all__ = [
     "CirDocument", "CirStep", "VisualToken", "LayoutInstruction",
     "ExecutionMap", "ExecutionCheckpoint", "ExecutionArrayTrack", "ExecutionParameterControl",
+    "LessonPlan", "SceneIntent",
     "TopicDomain", "VisualKind",
     "PipelineRunStatus", "SandboxMode", "SandboxStatus", "UITheme",
     "ValidationSeverity", "ValidationStatus",

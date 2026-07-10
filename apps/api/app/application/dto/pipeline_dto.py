@@ -3,6 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field, field_validator
 
 from app.domain.models.director import DirectorScript
+from app.domain.models.lesson_plan import LessonPlan
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.domain.models.playbook import PlaybookScript
 from app.domain.models.quality_report import QualityReport
@@ -75,3 +76,4 @@ class PipelineRunResponse(BaseModel):
     created_at: str
     review: CirReviewReport | PlaybookReviewVerdict | None = None
     quality_report: QualityReport | None = None
+    lesson_plan: LessonPlan | None = None

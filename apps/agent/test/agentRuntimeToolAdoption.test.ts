@@ -158,6 +158,10 @@ describe("agent runtime SceneBlueprint adoption", () => {
 
     const result = await runAgentGeneration({
       prompt: "讲解东亚夏季风的海陆热力差异",
+      lessonPlan: {
+        schema_version: "1.0.0",
+        title: "LESSON_PLAN_ONLY_MARKER",
+      },
       apiBaseUrl: "http://api.test",
       agentSharedToken: "secret",
       defaultProvider: "openai",
@@ -177,6 +181,8 @@ describe("agent runtime SceneBlueprint adoption", () => {
     );
     expect(result).toEqual(playbook);
     expect(result.steps[0].snapshot.kind).toBe("geo_map_scene");
+    expect(agentMock.prompts[0]).toContain("LESSON_PLAN_ONLY_MARKER");
+    expect(JSON.stringify(result)).not.toContain("LESSON_PLAN_ONLY_MARKER");
     expect(JSON.stringify(result)).not.toContain("algorithm_array");
   });
 
