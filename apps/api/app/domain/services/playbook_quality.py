@@ -152,6 +152,17 @@ _ALGORITHM_STATE_PROMPT_MARKERS = {
     "递归",
 }
 _BFS_PROMPT_MARKERS = {"bfs", "breadth-first", "breadth first", "广度优先"}
+_BFS_COMPLETE_PROMPT_MARKERS = {
+    "all nodes",
+    "complete traversal",
+    "every node",
+    "full traversal",
+    "visit order",
+    "全部节点",
+    "完整遍历",
+    "访问顺序",
+    "逐层点亮",
+}
 _GRAPH_TRAVERSAL_PROMPT_MARKERS = {
     *_BFS_PROMPT_MARKERS,
     "dfs",
@@ -383,6 +394,13 @@ def _check_steps(
             )
         if step.code_highlight is not None:
             _check_code_highlight(step.code_highlight, index, issues)
+            _check_code_visual_state(
+                step.code_highlight,
+                step.snapshot,
+                index,
+                issues,
+                prompt=prompt,
+            )
         _check_narration_visual_match(index, step.title, step.voiceover_text, step.snapshot, issues)
 
     _check_final_step_answers_prompt(playbook, prompt, issues)
@@ -620,6 +638,99 @@ def _check_code_highlight(
         )
 
 
+def _check_code_visual_state(
+    code: CodeHighlightOverlay,
+    snapshot: Any,
+    step_index: int,
+    issues: list[PlaybookReviewIssue],
+    *,
+    prompt: str,
+) -> None:
+    data = _snapshot_json(snapshot)
+    normalized_prompt = prompt.casefold()
+    kind = data.get("kind")
+    mismatch = False
+    if kind == "graph_scene" and any(
+        marker in normalized_prompt for marker in _BFS_PROMPT_MARKERS
+    ):
+        required = {"current", "queue", "visited"}
+        if not required.issubset(code.variables):
+            mismatch = True
+        current = str(
+            data.get("current_node_id")
+            or next(iter(data.get("active_node_ids") or []), "done")
+        )
+        queue = list(
+            dict.fromkeys(
+                [
+                    *(str(item) for item in data.get("queue_node_ids") or []),
+                    *(str(item) for item in data.get("frontier_node_ids") or []),
+                ]
+            )
+        )
+        visited = [str(item) for item in data.get("visited_node_ids") or []]
+        mismatch = mismatch or not (
+            code.variables.get("current", "").strip() == current
+            and _code_state_tokens(code.variables.get("queue", "")) == queue
+            and _code_state_tokens(code.variables.get("visited", "")) == visited
+        )
+    elif kind == "call_stack_scene" and any(
+        marker in normalized_prompt for marker in _RECURSION_PROMPT_MARKERS
+    ):
+        current_frame = next(
+            (
+                frame
+                for frame in data.get("frames") or []
+                if isinstance(frame, dict) and frame.get("id") == data.get("current_frame_id")
+            ),
+            None,
+        )
+        visual_variables = (current_frame or {}).get("variables") or {}
+        mismatch = not visual_variables or any(
+            key not in code.variables
+            or not _code_state_value_equal(code.variables[key], value)
+            for key, value in visual_variables.items()
+        )
+    elif kind == "code_trace_scene" and any(
+        marker in normalized_prompt for marker in _RECURSION_PROMPT_MARKERS
+    ):
+        visual_variables = data.get("variables") or {}
+        mismatch = not visual_variables or any(
+            key not in code.variables
+            or not _code_state_value_equal(code.variables[key], value)
+            for key, value in visual_variables.items()
+        )
+
+    if mismatch:
+        issues.append(
+            _issue(
+                "code.state_mismatch",
+                PlaybookIssueSeverity.ERROR,
+                f"steps[{step_index}].code_highlight.variables",
+                "Code Sync variables do not match the visual execution state.",
+                "Synchronize the code variables with the current graph, stack, or trace state.",
+            )
+        )
+
+
+def _code_state_tokens(value: str) -> list[str]:
+    return re.findall(r"[A-Za-z0-9_.-]+", value)
+
+
+def _code_state_value_equal(left: Any, right: Any) -> bool:
+    left_text = str(left).strip()
+    right_text = str(right).strip()
+    try:
+        left_number = float(left_text)
+        right_number = float(right_text)
+    except ValueError:
+        return left_text == right_text
+    return math.isfinite(left_number) and math.isfinite(right_number) and math.isclose(
+        left_number,
+        right_number,
+    )
+
+
 def _check_narration_visual_match(
     index: int,
     title: str,
@@ -746,8 +857,31 @@ def _check_domain_quality(
                     "Expose the changing algorithm state in the semantic snapshot fields.",
                 )
             )
+        if bfs:
+            bfs_steps = [
+                step
+                for step in playbook.steps
+                if getattr(step.snapshot, "kind", None) == "graph_scene"
+            ]
+            if bfs_steps and any(step.code_highlight is None for step in bfs_steps):
+                issues.append(
+                    _issue(
+                        "code.sync_missing",
+                        PlaybookIssueSeverity.ERROR,
+                        "steps[*].code_highlight",
+                        "BFS steps require a parallel Code Sync track outside the video stage.",
+                        "Attach canonical BFS code lines and current/queue/visited variables.",
+                    )
+                )
+            _check_bfs_checkpoint_progression(
+                [step.snapshot for step in bfs_steps],
+                issues,
+                require_complete=any(
+                    marker in normalized_prompt for marker in _BFS_COMPLETE_PROMPT_MARKERS
+                ),
+            )
 
-    if domain in {"code", "computer_science"} and any(
+    if domain in {"algorithm", "code", "computer_science"} and any(
         marker in normalized_prompt for marker in _RECURSION_PROMPT_MARKERS
     ):
         recursion_snapshots = [
@@ -765,6 +899,21 @@ def _check_domain_quality(
                     "steps",
                     "Recursive code explanation lacks a structured call stack or code trace state.",
                     "Use call_stack_scene or code_trace_scene with active frames and lines.",
+                )
+            )
+        recursion_steps = [
+            step
+            for step in playbook.steps
+            if getattr(step.snapshot, "kind", None) in {"call_stack_scene", "code_trace_scene"}
+        ]
+        if recursion_steps and any(step.code_highlight is None for step in recursion_steps):
+            issues.append(
+                _issue(
+                    "code.sync_missing",
+                    PlaybookIssueSeverity.ERROR,
+                    "steps[*].code_highlight",
+                    "Recursive execution steps require a parallel Code Sync track.",
+                    "Mirror the active code trace and current frame variables into code_highlight.",
                 )
             )
 
@@ -787,6 +936,96 @@ def _check_domain_quality(
                     ),
                 )
             )
+
+
+def _check_bfs_checkpoint_progression(
+    snapshots: list[Any],
+    issues: list[PlaybookReviewIssue],
+    *,
+    require_complete: bool,
+) -> None:
+    states = [_snapshot_json(snapshot) for snapshot in snapshots]
+    visited_states = [
+        [str(node_id) for node_id in state.get("visited_node_ids") or []]
+        for state in states
+    ]
+    longest_visited = max(visited_states, key=len, default=[])
+    distinct_checkpoints = {
+        (
+            state.get("current_node_id"),
+            tuple(str(node_id) for node_id in state.get("visited_node_ids") or []),
+        )
+        for state in states
+    }
+    current_order: list[str] = []
+    for state in states:
+        current = state.get("current_node_id")
+        if current is None:
+            continue
+        current_id = str(current)
+        if not current_order or current_order[-1] != current_id:
+            current_order.append(current_id)
+    if len(distinct_checkpoints) > 1 and longest_visited and current_order != longest_visited:
+        issues.append(
+            _issue(
+                "algorithm.invalid_state_transition",
+                PlaybookIssueSeverity.ERROR,
+                "steps[*].snapshot.current_node_id",
+                "BFS skips or reorders a current-node checkpoint from the visited sequence.",
+                (
+                    "Use one visual checkpoint per dequeue; do not combine multiple visited "
+                    "nodes into one snapshot."
+                ),
+            )
+        )
+    if not require_complete or not states:
+        return
+
+    graph = max(states, key=lambda state: len(state.get("nodes") or []))
+    start = next(
+        (
+            str(state.get("current_node_id"))
+            for state in states
+            if state.get("current_node_id") is not None
+        ),
+        longest_visited[0] if longest_visited else None,
+    )
+    reachable = _reachable_graph_nodes(graph, start) if start else set()
+    if reachable and set(longest_visited) != reachable:
+        issues.append(
+            _issue(
+                "algorithm.invalid_state_transition",
+                PlaybookIssueSeverity.ERROR,
+                "steps[*].snapshot.visited_node_ids",
+                "BFS final visited state does not cover every node reachable from the start.",
+                "Finish the traversal and show one dequeue checkpoint per reachable node.",
+            )
+        )
+
+
+def _reachable_graph_nodes(graph: dict[str, Any], start: str) -> set[str]:
+    adjacency: dict[str, set[str]] = {}
+    directed = bool(graph.get("directed"))
+    for edge in graph.get("edges") or []:
+        if not isinstance(edge, dict):
+            continue
+        source = str(edge.get("source") or "")
+        target = str(edge.get("target") or "")
+        if not source or not target:
+            continue
+        adjacency.setdefault(source, set()).add(target)
+        if not directed:
+            adjacency.setdefault(target, set()).add(source)
+    reachable = {start}
+    queue = [start]
+    while queue:
+        current = queue.pop(0)
+        for neighbor in adjacency.get(current, set()):
+            if neighbor in reachable:
+                continue
+            reachable.add(neighbor)
+            queue.append(neighbor)
+    return reachable
 
 
 def _snapshot_has_algorithm_state(snapshot: Any) -> bool:
@@ -991,13 +1230,13 @@ def _check_forbidden_rendering_paths(
 def _tokens_for_snapshot(snapshot: Any) -> set[str]:
     kind = str(getattr(snapshot, "kind", ""))
     data = snapshot.model_dump(mode="json", exclude_none=True)
-    tokens = set(kind.split("_"))
+    tokens = {token for token in kind.split("_") if len(token) >= 2}
     tokens.update(_tokens_for_text(_text_payload(data)))
     if kind.startswith("algorithm"):
         tokens.add("array")
     if kind.startswith("math"):
         tokens.add("math")
-    return {token for token in tokens if len(token) >= 2}
+    return tokens
 
 
 def _text_payload(value: Any) -> str:
@@ -1013,6 +1252,11 @@ def _text_payload(value: Any) -> str:
 def _tokens_for_text(text: str) -> set[str]:
     raw_tokens = re.findall(r"[a-zA-Z0-9_]+", text.lower())
     tokens = {part for token in raw_tokens for part in token.split("_") if len(part) >= 2}
+    tokens.update(
+        symbol.lower()
+        for symbol in re.findall(r"(?<![A-Za-z])([A-Za-z])(?![A-Za-z])", text)
+        if symbol.lower() not in {"a", "i"}
+    )
     for segment in re.findall(r"[\u4e00-\u9fff]+", text):
         tokens.update(segment[index : index + 2] for index in range(len(segment) - 1))
     return tokens

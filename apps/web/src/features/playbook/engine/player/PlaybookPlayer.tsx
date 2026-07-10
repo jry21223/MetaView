@@ -149,13 +149,14 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     [codeOverlay],
   );
 
-  // Show code panel slot for algorithm domain, or any script that has code highlights.
+  // Show the code slot for algorithm lessons, explicit code tracks, or a
+  // legacy snapshot that can be projected into the right-side console.
   const isAlgorithmDomain = script.domain === "algorithm";
   const hasAnyCode = useMemo(
     () => script.steps.some((s) => s.code_highlight != null),
     [script.steps],
   );
-  const showCodePanelSlot = isAlgorithmDomain || hasAnyCode;
+  const showCodePanelSlot = isAlgorithmDomain || hasAnyCode || codeOverlay != null;
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayerSettings, setShowPlayerSettings] = useState(false);
@@ -345,6 +346,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
             director,
             theme,
             showSubtitles: showStageSubtitles,
+            showInlineCode: false,
             swapDurationFrames,
           }}
           durationInFrames={script.total_frames}

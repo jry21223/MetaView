@@ -4,6 +4,7 @@ import math
 from typing import TypedDict
 
 from app.domain.models.playbook import (
+    CodeHighlightOverlay,
     GraphSceneEdge,
     GraphSceneNode,
     GraphSceneSnapshot,
@@ -15,6 +16,7 @@ from app.domain.models.playbook import (
     TableSceneSnapshot,
 )
 from app.domain.models.topic import TopicDomain
+from app.domain.services.algorithm_code_library import get_by_id
 from app.domain.skills.algorithm_graph_core.graph_kernel import GraphAlgorithmSolution
 
 _FPS = 30
@@ -43,6 +45,7 @@ def build_algorithm_graph_playbook(
             animation_hint=snapshot.kind,
             snapshot=snapshot,
             layers=[Layer(timing=LayerTiming(), body=snapshot)],
+            code_highlight=_code_highlight_for_snapshot(solution, snapshot),
             tokens=[],
         )
         for index, snapshot in enumerate(snapshots)
@@ -57,6 +60,31 @@ def build_algorithm_graph_playbook(
         parameter_controls=[],
         algorithm_id=solution.kind,
         initial_data={"nodes": solution.nodes},
+    )
+
+
+def _code_highlight_for_snapshot(
+    solution: GraphAlgorithmSolution,
+    snapshot: GraphSceneSnapshot | TableSceneSnapshot | MathFormulaSnapshot,
+) -> CodeHighlightOverlay | None:
+    if solution.kind != "bfs" or not isinstance(snapshot, GraphSceneSnapshot):
+        return None
+    source = get_by_id("bfs")
+    if source is None:
+        return None
+    current = snapshot.current_node_id or next(iter(snapshot.active_node_ids), "done")
+    queue = list(dict.fromkeys([*snapshot.queue_node_ids, *snapshot.frontier_node_ids]))
+    return CodeHighlightOverlay(
+        language=source.language,
+        lines=list(source.lines),
+        active_lines=[5],
+        active_line=5,
+        variables={
+            "current": current,
+            "queue": f"[{', '.join(queue)}]",
+            "visited": f"{{{', '.join(snapshot.visited_node_ids)}}}",
+        },
+        operation_label="scan neighbors",
     )
 
 

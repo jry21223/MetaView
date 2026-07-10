@@ -10,8 +10,17 @@ vi.mock("remotion", () => ({
 }));
 
 vi.mock("../features/playbook/engine/composition/PlaybookComposition", () => ({
-  PlaybookComposition: ({ showDiagnostics }: { showDiagnostics?: boolean }) => (
-    <div data-show-diagnostics={String(showDiagnostics)} />
+  PlaybookComposition: ({
+    showDiagnostics,
+    showInlineCode,
+  }: {
+    showDiagnostics?: boolean;
+    showInlineCode?: boolean;
+  }) => (
+    <div
+      data-show-diagnostics={String(showDiagnostics)}
+      data-show-inline-code={String(showInlineCode)}
+    />
   ),
 }));
 
@@ -46,5 +55,6 @@ describe("PlaybookExportComposition diagnostics", () => {
     );
 
     expect(markup).toContain('data-show-diagnostics="false"');
+    expect(markup).toContain('data-show-inline-code="false"');
   });
 });

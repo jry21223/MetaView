@@ -9,7 +9,7 @@ vi.mock("@remotion/player", async () => {
   const React = await import("react");
   return {
     Player: React.forwardRef(function MockPlayer(
-      props: { inputProps?: { showSubtitles?: boolean } },
+      props: { inputProps?: { showSubtitles?: boolean; showInlineCode?: boolean } },
       ref: React.ForwardedRef<unknown>,
     ) {
       React.useImperativeHandle(ref, () => ({
@@ -23,6 +23,7 @@ vi.mock("@remotion/player", async () => {
         <div
           data-testid="mock-remotion-player"
           data-show-subtitles={String(props.inputProps?.showSubtitles)}
+          data-show-inline-code={String(props.inputProps?.showInlineCode)}
         />
       );
     }),
@@ -128,6 +129,45 @@ describe("PlaybookPlayer", () => {
     expect(getByText("Ask this step")).toBeTruthy();
   });
 
+  it("shows legacy call-stack code sync in the desktop learning console", () => {
+    const script = baseScript({
+      domain: "code",
+      title: "Recursive factorial",
+      steps: [
+        {
+          ...baseScript().steps[0],
+          snapshot: {
+            kind: "call_stack_scene",
+            frames: [
+              {
+                id: "factorial-3",
+                function_name: "factorial",
+                arguments: { n: "3" },
+                variables: { n: "3" },
+                state: "active",
+              },
+            ],
+            current_frame_id: "factorial-3",
+            code_trace: {
+              language: "python",
+              lines: ["def factorial(n):", "    return n * factorial(n - 1)"],
+              active_line: 1,
+              active_lines: [1],
+            },
+          },
+          code_highlight: undefined,
+        },
+      ],
+    });
+
+    const { getByRole, getByText } = render(<PlaybookPlayer script={script} theme="light" />);
+    const learningConsole = getByRole("complementary", { name: "Learning console" });
+
+    expect(getByText("Code Sync")).toBeTruthy();
+    expect(learningConsole.textContent).toContain("def factorial(n):");
+    expect(learningConsole.textContent).toContain("n = 3");
+  });
+
   it("hides code sync for non-code lessons while keeping params above follow-up", () => {
     const { queryByText, getByText, getByTestId } = render(
       <PlaybookPlayer
@@ -150,6 +190,9 @@ describe("PlaybookPlayer", () => {
 
     expect(container.querySelector('[data-testid="mock-remotion-player"]')?.getAttribute("data-show-subtitles")).toBe(
       "true",
+    );
+    expect(container.querySelector('[data-testid="mock-remotion-player"]')?.getAttribute("data-show-inline-code")).toBe(
+      "false",
     );
     expect(container.querySelector(".playbook-player__caption")).toBeNull();
     expect(queryByText("先观察函数的基础形态。")).toBeNull();

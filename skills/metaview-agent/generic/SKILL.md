@@ -20,8 +20,13 @@ Use this skill for every Codex agent generation in MetaView.
   the prompt. Codex is for open-ended explanation, fallback, and visual direction.
 - Return only a valid MetaView PlaybookScript JSON object.
 - Use renderer-supported snapshot kinds only.
+- Produce 8-14 teaching steps so the first candidate satisfies the backend
+  launch-safe scene bound.
 - Keep each step focused: one main visual idea plus narration that explains why
   the step matters.
+- The final step must first state the prompt's exact conclusion in a standalone
+  sentence. A check-for-understanding question may follow, but must not replace
+  the answer.
 
 ## Visual Contract
 

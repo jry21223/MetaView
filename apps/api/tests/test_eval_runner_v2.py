@@ -5,7 +5,15 @@ from pathlib import Path
 
 from app.domain.services.scene_blueprint_compiler import compile_scene_blueprint_to_playbook
 from eval.benchmark_v2 import load_benchmark_v2_suite, score_benchmark_v2
-from eval.runner import GenerationMetrics, V2Attempt, _summarize_attempts, main
+from eval.runner import (
+    GenerationMetrics,
+    V2Attempt,
+    _print_card,
+    _print_v2_card,
+    _summarize_attempts,
+    main,
+)
+from eval.scorers import DimensionResult, ScoreCard
 
 
 def _derivative_raw() -> str:
@@ -46,6 +54,28 @@ def test_v2_summary_keeps_unavailable_api_metrics_null() -> None:
         "estimated_cost",
     ):
         assert summary[metric] == {"values": [None, None, None], "mean": None, "sum": None}
+
+
+def test_legacy_card_printing_does_not_require_v2_applicability(capsys) -> None:
+    card = ScoreCard(
+        prompt_id="legacy",
+        dimensions=[DimensionResult("schema_valid", 20.0, 20.0)],
+    )
+
+    _print_card(card)
+
+    assert "20.0/20" in capsys.readouterr().out
+
+
+def test_v2_card_prints_code_sync_as_not_applicable(capsys) -> None:
+    expectation = load_benchmark_v2_suite().by_id("math-derivative-tangent")
+    card = score_benchmark_v2(expectation, _derivative_raw())
+
+    _print_v2_card(card, 1)
+
+    output = capsys.readouterr().out
+    assert "Code Sync" in output
+    assert "N/A" in output
 
 
 def test_v2_recorded_runner_repeats_three_times_and_writes_stability_report(
@@ -89,7 +119,7 @@ def test_v2_live_runner_reports_real_metrics_and_preserves_missing_cost(
 ) -> None:
     monkeypatch.setattr(
         "eval.runner._generate_live_v2",
-        lambda *_: (
+        lambda *_, **__: (
             _derivative_raw(),
             GenerationMetrics(
                 latency_ms=125.0,

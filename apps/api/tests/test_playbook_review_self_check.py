@@ -51,6 +51,88 @@ def _valid_playbook() -> PlaybookScript:
     )
 
 
+def _bfs_playbook(*, skip_f_checkpoint: bool = False, include_code_sync: bool = True) -> PlaybookScript:
+    nodes = [{"id": node, "label": node} for node in "ABCDEFG"]
+    edges = [
+        {"id": "A-B", "source": "A", "target": "B"},
+        {"id": "A-C", "source": "A", "target": "C"},
+        {"id": "B-D", "source": "B", "target": "D"},
+        {"id": "B-E", "source": "B", "target": "E"},
+        {"id": "C-F", "source": "C", "target": "F"},
+        {"id": "C-G", "source": "C", "target": "G"},
+    ]
+    states = [
+        ("A", [], ["A"]),
+        ("A", ["A"], ["B", "C"]),
+        ("B", ["A", "B"], ["C", "D", "E"]),
+        ("C", ["A", "B", "C"], ["D", "E", "F", "G"]),
+        ("D", ["A", "B", "C", "D"], ["E", "F", "G"]),
+        ("E", ["A", "B", "C", "D", "E"], ["F", "G"]),
+        (
+            "G" if skip_f_checkpoint else "F",
+            ["A", "B", "C", "D", "E", "F", "G"] if skip_f_checkpoint else ["A", "B", "C", "D", "E", "F"],
+            [] if skip_f_checkpoint else ["G"],
+        ),
+        *([] if skip_f_checkpoint else [("G", ["A", "B", "C", "D", "E", "F", "G"], [])]),
+        (None, ["A", "B", "C", "D", "E", "F", "G"], []),
+    ]
+    steps = []
+    for index, (current, visited, queue) in enumerate(states, start=1):
+        snapshot = {
+            "kind": "graph_scene",
+            "pack_id": "algorithm-code-basic",
+            "asset_id": "bfs-graph-preset",
+            "nodes": nodes,
+            "edges": edges,
+            "current_node_id": current,
+            "active_node_ids": [current] if current else [],
+            "visited_node_ids": visited,
+            "queue_node_ids": queue,
+            "frontier_node_ids": queue,
+            "caption": f"BFS current {current or 'done'} queue {queue}",
+        }
+        code_highlight = None
+        if include_code_sync:
+            code_highlight = {
+                "language": "pseudocode",
+                "lines": ["current = queue.dequeue()", "process(current)"],
+                "active_lines": [0],
+                "active_line": 0,
+                "variables": {
+                    "current": current or "done",
+                    "queue": f"[{', '.join(queue)}]",
+                    "visited": f"{{{', '.join(visited)}}}",
+                },
+            }
+        steps.append(
+            {
+                "step_id": f"bfs-{index}",
+                "end_frame": index * 240,
+                "title": f"BFS checkpoint {index}",
+                "voiceover_text": (
+                    f"BFS checkpoint {index} shows current {current or 'done'} and the FIFO queue."
+                ),
+                "snapshot": deepcopy(snapshot),
+                "layers": [{"body": deepcopy(snapshot)}],
+                "code_highlight": code_highlight,
+            }
+        )
+    steps[-1]["voiceover_text"] = "BFS visits nodes layer by layer with a FIFO queue."
+    return PlaybookScript.model_validate(
+        {
+            "fps": 30,
+            "total_frames": steps[-1]["end_frame"],
+            "domain": "algorithm",
+            "title": "BFS tree traversal",
+            "summary": "BFS visits every node layer by layer with a FIFO queue.",
+            "algorithm_id": "breadth_first_search",
+            "initial_data": {"scene_blueprint": ["bfs_graph"]},
+            "steps": steps,
+            "parameter_controls": [],
+        }
+    )
+
+
 def test_playbook_self_check_returns_clean_for_renderer_ready_script() -> None:
     verdict = review_playbook_script(_valid_playbook(), prompt="Explain binary search.")
 
@@ -123,6 +205,15 @@ def test_playbook_self_check_accepts_recursion_and_code_trace_scenes(
         step["voiceover_text"] = voiceover
         step["snapshot"] = deepcopy(snapshot)
         step["layers"] = [{"body": deepcopy(snapshot)}]
+        if snapshot["kind"] == "call_stack_scene":
+            trace = snapshot["code_trace"]
+            step["code_highlight"] = {
+                "language": trace["language"],
+                "lines": trace["lines"],
+                "active_lines": trace["active_lines"],
+                "active_line": trace["active_line"],
+                "variables": {"n": "3"},
+            }
     playbook = PlaybookScript.model_validate(payload)
 
     verdict = review_playbook_script(playbook, prompt=prompt)
@@ -418,6 +509,149 @@ def test_canonical_gate_requires_algorithm_scene_for_bfs_prompt() -> None:
     assert {issue.code for issue in report.issues} >= {"algorithm.state_missing"}
 
 
+def test_canonical_gate_rejects_skipped_bfs_checkpoint() -> None:
+    report = quality_gate_playbook(
+        _bfs_playbook(skip_f_checkpoint=True),
+        "Explain BFS traversal and show every FIFO queue checkpoint",
+        generator_path="agent",
+    )
+
+    assert report.status == "repairable"
+    assert "algorithm.invalid_state_transition" in {issue.code for issue in report.issues}
+
+
+def test_canonical_gate_accepts_complete_bfs_checkpoints() -> None:
+    report = quality_gate_playbook(
+        _bfs_playbook(),
+        "Explain the complete BFS visit order for every node",
+        generator_path="agent",
+    )
+
+    assert report.status == "clean", [(issue.code, issue.path) for issue in report.issues]
+
+
+def test_canonical_gate_requires_bfs_code_sync() -> None:
+    report = quality_gate_playbook(
+        _bfs_playbook(include_code_sync=False),
+        "Explain BFS traversal and its FIFO queue",
+        generator_path="agent",
+    )
+
+    assert report.status == "repairable"
+    assert "code.sync_missing" in {issue.code for issue in report.issues}
+
+
+def test_canonical_gate_rejects_code_sync_state_mismatch() -> None:
+    payload = _bfs_playbook().model_dump(mode="json")
+    payload["steps"][2]["code_highlight"]["variables"]["queue"] = "[wrong]"
+    playbook = PlaybookScript.model_validate(payload)
+
+    report = quality_gate_playbook(
+        playbook,
+        "Explain BFS traversal and its FIFO queue",
+        generator_path="agent",
+    )
+
+    assert report.status == "repairable"
+    assert "code.state_mismatch" in {issue.code for issue in report.issues}
+
+
+def test_canonical_gate_rejects_missing_bfs_code_sync_variables() -> None:
+    payload = _bfs_playbook().model_dump(mode="json")
+    for step in payload["steps"]:
+        step["code_highlight"]["variables"] = {}
+    playbook = PlaybookScript.model_validate(payload)
+
+    report = quality_gate_playbook(
+        playbook,
+        "Explain BFS traversal and its FIFO queue",
+        generator_path="agent",
+    )
+
+    assert report.status == "repairable"
+    assert "code.state_mismatch" in {issue.code for issue in report.issues}
+
+
+def test_canonical_gate_rejects_recursive_code_sync_variable_mismatch() -> None:
+    payload = _valid_playbook().model_dump(mode="json")
+    payload["domain"] = "code"
+    snapshot = {
+        "kind": "call_stack_scene",
+        "frames": [
+            {
+                "id": "factorial-4",
+                "label": "factorial(4)",
+                "state": "active",
+                "variables": {"n": "4"},
+            }
+        ],
+        "current_frame_id": "factorial-4",
+        "code_trace": {
+            "language": "python",
+            "lines": ["def factorial(n):", "    return n * factorial(n - 1)"],
+            "active_lines": [1],
+            "active_line": 1,
+        },
+    }
+    for step in payload["steps"]:
+        step["title"] = "Trace recursive factorial"
+        step["voiceover_text"] = "Trace factorial recursion and the active n value."
+        step["snapshot"] = deepcopy(snapshot)
+        step["layers"] = [{"body": deepcopy(snapshot)}]
+        step["code_highlight"] = {
+            "language": "python",
+            "lines": snapshot["code_trace"]["lines"],
+            "active_lines": [1],
+            "active_line": 1,
+            "variables": {"n": "999"},
+        }
+    payload["summary"] = "Trace factorial recursion and the active n value."
+    playbook = PlaybookScript.model_validate(payload)
+
+    report = quality_gate_playbook(
+        playbook,
+        "Explain the factorial recursive call stack",
+        generator_path="agent",
+    )
+
+    assert report.status == "repairable"
+    assert "code.state_mismatch" in {issue.code for issue in report.issues}
+
+
+def test_canonical_gate_applies_recursion_contract_to_algorithm_domain() -> None:
+    payload = _valid_playbook().model_dump(mode="json")
+    payload["domain"] = "algorithm"
+    snapshot = {
+        "kind": "call_stack_scene",
+        "frames": [
+            {
+                "id": "factorial-4",
+                "label": "factorial(4)",
+                "state": "active",
+                "variables": {"n": "4"},
+            }
+        ],
+        "current_frame_id": "factorial-4",
+    }
+    for step in payload["steps"]:
+        step["title"] = "Trace recursive factorial"
+        step["voiceover_text"] = "Trace the factorial recursive call and active frame."
+        step["snapshot"] = deepcopy(snapshot)
+        step["layers"] = [{"body": deepcopy(snapshot)}]
+        step["code_highlight"] = None
+    payload["summary"] = "Trace the factorial recursive call stack."
+    playbook = PlaybookScript.model_validate(payload)
+
+    report = quality_gate_playbook(
+        playbook,
+        "Trace factorial(4) recursion and show the call stack",
+        generator_path="agent",
+    )
+
+    assert report.status == "repairable"
+    assert "code.sync_missing" in {issue.code for issue in report.issues}
+
+
 def test_canonical_gate_blocks_formula_only_plot_request() -> None:
     payload = _valid_playbook().model_dump(mode="json")
     payload["domain"] = "math"
@@ -540,3 +774,64 @@ def test_canonical_gate_reports_voiceover_timing_warning() -> None:
 
     assert report.status == "warnings"
     assert "timeline.voiceover_too_short" in {issue.code for issue in report.issues}
+
+
+def test_narration_visual_match_recognizes_single_letter_math_variables() -> None:
+    payload = _valid_playbook().model_dump(mode="json")
+    snapshot = {
+        "kind": "math_plot",
+        "curves": [
+            {"expression": "x^2", "label": "y=x²", "semantic_role": "curve"},
+            {
+                "expression": "(2+h)*x-(1+h)",
+                "label": "经过P与Q的割线",
+                "semantic_role": "secant",
+            },
+        ],
+        "params": {"h": 0.5},
+        "marker_x": 1,
+        "caption": "h控制Q与P的水平距离。",
+    }
+    payload["steps"][0]["title"] = "让Q用h表示"
+    payload["steps"][0]["voiceover_text"] = (
+        "把Q的横坐标写成1加h；当h接近0时，Q越来越接近P。"
+    )
+    payload["steps"][0]["snapshot"] = deepcopy(snapshot)
+    payload["steps"][0]["layers"] = [{"body": deepcopy(snapshot)}]
+
+    report = quality_gate_playbook(
+        PlaybookScript.model_validate(payload),
+        "用图像解释Q趋近P",
+        generator_path="agent",
+    )
+
+    assert not any(
+        issue.code == "snapshot.narration_mismatch"
+        and issue.path == "steps[0].voiceover_text"
+        for issue in report.issues
+    )
+
+
+def test_narration_visual_match_uses_formula_symbols_without_shared_prose() -> None:
+    payload = _valid_playbook().model_dump(mode="json")
+    snapshot = {
+        "kind": "math_formula",
+        "formula_latex": r"m_h=\frac{f(1+h)-f(1)}{h}=2+h",
+        "caption": "割线斜率趋近导数。",
+    }
+    payload["steps"][0]["title"] = "代数化为导数定义"
+    payload["steps"][0]["voiceover_text"] = "一般写成差商：m_h=(f(1+h)-f(1))/h=2+h。"
+    payload["steps"][0]["snapshot"] = deepcopy(snapshot)
+    payload["steps"][0]["layers"] = [{"body": deepcopy(snapshot)}]
+
+    report = quality_gate_playbook(
+        PlaybookScript.model_validate(payload),
+        "解释导数差商",
+        generator_path="agent",
+    )
+
+    assert not any(
+        issue.code == "snapshot.narration_mismatch"
+        and issue.path == "steps[0].voiceover_text"
+        for issue in report.issues
+    )

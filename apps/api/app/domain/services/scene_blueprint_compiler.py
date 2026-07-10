@@ -109,6 +109,12 @@ def _compile_steps(
     for index, caption in enumerate(captions, start=1):
         step_snapshot = snapshot.model_copy(deep=True)
         step_code_highlight = code_highlight.model_copy(deep=True) if code_highlight else None
+        if step_code_highlight is not None:
+            step_code_highlight = _sync_code_highlight_state(
+                scene_type,
+                step_snapshot,
+                step_code_highlight,
+            )
         duration = (
             step_frames
             if step_frames is not None
@@ -129,6 +135,32 @@ def _compile_steps(
             )
         )
     return steps
+
+
+def _sync_code_highlight_state(
+    scene_type: str,
+    snapshot: Any,
+    code_highlight: CodeHighlightOverlay,
+) -> CodeHighlightOverlay:
+    variables = dict(code_highlight.variables)
+    if scene_type == "bfs_graph" and isinstance(snapshot, GraphSceneSnapshot):
+        current = snapshot.current_node_id or next(iter(snapshot.active_node_ids), "done")
+        queue = list(dict.fromkeys([*snapshot.queue_node_ids, *snapshot.frontier_node_ids]))
+        variables.update(
+            {
+                "current": current,
+                "queue": f"[{', '.join(queue)}]",
+                "visited": f"{{{', '.join(snapshot.visited_node_ids)}}}",
+            }
+        )
+    elif scene_type == "recursion_stack" and isinstance(snapshot, CallStackSceneSnapshot):
+        current_frame = next(
+            (frame for frame in snapshot.frames if frame.id == snapshot.current_frame_id),
+            None,
+        )
+        if current_frame is not None:
+            variables.update(current_frame.variables)
+    return code_highlight.model_copy(update={"variables": variables})
 
 
 def _step_captions(scene_type: str, title: str, base_caption: str) -> list[str]:

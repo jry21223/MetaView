@@ -10,6 +10,7 @@ from app.domain.models.playbook import PlaybookScript
 from app.domain.services.scene_blueprint_compiler import compile_scene_blueprint_to_playbook
 from eval.benchmark_v2 import (
     GoldCaseExpectation,
+    _semantic_roles,
     load_benchmark_v2_suite,
     score_benchmark_v2,
 )
@@ -26,7 +27,8 @@ DIMENSION_WEIGHTS = {
     "contract_schema": 15.0,
     "knowledge_correctness": 25.0,
     "pedagogical_structure": 20.0,
-    "visual_requirement_coverage": 20.0,
+    "visual_requirement_coverage": 15.0,
+    "code_sync": 5.0,
     "narration_visual_consistency": 10.0,
     "timing_export_readiness": 10.0,
 }
@@ -85,6 +87,7 @@ def _apply_bfs_progression(payload: dict[str, Any]) -> None:
             snapshot["visited_node_ids"] = visited
             snapshot["queue_node_ids"] = queue
             snapshot["frontier_node_ids"] = queue
+        _sync_code_highlight_to_snapshot(step)
 
 
 def _apply_recursion_progression(payload: dict[str, Any]) -> None:
@@ -140,9 +143,56 @@ def _apply_recursion_progression(payload: dict[str, Any]) -> None:
                 "active_line": active_line,
                 "asset_id": "active-line",
             }
+        _sync_code_highlight_to_snapshot(step)
     conclusion = "factorial(4) = 24: pending values multiply while return values unwind the stack."
     payload["summary"] = conclusion
     payload["steps"][-1]["voiceover_text"] = conclusion
+
+
+def _sync_code_highlight_to_snapshot(step: dict[str, Any]) -> None:
+    snapshot = step["snapshot"]
+    if snapshot.get("kind") == "graph_scene":
+        current = str(
+            snapshot.get("current_node_id")
+            or next(iter(snapshot.get("active_node_ids") or []), "done")
+        )
+        queue = list(
+            dict.fromkeys(
+                [
+                    *(str(item) for item in snapshot.get("queue_node_ids") or []),
+                    *(str(item) for item in snapshot.get("frontier_node_ids") or []),
+                ]
+            )
+        )
+        visited = [str(item) for item in snapshot.get("visited_node_ids") or []]
+        step["code_highlight"] = {
+            "language": "pseudocode",
+            "lines": ["current = queue.dequeue()", "process(current)"],
+            "active_lines": [0],
+            "active_line": 0,
+            "variables": {
+                "current": current,
+                "queue": f"[{', '.join(queue)}]",
+                "visited": f"{{{', '.join(visited)}}}",
+            },
+        }
+    if snapshot.get("kind") == "call_stack_scene":
+        trace = snapshot.get("code_trace") or {}
+        current_frame = next(
+            (
+                frame
+                for frame in snapshot.get("frames") or []
+                if frame.get("id") == snapshot.get("current_frame_id")
+            ),
+            None,
+        )
+        step["code_highlight"] = {
+            "language": trace.get("language", "python"),
+            "lines": trace.get("lines") or ["return"],
+            "active_lines": trace.get("active_lines") or [0],
+            "active_line": trace.get("active_line", 0),
+            "variables": copy.deepcopy((current_frame or {}).get("variables") or {}),
+        }
 
 
 def _snapshot_dicts(payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -241,6 +291,10 @@ def test_benchmark_v2_expectation_schema_is_complete(
         assert case.required_state_fields
         assert case.expected_conclusion.statement
         assert case.hard_fail_conditions
+    assert expectations["algorithm-bfs-tree"].code_sync.required is True
+    assert expectations["code-recursion-factorial"].code_sync.required is True
+    assert expectations["math-derivative-tangent"].code_sync.required is False
+    assert expectations["physics-projectile"].code_sync.required is False
 
 
 def test_expectation_schema_allows_semantic_renderer_case_without_assets(
@@ -270,6 +324,33 @@ def test_gold_case_deterministic_positive_passes(
     assert {dimension.name: dimension.max_score for dimension in card.dimensions} == (
         DIMENSION_WEIGHTS
     )
+    code_sync = next(item for item in card.dimensions if item.name == "code_sync")
+    assert code_sync.applicable is (case_id in {"algorithm-bfs-tree", "code-recursion-factorial"})
+
+
+def test_schema_failure_keeps_non_code_case_code_sync_not_applicable(
+    expectations: dict[str, GoldCaseExpectation],
+) -> None:
+    card = score_benchmark_v2(expectations["math-derivative-tangent"], "{}")
+    code_sync = next(item for item in card.dimensions if item.name == "code_sync")
+
+    assert card.parse_error is not None
+    assert code_sync.applicable is False
+
+
+def test_slope_role_accepts_a_rendered_math_formula_conclusion() -> None:
+    roles = _semantic_roles(
+        [
+            {
+                "kind": "math_formula",
+                "formula_latex": "f'(1)=2",
+                "caption": "The tangent slope is two.",
+            }
+        ],
+        {},
+    )
+
+    assert "slope" in roles
 
 
 @pytest.mark.parametrize("case_id", sorted(EXPECTED_IDS))
@@ -289,6 +370,114 @@ def test_gold_case_missing_core_visual_hard_fails(
     )
 
 
+def test_bfs_missing_code_sync_hard_fails(
+    expectations: dict[str, GoldCaseExpectation],
+) -> None:
+    def mutate(payload: dict[str, Any]) -> None:
+        for step in payload["steps"]:
+            step["code_highlight"] = None
+
+    raw = _raw_after(_positive_playbook("algorithm-bfs-tree"), mutate)
+    card = score_benchmark_v2(expectations["algorithm-bfs-tree"], raw)
+
+    assert not card.passed
+    assert "missing_code_sync" in {issue.code for issue in card.hard_failures}
+    assert {issue.code for issue in card.hard_failures} & {
+        "missing_code_sync",
+        "invalid_code_sync",
+        "code_sync_state_mismatch",
+    } == {"missing_code_sync"}
+    code_sync = next(item for item in card.dimensions if item.name == "code_sync")
+    assert code_sync.score == 0.0
+
+
+def test_bfs_code_sync_state_mismatch_hard_fails(
+    expectations: dict[str, GoldCaseExpectation],
+) -> None:
+    def mutate(payload: dict[str, Any]) -> None:
+        payload["steps"][0]["code_highlight"]["variables"]["queue"] = "[wrong]"
+
+    raw = _raw_after(_positive_playbook("algorithm-bfs-tree"), mutate)
+    card = score_benchmark_v2(expectations["algorithm-bfs-tree"], raw)
+
+    assert not card.passed
+    assert "code_sync_state_mismatch" in {issue.code for issue in card.hard_failures}
+
+
+def test_recursion_invalid_code_sync_active_line_hard_fails(
+    expectations: dict[str, GoldCaseExpectation],
+) -> None:
+    def mutate(payload: dict[str, Any]) -> None:
+        payload["steps"][0]["code_highlight"]["active_lines"] = [999]
+        payload["steps"][0]["code_highlight"]["active_line"] = 999
+
+    raw = _raw_after(_positive_playbook("code-recursion-factorial"), mutate)
+    card = score_benchmark_v2(expectations["code-recursion-factorial"], raw)
+
+    assert not card.passed
+    assert "invalid_code_sync" in {issue.code for issue in card.hard_failures}
+
+
+def test_bfs_accepts_valid_sibling_visit_order(
+    expectations: dict[str, GoldCaseExpectation],
+) -> None:
+    def mutate(payload: dict[str, Any]) -> None:
+        states = [
+            ("S", ["S"], ["A"]),
+            ("A", ["S", "A"], ["C", "B"]),
+            ("C", ["S", "A", "C"], ["B", "D"]),
+            ("B", ["S", "A", "C", "B"], ["D"]),
+            ("D", ["S", "A", "C", "B", "D"], []),
+        ]
+        for index, step in enumerate(payload["steps"]):
+            current, visited, queue = states[min(index, len(states) - 1)]
+            for snapshot in _step_snapshots(step):
+                if snapshot.get("kind") != "graph_scene":
+                    continue
+                snapshot["current_node_id"] = current
+                snapshot["active_node_ids"] = [current]
+                snapshot["visited_node_ids"] = visited
+                snapshot["queue_node_ids"] = queue
+                snapshot["frontier_node_ids"] = queue
+            _sync_code_highlight_to_snapshot(step)
+
+    raw = _raw_after(_positive_playbook("algorithm-bfs-tree"), mutate)
+    card = score_benchmark_v2(expectations["algorithm-bfs-tree"], raw)
+
+    assert card.passed, [(issue.code, issue.message) for issue in card.hard_failures]
+
+
+def test_bfs_ignores_unreachable_decorative_node_for_completion(
+    expectations: dict[str, GoldCaseExpectation],
+) -> None:
+    def mutate(payload: dict[str, Any]) -> None:
+        for snapshot in _snapshot_dicts(payload):
+            if snapshot.get("kind") == "graph_scene":
+                snapshot["nodes"].append({"id": "X", "label": "X"})
+
+    raw = _raw_after(_positive_playbook("algorithm-bfs-tree"), mutate)
+    card = score_benchmark_v2(expectations["algorithm-bfs-tree"], raw)
+
+    assert card.passed, [(issue.code, issue.message) for issue in card.hard_failures]
+
+
+def test_recursion_code_sync_requires_visual_n_state(
+    expectations: dict[str, GoldCaseExpectation],
+) -> None:
+    def mutate(payload: dict[str, Any]) -> None:
+        first = payload["steps"][0]
+        for snapshot in _step_snapshots(first):
+            if snapshot.get("kind") == "call_stack_scene":
+                snapshot["frames"][0]["variables"] = {}
+        first["code_highlight"]["variables"] = {"n": "999"}
+
+    raw = _raw_after(_positive_playbook("code-recursion-factorial"), mutate)
+    card = score_benchmark_v2(expectations["code-recursion-factorial"], raw)
+
+    assert not card.passed
+    assert "code_sync_state_mismatch" in {issue.code for issue in card.hard_failures}
+
+
 @pytest.mark.parametrize("case_id", sorted(EXPECTED_IDS))
 def test_gold_case_wrong_conclusion_hard_fails(
     case_id: str,
@@ -304,6 +493,35 @@ def test_gold_case_wrong_conclusion_hard_fails(
         "forbidden_text_fact",
         "expected_conclusion_not_met",
     }
+
+
+def test_derivative_allows_a_secant_with_slope_three_before_tangent_limit(
+    expectations: dict[str, GoldCaseExpectation],
+) -> None:
+    def mutate(payload: dict[str, Any]) -> None:
+        payload["steps"][2]["voiceover_text"] = (
+            "割线经过 P=(1,1) 与 Q=(2,4)，所以割线斜率为 3；继续让 Q 靠近 P。"
+        )
+        for snapshot in _step_snapshots(payload["steps"][2]):
+            if snapshot.get("kind") != "math_plot":
+                continue
+            snapshot["curves"].append(
+                {
+                    "expression": "3*x - 2",
+                    "label": "割线斜率为 3",
+                    "emphasis": "secondary",
+                    "semantic_role": "secant",
+                }
+            )
+
+    raw = _raw_after(_positive_playbook("math-derivative-tangent"), mutate)
+    card = score_benchmark_v2(
+        expectations["math-derivative-tangent"],
+        raw,
+        external_warning_count=0,
+    )
+
+    assert card.passed, card.to_dict()
 
 
 @pytest.mark.parametrize("case_id", sorted(EXPECTED_IDS))
@@ -512,6 +730,98 @@ def test_bfs_rejects_incorrect_fifo_queue_progression(
     assert "invalid_state_transition" in {issue.code for issue in card.hard_failures}
 
 
+def test_bfs_accepts_explicit_dequeue_and_enqueue_microsteps(
+    expectations: dict[str, GoldCaseExpectation],
+) -> None:
+    payload = _positive_playbook("algorithm-bfs-tree").model_dump(
+        mode="json", by_alias=True
+    )
+    first = copy.deepcopy(payload["steps"][0])
+    start = first["snapshot"]["current_node_id"]
+    initial = copy.deepcopy(first)
+    dequeued = copy.deepcopy(first)
+    for suffix, step, visited, queue in (
+        ("initial", initial, [], [start]),
+        ("dequeued", dequeued, [start], []),
+    ):
+        step["step_id"] = f"{step['step_id']}-{suffix}"
+        step["title"] = f"{step['title']} ({suffix})"
+        for snapshot in _step_snapshots(step):
+            snapshot["visited_node_ids"] = visited
+            snapshot["queue_node_ids"] = queue
+            snapshot["frontier_node_ids"] = queue
+        _sync_code_highlight_to_snapshot(step)
+    payload["steps"] = [initial, dequeued, *payload["steps"]]
+    for index, step in enumerate(payload["steps"], start=1):
+        step["end_frame"] = index * 120
+    payload["total_frames"] = payload["steps"][-1]["end_frame"]
+
+    card = score_benchmark_v2(
+        expectations["algorithm-bfs-tree"],
+        PlaybookScript.model_validate(payload).model_dump_json(by_alias=True),
+    )
+
+    assert card.passed
+
+
+def test_bfs_rejects_queue_rewind_after_checkpoint(
+    expectations: dict[str, GoldCaseExpectation],
+) -> None:
+    payload = _positive_playbook("algorithm-bfs-tree").model_dump(
+        mode="json", by_alias=True
+    )
+    rewound = copy.deepcopy(payload["steps"][0])
+    rewound["step_id"] = f"{rewound['step_id']}-rewound"
+    rewound["title"] = f"{rewound['title']} (rewound)"
+    for snapshot in _step_snapshots(rewound):
+        snapshot["queue_node_ids"] = []
+        snapshot["frontier_node_ids"] = []
+    payload["steps"].insert(1, rewound)
+    for index, step in enumerate(payload["steps"], start=1):
+        step["end_frame"] = index * 120
+    payload["total_frames"] = payload["steps"][-1]["end_frame"]
+
+    card = score_benchmark_v2(
+        expectations["algorithm-bfs-tree"],
+        PlaybookScript.model_validate(payload).model_dump_json(by_alias=True),
+    )
+
+    assert not card.passed
+    assert "invalid_state_transition" in {issue.code for issue in card.hard_failures}
+
+
+def test_bfs_accepts_incremental_neighbor_enqueue_microsteps(
+    expectations: dict[str, GoldCaseExpectation],
+) -> None:
+    payload = _positive_playbook("algorithm-bfs-tree").model_dump(
+        mode="json", by_alias=True
+    )
+    checkpoint = payload["steps"][1]
+    after_dequeue = copy.deepcopy(checkpoint)
+    first_enqueue = copy.deepcopy(checkpoint)
+    for suffix, step, queue in (
+        ("after-dequeue", after_dequeue, []),
+        ("first-enqueue", first_enqueue, ["B"]),
+    ):
+        step["step_id"] = f"{step['step_id']}-{suffix}"
+        step["title"] = f"{step['title']} ({suffix})"
+        for snapshot in _step_snapshots(step):
+            snapshot["queue_node_ids"] = queue
+            snapshot["frontier_node_ids"] = queue
+        _sync_code_highlight_to_snapshot(step)
+    payload["steps"][1:1] = [after_dequeue, first_enqueue]
+    for index, step in enumerate(payload["steps"], start=1):
+        step["end_frame"] = index * 120
+    payload["total_frames"] = payload["steps"][-1]["end_frame"]
+
+    card = score_benchmark_v2(
+        expectations["algorithm-bfs-tree"],
+        PlaybookScript.model_validate(payload).model_dump_json(by_alias=True),
+    )
+
+    assert card.passed
+
+
 def test_recursion_requires_structured_return_propagation(
     expectations: dict[str, GoldCaseExpectation],
 ) -> None:
@@ -558,6 +868,112 @@ def test_recursion_rejects_incorrect_structured_return_values(
 
     assert not card.passed
     assert "invalid_semantic_evidence" in {issue.code for issue in card.hard_failures}
+
+
+def test_recursion_does_not_treat_child_return_as_current_result(
+    expectations: dict[str, GoldCaseExpectation],
+) -> None:
+    def mutate(payload: dict[str, Any]) -> None:
+        for step in payload["steps"]:
+            snapshot = step["snapshot"]
+            if snapshot.get("kind") != "call_stack_scene":
+                continue
+            current = next(
+                frame
+                for frame in snapshot["frames"]
+                if frame["id"] == snapshot["current_frame_id"]
+            )
+            variables = current.get("variables") or {}
+            if any(key in variables for key in ("return", "return_value", "result")):
+                variables["child_return"] = "1"
+            _sync_code_highlight_to_snapshot(step)
+
+    raw = _raw_after(_positive_playbook("code-recursion-factorial"), mutate)
+    card = score_benchmark_v2(expectations["code-recursion-factorial"], raw)
+
+    assert card.passed, [(issue.code, issue.message) for issue in card.hard_failures]
+
+
+def test_recursion_accepts_standard_zero_base_case(
+    expectations: dict[str, GoldCaseExpectation],
+) -> None:
+    def mutate(payload: dict[str, Any]) -> None:
+        payload["steps"].append(copy.deepcopy(payload["steps"][-1]))
+        stages = [
+            [(4, "active", None)],
+            [(4, "waiting", None), (3, "active", None)],
+            [(4, "waiting", None), (3, "waiting", None), (2, "active", None)],
+            [
+                (4, "waiting", None),
+                (3, "waiting", None),
+                (2, "waiting", None),
+                (1, "active", None),
+            ],
+            [
+                (4, "waiting", None),
+                (3, "waiting", None),
+                (2, "waiting", None),
+                (1, "waiting", None),
+                (0, "returned", "1"),
+            ],
+            [
+                (4, "waiting", None),
+                (3, "waiting", None),
+                (2, "waiting", None),
+                (1, "returned", "1"),
+            ],
+            [(4, "waiting", None), (3, "waiting", None), (2, "returned", "2")],
+            [(4, "waiting", None), (3, "returned", "6")],
+            [(4, "returned", "24")],
+        ]
+        lines = [
+            "def factorial(n):",
+            "    if n == 0:",
+            "        return 1",
+            "    return n * factorial(n - 1)",
+        ]
+        for index, step in enumerate(payload["steps"]):
+            step["step_id"] = f"zero-base-{index}"
+            step["title"] = f"Zero-base factorial step {index}"
+            step["end_frame"] = (index + 1) * 360
+            frames = []
+            for depth, (n_value, state, returned) in enumerate(stages[index]):
+                variables = {"n": str(n_value)}
+                if returned is not None:
+                    variables["return_value"] = returned
+                frames.append(
+                    {
+                        "id": f"factorial-{n_value}",
+                        "label": f"factorial({n_value})",
+                        "depth": depth,
+                        "state": state,
+                        "asset_id": "call-frame" if depth == 0 else "stack-frame",
+                        "variables": variables,
+                    }
+                )
+            for snapshot in _step_snapshots(step):
+                if snapshot.get("kind") != "call_stack_scene":
+                    continue
+                snapshot["frames"] = copy.deepcopy(frames)
+                snapshot["current_frame_id"] = frames[-1]["id"]
+                snapshot["code_trace"] = {
+                    "language": "python",
+                    "lines": lines,
+                    "active_lines": [2 if index == 4 else 3],
+                    "active_line": 2 if index == 4 else 3,
+                    "asset_id": "active-line",
+                }
+            _sync_code_highlight_to_snapshot(step)
+        payload["total_frames"] = payload["steps"][-1]["end_frame"]
+
+    raw = _raw_after(_positive_playbook("code-recursion-factorial"), mutate)
+    card = score_benchmark_v2(
+        expectations["code-recursion-factorial"],
+        raw,
+        external_warning_count=0,
+    )
+
+    assert card.passed, [(issue.code, issue.message) for issue in card.hard_failures]
 
 
 def test_projectile_rejects_straight_line_trajectory(

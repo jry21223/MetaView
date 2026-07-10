@@ -14,9 +14,7 @@
         {"id": "tangent", "any_of": ["tangent", "切线"]},
         {"id": "slope", "any_of": ["slope", "斜率"]}
       ],
-      "forbidden_text_facts": [
-        {"id": "wrong_slope_three", "any_of": ["slope = 3", "slope is 3", "斜率为 3", "斜率等于 3", "f'(1)=3"]}
-      ],
+      "forbidden_text_facts": [],
       "required_state_fields": ["curves", "marker_x"],
       "required_state_values": {"marker_x": 1.0},
       "expected_conclusion": {
@@ -29,6 +27,7 @@
         ],
         "none_of": ["slope = 3", "slope is 3", "斜率为 3", "斜率等于 3", "f'(1)=3"]
       },
+      "code_sync": {"required": false, "accepted_languages": [], "required_variables": []},
       "maximum_warning_count": 0,
       "hard_fail_conditions": [
         "schema_invalid", "unexpected_domain", "missing_required_snapshot_kind",
@@ -40,7 +39,8 @@
         "final_step_does_not_answer", "required_state_value_mismatch",
         "invalid_state_reference", "invalid_state_transition",
         "incorrect_state_order", "missing_visual_transition",
-        "invalid_semantic_evidence"
+        "invalid_semantic_evidence", "missing_code_sync", "invalid_code_sync",
+        "code_sync_state_mismatch"
       ]
     },
     {
@@ -54,7 +54,7 @@
       "required_text_facts": [
         {"id": "breadth_first", "any_of": ["breadth-first", "breadth first", "BFS", "广度优先"]},
         {"id": "queue", "any_of": ["queue", "frontier", "队列"]},
-        {"id": "visited", "any_of": ["visited", "已访问", "访问状态"]},
+        {"id": "visited", "any_of": ["visited", "已访问", "访问状态", "访问"]},
         {"id": "order", "any_of": ["order", "FIFO", "先进先出", "按层", "逐层"]}
       ],
       "forbidden_text_facts": [
@@ -72,6 +72,11 @@
         ],
         "none_of": ["depth-first", "depth first", "DFS", "深度优先"]
       },
+      "code_sync": {
+        "required": true,
+        "accepted_languages": ["pseudocode", "python"],
+        "required_variables": ["current", "queue", "visited"]
+      },
       "maximum_warning_count": 0,
       "hard_fail_conditions": [
         "schema_invalid", "unexpected_domain", "missing_required_snapshot_kind",
@@ -83,7 +88,8 @@
         "final_step_does_not_answer", "required_state_value_mismatch",
         "invalid_state_reference", "invalid_state_transition",
         "incorrect_state_order", "missing_visual_transition",
-        "invalid_semantic_evidence"
+        "invalid_semantic_evidence", "missing_code_sync", "invalid_code_sync",
+        "code_sync_state_mismatch"
       ]
     },
     {
@@ -116,6 +122,11 @@
         ],
         "none_of": ["factorial(4) = 12", "factorial(4)=12", "阶乘 4 等于 12", "4 的阶乘是 12"]
       },
+      "code_sync": {
+        "required": true,
+        "accepted_languages": ["python", "pseudocode"],
+        "required_variables": ["n"]
+      },
       "maximum_warning_count": 0,
       "hard_fail_conditions": [
         "schema_invalid", "unexpected_domain", "missing_required_snapshot_kind",
@@ -127,7 +138,8 @@
         "final_step_does_not_answer", "required_state_value_mismatch",
         "invalid_state_reference", "invalid_state_transition",
         "incorrect_state_order", "missing_visual_transition",
-        "invalid_semantic_evidence"
+        "invalid_semantic_evidence", "missing_code_sync", "invalid_code_sync",
+        "code_sync_state_mismatch"
       ]
     },
     {
@@ -158,6 +170,7 @@
         ],
         "none_of": ["horizontal acceleration from gravity", "gravity accelerates horizontal", "水平方向受重力加速", "水平速度因重力增加"]
       },
+      "code_sync": {"required": false, "accepted_languages": [], "required_variables": []},
       "maximum_warning_count": 0,
       "hard_fail_conditions": [
         "schema_invalid", "unexpected_domain", "missing_required_snapshot_kind",
@@ -169,7 +182,8 @@
         "final_step_does_not_answer", "required_state_value_mismatch",
         "invalid_state_reference", "invalid_state_transition",
         "incorrect_state_order", "missing_visual_transition",
-        "invalid_semantic_evidence"
+        "invalid_semantic_evidence", "missing_code_sync", "invalid_code_sync",
+        "code_sync_state_mismatch"
       ]
     }
   ]

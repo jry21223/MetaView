@@ -22,6 +22,7 @@ def generate_live_playbook(
     prompt: str,
     api_base: str,
     *,
+    domain: str | None = None,
     api_prefix: str = "/api/v1",
     timeout: int = 900,
     poll_interval: float = 2.0,
@@ -31,6 +32,7 @@ def generate_live_playbook(
     return generate_live_playbook_with_metadata(
         prompt,
         api_base,
+        domain=domain,
         api_prefix=api_prefix,
         timeout=timeout,
         poll_interval=poll_interval,
@@ -41,6 +43,7 @@ def generate_live_playbook_with_metadata(
     prompt: str,
     api_base: str,
     *,
+    domain: str | None = None,
     api_prefix: str = "/api/v1",
     timeout: int = 900,
     poll_interval: float = 2.0,
@@ -63,9 +66,12 @@ def generate_live_playbook_with_metadata(
     deadline = time.monotonic() + timeout
     last_status = "submitted"
 
+    request_payload = {"prompt": prompt}
+    if domain:
+        request_payload["domain"] = domain
     submit = httpx.post(
         f"{base}{prefix}/pipeline",
-        json={"prompt": prompt},
+        json=request_payload,
         timeout=min(timeout, 60),
     )
     submit.raise_for_status()

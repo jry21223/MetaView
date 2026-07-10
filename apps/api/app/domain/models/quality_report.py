@@ -120,6 +120,7 @@ def _scores_from_verdict(verdict: PlaybookReviewVerdict) -> dict[str, float]:
         "pedagogy": 1.0,
         "scene_contract": 1.0,
         "visual_structure": 1.0,
+        "code_sync": 1.0,
         "narration_visual_consistency": 1.0,
         "timeline": 1.0,
         "asset_license": 1.0,
@@ -133,8 +134,10 @@ def _scores_from_verdict(verdict: PlaybookReviewVerdict) -> dict[str, float]:
             keys = ["asset_license", "export_readiness"]
         elif issue.code.startswith(("scene.", "renderer.", "snapshot.")):
             keys = ["scene_contract", "visual_structure", "export_readiness"]
-        elif issue.code.startswith(("math.", "algorithm.", "code.")):
+        elif issue.code.startswith(("math.", "algorithm.")):
             keys = ["knowledge_correctness", "visual_structure"]
+        elif issue.code.startswith("code."):
+            keys = ["knowledge_correctness", "visual_structure", "code_sync"]
         elif issue.code.startswith(("narration.", "step.")):
             keys = ["pedagogy", "prompt_coverage", "narration_visual_consistency"]
         elif issue.code.startswith(("director.", "export.")):

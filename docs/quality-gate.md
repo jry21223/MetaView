@@ -39,8 +39,12 @@ The initial backend rule set covers:
 - non-monotonic or truncated timelines and narration-duration warnings;
 - unresolved Asset Manifest references;
 - math prompts that require a rich plot but receive formula-only output;
-- BFS/graph traversal state, recursion call-stack state, and explicit
-  projectile velocity-decomposition state;
+- BFS/graph traversal state, including one current-node checkpoint per visited
+  node, recursion call-stack state, and explicit projectile
+  velocity-decomposition state;
+- Code Sync source bounds plus current/queue/visited agreement with the graph
+  scene and current-frame variable agreement for recursion; missing BFS or
+  recursion Code Sync tracks are repairable errors;
 - final teaching step that does not address an explicit request;
 - forbidden alternate rendering paths;
 - Director persistence/load failures and export-readiness failures.
@@ -62,7 +66,8 @@ Export requires an already-succeeded run and reruns the gate against the active
 Playbook. Fresh errors replace stale export errors while prior non-blocking
 review warnings remain visible. A Director repository read failure blocks the
 job. Export receives the current light/dark theme and always renders with
-`showDiagnostics=false`.
+`showDiagnostics=false` and `showInlineCode=false`. Code Sync stays in the
+learning console beside the player and never enters preview/export pixels.
 
 ## Contract ownership
 

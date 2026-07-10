@@ -29,7 +29,7 @@ def test_generate_live_playbook_submits_and_polls_current_api(monkeypatch) -> No
     def post(url: str, *, json: dict, timeout: int) -> _Response:
         calls.append(url)
         assert url == "http://localhost:8000/api/v1/pipeline"
-        assert json == {"prompt": "hello"}
+        assert json == {"prompt": "hello", "domain": "code"}
         return _Response({"run_id": "run-1"})
 
     statuses = iter([
@@ -51,7 +51,12 @@ def test_generate_live_playbook_submits_and_polls_current_api(monkeypatch) -> No
     monkeypatch.setattr(httpx, "get", get)
     monkeypatch.setattr("eval.live_client.time.sleep", lambda _: None)
 
-    raw = generate_live_playbook("hello", "http://localhost:8000", poll_interval=0)
+    raw = generate_live_playbook(
+        "hello",
+        "http://localhost:8000",
+        domain="code",
+        poll_interval=0,
+    )
 
     assert '"title": "ok"' in raw
     assert "http://localhost:8000/api/pipeline/run" not in calls

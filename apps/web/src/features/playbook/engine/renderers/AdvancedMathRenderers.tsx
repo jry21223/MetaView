@@ -551,7 +551,6 @@ function GraphSvg({ graph, theme, opacity = 1 }: { graph: GraphSceneSnapshot; th
       {showStatePanel ? (
         <GraphAlgorithmStatePanel
           graph={graph}
-          packId={packId}
           theme={theme}
           currentNodes={[...currentNodes]}
           visitedNodes={[...visitedNodes]}
@@ -577,7 +576,6 @@ function shouldRenderGraphAlgorithmStatePanel(
 
 function GraphAlgorithmStatePanel({
   graph,
-  packId,
   theme,
   currentNodes,
   visitedNodes,
@@ -585,7 +583,6 @@ function GraphAlgorithmStatePanel({
   opacity,
 }: {
   graph: GraphSceneSnapshot;
-  packId: string;
   theme: ThemeName;
   currentNodes: string[];
   visitedNodes: string[];
@@ -593,20 +590,11 @@ function GraphAlgorithmStatePanel({
   opacity: number;
 }) {
   const colors = PALETTE[theme];
-  const activeLineAsset =
-    resolveAssetForRenderer("graph_scene", "active_line", packId) ??
-    resolveAssetByRole("algorithm", "active_line", packId);
   const current = currentNodes[0] ?? graph.current_node_id ?? "node";
-  const queueText = queueNodes.length ? queueNodes.join(", ") : "empty";
-  const codeLines = [
-    `current = ${current}`,
-    `for neighbor in ${current}`,
-    `queue <- ${queueText}`,
-  ];
 
   return (
     <g opacity={opacity} data-semantic-role="algorithm_state_panel">
-      <rect x="622" y="40" width="246" height="408" rx="14" fill={colors.card} stroke={colors.line} />
+      <rect x="622" y="40" width="246" height="256" rx="14" fill={colors.card} stroke={colors.line} />
       <text x="646" y="76" fill={colors.ink} fontSize="18" fontWeight="760">
         BFS state
       </text>
@@ -677,42 +665,6 @@ function GraphAlgorithmStatePanel({
         <text x="714" y="266" fill={colors.accent} fontSize="15" fontWeight="780">
           {current}
         </text>
-      </g>
-
-      <g data-semantic-role="code_trace">
-        <text x="646" y="312" fill={colors.muted} fontSize="13" fontWeight="700">
-          Code sync
-        </text>
-        {codeLines.map((line, index) => {
-          const active = index === 1;
-          return (
-            <g
-              key={line}
-              data-code-line-index={index}
-              data-code-line-state={active ? "active" : "idle"}
-            >
-              {active ? (
-                <AssetSvg
-                  asset={activeLineAsset}
-                  assetId={activeLineAsset?.id}
-                  packId={packId}
-                  subject="algorithm"
-                  semanticRole="active_line"
-                  x={642}
-                  y={326 + index * 30}
-                  width={202}
-                  height={24}
-                  fallbackShape="rect"
-                />
-              ) : (
-                <rect x="642" y={326 + index * 30} width="202" height="24" rx="6" fill="transparent" />
-              )}
-              <text x="654" y={343 + index * 30} fill={active ? colors.ink : colors.muted} fontSize="13">
-                {line}
-              </text>
-            </g>
-          );
-        })}
       </g>
     </g>
   );

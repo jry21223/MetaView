@@ -144,6 +144,7 @@ Agent demo 验收见 [`docs/agent-demo-acceptance.md`](docs/agent-demo-acceptanc
 | `METAVIEW_AGENT_PROVIDER` | `http` | `agent` 模式 provider adapter：`http` sidecar 或 `codex` fallback |
 | `METAVIEW_AGENT_BASE_URL` | `http://agent:8001` | agent sidecar 地址 |
 | `METAVIEW_AGENT_SHARED_TOKEN` | - | API 调用 agent sidecar 的共享鉴权 token |
+| `METAVIEW_CODEX_BIN` | - | Codex SDK 可选 CLI 路径；留空使用 SDK 固定 runtime |
 | `METAVIEW_ROUTER_MODE` | `hybrid` | 路由模式：`off` / `heuristic` / `llm` / `hybrid` |
 | `METAVIEW_OPENAI_API_KEY` | - | 内置 OpenAI 兼容 provider 的 key |
 | `METAVIEW_OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI 兼容接口根地址 |

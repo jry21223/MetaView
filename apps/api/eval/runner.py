@@ -72,12 +72,14 @@ def _load_recorded(prompt_id: str, fixtures_dir: pathlib.Path = FIXTURES_DIR) ->
 def _generate_live(
     prompt: str,
     api_base: str,
+    domain: str | None = None,
     api_prefix: str = "/api/v1",
     timeout: int = 900,
 ) -> str:
     return generate_live_playbook(
         prompt,
         api_base,
+        domain=domain,
         api_prefix=api_prefix,
         timeout=timeout,
     )
@@ -88,10 +90,12 @@ def _generate_live_v2(
     api_base: str,
     api_prefix: str,
     timeout: int,
+    domain: str | None = None,
 ) -> tuple[str, GenerationMetrics]:
     result: LiveGenerationResult = generate_live_playbook_with_metadata(
         prompt,
         api_base,
+        domain=domain,
         api_prefix=api_prefix,
         timeout=timeout,
     )
@@ -118,6 +122,7 @@ _DIM_LABELS = {
     "knowledge_correctness": "Knowledge",
     "pedagogical_structure": "Pedagogy",
     "visual_requirement_coverage": "Visual",
+    "code_sync": "Code Sync",
     "narration_visual_consistency": "Narr/visual",
     "timing_export_readiness": "Export",
 }
@@ -155,6 +160,9 @@ def _print_v2_card(card: V2ScoreCard, repeat_index: int) -> None:
     )
     for dimension in card.dimensions:
         label = _DIM_LABELS.get(dimension.name, dimension.name)
+        if not dimension.applicable:
+            print(f"    {label:<14s} {'N/A':>8s}  (not required for this case)")
+            continue
         line = (
             f"    {label:<14s} {_fmt_bar(dimension.score, dimension.max_score)}  "
             f"{dimension.score:4.1f}/{dimension.max_score:.0f}"
@@ -219,6 +227,7 @@ def _run_legacy(args: argparse.Namespace, prompts: list[dict[str, Any]]) -> int:
                 raw = _generate_live(
                     item["prompt"],
                     args.api,
+                    domain=item.get("domain"),
                     api_prefix=args.api_prefix,
                     timeout=args.live_timeout,
                 )
@@ -289,6 +298,7 @@ def _run_v2(
                         args.api,
                         args.api_prefix,
                         args.live_timeout,
+                        domain=item.get("domain"),
                     )
                 except Exception as exc:
                     raw = json.dumps({"error": str(exc)})

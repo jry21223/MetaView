@@ -109,6 +109,10 @@ Pydantic `AnySnapshot` discriminator、Agent self-check allow-list、Web `Snapsh
 4. LLM 在每个 checkpoint 的 `code_lines` 填入相关行号。
 5. `playbook_builder._build_code_highlight` 过滤越界行号，构造 `CodeHighlightOverlay`。
 
+`CodeHighlightOverlay` 是与视觉 snapshot 并行的工作台轨道。BFS 与递归的
+Agent 结果缺少该轨道时，后端会从 canonical 算法代码和结构化状态确定性补齐；
+Web 只在右侧 Code Sync 面板展示，主舞台与 Remotion 导出显式关闭 inline code。
+
 **幻觉防御**：超出源码行数范围的 `code_lines` 索引会被静默丢弃，全部越界则该步骤无 highlight。
 
 ## 3. Narration 模板
@@ -302,12 +306,15 @@ METAVIEW_AGENT_PROVIDER=codex
 METAVIEW_CODEX_MODEL=gpt-5.5
 METAVIEW_CODEX_EFFORT=high
 METAVIEW_CODEX_CWD=.
+METAVIEW_CODEX_BIN=                    # 可选：指定本机较新的 Codex CLI
 METAVIEW_AGENT_SKILLS_DIR=skills/metaview-agent
 ```
 
 Python SDK 会复用本机已有 Codex 登录；请求里传入 `provider_api_key` 时会调用
 SDK 的 API-key 登录。该路径仍然只返回 PlaybookScript，并由后端 Pydantic 契约
 校验后必须继续通过 reviewer、compatibility gate，再进入同一个 Remotion exit。
+SDK 默认使用随包固定的 Codex runtime；只有本机模型明确要求更新版本时才设置
+`METAVIEW_CODEX_BIN`，并指向已经安装且经过验证的 Codex CLI。
 Codex provider 会按 route decision 加载 `skills/metaview-agent/generic/SKILL.md`
 和对应学科的 `SKILL.md`，并接收 RuntimeToolHub manifest。Codex 当前不能执行
 runtime tools，因此它定位为 repo-aware fallback / planner / repair provider，而不是

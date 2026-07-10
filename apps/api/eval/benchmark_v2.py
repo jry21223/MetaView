@@ -46,6 +46,9 @@ HardFailCondition = Literal[
     "incorrect_state_order",
     "missing_visual_transition",
     "invalid_semantic_evidence",
+    "missing_code_sync",
+    "invalid_code_sync",
+    "code_sync_state_mismatch",
 ]
 
 _MANDATORY_HARD_FAILS: set[str] = {
@@ -67,6 +70,9 @@ _MANDATORY_HARD_FAILS: set[str] = {
     "incorrect_state_order",
     "missing_visual_transition",
     "invalid_semantic_evidence",
+    "missing_code_sync",
+    "invalid_code_sync",
+    "code_sync_state_mismatch",
 }
 
 
@@ -103,6 +109,26 @@ class ConclusionExpectation(BaseModel):
         return self
 
 
+class CodeSyncExpectation(BaseModel):
+    """Requirements for the parallel code track shown outside the video stage."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    required: bool = False
+    accepted_languages: list[str] = Field(default_factory=list)
+    required_variables: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_required_contract(self) -> "CodeSyncExpectation":
+        if self.required and not self.accepted_languages:
+            raise ValueError("required code sync must declare accepted_languages")
+        if any(not item.strip() for item in self.accepted_languages):
+            raise ValueError("code sync languages must not be blank")
+        if any(not item.strip() for item in self.required_variables):
+            raise ValueError("code sync variables must not be blank")
+        return self
+
+
 class GoldCaseExpectation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -118,6 +144,7 @@ class GoldCaseExpectation(BaseModel):
     required_state_fields: list[str] = Field(min_length=1)
     required_state_values: dict[str, Any] = Field(default_factory=dict)
     expected_conclusion: ConclusionExpectation
+    code_sync: CodeSyncExpectation = Field(default_factory=CodeSyncExpectation)
     maximum_warning_count: int = Field(ge=0)
     hard_fail_conditions: list[HardFailCondition] = Field(min_length=1)
 
@@ -180,6 +207,15 @@ class V2DimensionResult:
     score: float
     max_score: float
     issues: list[str] = field(default_factory=list)
+    applicable: bool = True
+
+
+@dataclass(frozen=True)
+class _CodeSyncAssessment:
+    present: bool
+    structurally_valid: bool
+    state_consistent: bool
+    issues: list[tuple[str, str, str]] = field(default_factory=list)
 
 
 @dataclass
@@ -267,7 +303,10 @@ def score_benchmark_v2(
         collector.add("schema_invalid", "$", message)
         return V2ScoreCard(
             prompt_id=expectation.id,
-            dimensions=_zero_dimensions("schema_invalid"),
+            dimensions=_zero_dimensions(
+                "schema_invalid",
+                code_sync_applicable=expectation.code_sync.required,
+            ),
             issues=collector.issues,
             legacy_structural_score=legacy.total,
             parse_error=message,
@@ -360,6 +399,10 @@ def score_benchmark_v2(
 
     semantic_state_issues = _validate_case_semantics(expectation, primary_snapshots)
     for code, path, message in semantic_state_issues:
+        collector.add(code, path, message)
+
+    code_sync = _assess_code_sync(expectation.code_sync, payload)
+    for code, path, message in code_sync.issues:
         collector.add(code, path, message)
 
     missing_facts = [
@@ -501,7 +544,7 @@ def score_benchmark_v2(
                 mismatched_values=mismatched_values,
                 semantic_state_issue_count=len(semantic_state_issues),
             ),
-            20.0,
+            15.0,
             _dimension_issues(
                 collector.issues,
                 {
@@ -519,6 +562,22 @@ def score_benchmark_v2(
                     "invalid_semantic_evidence",
                 },
             ),
+        ),
+        V2DimensionResult(
+            "code_sync",
+            sum(
+                [
+                    2.0 if code_sync.present else 0.0,
+                    1.0 if code_sync.structurally_valid else 0.0,
+                    2.0 if code_sync.state_consistent else 0.0,
+                ]
+            ),
+            5.0,
+            _dimension_issues(
+                collector.issues,
+                {"missing_code_sync", "invalid_code_sync", "code_sync_state_mismatch"},
+            ),
+            expectation.code_sync.required,
         ),
         V2DimensionResult(
             "narration_visual_consistency",
@@ -561,12 +620,17 @@ def score_benchmark_v2(
     )
 
 
-def _zero_dimensions(issue: str) -> list[V2DimensionResult]:
+def _zero_dimensions(
+    issue: str,
+    *,
+    code_sync_applicable: bool,
+) -> list[V2DimensionResult]:
     return [
         V2DimensionResult("contract_schema", 0.0, 15.0, [issue]),
         V2DimensionResult("knowledge_correctness", 0.0, 25.0, [issue]),
         V2DimensionResult("pedagogical_structure", 0.0, 20.0, [issue]),
-        V2DimensionResult("visual_requirement_coverage", 0.0, 20.0, [issue]),
+        V2DimensionResult("visual_requirement_coverage", 0.0, 15.0, [issue]),
+        V2DimensionResult("code_sync", 0.0, 5.0, [issue], code_sync_applicable),
         V2DimensionResult("narration_visual_consistency", 0.0, 10.0, [issue]),
         V2DimensionResult("timing_export_readiness", 0.0, 10.0, [issue]),
     ]
@@ -594,18 +658,18 @@ def _visual_score(
 ) -> float:
     raw = sum(
         [
-            3.0
+            2.0
             * _coverage_ratio(
                 len(expectation.required_snapshot_kinds) - len(missing_kinds),
                 len(expectation.required_snapshot_kinds),
             ),
-            3.0 if not present_forbidden_kinds else 0.0,
-            3.0
+            2.0 if not present_forbidden_kinds else 0.0,
+            2.0
             * _coverage_ratio(
                 len(expectation.required_scene_types) - len(missing_scene_types),
                 len(expectation.required_scene_types),
             ),
-            5.0
+            4.0
             * _coverage_ratio(
                 len(expectation.required_semantic_roles) - len(missing_roles),
                 len(expectation.required_semantic_roles),
@@ -615,7 +679,7 @@ def _visual_score(
                 len(expectation.required_asset_ids) - len(missing_assets),
                 len(expectation.required_asset_ids),
             ),
-            4.0
+            3.0
             * _coverage_ratio(
                 len(expectation.required_state_fields)
                 + len(expectation.required_state_values)
@@ -625,7 +689,181 @@ def _visual_score(
             ),
         ]
     )
-    return max(0.0, raw - min(5.0, semantic_state_issue_count * 2.0))
+    return max(0.0, raw - min(4.0, semantic_state_issue_count * 2.0))
+
+
+def _assess_code_sync(
+    expectation: CodeSyncExpectation,
+    payload: dict[str, Any],
+) -> _CodeSyncAssessment:
+    if not expectation.required:
+        return _CodeSyncAssessment(True, True, True)
+
+    relevant: list[tuple[int, dict[str, Any], dict[str, Any] | None]] = []
+    for index, step in enumerate(payload.get("steps") or []):
+        if not isinstance(step, dict):
+            continue
+        snapshot = step.get("snapshot")
+        if not isinstance(snapshot, dict) or snapshot.get("kind") not in {
+            "graph_scene",
+            "call_stack_scene",
+            "code_trace_scene",
+        }:
+            continue
+        overlay = step.get("code_highlight")
+        relevant.append((index, snapshot, overlay if isinstance(overlay, dict) else None))
+
+    present = bool(relevant) and all(
+        isinstance(overlay, dict) and bool(overlay.get("lines"))
+        for _, _, overlay in relevant
+    )
+    issues: list[tuple[str, str, str]] = []
+    if not present:
+        issues.append(
+            (
+                "missing_code_sync",
+                "$.steps[*].code_highlight",
+                "every code-backed teaching step requires a parallel Code Sync overlay.",
+            )
+        )
+        return _CodeSyncAssessment(False, False, False, issues)
+
+    accepted_languages = {item.casefold() for item in expectation.accepted_languages}
+    structurally_valid = present
+    if present:
+        for _, _, overlay in relevant:
+            assert overlay is not None
+            lines = overlay.get("lines")
+            active_lines = overlay.get("active_lines")
+            active_line = overlay.get("active_line")
+            variables = overlay.get("variables")
+            language = str(overlay.get("language") or "").casefold()
+            if (
+                language not in accepted_languages
+                or not isinstance(lines, list)
+                or not lines
+                or not isinstance(active_lines, list)
+                or not active_lines
+                or not isinstance(active_line, int)
+                or isinstance(active_line, bool)
+                or active_line not in active_lines
+                or any(
+                    not isinstance(line, int)
+                    or isinstance(line, bool)
+                    or line < 0
+                    or line >= len(lines)
+                    for line in active_lines
+                )
+                or not isinstance(variables, dict)
+                or any(variable not in variables for variable in expectation.required_variables)
+            ):
+                structurally_valid = False
+                break
+    if not structurally_valid:
+        issues.append(
+            (
+                "invalid_code_sync",
+                "$.steps[*].code_highlight",
+                "Code Sync requires accepted source, valid active lines, and declared variables.",
+            )
+        )
+        return _CodeSyncAssessment(True, False, False, issues)
+
+    state_consistent = all(
+        _code_sync_matches_snapshot(snapshot, overlay or {}, expectation.required_variables)
+        for _, snapshot, overlay in relevant
+    )
+    if not state_consistent:
+        issues.append(
+            (
+                "code_sync_state_mismatch",
+                "$.steps[*].code_highlight.variables",
+                "Code Sync variables must match the current visual state.",
+            )
+        )
+    return _CodeSyncAssessment(present, structurally_valid, state_consistent, issues)
+
+
+def _code_sync_matches_snapshot(
+    snapshot: dict[str, Any],
+    overlay: dict[str, Any],
+    required_variables: list[str],
+) -> bool:
+    variables = overlay.get("variables")
+    if not isinstance(variables, dict):
+        return False
+    kind = snapshot.get("kind")
+    if kind == "graph_scene":
+        current = str(
+            snapshot.get("current_node_id")
+            or next(iter(snapshot.get("active_node_ids") or []), "done")
+        )
+        queue = list(
+            dict.fromkeys(
+                [
+                    *(str(item) for item in snapshot.get("queue_node_ids") or []),
+                    *(str(item) for item in snapshot.get("frontier_node_ids") or []),
+                ]
+            )
+        )
+        visited = [str(item) for item in snapshot.get("visited_node_ids") or []]
+        expected = {"current": current, "queue": queue, "visited": visited}
+        for key in required_variables:
+            if key == "current" and str(variables.get(key)) != expected[key]:
+                return False
+            if (
+                key in {"queue", "visited"}
+                and _code_state_tokens(variables.get(key)) != expected[key]
+            ):
+                return False
+    if kind == "call_stack_scene":
+        current_frame_id = snapshot.get("current_frame_id")
+        current_frame = next(
+            (
+                frame
+                for frame in snapshot.get("frames") or []
+                if isinstance(frame, dict) and frame.get("id") == current_frame_id
+            ),
+            None,
+        )
+        if current_frame is None:
+            return False
+        frame_variables = current_frame.get("variables") or {}
+        for key in required_variables:
+            if (
+                key not in frame_variables
+                or key not in variables
+                or not _code_state_value_equal(variables[key], frame_variables[key])
+            ):
+                return False
+    if kind == "code_trace_scene":
+        snapshot_variables = snapshot.get("variables") or {}
+        for key in required_variables:
+            if (
+                key not in snapshot_variables
+                or key not in variables
+                or not _code_state_value_equal(variables[key], snapshot_variables[key])
+            ):
+                return False
+    return True
+
+
+def _code_state_tokens(value: Any) -> list[str]:
+    return re.findall(r"[A-Za-z0-9_.-]+", str(value or ""))
+
+
+def _code_state_value_equal(left: Any, right: Any) -> bool:
+    left_text = str(left).strip()
+    right_text = str(right).strip()
+    try:
+        left_number = float(left_text)
+        right_number = float(right_text)
+    except ValueError:
+        return left_text == right_text
+    return math.isfinite(left_number) and math.isfinite(right_number) and math.isclose(
+        left_number,
+        right_number,
+    )
 
 
 def _snapshots(payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -712,8 +950,9 @@ def _semantic_roles(
             segment_text = _flatten_strings(snapshot.get("segments") or []).casefold()
             if "tangent" in curve_text or "切线" in curve_text or "tangent" in segment_text:
                 roles.add("tangent")
+        if kind in {"math_plot", "math_scene", "math_formula"}:
             visual_text = _flatten_strings(snapshot).casefold()
-            if "slope" in curve_text or "斜率" in curve_text or "f'(" in visual_text:
+            if "slope" in visual_text or "斜率" in visual_text or "f'(" in visual_text:
                 roles.add("slope")
         if kind in {"graph_scene", "algorithm_tree"}:
             if snapshot.get("nodes"):
@@ -1092,17 +1331,15 @@ def _validate_bfs_progression(
 
     longest_order = max(visited_states, key=len, default=[])
     first_graph = graphs[0]
-    node_ids = {
-        str(node.get("id"))
-        for node in first_graph.get("nodes") or []
-        if isinstance(node, dict) and node.get("id") is not None
-    }
-    if node_ids and set(longest_order) != node_ids:
+    reachable_node_ids = (
+        set(_graph_distances(first_graph, longest_order[0])) if longest_order else set()
+    )
+    if reachable_node_ids and set(longest_order) != reachable_node_ids:
         issues.append(
             (
                 "invalid_state_transition",
                 "$.steps[*].snapshot.visited_node_ids",
-                "The final BFS visited state must cover every node in the demonstrated graph.",
+                "The final BFS visited state must cover every node reachable from the start.",
             )
         )
 
@@ -1145,8 +1382,12 @@ def _validate_bfs_progression(
             state = (str(current), visited, queue)
             if not actual_states or actual_states[-1] != state:
                 actual_states.append(state)
-        expected_states = _expected_bfs_states(first_graph, longest_order[0])
-        if actual_states != expected_states:
+        expected_states = _expected_bfs_states(
+            first_graph,
+            longest_order[0],
+            visit_order=longest_order,
+        )
+        if not _bfs_states_follow_valid_microsteps(actual_states, expected_states):
             issues.append(
                 (
                     "invalid_state_transition",
@@ -1160,9 +1401,54 @@ def _validate_bfs_progression(
     return _dedupe_semantic_issues(issues)
 
 
+def _bfs_states_follow_valid_microsteps(
+    actual_states: list[tuple[str, tuple[str, ...], tuple[str, ...]]],
+    expected_states: list[tuple[str, tuple[str, ...], tuple[str, ...]]],
+) -> bool:
+    """Accept complete BFS checkpoints plus optional dequeue/enqueue teaching beats."""
+    if not actual_states or not expected_states:
+        return actual_states == expected_states
+
+    actual_index = 0
+    incoming_queue: tuple[str, ...] = (expected_states[0][0],)
+    for current, visited, queue in expected_states:
+        if not incoming_queue or incoming_queue[0] != current:
+            return False
+        previous_visited = visited[:-1]
+        after_dequeue = incoming_queue[1:]
+        if queue[: len(after_dequeue)] != after_dequeue:
+            return False
+        discovered = queue[len(after_dequeue) :]
+        ranked_states = {(current, previous_visited, incoming_queue): 0}
+        ranked_states.update(
+            {
+                (current, visited, after_dequeue + discovered[:count]): count + 1
+                for count in range(len(discovered) + 1)
+            }
+        )
+        checkpoint_rank = len(discovered) + 1
+        previous_rank = -1
+        saw_checkpoint = False
+        while actual_index < len(actual_states) and actual_states[actual_index][0] == current:
+            state = actual_states[actual_index]
+            rank = ranked_states.get(state)
+            if rank is None or rank < previous_rank:
+                return False
+            if rank == checkpoint_rank:
+                saw_checkpoint = True
+            previous_rank = rank
+            actual_index += 1
+        if not saw_checkpoint:
+            return False
+        incoming_queue = queue
+    return actual_index == len(actual_states)
+
+
 def _expected_bfs_states(
     graph: dict[str, Any],
     start: str,
+    *,
+    visit_order: list[str],
 ) -> list[tuple[str, tuple[str, ...], tuple[str, ...]]]:
     adjacency: dict[str, list[str]] = {}
     directed = bool(graph.get("directed"))
@@ -1176,6 +1462,10 @@ def _expected_bfs_states(
         adjacency.setdefault(source, []).append(target)
         if not directed:
             adjacency.setdefault(target, []).append(source)
+
+    visit_rank = {node_id: index for index, node_id in enumerate(visit_order)}
+    for neighbors in adjacency.values():
+        neighbors.sort(key=lambda node_id: visit_rank.get(node_id, len(visit_rank)))
 
     queue = [start]
     discovered = {start}
@@ -1272,21 +1562,24 @@ def _validate_recursion_progression(
         has_valid_factorial_trace = has_valid_factorial_trace or bool(
             "factorial" in lowered_lines
             and "return" in lowered_lines
-            and ("n == 1" in lowered_lines or "n <= 1" in lowered_lines)
+            and any(
+                condition in lowered_lines
+                for condition in ("n == 0", "n == 1", "n <= 1")
+            )
         )
         for frame in frames:
             variables = frame.get("variables") if isinstance(frame.get("variables"), dict) else {}
             return_keys = {
                 str(key).casefold()
                 for key in variables
-                if any(token in str(key).casefold() for token in ("return", "result"))
+                if _is_return_value_key(key)
             }
             has_structured_return = has_structured_return or bool(
                 str(frame.get("state") or "").casefold() == "returned" or return_keys
             )
             n_value = _integer_value(variables.get("n"))
             for key, raw_value in variables.items():
-                if not any(token in str(key).casefold() for token in ("return", "result")):
+                if not _is_return_value_key(key):
                     continue
                 returned_value = _integer_value(raw_value)
                 if n_value is None or returned_value is None or not 0 <= n_value <= 20:
@@ -1333,12 +1626,13 @@ def _validate_recursion_progression(
             )
         )
     expected_returns = {1: 1, 2: 2, 3: 6, 4: 24}
+    positive_return_order = [n_value for n_value in return_order if 1 <= n_value <= 4]
     has_valid_return_values = (
         not invalid_return_value
         and all(
             return_values.get(n_value) == result for n_value, result in expected_returns.items()
         )
-        and return_order[:4] == [1, 2, 3, 4]
+        and positive_return_order[:4] == [1, 2, 3, 4]
         and has_final_return
     )
     if not has_structured_return or not has_valid_factorial_trace or not has_valid_return_values:
@@ -1353,6 +1647,16 @@ def _validate_recursion_progression(
             )
         )
     return _dedupe_semantic_issues(issues)
+
+
+def _is_return_value_key(key: Any) -> bool:
+    return str(key).strip().casefold() in {
+        "return",
+        "result",
+        "return_value",
+        "result_value",
+        "retval",
+    }
 
 
 def _integer_value(value: Any) -> int | None:

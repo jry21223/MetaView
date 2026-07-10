@@ -33,7 +33,8 @@ vectors whose targets are absent from the scene.
 | Contract and schema | 15 |
 | Knowledge correctness | 25 |
 | Pedagogical structure | 20 |
-| Visual requirement coverage | 20 |
+| Visual requirement coverage | 15 |
+| Code Sync | 5 |
 | Narration-visual consistency | 10 |
 | Timing and export readiness | 10 |
 
@@ -41,7 +42,15 @@ A total score of 90 is necessary but not sufficient. Any declared hard-fail
 condition fails the attempt regardless of total score. The expectation schema
 supports required/forbidden snapshot kinds, scene types, semantic roles,
 assets, text facts, state fields and values, conclusion aliases, warning limit,
-and hard-fail conditions.
+and hard-fail conditions. Code-backed cases additionally declare accepted Code
+Sync languages and required variables. Missing overlays, out-of-range active
+lines, or variables that disagree with the current graph/call-stack state are
+hard failures. Code Sync is a parallel workbench track; it is not rendered into
+the lesson stage or exported video. Cases without a meaningful code track keep
+the 100-point denominator unchanged but report the Code Sync dimension as N/A.
+BFS sibling order is derived from the demonstrated visit order rather than JSON
+edge order, while FIFO transitions and completion of the reachable component
+remain mandatory.
 
 ## Commands
 
