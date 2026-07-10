@@ -3,12 +3,14 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from app.domain.contracts.playbook_contract import SUPPORTED_SNAPSHOT_KIND_SET
 from app.domain.models.playbook import (
     AlgorithmArraySnapshot,
     AlgorithmBarsSnapshot,
     CodeHighlightOverlay,
     PlaybookScript,
 )
+from app.domain.models.quality_report import QualityReport
 from app.domain.models.review import (
     PlaybookIssueSeverity,
     PlaybookReviewIssue,
@@ -19,36 +21,7 @@ from app.domain.models.review import (
 MIN_AGENT_STEPS = 8
 MAX_AGENT_STEPS = 14
 
-SUPPORTED_FRONTEND_SNAPSHOT_KINDS = {
-    "algorithm_array",
-    "algorithm_bars",
-    "algorithm_tree",
-    "math_plot",
-    "math_formula",
-    "math_scene",
-    "matrix_scene",
-    "table_scene",
-    "graph_scene",
-    "call_stack_scene",
-    "code_trace_scene",
-    "stats_chart_scene",
-    "iteration_trace_scene",
-    "phase_portrait_scene",
-    "complex_plane_scene",
-    "optimization_scene",
-    "modeling_scene",
-    "manifold_scene",
-    "solid_geometry_scene",
-    "bio_cell_scene",
-    "bio_process_scene",
-    "molecule_2d_scene",
-    "reaction_scene",
-    "geo_map_scene",
-    "physics_force_scene",
-    "motion_scene",
-    "katex_overlay",
-    "narration_card",
-}
+SUPPORTED_FRONTEND_SNAPSHOT_KINDS = SUPPORTED_SNAPSHOT_KIND_SET
 
 _SUBJECT_VISUAL_DOMAINS = {"geography", "biology", "chemistry"}
 _ALGORITHM_FALLBACK_KINDS = {"algorithm_array", "algorithm_bars"}
@@ -66,6 +39,21 @@ _FORBIDDEN_RENDERING_PATTERNS = (
 
 
 PlaybookCheckReport = PlaybookReviewVerdict
+
+
+def quality_gate_playbook(
+    playbook: PlaybookScript,
+    prompt: str,
+    *,
+    generator_path: str,
+    coverage_mode: str = "unknown",
+) -> QualityReport:
+    """Run the canonical backend quality gate for a candidate playbook."""
+    return QualityReport.from_review_verdict(
+        self_check_playbook(playbook, prompt),
+        generator_path=generator_path,
+        coverage_mode=coverage_mode,
+    )
 
 
 def self_check_playbook(playbook: PlaybookScript, prompt: str) -> PlaybookCheckReport:

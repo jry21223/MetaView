@@ -1,0 +1,65 @@
+{
+  "schema_version": "2.0.0",
+  "cases": [
+    {
+      "id": "math-derivative-tangent",
+      "expected_domains": ["math"],
+      "required_snapshot_kinds": ["math_plot", "math_scene"],
+      "forbidden_snapshot_kinds": ["algorithm_array", "narration_card"],
+      "required_scene_types": ["derivative_tangent"],
+      "required_semantic_roles": ["curve", "target_point", "tangent", "slope"],
+      "required_asset_ids": [],
+      "required_text_facts": ["derivative", "tangent", "slope"],
+      "forbidden_text_facts": [],
+      "required_state_fields": ["curves", "marker_x"],
+      "expected_conclusion": "The derivative at the point equals the tangent slope.",
+      "maximum_warning_count": 0,
+      "hard_fail_conditions": ["missing_curve", "missing_tangent", "wrong_derivative_conclusion", "forbidden_fallback"]
+    },
+    {
+      "id": "algorithm-bfs-tree",
+      "expected_domains": ["algorithm", "computer_science"],
+      "required_snapshot_kinds": ["graph_scene", "algorithm_tree"],
+      "forbidden_snapshot_kinds": ["narration_card"],
+      "required_scene_types": ["bfs_graph_traversal"],
+      "required_semantic_roles": ["node", "edge", "current_node", "visited", "queue"],
+      "required_asset_ids": [],
+      "required_text_facts": ["breadth-first", "queue", "visited"],
+      "forbidden_text_facts": [],
+      "required_state_fields": ["nodes", "edges", "active_node_ids", "visited_node_ids"],
+      "expected_conclusion": "BFS visits nodes in breadth-first order using a queue/frontier.",
+      "maximum_warning_count": 0,
+      "hard_fail_conditions": ["missing_graph", "missing_queue_state", "wrong_visit_order", "forbidden_fallback"]
+    },
+    {
+      "id": "code-recursion-factorial",
+      "expected_domains": ["code", "computer_science"],
+      "required_snapshot_kinds": ["call_stack_scene", "code_trace_scene"],
+      "forbidden_snapshot_kinds": ["algorithm_array", "narration_card"],
+      "required_scene_types": ["recursion_call_stack"],
+      "required_semantic_roles": ["stack_frame", "active_frame", "code_line", "return_value"],
+      "required_asset_ids": [],
+      "required_text_facts": ["base case", "recursive call", "return"],
+      "forbidden_text_facts": [],
+      "required_state_fields": ["frames", "active_frame_id", "highlighted_lines"],
+      "expected_conclusion": "factorial returns by multiplying values as recursive frames unwind.",
+      "maximum_warning_count": 0,
+      "hard_fail_conditions": ["missing_stack_frames", "missing_code_trace", "missing_unwind_state", "wrong_return_value"]
+    },
+    {
+      "id": "physics-projectile",
+      "expected_domains": ["physics"],
+      "required_snapshot_kinds": ["motion_scene", "physics_force_scene"],
+      "forbidden_snapshot_kinds": ["algorithm_array", "narration_card"],
+      "required_scene_types": ["projectile_motion"],
+      "required_semantic_roles": ["object", "trajectory", "horizontal_velocity", "vertical_velocity", "gravity"],
+      "required_asset_ids": [],
+      "required_text_facts": ["parabolic", "gravity", "horizontal velocity", "vertical velocity"],
+      "forbidden_text_facts": [],
+      "required_state_fields": ["objects", "vectors", "trajectory"],
+      "expected_conclusion": "Projectile motion combines constant horizontal velocity with vertical acceleration from gravity.",
+      "maximum_warning_count": 0,
+      "hard_fail_conditions": ["missing_projectile", "missing_trajectory", "missing_velocity_components", "wrong_motion_law"]
+    }
+  ]
+}

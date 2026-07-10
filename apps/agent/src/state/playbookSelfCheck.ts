@@ -40,6 +40,8 @@ const SUPPORTED_FRONTEND_SNAPSHOT_KINDS = new Set([
   "matrix_scene",
   "table_scene",
   "graph_scene",
+  "call_stack_scene",
+  "code_trace_scene",
   "stats_chart_scene",
   "iteration_trace_scene",
   "phase_portrait_scene",

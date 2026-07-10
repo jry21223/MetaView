@@ -40,6 +40,7 @@ from app.domain.models.playbook import (
     StatsChartSceneSnapshot,
     TableSceneSnapshot,
 )
+from app.domain.models.quality_report import QualityReport
 from app.domain.models.review import (
     CirReviewIssue,
     CirReviewReport,
@@ -67,5 +68,5 @@ __all__ = [
     "PhysicsForceSceneSnapshot", "AnySnapshot", "SnapshotKind",
     "ReviewSeverity", "CirReviewIssue", "CirReviewReport",
     "PlaybookIssueSeverity", "PlaybookReviewIssue", "PlaybookReviewStatus",
-    "PlaybookReviewVerdict",
+    "PlaybookReviewVerdict", "QualityReport",
 ]
