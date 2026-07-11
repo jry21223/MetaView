@@ -23,7 +23,7 @@ describe("App edition shells", () => {
     window.history.pushState({}, "", "/");
   });
 
-  it("self edition does not load account state on the intake screen", async () => {
+  it("self edition keeps the public landing route independent from account state", async () => {
     let accountHits = 0;
     let opsHits = 0;
     server.use(
@@ -45,15 +45,16 @@ describe("App edition shells", () => {
     vi.stubEnv("VITE_APP_EDITION", "self");
 
     const { App } = await import("./App");
-    const { container } = render(<App />);
-    expect(container.textContent).toContain("MetaView");
-    expect(container.querySelectorAll(".mv-top")).toHaveLength(1);
+    const { container, getByText } = render(<App />);
 
+    expect(getByText("真实案例将在这里出现")).toBeTruthy();
+    expect(container.querySelectorAll(".mv-landing-header")).toHaveLength(1);
+    expect(container.querySelectorAll(".mv-top")).toHaveLength(0);
     expect(accountHits).toBe(0);
     expect(opsHits).toBe(0);
   }, 20000);
 
-  it("self edition keeps the intake hero calm without decorative debug controls", async () => {
+  it("public landing uses one calm canvas motif without debug controls", async () => {
     vi.stubEnv("VITE_APP_EDITION", "self");
 
     const { App } = await import("./App");
@@ -62,12 +63,13 @@ describe("App edition shells", () => {
     expect(container.textContent).toContain("MetaView");
     expect(
       container.querySelector('[data-testid="meta-particle-field"][data-variant="canvas"]'),
-    ).toBeNull();
+    ).toBeTruthy();
+    expect(container.querySelectorAll('[data-testid="meta-particle-field"]')).toHaveLength(1);
     expect(container.querySelector('[aria-label="MetaView logo animation"]')).toBeNull();
     expect(queryByLabelText("打开设计调节面板")).toBeNull();
   }, 10000);
 
-  it("ops edition shows the login gate when account session is missing", async () => {
+  it("ops edition shows the login gate when account session is missing on /create", async () => {
     let accountHits = 0;
     server.use(
       http.get(`${API_BASE_URL}/api/v1/account/me`, () => {
@@ -79,6 +81,7 @@ describe("App edition shells", () => {
       }),
     );
     vi.stubEnv("VITE_APP_EDITION", "ops");
+    window.history.pushState({}, "", "/create");
 
     const { App } = await import("./App");
     const { container } = render(<App />);
@@ -87,7 +90,7 @@ describe("App edition shells", () => {
     await waitFor(() =>
       expect(container.textContent).toContain("登录暂未开放"),
     );
-    expect(container.textContent).not.toContain("把一道题变成可播放的理论画布");
+    expect(container.textContent).not.toContain("让每一个理解过程都能被看见");
   });
 
   it("ops edition opens the intake screen after WeChat login", async () => {
@@ -116,6 +119,7 @@ describe("App edition shells", () => {
       }),
     );
     vi.stubEnv("VITE_APP_EDITION", "ops");
+    window.history.pushState({}, "", "/create");
 
     const { App } = await import("./App");
     const { container } = render(<App />);
@@ -153,6 +157,7 @@ describe("App edition shells", () => {
         status: "succeeded",
       }),
     }));
+    window.history.pushState({}, "", "/create");
 
     const { App } = await import("./App");
     const { container, getByRole, getByText } = render(<App />);
