@@ -5,17 +5,13 @@ from dataclasses import dataclass
 
 from app.application.agent.runtime_tool_hub import RuntimeToolHub
 from app.domain.animation_tools import list_animation_tools
+from app.domain.contracts.quality_contract import PLAYBOOK_VALIDATOR_TOOL_IDS
 from app.domain.models.coverage import CoverageDecision, CoverageFallbackPolicy
 from app.domain.models.topic import TopicDomain
 from app.domain.services.domain_router import route_topic
 from app.domain.services.scene_blueprint_schema import scene_blueprint_schema
 from app.domain.skills.base import SkillRouteInput, SkillRouteMatch
 from app.domain.skills.registry import SkillRegistry, build_default_skill_registry
-
-_PLAYBOOK_VALIDATORS = (
-    "playbook.schema.validate",
-    "playbook.self_check",
-)
 
 
 @dataclass(frozen=True)
@@ -36,7 +32,7 @@ _CONTROLLED_PROFILES = (
             "scene_blueprint.compile",
             "geometry.assert_passes_through",
         ),
-        required_validator_ids=_PLAYBOOK_VALIDATORS,
+        required_validator_ids=PLAYBOOK_VALIDATOR_TOOL_IDS,
         required_scene_types=("derivative_tangent", "math_plot"),
     ),
     _ControlledCompositionProfile(
@@ -46,7 +42,7 @@ _CONTROLLED_PROFILES = (
             "scene_blueprint.compile",
             "animation_tool.expand",
         ),
-        required_validator_ids=_PLAYBOOK_VALIDATORS,
+        required_validator_ids=PLAYBOOK_VALIDATOR_TOOL_IDS,
         required_scene_types=("bfs_graph", "graph_scene"),
         required_animation_tool_ids=("algorithm.graph_traversal",),
     ),
@@ -54,7 +50,7 @@ _CONTROLLED_PROFILES = (
         profile_id="recursion_stack",
         allowed_domains=frozenset({TopicDomain.ALGORITHM.value, TopicDomain.CODE.value}),
         required_tool_ids=("scene_blueprint.compile",),
-        required_validator_ids=_PLAYBOOK_VALIDATORS,
+        required_validator_ids=PLAYBOOK_VALIDATOR_TOOL_IDS,
         required_scene_types=("recursion_stack", "call_stack_scene"),
     ),
     _ControlledCompositionProfile(
@@ -64,7 +60,7 @@ _CONTROLLED_PROFILES = (
             "scene_blueprint.compile",
             "animation_tool.expand",
         ),
-        required_validator_ids=_PLAYBOOK_VALIDATORS,
+        required_validator_ids=PLAYBOOK_VALIDATOR_TOOL_IDS,
         required_scene_types=("projectile_motion", "physics_force_scene"),
         required_animation_tool_ids=("physics.projectile_motion",),
     ),
@@ -162,7 +158,7 @@ class DefaultCoverageResolver:
                 confidence=route_match.confidence,
                 matched_skill_ids=matched_skill_ids,
                 available_tool_ids=_available_evidence(
-                    (solve_tool_id, *_PLAYBOOK_VALIDATORS),
+                    (solve_tool_id, *PLAYBOOK_VALIDATOR_TOOL_IDS),
                     tool_inventory,
                 ),
                 missing_capabilities=[],
@@ -440,7 +436,7 @@ class DefaultCoverageResolver:
             missing.append(f"tool:{solve_tool_id}")
         elif not tool_inventory[solve_tool_id]:
             missing.append(f"tool:{solve_tool_id}:not_deterministic")
-        for validator_id in _PLAYBOOK_VALIDATORS:
+        for validator_id in PLAYBOOK_VALIDATOR_TOOL_IDS:
             if validator_id not in tool_inventory:
                 missing.append(f"validator:{validator_id}")
             elif not tool_inventory[validator_id]:
@@ -708,7 +704,7 @@ def _experimental_evidence(
     *,
     allow_scene_compile: bool,
 ) -> list[str]:
-    relevant = list(_PLAYBOOK_VALIDATORS)
+    relevant = list(PLAYBOOK_VALIDATOR_TOOL_IDS)
     if allow_scene_compile:
         relevant.append("scene_blueprint.compile")
     return _available_evidence(tuple(relevant), tool_inventory)

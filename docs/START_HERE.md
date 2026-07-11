@@ -15,7 +15,7 @@ User input
   -> subject understanding / router
   -> CoverageDecision
   -> LessonPlan
-  -> SkillPack / agent / legacy CIR
+  -> SkillPack / SkillRecipe (composable) / agent / legacy CIR
   -> PlaybookScript
   -> canonical backend QualityReport
   -> DirectorScript
@@ -50,12 +50,13 @@ Agent mode is an active verification path, not the default production claim. To 
 2. `docs/pipeline.md` — generation modes, PlaybookScript, and export path.
 3. `docs/lesson-plan.md` — shared teaching decisions and the renderer-free contract.
 4. `docs/coverage-and-fallback.md` — capability modes, controlled composition and fail-closed boundaries.
-5. `docs/quality-gate.md` — backend success semantics, repair, persistence, and export recheck.
-6. `docs/benchmark-v2.md` — four Gold Cases and strict product-quality scoring.
-7. `docs/agent-demo-acceptance.md` — how to prove agent / runtime-tool mode actually works.
-8. `docs/skill-pack-architecture.md` — deterministic SkillPack contract.
-9. `docs/frontend-shell.md` — frontend page and studio shell structure.
-10. `AGENTS.md` — required working rules for coding agents.
+5. `docs/skill-recipe.md` — transient composable execution contract and validator boundary.
+6. `docs/quality-gate.md` — backend success semantics, repair, persistence, and export recheck.
+7. `docs/benchmark-v2.md` — four Gold Cases and strict product-quality scoring.
+8. `docs/agent-demo-acceptance.md` — how to prove agent / runtime-tool mode actually works.
+9. `docs/skill-pack-architecture.md` — deterministic SkillPack contract.
+10. `docs/frontend-shell.md` — frontend page and studio shell structure.
+11. `AGENTS.md` — required working rules for coding agents.
 
 ## What not to do now
 

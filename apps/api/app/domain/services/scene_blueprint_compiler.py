@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, NamedTuple
 
 from app.domain.models.playbook import (
     BioCellSceneSnapshot,
@@ -335,7 +335,48 @@ def _step_captions(scene_type: str, title: str, base_caption: str) -> list[str]:
     )
 
 
+class CompiledSceneCapability(NamedTuple):
+    domain: str
+    snapshot_kinds: frozenset[str]
+
+
+COMPILED_SCENE_CAPABILITIES: dict[str, CompiledSceneCapability] = {
+    "east_asia_monsoon": CompiledSceneCapability("geography", frozenset({"geo_map_scene"})),
+    "projectile_motion": CompiledSceneCapability("physics", frozenset({"physics_force_scene"})),
+    "cell_structure": CompiledSceneCapability("biology", frozenset({"bio_cell_scene"})),
+    "bio_cell_scene": CompiledSceneCapability("biology", frozenset({"bio_cell_scene"})),
+    "dna_replication": CompiledSceneCapability("biology", frozenset({"bio_process_scene"})),
+    "bio_process_scene": CompiledSceneCapability("biology", frozenset({"bio_process_scene"})),
+    "molecule_2d_scene": CompiledSceneCapability("chemistry", frozenset({"molecule_2d_scene"})),
+    "molecule_2d_water": CompiledSceneCapability("chemistry", frozenset({"molecule_2d_scene"})),
+    "molecule_2d_methane": CompiledSceneCapability("chemistry", frozenset({"molecule_2d_scene"})),
+    "molecule_2d_glucose": CompiledSceneCapability("chemistry", frozenset({"molecule_2d_scene"})),
+    "reaction_scene": CompiledSceneCapability("chemistry", frozenset({"reaction_scene"})),
+    "reaction_synthesis_water": CompiledSceneCapability("chemistry", frozenset({"reaction_scene"})),
+    "math_plot": CompiledSceneCapability("math", frozenset({"math_plot"})),
+    "derivative_tangent": CompiledSceneCapability("math", frozenset({"math_plot"})),
+    "bfs_graph": CompiledSceneCapability("algorithm", frozenset({"graph_scene"})),
+    "recursion_stack": CompiledSceneCapability("algorithm", frozenset({"call_stack_scene"})),
+    "binary_search": CompiledSceneCapability("algorithm", frozenset({"code_trace_scene"})),
+}
+COMPILED_SCENE_SNAPSHOT_KINDS = {
+    scene_type: capability.snapshot_kinds
+    for scene_type, capability in COMPILED_SCENE_CAPABILITIES.items()
+}
+COMPILED_SCENE_DOMAINS = {
+    scene_type: capability.domain
+    for scene_type, capability in COMPILED_SCENE_CAPABILITIES.items()
+}
+COMPILE_SUPPORTED_SCENE_TYPES = frozenset(COMPILED_SCENE_CAPABILITIES)
+
+
+def can_compile_scene_type(scene_type: str) -> bool:
+    return scene_type in COMPILE_SUPPORTED_SCENE_TYPES
+
+
 def _compile_snapshot(scene_type: str, blueprint: dict[str, Any]):
+    if not can_compile_scene_type(scene_type):
+        raise ValueError(f"Unsupported SceneBlueprint sceneType: {scene_type}")
     if scene_type == "east_asia_monsoon":
         return _east_asia_monsoon_snapshot(blueprint)
     if scene_type == "projectile_motion":
@@ -360,7 +401,7 @@ def _compile_snapshot(scene_type: str, blueprint: dict[str, Any]):
         return _recursion_stack_snapshot(blueprint)
     if scene_type == "binary_search":
         return compile_binary_search_code_trace_snapshot(blueprint)
-    raise ValueError(f"Unsupported SceneBlueprint sceneType: {scene_type}")
+    raise RuntimeError(f"SceneBlueprint compiler registry is incomplete for {scene_type}")
 
 
 def _east_asia_monsoon_snapshot(blueprint: dict[str, Any]) -> GeoMapSceneSnapshot:

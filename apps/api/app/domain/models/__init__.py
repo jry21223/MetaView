@@ -51,6 +51,12 @@ from app.domain.models.review import (
     PlaybookReviewVerdict,
     ReviewSeverity,
 )
+from app.domain.models.skill_recipe import (
+    AssetRequirement,
+    FactRequirement,
+    QualityExpectation,
+    SkillRecipe,
+)
 from app.domain.models.topic import TopicDomain, VisualKind
 
 __all__ = [
@@ -71,4 +77,5 @@ __all__ = [
     "ReviewSeverity", "CirReviewIssue", "CirReviewReport",
     "PlaybookIssueSeverity", "PlaybookReviewIssue", "PlaybookReviewStatus",
     "PlaybookReviewVerdict", "QualityReport",
+    "AssetRequirement", "FactRequirement", "QualityExpectation", "SkillRecipe",
 ]
