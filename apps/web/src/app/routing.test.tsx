@@ -38,7 +38,7 @@ describe("App routing", () => {
     const { App } = await import("./App");
     const { getByText } = render(<App />);
 
-    expect(getByText("真实案例将在这里出现")).toBeTruthy();
+    expect(getByText("把一道题，变成一段看得见的理解过程。")).toBeTruthy();
     expect(window.location.pathname).toBe("/");
   });
 
@@ -92,7 +92,7 @@ describe("App routing", () => {
     const { getByText } = render(<App />);
 
     await waitFor(() => expect(window.location.pathname).toBe("/"));
-    expect(getByText("真实案例将在这里出现")).toBeTruthy();
+    expect(getByText("把一道题，变成一段看得见的理解过程。")).toBeTruthy();
   });
 
   it("shows the ops login gate for logged-out /run/:runId deep links", async () => {

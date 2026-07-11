@@ -1,4 +1,4 @@
-import { MetaParticleField } from "../../shared/ui/MetaParticleField";
+import { useState } from "react";
 
 interface LandingPageProps {
   appEdition: "self" | "ops";
@@ -8,58 +8,80 @@ interface LandingPageProps {
   onOpenTemplates: () => void;
 }
 
-const SUBJECTS = ["数学", "物理", "化学", "生物", "地理", "算法与代码"];
+type DemoDomain = "math" | "physics" | "algorithm";
 
-const PROCESS_STEPS = [
+interface DemoStory {
+  id: DemoDomain;
+  label: string;
+  index: string;
+  scene: string;
+  frame: string;
+  focus: string;
+  title: string;
+  description: string;
+  subtitle: string;
+}
+
+const DEMO_STORIES: DemoStory[] = [
   {
+    id: "math",
+    label: "数学",
     index: "01",
-    label: "UNDERSTAND",
-    title: "先理解题目",
-    description: "识别学科、学习目标、关键量与能力边界，不把所有输入都粗暴地交给同一条生成链。",
+    scene: "导数的几何意义",
+    frame: "FRAME 120",
+    focus: "切线斜率",
+    title: "让公式落到坐标、切线与变化过程上。",
+    description:
+      "公式不是终点。画布会保留对象身份，用移动、聚焦和对照解释变化为何发生。",
+    subtitle: "当 x 接近 1，切线斜率就是这一点的瞬时变化率。",
   },
   {
+    id: "physics",
+    label: "物理",
     index: "02",
-    label: "PLAN",
-    title: "规划讲解顺序",
-    description: "形成 LessonPlan，明确教学弧线、结论、误区与每一个场景要完成的任务。",
+    scene: "抛体运动分解",
+    frame: "FRAME 168",
+    focus: "速度分量",
+    title: "把受力、速度与轨迹放进同一个因果画面。",
+    description:
+      "矢量、轨迹和时间同步推进，学生看到的不只是答案，而是每一步如何影响下一步。",
+    subtitle: "水平速度保持不变，竖直速度持续受到重力改变。",
   },
   {
+    id: "algorithm",
+    label: "算法",
     index: "03",
-    label: "DIRECT",
-    title: "编排焦点与节奏",
-    description: "DirectorScript 决定镜头意图、强调对象、观看节奏与场景之间的连续关系。",
-  },
-  {
-    index: "04",
-    label: "RENDER",
-    title: "生成可交互画布",
-    description: "将结构化讲解转化为可播放、可追问、可调整并可导出的视频与学习内容。",
+    scene: "二分查找",
+    frame: "FRAME 214",
+    focus: "区间收缩",
+    title: "让指针、区间和代码行在同一时刻对齐。",
+    description:
+      "当前代码、变量状态与数组变化共享时间线，抽象控制流因此变成可追踪的过程。",
+    subtitle: "目标大于中点值，左边界移动到 mid + 1。",
   },
 ];
 
-const PRINCIPLES = [
-  {
-    marker: "A",
-    title: "教学计划先于画面",
-    description: "先确定为什么讲、按什么顺序讲，再决定画面中出现什么。",
-  },
-  {
-    marker: "B",
-    title: "焦点贯穿所有视图",
-    description: "动画、代码、时间线与数据状态围绕同一个当前步骤同步变化。",
-  },
-  {
-    marker: "C",
-    title: "生成之后仍可继续",
-    description: "用户可以继续追问、要求调整讲解，并保留可恢复的版本记录。",
-  },
-];
+const PIPELINE_STEPS = [
+  { index: "01", label: "理解题目", contract: "Coverage" },
+  { index: "02", label: "规划教学", contract: "LessonPlan" },
+  { index: "03", label: "构建画面", contract: "PlaybookScript" },
+  { index: "04", label: "编排焦点", contract: "DirectorScript" },
+  { index: "05", label: "播放导出", contract: "RenderPlan" },
+] as const;
 
 function ArrowIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
       <path d="M5 12h14" />
       <path d="m13 6 6 6-6 6" />
+    </svg>
+  );
+}
+
+function PlayIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+      <path d="m9 7 8 5-8 5Z" />
     </svg>
   );
 }
@@ -76,181 +98,183 @@ function SunIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
       <circle cx="12" cy="12" r="4" />
-      <path d="M12 2v2" />
-      <path d="M12 20v2" />
-      <path d="m4.9 4.9 1.4 1.4" />
-      <path d="m17.7 17.7 1.4 1.4" />
-      <path d="M2 12h2" />
-      <path d="M20 12h2" />
-      <path d="m4.9 19.1 1.4-1.4" />
-      <path d="m17.7 6.3 1.4-1.4" />
+      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
     </svg>
   );
 }
 
-function HeroCanvas() {
+function MathScene() {
   return (
-    <article className="mv-landing-canvas" aria-label="MetaView 讲解画布概念预览">
-      <header className="mv-landing-canvas__head">
-        <div>
-          <span>THEORETICAL CANVAS</span>
-          <strong>抛体运动 · 速度分解</strong>
-        </div>
-        <div className="mv-landing-canvas__status">
-          <span className="mv-landing-canvas__status-dot" />
-          SCENE 03 / 05
-        </div>
-      </header>
-
-      <div className="mv-landing-canvas__stage">
-        <div className="mv-landing-canvas__grid" aria-hidden="true" />
-        <svg
-          className="mv-landing-canvas__plot"
-          viewBox="0 0 640 350"
-          role="img"
-          aria-label="抛体运动轨迹、速度分解和重力方向示意"
-        >
-          <defs>
-            <marker
-              id="mv-landing-arrow"
-              markerWidth="8"
-              markerHeight="8"
-              refX="6"
-              refY="4"
-              orient="auto"
-            >
-              <path d="M0 0 8 4 0 8Z" fill="currentColor" />
-            </marker>
-          </defs>
-          <path className="mv-landing-canvas__axis" d="M92 286H574M92 286V60" />
-          <path
-            className="mv-landing-canvas__trajectory"
-            d="M116 270C214 92 378 76 528 244"
-          />
-          <circle className="mv-landing-canvas__object" cx="334" cy="112" r="8" />
-          <path
-            className="mv-landing-canvas__vector mv-landing-canvas__vector--velocity"
-            d="M334 112 420 132"
-            markerEnd="url(#mv-landing-arrow)"
-          />
-          <path
-            className="mv-landing-canvas__vector mv-landing-canvas__vector--x"
-            d="M334 112 420 112"
-            markerEnd="url(#mv-landing-arrow)"
-          />
-          <path
-            className="mv-landing-canvas__vector mv-landing-canvas__vector--y"
-            d="M334 112 334 166"
-            markerEnd="url(#mv-landing-arrow)"
-          />
-          <path
-            className="mv-landing-canvas__vector mv-landing-canvas__vector--gravity"
-            d="M526 112 526 196"
-            markerEnd="url(#mv-landing-arrow)"
-          />
-          <text className="mv-landing-canvas__label" x="425" y="139">
-            v
-          </text>
-          <text className="mv-landing-canvas__label" x="423" y="104">
-            vₓ
-          </text>
-          <text className="mv-landing-canvas__label" x="344" y="166">
-            vᵧ
-          </text>
-          <text className="mv-landing-canvas__label" x="538" y="176">
-            g
-          </text>
-        </svg>
-
-        <div className="mv-landing-canvas__note mv-landing-canvas__note--goal">
-          <span>LEARNING GOAL</span>
-          <strong>把速度拆成两个独立方向</strong>
-        </div>
-        <div className="mv-landing-canvas__note mv-landing-canvas__note--director">
-          <span>DIRECTOR</span>
-          <strong>聚焦速度矢量 · 慢速推进</strong>
-        </div>
+    <div className="mv-lesson-scene mv-lesson-scene--math">
+      <div className="mv-lesson-formula">
+        <span>f(x) = x²</span>
+        <strong>f′(1) = 2</strong>
       </div>
-
-      <footer className="mv-landing-canvas__timeline">
-        {["建立坐标", "绘制轨迹", "分解速度", "引入重力", "形成结论"].map(
-          (label, index) => (
-            <div
-              key={label}
-              className={`mv-landing-canvas__beat${index === 2 ? " is-active" : ""}`}
-            >
-              <span>{String(index + 1).padStart(2, "0")}</span>
-              <strong>{label}</strong>
-            </div>
-          ),
-        )}
-      </footer>
-    </article>
+      <svg viewBox="0 0 640 360" role="img" aria-label="二次函数与切线示意图">
+        <g className="mv-scene-grid">
+          <path d="M72 54V310M136 54V310M200 54V310M264 54V310M328 54V310M392 54V310M456 54V310M520 54V310M584 54V310" />
+          <path d="M72 54H584M72 118H584M72 182H584M72 246H584M72 310H584" />
+        </g>
+        <g className="mv-scene-axis">
+          <path d="M72 278H592" />
+          <path d="M136 318V46" />
+        </g>
+        <path
+          className="mv-scene-curve mv-scene-curve--animated"
+          d="M74 264C155 258 211 242 260 216C316 186 361 139 400 84C427 46 450 34 476 52C508 74 535 129 572 230"
+        />
+        <path className="mv-scene-tangent" d="M218 258L478 52" />
+        <circle className="mv-scene-focus-ring" cx="361" cy="139" r="24" />
+        <circle className="mv-scene-focus" cx="361" cy="139" r="8" />
+        <path className="mv-scene-guide" d="M361 139V278M136 139H361" />
+        <text className="mv-scene-label" x="374" y="126">P(1, 1)</text>
+        <text className="mv-scene-label mv-scene-label--muted" x="430" y="82">切线</text>
+      </svg>
+    </div>
   );
 }
 
-function LinkedExplorer() {
+function PhysicsScene() {
   return (
-    <div className="mv-landing-linked" aria-label="联动学习界面示意">
-      <header className="mv-landing-linked__head">
+    <div className="mv-lesson-scene mv-lesson-scene--physics">
+      <div className="mv-lesson-formula">
+        <span>v = vₓ + vᵧ</span>
+        <strong>g = 9.8 m/s²</strong>
+      </div>
+      <svg viewBox="0 0 640 360" role="img" aria-label="抛体运动速度分解示意图">
+        <g className="mv-scene-grid">
+          <path d="M72 54V310M136 54V310M200 54V310M264 54V310M328 54V310M392 54V310M456 54V310M520 54V310M584 54V310" />
+          <path d="M72 54H584M72 118H584M72 182H584M72 246H584M72 310H584" />
+        </g>
+        <g className="mv-scene-axis">
+          <path d="M72 286H592" />
+          <path d="M82 306V70" />
+        </g>
+        <path
+          className="mv-scene-curve mv-scene-curve--animated"
+          d="M84 278C166 116 294 76 438 130C500 153 545 202 579 278"
+        />
+        <path className="mv-scene-vector" d="M356 105H457" />
+        <path className="mv-scene-vector" d="M356 105V206" />
+        <path className="mv-scene-vector mv-scene-vector--result" d="M356 105L457 206" />
+        <path className="mv-scene-arrow" d="m448 97 9 8-9 8M348 197l8 9 8-9M445 205l12 1-1-12" />
+        <circle className="mv-scene-focus-ring" cx="356" cy="105" r="24" />
+        <circle className="mv-scene-focus" cx="356" cy="105" r="9" />
+        <text className="mv-scene-label" x="401" y="92">vₓ</text>
+        <text className="mv-scene-label" x="370" y="163">vᵧ</text>
+        <text className="mv-scene-label mv-scene-label--muted" x="455" y="190">v</text>
+      </svg>
+    </div>
+  );
+}
+
+function AlgorithmScene() {
+  return (
+    <div className="mv-lesson-scene mv-lesson-scene--algorithm">
+      <div className="mv-lesson-code" aria-label="二分查找当前代码">
+        <span><i>01</i> while left &lt;= right:</span>
+        <span><i>02</i> mid = (left + right) // 2</span>
+        <span><i>03</i> if nums[mid] &lt; target:</span>
+        <strong><i>04</i> left = mid + 1</strong>
+      </div>
+      <svg viewBox="0 0 640 360" role="img" aria-label="二分查找区间收缩示意图">
+        <path className="mv-algorithm-baseline" d="M70 282H574" />
+        <g className="mv-algorithm-bars">
+          <g className="mv-algorithm-bar is-discarded">
+            <rect x="83" y="256" width="44" height="26" rx="5" />
+            <text x="98" y="273">3</text>
+          </g>
+          <g className="mv-algorithm-bar is-discarded">
+            <rect x="145" y="244" width="44" height="38" rx="5" />
+            <text x="157" y="273">8</text>
+          </g>
+          <g className="mv-algorithm-bar is-discarded">
+            <rect x="207" y="233" width="44" height="49" rx="5" />
+            <text x="214" y="273">12</text>
+          </g>
+          <g className="mv-algorithm-bar is-discarded">
+            <rect x="269" y="221" width="44" height="61" rx="5" />
+            <text x="276" y="273">17</text>
+          </g>
+          <g className="mv-algorithm-bar is-mid">
+            <rect x="331" y="205" width="44" height="77" rx="5" />
+            <text x="338" y="273">24</text>
+          </g>
+          <g className="mv-algorithm-bar is-in-range">
+            <rect x="393" y="188" width="44" height="94" rx="5" />
+            <text x="400" y="273">31</text>
+          </g>
+          <g className="mv-algorithm-bar is-in-range">
+            <rect x="455" y="160" width="44" height="122" rx="5" />
+            <text x="462" y="273">46</text>
+          </g>
+          <g className="mv-algorithm-bar is-in-range">
+            <rect x="517" y="134" width="44" height="148" rx="5" />
+            <text x="524" y="273">59</text>
+          </g>
+        </g>
+        <g className="mv-algorithm-pointers">
+          <g className="mv-algorithm-pointer mv-algorithm-pointer--mid">
+            <path d="M353 176V196" />
+            <text x="337" y="166">mid</text>
+          </g>
+          <g className="mv-algorithm-pointer mv-algorithm-pointer--left">
+            <path d="M415 151V179" />
+            <text x="395" y="141">left</text>
+          </g>
+          <g className="mv-algorithm-pointer mv-algorithm-pointer--right">
+            <path d="M539 97V125" />
+            <text x="515" y="87">right</text>
+          </g>
+        </g>
+        <path className="mv-algorithm-range-bracket" d="M393 302V312H561V302" />
+        <text className="mv-scene-label mv-scene-label--muted" x="430" y="332">当前搜索区间</text>
+      </svg>
+    </div>
+  );
+}
+
+function LessonCanvas({ domain, hero = false }: { domain: DemoDomain; hero?: boolean }) {
+  const story = DEMO_STORIES.find((item) => item.id === domain) ?? DEMO_STORIES[0];
+
+  return (
+    <div className={`mv-lesson-canvas${hero ? " mv-lesson-canvas--hero" : ""}`}>
+      <div className="mv-lesson-toolbar">
         <div>
-          <span>LINKED EXPLORER</span>
-          <strong>同一个焦点，贯穿四种视图</strong>
+          <span>SCENE {story.index}</span>
+          <strong>{story.scene}</strong>
         </div>
-        <span className="mv-landing-linked__time">00:18.40</span>
-      </header>
+        <div className="mv-lesson-toolbar__status">
+          <span className="mv-lesson-live-dot" />
+          <code>{story.frame}</code>
+        </div>
+      </div>
 
-      <div className="mv-landing-linked__body">
-        <section className="mv-landing-linked__panel mv-landing-linked__panel--visual">
-          <span className="mv-landing-linked__label">ANIMATION</span>
-          <div className="mv-landing-linked__bars" aria-hidden="true">
-            {[56, 84, 38, 70, 46, 62].map((height, index) => (
-              <i
-                key={`${height}-${index}`}
-                className={index === 2 ? "is-active" : ""}
-                style={{ height: `${height}%` }}
-              />
-            ))}
+      <div className="mv-lesson-workspace">
+        <ol className="mv-lesson-steps" aria-label="教学步骤">
+          <li className="is-complete"><span>01</span><b>观察</b></li>
+          <li className="is-active"><span>02</span><b>推演</b></li>
+          <li><span>03</span><b>归纳</b></li>
+        </ol>
+
+        <div className="mv-lesson-stage" aria-live="polite" key={domain}>
+          {domain === "math" && <MathScene />}
+          {domain === "physics" && <PhysicsScene />}
+          {domain === "algorithm" && <AlgorithmScene />}
+
+          <div className="mv-lesson-focus-note">
+            <span>DIRECTOR FOCUS</span>
+            <strong>{story.focus}</strong>
           </div>
-        </section>
+          <p className="mv-lesson-subtitle">{story.subtitle}</p>
+        </div>
+      </div>
 
-        <section className="mv-landing-linked__panel mv-landing-linked__panel--code">
-          <span className="mv-landing-linked__label">CODE</span>
-          <code>
-            <span>while low &lt;= high:</span>
-            <span className="is-active">mid = (low + high) // 2</span>
-            <span>compare(target, items[mid])</span>
-          </code>
-        </section>
-
-        <section className="mv-landing-linked__panel mv-landing-linked__panel--timeline">
-          <span className="mv-landing-linked__label">TIMELINE</span>
-          <div className="mv-landing-linked__track" aria-hidden="true">
-            <i />
-            <i />
-            <i className="is-active" />
-            <i />
-            <i />
-          </div>
-        </section>
-
-        <section className="mv-landing-linked__panel mv-landing-linked__panel--state">
-          <span className="mv-landing-linked__label">STATE</span>
-          <dl>
-            <div>
-              <dt>low</dt>
-              <dd>0</dd>
-            </div>
-            <div className="is-active">
-              <dt>mid</dt>
-              <dd>3</dd>
-            </div>
-            <div>
-              <dt>high</dt>
-              <dd>6</dd>
-            </div>
-          </dl>
-        </section>
+      <div className="mv-lesson-timeline" aria-hidden="true">
+        <button type="button" tabIndex={-1}><PlayIcon /></button>
+        <span className="mv-lesson-time">00:18</span>
+        <div className="mv-lesson-track"><i /></div>
+        <span className="mv-lesson-time">00:42</span>
       </div>
     </div>
   );
@@ -263,222 +287,225 @@ export function LandingPage({
   onStart,
   onOpenTemplates,
 }: LandingPageProps) {
+  const [activeDomain, setActiveDomain] = useState<DemoDomain>("math");
+
   return (
     <div className="mv-landing" id="top">
+      <a className="mv-landing-skip" href="#landing-main">跳到主要内容</a>
+
       <header className="mv-landing-header">
-        <div className="mv-landing-container mv-landing-header__inner">
-          <a className="mv-landing-brand" href="#top" aria-label="MetaView 首页">
-            <span className="mv-brand-strip" />
-            <span className="mv-brand-copy">
-              <span className="mv-brand-name">MetaView</span>
-              <span className="mv-brand-meta">THEORETICAL CANVAS</span>
-            </span>
-          </a>
+        <a className="mv-landing-brand" href="#top" aria-label="MetaView 首页">
+          <img src="/brand/metaview-mark.svg" alt="" />
+          <span>
+            <strong>MetaView</strong>
+            <small>THEORETICAL CANVAS</small>
+          </span>
+        </a>
 
-          <nav className="mv-landing-nav" aria-label="官网导航">
-            <a href="#process">工作原理</a>
-            <a href="#capabilities">产品能力</a>
-            <a href="#cases">案例</a>
-          </nav>
+        <nav className="mv-landing-nav" aria-label="首页导航">
+          <a href="#workflow">工作原理</a>
+          <a href="#visuals">画面能力</a>
+          <a href="#director">导演层</a>
+        </nav>
 
-          <div className="mv-landing-header__actions">
-            <button
-              className="mv-landing-theme"
-              type="button"
-              onClick={onToggleTheme}
-              aria-label="切换主题"
-              title="切换主题"
-            >
-              {isDark ? <SunIcon /> : <MoonIcon />}
-            </button>
-            <button className="mv-landing-button mv-landing-button--compact" type="button" onClick={onStart}>
-              {appEdition === "ops" ? "进入 MetaView" : "打开工作台"}
-              <ArrowIcon />
-            </button>
-          </div>
+        <div className="mv-landing-header__actions">
+          <button
+            className="mv-landing-theme"
+            type="button"
+            onClick={onToggleTheme}
+            aria-label="切换主题"
+            title="切换主题"
+          >
+            {isDark ? <SunIcon /> : <MoonIcon />}
+          </button>
+          <button className="mv-landing-header-cta" type="button" onClick={onStart}>
+            {appEdition === "ops" ? "进入 MetaView" : "打开工作台"}
+            <ArrowIcon />
+          </button>
         </div>
       </header>
 
-      <main>
-        <section className="mv-landing-hero">
-          <MetaParticleField
-            variant="canvas"
-            className="mv-landing-hero__field mv-motion-decorative"
-          />
-          <div className="mv-landing-container mv-landing-hero__grid">
+      <main id="landing-main">
+        <section className="mv-landing-hero" aria-labelledby="landing-title">
+          <div className="mv-landing-hero__inner">
             <div className="mv-landing-hero__copy">
-              <div className="mv-landing-eyebrow">
-                <span>AI-NATIVE EDUCATIONAL VISUALIZATION</span>
-                <i aria-hidden="true" />
-                <span>V2</span>
-              </div>
-              <h1>
-                让每一个
-                <span>理解过程</span>
-                都能被看见
+              <p className="mv-landing-kicker">AI VISUAL LESSON ENGINE</p>
+              <h1 id="landing-title">
+                <strong>MetaView</strong>
+                <span>把一道题，变成一段看得见的理解过程。</span>
               </h1>
-              <p>
-                MetaView 把一道题转化为可播放、可追问、可调整并可导出的分步讲解。
-                从教学规划到导演编排，再到交互式画布，每一步都有结构。
+              <p className="mv-landing-lead">
+                把题目或代码转化为可播放、可追问、可导出的分步讲解。
               </p>
-              <div className="mv-landing-hero__actions">
-                <button className="mv-landing-button mv-landing-button--primary" type="button" onClick={onStart}>
-                  开始生成讲解
+
+              <div className="mv-landing-actions">
+                <button
+                  className="mv-landing-button mv-landing-button--primary"
+                  type="button"
+                  onClick={onStart}
+                >
+                  开始生成
                   <ArrowIcon />
                 </button>
-                <a className="mv-landing-button mv-landing-button--secondary" href="#process">
-                  查看生成过程
+                <a className="mv-landing-button mv-landing-button--ghost" href="#workflow">
+                  看它如何工作
                 </a>
               </div>
-              <div className="mv-landing-subjects" aria-label="支持领域">
-                <span>覆盖</span>
-                {SUBJECTS.map((subject) => (
-                  <i key={subject}>{subject}</i>
-                ))}
-              </div>
+
+              <p className="mv-landing-domain-line">
+                <span>SUPPORTED</span>
+                数学 · 物理 · 化学 · 生物 · 地理 · 算法 · 代码
+              </p>
             </div>
 
-            <div className="mv-landing-hero__visual">
-              <HeroCanvas />
-              <div className="mv-landing-hero__caption">
-                <span>CONCEPT PREVIEW</span>
-                <p>教学目标、画面对象与导演焦点在同一条生成链中保持一致。</p>
+            <figure className="mv-landing-hero__visual">
+              <div className="mv-landing-question">
+                <span>INPUT / 题目</span>
+                <p>如何直观看懂导数的几何意义？</p>
               </div>
+              <LessonCanvas domain="math" hero />
+              <figcaption>
+                <span>题意</span>
+                <i />
+                <span>教学结构</span>
+                <i />
+                <span>导演焦点</span>
+                <i />
+                <strong>可视化讲解</strong>
+              </figcaption>
+            </figure>
+          </div>
+        </section>
+
+        <section className="mv-landing-section mv-landing-workflow" id="workflow">
+          <div className="mv-landing-section__inner">
+            <div className="mv-landing-section-head">
+              <p className="mv-landing-kicker">WORKFLOW / 01</p>
+              <h2>不是把文字塞进视频，<br />而是先把教学想清楚。</h2>
+              <p>
+                每次生成都经过能力判断、教学规划、画面契约与导演编排，最后才进入播放和导出。
+              </p>
+            </div>
+
+            <ol className="mv-landing-pipeline" aria-label="MetaView 生成流程">
+              {PIPELINE_STEPS.map((step) => (
+                <li key={step.contract}>
+                  <span className="mv-landing-pipeline__index">{step.index}</span>
+                  <div>
+                    <strong>{step.label}</strong>
+                    <code>{step.contract}</code>
+                  </div>
+                </li>
+              ))}
+              <span className="mv-landing-pipeline__progress" aria-hidden="true" />
+            </ol>
+
+            <div className="mv-landing-proof-line">
+              <span>一条可审查的生成链</span>
+              <p>过程有结构，能力有边界，结果才能稳定复盘。</p>
             </div>
           </div>
         </section>
 
-        <section className="mv-landing-section mv-landing-process" id="process">
-          <div className="mv-landing-container">
-            <header className="mv-landing-section__head">
-              <div className="mv-landing-kicker">FROM ANSWER TO UNDERSTANDING</div>
-              <h2>不是把答案搬进视频，而是生成理解发生的过程</h2>
-              <p>
-                MetaView 先建立教学结构，再决定画面和节奏。每一层都有明确职责，也能被检查、回放和继续修改。
-              </p>
-            </header>
+        <section className="mv-landing-section mv-landing-capability" id="visuals">
+          <div className="mv-landing-capability__inner">
+            <div className="mv-landing-capability__visual">
+              <div className="mv-landing-demo-toolbar" role="tablist" aria-label="学科画面示例">
+                {DEMO_STORIES.map((story) => (
+                  <button
+                    key={story.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeDomain === story.id}
+                    className={activeDomain === story.id ? "is-active" : ""}
+                    onClick={() => setActiveDomain(story.id)}
+                  >
+                    <span>{story.index}</span>
+                    {story.label}
+                  </button>
+                ))}
+              </div>
+              <LessonCanvas domain={activeDomain} />
+            </div>
 
-            <div className="mv-landing-process__rail">
-              {PROCESS_STEPS.map((step) => (
-                <article key={step.index} className="mv-landing-process__step">
-                  <div className="mv-landing-process__index">
-                    <span>{step.index}</span>
-                    <i aria-hidden="true" />
-                  </div>
-                  <div className="mv-landing-process__content">
-                    <span>{step.label}</span>
-                    <h3>{step.title}</h3>
-                    <p>{step.description}</p>
-                  </div>
+            <div className="mv-landing-story">
+              <div className="mv-landing-section-head mv-landing-section-head--story">
+                <p className="mv-landing-kicker">VISUAL SYSTEM / 02</p>
+                <h2>同一套画布，<br />看见不同学科的因果关系。</h2>
+                <p>
+                  学习画布始终围绕核心知识对象组织，让公式、矢量和代码状态保持可追踪。
+                </p>
+              </div>
+
+              {DEMO_STORIES.map((story) => (
+                <article
+                  key={story.id}
+                  data-demo-domain={story.id}
+                  className={activeDomain === story.id ? "is-active" : ""}
+                  onMouseEnter={() => setActiveDomain(story.id)}
+                >
+                  <button type="button" onClick={() => setActiveDomain(story.id)}>
+                    <span>{story.index} / {story.label}</span>
+                    <h3>{story.title}</h3>
+                    <p>{story.description}</p>
+                    <small>当前焦点 · {story.focus}</small>
+                  </button>
                 </article>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="mv-landing-section mv-landing-capabilities" id="capabilities">
-          <div className="mv-landing-container mv-landing-capabilities__grid">
-            <div className="mv-landing-capabilities__copy">
-              <div className="mv-landing-kicker">ONE LEARNING FOCUS</div>
-              <h2>动画、代码、时间线与数据状态，不再彼此割裂</h2>
+        <section className="mv-landing-section mv-landing-director" id="director">
+          <div className="mv-landing-section__inner">
+            <div className="mv-landing-director__intro">
+              <p className="mv-landing-kicker">DIRECTOR LAYER / 03</p>
+              <h2>不仅决定讲什么，<br />也决定此刻看哪里。</h2>
               <p>
-                学习者看到的不是四块独立信息，而是同一个推理步骤在不同视图中的同步表达。
+                DirectorScript 单独管理镜头、节奏与焦点，让讲解从“有内容”走向“看得懂”。
               </p>
+            </div>
 
-              <div className="mv-landing-principles">
-                {PRINCIPLES.map((item) => (
-                  <article key={item.marker}>
-                    <span>{item.marker}</span>
-                    <div>
-                      <h3>{item.title}</h3>
-                      <p>{item.description}</p>
-                    </div>
-                  </article>
-                ))}
+            <div className="mv-landing-director-track" aria-label="导演节奏示意">
+              <div className="mv-landing-director-track__meta">
+                <span>SCENE 03</span>
+                <span>00:18 — 00:42</span>
+              </div>
+              <div className="mv-landing-director-track__line">
+                <i />
+                <span className="is-complete">WIDE</span>
+                <span className="is-active">FOCUS</span>
+                <span>HOLD</span>
+                <span>REVEAL</span>
+              </div>
+              <div className="mv-landing-director-track__focus">
+                <span>FOCUS TARGET</span>
+                <strong>tangent_point</strong>
+                <p>镜头收束到切点，字幕同步解释瞬时变化率。</p>
               </div>
             </div>
 
-            <LinkedExplorer />
+            <dl className="mv-landing-director-facts">
+              <div><dt>可播放</dt><dd>步骤、字幕与画面共享同一时间线。</dd></div>
+              <div><dt>可追问</dt><dd>保留原题与脚本，继续修改同一次讲解。</dd></div>
+              <div><dt>可导出</dt><dd>同一份 PlaybookScript 进入 Remotion 视频出口。</dd></div>
+            </dl>
           </div>
         </section>
 
-        <section className="mv-landing-section mv-landing-cases" id="cases">
-          <div className="mv-landing-container">
-            <header className="mv-landing-section__head mv-landing-section__head--split">
-              <div>
-                <div className="mv-landing-kicker">SELECTED CASES</div>
-                <h2>真实案例将在这里出现</h2>
-              </div>
-              <p>
-                该区域只接入已经通过线上播放、移动端和导出验收的案例，不使用仅存在于 Benchmark
-                中的结果冒充产品能力。
-              </p>
-            </header>
-
-            <div className="mv-landing-case-grid" aria-label="案例展示预留区域">
-              {[1, 2, 3].map((slot) => (
-                <article key={slot} className="mv-landing-case-slot">
-                  <div className="mv-landing-case-slot__visual" aria-hidden="true">
-                    <span>CASE SLOT {String(slot).padStart(2, "0")}</span>
-                    <i />
-                    <i />
-                    <i />
-                  </div>
-                  <div className="mv-landing-case-slot__meta">
-                    <span>待接入真实案例</span>
-                    <p>标题、学科、预览画面与可播放入口将在 Gold Case 完成产品化后补充。</p>
-                  </div>
-                </article>
-              ))}
-            </div>
-
-            <div className="mv-landing-cases__foot">
-              <span>案例内容暂时留空，但展示结构已经固定。</span>
-              <button type="button" onClick={onOpenTemplates}>
-                查看现有模板结构
-                <ArrowIcon />
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <section className="mv-landing-section mv-landing-architecture">
-          <div className="mv-landing-container mv-landing-architecture__grid">
+        <section className="mv-landing-final" aria-labelledby="landing-final-title">
+          <div className="mv-landing-final__inner">
             <div>
-              <div className="mv-landing-kicker">VISIBLE SYSTEM</div>
-              <h2>一条可以解释、验证和持续演进的生成链</h2>
-              <p>
-                内容、导演和渲染不是混在一个 Prompt 里的黑盒。它们通过独立契约连接，使能力边界、
-                质量评测和后续编辑都更清楚。
-              </p>
+              <p className="mv-landing-kicker">READY FOR THE NEXT QUESTION</p>
+              <h2 id="landing-final-title">把下一道题，变成一段看得见的理解。</h2>
+              <p>输入文字题目，或粘贴一段算法与代码。</p>
             </div>
-
-            <div className="mv-landing-pipeline" aria-label="MetaView 核心生成链">
-              {[
-                ["INPUT", "题目 / 代码"],
-                ["LESSON PLAN", "目标与教学弧线"],
-                ["PLAYBOOK", "内容与场景对象"],
-                ["DIRECTOR", "镜头、焦点与节奏"],
-                ["RENDER PLAN", "预览与视频导出"],
-              ].map(([label, value], index, rows) => (
-                <div key={label} className="mv-landing-pipeline__row">
-                  <span>{label}</span>
-                  <strong>{value}</strong>
-                  {index < rows.length - 1 && <i aria-hidden="true">↓</i>}
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="mv-landing-final">
-          <div className="mv-landing-container mv-landing-final__inner">
-            <div>
-              <span>START WITH A QUESTION</span>
-              <h2>把下一道题，变成可见的理解过程</h2>
-            </div>
-            <button className="mv-landing-button mv-landing-button--primary" type="button" onClick={onStart}>
-              进入 MetaView
+            <button
+              className="mv-landing-button mv-landing-button--primary"
+              type="button"
+              onClick={onStart}
+            >
+              进入工作台
               <ArrowIcon />
             </button>
           </div>
@@ -486,22 +513,15 @@ export function LandingPage({
       </main>
 
       <footer className="mv-landing-footer">
-        <div className="mv-landing-container mv-landing-footer__inner">
-          <div className="mv-landing-brand">
-            <span className="mv-brand-strip" />
-            <span>
-              <strong>MetaView</strong>
-              <small>THEORETICAL CANVAS</small>
-            </span>
-          </div>
-          <p>让知识不只被展示，而是被演绎。</p>
-          <div>
-            <a href="https://github.com/jry21223/MetaView" target="_blank" rel="noreferrer">
-              GitHub
-            </a>
-            <button type="button" onClick={onStart}>工作台</button>
-          </div>
+        <div>
+          <span>MetaView</span>
+          <p>面向教育场景的 AI 可视化讲解系统。</p>
         </div>
+        <nav aria-label="页脚导航">
+          <a href="#workflow">工作原理</a>
+          <button type="button" onClick={onOpenTemplates}>模板</button>
+          <button type="button" onClick={onStart}>工作台</button>
+        </nav>
       </footer>
     </div>
   );

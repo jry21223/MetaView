@@ -47,24 +47,22 @@ describe("App edition shells", () => {
     const { App } = await import("./App");
     const { container, getByText } = render(<App />);
 
-    expect(getByText("真实案例将在这里出现")).toBeTruthy();
+    expect(getByText("把一道题，变成一段看得见的理解过程。")).toBeTruthy();
     expect(container.querySelectorAll(".mv-landing-header")).toHaveLength(1);
     expect(container.querySelectorAll(".mv-top")).toHaveLength(0);
     expect(accountHits).toBe(0);
     expect(opsHits).toBe(0);
   }, 20000);
 
-  it("public landing uses one calm canvas motif without debug controls", async () => {
+  it("public landing uses one calm lesson canvas without debug controls", async () => {
     vi.stubEnv("VITE_APP_EDITION", "self");
 
     const { App } = await import("./App");
     const { container, queryByLabelText } = render(<App />);
 
     expect(container.textContent).toContain("MetaView");
-    expect(
-      container.querySelector('[data-testid="meta-particle-field"][data-variant="canvas"]'),
-    ).toBeTruthy();
-    expect(container.querySelectorAll('[data-testid="meta-particle-field"]')).toHaveLength(1);
+    expect(container.querySelectorAll(".mv-lesson-canvas--hero")).toHaveLength(1);
+    expect(container.querySelectorAll('[data-testid="meta-particle-field"]')).toHaveLength(0);
     expect(container.querySelector('[aria-label="MetaView logo animation"]')).toBeNull();
     expect(queryByLabelText("打开设计调节面板")).toBeNull();
   }, 10000);
@@ -90,7 +88,7 @@ describe("App edition shells", () => {
     await waitFor(() =>
       expect(container.textContent).toContain("登录暂未开放"),
     );
-    expect(container.textContent).not.toContain("让每一个理解过程都能被看见");
+    expect(container.textContent).not.toContain("把一道题，变成一段看得见的理解过程。");
   });
 
   it("ops edition opens the intake screen after WeChat login", async () => {
