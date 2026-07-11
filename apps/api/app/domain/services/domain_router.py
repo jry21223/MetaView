@@ -34,7 +34,7 @@ _KEYWORD_MAP: list[tuple[TopicDomain, frozenset[str]]] = [
     })),
     (TopicDomain.MATH, frozenset({
         "积分", "导数", "微分", "极限", "矩阵", "向量", "概率", "统计",
-        "方程", "函数", "坐标", "几何", "三角", "对数",
+        "方程", "函数", "图像", "坐标", "几何", "三角", "对数",
         "integral", "derivative", "matrix", "vector", "probability",
         "equation", "calculus", "geometry", "trigonometry",
     })),
@@ -97,15 +97,21 @@ def route_topic(
         )
 
     lowered = prompt.lower()
-    for domain, keywords in _KEYWORD_MAP:
+    candidates: list[tuple[int, int, int, TopicDomain, tuple[str, ...]]] = []
+    for priority, (domain, keywords) in enumerate(_KEYWORD_MAP):
         matched = tuple(sorted(kw for kw in keywords if kw in lowered))
         if matched:
-            return TopicRoute(
-                skill_mode=SkillMode.SPECIALIZED,
-                domain=domain,
-                matched_keywords=matched,
-                reason="keyword_match",
+            candidates.append(
+                (len(matched), sum(len(keyword) for keyword in matched), -priority, domain, matched)
             )
+    if candidates:
+        _, _, _, domain, matched = max(candidates)
+        return TopicRoute(
+            skill_mode=SkillMode.SPECIALIZED,
+            domain=domain,
+            matched_keywords=matched,
+            reason="keyword_match",
+        )
 
     return TopicRoute(
         skill_mode=SkillMode.GENERIC,

@@ -25,6 +25,10 @@ PlaybookScript schema. Do not edit files. Do not render video. The only valid
 rendering path is PlaybookScript consumed by the Remotion Player.
 
 Hard contract:
+- When the runtime payload includes coverage_decision, treat it as a binding,
+  read-only capability boundary. Respect its mode, fallback_policy, and
+  missing_capabilities. Do not claim unavailable kernels, validators, scene
+  types, assets, or tool results.
 - When the runtime payload includes lesson_plan, treat it as a binding,
   read-only teaching contract. Preserve SceneIntent order and cover every
   required fact, visual role, preferred scene type, narration goal, and
@@ -216,6 +220,11 @@ def _build_runtime_user_prompt(request: AgentRequest) -> str:
     runtime_payload = {
         "run_id": request.run_id,
         "route_decision": request.route_decision,
+        "coverage_decision": (
+            request.coverage_decision.model_dump(mode="json")
+            if request.coverage_decision is not None
+            else None
+        ),
         "lesson_plan": (
             request.lesson_plan.model_dump(mode="json")
             if request.lesson_plan is not None
@@ -224,7 +233,11 @@ def _build_runtime_user_prompt(request: AgentRequest) -> str:
         "constraints": request.constraints.model_dump(mode="json"),
         "tools": [tool.model_dump(mode="json") for tool in request.available_tools],
         "note": (
-            "The lesson_plan is binding when present: preserve SceneIntent order "
+            "The coverage_decision is binding when present: respect its mode, "
+            "fallback_policy, and missing_capabilities without inventing tool "
+            "results. available_tool_ids records capability evidence, not an "
+            "executed result. The lesson_plan is binding when present: preserve "
+            "SceneIntent order "
             "and cover its required facts, visual roles, narration goals, and "
             "expected conclusion without embedding it in PlaybookScript. Codex "
             "can inspect these runtime tool manifests, but this provider cannot "

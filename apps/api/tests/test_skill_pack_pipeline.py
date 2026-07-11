@@ -21,6 +21,7 @@ from app.domain.skills.base import (
 )
 from app.domain.skills.registry import SkillRegistry, build_default_skill_registry
 from app.domain.skills.solid_geometry.skill_pack import SolidGeometrySkillPack
+from tests.coverage_test_utils import ComposableCoverageResolver
 
 
 class _RecordingRepo:
@@ -344,7 +345,12 @@ async def test_geography_earth_scene_blueprint_runs_through_default_registry() -
 async def test_no_skill_match_blocks_generic_output_that_does_not_cover_prompt() -> None:
     registry = SkillRegistry([FakeSkillPack()])
     repo = _RecordingRepo()
-    use_case = RunPipelineUseCase(repo, _WorkingLLM(), skill_registry=registry)
+    use_case = RunPipelineUseCase(
+        repo,
+        _WorkingLLM(),
+        skill_registry=registry,
+        coverage_resolver=ComposableCoverageResolver(default_domain="math"),
+    )
 
     await use_case.execute("run-generic", PipelineRequest(prompt="解释一下概率密度函数"))
 

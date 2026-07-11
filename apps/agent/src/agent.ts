@@ -34,6 +34,7 @@ export interface GenerateOptions {
   language?: string | null;
   provider?: ProviderConfig;
   routeDecision?: Record<string, unknown>;
+  coverageDecision?: Record<string, unknown>;
   lessonPlan?: Record<string, unknown>;
   playbookSchema?: Record<string, unknown>;
   constraints?: Record<string, unknown>;
@@ -56,6 +57,12 @@ order, expanding one intent into multiple steps when needed to reach 8-14
 steps. Every required fact, visual role, preferred scene type, narration goal,
 and expected conclusion must be covered. Do not replace the plan with a new
 teaching arc, and do not copy LessonPlan fields into the final PlaybookScript.
+
+When the user prompt contains a \`[MetaView coverage decision]\`, it is a
+BINDING, read-only capability boundary. Do not claim a specialized kernel,
+validator, scene type, asset, or tool that the decision marks as missing. The
+listed available_tool_ids are evidence about this request, not permission to
+invent outputs from tools that were not actually executed.
 
 Workflow you MUST follow:
 
@@ -120,6 +127,7 @@ export async function runAgentGeneration(
     opts.prompt,
     opts.routeDecision,
     opts.lessonPlan,
+    opts.coverageDecision,
   );
   let lastReport: SelfCheckReport | null = null;
 
@@ -136,6 +144,7 @@ export async function runAgentGeneration(
     userPrompt = buildAgentSelfRepairPrompt({
       originalPrompt: opts.prompt,
       routeDecision: opts.routeDecision,
+      coverageDecision: opts.coverageDecision,
       lessonPlan: opts.lessonPlan,
       previousPlaybook: playbook,
       report,
@@ -283,8 +292,9 @@ export function buildAgentPrompt(
   prompt: string,
   routeDecision?: Record<string, unknown>,
   lessonPlan?: Record<string, unknown>,
+  coverageDecision?: Record<string, unknown>,
 ): string {
-  if (!routeDecision && !lessonPlan) {
+  if (!routeDecision && !coverageDecision && !lessonPlan) {
     return prompt;
   }
   const sections: string[] = [];
@@ -298,6 +308,11 @@ export function buildAgentPrompt(
       `[MetaView route decision]\n${JSON.stringify(routeDecision, null, 2)}`,
     );
   }
+  if (coverageDecision) {
+    sections.push(
+      `[MetaView coverage decision]\nBINDING read-only capability boundary: respect mode, fallback_policy, and missing_capabilities. available_tool_ids records relevant capability evidence; it does not authorize invented tool results.\n${JSON.stringify(coverageDecision, null, 2)}`,
+    );
+  }
   sections.push(`[user prompt]\n${prompt}`);
   return sections.join("\n\n");
 }
@@ -305,6 +320,7 @@ export function buildAgentPrompt(
 interface SelfRepairPromptInput {
   originalPrompt: string;
   routeDecision?: Record<string, unknown>;
+  coverageDecision?: Record<string, unknown>;
   lessonPlan?: Record<string, unknown>;
   previousPlaybook: PlaybookOutput;
   report: SelfCheckReport;
@@ -320,12 +336,14 @@ export function buildAgentSelfRepairPrompt(
     max_self_repair_attempts: MAX_SELF_REPAIR_ATTEMPTS,
     original_prompt: input.originalPrompt,
     route_decision: input.routeDecision ?? null,
+    coverage_decision: input.coverageDecision ?? null,
     lesson_plan: input.lessonPlan ?? null,
     previous_playbook: input.previousPlaybook,
     self_check: input.report,
     instructions: [
       "Repair by building a complete PlaybookScript through the Drawing CLI tools.",
       "Treat lesson_plan as binding: preserve SceneIntent order and cover every required fact, visual role, narration goal, and expected conclusion.",
+      "Treat coverage_decision as binding: do not invent missing capabilities or claim unexecuted tool results.",
       "Keep PlaybookScript as the only rendering exit.",
       "Do not introduce raw HTML, iframe, Manim, or server video rendering.",
       "Use only renderer-supported snapshot kinds.",

@@ -9,6 +9,7 @@ MetaView v2 是一个面向教育场景的 AI 可视化讲解平台。它不是�
 ```text
 User input
   -> subject understanding / router
+  -> CoverageDecision
   -> LessonPlan
   -> SkillPack / agent / legacy CIR
   -> PlaybookScript
@@ -18,6 +19,7 @@ User input
 ```
 
 - `LessonPlan` 是教学决策契约：负责学习目标、误区、结论、教学弧线与 SceneIntent，不包含 renderer 私有数据。
+- `CoverageDecision` 是能力边界：区分 specialized / composable / experimental / unsupported，并在生成前决定安全回退或拒绝。
 - `PlaybookScript` 是内容渲染契约：负责教学步骤、snapshot、公式、画面对象、旁白、代码高亮和可渲染场景数据。
 - `DirectorScript` 是导演契约：负责镜头意图、shot type、camera motion、pacing、focus target、emphasis terms 和观看节奏。
 - `RenderPlan` 是渲染适配层：把 DirectorScript 转换为 Remotion 可消费的 scale、translate、opacity、timing 等参数。
@@ -25,11 +27,11 @@ User input
 
 生成路径当前有两条：
 
-1. `single mode`: **LessonPlan -> LLM -> CIR + ExecutionMap -> PlaybookScript -> DirectorScript**
-2. `agent mode`: **LessonPlan -> Agent tool loop -> self-check -> PlaybookScript -> DirectorScript**
+1. `single mode`: **CoverageDecision -> LessonPlan -> LLM -> CIR + ExecutionMap -> PlaybookScript -> DirectorScript**
+2. `agent mode`: **CoverageDecision -> LessonPlan -> Agent tool loop -> self-check -> PlaybookScript -> DirectorScript**
 
 确定性 SkillPack 同样通过 `SkillExecutionContext` 接收这份 LessonPlan。运行历史会独立
-保存计划、PlaybookScript 和 QualityReport；LessonPlan 不会被塞入最终视频契约。
+保存能力判定、计划、PlaybookScript 和 QualityReport；CoverageDecision/LessonPlan 都不会被塞入最终视频契约。
 
 项目仍不引入 Manim、HTML iframe 或服务端 HTML 视频渲染。管线契约见 [`docs/pipeline.md`](docs/pipeline.md)，Director 契约见 [`docs/director-layer.md`](docs/director-layer.md)。
 
@@ -37,7 +39,7 @@ User input
 
 - 支持 `algorithm`, `math`, `code`, `physics`, `chemistry`, `biology`, `geography` 七个教学领域。
 - 首发输入支持文本题目、粘贴代码和上传代码文件；暂不支持图片、截图、PDF、PPT/课件或任意附件生成。
-- 题目提交前会做 topic routing：高置信题目进入 specialized skill，未命中时走 generic skill 或 agent 路径。
+- 题目提交后先做 topic/Skill routing，再由 CoverageResolver 验证真实能力；未知、明确不支持或当前只能走未验证降级面的请求会在模型调用前 fail closed。
 - deterministic SkillPack 用于把确定性学科问题转成可靠的 PlaybookScript。
 - Director 层为每个 run 生成独立 DirectorScript，当前已有 rule-based 默认导演，后续会进入可见、可渲染、可编辑阶段。
 - 播放器提供参数面板、字幕、TTS、速度控制、历史记录、视频导出和 provider 配置。
@@ -129,7 +131,7 @@ Agent demo 验收见 [`docs/agent-demo-acceptance.md`](docs/agent-demo-acceptanc
 |--------|------|------|
 | `POST` | `/api/v1/pipeline` | 提交题目，返回 `run_id` |
 | `GET` | `/api/v1/runs` | 运行历史列表 |
-| `GET` | `/api/v1/runs/{run_id}` | 单次运行结果，含 LessonPlan、PlaybookScript、DirectorScript 与原始 `prompt` |
+| `GET` | `/api/v1/runs/{run_id}` | 单次运行结果，含 CoverageDecision、LessonPlan、PlaybookScript、DirectorScript 与原始 `prompt` |
 | `POST` | `/api/v1/exports` | 创建视频导出任务 |
 | `GET` | `/api/v1/exports/{job_id}` | 查询导出任务状态 |
 | `GET` | `/health` | 健康检查 |

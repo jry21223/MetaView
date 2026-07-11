@@ -9,8 +9,10 @@ from typing import Any
 import pytest
 
 from app.application.use_cases.export_video import ExportVideoUseCase
+from app.domain.models.coverage import CoverageDecision
 from app.domain.models.director import DirectorBeat, DirectorScript
 from app.domain.models.export_job import ExportAssetReport, ExportJob, ExportOptions
+from app.domain.models.lesson_plan import LessonPlan, SceneIntent
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.domain.models.quality_report import QualityReport
 from app.domain.models.review import (
@@ -291,6 +293,94 @@ async def test_export_rechecks_quality_and_blocks_missing_asset(tmp_path) -> Non
 
 
 @pytest.mark.asyncio
+async def test_export_recheck_enforces_persisted_experimental_boundary(tmp_path) -> None:
+    db = str(tmp_path / "export-experimental.db")
+    init_db(db)
+    run_repo = SqliteRunRepository(db)
+    director_repo = SqliteRunDirectorRepository(db)
+    export_repo = InMemoryExportJobRepository()
+    await _seed_run(run_repo, "run-experimental")
+    decision = CoverageDecision(
+        mode="experimental",
+        domain="algorithm",
+        confidence=0.55,
+        matched_skill_ids=[],
+        available_tool_ids=["playbook.schema.validate"],
+        missing_capabilities=["capability:controlled_composition:algorithm"],
+        fallback_policy="text_only",
+        reason="No verified visual execution path covers the original run.",
+    )
+    await run_repo.update_coverage_decision(
+        "run-experimental",
+        decision.model_dump_json(),
+    )
+    await export_repo.create(_job("job-experimental", "run-experimental"))
+    use_case = RecordingExportVideoUseCase(
+        export_repo,
+        run_repo,
+        director_repo,
+        web_app_dir=tmp_path,
+        artifacts_dir=tmp_path / "artifacts",
+    )
+
+    await use_case.execute(
+        "job-experimental",
+        "run-experimental",
+        with_audio=False,
+        tts=None,
+    )
+
+    job = await export_repo.get("job-experimental")
+    run = await run_repo.get("run-experimental")
+    assert job is not None and job.status.value == "failed"
+    assert "capability.text_only_required" in (job.error or "")
+    assert run is not None and run.quality_report is not None
+    assert run.quality_report.status == "blocked"
+    assert run.quality_report.coverage_mode == "experimental"
+    assert "capability.text_only_required" in {
+        issue.code for issue in run.quality_report.issues
+    }
+
+
+@pytest.mark.asyncio
+async def test_export_recheck_preserves_persisted_lesson_plan_requirements(tmp_path) -> None:
+    db = str(tmp_path / "export-lesson-plan.db")
+    init_db(db)
+    run_repo = SqliteRunRepository(db)
+    director_repo = SqliteRunDirectorRepository(db)
+    export_repo = InMemoryExportJobRepository()
+    await _seed_run(run_repo, "run-lesson-plan")
+    await run_repo.update_lesson_plan(
+        "run-lesson-plan",
+        _strict_stack_lesson_plan().model_dump_json(),
+    )
+    await export_repo.create(_job("job-lesson-plan", "run-lesson-plan"))
+    use_case = RecordingExportVideoUseCase(
+        export_repo,
+        run_repo,
+        director_repo,
+        web_app_dir=tmp_path,
+        artifacts_dir=tmp_path / "artifacts",
+    )
+
+    await use_case.execute(
+        "job-lesson-plan",
+        "run-lesson-plan",
+        with_audio=False,
+        tts=None,
+    )
+
+    job = await export_repo.get("job-lesson-plan")
+    run = await run_repo.get("run-lesson-plan")
+    assert job is not None and job.status.value == "failed"
+    assert "lesson_plan.visual_role_missing" in (job.error or "")
+    assert run is not None and run.quality_report is not None
+    assert "lesson_plan.visual_role_missing" in {
+        issue.code for issue in run.quality_report.issues
+    }
+
+
+@pytest.mark.asyncio
 async def test_export_recheck_preserves_existing_quality_warnings(tmp_path) -> None:
     db = str(tmp_path / "export-warning.db")
     init_db(db)
@@ -316,6 +406,17 @@ async def test_export_recheck_preserves_existing_quality_warnings(tmp_path) -> N
         coverage_mode="experimental",
     )
     await run_repo.update_quality_report("run-warning", warning.model_dump_json())
+    decision = CoverageDecision(
+        mode="specialized",
+        domain="algorithm",
+        confidence=0.9,
+        matched_skill_ids=["algorithm_graph_core"],
+        available_tool_ids=["skill.algorithm_graph_core.solve"],
+        missing_capabilities=[],
+        fallback_policy="use_skill",
+        reason="A deterministic algorithm SkillPack covers the original run.",
+    )
+    await run_repo.update_coverage_decision("run-warning", decision.model_dump_json())
     await export_repo.create(_job("job-warning", "run-warning"))
     use_case = RecordingExportVideoUseCase(
         export_repo,
@@ -330,6 +431,8 @@ async def test_export_recheck_preserves_existing_quality_warnings(tmp_path) -> N
     run = await run_repo.get("run-warning")
     assert run is not None and run.quality_report is not None
     assert run.quality_report.status == "warnings"
+    assert run.quality_report.coverage_mode == "specialized"
+    assert run.coverage_decision == decision
     assert {issue.code for issue in run.quality_report.issues} >= {"knowledge.source_unverified"}
     assert "reviewer:status:warnings" in run.quality_report.actions
     assert any(action.startswith("export:readiness:") for action in run.quality_report.actions)
@@ -377,6 +480,30 @@ async def test_export_recheck_drops_stale_blocking_issues(tmp_path) -> None:
     assert job is not None and job.status == "completed"
     assert run is not None and run.quality_report is not None
     assert "export.not_ready" not in {issue.code for issue in run.quality_report.issues}
+
+
+def _strict_stack_lesson_plan() -> LessonPlan:
+    return LessonPlan(
+        schema_version="1.0.0",
+        domain="algorithm",
+        title="递归调用栈",
+        learning_objectives=["追踪 factorial(4) 的压栈与回溯。"],
+        prerequisites=[],
+        misconceptions=[],
+        expected_conclusion="factorial(4)=24",
+        lesson_arc="state_transition",
+        scenes=[
+            SceneIntent(
+                scene_id="stack_trace",
+                teaching_goal="展示调用栈状态和返回值传播。",
+                strategy="state_transition",
+                required_fact_ids=[],
+                required_visual_roles=["stack_frame", "active_frame", "return_value"],
+                preferred_scene_type="recursion_stack",
+                narration_goal="同步说明压栈和回溯。",
+            )
+        ],
+    )
 
 
 async def _seed_run(repo: SqliteRunRepository, run_id: str) -> None:

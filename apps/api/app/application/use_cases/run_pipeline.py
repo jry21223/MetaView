@@ -15,14 +15,17 @@ from app.application.agent.runtime_tool_hub import RuntimeToolHub
 from app.application.agent.types import AgentConstraints, AgentRequest
 from app.application.dto.pipeline_dto import PipelineRequest
 from app.application.ports.agent_provider import AgentProviderError, IAgentProvider
+from app.application.ports.coverage_resolver import ICoverageResolver
 from app.application.ports.director_repository import IRunDirectorRepository
 from app.application.ports.lesson_planner import ILessonPlanner
 from app.application.ports.llm_provider import ILLMProvider
 from app.application.ports.router_provider import IRouterProvider
 from app.application.ports.run_repository import IRunRepository
+from app.application.services.coverage_resolver import DefaultCoverageResolver
 from app.application.services.lesson_planner import RuleBasedLessonPlanner
 from app.config import GenerationMode, RouterMode
 from app.domain.models.cir import CirDocument, ExecutionMap
+from app.domain.models.coverage import CoverageDecision, CoverageMode
 from app.domain.models.lesson_plan import LessonPlan
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.domain.models.playbook import PlaybookScript
@@ -81,6 +84,7 @@ class ParseResult:
 @dataclass(frozen=True)
 class RouteContext:
     decision: RouteDecision
+    coverage_decision: CoverageDecision
     fallback: str = "none"
     router_model: str | None = None
 
@@ -103,6 +107,7 @@ class RunPipelineUseCase:
         router_min_confidence: float = 0.72,
         router_refine_confidence: float = 0.55,
         lesson_planner: ILessonPlanner | None = None,
+        coverage_resolver: ICoverageResolver | None = None,
     ) -> None:
         self._repo = run_repo
         self._llm = llm
@@ -123,6 +128,13 @@ class RunPipelineUseCase:
         self._router_min_confidence = router_min_confidence
         self._router_refine_confidence = router_refine_confidence
         self._lesson_planner = lesson_planner or RuleBasedLessonPlanner()
+        self._coverage_resolver = coverage_resolver or DefaultCoverageResolver(
+            skill_registry=self._skill_registry,
+            runtime_tool_hub=RuntimeToolHub(self._skill_registry),
+            min_confidence=router_min_confidence,
+            refine_confidence=router_refine_confidence,
+        )
+        self._coverage_by_run: dict[str, CoverageDecision] = {}
 
     async def execute(self, run_id: str, request: PipelineRequest) -> None:
         await self._repo.update(run_id, status=PipelineRunStatus.RUNNING)
@@ -132,16 +144,25 @@ class RunPipelineUseCase:
 
                 agent_pipeline = AgentPipeline(
                     route_request=self._route_request,
-                    try_execute_skill=lambda rid, req, match, plan: self._try_execute_skill(
+                    prepare_route_context=self._prepare_route_context,
+                    can_execute_skill=lambda ctx: (
+                        isinstance(ctx, RouteContext)
+                        and ctx.coverage_decision.mode == "specialized"
+                    ),
+                    try_execute_skill=lambda rid, req, match, ctx, plan: self._try_execute_skill(
                         rid,
                         req,
                         match,
+                        route_context=ctx,  # type: ignore[arg-type]
                         lesson_plan=plan,
                     ),
-                    fail_skill_consistency=self._fail_skill_consistency,
-                    build_route_context=lambda req, match: self._generic_route_context(
-                        req,
-                        route_match=match,
+                    fail_skill_consistency=lambda rid, match, ctx, message: (
+                        self._fail_skill_consistency(
+                            rid,
+                            match,
+                            route_context=ctx,  # type: ignore[arg-type]
+                            message=message,
+                        )
                     ),
                     prepare_lesson_plan=lambda rid, req, ctx: self._prepare_lesson_plan(
                         rid,
@@ -170,7 +191,7 @@ class RunPipelineUseCase:
             logger.exception("Pipeline run %s timed out after %.1fs", run_id, timeout)
             quality_report = _terminal_quality_report(
                 generator_path=("agent" if self._generation_mode == "agent" else "generic_cir"),
-                coverage_mode="experimental",
+                coverage_mode=self._coverage_mode_for_run(run_id),
                 code="pipeline.timeout",
                 path="pipeline",
                 message=f"Pipeline timed out after {timeout:.1f}s",
@@ -186,7 +207,7 @@ class RunPipelineUseCase:
             logger.exception("Pipeline run %s failed before candidate finalization", run_id)
             quality_report = _terminal_quality_report(
                 generator_path=("agent" if self._generation_mode == "agent" else "generic_cir"),
-                coverage_mode="experimental",
+                coverage_mode=self._coverage_mode_for_run(run_id),
                 code="quality.generation_failed",
                 path="pipeline",
                 message=f"Pipeline failed before producing a valid candidate: {exc}",
@@ -198,6 +219,8 @@ class RunPipelineUseCase:
                 status=PipelineRunStatus.FAILED,
                 error=str(exc),
             )
+        finally:
+            self._coverage_by_run.pop(run_id, None)
 
     async def _execute_routed_single_pipeline(
         self,
@@ -205,22 +228,30 @@ class RunPipelineUseCase:
         request: PipelineRequest,
     ) -> None:
         route_match = await self._route_request(request)
-        route_context = self._generic_route_context(request, route_match=route_match)
+        route_context = await self._prepare_route_context(run_id, request, route_match)
+        if route_context is None:
+            return
         lesson_plan = await self._prepare_lesson_plan(
             run_id,
             request,
             route_context=route_context,
         )
-        if route_match is not None:
+        if route_match is not None and route_context.coverage_decision.mode == "specialized":
             try:
                 handled = await self._try_execute_skill(
                     run_id,
                     request,
                     route_match,
+                    route_context=route_context,
                     lesson_plan=lesson_plan,
                 )
             except AssertionError as exc:
-                await self._fail_skill_consistency(run_id, route_match, str(exc))
+                await self._fail_skill_consistency(
+                    run_id,
+                    route_match,
+                    route_context=route_context,
+                    message=str(exc),
+                )
                 return
             if handled:
                 return
@@ -286,46 +317,132 @@ class RunPipelineUseCase:
 
         return None
 
+    async def _prepare_route_context(
+        self,
+        run_id: str,
+        request: PipelineRequest,
+        route_match: SkillRouteMatch | None,
+    ) -> RouteContext | None:
+        coverage_decision = self._coverage_resolver.resolve(
+            prompt=request.prompt,
+            source_code=request.source_code,
+            language=request.language,
+            explicit_domain=request.domain,
+            skill_mode_override=request.skill_mode_override,
+            route_match=route_match,
+        )
+        self._coverage_by_run[run_id] = coverage_decision
+        update_coverage_decision = getattr(self._repo, "update_coverage_decision", None)
+        if callable(update_coverage_decision):
+            await update_coverage_decision(
+                run_id,
+                coverage_decision.model_dump_json(),
+            )
+
+        route_context = self._generic_route_context(
+            request,
+            route_match=route_match,
+            coverage_decision=coverage_decision,
+        )
+        if coverage_decision.mode in {"specialized", "composable"}:
+            return route_context
+
+        actions = _coverage_review_actions(coverage_decision)
+        if coverage_decision.mode == "unsupported":
+            issue_code = "capability.unsupported"
+            suggestion = (
+                "Use a supported deterministic SkillPack or narrow the request to "
+                "a capability that MetaView can validate reliably."
+            )
+        elif coverage_decision.fallback_policy == "text_only":
+            issue_code = "capability.text_only_required"
+            suggestion = (
+                "Use a supported visual capability. MetaView does not yet expose a "
+                "separate text-only result surface, so this request cannot enter the "
+                "video pipeline safely."
+            )
+        else:
+            issue_code = "capability.limited_visual_unavailable"
+            suggestion = (
+                "Restore the missing visual validators or use a fully controlled "
+                "composition profile before generating a video."
+            )
+        report = _terminal_quality_report(
+            generator_path="capability_resolution",
+            coverage_mode=coverage_decision.mode,
+            code=issue_code,
+            path="coverage_decision",
+            message=coverage_decision.reason,
+            suggestion=suggestion,
+            actions=actions,
+        )
+        await self._persist_quality_report(run_id, report)
+        await self._repo.update(
+            run_id,
+            status=PipelineRunStatus.FAILED,
+            error=coverage_decision.reason,
+            review_json=PlaybookReviewVerdict(
+                status=PlaybookReviewStatus.BLOCKED,
+                summary=coverage_decision.reason,
+                issues=list(report.issues),
+                actions=actions,
+            ).model_dump_json(),
+        )
+        return None
+
     def _generic_route_context(
         self,
         request: PipelineRequest,
         *,
         route_match: SkillRouteMatch | None,
+        coverage_decision: CoverageDecision,
     ) -> RouteContext:
         topic_route = _resolve_route(request)
         if route_match is not None:
-            route_domain = (
-                route_match.domain
-                or (topic_route.domain.value if topic_route.domain else None)
+            route_domain = coverage_decision.domain or (
+                topic_route.domain.value if topic_route.domain else None
             )
             route = RouteDecision(
-                destination="generic_cir",
+                destination=(
+                    "deterministic_skill"
+                    if coverage_decision.mode == "specialized"
+                    else "generic_cir"
+                ),
                 domain=route_domain,
                 skill_id=route_match.skill_id,
                 confidence=route_match.confidence,
-                reason=route_match.reason or "skill_not_handled",
+                reason=coverage_decision.reason,
                 matched_capability=route_match.capability_id,
                 problem_spec=route_match.problem_spec,
                 needs_refinement=route_match.needs_refinement,
             )
             return RouteContext(
                 route,
-                fallback=f"skill_not_handled:{route_match.skill_id}",
+                coverage_decision,
+                fallback=(
+                    "none"
+                    if coverage_decision.mode == "specialized"
+                    else f"coverage:{coverage_decision.fallback_policy}"
+                ),
                 router_model=getattr(self._router_provider, "model_name", None),
             )
 
-        confidence = 0.62 if topic_route.domain is not None else 0.0
         route = RouteDecision(
             destination="generic_cir",
-            domain=topic_route.domain.value if topic_route.domain else None,
-            confidence=confidence,
-            reason=topic_route.reason or "topic_route",
+            domain=coverage_decision.domain,
+            confidence=coverage_decision.confidence,
+            reason=coverage_decision.reason,
             matched_capability=",".join(topic_route.matched_keywords) or None,
         )
         fallback = "router_disabled" if self._router_mode == "off" else "none"
         return RouteContext(
             route,
-            fallback=fallback,
+            coverage_decision,
+            fallback=(
+                fallback
+                if fallback != "none"
+                else f"coverage:{coverage_decision.fallback_policy}"
+            ),
             router_model=getattr(self._router_provider, "model_name", None),
         )
 
@@ -338,7 +455,11 @@ class RunPipelineUseCase:
     ) -> LessonPlan:
         lesson_plan = await self._lesson_planner.plan(
             prompt=request.prompt,
-            domain=route_context.decision.domain or request.domain,
+            domain=(
+                route_context.coverage_decision.domain
+                or route_context.decision.domain
+                or request.domain
+            ),
             route_decision=route_context.decision,
             source_code=request.source_code,
             language=request.language,
@@ -354,42 +475,88 @@ class RunPipelineUseCase:
         request: PipelineRequest,
         route_match: SkillRouteMatch,
         *,
+        route_context: RouteContext,
         lesson_plan: LessonPlan,
     ) -> bool:
+        if route_context.coverage_decision.mode != "specialized":
+            return False
         skill = self._skill_registry.get(route_match.skill_id)
         if skill is None:
             return False
 
-        problem_spec = None
-        spec_source = "none"
-        if route_match.problem_spec:
-            problem_spec = skill.validate_problem_spec(route_match.problem_spec)
-            if problem_spec is not None:
-                spec_source = "model"
-        if problem_spec is None:
-            heuristic_match = skill.heuristic_match(
-                SkillRouteInput(
-                    prompt=request.prompt,
-                    source_code=request.source_code,
-                    language=request.language,
-                )
+        heuristic_match = skill.heuristic_match(
+            SkillRouteInput(
+                prompt=request.prompt,
+                source_code=request.source_code,
+                language=request.language,
             )
-            if heuristic_match and heuristic_match.problem_spec:
-                problem_spec = skill.validate_problem_spec(heuristic_match.problem_spec)
-                if problem_spec is not None:
-                    spec_source = "heuristic"
+        )
+        if (
+            heuristic_match is None
+            or heuristic_match.skill_id != route_match.skill_id
+            or heuristic_match.capability_id != route_match.capability_id
+            or heuristic_match.problem_spec is None
+        ):
+            raise AssertionError(
+                "Specialized coverage lost its independently verified SkillPack "
+                "capability or ProblemSpec before execution."
+            )
+        problem_spec = skill.validate_problem_spec(heuristic_match.problem_spec)
+        if problem_spec is None:
+            raise AssertionError(
+                "Specialized coverage produced an invalid independently verified "
+                "ProblemSpec before execution."
+            )
+        spec_source = "heuristic_verified"
+        verified_route_match = route_match.model_copy(
+            update={"problem_spec": heuristic_match.problem_spec}
+        )
 
         result = await skill.execute(
             SkillExecutionContext(
                 run_id=run_id,
                 prompt=request.prompt,
-                route_match=route_match,
+                route_match=verified_route_match,
                 lesson_plan=lesson_plan,
             ),
             problem_spec,
         )
         if not result.handled or result.playbook_json is None:
-            return False
+            fallback_reason = result.fallback_reason or "skill_returned_no_playbook"
+            actions = [
+                "router:skill_pack",
+                f"router:skill_id:{route_match.skill_id}",
+                f"skill:execution_unhandled:{fallback_reason}",
+                *_coverage_review_actions(route_context.coverage_decision),
+            ]
+            report = _terminal_quality_report(
+                generator_path="skill_pack",
+                coverage_mode=route_context.coverage_decision.mode,
+                code="skill.execution_unhandled",
+                path="skill_pack",
+                message=(
+                    f"SkillPack {route_match.skill_id!r} declined or failed to produce "
+                    f"a PlaybookScript candidate: {fallback_reason}."
+                ),
+                suggestion=(
+                    "Fix the deterministic SkillPack or resolve the capability gap before "
+                    "retrying; do not continue through an unverified generic path."
+                ),
+                actions=actions,
+            )
+            await self._persist_quality_report(run_id, report)
+            await self._repo.update(
+                run_id,
+                status=PipelineRunStatus.FAILED,
+                error=report.summary,
+                review_json=PlaybookReviewVerdict(
+                    status=PlaybookReviewStatus.BLOCKED,
+                    summary=report.summary,
+                    issues=list(report.issues),
+                    actions=actions,
+                ).model_dump_json(),
+            )
+            return True
         if result.lesson_plan is not None:
             if result.lesson_plan.domain != lesson_plan.domain:
                 raise AssertionError(
@@ -414,7 +581,7 @@ class RunPipelineUseCase:
             failure_quality = QualityReport.from_review_verdict(
                 verdict,
                 generator_path="skill_pack",
-                coverage_mode="specialized",
+                coverage_mode=route_context.coverage_decision.mode,
             )
             if failure_quality.status == "repairable":
                 failure_quality = _mark_quality_repair_unavailable(
@@ -446,7 +613,8 @@ class RunPipelineUseCase:
             playbook,
             request.prompt,
             generator_path="skill_pack",
-            coverage_mode="specialized",
+            coverage_mode=route_context.coverage_decision.mode,
+            coverage_decision=route_context.coverage_decision,
             lesson_plan=lesson_plan,
         )
         quality_report.actions = list(review_report.actions)
@@ -477,6 +645,8 @@ class RunPipelineUseCase:
         self,
         run_id: str,
         route_match: SkillRouteMatch,
+        *,
+        route_context: RouteContext,
         message: str,
     ) -> None:
         review_report = CirReviewReport(
@@ -500,7 +670,7 @@ class RunPipelineUseCase:
             run_id,
             _terminal_quality_report(
                 generator_path="skill_pack",
-                coverage_mode="specialized",
+                coverage_mode=route_context.coverage_decision.mode,
                 code="skill.consistency_failed",
                 path="playbook",
                 message=(
@@ -567,7 +737,7 @@ class RunPipelineUseCase:
                 request.prompt,
                 review_report,
                 generator_path="agent",
-                coverage_mode="experimental",
+                coverage_decision=route_context.coverage_decision,
                 lesson_plan=lesson_plan,
             )
             if quality_report.status == "repairable":
@@ -609,7 +779,7 @@ class RunPipelineUseCase:
                     request.prompt,
                     review_report,
                     generator_path="agent",
-                    coverage_mode="experimental",
+                    coverage_decision=route_context.coverage_decision,
                     lesson_plan=lesson_plan,
                 )
             if quality_report.status == "repairable":
@@ -625,7 +795,7 @@ class RunPipelineUseCase:
             failure_quality = QualityReport.from_review_verdict(
                 exc.report,
                 generator_path="agent",
-                coverage_mode="experimental",
+                coverage_mode=route_context.coverage_decision.mode,
                 attempts=_playbook_repair_attempts(exc.report.actions),
             )
             if failure_quality.status == "repairable":
@@ -649,7 +819,7 @@ class RunPipelineUseCase:
             failure_quality = QualityReport.from_review_verdict(
                 failure_review,
                 generator_path="agent",
-                coverage_mode="experimental",
+                coverage_mode=route_context.coverage_decision.mode,
             )
             if failure_quality.status == "repairable":
                 failure_quality = _mark_quality_repair_unavailable(
@@ -672,7 +842,7 @@ class RunPipelineUseCase:
             failure_quality = QualityReport.from_review_verdict(
                 failure_review,
                 generator_path="agent",
-                coverage_mode="experimental",
+                coverage_mode=route_context.coverage_decision.mode,
             )
             if failure_quality.status == "repairable":
                 failure_quality = _mark_quality_repair_unavailable(
@@ -931,12 +1101,21 @@ class RunPipelineUseCase:
     ) -> dict[str, Any]:
         assert self._agent_provider is not None
         route_decision = route_context.decision.model_dump(mode="json")
+        available_tool_ids = frozenset(
+            route_context.coverage_decision.available_tool_ids
+        )
+        available_tools = [
+            tool
+            for tool in RuntimeToolHub(self._skill_registry).list_tools(route_decision)
+            if tool.name in available_tool_ids
+        ]
         agent_request = AgentRequest(
             run_id=run_id,
             prompt=prompt,
             source_code=request.source_code,
             language=request.language,
             route_decision=route_decision,
+            coverage_decision=route_context.coverage_decision,
             lesson_plan=lesson_plan,
             provider_config=provider_config,
             playbook_schema=PlaybookScript.model_json_schema(),
@@ -946,14 +1125,18 @@ class RunPipelineUseCase:
                 legacy_single_enabled=True,
                 executable_tools_available=True,
             ),
-            available_tools=RuntimeToolHub(self._skill_registry).list_tools(route_decision),
+            available_tools=available_tools,
         )
         runner = getattr(self._agent_provider, "run", None)
         if callable(runner):
             result = await runner(agent_request)
             return result.playbook
         return await self._agent_provider.generate(
-            _build_agent_generation_prompt(prompt, lesson_plan),
+            _build_agent_generation_prompt(
+                prompt,
+                lesson_plan,
+                route_context.coverage_decision,
+            ),
             provider_config=provider_config,
             route_decision=route_decision,
         )
@@ -986,6 +1169,7 @@ class RunPipelineUseCase:
                 language=request.language,
                 skill_mode=route.skill_mode,
                 route_decision=route_context.decision,
+                coverage_decision=route_context.coverage_decision,
                 lesson_plan=lesson_plan,
             )
             raw = await self._llm.complete(system, user)
@@ -1011,6 +1195,7 @@ class RunPipelineUseCase:
                 playbook,
                 request.prompt,
                 review_report,
+                coverage_decision=route_context.coverage_decision,
                 lesson_plan=lesson_plan,
             )
 
@@ -1058,6 +1243,7 @@ class RunPipelineUseCase:
                     playbook,
                     request.prompt,
                     review_report,
+                    coverage_decision=route_context.coverage_decision,
                     lesson_plan=lesson_plan,
                 )
 
@@ -1077,7 +1263,7 @@ class RunPipelineUseCase:
                 _quality_report_from_cir_failure(
                     exc.report,
                     generator_path="generic_cir",
-                    coverage_mode="experimental",
+                    coverage_mode=route_context.coverage_decision.mode,
                 ),
             )
             await self._repo.update(
@@ -1092,7 +1278,7 @@ class RunPipelineUseCase:
                 run_id,
                 _terminal_quality_report(
                     generator_path="generic_cir",
-                    coverage_mode="experimental",
+                    coverage_mode=route_context.coverage_decision.mode,
                     code="quality.generation_failed",
                     path="pipeline",
                     message=f"Generic CIR generation failed: {exc}",
@@ -1136,6 +1322,10 @@ class RunPipelineUseCase:
         update_quality_report = getattr(self._repo, "update_quality_report", None)
         if callable(update_quality_report):
             await update_quality_report(run_id, report.model_dump_json())
+
+    def _coverage_mode_for_run(self, run_id: str) -> CoverageMode:
+        decision = self._coverage_by_run.get(run_id)
+        return decision.mode if decision is not None else "experimental"
 
     async def _finalize_candidate(
         self,
@@ -1455,8 +1645,16 @@ def _blocking_playbook_review_issues(
     return [issue for issue in result.issues if issue.severity == PlaybookIssueSeverity.ERROR]
 
 
-def _build_agent_generation_prompt(prompt: str, lesson_plan: LessonPlan) -> str:
+def _build_agent_generation_prompt(
+    prompt: str,
+    lesson_plan: LessonPlan,
+    coverage_decision: CoverageDecision,
+) -> str:
     return (
+        "[MetaView coverage decision]\n"
+        "BINDING read-only capability boundary. Respect mode, fallback_policy, "
+        "and missing_capabilities; do not invent unexecuted tool results.\n"
+        f"{coverage_decision.model_dump_json(indent=2)}\n\n"
         "[MetaView LessonPlan]\n"
         f"{lesson_plan.model_dump_json(indent=2)}\n\n"
         "[user prompt]\n"
@@ -1523,14 +1721,15 @@ def _quality_report_with_review(
     review: PlaybookReviewVerdict,
     *,
     generator_path: str,
-    coverage_mode: str,
+    coverage_decision: CoverageDecision,
     lesson_plan: LessonPlan,
 ) -> QualityReport:
     canonical = quality_gate_playbook(
         playbook,
         prompt,
         generator_path=generator_path,
-        coverage_mode=coverage_mode,
+        coverage_mode=coverage_decision.mode,
+        coverage_decision=coverage_decision,
         lesson_plan=lesson_plan,
     )
     unique: dict[tuple[str, str, str], PlaybookReviewIssue] = {}
@@ -1546,7 +1745,7 @@ def _quality_report_with_review(
     return QualityReport.from_review_verdict(
         merged,
         generator_path=generator_path,
-        coverage_mode=coverage_mode,
+        coverage_mode=coverage_decision.mode,
         attempts=_playbook_repair_attempts(review.actions),
     )
 
@@ -1556,13 +1755,15 @@ def _quality_report_for_single(
     prompt: str,
     review: CirReviewReport,
     *,
+    coverage_decision: CoverageDecision,
     lesson_plan: LessonPlan,
 ) -> QualityReport:
     report = quality_gate_playbook(
         playbook,
         prompt,
         generator_path="generic_cir",
-        coverage_mode="experimental",
+        coverage_mode=coverage_decision.mode,
+        coverage_decision=coverage_decision,
         lesson_plan=lesson_plan,
     )
     report.actions = list(review.actions)
@@ -1650,7 +1851,7 @@ def _mark_quality_repair_unavailable(
 def _terminal_quality_report(
     *,
     generator_path: str,
-    coverage_mode: str,
+    coverage_mode: CoverageMode,
     code: str,
     path: str,
     message: str,
@@ -1683,7 +1884,7 @@ def _quality_report_from_cir_failure(
     report: CirReviewReport,
     *,
     generator_path: str,
-    coverage_mode: str,
+    coverage_mode: CoverageMode,
 ) -> QualityReport:
     issues = [
         PlaybookReviewIssue(
@@ -1882,6 +2083,7 @@ def _route_review_actions(route_context: RouteContext, *, generator: str) -> lis
         f"router:confidence:{route.confidence:.2f}",
         f"router:fallback:{route_context.fallback}",
         f"generator:{generator}",
+        *_coverage_review_actions(route_context.coverage_decision),
     ]
     if route_context.router_model:
         actions.append(f"router:model:{route_context.router_model}")
@@ -1897,6 +2099,19 @@ def _route_review_actions(route_context: RouteContext, *, generator: str) -> lis
         actions.append("router:needs_refinement:true")
     if route.unsupported_reason:
         actions.append(f"router:unsupported:{route.unsupported_reason}")
+    return actions
+
+
+def _coverage_review_actions(decision: CoverageDecision) -> list[str]:
+    actions = [
+        f"coverage:mode:{decision.mode}",
+        f"coverage:fallback:{decision.fallback_policy}",
+        f"coverage:confidence:{decision.confidence:.2f}",
+    ]
+    if decision.domain:
+        actions.append(f"coverage:domain:{decision.domain}")
+    actions.extend(f"coverage:skill:{skill_id}" for skill_id in decision.matched_skill_ids)
+    actions.extend(f"coverage:missing:{item}" for item in decision.missing_capabilities)
     return actions
 
 

@@ -7,6 +7,7 @@ import sqlite3
 
 from app.application.dto.followup_dto import RunFollowUpRecord, RunVersionRecord
 from app.application.dto.pipeline_dto import PipelineRunResponse
+from app.domain.models.coverage import CoverageDecision
 from app.domain.models.lesson_plan import LessonPlan
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.domain.models.playbook import PlaybookScript
@@ -111,6 +112,21 @@ class SqliteRunRepository:
                 conn.execute(
                     "UPDATE pipeline_runs SET lesson_plan_json=? WHERE run_id=?",
                     (lesson_plan_json, run_id),
+                )
+                conn.commit()
+
+        await asyncio.to_thread(_sync)
+
+    async def update_coverage_decision(
+        self,
+        run_id: str,
+        coverage_decision_json: str,
+    ) -> None:
+        def _sync() -> None:
+            with self._connect() as conn:
+                conn.execute(
+                    "UPDATE pipeline_runs SET coverage_decision_json=? WHERE run_id=?",
+                    (coverage_decision_json, run_id),
                 )
                 conn.commit()
 
@@ -383,6 +399,11 @@ def _row_to_response(row: sqlite3.Row) -> PipelineRunResponse:
     lesson_plan = None
     if "lesson_plan_json" in row.keys() and row["lesson_plan_json"]:
         lesson_plan = LessonPlan.model_validate_json(row["lesson_plan_json"])
+    coverage_decision = None
+    if "coverage_decision_json" in row.keys() and row["coverage_decision_json"]:
+        coverage_decision = CoverageDecision.model_validate_json(
+            row["coverage_decision_json"]
+        )
     return PipelineRunResponse(
         run_id=row["run_id"],
         status=PipelineRunStatus(row["status"]),
@@ -393,6 +414,7 @@ def _row_to_response(row: sqlite3.Row) -> PipelineRunResponse:
         review=review,
         quality_report=quality_report,
         lesson_plan=lesson_plan,
+        coverage_decision=coverage_decision,
     )
 
 

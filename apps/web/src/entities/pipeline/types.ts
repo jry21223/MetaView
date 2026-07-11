@@ -25,13 +25,37 @@ export interface ReviewReport {
 export interface QualityReport {
   status: "clean" | "warnings" | "repairable" | "blocked";
   generator_path: string;
-  coverage_mode: string;
+  coverage_mode: CoverageMode | "unknown";
   issues: ReviewIssue[];
   scores: Record<string, number>;
   repair_targets: string[];
   summary: string;
   actions: string[];
   attempts: number;
+}
+
+export type CoverageMode =
+  | "specialized"
+  | "composable"
+  | "experimental"
+  | "unsupported";
+
+export type CoverageFallbackPolicy =
+  | "use_skill"
+  | "compose"
+  | "limited_visual"
+  | "text_only"
+  | "reject";
+
+export interface CoverageDecision {
+  mode: CoverageMode;
+  domain: string | null;
+  confidence: number;
+  matched_skill_ids: string[];
+  available_tool_ids: string[];
+  missing_capabilities: string[];
+  fallback_policy: CoverageFallbackPolicy;
+  reason: string;
 }
 
 export type LessonArc =
@@ -89,4 +113,5 @@ export interface PipelineRunResult {
   review?: ReviewReport | null;
   quality_report?: QualityReport | null;
   lesson_plan?: LessonPlan | null;
+  coverage_decision?: CoverageDecision | null;
 }

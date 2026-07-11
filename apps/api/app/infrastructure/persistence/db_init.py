@@ -16,6 +16,7 @@ def _create_pipeline_runs(conn: sqlite3.Connection) -> None:
             review_json TEXT,
             quality_report_json TEXT,
             lesson_plan_json TEXT,
+            coverage_decision_json TEXT,
             created_at  TEXT NOT NULL,
             FOREIGN KEY(user_id) REFERENCES accounts(user_id)
         )
@@ -23,6 +24,7 @@ def _create_pipeline_runs(conn: sqlite3.Connection) -> None:
     _add_column_if_missing(conn, "pipeline_runs", "user_id", "TEXT")
     _add_column_if_missing(conn, "pipeline_runs", "quality_report_json", "TEXT")
     _add_column_if_missing(conn, "pipeline_runs", "lesson_plan_json", "TEXT")
+    _add_column_if_missing(conn, "pipeline_runs", "coverage_decision_json", "TEXT")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS pipeline_run_followups (
             followup_id    TEXT PRIMARY KEY,

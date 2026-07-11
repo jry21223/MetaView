@@ -1,4 +1,5 @@
 from app.application.services.lesson_planner import build_rule_based_lesson_plan
+from app.domain.models.coverage import CoverageDecision
 from app.domain.models.topic import TopicDomain
 from app.domain.services.cir_prompt import build_cir_prompt
 from app.domain.services.domain_router import SkillMode
@@ -124,6 +125,30 @@ def test_build_cir_prompt_generic_mode_has_no_domain_specific_guidance() -> None
     assert "No confident subject-specific skill was matched" in system
     assert "VISUAL + PEDAGOGY RULES for algorithms" not in system
     assert "VISUAL + PEDAGOGY RULES for physics" not in system
+
+
+def test_build_cir_prompt_includes_binding_coverage_boundary() -> None:
+    coverage = CoverageDecision(
+        mode="experimental",
+        domain="physics",
+        confidence=0.62,
+        matched_skill_ids=[],
+        available_tool_ids=["scene_blueprint.compile"],
+        missing_capabilities=["validator:physics.circuit"],
+        fallback_policy="text_only",
+        reason="Circuit facts cannot be validated by the current runtime.",
+    )
+
+    system, _ = build_cir_prompt(
+        "解释基尔霍夫定律",
+        TopicDomain.PHYSICS,
+        coverage_decision=coverage,
+    )
+
+    assert "Canonical CoverageDecision" in system
+    assert "BINDING CAPABILITY BOUNDARY" in system
+    assert "validator:physics.circuit" in system
+    assert "does not authorize invented outputs" in system
 
 
 def test_build_cir_prompt_specialized_mode_keeps_domain_guidance() -> None:

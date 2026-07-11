@@ -5,10 +5,13 @@
 > `single mode` 仍保留为 legacy fallback：**LLM → CIR + ExecutionMap → PlaybookScript**。
 > 项目仍不引入 Manim、HTML iframe 或服务端 HTML 视频渲染；前端通过 Remotion 帧驱动渲染。
 
-路由完成后，三条路径会先共享同一份 renderer-independent `LessonPlan`：
+路由完成后，后端先形成并持久化 `CoverageDecision`，再让三条路径共享同一份
+renderer-independent `LessonPlan`：
 
 ```text
 Router
+  -> CoverageResolver
+  -> persist CoverageDecision
   -> RuleBasedLessonPlanner
   -> persist LessonPlan
   -> SkillExecutionContext | AgentRequest | legacy CIR prompt
@@ -19,6 +22,12 @@ LessonPlan 只记录教学目标、误区、结论、教学弧线和 SceneIntent
 asset、layer 或 renderer 私有字段。最终候选还会由后端检查已注册的 required facts、
 visual roles、preferred scene type 和精确结论；缺失证据会触发 repair 或阻断。
 详见 [`lesson-plan.md`](./lesson-plan.md)。
+
+CoverageResolver 会验证真实 Skill manifest、ProblemSpec、domain、置信度、RuntimeToolHub
+manifest 和 SceneBlueprint scene type；它不会把 TopicRoute 的 `specialized` prompt 标签直接
+当成 Skill 覆盖。`unsupported` 与当前尚无安全降级输出面的 `experimental` 都会在
+LessonPlan/provider 之前 fail closed；`composable` 只覆盖四个精确受控模板。详见
+[`coverage-and-fallback.md`](./coverage-and-fallback.md)。
 
 ## 0. 当前成功语义与契约同步
 
@@ -50,7 +59,8 @@ Pydantic `AnySnapshot` discriminator、Agent self-check allow-list、Web `Snapsh
 
 `METAVIEW_GENERATION_MODE=single` 时，LLM 必须输出**单一 JSON 对象**，包含两层：
 
-生成前，后端会把已持久化的 canonical LessonPlan 注入 system prompt。CIR 可以把一个
+生成前，后端会把已持久化的 canonical CoverageDecision 和 LessonPlan 注入 system prompt。
+CIR 可以把一个
 SceneIntent 展开为多个步骤，但必须保持教学目标、所需事实、视觉角色和预期结论。
 
 ```jsonc

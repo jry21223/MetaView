@@ -16,14 +16,22 @@ from app.infrastructure.persistence.sqlite_director_repository import (
     SqliteRunDirectorRepository,
 )
 from app.infrastructure.persistence.sqlite_run_repository import SqliteRunRepository
-from app.main import create_app
+from app.main import create_app as _create_app
 from app.presentation.dependencies import (
     get_agent_provider,
+    get_coverage_resolver,
     get_llm_provider,
     get_reviewer_llm_provider,
     get_run_director_repo,
     get_run_repo,
 )
+from tests.coverage_test_utils import ComposableCoverageResolver
+
+
+def create_app():
+    app = _create_app()
+    app.dependency_overrides[get_coverage_resolver] = lambda: ComposableCoverageResolver()
+    return app
 
 _VALID_CIR = json.dumps({
     "cir": {
@@ -214,6 +222,27 @@ def test_post_pipeline_returns_prompt_in_response(client) -> None:
     assert resp.json()["prompt"] == prompt
 
 
+@pytest.mark.parametrize("minimum", [0.5, 0.0])
+def test_request_router_minimum_below_default_refine_is_normalized(
+    client,
+    minimum: float,
+) -> None:
+    response = client.post(
+        "/api/v1/pipeline",
+        json={
+            "prompt": "解释一个未被专用能力覆盖的地理主题",
+            "domain": "geography",
+            "router_min_confidence": minimum,
+        },
+    )
+
+    assert response.status_code == 202
+    run = client.get(f"/api/v1/runs/{response.json()['run_id']}").json()
+    assert run["status"] == "failed"
+    assert run["coverage_decision"]["mode"] == "experimental"
+    assert run["coverage_decision"]["confidence"] == minimum
+
+
 def test_ops_edition_rejects_client_provider_override(monkeypatch, tmp_path) -> None:
     get_settings.cache_clear()
     db = str(tmp_path / "ops.db")
@@ -260,7 +289,7 @@ def test_ops_pipeline_requires_wechat_session(monkeypatch, tmp_path) -> None:
         missing = client.post("/api/v1/pipeline", json={"prompt": "ops run"})
         guest_resp = client.post(
             "/api/v1/pipeline",
-            json={"prompt": "ops run"},
+            json={"prompt": "ops run", "domain": "algorithm"},
             headers={"Cookie": f"mv_session={guest.token}"},
         )
 
@@ -316,7 +345,7 @@ def test_ops_pipeline_scopes_runs_and_consumes_balance(monkeypatch, tmp_path) ->
     with TestClient(app) as client_a:
         created = client_a.post(
             "/api/v1/pipeline",
-            json={"prompt": "ops run"},
+            json={"prompt": "ops run", "domain": "algorithm"},
             headers={"Cookie": f"mv_session={session_a.token}"},
         )
         run_id = created.json()["run_id"]
@@ -368,7 +397,7 @@ def test_ops_pipeline_rejects_insufficient_balance(monkeypatch, tmp_path) -> Non
     with TestClient(app) as client:
         resp = client.post(
             "/api/v1/pipeline",
-            json={"prompt": "ops run"},
+            json={"prompt": "ops run", "domain": "algorithm"},
             headers={"Cookie": f"mv_session={session.token}"},
         )
 
@@ -397,7 +426,7 @@ def test_ops_pipeline_refunds_balance_when_generation_fails(monkeypatch, tmp_pat
     with TestClient(app) as client:
         resp = client.post(
             "/api/v1/pipeline",
-            json={"prompt": "ops run"},
+            json={"prompt": "ops run", "domain": "algorithm"},
             headers={"Cookie": f"mv_session={session.token}"},
         )
 
@@ -436,7 +465,7 @@ def test_ops_agent_pipeline_skips_missing_reviewer_after_clean_self_check(
     with TestClient(app) as client:
         resp = client.post(
             "/api/v1/pipeline",
-            json={"prompt": "ops agent run"},
+            json={"prompt": "ops agent run", "domain": "algorithm"},
             headers={"Cookie": f"mv_session={session.token}"},
         )
 
@@ -468,7 +497,10 @@ def test_get_run_includes_active_director_after_success(client) -> None:
 
 
 def test_delete_run_removes_active_director(client) -> None:
-    post_resp = client.post("/api/v1/pipeline", json={"prompt": "删除导演脚本"})
+    post_resp = client.post(
+        "/api/v1/pipeline",
+        json={"prompt": "删除导演脚本", "domain": "algorithm"},
+    )
     run_id = post_resp.json()["run_id"]
     assert client.get(f"/api/v1/runs/{run_id}").json()["director"] is not None
 

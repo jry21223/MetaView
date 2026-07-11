@@ -1,0 +1,86 @@
+{
+  "additionalProperties": false,
+  "description": "Canonical capability boundary resolved before content generation.",
+  "properties": {
+    "mode": {
+      "enum": [
+        "specialized",
+        "composable",
+        "experimental",
+        "unsupported"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "domain": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Domain"
+    },
+    "confidence": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "matched_skill_ids": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Matched Skill Ids",
+      "type": "array"
+    },
+    "available_tool_ids": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Available Tool Ids",
+      "type": "array"
+    },
+    "missing_capabilities": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Missing Capabilities",
+      "type": "array"
+    },
+    "fallback_policy": {
+      "enum": [
+        "use_skill",
+        "compose",
+        "limited_visual",
+        "text_only",
+        "reject"
+      ],
+      "title": "Fallback Policy",
+      "type": "string"
+    },
+    "reason": {
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+    }
+  },
+  "required": [
+    "mode",
+    "domain",
+    "confidence",
+    "matched_skill_ids",
+    "available_tool_ids",
+    "missing_capabilities",
+    "fallback_policy",
+    "reason"
+  ],
+  "title": "CoverageDecision",
+  "type": "object"
+}

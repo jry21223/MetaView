@@ -408,6 +408,108 @@
   overflow: auto;
 }
 
+/* ───── Capability resolution diagnostics ───────────────────────────── */
+.mv-coverage-decision {
+  flex: 0 0 auto;
+  margin: 16px 24px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius, 12px);
+  background: var(--surface);
+  color: var(--ink-2);
+}
+
+.mv-coverage-decision[data-coverage-mode='experimental'] {
+  border-left-color: var(--warn, #d89b3c);
+}
+
+.mv-coverage-decision[data-coverage-mode='unsupported'] {
+  border-left-color: var(--mv-status-failed);
+}
+
+.mv-coverage-decision__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.mv-coverage-decision__header strong {
+  color: var(--ink);
+}
+
+.mv-coverage-decision__header code,
+.mv-coverage-decision__list code {
+  color: var(--accent);
+  font: 10px/1.4 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+.mv-coverage-decision__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 10px 0 0;
+}
+
+.mv-coverage-decision__facts > div {
+  display: flex;
+  gap: 6px;
+}
+
+.mv-coverage-decision__facts dt {
+  color: var(--ink-3);
+  font-size: 11px;
+}
+
+.mv-coverage-decision__facts dd {
+  margin: 0;
+  color: var(--ink-2);
+  font: 11px/1.4 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+.mv-coverage-decision__reason {
+  margin: 10px 0 0;
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.mv-coverage-decision__diagnostics {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.mv-coverage-decision__list {
+  display: grid;
+  grid-template-columns: minmax(76px, auto) 1fr;
+  gap: 8px;
+  align-items: start;
+}
+
+.mv-coverage-decision__list > span {
+  color: var(--ink-3);
+  font-size: 11px;
+}
+
+.mv-coverage-decision__list ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mv-coverage-decision__list li {
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--surface) 82%, var(--accent));
+}
+
 /* ───── Canonical backend quality report ─────────────────────────────── */
 .mv-quality-report {
   flex: 0 0 auto;

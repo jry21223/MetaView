@@ -20,6 +20,13 @@ from app.domain.skills.elementary_algebra.spec_extractor import try_extract_elem
 
 logger = logging.getLogger(__name__)
 
+_TASK_CAPABILITY_IDS = {
+    "linear_equation": "elementary_algebra.equation_1var",
+    "quadratic_equation": "elementary_algebra.equation_1var",
+    "inequality": "elementary_algebra.inequality_1var",
+    "factor_expression": "elementary_algebra.factor_expression",
+}
+
 
 class ElementaryAlgebraSkillPack:
     manifest = ELEMENTARY_ALGEBRA_MANIFEST
@@ -32,7 +39,7 @@ class ElementaryAlgebraSkillPack:
             skill_id=self.manifest.skill_id,
             domain=self.manifest.domain,
             confidence=0.86,
-            capability_id=f"elementary_algebra.{spec.task}",
+            capability_id=_TASK_CAPABILITY_IDS[spec.task],
             reason="Detected supported deterministic elementary algebra prompt.",
             problem_spec=spec.model_dump(mode="json"),
         )
@@ -63,7 +70,7 @@ class ElementaryAlgebraSkillPack:
             playbook_json=playbook.model_dump_json(),
             review_actions=[
                 "skill:elementary_algebra",
-                f"skill_capability:elementary_algebra.{spec.task}",
+                f"skill_capability:{_TASK_CAPABILITY_IDS[spec.task]}",
             ],
         )
 

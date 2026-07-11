@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import math
 import re
-from typing import Any
+from typing import Any, Literal
 
 from app.domain.contracts.playbook_contract import SUPPORTED_SNAPSHOT_KIND_SET
+from app.domain.models.coverage import CoverageDecision, CoverageMode
 from app.domain.models.lesson_plan import LessonPlan
 from app.domain.models.playbook import (
     AlgorithmArraySnapshot,
@@ -272,19 +273,24 @@ def quality_gate_playbook(
     prompt: str,
     *,
     generator_path: str,
-    coverage_mode: str = "unknown",
+    coverage_mode: CoverageMode | Literal["unknown"] = "unknown",
+    coverage_decision: CoverageDecision | None = None,
     lesson_plan: LessonPlan | None = None,
 ) -> QualityReport:
     """Run the canonical backend quality gate for a candidate playbook."""
+    effective_coverage_mode = (
+        coverage_decision.mode if coverage_decision is not None else coverage_mode
+    )
     return QualityReport.from_review_verdict(
         _review_playbook(
             playbook,
             prompt,
             enforce_agent_step_bounds=False,
+            coverage_decision=coverage_decision,
             lesson_plan=lesson_plan,
         ),
         generator_path=generator_path,
-        coverage_mode=coverage_mode,
+        coverage_mode=effective_coverage_mode,
     )
 
 
@@ -299,6 +305,7 @@ def self_check_playbook(
         playbook,
         prompt,
         enforce_agent_step_bounds=True,
+        coverage_decision=None,
         lesson_plan=lesson_plan,
     )
 
@@ -308,6 +315,7 @@ def _review_playbook(
     prompt: str,
     *,
     enforce_agent_step_bounds: bool,
+    coverage_decision: CoverageDecision | None,
     lesson_plan: LessonPlan | None,
 ) -> PlaybookCheckReport:
     issues: list[PlaybookReviewIssue] = []
@@ -317,6 +325,8 @@ def _review_playbook(
     _check_domain_quality(playbook, prompt, issues)
     _check_assets(playbook, issues)
     _check_forbidden_rendering_paths(playbook, issues)
+    if coverage_decision is not None:
+        _check_coverage_boundary(coverage_decision, issues)
     if lesson_plan is not None:
         _check_lesson_plan_adherence(playbook, lesson_plan, issues)
     return playbook_review_verdict_from_issues(
@@ -326,6 +336,49 @@ def _review_playbook(
         blocked_summary="Playbook failed API self-check.",
         actions=["agent:self_check"],
     )
+
+
+def _check_coverage_boundary(
+    coverage_decision: CoverageDecision,
+    issues: list[PlaybookReviewIssue],
+) -> None:
+    if coverage_decision.mode != "experimental":
+        return
+    if coverage_decision.fallback_policy == "text_only":
+        issues.append(
+            _issue(
+                "capability.text_only_required",
+                PlaybookIssueSeverity.ERROR,
+                "coverage_decision.fallback_policy",
+                (
+                    "Coverage requires a text-only fallback, but MetaView currently "
+                    "has no separate text-only content output contract."
+                ),
+                (
+                    "Reject this Playbook candidate until a supported text-only product "
+                    "surface exists."
+                ),
+                requires_repair=False,
+            )
+        )
+        return
+    if coverage_decision.fallback_policy == "limited_visual":
+        issues.append(
+            _issue(
+                "capability.limited_visual_unavailable",
+                PlaybookIssueSeverity.ERROR,
+                "coverage_decision.fallback_policy",
+                (
+                    "Coverage requires a limited-visual fallback, but its required visual "
+                    "validation capability is unavailable."
+                ),
+                (
+                    "Reject this Playbook candidate until a validated limited-visual "
+                    "product surface exists."
+                ),
+                requires_repair=False,
+            )
+        )
 
 
 def _check_structure(
@@ -1751,6 +1804,8 @@ def _issue(
     path: str,
     message: str,
     suggestion: str,
+    *,
+    requires_repair: bool | None = None,
 ) -> PlaybookReviewIssue:
     return PlaybookReviewIssue(
         code=code,
@@ -1758,5 +1813,9 @@ def _issue(
         path=path,
         message=message,
         suggestion=suggestion,
-        requires_repair=severity == PlaybookIssueSeverity.ERROR,
+        requires_repair=(
+            severity == PlaybookIssueSeverity.ERROR
+            if requires_repair is None
+            else requires_repair
+        ),
     )
