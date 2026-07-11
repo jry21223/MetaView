@@ -66,6 +66,23 @@ function numberInRange(
     : fallback;
 }
 
+function relativeLuminance(hex: string): number {
+  const channels = [0, 2, 4].map((offset) =>
+    Number.parseInt(hex.slice(offset + 1, offset + 3), 16) / 255,
+  );
+  const linear = channels.map((channel) =>
+    channel <= 0.03928
+      ? channel / 12.92
+      : ((channel + 0.055) / 1.055) ** 2.4,
+  );
+  return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+}
+
+function accentContrastColor(accent: string, fallback: string): string {
+  const safeAccent = isHexColor(accent) ? accent : fallback;
+  return relativeLuminance(safeAccent) > 0.179 ? "#0b0f0d" : "#ffffff";
+}
+
 function sanitizeTweaks(
   candidate: Partial<TweakValues>,
   defaults: TweakValues,
@@ -114,6 +131,7 @@ export function themeVars(t: TweakValues): Record<string, string> {
     // ``t.accent`` defaults to the theme's accent (see useTweaks initializer);
     // users can still override via the color picker.
     "--accent": t.accent,
+    "--accent-contrast": accentContrastColor(t.accent, p.accent),
     "--accent-2": t.accent + "CC",
     "--accent-dim": t.accent + "80",
     "--accent-soft": t.accent + "26",

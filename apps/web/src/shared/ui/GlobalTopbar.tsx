@@ -62,7 +62,7 @@ export function GlobalTopbar({
   hidePrimaryNav = false,
 }: GlobalTopbarProps) {
   const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
-  const isHome = stage === "workbench" || stage === "intake";
+  const isWorkbench = stage === "workbench" || stage === "intake";
   const isHistory = stage === "history";
   const isTemplates = stage === "templates";
   const isSettings = stage === "settings";
@@ -90,15 +90,17 @@ export function GlobalTopbar({
       {!hidePrimaryNav && (
         <nav className="mv-nav">
           <button
-            className={`mv-nav-item ${isHome ? "is-active" : ""}`}
-            aria-current={isHome ? "page" : undefined}
+            className={`mv-nav-item ${isWorkbench ? "is-active" : ""}`}
+            aria-current={isWorkbench ? "page" : undefined}
             onClick={() => onNavigate("intake")}
             type="button"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-              <path d="M4 10.5 12 4l8 6.5V20H5v-7" />
+              <path d="M5 5h14v14H5z" />
+              <path d="M9 5v14" />
+              <path d="M9 10h10" />
             </svg>
-            首页
+            工作台
           </button>
           <button
             className={`mv-nav-item ${isHistory ? "is-active" : ""}`}
@@ -176,9 +178,6 @@ export function GlobalTopbar({
                 </span>
               </>
             ) : (
-              // Configured self edition: a quiet dot is enough. The
-              // unconfigured state stays silent here — provider onboarding
-              // lives in the follow-up panel and submit flow instead.
               <span
                 className="mv-pulse"
                 role="img"

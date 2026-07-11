@@ -41,5 +41,9 @@ describe("useTweaks", () => {
       swapFrames: TWEAK_DEFAULTS.swapFrames,
     });
     expect(themeVars(tweaks)["--accent"]).toBe(THEME_PALETTE.light.accent);
+    expect(themeVars(tweaks)["--accent-contrast"]).toBe("#0b0f0d");
+    expect(
+      themeVars({ ...tweaks, accent: "#111111" })["--accent-contrast"],
+    ).toBe("#ffffff");
   });
 });

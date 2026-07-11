@@ -92,7 +92,7 @@ export function SelfAppShell() {
 
   useEffect(() => {
     if (stage === "intake" && intakePrompt) {
-      routerNavigate("/", { replace: true, state: null });
+      routerNavigate("/create", { replace: true, state: null });
     }
   }, [stage, intakePrompt, routerNavigate]);
 
@@ -145,7 +145,7 @@ export function SelfAppShell() {
 
   const handleEditPrompt = (prompt: string) => {
     setTopbarCollapsed(false);
-    routerNavigate("/", { state: { prompt } });
+    routerNavigate("/create", { state: { prompt } });
   };
 
   const handleUseTemplate = async (prompt: string) => {
@@ -177,7 +177,7 @@ export function SelfAppShell() {
 
       <Routes>
         <Route
-          path="/"
+          path="/create"
           element={
             <IntakeScreen
               onSubmit={handleSubmit}
@@ -207,7 +207,7 @@ export function SelfAppShell() {
             </ErrorBoundary>
           }
         />
-        <Route path="/run" element={<Navigate to="/" replace />} />
+        <Route path="/run" element={<Navigate to="/create" replace />} />
         <Route
           path="/history"
           element={

@@ -42,8 +42,8 @@ describe("GlobalTopbar account avatar", () => {
     const { queryByText } = render(<GlobalTopbar {...baseProps} stage="workbench" appEdition="ops" />);
 
     expect(queryByText("运营面板")).toBeFalsy();
-    expect(queryByText("首页")).toBeTruthy();
-    expect(queryByText("工作台")).toBeNull();
+    expect(queryByText("工作台")).toBeTruthy();
+    expect(queryByText("首页")).toBeNull();
     expect(queryByText("任务历史")).toBeTruthy();
     expect(queryByText("模板")).toBeTruthy();
     expect(queryByText("设置")).toBeTruthy();
@@ -60,7 +60,7 @@ describe("GlobalTopbar account avatar", () => {
     );
 
     expect(getByText("MetaView")).toBeTruthy();
-    expect(queryByText("首页")).toBeNull();
+    expect(queryByText("工作台")).toBeNull();
     expect(queryByText("任务历史")).toBeNull();
     expect(queryByText("模板")).toBeNull();
     expect(queryByText("设置")).toBeNull();
@@ -82,7 +82,7 @@ describe("GlobalTopbar account avatar", () => {
       <GlobalTopbar {...baseProps} onNavigate={onNavigate} />,
     );
 
-    fireEvent.click(getByRole("button", { name: "首页" }));
+    fireEvent.click(getByRole("button", { name: "工作台" }));
     fireEvent.click(getByRole("button", { name: "任务历史" }));
     fireEvent.click(getByRole("button", { name: "模板" }));
     fireEvent.click(getByRole("button", { name: "设置" }));

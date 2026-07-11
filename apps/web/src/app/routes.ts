@@ -10,9 +10,9 @@ function normalizePath(pathname: string): string {
 export function stageToPath(stage: Stage, runId?: string | null): string {
   switch (stage) {
     case "intake":
-      return "/";
+      return "/create";
     case "workbench":
-      return runId ? `/run/${encodeURIComponent(runId)}` : "/";
+      return runId ? `/run/${encodeURIComponent(runId)}` : "/create";
     case "history":
       return "/history";
     case "templates":
@@ -24,7 +24,7 @@ export function stageToPath(stage: Stage, runId?: string | null): string {
 
 export function pathToStage(pathname: string): Stage {
   const path = normalizePath(pathname);
-  if (path === "/") return "intake";
+  if (path === "/create") return "intake";
   if (path.startsWith("/run/") && path.length > "/run/".length) return "workbench";
   if (path === "/history") return "history";
   if (path === "/templates") return "templates";
