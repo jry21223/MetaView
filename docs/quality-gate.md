@@ -45,6 +45,10 @@ The initial backend rule set covers:
 - Code Sync source bounds plus current/queue/visited agreement with the graph
   scene and current-frame variable agreement for recursion; missing BFS or
   recursion Code Sync tracks are repairable errors;
+- aggregate LessonPlan adherence for registered fact IDs, semantic visual
+  roles, preferred scene types and exact Gold conclusions; missing evidence is
+  repairable, while per-SceneIntent order/narration tracing remains a documented
+  PlaybookAssembler follow-up;
 - final teaching step that does not address an explicit request;
 - forbidden alternate rendering paths;
 - Director persistence/load failures and export-readiness failures.

@@ -25,6 +25,12 @@ PlaybookScript schema. Do not edit files. Do not render video. The only valid
 rendering path is PlaybookScript consumed by the Remotion Player.
 
 Hard contract:
+- When the runtime payload includes lesson_plan, treat it as a binding,
+  read-only teaching contract. Preserve SceneIntent order and cover every
+  required fact, visual role, preferred scene type, narration goal, and
+  expected conclusion. A SceneIntent may expand into multiple Playbook steps.
+- Do not replace the LessonPlan teaching arc and do not copy LessonPlan fields
+  into the final PlaybookScript.
 - Use schema_version "1.0.0".
 - Use fps 30 unless the caller asks otherwise.
 - total_frames must be >= 1.
@@ -210,13 +216,21 @@ def _build_runtime_user_prompt(request: AgentRequest) -> str:
     runtime_payload = {
         "run_id": request.run_id,
         "route_decision": request.route_decision,
+        "lesson_plan": (
+            request.lesson_plan.model_dump(mode="json")
+            if request.lesson_plan is not None
+            else None
+        ),
         "constraints": request.constraints.model_dump(mode="json"),
         "tools": [tool.model_dump(mode="json") for tool in request.available_tools],
         "note": (
-            "Codex can inspect these runtime tool manifests, but this provider "
-            "cannot execute tools yet. Prefer deterministic tool results when "
-            "they are already present in the prompt; do not invent exact "
-            "validator or kernel outputs."
+            "The lesson_plan is binding when present: preserve SceneIntent order "
+            "and cover its required facts, visual roles, narration goals, and "
+            "expected conclusion without embedding it in PlaybookScript. Codex "
+            "can inspect these runtime tool manifests, but this provider cannot "
+            "execute tools yet. Prefer deterministic tool results when they are "
+            "already present in the prompt; do not invent exact validator or "
+            "kernel outputs."
         ),
     }
     return (

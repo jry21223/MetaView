@@ -136,6 +136,12 @@ def _scores_from_verdict(verdict: PlaybookReviewVerdict) -> dict[str, float]:
             keys = ["scene_contract", "visual_structure", "export_readiness"]
         elif issue.code.startswith(("math.", "algorithm.")):
             keys = ["knowledge_correctness", "visual_structure"]
+        elif issue.code.startswith("lesson_plan.visual_role"):
+            keys = ["prompt_coverage", "scene_contract", "visual_structure"]
+        elif issue.code.startswith("lesson_plan.scene_type"):
+            keys = ["scene_contract", "visual_structure", "export_readiness"]
+        elif issue.code.startswith("lesson_plan."):
+            keys = ["knowledge_correctness", "prompt_coverage", "pedagogy"]
         elif issue.code.startswith("code."):
             keys = ["knowledge_correctness", "visual_structure", "code_sync"]
         elif issue.code.startswith(("narration.", "step.")):

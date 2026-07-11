@@ -25,6 +25,7 @@ class _RecordingRepo:
     def __init__(self) -> None:
         self.updates: list[dict[str, Any]] = []
         self.quality_reports: list[dict[str, Any]] = []
+        self.lesson_plans: list[dict[str, Any]] = []
 
     async def create(self, run_id: str, prompt: str, created_at: str) -> None:
         return None
@@ -41,6 +42,11 @@ class _RecordingRepo:
     async def update_quality_report(self, run_id: str, quality_report_json: str) -> None:
         self.quality_reports.append(
             {"run_id": run_id, "report": json.loads(quality_report_json)}
+        )
+
+    async def update_lesson_plan(self, run_id: str, lesson_plan_json: str) -> None:
+        self.lesson_plans.append(
+            {"run_id": run_id, "lesson_plan": json.loads(lesson_plan_json)}
         )
 
 
@@ -298,7 +304,8 @@ async def test_agent_mode_routes_to_agent_provider() -> None:
 
     await use_case.execute("run-1", PipelineRequest(prompt="hello math"))
 
-    assert agent.calls[0]["prompt"] == "hello math"
+    assert "[MetaView LessonPlan]" in agent.calls[0]["prompt"]
+    assert agent.calls[0]["prompt"].endswith("[user prompt]\nhello math")
     assert agent.calls[0]["provider_config"] is None
     assert agent.calls[0]["route_decision"]["destination"] == "generic_cir"
     # The final update must carry the persisted playbook JSON.
@@ -335,7 +342,10 @@ async def test_agent_mode_calls_wide_run_contract_when_available() -> None:
         reviewer_mode="off",
     )
 
-    await use_case.execute("run-wide", PipelineRequest(prompt="hello math"))
+    await use_case.execute(
+        "run-wide",
+        PipelineRequest(prompt="hello math", domain="math"),
+    )
 
     request = agent.requests[0]
     assert request.run_id == "run-wide"
@@ -343,6 +353,9 @@ async def test_agent_mode_calls_wide_run_contract_when_available() -> None:
     assert request.route_decision["destination"] == "generic_cir"
     assert request.playbook_schema["title"] == "PlaybookScript"
     assert "playbook.schema.validate" in {tool.name for tool in request.available_tools}
+    assert request.lesson_plan is not None
+    assert request.lesson_plan.domain == "math"
+    assert repo.lesson_plans[-1]["lesson_plan"] == request.lesson_plan.model_dump(mode="json")
     assert repo.updates[-1]["status"].value == "succeeded"
 
 

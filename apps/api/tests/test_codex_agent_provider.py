@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
 import types
 from pathlib import Path
@@ -11,6 +12,7 @@ import pytest
 
 from app.application.agent.types import AgentConstraints, AgentRequest, ToolManifest
 from app.application.ports.agent_provider import AgentProviderError
+from app.domain.models.lesson_plan import LessonPlan, SceneIntent
 from app.domain.models.playbook import PlaybookScript
 from app.infrastructure.agent.codex_agent_provider import (
     CodexAgentProvider,
@@ -50,6 +52,30 @@ _PLAYBOOK_JSON = """{
   ],
   "parameter_controls": []
 }"""
+
+
+def _lesson_plan() -> LessonPlan:
+    return LessonPlan(
+        schema_version="1.0.0",
+        domain="math",
+        title="LESSON_PLAN_ONLY_MARKER",
+        learning_objectives=["Connect a line equation to its graph."],
+        prerequisites=["Know the coordinate plane."],
+        misconceptions=["A line equation describes only one point."],
+        expected_conclusion="The graph of y=x is a straight line through the origin.",
+        lesson_arc="intuition_to_abstraction",
+        scenes=[
+            SceneIntent(
+                scene_id="line_graph",
+                teaching_goal="Relate equal x and y values to the diagonal line.",
+                strategy="demonstration",
+                required_fact_ids=["line_identity"],
+                required_visual_roles=["axis", "line"],
+                preferred_scene_type="line_graph",
+                narration_goal="Explain why every point on the line has x equal to y.",
+            )
+        ],
+    )
 
 
 class _FakeThread:
@@ -223,6 +249,7 @@ async def test_codex_provider_run_includes_tool_manifests_and_returns_agent_resu
             source_code=None,
             language=None,
             route_decision={"destination": "generic_cir"},
+            lesson_plan=_lesson_plan(),
             provider_config=None,
             playbook_schema={"type": "object"},
             constraints=AgentConstraints(max_self_repair_attempts=2),
@@ -242,8 +269,15 @@ async def test_codex_provider_run_includes_tool_manifests_and_returns_agent_resu
     prompt = fake.thread.run_calls[0]["input"]
     assert "[MetaView runtime tools]" in prompt
     assert "playbook.schema.validate" in prompt
+    assert '"lesson_plan"' in prompt
+    assert "lesson_plan is binding" in prompt
+    assert "LESSON_PLAN_ONLY_MARKER" in prompt
+    instructions = fake.thread_start_calls[0]["developer_instructions"]
+    assert "binding" in instructions
+    assert "Preserve SceneIntent order" in instructions
     assert result.provider == "codex"
     assert result.playbook["title"] == "Line"
+    assert "LESSON_PLAN_ONLY_MARKER" not in json.dumps(result.playbook)
     assert result.runtime_events[0]["event"] == "codex.tool_execution_unavailable"
 
 

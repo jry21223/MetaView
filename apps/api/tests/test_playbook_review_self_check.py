@@ -4,6 +4,7 @@ from copy import deepcopy
 
 import pytest
 
+from app.application.services.lesson_planner import build_rule_based_lesson_plan
 from app.domain.models.playbook import PlaybookScript
 from app.domain.models.review import PlaybookReviewStatus
 from app.domain.services.playbook_quality import quality_gate_playbook
@@ -133,11 +134,354 @@ def _bfs_playbook(*, skip_f_checkpoint: bool = False, include_code_sync: bool = 
     )
 
 
+def _derivative_playbook(
+    *,
+    final_value: str = "2",
+    include_secant: bool = True,
+    include_early_correct_conclusion: bool = False,
+) -> PlaybookScript:
+    payload = _valid_playbook().model_dump(mode="json")
+    payload["domain"] = "math"
+    payload["title"] = "从割线到切线"
+    payload["summary"] = "观察割线靠近目标点，再得到切线斜率。"
+    for index, step in enumerate(payload["steps"]):
+        is_final = index == len(payload["steps"]) - 1
+        curves = [
+            {
+                "expression": "x^2",
+                "label": "y=x²",
+                "semantic_role": "curve",
+            }
+        ]
+        if is_final:
+            curves.append(
+                {
+                    "expression": f"{final_value}*x-1",
+                    "label": f"切线斜率 = {final_value}",
+                    "semantic_role": "tangent",
+                }
+            )
+            formula = f"f'(1)={final_value}"
+            voiceover = f"最终导数与切线斜率都等于 {final_value}。"
+        else:
+            if include_secant:
+                curves.append(
+                    {
+                        "expression": "(2+h)*x-(1+h)",
+                        "label": "comparison line" if index else "割线斜率 = 2+h",
+                        "semantic_role": "secant",
+                    }
+                )
+            formula = "f'(1)=2" if include_early_correct_conclusion and index == 0 else "m_h=2+h"
+            voiceover = "让割线逐步靠近目标点，观察斜率的变化。"
+        snapshot = {
+            "kind": "math_plot",
+            "curves": curves,
+            "params": {"h": max(0.1, 1 - index / 10)},
+            "marker_x": 1,
+            "formula_latex": formula,
+            "caption": "目标点是 (1,1)。",
+        }
+        step["title"] = "总结" if is_final else f"割线状态 {index + 1}"
+        step["voiceover_text"] = voiceover
+        step["snapshot"] = deepcopy(snapshot)
+        step["layers"] = [{"body": deepcopy(snapshot)}]
+        step["code_highlight"] = None
+    return PlaybookScript.model_validate(payload)
+
+
 def test_playbook_self_check_returns_clean_for_renderer_ready_script() -> None:
     verdict = review_playbook_script(_valid_playbook(), prompt="Explain binary search.")
 
     assert verdict.status == PlaybookReviewStatus.CLEAN
     assert verdict.issues == []
+
+
+def test_canonical_gate_blocks_playbook_that_ignores_lesson_plan() -> None:
+    lesson_plan = build_rule_based_lesson_plan(
+        prompt="用二叉树演示广度优先遍历的访问顺序，逐层点亮节点。",
+        domain="algorithm",
+    )
+
+    report = quality_gate_playbook(
+        _valid_playbook(),
+        "Explain binary search.",
+        generator_path="test",
+        lesson_plan=lesson_plan,
+    )
+
+    assert report.status == "repairable"
+    assert {issue.code for issue in report.issues} >= {
+        "lesson_plan.fact_missing",
+        "lesson_plan.visual_role_missing",
+        "lesson_plan.scene_type_missing",
+    }
+
+
+def test_canonical_gate_accepts_playbook_with_lesson_plan_evidence() -> None:
+    prompt = "用二叉树演示广度优先遍历的访问顺序，逐层点亮节点。"
+    lesson_plan = build_rule_based_lesson_plan(prompt=prompt, domain="algorithm")
+
+    report = quality_gate_playbook(
+        _bfs_playbook(),
+        prompt,
+        generator_path="test",
+        lesson_plan=lesson_plan,
+    )
+
+    assert not any(issue.code.startswith("lesson_plan.") for issue in report.issues)
+
+
+def test_lesson_plan_visual_role_cannot_be_satisfied_by_narration_only() -> None:
+    prompt = "用图像解释曲线 y=x^2 在点 (1,1) 处的导数，从割线过渡到切线。"
+    payload = _derivative_playbook(include_secant=False).model_dump(mode="json")
+    for step in payload["steps"]:
+        step["snapshot"]["params"]["secant"] = 1.0
+        step["snapshot"]["caption"] = "这里只讨论割线，快照中没有对应曲线。"
+        step["layers"] = [{"body": deepcopy(step["snapshot"])}]
+    report = quality_gate_playbook(
+        PlaybookScript.model_validate(payload),
+        prompt,
+        generator_path="test",
+        lesson_plan=build_rule_based_lesson_plan(prompt=prompt, domain="math"),
+    )
+
+    missing_paths = {
+        issue.path
+        for issue in report.issues
+        if issue.code == "lesson_plan.visual_role_missing"
+    }
+    assert "lesson_plan.required_visual_roles.secant" in missing_paths
+
+
+def test_lesson_plan_conclusion_does_not_match_numeric_prefix() -> None:
+    prompt = "用图像解释曲线 y=x^2 在点 (1,1) 处的导数，从割线过渡到切线。"
+    report = quality_gate_playbook(
+        _derivative_playbook(final_value="2.5"),
+        prompt,
+        generator_path="test",
+        lesson_plan=build_rule_based_lesson_plan(prompt=prompt, domain="math"),
+    )
+
+    assert "lesson_plan.conclusion_conflict" in {issue.code for issue in report.issues}
+
+
+@pytest.mark.parametrize("expression", ["2+1", "2 / 10"])
+def test_lesson_plan_conclusion_rejects_unevaluated_expression(expression: str) -> None:
+    prompt = "用图像解释曲线 y=x^2 在点 (1,1) 处的导数，从割线过渡到切线。"
+    report = quality_gate_playbook(
+        _derivative_playbook(final_value=expression),
+        prompt,
+        generator_path="test",
+        lesson_plan=build_rule_based_lesson_plan(prompt=prompt, domain="math"),
+    )
+
+    assert "lesson_plan.conclusion_missing" in {issue.code for issue in report.issues}
+
+
+def test_lesson_plan_conclusion_ignores_negated_value() -> None:
+    prompt = "用图像解释曲线 y=x^2 在点 (1,1) 处的导数，从割线过渡到切线。"
+    payload = _derivative_playbook().model_dump(mode="json")
+    payload["steps"][-1]["voiceover_text"] = "最终导数不等于 3，而是 2。"
+    playbook = PlaybookScript.model_validate(payload)
+    report = quality_gate_playbook(
+        playbook,
+        prompt,
+        generator_path="test",
+        lesson_plan=build_rule_based_lesson_plan(prompt=prompt, domain="math"),
+    )
+
+    assert "lesson_plan.conclusion_conflict" not in {issue.code for issue in report.issues}
+    assert "lesson_plan.conclusion_missing" not in {issue.code for issue in report.issues}
+
+
+def test_lesson_plan_conclusion_does_not_treat_coordinate_as_result() -> None:
+    prompt = "用图像解释曲线 y=x^2 在点 (1,1) 处的导数，从割线过渡到切线。"
+    payload = _derivative_playbook().model_dump(mode="json")
+    payload["steps"][-1]["voiceover_text"] = (
+        "切线斜率是 2。因为导数定义给出 x=1 处的瞬时斜率 m=2。"
+    )
+    report = quality_gate_playbook(
+        PlaybookScript.model_validate(payload),
+        prompt,
+        generator_path="test",
+        lesson_plan=build_rule_based_lesson_plan(prompt=prompt, domain="math"),
+    )
+
+    assert "lesson_plan.conclusion_conflict" not in {issue.code for issue in report.issues}
+
+
+def test_lesson_plan_conclusion_uses_final_scene_not_earlier_correct_value() -> None:
+    prompt = "用图像解释曲线 y=x^2 在点 (1,1) 处的导数，从割线过渡到切线。"
+    report = quality_gate_playbook(
+        _derivative_playbook(final_value="3", include_early_correct_conclusion=True),
+        prompt,
+        generator_path="test",
+        lesson_plan=build_rule_based_lesson_plan(prompt=prompt, domain="math"),
+    )
+
+    assert "lesson_plan.conclusion_conflict" in {issue.code for issue in report.issues}
+
+
+def test_lesson_plan_visual_roles_accept_canonical_recursion_snapshot_fields() -> None:
+    prompt = "逐行追踪 factorial(4) 的递归调用栈、压栈和回溯返回值。"
+    lesson_plan = build_rule_based_lesson_plan(prompt=prompt, domain="code")
+    payload = _valid_playbook().model_dump(mode="json")
+    payload["domain"] = "code"
+    payload["title"] = "factorial(4) 递归调用栈"
+    payload["summary"] = "展示 recursive call、base case 和 return unwind。"
+    for index, step in enumerate(payload["steps"]):
+        is_final = index == len(payload["steps"]) - 1
+        variables = {"n": "4", **({"return": "24"} if is_final else {})}
+        snapshot = {
+            "kind": "call_stack_scene",
+            "frames": [
+                {
+                    "id": "factorial-4",
+                    "label": "factorial(4)",
+                    "state": "returned" if is_final else "active",
+                    "variables": variables,
+                }
+            ],
+            "code_trace": {
+                "language": "python",
+                "lines": [
+                    "def factorial(n):",
+                    "    if n <= 1:  # base case",
+                    "        return 1",
+                    "    return n * factorial(n - 1)  # recursive call",
+                ],
+                "active_lines": [2 if is_final else 3],
+                "active_line": 2 if is_final else 3,
+            },
+            "current_frame_id": "factorial-4",
+            "caption": (
+                "阶乘结果 factorial(4)=24，返回值完成回溯。"
+                if is_final
+                else "递归调用进入 active frame，等待 return unwind。"
+            ),
+        }
+        step["title"] = "最终返回" if is_final else f"递归状态 {index + 1}"
+        step["voiceover_text"] = (
+            "factorial(4)=24，base case 返回后逐层回溯。"
+            if is_final
+            else "recursive call 创建栈帧，base case 后 return unwind。"
+        )
+        step["snapshot"] = deepcopy(snapshot)
+        step["layers"] = [{"body": deepcopy(snapshot)}]
+        step["code_highlight"] = {
+            "language": "python",
+            "lines": snapshot["code_trace"]["lines"],
+            "active_lines": snapshot["code_trace"]["active_lines"],
+            "active_line": snapshot["code_trace"]["active_line"],
+            "variables": variables,
+        }
+    report = quality_gate_playbook(
+        PlaybookScript.model_validate(payload),
+        prompt,
+        generator_path="test",
+        lesson_plan=lesson_plan,
+    )
+
+    assert not any(
+        issue.code == "lesson_plan.visual_role_missing" for issue in report.issues
+    )
+
+    for step in payload["steps"]:
+        frame = step["snapshot"]["frames"][0]
+        frame["state"] = "waiting"
+        frame["variables"].pop("return", None)
+        step["snapshot"]["caption"] = "调用栈仍包含 Python return 代码行。"
+        step["layers"] = [{"body": deepcopy(step["snapshot"])}]
+        step["code_highlight"]["variables"] = {"n": "4"}
+    missing_report = quality_gate_playbook(
+        PlaybookScript.model_validate(payload),
+        prompt,
+        generator_path="test",
+        lesson_plan=lesson_plan,
+    )
+
+    assert any(
+        issue.code == "lesson_plan.visual_role_missing"
+        and issue.path == "lesson_plan.required_visual_roles.return_value"
+        for issue in missing_report.issues
+    )
+
+
+def test_lesson_plan_visual_roles_accept_canonical_projectile_vector_fields() -> None:
+    prompt = "演示平抛运动：水平速度不变、竖直速度受重力改变，并画出抛物线轨迹。"
+    lesson_plan = build_rule_based_lesson_plan(prompt=prompt, domain="physics")
+    payload = _valid_playbook().model_dump(mode="json")
+    payload["domain"] = "physics"
+    payload["title"] = "平抛运动"
+    payload["summary"] = "水平速度和竖直速度在重力下合成抛物线轨迹。"
+    snapshot = {
+        "kind": "physics_force_scene",
+        "objects": [{"id": "projectile", "label": "抛体", "x": 14, "y": 22}],
+        "vectors": [
+            {
+                "id": "velocity-x",
+                "target": "projectile",
+                "semantic_role": "velocity",
+                "dx": 16,
+                "dy": 0,
+                "label": "v_x",
+            },
+            {
+                "id": "velocity-y",
+                "target": "projectile",
+                "semantic_role": "velocity",
+                "dx": 0,
+                "dy": 8,
+                "label": "v_y",
+            },
+            {
+                "id": "gravity",
+                "target": "projectile",
+                "semantic_role": "acceleration",
+                "dx": 0,
+                "dy": 12,
+                "label": "g",
+            },
+        ],
+        "trajectory": [[14, 22], [24, 24], [34, 30], [44, 40]],
+        "caption": "v_x 保持不变，v_y 受重力改变，轨迹为抛物线。",
+    }
+    for index, step in enumerate(payload["steps"]):
+        step["title"] = f"平抛状态 {index + 1}"
+        step["voiceover_text"] = "水平速度不变，竖直速度受重力改变并形成抛物线。"
+        step["snapshot"] = deepcopy(snapshot)
+        step["layers"] = [{"body": deepcopy(snapshot)}]
+        step["code_highlight"] = None
+    report = quality_gate_playbook(
+        PlaybookScript.model_validate(payload),
+        prompt,
+        generator_path="test",
+        lesson_plan=lesson_plan,
+    )
+
+    assert not any(
+        issue.code == "lesson_plan.visual_role_missing" for issue in report.issues
+    )
+
+    for step in payload["steps"]:
+        step["snapshot"]["vectors"] = [
+            vector for vector in step["snapshot"]["vectors"] if vector["id"] != "gravity"
+        ]
+        step["snapshot"]["caption"] = "v_x 与 v_y 合成 trajectory。"
+        step["layers"] = [{"body": deepcopy(step["snapshot"])}]
+    missing_report = quality_gate_playbook(
+        PlaybookScript.model_validate(payload),
+        prompt,
+        generator_path="test",
+        lesson_plan=lesson_plan,
+    )
+
+    assert any(
+        issue.code == "lesson_plan.visual_role_missing"
+        and issue.path == "lesson_plan.required_visual_roles.gravity"
+        for issue in missing_report.issues
+    )
 
 
 @pytest.mark.parametrize(

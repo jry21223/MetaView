@@ -36,6 +36,8 @@ class IRunRepository(Protocol):
 
     async def update_quality_report(self, run_id: str, quality_report_json: str) -> None: ...
 
+    async def update_lesson_plan(self, run_id: str, lesson_plan_json: str) -> None: ...
+
     async def list(
         self,
         limit: int = 50,

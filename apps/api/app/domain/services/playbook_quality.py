@@ -5,6 +5,7 @@ import re
 from typing import Any
 
 from app.domain.contracts.playbook_contract import SUPPORTED_SNAPSHOT_KIND_SET
+from app.domain.models.lesson_plan import LessonPlan
 from app.domain.models.playbook import (
     AlgorithmArraySnapshot,
     AlgorithmBarsSnapshot,
@@ -196,6 +197,72 @@ _FORBIDDEN_RENDERING_PATTERNS = (
     "ffmpeg",
 )
 
+_LESSON_FACT_ALIASES: dict[str, tuple[str, ...]] = {
+    "derivative": ("derivative", "导数", "f'", "f′"),
+    "tangent": ("tangent", "切线"),
+    "slope": ("slope", "斜率"),
+    "breadth_first": ("bfs", "breadth-first", "breadth first", "广度优先"),
+    "queue": ("queue", "frontier", "队列"),
+    "visited": ("visited", "已访问", "访问集合"),
+    "order": ("visit_order", "visit order", "layer by layer", "访问顺序", "逐层"),
+    "factorial": ("factorial", "阶乘"),
+    "base_case": ("base_case", "base case", "基例", "递归出口"),
+    "recursive_call": ("recursive_call", "recursive call", "递归调用"),
+    "return_unwind": ("return_unwind", "unwind", "回溯", "返回"),
+    "factorial_result": ("factorial_result", "return_value", "返回值", "阶乘结果"),
+    "horizontal_velocity": (
+        "horizontal_velocity",
+        "horizontal velocity",
+        "velocity-x",
+        "v_x",
+        "水平速度",
+    ),
+    "vertical_velocity": (
+        "vertical_velocity",
+        "vertical velocity",
+        "velocity-y",
+        "v_y",
+        "竖直速度",
+    ),
+    "gravity": ("gravity", "重力", "g向下"),
+    "parabolic": ("parabolic", "parabola", "抛物线"),
+}
+
+_LESSON_VISUAL_ROLE_ALIASES: dict[str, tuple[str, ...]] = {
+    "curve": ("curves", "curve", "expression"),
+    "target_point": ("target_point", "marker_x", "point"),
+    "secant": ("secant", "割线"),
+    "tangent": ("tangent", "切线"),
+    "slope": ("slope", "斜率"),
+    "node": ("nodes", "node_ids", "node"),
+    "edge": ("edges", "edge"),
+    "current_node": (
+        "current",
+        "current_node",
+        "current_node_id",
+        "active_node",
+        "active_node_ids",
+    ),
+    "visited": ("visited", "visited_node_ids"),
+    "queue": ("queue", "queue_node_ids", "frontier", "frontier_node_ids"),
+    "stack_frame": ("frames", "stack_frame", "call_stack"),
+    "active_frame": ("active_frame", "active_frame_id", "current_frame_id"),
+    "code_line": ("code_trace", "active_line", "code_lines"),
+    "return_value": ("return_value", "returned_value", "result", "return", "returned"),
+    "object": ("objects", "object", "body_id"),
+    "trajectory": ("trajectory", "path_points", "trail"),
+    "horizontal_velocity": ("horizontal_velocity", "velocity-x", "v_x", "vx"),
+    "vertical_velocity": ("vertical_velocity", "velocity-y", "v_y", "vy"),
+    "gravity": ("gravity", "acceleration", "g"),
+}
+
+_LESSON_SCENE_SNAPSHOT_KINDS: dict[str, frozenset[str]] = {
+    "derivative_tangent": frozenset(("math_plot", "math_scene")),
+    "bfs_graph": frozenset(("graph_scene", "algorithm_tree")),
+    "recursion_stack": frozenset(("call_stack_scene",)),
+    "projectile_motion": frozenset(("physics_force_scene", "motion_scene", "math_scene")),
+}
+
 
 PlaybookCheckReport = PlaybookReviewVerdict
 
@@ -206,18 +273,34 @@ def quality_gate_playbook(
     *,
     generator_path: str,
     coverage_mode: str = "unknown",
+    lesson_plan: LessonPlan | None = None,
 ) -> QualityReport:
     """Run the canonical backend quality gate for a candidate playbook."""
     return QualityReport.from_review_verdict(
-        _review_playbook(playbook, prompt, enforce_agent_step_bounds=False),
+        _review_playbook(
+            playbook,
+            prompt,
+            enforce_agent_step_bounds=False,
+            lesson_plan=lesson_plan,
+        ),
         generator_path=generator_path,
         coverage_mode=coverage_mode,
     )
 
 
-def self_check_playbook(playbook: PlaybookScript, prompt: str) -> PlaybookCheckReport:
+def self_check_playbook(
+    playbook: PlaybookScript,
+    prompt: str,
+    *,
+    lesson_plan: LessonPlan | None = None,
+) -> PlaybookCheckReport:
     """Strict agent pre-check; final success still goes through ``quality_gate_playbook``."""
-    return _review_playbook(playbook, prompt, enforce_agent_step_bounds=True)
+    return _review_playbook(
+        playbook,
+        prompt,
+        enforce_agent_step_bounds=True,
+        lesson_plan=lesson_plan,
+    )
 
 
 def _review_playbook(
@@ -225,6 +308,7 @@ def _review_playbook(
     prompt: str,
     *,
     enforce_agent_step_bounds: bool,
+    lesson_plan: LessonPlan | None,
 ) -> PlaybookCheckReport:
     issues: list[PlaybookReviewIssue] = []
     _check_structure(playbook, issues, enforce_step_bounds=enforce_agent_step_bounds)
@@ -233,6 +317,8 @@ def _review_playbook(
     _check_domain_quality(playbook, prompt, issues)
     _check_assets(playbook, issues)
     _check_forbidden_rendering_paths(playbook, issues)
+    if lesson_plan is not None:
+        _check_lesson_plan_adherence(playbook, lesson_plan, issues)
     return playbook_review_verdict_from_issues(
         issues,
         clean_summary="Playbook passed API self-check.",
@@ -1225,6 +1311,378 @@ def _check_forbidden_rendering_paths(
                     "Use only PlaybookScript consumed by the frontend Remotion renderer.",
                 )
             )
+
+
+def _check_lesson_plan_adherence(
+    playbook: PlaybookScript,
+    lesson_plan: LessonPlan,
+    issues: list[PlaybookReviewIssue],
+) -> None:
+    evidence = _lesson_plan_evidence(playbook)
+    visual_tokens = _lesson_plan_visual_tokens(playbook)
+    required_facts = {
+        fact_id for scene in lesson_plan.scenes for fact_id in scene.required_fact_ids
+    }
+    required_roles = {
+        role for scene in lesson_plan.scenes for role in scene.required_visual_roles
+    }
+
+    for fact_id in sorted(required_facts):
+        aliases = _LESSON_FACT_ALIASES.get(fact_id)
+        if aliases is None:
+            issues.append(
+                _issue(
+                    "lesson_plan.fact_unverifiable",
+                    PlaybookIssueSeverity.WARNING,
+                    f"lesson_plan.required_fact_ids.{fact_id}",
+                    f"Required fact {fact_id!r} has no deterministic evidence matcher yet.",
+                    (
+                        "Register a deterministic fact check before treating this "
+                        "fact as verified."
+                    ),
+                )
+            )
+        elif not _contains_lesson_alias(evidence, aliases):
+            issues.append(
+                _issue(
+                    "lesson_plan.fact_missing",
+                    PlaybookIssueSeverity.ERROR,
+                    f"lesson_plan.required_fact_ids.{fact_id}",
+                    f"Playbook does not provide evidence for required fact {fact_id!r}.",
+                    "Repair the relevant scene and narration to cover this LessonPlan fact.",
+                )
+            )
+
+    for role in sorted(required_roles):
+        aliases = _LESSON_VISUAL_ROLE_ALIASES.get(role)
+        if aliases is None:
+            continue
+        if not _contains_lesson_visual_alias(visual_tokens, aliases):
+            issues.append(
+                _issue(
+                    "lesson_plan.visual_role_missing",
+                    PlaybookIssueSeverity.ERROR,
+                    f"lesson_plan.required_visual_roles.{role}",
+                    f"Playbook does not render required visual role {role!r}.",
+                    "Compile a scene containing this semantic visual role.",
+                )
+            )
+
+    snapshot_kinds = {step.snapshot.kind for step in playbook.steps}
+    preferred_scene_types = {
+        scene.preferred_scene_type
+        for scene in lesson_plan.scenes
+        if scene.preferred_scene_type is not None
+    }
+    for scene_type in sorted(preferred_scene_types):
+        accepted_kinds = _LESSON_SCENE_SNAPSHOT_KINDS.get(scene_type)
+        if accepted_kinds is None:
+            continue
+        if snapshot_kinds.isdisjoint(accepted_kinds):
+            issues.append(
+                _issue(
+                    "lesson_plan.scene_type_missing",
+                    PlaybookIssueSeverity.ERROR,
+                    f"lesson_plan.preferred_scene_type.{scene_type}",
+                    f"Playbook does not contain a renderer for scene type {scene_type!r}.",
+                    "Use a compatible SceneBlueprint or renderer-backed snapshot kind.",
+                )
+            )
+
+    _check_lesson_plan_exact_conclusion(
+        lesson_plan,
+        _lesson_plan_final_evidence(playbook),
+        required_facts,
+        issues,
+    )
+
+
+def _check_lesson_plan_exact_conclusion(
+    lesson_plan: LessonPlan,
+    final_evidence: str,
+    required_facts: set[str],
+    issues: list[PlaybookReviewIssue],
+) -> None:
+    if "factorial_result" in required_facts:
+        conclusion = re.sub(r"\s+", "", lesson_plan.expected_conclusion.casefold())
+        match = re.search(r"factorial\((\d+)\)=(\d+)", conclusion)
+        if match:
+            n, result = match.groups()
+            actual_values = _factorial_conclusion_values(final_evidence, n)
+            _check_exact_numeric_conclusion(
+                expected_value=float(result),
+                actual_values=actual_values,
+                required_marker=match.group(0),
+                issues=issues,
+            )
+    elif {"derivative", "tangent", "slope"} <= required_facts:
+        expected_values = _derivative_conclusion_values(lesson_plan.expected_conclusion)
+        if expected_values:
+            expected_value = expected_values[-1]
+            _check_exact_numeric_conclusion(
+                expected_value=expected_value,
+                actual_values=_derivative_conclusion_values(final_evidence),
+                required_marker=f"导数/切线斜率等于 {_format_lesson_number(expected_value)}",
+                issues=issues,
+            )
+
+
+def _check_exact_numeric_conclusion(
+    *,
+    expected_value: float,
+    actual_values: list[float],
+    required_marker: str,
+    issues: list[PlaybookReviewIssue],
+) -> None:
+    conflicting_values = [
+        value
+        for value in actual_values
+        if not math.isclose(value, expected_value, rel_tol=0.0, abs_tol=1e-12)
+    ]
+    if conflicting_values:
+        rendered_values = ", ".join(
+            sorted({_format_lesson_number(value) for value in conflicting_values})
+        )
+        issues.append(
+            _issue(
+                "lesson_plan.conclusion_conflict",
+                PlaybookIssueSeverity.ERROR,
+                "lesson_plan.expected_conclusion",
+                (
+                    f"Final teaching scene states {rendered_values}, which conflicts with the "
+                    f"planned conclusion {required_marker!r}."
+                ),
+                "Repair the final teaching scene so every explicit result matches the plan.",
+            )
+        )
+        return
+
+    if not any(
+        math.isclose(value, expected_value, rel_tol=0.0, abs_tol=1e-12)
+        for value in actual_values
+    ):
+        issues.append(
+            _issue(
+                "lesson_plan.conclusion_missing",
+                PlaybookIssueSeverity.ERROR,
+                "lesson_plan.expected_conclusion",
+                f"Final teaching scene does not establish {required_marker!r}.",
+                "Repair the final teaching scene so it explicitly states the verified conclusion.",
+            )
+        )
+
+
+_LESSON_NUMBER_PATTERN = (
+    r"(?<![\w.])-?\d+(?:\.\d+)?(?![\w.])(?!(?:\s*)[+*/^%-])"
+)
+_DERIVATIVE_SUBJECT_PATTERN = (
+    r"(?:f\s*['′]\s*\([^\n)]{1,24}\)|derivative|tangent(?:'s)?\s+slope|"
+    r"slope\s+of\s+(?:the\s+)?tangent|导数|切线(?:的)?斜率)"
+)
+_DERIVATIVE_WORD_RESULT_PATTERN = re.compile(
+    rf"{_DERIVATIVE_SUBJECT_PATTERN}[^。！？!?；;\n]{{0,48}}?"
+    rf"(?:(?<!不)(?:等于|为|是)|\bis\b(?!\s+not\b)|\bequals\b)\s*"
+    rf"({_LESSON_NUMBER_PATTERN})",
+    flags=re.IGNORECASE,
+)
+_DERIVATIVE_EQUAL_RESULT_PATTERN = re.compile(
+    rf"{_DERIVATIVE_SUBJECT_PATTERN}\s*=\s*({_LESSON_NUMBER_PATTERN})",
+    flags=re.IGNORECASE,
+)
+_DERIVATIVE_FORMULA_RESULT_PATTERN = re.compile(
+    rf"f\s*['′]\s*\([^\n)]{{1,24}}\)\s*=\s*[^\n]{{1,180}}?"
+    rf"=\s*({_LESSON_NUMBER_PATTERN})",
+    flags=re.IGNORECASE,
+)
+
+
+def _derivative_conclusion_values(evidence: str) -> list[float]:
+    patterns = (
+        _DERIVATIVE_WORD_RESULT_PATTERN,
+        _DERIVATIVE_EQUAL_RESULT_PATTERN,
+        _DERIVATIVE_FORMULA_RESULT_PATTERN,
+    )
+    return [
+        float(match.group(1))
+        for pattern in patterns
+        for match in pattern.finditer(evidence)
+    ]
+
+
+def _factorial_conclusion_values(evidence: str, n: str) -> list[float]:
+    escaped_n = re.escape(n)
+    relationship = r"(?:=|等于|为|是|\bis\b|\bequals\b)"
+    patterns = (
+        rf"factorial\s*[（(]\s*{escaped_n}\s*[）)]\s*{relationship}\s*"
+        rf"({_LESSON_NUMBER_PATTERN})",
+        rf"(?<!\d){escaped_n}(?!\d)\s*!\s*{relationship}\s*"
+        rf"({_LESSON_NUMBER_PATTERN})",
+        rf"阶乘\s*{escaped_n}\s*{relationship}\s*({_LESSON_NUMBER_PATTERN})",
+        rf"(?<!\d){escaped_n}(?!\d)\s*的阶乘\s*{relationship}\s*"
+        rf"({_LESSON_NUMBER_PATTERN})",
+    )
+    values: list[float] = []
+    for pattern in patterns:
+        values.extend(
+            float(match.group(1))
+            for match in re.finditer(pattern, evidence, flags=re.IGNORECASE)
+        )
+    return values
+
+
+def _format_lesson_number(value: float) -> str:
+    return str(int(value)) if value.is_integer() else str(value)
+
+
+def _lesson_plan_evidence(playbook: PlaybookScript) -> str:
+    evidence: list[str] = [playbook.title, playbook.summary]
+    for step in playbook.steps:
+        evidence.extend((step.title, step.voiceover_text, step.snapshot.kind))
+        _collect_lesson_snapshot_evidence(
+            step.snapshot.model_dump(mode="json", exclude_none=True),
+            evidence,
+        )
+    return " ".join(evidence).casefold()
+
+
+_LESSON_VISUAL_STRUCTURAL_FIELDS = frozenset(
+    {
+        "active_line",
+        "active_lines",
+        "active_node_ids",
+        "code_trace",
+        "current_frame_id",
+        "current_node_id",
+        "curves",
+        "edges",
+        "frames",
+        "frontier_node_ids",
+        "marker_x",
+        "nodes",
+        "objects",
+        "path_points",
+        "points",
+        "queue_node_ids",
+        "segments",
+        "trail",
+        "trajectory",
+        "vectors",
+        "visited_node_ids",
+    }
+)
+_LESSON_VISUAL_DRAWABLE_FIELDS = frozenset(
+    {"curves", "edges", "frames", "nodes", "objects", "points", "segments", "vectors"}
+)
+
+
+def _lesson_plan_visual_tokens(playbook: PlaybookScript) -> set[str]:
+    tokens: set[str] = set()
+    for step in playbook.steps:
+        tokens.add(step.snapshot.kind.casefold())
+        _collect_lesson_visual_snapshot_tokens(
+            step.snapshot.model_dump(mode="json", exclude_none=True),
+            tokens,
+        )
+    return tokens
+
+
+def _lesson_plan_final_evidence(playbook: PlaybookScript) -> str:
+    if not playbook.steps:
+        return ""
+    final_step = playbook.steps[-1]
+    evidence = [final_step.title, final_step.voiceover_text, final_step.snapshot.kind]
+    _collect_lesson_snapshot_evidence(
+        final_step.snapshot.model_dump(mode="json", exclude_none=True),
+        evidence,
+    )
+    return "\n".join(evidence).casefold()
+
+
+def _collect_lesson_snapshot_evidence(value: Any, evidence: list[str]) -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if _has_lesson_semantic_value(child):
+                evidence.append(str(key))
+            _collect_lesson_snapshot_evidence(child, evidence)
+    elif isinstance(value, list):
+        for child in value:
+            _collect_lesson_snapshot_evidence(child, evidence)
+    elif isinstance(value, str) and value.strip():
+        evidence.append(value)
+
+
+def _collect_lesson_visual_snapshot_tokens(
+    value: Any,
+    tokens: set[str],
+    *,
+    inside_drawable: bool = False,
+) -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            normalized_key = key.casefold()
+            if normalized_key == "formula_latex" and isinstance(child, str):
+                if re.search(r"(?:\bm\b|m[_({]|f\s*['′])", child, flags=re.IGNORECASE):
+                    tokens.add("slope")
+                continue
+            if normalized_key in _LESSON_VISUAL_STRUCTURAL_FIELDS:
+                if _has_lesson_semantic_value(child):
+                    tokens.add(normalized_key)
+                if normalized_key in _LESSON_VISUAL_DRAWABLE_FIELDS:
+                    _collect_lesson_visual_snapshot_tokens(
+                        child,
+                        tokens,
+                        inside_drawable=True,
+                    )
+                continue
+            if inside_drawable and normalized_key in {"id", "label", "semantic_role", "state"}:
+                if isinstance(child, str) and child.strip():
+                    _add_lesson_visual_drawable_token(child, tokens)
+                continue
+            if inside_drawable and normalized_key == "variables" and isinstance(child, dict):
+                tokens.update(str(variable).casefold() for variable in child)
+                continue
+            if isinstance(child, (dict, list)):
+                _collect_lesson_visual_snapshot_tokens(
+                    child,
+                    tokens,
+                    inside_drawable=inside_drawable,
+                )
+    elif isinstance(value, list):
+        for child in value:
+            _collect_lesson_visual_snapshot_tokens(
+                child,
+                tokens,
+                inside_drawable=inside_drawable,
+            )
+
+
+def _add_lesson_visual_drawable_token(value: str, tokens: set[str]) -> None:
+    normalized = value.strip().casefold()
+    tokens.add(normalized)
+    for aliases in _LESSON_VISUAL_ROLE_ALIASES.values():
+        for alias in aliases:
+            normalized_alias = alias.casefold()
+            if normalized_alias == "g":
+                if normalized == normalized_alias:
+                    tokens.add(normalized_alias)
+            elif normalized_alias in normalized:
+                tokens.add(normalized_alias)
+
+
+def _has_lesson_semantic_value(value: Any) -> bool:
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, dict)):
+        return bool(value)
+    return value is not None
+
+
+def _contains_lesson_alias(evidence: str, aliases: tuple[str, ...]) -> bool:
+    return any(alias.casefold() in evidence for alias in aliases)
+
+
+def _contains_lesson_visual_alias(tokens: set[str], aliases: tuple[str, ...]) -> bool:
+    return any(alias.casefold() in tokens for alias in aliases)
 
 
 def _tokens_for_snapshot(snapshot: Any) -> set[str]:

@@ -34,6 +34,43 @@ export interface QualityReport {
   attempts: number;
 }
 
+export type LessonArc =
+  | "intuition_to_abstraction"
+  | "problem_to_solution"
+  | "state_transition"
+  | "comparison"
+  | "derivation";
+
+export type SceneTeachingStrategy =
+  | "intuition"
+  | "demonstration"
+  | "derivation"
+  | "comparison"
+  | "state_transition"
+  | "summary";
+
+export interface SceneIntent {
+  scene_id: string;
+  teaching_goal: string;
+  strategy: SceneTeachingStrategy;
+  required_fact_ids: string[];
+  required_visual_roles: string[];
+  preferred_scene_type: string | null;
+  narration_goal: string;
+}
+
+export interface LessonPlan {
+  schema_version: "1.0.0";
+  domain: string;
+  title: string;
+  learning_objectives: string[];
+  prerequisites: string[];
+  misconceptions: string[];
+  expected_conclusion: string;
+  lesson_arc: LessonArc;
+  scenes: SceneIntent[];
+}
+
 export type PipelineRunStatus =
   | "queued"
   | "running"
@@ -51,4 +88,5 @@ export interface PipelineRunResult {
   created_at: string;
   review?: ReviewReport | null;
   quality_report?: QualityReport | null;
+  lesson_plan?: LessonPlan | null;
 }

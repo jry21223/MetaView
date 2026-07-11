@@ -12,7 +12,9 @@ The core pipeline is:
 
 ```text
 User input
-  -> subject understanding / router / SkillPack / agent
+  -> subject understanding / router
+  -> LessonPlan
+  -> SkillPack / agent / legacy CIR
   -> PlaybookScript
   -> canonical backend QualityReport
   -> DirectorScript
@@ -45,12 +47,13 @@ Agent mode is an active verification path, not the default production claim. To 
 
 1. `docs/director-layer.md` — Director as the independent shot-planning layer.
 2. `docs/pipeline.md` — generation modes, PlaybookScript, and export path.
-3. `docs/quality-gate.md` — backend success semantics, repair, persistence, and export recheck.
-4. `docs/benchmark-v2.md` — four Gold Cases and strict product-quality scoring.
-5. `docs/agent-demo-acceptance.md` — how to prove agent / runtime-tool mode actually works.
-6. `docs/skill-pack-architecture.md` — deterministic SkillPack contract.
-7. `docs/frontend-shell.md` — frontend page and studio shell structure.
-8. `AGENTS.md` — required working rules for coding agents.
+3. `docs/lesson-plan.md` — shared teaching decisions and the renderer-free contract.
+4. `docs/quality-gate.md` — backend success semantics, repair, persistence, and export recheck.
+5. `docs/benchmark-v2.md` — four Gold Cases and strict product-quality scoring.
+6. `docs/agent-demo-acceptance.md` — how to prove agent / runtime-tool mode actually works.
+7. `docs/skill-pack-architecture.md` — deterministic SkillPack contract.
+8. `docs/frontend-shell.md` — frontend page and studio shell structure.
+9. `AGENTS.md` — required working rules for coding agents.
 
 ## What not to do now
 
@@ -64,5 +67,5 @@ Agent mode is an active verification path, not the default production claim. To 
 
 1. Migrate the four Gold generators from static/repeated state to genuine visual progression.
 2. Make the four cases pass three independent live runs without hard failures.
-3. Add LessonPlan as the shared teaching contract without removing legacy CIR in one step.
+3. Compile SceneIntent into shared SceneBlueprint/Playbook assembly without removing legacy CIR in one step.
 4. Add CoverageDecision and the controlled Generalist Composer only after the Gold gate is green.

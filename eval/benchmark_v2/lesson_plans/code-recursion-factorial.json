@@ -1,0 +1,75 @@
+{
+  "schema_version": "1.0.0",
+  "domain": "code",
+  "title": "factorial(4)：递归调用栈与返回值",
+  "learning_objectives": [
+    "识别递归调用、基例和等待返回的栈帧",
+    "按顺序解释 factorial(4) 的压栈过程",
+    "追踪返回值 1、2、6、24 的逐层传播"
+  ],
+  "prerequisites": [
+    "函数调用与返回值",
+    "条件分支",
+    "阶乘的乘法定义"
+  ],
+  "misconceptions": [
+    "认为递归调用会立即得到最终结果",
+    "把压栈顺序与回溯返回顺序混为一谈",
+    "忽略基例或错误地让基例返回 0"
+  ],
+  "expected_conclusion": "factorial(4) 先建立等待相乘的递归栈帧，再从基例开始逐层返回并回溯，最终得到 factorial(4)=24。",
+  "lesson_arc": "state_transition",
+  "scenes": [
+    {
+      "scene_id": "factorial-contract",
+      "teaching_goal": "明确 factorial 的递归关系和终止基例",
+      "strategy": "demonstration",
+      "required_fact_ids": ["factorial", "base_case", "recursive_call"],
+      "required_visual_roles": ["stack_frame", "active_frame", "code_line"],
+      "preferred_scene_type": "recursion_stack",
+      "narration_goal": "说明非基例调用会暂停当前乘法并进入更小参数的调用。"
+    },
+    {
+      "scene_id": "factorial-push",
+      "teaching_goal": "逐步展示 factorial(4) 到基例的压栈过程",
+      "strategy": "state_transition",
+      "required_fact_ids": ["factorial", "recursive_call"],
+      "required_visual_roles": ["stack_frame", "active_frame", "code_line"],
+      "preferred_scene_type": "recursion_stack",
+      "narration_goal": "让每次调用拥有独立栈帧和局部 n，并区分 active 与 waiting 状态。"
+    },
+    {
+      "scene_id": "factorial-base-case",
+      "teaching_goal": "展示基例停止继续递归并产生第一个返回值",
+      "strategy": "demonstration",
+      "required_fact_ids": ["base_case", "return_unwind"],
+      "required_visual_roles": ["stack_frame", "active_frame", "code_line", "return_value"],
+      "preferred_scene_type": "recursion_stack",
+      "narration_goal": "明确基例返回 1，它是后续逐层乘法能够开始的条件。"
+    },
+    {
+      "scene_id": "factorial-unwind",
+      "teaching_goal": "追踪返回值沿调用栈逐层传播",
+      "strategy": "state_transition",
+      "required_fact_ids": ["return_unwind", "factorial_result"],
+      "required_visual_roles": ["stack_frame", "active_frame", "code_line", "return_value"],
+      "preferred_scene_type": "recursion_stack",
+      "narration_goal": "依次说明返回值 1、2、6、24，并把每次乘法对应到正在恢复的栈帧。"
+    },
+    {
+      "scene_id": "factorial-summary",
+      "teaching_goal": "总结压栈、基例和回溯共同产生最终结果",
+      "strategy": "summary",
+      "required_fact_ids": [
+        "factorial",
+        "base_case",
+        "recursive_call",
+        "return_unwind",
+        "factorial_result"
+      ],
+      "required_visual_roles": ["stack_frame", "active_frame", "code_line", "return_value"],
+      "preferred_scene_type": "recursion_stack",
+      "narration_goal": "明确陈述 factorial(4)=24，并解释结果来自等待乘法在回溯阶段逐层完成。"
+    }
+  ]
+}

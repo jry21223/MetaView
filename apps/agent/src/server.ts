@@ -2,7 +2,8 @@
  * HTTP entry point for the MetaView agent sidecar.
  *
  * Exposes ``POST /generate`` with either the legacy body
- * ``{ prompt, provider?, route_decision? }`` or the wider AgentRequest shape,
+ * ``{ prompt, provider?, route_decision?, lesson_plan? }`` or the wider
+ * AgentRequest shape,
  * then returns ``{ playbook: PlaybookScript, provider, tool_events,
  * runtime_events }`` once the pi-agent-core loop has walked the Drawing CLI
  * flow. Health probe at ``GET /healthz``.
@@ -55,6 +56,7 @@ app.post("/generate", async (req: Request, res: Response) => {
     provider,
     provider_config,
     route_decision,
+    lesson_plan,
     playbook_schema,
     constraints,
     available_tools,
@@ -66,6 +68,7 @@ app.post("/generate", async (req: Request, res: Response) => {
     provider?: { provider?: string; model?: string; api_key?: string; base_url?: string };
     provider_config?: { provider?: string; model?: string; api_key?: string; base_url?: string };
     route_decision?: Record<string, unknown>;
+    lesson_plan?: Record<string, unknown>;
     playbook_schema?: Record<string, unknown>;
     constraints?: Record<string, unknown>;
     available_tools?: Array<Record<string, unknown>>;
@@ -89,6 +92,7 @@ app.post("/generate", async (req: Request, res: Response) => {
         language,
         provider: provider ?? provider_config,
         routeDecision: route_decision,
+        lessonPlan: lesson_plan,
         playbookSchema: playbook_schema,
         constraints,
         availableTools: available_tools,

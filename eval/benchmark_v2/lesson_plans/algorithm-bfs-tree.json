@@ -1,0 +1,69 @@
+{
+  "schema_version": "1.0.0",
+  "domain": "algorithm",
+  "title": "广度优先遍历：队列驱动的逐层访问",
+  "learning_objectives": [
+    "说明 BFS 为什么使用先进先出的队列",
+    "区分当前节点、已访问集合和等待队列",
+    "根据队列状态复述二叉树的逐层访问顺序"
+  ],
+  "prerequisites": [
+    "树的节点与边",
+    "队首与队尾",
+    "先进先出的基本规则"
+  ],
+  "misconceptions": [
+    "把 BFS 与沿单一路径深入的 DFS 混淆",
+    "忽略 visited 状态而重复加入同一节点",
+    "认为同一层的多个节点可以同时出队，而不需要保持先后顺序"
+  ],
+  "expected_conclusion": "BFS 使用先进先出的队列按层访问节点；每次从队首取出一个当前节点，再把尚未访问的相邻节点加入队尾。",
+  "lesson_arc": "state_transition",
+  "scenes": [
+    {
+      "scene_id": "bfs-structure",
+      "teaching_goal": "建立树结构、遍历起点和 FIFO 队列",
+      "strategy": "demonstration",
+      "required_fact_ids": ["breadth_first", "queue", "order"],
+      "required_visual_roles": ["node", "edge", "queue"],
+      "preferred_scene_type": "bfs_graph",
+      "narration_goal": "介绍 BFS 从根节点开始，并由队列决定接下来处理哪个节点。"
+    },
+    {
+      "scene_id": "bfs-root-transition",
+      "teaching_goal": "展示根节点入队、出队和子节点入队的第一次完整状态变化",
+      "strategy": "state_transition",
+      "required_fact_ids": ["queue", "visited", "order"],
+      "required_visual_roles": ["node", "edge", "current_node", "visited", "queue"],
+      "preferred_scene_type": "bfs_graph",
+      "narration_goal": "逐项同步说明 current、visited 与 queue 在一次出队处理中的变化。"
+    },
+    {
+      "scene_id": "bfs-first-layer",
+      "teaching_goal": "展示第一层节点按照队列顺序依次处理",
+      "strategy": "state_transition",
+      "required_fact_ids": ["breadth_first", "queue", "visited", "order"],
+      "required_visual_roles": ["node", "edge", "current_node", "visited", "queue"],
+      "preferred_scene_type": "bfs_graph",
+      "narration_goal": "强调先进入队列的同层节点先被处理，新发现节点只能追加到队尾。"
+    },
+    {
+      "scene_id": "bfs-completion",
+      "teaching_goal": "完成所有可达节点的独立出队 checkpoint",
+      "strategy": "state_transition",
+      "required_fact_ids": ["breadth_first", "queue", "visited", "order"],
+      "required_visual_roles": ["node", "edge", "current_node", "visited", "queue"],
+      "preferred_scene_type": "bfs_graph",
+      "narration_goal": "保持每个出队节点都有独立状态，并展示队列最终清空。"
+    },
+    {
+      "scene_id": "bfs-summary",
+      "teaching_goal": "总结 BFS 的逐层顺序及 FIFO 原因",
+      "strategy": "summary",
+      "required_fact_ids": ["breadth_first", "queue", "visited", "order"],
+      "required_visual_roles": ["node", "edge", "visited", "queue"],
+      "preferred_scene_type": "bfs_graph",
+      "narration_goal": "明确回答 BFS 为什么按层访问，以及队列如何保证这一顺序。"
+    }
+  ]
+}

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from app.domain.models.lesson_plan import LessonPlan
 from app.domain.models.route_decision import RouteDecision
 from app.domain.models.topic import TopicDomain
 from app.domain.services.algorithm_code_library import infer_id, prompt_hint
@@ -309,6 +310,7 @@ def build_cir_prompt(
     language: str = "python",
     skill_mode: SkillMode = SkillMode.SPECIALIZED,
     route_decision: RouteDecision | dict[str, Any] | None = None,
+    lesson_plan: LessonPlan | None = None,
 ) -> tuple[str, str]:
     """Return (system_prompt, user_prompt) for CIR + ExecutionMap generation.
 
@@ -333,6 +335,7 @@ Skill mode: specialized.
 You may change this if the topic clearly belongs to a different domain."""
 
     route_section = _format_route_decision(route_decision)
+    lesson_plan_section = _format_lesson_plan(lesson_plan)
 
     code_track = ""
     if source_code and source_code.strip():
@@ -407,6 +410,8 @@ Only use: "array", "graph", "function", "scene", or "formula"
 {route_section}
 {domain_section}
 {domain_guidance}
+
+{lesson_plan_section}
 
 ## Narration Output Format
 Output the "narration" field of each cir step as a JSON array (NOT a plain string):
@@ -591,4 +596,19 @@ The router classified this request as:
 {json.dumps(payload, ensure_ascii=False, indent=2)}
 ```
 Use this as routing context only. Do not use unsupported deterministic skill output, and do not invent deterministic results when skill_id is unsupported or null.
+"""
+
+
+def _format_lesson_plan(lesson_plan: LessonPlan | None) -> str:
+    if lesson_plan is None:
+        return ""
+    payload = json.dumps(lesson_plan.model_dump(mode="json"), ensure_ascii=False, indent=2)
+    return f"""## Canonical LessonPlan (BINDING TEACHING DECISIONS)
+Use this renderer-independent plan as the teaching spine for the CIR.
+- Cover every SceneIntent in order; a SceneIntent may expand into multiple CIR steps.
+- Preserve its teaching goal, required facts, visual roles, narration goal, and conclusion.
+- Do not copy LessonPlan into renderer payloads or invent coordinates/assets from it.
+- The final CIR must still satisfy the CIR + ExecutionMap schema.
+
+{payload}
 """

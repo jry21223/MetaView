@@ -4,6 +4,8 @@ from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.domain.models.lesson_plan import LessonPlan
+
 SkillExecutionMode = Literal[
     "deterministic",
     "llm_assisted",
@@ -56,11 +58,13 @@ class SkillExecutionContext(BaseModel):
     run_id: str
     prompt: str
     route_match: SkillRouteMatch | None = None
+    lesson_plan: LessonPlan | None = None
 
 
 class SkillExecutionResult(BaseModel):
     handled: bool
     playbook_json: str | None = None
+    lesson_plan: LessonPlan | None = None
     review_actions: list[str] = Field(default_factory=list)
     fallback_reason: str | None = None
 
