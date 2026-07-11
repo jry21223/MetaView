@@ -1,14 +1,34 @@
-# 前端外壳：Topbar / Stage / Provider
+# 前端外壳：Landing / Topbar / Stage / Provider
+
+## 公共 Landing 路由
+
+`App.tsx` 在 edition shell 之外注册公共首页：
+
+```text
+/             -> LandingRoute
+/create       -> IntakeScreen
+/run/:runId   -> StudioPage
+/history      -> HistoryPage
+/templates    -> TemplatesPage
+/settings     -> SettingsPage
+```
+
+`LandingRoute` 负责加载与应用内一致的主题变量，并把“开始创建”导航到 `/create`。公共首页不复用应用内 `GlobalTopbar`，避免把营销叙事和工具导航塞进同一个 Shell。
 
 ## Stage 路由
 
-`App.tsx` 用本地状态管理三个 Stage：
+`SelfAppShell` / `OpsAppShell` 使用当前路径派生五个应用 Stage：
 
 ```ts
-type Stage = 'intake' | 'workbench' | 'history';
+type Stage =
+  | "intake"
+  | "workbench"
+  | "history"
+  | "templates"
+  | "settings";
 ```
 
-切换通过 `setStage`（即 `onNavigate` 回调）。每个页面接收同一签名：
+切换通过 `onNavigate(stage)`。每个页面接收同一签名：
 
 ```ts
 onNavigate: (stage: Stage) => void
@@ -16,9 +36,22 @@ onNavigate: (stage: Stage) => void
 
 避免每页定义 `onHome / onHistory / onTemplate` 等 N×M 回调。
 
+Stage 与路径映射：
+
+```text
+intake                -> /create
+workbench + runId     -> /run/:runId
+workbench without id  -> /create
+history               -> /history
+templates             -> /templates
+settings              -> /settings
+```
+
+未知应用路径回到公共首页 `/`。
+
 ## GlobalTopbar
 
-`apps/web/src/shared/ui/GlobalTopbar.tsx` 是三个 stage 共享的顶部栏。**不要**在页面级别复制 topbar JSX。
+`apps/web/src/shared/ui/GlobalTopbar.tsx` 是应用内五个 Stage 共享的顶部栏。**不要**在页面级别复制 Topbar JSX，也不要在公共 Landing Page 中强行复用它。
 
 接口：
 
@@ -33,20 +66,21 @@ interface GlobalTopbarProps {
 }
 ```
 
-- `stage='intake' | 'workbench'` 时 “工作台” 高亮（intake 是 workbench 的子态）。
-- “模板/设置” 当前 disabled，待实现。
-- Provider 状态指示：`isProviderConfigured` → `CORE NODES ONLINE` / `NO PROVIDER SET`。
+- `stage="intake" | "workbench"` 时“工作台”高亮。
+- “任务历史 / 模板 / 设置”分别对应独立路由。
+- Provider 状态在 self edition 中保持安静；未配置引导由输入和追问流程承担。
+- 工作台可在桌面端折叠 Topbar，移动端始终恢复可见。
 
 ## Provider 配置
 
 - Hook：`useProviderSettings`（`apps/web/src/features/providers/hooks/useProviderSettings.ts`）
 - 模态：`ProviderSettingsModal`
   - **关闭逻辑**：`onMouseDown` 触发关闭，内层 `onMouseDown` `stopPropagation`。这样从内部拖拽到外部释放鼠标不会误关。
-- 凭据保存在 localStorage（用户自带 key），前端调用 OpenAI 兼容接口（`baseUrl + /chat/completions`）。
+- 凭据保存在 localStorage（用户自带 Key），前端调用 OpenAI 兼容接口（`baseUrl + /chat/completions`）。
 
 ## Snapshot support levels
 
-前端 renderer registry 可以注册比首发产品面更宽的 snapshot kind。`registered` 只表示有渲染器入口；`launch-supported` 才表示生成、review、导出和产品验收都按首发质量承诺覆盖。
+前端 Renderer Registry 可以注册比首发产品面更宽的 Snapshot Kind。`registered` 只表示有渲染器入口；`launch-supported` 才表示生成、Review、导出和产品验收都按首发质量承诺覆盖。
 
 Launch-supported:
 
@@ -65,7 +99,7 @@ Parked:
 - `phase_portrait_scene`, `complex_plane_scene`
 - `optimization_scene`, `modeling_scene`, `manifold_scene`
 
-任何已注册但未列入 launch-supported 的 kind，都不能仅因为 registry 可渲染就进入首发生成承诺。
+任何已注册但未列入 launch-supported 的 Kind，都不能仅因为 Registry 可渲染就进入首发生成承诺。
 
 ## Studio 布局
 
@@ -73,28 +107,34 @@ Parked:
 
 ```ts
 mainStyle = {
-  '--left-w': leftCollapsed ? '0px' : `${t.leftRatio}%`,
-  gridTemplateColumns: leftCollapsed ? '1fr' : 'var(--left-w) 1fr',
+  "--left-w": leftCollapsed ? "0px" : `${t.leftRatio}%`,
+  gridTemplateColumns: leftCollapsed ? "1fr" : "var(--left-w) 1fr",
 };
 ```
 
 - `t.leftRatio` 范围 `[12, 50]`（`TweaksPanel` 滑块）。
-- 折叠时左 aside 不渲染（不只是隐藏），由 `mv-left-handle` 浮按钮切回。
+- 折叠时左 Aside 不渲染（不只是隐藏），由 `mv-left-handle` 浮按钮切回。
 
 ### 卡片折叠
+
 左栏两张卡片（`ProblemCard` / `ChatPanel`）各自独立折叠，状态在 `StudioPage` 里持有。
+
 折叠样式见 `studio.css` `.is-collapsed` 选择器。
 
 ### ChatPanel
-- 直连用户配置的 LLM provider（不走后端）。
-- 每次发送会先 abort 上一次请求。
-- 历史不持久化，stage 切换即丢失。
+
+- 直连用户配置的 LLM Provider（不走后端）。
+- 每次发送会先 Abort 上一次请求。
+- 历史不持久化，Stage 切换即丢失。
 - 输入框 Enter 发送，Shift+Enter 换行。
-- 未配置 provider 时禁用输入并显示去配置入口。
+- 未配置 Provider 时禁用输入并显示去配置入口。
 
 ## 文件位置约定
 
-- 跨 stage 共享 UI → `apps/web/src/shared/ui/`
-- 单 stage 专用 → `apps/web/src/pages/<Stage>/` 或 `apps/web/src/features/<feature>/ui/`
+- 公共 Landing 页面组合 → `apps/web/src/pages/Landing/`
+- 公共 Landing 路由与主题装配 → `apps/web/src/app/LandingRoute.tsx`
+- 跨 Stage 共享 UI → `apps/web/src/shared/ui/`
+- 单 Stage 专用 → `apps/web/src/pages/<Stage>/` 或 `apps/web/src/features/<feature>/ui/`
+- Landing 样式 → `apps/web/src/styles/pages/landing.css`
 
 `shared/` 不得反向导入 `features/` 或 `pages/`。
