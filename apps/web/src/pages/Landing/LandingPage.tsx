@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface LandingPageProps {
   appEdition: "self" | "ops";
@@ -288,6 +288,111 @@ export function LandingPage({
   onOpenTemplates,
 }: LandingPageProps) {
   const [activeDomain, setActiveDomain] = useState<DemoDomain>("math");
+  const storyRefs = useRef<Partial<Record<DemoDomain, HTMLElement | null>>>({});
+  const visualRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const visual = visualRef.current;
+    if (!visual) return;
+
+    const syncVisualHeight = () => {
+      visual.style.setProperty(
+        "--mv-landing-visual-half",
+        `${visual.getBoundingClientRect().height / 2}px`,
+      );
+    };
+
+    syncVisualHeight();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", syncVisualHeight);
+      return () => window.removeEventListener("resize", syncVisualHeight);
+    }
+
+    const observer = new ResizeObserver(syncVisualHeight);
+    observer.observe(visual);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (
+      typeof window === "undefined" ||
+      typeof window.matchMedia !== "function" ||
+      typeof window.requestAnimationFrame !== "function"
+    ) {
+      return;
+    }
+
+    const desktopQuery = window.matchMedia("(min-width: 901px)");
+    let animationFrame: number | null = null;
+
+    const syncDomainToViewport = () => {
+      animationFrame = null;
+      if (!desktopQuery.matches) return;
+
+      const viewportCenter = window.innerHeight / 2;
+      let closestDomain: DemoDomain | null = null;
+      let closestDistance = Number.POSITIVE_INFINITY;
+
+      for (const story of DEMO_STORIES) {
+        const node = storyRefs.current[story.id];
+        if (!node) continue;
+
+        const rect = node.getBoundingClientRect();
+        const distance = Math.abs(rect.top + rect.height / 2 - viewportCenter);
+        if (distance < closestDistance) {
+          closestDomain = story.id;
+          closestDistance = distance;
+        }
+      }
+
+      if (closestDomain) {
+        setActiveDomain((current) =>
+          current === closestDomain ? current : closestDomain,
+        );
+      }
+    };
+
+    const scheduleDomainSync = () => {
+      if (animationFrame !== null) return;
+      animationFrame = window.requestAnimationFrame(syncDomainToViewport);
+    };
+
+    scheduleDomainSync();
+    window.addEventListener("scroll", scheduleDomainSync, { passive: true });
+    window.addEventListener("resize", scheduleDomainSync);
+    desktopQuery.addEventListener?.("change", scheduleDomainSync);
+
+    return () => {
+      if (animationFrame !== null) {
+        window.cancelAnimationFrame(animationFrame);
+      }
+      window.removeEventListener("scroll", scheduleDomainSync);
+      window.removeEventListener("resize", scheduleDomainSync);
+      desktopQuery.removeEventListener?.("change", scheduleDomainSync);
+    };
+  }, []);
+
+  const activateDomain = (domain: DemoDomain, alignStory = false) => {
+    setActiveDomain(domain);
+
+    if (
+      !alignStory ||
+      typeof window === "undefined" ||
+      typeof window.matchMedia !== "function" ||
+      !window.matchMedia("(min-width: 901px)").matches
+    ) {
+      return;
+    }
+
+    const story = storyRefs.current[domain];
+    if (!story || typeof story.scrollIntoView !== "function") return;
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    story.scrollIntoView({
+      behavior: reduceMotion ? "auto" : "smooth",
+      block: "center",
+    });
+  };
 
   return (
     <div className="mv-landing" id="top">
@@ -409,8 +514,13 @@ export function LandingPage({
 
         <section className="mv-landing-section mv-landing-capability" id="visuals">
           <div className="mv-landing-capability__inner">
-            <div className="mv-landing-capability__visual">
-              <div className="mv-landing-demo-toolbar" role="tablist" aria-label="学科画面示例">
+            <div className="mv-landing-capability__visual" ref={visualRef}>
+              <div
+                className="mv-landing-demo-toolbar"
+                role="tablist"
+                aria-label="学科画面示例"
+                data-active-domain={activeDomain}
+              >
                 {DEMO_STORIES.map((story) => (
                   <button
                     key={story.id}
@@ -418,7 +528,7 @@ export function LandingPage({
                     role="tab"
                     aria-selected={activeDomain === story.id}
                     className={activeDomain === story.id ? "is-active" : ""}
-                    onClick={() => setActiveDomain(story.id)}
+                    onClick={() => activateDomain(story.id, true)}
                   >
                     <span>{story.index}</span>
                     {story.label}
@@ -440,11 +550,18 @@ export function LandingPage({
               {DEMO_STORIES.map((story) => (
                 <article
                   key={story.id}
+                  ref={(node) => {
+                    storyRefs.current[story.id] = node;
+                  }}
                   data-demo-domain={story.id}
                   className={activeDomain === story.id ? "is-active" : ""}
-                  onMouseEnter={() => setActiveDomain(story.id)}
+                  aria-current={activeDomain === story.id ? "step" : undefined}
                 >
-                  <button type="button" onClick={() => setActiveDomain(story.id)}>
+                  <button
+                    type="button"
+                    onClick={() => activateDomain(story.id)}
+                    onFocus={() => setActiveDomain(story.id)}
+                  >
                     <span>{story.index} / {story.label}</span>
                     <h3>{story.title}</h3>
                     <p>{story.description}</p>

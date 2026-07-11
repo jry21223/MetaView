@@ -49,7 +49,7 @@ describe("App routing", () => {
     const { App } = await import("./App");
     const { getByText } = render(<App />);
 
-    expect(getByText("输入题目或代码，生成可播放的分步讲解")).toBeTruthy();
+    expect(getByText("新建可视化讲解")).toBeTruthy();
   });
 
   it("restores the workbench from a direct /run/:runId link", async () => {

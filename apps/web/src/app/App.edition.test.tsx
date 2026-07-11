@@ -124,7 +124,7 @@ describe("App edition shells", () => {
 
     await waitFor(() => expect(accountHits).toBe(1));
     await waitFor(() => expect(dashboardHits).toBe(0));
-    expect(container.textContent).toContain("输入题目或代码，生成可播放的分步讲解");
+    expect(container.textContent).toContain("新建可视化讲解");
     expect(container.textContent).not.toContain("全局运营");
     expect(container.textContent).toContain("微信用户 · ¥ 5.00");
     expect(container.querySelectorAll(".mv-top")).toHaveLength(1);
@@ -162,6 +162,7 @@ describe("App edition shells", () => {
 
     expect(container.querySelectorAll(".mv-top")).toHaveLength(1);
     fireEvent.click(getByRole("button", { name: /二分查找/ }));
+    fireEvent.click(getByRole("button", { name: "生成讲解" }));
 
     await waitFor(() =>
       expect(getByRole("button", { name: "显示顶部栏" })).toBeTruthy(),

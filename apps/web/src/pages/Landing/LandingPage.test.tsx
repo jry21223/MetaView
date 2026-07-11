@@ -46,6 +46,9 @@ describe("LandingPage", () => {
     fireEvent.click(physicsTab);
 
     expect(physicsTab.getAttribute("aria-selected")).toBe("true");
+    expect(getByRole("tablist", { name: "学科画面示例" }).getAttribute("data-active-domain")).toBe(
+      "physics",
+    );
     expect(getByText("抛体运动分解")).toBeTruthy();
     expect(getByText("水平速度保持不变，竖直速度持续受到重力改变。")).toBeTruthy();
   });

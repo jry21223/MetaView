@@ -32,12 +32,13 @@ describe("IntakeScreen launch home", () => {
   it("renders only currently supported generation promises", () => {
     const { getByText, queryByText, getByRole } = renderIntake();
 
-    expect(getByText("输入题目或代码，生成可播放的分步讲解")).toBeTruthy();
+    expect(getByText("新建可视化讲解")).toBeTruthy();
     expect(
       getByText(
-        "覆盖数学、物理、化学、生物、地理与算法代码；生成后可继续追问，也可导出视频。",
+        "输入一道题或一段代码，MetaView 会把它组织成可播放的分步画面。",
       ),
     ).toBeTruthy();
+    expect(getByText("从题意到可播放画面")).toBeTruthy();
     expect(queryByText(/截图/)).toBeNull();
     expect(queryByText(/翻译/)).toBeNull();
     expect(queryByText("英语拆解")).toBeNull();
@@ -71,27 +72,39 @@ describe("IntakeScreen launch home", () => {
     expect(uploadButton.textContent).toContain("代码文件");
   });
 
-  it("submits physics examples with a supported domain hint", () => {
-    const { getByRole, props } = renderIntake();
+  it("fills physics examples for review before the explicit generation action", async () => {
+    const { getByRole, getByPlaceholderText, props } = renderIntake();
 
     fireEvent.click(getByRole("button", { name: /抛体运动/ }));
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    expect((getByPlaceholderText(/例如：解释导数/) as HTMLTextAreaElement).value).toContain(
+      "抛体运动",
+    );
 
+    fireEvent.click(getByRole("button", { name: "生成讲解" }));
+
+    await waitFor(() => expect(props.onSubmit).toHaveBeenCalledTimes(1));
     expect(props.onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({
         domain: "physics",
+        template: "projectile-motion",
         title: "抛体运动",
       }),
     );
   });
 
-  it("submits biology examples with a supported domain hint", () => {
+  it("preserves the supported biology hint after selecting an example", async () => {
     const { getByRole, props } = renderIntake();
 
     fireEvent.click(getByRole("button", { name: /孟德尔遗传/ }));
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    fireEvent.click(getByRole("button", { name: "生成讲解" }));
 
+    await waitFor(() => expect(props.onSubmit).toHaveBeenCalledTimes(1));
     expect(props.onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({
         domain: "biology",
+        template: "mendel-genetics",
         title: "孟德尔遗传",
       }),
     );
@@ -119,7 +132,7 @@ describe("IntakeScreen launch home", () => {
 
     fireEvent.change(input, { target: { files: [file] } });
     expect(getByText("solution.py")).toBeTruthy();
-    fireEvent.change(getByPlaceholderText(/输入一道数学题/), {
+    fireEvent.change(getByPlaceholderText(/例如：解释导数/), {
       target: { value: "讲解这段代码" },
     });
     fireEvent.click(getByRole("button", { name: "生成讲解" }));
@@ -143,7 +156,7 @@ describe("IntakeScreen launch home", () => {
   it("submits freeform prompts with a null domain when inference misses", async () => {
     const { getByPlaceholderText, getByRole, queryByRole, props } = renderIntake();
 
-    fireEvent.change(getByPlaceholderText(/输入一道数学题/), {
+    fireEvent.change(getByPlaceholderText(/例如：解释导数/), {
       target: { value: "孟德尔豌豆杂交实验的显隐性遗传规律" },
     });
     fireEvent.click(getByRole("button", { name: "生成讲解" }));
@@ -158,7 +171,7 @@ describe("IntakeScreen launch home", () => {
   it("still forwards the inferred domain hint when keywords match", async () => {
     const { getByPlaceholderText, getByRole, props } = renderIntake();
 
-    fireEvent.change(getByPlaceholderText(/输入一道数学题/), {
+    fireEvent.change(getByPlaceholderText(/例如：解释导数/), {
       target: { value: "求函数 f(x)=x^2 在 x=1 处的导数" },
     });
     fireEvent.click(getByRole("button", { name: "生成讲解" }));
