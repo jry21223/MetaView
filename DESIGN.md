@@ -1,6 +1,6 @@
 # MetaView Design Language
 
-> 状态：Draft v0.1  
+> 状态：Current baseline v0.2
 > 适用范围：`apps/web` 公共页面、输入页、工作台、播放器、历史、模板、设置与共享组件  
 > 更新日期：2026-07-11
 
@@ -71,6 +71,18 @@ Director 层决定顺序、节奏、镜头和焦点，因此这些概念应在�
 - 焦点高亮；
 - 高级参数的渐进披露。
 
+### 2.4 当前界面分层
+
+整个前端共享同一套品牌原则，但不同表面承担不同任务，不强制使用完全相同的局部色板：
+
+1. **公共品牌层**：Landing、公共导航和默认产品截图使用暖白 / 克制深色与 Sage Accent；
+2. **应用壳层**：工作台、历史、模板、设置共享 `themeVars()` 注入的语义 Token，并允许用户选择工作区主题；
+3. **学习播放器层**：播放器使用独立的纸面 Token，保持画布、时间线和控制台之间的阅读层级；
+4. **Renderer 层**：数学、算法、科学等 Renderer 可维护表达数据关系所需的局部语义色，但不得反向覆盖应用壳层品牌变量；
+5. **运维层**：Ops 页面优先信息密度、状态辨识和操作效率，不套用官网 Hero 语言。
+
+因此，“品牌一致”指层级、语气、交互与默认主题一致，不表示所有数据可视化颜色都必须替换成 Sage。
+
 ---
 
 ## 3. 禁止方向
@@ -134,7 +146,7 @@ THEORETICAL CANVAS
 | Token | Value | Usage |
 |---|---:|---|
 | `--bg` | `#F4F1EA` | 页面背景 |
-| `--surface` | `#FFFFFF` | 主表面 |
+| `--surface` | `#FFFFFF` | 主表面；由 `themeVars()` 注入 |
 | `--surface-2` | `#FAF8F3` | 次级表面 |
 | `--ink` | `#161A18` | 主文字 |
 | `--ink-2` | `#5D655F` | 次级文字 |
@@ -142,16 +154,15 @@ THEORETICAL CANVAS
 | `--line` | `#E6E2D5` | 默认边框 |
 | `--line-2` | `#D6D1C2` | 强边框 |
 | `--accent` | `#82976F` | 品牌强调色 |
-| `--accent-soft` | `rgba(130,151,111,.14)` | 选择和弱高亮 |
+| `--accent-soft` | `#82976F26` | 选择和弱高亮；约 15% 透明度 |
 | `--warn` | `#E9A23B` | 警告 |
-| `--danger` | `#B7664B` | 错误和危险操作 |
 
 ### 5.2 深色主题
 
 | Token | Value |
 |---|---:|
 | `--bg` | `#0B0F0D` |
-| `--surface` | `#111715` |
+| `--surface` | `#11171580` |
 | `--surface-2` | `#0E1412` |
 | `--ink` | `#E8EFE9` |
 | `--ink-2` | `#9BA8A0` |
@@ -159,9 +170,12 @@ THEORETICAL CANVAS
 | `--line` | `#1D2A23` |
 | `--line-2` | `#27332C` |
 | `--accent` | `#9FB48D` |
-| `--accent-soft` | `rgba(159,180,141,.16)` |
+| `--accent-soft` | `#9FB48D26` |
 | `--warn` | `#E9A23B` |
-| `--danger` | `#FF9E8A` |
+
+`--bg-2`、`--accent-2`、`--accent-dim`、`--radius` 和 `--radius-sm` 也由
+`themeVars()` 提供。成功、失败等运行状态目前使用页面或组件边界内的语义变量，
+例如 History 的 `--mv-status-*`；项目尚未提供全局 `--danger` Token，不应在新代码中假定它存在。
 
 ### 5.3 强调色规则
 
@@ -184,7 +198,8 @@ THEORETICAL CANVAS
 
 一个视口通常只有一个主要强调焦点。
 
-Monokai、Nord 和 Solarized 属于工作区个性化主题，不属于 MetaView 品牌色板。
+Monokai、Nord 和 Solarized 属于工作区个性化主题，不属于 MetaView 品牌色板。公共 Landing
+固定跟随品牌 light / dark 类型，不直接继承这些命名工作区主题。
 
 ---
 
@@ -261,8 +276,8 @@ font-family: "IBM Plex Mono", ui-monospace, monospace;
 
 - 密度模式用于工作台，不控制官网间距；
 - 默认密度为 `regular`；
-- Landing 分区上下间距通常为 `80–112px`；
-- 公共页面左右 Padding 为 `24–32px`；
+- Landing 分区上下间距使用 `clamp(78px, 9vw, 116px)`，手机收敛为 `70px`；
+- 公共页面左右 Padding 默认由 `clamp(18px, 3vw, 32px)` 控制，`640px` 以下为 `14px`；
 - 卡片内部 Padding 为 `14–24px`；
 - 密度变化不得降低触控目标。
 
@@ -532,15 +547,17 @@ comet
 
 ## 14. 响应式与可访问性
 
-优先复用现有断点：
+断点按表面复用，不建立一套脱离现有布局的全局断点：
 
-```text
-900px
-720px
-680px
-640px
-380px
-```
+| Surface | Current breakpoints |
+|---|---|
+| Landing | `1080px`, `820px`, `640px`, `390px` |
+| App shell / Studio | `900px`, `720px`, `680px`, `640px`, `380px` |
+| Player | `1180px`, `920px`, `680px` |
+| Tools / Ops | `1024px`, `640px` |
+
+新样式优先加入对应表面的现有断点。只有真实布局在区间内失效时才增加断点，并在同一 PR
+中补充相应视口验证。
 
 移动端：
 
@@ -613,13 +630,21 @@ AI 正在施展魔法…
 
 ### 16.1 Source of Truth
 
-1. `DESIGN.md`：产品设计决策；
-2. `shared/config/themePalette.ts`：主题色板；
-3. `useTweaks.ts`：运行时 CSS Variable；
-4. `styles/tokens.css`：共享 Token；
-5. 页面 CSS：布局和页面特有组合。
+当前实现的权威边界按以下顺序理解：
 
-不得在 JSX 中新增固定颜色、圆角和动效时长；Inline Style 仅用于运行时几何和数据值。
+1. `DESIGN.md`：产品设计原则、表面分层和新功能约束；
+2. `shared/config/themePalette.ts`：工作区主题中可配置的语义色板；
+3. `features/studio-editor/hooks/useTweaks.ts` 的 `themeVars()`：浏览器实际收到的壳层 CSS Variable；
+4. `styles/tokens.css`：当前已落地的共享 Density Token；
+5. `styles/pages/*.css`：页面布局、页面局部变量和响应式行为；
+6. `features/playbook/engine/**`：Renderer / Remotion 所需的局部可视化色板和回退值。
+
+文档描述目标与约束，运行时文件描述当前可用契约。二者不一致时，不得静默选择其中一方：
+修改代码时同步更新文档，修改规范时明确标记尚未落地的迁移项。
+
+应用壳层和页面 JSX 不新增固定颜色、圆角和动效时长；Inline Style 仅用于运行时几何和数据值。
+Renderer 中与数据语义或导出一致性绑定的颜色可以保留在 Renderer 边界，但应集中为命名色板，
+并同时覆盖 light / dark 与 SSR / Remotion 回退路径。
 
 ### 16.2 CSS 目录
 
@@ -634,11 +659,13 @@ styles/
       shell.css
       content.css
       responsive.css
+      compat.css
     studio.css
     playbook.css
     history.css
     templates.css
     settings.css
+    tools.css
 ```
 
 - Page CSS 负责页面布局；
@@ -660,12 +687,14 @@ styles/
 
 ## 17. 当前已知迁移项
 
-1. 全局旧 Accent `#10B981` 与播放器 Sage Accent 不一致；默认品牌主题统一为 `#82976F / #9FB48D`。
-2. `tokens.css` 当前主要记录 Density，后续应补齐状态色、间距、圆角、阴影和动效 Token。
-3. `studio.css` 职责过多，Landing 已拆入独立目录，其他共享控件继续逐步迁移。
-4. 当前页面仍存在 `6px–14px` 的圆角漂移，新功能遵守本文尺度。
-5. 模板页仍包含 Raw Prompt 和开发者路径，公共产品化时应改为真实结果预览。
-6. `/` 已作为公共 Landing，输入页使用 `/create`，应用内首项统一称为“工作台”。
+1. 默认品牌与播放器已采用 `#82976F / #9FB48D`，但部分旧 Renderer 仍使用各自的数据色板；迁移时先判断是否属于数据语义，不能机械替换。
+2. `tokens.css` 当前主要记录 Density；状态色、间距、圆角、阴影和动效尚未形成完整的全局 Token 契约。
+3. `themeVars()` 仍直接提供部分壳层值，`ThemePalette` 尚未覆盖 `--bg`、`--surface`、圆角和完整状态色。
+4. `studio.css` 职责较多，Landing 已拆入独立目录，其他共享控件继续按真实复用需求渐进迁移。
+5. 当前页面仍存在 `6px–14px` 的圆角漂移；新功能遵守本文角色尺度，不为统一数值进行无关重构。
+6. 播放器与 Renderer 存在局部 Token 和硬编码回退，这是渲染 / 导出边界的一部分；新增值应集中管理并保持浏览器与 Remotion 一致。
+7. 模板页仍包含 Raw Prompt 和开发者路径，公共产品化时应改为真实结果预览。
+8. `/` 已作为公共 Landing，输入页使用 `/create`，应用内首项统一称为“工作台”。
 
 ---
 
@@ -700,10 +729,10 @@ styles/
 
 ### 响应式
 
-- [ ] 1440px 桌面检查
-- [ ] 1024px 平板检查
-- [ ] 720px 窄屏检查
-- [ ] 390px 手机检查
+- [ ] `1440 × 900` 桌面检查
+- [ ] `1024 × 768` 平板 / 小桌面检查
+- [ ] `720 × 900` 窄屏检查
+- [ ] `390 × 844` 手机检查
 - [ ] Safe Area / Visual Viewport 检查
 
 ### 产品诚实
