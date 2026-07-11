@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from enum import Enum
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -13,6 +14,25 @@ from app.domain.models.review import (
 )
 
 QualityReportStatus = Literal["clean", "warnings", "repairable", "blocked"]
+
+
+class QualityScoreDimension(str, Enum):
+    SCHEMA = "schema"
+    KNOWLEDGE_CORRECTNESS = "knowledge_correctness"
+    PROMPT_COVERAGE = "prompt_coverage"
+    PEDAGOGY = "pedagogy"
+    SCENE_CONTRACT = "scene_contract"
+    VISUAL_STRUCTURE = "visual_structure"
+    CODE_SYNC = "code_sync"
+    NARRATION_VISUAL_CONSISTENCY = "narration_visual_consistency"
+    TIMELINE = "timeline"
+    ASSET_LICENSE = "asset_license"
+    EXPORT_READINESS = "export_readiness"
+
+
+QUALITY_SCORE_DIMENSIONS: tuple[str, ...] = tuple(
+    dimension.value for dimension in QualityScoreDimension
+)
 
 
 class QualityReport(BaseModel):
@@ -114,19 +134,7 @@ class QualityReport(BaseModel):
 
 
 def _scores_from_verdict(verdict: PlaybookReviewVerdict) -> dict[str, float]:
-    dimensions = {
-        "schema": 1.0,
-        "knowledge_correctness": 1.0,
-        "prompt_coverage": 1.0,
-        "pedagogy": 1.0,
-        "scene_contract": 1.0,
-        "visual_structure": 1.0,
-        "code_sync": 1.0,
-        "narration_visual_consistency": 1.0,
-        "timeline": 1.0,
-        "asset_license": 1.0,
-        "export_readiness": 1.0,
-    }
+    dimensions = dict.fromkeys(QUALITY_SCORE_DIMENSIONS, 1.0)
     for issue in verdict.issues:
         penalty = 0.35 if issue.severity == "error" else 0.15
         if issue.code.startswith("capability."):

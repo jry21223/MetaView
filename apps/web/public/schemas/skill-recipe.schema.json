@@ -1,0 +1,369 @@
+{
+  "$defs": {
+    "AssetRequirement": {
+      "additionalProperties": false,
+      "properties": {
+        "semantic_role": {
+          "minLength": 1,
+          "title": "Semantic Role",
+          "type": "string"
+        },
+        "asset_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Asset Id"
+        },
+        "pack_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pack Id"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "semantic_role"
+      ],
+      "title": "AssetRequirement",
+      "type": "object"
+    },
+    "FactRequirement": {
+      "additionalProperties": false,
+      "properties": {
+        "fact_id": {
+          "minLength": 1,
+          "title": "Fact Id",
+          "type": "string"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "validator_id": {
+          "minLength": 1,
+          "title": "Validator Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "fact_id",
+        "description",
+        "validator_id"
+      ],
+      "title": "FactRequirement",
+      "type": "object"
+    },
+    "LessonPlan": {
+      "additionalProperties": false,
+      "description": "Renderer-independent teaching plan shared by every generation path.",
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "domain": {
+          "minLength": 1,
+          "title": "Domain",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "learning_objectives": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Learning Objectives",
+          "type": "array"
+        },
+        "prerequisites": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Prerequisites",
+          "type": "array"
+        },
+        "misconceptions": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Misconceptions",
+          "type": "array"
+        },
+        "expected_conclusion": {
+          "minLength": 1,
+          "title": "Expected Conclusion",
+          "type": "string"
+        },
+        "lesson_arc": {
+          "enum": [
+            "intuition_to_abstraction",
+            "problem_to_solution",
+            "state_transition",
+            "comparison",
+            "derivation"
+          ],
+          "title": "Lesson Arc",
+          "type": "string"
+        },
+        "scenes": {
+          "items": {
+            "$ref": "#/$defs/SceneIntent"
+          },
+          "minItems": 1,
+          "title": "Scenes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema_version",
+        "domain",
+        "title",
+        "learning_objectives",
+        "prerequisites",
+        "misconceptions",
+        "expected_conclusion",
+        "lesson_arc",
+        "scenes"
+      ],
+      "title": "LessonPlan",
+      "type": "object"
+    },
+    "QualityExpectation": {
+      "additionalProperties": false,
+      "properties": {
+        "dimension": {
+          "$ref": "#/$defs/QualityScoreDimension"
+        },
+        "minimum_score": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Minimum Score",
+          "type": "number"
+        },
+        "blocking": {
+          "default": true,
+          "title": "Blocking",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "dimension",
+        "minimum_score"
+      ],
+      "title": "QualityExpectation",
+      "type": "object"
+    },
+    "QualityScoreDimension": {
+      "enum": [
+        "schema",
+        "knowledge_correctness",
+        "prompt_coverage",
+        "pedagogy",
+        "scene_contract",
+        "visual_structure",
+        "code_sync",
+        "narration_visual_consistency",
+        "timeline",
+        "asset_license",
+        "export_readiness"
+      ],
+      "title": "QualityScoreDimension",
+      "type": "string"
+    },
+    "SceneIntent": {
+      "additionalProperties": false,
+      "description": "One pedagogical decision, without renderer or layout details.",
+      "properties": {
+        "scene_id": {
+          "minLength": 1,
+          "title": "Scene Id",
+          "type": "string"
+        },
+        "teaching_goal": {
+          "minLength": 1,
+          "title": "Teaching Goal",
+          "type": "string"
+        },
+        "strategy": {
+          "enum": [
+            "intuition",
+            "demonstration",
+            "derivation",
+            "comparison",
+            "state_transition",
+            "summary"
+          ],
+          "title": "Strategy",
+          "type": "string"
+        },
+        "required_fact_ids": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Required Fact Ids",
+          "type": "array"
+        },
+        "required_visual_roles": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Required Visual Roles",
+          "type": "array"
+        },
+        "preferred_scene_type": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Preferred Scene Type"
+        },
+        "narration_goal": {
+          "minLength": 1,
+          "title": "Narration Goal",
+          "type": "string"
+        }
+      },
+      "required": [
+        "scene_id",
+        "teaching_goal",
+        "strategy",
+        "required_fact_ids",
+        "required_visual_roles",
+        "preferred_scene_type",
+        "narration_goal"
+      ],
+      "title": "SceneIntent",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Transient, data-only execution recipe for composable coverage.",
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "recipe_id": {
+      "minLength": 1,
+      "title": "Recipe Id",
+      "type": "string"
+    },
+    "domain": {
+      "minLength": 1,
+      "title": "Domain",
+      "type": "string"
+    },
+    "lesson_plan": {
+      "$ref": "#/$defs/LessonPlan"
+    },
+    "required_facts": {
+      "items": {
+        "$ref": "#/$defs/FactRequirement"
+      },
+      "title": "Required Facts",
+      "type": "array"
+    },
+    "allowed_tool_ids": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Allowed Tool Ids",
+      "type": "array"
+    },
+    "required_validator_ids": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Required Validator Ids",
+      "type": "array"
+    },
+    "allowed_scene_types": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Allowed Scene Types",
+      "type": "array"
+    },
+    "allowed_snapshot_kinds": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Allowed Snapshot Kinds",
+      "type": "array"
+    },
+    "asset_requirements": {
+      "items": {
+        "$ref": "#/$defs/AssetRequirement"
+      },
+      "title": "Asset Requirements",
+      "type": "array"
+    },
+    "quality_expectations": {
+      "items": {
+        "$ref": "#/$defs/QualityExpectation"
+      },
+      "minItems": 1,
+      "title": "Quality Expectations",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "recipe_id",
+    "domain",
+    "lesson_plan",
+    "required_facts",
+    "allowed_tool_ids",
+    "required_validator_ids",
+    "allowed_scene_types",
+    "allowed_snapshot_kinds",
+    "asset_requirements",
+    "quality_expectations"
+  ],
+  "title": "SkillRecipe",
+  "type": "object"
+}

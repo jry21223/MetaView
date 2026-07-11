@@ -74,19 +74,22 @@ same domain is not enough to claim `composable`.
 
 `available_tool_ids` contains the minimum relevant tools that discovery proved available for
 this decision. It is audit evidence, not an authorization boundary and not proof that a tool was
-executed. The planned `SkillRecipe`/RecipeExecutor phase will enforce per-request tool allowlists.
+executed. The `SkillRecipe` contract and RecipeValidator now enforce a narrower per-request
+allowlist; production wiring to the planned RecipeExecutor is not active yet.
 
 ## Current execution status
 
 - Production/verified: contract, deterministic resolver, SQLite persistence, API response,
   QualityReport mode propagation, fail-closed unsupported/experimental behavior, Agent/CIR
   prompt binding, and History diagnostics.
+- Production/verified: the transient `SkillRecipe` contract, canonical public schema and
+  deterministic RecipeValidator.
 - Transitional: a `composable` decision continues through the existing agent or legacy CIR
-  generation path with the boundary attached. It does not yet create or execute a
-  `SkillRecipe`, so this is not the final Generalist execution architecture.
+  generation path with the boundary attached. It does not yet create or execute a recipe in the
+  live pipeline, so this is not the final Generalist execution architecture.
 - Legacy: `RouteDecision` and topic `SkillMode` remain prompt/routing context. Neither is a
   substitute for CoverageDecision.
-- Planned: Generalist Composer, SkillRecipe validation/execution, Capability Gap recording and
+- Planned: Generalist Composer, SkillRecipe production execution, Capability Gap recording and
   offline SkillForge. Generalist Composer must not be registered as a universal SkillPack.
 
 ## Persistence and UI
