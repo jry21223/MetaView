@@ -32,6 +32,26 @@ describe("App routing", () => {
     window.history.pushState({}, "", "/");
   });
 
+  it("renders the public landing page at /", async () => {
+    vi.stubEnv("VITE_APP_EDITION", "self");
+
+    const { App } = await import("./App");
+    const { getByText } = render(<App />);
+
+    expect(getByText("真实案例将在这里出现")).toBeTruthy();
+    expect(window.location.pathname).toBe("/");
+  });
+
+  it("opens the creation intake directly from /create", async () => {
+    vi.stubEnv("VITE_APP_EDITION", "self");
+    window.history.pushState({}, "", "/create");
+
+    const { App } = await import("./App");
+    const { getByText } = render(<App />);
+
+    expect(getByText("输入题目或代码，生成可播放的分步讲解")).toBeTruthy();
+  });
+
   it("restores the workbench from a direct /run/:runId link", async () => {
     const seenRunIds: Array<string | null> = [];
     vi.stubEnv("VITE_APP_EDITION", "self");
@@ -64,7 +84,7 @@ describe("App routing", () => {
     expect(getByRole("searchbox")).toBeTruthy();
   });
 
-  it("redirects unknown app paths back to intake", async () => {
+  it("redirects unknown app paths back to the public landing page", async () => {
     vi.stubEnv("VITE_APP_EDITION", "self");
     window.history.pushState({}, "", "/nope");
 
@@ -72,7 +92,7 @@ describe("App routing", () => {
     const { getByText } = render(<App />);
 
     await waitFor(() => expect(window.location.pathname).toBe("/"));
-    expect(getByText("输入题目或代码，生成可播放的分步讲解")).toBeTruthy();
+    expect(getByText("真实案例将在这里出现")).toBeTruthy();
   });
 
   it("shows the ops login gate for logged-out /run/:runId deep links", async () => {
