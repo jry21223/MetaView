@@ -3,20 +3,21 @@ import { describe, expect, it } from "vitest";
 import { pathToStage, stageToPath } from "./routes";
 
 describe("app route helpers", () => {
-  it("maps top-level stages to shareable paths", () => {
-    expect(stageToPath("intake")).toBe("/");
+  it("maps app-shell stages to shareable paths", () => {
+    expect(stageToPath("intake")).toBe("/create");
     expect(stageToPath("workbench", "run-1")).toBe("/run/run-1");
     expect(stageToPath("history")).toBe("/history");
     expect(stageToPath("templates")).toBe("/templates");
     expect(stageToPath("settings")).toBe("/settings");
   });
 
-  it("falls back to intake when workbench has no run id", () => {
-    expect(stageToPath("workbench")).toBe("/");
+  it("falls back to create when workbench has no run id", () => {
+    expect(stageToPath("workbench")).toBe("/create");
   });
 
-  it("derives the active stage from location pathnames", () => {
-    expect(pathToStage("/")).toBe("intake");
+  it("derives the active app stage from location pathnames", () => {
+    expect(pathToStage("/create")).toBe("intake");
+    expect(pathToStage("/create/")).toBe("intake");
     expect(pathToStage("/run/run-1")).toBe("workbench");
     expect(pathToStage("/run/run-1/")).toBe("workbench");
     expect(pathToStage("/history")).toBe("history");
@@ -25,6 +26,7 @@ describe("app route helpers", () => {
   });
 
   it("treats unknown shell paths as intake for navigation state", () => {
+    expect(pathToStage("/")).toBe("intake");
     expect(pathToStage("/nope")).toBe("intake");
     expect(pathToStage("/run")).toBe("intake");
   });
