@@ -202,7 +202,7 @@
 .mv-landing-button--primary {
   background: var(--accent);
   border-color: transparent;
-  color: #fff;
+  color: var(--accent-contrast, var(--ink));
 }
 
 .mv-landing-button--primary:hover {

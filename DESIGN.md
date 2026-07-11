@@ -237,8 +237,8 @@ font-family: "IBM Plex Mono", ui-monospace, monospace;
 
 | Role | Size | Weight | Line Height |
 |---|---:|---:|---:|
-| Landing Display | `clamp(40px, 5vw, 68px)` | `600–650` | `1.06–1.12` |
-| Landing Lead | `17–20px` | `400–500` | `1.55–1.7` |
+| Landing Display | `clamp(44px, 5.4vw, 72px)`; mobile `clamp(39px, 12vw, 52px)` | `600–650` | `1.03–1.12` |
+| Landing Lead | `clamp(15px, 1.3vw, 17px)`; mobile `14px` | `400–500` | `1.68–1.75` |
 | App Hero | `clamp(24px, 2.4vw, 32px)` | `600–650` | `1.25–1.3` |
 | Page Title | `26px` | `600` | `1.25` |
 | Section Title | `15–18px` | `600` | `1.3` |
@@ -398,9 +398,12 @@ Hero 必须展示：
 
 ```css
 background: var(--accent);
-color: white;
+color: var(--accent-contrast);
 border-color: transparent;
 ```
+
+`--accent-contrast` 必须根据当前 Accent 动态选择高对比前景色；不得假设白色在浅色和深色
+品牌 Accent 上都满足可读性。新主题或用户自定义 Accent 也必须通过同一 Token。
 
 ### 10.2 Soft Primary
 
@@ -693,8 +696,9 @@ styles/
 4. `studio.css` 职责较多，Landing 已拆入独立目录，其他共享控件继续按真实复用需求渐进迁移。
 5. 当前页面仍存在 `6px–14px` 的圆角漂移；新功能遵守本文角色尺度，不为统一数值进行无关重构。
 6. 播放器与 Renderer 存在局部 Token 和硬编码回退，这是渲染 / 导出边界的一部分；新增值应集中管理并保持浏览器与 Remotion 一致。
-7. 模板页仍包含 Raw Prompt 和开发者路径，公共产品化时应改为真实结果预览。
-8. `/` 已作为公共 Landing，输入页使用 `/create`，应用内首项统一称为“工作台”。
+7. `styles/pages/tools.css` 仍保留未接入的 `--primary` / `--surface-container` 等旧 Token，且当前未由 `index.css` 导入；它不是当前品牌系统的有效来源，迁移前不得继续扩展。
+8. 模板页仍包含 Raw Prompt 和开发者路径，公共产品化时应改为真实结果预览。
+9. `/` 已作为公共 Landing，输入页使用 `/create`，应用内首项统一称为“工作台”。
 
 ---
 
