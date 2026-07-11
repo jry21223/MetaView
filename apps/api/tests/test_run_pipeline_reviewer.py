@@ -1,14 +1,21 @@
 from __future__ import annotations
 
 import json
+from functools import partial
 
 import pytest
 
 from app.application.dto.pipeline_dto import PipelineRequest
-from app.application.use_cases.run_pipeline import RunPipelineUseCase
+from app.application.use_cases.run_pipeline import RunPipelineUseCase as _RunPipelineUseCase
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.infrastructure.persistence.db_init import init_db
 from app.infrastructure.persistence.sqlite_run_repository import SqliteRunRepository
+from tests.coverage_test_utils import ComposableCoverageResolver
+
+RunPipelineUseCase = partial(
+    _RunPipelineUseCase,
+    coverage_resolver=ComposableCoverageResolver(default_domain="math"),
+)
 
 
 def _combined(cir: dict, execution_map: dict | None = None) -> str:

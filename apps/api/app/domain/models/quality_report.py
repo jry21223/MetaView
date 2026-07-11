@@ -4,6 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.domain.models.coverage import CoverageMode
 from app.domain.models.review import (
     PlaybookIssueSeverity,
     PlaybookReviewIssue,
@@ -21,7 +22,7 @@ class QualityReport(BaseModel):
 
     status: QualityReportStatus
     generator_path: str = Field(min_length=1)
-    coverage_mode: str = Field(default="unknown", min_length=1)
+    coverage_mode: CoverageMode | Literal["unknown"] = "unknown"
     issues: list[PlaybookReviewIssue] = Field(default_factory=list)
     scores: dict[str, float] = Field(default_factory=dict)
     repair_targets: list[str] = Field(default_factory=list)
@@ -35,7 +36,7 @@ class QualityReport(BaseModel):
         verdict: PlaybookReviewVerdict,
         *,
         generator_path: str,
-        coverage_mode: str = "unknown",
+        coverage_mode: CoverageMode | Literal["unknown"] = "unknown",
         attempts: int = 0,
     ) -> "QualityReport":
         repair_targets = [issue.path for issue in verdict.issues if issue.requires_repair]
@@ -128,7 +129,9 @@ def _scores_from_verdict(verdict: PlaybookReviewVerdict) -> dict[str, float]:
     }
     for issue in verdict.issues:
         penalty = 0.35 if issue.severity == "error" else 0.15
-        if issue.code.startswith("schema."):
+        if issue.code.startswith("capability."):
+            keys = ["knowledge_correctness", "prompt_coverage", "export_readiness"]
+        elif issue.code.startswith("schema."):
             keys = ["schema", "export_readiness"]
         elif issue.code.startswith("asset."):
             keys = ["asset_license", "export_readiness"]

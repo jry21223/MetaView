@@ -9,6 +9,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
+from app.domain.models.coverage import CoverageDecision
+from app.domain.models.lesson_plan import LessonPlan, SceneIntent
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.infrastructure.persistence.db_init import init_db
 from app.infrastructure.persistence.sqlite_account_repository import SqliteAccountRepository
@@ -90,6 +92,17 @@ def followup_client(
 def test_followup_applies_patch_persists_history_and_versions(followup_client) -> None:
     client, repo, director_repo, _llm = followup_client
     run_id = _seed_run(repo)
+    decision = CoverageDecision(
+        mode="specialized",
+        domain="algorithm",
+        confidence=0.9,
+        matched_skill_ids=["algorithm_graph_core"],
+        available_tool_ids=["skill.algorithm_graph_core.solve"],
+        missing_capabilities=[],
+        fallback_policy="use_skill",
+        reason="A deterministic algorithm SkillPack covers the original run.",
+    )
+    _run(repo.update_coverage_decision(run_id, decision.model_dump_json()))
 
     resp = client.post(f"/api/v1/runs/{run_id}/follow-up", json={"message": "换个角度讲"})
 
@@ -112,6 +125,8 @@ def test_followup_applies_patch_persists_history_and_versions(followup_client) -
     assert stored.playbook.summary == "改成更直观的版本。"
     assert stored.quality_report is not None
     assert stored.quality_report.generator_path == "followup_patch"
+    assert stored.quality_report.coverage_mode == "specialized"
+    assert stored.coverage_decision == decision
     assert stored.quality_report.status in {"clean", "warnings"}
 
     history = client.get(f"/api/v1/runs/{run_id}/follow-ups").json()
@@ -124,6 +139,49 @@ def test_followup_applies_patch_persists_history_and_versions(followup_client) -
     assert history["versions"][1]["parent_version_id"] == history["versions"][0]["version_id"]
     assert history["versions"][1]["short_id"]
     assert history["versions"][1]["is_head"] is True
+
+
+def test_followup_gate_enforces_persisted_experimental_boundary(followup_client) -> None:
+    client, repo, _director_repo, _llm = followup_client
+    run_id = _seed_run(repo)
+    decision = CoverageDecision(
+        mode="experimental",
+        domain="algorithm",
+        confidence=0.55,
+        matched_skill_ids=[],
+        available_tool_ids=["playbook.schema.validate"],
+        missing_capabilities=["capability:controlled_composition:algorithm"],
+        fallback_policy="text_only",
+        reason="No verified visual execution path covers the original run.",
+    )
+    _run(repo.update_coverage_decision(run_id, decision.model_dump_json()))
+
+    response = client.post(
+        f"/api/v1/runs/{run_id}/follow-up",
+        json={"message": "换个角度讲"},
+    )
+
+    assert response.status_code == 422
+    assert "capability.text_only_required" in response.json()["detail"]
+    stored = _run(repo.get(run_id))
+    assert stored is not None
+    assert stored.coverage_decision == decision
+
+
+def test_followup_gate_preserves_persisted_lesson_plan_requirements(
+    followup_client,
+) -> None:
+    client, repo, _director_repo, _llm = followup_client
+    run_id = _seed_run(repo)
+    _run(repo.update_lesson_plan(run_id, _strict_stack_lesson_plan().model_dump_json()))
+
+    response = client.post(
+        f"/api/v1/runs/{run_id}/follow-up",
+        json={"message": "换个角度讲"},
+    )
+
+    assert response.status_code == 422
+    assert "lesson_plan.visual_role_missing" in response.json()["detail"]
 
 
 def test_followup_can_reply_without_creating_version(monkeypatch, tmp_path) -> None:
@@ -220,6 +278,27 @@ def test_followup_restore_version(followup_client) -> None:
     assert versions_after[0]["is_head"] is True
     assert versions_after[1]["source"] == "followup"
     assert versions_after[1]["is_head"] is False
+
+
+def test_restore_gate_preserves_persisted_lesson_plan_requirements(
+    followup_client,
+) -> None:
+    client, repo, _director_repo, _llm = followup_client
+    run_id = _seed_run(repo)
+    assert client.post(
+        f"/api/v1/runs/{run_id}/follow-up",
+        json={"message": "修改"},
+    ).status_code == 200
+    versions = client.get(f"/api/v1/runs/{run_id}/follow-ups").json()["versions"]
+    original_version = versions[0]["version_id"]
+    _run(repo.update_lesson_plan(run_id, _strict_stack_lesson_plan().model_dump_json()))
+
+    response = client.post(
+        f"/api/v1/runs/{run_id}/versions/{original_version}/restore"
+    )
+
+    assert response.status_code == 422
+    assert "lesson_plan.visual_role_missing" in response.json()["detail"]
 
 
 def test_followup_director_failure_does_not_activate_new_playbook_or_quality(
@@ -505,6 +584,30 @@ def test_followup_ops_refunds_balance_when_patch_fails(monkeypatch, tmp_path) ->
     assert _balance(db, owner.account.user_id) == 20
     assert _ledger_count(db, owner.account.user_id, "consume") == 1
     assert _ledger_count(db, owner.account.user_id, "refund") == 1
+
+
+def _strict_stack_lesson_plan() -> LessonPlan:
+    return LessonPlan(
+        schema_version="1.0.0",
+        domain="algorithm",
+        title="递归调用栈",
+        learning_objectives=["追踪 factorial(4) 的压栈与回溯。"],
+        prerequisites=[],
+        misconceptions=[],
+        expected_conclusion="factorial(4)=24",
+        lesson_arc="state_transition",
+        scenes=[
+            SceneIntent(
+                scene_id="stack_trace",
+                teaching_goal="展示调用栈状态和返回值传播。",
+                strategy="state_transition",
+                required_fact_ids=[],
+                required_visual_roles=["stack_frame", "active_frame", "return_value"],
+                preferred_scene_type="recursion_stack",
+                narration_goal="同步说明压栈和回溯。",
+            )
+        ],
+    )
 
 
 def _seed_run(repo: SqliteRunRepository, user_id: str | None = None) -> str:

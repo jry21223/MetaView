@@ -91,8 +91,14 @@ class ExportVideoUseCase:
                 generator_path=(
                     previous_quality.generator_path if previous_quality else "export_recheck"
                 ),
+                coverage_decision=getattr(run, "coverage_decision", None),
+                lesson_plan=getattr(run, "lesson_plan", None),
                 coverage_mode=(
-                    previous_quality.coverage_mode if previous_quality else "unknown"
+                    run.coverage_decision.mode
+                    if getattr(run, "coverage_decision", None) is not None
+                    else (
+                        previous_quality.coverage_mode if previous_quality else "unknown"
+                    )
                 ),
             )
             export_quality = _merge_export_quality(previous_quality, export_quality)
@@ -430,7 +436,7 @@ def _merge_export_quality(
     return QualityReport.from_review_verdict(
         verdict,
         generator_path=previous.generator_path,
-        coverage_mode=previous.coverage_mode,
+        coverage_mode=current.coverage_mode,
         attempts=previous.attempts,
     )
 

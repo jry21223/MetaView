@@ -173,10 +173,16 @@ async def submit_followup(
                     result.playbook,
                     run.prompt,
                     generator_path="followup_patch",
+                    coverage_decision=getattr(run, "coverage_decision", None),
+                    lesson_plan=getattr(run, "lesson_plan", None),
                     coverage_mode=(
-                        run.quality_report.coverage_mode
-                        if run.quality_report is not None
-                        else "unknown"
+                        run.coverage_decision.mode
+                        if getattr(run, "coverage_decision", None) is not None
+                        else (
+                            run.quality_report.coverage_mode
+                            if run.quality_report is not None
+                            else "unknown"
+                        )
                     ),
                 )
                 next_quality.actions = [
@@ -276,8 +282,16 @@ async def restore_version(
             playbook,
             run.prompt,
             generator_path="version_restore",
+            coverage_decision=getattr(run, "coverage_decision", None),
+            lesson_plan=getattr(run, "lesson_plan", None),
             coverage_mode=(
-                run.quality_report.coverage_mode if run.quality_report is not None else "unknown"
+                run.coverage_decision.mode
+                if getattr(run, "coverage_decision", None) is not None
+                else (
+                    run.quality_report.coverage_mode
+                    if run.quality_report is not None
+                    else "unknown"
+                )
             ),
         )
         quality_report.actions = [

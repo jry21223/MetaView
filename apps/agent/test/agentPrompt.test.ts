@@ -71,12 +71,26 @@ function lessonPlan(): Record<string, unknown> {
   };
 }
 
+function coverageDecision(): Record<string, unknown> {
+  return {
+    mode: "experimental",
+    domain: "geography",
+    confidence: 0.68,
+    matched_skill_ids: [],
+    available_tool_ids: ["scene_blueprint.compile"],
+    missing_capabilities: ["validator:geography.monsoon"],
+    fallback_policy: "limited_visual",
+    reason: "The visual template exists but the fact validator is missing.",
+  };
+}
+
 describe("agent prompt contracts", () => {
   it("hands the LessonPlan to the initial prompt as read-only context", () => {
     const prompt = buildAgentPrompt(
       "讲解东亚季风",
       { destination: "agent", domain: "geography" },
       lessonPlan(),
+      coverageDecision(),
     );
 
     expect(prompt).toContain("[MetaView LessonPlan]");
@@ -84,6 +98,9 @@ describe("agent prompt contracts", () => {
     expect(prompt).toContain("cover every required fact");
     expect(prompt).toContain("LESSON_PLAN_ONLY_MARKER");
     expect(prompt).toContain("[MetaView route decision]");
+    expect(prompt).toContain("[MetaView coverage decision]");
+    expect(prompt).toContain("validator:geography.monsoon");
+    expect(prompt).toContain("available_tool_ids records relevant capability evidence");
     expect(prompt).toContain("[user prompt]");
   });
 
@@ -105,6 +122,7 @@ describe("agent prompt contracts", () => {
   it("gives specific repair guidance for subject visual array fallbacks", () => {
     const prompt = buildAgentSelfRepairPrompt({
       originalPrompt: "讲解东亚夏季风的海陆热力差异",
+      coverageDecision: coverageDecision(),
       lessonPlan: lessonPlan(),
       previousPlaybook: fallbackPlaybook(),
       repairAttempt: 1,
@@ -126,6 +144,8 @@ describe("agent prompt contracts", () => {
     expect(prompt).toContain("snapshot.domain_fallback");
     expect(prompt).toContain("LESSON_PLAN_ONLY_MARKER");
     expect(prompt).toContain('"lesson_plan"');
+    expect(prompt).toContain('"coverage_decision"');
+    expect(prompt).toContain("Treat coverage_decision as binding");
     expect(prompt).toContain("Treat lesson_plan as binding");
     expect(prompt).toContain("matching SkillPack runtime tool");
     expect(prompt).toContain("SceneBlueprint");

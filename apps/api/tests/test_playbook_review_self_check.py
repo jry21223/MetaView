@@ -5,8 +5,13 @@ from copy import deepcopy
 import pytest
 
 from app.application.services.lesson_planner import build_rule_based_lesson_plan
+from app.domain.models.coverage import CoverageDecision
 from app.domain.models.playbook import PlaybookScript
-from app.domain.models.review import PlaybookReviewStatus
+from app.domain.models.review import (
+    SUPPORTED_PLAYBOOK_REVIEW_CODES,
+    PlaybookIssueSeverity,
+    PlaybookReviewStatus,
+)
 from app.domain.services.playbook_quality import quality_gate_playbook
 from app.domain.services.playbook_review import review_playbook_script
 
@@ -230,6 +235,89 @@ def test_canonical_gate_accepts_playbook_with_lesson_plan_evidence() -> None:
     )
 
     assert not any(issue.code.startswith("lesson_plan.") for issue in report.issues)
+
+
+def test_canonical_gate_blocks_experimental_text_only_coverage() -> None:
+    coverage_decision = CoverageDecision(
+        mode="experimental",
+        domain="algorithm",
+        confidence=0.6,
+        matched_skill_ids=[],
+        available_tool_ids=["animation.compile"],
+        missing_capabilities=["verified_visual_output"],
+        fallback_policy="text_only",
+        reason="Knowledge can be explained but no verified visual output is available.",
+    )
+
+    report = quality_gate_playbook(
+        _valid_playbook(),
+        "Binary search.",
+        generator_path="test",
+        coverage_decision=coverage_decision,
+    )
+
+    issue = next(
+        item for item in report.issues if item.code == "capability.text_only_required"
+    )
+    assert report.status == "blocked"
+    assert report.coverage_mode == "experimental"
+    assert issue.severity == PlaybookIssueSeverity.ERROR
+    assert issue.requires_repair is False
+    assert issue.path not in report.repair_targets
+
+
+def test_canonical_gate_blocks_limited_visual_without_hiding_other_warnings() -> None:
+    payload = _valid_playbook().model_dump(mode="json")
+    payload["summary"] = ""
+    coverage_decision = CoverageDecision(
+        mode="experimental",
+        domain="algorithm",
+        confidence=0.7,
+        matched_skill_ids=[],
+        available_tool_ids=["animation.compile"],
+        missing_capabilities=["visual_validator"],
+        fallback_policy="limited_visual",
+        reason="The visual can be composed but cannot be fully validated.",
+    )
+
+    report = quality_gate_playbook(
+        PlaybookScript.model_validate(payload),
+        "Binary search.",
+        generator_path="test",
+        coverage_mode="specialized",
+        coverage_decision=coverage_decision,
+    )
+
+    issues = {issue.code: issue for issue in report.issues}
+    assert report.status == "blocked"
+    assert report.coverage_mode == "experimental"
+    issue = issues["capability.limited_visual_unavailable"]
+    assert issue.severity == PlaybookIssueSeverity.ERROR
+    assert issue.requires_repair is False
+    assert issue.path not in report.repair_targets
+    assert "step.too_shallow" in issues
+
+
+def test_canonical_gate_keeps_legacy_coverage_mode_call_compatible() -> None:
+    report = quality_gate_playbook(
+        _valid_playbook(),
+        "Binary search.",
+        generator_path="test",
+        coverage_mode="composable",
+    )
+
+    assert report.status == "clean"
+    assert report.coverage_mode == "composable"
+    assert "capability.limited_visual_unavailable" not in {
+        issue.code for issue in report.issues
+    }
+
+
+def test_coverage_boundary_issue_codes_are_canonical() -> None:
+    assert {
+        "capability.limited_visual_unavailable",
+        "capability.text_only_required",
+    } <= set(SUPPORTED_PLAYBOOK_REVIEW_CODES)
 
 
 def test_lesson_plan_visual_role_cannot_be_satisfied_by_narration_only() -> None:

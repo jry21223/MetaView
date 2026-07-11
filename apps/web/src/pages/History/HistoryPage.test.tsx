@@ -59,6 +59,16 @@ const succeededRun: PipelineRunResult = {
   error: null,
   created_at: "2026-06-01T08:00:00.000Z",
   review: null,
+  coverage_decision: {
+    mode: "composable",
+    domain: "algorithm",
+    confidence: 0.88,
+    matched_skill_ids: ["algorithm_graph_core"],
+    available_tool_ids: ["scene_blueprint.compile"],
+    missing_capabilities: [],
+    fallback_policy: "compose",
+    reason: "The request can be assembled from controlled capabilities.",
+  },
 };
 
 function renderHistoryPage(overrides: Partial<React.ComponentProps<typeof HistoryPage>> = {}) {
@@ -242,6 +252,9 @@ describe("HistoryPage actions", () => {
     const { findByTestId, queryByLabelText, queryByText } = renderHistoryPage();
 
     await findByTestId("mock-remotion-player");
+    expect(queryByLabelText("能力覆盖判定")).not.toBeNull();
+    expect(queryByText("scene_blueprint.compile")).toBeNull();
+    expect(queryByText("algorithm_graph_core")).toBeNull();
     expect(queryByLabelText("Learning console")).toBeNull();
     expect(queryByText("Params")).toBeNull();
     expect(queryByText("Code Sync")).toBeNull();

@@ -19,6 +19,7 @@
 | [director-layer.md](./director-layer.md) | Director 独立导演层：运镜、节奏、镜头、强调、RenderPlan 和阶段路线 |
 | [pipeline.md](./pipeline.md) | single / agent 生成路径、PlaybookScript、DirectorScript 挂载点、视频导出管线 |
 | [lesson-plan.md](./lesson-plan.md) | 三条生成路径共享的教学规划契约、持久化、边界与当前限制 |
+| [coverage-and-fallback.md](./coverage-and-fallback.md) | CoverageDecision 四种能力模式、受控组合、阻断与持久化边界 |
 | [quality-gate.md](./quality-gate.md) | 后端 Canonical QualityReport、修复、持久化、Director 与导出阻断语义 |
 | [frontend-shell.md](./frontend-shell.md) | Stage 路由、GlobalTopbar、Studio 布局、Provider 配置、snapshot support levels |
 | [animation-tool-registry.md](./animation-tool-registry.md) | 后端 animation tool registry 的扩展流程、当前工具和新增规则 |

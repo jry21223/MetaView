@@ -12,6 +12,7 @@ import pytest
 
 from app.application.agent.types import AgentConstraints, AgentRequest, ToolManifest
 from app.application.ports.agent_provider import AgentProviderError
+from app.domain.models.coverage import CoverageDecision
 from app.domain.models.lesson_plan import LessonPlan, SceneIntent
 from app.domain.models.playbook import PlaybookScript
 from app.infrastructure.agent.codex_agent_provider import (
@@ -249,6 +250,16 @@ async def test_codex_provider_run_includes_tool_manifests_and_returns_agent_resu
             source_code=None,
             language=None,
             route_decision={"destination": "generic_cir"},
+            coverage_decision=CoverageDecision(
+                mode="experimental",
+                domain="math",
+                confidence=0.6,
+                matched_skill_ids=[],
+                available_tool_ids=["playbook.schema.validate"],
+                missing_capabilities=["validator:line_graph"],
+                fallback_policy="limited_visual",
+                reason="Only a limited visual path is available.",
+            ),
             lesson_plan=_lesson_plan(),
             provider_config=None,
             playbook_schema={"type": "object"},
@@ -270,6 +281,9 @@ async def test_codex_provider_run_includes_tool_manifests_and_returns_agent_resu
     assert "[MetaView runtime tools]" in prompt
     assert "playbook.schema.validate" in prompt
     assert '"lesson_plan"' in prompt
+    assert '"coverage_decision"' in prompt
+    assert "validator:line_graph" in prompt
+    assert "coverage_decision is binding" in prompt
     assert "lesson_plan is binding" in prompt
     assert "LESSON_PLAN_ONLY_MARKER" in prompt
     instructions = fake.thread_start_calls[0]["developer_instructions"]

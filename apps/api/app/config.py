@@ -97,8 +97,8 @@ class Settings(BaseSettings):
     router_mode: RouterMode = "hybrid"
     router_model: str | None = None
     router_timeout_s: float = 12.0
-    router_min_confidence: float = 0.72
-    router_refine_confidence: float = 0.55
+    router_min_confidence: float = Field(default=0.72, ge=0.0, le=1.0)
+    router_refine_confidence: float = Field(default=0.55, ge=0.0, le=1.0)
     router_temperature: float = 0.0
 
     # ── Generation pipeline mode (single-shot vs agent sidecar) ─────────────

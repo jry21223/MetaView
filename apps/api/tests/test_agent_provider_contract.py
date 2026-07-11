@@ -8,6 +8,7 @@ from app.application.agent.types import (
     AgentResult,
     ToolManifest,
 )
+from app.domain.models.coverage import CoverageDecision
 from app.domain.models.lesson_plan import LessonPlan, SceneIntent
 
 
@@ -17,6 +18,8 @@ async def test_agent_provider_run_contract_uses_wide_request_shape() -> None:
         async def run(self, request: AgentRequest) -> AgentResult:
             assert request.run_id == "run-contract"
             assert request.route_decision["destination"] == "generic_cir"
+            assert request.coverage_decision is not None
+            assert request.coverage_decision.mode == "experimental"
             assert request.lesson_plan is not None
             assert request.lesson_plan.title == "Line lesson plan"
             assert request.available_tools[0].name == "playbook.schema.validate"
@@ -56,6 +59,16 @@ async def test_agent_provider_run_contract_uses_wide_request_shape() -> None:
         source_code=None,
         language=None,
         route_decision={"destination": "generic_cir"},
+        coverage_decision=CoverageDecision(
+            mode="experimental",
+            domain="math",
+            confidence=0.6,
+            matched_skill_ids=[],
+            available_tool_ids=["playbook.schema.validate"],
+            missing_capabilities=["validator:line_graph"],
+            fallback_policy="limited_visual",
+            reason="Only a limited visual path is available.",
+        ),
         lesson_plan=lesson_plan,
         provider_config={"model": "test-model"},
         playbook_schema={"type": "object"},

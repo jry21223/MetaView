@@ -13,6 +13,7 @@ It is not a rendering format and does not replace `PlaybookScript`.
 ```text
 Intake
   -> Router
+  -> CoverageDecision
   -> RuleBasedLessonPlanner
   -> persist pipeline_runs.lesson_plan_json
   -> specialized SkillPack | Agent provider | legacy CIR generator
@@ -22,7 +23,7 @@ Intake
   -> Remotion
 ```
 
-The plan is created after routing and before any generation provider call. The
+The plan is created after routing and capability resolution, and before any generation provider call. The
 same typed object is passed through each path:
 
 - specialized SkillPack: `SkillExecutionContext.lesson_plan`;
@@ -102,5 +103,5 @@ not a second production planner.
   localized scene trace rather than brittle text matching.
 - Existing SkillPacks may optionally return a refined `LessonPlan`, but old
   SkillPacks remain valid and receive the shared plan through their context.
-- CoverageDecision, Generalist Composer and SkillRecipe are later phases and
-  are not implied by this contract.
+- CoverageDecision is now the preceding capability boundary. Generalist Composer
+  and SkillRecipe remain planned and are not implied by this contract.

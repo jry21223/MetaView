@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from app.domain.models.coverage import CoverageDecision
 from app.domain.models.lesson_plan import LessonPlan
 from app.domain.models.route_decision import RouteDecision
 from app.domain.models.topic import TopicDomain
@@ -310,6 +311,7 @@ def build_cir_prompt(
     language: str = "python",
     skill_mode: SkillMode = SkillMode.SPECIALIZED,
     route_decision: RouteDecision | dict[str, Any] | None = None,
+    coverage_decision: CoverageDecision | None = None,
     lesson_plan: LessonPlan | None = None,
 ) -> tuple[str, str]:
     """Return (system_prompt, user_prompt) for CIR + ExecutionMap generation.
@@ -335,6 +337,7 @@ Skill mode: specialized.
 You may change this if the topic clearly belongs to a different domain."""
 
     route_section = _format_route_decision(route_decision)
+    coverage_section = _format_coverage_decision(coverage_decision)
     lesson_plan_section = _format_lesson_plan(lesson_plan)
 
     code_track = ""
@@ -408,6 +411,7 @@ Only use: "array", "graph", "function", "scene", or "formula"
 
 ## Domain Classification
 {route_section}
+{coverage_section}
 {domain_section}
 {domain_guidance}
 
@@ -596,6 +600,23 @@ The router classified this request as:
 {json.dumps(payload, ensure_ascii=False, indent=2)}
 ```
 Use this as routing context only. Do not use unsupported deterministic skill output, and do not invent deterministic results when skill_id is unsupported or null.
+"""
+
+
+def _format_coverage_decision(coverage_decision: CoverageDecision | None) -> str:
+    if coverage_decision is None:
+        return ""
+    payload = json.dumps(
+        coverage_decision.model_dump(mode="json"), ensure_ascii=False, indent=2
+    )
+    return f"""## Canonical CoverageDecision (BINDING CAPABILITY BOUNDARY)
+Respect mode, fallback_policy, and missing_capabilities when producing the CIR.
+- Do not claim an unavailable Skill, validator, scene type, asset, or tool result.
+- available_tool_ids records capability evidence for this request; it is not proof
+  that a tool was executed and it does not authorize invented outputs.
+- Experimental output must stay within the stated limited_visual/text_only boundary.
+
+{payload}
 """
 
 
