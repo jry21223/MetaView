@@ -1,0 +1,629 @@
+/* MetaView — public landing page */
+
+.mv-landing {
+  --mv-landing-max: 1200px;
+  --mv-landing-gutter: clamp(18px, 3vw, 32px);
+  --mv-landing-section-y: clamp(78px, 9vw, 116px);
+
+  width: 100%;
+  min-height: var(--mv-vvh, 100vh);
+  overflow-x: hidden;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.mv-landing,
+.mv-landing button,
+.mv-landing a {
+  font-family:
+    "Inter",
+    -apple-system,
+    system-ui,
+    "PingFang SC",
+    "Noto Sans SC",
+    sans-serif;
+}
+
+.mv-landing button,
+.mv-landing a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mv-landing a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.mv-landing-container {
+  width: min(
+    var(--mv-landing-max),
+    calc(100vw - var(--mv-landing-gutter) * 2)
+  );
+  margin-inline: auto;
+}
+
+/* ───── Header ───── */
+
+.mv-landing-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  min-height: calc(68px + var(--mv-safe-top));
+  padding-top: var(--mv-safe-top);
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+  background: color-mix(in srgb, var(--bg) 84%, transparent);
+  backdrop-filter: blur(18px);
+}
+
+.mv-landing-header__inner {
+  min-height: 68px;
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) auto minmax(190px, 1fr);
+  align-items: center;
+  gap: 24px;
+}
+
+.mv-landing-brand {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  justify-self: start;
+}
+
+.mv-landing-brand .mv-brand-name {
+  font-size: 14px;
+}
+
+.mv-landing-brand .mv-brand-meta {
+  font-size: 8px;
+  letter-spacing: 0.2em;
+}
+
+.mv-landing-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-2) 52%, transparent);
+}
+
+.mv-landing-nav a {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border-radius: 7px;
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 520;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease;
+}
+
+.mv-landing-nav a:hover,
+.mv-landing-nav a:focus-visible {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+}
+
+.mv-landing-header__actions {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  gap: 8px;
+}
+
+.mv-landing-theme {
+  appearance: none;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  color: var(--ink-2);
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    color 150ms ease,
+    background-color 150ms ease;
+}
+
+.mv-landing-theme:hover {
+  color: var(--ink);
+  border-color: var(--line-2);
+  background: var(--surface);
+}
+
+.mv-landing-theme svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 1.75;
+}
+
+/* ───── Shared controls ───── */
+
+.mv-landing-button {
+  appearance: none;
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 0 17px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 560;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    color 150ms ease,
+    border-color 150ms ease,
+    background-color 150ms ease,
+    opacity 150ms ease;
+}
+
+.mv-landing-button svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 1.8;
+}
+
+.mv-landing-button:hover {
+  border-color: var(--line-2);
+  background: var(--surface-2);
+}
+
+.mv-landing-button--compact {
+  min-height: 36px;
+  padding-inline: 13px;
+  font-size: 12px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 18%, var(--line));
+  color: color-mix(in srgb, var(--accent) 64%, var(--ink));
+}
+
+.mv-landing-button--compact:hover {
+  background: color-mix(in srgb, var(--accent) 13%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--line));
+}
+
+.mv-landing-button--primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: #fff;
+}
+
+.mv-landing-button--primary:hover {
+  background: color-mix(in srgb, var(--accent) 90%, var(--ink));
+  border-color: transparent;
+}
+
+.mv-landing-button--secondary {
+  background: color-mix(in srgb, var(--surface) 76%, transparent);
+  color: var(--ink-2);
+}
+
+.mv-landing-button:focus-visible,
+.mv-landing-theme:focus-visible,
+.mv-landing-nav a:focus-visible,
+.mv-landing-footer a:focus-visible,
+.mv-landing-footer button:focus-visible,
+.mv-landing-cases__foot button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 46%, transparent);
+  outline-offset: 2px;
+}
+
+/* ───── Hero ───── */
+
+.mv-landing-hero {
+  position: relative;
+  isolation: isolate;
+  min-height: min(840px, calc(var(--mv-vvh, 100vh) - 68px));
+  display: grid;
+  align-items: center;
+  padding: clamp(72px, 9vw, 112px) 0 clamp(76px, 8vw, 104px);
+  overflow: hidden;
+  background:
+    radial-gradient(
+      circle at 18% 8%,
+      color-mix(in srgb, var(--accent) 9%, transparent),
+      transparent 30%
+    ),
+    radial-gradient(
+      circle at 84% 32%,
+      color-mix(in srgb, #a99562 7%, transparent),
+      transparent 28%
+    ),
+    var(--bg);
+}
+
+.mv-landing-hero::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--line-2) 70%, transparent),
+    transparent
+  );
+}
+
+.mv-landing-hero__field {
+  z-index: -1;
+  inset: 2% -3% auto;
+  height: min(520px, 62vh);
+  opacity: 0.52;
+  mask-image: linear-gradient(to bottom, black 22%, transparent 94%);
+}
+
+.mv-landing-hero__field .mv-meta-particle__svg {
+  transform: scale(1.08);
+}
+
+.mv-landing-hero__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.88fr) minmax(520px, 1.12fr);
+  align-items: center;
+  gap: clamp(48px, 6vw, 88px);
+}
+
+.mv-landing-hero__copy {
+  max-width: 560px;
+  position: relative;
+  z-index: 2;
+}
+
+.mv-landing-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 22px;
+  color: var(--ink-3);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 9.5px;
+  font-weight: 560;
+  letter-spacing: 0.12em;
+}
+
+.mv-landing-eyebrow i {
+  width: 22px;
+  height: 1px;
+  background: var(--line-2);
+}
+
+.mv-landing-hero h1 {
+  margin: 0;
+  max-width: 8.7em;
+  color: var(--ink);
+  font-family: var(--font-headline, "Space Grotesk", "Inter", sans-serif);
+  font-size: clamp(44px, 5.4vw, 72px);
+  font-weight: 620;
+  letter-spacing: -0.052em;
+  line-height: 1.03;
+  text-wrap: balance;
+}
+
+.mv-landing-hero h1 > span {
+  display: block;
+  color: color-mix(in srgb, var(--accent) 76%, var(--ink));
+}
+
+.mv-landing-hero__copy > p {
+  max-width: 520px;
+  margin: 26px 0 0;
+  color: var(--ink-2);
+  font-size: clamp(15px, 1.3vw, 17px);
+  line-height: 1.75;
+}
+
+.mv-landing-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 32px;
+}
+
+.mv-landing-subjects {
+  max-width: 520px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px 12px;
+  margin-top: 28px;
+  color: var(--ink-3);
+  font-size: 11px;
+}
+
+.mv-landing-subjects > span {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  letter-spacing: 0.1em;
+}
+
+.mv-landing-subjects i {
+  position: relative;
+  font-style: normal;
+  color: var(--ink-2);
+}
+
+.mv-landing-subjects i:not(:last-child)::after {
+  content: "·";
+  position: absolute;
+  left: calc(100% + 5px);
+  color: var(--line-2);
+}
+
+.mv-landing-hero__visual {
+  min-width: 0;
+  position: relative;
+  z-index: 2;
+}
+
+.mv-landing-hero__caption {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 13px 10px 0;
+}
+
+.mv-landing-hero__caption span {
+  flex: 0 0 auto;
+  color: var(--ink-3);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+}
+
+.mv-landing-hero__caption p {
+  max-width: 360px;
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: right;
+}
+
+/* ───── Hero canvas ───── */
+
+.mv-landing-canvas {
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--line-2) 82%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  box-shadow:
+    0 26px 80px rgba(41, 38, 30, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(14px);
+}
+
+.mv-dark .mv-landing-canvas {
+  box-shadow:
+    0 28px 80px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.mv-landing-canvas__head {
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-2) 72%, transparent);
+}
+
+.mv-landing-canvas__head > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.mv-landing-canvas__head span,
+.mv-landing-canvas__status {
+  color: var(--ink-3);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+}
+
+.mv-landing-canvas__head strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mv-landing-canvas__status {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.mv-landing-canvas__status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.mv-landing-canvas__stage {
+  min-height: 390px;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      circle at 58% 30%,
+      color-mix(in srgb, var(--accent) 7%, transparent),
+      transparent 34%
+    ),
+    var(--surface-2);
+}
+
+.mv-landing-canvas__grid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.54;
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--line) 64%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--line) 64%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 30px 30px;
+  mask-image: linear-gradient(to bottom, black, transparent 94%);
+}
+
+.mv-landing-canvas__plot {
+  width: 100%;
+  height: 100%;
+  min-height: 390px;
+  position: relative;
+  z-index: 1;
+  color: var(--accent);
+}
+
+.mv-landing-canvas__axis {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ink-3) 34%, transparent);
+  stroke-width: 1.2;
+}
+
+.mv-landing-canvas__trajectory {
+  fill: none;
+  stroke: color-mix(in srgb, var(--accent) 74%, var(--ink-2));
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.mv-landing-canvas__object {
+  fill: var(--surface);
+  stroke: var(--accent);
+  stroke-width: 3;
+  filter: drop-shadow(0 4px 8px color-mix(in srgb, var(--accent) 24%, transparent));
+}
+
+.mv-landing-canvas__vector {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.mv-landing-canvas__vector--velocity {
+  stroke: color-mix(in srgb, var(--accent) 72%, var(--ink));
+}
+
+.mv-landing-canvas__vector--x,
+.mv-landing-canvas__vector--y {
+  stroke: color-mix(in srgb, var(--ink-2) 62%, transparent);
+  stroke-dasharray: 5 5;
+}
+
+.mv-landing-canvas__vector--gravity {
+  stroke: color-mix(in srgb, #a99562 66%, var(--ink-2));
+}
+
+.mv-landing-canvas__label {
+  fill: var(--ink-2);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 14px;
+}
+
+.mv-landing-canvas__note {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  gap: 4px;
+  padding: 10px 11px;
+  border: 1px solid color-mix(in srgb, var(--line-2) 76%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  box-shadow: 0 10px 28px rgba(41, 38, 30, 0.07);
+  backdrop-filter: blur(10px);
+}
+
+.mv-landing-canvas__note span {
+  color: var(--ink-3);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 8px;
+  letter-spacing: 0.1em;
+}
+
+.mv-landing-canvas__note strong {
+  color: var(--ink-2);
+  font-size: 10.5px;
+  font-weight: 560;
+}
+
+.mv-landing-canvas__note--goal {
+  top: 18px;
+  left: 18px;
+}
+
+.mv-landing-canvas__note--director {
+  right: 18px;
+  bottom: 18px;
+}
+
+.mv-landing-canvas__timeline {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+}
+
+.mv-landing-canvas__beat {
+  min-width: 0;
+  min-height: 64px;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  padding: 0 12px;
+  border-right: 1px solid var(--line);
+  color: var(--ink-3);
+}
+
+.mv-landing-canvas__beat:last-child {
+  border-right: 0;
+}
+
+.mv-landing-canvas__beat span {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 9px;
+}
+
+.mv-landing-canvas__beat strong {
+  overflow: hidden;
+  font-size: 10px;
+  font-weight: 520;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mv-landing-canvas__beat.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
