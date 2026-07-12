@@ -9,6 +9,8 @@ interface LandingPageProps {
 }
 
 type DemoDomain = "math" | "physics" | "algorithm";
+type DemoRailPanel = "intro" | DemoDomain;
+type FollowupDemoMode = "explain" | "revise";
 
 interface DemoStory {
   id: DemoDomain;
@@ -61,6 +63,8 @@ const DEMO_STORIES: DemoStory[] = [
   },
 ];
 
+const DEMO_RAIL_PANELS: DemoRailPanel[] = ["intro", ...DEMO_STORIES.map((story) => story.id)];
+
 const PIPELINE_STEPS = [
   { index: "01", label: "理解题目", contract: "Coverage" },
   { index: "02", label: "规划教学", contract: "LessonPlan" },
@@ -68,6 +72,34 @@ const PIPELINE_STEPS = [
   { index: "04", label: "编排焦点", contract: "DirectorScript" },
   { index: "05", label: "播放导出", contract: "RenderPlan" },
 ] as const;
+
+const FOLLOWUP_DEMOS = [
+  {
+    id: "explain",
+    label: "解释这一步",
+    prompt: "为什么目标值大于 24，就能排除左半区间？",
+    response:
+      "数组已经按升序排列。左半区间的值都不超过 24，而目标值是 46，所以它们不可能命中。",
+    status: "TEXT REPLY",
+    summary: "回答当前疑问，不改动讲解",
+  },
+  {
+    id: "revise",
+    label: "调整讲解",
+    prompt: "把“排除左半区间”讲慢一点，并在画布上标出来。",
+    response:
+      "已拆成两个步骤：先对比 46 与 24，再淡出左半区间并移动 left 指针。",
+    status: "NEW VERSION",
+    summary: "强化区间排除的因果过程",
+  },
+] as const satisfies ReadonlyArray<{
+  id: FollowupDemoMode;
+  label: string;
+  prompt: string;
+  response: string;
+  status: string;
+  summary: string;
+}>;
 
 function ArrowIcon() {
   return (
@@ -236,17 +268,36 @@ function AlgorithmScene() {
 
 function LessonCanvas({ domain, hero = false }: { domain: DemoDomain; hero?: boolean }) {
   const story = DEMO_STORIES.find((item) => item.id === domain) ?? DEMO_STORIES[0];
+  const canvasStories = hero ? [story] : DEMO_STORIES;
 
   return (
     <div className={`mv-lesson-canvas${hero ? " mv-lesson-canvas--hero" : ""}`}>
       <div className="mv-lesson-toolbar">
-        <div>
-          <span>SCENE {story.index}</span>
-          <strong>{story.scene}</strong>
+        <div className="mv-lesson-toolbar__scene-stack" aria-live="polite">
+          {canvasStories.map((item) => (
+            <div
+              key={item.id}
+              className={domain === item.id ? "is-active" : ""}
+              aria-hidden={domain !== item.id}
+            >
+              <span>SCENE {item.index}</span>
+              <strong>{item.scene}</strong>
+            </div>
+          ))}
         </div>
         <div className="mv-lesson-toolbar__status">
           <span className="mv-lesson-live-dot" />
-          <code>{story.frame}</code>
+          <span className="mv-lesson-toolbar__frame-stack">
+            {canvasStories.map((item) => (
+              <code
+                key={item.id}
+                className={domain === item.id ? "is-active" : ""}
+                aria-hidden={domain !== item.id}
+              >
+                {item.frame}
+              </code>
+            ))}
+          </span>
         </div>
       </div>
 
@@ -257,16 +308,29 @@ function LessonCanvas({ domain, hero = false }: { domain: DemoDomain; hero?: boo
           <li><span>03</span><b>归纳</b></li>
         </ol>
 
-        <div className="mv-lesson-stage" aria-live="polite" key={domain}>
-          {domain === "math" && <MathScene />}
-          {domain === "physics" && <PhysicsScene />}
-          {domain === "algorithm" && <AlgorithmScene />}
+        <div
+          className="mv-lesson-stage"
+          data-active-domain={domain}
+          aria-label={`${story.label}画面：${story.scene}`}
+        >
+          {canvasStories.map((item) => (
+            <div
+              key={item.id}
+              className={`mv-lesson-scene-layer${domain === item.id ? " is-active" : ""}`}
+              data-scene-domain={item.id}
+              aria-hidden={domain !== item.id}
+            >
+              {item.id === "math" && <MathScene />}
+              {item.id === "physics" && <PhysicsScene />}
+              {item.id === "algorithm" && <AlgorithmScene />}
 
-          <div className="mv-lesson-focus-note">
-            <span>DIRECTOR FOCUS</span>
-            <strong>{story.focus}</strong>
-          </div>
-          <p className="mv-lesson-subtitle">{story.subtitle}</p>
+              <div className="mv-lesson-focus-note">
+                <span>DIRECTOR FOCUS</span>
+                <strong>{item.focus}</strong>
+              </div>
+              <p className="mv-lesson-subtitle">{item.subtitle}</p>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -288,17 +352,25 @@ export function LandingPage({
   onOpenTemplates,
 }: LandingPageProps) {
   const [activeDomain, setActiveDomain] = useState<DemoDomain>("math");
-  const storyRefs = useRef<Partial<Record<DemoDomain, HTMLElement | null>>>({});
+  const [activeRailPanel, setActiveRailPanel] = useState<DemoRailPanel>("intro");
+  const [followupMode, setFollowupMode] = useState<FollowupDemoMode>("explain");
+  const capabilityRef = useRef<HTMLElement | null>(null);
+  const capabilityInnerRef = useRef<HTMLDivElement | null>(null);
   const visualRef = useRef<HTMLDivElement | null>(null);
+  const storyTrackRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const visual = visualRef.current;
     if (!visual) return;
 
     const syncVisualHeight = () => {
-      visual.style.setProperty(
+      capabilityInnerRef.current?.style.setProperty(
         "--mv-landing-visual-half",
         `${visual.getBoundingClientRect().height / 2}px`,
+      );
+      capabilityInnerRef.current?.style.setProperty(
+        "--mv-landing-visual-height",
+        `${visual.getBoundingClientRect().height}px`,
       );
     };
 
@@ -323,57 +395,104 @@ export function LandingPage({
     }
 
     const desktopQuery = window.matchMedia("(min-width: 901px)");
+    const reduceMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const lastPanelIndex = DEMO_RAIL_PANELS.length - 1;
+    let targetPosition = 0;
+    let renderedPosition = 0;
     let animationFrame: number | null = null;
+    let lastFrameTime: number | null = null;
 
-    const syncDomainToViewport = () => {
+    const applyRailPosition = (position: number) => {
+      const track = storyTrackRef.current;
+      if (!track) return;
+
+      const panelOffset = 100 / DEMO_RAIL_PANELS.length;
+      track.style.setProperty(
+        "--mv-landing-story-offset",
+        `${-position * panelOffset}%`,
+      );
+
+      const panel = DEMO_RAIL_PANELS[Math.min(lastPanelIndex, Math.round(position))];
+      setActiveRailPanel((current) => (current === panel ? current : panel));
+      if (panel !== "intro") {
+        setActiveDomain((current) => (current === panel ? current : panel));
+      }
+    };
+
+    const animateRail = (timestamp: number) => {
       animationFrame = null;
-      if (!desktopQuery.matches) return;
 
-      const viewportCenter = window.innerHeight / 2;
-      let closestDomain: DemoDomain | null = null;
-      let closestDistance = Number.POSITIVE_INFINITY;
-
-      for (const story of DEMO_STORIES) {
-        const node = storyRefs.current[story.id];
-        if (!node) continue;
-
-        const rect = node.getBoundingClientRect();
-        const distance = Math.abs(rect.top + rect.height / 2 - viewportCenter);
-        if (distance < closestDistance) {
-          closestDomain = story.id;
-          closestDistance = distance;
-        }
+      if (!desktopQuery.matches || reduceMotionQuery.matches) {
+        renderedPosition = targetPosition;
+        applyRailPosition(renderedPosition);
+        lastFrameTime = null;
+        return;
       }
 
-      if (closestDomain) {
-        setActiveDomain((current) =>
-          current === closestDomain ? current : closestDomain,
-        );
+      const elapsed = lastFrameTime === null ? 16 : Math.min(timestamp - lastFrameTime, 64);
+      const followStrength = 1 - Math.exp(-elapsed / 92);
+      renderedPosition += (targetPosition - renderedPosition) * followStrength;
+      lastFrameTime = timestamp;
+      applyRailPosition(renderedPosition);
+
+      if (Math.abs(targetPosition - renderedPosition) > 0.001) {
+        animationFrame = window.requestAnimationFrame(animateRail);
+      } else {
+        renderedPosition = targetPosition;
+        applyRailPosition(renderedPosition);
+        lastFrameTime = null;
       }
     };
 
-    const scheduleDomainSync = () => {
+    const scheduleRailAnimation = () => {
       if (animationFrame !== null) return;
-      animationFrame = window.requestAnimationFrame(syncDomainToViewport);
+      animationFrame = window.requestAnimationFrame(animateRail);
     };
 
-    scheduleDomainSync();
-    window.addEventListener("scroll", scheduleDomainSync, { passive: true });
-    window.addEventListener("resize", scheduleDomainSync);
-    desktopQuery.addEventListener?.("change", scheduleDomainSync);
+    const syncRailTarget = () => {
+      const section = capabilityRef.current;
+      const track = storyTrackRef.current;
+      if (!section || !track) return;
+
+      if (!desktopQuery.matches) {
+        track.style.removeProperty("--mv-landing-story-offset");
+        return;
+      }
+
+      const sectionTop = window.scrollY + section.getBoundingClientRect().top;
+      const travel = Math.max(section.offsetHeight - window.innerHeight, 1);
+      const progress = Math.min(1, Math.max(0, (window.scrollY - sectionTop) / travel));
+      targetPosition = progress * lastPanelIndex;
+
+      if (reduceMotionQuery.matches) {
+        renderedPosition = targetPosition;
+        applyRailPosition(renderedPosition);
+        return;
+      }
+
+      scheduleRailAnimation();
+    };
+
+    syncRailTarget();
+    window.addEventListener("scroll", syncRailTarget, { passive: true });
+    window.addEventListener("resize", syncRailTarget);
+    desktopQuery.addEventListener?.("change", syncRailTarget);
+    reduceMotionQuery.addEventListener?.("change", syncRailTarget);
 
     return () => {
       if (animationFrame !== null) {
         window.cancelAnimationFrame(animationFrame);
       }
-      window.removeEventListener("scroll", scheduleDomainSync);
-      window.removeEventListener("resize", scheduleDomainSync);
-      desktopQuery.removeEventListener?.("change", scheduleDomainSync);
+      window.removeEventListener("scroll", syncRailTarget);
+      window.removeEventListener("resize", syncRailTarget);
+      desktopQuery.removeEventListener?.("change", syncRailTarget);
+      reduceMotionQuery.removeEventListener?.("change", syncRailTarget);
     };
   }, []);
 
   const activateDomain = (domain: DemoDomain, alignStory = false) => {
     setActiveDomain(domain);
+    setActiveRailPanel(domain);
 
     if (
       !alignStory ||
@@ -384,13 +503,18 @@ export function LandingPage({
       return;
     }
 
-    const story = storyRefs.current[domain];
-    if (!story || typeof story.scrollIntoView !== "function") return;
+    const section = capabilityRef.current;
+    if (!section || typeof window.scrollTo !== "function") return;
+
+    const panelIndex = DEMO_RAIL_PANELS.indexOf(domain);
+    const sectionTop = window.scrollY + section.getBoundingClientRect().top;
+    const travel = Math.max(section.offsetHeight - window.innerHeight, 1);
+    const top = sectionTop + (panelIndex / (DEMO_RAIL_PANELS.length - 1)) * travel;
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    story.scrollIntoView({
+    window.scrollTo({
+      top,
       behavior: reduceMotion ? "auto" : "smooth",
-      block: "center",
     });
   };
 
@@ -411,6 +535,7 @@ export function LandingPage({
           <a href="#workflow">工作原理</a>
           <a href="#visuals">画面能力</a>
           <a href="#director">导演层</a>
+          <a href="#followup">继续追问</a>
         </nav>
 
         <div className="mv-landing-header__actions">
@@ -512,8 +637,12 @@ export function LandingPage({
           </div>
         </section>
 
-        <section className="mv-landing-section mv-landing-capability" id="visuals">
-          <div className="mv-landing-capability__inner">
+        <section
+          className="mv-landing-section mv-landing-capability"
+          id="visuals"
+          ref={capabilityRef}
+        >
+          <div className="mv-landing-capability__inner" ref={capabilityInnerRef}>
             <div className="mv-landing-capability__visual" ref={visualRef}>
               <div
                 className="mv-landing-demo-toolbar"
@@ -539,36 +668,46 @@ export function LandingPage({
             </div>
 
             <div className="mv-landing-story">
-              <div className="mv-landing-section-head mv-landing-section-head--story">
-                <p className="mv-landing-kicker">VISUAL SYSTEM / 02</p>
-                <h2>同一套画布，<br />看见不同学科的因果关系。</h2>
-                <p>
-                  学习画布始终围绕核心知识对象组织，让公式、矢量和代码状态保持可追踪。
-                </p>
-              </div>
-
-              {DEMO_STORIES.map((story) => (
-                <article
-                  key={story.id}
-                  ref={(node) => {
-                    storyRefs.current[story.id] = node;
-                  }}
-                  data-demo-domain={story.id}
-                  className={activeDomain === story.id ? "is-active" : ""}
-                  aria-current={activeDomain === story.id ? "step" : undefined}
+              <div
+                className="mv-landing-story__track"
+                ref={storyTrackRef}
+                data-active-panel={activeRailPanel}
+              >
+                <div
+                  className="mv-landing-section-head mv-landing-section-head--story"
+                  aria-hidden={activeRailPanel !== "intro"}
                 >
-                  <button
-                    type="button"
-                    onClick={() => activateDomain(story.id)}
-                    onFocus={() => setActiveDomain(story.id)}
+                  <p className="mv-landing-kicker">VISUAL SYSTEM / 02</p>
+                  <h2>同一套画布，<br />看见不同学科的因果关系。</h2>
+                  <p>
+                    学习画布始终围绕核心知识对象组织，让公式、矢量和代码状态保持可追踪。
+                  </p>
+                </div>
+
+                {DEMO_STORIES.map((story) => (
+                  <article
+                    key={story.id}
+                    data-demo-domain={story.id}
+                    className={activeRailPanel === story.id ? "is-active" : ""}
+                    aria-hidden={activeRailPanel !== story.id}
+                    aria-current={activeRailPanel === story.id ? "step" : undefined}
                   >
-                    <span>{story.index} / {story.label}</span>
-                    <h3>{story.title}</h3>
-                    <p>{story.description}</p>
-                    <small>当前焦点 · {story.focus}</small>
-                  </button>
-                </article>
-              ))}
+                    <button
+                      type="button"
+                      onClick={() => activateDomain(story.id)}
+                      onFocus={() => {
+                        setActiveDomain(story.id);
+                        setActiveRailPanel(story.id);
+                      }}
+                    >
+                      <span>{story.index} / {story.label}</span>
+                      <h3>{story.title}</h3>
+                      <p>{story.description}</p>
+                      <small>当前焦点 · {story.focus}</small>
+                    </button>
+                  </article>
+                ))}
+              </div>
             </div>
           </div>
         </section>
@@ -607,6 +746,96 @@ export function LandingPage({
               <div><dt>可追问</dt><dd>保留原题与脚本，继续修改同一次讲解。</dd></div>
               <div><dt>可导出</dt><dd>同一份 PlaybookScript 进入 Remotion 视频出口。</dd></div>
             </dl>
+          </div>
+        </section>
+
+        <section className="mv-landing-section mv-landing-followup" id="followup">
+          <div className="mv-landing-followup__inner">
+            <div className="mv-landing-followup__copy">
+              <p className="mv-landing-kicker">FOLLOW-UP / 04</p>
+              <h2>哪里没看懂，<br />就从那一步继续问。</h2>
+              <p>
+                MetaView 会带着原题、当前步骤和画布上下文继续对话。只需解释时保留当前版本；需要调整时，生成可恢复的新版本。
+              </p>
+              <ol aria-label="追问工作方式">
+                <li><span>01</span><p><strong>定位</strong>当前场景与知识对象</p></li>
+                <li><span>02</span><p><strong>判断</strong>回答疑问或调整讲解</p></li>
+                <li><span>03</span><p><strong>保留</strong>每次修改的版本记录</p></li>
+              </ol>
+              <button
+                className="mv-landing-button mv-landing-button--ghost"
+                type="button"
+                onClick={onStart}
+              >
+                用自己的题目试一次
+                <ArrowIcon />
+              </button>
+            </div>
+
+            <div className="mv-landing-followup-demo" aria-label="追问能力示例">
+              <div className="mv-landing-followup-demo__head">
+                <div>
+                  <span>ACTIVE LESSON</span>
+                  <strong>二分查找 · 区间收缩</strong>
+                </div>
+                <code>STEP 02 / mid = 24</code>
+              </div>
+
+              <div
+                className="mv-landing-followup-demo__modes"
+                role="tablist"
+                aria-label="追问方式"
+                data-active-mode={followupMode}
+              >
+                {FOLLOWUP_DEMOS.map((demo) => (
+                  <button
+                    key={demo.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={followupMode === demo.id}
+                    className={followupMode === demo.id ? "is-active" : ""}
+                    onClick={() => setFollowupMode(demo.id)}
+                  >
+                    {demo.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mv-landing-followup-demo__thread-stack" aria-live="polite">
+                {FOLLOWUP_DEMOS.map((demo) => (
+                  <div
+                    key={demo.id}
+                    className={`mv-landing-followup-demo__thread${followupMode === demo.id ? " is-active" : ""}`}
+                    aria-hidden={followupMode !== demo.id}
+                  >
+                    <div className="mv-landing-followup-demo__context">
+                      <span>CONTEXT</span>
+                      <p><i>target</i> 46 <b>›</b> <i>mid</i> 24</p>
+                      <small>当前搜索区间 · [24, 31, 46, 59]</small>
+                    </div>
+
+                    <div className="mv-landing-followup-demo__message is-user">
+                      <span>你</span>
+                      <p>{demo.prompt}</p>
+                    </div>
+                    <div className="mv-landing-followup-demo__message is-ai">
+                      <span>MetaView</span>
+                      <p>{demo.response}</p>
+                      <small>{demo.status} · {demo.summary}</small>
+                    </div>
+
+                    <div
+                      className={`mv-landing-followup-demo__versions${demo.id === "revise" ? " is-revised" : ""}`}
+                      aria-label={demo.id === "revise" ? "已从版本 v1 更新到 v2" : "当前保持版本 v1"}
+                    >
+                      <span><code>v1</code><small>{demo.id === "revise" ? "可恢复" : "HEAD"}</small></span>
+                      <i />
+                      <span><code>{demo.id === "revise" ? "v2" : "—"}</code><small>{demo.id === "revise" ? "HEAD" : "未创建新版本"}</small></span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
 

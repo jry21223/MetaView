@@ -40,7 +40,16 @@ describe("LandingPage", () => {
   });
 
   it("switches the learning canvas between supported subject examples", () => {
-    const { getByRole, getByText } = renderLanding();
+    const { container, getByRole, getByText } = renderLanding();
+
+    const stage = container.querySelector<HTMLElement>(
+      ".mv-landing-capability .mv-lesson-stage",
+    );
+    const mathLayer = stage?.querySelector<HTMLElement>("[data-scene-domain='math']");
+    const physicsLayer = stage?.querySelector<HTMLElement>("[data-scene-domain='physics']");
+
+    expect(stage?.querySelectorAll(".mv-lesson-scene-layer")).toHaveLength(3);
+    expect(mathLayer?.classList.contains("is-active")).toBe(true);
 
     const physicsTab = getByRole("tab", { name: /物理/ });
     fireEvent.click(physicsTab);
@@ -51,6 +60,10 @@ describe("LandingPage", () => {
     );
     expect(getByText("抛体运动分解")).toBeTruthy();
     expect(getByText("水平速度保持不变，竖直速度持续受到重力改变。")).toBeTruthy();
+    expect(stage?.getAttribute("data-active-domain")).toBe("physics");
+    expect(physicsLayer?.classList.contains("is-active")).toBe(true);
+    expect(mathLayer?.classList.contains("is-active")).toBe(false);
+    expect(stage?.querySelector("[data-scene-domain='physics']")).toBe(physicsLayer);
   });
 
   it("encodes binary-search values by bar height while keeping range state explicit", () => {
@@ -72,5 +85,27 @@ describe("LandingPage", () => {
     expect(container.querySelector(".mv-lesson-code strong")?.textContent).toContain(
       "left = mid + 1",
     );
+  });
+
+  it("shows follow-up as contextual replies and reversible lesson revisions", () => {
+    const { container, getByRole, getByText, props } = renderLanding();
+
+    expect(getByText("哪里没看懂，就从那一步继续问。")).toBeTruthy();
+    expect(getByRole("tab", { name: "解释这一步" }).getAttribute("aria-selected")).toBe(
+      "true",
+    );
+    expect(
+      container.querySelector(".mv-landing-followup-demo__thread.is-active")?.textContent,
+    ).toContain("回答当前疑问，不改动讲解");
+
+    fireEvent.click(getByRole("tab", { name: "调整讲解" }));
+
+    const activeThread = container.querySelector(".mv-landing-followup-demo__thread.is-active");
+    expect(activeThread?.textContent).toContain("NEW VERSION");
+    expect(activeThread?.textContent).toContain("v2");
+    expect(activeThread?.textContent).toContain("可恢复");
+
+    fireEvent.click(getByRole("button", { name: /用自己的题目试一次/ }));
+    expect(props.onStart).toHaveBeenCalledTimes(1);
   });
 });
