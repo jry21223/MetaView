@@ -108,9 +108,16 @@ describe("LandingPage", () => {
     const followupFrame = container.querySelector(".mv-landing-followup-demo");
 
     expect(getByText("哪里没看懂，就从那一步继续问。")).toBeTruthy();
+    expect(followupFrame?.querySelector(":scope > .mv-landing-followup-demo__head")).toBeTruthy();
+    expect(followupFrame?.querySelector(":scope > .mv-landing-followup-demo__modes")).toBeTruthy();
     expect(
-      followupFrame?.querySelector(":scope > .mv-landing-followup-demo__camera"),
+      followupFrame?.querySelector(
+        ":scope > .mv-landing-followup-demo__viewport > .mv-landing-followup-demo__camera",
+      ),
     ).toBeTruthy();
+    expect(
+      followupFrame?.querySelectorAll("[data-camera-target='prompt'], [data-camera-target='response']"),
+    ).toHaveLength(4);
     expect(getByRole("tab", { name: "解释这一步" }).getAttribute("aria-selected")).toBe(
       "true",
     );

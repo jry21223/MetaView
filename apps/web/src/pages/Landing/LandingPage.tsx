@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 interface LandingPageProps {
   appEdition: "self" | "ops";
@@ -102,20 +102,27 @@ const FOLLOWUP_DEMOS = [
 }>;
 
 type FollowupDemo = (typeof FOLLOWUP_DEMOS)[number];
+type FollowupCameraShot = "wide" | "prompt" | "response";
 
 interface FollowupAnimationState {
   prompt: string;
   response: string;
+  cameraShot: FollowupCameraShot;
   promptVisible: boolean;
+  promptTyping: boolean;
   responseVisible: boolean;
+  responseTyping: boolean;
   complete: boolean;
 }
 
 const EMPTY_FOLLOWUP_ANIMATION: FollowupAnimationState = {
   prompt: "",
   response: "",
+  cameraShot: "wide",
   promptVisible: false,
+  promptTyping: false,
   responseVisible: false,
+  responseTyping: false,
   complete: false,
 };
 
@@ -126,6 +133,75 @@ function shouldSkipFollowupMotion() {
     typeof window.matchMedia !== "function" ||
     window.matchMedia("(prefers-reduced-motion: reduce)").matches
   );
+}
+
+function numberFromCssVariable(
+  element: HTMLElement,
+  name: string,
+  fallback: number,
+) {
+  const value = Number.parseFloat(
+    getComputedStyle(element).getPropertyValue(name),
+  );
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function offsetWithin(element: HTMLElement, ancestor: HTMLElement) {
+  let node: HTMLElement | null = element;
+  let x = 0;
+  let y = 0;
+
+  while (node && node !== ancestor) {
+    x += node.offsetLeft;
+    y += node.offsetTop;
+    node = node.offsetParent as HTMLElement | null;
+  }
+
+  return node === ancestor ? { x, y } : null;
+}
+
+function setFollowupCameraShot(
+  thread: HTMLDivElement,
+  shot: FollowupCameraShot,
+) {
+  const camera = thread.closest<HTMLElement>(".mv-landing-followup-demo__camera");
+  const viewport = thread.closest<HTMLElement>(
+    ".mv-landing-followup-demo__viewport",
+  );
+  if (!camera || !viewport) return;
+
+  if (shot === "wide") {
+    camera.style.setProperty("--mv-followup-camera-x", "0px");
+    camera.style.setProperty("--mv-followup-camera-y", "0px");
+    camera.style.setProperty("--mv-followup-camera-origin-x", "50%");
+    camera.style.setProperty("--mv-followup-camera-origin-y", "50%");
+    camera.style.setProperty("--mv-followup-camera-scale", "1");
+    return;
+  }
+
+  const target = thread.querySelector<HTMLElement>(`[data-camera-target="${shot}"]`);
+  const targetOffset = target ? offsetWithin(target, camera) : null;
+  if (!target || !targetOffset) return;
+  if (viewport.clientWidth === 0 || viewport.clientHeight === 0) return;
+
+  const targetCenterX = targetOffset.x + target.offsetWidth / 2;
+  const targetCenterY = targetOffset.y + target.offsetHeight / 2;
+  const scale = numberFromCssVariable(
+    viewport,
+    "--mv-followup-closeup-scale",
+    1.075,
+  );
+  const maxPan = numberFromCssVariable(viewport, "--mv-followup-closeup-pan", 24);
+  const desiredX = viewport.clientWidth * (shot === "prompt" ? 0.6 : 0.5);
+  const desiredY = viewport.clientHeight * 0.52;
+  const panX = Math.max(-maxPan, Math.min(maxPan, desiredX - targetCenterX));
+  const panY = Math.max(-maxPan, Math.min(maxPan, desiredY - targetCenterY));
+
+  camera.style.setProperty("--mv-followup-camera-x", `${panX}px`);
+  camera.style.setProperty("--mv-followup-camera-y", `${panY}px`);
+  camera.style.setProperty("--mv-followup-camera-origin-x", `${targetCenterX}px`);
+  camera.style.setProperty("--mv-followup-camera-origin-y", `${targetCenterY}px`);
+  camera.style.setProperty("--mv-followup-camera-scale", `${scale}`);
 }
 
 function AnimatedFollowupThread({
@@ -143,53 +219,77 @@ function AnimatedFollowupThread({
       ? {
           prompt: demo.prompt,
           response: demo.response,
+          cameraShot: "wide",
           promptVisible: true,
+          promptTyping: false,
           responseVisible: true,
+          responseTyping: false,
           complete: true,
         }
       : EMPTY_FOLLOWUP_ANIMATION,
   );
+  const threadRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!isSelected || !isPlaying || skipMotion) return;
 
-    const promptDelay = 520;
-    const promptCharacterMs = 34;
-    const responsePause = 360;
-    const responseCharacterMs = 24;
-    const responseHoldMs = 520;
+    const introDelayMs = 340;
+    const cameraTravelMs = 320;
+    const promptCharacterMs = 30;
+    const promptHoldMs = 180;
+    const responseCharacterMs = 20;
+    const responseHoldMs = 420;
+    const promptFocusAt = introDelayMs;
+    const promptTypingAt = promptFocusAt + cameraTravelMs;
+    const promptTypedAt = promptTypingAt + demo.prompt.length * promptCharacterMs;
+    const responseFocusAt = promptTypedAt + promptHoldMs;
+    const responseTypingAt = responseFocusAt + cameraTravelMs;
+    const responseTypedAt =
+      responseTypingAt + demo.response.length * responseCharacterMs;
+    const returnWideAt = responseTypedAt + responseHoldMs;
+    const completeAt = returnWideAt + cameraTravelMs;
     const startedAt = window.performance.now();
     let animationFrame: number | null = null;
 
     const animate = (timestamp: number) => {
       const elapsed = timestamp - startedAt;
-      const promptElapsed = Math.max(0, elapsed - promptDelay);
+      const promptElapsed = Math.max(0, elapsed - promptTypingAt);
       const promptCount = Math.min(
         demo.prompt.length,
         Math.floor(promptElapsed / promptCharacterMs),
       );
-      const responseStart =
-        promptDelay + demo.prompt.length * promptCharacterMs + responsePause;
-      const responseElapsed = Math.max(0, elapsed - responseStart);
+      const responseElapsed = Math.max(0, elapsed - responseTypingAt);
       const responseCount = Math.min(
         demo.response.length,
         Math.floor(responseElapsed / responseCharacterMs),
       );
-      const responseTypedAt =
-        responseStart + demo.response.length * responseCharacterMs;
+      const cameraShot: FollowupCameraShot =
+        elapsed >= returnWideAt
+          ? "wide"
+          : elapsed >= responseFocusAt
+            ? "response"
+            : elapsed >= promptFocusAt
+              ? "prompt"
+              : "wide";
       const nextState: FollowupAnimationState = {
         prompt: demo.prompt.slice(0, promptCount),
         response: demo.response.slice(0, responseCount),
-        promptVisible: elapsed >= promptDelay,
-        responseVisible: elapsed >= responseStart,
-        complete: elapsed >= responseTypedAt + responseHoldMs,
+        cameraShot,
+        promptVisible: elapsed >= promptFocusAt,
+        promptTyping: elapsed >= promptTypingAt,
+        responseVisible: elapsed >= responseFocusAt,
+        responseTyping: elapsed >= responseTypingAt,
+        complete: elapsed >= completeAt,
       };
 
       setAnimation((current) =>
         current.prompt === nextState.prompt &&
         current.response === nextState.response &&
+        current.cameraShot === nextState.cameraShot &&
         current.promptVisible === nextState.promptVisible &&
+        current.promptTyping === nextState.promptTyping &&
         current.responseVisible === nextState.responseVisible &&
+        current.responseTyping === nextState.responseTyping &&
         current.complete === nextState.complete
           ? current
           : nextState,
@@ -208,18 +308,44 @@ function AnimatedFollowupThread({
     };
   }, [demo, isPlaying, isSelected, skipMotion]);
 
+  useLayoutEffect(() => {
+    const thread = threadRef.current;
+    if (!thread || !isSelected) return;
+
+    const updateCamera = () =>
+      setFollowupCameraShot(thread, animation.cameraShot);
+    updateCamera();
+
+    const viewport = thread.closest<HTMLElement>(
+      ".mv-landing-followup-demo__viewport",
+    );
+    if (!viewport || typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(updateCamera);
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, [animation.cameraShot, isSelected]);
+
   const animationPhase = animation.complete
     ? "complete"
-    : animation.responseVisible
-      ? "response"
-      : animation.promptVisible
-        ? "prompt"
-        : "focus";
+    : animation.cameraShot === "wide" && animation.responseVisible
+      ? "return"
+      : animation.responseTyping
+        ? "response"
+        : animation.responseVisible
+          ? "response-focus"
+          : animation.promptTyping
+            ? "prompt"
+            : animation.promptVisible
+              ? "prompt-focus"
+              : "focus";
 
   return (
     <div
+      ref={threadRef}
       className={`mv-landing-followup-demo__thread${isSelected ? " is-active" : ""}`}
       data-animation-phase={animationPhase}
+      data-camera-shot={animation.cameraShot}
       aria-hidden={!isSelected}
     >
       <div className="mv-landing-followup-demo__context">
@@ -230,28 +356,36 @@ function AnimatedFollowupThread({
 
       <div
         className={`mv-landing-followup-demo__message is-user${animation.promptVisible ? " is-visible" : ""}`}
+        data-camera-target="prompt"
       >
         <span>你</span>
         <p>
           <span className="mv-landing-visually-hidden">{demo.prompt}</span>
           <span aria-hidden="true">{animation.prompt}</span>
-          {animation.promptVisible && !animation.responseVisible && (
+          {animation.promptTyping && animation.prompt.length < demo.prompt.length && (
             <i className="mv-landing-type-cursor" aria-hidden="true" />
           )}
         </p>
       </div>
       <div
         className={`mv-landing-followup-demo__message is-ai${animation.responseVisible ? " is-visible" : ""}`}
+        data-camera-target="response"
       >
         <span>MetaView</span>
         <p>
           <span className="mv-landing-visually-hidden">{demo.response}</span>
           <span aria-hidden="true">{animation.response}</span>
-          {animation.responseVisible && animation.response.length < demo.response.length && (
+          {animation.responseTyping && animation.response.length < demo.response.length && (
             <i className="mv-landing-type-cursor" aria-hidden="true" />
           )}
         </p>
-        <small>{demo.status} · {demo.summary}</small>
+        <small
+          className={
+            animation.response.length >= demo.response.length ? "is-visible" : ""
+          }
+        >
+          {demo.status} · {demo.summary}
+        </small>
       </div>
 
       <div
@@ -899,44 +1033,46 @@ export function LandingPage({
               className={`mv-landing-followup-demo${followupInView ? " is-focused" : ""}`}
               aria-label="追问能力示例"
             >
-              <div className="mv-landing-followup-demo__camera">
-                <div className="mv-landing-followup-demo__head">
-                  <div>
-                    <span>ACTIVE LESSON</span>
-                    <strong>二分查找 · 区间收缩</strong>
+              <div className="mv-landing-followup-demo__head">
+                <div>
+                  <span>ACTIVE LESSON</span>
+                  <strong>二分查找 · 区间收缩</strong>
+                </div>
+                <code>STEP 02 / mid = 24</code>
+              </div>
+
+              <div
+                className="mv-landing-followup-demo__modes"
+                role="tablist"
+                aria-label="追问方式"
+                data-active-mode={followupMode}
+              >
+                {FOLLOWUP_DEMOS.map((demo) => (
+                  <button
+                    key={demo.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={followupMode === demo.id}
+                    className={followupMode === demo.id ? "is-active" : ""}
+                    onClick={() => setFollowupMode(demo.id)}
+                  >
+                    {demo.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mv-landing-followup-demo__viewport">
+                <div className="mv-landing-followup-demo__camera">
+                  <div className="mv-landing-followup-demo__thread-stack" aria-live="polite">
+                    {FOLLOWUP_DEMOS.map((demo) => (
+                      <AnimatedFollowupThread
+                        key={`${demo.id}-${followupMode === demo.id ? "active" : "inactive"}-${followupInView ? "playing" : "idle"}`}
+                        demo={demo}
+                        isSelected={followupMode === demo.id}
+                        isPlaying={followupInView}
+                      />
+                    ))}
                   </div>
-                  <code>STEP 02 / mid = 24</code>
-                </div>
-
-                <div
-                  className="mv-landing-followup-demo__modes"
-                  role="tablist"
-                  aria-label="追问方式"
-                  data-active-mode={followupMode}
-                >
-                  {FOLLOWUP_DEMOS.map((demo) => (
-                    <button
-                      key={demo.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={followupMode === demo.id}
-                      className={followupMode === demo.id ? "is-active" : ""}
-                      onClick={() => setFollowupMode(demo.id)}
-                    >
-                      {demo.label}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="mv-landing-followup-demo__thread-stack" aria-live="polite">
-                  {FOLLOWUP_DEMOS.map((demo) => (
-                    <AnimatedFollowupThread
-                      key={`${demo.id}-${followupMode === demo.id ? "active" : "inactive"}-${followupInView ? "playing" : "idle"}`}
-                      demo={demo}
-                      isSelected={followupMode === demo.id}
-                      isPlaying={followupInView}
-                    />
-                  ))}
                 </div>
               </div>
             </div>

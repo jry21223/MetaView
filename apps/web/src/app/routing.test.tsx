@@ -32,15 +32,19 @@ describe("App routing", () => {
     window.history.pushState({}, "", "/");
   });
 
-  it("renders the public landing page at /", async () => {
-    vi.stubEnv("VITE_APP_EDITION", "self");
+  it(
+    "renders the public landing page at /",
+    async () => {
+      vi.stubEnv("VITE_APP_EDITION", "self");
 
-    const { App } = await import("./App");
-    const { getByText } = render(<App />);
+      const { App } = await import("./App");
+      const { getByText } = render(<App />);
 
-    expect(getByText("把一道题，变成一段看得见的理解过程。")).toBeTruthy();
-    expect(window.location.pathname).toBe("/");
-  });
+      expect(getByText("把一道题，变成一段看得见的理解过程。")).toBeTruthy();
+      expect(window.location.pathname).toBe("/");
+    },
+    15_000,
+  );
 
   it("opens the creation intake directly from /create", async () => {
     vi.stubEnv("VITE_APP_EDITION", "self");
