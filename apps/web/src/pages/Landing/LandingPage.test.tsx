@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { LandingPage } from "./LandingPage";
@@ -37,6 +37,22 @@ describe("LandingPage", () => {
     expect(props.onStart).toHaveBeenCalledTimes(1);
     expect(props.onToggleTheme).toHaveBeenCalledTimes(1);
     expect(props.onOpenTemplates).toHaveBeenCalledTimes(1);
+  });
+
+  it("orders the landing narrative as visual, follow-up, workflow, then director", () => {
+    const { container, getByRole } = renderLanding();
+    const sectionIds = Array.from(
+      container.querySelectorAll<HTMLElement>("#landing-main > section[id]"),
+    ).map((section) => section.id);
+    const primaryNav = getByRole("navigation", { name: "首页导航" });
+
+    expect(sectionIds).toEqual(["visuals", "followup", "workflow", "director"]);
+    expect(
+      within(primaryNav)
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual(["画面能力", "继续追问", "工作原理", "导演层"]);
+    expect(getByRole("link", { name: "看它如何工作" }).getAttribute("href")).toBe("#visuals");
   });
 
   it("switches the learning canvas between supported subject examples", () => {

@@ -101,6 +101,168 @@ const FOLLOWUP_DEMOS = [
   summary: string;
 }>;
 
+type FollowupDemo = (typeof FOLLOWUP_DEMOS)[number];
+
+interface FollowupAnimationState {
+  prompt: string;
+  response: string;
+  promptVisible: boolean;
+  responseVisible: boolean;
+  complete: boolean;
+}
+
+const EMPTY_FOLLOWUP_ANIMATION: FollowupAnimationState = {
+  prompt: "",
+  response: "",
+  promptVisible: false,
+  responseVisible: false,
+  complete: false,
+};
+
+function shouldSkipFollowupMotion() {
+  return (
+    typeof window === "undefined" ||
+    typeof window.requestAnimationFrame !== "function" ||
+    typeof window.matchMedia !== "function" ||
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
+function AnimatedFollowupThread({
+  demo,
+  isSelected,
+  isPlaying,
+}: {
+  demo: FollowupDemo;
+  isSelected: boolean;
+  isPlaying: boolean;
+}) {
+  const skipMotion = shouldSkipFollowupMotion();
+  const [animation, setAnimation] = useState<FollowupAnimationState>(() =>
+    skipMotion
+      ? {
+          prompt: demo.prompt,
+          response: demo.response,
+          promptVisible: true,
+          responseVisible: true,
+          complete: true,
+        }
+      : EMPTY_FOLLOWUP_ANIMATION,
+  );
+
+  useEffect(() => {
+    if (!isSelected || !isPlaying || skipMotion) return;
+
+    const promptDelay = 520;
+    const promptCharacterMs = 34;
+    const responsePause = 360;
+    const responseCharacterMs = 24;
+    const startedAt = window.performance.now();
+    let animationFrame: number | null = null;
+
+    const animate = (timestamp: number) => {
+      const elapsed = timestamp - startedAt;
+      const promptElapsed = Math.max(0, elapsed - promptDelay);
+      const promptCount = Math.min(
+        demo.prompt.length,
+        Math.floor(promptElapsed / promptCharacterMs),
+      );
+      const responseStart =
+        promptDelay + demo.prompt.length * promptCharacterMs + responsePause;
+      const responseElapsed = Math.max(0, elapsed - responseStart);
+      const responseCount = Math.min(
+        demo.response.length,
+        Math.floor(responseElapsed / responseCharacterMs),
+      );
+      const nextState: FollowupAnimationState = {
+        prompt: demo.prompt.slice(0, promptCount),
+        response: demo.response.slice(0, responseCount),
+        promptVisible: elapsed >= promptDelay,
+        responseVisible: elapsed >= responseStart,
+        complete: responseCount >= demo.response.length,
+      };
+
+      setAnimation((current) =>
+        current.prompt === nextState.prompt &&
+        current.response === nextState.response &&
+        current.promptVisible === nextState.promptVisible &&
+        current.responseVisible === nextState.responseVisible &&
+        current.complete === nextState.complete
+          ? current
+          : nextState,
+      );
+
+      if (!nextState.complete) {
+        animationFrame = window.requestAnimationFrame(animate);
+      }
+    };
+
+    animationFrame = window.requestAnimationFrame(animate);
+    return () => {
+      if (animationFrame !== null) {
+        window.cancelAnimationFrame(animationFrame);
+      }
+    };
+  }, [demo, isPlaying, isSelected, skipMotion]);
+
+  const animationPhase = animation.complete
+    ? "complete"
+    : animation.responseVisible
+      ? "response"
+      : animation.promptVisible
+        ? "prompt"
+        : "focus";
+
+  return (
+    <div
+      className={`mv-landing-followup-demo__thread${isSelected ? " is-active" : ""}`}
+      data-animation-phase={animationPhase}
+      aria-hidden={!isSelected}
+    >
+      <div className="mv-landing-followup-demo__context">
+        <span>CONTEXT</span>
+        <p><i>target</i> 46 <b>›</b> <i>mid</i> 24</p>
+        <small>当前搜索区间 · [24, 31, 46, 59]</small>
+      </div>
+
+      <div
+        className={`mv-landing-followup-demo__message is-user${animation.promptVisible ? " is-visible" : ""}`}
+      >
+        <span>你</span>
+        <p>
+          <span className="mv-landing-visually-hidden">{demo.prompt}</span>
+          <span aria-hidden="true">{animation.prompt}</span>
+          {animation.promptVisible && !animation.responseVisible && (
+            <i className="mv-landing-type-cursor" aria-hidden="true" />
+          )}
+        </p>
+      </div>
+      <div
+        className={`mv-landing-followup-demo__message is-ai${animation.responseVisible ? " is-visible" : ""}`}
+      >
+        <span>MetaView</span>
+        <p>
+          <span className="mv-landing-visually-hidden">{demo.response}</span>
+          <span aria-hidden="true">{animation.response}</span>
+          {animation.responseVisible && !animation.complete && (
+            <i className="mv-landing-type-cursor" aria-hidden="true" />
+          )}
+        </p>
+        <small>{demo.status} · {demo.summary}</small>
+      </div>
+
+      <div
+        className={`mv-landing-followup-demo__versions${demo.id === "revise" ? " is-revised" : ""}${animation.complete ? " is-visible" : ""}`}
+        aria-label={demo.id === "revise" ? "已从版本 v1 更新到 v2" : "当前保持版本 v1"}
+      >
+        <span><code>v1</code><small>{demo.id === "revise" ? "可恢复" : "HEAD"}</small></span>
+        <i />
+        <span><code>{demo.id === "revise" ? "v2" : "—"}</code><small>{demo.id === "revise" ? "HEAD" : "未创建新版本"}</small></span>
+      </div>
+    </div>
+  );
+}
+
 function ArrowIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
@@ -354,8 +516,12 @@ export function LandingPage({
   const [activeDomain, setActiveDomain] = useState<DemoDomain>("math");
   const [activeRailPanel, setActiveRailPanel] = useState<DemoRailPanel>("intro");
   const [followupMode, setFollowupMode] = useState<FollowupDemoMode>("explain");
+  const [followupInView, setFollowupInView] = useState(
+    () => typeof IntersectionObserver === "undefined",
+  );
   const capabilityRef = useRef<HTMLElement | null>(null);
   const capabilityInnerRef = useRef<HTMLDivElement | null>(null);
+  const followupRef = useRef<HTMLElement | null>(null);
   const visualRef = useRef<HTMLDivElement | null>(null);
   const storyTrackRef = useRef<HTMLDivElement | null>(null);
 
@@ -382,6 +548,23 @@ export function LandingPage({
 
     const observer = new ResizeObserver(syncVisualHeight);
     observer.observe(visual);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const section = followupRef.current;
+    if (!section) return;
+
+    if (typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setFollowupInView(entry.isIntersecting),
+      {
+        rootMargin: "-12% 0px -12% 0px",
+        threshold: 0.12,
+      },
+    );
+    observer.observe(section);
     return () => observer.disconnect();
   }, []);
 
@@ -532,10 +715,10 @@ export function LandingPage({
         </a>
 
         <nav className="mv-landing-nav" aria-label="首页导航">
-          <a href="#workflow">工作原理</a>
           <a href="#visuals">画面能力</a>
-          <a href="#director">导演层</a>
           <a href="#followup">继续追问</a>
+          <a href="#workflow">工作原理</a>
+          <a href="#director">导演层</a>
         </nav>
 
         <div className="mv-landing-header__actions">
@@ -577,7 +760,7 @@ export function LandingPage({
                   开始生成
                   <ArrowIcon />
                 </button>
-                <a className="mv-landing-button mv-landing-button--ghost" href="#workflow">
+                <a className="mv-landing-button mv-landing-button--ghost" href="#visuals">
                   看它如何工作
                 </a>
               </div>
@@ -604,36 +787,6 @@ export function LandingPage({
                 <strong>可视化讲解</strong>
               </figcaption>
             </figure>
-          </div>
-        </section>
-
-        <section className="mv-landing-section mv-landing-workflow" id="workflow">
-          <div className="mv-landing-section__inner">
-            <div className="mv-landing-section-head">
-              <p className="mv-landing-kicker">WORKFLOW / 01</p>
-              <h2>不是把文字塞进视频，<br />而是先把教学想清楚。</h2>
-              <p>
-                每次生成都经过能力判断、教学规划、画面契约与导演编排，最后才进入播放和导出。
-              </p>
-            </div>
-
-            <ol className="mv-landing-pipeline" aria-label="MetaView 生成流程">
-              {PIPELINE_STEPS.map((step) => (
-                <li key={step.contract}>
-                  <span className="mv-landing-pipeline__index">{step.index}</span>
-                  <div>
-                    <strong>{step.label}</strong>
-                    <code>{step.contract}</code>
-                  </div>
-                </li>
-              ))}
-              <span className="mv-landing-pipeline__progress" aria-hidden="true" />
-            </ol>
-
-            <div className="mv-landing-proof-line">
-              <span>一条可审查的生成链</span>
-              <p>过程有结构，能力有边界，结果才能稳定复盘。</p>
-            </div>
           </div>
         </section>
 
@@ -712,6 +865,109 @@ export function LandingPage({
           </div>
         </section>
 
+        <section
+          className="mv-landing-section mv-landing-followup"
+          id="followup"
+          ref={followupRef}
+        >
+          <div className="mv-landing-followup__inner">
+            <div className="mv-landing-followup__copy">
+              <p className="mv-landing-kicker">FOLLOW-UP / 04</p>
+              <h2>哪里没看懂，<br />就从那一步继续问。</h2>
+              <p>
+                MetaView 会带着原题、当前步骤和画布上下文继续对话。只需解释时保留当前版本；需要调整时，生成可恢复的新版本。
+              </p>
+              <ol aria-label="追问工作方式">
+                <li><span>01</span><p><strong>定位</strong>当前场景与知识对象</p></li>
+                <li><span>02</span><p><strong>判断</strong>回答疑问或调整讲解</p></li>
+                <li><span>03</span><p><strong>保留</strong>每次修改的版本记录</p></li>
+              </ol>
+              <button
+                className="mv-landing-button mv-landing-button--ghost"
+                type="button"
+                onClick={onStart}
+              >
+                用自己的题目试一次
+                <ArrowIcon />
+              </button>
+            </div>
+
+            <div
+              className={`mv-landing-followup-demo${followupInView ? " is-focused" : ""}`}
+              aria-label="追问能力示例"
+            >
+              <div className="mv-landing-followup-demo__head">
+                <div>
+                  <span>ACTIVE LESSON</span>
+                  <strong>二分查找 · 区间收缩</strong>
+                </div>
+                <code>STEP 02 / mid = 24</code>
+              </div>
+
+              <div
+                className="mv-landing-followup-demo__modes"
+                role="tablist"
+                aria-label="追问方式"
+                data-active-mode={followupMode}
+              >
+                {FOLLOWUP_DEMOS.map((demo) => (
+                  <button
+                    key={demo.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={followupMode === demo.id}
+                    className={followupMode === demo.id ? "is-active" : ""}
+                    onClick={() => setFollowupMode(demo.id)}
+                  >
+                    {demo.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mv-landing-followup-demo__thread-stack" aria-live="polite">
+                {FOLLOWUP_DEMOS.map((demo) => (
+                  <AnimatedFollowupThread
+                    key={`${demo.id}-${followupMode === demo.id ? "active" : "inactive"}-${followupInView ? "playing" : "idle"}`}
+                    demo={demo}
+                    isSelected={followupMode === demo.id}
+                    isPlaying={followupInView}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="mv-landing-section mv-landing-workflow" id="workflow">
+          <div className="mv-landing-section__inner">
+            <div className="mv-landing-section-head">
+              <p className="mv-landing-kicker">WORKFLOW / 01</p>
+              <h2>不是把文字塞进视频，<br />而是先把教学想清楚。</h2>
+              <p>
+                每次生成都经过能力判断、教学规划、画面契约与导演编排，最后才进入播放和导出。
+              </p>
+            </div>
+
+            <ol className="mv-landing-pipeline" aria-label="MetaView 生成流程">
+              {PIPELINE_STEPS.map((step) => (
+                <li key={step.contract}>
+                  <span className="mv-landing-pipeline__index">{step.index}</span>
+                  <div>
+                    <strong>{step.label}</strong>
+                    <code>{step.contract}</code>
+                  </div>
+                </li>
+              ))}
+              <span className="mv-landing-pipeline__progress" aria-hidden="true" />
+            </ol>
+
+            <div className="mv-landing-proof-line">
+              <span>一条可审查的生成链</span>
+              <p>过程有结构，能力有边界，结果才能稳定复盘。</p>
+            </div>
+          </div>
+        </section>
+
         <section className="mv-landing-section mv-landing-director" id="director">
           <div className="mv-landing-section__inner">
             <div className="mv-landing-director__intro">
@@ -746,96 +1002,6 @@ export function LandingPage({
               <div><dt>可追问</dt><dd>保留原题与脚本，继续修改同一次讲解。</dd></div>
               <div><dt>可导出</dt><dd>同一份 PlaybookScript 进入 Remotion 视频出口。</dd></div>
             </dl>
-          </div>
-        </section>
-
-        <section className="mv-landing-section mv-landing-followup" id="followup">
-          <div className="mv-landing-followup__inner">
-            <div className="mv-landing-followup__copy">
-              <p className="mv-landing-kicker">FOLLOW-UP / 04</p>
-              <h2>哪里没看懂，<br />就从那一步继续问。</h2>
-              <p>
-                MetaView 会带着原题、当前步骤和画布上下文继续对话。只需解释时保留当前版本；需要调整时，生成可恢复的新版本。
-              </p>
-              <ol aria-label="追问工作方式">
-                <li><span>01</span><p><strong>定位</strong>当前场景与知识对象</p></li>
-                <li><span>02</span><p><strong>判断</strong>回答疑问或调整讲解</p></li>
-                <li><span>03</span><p><strong>保留</strong>每次修改的版本记录</p></li>
-              </ol>
-              <button
-                className="mv-landing-button mv-landing-button--ghost"
-                type="button"
-                onClick={onStart}
-              >
-                用自己的题目试一次
-                <ArrowIcon />
-              </button>
-            </div>
-
-            <div className="mv-landing-followup-demo" aria-label="追问能力示例">
-              <div className="mv-landing-followup-demo__head">
-                <div>
-                  <span>ACTIVE LESSON</span>
-                  <strong>二分查找 · 区间收缩</strong>
-                </div>
-                <code>STEP 02 / mid = 24</code>
-              </div>
-
-              <div
-                className="mv-landing-followup-demo__modes"
-                role="tablist"
-                aria-label="追问方式"
-                data-active-mode={followupMode}
-              >
-                {FOLLOWUP_DEMOS.map((demo) => (
-                  <button
-                    key={demo.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={followupMode === demo.id}
-                    className={followupMode === demo.id ? "is-active" : ""}
-                    onClick={() => setFollowupMode(demo.id)}
-                  >
-                    {demo.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="mv-landing-followup-demo__thread-stack" aria-live="polite">
-                {FOLLOWUP_DEMOS.map((demo) => (
-                  <div
-                    key={demo.id}
-                    className={`mv-landing-followup-demo__thread${followupMode === demo.id ? " is-active" : ""}`}
-                    aria-hidden={followupMode !== demo.id}
-                  >
-                    <div className="mv-landing-followup-demo__context">
-                      <span>CONTEXT</span>
-                      <p><i>target</i> 46 <b>›</b> <i>mid</i> 24</p>
-                      <small>当前搜索区间 · [24, 31, 46, 59]</small>
-                    </div>
-
-                    <div className="mv-landing-followup-demo__message is-user">
-                      <span>你</span>
-                      <p>{demo.prompt}</p>
-                    </div>
-                    <div className="mv-landing-followup-demo__message is-ai">
-                      <span>MetaView</span>
-                      <p>{demo.response}</p>
-                      <small>{demo.status} · {demo.summary}</small>
-                    </div>
-
-                    <div
-                      className={`mv-landing-followup-demo__versions${demo.id === "revise" ? " is-revised" : ""}`}
-                      aria-label={demo.id === "revise" ? "已从版本 v1 更新到 v2" : "当前保持版本 v1"}
-                    >
-                      <span><code>v1</code><small>{demo.id === "revise" ? "可恢复" : "HEAD"}</small></span>
-                      <i />
-                      <span><code>{demo.id === "revise" ? "v2" : "—"}</code><small>{demo.id === "revise" ? "HEAD" : "未创建新版本"}</small></span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         </section>
 

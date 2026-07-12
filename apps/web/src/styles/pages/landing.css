@@ -1573,11 +1573,51 @@ body:has(.mv-landing),
     linear-gradient(90deg, color-mix(in srgb, var(--line) 46%, transparent) 1px, transparent 1px),
     color-mix(in srgb, var(--surface-2) 88%, var(--bg));
   background-size: 32px 32px;
-  box-shadow: 0 28px 72px rgba(45, 48, 40, 0.12);
+  box-shadow: 0 18px 48px rgba(45, 48, 40, 0.08);
+  opacity: 0.68;
+  filter: blur(1.6px) saturate(0.82);
+  transform: perspective(1000px) translate3d(0, 28px, 0) scale(0.94);
+  transform-origin: 50% 48%;
+  transition:
+    opacity 520ms ease,
+    filter 620ms ease,
+    transform 760ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 700ms ease;
+  will-change: opacity, filter, transform;
+}
+
+.mv-landing-followup-demo::after {
+  content: "";
+  position: absolute;
+  z-index: 4;
+  inset: 28px;
+  border: 1px solid color-mix(in srgb, var(--accent) 62%, transparent);
+  border-radius: 13px;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--surface) 50%, transparent),
+    0 0 0 999px color-mix(in srgb, var(--bg) 8%, transparent);
+  opacity: 0;
+  transform: scale(0.96);
+  pointer-events: none;
+}
+
+.mv-landing-followup-demo.is-focused {
+  box-shadow: 0 32px 84px rgba(45, 48, 40, 0.14);
+  opacity: 1;
+  filter: blur(0) saturate(1);
+  transform: perspective(1000px) translate3d(0, 0, 0) scale(1);
+}
+
+.mv-landing-followup-demo.is-focused::after {
+  animation: mvLandingCameraFocus 980ms 80ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .mv-dark .mv-landing-followup-demo {
-  box-shadow: 0 28px 72px rgba(0, 0, 0, 0.26);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.2);
+}
+
+.mv-dark .mv-landing-followup-demo.is-focused {
+  box-shadow: 0 32px 84px rgba(0, 0, 0, 0.32);
 }
 
 .mv-landing-followup-demo__head {
@@ -1714,6 +1754,17 @@ body:has(.mv-landing),
   border: 1px solid var(--line);
   border-radius: 10px;
   background: color-mix(in srgb, var(--surface) 82%, transparent);
+  opacity: 0;
+  transform: translateY(8px) scale(0.985);
+  transition:
+    opacity 320ms ease,
+    transform 460ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mv-landing-followup-demo.is-focused .mv-landing-followup-demo__thread.is-active .mv-landing-followup-demo__context {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition-delay: 180ms;
 }
 
 .mv-landing-followup-demo__context p {
@@ -1745,9 +1796,20 @@ body:has(.mv-landing),
   max-width: 86%;
   display: grid;
   gap: 7px;
+  opacity: 0;
+  transform: translateY(9px);
+  transition:
+    opacity 260ms ease,
+    transform 380ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mv-landing-followup-demo__message.is-visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .mv-landing-followup-demo__message p {
+  min-height: 47px;
   margin: 0;
   padding: 12px 14px;
   border: 1px solid var(--line);
@@ -1756,6 +1818,10 @@ body:has(.mv-landing),
   color: var(--ink-2);
   font-size: 12.5px;
   line-height: 1.65;
+}
+
+.mv-landing-followup-demo__message.is-ai p {
+  min-height: 68px;
 }
 
 .mv-landing-followup-demo__message.is-user {
@@ -1779,6 +1845,17 @@ body:has(.mv-landing),
   font-size: 8px;
   font-weight: 600;
   letter-spacing: 0.04em;
+  opacity: 0;
+  transform: translateY(3px);
+  transition:
+    opacity 260ms ease,
+    transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mv-landing-followup-demo__message.is-visible small {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 180ms;
 }
 
 .mv-landing-followup-demo__versions {
@@ -1788,6 +1865,16 @@ body:has(.mv-landing),
   gap: 12px;
   padding-top: 18px;
   border-top: 1px solid var(--line);
+  opacity: 0;
+  transform: translateY(7px);
+  transition:
+    opacity 300ms ease,
+    transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mv-landing-followup-demo__versions.is-visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .mv-landing-followup-demo__versions > span {
@@ -1815,7 +1902,7 @@ body:has(.mv-landing),
   background: var(--line-2);
 }
 
-.mv-landing-followup-demo__thread.is-active .mv-landing-followup-demo__versions.is-revised > i::after {
+.mv-landing-followup-demo__thread.is-active .mv-landing-followup-demo__versions.is-revised.is-visible > i::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -1827,6 +1914,28 @@ body:has(.mv-landing),
 .mv-landing-followup-demo__versions.is-revised > span:last-child code,
 .mv-landing-followup-demo__versions.is-revised > span:last-child small {
   color: var(--accent-strong);
+}
+
+.mv-landing-type-cursor {
+  width: 1px;
+  height: 1.05em;
+  display: inline-block;
+  margin-left: 2px;
+  background: var(--accent-strong);
+  vertical-align: -0.12em;
+  animation: mvLandingTypeCursor 760ms steps(1, end) infinite;
+}
+
+.mv-landing-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .mv-landing-final {
@@ -1958,6 +2067,27 @@ body:has(.mv-landing),
 @keyframes mvLandingVersionLine {
   from { transform: scaleX(0); }
   to { transform: scaleX(1); }
+}
+
+@keyframes mvLandingCameraFocus {
+  0% {
+    inset: 28px;
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  38% {
+    opacity: 0.72;
+  }
+  100% {
+    inset: 8px;
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+@keyframes mvLandingTypeCursor {
+  0%, 48% { opacity: 1; }
+  49%, 100% { opacity: 0; }
 }
 
 @media (max-width: 1080px) {
@@ -2435,6 +2565,14 @@ body:has(.mv-landing),
 
   .mv-landing-followup-demo__message {
     max-width: 94%;
+  }
+
+  .mv-landing-followup-demo {
+    transform: perspective(1000px) translate3d(0, 20px, 0) scale(0.97);
+  }
+
+  .mv-landing-followup-demo.is-focused {
+    transform: perspective(1000px) translate3d(0, 0, 0) scale(1);
   }
 
   .mv-landing-followup-demo__versions {
