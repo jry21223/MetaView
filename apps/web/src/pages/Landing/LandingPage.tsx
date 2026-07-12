@@ -171,10 +171,14 @@ function setFollowupCameraShot(
   if (!camera || !viewport) return;
 
   if (shot === "wide") {
+    const cameraOriginX =
+      camera.clientWidth > 0 ? `${camera.clientWidth / 2}px` : "50%";
+    const cameraOriginY =
+      camera.clientHeight > 0 ? `${camera.clientHeight / 2}px` : "50%";
     camera.style.setProperty("--mv-followup-camera-x", "0px");
     camera.style.setProperty("--mv-followup-camera-y", "0px");
-    camera.style.setProperty("--mv-followup-camera-origin-x", "50%");
-    camera.style.setProperty("--mv-followup-camera-origin-y", "50%");
+    camera.style.setProperty("--mv-followup-camera-origin-x", cameraOriginX);
+    camera.style.setProperty("--mv-followup-camera-origin-y", cameraOriginY);
     camera.style.setProperty("--mv-followup-camera-scale", "1");
     return;
   }
