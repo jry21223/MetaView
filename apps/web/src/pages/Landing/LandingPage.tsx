@@ -233,12 +233,12 @@ function AnimatedFollowupThread({
   useEffect(() => {
     if (!isSelected || !isPlaying || skipMotion) return;
 
-    const introDelayMs = 340;
-    const cameraTravelMs = 320;
-    const promptCharacterMs = 30;
-    const promptHoldMs = 180;
-    const responseCharacterMs = 20;
-    const responseHoldMs = 420;
+    const introDelayMs = 420;
+    const cameraTravelMs = 520;
+    const promptCharacterMs = 44;
+    const promptHoldMs = 320;
+    const responseCharacterMs = 32;
+    const responseHoldMs = 620;
     const promptFocusAt = introDelayMs;
     const promptTypingAt = promptFocusAt + cameraTravelMs;
     const promptTypedAt = promptTypingAt + demo.prompt.length * promptCharacterMs;
