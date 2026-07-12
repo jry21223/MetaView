@@ -44,6 +44,15 @@ METAVIEW_MOCK_PROVIDER_ENABLED=true
 
 Agent mode is an active verification path, not the default production claim. To claim agent mode is working, run the agent demo acceptance suite and keep the generated report local under `eval/reports/`.
 
+## Web route map
+
+- `/` is the public Landing page.
+- `/create` is the lesson creation entrypoint; use this path for bookmarks, external CTAs, and E2E flows that should open the workbench directly.
+- `/templates` opens the template library.
+- `/admin` is the hidden operations dashboard and remains restricted to `ops` edition administrators.
+
+The move from `/` to `/create` for direct creation is an intentional route behavior change. Do not assume the root path opens the generator.
+
 ## What to read next
 
 1. `docs/director-layer.md` — Director as the independent shot-planning layer.
