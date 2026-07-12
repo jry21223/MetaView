@@ -53,6 +53,17 @@ describe("LandingPage", () => {
         .map((link) => link.textContent),
     ).toEqual(["画面能力", "继续追问", "工作原理", "导演层"]);
     expect(getByRole("link", { name: "看它如何工作" }).getAttribute("href")).toBe("#visuals");
+    expect(
+      sectionIds.map(
+        (sectionId) =>
+          container.querySelector<HTMLElement>(`#${sectionId} .mv-landing-kicker`)?.textContent,
+      ),
+    ).toEqual([
+      "VISUAL SYSTEM / 01",
+      "FOLLOW-UP / 02",
+      "WORKFLOW / 03",
+      "DIRECTOR LAYER / 04",
+    ]);
   });
 
   it("switches the learning canvas between supported subject examples", () => {

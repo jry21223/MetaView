@@ -967,7 +967,7 @@ export function LandingPage({
                   className="mv-landing-section-head mv-landing-section-head--story"
                   aria-hidden={activeRailPanel !== "intro"}
                 >
-                  <p className="mv-landing-kicker">VISUAL SYSTEM / 02</p>
+                  <p className="mv-landing-kicker">VISUAL SYSTEM / 01</p>
                   <h2>同一套画布，<br />看见不同学科的因果关系。</h2>
                   <p>
                     学习画布始终围绕核心知识对象组织，让公式、矢量和代码状态保持可追踪。
@@ -1009,7 +1009,7 @@ export function LandingPage({
         >
           <div className="mv-landing-followup__inner">
             <div className="mv-landing-followup__copy">
-              <p className="mv-landing-kicker">FOLLOW-UP / 04</p>
+              <p className="mv-landing-kicker">FOLLOW-UP / 02</p>
               <h2>哪里没看懂，<br />就从那一步继续问。</h2>
               <p>
                 MetaView 会带着原题、当前步骤和画布上下文继续对话。只需解释时保留当前版本；需要调整时，生成可恢复的新版本。
@@ -1082,7 +1082,7 @@ export function LandingPage({
         <section className="mv-landing-section mv-landing-workflow" id="workflow">
           <div className="mv-landing-section__inner">
             <div className="mv-landing-section-head">
-              <p className="mv-landing-kicker">WORKFLOW / 01</p>
+              <p className="mv-landing-kicker">WORKFLOW / 03</p>
               <h2>不是把文字塞进视频，<br />而是先把教学想清楚。</h2>
               <p>
                 每次生成都经过能力判断、教学规划、画面契约与导演编排，最后才进入播放和导出。
@@ -1112,7 +1112,7 @@ export function LandingPage({
         <section className="mv-landing-section mv-landing-director" id="director">
           <div className="mv-landing-section__inner">
             <div className="mv-landing-director__intro">
-              <p className="mv-landing-kicker">DIRECTOR LAYER / 03</p>
+              <p className="mv-landing-kicker">DIRECTOR LAYER / 04</p>
               <h2>不仅决定讲什么，<br />也决定此刻看哪里。</h2>
               <p>
                 DirectorScript 单独管理镜头、节奏与焦点，让讲解从“有内容”走向“看得懂”。
