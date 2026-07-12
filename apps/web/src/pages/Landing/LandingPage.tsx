@@ -157,6 +157,7 @@ function AnimatedFollowupThread({
     const promptCharacterMs = 34;
     const responsePause = 360;
     const responseCharacterMs = 24;
+    const responseHoldMs = 520;
     const startedAt = window.performance.now();
     let animationFrame: number | null = null;
 
@@ -174,12 +175,14 @@ function AnimatedFollowupThread({
         demo.response.length,
         Math.floor(responseElapsed / responseCharacterMs),
       );
+      const responseTypedAt =
+        responseStart + demo.response.length * responseCharacterMs;
       const nextState: FollowupAnimationState = {
         prompt: demo.prompt.slice(0, promptCount),
         response: demo.response.slice(0, responseCount),
         promptVisible: elapsed >= promptDelay,
         responseVisible: elapsed >= responseStart,
-        complete: responseCount >= demo.response.length,
+        complete: elapsed >= responseTypedAt + responseHoldMs,
       };
 
       setAnimation((current) =>
@@ -244,7 +247,7 @@ function AnimatedFollowupThread({
         <p>
           <span className="mv-landing-visually-hidden">{demo.response}</span>
           <span aria-hidden="true">{animation.response}</span>
-          {animation.responseVisible && !animation.complete && (
+          {animation.responseVisible && animation.response.length < demo.response.length && (
             <i className="mv-landing-type-cursor" aria-hidden="true" />
           )}
         </p>
@@ -896,43 +899,45 @@ export function LandingPage({
               className={`mv-landing-followup-demo${followupInView ? " is-focused" : ""}`}
               aria-label="追问能力示例"
             >
-              <div className="mv-landing-followup-demo__head">
-                <div>
-                  <span>ACTIVE LESSON</span>
-                  <strong>二分查找 · 区间收缩</strong>
+              <div className="mv-landing-followup-demo__camera">
+                <div className="mv-landing-followup-demo__head">
+                  <div>
+                    <span>ACTIVE LESSON</span>
+                    <strong>二分查找 · 区间收缩</strong>
+                  </div>
+                  <code>STEP 02 / mid = 24</code>
                 </div>
-                <code>STEP 02 / mid = 24</code>
-              </div>
 
-              <div
-                className="mv-landing-followup-demo__modes"
-                role="tablist"
-                aria-label="追问方式"
-                data-active-mode={followupMode}
-              >
-                {FOLLOWUP_DEMOS.map((demo) => (
-                  <button
-                    key={demo.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={followupMode === demo.id}
-                    className={followupMode === demo.id ? "is-active" : ""}
-                    onClick={() => setFollowupMode(demo.id)}
-                  >
-                    {demo.label}
-                  </button>
-                ))}
-              </div>
+                <div
+                  className="mv-landing-followup-demo__modes"
+                  role="tablist"
+                  aria-label="追问方式"
+                  data-active-mode={followupMode}
+                >
+                  {FOLLOWUP_DEMOS.map((demo) => (
+                    <button
+                      key={demo.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={followupMode === demo.id}
+                      className={followupMode === demo.id ? "is-active" : ""}
+                      onClick={() => setFollowupMode(demo.id)}
+                    >
+                      {demo.label}
+                    </button>
+                  ))}
+                </div>
 
-              <div className="mv-landing-followup-demo__thread-stack" aria-live="polite">
-                {FOLLOWUP_DEMOS.map((demo) => (
-                  <AnimatedFollowupThread
-                    key={`${demo.id}-${followupMode === demo.id ? "active" : "inactive"}-${followupInView ? "playing" : "idle"}`}
-                    demo={demo}
-                    isSelected={followupMode === demo.id}
-                    isPlaying={followupInView}
-                  />
-                ))}
+                <div className="mv-landing-followup-demo__thread-stack" aria-live="polite">
+                  {FOLLOWUP_DEMOS.map((demo) => (
+                    <AnimatedFollowupThread
+                      key={`${demo.id}-${followupMode === demo.id ? "active" : "inactive"}-${followupInView ? "playing" : "idle"}`}
+                      demo={demo}
+                      isSelected={followupMode === demo.id}
+                      isPlaying={followupInView}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
           </div>

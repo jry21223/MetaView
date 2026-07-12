@@ -105,8 +105,12 @@ describe("LandingPage", () => {
 
   it("shows follow-up as contextual replies and reversible lesson revisions", () => {
     const { container, getByRole, getByText, props } = renderLanding();
+    const followupFrame = container.querySelector(".mv-landing-followup-demo");
 
     expect(getByText("哪里没看懂，就从那一步继续问。")).toBeTruthy();
+    expect(
+      followupFrame?.querySelector(":scope > .mv-landing-followup-demo__camera"),
+    ).toBeTruthy();
     expect(getByRole("tab", { name: "解释这一步" }).getAttribute("aria-selected")).toBe(
       "true",
     );
