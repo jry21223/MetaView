@@ -234,7 +234,7 @@ function AnimatedFollowupThread({
     if (!isSelected || !isPlaying || skipMotion) return;
 
     const introDelayMs = 420;
-    const cameraTravelMs = 520;
+    const cameraTravelMs = 760;
     const promptCharacterMs = 44;
     const promptHoldMs = 320;
     const responseCharacterMs = 32;
