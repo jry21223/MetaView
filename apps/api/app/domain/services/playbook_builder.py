@@ -95,13 +95,13 @@ def _infer_algorithm_id(title: str, execution_map: ExecutionMap | None = None) -
 
 def _resolve_source(
     user_source: str | None,
-    user_language: str,
+    user_language: str | None,
     algorithm_id: str | None,
     execution_map: ExecutionMap | None,
 ) -> tuple[list[str], str]:
     """Return (source_lines, language) using priority: user upload > library > LLM generated."""
     if user_source and user_source.strip():
-        return user_source.splitlines(), user_language
+        return user_source.splitlines(), user_language or "text"
     if algorithm_id:
         library_entry = get_by_id(algorithm_id)
         if library_entry:
@@ -109,7 +109,7 @@ def _resolve_source(
     if execution_map and execution_map.algorithm_code:
         lang = getattr(execution_map, "algorithm_language", "pseudocode") or "pseudocode"
         return list(execution_map.algorithm_code), lang
-    return [], user_language
+    return [], user_language or "text"
 
 
 def build_playbook(
@@ -117,7 +117,7 @@ def build_playbook(
     execution_map: ExecutionMap | None,
     fps: int = _DEFAULT_FPS,
     source_code: str | None = None,
-    source_language: str = "python",
+    source_language: str | None = None,
 ) -> PlaybookScript:
     # Expand high-level animation macros before processing steps.
     cir = expand_cir_animation_calls(cir)
