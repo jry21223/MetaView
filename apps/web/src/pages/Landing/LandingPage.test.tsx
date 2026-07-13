@@ -93,6 +93,17 @@ describe("LandingPage", () => {
     expect(stage?.querySelector("[data-scene-domain='physics']")).toBe(physicsLayer);
   });
 
+  it("describes the math canvas as the custom curve it actually renders", () => {
+    const { container } = renderLanding();
+    const mathLayer = container.querySelector<HTMLElement>("[data-scene-domain='math']");
+    const mathSvg = mathLayer?.querySelector("svg");
+
+    expect(within(mathLayer as HTMLElement).getByText("f(x) = B(x)")).toBeTruthy();
+    expect(within(mathLayer as HTMLElement).getByText("f′(1) ≈ 1.83")).toBeTruthy();
+    expect(mathLayer?.textContent).not.toContain("f(x) = x²");
+    expect(mathSvg?.getAttribute("aria-label")).toBe("自定义 Bézier 曲线与切线示意图");
+  });
+
   it("encodes binary-search values by bar height while keeping range state explicit", () => {
     const { container, getByRole } = renderLanding();
 

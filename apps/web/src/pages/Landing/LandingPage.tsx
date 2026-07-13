@@ -35,7 +35,7 @@ const DEMO_STORIES: DemoStory[] = [
     title: "让公式落到坐标、切线与变化过程上。",
     description:
       "公式不是终点。画布会保留对象身份，用移动、聚焦和对照解释变化为何发生。",
-    subtitle: "当 x 接近 1，切线斜率就是这一点的瞬时变化率。",
+    subtitle: "当 x 接近 1，切线斜率约为 1.83，表示这一点的瞬时变化率。",
   },
   {
     id: "physics",
@@ -442,10 +442,10 @@ function MathScene() {
   return (
     <div className="mv-lesson-scene mv-lesson-scene--math">
       <div className="mv-lesson-formula">
-        <span>f(x) = x²</span>
-        <strong>f′(1) = 2</strong>
+        <span>f(x) = B(x)</span>
+        <strong>f′(1) ≈ 1.83</strong>
       </div>
-      <svg viewBox="0 0 640 360" role="img" aria-label="二次函数与切线示意图">
+      <svg viewBox="0 0 640 360" role="img" aria-label="自定义 Bézier 曲线与切线示意图">
         <g className="mv-scene-grid">
           <path d="M72 54V310M136 54V310M200 54V310M264 54V310M328 54V310M392 54V310M456 54V310M520 54V310M584 54V310" />
           <path d="M72 54H584M72 118H584M72 182H584M72 246H584M72 310H584" />
