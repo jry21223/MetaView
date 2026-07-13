@@ -2404,6 +2404,30 @@
   opacity: 0.52;
 }
 
+/* The auth gate is a quiet checkpoint, not the primary generation composer. */
+.mv-login-gate .mv-login-gate__button {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  color: color-mix(in srgb, var(--accent) 68%, var(--ink));
+  border-color: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.mv-login-gate .mv-login-gate__button:hover {
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--line-2));
+  color: color-mix(in srgb, var(--accent) 76%, var(--ink));
+}
+
+.mv-login-gate .mv-login-gate__button:active {
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface));
+}
+
+.mv-login-gate .mv-login-gate__button:disabled {
+  background: var(--surface-2);
+  border-color: var(--line);
+  color: var(--ink-3);
+  opacity: 1;
+}
+
 .mv-intake-examples {
   min-width: 0;
   margin-top: 24px;

@@ -356,7 +356,7 @@ function OpsLoginGate({
           <div className="mv-avatar">MV</div>
         </div>
       </header>
-      <main className="mv-intake-body">
+      <main className="mv-intake-body mv-login-gate">
         <section className="mv-intake-hero">
           <div className="mv-eyebrow-mini">运营版</div>
           <h1 className="mv-intake-title">微信登录后继续使用</h1>
@@ -370,7 +370,7 @@ function OpsLoginGate({
           <div className="mv-settings-actions">
             <button
               type="button"
-              className="mv-send mv-intake-send"
+              className="mv-send mv-intake-send mv-login-gate__button"
               disabled={!loginUrl || isCheckingLogin}
               onClick={() => {
                 if (loginUrl) window.location.assign(loginUrl);
