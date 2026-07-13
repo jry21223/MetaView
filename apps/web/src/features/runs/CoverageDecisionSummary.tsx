@@ -12,6 +12,31 @@ const MODE_LABEL: Record<CoverageDecision["mode"], string> = {
   unsupported: "不支持",
 };
 
+const MODE_SUMMARY: Record<CoverageDecision["mode"], string> = {
+  specialized: "已匹配经过验证的专用讲解能力。",
+  composable: "可以由现有画面能力受控组合生成。",
+  experimental: "可以解释题目，但当前缺少经过验证的专用画面能力。",
+  unsupported: "当前能力不足，暂时不能安全生成可播放讲解。",
+};
+
+const FALLBACK_LABEL: Record<CoverageDecision["fallback_policy"], string> = {
+  use_skill: "调用专用能力",
+  compose: "组合现有能力",
+  limited_visual: "限制画面复杂度",
+  text_only: "仅返回文本",
+  reject: "不生成",
+};
+
+const DOMAIN_LABEL: Record<string, string> = {
+  algorithm: "算法",
+  biology: "生物",
+  chemistry: "化学",
+  code: "代码",
+  geography: "地理",
+  math: "数学",
+  physics: "物理",
+};
+
 function DiagnosticList({
   label,
   values,
@@ -50,13 +75,17 @@ export function CoverageDecisionSummary({
       data-coverage-mode={decision.mode}
     >
       <div className="mv-coverage-decision__header">
-        <strong>能力覆盖：{MODE_LABEL[decision.mode]}</strong>
-        <code>{decision.mode}</code>
+        <strong>讲解能力</strong>
+        <span>{MODE_LABEL[decision.mode]}</span>
       </div>
       <dl className="mv-coverage-decision__facts">
         <div>
           <dt>领域</dt>
-          <dd>{decision.domain ?? "未判定"}</dd>
+          <dd>
+            {decision.domain
+              ? (DOMAIN_LABEL[decision.domain.toLowerCase()] ?? decision.domain)
+              : "未判定"}
+          </dd>
         </div>
         <div>
           <dt>置信度</dt>
@@ -64,19 +93,20 @@ export function CoverageDecisionSummary({
         </div>
         <div>
           <dt>回退策略</dt>
-          <dd>{decision.fallback_policy}</dd>
+          <dd>{FALLBACK_LABEL[decision.fallback_policy]}</dd>
         </div>
       </dl>
-      <p className="mv-coverage-decision__reason">{decision.reason}</p>
+      <p className="mv-coverage-decision__reason">
+        {MODE_SUMMARY[decision.mode]}
+      </p>
       {showTechnicalDetails ? (
-        <div className="mv-coverage-decision__diagnostics">
+        <details className="mv-coverage-decision__diagnostics">
+          <summary>查看判定依据</summary>
+          <p>{decision.reason}</p>
           <DiagnosticList label="匹配 Skill" values={decision.matched_skill_ids} />
           <DiagnosticList label="相关工具" values={decision.available_tool_ids} />
-          <DiagnosticList
-            label="缺失能力"
-            values={decision.missing_capabilities}
-          />
-        </div>
+          <DiagnosticList label="缺失能力" values={decision.missing_capabilities} />
+        </details>
       ) : null}
     </section>
   );

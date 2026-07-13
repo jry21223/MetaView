@@ -269,7 +269,7 @@
   grid-template-columns: repeat(6, minmax(0, 1fr));
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   animation: mv-ops-enter 180ms ease-out both;
 }
@@ -382,7 +382,12 @@
 
 .mv-ops-activity-grid {
   grid-template-columns: minmax(0, 1.7fr) minmax(330px, 0.8fr);
+  align-items: start;
   animation: mv-ops-enter 180ms 90ms ease-out both;
+}
+
+.mv-ops-activity-grid > .mv-ops-panel.MuiPaper-root {
+  height: auto;
 }
 
 .mv-ops-side-stack {
@@ -397,7 +402,7 @@
   height: 100%;
   overflow: hidden;
   border-color: var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   box-shadow: none;
 }
@@ -564,6 +569,16 @@
 
 .mv-ops-table .MuiDataGrid-row:hover {
   background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+}
+
+.mv-ops-table .MuiDataGrid-row.is-failed {
+  background: color-mix(in srgb, var(--mv-ops-negative) 4%, var(--surface));
+  box-shadow: inset 2px 0 var(--mv-ops-negative);
+}
+
+.mv-ops-table .MuiDataGrid-row.is-pending {
+  background: color-mix(in srgb, var(--warn) 4%, var(--surface));
+  box-shadow: inset 2px 0 var(--warn);
 }
 
 .mv-ops-table .MuiDataGrid-footerContainer {

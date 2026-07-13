@@ -423,6 +423,9 @@ function DashboardContent({
               <DataGrid
                 rows={runRows}
                 columns={runColumns}
+                getRowClassName={({ row }) =>
+                  row.status === "failed" ? "is-failed" : ""
+                }
                 density="compact"
                 initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
                 pageSizeOptions={[10, 20, 50]}
@@ -436,6 +439,9 @@ function DashboardContent({
               <DataGrid
                 rows={orderRows}
                 columns={orderColumns}
+                getRowClassName={({ row }) =>
+                  row.status === "pending" ? "is-pending" : ""
+                }
                 density="compact"
                 initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
                 pageSizeOptions={[10, 20, 50]}
@@ -450,12 +456,12 @@ function DashboardContent({
         </Panel>
 
         <div className="mv-ops-side-stack">
+          <HealthPanel items={dashboard.health_tree} />
           <TaskStructurePanel
             statusDistribution={dashboard.status_distribution}
             domainDistribution={dashboard.domain_distribution}
             skipAnimation={prefersReducedMotion}
           />
-          <HealthPanel items={dashboard.health_tree} />
         </div>
       </div>
     </>

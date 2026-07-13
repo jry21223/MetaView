@@ -29,6 +29,8 @@ describe("QualityReportSummary", () => {
     expect(
       screen.getByLabelText("生成质量报告").getAttribute("data-quality-status"),
     ).toBe("blocked");
+    expect(screen.getByText("结果未通过检查，已停止进入播放流程。")).not.toBeNull();
+    expect(screen.getByText("查看检查详情（1 项）")).not.toBeNull();
     expect(screen.getByText(/skill_pack · specialized/)).not.toBeNull();
     expect(screen.getByText("asset.missing")).not.toBeNull();
   });

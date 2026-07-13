@@ -55,6 +55,21 @@ describe("SettingsPage appearance controls", () => {
     expect(setTweak).toHaveBeenCalledWith("accent", "#ff0055");
   });
 
+  it("restores the accent defined by the selected theme", () => {
+    const setTweak = vi.fn();
+    const { getByRole } = renderSettingsPage({
+      tweaks: { ...TWEAK_DEFAULTS, accent: "#10b981" },
+      setTweak,
+    });
+
+    fireEvent.click(getByRole("button", { name: "恢复主题默认色" }));
+
+    expect(setTweak).toHaveBeenCalledWith(
+      "accent",
+      THEME_PALETTE.light.accent,
+    );
+  });
+
   it("shows local TTS provider settings in self edition", () => {
     const { getByText, getByLabelText } = renderSettingsPage({
       appEdition: "self",

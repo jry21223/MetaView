@@ -2973,3 +2973,169 @@
   font-size: 12px;
   color: var(--ink-3);
 }
+
+/* Intake is a quiet input sheet: one dominant composer and a compact sample rail. */
+.mv-intake-body {
+  padding: clamp(34px, 5.5vh, 58px) 24px 52px;
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--line) 30%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--line) 30%, transparent) 1px,
+      transparent 1px
+    ),
+    var(--bg);
+  background-size: 40px 40px, 40px 40px, auto;
+}
+
+.mv-dark .mv-intake-body {
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--line) 28%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--line) 28%, transparent) 1px,
+      transparent 1px
+    ),
+    var(--bg);
+  background-size: 40px 40px, 40px 40px, auto;
+}
+
+.mv-intake-shell {
+  width: min(1080px, calc(100vw - 48px));
+}
+
+.mv-intake-hero {
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.mv-intake-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(238px, 0.34fr);
+  align-items: start;
+  gap: clamp(26px, 3vw, 38px);
+  padding-top: 26px;
+}
+
+.mv-intake-composer {
+  border-radius: var(--radius);
+  box-shadow: 0 16px 36px color-mix(in srgb, var(--ink) 7%, transparent);
+}
+
+.mv-dark .mv-intake-composer {
+  box-shadow: 0 16px 36px color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.mv-intake-examples {
+  margin-top: 0;
+  padding: 4px 0 0 24px;
+  border-left: 1px solid var(--line);
+}
+
+.mv-intake-example-head h2 {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 620;
+}
+
+.mv-intake-example-list {
+  counter-reset: mv-intake-example;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.mv-intake-example {
+  counter-increment: mv-intake-example;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  min-height: 54px;
+  padding: 0 4px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.mv-intake-example::before {
+  content: counter(mv-intake-example, decimal-leading-zero);
+  color: var(--ink-3);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+}
+
+.mv-intake-example:hover {
+  border-color: var(--line-2);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+.mv-intake-cases-link {
+  min-height: 38px;
+  margin-top: 9px;
+}
+
+@media (max-width: 880px) {
+  .mv-intake-shell {
+    width: min(820px, calc(100vw - 40px));
+  }
+
+  .mv-intake-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mv-intake-examples {
+    padding: 4px 0 0;
+    border-left: 0;
+  }
+
+  .mv-intake-example-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    border-top: 0;
+  }
+
+  .mv-intake-example {
+    grid-template-columns: auto minmax(0, 1fr);
+    min-height: 48px;
+    padding: 0 11px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+  }
+}
+
+@media (max-width: 600px) {
+  .mv-intake-body {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .mv-intake-shell {
+    width: 100%;
+  }
+
+  .mv-intake-example-list {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .mv-intake-example {
+    min-height: 48px;
+    padding: 0 4px;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    border-radius: 0;
+    background: transparent;
+  }
+}

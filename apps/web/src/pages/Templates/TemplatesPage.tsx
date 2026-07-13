@@ -40,81 +40,120 @@ export function TemplatesPage({
     });
   }, [filter, search]);
 
-  return (
-    <>
-      <main className="mv-templates-body">
-        <header className="mv-templates-head">
-          <div className="mv-eyebrow-mini">模板库</div>
-          <h1 className="mv-templates-title">挑一个模板，立刻看到它怎么讲</h1>
-          <p className="mv-templates-sub">
-            每个模板已经写好了对应的
-            prompt，点一下就会带着它跑一遍管线；进入工作台后还能继续微调。
-          </p>
-        </header>
+  const filteredGroups = useMemo(
+    () =>
+      grouped
+        .map((group) => ({
+          ...group,
+          items: filtered.filter((template) => template.domain === group.domain),
+        }))
+        .filter((group) => group.items.length > 0),
+    [filtered, grouped],
+  );
 
-        <section className="mv-templates-controls">
+  return (
+    <main className="mv-templates-body">
+      <header className="mv-templates-head">
+        <div className="mv-templates-head__copy">
+          <div className="mv-eyebrow-mini">LESSON ATLAS / 讲解图谱</div>
+          <h1 className="mv-templates-title">从一个可靠样例开始</h1>
+          <p className="mv-templates-sub">
+            按学科浏览已经验证过的讲解起点，选中后仍可在工作台继续修改。
+          </p>
+        </div>
+        <div className="mv-templates-index-mark" aria-label={`${filtered.length} 个模板`}>
+          <strong>{String(filtered.length).padStart(2, "0")}</strong>
+          <span>VISIBLE<br />STARTS</span>
+        </div>
+      </header>
+
+      <section className="mv-templates-controls" aria-label="查找讲解模板">
+        <label className="mv-templates-search-wrap">
+          <span>SEARCH</span>
           <input
             type="search"
             className="mv-text-input mv-templates-search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="搜索模板（标题 / 描述 / prompt 关键字）"
+            placeholder="搜索标题、知识点或 prompt"
           />
-          <div className="mv-templates-filters">
+        </label>
+        <div className="mv-templates-filters" role="group" aria-label="学科筛选">
+          <button
+            type="button"
+            aria-pressed={filter === "all"}
+            className={`mv-chip${filter === "all" ? " mv-chip-primary" : ""}`}
+            onClick={() => setFilter("all")}
+          >
+            全部
+          </button>
+          {availableDomains.map((d) => (
             <button
+              key={d}
               type="button"
-              className={`mv-chip${filter === "all" ? " mv-chip-primary" : ""}`}
-              onClick={() => setFilter("all")}
+              aria-pressed={filter === d}
+              className={`mv-chip${filter === d ? " mv-chip-primary" : ""}`}
+              onClick={() => setFilter(d)}
             >
-              全部
-            </button>
-            {availableDomains.map((d) => (
-              <button
-                key={d}
-                type="button"
-                className={`mv-chip${filter === d ? " mv-chip-primary" : ""}`}
-                onClick={() => setFilter(d)}
-              >
-                {TEMPLATE_DOMAIN_LABEL[d]}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        {filtered.length === 0 && (
-          <div className="mv-templates-empty">
-            没有匹配的模板。试试改一下搜索关键字。
-          </div>
-        )}
-
-        <div className="mv-templates-grid">
-          {filtered.map((tpl) => (
-            <button
-              key={tpl.id}
-              type="button"
-              className="mv-tpl-card mv-tpl-card-lg"
-              onClick={() => {
-                void Promise.resolve(onUseTemplate(tpl.prompt)).catch(() => undefined);
-              }}
-            >
-              <div className="mv-tpl-tag">
-                {TEMPLATE_DOMAIN_LABEL[tpl.domain]}
-              </div>
-              <div className="mv-tpl-title">{tpl.title}</div>
-              <div className="mv-tpl-desc">{tpl.desc}</div>
-              <div className="mv-tpl-prompt-preview">{tpl.prompt}</div>
-              <div className="mv-tpl-arrow">→</div>
+              {TEMPLATE_DOMAIN_LABEL[d]}
             </button>
           ))}
         </div>
+      </section>
 
-        <footer className="mv-templates-foot">
-          <span>
-            模板写在 <code>apps/web/src/pages/Templates/templates.ts</code>
-            ；新增一项是一个对象。
-          </span>
-        </footer>
-      </main>
-    </>
+      {filtered.length === 0 ? (
+        <div className="mv-templates-empty">
+          <span>NO MATCH</span>
+          <strong>没有匹配的讲解起点</strong>
+          <p>试试更短的关键词，或切换到全部学科。</p>
+        </div>
+      ) : (
+        <div className="mv-templates-catalog">
+          {filteredGroups.map((group, groupIndex) => (
+            <section className="mv-template-domain" key={group.domain}>
+              <header className="mv-template-domain__head">
+                <span>{String(groupIndex + 1).padStart(2, "0")}</span>
+                <h2>{TEMPLATE_DOMAIN_LABEL[group.domain]}</h2>
+                <small>{group.items.length} 个起点</small>
+              </header>
+              <div className="mv-template-list">
+                {group.items.map((template, index) => (
+                  <button
+                    key={template.id}
+                    type="button"
+                    className="mv-template-entry"
+                    onClick={() => {
+                      void Promise.resolve(onUseTemplate(template.prompt)).catch(
+                        () => undefined,
+                      );
+                    }}
+                  >
+                    <span className="mv-template-entry__index">
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+                    <span className="mv-template-entry__copy">
+                      <strong>{template.title}</strong>
+                      <small>{template.desc}</small>
+                    </span>
+                    <span
+                      className="mv-template-entry__signal"
+                      data-domain={template.domain}
+                      aria-hidden="true"
+                    >
+                      <i />
+                      <i />
+                      <i />
+                    </span>
+                    <span className="mv-template-entry__action">
+                      使用模板 <b>→</b>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
+    </main>
   );
 }

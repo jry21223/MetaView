@@ -4,35 +4,108 @@
  */
 
 .mv-settings-body {
+  flex: 1;
   width: 100%;
-  max-width: 720px;
   box-sizing: border-box;
-  margin: 0 auto;
-  padding: 48px 28px 64px;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
+  padding: 42px clamp(18px, 3vw, 42px) 72px;
+  background:
+    linear-gradient(color-mix(in srgb, var(--line) 26%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--line) 26%, transparent) 1px, transparent 1px),
+    var(--bg);
+  background-size: 40px 40px, 40px 40px, auto;
 }
 
 .mv-settings-head {
+  width: min(1120px, 100%);
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--line);
 }
 
 .mv-settings-title {
-  font-size: 26px;
-  font-weight: 600;
-  margin: 0;
+  margin: 8px 0 0;
   color: var(--ink);
-  line-height: 1.25;
+  font-family: var(--font-headline, "Space Grotesk", sans-serif);
+  font-size: clamp(32px, 3.4vw, 46px);
+  font-weight: 620;
+  line-height: 1.08;
+  letter-spacing: -0.04em;
 }
 
 .mv-settings-sub {
+  max-width: 660px;
   font-size: 13px;
-  line-height: 1.55;
+  line-height: 1.65;
   color: var(--ink-2);
   margin: 0;
+}
+
+.mv-settings-layout {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 46px;
+}
+
+.mv-settings-nav {
+  position: sticky;
+  top: 86px;
+  align-self: start;
+  display: grid;
+  gap: 2px;
+  padding-top: 30px;
+}
+
+.mv-settings-nav__label {
+  margin-bottom: 9px;
+  color: var(--ink-3);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+}
+
+.mv-settings-nav a {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px;
+  border-left: 1px solid var(--line);
+  color: var(--ink-2);
+  font-size: 12px;
+  text-decoration: none;
+  transition: color 150ms ease, border-color 150ms ease, background 150ms ease;
+}
+
+.mv-settings-nav a:hover,
+.mv-settings-nav a:focus-visible {
+  outline: none;
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+.mv-settings-nav a span {
+  color: var(--ink-3);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 8px;
+}
+
+.mv-settings-nav small {
+  margin-top: 16px;
+  padding-left: 8px;
+  color: var(--ink-3);
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.mv-settings-sections {
+  min-width: 0;
 }
 
 .mv-settings-flash {
@@ -48,26 +121,47 @@
 }
 
 .mv-settings-section {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 22px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  column-gap: 36px;
+  row-gap: 14px;
+  padding: 32px 0 38px;
+  border-bottom: 1px solid var(--line-2);
+  scroll-margin-top: 84px;
+  animation: mv-settings-reveal 420ms ease both;
+}
+
+.mv-settings-section-intro {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: start;
+}
+
+.mv-settings-section-intro > span {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--accent);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+
+.mv-settings-section > :not(.mv-settings-section-intro) {
+  grid-column: 2;
 }
 
 .mv-settings-section-title {
   margin: 0;
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 17px;
+  font-weight: 620;
   color: var(--ink);
 }
 
 .mv-settings-section-hint {
-  margin: -6px 0 4px;
+  margin: 8px 0 0;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.6;
   color: var(--ink-3);
 }
 
@@ -83,6 +177,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 
 .mv-settings-field > label {
@@ -98,6 +193,10 @@
 
 .mv-settings-field-inline > .mv-text-input {
   flex: 1;
+}
+
+.mv-settings-section .mv-text-input {
+  width: 100%;
 }
 
 .mv-settings-field-row {
@@ -116,9 +215,30 @@
   gap: 6px;
 }
 
-.mv-settings-theme-grid {
+.mv-router-mode-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mv-router-mode-grid .mv-chip {
+  height: auto;
+  min-height: 54px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 9px 11px;
+  text-align: left;
+}
+
+.mv-settings-router-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 150px;
+  gap: 16px;
+}
+
+.mv-settings-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -222,6 +342,7 @@
 .mv-settings-accent-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
@@ -246,6 +367,10 @@
 .mv-settings-accent-value {
   color: var(--ink-2);
   font-size: 12px;
+}
+
+.mv-settings-accent-reset {
+  margin-left: 4px;
 }
 
 .mv-settings-layout-grid {
@@ -287,7 +412,11 @@
 }
 
 .mv-settings-danger {
-  border-color: color-mix(in oklab, var(--warn) 40%, var(--line));
+  border-bottom-color: color-mix(in oklab, var(--warn) 40%, var(--line));
+}
+
+.mv-settings-danger .mv-settings-section-intro > span {
+  color: var(--warn);
 }
 
 /* Probe row colors — only used when 朗读引擎 = OpenAI 服务端. */
@@ -313,4 +442,99 @@
   border-radius: 4px;
   padding: 1px 5px;
   font-size: 11px;
+}
+
+@keyframes mv-settings-reveal {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (max-width: 960px) {
+  .mv-settings-layout {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .mv-settings-nav {
+    position: static;
+    display: flex;
+    overflow-x: auto;
+    gap: 4px;
+    padding: 18px 0 8px;
+    scrollbar-width: none;
+  }
+
+  .mv-settings-nav::-webkit-scrollbar,
+  .mv-settings-nav__label,
+  .mv-settings-nav small {
+    display: none;
+  }
+
+  .mv-settings-nav a {
+    min-width: max-content;
+    min-height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+  }
+
+  .mv-settings-section {
+    grid-template-columns: 160px minmax(0, 1fr);
+    column-gap: 28px;
+  }
+
+  .mv-settings-theme-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .mv-settings-body {
+    padding: 28px 14px 48px;
+  }
+
+  .mv-settings-head {
+    padding-bottom: 20px;
+  }
+
+  .mv-settings-title {
+    font-size: 32px;
+  }
+
+  .mv-settings-section {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 26px 0 30px;
+  }
+
+  .mv-settings-section-intro,
+  .mv-settings-section > :not(.mv-settings-section-intro) {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .mv-settings-section-hint {
+    max-width: 520px;
+  }
+
+  .mv-settings-field-inline,
+  .mv-settings-router-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mv-settings-field-inline {
+    flex-wrap: wrap;
+  }
+
+  .mv-router-mode-grid,
+  .mv-settings-theme-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mv-settings-section {
+    animation: none;
+  }
 }

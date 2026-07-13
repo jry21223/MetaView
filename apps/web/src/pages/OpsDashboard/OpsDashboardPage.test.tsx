@@ -58,6 +58,26 @@ describe("OpsDashboardPage", () => {
     expect(getByText("窗口任务")).toBeTruthy();
   });
 
+  it("marks failed tasks and pending orders for fast scanning", async () => {
+    const dashboard = sampleDashboard();
+    dashboard.recent_runs[0].status = "failed";
+    dashboard.recent_orders[0].status = "pending";
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>
+        HttpResponse.json(dashboard),
+      ),
+    );
+
+    const { container, findByText, getByRole } = renderPage();
+    await findByText("矩阵特征值");
+    expect(container.querySelector(".MuiDataGrid-row.is-failed")).toBeTruthy();
+
+    fireEvent.click(getByRole("tab", { name: "订单" }));
+    await waitFor(() =>
+      expect(container.querySelector(".MuiDataGrid-row.is-pending")).toBeTruthy(),
+    );
+  });
+
   it("does not render row-level user identifiers from dashboard payloads", async () => {
     const dashboard = sampleDashboard();
     Object.assign(dashboard.recent_runs[0], {
