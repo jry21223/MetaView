@@ -4,9 +4,10 @@ import type { ProviderSettings } from "../../providers/hooks/useProviderSettings
 
 export interface PipelineSubmitInput {
   prompt: string;
-  domain?: string | null;
-  sourceCode?: string;
-  language?: string;
+  sourceCode?: string | null;
+  language?: string | null;
+  sourceFilename?: string | null;
+  sourceSizeBytes?: number | null;
   provider?: ProviderSettings;
 }
 
@@ -27,12 +28,22 @@ export function usePipelineSubmit(): UsePipelineSubmitResult {
     setError(null);
     setRunId(null);
     try {
-      const { prompt, domain, sourceCode, language, provider } = input;
+      const {
+        prompt,
+        sourceCode,
+        language,
+        sourceFilename,
+        sourceSizeBytes,
+        provider,
+      } = input;
+      const hasSourceCode = sourceCode != null;
       const result = await submitPipeline({
         prompt,
-        domain: domain ?? null,
-        source_code: sourceCode ?? null,
-        language: language ?? "python",
+        domain: null,
+        source_code: hasSourceCode ? sourceCode : null,
+        language: hasSourceCode ? (language ?? null) : null,
+        source_filename: hasSourceCode ? (sourceFilename ?? null) : null,
+        source_size_bytes: hasSourceCode ? (sourceSizeBytes ?? null) : null,
         provider_api_key: provider?.apiKey || null,
         provider_base_url: provider?.baseUrl || null,
         provider_model: provider?.model || null,

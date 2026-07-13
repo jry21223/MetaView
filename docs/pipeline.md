@@ -18,6 +18,13 @@ Router
   -> PlaybookScript
 ```
 
+正常 Web Intake 不预判 Router 结果。`usePipelineSubmit` 对所有应用内提交写入
+`domain: null`；纯文本同时写入 `source_code: null`、`language: null`、
+`source_filename: null` 与 `source_size_bytes: null`。因此一条普通数学或物理 prompt
+不会携带虚假的 Python 信号。`PipelineRequest.language` 是 nullable，null 会原样进入
+`SkillRouteInput`、CoverageResolver 和 Agent/legacy 上下文。API 仍保留显式 domain
+字段，供基准和内部兼容调用使用。
+
 LessonPlan 只记录教学目标、误区、结论、教学弧线和 SceneIntent，不包含 frame、坐标、
 asset、layer 或 renderer 私有字段。最终候选还会由后端检查已注册的 required facts、
 visual roles、preferred scene type 和精确结论；缺失证据会触发 repair 或阻断。
@@ -131,11 +138,17 @@ SceneIntent 展开为多个步骤，但必须保持教学目标、所需事实�
 
 当 `IntakeContext.sourceCode` 存在时：
 
-1. 前端从扩展名映射 `language`（见 `IntakeScreen.EXT_TO_LANGUAGE`）。
-2. `usePipelineSubmit` 把 `sourceCode + language` 传到后端。
+1. 前端从扩展名映射真实 `language`，并记录 `sourceFilename` 与
+   `sourceSizeBytes`；仅接受一个不超过 256 KB 的代码文件。
+2. `usePipelineSubmit` 把四项证据映射为 `source_code + language +
+   source_filename + source_size_bytes`，仍保持 `domain: null`。
 3. `build_cir_prompt` 在 system prompt 里以行号方式嵌入源码（`_number_source`，0-indexed）。
 4. LLM 在每个 checkpoint 的 `code_lines` 填入相关行号。
 5. `playbook_builder._build_code_highlight` 过滤越界行号，构造 `CodeHighlightOverlay`。
+
+后端拒绝没有 `source_code` 却携带语言/文件元数据的请求，也拒绝超过 256 KB 的
+源码或声明字节数。若非 Web 调用方提供源码但没有语言，Router prompt 与 CIR prompt
+使用 `unknown`，Playbook 的展示降级语言使用 `text`；任何路径都不得默认为 Python。
 
 `CodeHighlightOverlay` 是与视觉 snapshot 并行的工作台轨道。BFS 与递归的
 Agent 结果缺少该轨道时，后端会从 canonical 算法代码和结构化状态确定性补齐；

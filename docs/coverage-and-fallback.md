@@ -18,6 +18,19 @@ Skill routing + topic evidence + registered manifests + runtime tool discovery
 `CoverageDecision` is a capability and safety boundary. It is not a rendering contract and
 must not be copied into `PlaybookScript`, `DirectorScript`, or the Remotion composition.
 
+## Intake evidence boundary
+
+The normal Web Intake always supplies `explicit_domain=None`. Text-only requests also carry
+`source_code=None` and `language=None`; code attachments carry the source and detected language
+but still do not claim a domain. Nullable language is preserved through `PipelineRequest`,
+`SkillRouteInput`, the topic router and this resolver. Missing language means unknown evidence,
+never Python.
+
+Domain selection therefore belongs to backend topic evidence, registered deterministic skill
+heuristics and coverage validation. The request DTO keeps an explicit domain for benchmarks and
+internal compatibility clients, but a Web-provided label cannot bypass the resolver's manifest,
+ProblemSpec, confidence or tool checks because the Web path does not provide one.
+
 ## Modes
 
 | Mode | Meaning | Fallback |

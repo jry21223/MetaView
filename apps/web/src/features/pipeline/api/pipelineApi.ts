@@ -7,7 +7,9 @@ export interface SubmitPipelineRequest {
   prompt: string;
   domain?: string | null;
   source_code?: string | null;
-  language?: string;
+  language?: string | null;
+  source_filename?: string | null;
+  source_size_bytes?: number | null;
   provider_api_key?: string | null;
   provider_base_url?: string | null;
   provider_model?: string | null;

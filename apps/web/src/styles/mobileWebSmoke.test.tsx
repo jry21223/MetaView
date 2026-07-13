@@ -120,7 +120,7 @@ describe("mobile web smoke", () => {
       expect(container.querySelector(".mv-intake-hero")).toBeTruthy();
       expect(container.querySelector(".mv-intake-composer")).toBeTruthy();
       expect(container.querySelector(".mv-intake-send")).toBeTruthy();
-      expect(container.querySelectorAll(".mv-intake-example")).toHaveLength(4);
+      expect(container.querySelectorAll(".mv-intake-example")).toHaveLength(3);
       expect(
         container.querySelector<HTMLInputElement>('input[type="file"]')?.accept,
       ).toContain(".py");

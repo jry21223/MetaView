@@ -49,6 +49,25 @@ settings              -> /settings
 
 未知应用路径回到公共首页 `/`。
 
+## 智能创建入口契约
+
+`/create` 只呈现一个单列输入面，不在前端显示或推断学科、Coverage、Skill、
+LessonPlan 或 Director。教师可以输入题目/知识点、粘贴代码，或附加一个代码文件；
+“导数与切线 / 二分查找 / 抛体运动”三个按钮只填入自然语言 prompt，不提交、
+不选择模板，也不写入 domain。`/cases` 是精选案例的稳定目标路径，由后续公共案例
+阶段实现。
+
+正常 Web 提交统一经过 `usePipelineSubmit`，始终发送 `domain: null`：
+
+- 纯文本发送 `source_code/language/source_filename/source_size_bytes: null`；
+- 代码附件发送源码、扩展名映射出的真实语言、原始文件名和字节数；
+- 附件只允许一个受支持的代码文件，第二次选择替换前一个，大小上限为 256 KB；
+- 空输入不提交，`Ctrl/Cmd + Enter` 与按钮共用同一异步防重入口。
+
+这意味着 Web Intake 只收集证据，最终 domain 和能力路径由后端 Router、
+CoverageResolver 与 Skill registry 决定。API 仍允许内部调用方显式提供 domain，
+但应用 Shell 不使用该兼容入口。
+
 ## GlobalTopbar
 
 `apps/web/src/shared/ui/GlobalTopbar.tsx` 是应用内五个 Stage 共享的顶部栏。**不要**在页面级别复制 Topbar JSX，也不要在公共 Landing Page 中强行复用它。

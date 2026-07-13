@@ -17,6 +17,18 @@ def test_user_prompt_equals_original_input() -> None:
     assert user == prompt
 
 
+def test_source_code_with_unknown_language_is_not_labeled_python() -> None:
+    system, _ = build_cir_prompt(
+        "解释这段代码",
+        TopicDomain.CODE,
+        source_code="custom syntax",
+        language=None,
+    )
+
+    assert "provided source code in `unknown`" in system
+    assert "provided source code in `python`" not in system
+
+
 def test_canonical_lesson_plan_guides_cir_without_changing_user_prompt() -> None:
     prompt = "用 BFS 解释广度优先遍历为什么需要队列"
     lesson_plan = build_rule_based_lesson_plan(prompt=prompt, domain="algorithm")
