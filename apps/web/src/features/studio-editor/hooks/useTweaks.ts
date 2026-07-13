@@ -33,6 +33,10 @@ export const TWEAK_DEFAULTS: TweakValues = {
 };
 
 const STORAGE_KEY = "mv_tweaks";
+// Accent values that shipped as theme defaults before the current DESIGN.md
+// palette. Migrate these on load only so an intentional custom color remains
+// user-owned after it has been selected.
+const LEGACY_DEFAULT_ACCENTS = new Set(["#10b981"]);
 const LAYOUTS = ["drawer", "left", "top"] as const;
 const DENSITIES = ["compact", "regular", "comfy"] as const;
 
@@ -149,7 +153,14 @@ function loadFromStorage(defaults: TweakValues): TweakValues {
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
       return defaults;
-    return sanitizeTweaks({ ...defaults, ...(parsed as Partial<TweakValues>) }, defaults);
+    const persisted = parsed as Partial<TweakValues>;
+    const theme = isThemeName(persisted.theme) ? persisted.theme : defaults.theme;
+    const migrated =
+      typeof persisted.accent === "string" &&
+      LEGACY_DEFAULT_ACCENTS.has(persisted.accent.toLowerCase())
+        ? { ...persisted, accent: THEME_PALETTE[theme].accent }
+        : persisted;
+    return sanitizeTweaks({ ...defaults, ...migrated }, defaults);
   } catch {
     return defaults;
   }

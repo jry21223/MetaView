@@ -114,6 +114,9 @@ export function SettingsPage({
 
   const tts = useTTS();
   const showLocalTtsSettings = appEdition === "self";
+  const themeDefaultAccent = THEME_PALETTE[tweaks.theme].accent;
+  const accentIsThemeDefault =
+    tweaks.accent.toLowerCase() === themeDefaultAccent.toLowerCase();
 
   const flash = (msg: string) => {
     setSavedFlash(msg);
@@ -198,7 +201,7 @@ export function SettingsPage({
     <>
       <main className="mv-settings-body">
         <header className="mv-settings-head">
-          <div className="mv-eyebrow-mini">设置</div>
+          <div className="mv-eyebrow-mini">SYSTEM INSTRUMENTS / 设置</div>
           <h1 className="mv-settings-title">
             {showProviderSettings ? "教学生成与模型路由" : "账户偏好与播放设置"}
           </h1>
@@ -214,12 +217,31 @@ export function SettingsPage({
           )}
         </header>
 
+        <div className="mv-settings-layout">
+          <nav className="mv-settings-nav" aria-label="设置分区">
+            <span className="mv-settings-nav__label">SECTIONS</span>
+            {showProviderSettings && (
+              <>
+                <a href="#settings-provider"><span>01</span>生成模型</a>
+                <a href="#settings-router"><span>02</span>模型路由</a>
+              </>
+            )}
+            <a href="#settings-tts"><span>{showProviderSettings ? "03" : "01"}</span>朗读</a>
+            <a href="#settings-appearance"><span>{showProviderSettings ? "04" : "02"}</span>外观</a>
+            <a href="#settings-data"><span>{showProviderSettings ? "05" : "03"}</span>本地数据</a>
+            <small>设置实时保存在当前浏览器</small>
+          </nav>
+
+          <div className="mv-settings-sections">
         {showProviderSettings && (
-          <section className="mv-settings-section">
-            <h2 className="mv-settings-section-title">生成模型</h2>
-            <p className="mv-settings-section-hint">
-              配置 OpenAI 或任意兼容接口；留空密钥时会回退到后端默认凭据。
-            </p>
+          <section className="mv-settings-section" id="settings-provider">
+            <div className="mv-settings-section-intro">
+              <span>01 / PROVIDER</span>
+              <h2 className="mv-settings-section-title">生成模型</h2>
+              <p className="mv-settings-section-hint">
+                配置 OpenAI 或任意兼容接口；留空密钥时会回退到后端默认凭据。
+              </p>
+            </div>
 
             <div className="mv-settings-field">
               <label htmlFor="mv-set-key">API 密钥</label>
@@ -269,12 +291,15 @@ export function SettingsPage({
         )}
 
         {showProviderSettings && (
-          <section className="mv-settings-section">
-            <h2 className="mv-settings-section-title">小模型路由</h2>
-            <p className="mv-settings-section-hint">
-              题目进入生成链路前先判断学科与 specialized
-              skill；路由模型建议使用小而快的模型。
-            </p>
+          <section className="mv-settings-section" id="settings-router">
+            <div className="mv-settings-section-intro">
+              <span>02 / ROUTER</span>
+              <h2 className="mv-settings-section-title">小模型路由</h2>
+              <p className="mv-settings-section-hint">
+                题目进入生成链路前先判断学科与 specialized
+                skill；路由模型建议使用小而快的模型。
+              </p>
+            </div>
 
             <div className="mv-settings-field">
               <label>Router Mode</label>
@@ -359,24 +384,27 @@ export function SettingsPage({
         )}
 
         {/* ───── TTS ───── */}
-        <section className="mv-settings-section">
-          <h2 className="mv-settings-section-title">
-            {showLocalTtsSettings ? "本地 TTS 配置" : "平台托管 TTS"}
-          </h2>
-          <p className="mv-settings-section-hint">
-            {showLocalTtsSettings ? (
-              <>
-                浏览器语音不需要配置；OpenAI / 兼容 TTS
-                通过后端临时代理，请求只使用当前浏览器保存的本地配置。
-              </>
-            ) : (
-              <>
-                运营版使用平台托管 TTS。API 密钥由服务器 <code>.env</code>{" "}
-                中的 <code>METAVIEW_TTS_API_KEY</code> 或{" "}
-                <code>METAVIEW_OPENAI_API_KEY</code> 提供。
-              </>
-            )}
-          </p>
+        <section className="mv-settings-section" id="settings-tts">
+          <div className="mv-settings-section-intro">
+            <span>{showProviderSettings ? "03" : "01"} / NARRATION</span>
+            <h2 className="mv-settings-section-title">
+              {showLocalTtsSettings ? "本地 TTS 配置" : "平台托管 TTS"}
+            </h2>
+            <p className="mv-settings-section-hint">
+              {showLocalTtsSettings ? (
+                <>
+                  浏览器语音不需要配置；OpenAI / 兼容 TTS
+                  通过后端临时代理，请求只使用当前浏览器保存的本地配置。
+                </>
+              ) : (
+                <>
+                  运营版使用平台托管 TTS。API 密钥由服务器 <code>.env</code>{" "}
+                  中的 <code>METAVIEW_TTS_API_KEY</code> 或{" "}
+                  <code>METAVIEW_OPENAI_API_KEY</code> 提供。
+                </>
+              )}
+            </p>
+          </div>
 
           <div className="mv-settings-field">
             <label>朗读引擎</label>
@@ -528,11 +556,14 @@ export function SettingsPage({
         </section>
 
         {/* ───── Appearance ───── */}
-        <section className="mv-settings-section">
-          <h2 className="mv-settings-section-title">外观</h2>
-          <p className="mv-settings-section-hint">
-            实时生效；主题和强调色会同步到工作台与播放器。
-          </p>
+        <section className="mv-settings-section" id="settings-appearance">
+          <div className="mv-settings-section-intro">
+            <span>{showProviderSettings ? "04" : "02"} / APPEARANCE</span>
+            <h2 className="mv-settings-section-title">外观</h2>
+            <p className="mv-settings-section-hint">
+              实时生效；主题和强调色会同步到工作台与播放器。
+            </p>
+          </div>
 
           <div className="mv-settings-field">
             <label>主题</label>
@@ -601,6 +632,14 @@ export function SettingsPage({
               <span className="mv-settings-accent-value mv-mono">
                 {tweaks.accent}
               </span>
+              <button
+                type="button"
+                className="mv-chip mv-settings-accent-reset"
+                disabled={accentIsThemeDefault}
+                onClick={() => setTweak("accent", themeDefaultAccent)}
+              >
+                恢复主题默认色
+              </button>
             </div>
           </div>
 
@@ -650,11 +689,14 @@ export function SettingsPage({
         </section>
 
         {/* ───── Local data ───── */}
-        <section className="mv-settings-section mv-settings-danger">
-          <h2 className="mv-settings-section-title">本地数据</h2>
-          <p className="mv-settings-section-hint">
-            服务端历史不受影响；仅清理浏览器里的本地状态。
-          </p>
+        <section className="mv-settings-section mv-settings-danger" id="settings-data">
+          <div className="mv-settings-section-intro">
+            <span>{showProviderSettings ? "05" : "03"} / LOCAL DATA</span>
+            <h2 className="mv-settings-section-title">本地数据</h2>
+            <p className="mv-settings-section-hint">
+              服务端历史不受影响；仅清理浏览器里的本地状态。
+            </p>
+          </div>
 
           <div className="mv-settings-actions">
             <button
@@ -673,6 +715,8 @@ export function SettingsPage({
             </button>
           </div>
         </section>
+          </div>
+        </div>
       </main>
     </>
   );
