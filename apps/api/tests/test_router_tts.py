@@ -171,7 +171,7 @@ def test_ops_speech_requires_wechat_session(ops_client) -> None:
     assert _FakeAsyncClient.last_request is None
 
 
-def test_ops_speech_rejects_client_provider_config(ops_client) -> None:
+def test_ops_speech_accepts_client_provider_config(ops_client) -> None:
     client, session = ops_client
     _FakeAsyncClient.response = _FakeResponse(
         status_code=200,
@@ -181,12 +181,21 @@ def test_ops_speech_rejects_client_provider_config(ops_client) -> None:
 
     r = client.post(
         "/api/v1/tts/speech",
-        json={"text": "hi", "api_key": "sk-client-secret"},
+        json={
+            "text": "hi",
+            "api_key": "sk-client-secret",
+            "base_url": "https://tts.example.test/v1",
+            "model": "tts-custom",
+        },
         headers={"Cookie": f"mv_session={session.token}"},
     )
 
-    assert r.status_code == 400
-    assert _FakeAsyncClient.last_request is None
+    assert r.status_code == 200
+    req = _FakeAsyncClient.last_request
+    assert req is not None
+    assert req["url"] == "https://tts.example.test/v1/audio/speech"
+    assert req["headers"]["Authorization"] == "Bearer sk-client-secret"
+    assert req["json"]["model"] == "tts-custom"
 
 
 def test_speech_defaults_voice_to_settings(client) -> None:

@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { APP_EDITION } from "../../../shared/config/constants";
 import { readStoredTTSConfig } from "../../playbook/engine/player/useTTS";
 import {
   buildDownloadUrl,
@@ -94,7 +93,9 @@ function readJobStartedAt(job: ExportJobResponse | null): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function assetReportEntryId(entry: ExportAssetReport["entries"][number]): string {
+function assetReportEntryId(
+  entry: ExportAssetReport["entries"][number],
+): string {
   return `${entry.pack_id ?? "any"}/${entry.asset_id}`;
 }
 
@@ -257,11 +258,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           ttsConfig && {
             tts: {
               voice: ttsConfig.voice || "alloy",
-              ...(APP_EDITION === "self" && {
-                api_key: ttsConfig.apiKey || undefined,
-                base_url: ttsConfig.baseUrl || undefined,
-                model: ttsConfig.model || undefined,
-              }),
+              api_key: ttsConfig.apiKey || undefined,
+              base_url: ttsConfig.baseUrl || undefined,
+              model: ttsConfig.model || undefined,
             },
           }),
       });
@@ -414,20 +413,31 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   </span>
                 </div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  <span style={{ ...reportBadgeStyle(c.border, c.text), color: c.text }}>
+                  <span
+                    style={{
+                      ...reportBadgeStyle(c.border, c.text),
+                      color: c.text,
+                    }}
+                  >
                     需署名 {assetReport.attribution_required.length}
                   </span>
                   <span
                     style={{
-                      ...reportBadgeStyle(assetReport.license_risk.length > 0 ? c.warn : c.border, c.text),
-                      color: assetReport.license_risk.length > 0 ? c.warn : c.text,
+                      ...reportBadgeStyle(
+                        assetReport.license_risk.length > 0 ? c.warn : c.border,
+                        c.text,
+                      ),
+                      color:
+                        assetReport.license_risk.length > 0 ? c.warn : c.text,
                     }}
                   >
                     授权风险 {assetReport.license_risk.length}
                   </span>
                 </div>
                 {previewAssetReportEntries.length > 0 && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div
+                    style={{ display: "flex", flexDirection: "column", gap: 4 }}
+                  >
                     {previewAssetReportEntries.map((entry) => (
                       <div
                         key={assetReportEntryId(entry)}
@@ -439,10 +449,22 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                           color: c.muted,
                         }}
                       >
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <span
+                          style={{
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
                           {assetReportEntryId(entry)}
                         </span>
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <span
+                          style={{
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
                           {entry.attribution ?? entry.license ?? "无署名要求"}
                         </span>
                       </div>

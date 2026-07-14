@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { API_BASE_URL, APP_EDITION } from "../../../../shared/config/constants";
+import { API_BASE_URL } from "../../../../shared/config/constants";
 import { isSSML, normalizeSSML } from "./ssml";
 import { sharedTTSCache, ttsCacheKey, type TTSCacheStats } from "./ttsCache";
 
@@ -45,7 +45,10 @@ export const DOMAIN_VOICE_MAP: Record<string, string> = {
 
 export const AUTO_VOICE = "auto";
 
-export function resolveVoice(configVoice: string, domain: string | undefined): string {
+export function resolveVoice(
+  configVoice: string,
+  domain: string | undefined,
+): string {
   if (configVoice !== AUTO_VOICE) return configVoice;
   if (domain && DOMAIN_VOICE_MAP[domain]) return DOMAIN_VOICE_MAP[domain];
   return "alloy";
@@ -66,7 +69,7 @@ const TTS_PROXY_ENDPOINT = `${API_BASE_URL}/api/v1/tts/speech`;
 /**
  * Trim a parsed config object to the fields we currently persist. Older
  * builds stored a narrower shape; keep unknown entries out while preserving
- * the self-edition BYOK fields the TTS proxy accepts per request.
+ * the local BYOK fields the TTS proxy accepts per request.
  */
 function sanitizeStoredConfig(parsed: unknown): Partial<TTSConfig> {
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
@@ -75,11 +78,14 @@ function sanitizeStoredConfig(parsed: unknown): Partial<TTSConfig> {
   const raw = parsed as Record<string, unknown>;
   const out: Partial<TTSConfig> = {};
   if (typeof raw.enabled === "boolean") out.enabled = raw.enabled;
-  if (raw.backend === "system" || raw.backend === "openai") out.backend = raw.backend;
+  if (raw.backend === "system" || raw.backend === "openai")
+    out.backend = raw.backend;
   if (typeof raw.voice === "string") out.voice = raw.voice;
-  if (typeof raw.rate === "number" && Number.isFinite(raw.rate)) out.rate = raw.rate;
+  if (typeof raw.rate === "number" && Number.isFinite(raw.rate))
+    out.rate = raw.rate;
   if (typeof raw.apiKey === "string") out.apiKey = raw.apiKey;
-  if (typeof raw.baseUrl === "string" && raw.baseUrl.trim()) out.baseUrl = raw.baseUrl;
+  if (typeof raw.baseUrl === "string" && raw.baseUrl.trim())
+    out.baseUrl = raw.baseUrl;
   if (typeof raw.model === "string" && raw.model.trim()) out.model = raw.model;
   return out;
 }
@@ -97,7 +103,7 @@ function loadConfig(): TTSConfig {
   return { ...DEFAULT_CONFIG };
 }
 
-const TTS_CONFIG_CHANGE_EVENT = 'mv-tts-config-change';
+const TTS_CONFIG_CHANGE_EVENT = "mv-tts-config-change";
 
 function saveConfig(cfg: TTSConfig): void {
   try {
@@ -161,16 +167,16 @@ export function useTTS(): UseTTSResult {
   // this, switching the backend in Settings did not take effect for the
   // already-mounted player. (Companion to issue #40 / #72 layering.)
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
     const refresh = () => setConfig(loadConfig());
     const onStorage = (event: StorageEvent) => {
       if (event.key !== STORAGE_KEY) return;
       refresh();
     };
-    window.addEventListener('storage', onStorage);
+    window.addEventListener("storage", onStorage);
     window.addEventListener(TTS_CONFIG_CHANGE_EVENT, refresh);
     return () => {
-      window.removeEventListener('storage', onStorage);
+      window.removeEventListener("storage", onStorage);
       window.removeEventListener(TTS_CONFIG_CHANGE_EVENT, refresh);
     };
   }, []);
@@ -187,7 +193,8 @@ export function useTTS(): UseTTSResult {
     (Boolean(window.speechSynthesis) ||
       Boolean(
         window.AudioContext ??
-          (window as unknown as { webkitAudioContext: unknown }).webkitAudioContext,
+        (window as unknown as { webkitAudioContext: unknown })
+          .webkitAudioContext,
       ));
 
   const stopSystem = useCallback(() => {
@@ -212,38 +219,39 @@ export function useTTS(): UseTTSResult {
     setSpeaking(false);
   }, [stopSystem, stopOpenAI]);
 
-  const speakSystem = useCallback(
-    (text: string, rate: number) => {
-      if (!window.speechSynthesis) return;
-      window.speechSynthesis.cancel();
-      const utt = new SpeechSynthesisUtterance(text);
-      utt.rate = rate;
-      utt.onstart = () => setSpeaking(true);
-      utt.onend = () => setSpeaking(false);
-      utt.onerror = () => setSpeaking(false);
-      window.speechSynthesis.speak(utt);
+  const speakSystem = useCallback((text: string, rate: number) => {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.rate = rate;
+    utt.onstart = () => setSpeaking(true);
+    utt.onend = () => setSpeaking(false);
+    utt.onerror = () => setSpeaking(false);
+    window.speechSynthesis.speak(utt);
+  }, []);
+
+  const playArrayBuffer = useCallback(
+    async (buf: ArrayBuffer, signal: AbortSignal): Promise<void> => {
+      const ActxCtor =
+        window.AudioContext ??
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext;
+      if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
+        audioCtxRef.current = new ActxCtor();
+      }
+      // decodeAudioData mutates the source buffer, so clone before decoding so cache stays usable
+      const decoded = await audioCtxRef.current.decodeAudioData(buf.slice(0));
+      if (signal.aborted) return;
+
+      const src = audioCtxRef.current.createBufferSource();
+      src.buffer = decoded;
+      src.connect(audioCtxRef.current.destination);
+      src.onended = () => setSpeaking(false);
+      audioSrcRef.current = src;
+      src.start();
     },
     [],
   );
-
-  const playArrayBuffer = useCallback(async (buf: ArrayBuffer, signal: AbortSignal): Promise<void> => {
-    const ActxCtor =
-      window.AudioContext ??
-      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
-      audioCtxRef.current = new ActxCtor();
-    }
-    // decodeAudioData mutates the source buffer, so clone before decoding so cache stays usable
-    const decoded = await audioCtxRef.current.decodeAudioData(buf.slice(0));
-    if (signal.aborted) return;
-
-    const src = audioCtxRef.current.createBufferSource();
-    src.buffer = decoded;
-    src.connect(audioCtxRef.current.destination);
-    src.onended = () => setSpeaking(false);
-    audioSrcRef.current = src;
-    src.start();
-  }, []);
 
   const speakOpenAI = useCallback(
     async (text: string, rate: number, voice: string) => {
@@ -259,15 +267,14 @@ export function useTTS(): UseTTSResult {
       audioSrcRef.current = null;
       setSpeaking(true);
 
-      // Issue #40: cache key no longer mixes in user-supplied baseUrl/model —
-      // the backend proxy owns both — so the key fingerprints exactly the
-      // synthesis-shaping inputs the client controls.
+      // Include the local endpoint/model in the cache key so audio generated
+      // with one provider configuration is never reused for another.
       const key = ttsCacheKey({
         voice,
         rate,
         text,
-        baseUrl: APP_EDITION === "self" ? config.baseUrl : "",
-        model: APP_EDITION === "self" ? config.model : "",
+        baseUrl: config.baseUrl,
+        model: config.model,
       });
       const cached = sharedTTSCache.get(key);
       if (cached) {
@@ -290,11 +297,9 @@ export function useTTS(): UseTTSResult {
             text,
             voice,
             rate,
-            ...(APP_EDITION === "self" && {
-              api_key: config.apiKey || null,
-              base_url: config.baseUrl || null,
-              model: config.model || null,
-            }),
+            api_key: config.apiKey || null,
+            base_url: config.baseUrl || null,
+            model: config.model || null,
           }),
         });
         if (ac.signal.aborted) return;
@@ -321,7 +326,8 @@ export function useTTS(): UseTTSResult {
       // When caller doesn't pass a voice, resolve through the latest known
       // domain so AUTO-voice picks the right per-subject mapping
       // (e.g. math → echo, chemistry → shimmer). See issue #52.
-      const voice = options?.voice ?? resolveVoice(config.voice, domainRef.current);
+      const voice =
+        options?.voice ?? resolveVoice(config.voice, domainRef.current);
       if (config.backend === "openai") {
         void speakOpenAI(normalized, rate, voice);
       } else {

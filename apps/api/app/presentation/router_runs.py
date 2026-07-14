@@ -123,13 +123,6 @@ async def submit_followup(
     llm: Annotated[ILLMProvider, Depends(get_llm_provider)],
     account_use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
 ) -> FollowUpResponse:
-    if settings.app_edition == "ops" and (
-        payload.provider_api_key or payload.provider_base_url or payload.provider_model
-    ):
-        raise HTTPException(
-            status_code=400,
-            detail="运营版使用平台托管模型，不能提交客户端 Provider 配置",
-        )
     if not payload.provider_api_key and not settings.openai_api_key:
         raise HTTPException(
             status_code=503,

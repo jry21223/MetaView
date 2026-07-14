@@ -541,12 +541,18 @@ def test_followup_coerces_numeric_parameter_contract(monkeypatch, tmp_path) -> N
     }
 
 
-def test_followup_ops_rejects_provider_override(monkeypatch, tmp_path) -> None:
+def test_followup_ops_accepts_provider_override(monkeypatch, tmp_path) -> None:
     get_settings.cache_clear()
     monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
     monkeypatch.setenv("METAVIEW_OPENAI_API_KEY", "sk-server")
     monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    provider = SequenceLLM([_llm_payload([])])
+    monkeypatch.setattr(
+        "app.presentation.router_runs.OpenAIProvider",
+        lambda **_kwargs: provider,
+    )
     db = str(tmp_path / "ops.db")
+    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", db)
     init_db(db)
     repo = SqliteRunRepository(db)
     director_repo = SqliteRunDirectorRepository(db)
@@ -555,7 +561,7 @@ def test_followup_ops_rejects_provider_override(monkeypatch, tmp_path) -> None:
     app = create_app()
     app.dependency_overrides[get_run_repo] = lambda: repo
     app.dependency_overrides[get_run_director_repo] = lambda: director_repo
-    app.dependency_overrides[get_llm_provider] = lambda: SequenceLLM([_llm_payload([])])
+    app.dependency_overrides[get_llm_provider] = lambda: provider
 
     with TestClient(app) as client:
         resp = client.post(
@@ -565,7 +571,7 @@ def test_followup_ops_rejects_provider_override(monkeypatch, tmp_path) -> None:
         )
 
     get_settings.cache_clear()
-    assert resp.status_code == 400
+    assert resp.status_code == 200
 
 
 def test_followup_ops_requires_wechat_session(monkeypatch, tmp_path) -> None:

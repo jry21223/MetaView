@@ -38,7 +38,11 @@ const DOMAIN_SUGGESTIONS: Record<string, string[]> = {
   geography: ["主要驱动力是什么？", "风向为什么改变？", "这个区域有何差异？"],
 };
 
-const FALLBACK_SUGGESTIONS = ["先抓哪个关键点？", "这一步为什么必要？", "我来复述一遍"];
+const FALLBACK_SUGGESTIONS = [
+  "先抓哪个关键点？",
+  "这一步为什么必要？",
+  "我来复述一遍",
+];
 
 // ── ChatPanel ─────────────────────────────────────────────────────────────
 
@@ -52,7 +56,6 @@ interface ChatMessage {
 }
 
 interface ChatPanelProps {
-  appEdition: "self" | "ops";
   runId: string | null;
   playbook: PlaybookScript | null;
   isProviderConfigured: boolean;
@@ -82,7 +85,6 @@ function formatChatError(err: unknown): string {
 }
 
 function ChatPanel({
-  appEdition,
   runId,
   playbook,
   isProviderConfigured,
@@ -167,7 +169,7 @@ function ChatPanel({
     abortRef.current = controller;
 
     const nextMsgs: ChatMessage[] = [...msgs, { from: "user", text: userText }];
-      setMsgs([...nextMsgs, { from: "ai", text: "回复中…", pending: true }]);
+    setMsgs([...nextMsgs, { from: "ai", text: "回复中…", pending: true }]);
     setInput("");
     setPending(true);
 
@@ -181,10 +183,9 @@ function ChatPanel({
             | "assistant",
           content: m.text,
         }));
-      const provider =
-        appEdition === "self" && providerSettings?.apiKey.trim().length
-          ? providerSettings
-          : undefined;
+      const provider = providerSettings?.apiKey.trim().length
+        ? providerSettings
+        : undefined;
       const result = await submitRunFollowUp(
         runId!,
         userText,
@@ -286,7 +287,7 @@ function ChatPanel({
   };
 
   const shouldCollapseEmptyProvider =
-    appEdition === "self" && !isProviderConfigured && msgs.length === 0;
+    !isProviderConfigured && msgs.length === 0;
 
   const followupSlot = shouldCollapseEmptyProvider ? (
     <div className="mv-followup-compact">
@@ -320,9 +321,10 @@ function ChatPanel({
             }}
           >
             <span>
-              可以继续提问，也可以要求调整当前讲解；未配置本地 Provider 时将使用服务器模型。
+              可以继续提问，也可以要求调整当前讲解；未配置本地 Provider
+              时将使用服务器模型。
             </span>
-            {appEdition === "self" && onOpenProviderSettings && (
+            {onOpenProviderSettings && (
               <button
                 className="mv-chip mv-chip-primary"
                 onClick={onOpenProviderSettings}
@@ -548,7 +550,6 @@ export interface StudioPageProps {
 }
 
 export function StudioPage({
-  appEdition = "self",
   runId,
   t,
   onNavigate,
@@ -591,7 +592,10 @@ export function StudioPage({
     activePatchedRun !== null && activePatchedRun.versionId == null;
   const canExport = !!playbook && !!runId;
   const exportAssetReport = useMemo(
-    () => (activePlaybook ? createAssetAttributionReportForScript(activePlaybook) : null),
+    () =>
+      activePlaybook
+        ? createAssetAttributionReportForScript(activePlaybook)
+        : null,
     [activePlaybook],
   );
 
@@ -635,7 +639,6 @@ export function StudioPage({
             />
           ) : activePlaybook ? (
             <ChatPanel
-              appEdition={appEdition}
               runId={runId}
               playbook={activePlaybook}
               isProviderConfigured={isProviderConfigured}
@@ -671,7 +674,9 @@ export function StudioPage({
                   interactionActionPending={interactionActionPending}
                   interactionSessionKey={interactionSessionKey}
                   swapDurationFrames={t.swapFrames}
-                  onOpenExport={canExport ? () => setExportOpen(true) : undefined}
+                  onOpenExport={
+                    canExport ? () => setExportOpen(true) : undefined
+                  }
                   topbarCollapsed={topbarCollapsed}
                   onToggleTopbar={onToggleTopbar}
                   followupSlot={followupSlot}

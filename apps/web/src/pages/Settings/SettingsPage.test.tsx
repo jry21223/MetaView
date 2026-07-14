@@ -6,7 +6,9 @@ import { TWEAK_DEFAULTS } from "../../features/studio-editor/hooks/useTweaks";
 import { THEME_PALETTE } from "../../shared/config/themePalette";
 import { SettingsPage } from "./SettingsPage";
 
-function renderSettingsPage(overrides: Partial<React.ComponentProps<typeof SettingsPage>> = {}) {
+function renderSettingsPage(
+  overrides: Partial<React.ComponentProps<typeof SettingsPage>> = {},
+) {
   const props: React.ComponentProps<typeof SettingsPage> = {
     appEdition: "ops",
     tweaks: TWEAK_DEFAULTS,
@@ -31,9 +33,13 @@ describe("SettingsPage appearance controls", () => {
 
     const group = getByRole("group", { name: "主题" });
     expect(group.className).toContain("mv-settings-theme-grid");
-    expect(group.querySelectorAll(".mv-settings-theme-card")).toHaveLength(Object.keys(THEME_PALETTE).length);
+    expect(group.querySelectorAll(".mv-settings-theme-card")).toHaveLength(
+      Object.keys(THEME_PALETTE).length,
+    );
     expect(
-      Array.from(group.querySelectorAll(".mv-settings-theme-name")).map((el) => el.textContent),
+      Array.from(group.querySelectorAll(".mv-settings-theme-name")).map(
+        (el) => el.textContent,
+      ),
     ).toEqual(Object.values(THEME_PALETTE).map((theme) => theme.label));
   });
 
@@ -41,7 +47,11 @@ describe("SettingsPage appearance controls", () => {
     const setTweak = vi.fn();
     const { getByRole } = renderSettingsPage({ setTweak });
 
-    fireEvent.click(within(getByRole("group", { name: "主题" })).getByRole("button", { name: /Nord/ }));
+    fireEvent.click(
+      within(getByRole("group", { name: "主题" })).getByRole("button", {
+        name: /Nord/,
+      }),
+    );
 
     expect(setTweak).toHaveBeenCalledWith("theme", "nord");
   });
@@ -50,7 +60,9 @@ describe("SettingsPage appearance controls", () => {
     const setTweak = vi.fn();
     const { getByLabelText } = renderSettingsPage({ setTweak });
 
-    fireEvent.change(getByLabelText("强调色"), { target: { value: "#ff0055" } });
+    fireEvent.change(getByLabelText("强调色"), {
+      target: { value: "#ff0055" },
+    });
 
     expect(setTweak).toHaveBeenCalledWith("accent", "#ff0055");
   });
@@ -64,10 +76,7 @@ describe("SettingsPage appearance controls", () => {
 
     fireEvent.click(getByRole("button", { name: "恢复主题默认色" }));
 
-    expect(setTweak).toHaveBeenCalledWith(
-      "accent",
-      THEME_PALETTE.light.accent,
-    );
+    expect(setTweak).toHaveBeenCalledWith("accent", THEME_PALETTE.light.accent);
   });
 
   it("shows local TTS provider settings in self edition", () => {
@@ -91,14 +100,25 @@ describe("SettingsPage appearance controls", () => {
     expect(getByLabelText("TTS 模型")).toBeTruthy();
   });
 
-  it("shows platform-managed TTS in ops edition without local key fields", () => {
-    const { getByText, queryByLabelText } = renderSettingsPage({
+  it("exposes self provider and local TTS controls in ops edition", () => {
+    const { getByText, getByLabelText } = renderSettingsPage({
       appEdition: "ops",
+      providerSettings: {
+        apiKey: "",
+        baseUrl: "https://api.openai.com/v1",
+        model: "gpt-4o-mini",
+        routerMode: "hybrid",
+        routerModel: "",
+        routerMinConfidence: 0.72,
+        routerTimeoutS: 12,
+      },
+      onUpdateProvider: vi.fn(),
     });
 
-    expect(getByText("平台托管 TTS")).toBeTruthy();
-    expect(queryByLabelText("TTS API 密钥")).toBeNull();
-    expect(queryByLabelText("TTS 接口地址")).toBeNull();
-    expect(queryByLabelText("TTS 模型")).toBeNull();
+    expect(getByText("教学生成与模型路由")).toBeTruthy();
+    expect(getByLabelText("API 密钥")).toBeTruthy();
+    expect(getByLabelText("TTS API 密钥")).toBeTruthy();
+    expect(getByLabelText("TTS 接口地址")).toBeTruthy();
+    expect(getByLabelText("TTS 模型")).toBeTruthy();
   });
 });

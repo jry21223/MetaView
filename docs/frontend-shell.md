@@ -100,7 +100,7 @@ interface GlobalTopbarProps {
 - Hook：`useProviderSettings`（`apps/web/src/features/providers/hooks/useProviderSettings.ts`）
 - 模态：`ProviderSettingsModal`
   - **关闭逻辑**：`onMouseDown` 触发关闭，内层 `onMouseDown` `stopPropagation`。这样从内部拖拽到外部释放鼠标不会误关。
-- 凭据保存在 localStorage（用户自带 Key），前端调用 OpenAI 兼容接口（`baseUrl + /chat/completions`）。
+- 凭据保存在 localStorage（用户自带 Key）。self 与 ops edition 的生成和 follow-up 会把 provider override 交给 MetaView API；Studio `ChatPanel` 才会从浏览器直连 OpenAI 兼容接口（`baseUrl + /chat/completions`）。
 
 ## Snapshot support levels
 

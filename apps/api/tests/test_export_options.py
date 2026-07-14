@@ -64,7 +64,7 @@ def test_unsupported_format_rejected(bad_format: str) -> None:
         ExportOptions.model_validate({"format": bad_format})
 
 
-def test_ops_export_rejects_client_tts_provider_config(monkeypatch) -> None:
+def test_ops_export_accepts_client_tts_provider_config(monkeypatch) -> None:
     get_settings.cache_clear()
     monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
     monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
@@ -81,5 +81,7 @@ def test_ops_export_rejects_client_tts_provider_config(monkeypatch) -> None:
         )
 
     get_settings.cache_clear()
-    assert resp.status_code == 400
-    assert "平台托管 TTS" in resp.json()["detail"]
+    # The request passes the edition/provider validation and reaches the run
+    # lookup; the missing run is unrelated to the client TTS configuration.
+    assert resp.status_code == 404
+    assert "missing-run" in resp.json()["detail"]
