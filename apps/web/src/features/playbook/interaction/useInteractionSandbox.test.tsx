@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import type { MathPlotSnapshot, PlaybookScript } from "../engine/types";
+import type { GraphSceneSnapshot, MathPlotSnapshot, PlaybookScript } from "../engine/types";
 import { useInteractionSandbox } from "./useInteractionSandbox";
 
 function plot(markerX = 1): MathPlotSnapshot {
@@ -35,6 +35,35 @@ function script(markerX = 1): PlaybookScript {
       title: "Tangent",
       voiceover_text: "",
       snapshot: plot(markerX),
+      tokens: [],
+    }],
+  };
+}
+
+function bfsScript(): PlaybookScript {
+  const graph: GraphSceneSnapshot = {
+    kind: "graph_scene",
+    nodes: [{ id: "A" }, { id: "B" }, { id: "C" }],
+    edges: [
+      { source: "A", target: "B" },
+      { source: "B", target: "C" },
+    ],
+    directed: false,
+  };
+  return {
+    fps: 30,
+    total_frames: 30,
+    domain: "algorithm",
+    algorithm_id: "bfs",
+    title: "BFS sandbox",
+    summary: "",
+    parameter_controls: [],
+    steps: [{
+      step_id: "graph",
+      end_frame: 30,
+      title: "BFS",
+      voiceover_text: "",
+      snapshot: graph,
       tokens: [],
     }],
   };
@@ -92,6 +121,29 @@ describe("useInteractionSandbox", () => {
     act(() => result.current.cancelPreview());
     expect((result.current.previewScript.steps[0].snapshot as MathPlotSnapshot).marker_x).toBe(1);
     expect(result.current.events).toEqual([]);
+  });
+
+  it("previews BFS replay frames without adding history events", () => {
+    const base = bfsScript();
+    const { result } = renderHook(() => useInteractionSandbox(base));
+
+    act(() => result.current.apply({
+      adapter_id: "algorithm.bfs",
+      step_id: "graph",
+      target_id: "step:graph:start-node",
+      action: "select",
+      value: "C",
+    }));
+
+    const replay = result.current.latestReplay;
+    expect(replay?.visit_order).toEqual(["C", "B", "A"]);
+    expect(result.current.events).toHaveLength(1);
+
+    act(() => result.current.showReplayFrame(replay!, 2));
+    expect(
+      (result.current.previewScript.steps[0].snapshot as GraphSceneSnapshot).current_node_id,
+    ).toBe("A");
+    expect(result.current.events).toHaveLength(1);
   });
 
   it("keeps a rejected command out of the event history", () => {
