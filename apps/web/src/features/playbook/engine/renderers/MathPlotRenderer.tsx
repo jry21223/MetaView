@@ -138,11 +138,46 @@ interface CompiledCurve {
   primaryIndex: number;
 }
 
+// ── Browser interaction helpers ─────────────────────────────────────────────
+
+function pointerDomainX(
+  svg: SVGSVGElement,
+  clientX: number,
+  clientY: number,
+  xMin: number,
+  xMax: number,
+): number {
+  let virtualX: number | null = null;
+  const matrix = svg.getScreenCTM?.();
+  if (matrix && typeof svg.createSVGPoint === "function") {
+    const point = svg.createSVGPoint();
+    point.x = clientX;
+    point.y = clientY;
+    virtualX = point.matrixTransform(matrix.inverse()).x;
+  }
+  if (virtualX == null) {
+    const rect = svg.getBoundingClientRect();
+    if (rect.width > 0) {
+      virtualX = ((clientX - rect.left) / rect.width) * SVG_W;
+    }
+  }
+  const plotX = Math.max(MARGIN.left, Math.min(MARGIN.left + PLOT_W, virtualX ?? MARGIN.left));
+  return xMin + ((plotX - MARGIN.left) / PLOT_W) * (xMax - xMin);
+}
+
 // ── Component ──────────────────────────────────────────────────────────────
 
-export const MathPlotRenderer: React.FC<RendererProps> = ({ step, frame, stepStartFrame, progress, theme }) => {
+export const MathPlotRenderer: React.FC<RendererProps> = ({
+  step,
+  frame,
+  stepStartFrame,
+  progress,
+  theme,
+  onInteraction,
+}) => {
   const snap = step.snapshot as MathPlotSnapshot;
   const colors = PALETTE[theme];
+  const draggingMarker = React.useRef(false);
 
   // Spring-driven `progress` can briefly overshoot; for time-fades use raw elapsed.
   const elapsed = Math.max(0, frame - stepStartFrame);
@@ -509,7 +544,82 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({ step, frame, stepSta
               })}
 
               {marker && (
-                <g opacity={marker.opacity} data-semantic-role="marker">
+                <g
+                  opacity={marker.opacity}
+                  data-semantic-role="marker"
+                  data-interaction-target={onInteraction ? "marker-x" : undefined}
+                  role={onInteraction ? "slider" : undefined}
+                  aria-label={onInteraction ? "切点 x" : undefined}
+                  aria-valuemin={onInteraction ? xMin : undefined}
+                  aria-valuemax={onInteraction ? xMax : undefined}
+                  aria-valuenow={onInteraction ? marker.mx : undefined}
+                  tabIndex={onInteraction ? 0 : undefined}
+                  style={onInteraction ? { cursor: "ew-resize", touchAction: "none" } : undefined}
+                  onPointerDown={onInteraction ? (event) => {
+                    const svg = event.currentTarget.ownerSVGElement;
+                    if (!svg) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    draggingMarker.current = true;
+                    event.currentTarget.setPointerCapture?.(event.pointerId);
+                    onInteraction({
+                      type: "set-number",
+                      phase: "preview",
+                      step_id: step.step_id,
+                      target_role: "marker-x",
+                      value: pointerDomainX(svg, event.clientX, event.clientY, xMin, xMax),
+                    });
+                  } : undefined}
+                  onPointerMove={onInteraction ? (event) => {
+                    if (!draggingMarker.current) return;
+                    const svg = event.currentTarget.ownerSVGElement;
+                    if (!svg) return;
+                    onInteraction({
+                      type: "set-number",
+                      phase: "preview",
+                      step_id: step.step_id,
+                      target_role: "marker-x",
+                      value: pointerDomainX(svg, event.clientX, event.clientY, xMin, xMax),
+                    });
+                  } : undefined}
+                  onPointerUp={onInteraction ? (event) => {
+                    if (!draggingMarker.current) return;
+                    const svg = event.currentTarget.ownerSVGElement;
+                    draggingMarker.current = false;
+                    event.currentTarget.releasePointerCapture?.(event.pointerId);
+                    if (!svg) return;
+                    onInteraction({
+                      type: "set-number",
+                      phase: "commit",
+                      step_id: step.step_id,
+                      target_role: "marker-x",
+                      value: pointerDomainX(svg, event.clientX, event.clientY, xMin, xMax),
+                    });
+                  } : undefined}
+                  onPointerCancel={onInteraction ? () => {
+                    draggingMarker.current = false;
+                    onInteraction({
+                      type: "set-number",
+                      phase: "cancel",
+                      step_id: step.step_id,
+                      target_role: "marker-x",
+                    });
+                  } : undefined}
+                  onKeyDown={onInteraction ? (event) => {
+                    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+                    event.preventDefault();
+                    const delta = (xMax - xMin) / 100;
+                    const direction = event.key === "ArrowLeft" ? -1 : 1;
+                    const value = Math.max(xMin, Math.min(xMax, marker.mx + direction * delta));
+                    onInteraction({
+                      type: "set-number",
+                      phase: "commit",
+                      step_id: step.step_id,
+                      target_role: "marker-x",
+                      value,
+                    });
+                  } : undefined}
+                >
                   <line
                     x1={marker.px}
                     y1={marker.py}
