@@ -53,30 +53,23 @@ export function PlaybookLearningConsole({
         </section>
       )}
 
-      {interactionSlot && (
-        <section className="playbook-player__console-card playbook-player__interaction-card">
-          <div className="playbook-player__console-head">
-            <span>Explore</span>
-            <small>Experimental</small>
-          </div>
-          {interactionSlot}
-        </section>
-      )}
-
-      {hasDomainPanel && (
+      {(interactionSlot || hasDomainPanel) && (
         <section className="playbook-player__console-card playbook-player__params-card">
           <div className="playbook-player__console-head">
-            <span>Params</span>
-            <small>{baseScript.domain}</small>
+            <span>{interactionSlot ? "Explore" : "Params"}</span>
+            <small>{interactionSlot ? "Experimental" : baseScript.domain}</small>
           </div>
           <div className="playbook-player__param-body">
-            <ParamPanelSlot
-              domain={baseScript.domain}
-              script={baseScript}
-              overrides={overrides}
-              onOverridesChange={onOverridesChange}
-              isDark={theme === "dark"}
-            />
+            {interactionSlot}
+            {hasDomainPanel && (
+              <ParamPanelSlot
+                domain={baseScript.domain}
+                script={baseScript}
+                overrides={overrides}
+                onOverridesChange={onOverridesChange}
+                isDark={theme === "dark"}
+              />
+            )}
           </div>
         </section>
       )}
