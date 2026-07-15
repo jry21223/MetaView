@@ -25,6 +25,8 @@ import { ExportSVG, MoreSVG, SettingsSVG, TopbarFoldIcon } from "./PlaybookPlaye
 import { PlaybookPortraitShell, type MobileTabKey } from "./PlaybookPortraitShell";
 import { clipCodeOverlay } from "./mobileCodeOverlay";
 import { SPEED_STEPS } from "./playbackRates";
+import { InteractionSandboxPanel } from "../../interaction/InteractionSandboxPanel";
+import { useInteractionSandbox } from "../../interaction/useInteractionSandbox";
 
 export type PlaybookLayoutMode = "desktop" | "portrait";
 
@@ -97,7 +99,9 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   const [playbackRate, setPlaybackRate] = useState(1);
   const [mobileTab, setMobileTab] = useState<MobileTabKey>("narration");
   const [mobileSheet, setMobileSheet] = useState<MobileTabKey | null>(null);
-  const script = useResolvedScript(baseScript, overrides);
+  const parameterScript = useResolvedScript(baseScript, overrides);
+  const interactionSandbox = useInteractionSandbox(parameterScript);
+  const script = interactionSandbox.previewScript;
   const capability = useMemo(() => domainCapability(script.domain), [script.domain]);
   const hasDomainPanel = useMemo(() => {
     if (getParamPanel(baseScript.domain) === null) return false;
@@ -252,6 +256,22 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   }
 
   const currentStep = script.steps[safeStepIndex];
+  const hasCurrentInteraction = interactionSandbox.manifest.adapters.some((adapter) =>
+    adapter.bindings.some((binding) => binding.step_id === currentStep.step_id)
+  );
+  const interactionSlot = hasCurrentInteraction ? (
+    <InteractionSandboxPanel
+      manifest={interactionSandbox.manifest}
+      currentStepId={currentStep.step_id}
+      events={interactionSandbox.events}
+      dirty={interactionSandbox.dirty}
+      canUndo={interactionSandbox.canUndo}
+      lastError={interactionSandbox.lastError}
+      onApply={interactionSandbox.apply}
+      onUndo={interactionSandbox.undo}
+      onReset={interactionSandbox.reset}
+    />
+  ) : undefined;
   const isDark = theme === "dark";
   const currentNarrationFallback =
     currentStep.narration_template && currentStep.tokens.length > 0
@@ -547,6 +567,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
           baseScript={baseScript}
           overrides={overrides}
           onOverridesChange={setOverrides}
+          interactionSlot={interactionSlot}
           followupSlot={followupSlot}
           relatedSlot={relatedSlot}
           relatedAlgorithmId={script.algorithm_id}
