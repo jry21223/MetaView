@@ -91,7 +91,10 @@ describe("interaction manifest", () => {
       [step("graph", graph)],
       { domain: "algorithm", algorithm_id: "bfs" },
     ));
-    expect(bfs.adapters[0].bindings[0].options.map((item) => item.id))
+    const bfsBinding = bfs.adapters[0].bindings.find(
+      (binding) => binding.target_role === "start-node",
+    );
+    expect(bfsBinding?.options.map((item) => item.id))
       .toEqual(["A", "B", "C", "D"]);
   });
 
