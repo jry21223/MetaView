@@ -7,7 +7,10 @@ import { useInteractionSandbox } from "./useInteractionSandbox";
 function plot(markerX = 1): MathPlotSnapshot {
   return {
     kind: "math_plot",
-    curves: [{ expression: "x^2", semantic_role: "curve" }],
+    curves: [
+      { expression: "x^2", semantic_role: "curve" },
+      { expression: "2*x - 1", semantic_role: "tangent", emphasis: "accent" },
+    ],
     x_min: -5,
     x_max: 5,
     y_min: -1,
