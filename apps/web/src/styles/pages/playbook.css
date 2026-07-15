@@ -762,11 +762,6 @@
   margin: 0;
 }
 
-.playbook-player__interaction-card {
-  flex: 0 0 auto;
-  max-height: min(300px, 34vh);
-}
-
 .playbook-interaction {
   min-height: 0;
   display: grid;
@@ -860,6 +855,10 @@
   color: var(--warn);
   font-size: 11px;
   line-height: 1.5;
+}
+
+.playbook-interaction + .math-param-panel {
+  border-top: 1px solid var(--player-line-soft);
 }
 
 .playbook-player__params-card {
