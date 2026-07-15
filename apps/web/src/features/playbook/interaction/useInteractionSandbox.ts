@@ -23,6 +23,12 @@ type InteractionSandboxAction =
   | { type: "sync"; baseScript: PlaybookScript }
   | { type: "preview"; baseScript: PlaybookScript; command: InteractionCommand }
   | { type: "cancel-preview"; baseScript: PlaybookScript }
+  | {
+      type: "show-replay-frame";
+      baseScript: PlaybookScript;
+      replay: BfsInteractionReplay;
+      frameIndex: number;
+    }
   | { type: "apply"; baseScript: PlaybookScript; command: InteractionCommand }
   | { type: "undo"; baseScript: PlaybookScript }
   | { type: "reset"; baseScript: PlaybookScript };
@@ -88,6 +94,29 @@ function replay(
   }
 }
 
+function showReplayFrame(
+  committedScript: PlaybookScript,
+  replay: BfsInteractionReplay,
+  frameIndex: number,
+): PlaybookScript {
+  const frame = replay.frames[Math.max(0, Math.min(frameIndex, replay.frames.length - 1))];
+  if (!frame) return committedScript;
+  const steps = committedScript.steps.map((step) => {
+    if (step.step_id !== replay.step_id || step.snapshot.kind !== "graph_scene") return step;
+    const layers = step.layers?.map((layer, index) =>
+      index === 0 && layer.body.kind === "graph_scene"
+        ? { ...layer, body: frame.snapshot }
+        : layer
+    );
+    return {
+      ...step,
+      snapshot: frame.snapshot,
+      ...(layers ? { layers } : {}),
+    };
+  });
+  return { ...committedScript, steps };
+}
+
 function reducer(
   state: InteractionSandboxState,
   action: InteractionSandboxAction,
@@ -108,6 +137,15 @@ function reducer(
       previewScript: current.committedScript,
       lastError: null,
     };
+  }
+  if (action.type === "show-replay-frame") {
+    const previewScript = showReplayFrame(
+      current.committedScript,
+      action.replay,
+      action.frameIndex,
+    );
+    assertSameTimeline(action.baseScript, previewScript);
+    return { ...current, previewScript, lastError: null };
   }
 
   try {
@@ -152,6 +190,7 @@ export interface InteractionSandbox {
   lastError: string | null;
   preview: (command: InteractionCommand) => void;
   cancelPreview: () => void;
+  showReplayFrame: (replay: BfsInteractionReplay, frameIndex: number) => void;
   apply: (command: InteractionCommand) => void;
   undo: () => void;
   reset: () => void;
@@ -179,6 +218,12 @@ export function useInteractionSandbox(baseScript: PlaybookScript): InteractionSa
   const cancelPreview = useCallback(() => {
     dispatch({ type: "cancel-preview", baseScript });
   }, [baseScript]);
+  const showReplayFrameAt = useCallback((
+    replay: BfsInteractionReplay,
+    frameIndex: number,
+  ) => {
+    dispatch({ type: "show-replay-frame", baseScript, replay, frameIndex });
+  }, [baseScript]);
   const apply = useCallback((command: InteractionCommand) => {
     dispatch({ type: "apply", baseScript, command });
   }, [baseScript]);
@@ -199,6 +244,7 @@ export function useInteractionSandbox(baseScript: PlaybookScript): InteractionSa
     lastError: state.lastError,
     preview,
     cancelPreview,
+    showReplayFrame: showReplayFrameAt,
     apply,
     undo,
     reset,
