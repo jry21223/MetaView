@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 import type {
   BfsInteractionBinding,
@@ -115,11 +115,11 @@ function BfsReplayControls({
   const [playing, setPlaying] = useState(false);
   const lastIndex = Math.max(0, replay.frames.length - 1);
 
-  const showFrame = (nextIndex: number) => {
+  const showFrame = useCallback((nextIndex: number) => {
     const bounded = Math.max(0, Math.min(nextIndex, lastIndex));
     setFrameIndex(bounded);
     onShowFrame(replay, bounded);
-  };
+  }, [lastIndex, onShowFrame, replay]);
 
   useEffect(() => {
     if (!playing || frameIndex >= lastIndex) return;
@@ -129,7 +129,7 @@ function BfsReplayControls({
       if (nextIndex >= lastIndex) setPlaying(false);
     }, 700);
     return () => window.clearTimeout(timeout);
-  }, [frameIndex, lastIndex, onShowFrame, playing, replay]);
+  }, [frameIndex, lastIndex, playing, showFrame]);
 
   return (
     <div className="playbook-interaction__replay" aria-label="BFS 重放">
