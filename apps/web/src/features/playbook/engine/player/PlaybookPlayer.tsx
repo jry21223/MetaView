@@ -25,6 +25,7 @@ import { ExportSVG, MoreSVG, SettingsSVG, TopbarFoldIcon } from "./PlaybookPlaye
 import { PlaybookPortraitShell, type MobileTabKey } from "./PlaybookPortraitShell";
 import { clipCodeOverlay } from "./mobileCodeOverlay";
 import { SPEED_STEPS } from "./playbackRates";
+import type { RendererInteractionEvent } from "../renderers/types";
 import { InteractionSandboxPanel } from "../../interaction/InteractionSandboxPanel";
 import { useInteractionSandbox } from "../../interaction/useInteractionSandbox";
 
@@ -255,9 +256,30 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   }
 
   const currentStep = script.steps[safeStepIndex];
-  const hasCurrentInteraction = interactionSandbox.manifest.adapters.some((adapter) =>
-    adapter.bindings.some((binding) => binding.step_id === currentStep.step_id)
-  );
+  const currentInteractionBinding = interactionSandbox.manifest.adapters
+    .flatMap((adapter) => adapter.bindings)
+    .find((binding) => binding.step_id === currentStep.step_id);
+  const hasCurrentInteraction = currentInteractionBinding != null;
+  const handleRendererInteraction = (event: RendererInteractionEvent) => {
+    if (event.phase === "cancel") {
+      interactionSandbox.cancelPreview();
+      return;
+    }
+    if (
+      currentInteractionBinding?.target_role !== "marker-x" ||
+      event.target_role !== "marker-x" ||
+      event.step_id !== currentInteractionBinding.step_id
+    ) return;
+    const command = {
+      adapter_id: "math.derivative-tangent" as const,
+      step_id: event.step_id,
+      target_id: currentInteractionBinding.id,
+      action: "set-value" as const,
+      value: event.value,
+    };
+    if (event.phase === "preview") interactionSandbox.preview(command);
+    else interactionSandbox.apply(command);
+  };
   const interactionSlot = hasCurrentInteraction ? (
     <InteractionSandboxPanel
       manifest={interactionSandbox.manifest}
@@ -367,6 +389,10 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
             showSubtitles: showStageSubtitles,
             showInlineCode: false,
             swapDurationFrames,
+            onInteraction:
+              currentInteractionBinding?.target_role === "marker-x"
+                ? handleRendererInteraction
+                : undefined,
           }}
           durationInFrames={script.total_frames}
           fps={script.fps}
