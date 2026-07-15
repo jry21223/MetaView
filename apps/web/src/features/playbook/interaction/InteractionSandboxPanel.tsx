@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 
 import type {
   BfsInteractionBinding,
@@ -29,10 +29,6 @@ function RangeBinding({
 }) {
   const current = binding.value;
   const [draft, setDraft] = useState(current);
-
-  useEffect(() => {
-    setDraft(current);
-  }, [current]);
 
   const commit = () => {
     if (!Number.isFinite(draft) || draft === current) return;
@@ -131,7 +127,11 @@ export function InteractionSandboxPanel({
       </div>
 
       {binding.target_role === "marker-x" ? (
-        <RangeBinding binding={binding} onApply={onApply} />
+        <RangeBinding
+          key={`${binding.id}:${binding.value}`}
+          binding={binding}
+          onApply={onApply}
+        />
       ) : (
         <ChoiceBinding binding={binding} onApply={onApply} />
       )}
