@@ -7,6 +7,11 @@ import type {
 } from "../engine/types";
 import {
   InteractionEngineError,
+  type BfsInteractionBinding,
+  type BfsInteractionCommand,
+  type BfsInteractionReplay,
+  type DerivativeInteractionBinding,
+  type DerivativeInteractionCommand,
   type InteractionAdapterManifest,
   type InteractionBinding,
   type InteractionCommand,
@@ -21,17 +26,40 @@ function bindingId(stepId: string, role: InteractionBinding["target_role"]): str
   return `step:${stepId}:${role}`;
 }
 
-function mathBindings(script: PlaybookScript): InteractionBinding[] {
+function sourceCurve(snapshot: MathPlotSnapshot) {
+  return snapshot.curves.find((curve) =>
+    curve.semantic_role !== "tangent" && curve.semantic_role !== "normal"
+  );
+}
+
+function hasFiniteParams(snapshot: MathPlotSnapshot): boolean {
+  return Object.values(snapshot.params ?? {}).every(Number.isFinite);
+}
+
+function mathBindings(script: PlaybookScript): DerivativeInteractionBinding[] {
+  if (script.domain !== "math") return [];
   return script.steps.flatMap((step) => {
     const snapshot = step.snapshot;
     if (
       snapshot.kind !== "math_plot" ||
       snapshot.marker_x == null ||
-      snapshot.curves.length === 0 ||
+      !Number.isFinite(snapshot.marker_x) ||
       !Number.isFinite(snapshot.x_min) ||
       !Number.isFinite(snapshot.x_max) ||
-      snapshot.x_min >= snapshot.x_max
+      snapshot.x_min >= snapshot.x_max ||
+      snapshot.marker_x < snapshot.x_min ||
+      snapshot.marker_x > snapshot.x_max ||
+      !sourceCurve(snapshot) ||
+      !snapshot.curves.some((curve) => curve.semantic_role === "tangent") ||
+      !hasFiniteParams(snapshot)
     ) return [];
+
+    try {
+      estimateDerivative(snapshot, snapshot.marker_x);
+    } catch {
+      return [];
+    }
+
     return [{
       id: bindingId(step.step_id, "marker-x"),
       adapter_id: DERIVATIVE_ADAPTER,
@@ -46,13 +74,22 @@ function mathBindings(script: PlaybookScript): InteractionBinding[] {
   });
 }
 
-function bfsBindings(script: PlaybookScript): InteractionBinding[] {
+function validGraph(snapshot: GraphSceneSnapshot): boolean {
+  if (snapshot.nodes.length === 0) return false;
+  const ids = new Set(snapshot.nodes.map((node) => node.id));
+  if (ids.size !== snapshot.nodes.length || [...ids].some((id) => !id)) return false;
+  return snapshot.edges.every((edge) => ids.has(edge.source) && ids.has(edge.target));
+}
+
+function bfsBindings(script: PlaybookScript): BfsInteractionBinding[] {
   if (script.algorithm_id?.toLowerCase() !== "bfs") return [];
   return script.steps.flatMap((step) => {
     const snapshot = step.snapshot;
-    if (snapshot.kind !== "graph_scene" || snapshot.nodes.length === 0) return [];
-    const ids = new Set(snapshot.nodes.map((node) => node.id));
-    if (ids.size !== snapshot.nodes.length || [...ids].some((id) => !id)) return [];
+    if (snapshot.kind !== "graph_scene" || !validGraph(snapshot)) return [];
+    const selected = snapshot.current_node_id &&
+      snapshot.nodes.some((node) => node.id === snapshot.current_node_id)
+      ? snapshot.current_node_id
+      : snapshot.nodes[0].id;
     return [{
       id: bindingId(step.step_id, "start-node"),
       adapter_id: BFS_ADAPTER,
@@ -60,7 +97,7 @@ function bfsBindings(script: PlaybookScript): InteractionBinding[] {
       target_role: "start-node",
       action: "select",
       label: "BFS 起点",
-      value: snapshot.current_node_id ?? snapshot.nodes[0].id,
+      value: selected,
       options: snapshot.nodes.map((node) => ({ id: node.id, label: node.label ?? node.id })),
     }];
   });
@@ -85,6 +122,7 @@ function requireBinding(script: PlaybookScript, command: InteractionCommand): In
     ?.bindings.find((candidate) =>
       candidate.id === command.target_id &&
       candidate.step_id === command.step_id &&
+      candidate.adapter_id === command.adapter_id &&
       candidate.action === command.action
     );
   if (!binding) {
@@ -93,25 +131,20 @@ function requireBinding(script: PlaybookScript, command: InteractionCommand): In
   return binding;
 }
 
-function finiteNumber(value: number | string, label: string): number {
-  const parsed = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(parsed)) {
-    throw new InteractionEngineError(`${label} must be a finite number`);
-  }
-  return parsed;
-}
-
 function concise(value: number): string {
   return Number(value.toPrecision(12)).toString();
 }
 
-function updateMathSnapshot(snapshot: MathPlotSnapshot, markerX: number): MathPlotSnapshot {
-  if (markerX < snapshot.x_min || markerX > snapshot.x_max) {
-    throw new InteractionEngineError("Marker x is outside the declared plot bounds");
-  }
-  const lead = snapshot.curves.find((curve) =>
-    curve.semantic_role !== "tangent" && curve.semantic_role !== "normal"
-  );
+interface DerivativeEstimate {
+  y: number;
+  slope: number;
+}
+
+function estimateDerivative(
+  snapshot: MathPlotSnapshot,
+  markerX: number,
+): DerivativeEstimate {
+  const lead = sourceCurve(snapshot);
   if (!lead) throw new InteractionEngineError("Derivative interaction requires a source curve");
 
   let fn: ReturnType<typeof compileExpr>;
@@ -121,24 +154,54 @@ function updateMathSnapshot(snapshot: MathPlotSnapshot, markerX: number): MathPl
     throw new InteractionEngineError("Derivative interaction requires a valid source expression");
   }
 
+  const span = snapshot.x_max - snapshot.x_min;
+  const scale = Math.max(1, Math.abs(markerX));
+  const h = Math.max(1e-6, Math.min(Math.abs(span) * 1e-4, scale * 1e-3));
+  if (markerX - h < snapshot.x_min || markerX + h > snapshot.x_max) {
+    throw new InteractionEngineError("Derivative pilot requires a two-sided interior point");
+  }
+
   const scope = snapshot.params ?? {};
-  const h = Math.max(Math.abs(snapshot.x_max - snapshot.x_min) * 1e-5, 1e-6);
-  const left = Math.max(snapshot.x_min, markerX - h);
-  const right = Math.min(snapshot.x_max, markerX + h);
-  if (right <= left) throw new InteractionEngineError("Derivative cannot be sampled at this point");
+  const evaluate = (x: number): number => {
+    const value = fn({ ...scope, x });
+    if (!Number.isFinite(value)) {
+      throw new InteractionEngineError("Derivative is not finite at this point");
+    }
+    return value;
+  };
 
-  let y: number;
-  let slope: number;
-  try {
-    y = fn({ ...scope, x: markerX });
-    slope = (fn({ ...scope, x: right }) - fn({ ...scope, x: left })) / (right - left);
-  } catch {
-    throw new InteractionEngineError("Derivative cannot be evaluated at this point");
+  const y = evaluate(markerX);
+  const estimates = [h, h / 2, h / 4, h / 8].map((delta) => {
+    const left = (y - evaluate(markerX - delta)) / delta;
+    const right = (evaluate(markerX + delta) - y) / delta;
+    const central = (left + right) / 2;
+    if (![left, right, central].every(Number.isFinite)) {
+      throw new InteractionEngineError("Derivative is not finite at this point");
+    }
+    return { left, right, central };
+  });
+
+  const finest = estimates[estimates.length - 1];
+  const previous = estimates[estimates.length - 2];
+  const sideTolerance =
+    1e-5 + 5e-3 * Math.max(1, Math.abs(finest.left), Math.abs(finest.right));
+  if (Math.abs(finest.left - finest.right) > sideTolerance) {
+    throw new InteractionEngineError("The selected point is not differentiable");
   }
-  if (!Number.isFinite(y) || !Number.isFinite(slope)) {
-    throw new InteractionEngineError("Derivative is not finite at this point");
+  const convergenceTolerance =
+    1e-6 + 2e-3 * Math.max(1, Math.abs(finest.central), Math.abs(previous.central));
+  if (Math.abs(finest.central - previous.central) > convergenceTolerance) {
+    throw new InteractionEngineError("The derivative estimate does not converge");
   }
 
+  return { y, slope: finest.central };
+}
+
+function updateMathSnapshot(snapshot: MathPlotSnapshot, markerX: number): MathPlotSnapshot {
+  if (!Number.isFinite(markerX) || markerX < snapshot.x_min || markerX > snapshot.x_max) {
+    throw new InteractionEngineError("Marker x is outside the declared plot bounds");
+  }
+  const { y, slope } = estimateDerivative(snapshot, markerX);
   const tangent = {
     expression: `(${concise(slope)}) * (x - (${concise(markerX)})) + (${concise(y)})`,
     label: `tangent @ x=${concise(markerX)}`,
@@ -146,9 +209,11 @@ function updateMathSnapshot(snapshot: MathPlotSnapshot, markerX: number): MathPl
     semantic_role: "tangent",
   };
   const tangentIndex = snapshot.curves.findIndex((curve) => curve.semantic_role === "tangent");
+  if (tangentIndex < 0) {
+    throw new InteractionEngineError("Derivative interaction requires a declared tangent curve");
+  }
   const curves = [...snapshot.curves];
-  if (tangentIndex >= 0) curves[tangentIndex] = tangent;
-  else curves.push(tangent);
+  curves[tangentIndex] = tangent;
   return { ...snapshot, marker_x: markerX, curves };
 }
 
@@ -156,6 +221,12 @@ interface BfsState {
   current: string;
   visited: string[];
   queue: string[];
+  activeEdgeIds: string[];
+}
+
+interface BfsNeighbor {
+  nodeId: string;
+  edgeId: string | null;
 }
 
 function bfsTrace(graph: GraphSceneSnapshot, startId: string): BfsState[] {
@@ -163,39 +234,78 @@ function bfsTrace(graph: GraphSceneSnapshot, startId: string): BfsState[] {
   if (!nodeIds.includes(startId)) {
     throw new InteractionEngineError("Selected BFS start node does not exist");
   }
-  const order = new Map(nodeIds.map((id, index) => [id, index]));
-  const adjacency = new Map(nodeIds.map((id) => [id, [] as string[]]));
-  for (const edge of graph.edges) {
-    if (!adjacency.has(edge.source) || !adjacency.has(edge.target)) {
-      throw new InteractionEngineError("BFS graph contains an edge with an unknown node");
-    }
-    adjacency.get(edge.source)?.push(edge.target);
-    if (!graph.directed) adjacency.get(edge.target)?.push(edge.source);
-  }
-  for (const neighbors of adjacency.values()) {
-    neighbors.sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
+  if (!validGraph(graph)) {
+    throw new InteractionEngineError("BFS graph is not valid");
   }
 
-  const queue = [startId];
-  const queued = new Set(queue);
+  const order = new Map(nodeIds.map((id, index) => [id, index]));
+  const adjacency = new Map(nodeIds.map((id) => [id, [] as BfsNeighbor[]]));
+  graph.edges.forEach((edge) => {
+    adjacency.get(edge.source)?.push({ nodeId: edge.target, edgeId: edge.id ?? null });
+    if (!graph.directed) {
+      adjacency.get(edge.target)?.push({ nodeId: edge.source, edgeId: edge.id ?? null });
+    }
+  });
+  for (const neighbors of adjacency.values()) {
+    neighbors.sort((a, b) => (order.get(a.nodeId) ?? 0) - (order.get(b.nodeId) ?? 0));
+  }
+
+  const queue: Array<{ nodeId: string; viaEdgeId: string | null }> = [{
+    nodeId: startId,
+    viaEdgeId: null,
+  }];
+  const queued = new Set([startId]);
   const visited: string[] = [];
   const seen = new Set<string>();
   const trace: BfsState[] = [];
+
   while (queue.length) {
-    const current = queue.shift() as string;
-    queued.delete(current);
-    if (seen.has(current)) continue;
-    seen.add(current);
-    visited.push(current);
-    for (const neighbor of adjacency.get(current) ?? []) {
-      if (!seen.has(neighbor) && !queued.has(neighbor)) {
-        queue.push(neighbor);
-        queued.add(neighbor);
+    const entry = queue.shift();
+    if (!entry) break;
+    queued.delete(entry.nodeId);
+    if (seen.has(entry.nodeId)) continue;
+    seen.add(entry.nodeId);
+    visited.push(entry.nodeId);
+
+    for (const neighbor of adjacency.get(entry.nodeId) ?? []) {
+      if (!seen.has(neighbor.nodeId) && !queued.has(neighbor.nodeId)) {
+        queue.push({ nodeId: neighbor.nodeId, viaEdgeId: neighbor.edgeId });
+        queued.add(neighbor.nodeId);
       }
     }
-    trace.push({ current, visited: [...visited], queue: [...queue] });
+    trace.push({
+      current: entry.nodeId,
+      visited: [...visited],
+      queue: queue.map((item) => item.nodeId),
+      activeEdgeIds: entry.viaEdgeId ? [entry.viaEdgeId] : [],
+    });
   }
   return trace;
+}
+
+function replaySnapshot(
+  graph: GraphSceneSnapshot,
+  state: BfsState,
+): GraphSceneSnapshot {
+  return {
+    ...graph,
+    nodes: graph.nodes.map((node) => ({
+      ...node,
+      emphasis: undefined,
+      asset_id: undefined,
+    })),
+    edges: graph.edges.map((edge) => ({
+      ...edge,
+      emphasis: undefined,
+      asset_id: undefined,
+    })),
+    current_node_id: state.current,
+    active_node_ids: [state.current],
+    active_edge_ids: state.activeEdgeIds,
+    visited_node_ids: state.visited,
+    queue_node_ids: state.queue,
+    frontier_node_ids: state.queue,
+  };
 }
 
 function withSnapshot(step: MetaStep, snapshot: MathPlotSnapshot | GraphSceneSnapshot): MetaStep {
@@ -207,57 +317,65 @@ function withSnapshot(step: MetaStep, snapshot: MathPlotSnapshot | GraphSceneSna
 
 function applyDerivative(
   script: PlaybookScript,
-  command: InteractionCommand,
-  binding: InteractionBinding,
+  command: DerivativeInteractionCommand,
+  binding: DerivativeInteractionBinding,
 ): { script: PlaybookScript; summary: string } {
-  const markerX = finiteNumber(command.value, "Marker x");
-  if (binding.min == null || binding.max == null || markerX < binding.min || markerX > binding.max) {
+  if (
+    !Number.isFinite(command.value) ||
+    command.value < binding.min ||
+    command.value > binding.max
+  ) {
     throw new InteractionEngineError("Marker x is outside the manifest bounds");
   }
+
   let updated = false;
   const steps = script.steps.map((step) => {
     if (step.step_id !== command.step_id || step.snapshot.kind !== "math_plot") return step;
     updated = true;
-    return withSnapshot(step, updateMathSnapshot(step.snapshot, markerX));
+    return withSnapshot(step, updateMathSnapshot(step.snapshot, command.value));
   });
   if (!updated) throw new InteractionEngineError("Derivative step no longer exists");
   return {
     script: { ...script, steps },
-    summary: `Moved the tangent point to x=${concise(markerX)} and recomputed the local slope.`,
+    summary: `Moved the tangent point to x=${concise(command.value)} and recomputed the local slope.`,
   };
 }
 
 function applyBfs(
   script: PlaybookScript,
-  command: InteractionCommand,
-): { script: PlaybookScript; summary: string } {
-  if (typeof command.value !== "string" || !command.value) {
+  command: BfsInteractionCommand,
+): { script: PlaybookScript; summary: string; replay: BfsInteractionReplay } {
+  if (!command.value) {
     throw new InteractionEngineError("BFS start node must be a stable node id");
   }
-  const anchor = script.steps.find((step) => step.step_id === command.step_id);
+  const anchorIndex = script.steps.findIndex((step) => step.step_id === command.step_id);
+  const anchor = script.steps[anchorIndex];
   if (!anchor || anchor.snapshot.kind !== "graph_scene") {
     throw new InteractionEngineError("BFS graph step no longer exists");
   }
+
   const trace = bfsTrace(anchor.snapshot, command.value);
-  let graphIndex = 0;
-  const steps = script.steps.map((step) => {
-    if (step.snapshot.kind !== "graph_scene") return step;
-    const state = trace[Math.min(graphIndex, trace.length - 1)];
-    graphIndex += 1;
-    const snapshot: GraphSceneSnapshot = {
-      ...step.snapshot,
-      current_node_id: state.current,
-      active_node_ids: [state.current],
-      visited_node_ids: state.visited,
-      queue_node_ids: state.queue,
-      frontier_node_ids: state.queue,
-    };
-    return withSnapshot(step, snapshot);
-  });
+  const frames = trace.map((state, index) => ({
+    index,
+    current_node_id: state.current,
+    visited_node_ids: state.visited,
+    queue_node_ids: state.queue,
+    snapshot: replaySnapshot(anchor.snapshot as GraphSceneSnapshot, state),
+  }));
+  const steps = [...script.steps];
+  steps[anchorIndex] = withSnapshot(anchor, frames[0].snapshot);
+  const visitOrder = trace.map((state) => state.current);
+
   return {
     script: { ...script, steps },
-    summary: `Replayed BFS from node ${command.value}; visit order: ${trace
-      .map((state) => state.current).join(" → ")}.`,
+    replay: {
+      adapter_id: BFS_ADAPTER,
+      step_id: command.step_id,
+      start_node_id: command.value,
+      visit_order: visitOrder,
+      frames,
+    },
+    summary: `Prepared BFS replay from node ${command.value}; visit order: ${visitOrder.join(" → ")}.`,
   };
 }
 
@@ -266,9 +384,20 @@ export function applyInteraction(
   command: InteractionCommand,
   sequence = 1,
 ): InteractionResult {
+  if (!Number.isInteger(sequence) || sequence < 1) {
+    throw new InteractionEngineError("Interaction event sequence must be a positive integer");
+  }
   const binding = requireBinding(script, command);
-  const applied = command.adapter_id === DERIVATIVE_ADAPTER
-    ? applyDerivative(script, command, binding)
-    : applyBfs(script, command);
+  if (command.adapter_id === DERIVATIVE_ADAPTER) {
+    if (binding.adapter_id !== DERIVATIVE_ADAPTER) {
+      throw new InteractionEngineError("Interaction binding type does not match the command");
+    }
+    const applied = applyDerivative(script, command, binding);
+    return { ...applied, event: { ...command, sequence } };
+  }
+  if (binding.adapter_id !== BFS_ADAPTER) {
+    throw new InteractionEngineError("Interaction binding type does not match the command");
+  }
+  const applied = applyBfs(script, command);
   return { ...applied, event: { ...command, sequence } };
 }
