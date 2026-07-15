@@ -571,4 +571,41 @@ describe("PlaybookPlayer", () => {
       "0101",
     );
   });
+  it("reuses the five-tab portrait params surface for interaction controls", () => {
+    const derivative = baseScript({
+      total_frames: 45,
+      steps: [{
+        ...baseScript().steps[0],
+        end_frame: 45,
+        snapshot: {
+          kind: "math_plot",
+          curves: [
+            { expression: "x^2", semantic_role: "curve" },
+            {
+              expression: "2*x - 1",
+              semantic_role: "tangent",
+              emphasis: "accent",
+            },
+          ],
+          x_min: -3,
+          x_max: 3,
+          y_min: -1,
+          y_max: 10,
+          marker_x: 1,
+          x_label: "x",
+          y_label: "y",
+        },
+      }],
+    });
+
+    const view = render(
+      <PlaybookPlayer script={derivative} theme="light" layoutMode="portrait" />,
+    );
+    expect(view.getAllByRole("tab")).toHaveLength(5);
+
+    fireEvent.click(view.getByRole("tab", { name: "参数" }));
+    expect(view.getByRole("slider", { name: "切点 x" })).toBeTruthy();
+    expect(view.getByText("沙盒预览")).toBeTruthy();
+  });
+
 });
