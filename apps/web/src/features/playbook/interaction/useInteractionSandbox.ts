@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useReducer } from "react";
 import type { PlaybookScript } from "../engine/types";
 import { applyInteraction, deriveInteractionManifest } from "./engine";
 import type {
+  BfsInteractionReplay,
   InteractionCommand,
   InteractionEvent,
   InteractionManifest,
@@ -13,6 +14,7 @@ interface InteractionSandboxState {
   previewScript: PlaybookScript;
   commands: InteractionCommand[];
   events: InteractionEvent[];
+  replays: BfsInteractionReplay[];
   lastError: string | null;
 }
 
@@ -28,8 +30,26 @@ function initialState(baseScript: PlaybookScript): InteractionSandboxState {
     previewScript: baseScript,
     commands: [],
     events: [],
+    replays: [],
     lastError: null,
   };
+}
+
+function assertSameTimeline(
+  baseScript: PlaybookScript,
+  previewScript: PlaybookScript,
+): void {
+  const sameTimeline =
+    previewScript.fps === baseScript.fps &&
+    previewScript.total_frames === baseScript.total_frames &&
+    previewScript.steps.length === baseScript.steps.length &&
+    previewScript.steps.every((step, index) =>
+      step.step_id === baseScript.steps[index]?.step_id &&
+      step.end_frame === baseScript.steps[index]?.end_frame
+    );
+  if (!sameTimeline) {
+    throw new Error("Interaction adapters cannot change the player timeline");
+  }
 }
 
 function replay(
@@ -38,17 +58,21 @@ function replay(
 ): InteractionSandboxState {
   let previewScript = baseScript;
   const events: InteractionEvent[] = [];
+  const replays: BfsInteractionReplay[] = [];
   try {
     commands.forEach((command, index) => {
       const result = applyInteraction(previewScript, command, index + 1);
+      assertSameTimeline(baseScript, result.script);
       previewScript = result.script;
       events.push(result.event);
+      if (result.replay) replays.push(result.replay);
     });
     return {
       baseScript,
       previewScript,
       commands,
       events,
+      replays,
       lastError: null,
     };
   } catch (error) {
@@ -80,11 +104,13 @@ function reducer(
       action.command,
       current.events.length + 1,
     );
+    assertSameTimeline(action.baseScript, result.script);
     return {
       ...current,
       previewScript: result.script,
       commands: [...current.commands, action.command],
       events: [...current.events, result.event],
+      replays: result.replay ? [...current.replays, result.replay] : current.replays,
       lastError: null,
     };
   } catch (error) {
@@ -99,6 +125,7 @@ export interface InteractionSandbox {
   previewScript: PlaybookScript;
   manifest: InteractionManifest;
   events: InteractionEvent[];
+  latestReplay: BfsInteractionReplay | null;
   dirty: boolean;
   canUndo: boolean;
   lastError: string | null;
@@ -137,6 +164,7 @@ export function useInteractionSandbox(baseScript: PlaybookScript): InteractionSa
     previewScript: state.previewScript,
     manifest,
     events: state.events,
+    latestReplay: state.replays.at(-1) ?? null,
     dirty: state.events.length > 0,
     canUndo: state.events.length > 0,
     lastError: state.lastError,
