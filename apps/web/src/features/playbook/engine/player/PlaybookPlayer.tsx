@@ -321,14 +321,20 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     setMobileSheet(sheet);
     emitNativeEvent("playbook.mobileSheetOpened", { sheet });
   };
+  const hasControlPanel = hasDomainPanel || hasCurrentInteraction;
   const mobileParamsContent = (
-    <ParamPanelSlot
-      domain={baseScript.domain}
-      script={baseScript}
-      overrides={overrides}
-      onOverridesChange={setOverrides}
-      isDark={theme === "dark"}
-    />
+    <>
+      {interactionSlot}
+      {hasDomainPanel && (
+        <ParamPanelSlot
+          domain={baseScript.domain}
+          script={baseScript}
+          overrides={overrides}
+          onOverridesChange={setOverrides}
+          isDark={theme === "dark"}
+        />
+      )}
+    </>
   );
   const topbarAction =
     isPortraitLayout && onToggleTopbar ? (
@@ -510,7 +516,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
           onSelectTab={selectMobileTab}
           onOpenSheet={openMobileSheet}
           mobileCodeOverlay={mobileCodeOverlay}
-          hasDomainPanel={hasDomainPanel}
+          hasDomainPanel={hasControlPanel}
           paramsContent={mobileParamsContent}
         />
       )}
@@ -612,14 +618,8 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
           )}
           {mobileSheet === "params" && (
             <div className="playbook-player__mobile-sheet-section">
-              {hasDomainPanel ? (
-                <ParamPanelSlot
-                  domain={baseScript.domain}
-                  script={baseScript}
-                  overrides={overrides}
-                  onOverridesChange={setOverrides}
-                  isDark={theme === "dark"}
-                />
+              {hasControlPanel ? (
+                mobileParamsContent
               ) : (
                 <div className="playbook-player__mobile-empty">当前步骤没有可调参数。</div>
               )}
