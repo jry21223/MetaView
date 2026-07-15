@@ -3,7 +3,7 @@ import { useCurrentFrame } from "remotion";
 import type { DirectorScript, PlaybookScript } from "../types";
 import { CodeHighlightRenderer } from "../renderers/CodeHighlightRenderer";
 import { useStepProgress } from "./useInterpolatedState";
-import type { RendererProps } from "../renderers/types";
+import type { RendererInteractionEvent, RendererProps } from "../renderers/types";
 import { PLAYBOOK_LAYOUT } from "../../../../shared/config/constants";
 import { rendererRegistry } from "../renderers/registry";
 import { appearTransform, useTimeline } from "../foundation";
@@ -24,6 +24,8 @@ interface PlaybookCompositionProps {
   showInlineCode?: boolean;
   /** Total frames for the bar-swap animation; forwarded to renderers. */
   swapDurationFrames?: number;
+  /** Browser-only semantic interaction channel; omitted by export renders. */
+  onInteraction?: (event: RendererInteractionEvent) => void;
 }
 
 function stageBackground(theme: "dark" | "light"): string {
@@ -65,7 +67,8 @@ function VisualQualityWarningIcon() {
         width: 36,
         height: 32,
         zIndex: 30,
-        pointerEvents: "none",
+        pointerEvents:
+          baseProps.onInteraction && layer.body.kind === "math_plot" ? "auto" : "none",
         opacity: 0.9,
         filter: "drop-shadow(0 2px 6px rgba(0, 0, 0, 0.26))",
       }}
@@ -228,6 +231,7 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
   showDiagnostics = false,
   showInlineCode = false,
   swapDurationFrames,
+  onInteraction,
 }) => {
   const frame = useCurrentFrame();
   const visualTimeline = React.useMemo(() => compileVisualTimeline(script), [script]);
@@ -306,6 +310,7 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
     visualKey: visualState?.visualKey,
     isVisualContinuation: visualState?.isVisualContinuation,
     directorFrame,
+    onInteraction,
   };
 
   return (
