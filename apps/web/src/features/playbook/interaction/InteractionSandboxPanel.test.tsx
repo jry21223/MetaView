@@ -1,5 +1,5 @@
-import { fireEvent, render } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { InteractionSandboxPanel } from "./InteractionSandboxPanel";
 import type { BfsInteractionReplay, InteractionManifest } from "./types";
@@ -24,6 +24,8 @@ const derivativeManifest: InteractionManifest = {
 };
 
 describe("InteractionSandboxPanel", () => {
+  afterEach(cleanup);
+
   it("commits a range change only when the user finishes the gesture", () => {
     const onApply = vi.fn();
     const view = render(
@@ -54,6 +56,43 @@ describe("InteractionSandboxPanel", () => {
       action: "set-value",
       value: 3,
     });
+  });
+
+  it("syncs an externally updated range without remounting the focused control", () => {
+    const commonProps = {
+      currentStepId: "plot",
+      events: [],
+      dirty: false,
+      canUndo: false,
+      lastError: null,
+      latestReplay: null,
+      onShowReplayFrame: vi.fn(),
+      onApply: vi.fn(),
+      onUndo: vi.fn(),
+      onReset: vi.fn(),
+    };
+    const view = render(
+      <InteractionSandboxPanel manifest={derivativeManifest} {...commonProps} />,
+    );
+    const slider = view.getByRole<HTMLInputElement>("slider", { name: "切点 x" });
+    slider.focus();
+    fireEvent.change(slider, { target: { value: "3" } });
+
+    const updatedManifest: InteractionManifest = {
+      ...derivativeManifest,
+      adapters: derivativeManifest.adapters.map((adapter) => ({
+        ...adapter,
+        bindings: adapter.bindings.map((binding) =>
+          binding.target_role === "marker-x" ? { ...binding, value: -1 } : binding
+        ),
+      })),
+    };
+    view.rerender(
+      <InteractionSandboxPanel manifest={updatedManifest} {...commonProps} />,
+    );
+
+    expect(slider.value).toBe("-1");
+    expect(document.activeElement).toBe(slider);
   });
 
   it("uses stable node ids for BFS selection", () => {
@@ -91,9 +130,14 @@ describe("InteractionSandboxPanel", () => {
       />,
     );
 
+    const selected = view.getByRole("button", { name: "Alpha" });
+    expect(selected.disabled).toBe(true);
+    fireEvent.click(selected);
+    expect(onApply).not.toHaveBeenCalled();
+
     fireEvent.click(view.getByRole("button", { name: "Beta" }));
     expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ value: "B" }));
-    expect(view.getByRole("button", { name: "Alpha" }).getAttribute("aria-pressed")).toBe("true");
+    expect(selected.getAttribute("aria-pressed")).toBe("true");
   });
 
   it("steps through a prepared BFS replay without creating commands", () => {
@@ -163,6 +207,17 @@ describe("InteractionSandboxPanel", () => {
     expect(onShowReplayFrame).toHaveBeenCalledWith(replay, 1);
     expect(onApply).not.toHaveBeenCalled();
     expect(view.getByText("重放 2 / 2")).toBeTruthy();
+
+    fireEvent.click(view.getByRole("button", { name: "第一帧" }));
+    expect(onShowReplayFrame).toHaveBeenLastCalledWith(replay, 0);
+    fireEvent.click(view.getByRole("button", { name: "最后一帧" }));
+    expect(onShowReplayFrame).toHaveBeenLastCalledWith(replay, 1);
+
+    const play = view.getByRole("button", { name: "播放" });
+    fireEvent.click(play);
+    expect(view.getByRole("button", { name: "暂停" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(view.getByRole("button", { name: "暂停" }));
+    expect(view.getByRole("button", { name: "播放" }).getAttribute("aria-pressed")).toBe("false");
   });
 
   it("renders nothing when the current step has no declared binding", () => {
@@ -182,5 +237,63 @@ describe("InteractionSandboxPanel", () => {
       />,
     );
     expect(container.firstChild).toBeNull();
+  });
+
+  it("keeps recovery controls available after leaving a bound step", () => {
+    const onUndo = vi.fn();
+    const onReset = vi.fn();
+    const view = render(
+      <InteractionSandboxPanel
+        manifest={derivativeManifest}
+        currentStepId="other"
+        events={[{
+          adapter_id: "math.derivative-tangent",
+          step_id: "plot",
+          target_id: "step:plot:marker-x",
+          action: "set-value",
+          value: 2,
+          sequence: 1,
+        }]}
+        dirty
+        canUndo
+        lastError={null}
+        latestReplay={null}
+        onShowReplayFrame={vi.fn()}
+        onApply={vi.fn()}
+        onUndo={onUndo}
+        onReset={onReset}
+      />,
+    );
+
+    expect(view.getByRole("status").textContent).toContain("没有交互目标");
+    fireEvent.click(view.getByRole("button", { name: "撤销" }));
+    fireEvent.click(view.getByRole("button", { name: "重置" }));
+    expect(onUndo).toHaveBeenCalledTimes(1);
+    expect(onReset).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows an error-only sandbox to be reset", () => {
+    const onReset = vi.fn();
+    const view = render(
+      <InteractionSandboxPanel
+        manifest={derivativeManifest}
+        currentStepId="other"
+        events={[]}
+        dirty={false}
+        canUndo={false}
+        lastError="Replay failed"
+        latestReplay={null}
+        onShowReplayFrame={vi.fn()}
+        onApply={vi.fn()}
+        onUndo={vi.fn()}
+        onReset={onReset}
+      />,
+    );
+
+    expect(view.getByRole("alert").textContent).toBe("Replay failed");
+    const reset = view.getByRole("button", { name: "重置" });
+    expect(reset.disabled).toBe(false);
+    fireEvent.click(reset);
+    expect(onReset).toHaveBeenCalledTimes(1);
   });
 });

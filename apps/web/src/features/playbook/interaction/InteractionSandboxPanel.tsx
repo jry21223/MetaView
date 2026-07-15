@@ -31,7 +31,11 @@ function RangeBinding({
   onApply: (command: InteractionCommand) => void;
 }) {
   const current = binding.value;
-  const [draft, setDraft] = useState(current);
+  const [draftState, setDraftState] = useState(() => ({
+    source: binding,
+    value: current,
+  }));
+  const draft = draftState.source === binding ? draftState.value : current;
 
   const commit = () => {
     if (!Number.isFinite(draft) || draft === current) return;
@@ -61,7 +65,10 @@ function RangeBinding({
         step={step}
         value={draft}
         aria-label={binding.label}
-        onChange={(event) => setDraft(Number(event.currentTarget.value))}
+        onChange={(event) => setDraftState({
+          source: binding,
+          value: Number(event.currentTarget.value),
+        })}
         onPointerUp={commit}
         onKeyUp={commit}
         onBlur={commit}
@@ -88,6 +95,7 @@ function ChoiceBinding({
             key={option.id}
             type="button"
             aria-pressed={selectedValue === option.id}
+            disabled={selectedValue === option.id}
             onClick={() => onApply({
               adapter_id: binding.adapter_id,
               step_id: binding.step_id,
@@ -121,6 +129,11 @@ function BfsReplayControls({
     onShowFrame(replay, bounded);
   }, [lastIndex, onShowFrame, replay]);
 
+  const showManualFrame = (nextIndex: number) => {
+    setPlaying(false);
+    showFrame(nextIndex);
+  };
+
   useEffect(() => {
     if (!playing || frameIndex >= lastIndex) return;
     const timeout = window.setTimeout(() => {
@@ -132,7 +145,7 @@ function BfsReplayControls({
   }, [frameIndex, lastIndex, playing, showFrame]);
 
   return (
-    <div className="playbook-interaction__replay" aria-label="BFS 重放">
+    <div className="playbook-interaction__replay" role="group" aria-label="BFS 重放">
       <div className="playbook-interaction__replay-status" aria-live="polite">
         <span>重放 {frameIndex + 1} / {replay.frames.length}</span>
         <small>
@@ -146,7 +159,14 @@ function BfsReplayControls({
       <div className="playbook-interaction__replay-actions">
         <button
           type="button"
-          onClick={() => showFrame(frameIndex - 1)}
+          onClick={() => showManualFrame(0)}
+          disabled={frameIndex === 0}
+        >
+          第一帧
+        </button>
+        <button
+          type="button"
+          onClick={() => showManualFrame(frameIndex - 1)}
           disabled={frameIndex === 0}
         >
           上一帧
@@ -164,10 +184,17 @@ function BfsReplayControls({
         </button>
         <button
           type="button"
-          onClick={() => showFrame(frameIndex + 1)}
+          onClick={() => showManualFrame(frameIndex + 1)}
           disabled={frameIndex >= lastIndex}
         >
           下一帧
+        </button>
+        <button
+          type="button"
+          onClick={() => showManualFrame(lastIndex)}
+          disabled={frameIndex >= lastIndex}
+        >
+          最后一帧
         </button>
       </div>
     </div>
@@ -194,7 +221,7 @@ export function InteractionSandboxPanel({
     [currentStepId, manifest],
   );
 
-  if (!binding) return null;
+  if (!binding && !dirty && !lastError) return null;
 
   return (
     <div className="playbook-interaction">
@@ -203,13 +230,13 @@ export function InteractionSandboxPanel({
         <small>{dirty ? `${events.length} 个未保存操作` : "不会修改原课程"}</small>
       </div>
 
-      {binding.target_role === "marker-x" ? (
+      {binding?.target_role === "marker-x" ? (
         <RangeBinding
-          key={`${binding.id}:${binding.value}`}
+          key={binding.id}
           binding={binding}
           onApply={onApply}
         />
-      ) : (
+      ) : binding?.target_role === "start-node" ? (
         <>
           <ChoiceBinding
             binding={binding}
@@ -228,6 +255,10 @@ export function InteractionSandboxPanel({
             />
           )}
         </>
+      ) : (
+        <p className="playbook-interaction__inactive" role="status">
+          当前步骤没有交互目标；仍可撤销或重置沙盒操作。
+        </p>
       )}
 
       {lastError && (
@@ -240,7 +271,7 @@ export function InteractionSandboxPanel({
         <button type="button" onClick={onUndo} disabled={!canUndo}>
           撤销
         </button>
-        <button type="button" onClick={onReset} disabled={!dirty}>
+        <button type="button" onClick={onReset} disabled={!dirty && !lastError}>
           重置
         </button>
       </div>

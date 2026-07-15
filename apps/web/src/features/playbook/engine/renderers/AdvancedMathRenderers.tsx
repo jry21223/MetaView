@@ -551,7 +551,7 @@ function GraphSvg({
             role={onNodeSelect ? "button" : undefined}
             aria-label={onNodeSelect ? `从 ${node.label ?? node.id} 开始 BFS` : undefined}
             tabIndex={onNodeSelect ? 0 : undefined}
-            style={onNodeSelect ? { cursor: "pointer" } : undefined}
+            style={onNodeSelect ? { cursor: "pointer", pointerEvents: "all" } : undefined}
             onClick={onNodeSelect ? (event) => {
               event.stopPropagation();
               onNodeSelect(node.id);
@@ -559,6 +559,7 @@ function GraphSvg({
             onKeyDown={onNodeSelect ? (event) => {
               if (event.key !== "Enter" && event.key !== " ") return;
               event.preventDefault();
+              event.stopPropagation();
               onNodeSelect(node.id);
             } : undefined}
           >

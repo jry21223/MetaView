@@ -18,7 +18,8 @@ function isInputFocused(): boolean {
   if (!el) return false;
   const tag = el.tagName.toLowerCase();
   if (tag === "input" || tag === "textarea" || tag === "select") return true;
-  return (el as HTMLElement).isContentEditable;
+  if ((el as HTMLElement).isContentEditable) return true;
+  return el instanceof Element && el.closest('[role="slider"], [contenteditable="true"]') != null;
 }
 
 export function useKeyboardShortcuts(handlers: ShortcutHandlers): void {

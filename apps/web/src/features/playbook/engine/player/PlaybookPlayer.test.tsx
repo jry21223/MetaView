@@ -2,14 +2,27 @@ import React from "react";
 import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { PlaybookScript } from "../types";
+import type { GraphSceneSnapshot, PlaybookScript } from "../types";
 import { PlaybookPlayer } from "./PlaybookPlayer";
 
 vi.mock("@remotion/player", async () => {
   const React = await import("react");
   return {
     Player: React.forwardRef(function MockPlayer(
-      props: { inputProps?: { showSubtitles?: boolean; showInlineCode?: boolean } },
+      props: {
+        inputProps?: {
+          script?: PlaybookScript;
+          showSubtitles?: boolean;
+          showInlineCode?: boolean;
+          onInteraction?: (event: {
+            type: "select-node";
+            phase: "commit";
+            step_id: string;
+            target_role: "start-node";
+            value: string;
+          }) => void;
+        };
+      },
       ref: React.ForwardedRef<unknown>,
     ) {
       React.useImperativeHandle(ref, () => ({
@@ -19,12 +32,43 @@ vi.mock("@remotion/player", async () => {
         play: vi.fn(),
         seekTo: vi.fn(),
       }));
+      const graphStep = props.inputProps?.script?.steps.find(
+        (step) => step.snapshot.kind === "graph_scene",
+      );
+      const graph = graphStep?.snapshot.kind === "graph_scene"
+        ? graphStep.snapshot
+        : null;
       return (
         <div
           data-testid="mock-remotion-player"
           data-show-subtitles={String(props.inputProps?.showSubtitles)}
           data-show-inline-code={String(props.inputProps?.showInlineCode)}
-        />
+          data-interaction-enabled={String(Boolean(props.inputProps?.onInteraction))}
+          data-has-interaction={String(Boolean(props.inputProps?.onInteraction))}
+          data-current-node={graph?.current_node_id ?? ""}
+          data-code-current={graphStep?.code_highlight?.variables?.current ?? ""}
+          data-code-queue={graphStep?.code_highlight?.variables?.queue ?? ""}
+          data-code-visited={graphStep?.code_highlight?.variables?.visited ?? ""}
+          data-marker-x={String(
+            props.inputProps?.script?.steps[0]?.snapshot.kind === "math_plot"
+              ? props.inputProps.script.steps[0].snapshot.marker_x
+              : "",
+          )}
+        >
+          {props.inputProps?.onInteraction && graphStep && (
+            <button
+              type="button"
+              aria-label="模拟选择节点 B"
+              onClick={() => props.inputProps?.onInteraction?.({
+                type: "select-node",
+                phase: "commit",
+                step_id: graphStep.step_id,
+                target_role: "start-node",
+                value: "B",
+              })}
+            />
+          )}
+        </div>
       );
     }),
   };
@@ -81,6 +125,80 @@ function baseScript(overrides: Partial<PlaybookScript> = {}): PlaybookScript {
     ],
     ...overrides,
   };
+}
+
+function derivativeScript(): PlaybookScript {
+  return baseScript({
+    steps: [
+      {
+        ...baseScript().steps[0],
+        snapshot: {
+          kind: "math_plot",
+          curves: [
+            { expression: "x^2", semantic_role: "curve" },
+            {
+              expression: "2*x - 1",
+              semantic_role: "tangent",
+              emphasis: "accent",
+            },
+          ],
+          x_min: -3,
+          x_max: 3,
+          y_min: -1,
+          y_max: 10,
+          marker_x: 1,
+          x_label: "x",
+          y_label: "y",
+        },
+      },
+      baseScript().steps[1],
+    ],
+  });
+}
+
+function bfsScript(withTrailingStep = false): PlaybookScript {
+  const graph: GraphSceneSnapshot = {
+    kind: "graph_scene",
+    nodes: [{ id: "A" }, { id: "B" }, { id: "C" }],
+    edges: [
+      { source: "A", target: "B" },
+      { source: "B", target: "C" },
+    ],
+    directed: false,
+    current_node_id: "A",
+    active_node_ids: ["A"],
+    visited_node_ids: ["A"],
+    queue_node_ids: ["B"],
+    frontier_node_ids: ["B"],
+  };
+  return baseScript({
+    domain: "algorithm",
+    algorithm_id: "bfs",
+    total_frames: withTrailingStep ? 90 : 45,
+    steps: [{
+      ...baseScript().steps[0],
+      step_id: "graph",
+      end_frame: 45,
+      title: "Choose a BFS start",
+      snapshot: graph,
+      code_highlight: {
+        language: "pseudocode",
+        lines: ["current = queue.dequeue()", "visit(current)"],
+        active_line: 0,
+        active_lines: [0],
+        variables: {
+          current: "A",
+          queue: "[B]",
+          visited: "{A}",
+        },
+      },
+    }, ...(withTrailingStep ? [{
+      ...baseScript().steps[1],
+      step_id: "summary",
+      end_frame: 90,
+      title: "Summary",
+    }] : [])],
+  });
 }
 
 describe("PlaybookPlayer", () => {
@@ -571,41 +689,187 @@ describe("PlaybookPlayer", () => {
       "0101",
     );
   });
-  it("reuses the five-tab portrait params surface for interaction controls", () => {
-    const derivative = baseScript({
-      total_frames: 45,
-      steps: [{
-        ...baseScript().steps[0],
-        end_frame: 45,
-        snapshot: {
-          kind: "math_plot",
-          curves: [
-            { expression: "x^2", semantic_role: "curve" },
-            {
-              expression: "2*x - 1",
-              semantic_role: "tangent",
-              emphasis: "accent",
-            },
-          ],
-          x_min: -3,
-          x_max: 3,
-          y_min: -1,
-          y_max: 10,
-          marker_x: 1,
-          x_label: "x",
-          y_label: "y",
-        },
-      }],
-    });
+  it("keeps the interaction sandbox disabled unless a player surface opts in", () => {
+    const view = render(<PlaybookPlayer script={derivativeScript()} theme="light" />);
 
+    expect(view.queryByText("Explore")).toBeNull();
+    expect(view.queryByText("沙盒预览")).toBeNull();
+    expect(view.getByTestId("mock-remotion-player").getAttribute("data-has-interaction"))
+      .toBe("false");
+  });
+
+  it("does not expose interaction on a read-only player with no learning console", () => {
     const view = render(
-      <PlaybookPlayer script={derivative} theme="light" layoutMode="portrait" />,
+      <PlaybookPlayer
+        script={derivativeScript()}
+        theme="light"
+        showLearningConsole={false}
+        enableInteractionSandbox
+      />,
+    );
+
+    expect(view.queryByText("沙盒预览")).toBeNull();
+    expect(view.getByTestId("mock-remotion-player").getAttribute("data-has-interaction"))
+      .toBe("false");
+  });
+
+  it("opts the desktop Studio-style player into direct sandbox manipulation", () => {
+    const view = render(
+      <PlaybookPlayer
+        script={derivativeScript()}
+        theme="light"
+        enableInteractionSandbox
+      />,
+    );
+
+    expect(view.getByText("Explore")).toBeTruthy();
+    expect(view.getByTestId("mock-remotion-player").getAttribute("data-has-interaction"))
+      .toBe("true");
+
+    const slider = view.getByRole("slider", { name: "切点 x" });
+    fireEvent.change(slider, { target: { value: "2" } });
+    fireEvent.pointerUp(slider);
+    expect(view.getByTestId("mock-remotion-player").getAttribute("data-marker-x"))
+      .toBe("2");
+  });
+
+  it("keeps recovery controls after navigating away from the bound plot", async () => {
+    const view = render(
+      <PlaybookPlayer
+        script={derivativeScript()}
+        theme="light"
+        enableInteractionSandbox
+      />,
+    );
+
+    const slider = view.getByRole("slider", { name: "切点 x" });
+    fireEvent.change(slider, { target: { value: "2" } });
+    fireEvent.pointerUp(slider);
+    fireEvent.click(view.getByRole("button", { name: "下一步" }));
+
+    await waitFor(() => {
+      expect(view.getByText(/当前步骤没有交互目标/)).toBeTruthy();
+    });
+    expect(view.queryByRole("slider", { name: "切点 x" })).toBeNull();
+    const reset = view.getByRole("button", { name: "重置" }) as HTMLButtonElement;
+    expect(reset.disabled).toBe(false);
+    fireEvent.click(reset);
+    await waitFor(() => {
+      expect(view.queryByText("Explore")).toBeNull();
+    });
+  });
+
+  it("reuses the five-tab portrait params surface without enabling canvas drag", () => {
+    const view = render(
+      <PlaybookPlayer
+        script={derivativeScript()}
+        theme="light"
+        layoutMode="portrait"
+        enableInteractionSandbox
+      />,
     );
     expect(view.getAllByRole("tab")).toHaveLength(5);
 
     fireEvent.click(view.getByRole("tab", { name: "参数" }));
     expect(view.getByRole("slider", { name: "切点 x" })).toBeTruthy();
     expect(view.getByText("沙盒预览")).toBeTruthy();
+    expect(view.getByTestId("mock-remotion-player").getAttribute("data-has-interaction"))
+      .toBe("false");
+  });
+
+  it("keeps the experimental sandbox off by default on read-only players", () => {
+    const view = render(<PlaybookPlayer script={bfsScript()} theme="light" />);
+    const player = view.getByTestId("mock-remotion-player");
+
+    expect(player.getAttribute("data-interaction-enabled")).toBe("false");
+    expect(view.queryByText("沙盒预览")).toBeNull();
+    expect(view.queryByRole("button", { name: "B" })).toBeNull();
+  });
+
+  it("selects a BFS start and previews replay frames end to end", async () => {
+    const view = render(
+      <PlaybookPlayer
+        script={bfsScript()}
+        theme="light"
+        enableInteractionSandbox
+      />,
+    );
+    const player = view.getByTestId("mock-remotion-player");
+
+    expect(player.getAttribute("data-interaction-enabled")).toBe("true");
+    expect(view.getByRole<HTMLButtonElement>("button", { name: "A" }).disabled).toBe(true);
+    fireEvent.click(view.getByRole("button", { name: "模拟选择节点 B" }));
+
+    await waitFor(() => {
+      expect(view.getByRole("group", { name: "BFS 重放" })).toBeTruthy();
+      expect(player.getAttribute("data-current-node")).toBe("B");
+      expect(player.getAttribute("data-code-current")).toBe("B");
+      expect(player.getAttribute("data-code-queue")).toBe("[A, C]");
+      expect(player.getAttribute("data-code-visited")).toBe("{B}");
+    });
+    expect(view.getByText("B → A → C")).toBeTruthy();
+
+    fireEvent.click(view.getByRole("button", { name: "下一帧" }));
+    await waitFor(() => {
+      expect(player.getAttribute("data-current-node")).toBe("A");
+      expect(player.getAttribute("data-code-current")).toBe("A");
+      expect(player.getAttribute("data-code-queue")).toBe("[C]");
+      expect(player.getAttribute("data-code-visited")).toBe("{B, A}");
+    });
+    expect(view.getByText("重放 2 / 3")).toBeTruthy();
+  });
+
+  it("keeps undo and reset available after navigating away from the BFS step", async () => {
+    const view = render(
+      <PlaybookPlayer
+        script={bfsScript(true)}
+        theme="light"
+        enableInteractionSandbox
+      />,
+    );
+    fireEvent.click(view.getByRole("button", { name: "模拟选择节点 B" }));
+    await waitFor(() => expect(view.getByText("1 个未保存操作")).toBeTruthy());
+
+    fireEvent.click(view.getByRole("button", { name: "下一步" }));
+    await waitFor(() => {
+      expect(view.getByRole("status").textContent).toContain("没有交互目标");
+    });
+    expect(view.getByRole<HTMLButtonElement>("button", { name: "撤销" }).disabled).toBe(false);
+    expect(view.getByRole<HTMLButtonElement>("button", { name: "重置" }).disabled).toBe(false);
+  });
+
+  it("uses the mobile params panel while keeping graph nodes passive", () => {
+    const view = render(
+      <PlaybookPlayer
+        script={bfsScript()}
+        theme="light"
+        layoutMode="portrait"
+        enableInteractionSandbox
+      />,
+    );
+    expect(view.getByTestId("mock-remotion-player").getAttribute("data-interaction-enabled"))
+      .toBe("false");
+    expect(view.queryByRole("button", { name: "模拟选择节点 B" })).toBeNull();
+
+    fireEvent.click(view.getByRole("tab", { name: "参数" }));
+    expect(view.getByRole("group", { name: "BFS 起点" })).toBeTruthy();
+    expect(view.getByRole<HTMLButtonElement>("button", { name: "A" }).disabled).toBe(true);
+    expect(view.getByRole<HTMLButtonElement>("button", { name: "B" }).disabled).toBe(false);
+  });
+
+  it("never enables sandbox interaction when the learning console is hidden", () => {
+    const view = render(
+      <PlaybookPlayer
+        script={bfsScript()}
+        theme="light"
+        showLearningConsole={false}
+        enableInteractionSandbox
+      />,
+    );
+
+    expect(view.getByTestId("mock-remotion-player").getAttribute("data-interaction-enabled"))
+      .toBe("false");
+    expect(view.queryByText("沙盒预览")).toBeNull();
   });
 
 });
