@@ -150,7 +150,10 @@ function LayerSlot({
         inset: 0,
         zIndex: layer.timing.z_order,
         pointerEvents:
-          baseProps.onInteraction && layer.body.kind === "math_plot" ? "auto" : "none",
+          baseProps.onInteraction &&
+          (layer.body.kind === "math_plot" || layer.body.kind === "graph_scene")
+            ? "auto"
+            : "none",
         opacity: appear.opacity,
         transform: appear.transform === "none" ? undefined : appear.transform,
       }}
