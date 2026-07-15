@@ -74,6 +74,26 @@ describe("useInteractionSandbox", () => {
     expect((result.current.previewScript.steps[0].snapshot as MathPlotSnapshot).marker_x).toBe(1);
   });
 
+  it("renders transient previews without recording pointer movement", () => {
+    const { result } = renderHook(() => useInteractionSandbox(script()));
+
+    act(() => result.current.preview({
+      adapter_id: "math.derivative-tangent",
+      step_id: "plot",
+      target_id: "step:plot:marker-x",
+      action: "set-value",
+      value: 2,
+    }));
+
+    expect((result.current.previewScript.steps[0].snapshot as MathPlotSnapshot).marker_x).toBe(2);
+    expect(result.current.events).toEqual([]);
+    expect(result.current.dirty).toBe(false);
+
+    act(() => result.current.cancelPreview());
+    expect((result.current.previewScript.steps[0].snapshot as MathPlotSnapshot).marker_x).toBe(1);
+    expect(result.current.events).toEqual([]);
+  });
+
   it("keeps a rejected command out of the event history", () => {
     const { result } = renderHook(() => useInteractionSandbox(script()));
 
