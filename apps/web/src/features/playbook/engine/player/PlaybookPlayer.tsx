@@ -99,9 +99,8 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   const [playbackRate, setPlaybackRate] = useState(1);
   const [mobileTab, setMobileTab] = useState<MobileTabKey>("narration");
   const [mobileSheet, setMobileSheet] = useState<MobileTabKey | null>(null);
-  const parameterScript = useResolvedScript(baseScript, overrides);
-  const interactionSandbox = useInteractionSandbox(parameterScript);
-  const script = interactionSandbox.previewScript;
+  const script = useResolvedScript(baseScript, overrides);
+  const interactionSandbox = useInteractionSandbox(script);
   const capability = useMemo(() => domainCapability(script.domain), [script.domain]);
   const hasDomainPanel = useMemo(() => {
     if (getParamPanel(baseScript.domain) === null) return false;
@@ -362,7 +361,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
           ref={playerRef}
           component={PlaybookComposition}
           inputProps={{
-            script,
+            script: interactionSandbox.previewScript,
             director,
             theme,
             showSubtitles: showStageSubtitles,
