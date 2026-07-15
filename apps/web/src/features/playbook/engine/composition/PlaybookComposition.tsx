@@ -67,8 +67,7 @@ function VisualQualityWarningIcon() {
         width: 36,
         height: 32,
         zIndex: 30,
-        pointerEvents:
-          baseProps.onInteraction && layer.body.kind === "math_plot" ? "auto" : "none",
+        pointerEvents: "none",
         opacity: 0.9,
         filter: "drop-shadow(0 2px 6px rgba(0, 0, 0, 0.26))",
       }}
@@ -150,7 +149,8 @@ function LayerSlot({
         position: "absolute",
         inset: 0,
         zIndex: layer.timing.z_order,
-        pointerEvents: "none",
+        pointerEvents:
+          baseProps.onInteraction && layer.body.kind === "math_plot" ? "auto" : "none",
         opacity: appear.opacity,
         transform: appear.transform === "none" ? undefined : appear.transform,
       }}
