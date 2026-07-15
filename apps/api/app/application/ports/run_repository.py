@@ -4,7 +4,12 @@ from typing import Protocol
 
 from app.application.dto.followup_dto import RunFollowUpRecord, RunVersionRecord
 from app.application.dto.pipeline_dto import PipelineRunResponse
+from app.domain.models.director import DirectorScript
 from app.domain.models.pipeline_run import PipelineRunStatus
+
+
+class InteractionVersionConflictError(RuntimeError):
+    """The interaction sandbox was based on a version that is no longer active."""
 
 
 class IRunRepository(Protocol):
@@ -85,6 +90,20 @@ class IRunRepository(Protocol):
         created_at: str,
         director_json: str | None = None,
     ) -> int: ...
+
+    async def commit_interaction_version(
+        self,
+        run_id: str,
+        *,
+        expected_base_version_id: str | None,
+        version_id: str,
+        initial_playbook_json: str,
+        playbook_json: str,
+        quality_report_json: str,
+        director: DirectorScript,
+        summary: str,
+        created_at: str,
+    ) -> None: ...
 
     async def attach_followup_version(self, followup_id: str, version_id: str) -> None: ...
 

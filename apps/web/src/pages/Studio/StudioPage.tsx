@@ -13,13 +13,19 @@ import { PipelineErrorCard } from "../../features/pipeline/ui/PipelineErrorCard"
 import { PipelineSkeleton } from "../../features/pipeline/ui/PipelineSkeleton";
 import { createAssetAttributionReportForScript } from "../../features/playbook/engine/assets/assetAttributionSummary";
 import {
+  applyRunInteractionVersion,
+  InteractionVersionRequestError,
   listRunFollowUps,
   restoreRunVersion,
   submitRunFollowUp,
   type RunVersionRecord,
 } from "../../features/followups/api/followupApi";
+import { getPipelineRun } from "../../features/pipeline/api/pipelineApi";
 import { FollowupCommitLog } from "../../features/followups/ui/FollowupCommitLog";
-import type { InteractionFollowUpContext } from "../../features/playbook/interaction/types";
+import type {
+  InteractionEvent,
+  InteractionFollowUpContext,
+} from "../../features/playbook/interaction/types";
 
 // ── Domain mapping ────────────────────────────────────────────────────────
 
@@ -63,6 +69,9 @@ interface ChatPanelProps {
     followupSlot: React.ReactNode;
     relatedSlot: React.ReactNode;
     onExplainInteraction?: (context: InteractionFollowUpContext) => Promise<void>;
+    onApplyInteractionVersion?: (events: InteractionEvent[]) => Promise<void>;
+    interactionActionPending: boolean;
+    interactionSessionKey: string;
   }) => React.ReactNode;
 }
 
@@ -86,6 +95,9 @@ function ChatPanel({
 }: ChatPanelProps) {
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
   const [versions, setVersions] = useState<RunVersionRecord[]>([]);
+  const [headVersionId, setHeadVersionId] = useState<string | null | undefined>(undefined);
+  const [historyReady, setHistoryReady] = useState(false);
+  const [interactionEpoch, setInteractionEpoch] = useState(0);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -102,8 +114,13 @@ function ChatPanel({
     abortRef.current?.abort();
     setMsgs([]);
     setVersions([]);
+    setHeadVersionId(undefined);
+    setHistoryReady(false);
+    setInteractionEpoch(0);
+    setPending(false);
     if (!runId) return;
     const controller = new AbortController();
+    abortRef.current = controller;
     listRunFollowUps(runId, controller.signal)
       .then((data) => {
         const loaded: ChatMessage[] = data.followups.flatMap((item) => [
@@ -117,13 +134,22 @@ function ChatPanel({
         ]);
         setMsgs(loaded);
         setVersions(data.versions);
+        setHeadVersionId(data.versions.find((version) => version.is_head)?.version_id ?? null);
+        setHistoryReady(true);
       })
       .catch((err) => {
         if ((err as Error).name !== "AbortError") {
           setMsgs([{ from: "ai", text: formatChatError(err), error: true }]);
+          setHistoryReady(true);
         }
+      })
+      .finally(() => {
+        if (abortRef.current === controller) abortRef.current = null;
       });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      if (abortRef.current === controller) abortRef.current = null;
+    };
   }, [runId]);
 
   const domain = playbook?.domain ?? "";
@@ -135,10 +161,11 @@ function ChatPanel({
     interactionContext?: InteractionFollowUpContext,
   ) => {
     const userText = (text ?? input).trim();
-    if (!userText || pending || !canModify) return;
+    if (!userText || pending || !canModify || !historyReady) return;
 
     abortRef.current?.abort();
-    abortRef.current = new AbortController();
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     const nextMsgs: ChatMessage[] = [...msgs, { from: "user", text: userText }];
       setMsgs([...nextMsgs, { from: "ai", text: "回复中…", pending: true }]);
@@ -164,12 +191,14 @@ function ChatPanel({
         userText,
         history,
         provider,
-        abortRef.current.signal,
+        controller.signal,
         activeVersionId,
         interactionContext,
       );
       if (result.kind === "patch" && result.playbook) {
         onPlaybookPatched(result.playbook, result.director, result.version_id);
+        setHeadVersionId(result.version_id);
+        setInteractionEpoch((current) => current + 1);
       }
       setMsgs([
         ...nextMsgs,
@@ -181,9 +210,16 @@ function ChatPanel({
         },
       ]);
       if (result.kind === "patch") {
-        listRunFollowUps(runId!, abortRef.current.signal)
-          .then((data) => setVersions(data.versions))
-          .catch(() => undefined);
+        try {
+          const data = await listRunFollowUps(runId!, controller.signal);
+          setVersions(data.versions);
+          setHeadVersionId(
+            data.versions.find((version) => version.is_head)?.version_id
+              ?? result.version_id,
+          );
+        } catch (historyError) {
+          if ((historyError as Error).name === "AbortError") throw historyError;
+        }
       }
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
@@ -192,16 +228,24 @@ function ChatPanel({
         { from: "ai", text: formatChatError(err), error: true },
       ]);
     } finally {
-      setPending(false);
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+        setPending(false);
+      }
     }
   };
 
   const restore = async (versionId: string) => {
     if (!runId || pending) return;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setPending(true);
     try {
-      const result = await restoreRunVersion(runId, versionId);
+      const result = await restoreRunVersion(runId, versionId, controller.signal);
       onPlaybookPatched(result.playbook, result.director, result.version_id);
+      setHeadVersionId(result.version_id);
+      setInteractionEpoch((current) => current + 1);
       setMsgs((current) => [
         ...current,
         {
@@ -210,17 +254,35 @@ function ChatPanel({
           versionId: result.version_id,
         },
       ]);
-      listRunFollowUps(runId)
-        .then((data) => setVersions(data.versions))
-        .catch(() => undefined);
+      try {
+        const data = await listRunFollowUps(runId, controller.signal);
+        setVersions(data.versions);
+        setHeadVersionId(
+          data.versions.find((version) => version.is_head)?.version_id ?? result.version_id,
+        );
+      } catch (historyError) {
+        if ((historyError as Error).name === "AbortError") throw historyError;
+        setMsgs((current) => [
+          ...current,
+          {
+            from: "ai",
+            text: "版本已恢复，但版本列表暂时无法刷新。",
+            error: true,
+          },
+        ]);
+      }
     } catch (err) {
+      if ((err as Error).name === "AbortError") throw err;
       setMsgs((current) => [
         ...current,
         { from: "ai", text: formatChatError(err), error: true },
       ]);
       throw err;
     } finally {
-      setPending(false);
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+        setPending(false);
+      }
     }
   };
 
@@ -243,7 +305,12 @@ function ChatPanel({
   ) : (
     <div className="mv-followup-panel">
       <div className="mv-chat-stream" ref={scrollRef}>
-        {msgs.length === 0 && !isProviderConfigured && (
+        {msgs.length === 0 && !historyReady && (
+          <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
+            正在加载对话与版本记录…
+          </div>
+        )}
+        {msgs.length === 0 && historyReady && !isProviderConfigured && (
           <div
             style={{
               fontSize: 12,
@@ -267,12 +334,12 @@ function ChatPanel({
             )}
           </div>
         )}
-        {msgs.length === 0 && isProviderConfigured && canModify && (
+        {msgs.length === 0 && historyReady && isProviderConfigured && canModify && (
           <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
             可以继续提问，也可以要求调整当前讲解。
           </div>
         )}
-        {msgs.length === 0 && !canModify && (
+        {msgs.length === 0 && historyReady && !canModify && (
           <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
             需要真实生成任务后才能保存修改版本。
           </div>
@@ -306,7 +373,7 @@ function ChatPanel({
             key={s}
             className="mv-suggestion"
             onClick={() => send(s)}
-            disabled={pending || !canModify}
+            disabled={pending || !canModify || !historyReady}
           >
             {s}
           </button>
@@ -317,7 +384,9 @@ function ChatPanel({
         <textarea
           rows={1}
           className="mv-chat-input"
-          placeholder={canModify ? "还有什么想问的" : "等待真实任务"}
+          placeholder={
+            !historyReady ? "正在加载记录" : canModify ? "还有什么想问的" : "等待真实任务"
+          }
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
@@ -326,14 +395,14 @@ function ChatPanel({
               send();
             }
           }}
-          disabled={!canModify}
+          disabled={!canModify || !historyReady}
         />
         <div className="mv-chat-actions">
           <div className="mv-spacer" />
           <button
             className="mv-send"
             onClick={() => send()}
-            disabled={pending || !input.trim() || !canModify}
+            disabled={pending || !input.trim() || !canModify || !historyReady}
           >
             {pending ? "回复中…" : "发送 ↵"}
           </button>
@@ -351,11 +420,121 @@ function ChatPanel({
       />
     ) : null;
 
-  const onExplainInteraction = canModify
+  const onExplainInteraction = canModify && historyReady
     ? (context: InteractionFollowUpContext) => send("请解释我刚才的操作", context)
     : undefined;
 
-  return <>{children({ followupSlot, relatedSlot, onExplainInteraction })}</>;
+  const onApplyInteractionVersion = canModify && headVersionId !== undefined
+    ? async (events: InteractionEvent[]) => {
+      if (pending || events.length === 0) return;
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setPending(true);
+      try {
+        const result = await applyRunInteractionVersion(
+          runId!,
+          events,
+          headVersionId,
+          controller.signal,
+        );
+        onPlaybookPatched(result.playbook, result.director);
+        setHeadVersionId(result.version_id);
+        setInteractionEpoch((current) => current + 1);
+        setMsgs((current) => [
+          ...current,
+          {
+            from: "ai",
+            text: `已将沙盒操作应用为新版本（${result.version_id.slice(0, 8)}）。`,
+            changeSummary: result.summary,
+            versionId: result.version_id,
+          },
+        ]);
+        try {
+          const data = await listRunFollowUps(runId!, controller.signal);
+          setVersions(data.versions);
+          setHeadVersionId(
+            data.versions.find((version) => version.is_head)?.version_id
+              ?? result.version_id,
+          );
+        } catch (err) {
+          if ((err as Error).name === "AbortError") throw err;
+          setMsgs((current) => [
+            ...current,
+            {
+              from: "ai",
+              text: "新版本已保存，但版本列表暂时无法刷新。",
+              error: true,
+            },
+          ]);
+        }
+      } catch (err) {
+        if ((err as Error).name === "AbortError") throw err;
+        if (err instanceof InteractionVersionRequestError && err.status === 409) {
+          setHeadVersionId(undefined);
+          try {
+            const [history, latestRun] = await Promise.all([
+              listRunFollowUps(runId!, controller.signal),
+              getPipelineRun(runId!, controller.signal),
+            ]);
+            if (latestRun.playbook) {
+              onPlaybookPatched(latestRun.playbook, latestRun.director);
+              setInteractionEpoch((current) => current + 1);
+            }
+            setVersions(history.versions);
+            setHeadVersionId(
+              history.versions.find((version) => version.is_head)?.version_id ?? null,
+            );
+            setMsgs((current) => [
+              ...current,
+              {
+                from: "ai",
+                text: `（版本冲突：${err.message}。已加载最新版本，请重新执行沙盒操作。）`,
+                error: true,
+              },
+            ]);
+            throw new Error("已加载最新版本，请重新执行沙盒操作。");
+          } catch (refreshError) {
+            if ((refreshError as Error).name === "AbortError") throw refreshError;
+            if (
+              refreshError instanceof Error &&
+              refreshError.message === "已加载最新版本，请重新执行沙盒操作。"
+            ) {
+              throw refreshError;
+            }
+            setMsgs((current) => [
+              ...current,
+              {
+                from: "ai",
+                text: `（版本冲突：${err.message}。请刷新页面后重新操作。）`,
+                error: true,
+              },
+            ]);
+            throw new Error("版本冲突，请刷新页面后重新操作。");
+          }
+        }
+        setMsgs((current) => [
+          ...current,
+          { from: "ai", text: formatChatError(err), error: true },
+        ]);
+        throw err;
+      } finally {
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+          setPending(false);
+        }
+      }
+    }
+    : undefined;
+
+  return <>{children({
+    followupSlot,
+    relatedSlot,
+    onExplainInteraction,
+    onApplyInteractionVersion,
+    interactionActionPending: pending,
+    interactionSessionKey: `${runId ?? "no-run"}:${interactionEpoch}`,
+  })}</>;
 }
 
 // ── StudioPage ────────────────────────────────────────────────────────────
@@ -482,13 +661,23 @@ export function StudioPage({
                 }
               }}
             >
-              {({ followupSlot, relatedSlot, onExplainInteraction }) => (
+              {({
+                followupSlot,
+                relatedSlot,
+                onExplainInteraction,
+                onApplyInteractionVersion,
+                interactionActionPending,
+                interactionSessionKey,
+              }) => (
                 <PlaybookPlayer
                   script={activePlaybook}
                   director={activeDirector}
                   theme={isDark ? "dark" : "light"}
                   enableInteractionSandbox
                   onExplainInteraction={onExplainInteraction}
+                  onApplyInteractionVersion={onApplyInteractionVersion}
+                  interactionActionPending={interactionActionPending}
+                  interactionSessionKey={interactionSessionKey}
                   swapDurationFrames={t.swapFrames}
                   onOpenExport={canExport ? () => setExportOpen(true) : undefined}
                   topbarCollapsed={topbarCollapsed}

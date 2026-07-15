@@ -13,6 +13,8 @@ import type {
   InteractionManifest,
 } from "./types";
 
+export const MAX_INTERACTION_EVENTS = 100;
+
 interface InteractionSandboxState {
   baseKey: string;
   baseScript: PlaybookScript;
@@ -219,6 +221,14 @@ function reducer(
     }
   }
 
+  if (action.type === "apply" && current.events.length >= MAX_INTERACTION_EVENTS) {
+    return {
+      ...current,
+      previewScript: current.committedScript,
+      lastError: `沙盒最多记录 ${MAX_INTERACTION_EVENTS} 个操作；请先应用到新版本或重置。`,
+    };
+  }
+
   try {
     const result = applyInteraction(
       current.committedScript,
@@ -271,8 +281,14 @@ export interface InteractionSandbox {
   reset: () => void;
 }
 
-export function useInteractionSandbox(baseScript: PlaybookScript): InteractionSandbox {
-  const baseKey = useMemo(() => scriptContentKey(baseScript), [baseScript]);
+export function useInteractionSandbox(
+  baseScript: PlaybookScript,
+  sessionKey = "",
+): InteractionSandbox {
+  const baseKey = useMemo(
+    () => `${sessionKey}\u0000${scriptContentKey(baseScript)}`,
+    [baseScript, sessionKey],
+  );
   const [storedState, dispatch] = useReducer(
     reducer,
     { baseScript, baseKey },

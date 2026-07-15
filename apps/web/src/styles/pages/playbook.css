@@ -936,12 +936,20 @@
 
 .playbook-interaction__actions {
   justify-content: flex-end;
+  flex-wrap: wrap;
 }
 
 .playbook-interaction__actions .playbook-interaction__explain {
   margin-right: auto;
   border-color: color-mix(in srgb, var(--player-accent) 42%, var(--player-line));
   color: var(--player-accent);
+}
+
+.playbook-interaction__actions .playbook-interaction__apply-version {
+  border-color: color-mix(in srgb, var(--player-accent) 62%, var(--player-line));
+  background: var(--player-accent);
+  color: #172012;
+  font-weight: 650;
 }
 
 .playbook-interaction__actions button:disabled,

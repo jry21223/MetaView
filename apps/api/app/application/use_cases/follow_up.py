@@ -11,8 +11,8 @@ from pydantic import ValidationError
 from app.application.dto.followup_dto import (
     FollowUpChatMessage,
     FollowUpRequest,
-    InteractionFollowUpContext,
 )
+from app.application.dto.interaction_dto import InteractionFollowUpContext
 from app.application.ports.llm_provider import ILLMProvider
 from app.domain.models.director import DirectorScript
 from app.domain.models.playbook import PlaybookScript
@@ -157,7 +157,8 @@ class FollowUpPatchUseCase:
 def _build_system_prompt(intent: str = "conversation") -> str:
     explicit_interaction_rule = (
         "\n当前请求是用户显式点击“解释我的操作”后发起的。"
-        "只解释 interaction_context 中的语义事件，不得修改 Playbook；patch 必须为 []。\n"
+        "只解释 interaction_context 中的语义事件，不得修改 Playbook；"
+        "patch 必须为 []。\n"
         if intent == "explain_interaction"
         else ""
     )

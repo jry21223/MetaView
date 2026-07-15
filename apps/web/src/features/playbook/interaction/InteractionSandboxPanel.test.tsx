@@ -218,6 +218,29 @@ describe("InteractionSandboxPanel", () => {
     expect(view.getByRole("button", { name: "暂停" }).getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(view.getByRole("button", { name: "暂停" }));
     expect(view.getByRole("button", { name: "播放" }).getAttribute("aria-pressed")).toBe("false");
+
+    view.rerender(
+      <InteractionSandboxPanel
+        manifest={manifest}
+        currentStepId="graph"
+        events={[]}
+        dirty
+        canUndo
+        lastError={null}
+        latestReplay={replay}
+        onShowReplayFrame={onShowReplayFrame}
+        onApply={onApply}
+        onUndo={vi.fn()}
+        onReset={vi.fn()}
+        actionPending
+      />,
+    );
+    const callsBeforeLockedClick = onShowReplayFrame.mock.calls.length;
+    for (const name of ["第一帧", "上一帧", "播放", "下一帧", "最后一帧"]) {
+      expect(view.getByRole<HTMLButtonElement>("button", { name }).disabled).toBe(true);
+    }
+    fireEvent.click(view.getByRole("button", { name: "下一帧" }));
+    expect(onShowReplayFrame).toHaveBeenCalledTimes(callsBeforeLockedClick);
   });
 
   it("renders nothing when the current step has no declared binding", () => {
@@ -336,5 +359,62 @@ describe("InteractionSandboxPanel", () => {
     await waitFor(() => {
       expect(view.getByRole("button", { name: "解释我的操作" })).toBeTruthy();
     });
+  });
+
+  it("applies a semantic event snapshot only after an explicit click and locks actions", async () => {
+    let finishApply: (() => void) | undefined;
+    const onApplyVersion = vi.fn(() => new Promise<void>((resolve) => {
+      finishApply = resolve;
+    }));
+    const onExplainInteraction = vi.fn().mockResolvedValue(undefined);
+    const onUndo = vi.fn();
+    const onReset = vi.fn();
+    const event = {
+      adapter_id: "math.derivative-tangent" as const,
+      step_id: "plot",
+      target_id: "step:plot:marker-x",
+      action: "set-value" as const,
+      value: 3,
+      sequence: 1,
+    };
+    const view = render(
+      <InteractionSandboxPanel
+        manifest={derivativeManifest}
+        currentStepId="plot"
+        events={[event]}
+        dirty
+        canUndo
+        lastError={null}
+        latestReplay={null}
+        onShowReplayFrame={vi.fn()}
+        onApply={vi.fn()}
+        onUndo={onUndo}
+        onReset={onReset}
+        onExplainInteraction={onExplainInteraction}
+        onApplyVersion={onApplyVersion}
+      />,
+    );
+
+    expect(onApplyVersion).not.toHaveBeenCalled();
+    fireEvent.click(view.getByRole("button", { name: "应用到新版本" }));
+
+    expect(onApplyVersion).toHaveBeenCalledTimes(1);
+    expect(onApplyVersion).toHaveBeenCalledWith([event]);
+    const pendingButton = view.getByRole<HTMLButtonElement>("button", { name: "应用中…" });
+    expect(pendingButton.disabled).toBe(true);
+    expect(pendingButton.getAttribute("aria-busy")).toBe("true");
+    expect(view.getByRole<HTMLButtonElement>("button", { name: "解释我的操作" }).disabled)
+      .toBe(true);
+    expect(view.getByRole<HTMLButtonElement>("button", { name: "撤销" }).disabled).toBe(true);
+    expect(view.getByRole<HTMLButtonElement>("button", { name: "重置" }).disabled).toBe(true);
+    expect(view.getByRole<HTMLInputElement>("slider", { name: "切点 x" }).disabled).toBe(true);
+
+    finishApply?.();
+    await waitFor(() => {
+      expect(view.getByRole("button", { name: "应用到新版本" })).toBeTruthy();
+    });
+    expect(onExplainInteraction).not.toHaveBeenCalled();
+    expect(onUndo).not.toHaveBeenCalled();
+    expect(onReset).toHaveBeenCalledTimes(1);
   });
 });

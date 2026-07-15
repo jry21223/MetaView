@@ -1,0 +1,68 @@
+[
+  {
+    "expression": "x^2 + a",
+    "params": { "x": 10, "a": 2 },
+    "x": 3,
+    "expected": 11
+  },
+  {
+    "expression": "2^3^2",
+    "params": {},
+    "x": 0,
+    "expected": 512
+  },
+  {
+    "expression": "-2^2",
+    "params": {},
+    "x": 0,
+    "expected": 4
+  },
+  {
+    "expression": "-5 % 2",
+    "params": {},
+    "x": 0,
+    "expected": -1
+  },
+  {
+    "expression": "sin(pi / 2) + sqrt(9) + log(e) + ln(e)",
+    "params": { "pi": 1, "e": 1 },
+    "x": 0,
+    "expected": 6
+  },
+  {
+    "expression": "cos(0) + tan(0) + asin(0) + acos(1) + atan(0) + atan2(1, 1)",
+    "params": {},
+    "x": 0,
+    "expected": 1.7853981633974483
+  },
+  {
+    "expression": "sinh(0) + cosh(0) + tanh(0) + exp(0)",
+    "params": {},
+    "x": 0,
+    "expected": 2
+  },
+  {
+    "expression": "log2(8) + log10(100) + cbrt(8)",
+    "params": {},
+    "x": 0,
+    "expected": 7
+  },
+  {
+    "expression": "abs(-3) + floor(1.9) + ceil(1.1) + round(-1.5) + round(1.5) + sign(-5)",
+    "params": {},
+    "x": 0,
+    "expected": 6
+  },
+  {
+    "expression": "max(x, 2) + min(5, a) + pow(2, 3) + hypot(3, 4)",
+    "params": { "a": 4 },
+    "x": 1,
+    "expected": 19
+  },
+  {
+    "expression": "pi + tau + e",
+    "params": { "pi": 1, "tau": 1, "e": 1 },
+    "x": 0,
+    "expected": 12.143059789228424
+  }
+]
