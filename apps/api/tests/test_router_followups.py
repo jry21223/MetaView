@@ -223,6 +223,46 @@ def test_followup_can_reply_without_creating_version(monkeypatch, tmp_path) -> N
     assert history["versions"] == []
 
 
+def test_explicit_interaction_explanation_cannot_create_a_version(followup_client) -> None:
+    client, repo, _director_repo, llm = followup_client
+    run_id = _seed_run(repo)
+    original = _run(repo.get(run_id))
+    assert original is not None
+
+    response = client.post(
+        f"/api/v1/runs/{run_id}/follow-up",
+        json={
+            "message": "请解释我刚才的操作",
+            "intent": "explain_interaction",
+            "interaction_context": {
+                "manifest_version": "1",
+                "events": [
+                    {
+                        "adapter_id": "algorithm.bfs",
+                        "step_id": "step_01",
+                        "target_id": "step:step_01:start-node",
+                        "action": "select",
+                        "value": "A",
+                        "sequence": 1,
+                    }
+                ],
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["kind"] == "reply"
+    assert response.json()["version_id"] is None
+    assert llm.calls == 1
+    stored = _run(repo.get(run_id))
+    assert stored is not None
+    assert stored.playbook == original.playbook
+    history = client.get(f"/api/v1/runs/{run_id}/follow-ups").json()
+    assert history["followups"][0]["patch_json"] == "[]"
+    assert history["followups"][0]["change_summary"] == "explain: interaction context"
+    assert history["versions"] == []
+
+
 def test_followup_repairs_invalid_patch_once(monkeypatch, tmp_path) -> None:
     get_settings.cache_clear()
     monkeypatch.setenv("METAVIEW_OPENAI_API_KEY", "sk-server")

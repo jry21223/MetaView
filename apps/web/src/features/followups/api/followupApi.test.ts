@@ -60,6 +60,50 @@ describe("followupApi", () => {
     expect(result.version_id).toBeNull();
   });
 
+  it("sends semantic interaction context only for an explicit explanation", async () => {
+    let requestBody: unknown = null;
+    server.use(
+      http.post(`${API_BASE_URL}/api/v1/runs/run-1/follow-up`, async ({ request }) => {
+        requestBody = await request.json();
+        return HttpResponse.json({
+          kind: "reply",
+          reply: "切点右移后，局部斜率变大。",
+          change_summary: "explain: interaction context",
+          version_id: null,
+          playbook: null,
+        });
+      }),
+    );
+
+    await submitRunFollowUp(
+      "run-1",
+      "请解释我刚才的操作",
+      [],
+      undefined,
+      undefined,
+      {
+        manifest_version: "1",
+        events: [{
+          adapter_id: "math.derivative-tangent",
+          step_id: "plot",
+          target_id: "step:plot:marker-x",
+          action: "set-value",
+          value: 3,
+          sequence: 1,
+        }],
+      },
+    );
+
+    expect(requestBody).toMatchObject({
+      message: "请解释我刚才的操作",
+      intent: "explain_interaction",
+      interaction_context: {
+        manifest_version: "1",
+        events: [{ target_id: "step:plot:marker-x", value: 3 }],
+      },
+    });
+  });
+
   it("loads follow-up history and restores versions", async () => {
     server.use(
       http.post(`${API_BASE_URL}/api/v1/runs/run-1/versions/v0/restore`, ({ request }) => {
