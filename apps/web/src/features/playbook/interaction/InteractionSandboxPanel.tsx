@@ -28,7 +28,8 @@ function RangeBinding({
   onApply: (command: InteractionCommand) => void;
 }) {
   const current = binding.value;
-  const [draft, setDraft] = useState(current);
+  const [draftState, setDraftState] = useState({ source: current, draft: current });
+  const draft = Object.is(draftState.source, current) ? draftState.draft : current;
 
   const commit = () => {
     if (!Number.isFinite(draft) || draft === current) return;
@@ -58,7 +59,10 @@ function RangeBinding({
         step={step}
         value={draft}
         aria-label={binding.label}
-        onChange={(event) => setDraft(Number(event.currentTarget.value))}
+        onChange={(event) => setDraftState({
+          source: current,
+          draft: Number(event.currentTarget.value),
+        })}
         onPointerUp={commit}
         onKeyUp={commit}
         onBlur={commit}
@@ -83,6 +87,7 @@ function ChoiceBinding({
             key={option.id}
             type="button"
             aria-pressed={binding.value === option.id}
+            disabled={binding.value === option.id}
             onClick={() => onApply({
               adapter_id: binding.adapter_id,
               step_id: binding.step_id,
@@ -117,7 +122,7 @@ export function InteractionSandboxPanel({
     [currentStepId, manifest],
   );
 
-  if (!binding) return null;
+  if (!binding && !dirty && !lastError) return null;
 
   return (
     <div className="playbook-interaction">
@@ -126,14 +131,18 @@ export function InteractionSandboxPanel({
         <small>{dirty ? `${events.length} 个未保存操作` : "不会修改原课程"}</small>
       </div>
 
-      {binding.target_role === "marker-x" ? (
+      {binding?.target_role === "marker-x" ? (
         <RangeBinding
-          key={`${binding.id}:${binding.value}`}
+          key={binding.id}
           binding={binding}
           onApply={onApply}
         />
-      ) : (
+      ) : binding?.target_role === "start-node" ? (
         <ChoiceBinding binding={binding} onApply={onApply} />
+      ) : (
+        <p className="playbook-interaction__inactive">
+          当前步骤没有交互控件，未保存的沙盒预览仍然保留。
+        </p>
       )}
 
       {lastError && (
@@ -146,7 +155,7 @@ export function InteractionSandboxPanel({
         <button type="button" onClick={onUndo} disabled={!canUndo}>
           撤销
         </button>
-        <button type="button" onClick={onReset} disabled={!dirty}>
+        <button type="button" onClick={onReset} disabled={!dirty && !lastError}>
           重置
         </button>
       </div>

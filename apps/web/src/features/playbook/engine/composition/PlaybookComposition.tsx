@@ -98,6 +98,7 @@ function LayerSlot({
   director,
   script,
   frame,
+  interactiveLayerKey,
 }: {
   layerState: VisualLayerState;
   baseProps: RendererProps;
@@ -106,6 +107,7 @@ function LayerSlot({
   director?: DirectorScript | null;
   script: PlaybookScript;
   frame: number;
+  interactiveLayerKey?: string;
 }) {
   const { layer } = layerState;
   const slice = useTimeline(layer.timing, stepProgress);
@@ -139,6 +141,9 @@ function LayerSlot({
   const appear = renderMode === "stage-base" || layerState.isVisualContinuation
     ? appearTransform("none", 1)
     : appearTransform(slice.anim, slice.progress);
+  const layerOnInteraction = layerState.visualKey === interactiveLayerKey
+    ? baseProps.onInteraction
+    : undefined;
   return (
     <div
       className="scene-compositor__layer"
@@ -149,8 +154,7 @@ function LayerSlot({
         position: "absolute",
         inset: 0,
         zIndex: layer.timing.z_order,
-        pointerEvents:
-          baseProps.onInteraction && layer.body.kind === "math_plot" ? "auto" : "none",
+        pointerEvents: "none",
         opacity: appear.opacity,
         transform: appear.transform === "none" ? undefined : appear.transform,
       }}
@@ -165,6 +169,7 @@ function LayerSlot({
         isVisualContinuation: layerState.isVisualContinuation,
         renderMode,
         directorFrame: layerDirectorFrame,
+        onInteraction: layerOnInteraction,
       })}
     </div>
   );
@@ -197,6 +202,18 @@ function SceneCompositor({
   const firstStageLayerKey = layers.find(
     (layerState) => snapshotSurface(layerState.layer.body.kind) === "stage",
   )?.visualKey;
+  const declaredMathLayerCount = baseProps.step.layers?.length
+    ? baseProps.step.layers.filter((layer) => layer.body.kind === "math_plot").length
+    : baseProps.step.snapshot.kind === "math_plot" ? 1 : 0;
+  const renderedMathLayers = layers.filter(
+    (layerState) => layerState.layer.body.kind === "math_plot",
+  );
+  const interactiveLayerKey =
+    baseProps.onInteraction &&
+    declaredMathLayerCount === 1 &&
+    renderedMathLayers.length === 1
+      ? renderedMathLayers[0].visualKey
+      : undefined;
   return (
     <div
       className="scene-compositor"
@@ -217,6 +234,7 @@ function SceneCompositor({
           director={director}
           script={script}
           frame={frame}
+          interactiveLayerKey={interactiveLayerKey}
         />
       ))}
     </div>

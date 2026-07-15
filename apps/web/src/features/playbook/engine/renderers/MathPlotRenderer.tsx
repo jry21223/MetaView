@@ -13,6 +13,13 @@ import { sanitizeKatex } from "../../../../shared/lib/sanitizeKatex";
 import { THEME_PALETTE } from "../../../../shared/config/themePalette";
 import { MATH_PLOT } from "../../../../shared/config/constants";
 import { clamp01 } from "../foundation";
+import {
+  MATH_PLOT_MARGIN as MARGIN,
+  MATH_PLOT_SVG_HEIGHT as SVG_H,
+  MATH_PLOT_SVG_WIDTH as SVG_W,
+  MATH_PLOT_WIDTH as PLOT_W,
+  pointerDomainX,
+} from "./mathPlotInteraction";
 
 // ── Theme ──────────────────────────────────────────────────────────────────
 
@@ -93,10 +100,6 @@ const PALETTE: Record<"dark" | "light", MathPalette> = {
 
 // ── Geometry (virtual SVG coordinate space) ───────────────────────────────
 
-const SVG_W = 1000;
-const SVG_H = 560;
-const MARGIN = { top: 20, right: 28, bottom: 40, left: 56 };
-const PLOT_W = SVG_W - MARGIN.left - MARGIN.right;
 const PLOT_H = SVG_H - MARGIN.top - MARGIN.bottom;
 const SAMPLES = MATH_PLOT.CURVE_SAMPLES;
 
@@ -138,33 +141,6 @@ interface CompiledCurve {
   primaryIndex: number;
 }
 
-// ── Browser interaction helpers ─────────────────────────────────────────────
-
-function pointerDomainX(
-  svg: SVGSVGElement,
-  clientX: number,
-  clientY: number,
-  xMin: number,
-  xMax: number,
-): number {
-  let virtualX: number | null = null;
-  const matrix = svg.getScreenCTM?.();
-  if (matrix && typeof svg.createSVGPoint === "function") {
-    const point = svg.createSVGPoint();
-    point.x = clientX;
-    point.y = clientY;
-    virtualX = point.matrixTransform(matrix.inverse()).x;
-  }
-  if (virtualX == null) {
-    const rect = svg.getBoundingClientRect();
-    if (rect.width > 0) {
-      virtualX = ((clientX - rect.left) / rect.width) * SVG_W;
-    }
-  }
-  const plotX = Math.max(MARGIN.left, Math.min(MARGIN.left + PLOT_W, virtualX ?? MARGIN.left));
-  return xMin + ((plotX - MARGIN.left) / PLOT_W) * (xMax - xMin);
-}
-
 // ── Component ──────────────────────────────────────────────────────────────
 
 export const MathPlotRenderer: React.FC<RendererProps> = ({
@@ -177,7 +153,32 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
 }) => {
   const snap = step.snapshot as MathPlotSnapshot;
   const colors = PALETTE[theme];
-  const draggingMarker = React.useRef(false);
+  const draggingPointerId = React.useRef<number | null>(null);
+  const onInteractionRef = React.useRef(onInteraction);
+
+  React.useEffect(() => {
+    const previousInteraction = onInteractionRef.current;
+    onInteractionRef.current = onInteraction;
+    if (onInteraction || draggingPointerId.current == null) return;
+    draggingPointerId.current = null;
+    previousInteraction?.({
+      type: "set-number",
+      phase: "cancel",
+      step_id: step.step_id,
+      target_role: "marker-x",
+    });
+  }, [onInteraction, step.step_id]);
+
+  React.useEffect(() => () => {
+    if (draggingPointerId.current == null) return;
+    draggingPointerId.current = null;
+    onInteractionRef.current?.({
+      type: "set-number",
+      phase: "cancel",
+      step_id: step.step_id,
+      target_role: "marker-x",
+    });
+  }, [step.step_id]);
 
   // Spring-driven `progress` can briefly overshoot; for time-fades use raw elapsed.
   const elapsed = Math.max(0, frame - stepStartFrame);
@@ -554,14 +555,27 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
                   aria-valuemax={onInteraction ? xMax : undefined}
                   aria-valuenow={onInteraction ? marker.mx : undefined}
                   tabIndex={onInteraction ? 0 : undefined}
-                  style={onInteraction ? { cursor: "ew-resize", touchAction: "none" } : undefined}
+                  style={onInteraction ? {
+                    cursor: "ew-resize",
+                    pointerEvents: "all",
+                    touchAction: "none",
+                  } : undefined}
                   onPointerDown={onInteraction ? (event) => {
+                    if (
+                      (typeof event.button === "number" && event.button !== 0) ||
+                      event.isPrimary === false ||
+                      draggingPointerId.current != null
+                    ) return;
                     const svg = event.currentTarget.ownerSVGElement;
                     if (!svg) return;
                     event.preventDefault();
                     event.stopPropagation();
-                    draggingMarker.current = true;
-                    event.currentTarget.setPointerCapture?.(event.pointerId);
+                    draggingPointerId.current = event.pointerId;
+                    try {
+                      event.currentTarget.setPointerCapture?.(event.pointerId);
+                    } catch {
+                      // Pointer capture can fail if the node detaches during a Remotion update.
+                    }
                     onInteraction({
                       type: "set-number",
                       phase: "preview",
@@ -571,9 +585,11 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
                     });
                   } : undefined}
                   onPointerMove={onInteraction ? (event) => {
-                    if (!draggingMarker.current) return;
+                    if (draggingPointerId.current !== event.pointerId) return;
                     const svg = event.currentTarget.ownerSVGElement;
                     if (!svg) return;
+                    event.preventDefault();
+                    event.stopPropagation();
                     onInteraction({
                       type: "set-number",
                       phase: "preview",
@@ -583,11 +599,25 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
                     });
                   } : undefined}
                   onPointerUp={onInteraction ? (event) => {
-                    if (!draggingMarker.current) return;
+                    if (draggingPointerId.current !== event.pointerId) return;
                     const svg = event.currentTarget.ownerSVGElement;
-                    draggingMarker.current = false;
-                    event.currentTarget.releasePointerCapture?.(event.pointerId);
-                    if (!svg) return;
+                    draggingPointerId.current = null;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    try {
+                      event.currentTarget.releasePointerCapture?.(event.pointerId);
+                    } catch {
+                      // The browser may already have released capture.
+                    }
+                    if (!svg) {
+                      onInteraction({
+                        type: "set-number",
+                        phase: "cancel",
+                        step_id: step.step_id,
+                        target_role: "marker-x",
+                      });
+                      return;
+                    }
                     onInteraction({
                       type: "set-number",
                       phase: "commit",
@@ -596,8 +626,20 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
                       value: pointerDomainX(svg, event.clientX, event.clientY, xMin, xMax),
                     });
                   } : undefined}
-                  onPointerCancel={onInteraction ? () => {
-                    draggingMarker.current = false;
+                  onPointerCancel={onInteraction ? (event) => {
+                    if (draggingPointerId.current !== event.pointerId) return;
+                    draggingPointerId.current = null;
+                    event.stopPropagation();
+                    onInteraction({
+                      type: "set-number",
+                      phase: "cancel",
+                      step_id: step.step_id,
+                      target_role: "marker-x",
+                    });
+                  } : undefined}
+                  onLostPointerCapture={onInteraction ? (event) => {
+                    if (draggingPointerId.current !== event.pointerId) return;
+                    draggingPointerId.current = null;
                     onInteraction({
                       type: "set-number",
                       phase: "cancel",
@@ -608,6 +650,7 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
                   onKeyDown={onInteraction ? (event) => {
                     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
                     event.preventDefault();
+                    event.stopPropagation();
                     const delta = (xMax - xMin) / 100;
                     const direction = event.key === "ArrowLeft" ? -1 : 1;
                     const value = Math.max(xMin, Math.min(xMax, marker.mx + direction * delta));
@@ -620,6 +663,14 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
                     });
                   } : undefined}
                 >
+                  <circle
+                    data-interaction-hit-target="marker-x"
+                    r={24}
+                    cx={marker.px}
+                    cy={marker.py}
+                    fill="transparent"
+                    pointerEvents="all"
+                  />
                   <line
                     x1={marker.px}
                     y1={marker.py}

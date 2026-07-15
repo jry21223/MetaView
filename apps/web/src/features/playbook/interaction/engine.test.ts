@@ -140,6 +140,22 @@ describe("interaction manifest", () => {
     expect(deriveInteractionManifest(script([step("cusp", cusp)])).adapters).toEqual([]);
     expect(deriveInteractionManifest(script([step("boundary", boundary)])).adapters).toEqual([]);
   });
+
+  it("fails closed when a step declares more than one math plot layer", () => {
+    const layered = step("plot", plot);
+    layered.layers = [
+      {
+        timing: { enter_at: 0, exit_at: 1, appear_anim: "fade", z_order: 0 },
+        body: plot,
+      },
+      {
+        timing: { enter_at: 0, exit_at: 1, appear_anim: "fade", z_order: 1 },
+        body: { ...plot, marker_x: 2 },
+      },
+    ];
+
+    expect(deriveInteractionManifest(script([layered])).adapters).toEqual([]);
+  });
 });
 
 describe("derivative interaction", () => {

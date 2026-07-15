@@ -28,6 +28,10 @@ import { SPEED_STEPS } from "./playbackRates";
 import type { RendererInteractionEvent } from "../renderers/types";
 import { InteractionSandboxPanel } from "../../interaction/InteractionSandboxPanel";
 import { useInteractionSandbox } from "../../interaction/useInteractionSandbox";
+import type {
+  DerivativeInteractionBinding,
+  InteractionManifest,
+} from "../../interaction/types";
 
 export type PlaybookLayoutMode = "desktop" | "portrait";
 
@@ -56,6 +60,21 @@ function useAutoLayoutMode(layoutMode?: PlaybookLayoutMode): PlaybookLayoutMode 
   return layoutMode ?? autoLayoutMode;
 }
 
+function derivativeInteractionManifest(
+  manifest: InteractionManifest,
+): InteractionManifest {
+  return {
+    version: manifest.version,
+    adapters: manifest.adapters.flatMap((adapter) => {
+      const bindings = adapter.bindings.filter(
+        (binding): binding is DerivativeInteractionBinding =>
+          binding.target_role === "marker-x",
+      );
+      return bindings.length > 0 ? [{ ...adapter, bindings }] : [];
+    }),
+  };
+}
+
 // ── Main component ─────────────────────────────────────────────────────────
 
 interface PlaybookPlayerProps {
@@ -73,6 +92,8 @@ interface PlaybookPlayerProps {
   followupSlot?: React.ReactNode;
   relatedSlot?: React.ReactNode;
   showLearningConsole?: boolean;
+  /** Opt-in browser-only sandbox controls. Read-only player surfaces leave this disabled. */
+  enableInteractionSandbox?: boolean;
   topbarCollapsed?: boolean;
   onToggleTopbar?: () => void;
   layoutMode?: PlaybookLayoutMode;
@@ -87,6 +108,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   followupSlot,
   relatedSlot,
   showLearningConsole = true,
+  enableInteractionSandbox = false,
   topbarCollapsed = false,
   onToggleTopbar,
   layoutMode,
@@ -102,6 +124,12 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   const [mobileSheet, setMobileSheet] = useState<MobileTabKey | null>(null);
   const script = useResolvedScript(baseScript, overrides);
   const interactionSandbox = useInteractionSandbox(script);
+  const interactionEnabled = enableInteractionSandbox && showLearningConsole;
+  const displayScript = interactionEnabled ? interactionSandbox.previewScript : script;
+  const interactionManifest = useMemo(
+    () => derivativeInteractionManifest(interactionSandbox.manifest),
+    [interactionSandbox.manifest],
+  );
   const capability = useMemo(() => domainCapability(script.domain), [script.domain]);
   const hasDomainPanel = useMemo(() => {
     if (getParamPanel(baseScript.domain) === null) return false;
@@ -145,8 +173,8 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     ? Math.min(currentStepIndex, script.steps.length - 1)
     : 0;
   const codeOverlay = useMemo(
-    () => resolveCodePanelOverlay(script, safeStepIndex),
-    [script, safeStepIndex],
+    () => resolveCodePanelOverlay(displayScript, safeStepIndex),
+    [displayScript, safeStepIndex],
   );
   const mobileCodeOverlay = useMemo(
     () => clipCodeOverlay(codeOverlay),
@@ -155,10 +183,10 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
 
   // Show the code slot for algorithm lessons, explicit code tracks, or a
   // legacy snapshot that can be projected into the right-side console.
-  const isAlgorithmDomain = script.domain === "algorithm";
+  const isAlgorithmDomain = displayScript.domain === "algorithm";
   const hasAnyCode = useMemo(
-    () => script.steps.some((s) => s.code_highlight != null),
-    [script.steps],
+    () => displayScript.steps.some((s) => s.code_highlight != null),
+    [displayScript.steps],
   );
   const showCodePanelSlot = isAlgorithmDomain || hasAnyCode || codeOverlay != null;
 
@@ -256,9 +284,13 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   }
 
   const currentStep = script.steps[safeStepIndex];
-  const currentInteractionBinding = interactionSandbox.manifest.adapters
-    .flatMap((adapter) => adapter.bindings)
-    .find((binding) => binding.step_id === currentStep.step_id);
+  const currentInteractionBinding = interactionEnabled
+    ? interactionManifest.adapters
+      .flatMap((adapter) => adapter.bindings)
+      .find((binding): binding is DerivativeInteractionBinding =>
+        binding.step_id === currentStep.step_id && binding.target_role === "marker-x"
+      )
+    : undefined;
   const hasCurrentInteraction = currentInteractionBinding != null;
   const handleRendererInteraction = (event: RendererInteractionEvent) => {
     if (event.phase === "cancel") {
@@ -280,9 +312,12 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     if (event.phase === "preview") interactionSandbox.preview(command);
     else interactionSandbox.apply(command);
   };
-  const interactionSlot = hasCurrentInteraction ? (
+  const showInteractionPanel = interactionEnabled && (
+    hasCurrentInteraction || interactionSandbox.dirty || interactionSandbox.lastError != null
+  );
+  const interactionSlot = showInteractionPanel ? (
     <InteractionSandboxPanel
-      manifest={interactionSandbox.manifest}
+      manifest={interactionManifest}
       currentStepId={currentStep.step_id}
       events={interactionSandbox.events}
       dirty={interactionSandbox.dirty}
@@ -321,7 +356,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     setMobileSheet(sheet);
     emitNativeEvent("playbook.mobileSheetOpened", { sheet });
   };
-  const hasControlPanel = hasDomainPanel || hasCurrentInteraction;
+  const hasControlPanel = hasDomainPanel || showInteractionPanel;
   const mobileParamsContent = (
     <>
       {interactionSlot}
@@ -389,13 +424,15 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
           ref={playerRef}
           component={PlaybookComposition}
           inputProps={{
-            script: interactionSandbox.previewScript,
+            script: displayScript,
             director,
             theme,
             showSubtitles: showStageSubtitles,
             showInlineCode: false,
             swapDurationFrames,
             onInteraction:
+              interactionEnabled &&
+              !isPortraitLayout &&
               currentInteractionBinding?.target_role === "marker-x"
                 ? handleRendererInteraction
                 : undefined,

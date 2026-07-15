@@ -9,7 +9,14 @@ vi.mock("@remotion/player", async () => {
   const React = await import("react");
   return {
     Player: React.forwardRef(function MockPlayer(
-      props: { inputProps?: { showSubtitles?: boolean; showInlineCode?: boolean } },
+      props: {
+        inputProps?: {
+          showSubtitles?: boolean;
+          showInlineCode?: boolean;
+          onInteraction?: unknown;
+          script?: PlaybookScript;
+        };
+      },
       ref: React.ForwardedRef<unknown>,
     ) {
       React.useImperativeHandle(ref, () => ({
@@ -24,6 +31,12 @@ vi.mock("@remotion/player", async () => {
           data-testid="mock-remotion-player"
           data-show-subtitles={String(props.inputProps?.showSubtitles)}
           data-show-inline-code={String(props.inputProps?.showInlineCode)}
+          data-has-interaction={String(typeof props.inputProps?.onInteraction === "function")}
+          data-marker-x={String(
+            props.inputProps?.script?.steps[0]?.snapshot.kind === "math_plot"
+              ? props.inputProps.script.steps[0].snapshot.marker_x
+              : "",
+          )}
         />
       );
     }),
@@ -81,6 +94,53 @@ function baseScript(overrides: Partial<PlaybookScript> = {}): PlaybookScript {
     ],
     ...overrides,
   };
+}
+
+function derivativeScript(): PlaybookScript {
+  return baseScript({
+    steps: [
+      {
+        ...baseScript().steps[0],
+        snapshot: {
+          kind: "math_plot",
+          curves: [
+            { expression: "x^2", semantic_role: "curve" },
+            {
+              expression: "2*x - 1",
+              semantic_role: "tangent",
+              emphasis: "accent",
+            },
+          ],
+          x_min: -3,
+          x_max: 3,
+          y_min: -1,
+          y_max: 10,
+          marker_x: 1,
+          x_label: "x",
+          y_label: "y",
+        },
+      },
+      baseScript().steps[1],
+    ],
+  });
+}
+
+function bfsScript(): PlaybookScript {
+  return baseScript({
+    domain: "algorithm",
+    algorithm_id: "bfs",
+    total_frames: 45,
+    steps: [{
+      ...baseScript().steps[0],
+      end_frame: 45,
+      snapshot: {
+        kind: "graph_scene",
+        nodes: [{ id: "A", label: "Alpha" }, { id: "B", label: "Beta" }],
+        edges: [{ id: "AB", source: "A", target: "B" }],
+        directed: false,
+      },
+    }],
+  });
 }
 
 describe("PlaybookPlayer", () => {
@@ -571,41 +631,103 @@ describe("PlaybookPlayer", () => {
       "0101",
     );
   });
-  it("reuses the five-tab portrait params surface for interaction controls", () => {
-    const derivative = baseScript({
-      total_frames: 45,
-      steps: [{
-        ...baseScript().steps[0],
-        end_frame: 45,
-        snapshot: {
-          kind: "math_plot",
-          curves: [
-            { expression: "x^2", semantic_role: "curve" },
-            {
-              expression: "2*x - 1",
-              semantic_role: "tangent",
-              emphasis: "accent",
-            },
-          ],
-          x_min: -3,
-          x_max: 3,
-          y_min: -1,
-          y_max: 10,
-          marker_x: 1,
-          x_label: "x",
-          y_label: "y",
-        },
-      }],
-    });
+  it("keeps the interaction sandbox disabled unless a player surface opts in", () => {
+    const view = render(<PlaybookPlayer script={derivativeScript()} theme="light" />);
 
+    expect(view.queryByText("Explore")).toBeNull();
+    expect(view.queryByText("沙盒预览")).toBeNull();
+    expect(view.getByTestId("mock-remotion-player").getAttribute("data-has-interaction"))
+      .toBe("false");
+  });
+
+  it("does not expose interaction on a read-only player with no learning console", () => {
     const view = render(
-      <PlaybookPlayer script={derivative} theme="light" layoutMode="portrait" />,
+      <PlaybookPlayer
+        script={derivativeScript()}
+        theme="light"
+        showLearningConsole={false}
+        enableInteractionSandbox
+      />,
+    );
+
+    expect(view.queryByText("沙盒预览")).toBeNull();
+    expect(view.getByTestId("mock-remotion-player").getAttribute("data-has-interaction"))
+      .toBe("false");
+  });
+
+  it("opts the desktop Studio-style player into direct sandbox manipulation", () => {
+    const view = render(
+      <PlaybookPlayer
+        script={derivativeScript()}
+        theme="light"
+        enableInteractionSandbox
+      />,
+    );
+
+    expect(view.getByText("Explore")).toBeTruthy();
+    expect(view.getByTestId("mock-remotion-player").getAttribute("data-has-interaction"))
+      .toBe("true");
+
+    const slider = view.getByRole("slider", { name: "切点 x" });
+    fireEvent.change(slider, { target: { value: "2" } });
+    fireEvent.pointerUp(slider);
+    expect(view.getByTestId("mock-remotion-player").getAttribute("data-marker-x"))
+      .toBe("2");
+  });
+
+  it("keeps recovery controls after navigating away from the bound plot", async () => {
+    const view = render(
+      <PlaybookPlayer
+        script={derivativeScript()}
+        theme="light"
+        enableInteractionSandbox
+      />,
+    );
+
+    const slider = view.getByRole("slider", { name: "切点 x" });
+    fireEvent.change(slider, { target: { value: "2" } });
+    fireEvent.pointerUp(slider);
+    fireEvent.click(view.getByRole("button", { name: "下一步" }));
+
+    await waitFor(() => {
+      expect(view.getByText(/当前步骤没有交互控件/)).toBeTruthy();
+    });
+    expect(view.queryByRole("slider", { name: "切点 x" })).toBeNull();
+    const reset = view.getByRole("button", { name: "重置" }) as HTMLButtonElement;
+    expect(reset.disabled).toBe(false);
+    fireEvent.click(reset);
+    await waitFor(() => {
+      expect(view.queryByText("Explore")).toBeNull();
+    });
+  });
+
+  it("defers BFS controls even when the interaction sandbox is enabled", () => {
+    const view = render(
+      <PlaybookPlayer script={bfsScript()} theme="light" enableInteractionSandbox />,
+    );
+
+    expect(view.queryByText("沙盒预览")).toBeNull();
+    expect(view.queryByRole("button", { name: "Alpha" })).toBeNull();
+    expect(view.getByTestId("mock-remotion-player").getAttribute("data-has-interaction"))
+      .toBe("false");
+  });
+
+  it("reuses the five-tab portrait params surface without enabling canvas drag", () => {
+    const view = render(
+      <PlaybookPlayer
+        script={derivativeScript()}
+        theme="light"
+        layoutMode="portrait"
+        enableInteractionSandbox
+      />,
     );
     expect(view.getAllByRole("tab")).toHaveLength(5);
 
     fireEvent.click(view.getByRole("tab", { name: "参数" }));
     expect(view.getByRole("slider", { name: "切点 x" })).toBeTruthy();
     expect(view.getByText("沙盒预览")).toBeTruthy();
+    expect(view.getByTestId("mock-remotion-player").getAttribute("data-has-interaction"))
+      .toBe("false");
   });
 
 });
