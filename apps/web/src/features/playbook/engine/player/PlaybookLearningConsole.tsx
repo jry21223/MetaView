@@ -13,6 +13,7 @@ interface PlaybookLearningConsoleProps {
   baseScript: PlaybookScript;
   overrides: ScriptOverrides;
   onOverridesChange: (next: ScriptOverrides) => void;
+  interactionSlot?: React.ReactNode;
   followupSlot?: React.ReactNode;
   relatedSlot?: React.ReactNode;
   relatedAlgorithmId?: string | null;
@@ -26,6 +27,7 @@ export function PlaybookLearningConsole({
   baseScript,
   overrides,
   onOverridesChange,
+  interactionSlot,
   followupSlot,
   relatedSlot,
   relatedAlgorithmId,
@@ -48,6 +50,16 @@ export function PlaybookLearningConsole({
               </div>
             )}
           </div>
+        </section>
+      )}
+
+      {interactionSlot && (
+        <section className="playbook-player__console-card playbook-player__interaction-card">
+          <div className="playbook-player__console-head">
+            <span>Explore</span>
+            <small>Experimental</small>
+          </div>
+          {interactionSlot}
         </section>
       )}
 
