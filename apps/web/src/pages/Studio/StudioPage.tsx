@@ -465,6 +465,7 @@ export function StudioPage({
                   script={activePlaybook}
                   director={activeDirector}
                   theme={isDark ? "dark" : "light"}
+                  enableInteractionSandbox
                   swapDurationFrames={t.swapFrames}
                   onOpenExport={canExport ? () => setExportOpen(true) : undefined}
                   topbarCollapsed={topbarCollapsed}

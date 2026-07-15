@@ -28,7 +28,11 @@ function RangeBinding({
   onApply: (command: InteractionCommand) => void;
 }) {
   const current = binding.value;
-  const [draft, setDraft] = useState(current);
+  const [draftState, setDraftState] = useState(() => ({
+    source: binding,
+    value: current,
+  }));
+  const draft = draftState.source === binding ? draftState.value : current;
 
   const commit = () => {
     if (!Number.isFinite(draft) || draft === current) return;
@@ -58,7 +62,10 @@ function RangeBinding({
         step={step}
         value={draft}
         aria-label={binding.label}
-        onChange={(event) => setDraft(Number(event.currentTarget.value))}
+        onChange={(event) => setDraftState({
+          source: binding,
+          value: Number(event.currentTarget.value),
+        })}
         onPointerUp={commit}
         onKeyUp={commit}
         onBlur={commit}
@@ -83,6 +90,7 @@ function ChoiceBinding({
             key={option.id}
             type="button"
             aria-pressed={binding.value === option.id}
+            disabled={binding.value === option.id}
             onClick={() => onApply({
               adapter_id: binding.adapter_id,
               step_id: binding.step_id,

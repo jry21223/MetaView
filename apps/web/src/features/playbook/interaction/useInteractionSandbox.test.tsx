@@ -1,7 +1,11 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import type { MathPlotSnapshot, PlaybookScript } from "../engine/types";
+import type {
+  GraphSceneSnapshot,
+  MathPlotSnapshot,
+  PlaybookScript,
+} from "../engine/types";
 import { useInteractionSandbox } from "./useInteractionSandbox";
 
 function plot(markerX = 1): MathPlotSnapshot {
@@ -20,6 +24,13 @@ function plot(markerX = 1): MathPlotSnapshot {
     y_label: "y",
   };
 }
+
+const graph: GraphSceneSnapshot = {
+  kind: "graph_scene",
+  nodes: [{ id: "A", label: "A" }, { id: "B", label: "B" }],
+  edges: [{ id: "AB", source: "A", target: "B" }],
+  directed: false,
+};
 
 function script(markerX = 1): PlaybookScript {
   return {
@@ -40,18 +51,40 @@ function script(markerX = 1): PlaybookScript {
   };
 }
 
+function mixedScript(): PlaybookScript {
+  const math = script();
+  return {
+    ...math,
+    algorithm_id: "bfs",
+    total_frames: 60,
+    steps: [
+      math.steps[0],
+      {
+        step_id: "graph",
+        end_frame: 60,
+        title: "Graph",
+        voiceover_text: "",
+        snapshot: graph,
+        tokens: [],
+      },
+    ],
+  };
+}
+
+const moveMarker = (value: number) => ({
+  adapter_id: "math.derivative-tangent" as const,
+  step_id: "plot",
+  target_id: "step:plot:marker-x",
+  action: "set-value" as const,
+  value,
+});
+
 describe("useInteractionSandbox", () => {
   it("applies, undoes, and resets interactions without mutating the base script", () => {
     const base = script();
     const { result } = renderHook(() => useInteractionSandbox(base));
 
-    act(() => result.current.apply({
-      adapter_id: "math.derivative-tangent",
-      step_id: "plot",
-      target_id: "step:plot:marker-x",
-      action: "set-value",
-      value: 3,
-    }));
+    act(() => result.current.apply(moveMarker(3)));
 
     expect(result.current.dirty).toBe(true);
     expect(result.current.events).toHaveLength(1);
@@ -62,13 +95,7 @@ describe("useInteractionSandbox", () => {
     expect(result.current.dirty).toBe(false);
     expect((result.current.previewScript.steps[0].snapshot as MathPlotSnapshot).marker_x).toBe(1);
 
-    act(() => result.current.apply({
-      adapter_id: "math.derivative-tangent",
-      step_id: "plot",
-      target_id: "step:plot:marker-x",
-      action: "set-value",
-      value: 2,
-    }));
+    act(() => result.current.apply(moveMarker(2)));
     act(() => result.current.reset());
     expect(result.current.events).toEqual([]);
     expect((result.current.previewScript.steps[0].snapshot as MathPlotSnapshot).marker_x).toBe(1);
@@ -79,11 +106,8 @@ describe("useInteractionSandbox", () => {
     const { result } = renderHook(() => useInteractionSandbox(base));
 
     act(() => result.current.apply({
-      adapter_id: "math.derivative-tangent",
-      step_id: "plot",
+      ...moveMarker(3),
       target_id: "raw-dom-selector",
-      action: "set-value",
-      value: 3,
     }));
 
     expect(result.current.dirty).toBe(false);
@@ -91,7 +115,39 @@ describe("useInteractionSandbox", () => {
     expect(result.current.lastError).toContain("not declared by the manifest");
   });
 
-  it("drops sandbox history when the base script changes", () => {
+  it("keeps the valid preview and history when a later command fails", () => {
+    const base = script();
+    const { result } = renderHook(() => useInteractionSandbox(base));
+
+    act(() => result.current.apply(moveMarker(3)));
+    act(() => result.current.apply({
+      ...moveMarker(4),
+      target_id: "raw-dom-selector",
+    }));
+
+    expect(result.current.events).toHaveLength(1);
+    expect(result.current.dirty).toBe(true);
+    expect((result.current.previewScript.steps[0].snapshot as MathPlotSnapshot).marker_x).toBe(3);
+    expect(result.current.lastError).toContain("not declared by the manifest");
+  });
+
+  it("preserves history when an equivalent base script gets a new object identity", () => {
+    const first = script(1);
+    const equivalent = JSON.parse(JSON.stringify(first)) as PlaybookScript;
+    const { result, rerender } = renderHook(
+      ({ base }) => useInteractionSandbox(base),
+      { initialProps: { base: first } },
+    );
+
+    act(() => result.current.apply(moveMarker(3)));
+    rerender({ base: equivalent });
+
+    expect(result.current.dirty).toBe(true);
+    expect(result.current.events).toHaveLength(1);
+    expect((result.current.previewScript.steps[0].snapshot as MathPlotSnapshot).marker_x).toBe(3);
+  });
+
+  it("drops sandbox history when the base script content changes", () => {
     const first = script(1);
     const second = script(-2);
     const { result, rerender } = renderHook(
@@ -99,16 +155,28 @@ describe("useInteractionSandbox", () => {
       { initialProps: { base: first } },
     );
 
-    act(() => result.current.apply({
-      adapter_id: "math.derivative-tangent",
-      step_id: "plot",
-      target_id: "step:plot:marker-x",
-      action: "set-value",
-      value: 3,
-    }));
+    act(() => result.current.apply(moveMarker(3)));
     rerender({ base: second });
 
     expect(result.current.dirty).toBe(false);
     expect((result.current.previewScript.steps[0].snapshot as MathPlotSnapshot).marker_x).toBe(-2);
+  });
+
+  it("clears the latest BFS replay after a successful non-BFS event", () => {
+    const base = mixedScript();
+    const { result } = renderHook(() => useInteractionSandbox(base));
+
+    act(() => result.current.apply({
+      adapter_id: "algorithm.bfs",
+      step_id: "graph",
+      target_id: "step:graph:start-node",
+      action: "select",
+      value: "B",
+    }));
+    expect(result.current.latestReplay?.start_node_id).toBe("B");
+
+    act(() => result.current.apply(moveMarker(3)));
+    expect(result.current.latestReplay).toBeNull();
+    expect(result.current.events).toHaveLength(2);
   });
 });

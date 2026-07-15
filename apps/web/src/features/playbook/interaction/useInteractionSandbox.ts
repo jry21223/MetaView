@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer } from "react";
+import { useEffect, useMemo, useReducer } from "react";
 
 import type { PlaybookScript } from "../engine/types";
 import { applyInteraction, deriveInteractionManifest } from "./engine";
@@ -10,27 +10,52 @@ import type {
 } from "./types";
 
 interface InteractionSandboxState {
+  baseKey: string;
   baseScript: PlaybookScript;
   previewScript: PlaybookScript;
   commands: InteractionCommand[];
   events: InteractionEvent[];
-  replays: BfsInteractionReplay[];
+  latestReplay: BfsInteractionReplay | null;
   lastError: string | null;
 }
 
-type InteractionSandboxAction =
-  | { type: "sync"; baseScript: PlaybookScript }
-  | { type: "apply"; baseScript: PlaybookScript; command: InteractionCommand }
-  | { type: "undo"; baseScript: PlaybookScript }
-  | { type: "reset"; baseScript: PlaybookScript };
+interface InteractionSandboxBase {
+  baseKey: string;
+  baseScript: PlaybookScript;
+}
 
-function initialState(baseScript: PlaybookScript): InteractionSandboxState {
+type InteractionSandboxAction =
+  | ({ type: "sync" } & InteractionSandboxBase)
+  | ({ type: "apply"; command: InteractionCommand } & InteractionSandboxBase)
+  | ({ type: "undo" } & InteractionSandboxBase)
+  | ({ type: "reset" } & InteractionSandboxBase);
+
+function scriptContentKey(script: PlaybookScript): string {
+  return JSON.stringify(script, (_key: string, value: unknown) => {
+    if (value === null || typeof value !== "object" || Array.isArray(value)) {
+      return value;
+    }
+    const record = value as Record<string, unknown>;
+    return Object.keys(record)
+      .sort()
+      .reduce<Record<string, unknown>>((sorted, key) => {
+        sorted[key] = record[key];
+        return sorted;
+      }, {});
+  });
+}
+
+function initialState(
+  baseScript: PlaybookScript,
+  baseKey: string,
+): InteractionSandboxState {
   return {
+    baseKey,
     baseScript,
     previewScript: baseScript,
     commands: [],
     events: [],
-    replays: [],
+    latestReplay: null,
     lastError: null,
   };
 }
@@ -54,48 +79,63 @@ function assertSameTimeline(
 
 function replay(
   baseScript: PlaybookScript,
+  baseKey: string,
   commands: InteractionCommand[],
 ): InteractionSandboxState {
   let previewScript = baseScript;
+  const appliedCommands: InteractionCommand[] = [];
   const events: InteractionEvent[] = [];
-  const replays: BfsInteractionReplay[] = [];
-  try {
-    commands.forEach((command, index) => {
-      const result = applyInteraction(previewScript, command, index + 1);
+  let latestReplay: BfsInteractionReplay | null = null;
+
+  for (const command of commands) {
+    try {
+      const result = applyInteraction(previewScript, command, events.length + 1);
       assertSameTimeline(baseScript, result.script);
       previewScript = result.script;
+      appliedCommands.push(command);
       events.push(result.event);
-      if (result.replay) replays.push(result.replay);
-    });
-    return {
-      baseScript,
-      previewScript,
-      commands,
-      events,
-      replays,
-      lastError: null,
-    };
-  } catch (error) {
-    return {
-      ...initialState(baseScript),
-      lastError: error instanceof Error ? error.message : "Interaction replay failed",
-    };
+      latestReplay = result.replay ?? null;
+    } catch (error) {
+      return {
+        baseKey,
+        baseScript,
+        previewScript,
+        commands: appliedCommands,
+        events,
+        latestReplay,
+        lastError: error instanceof Error ? error.message : "Interaction replay failed",
+      };
+    }
   }
+
+  return {
+    baseKey,
+    baseScript,
+    previewScript,
+    commands: appliedCommands,
+    events,
+    latestReplay,
+    lastError: null,
+  };
 }
 
 function reducer(
   state: InteractionSandboxState,
   action: InteractionSandboxAction,
 ): InteractionSandboxState {
-  const current = state.baseScript === action.baseScript
+  const current = state.baseKey === action.baseKey
     ? state
-    : initialState(action.baseScript);
+    : initialState(action.baseScript, action.baseKey);
 
   if (action.type === "sync" || action.type === "reset") {
-    return initialState(action.baseScript);
+    return initialState(action.baseScript, action.baseKey);
   }
   if (action.type === "undo") {
-    return replay(action.baseScript, current.commands.slice(0, -1));
+    return replay(
+      action.baseScript,
+      action.baseKey,
+      current.commands.slice(0, -1),
+    );
   }
 
   try {
@@ -107,10 +147,12 @@ function reducer(
     assertSameTimeline(action.baseScript, result.script);
     return {
       ...current,
+      baseKey: action.baseKey,
+      baseScript: action.baseScript,
       previewScript: result.script,
       commands: [...current.commands, action.command],
       events: [...current.events, result.event],
-      replays: result.replay ? [...current.replays, result.replay] : current.replays,
+      latestReplay: result.replay ?? null,
       lastError: null,
     };
   } catch (error) {
@@ -135,36 +177,41 @@ export interface InteractionSandbox {
 }
 
 export function useInteractionSandbox(baseScript: PlaybookScript): InteractionSandbox {
-  const [storedState, dispatch] = useReducer(reducer, baseScript, initialState);
-  const state = storedState.baseScript === baseScript
+  const baseKey = useMemo(() => scriptContentKey(baseScript), [baseScript]);
+  const [storedState, dispatch] = useReducer(
+    reducer,
+    { baseScript, baseKey },
+    (base) => initialState(base.baseScript, base.baseKey),
+  );
+  const state = storedState.baseKey === baseKey
     ? storedState
-    : initialState(baseScript);
+    : initialState(baseScript, baseKey);
 
   useEffect(() => {
-    if (storedState.baseScript !== baseScript) {
-      dispatch({ type: "sync", baseScript });
+    if (storedState.baseKey !== baseKey) {
+      dispatch({ type: "sync", baseScript, baseKey });
     }
-  }, [baseScript, storedState.baseScript]);
+  }, [baseKey, baseScript, storedState.baseKey]);
 
   const manifest = useMemo(
     () => deriveInteractionManifest(state.previewScript),
     [state.previewScript],
   );
-  const apply = useCallback((command: InteractionCommand) => {
-    dispatch({ type: "apply", baseScript, command });
-  }, [baseScript]);
-  const undo = useCallback(() => {
-    dispatch({ type: "undo", baseScript });
-  }, [baseScript]);
-  const reset = useCallback(() => {
-    dispatch({ type: "reset", baseScript });
-  }, [baseScript]);
+  const apply = (command: InteractionCommand) => {
+    dispatch({ type: "apply", baseScript, baseKey, command });
+  };
+  const undo = () => {
+    dispatch({ type: "undo", baseScript, baseKey });
+  };
+  const reset = () => {
+    dispatch({ type: "reset", baseScript, baseKey });
+  };
 
   return {
     previewScript: state.previewScript,
     manifest,
     events: state.events,
-    latestReplay: state.replays.at(-1) ?? null,
+    latestReplay: state.latestReplay,
     dirty: state.events.length > 0,
     canUndo: state.events.length > 0,
     lastError: state.lastError,

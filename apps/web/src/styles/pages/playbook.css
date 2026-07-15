@@ -845,6 +845,7 @@
   justify-content: flex-end;
 }
 
+.playbook-interaction__choice button:disabled,
 .playbook-interaction__actions button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
