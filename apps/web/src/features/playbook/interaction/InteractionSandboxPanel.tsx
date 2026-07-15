@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 import type {
-  InteractionBinding,
+  BfsInteractionBinding,
+  DerivativeInteractionBinding,
   InteractionCommand,
   InteractionEvent,
   InteractionManifest,
@@ -23,10 +24,10 @@ function RangeBinding({
   binding,
   onApply,
 }: {
-  binding: InteractionBinding;
+  binding: DerivativeInteractionBinding;
   onApply: (command: InteractionCommand) => void;
 }) {
-  const current = typeof binding.value === "number" ? binding.value : Number(binding.value ?? 0);
+  const current = binding.value;
   const [draft, setDraft] = useState(current);
 
   useEffect(() => {
@@ -74,7 +75,7 @@ function ChoiceBinding({
   binding,
   onApply,
 }: {
-  binding: InteractionBinding;
+  binding: BfsInteractionBinding;
   onApply: (command: InteractionCommand) => void;
 }) {
   return (
