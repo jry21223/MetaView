@@ -75,7 +75,8 @@ describe("useInteractionSandbox", () => {
   });
 
   it("keeps a rejected command out of the event history", () => {
-    const { result } = renderHook(() => useInteractionSandbox(script()));
+    const base = script();
+    const { result } = renderHook(() => useInteractionSandbox(base));
 
     act(() => result.current.apply({
       adapter_id: "math.derivative-tangent",
