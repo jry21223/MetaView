@@ -11,6 +11,7 @@ import type {
 
 interface InteractionSandboxState {
   baseScript: PlaybookScript;
+  committedScript: PlaybookScript;
   previewScript: PlaybookScript;
   commands: InteractionCommand[];
   events: InteractionEvent[];
@@ -20,6 +21,8 @@ interface InteractionSandboxState {
 
 type InteractionSandboxAction =
   | { type: "sync"; baseScript: PlaybookScript }
+  | { type: "preview"; baseScript: PlaybookScript; command: InteractionCommand }
+  | { type: "cancel-preview"; baseScript: PlaybookScript }
   | { type: "apply"; baseScript: PlaybookScript; command: InteractionCommand }
   | { type: "undo"; baseScript: PlaybookScript }
   | { type: "reset"; baseScript: PlaybookScript };
@@ -27,6 +30,7 @@ type InteractionSandboxAction =
 function initialState(baseScript: PlaybookScript): InteractionSandboxState {
   return {
     baseScript,
+    committedScript: baseScript,
     previewScript: baseScript,
     commands: [],
     events: [],
@@ -56,20 +60,21 @@ function replay(
   baseScript: PlaybookScript,
   commands: InteractionCommand[],
 ): InteractionSandboxState {
-  let previewScript = baseScript;
+  let committedScript = baseScript;
   const events: InteractionEvent[] = [];
   const replays: BfsInteractionReplay[] = [];
   try {
     commands.forEach((command, index) => {
-      const result = applyInteraction(previewScript, command, index + 1);
+      const result = applyInteraction(committedScript, command, index + 1);
       assertSameTimeline(baseScript, result.script);
-      previewScript = result.script;
+      committedScript = result.script;
       events.push(result.event);
       if (result.replay) replays.push(result.replay);
     });
     return {
       baseScript,
-      previewScript,
+      committedScript,
+      previewScript: committedScript,
       commands,
       events,
       replays,
@@ -97,16 +102,31 @@ function reducer(
   if (action.type === "undo") {
     return replay(action.baseScript, current.commands.slice(0, -1));
   }
+  if (action.type === "cancel-preview") {
+    return {
+      ...current,
+      previewScript: current.committedScript,
+      lastError: null,
+    };
+  }
 
   try {
     const result = applyInteraction(
-      current.previewScript,
+      current.committedScript,
       action.command,
       current.events.length + 1,
     );
     assertSameTimeline(action.baseScript, result.script);
+    if (action.type === "preview") {
+      return {
+        ...current,
+        previewScript: result.script,
+        lastError: null,
+      };
+    }
     return {
       ...current,
+      committedScript: result.script,
       previewScript: result.script,
       commands: [...current.commands, action.command],
       events: [...current.events, result.event],
@@ -116,6 +136,7 @@ function reducer(
   } catch (error) {
     return {
       ...current,
+      previewScript: current.committedScript,
       lastError: error instanceof Error ? error.message : "Interaction failed",
     };
   }
@@ -129,6 +150,8 @@ export interface InteractionSandbox {
   dirty: boolean;
   canUndo: boolean;
   lastError: string | null;
+  preview: (command: InteractionCommand) => void;
+  cancelPreview: () => void;
   apply: (command: InteractionCommand) => void;
   undo: () => void;
   reset: () => void;
@@ -150,6 +173,12 @@ export function useInteractionSandbox(baseScript: PlaybookScript): InteractionSa
     () => deriveInteractionManifest(state.previewScript),
     [state.previewScript],
   );
+  const preview = useCallback((command: InteractionCommand) => {
+    dispatch({ type: "preview", baseScript, command });
+  }, [baseScript]);
+  const cancelPreview = useCallback(() => {
+    dispatch({ type: "cancel-preview", baseScript });
+  }, [baseScript]);
   const apply = useCallback((command: InteractionCommand) => {
     dispatch({ type: "apply", baseScript, command });
   }, [baseScript]);
@@ -168,6 +197,8 @@ export function useInteractionSandbox(baseScript: PlaybookScript): InteractionSa
     dirty: state.events.length > 0,
     canUndo: state.events.length > 0,
     lastError: state.lastError,
+    preview,
+    cancelPreview,
     apply,
     undo,
     reset,
