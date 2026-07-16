@@ -152,7 +152,11 @@ describe("mobile web smoke", () => {
       expect(container.querySelector(".playbook-player__export-btn")).toBeTruthy();
       expect(container.querySelector(".playbook-player__mobile-more-btn")).toBeTruthy();
       expect(container.querySelectorAll(".playbook-player__mobile-tabs button")).toHaveLength(4);
-      expect(container.querySelector('[role="tab"][aria-label="参数"]')).toBeNull();
+      expect(
+        Array.from(container.querySelectorAll(".playbook-player__mobile-tabs button")).some(
+          (tab) => tab.textContent?.includes("参数"),
+        ),
+      ).toBe(false);
       expect(container.querySelector(".playbook-player__console")).toBeNull();
     },
   );
