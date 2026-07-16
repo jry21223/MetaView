@@ -29,18 +29,6 @@ MetaView 是一个面向教育场景的 AI 可视化讲解平台。它把题目�
 
 支持七个教学领域：`algorithm`、`math`、`code`、`physics`、`chemistry`、`biology`、`geography`。这表示管线和专用渲染能力覆盖这些领域，并不表示其中任意题目都达到同一质量等级；实际请求会由 CoverageResolver 判定为 `specialized`、`composable`、`experimental` 或 `unsupported`。
 
-## 真实渲染结果
-
-以下画面来自仓库 Visual Check 实际生成的 Remotion/renderer 帧，不是设计稿或概念图。
-
-| 导数与切线 | BFS 遍历 |
-|---|---|
-| ![导数与切线的函数图像、切点和切线](docs/screenshots/derivative-tangent.png) | ![BFS 图遍历及队列状态](docs/screenshots/bfs-graph.png) |
-
-递归调用栈与代码轨道：
-
-![递归调用栈与 Python 执行行](docs/screenshots/recursion-stack.png)
-
 ## 交互式学习工作台
 
 MetaView 不是纯线性视频播放器。参数面板、Code Sync 和 Follow-up 构成三条协同的交互轨道：参数面板改变确定性状态，Code Sync 解释执行过程，Follow-up 负责教学问答或对讲解版本做受控修改。
