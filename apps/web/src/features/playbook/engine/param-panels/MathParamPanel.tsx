@@ -22,6 +22,27 @@ function sliderRange(initial: number): { min: number; max: number; step: number 
   return { min, max, step };
 }
 
+export function resolveEditableMathControls(
+  script: ParamPanelProps["script"],
+): NumericControl[] {
+  const controls: NumericControl[] = [];
+  // Older playbooks (pre-execution_map) may serialize without
+  // parameter_controls at all. Invalid or non-numeric controls are not
+  // editable and therefore must not make the Params surface visible.
+  for (const control of script.parameter_controls ?? []) {
+    const initial = parseNumber(control.value);
+    if (initial == null || !PARAM_ID_RE.test(control.id)) continue;
+    controls.push({ control, initial });
+  }
+  return controls;
+}
+
+export function hasEditableMathParams(
+  script: ParamPanelProps["script"],
+): boolean {
+  return resolveEditableMathControls(script).length > 0;
+}
+
 export function MathParamPanel({
   script,
   overrides,
@@ -30,19 +51,10 @@ export function MathParamPanel({
 }: ParamPanelProps): React.JSX.Element {
   const theme = isDark ? "dark" : "light";
 
-  const numericControls = useMemo<NumericControl[]>(() => {
-    const controls: NumericControl[] = [];
-    // Older playbooks (pre-execution_map) may serialize without
-    // parameter_controls at all — treat missing array as empty so we render
-    // the "no editable params" placeholder instead of throwing.
-    const list = script.parameter_controls ?? [];
-    for (const control of list) {
-      const initial = parseNumber(control.value);
-      if (initial == null || !PARAM_ID_RE.test(control.id)) continue;
-      controls.push({ control, initial });
-    }
-    return controls;
-  }, [script.parameter_controls]);
+  const numericControls = useMemo(
+    () => resolveEditableMathControls(script),
+    [script.parameter_controls],
+  );
 
   const setScriptParam = (key: string, value: number): void => {
     onOverridesChange({
