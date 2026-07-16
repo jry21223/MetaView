@@ -151,7 +151,8 @@ describe("mobile web smoke", () => {
       );
       expect(container.querySelector(".playbook-player__export-btn")).toBeTruthy();
       expect(container.querySelector(".playbook-player__mobile-more-btn")).toBeTruthy();
-      expect(container.querySelectorAll(".playbook-player__mobile-tabs button")).toHaveLength(5);
+      expect(container.querySelectorAll(".playbook-player__mobile-tabs button")).toHaveLength(4);
+      expect(container.querySelector('[role="tab"][aria-label="参数"]')).toBeNull();
       expect(container.querySelector(".playbook-player__console")).toBeNull();
     },
   );
