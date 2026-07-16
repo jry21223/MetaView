@@ -11,11 +11,11 @@ MetaView 是一个面向教育场景的 AI 可视化讲解平台。它把题目�
 
 二者最终统一进入 Remotion 播放器和导出链路。项目不使用 Manim、HTML iframe 或服务端 HTML 录屏作为另一套渲染出口。
 
-> 当前状态：Beta。开发入口请先读 [`docs/START_HERE.md`](docs/START_HERE.md)。本 README 以默认分支为发布基线；已在 Draft PR 或本地分支完成但尚未合并的能力会单独标出，避免把“代码已写完”“已进入 main”和“已上线”混为一谈。
+开发入口请先读 [`docs/START_HERE.md`](docs/START_HERE.md)。
 
-## 产品现在可以做什么
+## 产品能力
 
-| 环节 | 默认分支已有能力 |
+| 环节 | 能力 |
 |---|---|
 | 输入 | 输入题目或知识点、粘贴代码、上传一个不超过 256 KB 的受支持代码文件 |
 | 理解与规划 | 后端路由学科与主题，生成 `CoverageDecision` 和 renderer-independent `LessonPlan` |
@@ -27,25 +27,20 @@ MetaView 是一个面向教育场景的 AI 可视化讲解平台。它把题目�
 | 质量控制 | Agent 轻量自检、后端 canonical `QualityReport`、资产审计、视觉基线和 Benchmark V2 |
 | 导出 | 与播放器共用渲染器的 Remotion 视频导出；无音轨导出为稳定路径 |
 
-当前支持七个教学领域：`algorithm`、`math`、`code`、`physics`、`chemistry`、`biology`、`geography`。这表示管线和专用渲染能力覆盖这些领域，并不表示其中任意题目都已达到同一质量等级；实际请求会由 CoverageResolver 判定为 `specialized`、`composable`、`experimental` 或 `unsupported`。
+支持七个教学领域：`algorithm`、`math`、`code`、`physics`、`chemistry`、`biology`、`geography`。这表示管线和专用渲染能力覆盖这些领域，并不表示其中任意题目都达到同一质量等级；实际请求会由 CoverageResolver 判定为 `specialized`、`composable`、`experimental` 或 `unsupported`。
 
-## 交互能力：`main` 今天已有 vs Draft interaction stack
+## 交互式学习工作台
 
-MetaView 已经不是纯线性视频播放器，但“完整双向教学交互引擎”仍在分阶段建设。
+MetaView 不是纯线性视频播放器。参数面板、Code Sync 和 Follow-up 构成三条协同的交互轨道：参数面板改变确定性状态，Code Sync 解释执行过程，Follow-up 负责教学问答或对讲解版本做受控修改。
 
-| 能力 | `main` 当前状态 | 边界 |
+| 模块 | 能力 | 边界 |
 |---|---|---|
-| 步进控制 | 已实现 | 可按步骤前进、后退或直接跳转，移动端同样可用 |
-| 数学参数面板 | 已实现 | 读取 `PlaybookScript.parameter_controls`，通过滑块或数字输入实时覆盖参数 |
-| 算法参数面板 | 已实现 | 支持 `merge_sort`、`bubble_sort`、`quick_sort`、`selection_sort`、`insertion_sort` 修改数组并 replay |
-| Code Sync | 已实现 | 支持 JS/TS、Python、Java、Go、C/C++、Rust；显示活动行、操作标签和变量变化 |
-| Follow-up 修改 | 已实现 | 追问可返回纯文字，也可生成受约束 patch；patch 通过质量门后才成为新版本 |
-| 版本恢复 | 已实现 | 保存 initial / follow-up / restore 版本，恢复时同步 Playbook 与 Director |
-| 元素点击选择 | 尚未进入 `main` | Issue [#110](https://github.com/jry21223/MetaView/issues/110) |
-| 直接拖拽与交互沙箱 | Draft PR，未合并 | PR [#128](https://github.com/jry21223/MetaView/pull/128)–[#133](https://github.com/jry21223/MetaView/pull/133)；不能作为当前发布能力宣传 |
-| AI 感知点击/拖拽历史 | 尚未进入 `main` | Issue [#112](https://github.com/jry21223/MetaView/issues/112) |
-
-参数面板、Code Sync 和 Follow-up 是三条不同但协同的交互轨道：参数面板改变确定性状态，Code Sync 解释执行过程，Follow-up 负责教学问答或对讲解版本做受控修改。
+| 步进控制 | 按步骤前进、后退或直接跳转 | 桌面与移动布局共用同一时间线 |
+| 数学参数面板 | 读取 `PlaybookScript.parameter_controls`，通过滑块或数字输入实时覆盖参数 | 参数变化只影响受控字段 |
+| 算法参数面板 | 修改输入数组并确定性重放排序过程 | 支持 `merge_sort`、`bubble_sort`、`quick_sort`、`selection_sort`、`insertion_sort` |
+| Code Sync | 同步显示代码、活动行、操作标签和变量变化 | 支持 JS/TS、Python、Java、Go、C/C++、Rust |
+| Follow-up | 返回解释，或对 Playbook 生成受约束修改 | 修改必须通过质量门 |
+| 版本记录 | 保存 initial / follow-up / restore 版本并恢复历史状态 | 恢复时同步 Playbook 与 Director |
 
 ## Follow-up 不是普通聊天框
 
@@ -104,12 +99,12 @@ User input
 
 ### 两种生成模式
 
-| 模式 | 用途 | 当前定位 |
+| 模式 | 工作方式 | 适用场景 |
 |---|---|---|
-| `single` | LLM 生成 CIR + ExecutionMap，再构建 Playbook | 默认稳定/回滚路径 |
-| `agent` | Agent 调用 RuntimeToolHub、动画工具和绘图工具生成 Playbook | 活跃验证路径，不是默认生产承诺 |
+| `single` | LLM 生成 CIR + ExecutionMap，再构建 Playbook | 直接、可回滚的生成链路 |
+| `agent` | Agent 调用 RuntimeToolHub、动画工具和绘图工具生成 Playbook | 需要工具编排和确定性能力组合的内容 |
 
-Agent runtime 已合入默认分支。它可以列出和执行 deterministic SkillPack、SceneBlueprint compiler、schema/self-check、几何断言和动画工具；但 Agent 的自检只是前置检查，最终成功语义仍由 API 后端的 `QualityReport` 决定。
+Agent runtime 可以列出和执行 deterministic SkillPack、SceneBlueprint compiler、schema/self-check、几何断言和动画工具；但 Agent 的自检只是前置检查，最终成功语义仍由 API 后端的 `QualityReport` 决定。
 
 ## 质量门、Benchmark 与资产治理
 
@@ -142,7 +137,7 @@ make eval-gold
 make eval-gold LIVE=1 API=http://localhost:8000 REPEAT=3
 ```
 
-仓库当前文档把 checked-in legacy fixtures 定义为负迁移证据，不能仅凭结构分数宣传为“已验证成品”。发布声明应以真实生成的独立重复运行和本地 `eval/reports/` 证据为准。
+Checked-in fixtures 用于回归和迁移验证，不作为发布质量证据。发布验收应基于真实生成的独立重复运行和 `eval/reports/` 证据。
 
 ### 资产与 showcase
 
@@ -154,23 +149,20 @@ make eval-gold LIVE=1 API=http://localhost:8000 REPEAT=3
 
 内部 showcase 已覆盖地理季风、抛体运动、细胞/DNA、分子/化学反应、导数曲线、BFS、递归和代码追踪等结构化 fixture。它们是渲染器与资产质量证据，不等于已经发布给教师的公共成品案例。
 
-## 模板与教师展示案例
+## 模板与内部 Showcase
 
-必须区分三类内容：
+| 类型 | 用途 |
+|---|---|
+| `/templates` | 搜索和筛选 prompt 起点，点击后发起新的生成 |
+| `/asset-showcase` 与 fixture matrix | 验证 renderer、SceneBlueprint、资产包和视觉基线 |
 
-| 类型 | 当前状态 | 含义 |
-|---|---|---|
-| `/templates` | 已实现 | 搜索和筛选 prompt 起点，点击后发起新的生成 |
-| `/asset-showcase` 与 fixture matrix | 已实现，偏内部验收 | 验证 renderer、SceneBlueprint、资产包和视觉基线 |
-| 匿名教师成品案例 `/cases/...` | 本地实现完成，尚未推送或进入 `main` | 应是冻结、审阅、版本化、无需模型调用即可播放的成品 |
-
-第一份教师成品案例“定积分与曲线下面积”已在本地分支 `codex/teacher-integral-case` 完成，包含 6 个同步步骤、只读播放器、同源 Remotion 海报、匿名路由与隐私/哈希校验；验证记录见 Issue [#134](https://github.com/jry21223/MetaView/issues/134)。但该分支尚未推送、没有 PR，也未进入默认分支，因此当前仍不能把 prompt 模板页、内部 fixture 或本地实现称为已经上线的教师成品案例。
+模板是生成起点；showcase fixture 是渲染器和资产的回归证据。两者都不应被当作真实生成质量的替代证明。
 
 ## Edition 与访问边界
 
 前后端 edition 必须一致：`METAVIEW_APP_EDITION` 与 `VITE_APP_EDITION` 都设为 `self` 或都设为 `ops`。
 
-| 能力 | `self` | `ops`（默认分支当前行为） |
+| 能力 | `self` | `ops` |
 |---|---|---|
 | 公共 Landing `/` | 可访问 | 可访问 |
 | 应用工作台 | 无账户体系 | 微信登录后访问 |
@@ -179,8 +171,6 @@ make eval-gold LIVE=1 API=http://localhost:8000 REPEAT=3
 | 余额/充值/账户 | 不显示 | 登录后启用 |
 | 运行历史 | 本地 SQLite | 按微信账户隔离 |
 | 管理后台 | 不可用 | `/admin`，仍需 `role=admin` |
-
-运营版“游客配置 BYOK 后免登录生成”已在本地分支 `codex/ops-guest-byok` 完成，并覆盖 guest-session 隔离、跨游客拒绝、无平台扣费、凭据不落库、SSRF/重定向/响应体限制与 OAuth 绑定回归；验证记录见 Issue [#135](https://github.com/jry21223/MetaView/issues/135)。但该分支尚未推送、没有 PR，也未进入默认分支，因此默认分支当前仍维持登录门和平台托管模型行为，不能宣传为已上线。
 
 ## 快速开始
 
@@ -286,17 +276,14 @@ make stop
 
 后端遵循 Clean Architecture；前端采用 Feature-Sliced Design。新增 snapshot renderer 时必须同时更新后端判别联合、前端类型、renderer registry、质量契约和跨运行时一致性测试。
 
-## 当前限制与已知边界
+## 已知边界
 
 - 首发附件只支持文本和代码文件；图片、截图、PDF、PPT/课件和任意附件尚不支持生成。
-- `single` 仍是默认路径；Agent mode 需要按 [`docs/agent-demo-acceptance.md`](docs/agent-demo-acceptance.md) 独立验收。
-- CoverageResolver 的受控 profile 仍有限，严格 fail-closed 的 rollout 风险跟踪在 Issue [#120](https://github.com/jry21223/MetaView/issues/120)。
-- 公共 `/cases` 教师成品、匿名只读播放和 promotion artifact 已在本地分支完成首例，但尚未推送、评审、合并或上线。
-- 运营版游客 BYOK 已在本地分支完成并通过测试，但尚未推送、评审、合并或上线；默认分支仍由登录门与后端 edition policy 拦截。
-- 点击选择、拖拽、直接操作画布和 InteractionLog → AI 尚未进入默认分支。
+- Agent mode 需要按 [`docs/agent-demo-acceptance.md`](docs/agent-demo-acceptance.md) 独立验收。
+- CoverageResolver 只对受控 profile 提供专用或可组合能力，无法可靠覆盖的请求会降级或拒绝。
+- 学习工作台围绕步进、参数、Code Sync 和 Follow-up 设计，不是通用自由画布编辑器。
 - 有音轨视频导出仍为 beta；无法保证音频时序时应使用稳定的 silent export。
-- 化学分子路径依赖 RDKit 的生产安全处理仍有未合并工作；部署前应确认依赖策略。
-- 播放器重构后的完整 E2E/集成测试仍有补强空间，见 Issue [#102](https://github.com/jry21223/MetaView/issues/102)。
+- 化学分子路径在生产部署中依赖 RDKit；部署前应确认依赖和隔离策略。
 
 ## 文档索引
 
