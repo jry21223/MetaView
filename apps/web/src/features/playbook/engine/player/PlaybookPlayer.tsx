@@ -15,6 +15,7 @@ import { CodeHighlightRenderer } from "../renderers/CodeHighlightRenderer";
 import { domainCapability } from "../domainCapabilities";
 import { getParamPanel } from "../param-panels/registry";
 import { hasReplayableAlgorithmParams } from "../param-panels/AlgorithmParamPanel";
+import { hasEditableMathParams } from "../param-panels/MathParamPanel";
 import { resolveDirectorVoiceover } from "../director";
 import { emitNativeEvent } from "../../../../shared/native/emitNativeEvent";
 import { MobileSheet } from "./MobileSheet";
@@ -104,8 +105,17 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     if (baseScript.domain === "algorithm") {
       return hasReplayableAlgorithmParams(baseScript);
     }
+    if (baseScript.domain === "math") {
+      return hasEditableMathParams(baseScript);
+    }
     return true;
   }, [baseScript]);
+
+  useEffect(() => {
+    if (hasDomainPanel) return;
+    if (mobileTab === "params") setMobileTab("narration");
+    if (mobileSheet === "params") setMobileSheet(null);
+  }, [hasDomainPanel, mobileSheet, mobileTab]);
   const initialPreviewFrame = useMemo(() => resolveInitialPreviewFrame(script), [script]);
   const playerTimelineKey = useMemo(() => resolvePlayerTimelineKey(baseScript), [baseScript]);
 
@@ -263,7 +273,9 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     currentNarrationFallback,
   );
   const showMobileConsole = isPortraitLayout && showLearningConsole;
-  const showStageSubtitles = !(showMobileConsole && mobileTab === "narration");
+  const effectiveMobileTab =
+    mobileTab === "params" && !hasDomainPanel ? "narration" : mobileTab;
+  const showStageSubtitles = !(showMobileConsole && effectiveMobileTab === "narration");
   const mobileSheetTitle =
     mobileSheet === "code"
       ? "全部代码"
@@ -461,7 +473,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
           stageSlot={stageSlot}
           controlsSlot={controlsSlot}
           showMobileConsole={showMobileConsole}
-          activeTab={mobileTab}
+          activeTab={effectiveMobileTab}
           onSelectTab={selectMobileTab}
           onOpenSheet={openMobileSheet}
           mobileCodeOverlay={mobileCodeOverlay}
