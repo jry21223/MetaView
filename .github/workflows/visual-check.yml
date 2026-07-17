@@ -1,0 +1,58 @@
+name: Visual Check
+
+on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "apps/web/public/assets/**"
+      - "apps/web/scripts/**"
+      - "apps/web/src/features/playbook/engine/assets/**"
+      - "apps/web/src/features/playbook/engine/composition/**"
+      - "apps/web/src/features/playbook/engine/renderers/**"
+      - "apps/web/src/remotion/**"
+      - "eval/**"
+      - "Makefile"
+      - "package.json"
+      - "package-lock.json"
+      - "apps/web/package.json"
+      - ".github/workflows/visual-check.yml"
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  visual-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Ensure Remotion browser
+        run: npx remotion browser ensure
+
+      - name: Run visual regression gate
+        run: make visual-check
+
+      - name: Upload visual review evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-check-${{ github.run_id }}
+          path: |
+            eval/reports/
+            eval/shots/
+          if-no-files-found: ignore
+          retention-days: 14
