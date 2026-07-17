@@ -35,10 +35,15 @@ vi.mock("@remotion/player", async () => {
       }));
       const snapshot = props.inputProps?.script?.steps[0]?.snapshot;
       const markerX = snapshot?.kind === "math_plot" ? snapshot.marker_x : undefined;
+      const arrayValues =
+        snapshot?.kind === "algorithm_array" || snapshot?.kind === "algorithm_bars"
+          ? snapshot.array_values.join(",")
+          : undefined;
       return (
         <div
           data-testid="mock-remotion-player"
           data-marker-x={markerX}
+          data-array-values={arrayValues}
           data-show-subtitles={String(props.inputProps?.showSubtitles)}
           data-show-inline-code={String(props.inputProps?.showInlineCode)}
         />
