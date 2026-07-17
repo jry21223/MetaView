@@ -10,7 +10,9 @@ export interface EditableMathControl {
 }
 
 function parseNumber(value: string): number | null {
-  const parsed = Number(value.trim());
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return null;
+  const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : null;
 }
 
