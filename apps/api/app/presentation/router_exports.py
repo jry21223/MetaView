@@ -19,6 +19,9 @@ from app.presentation.dependencies import get_export_repo, get_run_director_repo
 from app.presentation.rate_limit import read_limit, write_limit
 
 router = APIRouter(prefix="/exports", tags=["exports"])
+_MISSING_ASSET_REPORT_WARNING = (
+    "asset_report metadata was not provided; export will not include an asset attribution sidecar"
+)
 
 _DOWNLOAD_MEDIA_TYPES = {
     ".mp4": "video/mp4",
@@ -37,8 +40,11 @@ def _resolve_path(raw: str) -> Path:
 
 def _to_response(job: ExportJob, request: Request, api_prefix: str) -> ExportJobResponse:
     output_url: str | None = None
+    asset_report_url: str | None = None
     if job.status == ExportJobStatus.COMPLETED and job.output_path:
         output_url = f"{api_prefix}/exports/{job.job_id}/download"
+    if job.status == ExportJobStatus.COMPLETED and job.asset_report_path:
+        asset_report_url = f"{api_prefix}/exports/{job.job_id}/asset-report"
     return ExportJobResponse(
         job_id=job.job_id,
         run_id=job.run_id,
@@ -46,6 +52,8 @@ def _to_response(job: ExportJob, request: Request, api_prefix: str) -> ExportJob
         progress=job.progress,
         message=job.message,
         output_url=output_url,
+        asset_report_url=asset_report_url,
+        asset_report_warning=job.asset_report_warning,
         error=job.error,
         with_audio=job.with_audio,
         created_at=job.created_at,
@@ -83,6 +91,10 @@ async def submit_export(
         job_id=job_id,
         run_id=payload.run_id,
         with_audio=payload.with_audio,
+        asset_report=payload.asset_report,
+        asset_report_warning=(
+            _MISSING_ASSET_REPORT_WARNING if payload.asset_report is None else None
+        ),
         created_at=datetime.now(timezone.utc).isoformat(),
     )
     await export_repo.create(job)
@@ -140,4 +152,26 @@ async def download_export(
         path,
         media_type=_DOWNLOAD_MEDIA_TYPES.get(suffix, "application/octet-stream"),
         filename=f"metaview-{job.run_id[:8]}{suffix}",
+    )
+
+
+@router.get("/{job_id}/asset-report")
+@read_limit()
+async def download_asset_report(
+    request: Request,
+    job_id: str,
+    export_repo: Annotated[IExportJobRepository, Depends(get_export_repo)],
+) -> FileResponse:
+    job = await export_repo.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Export {job_id!r} not found")
+    if job.status != ExportJobStatus.COMPLETED or not job.asset_report_path:
+        raise HTTPException(status_code=409, detail="asset report not available")
+    path = Path(job.asset_report_path)
+    if not path.exists():
+        raise HTTPException(status_code=410, detail="asset report file missing")
+    return FileResponse(
+        path,
+        media_type="application/json",
+        filename=f"metaview-{job.run_id[:8]}-asset-report.json",
     )

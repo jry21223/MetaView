@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "derivative-tangent-contract",
+  "sceneTemplate": "derivative_tangent",
+  "rendererKind": "math_plot",
+  "packId": "math-basic",
+  "requiredAssetIds": ["derivative-tangent-preset"],
+  "requiredSemanticRoles": ["plot", "tangent"],
+  "caption": "Derivative tangent plots must render through the derivative tangent structured preset."
+}

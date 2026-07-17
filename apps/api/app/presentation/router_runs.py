@@ -27,6 +27,7 @@ from app.config import Settings, get_settings
 from app.domain.models.account import SessionAccount
 from app.domain.models.playbook import PlaybookScript
 from app.domain.services.director_builder import build_default_director
+from app.domain.services.playbook_quality import quality_gate_playbook
 from app.infrastructure.llm.openai_provider import OpenAIProvider
 from app.presentation.dependencies import (
     get_account_use_case,
@@ -121,8 +122,7 @@ async def submit_followup(
         raise HTTPException(
             status_code=503,
             detail=(
-                "Follow-up LLM not configured: set METAVIEW_OPENAI_API_KEY "
-                "or configure Provider"
+                "Follow-up LLM not configured: set METAVIEW_OPENAI_API_KEY or configure Provider"
             ),
         )
 
@@ -131,9 +131,7 @@ async def submit_followup(
         owner_user_id = owner.account.user_id if owner is not None else None
         run = await run_repo.get(run_id, user_id=owner_user_id)
         if run is None or run.playbook is None:
-            raise HTTPException(
-                status_code=404, detail=f"Run {run_id!r} has no playbook"
-            )
+            raise HTTPException(status_code=404, detail=f"Run {run_id!r} has no playbook")
         base_playbook = run.playbook
         parent_version_id = payload.base_version_id
         if payload.base_version_id:
@@ -169,6 +167,35 @@ async def submit_followup(
             except FollowUpPatchError as exc:
                 raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+            next_quality = None
+            if result.playbook is not None:
+                next_quality = quality_gate_playbook(
+                    result.playbook,
+                    run.prompt,
+                    generator_path="followup_patch",
+                    coverage_decision=getattr(run, "coverage_decision", None),
+                    lesson_plan=getattr(run, "lesson_plan", None),
+                    coverage_mode=(
+                        run.coverage_decision.mode
+                        if getattr(run, "coverage_decision", None) is not None
+                        else (
+                            run.quality_report.coverage_mode
+                            if run.quality_report is not None
+                            else "unknown"
+                        )
+                    ),
+                )
+                next_quality.actions = [
+                    *(run.quality_report.actions if run.quality_report is not None else []),
+                    "followup:quality_gate",
+                ]
+                if next_quality.status in {"repairable", "blocked"}:
+                    codes = ", ".join(issue.code for issue in next_quality.issues[:5])
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"Follow-up failed the canonical quality gate: {codes}",
+                    )
+
             now = _now()
             patch_json = json.dumps(result.patch, ensure_ascii=False)
             await run_repo.append_followup(
@@ -200,9 +227,14 @@ async def submit_followup(
                     created_at=now,
                 )
                 await run_repo.attach_followup_version(followup_id, version_id)
-                await run_repo.update_playbook_json(run_id, next_json)
                 director = build_default_director(result.playbook, run_id)
                 await director_repo.upsert(director, now)
+                await run_repo.update_playbook_json(run_id, next_json)
+                assert next_quality is not None
+                await run_repo.update_quality_report(
+                    run_id,
+                    next_quality.model_dump_json(),
+                )
         except Exception:
             if owner is not None:
                 await account_use_case.refund_generation_credit(
@@ -241,17 +273,42 @@ async def restore_version(
             raise HTTPException(status_code=404, detail=f"Run {run_id!r} not found")
         playbook_json = await run_repo.get_version_playbook(run_id, version_id)
         if playbook_json is None:
-            raise HTTPException(
-                status_code=404, detail=f"Version {version_id!r} not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Version {version_id!r} not found")
         try:
             playbook = PlaybookScript.model_validate_json(playbook_json)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail="Stored version is invalid") from exc
+        quality_report = quality_gate_playbook(
+            playbook,
+            run.prompt,
+            generator_path="version_restore",
+            coverage_decision=getattr(run, "coverage_decision", None),
+            lesson_plan=getattr(run, "lesson_plan", None),
+            coverage_mode=(
+                run.coverage_decision.mode
+                if getattr(run, "coverage_decision", None) is not None
+                else (
+                    run.quality_report.coverage_mode
+                    if run.quality_report is not None
+                    else "unknown"
+                )
+            ),
+        )
+        quality_report.actions = [
+            *(run.quality_report.actions if run.quality_report is not None else []),
+            "version:restore_quality_gate",
+        ]
+        if quality_report.status in {"repairable", "blocked"}:
+            codes = ", ".join(issue.code for issue in quality_report.issues[:5])
+            raise HTTPException(
+                status_code=422,
+                detail=f"Stored version failed the canonical quality gate: {codes}",
+            )
         now = _now()
-        await run_repo.update_playbook_json(run_id, playbook.model_dump_json())
         director = build_default_director(playbook, run_id)
         await director_repo.upsert(director, now)
+        await run_repo.update_playbook_json(run_id, playbook.model_dump_json())
+        await run_repo.update_quality_report(run_id, quality_report.model_dump_json())
 
     return RestoreVersionResponse(
         version_id=version_id,

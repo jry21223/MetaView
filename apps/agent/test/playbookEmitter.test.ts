@@ -75,6 +75,48 @@ describe("PlaybookEmitter — finalize", () => {
     expect(step).not.toHaveProperty("id");
   });
 
+  it("allocates longer end_frame for longer Chinese narration", () => {
+    const e = new PlaybookEmitter();
+    e.beginStep(1, "短旁白");
+    e.setNarration(["这是一个短的中文旁白。"]);
+    e.commitStep();
+    e.beginStep(2, "长旁白");
+    e.setNarration(["这是一段较长的中文旁白，用于验证字幕节奏会随文本增长自动变长。".repeat(3)]);
+    e.commitStep();
+
+    const out = e.finalize();
+    const firstDuration = out.steps[0].end_frame;
+    const secondDuration = out.steps[1].end_frame - out.steps[0].end_frame;
+
+    expect(secondDuration).toBeGreaterThan(firstDuration);
+  });
+
+  it("uses DEFAULT_STEP_FRAMES for steps with empty voiceover_text", () => {
+    const e = new PlaybookEmitter();
+    e.beginStep(1, "empty step");
+    e.commitStep();
+    const out = e.finalize();
+
+    expect(out.steps[0].end_frame).toBe(120);
+  });
+
+  it("uses per-step estimated narration durations and sets total_frames to the final end_frame", () => {
+    const e = new PlaybookEmitter();
+    e.beginStep(1, "short");
+    e.setNarration(["短字幕"]);
+    e.commitStep();
+    e.beginStep(2, "long");
+    e.setNarration(["这是一个更长的中文旁白，用于测试每步时间会被拉伸以匹配语音时长。".repeat(4)]);
+    e.commitStep();
+    e.beginStep(3, "empty");
+    e.commitStep();
+    const out = e.finalize();
+
+    expect(out.total_frames).toBe(out.steps.at(-1)!.end_frame);
+    expect(out.steps[1].end_frame).toBeGreaterThan(out.steps[0].end_frame);
+    expect(out.steps[2].end_frame - out.steps[1].end_frame).toBe(120);
+  });
+
   it("never emits a vector_field field on any snapshot", () => {
     const e = new PlaybookEmitter();
     e.setOutline("math", ["a"]);

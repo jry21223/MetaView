@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "water-molecule-contract",
+  "moleculeId": "water",
+  "assetId": "water-molecule-preset",
+  "sourceAssetId": "water-molecule-preset",
+  "smiles": "O",
+  "formula": "H2O",
+  "formulaLatex": "H_2O",
+  "elementCounts": {
+    "H": 2,
+    "O": 1
+  },
+  "minBondCount": 2
+}

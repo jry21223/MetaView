@@ -1,3 +1,5 @@
+from app.application.services.lesson_planner import build_rule_based_lesson_plan
+from app.domain.models.coverage import CoverageDecision
 from app.domain.models.topic import TopicDomain
 from app.domain.services.cir_prompt import build_cir_prompt
 from app.domain.services.domain_router import SkillMode
@@ -13,6 +15,35 @@ def test_user_prompt_equals_original_input() -> None:
     prompt = "请可视化二分查找"
     _, user = build_cir_prompt(prompt, TopicDomain.ALGORITHM)
     assert user == prompt
+
+
+def test_source_code_with_unknown_language_is_not_labeled_python() -> None:
+    system, _ = build_cir_prompt(
+        "解释这段代码",
+        TopicDomain.CODE,
+        source_code="custom syntax",
+        language=None,
+    )
+
+    assert "provided source code in `unknown`" in system
+    assert "provided source code in `python`" not in system
+
+
+def test_canonical_lesson_plan_guides_cir_without_changing_user_prompt() -> None:
+    prompt = "用 BFS 解释广度优先遍历为什么需要队列"
+    lesson_plan = build_rule_based_lesson_plan(prompt=prompt, domain="algorithm")
+
+    system, user = build_cir_prompt(
+        prompt,
+        TopicDomain.ALGORITHM,
+        lesson_plan=lesson_plan,
+    )
+
+    assert user == prompt
+    assert "Canonical LessonPlan" in system
+    assert '"preferred_scene_type": "bfs_graph"' in system
+    assert '"required_fact_ids"' in system
+    assert "Do not copy LessonPlan into renderer payloads" in system
 
 
 def test_system_prompt_contains_domain_hint() -> None:
@@ -106,6 +137,30 @@ def test_build_cir_prompt_generic_mode_has_no_domain_specific_guidance() -> None
     assert "No confident subject-specific skill was matched" in system
     assert "VISUAL + PEDAGOGY RULES for algorithms" not in system
     assert "VISUAL + PEDAGOGY RULES for physics" not in system
+
+
+def test_build_cir_prompt_includes_binding_coverage_boundary() -> None:
+    coverage = CoverageDecision(
+        mode="experimental",
+        domain="physics",
+        confidence=0.62,
+        matched_skill_ids=[],
+        available_tool_ids=["scene_blueprint.compile"],
+        missing_capabilities=["validator:physics.circuit"],
+        fallback_policy="text_only",
+        reason="Circuit facts cannot be validated by the current runtime.",
+    )
+
+    system, _ = build_cir_prompt(
+        "解释基尔霍夫定律",
+        TopicDomain.PHYSICS,
+        coverage_decision=coverage,
+    )
+
+    assert "Canonical CoverageDecision" in system
+    assert "BINDING CAPABILITY BOUNDARY" in system
+    assert "validator:physics.circuit" in system
+    assert "does not authorize invented outputs" in system
 
 
 def test_build_cir_prompt_specialized_mode_keeps_domain_guidance() -> None:

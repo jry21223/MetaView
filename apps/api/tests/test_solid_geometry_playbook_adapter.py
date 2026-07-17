@@ -22,6 +22,7 @@ def test_solid_geometry_solution_maps_to_consistent_playbook() -> None:
     assert len(playbook.steps) >= 5
     final_step = playbook.steps[-1]
     assert solution.answer_latex in final_step.voiceover_text
+    assert "线面角" in final_step.voiceover_text
     assert final_step.snapshot.kind == "solid_geometry_scene"
     assert isinstance(final_step.snapshot, SolidGeometrySceneSnapshot)
     assert final_step.snapshot.formula_latex == solution.answer_latex

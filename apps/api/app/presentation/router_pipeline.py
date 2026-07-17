@@ -9,6 +9,7 @@ from starlette.requests import Request
 
 from app.application.dto.pipeline_dto import PipelineRequest, PipelineRunResponse
 from app.application.ports.agent_provider import IAgentProvider
+from app.application.ports.coverage_resolver import ICoverageResolver
 from app.application.ports.director_repository import IRunDirectorRepository
 from app.application.ports.llm_provider import ILLMProvider
 from app.application.ports.router_provider import IRouterProvider
@@ -23,6 +24,7 @@ from app.infrastructure.router.llm_router_provider import LLMRouterProvider
 from app.presentation.dependencies import (
     get_account_use_case,
     get_agent_provider,
+    get_coverage_resolver,
     get_llm_provider,
     get_reviewer_llm_provider,
     get_router_provider,
@@ -48,10 +50,20 @@ async def submit_pipeline(
     reviewer_llm: Annotated[ILLMProvider | None, Depends(get_reviewer_llm_provider)],
     router_provider: Annotated[IRouterProvider | None, Depends(get_router_provider)],
     agent_provider: Annotated[IAgentProvider | None, Depends(get_agent_provider)],
+    coverage_resolver: Annotated[ICoverageResolver, Depends(get_coverage_resolver)],
     account_use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
 ) -> PipelineRunResponse:
     run_id = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
+    router_min_confidence = (
+        payload.router_min_confidence
+        if payload.router_min_confidence is not None
+        else settings.router_min_confidence
+    )
+    router_refine_confidence = min(
+        settings.router_refine_confidence,
+        router_min_confidence,
+    )
     owner_user_id: str | None = None
     owner_session: SessionAccount | None = None
     consume_ledger_id: str | None = None
@@ -127,8 +139,11 @@ async def submit_pipeline(
         director_repo=director_repo,
         router_provider=effective_router,
         router_mode=router_mode,
-        router_min_confidence=payload.router_min_confidence or settings.router_min_confidence,
-        router_refine_confidence=settings.router_refine_confidence,
+        router_min_confidence=router_min_confidence,
+        router_refine_confidence=router_refine_confidence,
+        coverage_resolver=(
+            coverage_resolver if payload.router_min_confidence is None else None
+        ),
     )
     background_tasks.add_task(
         _execute_pipeline_with_optional_refund,

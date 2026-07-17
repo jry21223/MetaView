@@ -16,6 +16,7 @@ def test_default_options_match_historical_behaviour() -> None:
     assert opts.quality == "1080p"
     assert opts.fps == 30
     assert opts.format == "mp4"
+    assert opts.theme == "light"
 
 
 def test_export_request_accepts_explicit_options() -> None:
@@ -23,13 +24,19 @@ def test_export_request_accepts_explicit_options() -> None:
         {
             "run_id": "r1",
             "with_audio": False,
-            "options": {"quality": "2k", "fps": 60, "format": "webm"},
+            "options": {
+                "quality": "2k",
+                "fps": 60,
+                "format": "webm",
+                "theme": "dark",
+            },
         }
     )
     assert req.options is not None
     assert req.options.quality == "2k"
     assert req.options.fps == 60
     assert req.options.format == "webm"
+    assert req.options.theme == "dark"
 
 
 def test_export_request_omitting_options_keeps_field_none() -> None:

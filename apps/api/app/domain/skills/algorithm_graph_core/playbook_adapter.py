@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import math
+from typing import TypedDict
 
 from app.domain.models.playbook import (
+    CodeHighlightOverlay,
     GraphSceneEdge,
     GraphSceneNode,
     GraphSceneSnapshot,
@@ -14,10 +16,19 @@ from app.domain.models.playbook import (
     TableSceneSnapshot,
 )
 from app.domain.models.topic import TopicDomain
+from app.domain.services.algorithm_code_library import get_by_id
 from app.domain.skills.algorithm_graph_core.graph_kernel import GraphAlgorithmSolution
 
 _FPS = 30
 _STEP_FRAMES = 90
+
+
+class GraphVisualState(TypedDict):
+    current_node_id: str | None
+    active_node_ids: list[str]
+    visited_node_ids: list[str]
+    queue_node_ids: list[str]
+    active_edge_ids: list[str]
 
 
 def build_algorithm_graph_playbook(
@@ -34,6 +45,7 @@ def build_algorithm_graph_playbook(
             animation_hint=snapshot.kind,
             snapshot=snapshot,
             layers=[Layer(timing=LayerTiming(), body=snapshot)],
+            code_highlight=_code_highlight_for_snapshot(solution, snapshot),
             tokens=[],
         )
         for index, snapshot in enumerate(snapshots)
@@ -48,6 +60,31 @@ def build_algorithm_graph_playbook(
         parameter_controls=[],
         algorithm_id=solution.kind,
         initial_data={"nodes": solution.nodes},
+    )
+
+
+def _code_highlight_for_snapshot(
+    solution: GraphAlgorithmSolution,
+    snapshot: GraphSceneSnapshot | TableSceneSnapshot | MathFormulaSnapshot,
+) -> CodeHighlightOverlay | None:
+    if solution.kind != "bfs" or not isinstance(snapshot, GraphSceneSnapshot):
+        return None
+    source = get_by_id("bfs")
+    if source is None:
+        return None
+    current = snapshot.current_node_id or next(iter(snapshot.active_node_ids), "done")
+    queue = list(dict.fromkeys([*snapshot.queue_node_ids, *snapshot.frontier_node_ids]))
+    return CodeHighlightOverlay(
+        language=source.language,
+        lines=list(source.lines),
+        active_lines=[5],
+        active_line=5,
+        variables={
+            "current": current,
+            "queue": f"[{', '.join(queue)}]",
+            "visited": f"{{{', '.join(snapshot.visited_node_ids)}}}",
+        },
+        operation_label="scan neighbors",
     )
 
 
@@ -76,21 +113,25 @@ def _snapshots(
 
 def _graph_snapshot(solution: GraphAlgorithmSolution) -> GraphSceneSnapshot:
     positions = _node_positions(solution.nodes)
-    active_nodes = solution.path or solution.order
-    active_edge_ids = _active_edge_ids(solution, active_nodes)
+    graph_state = _graph_visual_state(solution)
+    active_edge_ids = graph_state["active_edge_ids"]
     return GraphSceneSnapshot(
+        pack_id="algorithm-code-basic",
+        asset_id=_graph_asset_id(solution.kind),
         nodes=[
             GraphSceneNode(
                 id=node,
                 label=node,
                 x=positions[node][0],
                 y=positions[node][1],
-                emphasis="primary" if node in active_nodes else "secondary",
+                emphasis="primary" if node in graph_state["active_node_ids"] else "secondary",
+                asset_id=_node_asset_id(node, graph_state),
             )
             for node in solution.nodes
         ],
         edges=[
             GraphSceneEdge(
+                id=_edge_id(edge.source, edge.target),
                 source=edge.source,
                 target=edge.target,
                 label=str(_clean_weight(edge.weight)) if edge.weight is not None else None,
@@ -100,15 +141,86 @@ def _graph_snapshot(solution: GraphAlgorithmSolution) -> GraphSceneSnapshot:
                     if _edge_id(edge.source, edge.target) in active_edge_ids
                     else "secondary"
                 ),
+                asset_id=(
+                    "edge-active"
+                    if _edge_id(edge.source, edge.target) in active_edge_ids
+                    else None
+                ),
             )
             for edge in solution.edges
         ],
         directed=solution.directed,
         weighted=any(edge.weight is not None for edge in solution.edges),
-        active_node_ids=active_nodes,
+        current_node_id=graph_state["current_node_id"],
+        active_node_ids=graph_state["active_node_ids"],
         active_edge_ids=active_edge_ids,
+        visited_node_ids=graph_state["visited_node_ids"],
+        queue_node_ids=graph_state["queue_node_ids"],
         caption=solution.answer_text,
     )
+
+
+def _graph_asset_id(kind: str) -> str | None:
+    if kind == "bfs":
+        return "bfs-graph-preset"
+    return None
+
+
+def _graph_visual_state(solution: GraphAlgorithmSolution) -> GraphVisualState:
+    if solution.kind == "bfs" and solution.table_rows:
+        row = solution.table_rows[0]
+        current = row[0]
+        visited = _split_state_cell(row[1] if len(row) > 1 else "")
+        enqueued = _split_state_cell(row[2] if len(row) > 2 else "")
+        queue = _split_state_cell(row[3] if len(row) > 3 else "")
+        return {
+            "current_node_id": current,
+            "active_node_ids": [current],
+            "visited_node_ids": visited,
+            "queue_node_ids": queue,
+            "active_edge_ids": _edge_ids_from_current(solution, current, enqueued),
+        }
+
+    active_nodes = solution.path or solution.order
+    return {
+        "current_node_id": active_nodes[0] if active_nodes else None,
+        "active_node_ids": active_nodes,
+        "visited_node_ids": [],
+        "queue_node_ids": [],
+        "active_edge_ids": _active_edge_ids(solution, active_nodes),
+    }
+
+
+def _split_state_cell(value: str) -> list[str]:
+    return [item.strip() for item in value.split(",") if item.strip() and item.strip() != "-"]
+
+
+def _edge_ids_from_current(
+    solution: GraphAlgorithmSolution,
+    current: str,
+    targets: list[str],
+) -> list[str]:
+    ids: list[str] = []
+    for target in targets:
+        if _has_edge(solution, current, target):
+            ids.append(_edge_id(current, target))
+        elif not solution.directed and _has_edge(solution, target, current):
+            ids.append(_edge_id(target, current))
+    return ids
+
+
+def _node_asset_id(
+    node: str,
+    graph_state: GraphVisualState,
+) -> str:
+    queue_nodes = set(graph_state["queue_node_ids"])
+    visited_nodes = set(graph_state["visited_node_ids"])
+    current = graph_state["current_node_id"]
+    if node in queue_nodes:
+        return "queue-frame"
+    if node in visited_nodes and node != current:
+        return "visited-node"
+    return "graph-node"
 
 
 def _node_positions(nodes: list[str]) -> dict[str, tuple[float, float]]:

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "glucose-smiles-contract",
+  "moleculeId": "glucose",
+  "assetId": "rdkit-smiles-glucose",
+  "sourceAssetId": "rdkit-smiles-glucose",
+  "smiles": "OC[C@H]1O[C@@H](O)[C@H](O)[C@H](O)[C@@H]1O",
+  "formula": "C6H12O6",
+  "formulaLatex": "C_6H_12O_6",
+  "elementCounts": {
+    "C": 6,
+    "O": 6
+  },
+  "implicitHydrogenCount": 12,
+  "minBondCount": 12
+}

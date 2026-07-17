@@ -3,6 +3,9 @@ from __future__ import annotations
 import asyncio
 import sqlite3
 
+import pytest
+from pydantic import ValidationError
+
 from app.domain.models.director import DirectorBeat, DirectorScript
 from app.infrastructure.persistence.db_init import init_db
 from app.infrastructure.persistence.sqlite_director_repository import (
@@ -46,7 +49,7 @@ def test_sqlite_director_repository_initializes_legacy_database(tmp_path) -> Non
     assert {"run_id", "director_json", "source", "created_at", "updated_at"} <= cols
 
 
-def test_sqlite_director_repository_treats_invalid_json_as_absent(tmp_path) -> None:
+def test_sqlite_director_repository_surfaces_invalid_json(tmp_path) -> None:
     db = str(tmp_path / "invalid.db")
     init_db(db)
     with sqlite3.connect(db) as conn:
@@ -59,7 +62,8 @@ def test_sqlite_director_repository_treats_invalid_json_as_absent(tmp_path) -> N
 
     repo = SqliteRunDirectorRepository(db)
 
-    assert _run(repo.get("run-bad")) is None
+    with pytest.raises(ValidationError):
+        _run(repo.get("run-bad"))
 
 
 def _director(run_id: str, voiceover: str) -> DirectorScript:

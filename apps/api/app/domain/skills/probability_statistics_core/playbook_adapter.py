@@ -11,6 +11,7 @@ from app.domain.models.playbook import (
     TableSceneSnapshot,
 )
 from app.domain.models.topic import TopicDomain
+from app.domain.services.playbook_quality import estimate_step_frames
 from app.domain.skills.probability_statistics_core.statistics_kernel import (
     ProbabilityStatisticsSolution,
 )
@@ -24,25 +25,29 @@ def build_probability_statistics_playbook(
     solution: ProbabilityStatisticsSolution,
 ) -> PlaybookScript:
     snapshots = _snapshots(solution)
-    steps = [
-        MetaStep(
-            step_id=f"probability_statistics_core_{index + 1:02d}",
-            end_frame=(index + 1) * _STEP_FRAMES,
-            title=_title(snapshot.kind),
-            voiceover_text=getattr(snapshot, "caption", None) or solution.answer_text,
-            animation_hint=snapshot.kind,
-            snapshot=snapshot,
-            layers=[Layer(timing=LayerTiming(), body=snapshot)],
-            tokens=[],
+    steps: list[MetaStep] = []
+    frame_cursor = 0
+    for index, snapshot in enumerate(snapshots):
+        voiceover = getattr(snapshot, "caption", None) or solution.answer_text
+        frame_cursor += max(_STEP_FRAMES, estimate_step_frames(voiceover, _FPS))
+        steps.append(
+            MetaStep(
+                step_id=f"probability_statistics_core_{index + 1:02d}",
+                end_frame=frame_cursor,
+                title=_title(snapshot.kind),
+                voiceover_text=voiceover,
+                animation_hint=snapshot.kind,
+                snapshot=snapshot,
+                layers=[Layer(timing=LayerTiming(), body=snapshot)],
+                tokens=[],
+            )
         )
-        for index, snapshot in enumerate(snapshots)
-    ]
     return PlaybookScript(
         fps=_FPS,
-        total_frames=len(steps) * _STEP_FRAMES,
+        total_frames=frame_cursor,
         domain=TopicDomain.MATH,
         title=_playbook_title(solution.kind),
-        summary="使用确定性概率统计 kernel 构建可渲染步骤。",
+        summary=f"使用确定性概率统计 kernel 得到结论：{solution.answer_text}",
         steps=steps,
         parameter_controls=[],
         algorithm_id=solution.kind,
@@ -75,7 +80,7 @@ def _snapshots(
     )
     formula = MathFormulaSnapshot(
         formula_latex=solution.formula_latex,
-        caption=solution.answer_text,
+        caption=f"概率计算结论：{solution.answer_text}",
         annotations=[f"{key}={value}" for key, value in solution.results.items()],
     )
     return [table, chart, formula]
@@ -92,7 +97,7 @@ def _title(kind: str) -> str:
     return {
         "table_scene": "整理数据",
         "stats_chart_scene": "比较数值",
-        "math_formula": "套用公式",
+        "math_formula": "概率结论",
     }.get(kind, "概率统计")
 
 

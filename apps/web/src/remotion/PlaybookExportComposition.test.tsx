@@ -1,64 +1,60 @@
-import { describe, expect, it, vi } from "vitest";
+import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it, vi } from "vitest";
 
 import type { PlaybookScript } from "../features/playbook/engine/types";
+
+vi.mock("remotion", () => ({
+  Audio: ({ src }: { src: string }) => <audio src={src} />,
+  Sequence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
+vi.mock("../features/playbook/engine/composition/PlaybookComposition", () => ({
+  PlaybookComposition: ({
+    showDiagnostics,
+    showInlineCode,
+  }: {
+    showDiagnostics?: boolean;
+    showInlineCode?: boolean;
+  }) => (
+    <div
+      data-show-diagnostics={String(showDiagnostics)}
+      data-show-inline-code={String(showInlineCode)}
+    />
+  ),
+}));
+
 import { PlaybookExportComposition } from "./PlaybookExportComposition";
 
-vi.mock("remotion", async () => {
-  const actual = await vi.importActual<typeof import("remotion")>("remotion");
-  return {
-    ...actual,
-    useCurrentFrame: () => 0,
-    useVideoConfig: () => ({ fps: 30 }),
-    spring: ({ frame, durationInFrames }: { frame: number; durationInFrames?: number }) => {
-      const duration = Math.max(1, durationInFrames ?? 1);
-      return Math.max(0, Math.min(1, frame / duration));
-    },
-  };
-});
-
-function script(): PlaybookScript {
-  return {
-    fps: 30,
-    total_frames: 60,
-    domain: "math",
-    title: "SSR export",
-    summary: "Export render smoke test",
-    parameter_controls: [],
-    steps: [
-      {
-        step_id: "s1",
-        end_frame: 60,
-        title: "字幕导出",
-        voiceover_text: "导出视频需要保留这段字幕。",
-        tokens: [],
-        snapshot: {
-          kind: "math_formula",
-          formula_latex: "f(x)=x^2",
-        },
+const SCRIPT: PlaybookScript = {
+  fps: 30,
+  total_frames: 60,
+  domain: "math",
+  title: "Export diagnostics contract",
+  summary: "Diagnostics must never render into export output.",
+  parameter_controls: [],
+  steps: [
+    {
+      step_id: "s1",
+      end_frame: 60,
+      title: "Plot",
+      voiceover_text: "Show the plot.",
+      tokens: [],
+      snapshot: {
+        kind: "math_formula",
+        formula_latex: "y=x",
       },
-    ],
-  };
-}
+    },
+  ],
+};
 
-describe("PlaybookExportComposition", () => {
-  it("renders on the SSR export path without browser viewport APIs while keeping subtitles", () => {
-    Object.defineProperty(window, "visualViewport", {
-      configurable: true,
-      value: undefined,
-    });
-
+describe("PlaybookExportComposition diagnostics", () => {
+  it("forces renderer diagnostics off", () => {
     const markup = renderToStaticMarkup(
-      <PlaybookExportComposition
-        script={script()}
-        director={null}
-        theme="dark"
-        showSubtitles
-        audioFiles={[]}
-      />,
+      <PlaybookExportComposition script={SCRIPT} theme="light" showSubtitles />,
     );
 
-    expect(markup).toContain("导出视频需要保留这段字幕。");
-    expect(markup).toContain("1 / 1");
+    expect(markup).toContain('data-show-diagnostics="false"');
+    expect(markup).toContain('data-show-inline-code="false"');
   });
 });

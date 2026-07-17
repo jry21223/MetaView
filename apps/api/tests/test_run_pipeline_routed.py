@@ -8,10 +8,15 @@ import pytest
 from app.application.dto.pipeline_dto import PipelineRequest
 from app.application.use_cases.run_pipeline import RunPipelineUseCase
 from app.domain.models.pipeline_run import PipelineRunStatus
-from app.domain.skills.base import SkillRouteMatch
+from app.domain.skills.base import SkillRouteInput, SkillRouteMatch
+from tests.coverage_test_utils import ComposableCoverageResolver
+
+_SOLID_PROMPT = (
+    "正四棱锥 S-ABCD，底面边长为 2，高为 3，求 SA 与底面 ABCD 的线面角"
+)
 
 
-def _generic_cir_json(domain: str = "geography") -> str:
+def _generic_cir_json(domain: str = "algorithm") -> str:
     return json.dumps({
         "version": "0.1.0",
         "title": "Generic Route",
@@ -61,12 +66,35 @@ class _StaticRouter:
         self._route = route
         self.model_name = "router-test"
         self.calls = 0
+        self.last_request: SkillRouteInput | None = None
 
-    async def route(self, **_: Any) -> SkillRouteMatch | None:
+    async def route(self, *, request: SkillRouteInput, **_: Any) -> SkillRouteMatch | None:
         self.calls += 1
+        self.last_request = request
         if isinstance(self._route, Exception):
             raise self._route
         return self._route
+
+
+@pytest.mark.asyncio
+async def test_text_request_does_not_send_a_false_python_signal_to_router() -> None:
+    router = _StaticRouter(None)
+    repo = _RecordingRepo()
+    use_case = RunPipelineUseCase(
+        repo,
+        _CapturingLLM(_generic_cir_json("math")),
+        router_provider=router,
+        coverage_resolver=ComposableCoverageResolver(default_domain="math"),
+    )
+
+    await use_case.execute(
+        "run-null-language",
+        PipelineRequest(prompt="用动画解释导数的几何意义"),
+    )
+
+    assert router.last_request is not None
+    assert router.last_request.source_code is None
+    assert router.last_request.language is None
 
 
 class _Agent:
@@ -117,7 +145,7 @@ async def test_agent_mode_routes_solid_geometry_before_agent() -> None:
         router_provider=_StaticRouter(_solid_route()),
     )
 
-    await use_case.execute("run-solid-agent", PipelineRequest(prompt="换一种问法，但 spec 已结构化"))
+    await use_case.execute("run-solid-agent", PipelineRequest(prompt=_SOLID_PROMPT))
 
     assert agent.calls == []
     last = repo.updates[-1]
@@ -139,7 +167,7 @@ async def test_agent_mode_heuristic_solid_geometry_before_agent_without_router()
 
     await use_case.execute(
         "run-solid-agent-heuristic",
-        PipelineRequest(prompt="正四棱锥 S-ABCD，底面边长为 2，高为 3，求 SA 与底面 ABCD 的线面角"),
+        PipelineRequest(prompt=_SOLID_PROMPT),
     )
 
     assert agent.calls == []
@@ -168,7 +196,7 @@ async def test_router_failure_falls_back_to_heuristic_without_crashing() -> None
 
 
 @pytest.mark.asyncio
-async def test_low_confidence_router_falls_back_to_generic_cir() -> None:
+async def test_low_confidence_router_without_domain_is_rejected() -> None:
     route = SkillRouteMatch(
         skill_id="solid_geometry",
         domain="math",
@@ -182,10 +210,10 @@ async def test_low_confidence_router_falls_back_to_generic_cir() -> None:
 
     await use_case.execute("run-low", PipelineRequest(prompt="some unrelated vague idea"))
 
-    assert llm.calls
-    assert repo.updates[-1]["status"] == PipelineRunStatus.SUCCEEDED
+    assert llm.calls == []
+    assert repo.updates[-1]["status"] == PipelineRunStatus.FAILED
     review = json.loads(repo.updates[-1]["review_json"])
-    assert "skill:solid_geometry" not in review["actions"]
+    assert review["issues"][0]["code"] == "capability.unsupported"
 
 
 @pytest.mark.asyncio
@@ -210,7 +238,12 @@ async def test_route_metadata_is_persisted_for_generic_cir() -> None:
         })
     )
     repo = _RecordingRepo()
-    use_case = RunPipelineUseCase(repo, llm, router_provider=_StaticRouter(None))
+    use_case = RunPipelineUseCase(
+        repo,
+        llm,
+        router_provider=_StaticRouter(None),
+        coverage_resolver=ComposableCoverageResolver(default_domain="math"),
+    )
 
     await use_case.execute("run-meta", PipelineRequest(prompt="解释概率密度函数为什么面积等于 1"))
 

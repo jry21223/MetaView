@@ -15,10 +15,12 @@ from app.domain.models.playbook import (
     MotionSegmentObject,
     MotionTextObject,
     MotionTrack,
+    PhysicsForceSceneSnapshot,
     PlaybookScript,
     TableSceneSnapshot,
 )
 from app.domain.models.topic import TopicDomain
+from app.domain.services.scene_blueprint_compiler import compile_scene_blueprint_to_playbook
 from app.domain.skills.physics_mechanics.mechanics_kernel import PhysicsMechanicsSolution
 
 _FPS = 30
@@ -58,7 +60,9 @@ def build_physics_mechanics_playbook(
 
 def _snapshots(
     solution: PhysicsMechanicsSolution,
-) -> list[MotionSceneSnapshot | MathFormulaSnapshot | TableSceneSnapshot]:
+) -> list[
+    MotionSceneSnapshot | PhysicsForceSceneSnapshot | MathFormulaSnapshot | TableSceneSnapshot
+]:
     motion = _motion_snapshot(solution)
     formula = MathFormulaSnapshot(
         formula_latex=solution.steps[-1].formula_latex,
@@ -77,10 +81,29 @@ def _snapshots(
         highlights=[solution.answer_latex],
     )
     if solution.kind == "projectile_motion":
-        return [formula, motion, table, answer]
+        return [formula, _projectile_force_snapshot(solution), table, answer]
     if solution.kind == "uniform_acceleration_1d":
         return [motion, formula, table, answer]
     return [formula, motion, table, answer]
+
+
+def _projectile_force_snapshot(solution: PhysicsMechanicsSolution) -> PhysicsForceSceneSnapshot:
+    playbook = compile_scene_blueprint_to_playbook(
+        {
+            "id": "projectile_motion",
+            "subject": "physics",
+            "sceneType": "projectile_motion",
+            "title": "抛体运动资产视图",
+            "caption": solution.answer_text,
+            "packId": "physics-basic",
+            "visualIntent": ["asset_backed_projectile", "vector_decomposition"],
+            "emphasisPoints": ["projectile", "trajectory", "velocity", "gravity"],
+        }
+    )
+    snapshot = playbook.steps[0].snapshot
+    if not isinstance(snapshot, PhysicsForceSceneSnapshot):
+        raise TypeError("projectile_motion blueprint did not produce physics_force_scene")
+    return snapshot
 
 
 def _motion_snapshot(solution: PhysicsMechanicsSolution) -> MotionSceneSnapshot:
@@ -202,8 +225,13 @@ def _motion_snapshot(solution: PhysicsMechanicsSolution) -> MotionSceneSnapshot:
 
 def _title(
     index: int,
-    snapshot: MotionSceneSnapshot | MathFormulaSnapshot | TableSceneSnapshot,
+    snapshot: MotionSceneSnapshot
+    | PhysicsForceSceneSnapshot
+    | MathFormulaSnapshot
+    | TableSceneSnapshot,
 ) -> str:
+    if snapshot.kind == "physics_force_scene":
+        return "资产化受力视图"
     if snapshot.kind == "motion_scene":
         return "可视化运动"
     if snapshot.kind == "table_scene":

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 64" role="img" aria-label="Force vector arrow asset" data-asset-quality="v2">
+  <defs>
+    <linearGradient id="force-v2" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#f8d08b"/>
+      <stop offset=".5" stop-color="#f18c45"/>
+      <stop offset="1" stop-color="#d9482b"/>
+    </linearGradient>
+    <filter id="force-shadow-v2" x="-10%" y="-40%" width="120%" height="180%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#6d2118" flood-opacity=".25"/>
+    </filter>
+  </defs>
+  <g filter="url(#force-shadow-v2)">
+    <path d="M18 32h104" fill="none" stroke="url(#force-v2)" stroke-width="10" stroke-linecap="round"/>
+    <path d="M120 11l31 21-31 21 8-16H18v-10h110z" fill="url(#force-v2)"/>
+  </g>
+  <path d="M24 22h76" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity=".42"/>
+  <g font-family="Inter, Arial, sans-serif" font-weight="800">
+    <text x="20" y="21" font-size="15" fill="#8d2f1d">F</text>
+    <text x="39" y="53" font-size="9" fill="#8d2f1d" opacity=".78">vector</text>
+  </g>
+</svg>

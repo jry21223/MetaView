@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { TweakValues } from "../../features/studio-editor/hooks/useTweaks";
 import { usePipelinePoller } from "../../features/pipeline/hooks/usePipelinePoller";
 import { PlaybookPlayer } from "../../features/playbook/engine/player/PlaybookPlayer";
@@ -9,6 +9,9 @@ import type {
   PlaybookScript,
 } from "../../features/playbook/engine/types";
 import { ExportModal } from "../../features/export/ui/ExportModal";
+import { PipelineErrorCard } from "../../features/pipeline/ui/PipelineErrorCard";
+import { PipelineSkeleton } from "../../features/pipeline/ui/PipelineSkeleton";
+import { createAssetAttributionReportForScript } from "../../features/playbook/engine/assets/assetAttributionSummary";
 import {
   listRunFollowUps,
   restoreRunVersion,
@@ -211,7 +214,23 @@ function ChatPanel({
     }
   };
 
-  const followupSlot = (
+  const shouldCollapseEmptyProvider =
+    appEdition === "self" && !isProviderConfigured && msgs.length === 0;
+
+  const followupSlot = shouldCollapseEmptyProvider ? (
+    <div className="mv-followup-compact">
+      <span>配置本地 Provider 后可继续追问和调整当前讲解。</span>
+      {onOpenProviderSettings && (
+        <button
+          type="button"
+          className="mv-chip mv-chip-primary"
+          onClick={onOpenProviderSettings}
+        >
+          配置本地 Provider
+        </button>
+      )}
+    </div>
+  ) : (
     <div className="mv-followup-panel">
       <div className="mv-chat-stream" ref={scrollRef}>
         {msgs.length === 0 && !isProviderConfigured && (
@@ -325,90 +344,6 @@ function ChatPanel({
   return <>{children({ followupSlot, relatedSlot })}</>;
 }
 
-// ── PipelineSkeleton ──────────────────────────────────────────────────────
-
-type PipelineStatus =
-  | "queued"
-  | "running"
-  | "reviewing"
-  | "succeeded"
-  | "failed"
-  | null;
-
-interface PipelineSkeletonProps {
-  status: PipelineStatus;
-}
-
-const STAGES: { key: PipelineStatus; label: string }[] = [
-  { key: "queued", label: "排队中" },
-  { key: "running", label: "脚本生成" },
-  { key: "reviewing", label: "审核与修正" },
-  { key: "succeeded", label: "渲染完成" },
-];
-
-const STATUS_ORDER: Record<NonNullable<PipelineStatus>, number> = {
-  queued: 0,
-  running: 1,
-  reviewing: 2,
-  succeeded: 3,
-  failed: 3,
-};
-
-const STATUS_LOADER_LABEL: Record<NonNullable<PipelineStatus>, string> = {
-  queued: "排队等待生成",
-  running: "正在生成脚本",
-  reviewing: "正在审核与修正",
-  succeeded: "渲染完成",
-  failed: "生成失败",
-};
-
-function PipelineSkeleton({ status }: PipelineSkeletonProps) {
-  const currentOrder = status !== null ? STATUS_ORDER[status] : -1;
-  const loaderLabel =
-    status !== null ? STATUS_LOADER_LABEL[status] : "正在准备生成";
-
-  return (
-    <div className="mv-pipeline-skeleton">
-      <div className="mv-pipeline-stages">
-        {STAGES.map((stage, i) => {
-          const stageOrder = STATUS_ORDER[stage.key!]!;
-          const isDone = currentOrder > stageOrder;
-          const isActive = currentOrder === stageOrder;
-          return (
-            <React.Fragment key={stage.key}>
-              <div
-                className={`mv-stage${isActive ? " is-active" : isDone ? " is-done" : ""}`}
-              >
-                <span className="mv-stage-dot" />
-                <span>{stage.label}</span>
-              </div>
-              {i < STAGES.length - 1 && <div className="mv-stage-line" />}
-            </React.Fragment>
-          );
-        })}
-      </div>
-
-      <div className="mv-skeleton-area">
-        <div className="mv-pipeline-status" role="status" aria-live="polite">
-          {loaderLabel}
-        </div>
-        <div className="mv-skeleton-bar mv-skeleton-title" />
-        <div className="mv-skeleton-cells">
-          {Array.from({ length: 8 }, (_, i) => (
-            <div
-              key={i}
-              className="mv-skeleton-bar mv-skeleton-cell"
-              style={{ animationDelay: `${i * 0.1}s` }}
-            />
-          ))}
-        </div>
-        <div className="mv-skeleton-bar mv-skeleton-narration" />
-        <div className="mv-skeleton-bar mv-skeleton-narration-short" />
-      </div>
-    </div>
-  );
-}
-
 // ── StudioPage ────────────────────────────────────────────────────────────
 
 export interface StudioPageProps {
@@ -419,6 +354,10 @@ export interface StudioPageProps {
   isProviderConfigured: boolean;
   providerSettings?: ProviderSettings | null;
   onOpenProviderSettings?: () => void;
+  /** Resubmit the failed run's prompt as a brand-new run. */
+  onResubmitPrompt?: (prompt: string) => void;
+  /** Return to intake with the failed run's prompt prefilled. */
+  onEditPrompt?: (prompt: string) => void;
   topbarCollapsed?: boolean;
   onToggleTopbar?: () => void;
 }
@@ -431,12 +370,23 @@ export function StudioPage({
   isProviderConfigured,
   providerSettings = null,
   onOpenProviderSettings,
+  onResubmitPrompt,
+  onEditPrompt,
   topbarCollapsed = false,
   onToggleTopbar,
 }: StudioPageProps) {
   const isDark = t.theme === "dark";
-  const { playbook, director, error, isLoading, status } =
-    usePipelinePoller(runId);
+  const {
+    playbook,
+    director,
+    error,
+    errorKind,
+    prompt,
+    createdAt,
+    isLoading,
+    status,
+    retry,
+  } = usePipelinePoller(runId);
 
   const [exportOpen, setExportOpen] = useState(false);
   const [patchedPlaybook, setPatchedPlaybook] = useState<{
@@ -451,10 +401,18 @@ export function StudioPage({
     ? (activePatchedRun.director ?? null)
     : director;
   const canExport = !!playbook && !!runId;
+  const exportAssetReport = useMemo(
+    () => (activePlaybook ? createAssetAttributionReportForScript(activePlaybook) : null),
+    [activePlaybook],
+  );
 
-  useEffect(() => {
-    if (error) onNavigate("intake");
-  }, [error, onNavigate]);
+  const handleBackToIntake = () => {
+    if (prompt && onEditPrompt) {
+      onEditPrompt(prompt);
+      return;
+    }
+    onNavigate("intake");
+  };
 
   return (
     <>
@@ -466,12 +424,25 @@ export function StudioPage({
             activePlaybook?.steps?.[0]?.title ?? activePlaybook?.title ?? null
           }
           accentColor={t.accent}
+          assetReport={exportAssetReport}
           onClose={() => setExportOpen(false)}
         />
       )}
       <main className="mv-main mv-main--player">
         <section className="mv-right">
-          {activePlaybook ? (
+          {error && errorKind ? (
+            <PipelineErrorCard
+              errorKind={errorKind}
+              message={error}
+              onRetryPolling={retry}
+              onResubmit={
+                errorKind === "run_failed" && prompt && onResubmitPrompt
+                  ? () => onResubmitPrompt(prompt)
+                  : null
+              }
+              onBackToIntake={handleBackToIntake}
+            />
+          ) : activePlaybook ? (
             <ChatPanel
               appEdition={appEdition}
               runId={runId}
@@ -494,6 +465,7 @@ export function StudioPage({
                   script={activePlaybook}
                   director={activeDirector}
                   theme={isDark ? "dark" : "light"}
+                  enableInteractionSandbox
                   swapDurationFrames={t.swapFrames}
                   onOpenExport={canExport ? () => setExportOpen(true) : undefined}
                   topbarCollapsed={topbarCollapsed}
@@ -504,8 +476,8 @@ export function StudioPage({
               )}
             </ChatPanel>
           ) : isLoading ? (
-            <PipelineSkeleton status={status} />
-          ) : !error ? (
+            <PipelineSkeleton status={status} createdAt={createdAt} />
+          ) : (
             <div className="mv-right-placeholder">
               <span>暂无任务</span>
               <button
@@ -516,7 +488,7 @@ export function StudioPage({
                 先提交一个题目
               </button>
             </div>
-          ) : null}
+          )}
         </section>
       </main>
     </>

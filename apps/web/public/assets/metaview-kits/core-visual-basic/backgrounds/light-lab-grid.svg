@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" role="img" aria-label="Light lab grid" data-asset-quality="v2">
+  <defs>
+    <linearGradient id="lab-paper" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fbfdff"/>
+      <stop offset="0.36" stop-color="#f4f9fb"/>
+      <stop offset="0.72" stop-color="#eef6f3"/>
+      <stop offset="1" stop-color="#e9f1f7"/>
+    </linearGradient>
+    <linearGradient id="lab-sheen" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.62"/>
+      <stop offset="0.45" stop-color="#d7ebe5" stop-opacity="0.2"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.48"/>
+    </linearGradient>
+    <pattern id="micro-grid" width="10" height="10" patternUnits="userSpaceOnUse">
+      <path d="M10 0H0V10" fill="none" stroke="#dbe7ee" stroke-width="0.55" opacity="0.82"/>
+    </pattern>
+    <pattern id="major-grid" width="40" height="30" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V30" fill="none" stroke="#c5d3dc" stroke-width="0.9" opacity="0.72"/>
+    </pattern>
+  </defs>
+  <rect width="320" height="180" fill="url(#lab-paper)"/>
+  <rect width="320" height="180" fill="url(#micro-grid)" opacity="0.72"/>
+  <rect width="320" height="180" fill="url(#major-grid)" opacity="0.86"/>
+  <path d="M0 90h320M160 0v180" fill="none" stroke="#aebfca" stroke-width="1.45" opacity="0.72"/>
+  <path d="M0 45h320M0 135h320M80 0v180M240 0v180" fill="none" stroke="#ccd9e0" stroke-width="1" opacity="0.62"/>
+  <path d="M0 0L320 180M320 0L0 180" fill="none" stroke="#ffffff" stroke-width="0.65" opacity="0.22"/>
+  <rect width="320" height="180" fill="url(#lab-sheen)" opacity="0.58"/>
+</svg>

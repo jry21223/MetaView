@@ -57,3 +57,25 @@ def test_route_topic_source_code_routes_to_code() -> None:
 
 def test_keyword_hint_is_case_insensitive() -> None:
     assert keyword_hint("BINARY SEARCH ALGORITHM") == TopicDomain.ALGORITHM
+
+
+def test_route_topic_prefers_stronger_math_evidence_over_shared_function_keyword() -> None:
+    route = route_topic("演示函数 y=x^2 的导数和切线")
+
+    assert route.domain == TopicDomain.MATH
+    assert "导数" in route.matched_keywords
+    assert "函数" in route.matched_keywords
+
+
+def test_route_topic_prefers_specific_monsoon_evidence_over_single_character_force() -> None:
+    route = route_topic("讲解东亚夏季风的海陆热力差异")
+
+    assert route.domain == TopicDomain.GEOGRAPHY
+    assert "季风" in route.matched_keywords
+
+
+def test_route_topic_prefers_math_image_transform_over_graph_character() -> None:
+    route = route_topic("解释 y=(x-2)^2+1 的图像变换")
+
+    assert route.domain == TopicDomain.MATH
+    assert "图像" in route.matched_keywords

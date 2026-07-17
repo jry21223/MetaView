@@ -15,6 +15,8 @@ import pytest
 
 from app.application.agent.types import AgentConstraints, AgentRequest, ToolManifest
 from app.application.ports.agent_provider import AgentProviderError
+from app.domain.models.coverage import CoverageDecision
+from app.domain.models.lesson_plan import LessonPlan, SceneIntent
 from app.infrastructure.agent.http_agent_provider import HttpAgentProvider
 
 
@@ -110,6 +112,27 @@ async def test_run_posts_wide_agent_request_and_returns_agent_result() -> None:
         )
 
     provider = _make_provider_with_handler(handler, shared_token="shared-secret")
+    lesson_plan = LessonPlan(
+        schema_version="1.0.0",
+        domain="math",
+        title="Line lesson plan",
+        learning_objectives=["Explain the line y=x."],
+        prerequisites=["Know x and y coordinates."],
+        misconceptions=["The line contains only the origin."],
+        expected_conclusion="Every point on y=x has equal coordinates.",
+        lesson_arc="intuition_to_abstraction",
+        scenes=[
+            SceneIntent(
+                scene_id="line",
+                teaching_goal="Plot representative points on y=x.",
+                strategy="demonstration",
+                required_fact_ids=["line_identity"],
+                required_visual_roles=["axis", "line"],
+                preferred_scene_type="line_graph",
+                narration_goal="Connect equal coordinates to the diagonal line.",
+            )
+        ],
+    )
     result = await provider.run(
         AgentRequest(
             run_id="run-http",
@@ -117,6 +140,17 @@ async def test_run_posts_wide_agent_request_and_returns_agent_result() -> None:
             source_code=None,
             language=None,
             route_decision={"destination": "generic_cir"},
+            coverage_decision=CoverageDecision(
+                mode="experimental",
+                domain="math",
+                confidence=0.6,
+                matched_skill_ids=[],
+                available_tool_ids=["playbook.schema.validate"],
+                missing_capabilities=["validator:line_graph"],
+                fallback_policy="limited_visual",
+                reason="Only a limited visual path is available.",
+            ),
+            lesson_plan=lesson_plan,
             provider_config={"model": "gpt-4o-mini"},
             playbook_schema={"type": "object"},
             constraints=AgentConstraints(max_self_repair_attempts=2),
@@ -136,6 +170,11 @@ async def test_run_posts_wide_agent_request_and_returns_agent_result() -> None:
     assert seen["prompt"] == "hello"
     assert seen["provider"] == {"model": "gpt-4o-mini"}
     assert seen["route_decision"] == {"destination": "generic_cir"}
+    assert seen["coverage_decision"]["mode"] == "experimental"
+    assert seen["coverage_decision"]["missing_capabilities"] == [
+        "validator:line_graph"
+    ]
+    assert seen["lesson_plan"] == lesson_plan.model_dump(mode="json")
     assert seen["playbook_schema"] == {"type": "object"}
     assert seen["available_tools"][0]["name"] == "playbook.schema.validate"
     assert result.provider == "pi"

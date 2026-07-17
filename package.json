@@ -3,7 +3,8 @@
   "private": true,
   "workspaces": [
     "apps/web",
-    "apps/agent"
+    "apps/agent",
+    "apps/mcp-server"
   ],
   "overrides": {
     "flatted": "^3.4.2",
@@ -18,6 +19,9 @@
   "scripts": {
     "build:web": "npm --workspace apps/web run build",
     "lint:web": "npm --workspace apps/web run lint",
+    "asset:audit": "npm --workspace apps/web run asset:audit",
+    "test:mcp": "npm --workspace apps/mcp-server run test",
+    "mcp:stdio": "npm --workspace apps/mcp-server run start",
     "setup:git-hooks": "git config core.hooksPath .githooks"
   },
   "devDependencies": {

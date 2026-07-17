@@ -58,10 +58,10 @@ function sceneSnapshot(overrides: Partial<MathSceneSnapshot> = {}): MathSceneSna
   };
 }
 
-function mathScript(): PlaybookScript {
+function mathScript(totalFrames = 60): PlaybookScript {
   return {
     fps: 30,
-    total_frames: 60,
+    total_frames: totalFrames,
     domain: "math",
     title: "参数直线",
     summary: "Shows a parameterized line",
@@ -69,7 +69,7 @@ function mathScript(): PlaybookScript {
     steps: [
       {
         step_id: "s1",
-        end_frame: 60,
+        end_frame: totalFrames,
         title: "画直线",
         voiceover_text: "观察斜率变化",
         tokens: [],
@@ -152,11 +152,40 @@ function motionScript(): PlaybookScript {
   };
 }
 
+function geographyArrayFallbackScript(): PlaybookScript {
+  return {
+    fps: 30,
+    total_frames: 60,
+    domain: "geography",
+    title: "数组兜底",
+    summary: "Unsupported geography fallback",
+    parameter_controls: [],
+    steps: [
+      {
+        step_id: "array-fallback",
+        end_frame: 60,
+        title: "数组兜底",
+        voiceover_text: "不应使用算法数组表现地理图层。",
+        tokens: [],
+        snapshot: {
+          kind: "algorithm_array",
+          array_values: ["land", "ocean"],
+          active_indices: [],
+          swap_indices: [],
+          sorted_indices: [],
+          pointers: {},
+        },
+      },
+    ],
+  };
+}
+
 function directorFor(
   script: PlaybookScript,
   cameraMotion: DirectorCameraMotion,
   voiceoverText = "Director override.",
   source: DirectorSource = "rule",
+  beatDurationFrames = script.steps[0].end_frame,
 ): DirectorScript {
   return {
     schema_version: "1.0.0",
@@ -167,7 +196,7 @@ function directorFor(
         beat_id: "beat_01",
         step_id: script.steps[0].step_id,
         start_frame: 0,
-        end_frame: script.steps[0].end_frame,
+        end_frame: beatDurationFrames,
         intent: "hook",
         shot_type: "medium",
         camera_motion: cameraMotion,
@@ -370,10 +399,54 @@ describe("PlaybookComposition", () => {
     expect(markup).not.toContain("Unknown snapshot kind");
   });
 
+  it("exposes non-blocking visual quality warning metadata only in diagnostics mode", () => {
+    const markup = renderToStaticMarkup(
+      <PlaybookComposition
+        script={geographyArrayFallbackScript()}
+        showSubtitles={false}
+        showDiagnostics
+      />,
+    );
+
+    expect(markup).toContain('data-visual-quality-warning-count="1"');
+    expect(markup).toContain('data-visual-quality-warning-codes="unsupported_array_fallback"');
+    expect(markup).toContain('data-visual-quality-warning-steps="array-fallback"');
+    expect(markup).toContain('data-visual-quality-warning-icon="true"');
+    expect(markup).toContain('data-asset-id="core-warning-icon"');
+    expect(markup).not.toContain('data-missing-asset="true"');
+    expect(markup).toContain("domain-array-renderer");
+  });
+
   it("renders narration only in the shared subtitle row", () => {
     const markup = renderToStaticMarkup(<PlaybookComposition script={mathScript()} />);
     const matches = markup.match(/观察斜率变化/g) ?? [];
     expect(matches).toHaveLength(1);
+  });
+
+  it("uses long director beat voiceover when it is long enough", () => {
+    const script = mathScript(120);
+    const markup = renderToStaticMarkup(
+      <PlaybookComposition
+        script={script}
+        director={directorFor(script, "hold", "长时段导演口播。", "manual", 120)}
+      />,
+    );
+
+    expect(markup).toContain("长时段导演口播。");
+    expect(markup).not.toContain("观察斜率变化");
+  });
+
+  it("keeps step-level subtitles when director beat is too short", () => {
+    const script = mathScript(120);
+    const markup = renderToStaticMarkup(
+      <PlaybookComposition
+        script={script}
+        director={directorFor(script, "hold", "短时段导演口播。", "manual", 30)}
+      />,
+    );
+
+    expect(markup).toContain("观察斜率变化");
+    expect(markup).not.toContain("短时段导演口播。");
   });
 
   it("keeps subtitle and stage transform unchanged without a director", () => {
@@ -442,7 +515,7 @@ describe("PlaybookComposition", () => {
   it("merges simultaneous math plot layers into one scene", () => {
     remotionState.frame = 60;
     const markup = renderToStaticMarkup(<PlaybookComposition script={layeredMathScript()} showSubtitles={false} />);
-    expect(markup.match(/<svg/g)).toHaveLength(1);
+    expect(markup.match(/class="math-plot-renderer"/g)).toHaveLength(1);
     expect(markup).toContain("tangent");
     expect(markup).toContain("<polygon");
   });

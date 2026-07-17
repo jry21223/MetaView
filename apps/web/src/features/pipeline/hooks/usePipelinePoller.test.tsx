@@ -1,4 +1,4 @@
-import { act, cleanup, render, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -15,6 +15,12 @@ function PollerProbe({ runId }: { runId: string | null }) {
       <span data-testid="status">{result.status ?? "none"}</span>
       <span data-testid="loading">{String(result.isLoading)}</span>
       <span data-testid="error">{result.error ?? ""}</span>
+      <span data-testid="error-kind">{result.errorKind ?? ""}</span>
+      <span data-testid="prompt">{result.prompt ?? ""}</span>
+      <span data-testid="created-at">{result.createdAt ?? ""}</span>
+      <button type="button" data-testid="retry" onClick={result.retry}>
+        retry
+      </button>
     </div>
   );
 }
@@ -78,5 +84,91 @@ describe("usePipelinePoller", () => {
     expect(getByTestId("status").textContent).toBe("running");
     expect(getByTestId("loading").textContent).toBe("true");
     expect(getByTestId("error").textContent).toBe("仍在生成，可稍后到历史记录查看");
+  });
+
+  it("recovers from a single transient poll failure without surfacing an error", async () => {
+    vi.useFakeTimers();
+    let calls = 0;
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/runs/run-1`, () => {
+        calls += 1;
+        if (calls === 1) return HttpResponse.error();
+        return HttpResponse.json(fixtureRun("running"));
+      }),
+    );
+
+    const { getByTestId } = render(<PollerProbe runId="run-1" />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+
+    expect(calls).toBeGreaterThan(1);
+    expect(getByTestId("status").textContent).toBe("running");
+    expect(getByTestId("error").textContent).toBe("");
+    expect(getByTestId("error-kind").textContent).toBe("");
+  });
+
+  it("declares a network failure only after consecutive poll failures", async () => {
+    vi.useFakeTimers();
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/runs/run-1`, () => HttpResponse.error()),
+    );
+
+    const { getByTestId } = render(<PollerProbe runId="run-1" />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+
+    expect(getByTestId("status").textContent).toBe("failed");
+    expect(getByTestId("error-kind").textContent).toBe("network");
+    expect(getByTestId("error").textContent).toBe(
+      "连接服务器失败，请检查网络后重试",
+    );
+    expect(getByTestId("loading").textContent).toBe("false");
+  });
+
+  it("marks backend-reported failures as run_failed and exposes the prompt", async () => {
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/runs/run-1`, () =>
+        HttpResponse.json(fixtureRun("failed")),
+      ),
+    );
+
+    const { getByTestId } = render(<PollerProbe runId="run-1" />);
+
+    await waitFor(() => expect(getByTestId("status").textContent).toBe("failed"));
+    expect(getByTestId("error-kind").textContent).toBe("run_failed");
+    expect(getByTestId("error").textContent).toBe("生成失败");
+    expect(getByTestId("prompt").textContent).toBe("讲解二分查找");
+    expect(getByTestId("created-at").textContent).toBe(
+      "2026-06-02T00:00:00.000Z",
+    );
+  });
+
+  it("restarts polling after retry() and recovers", async () => {
+    vi.useFakeTimers();
+    let healthy = false;
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/runs/run-1`, () => {
+        if (!healthy) return HttpResponse.error();
+        return HttpResponse.json(fixtureRun("running"));
+      }),
+    );
+
+    const { getByTestId } = render(<PollerProbe runId="run-1" />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(getByTestId("error-kind").textContent).toBe("network");
+
+    healthy = true;
+    fireEvent.click(getByTestId("retry"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+
+    expect(getByTestId("status").textContent).toBe("running");
+    expect(getByTestId("error").textContent).toBe("");
+    expect(getByTestId("loading").textContent).toBe("true");
   });
 });

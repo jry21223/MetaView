@@ -1,6 +1,6 @@
 # MetaView Logo
 
-MetaView uses an MV viewport mark: a rounded frame with one continuous motion path. The path reads as `M -> V`, while the node at the upper right suggests object identity, property tracks, and camera focus.
+MetaView uses a rounded cream viewport mark with a light grid, a connected graph path, and green focus nodes. The mark suggests visual analysis, connected data points, and camera focus.
 
 ## Assets
 
@@ -16,9 +16,9 @@ MetaView uses an MV viewport mark: a rounded frame with one continuous motion pa
 
 ## Colors
 
-- Primary accent: `#10b981`.
-- Dark lockup: background `#0e1412`, path `#4de8b0`, node `#f7d65c`.
-- Light lockup: background `#faf8f3`, path `#00896e`, node `#b07d00`.
+- Primary accent: `#7f9f86`.
+- Icon background: `#f7f4ec`, border/grid `#e2ded2` / `#ebe7dd`, path `#1d2521`, nodes `#7f9f86`.
+- Lockups retain their dark and light wordmark treatments until the horizontal logo art is refreshed.
 
 ## Usage
 
@@ -31,7 +31,7 @@ MetaView uses an MV viewport mark: a rounded frame with one continuous motion pa
 ## Do Not
 
 - Stretch, rotate, or skew the mark.
-- Replace the path with a gradient or a multi-color decorative stroke.
-- Remove the focus node.
+- Replace the graph path with a gradient or a multi-color decorative stroke.
+- Remove the focus nodes or grid.
 - Place the dark lockup on a light surface or the light lockup on a dark surface.
 - Recreate the wordmark with a live font; the lockup SVG uses vector strokes so it does not depend on external fonts.

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 160" role="img" aria-label="Animal cell outline" data-asset-id="cell-outline" data-asset-quality="v1">
+  <defs>
+    <radialGradient id="cell-cytoplasm" cx=".42" cy=".38" r=".68">
+      <stop offset="0" stop-color="#f8fff6"/>
+      <stop offset=".6" stop-color="#dff1d5"/>
+      <stop offset="1" stop-color="#b9d6c5"/>
+    </radialGradient>
+  </defs>
+  <path d="M28 77 C20 35 70 14 117 20 C168 27 204 53 196 94 C188 136 141 151 91 141 C48 132 34 112 28 77Z" fill="url(#cell-cytoplasm)" stroke="#5b8c6a" stroke-width="7"/>
+  <path d="M40 75 C48 45 80 34 116 36 C153 39 180 57 180 91" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" opacity=".45"/>
+</svg>

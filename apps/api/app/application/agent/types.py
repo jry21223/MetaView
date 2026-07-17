@@ -4,6 +4,9 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.domain.models.coverage import CoverageDecision
+from app.domain.models.lesson_plan import LessonPlan
+
 
 class AgentConstraints(BaseModel):
     max_self_repair_attempts: int = 2
@@ -44,6 +47,8 @@ class AgentRequest(BaseModel):
     source_code: str | None = None
     language: str | None = None
     route_decision: dict[str, Any] = Field(default_factory=dict)
+    coverage_decision: CoverageDecision | None = None
+    lesson_plan: LessonPlan | None = None
     provider_config: dict[str, Any] | None = None
     playbook_schema: dict[str, Any] = Field(default_factory=dict)
     constraints: AgentConstraints = Field(default_factory=AgentConstraints)

@@ -1,29 +1,71 @@
-import { APP_EDITION } from '../shared/config/constants';
-import { OpsAppShell } from './OpsAppShell';
-import { SelfAppShell } from './SelfAppShell';
-import { PaymentResultPage } from '../pages/PaymentResultPage';
-import { OpsDashboardPage } from '../pages/OpsDashboard/OpsDashboardPage';
+import { BrowserRouter, Route, Routes, useNavigate } from "react-router-dom";
+import type { AppEdition } from "../shared/config/constants";
+import { PaymentResultPage } from "../pages/PaymentResultPage";
+import { OpsDashboardPage } from "../pages/OpsDashboard/OpsDashboardPage";
+import { AssetShowcasePage } from "../pages/AssetShowcase/AssetShowcasePage";
+import { LandingRoute } from "./LandingRoute";
+import { OpsAppShell } from "./OpsAppShell";
+import { SelfAppShell } from "./SelfAppShell";
+import { stageToPath } from "./routes";
+
+function resolveAppEdition(): AppEdition {
+  return import.meta.env.VITE_APP_EDITION === "ops" ? "ops" : "self";
+}
 
 export function App() {
-  if (window.location.pathname === '/payment/result') {
-    return <PaymentResultPage />;
-  }
-  if (window.location.pathname === '/admin') {
-    if (APP_EDITION === 'ops') {
-      return <OpsDashboardPage onNavigate={() => {}} />;
-    }
-    return (
-      <main className="mv-root mv-admin-unavailable">
-        <section className="mv-admin-unavailable__panel">
-          <h1>运营后台仅在 ops edition 可用</h1>
-          <p>当前是 self edition。后端仍会继续执行管理员权限校验。</p>
-          <button type="button" className="mv-chip" onClick={() => window.location.assign("/")}>
-            返回工作台
-          </button>
-        </section>
-      </main>
-    );
-  }
+  return (
+    <BrowserRouter>
+      <AppRoutes />
+    </BrowserRouter>
+  );
+}
 
-  return APP_EDITION === 'ops' ? <OpsAppShell /> : <SelfAppShell />;
+function AppRoutes() {
+  const appEdition = resolveAppEdition();
+
+  return (
+    <Routes>
+      <Route path="/" element={<LandingRoute appEdition={appEdition} />} />
+      <Route path="/payment/result" element={<PaymentResultPage />} />
+      <Route
+        path="/admin"
+        element={
+          appEdition === "ops" ? (
+            <OpsDashboardRoute />
+          ) : (
+            <AdminUnavailable />
+          )
+        }
+      />
+      <Route path="/asset-showcase" element={<AssetShowcasePage />} />
+      <Route
+        path="/*"
+        element={appEdition === "ops" ? <OpsAppShell /> : <SelfAppShell />}
+      />
+    </Routes>
+  );
+}
+
+function OpsDashboardRoute() {
+  const navigate = useNavigate();
+  return (
+    <OpsDashboardPage
+      onNavigate={(stage) => navigate(stageToPath(stage))}
+    />
+  );
+}
+
+function AdminUnavailable() {
+  const navigate = useNavigate();
+  return (
+    <main className="mv-root mv-admin-unavailable">
+      <section className="mv-admin-unavailable__panel">
+        <h1>运营后台仅在 ops edition 可用</h1>
+        <p>当前是 self edition。后端仍会继续执行管理员权限校验。</p>
+        <button type="button" className="mv-chip" onClick={() => navigate("/")}>
+          返回首页
+        </button>
+      </section>
+    </main>
+  );
 }

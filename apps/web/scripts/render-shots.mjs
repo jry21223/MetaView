@@ -11,7 +11,11 @@
  *
  * Env:
  *   SHOT_THEME       "dark" | "light"   (default dark)
+ *   SHOT_FRAME       fixed frame to render once instead of per-step shots
+ *   SHOT_LABEL       output label when SHOT_FRAME is set (default mcp-preview)
+ *   SHOT_DIRECTOR_PATH optional DirectorScript JSON path to pass to the playbook composition
  *   REMOTION_ENTRY   override entry path (default apps/web/src/remotion/index.ts from cwd)
+ *   REMOTION_PUBLIC_DIR override public assets dir (default apps/web/public from cwd)
  */
 import { bundle } from "@remotion/bundler";
 import { renderStill, selectComposition } from "@remotion/renderer";
@@ -27,30 +31,46 @@ if (!playbookPath) {
 
 const theme = process.env.SHOT_THEME ?? "dark";
 const entry = process.env.REMOTION_ENTRY ?? path.resolve("apps/web/src/remotion/index.ts");
+const publicDir = process.env.REMOTION_PUBLIC_DIR ?? path.resolve("apps/web/public");
 
 const script = JSON.parse(fs.readFileSync(playbookPath, "utf8"));
+const director = process.env.SHOT_DIRECTOR_PATH
+  ? JSON.parse(fs.readFileSync(process.env.SHOT_DIRECTOR_PATH, "utf8"))
+  : null;
 fs.mkdirSync(outDir, { recursive: true });
 
 console.log(`[render-shots] bundling ${entry} ...`);
-const serveUrl = await bundle({ entryPoint: entry });
+const serveUrl = await bundle({ entryPoint: entry, publicDir });
 
-const inputProps = { script, theme, showSubtitles: true, audioFiles: [] };
+const inputProps = { script, director, theme, showSubtitles: true, audioFiles: [] };
 const composition = await selectComposition({ serveUrl, id: "playbook", inputProps });
 
-// Pick a representative frame per step: 85% into the step's window, where the
-// reveal/fade animations have settled but before the next step begins.
+const requestedFrame = process.env.SHOT_FRAME;
 const steps = Array.isArray(script.steps) ? script.steps : [];
 const shots = [];
-let start = 0;
-if (steps.length === 0) {
-  shots.push({ label: "frame-000", frame: 0, title: script.title ?? "" });
+
+if (requestedFrame !== undefined) {
+  const frame = Number.parseInt(requestedFrame, 10);
+  if (!Number.isFinite(frame) || frame < 0) {
+    console.error(`[render-shots] invalid SHOT_FRAME: ${requestedFrame}`);
+    process.exit(1);
+  }
+  const clampedFrame = Math.min(frame, Math.max(0, composition.durationInFrames - 1));
+  shots.push({ label: process.env.SHOT_LABEL ?? "mcp-preview", frame: clampedFrame, title: script.title ?? "" });
 } else {
-  steps.forEach((s, i) => {
-    const end = s.end_frame;
-    const frame = Math.max(start, Math.min(end - 1, Math.round(start + (end - start) * 0.85)));
-    shots.push({ label: `step-${String(i + 1).padStart(2, "0")}`, frame, title: s.title ?? "" });
-    start = end;
-  });
+  // Pick a representative frame per step: 85% into the step's window, where the
+  // reveal/fade animations have settled but before the next step begins.
+  let start = 0;
+  if (steps.length === 0) {
+    shots.push({ label: "frame-000", frame: 0, title: script.title ?? "" });
+  } else {
+    steps.forEach((s, i) => {
+      const end = s.end_frame;
+      const frame = Math.max(start, Math.min(end - 1, Math.round(start + (end - start) * 0.85)));
+      shots.push({ label: `step-${String(i + 1).padStart(2, "0")}`, frame, title: s.title ?? "" });
+      start = end;
+    });
+  }
 }
 
 for (const { label, frame, title } of shots) {

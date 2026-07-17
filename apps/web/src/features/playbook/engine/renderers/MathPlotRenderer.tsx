@@ -132,6 +132,7 @@ interface CompiledCurve {
   expression: string;
   label: string | null | undefined;
   emphasis: string | undefined;
+  semanticRole: string | undefined;
   fn: CompiledExpr | null;
   points: SamplePoint[];
   primaryIndex: number;
@@ -166,6 +167,7 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({ step, frame, stepSta
         expression: c.expression,
         label: c.label,
         emphasis: c.emphasis,
+        semanticRole: c.semantic_role,
         fn,
         points: fn ? sampleExpr(fn, xMin, xMax, SAMPLES, snap.params) : [],
         primaryIndex,
@@ -256,9 +258,7 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({ step, frame, stepSta
     if (Number.isFinite(my)) {
       const xFrac = (snap.marker_x - xMin) / (xMax - xMin);
       const opacity = clamp01((reveal - Math.min(0.85, xFrac)) * 6);
-      if (opacity > 0) {
-        marker = { px: sx(snap.marker_x), py: sy(my), mx: snap.marker_x, my, opacity };
-      }
+      marker = { px: sx(snap.marker_x), py: sy(my), mx: snap.marker_x, my, opacity };
     }
   }
 
@@ -272,6 +272,10 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({ step, frame, stepSta
 
   return (
     <div
+      className="math-plot-renderer"
+      data-theme={theme}
+      data-pack-id={snap.pack_id ?? undefined}
+      data-plot-asset-id={snap.asset_id ?? undefined}
       style={{
         width: "100%",
         height: "100%",
@@ -307,6 +311,7 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({ step, frame, stepSta
         </h2>
         {formulaHtml && (
           <div
+            data-semantic-role="formula"
             style={{
               flexShrink: 0,
               padding: "6px 12px",
@@ -473,10 +478,11 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({ step, frame, stepSta
                 const segments = toSegments(shown);
                 const lastFinite = [...shown].reverse().find((p) => Number.isFinite(p.y));
                 return (
-                  <g key={`curve-${ci}`}>
+                  <g key={`curve-${ci}`} data-semantic-role={c.semanticRole ?? "curve"}>
                     {segments.map((seg, si) => (
                       <polyline
                         key={si}
+                        data-semantic-role={c.semanticRole ?? "curve"}
                         points={pointsToPath(seg)}
                         fill="none"
                         stroke={stroke}
@@ -503,7 +509,7 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({ step, frame, stepSta
               })}
 
               {marker && (
-                <g opacity={marker.opacity}>
+                <g opacity={marker.opacity} data-semantic-role="marker">
                   <line
                     x1={marker.px}
                     y1={marker.py}

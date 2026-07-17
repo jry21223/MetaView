@@ -15,6 +15,7 @@ import { CodeHighlightRenderer } from "../renderers/CodeHighlightRenderer";
 import { domainCapability } from "../domainCapabilities";
 import { getParamPanel } from "../param-panels/registry";
 import { hasReplayableAlgorithmParams } from "../param-panels/AlgorithmParamPanel";
+import { hasEditableMathParams } from "../param-panels/mathParams";
 import { resolveDirectorVoiceover } from "../director";
 import { emitNativeEvent } from "../../../../shared/native/emitNativeEvent";
 import { MobileSheet } from "./MobileSheet";
@@ -25,6 +26,12 @@ import { ExportSVG, MoreSVG, SettingsSVG, TopbarFoldIcon } from "./PlaybookPlaye
 import { PlaybookPortraitShell, type MobileTabKey } from "./PlaybookPortraitShell";
 import { clipCodeOverlay } from "./mobileCodeOverlay";
 import { SPEED_STEPS } from "./playbackRates";
+import { InteractionSandboxPanel } from "../../interaction/InteractionSandboxPanel";
+import { useInteractionSandbox } from "../../interaction/useInteractionSandbox";
+import type {
+  DerivativeInteractionBinding,
+  InteractionManifest,
+} from "../../interaction/types";
 
 export type PlaybookLayoutMode = "desktop" | "portrait";
 
@@ -53,6 +60,21 @@ function useAutoLayoutMode(layoutMode?: PlaybookLayoutMode): PlaybookLayoutMode 
   return layoutMode ?? autoLayoutMode;
 }
 
+function derivativeInteractionManifest(
+  manifest: InteractionManifest,
+): InteractionManifest {
+  return {
+    version: manifest.version,
+    adapters: manifest.adapters.flatMap((adapter) => {
+      const bindings = adapter.bindings.filter(
+        (binding): binding is DerivativeInteractionBinding =>
+          binding.target_role === "marker-x",
+      );
+      return bindings.length > 0 ? [{ ...adapter, bindings }] : [];
+    }),
+  };
+}
+
 // ── Main component ─────────────────────────────────────────────────────────
 
 interface PlaybookPlayerProps {
@@ -70,6 +92,8 @@ interface PlaybookPlayerProps {
   followupSlot?: React.ReactNode;
   relatedSlot?: React.ReactNode;
   showLearningConsole?: boolean;
+  /** Opts this player instance into the experimental, ephemeral interaction sandbox. */
+  enableInteractionSandbox?: boolean;
   topbarCollapsed?: boolean;
   onToggleTopbar?: () => void;
   layoutMode?: PlaybookLayoutMode;
@@ -78,12 +102,13 @@ interface PlaybookPlayerProps {
 export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   script: baseScript,
   director = null,
-  theme = "dark",
+  theme = "light",
   swapDurationFrames = 24,
   onOpenExport,
   followupSlot,
   relatedSlot,
   showLearningConsole = true,
+  enableInteractionSandbox = false,
   topbarCollapsed = false,
   onToggleTopbar,
   layoutMode,
@@ -98,11 +123,23 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   const [mobileTab, setMobileTab] = useState<MobileTabKey>("narration");
   const [mobileSheet, setMobileSheet] = useState<MobileTabKey | null>(null);
   const script = useResolvedScript(baseScript, overrides);
+  const interactionSandbox = useInteractionSandbox(script);
+  const interactionEnabled = enableInteractionSandbox && showLearningConsole;
+  const displayScript = interactionEnabled
+    ? interactionSandbox.previewScript
+    : script;
+  const interactionManifest = useMemo(
+    () => derivativeInteractionManifest(interactionSandbox.manifest),
+    [interactionSandbox.manifest],
+  );
   const capability = useMemo(() => domainCapability(script.domain), [script.domain]);
   const hasDomainPanel = useMemo(() => {
     if (getParamPanel(baseScript.domain) === null) return false;
     if (baseScript.domain === "algorithm") {
       return hasReplayableAlgorithmParams(baseScript);
+    }
+    if (baseScript.domain === "math") {
+      return hasEditableMathParams(baseScript.parameter_controls);
     }
     return true;
   }, [baseScript]);
@@ -112,9 +149,15 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   useEffect(() => {
     const id = setTimeout(() => {
       setOverrides((current) => (Object.keys(current).length > 0 ? {} : current));
+      setMobileTab((current) =>
+        current === "params" && !hasDomainPanel ? "narration" : current,
+      );
+      setMobileSheet((current) =>
+        current === "params" && !hasDomainPanel ? null : current,
+      );
     }, 0);
     return () => clearTimeout(id);
-  }, [baseScript]);
+  }, [baseScript, hasDomainPanel]);
 
   const tts = useTTS();
   // Push the playbook domain into useTTS so AUTO-voice resolution still
@@ -141,21 +184,22 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     ? Math.min(currentStepIndex, script.steps.length - 1)
     : 0;
   const codeOverlay = useMemo(
-    () => resolveCodePanelOverlay(script, safeStepIndex),
-    [script, safeStepIndex],
+    () => resolveCodePanelOverlay(displayScript, safeStepIndex),
+    [displayScript, safeStepIndex],
   );
   const mobileCodeOverlay = useMemo(
     () => clipCodeOverlay(codeOverlay),
     [codeOverlay],
   );
 
-  // Show code panel slot for algorithm domain, or any script that has code highlights.
-  const isAlgorithmDomain = script.domain === "algorithm";
+  // Show the code slot for algorithm lessons, explicit code tracks, or a
+  // legacy snapshot that can be projected into the right-side console.
+  const isAlgorithmDomain = displayScript.domain === "algorithm";
   const hasAnyCode = useMemo(
-    () => script.steps.some((s) => s.code_highlight != null),
-    [script.steps],
+    () => displayScript.steps.some((s) => s.code_highlight != null),
+    [displayScript.steps],
   );
-  const showCodePanelSlot = isAlgorithmDomain || hasAnyCode;
+  const showCodePanelSlot = isAlgorithmDomain || hasAnyCode || codeOverlay != null;
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayerSettings, setShowPlayerSettings] = useState(false);
@@ -251,6 +295,27 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   }
 
   const currentStep = script.steps[safeStepIndex];
+  const hasCurrentInteraction = interactionManifest.adapters.some((adapter) =>
+    adapter.bindings.some((binding) => binding.step_id === currentStep.step_id)
+  );
+  const showInteractionSlot = interactionEnabled && (
+    hasCurrentInteraction ||
+    interactionSandbox.dirty ||
+    interactionSandbox.lastError !== null
+  );
+  const interactionSlot = showInteractionSlot ? (
+    <InteractionSandboxPanel
+      manifest={interactionManifest}
+      currentStepId={currentStep.step_id}
+      events={interactionSandbox.events}
+      dirty={interactionSandbox.dirty}
+      canUndo={interactionSandbox.canUndo}
+      lastError={interactionSandbox.lastError}
+      onApply={interactionSandbox.apply}
+      onUndo={interactionSandbox.undo}
+      onReset={interactionSandbox.reset}
+    />
+  ) : undefined;
   const isDark = theme === "dark";
   const currentNarrationFallback =
     currentStep.narration_template && currentStep.tokens.length > 0
@@ -262,12 +327,17 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     currentNarrationFallback,
   );
   const showMobileConsole = isPortraitLayout && showLearningConsole;
+  const effectiveMobileTab =
+    mobileTab === "params" && !hasDomainPanel ? "narration" : mobileTab;
+  const effectiveMobileSheet =
+    mobileSheet === "params" && !hasDomainPanel ? null : mobileSheet;
+  const showStageSubtitles = !(showMobileConsole && effectiveMobileTab === "narration");
   const mobileSheetTitle =
-    mobileSheet === "code"
+    effectiveMobileSheet === "code"
       ? "全部代码"
-      : mobileSheet === "params"
+      : effectiveMobileSheet === "params"
         ? "参数"
-        : mobileSheet === "followup"
+        : effectiveMobileSheet === "followup"
           ? "追问"
           : "更多";
   const selectMobileTab = (tab: MobileTabKey) => {
@@ -340,10 +410,11 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
           ref={playerRef}
           component={PlaybookComposition}
           inputProps={{
-            script,
+            script: displayScript,
             director,
             theme,
-            showSubtitles: true,
+            showSubtitles: showStageSubtitles,
+            showInlineCode: false,
             swapDurationFrames,
           }}
           durationInFrames={script.total_frames}
@@ -458,7 +529,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
           stageSlot={stageSlot}
           controlsSlot={controlsSlot}
           showMobileConsole={showMobileConsole}
-          activeTab={mobileTab}
+          activeTab={effectiveMobileTab}
           onSelectTab={selectMobileTab}
           onOpenSheet={openMobileSheet}
           mobileCodeOverlay={mobileCodeOverlay}
@@ -531,11 +602,6 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
 
         {stageSlot}
 
-        <div className="playbook-player__caption">
-          <span aria-hidden="true" />
-          <p>{currentNarration || currentStep.title}</p>
-        </div>
-
         {controlsSlot}
       </div>
       )}
@@ -549,15 +615,16 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
           baseScript={baseScript}
           overrides={overrides}
           onOverridesChange={setOverrides}
+          interactionSlot={interactionSlot}
           followupSlot={followupSlot}
           relatedSlot={relatedSlot}
           relatedAlgorithmId={script.algorithm_id}
         />
       )}
 
-      {showMobileConsole && mobileSheet && (
+      {showMobileConsole && effectiveMobileSheet && (
         <MobileSheet title={mobileSheetTitle} onClose={() => setMobileSheet(null)}>
-          {mobileSheet === "code" && (
+          {effectiveMobileSheet === "code" && (
             <div className="playbook-player__mobile-sheet-code">
               {codeOverlay ? (
                 <CodeHighlightRenderer overlay={codeOverlay} theme={theme} />
@@ -566,7 +633,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
               )}
             </div>
           )}
-          {mobileSheet === "params" && (
+          {effectiveMobileSheet === "params" && (
             <div className="playbook-player__mobile-sheet-section">
               {hasDomainPanel ? (
                 <ParamPanelSlot
@@ -581,14 +648,14 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
               )}
             </div>
           )}
-          {mobileSheet === "followup" && (
+          {effectiveMobileSheet === "followup" && (
             <div className="playbook-player__mobile-followup-sheet">
               {followupSlot ?? (
                 <div className="playbook-player__mobile-empty">当前讲解暂不能继续追问。</div>
               )}
             </div>
           )}
-          {mobileSheet === "more" && (
+          {effectiveMobileSheet === "more" && (
             <div className="playbook-player__mobile-more-sheet">
               <div className="playbook-player__mobile-sheet-actions">
                 {onOpenExport && (

@@ -10,6 +10,7 @@ In agent mode the use case must:
 from __future__ import annotations
 
 import json
+from functools import partial
 from typing import Any
 
 import pytest
@@ -17,13 +18,21 @@ import pytest
 from app.application.agent.types import AgentRequest, AgentResult
 from app.application.dto.pipeline_dto import PipelineRequest
 from app.application.ports.agent_provider import AgentProviderError
-from app.application.use_cases.run_pipeline import RunPipelineUseCase
+from app.application.use_cases.run_pipeline import RunPipelineUseCase as _RunPipelineUseCase
 from app.domain.skills.registry import SkillRegistry
+from tests.coverage_test_utils import ComposableCoverageResolver
+
+RunPipelineUseCase = partial(
+    _RunPipelineUseCase,
+    coverage_resolver=ComposableCoverageResolver(),
+)
 
 
 class _RecordingRepo:
     def __init__(self) -> None:
         self.updates: list[dict[str, Any]] = []
+        self.quality_reports: list[dict[str, Any]] = []
+        self.lesson_plans: list[dict[str, Any]] = []
 
     async def create(self, run_id: str, prompt: str, created_at: str) -> None:
         return None
@@ -36,6 +45,16 @@ class _RecordingRepo:
 
     async def update(self, run_id: str, **kwargs: Any) -> None:
         self.updates.append({"run_id": run_id, **kwargs})
+
+    async def update_quality_report(self, run_id: str, quality_report_json: str) -> None:
+        self.quality_reports.append(
+            {"run_id": run_id, "report": json.loads(quality_report_json)}
+        )
+
+    async def update_lesson_plan(self, run_id: str, lesson_plan_json: str) -> None:
+        self.lesson_plans.append(
+            {"run_id": run_id, "lesson_plan": json.loads(lesson_plan_json)}
+        )
 
 
 class _RecordingDirectorRepo:
@@ -167,7 +186,7 @@ def _algorithm_step(index: int) -> dict[str, Any]:
     }
     return {
         "step_id": f"step_{index:02d}",
-        "end_frame": index * 60,
+        "end_frame": index * 180,
         "title": f"Array state {index}",
         "voiceover_text": f"Show the array state {index} and explain the array result.",
         "tokens": [
@@ -227,7 +246,7 @@ def _motion_step(index: int) -> dict[str, Any]:
     }
     return {
         "step_id": f"motion_{index:02d}",
-        "end_frame": index * 60,
+        "end_frame": index * 180,
         "title": f"Move point {index}",
         "voiceover_text": f"Track the motion scene point across the canvas in step {index}.",
         "tokens": [],
@@ -256,7 +275,7 @@ def _blocking_issue(code: str = "review.final_answer_missing") -> dict[str, Any]
 
 _MIN_PLAYBOOK: dict[str, Any] = {
     "fps": 30,
-    "total_frames": 480,
+    "total_frames": 1440,
     "domain": "algorithm",
     "title": "Sample",
     "summary": "From agent",
@@ -267,7 +286,7 @@ _MIN_PLAYBOOK: dict[str, Any] = {
 
 _MOTION_SCENE_PLAYBOOK: dict[str, Any] = {
     "fps": 30,
-    "total_frames": 480,
+    "total_frames": 1440,
     "domain": "math",
     "title": "Motion Scene",
     "summary": "Agent-authored object motion scene",
@@ -290,9 +309,12 @@ async def test_agent_mode_routes_to_agent_provider() -> None:
         reviewer_mode="off",
     )
 
-    await use_case.execute("run-1", PipelineRequest(prompt="hello math"))
+    await use_case.execute(
+        "run-1", PipelineRequest(prompt="hello math", domain="algorithm")
+    )
 
-    assert agent.calls[0]["prompt"] == "hello math"
+    assert "[MetaView LessonPlan]" in agent.calls[0]["prompt"]
+    assert agent.calls[0]["prompt"].endswith("[user prompt]\nhello math")
     assert agent.calls[0]["provider_config"] is None
     assert agent.calls[0]["route_decision"]["destination"] == "generic_cir"
     # The final update must carry the persisted playbook JSON.
@@ -308,9 +330,11 @@ async def test_agent_mode_routes_to_agent_provider() -> None:
     review = json.loads(last["review_json"])
     assert review["status"] == "clean"
     assert "agent:self_check:clean" in review["actions"]
-    assert "agent_skill:generic" in review["actions"]
+    assert "agent_skill:algorithm" in review["actions"]
     assert "reviewer:disabled" in review["actions"]
     assert "reviewer:unconfigured" not in review["actions"]
+    assert repo.quality_reports[-1]["report"]["status"] == "clean"
+    assert repo.quality_reports[-1]["report"]["generator_path"] == "agent"
     assert director_repo.upserts[0]["director"].run_id == "run-1"
     assert director_repo.upserts[0]["director"].beats[0].step_id == "step_01"
 
@@ -327,7 +351,10 @@ async def test_agent_mode_calls_wide_run_contract_when_available() -> None:
         reviewer_mode="off",
     )
 
-    await use_case.execute("run-wide", PipelineRequest(prompt="hello math"))
+    await use_case.execute(
+        "run-wide",
+        PipelineRequest(prompt="hello math", domain="math"),
+    )
 
     request = agent.requests[0]
     assert request.run_id == "run-wide"
@@ -335,6 +362,9 @@ async def test_agent_mode_calls_wide_run_contract_when_available() -> None:
     assert request.route_decision["destination"] == "generic_cir"
     assert request.playbook_schema["title"] == "PlaybookScript"
     assert "playbook.schema.validate" in {tool.name for tool in request.available_tools}
+    assert request.lesson_plan is not None
+    assert request.lesson_plan.domain == "math"
+    assert repo.lesson_plans[-1]["lesson_plan"] == request.lesson_plan.model_dump(mode="json")
     assert repo.updates[-1]["status"].value == "succeeded"
 
 
@@ -362,7 +392,34 @@ async def test_agent_mode_records_domain_agent_skill_action() -> None:
 
 
 @pytest.mark.asyncio
-async def test_agent_mode_missing_reviewer_fails_when_reviewer_enabled() -> None:
+async def test_agent_mode_missing_reviewer_fails_when_reviewer_always_enabled() -> None:
+    repo = _RecordingRepo()
+    agent = _FakeAgent(_MIN_PLAYBOOK)
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        agent_provider=agent,
+        generation_mode="agent",
+        reviewer_mode="always",
+    )
+
+    await use_case.execute(
+        "run-reviewer-missing",
+        PipelineRequest(prompt="Show the array", domain="algorithm"),
+    )
+
+    last = repo.updates[-1]
+    assert last["status"].value == "failed"
+    assert "reviewer.unconfigured" in last["error"]
+    assert "playbook_json" not in last
+    review = json.loads(last["review_json"])
+    assert review["status"] == "blocked"
+    assert review["issues"][0]["code"] == "reviewer.unconfigured"
+    assert "reviewer:unconfigured" in review["actions"]
+
+
+@pytest.mark.asyncio
+async def test_agent_mode_on_failure_without_reviewer_skips_clean_self_check() -> None:
     repo = _RecordingRepo()
     agent = _FakeAgent(_MIN_PLAYBOOK)
     use_case = RunPipelineUseCase(
@@ -373,7 +430,38 @@ async def test_agent_mode_missing_reviewer_fails_when_reviewer_enabled() -> None
         reviewer_mode="on_failure",
     )
 
-    await use_case.execute("run-reviewer-missing", PipelineRequest(prompt="Show the array"))
+    await use_case.execute(
+        "run-reviewer-missing",
+        PipelineRequest(prompt="Show the array", domain="algorithm"),
+    )
+
+    last = repo.updates[-1]
+    assert last["status"].value == "succeeded"
+    assert "playbook_json" in last
+    review = json.loads(last["review_json"])
+    assert review["status"] == "clean"
+    assert "agent:self_check:clean" in review["actions"]
+    assert "reviewer:skipped_on_clean_self_check" in review["actions"]
+    assert "reviewer:unconfigured" not in review["actions"]
+    assert "reviewer:status:blocked" not in review["actions"]
+
+
+@pytest.mark.asyncio
+async def test_agent_mode_math_always_requires_reviewer_in_math_domain() -> None:
+    repo = _RecordingRepo()
+    agent = _FakeAgent(_MIN_PLAYBOOK)
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        agent_provider=agent,
+        generation_mode="agent",
+        reviewer_mode="math_always",
+    )
+
+    await use_case.execute(
+        "run-reviewer-math-requires-reviewer",
+        PipelineRequest(prompt="Show the array", domain="math"),
+    )
 
     last = repo.updates[-1]
     assert last["status"].value == "failed"
@@ -398,7 +486,9 @@ async def test_agent_mode_clean_output_records_self_check_and_reviewer_status() 
         generation_mode="agent",
     )
 
-    await use_case.execute("run-clean", PipelineRequest(prompt="Show the array"))
+    await use_case.execute(
+        "run-clean", PipelineRequest(prompt="Show the array", domain="algorithm")
+    )
 
     last = repo.updates[-1]
     assert last["status"].value == "succeeded"
@@ -425,7 +515,9 @@ async def test_agent_mode_self_check_blocked_repairs_before_persisting() -> None
         generation_mode="agent",
     )
 
-    await use_case.execute("run-self-repair", PipelineRequest(prompt="Show the array"))
+    await use_case.execute(
+        "run-self-repair", PipelineRequest(prompt="Show the array", domain="algorithm")
+    )
 
     assert len(agent.calls) == 2
     assert "agent self-check blocked" in agent.calls[1]["prompt"]
@@ -458,7 +550,10 @@ async def test_agent_mode_reviewer_blocked_repairs_and_reruns_reviewer() -> None
         generation_mode="agent",
     )
 
-    await use_case.execute("run-reviewer-repair", PipelineRequest(prompt="Show the array"))
+    await use_case.execute(
+        "run-reviewer-repair",
+        PipelineRequest(prompt="Show the array", domain="algorithm"),
+    )
 
     assert len(agent.calls) == 2
     assert "third-party reviewer blocked" in agent.calls[1]["prompt"]
@@ -490,7 +585,10 @@ async def test_agent_mode_reviewer_blocked_after_max_attempts_fails() -> None:
         generation_mode="agent",
     )
 
-    await use_case.execute("run-reviewer-fail", PipelineRequest(prompt="Show the array"))
+    await use_case.execute(
+        "run-reviewer-fail",
+        PipelineRequest(prompt="Show the array", domain="algorithm"),
+    )
 
     last = repo.updates[-1]
     assert last["status"].value == "failed"
@@ -514,7 +612,10 @@ async def test_agent_mode_malformed_reviewer_json_fails_closed() -> None:
         generation_mode="agent",
     )
 
-    await use_case.execute("run-reviewer-malformed", PipelineRequest(prompt="Show the array"))
+    await use_case.execute(
+        "run-reviewer-malformed",
+        PipelineRequest(prompt="Show the array", domain="algorithm"),
+    )
 
     last = repo.updates[-1]
     assert last["status"].value == "failed"
@@ -535,7 +636,10 @@ async def test_agent_mode_structured_sidecar_self_check_failure_is_reviewed() ->
         generation_mode="agent",
     )
 
-    await use_case.execute("run-sidecar-self-check", PipelineRequest(prompt="Show the array"))
+    await use_case.execute(
+        "run-sidecar-self-check",
+        PipelineRequest(prompt="Show the array", domain="algorithm"),
+    )
 
     last = repo.updates[-1]
     assert last["status"].value == "failed"
@@ -545,6 +649,12 @@ async def test_agent_mode_structured_sidecar_self_check_failure_is_reviewed() ->
     assert review["status"] == "blocked"
     assert review["issues"][0]["code"] == "step.empty_voiceover"
     assert "agent:self_check:blocked" in review["actions"]
+    quality = repo.quality_reports[-1]["report"]
+    assert quality["status"] == "blocked"
+    assert {issue["code"] for issue in quality["issues"]} >= {
+        "step.empty_voiceover",
+        "quality.repair_unavailable",
+    }
 
 
 @pytest.mark.asyncio
@@ -559,7 +669,9 @@ async def test_agent_mode_accepts_motion_scene_playbook_contract() -> None:
         reviewer_mode="off",
     )
 
-    await use_case.execute("run-motion", PipelineRequest(prompt="show object motion"))
+    await use_case.execute(
+        "run-motion", PipelineRequest(prompt="show object motion", domain="math")
+    )
 
     last = repo.updates[-1]
     assert last["status"].value == "succeeded"
@@ -586,6 +698,7 @@ async def test_agent_mode_forwards_provider_override() -> None:
         "run-1",
         PipelineRequest(
             prompt="topic",
+            domain="algorithm",
             provider_api_key="sk-x",
             provider_base_url="https://example.com/v1",
             provider_model="qwen-plus",
@@ -609,7 +722,7 @@ async def test_agent_mode_bad_payload_fails_run() -> None:
         generation_mode="agent",
     )
 
-    await use_case.execute("run-1", PipelineRequest(prompt="x"))
+    await use_case.execute("run-1", PipelineRequest(prompt="x", domain="algorithm"))
 
     assert len(agent.calls) == 3
     assert repo.updates[-1]["status"].value == "failed"
@@ -634,7 +747,7 @@ async def test_agent_mode_rejects_legacy_id_only_step_payload() -> None:
         generation_mode="agent",
     )
 
-    await use_case.execute("run-1", PipelineRequest(prompt="x"))
+    await use_case.execute("run-1", PipelineRequest(prompt="x", domain="algorithm"))
 
     assert repo.updates[-1]["status"].value == "failed"
     assert "step_id" in repo.updates[-1]["error"]
@@ -656,7 +769,9 @@ async def test_agent_mode_rejects_invalid_third_party_reviewer_output() -> None:
         generation_mode="agent",
     )
 
-    await use_case.execute("run-1", PipelineRequest(prompt="hello math"))
+    await use_case.execute(
+        "run-1", PipelineRequest(prompt="hello math", domain="algorithm")
+    )
 
     last = repo.updates[-1]
     assert last["status"].value == "failed"
@@ -695,7 +810,9 @@ async def test_agent_mode_persists_third_party_reviewer_warnings() -> None:
         generation_mode="agent",
     )
 
-    await use_case.execute("run-1", PipelineRequest(prompt="hello math"))
+    await use_case.execute(
+        "run-1", PipelineRequest(prompt="hello math", domain="algorithm")
+    )
 
     last = repo.updates[-1]
     assert last["status"].value == "succeeded"
@@ -724,7 +841,9 @@ async def test_single_mode_does_not_call_agent() -> None:
         agent_provider=agent,
         generation_mode="single",
     )
-    await use_case.execute("run-1", PipelineRequest(prompt="single"))
+    await use_case.execute(
+        "run-1", PipelineRequest(prompt="single", domain="algorithm")
+    )
 
     # Agent must never be invoked.
     assert agent.calls == []

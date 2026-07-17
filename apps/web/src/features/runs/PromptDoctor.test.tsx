@@ -28,7 +28,7 @@ describe("PromptDoctor", () => {
     const html = renderToStaticMarkup(
       <PromptDoctor report={reviewReport} error="raw trace" />,
     );
-    expect(html).toContain("已尝试 2 次自动修复");
+    expect(html).toContain("已自动修复 2 次");
   });
 
   it("renders one pill per distinct suggestion", () => {
@@ -45,6 +45,30 @@ describe("PromptDoctor", () => {
     );
     expect(html).toContain("查看技术细节");
     expect(html).toContain("ValidationError: stack trace here");
+  });
+
+  it("does not expose an English-only backend suggestion in the recovery UI", () => {
+    const report: ReviewReport = {
+      status: "failed",
+      attempts: 0,
+      actions: [],
+      issues: [
+        {
+          code: "capability.text_only_required",
+          severity: "error",
+          path: "coverage_decision",
+          message: "Text-only output is not supported.",
+          suggestion: "Use a supported visual capability.",
+        },
+      ],
+    };
+
+    const html = renderToStaticMarkup(
+      <PromptDoctor report={report} error="raw trace" />,
+    );
+
+    expect(html).toContain("补充希望展示的画面");
+    expect(html).not.toContain("Use a supported visual capability");
   });
 
   it("invokes onRetryWithSuggestion when pill clicked", () => {

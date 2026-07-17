@@ -87,6 +87,9 @@ async def test_v1_math_skill_executes_playbook(
     match = skill.heuristic_match(SkillRouteInput(prompt=prompt))
     assert match is not None
     assert match.skill_id == expected_skill
+    assert match.capability_id in {
+        capability.capability_id for capability in skill.manifest.capabilities
+    }
     assert match.problem_spec is not None
     assert "answer" not in json.dumps(match.problem_spec)
 

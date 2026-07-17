@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 28" role="img" aria-label="Timeline arrow" data-asset-quality="v1">
+  <path d="M10 14h92" fill="none" stroke="#6b8095" stroke-width="3" stroke-linecap="round"/>
+  <path d="M100 5 121 14 100 23Z" fill="#6b8095"/>
+  <circle cx="26" cy="14" r="4.5" fill="#f7f9fc" stroke="#6b8095" stroke-width="2"/>
+  <circle cx="58" cy="14" r="4.5" fill="#f7f9fc" stroke="#6b8095" stroke-width="2"/>
+  <circle cx="90" cy="14" r="4.5" fill="#f7f9fc" stroke="#6b8095" stroke-width="2"/>
+</svg>

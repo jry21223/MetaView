@@ -1,0 +1,27 @@
+{
+  "id": "methane",
+  "source": "structured-preset",
+  "smiles": "C",
+  "formula": "CH4",
+  "formulaLatex": "CH_4",
+  "geometry": "tetrahedral",
+  "caption": "Methane is a tetrahedral molecule loaded from a SMILES-addressable structured preset.",
+  "atoms": [
+    { "id": "c", "element": "C", "x": 50, "y": 48, "label": "carbon" },
+    { "id": "h1", "element": "H", "x": 50, "y": 26, "label": "hydrogen" },
+    { "id": "h2", "element": "H", "x": 30, "y": 62, "label": "hydrogen" },
+    { "id": "h3", "element": "H", "x": 70, "y": 62, "label": "hydrogen" },
+    { "id": "h4", "element": "H", "x": 50, "y": 75, "label": "hydrogen" }
+  ],
+  "bonds": [
+    { "id": "ch1", "from": "c", "to": "h1", "order": 1 },
+    { "id": "ch2", "from": "c", "to": "h2", "order": 1 },
+    { "id": "ch3", "from": "c", "to": "h3", "order": 1 },
+    { "id": "ch4", "from": "c", "to": "h4", "order": 1 }
+  ],
+  "callouts": [
+    { "id": "methane-carbon-center", "target_id": "c", "label": "central carbon", "side": "right" },
+    { "id": "methane-tetrahedral", "target_id": "h4", "label": "tetrahedral geometry", "side": "bottom" }
+  ],
+  "notes": "Internal deterministic 2D teaching preset keyed by canonical methane SMILES; not a rendered molecule image."
+}

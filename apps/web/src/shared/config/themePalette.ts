@@ -30,7 +30,8 @@ export interface ThemePalette {
   warn: string;
 }
 
-const DEFAULT_ACCENT = "#10b981";
+const LIGHT_ACCENT = "#82976f";
+const DARK_ACCENT = "#9fb48d";
 
 /**
  * Identifier for every theme MetaView knows about. The pair "dark" / "light"
@@ -77,8 +78,8 @@ export const THEME_PALETTE: Record<ThemeName, ThemeDescriptor> = {
     ink3: "#5b6862",
     line: "#1d2a23",
     line2: "#27332c",
-    accent: DEFAULT_ACCENT,
-    accentSoft: `${DEFAULT_ACCENT}26`,
+    accent: DARK_ACCENT,
+    accentSoft: `${DARK_ACCENT}26`,
     warn: "#e9a23b",
   },
   light: {
@@ -90,8 +91,8 @@ export const THEME_PALETTE: Record<ThemeName, ThemeDescriptor> = {
     ink3: "#9aa39d",
     line: "#e6e2d5",
     line2: "#d6d1c2",
-    accent: DEFAULT_ACCENT,
-    accentSoft: `${DEFAULT_ACCENT}26`,
+    accent: LIGHT_ACCENT,
+    accentSoft: `${LIGHT_ACCENT}26`,
     warn: "#e9a23b",
   },
   monokai: {
@@ -103,7 +104,7 @@ export const THEME_PALETTE: Record<ThemeName, ThemeDescriptor> = {
     ink3: "#75715e",
     line: "#3e3d32",
     line2: "#49483e",
-    accent: "#f92672", // signature pink
+    accent: "#f92672",
     accentSoft: "#f9267226",
     warn: "#fd971f",
   },

@@ -120,10 +120,7 @@ describe("mobile web smoke", () => {
       expect(container.querySelector(".mv-intake-hero")).toBeTruthy();
       expect(container.querySelector(".mv-intake-composer")).toBeTruthy();
       expect(container.querySelector(".mv-intake-send")).toBeTruthy();
-      expect(container.querySelectorAll(".mv-tpl-card")).toHaveLength(4);
-      expect(
-        container.querySelector('[data-testid="meta-particle-field"][data-variant="canvas"]'),
-      ).toBeTruthy();
+      expect(container.querySelectorAll(".mv-intake-example")).toHaveLength(3);
       expect(
         container.querySelector<HTMLInputElement>('input[type="file"]')?.accept,
       ).toContain(".py");
@@ -148,10 +145,18 @@ describe("mobile web smoke", () => {
       expect(container.querySelector(".playbook-player--portrait")).toBeTruthy();
       expect(container.querySelector(".playbook-player__stage")).toBeTruthy();
       expect(container.querySelector(".playbook-player__controls")).toBeTruthy();
-      expect(container.querySelector(".playbook-player__caption--mobile")).toBeTruthy();
+      expect(container.querySelector(".playbook-player__caption--mobile")).toBeNull();
+      expect(container.querySelector(".playbook-player__mobile-narration")?.textContent).toContain(
+        "Narration",
+      );
       expect(container.querySelector(".playbook-player__export-btn")).toBeTruthy();
       expect(container.querySelector(".playbook-player__mobile-more-btn")).toBeTruthy();
-      expect(container.querySelectorAll(".playbook-player__mobile-tabs button")).toHaveLength(5);
+      expect(container.querySelectorAll(".playbook-player__mobile-tabs button")).toHaveLength(4);
+      expect(
+        Array.from(container.querySelectorAll(".playbook-player__mobile-tabs button")).some(
+          (tab) => tab.textContent?.includes("参数"),
+        ),
+      ).toBe(false);
       expect(container.querySelector(".playbook-player__console")).toBeNull();
     },
   );
@@ -180,6 +185,8 @@ describe("mobile web smoke", () => {
     expect(playbookCss).toContain(".playbook-player__mobile-sheet");
     expect(playbookCss).toContain("max-height: min(72vh, calc(var(--mv-vvh, 100vh) * 0.72));");
     expect(playbookCss).toContain("-webkit-overflow-scrolling: touch;");
+    expect(studioCss).toContain("grid-template-columns: repeat(4, minmax(0, 1fr));");
+    expect(studioCss).not.toContain(".mv-nav-item:nth-child(4)");
     expect(studioCss).toContain(".mv-meta-particle__canvas-node.is-mobile-hidden");
     expect(studioCss).toContain("@media (prefers-reduced-motion: reduce)");
   });

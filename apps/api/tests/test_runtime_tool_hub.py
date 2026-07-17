@@ -18,6 +18,8 @@ from app.domain.skills.base import (
 )
 from app.domain.skills.registry import SkillRegistry
 
+GLUCOSE_SMILES = "OC[C@H]1O[C@@H](O)[C@H](O)[C@H](O)[C@@H]1O"
+
 
 class FakeSpec(BaseModel):
     text: str
@@ -107,6 +109,7 @@ def test_runtime_tool_hub_lists_core_animation_geometry_and_skill_tools() -> Non
     names = {tool.name for tool in hub.list_tools()}
 
     assert "skill.registry.list" in names
+    assert "scene_blueprint.compile" in names
     assert "skill.fake_skill.solve" in names
     assert "playbook.schema.validate" in names
     assert "playbook.self_check" in names
@@ -285,6 +288,183 @@ async def test_runtime_tool_hub_runs_self_check() -> None:
     assert result.result is not None
     assert result.result["status"] == "blocked"
     assert result.result["issues"][0]["code"] == "step.too_shallow"
+
+
+def test_runtime_tool_hub_scene_blueprint_tool_uses_shared_schema_contract() -> None:
+    hub = RuntimeToolHub(skill_registry=SkillRegistry([]))
+
+    tool = hub.get_tool("scene_blueprint.compile")
+
+    assert tool is not None
+    blueprint_schema = tool.args_schema["properties"]["blueprint"]
+    assert blueprint_schema["$id"].endswith("/scene-blueprint.schema.json")
+    assert blueprint_schema["required"] == ["subject", "sceneType", "title", "visualIntent"]
+    assert "east_asia_monsoon" in blueprint_schema["properties"]["sceneType"]["enum"]
+
+
+@pytest.mark.asyncio
+async def test_runtime_tool_hub_rejects_invalid_scene_blueprint_before_compile() -> None:
+    hub = RuntimeToolHub(skill_registry=SkillRegistry([]))
+
+    result = await hub.execute_tool(
+        "scene_blueprint.compile",
+        {"blueprint": {"subject": "geography", "sceneType": "east_asia_monsoon"}},
+    )
+
+    assert result.ok is False
+    assert result.error is not None
+    assert result.error["code"] == "scene_blueprint.schema_invalid"
+    assert {error["path"] for error in result.error["errors"]} == {"title", "visualIntent"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("blueprint", "expected_kind", "expected_pack"),
+    [
+        (
+            {
+                "id": "east_asia_monsoon",
+                "subject": "geography",
+                "sceneType": "east_asia_monsoon",
+                "title": "东亚季风",
+                "caption": "海陆热力差异驱动季风环流。",
+                "visualIntent": ["land_sea_contrast", "monsoon_flow"],
+                "emphasisPoints": ["land_low", "ocean_high"],
+            },
+            "geo_map_scene",
+            "geography-earth-basic",
+        ),
+        (
+            {
+                "id": "projectile_motion",
+                "subject": "physics",
+                "sceneType": "projectile_motion",
+                "title": "平抛运动",
+                "caption": "水平速度不变，竖直方向受重力加速度影响。",
+                "visualIntent": ["projectile_motion", "velocity_decomposition"],
+                "emphasisPoints": ["trajectory", "gravity"],
+            },
+            "physics_force_scene",
+            "physics-basic",
+        ),
+        (
+            {
+                "id": "dna_replication",
+                "subject": "biology",
+                "sceneType": "dna_replication",
+                "title": "DNA replication",
+                "caption": "DNA replication copies each strand by complementary base pairing.",
+                "visualIntent": ["show_process_steps", "show_complementary_base_pairing"],
+                "emphasisPoints": ["template DNA", "replication fork", "new strands"],
+            },
+            "bio_process_scene",
+            "biology-basic",
+        ),
+        (
+            {
+                "id": "reaction_synthesis_water",
+                "subject": "chemistry",
+                "sceneType": "reaction_synthesis_water",
+                "title": "Water synthesis reaction",
+                "caption": "Balanced synthesis conserves atoms from reactants to product.",
+                "visualIntent": ["show_balanced_reaction", "show_electron_flow"],
+                "emphasisPoints": ["reactants", "products", "atom conservation"],
+            },
+            "reaction_scene",
+            "chemistry-basic",
+        ),
+        (
+            {
+                "id": "molecule_2d_methane",
+                "subject": "chemistry",
+                "sceneType": "molecule_2d_methane",
+                "title": "Methane molecule",
+                "caption": "Methane geometry comes from a SMILES-addressable structured preset.",
+                "visualIntent": ["render_structured_molecule", "show_tetrahedral_geometry"],
+                "emphasisPoints": ["carbon", "hydrogen", "tetrahedral geometry"],
+                "smiles": "C",
+            },
+            "molecule_2d_scene",
+            "chemistry-basic",
+        ),
+        (
+            {
+                "id": "molecule_2d_glucose",
+                "subject": "chemistry",
+                "sceneType": "molecule_2d_glucose",
+                "title": "Glucose molecule",
+                "caption": "Glucose is compiled from an RDKit SMILES layout.",
+                "visualIntent": ["render_structured_molecule", "use_rdkit_smiles"],
+                "emphasisPoints": ["SMILES", "atoms", "bonds"],
+                "smiles": GLUCOSE_SMILES,
+            },
+            "molecule_2d_scene",
+            "chemistry-basic",
+        ),
+        (
+            {
+                "id": "recursion_stack",
+                "subject": "algorithm",
+                "sceneType": "recursion_stack",
+                "title": "Recursion stack",
+                "caption": "Recursive calls push call frames until the base case returns.",
+                "visualIntent": ["show_call_stack", "highlight_active_line"],
+                "emphasisPoints": ["active call frame", "pending multiplication"],
+            },
+            "call_stack_scene",
+            "algorithm-code-basic",
+        ),
+        (
+            {
+                "id": "binary_search",
+                "subject": "algorithm",
+                "sceneType": "binary_search",
+                "title": "Binary search",
+                "caption": "Binary search narrows the sorted range around a midpoint.",
+                "visualIntent": ["show_search_window", "highlight_midpoint", "trace_branch"],
+                "emphasisPoints": ["low pointer", "mid pointer", "high pointer"],
+            },
+            "code_trace_scene",
+            "algorithm-code-basic",
+        ),
+    ],
+)
+async def test_runtime_tool_hub_compiles_subject_scene_blueprints(
+    blueprint: dict[str, Any],
+    expected_kind: str,
+    expected_pack: str,
+) -> None:
+    hub = RuntimeToolHub(skill_registry=SkillRegistry([]))
+
+    result = await hub.execute_tool("scene_blueprint.compile", {"blueprint": blueprint})
+
+    assert result.ok is True
+    assert result.result is not None
+    assert result.result["scene_blueprint_schema"]["valid"] is True
+    assert result.result["scene_blueprint_schema"]["id"].endswith("/scene-blueprint.schema.json")
+    assert result.result["scene_blueprint"] == blueprint
+    assert result.result["playbook"]["initial_data"]["scene_blueprint"] == [
+        blueprint["sceneType"]
+    ]
+    assert result.result["self_check"]["status"] == "clean"
+    assert result.result["visual_quality"]["pass"] is True
+    assert result.result["visual_quality"]["warnings"] == []
+    steps = result.result["playbook"]["steps"]
+    assert 8 <= len(steps) <= 14
+    for step in steps:
+        snapshot = step["snapshot"]
+        assert snapshot["kind"] == expected_kind
+        assert snapshot["pack_id"] == expected_pack
+        assert snapshot["kind"] not in {"algorithm_array", "algorithm_bars"}
+        if blueprint["sceneType"] == "recursion_stack":
+            assert snapshot["asset_id"] == "recursion-stack-preset"
+            assert snapshot["code_trace"]["asset_id"] == "active-line"
+        if blueprint["sceneType"] == "binary_search":
+            assert snapshot["asset_id"] == "binary-search-trace-preset"
+            assert snapshot["active_line_asset_id"] == "active-line"
+            assert {pointer["asset_id"] for pointer in snapshot["pointers"]} == {
+                "pointer-marker"
+            }
 
 
 @pytest.mark.asyncio

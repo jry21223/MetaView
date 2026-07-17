@@ -160,3 +160,61 @@ pre {
     transition: none !important;
   }
 }
+
+/* ───── Shared confirm dialog ───── */
+.mv-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  backdrop-filter: blur(2px);
+}
+
+.mv-confirm-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(360px, 100%);
+  padding: 20px 22px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 12px);
+  animation: dockIn 0.18s ease;
+}
+
+.mv-confirm-title {
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.mv-confirm-desc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mv-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.mv-chip-danger {
+  background: var(--mv-status-failed, #ff9e8a);
+  color: #2a1410;
+  border-color: transparent;
+}
+.mv-chip-danger:hover {
+  color: #2a1410;
+  opacity: 0.88;
+}

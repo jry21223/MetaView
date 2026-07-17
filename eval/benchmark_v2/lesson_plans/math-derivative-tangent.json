@@ -1,0 +1,60 @@
+{
+  "schema_version": "1.0.0",
+  "domain": "math",
+  "title": "导数的几何意义：从割线到切线",
+  "learning_objectives": [
+    "识别曲线 y=x² 上的目标点 (1,1) 及其切线",
+    "用割线斜率的极限解释瞬时变化率",
+    "说明 f'(1)、切线斜率与数值 2 表示同一结论"
+  ],
+  "prerequisites": [
+    "直线斜率公式",
+    "函数图像上的点",
+    "极限的直观含义"
+  ],
+  "misconceptions": [
+    "把某一条割线的斜率直接当成导数",
+    "认为切线斜率描述整条曲线的平均变化",
+    "只记住 f'(1)=2 而不能把它对应到切线"
+  ],
+  "expected_conclusion": "当割线的第二点趋近 (1,1) 时，割线斜率趋近 2，因此 y=x² 在 x=1 处的导数与切线斜率都等于 2。",
+  "lesson_arc": "intuition_to_abstraction",
+  "scenes": [
+    {
+      "scene_id": "derivative-context",
+      "teaching_goal": "建立曲线、目标点与局部斜率问题之间的联系",
+      "strategy": "intuition",
+      "required_fact_ids": ["derivative"],
+      "required_visual_roles": ["curve", "target_point"],
+      "preferred_scene_type": "derivative_tangent",
+      "narration_goal": "指出导数研究的是曲线在指定点附近的瞬时变化，而不是整段平均变化。"
+    },
+    {
+      "scene_id": "secant-approach",
+      "teaching_goal": "展示第二点靠近目标点时割线斜率如何变化",
+      "strategy": "demonstration",
+      "required_fact_ids": ["slope"],
+      "required_visual_roles": ["curve", "target_point", "secant", "slope"],
+      "preferred_scene_type": "derivative_tangent",
+      "narration_goal": "说明中间割线可以具有其他斜率，但随着两点靠近，斜率逐步趋近 2。"
+    },
+    {
+      "scene_id": "tangent-limit",
+      "teaching_goal": "把割线斜率极限转化为目标点处的切线斜率",
+      "strategy": "derivation",
+      "required_fact_ids": ["derivative", "tangent", "slope"],
+      "required_visual_roles": ["curve", "target_point", "secant", "tangent", "slope"],
+      "preferred_scene_type": "derivative_tangent",
+      "narration_goal": "推导并明确 f'(1)=2，同时将代数结果对应到切线的倾斜程度。"
+    },
+    {
+      "scene_id": "derivative-summary",
+      "teaching_goal": "总结导数、切线与斜率 2 的统一含义",
+      "strategy": "summary",
+      "required_fact_ids": ["derivative", "tangent", "slope"],
+      "required_visual_roles": ["curve", "target_point", "tangent", "slope"],
+      "preferred_scene_type": "derivative_tangent",
+      "narration_goal": "用一句完整结论回答为什么该点的切线斜率等于 2。"
+    }
+  ]
+}

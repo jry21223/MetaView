@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 34 28" role="img" aria-label="Ribosome" data-asset-id="ribosome" data-asset-quality="v1">
+  <ellipse cx="15" cy="16" rx="11" ry="8" fill="#7fc9c2" stroke="#367f79" stroke-width="3"/>
+  <ellipse cx="22" cy="11" rx="8" ry="6" fill="#a7ded9" stroke="#367f79" stroke-width="3"/>
+  <circle cx="12" cy="15" r="2" fill="#ffffff" opacity=".6"/>
+</svg>

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" role="img" aria-label="East Asia ocean background" data-asset-id="east-asia-ocean-background" data-asset-quality="v1">
+  <defs>
+    <linearGradient id="ocean-bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#e1f5fb"/>
+      <stop offset="0.62" stop-color="#b9dced"/>
+      <stop offset="1" stop-color="#91c4dc"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="180" rx="8" fill="url(#ocean-bg)"/>
+  <path d="M16 132 C58 112 96 122 140 102 S228 76 304 96" fill="none" stroke="#ffffff" stroke-width="2.4" opacity=".26"/>
+  <path d="M28 44 C72 58 104 50 150 36 S236 28 296 48" fill="none" stroke="#ffffff" stroke-width="1.6" opacity=".2"/>
+</svg>

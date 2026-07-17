@@ -17,6 +17,8 @@ import type {
 } from "../types";
 import { clamp01 } from "../foundation";
 import { sanitizeKatex } from "../../../../shared/lib/sanitizeKatex";
+import { AssetSvg } from "../assets/AssetSvg";
+import { resolveAssetById, resolveAssetByRole, resolveAssetForRenderer } from "../assets/assetResolver";
 import type { RendererProps } from "./types";
 
 type ThemeName = "dark" | "light";
@@ -425,22 +427,68 @@ function GraphSvg({ graph, theme, opacity = 1 }: { graph: GraphSceneSnapshot; th
       y: projected.y,
     };
   });
-  const byId = new Map(positioned.map((node) => [node.id, node]));
   const activeNodes = new Set(graph.active_node_ids ?? []);
+  const currentNodes = new Set([
+    ...activeNodes,
+    ...(graph.current_node_id ? [graph.current_node_id] : []),
+  ]);
+  const visitedNodes = new Set(graph.visited_node_ids ?? []);
+  const queueNodes = new Set([
+    ...(graph.queue_node_ids ?? []),
+    ...(graph.frontier_node_ids ?? []),
+  ]);
+  const activeEdges = new Set(graph.active_edge_ids ?? []);
+  const packId = graph.pack_id ?? "algorithm-code-basic";
+  const graphAsset = graph.asset_id ? resolveAssetById(packId, graph.asset_id) : undefined;
+  const showStatePanel = shouldRenderGraphAlgorithmStatePanel(graph, currentNodes, visitedNodes, queueNodes);
+  const projection = showStatePanel
+    ? { centerX: 312, centerY: 258, xScale: 78, yScale: 66 }
+    : { centerX: SVG_W / 2, centerY: SVG_H / 2, xScale: 120, yScale: 82 };
+  const layoutPositioned = positioned.map((node) => {
+    if (!projectCompactCoords || !showStatePanel || typeof node.x !== "number" || typeof node.y !== "number") {
+      return node;
+    }
+    const source = nodes.find((item) => item.id === node.id);
+    if (typeof source?.x !== "number" || typeof source.y !== "number") return node;
+    return {
+      ...node,
+      ...projectGraphPoint(source.x, source.y, projectCompactCoords, projection),
+    };
+  });
+  const layoutById = new Map(layoutPositioned.map((node) => [node.id, node]));
   return (
-    <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} width="100%" height="100%">
+    <svg
+      className="graph-scene-renderer"
+      viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+      width="100%"
+      height="100%"
+      data-pack-id={graph.pack_id ?? undefined}
+      data-graph-asset-id={graph.asset_id ?? graphAsset?.id ?? undefined}
+      data-asset-id={graphAsset?.id ?? undefined}
+    >
       <defs>
         <marker id="graph-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
           <path d="M0,0 L0,6 L9,3 z" fill={colors.muted} />
         </marker>
       </defs>
       {(graph.edges ?? []).map((edge, index) => {
-        const a = byId.get(edge.source);
-        const b = byId.get(edge.target);
+        const a = layoutById.get(edge.source);
+        const b = layoutById.get(edge.target);
         if (!a || !b) return null;
-        const active = edge.emphasis === "accent" || activeNodes.has(edge.source) || activeNodes.has(edge.target);
+        const edgeId = edge.id ?? `${edge.source}-${edge.target}`;
+        const active = edge.emphasis === "accent" || activeEdges.has(edgeId);
+        const edgeAsset = edge.asset_id
+          ? resolveAssetById(packId, edge.asset_id)
+          : resolveAssetForRenderer("graph_scene", active ? "active_edge" : "graph_edge", packId) ??
+            resolveAssetByRole("algorithm", active ? "active_edge" : "graph_edge", packId);
         return (
-          <g key={`${edge.source}-${edge.target}-${index}`} opacity={opacity}>
+          <g
+            key={`${edge.source}-${edge.target}-${index}`}
+            opacity={opacity}
+            data-edge-id={edgeId}
+            data-edge-state={active ? "active" : "idle"}
+            data-asset-id={edgeAsset?.id ?? edge.asset_id ?? undefined}
+          >
             <line
               x1={a.x}
               y1={a.y}
@@ -448,6 +496,7 @@ function GraphSvg({ graph, theme, opacity = 1 }: { graph: GraphSceneSnapshot; th
               y2={b.y}
               stroke={active ? colors.accent : colors.line}
               strokeWidth={active ? 4 : 2}
+              strokeLinecap="round"
               markerEnd={graph.directed ? "url(#graph-arrow)" : undefined}
             />
             {edge.label || edge.weight != null ? (
@@ -458,18 +507,208 @@ function GraphSvg({ graph, theme, opacity = 1 }: { graph: GraphSceneSnapshot; th
           </g>
         );
       })}
-      {positioned.map((node) => {
-        const active = activeNodes.has(node.id) || node.emphasis === "accent";
+      {layoutPositioned.map((node) => {
+        const state = graphNodeState(node.id, currentNodes, visitedNodes, queueNodes);
+        const active = state === "current" || node.emphasis === "accent";
+        const nodeAsset = resolveGraphNodeAsset(packId, node.asset_id, state);
+        const width = state === "queue" ? 76 : active ? 64 : 58;
+        const height = state === "queue" ? 52 : active ? 64 : 58;
+        const radius = Math.max(width, height) / 2;
         return (
-          <g key={node.id} opacity={opacity}>
-            <circle cx={node.x} cy={node.y} r={active ? 32 : 27} fill={active ? colors.accent : colors.card} stroke={active ? colors.accent : colors.primary} strokeWidth={3} />
-            <text x={node.x} y={node.y + 5} fill={colors.ink} fontSize={18} fontWeight={760} textAnchor="middle">
+          <g
+            key={node.id}
+            opacity={opacity}
+            data-node-id={node.id}
+            data-node-state={state}
+          >
+            <circle cx={node.x} cy={node.y} r={radius} fill="transparent" />
+            <AssetSvg
+              asset={nodeAsset}
+              assetId={node.asset_id ?? nodeAsset?.id}
+              packId={packId}
+              subject="algorithm"
+              semanticRole={nodeRoleForState(state)}
+              x={node.x - width / 2}
+              y={node.y - height / 2}
+              width={width}
+              height={height}
+              fallbackShape={state === "queue" ? "rect" : "circle"}
+              className="graph-node-asset"
+            />
+            <text
+              x={node.x}
+              y={node.y + 6}
+              fill={state === "queue" ? "#7a4b00" : colors.ink}
+              fontSize={18}
+              fontWeight={760}
+              textAnchor="middle"
+            >
               {node.label ?? node.id}
             </text>
           </g>
         );
       })}
+      {showStatePanel ? (
+        <GraphAlgorithmStatePanel
+          graph={graph}
+          theme={theme}
+          currentNodes={[...currentNodes]}
+          visitedNodes={[...visitedNodes]}
+          queueNodes={[...queueNodes]}
+          opacity={opacity}
+        />
+      ) : null}
     </svg>
+  );
+}
+
+function shouldRenderGraphAlgorithmStatePanel(
+  graph: GraphSceneSnapshot,
+  currentNodes: Set<string>,
+  visitedNodes: Set<string>,
+  queueNodes: Set<string>,
+): boolean {
+  return Boolean(
+    graph.pack_id === "algorithm-code-basic" &&
+      (currentNodes.size > 0 || visitedNodes.size > 0 || queueNodes.size > 0 || (graph.active_edge_ids?.length ?? 0) > 0),
+  );
+}
+
+function GraphAlgorithmStatePanel({
+  graph,
+  theme,
+  currentNodes,
+  visitedNodes,
+  queueNodes,
+  opacity,
+}: {
+  graph: GraphSceneSnapshot;
+  theme: ThemeName;
+  currentNodes: string[];
+  visitedNodes: string[];
+  queueNodes: string[];
+  opacity: number;
+}) {
+  const colors = PALETTE[theme];
+  const current = currentNodes[0] ?? graph.current_node_id ?? "node";
+
+  return (
+    <g opacity={opacity} data-semantic-role="algorithm_state_panel">
+      <rect x="622" y="40" width="246" height="256" rx="14" fill={colors.card} stroke={colors.line} />
+      <text x="646" y="76" fill={colors.ink} fontSize="18" fontWeight="760">
+        BFS state
+      </text>
+
+      <g data-semantic-role="queue_panel">
+        <text x="646" y="114" fill={colors.muted} fontSize="13" fontWeight="700">
+          Queue
+        </text>
+        {queueNodes.length ? (
+          queueNodes.map((nodeId, index) => (
+            <g key={nodeId} data-queue-node-id={nodeId}>
+              <rect
+                x={646 + index * 54}
+                y="126"
+                width="42"
+                height="30"
+                rx="8"
+                fill={`${colors.accent}22`}
+                stroke={colors.accent}
+              />
+              <text
+                x={667 + index * 54}
+                y="146"
+                textAnchor="middle"
+                fill={colors.ink}
+                fontSize="14"
+                fontWeight="760"
+              >
+                {nodeId}
+              </text>
+            </g>
+          ))
+        ) : (
+          <text x="646" y="146" fill={colors.muted} fontSize="13">
+            empty
+          </text>
+        )}
+      </g>
+
+      <g data-semantic-role="visited_set">
+        <text x="646" y="194" fill={colors.muted} fontSize="13" fontWeight="700">
+          Visited
+        </text>
+        {visitedNodes.length ? (
+          visitedNodes.map((nodeId, index) => (
+            <g key={nodeId} data-visited-node-id={nodeId}>
+              <circle cx={662 + index * 36} cy="224" r="15" fill={`${colors.secondary}24`} stroke={colors.secondary} />
+              <text
+                x={662 + index * 36}
+                y="229"
+                textAnchor="middle"
+                fill={colors.ink}
+                fontSize="13"
+                fontWeight="760"
+              >
+                {nodeId}
+              </text>
+            </g>
+          ))
+        ) : (
+          <text x="646" y="226" fill={colors.muted} fontSize="13">
+            none
+          </text>
+        )}
+        <text x="646" y="266" fill={colors.muted} fontSize="13" fontWeight="700">
+          Current
+        </text>
+        <text x="714" y="266" fill={colors.accent} fontSize="15" fontWeight="780">
+          {current}
+        </text>
+      </g>
+    </g>
+  );
+}
+
+type GraphNodeVisualState = "current" | "queue" | "visited" | "default";
+
+interface GraphProjection {
+  centerX: number;
+  centerY: number;
+  xScale: number;
+  yScale: number;
+}
+
+function graphNodeState(
+  nodeId: string,
+  currentNodes: Set<string>,
+  visitedNodes: Set<string>,
+  queueNodes: Set<string>,
+): GraphNodeVisualState {
+  if (currentNodes.has(nodeId)) return "current";
+  if (queueNodes.has(nodeId)) return "queue";
+  if (visitedNodes.has(nodeId)) return "visited";
+  return "default";
+}
+
+function nodeRoleForState(state: GraphNodeVisualState): string {
+  if (state === "queue") return "queue";
+  if (state === "visited") return "visited";
+  return "graph_node";
+}
+
+function resolveGraphNodeAsset(
+  packId: string,
+  assetId: string | null | undefined,
+  state: GraphNodeVisualState,
+) {
+  if (assetId) return resolveAssetById(packId, assetId);
+  const semanticRole = nodeRoleForState(state);
+  return (
+    resolveAssetForRenderer("graph_scene", semanticRole, packId) ??
+    resolveAssetByRole("algorithm", semanticRole, packId) ??
+    resolveAssetForRenderer("graph_scene", "graph_node", packId) ??
+    resolveAssetByRole("algorithm", "graph_node", packId)
   );
 }
 
@@ -479,11 +718,16 @@ function shouldProjectCompactGraphCoords(nodes: GraphSceneSnapshot["nodes"]): bo
   return positioned.every((node) => Math.abs(node.x as number) <= 12 && Math.abs(node.y as number) <= 12);
 }
 
-function projectGraphPoint(x: number, y: number, compact: boolean): { x: number; y: number } {
+function projectGraphPoint(
+  x: number,
+  y: number,
+  compact: boolean,
+  projection: GraphProjection = { centerX: SVG_W / 2, centerY: SVG_H / 2, xScale: 120, yScale: 82 },
+): { x: number; y: number } {
   if (!compact) return { x, y };
   return {
-    x: SVG_W / 2 + x * 120,
-    y: SVG_H / 2 + y * 82,
+    x: projection.centerX + x * projection.xScale,
+    y: projection.centerY + y * projection.yScale,
   };
 }
 

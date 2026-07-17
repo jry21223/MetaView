@@ -1,0 +1,6 @@
+{
+  "source": "structured-preset",
+  "template": "recursion_stack",
+  "states": ["active_frame", "waiting_frame", "active_line"],
+  "rendererKind": "call_stack_scene"
+}

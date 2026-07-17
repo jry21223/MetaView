@@ -33,6 +33,10 @@ export const TWEAK_DEFAULTS: TweakValues = {
 };
 
 const STORAGE_KEY = "mv_tweaks";
+// Accent values that shipped as theme defaults before the current DESIGN.md
+// palette. Migrate these on load only so an intentional custom color remains
+// user-owned after it has been selected.
+const LEGACY_DEFAULT_ACCENTS = new Set(["#10b981"]);
 const LAYOUTS = ["drawer", "left", "top"] as const;
 const DENSITIES = ["compact", "regular", "comfy"] as const;
 
@@ -64,6 +68,23 @@ function numberInRange(
   return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max
     ? value
     : fallback;
+}
+
+function relativeLuminance(hex: string): number {
+  const channels = [0, 2, 4].map((offset) =>
+    Number.parseInt(hex.slice(offset + 1, offset + 3), 16) / 255,
+  );
+  const linear = channels.map((channel) =>
+    channel <= 0.03928
+      ? channel / 12.92
+      : ((channel + 0.055) / 1.055) ** 2.4,
+  );
+  return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+}
+
+function accentContrastColor(accent: string, fallback: string): string {
+  const safeAccent = isHexColor(accent) ? accent : fallback;
+  return relativeLuminance(safeAccent) > 0.179 ? "#0b0f0d" : "#ffffff";
 }
 
 function sanitizeTweaks(
@@ -114,6 +135,7 @@ export function themeVars(t: TweakValues): Record<string, string> {
     // ``t.accent`` defaults to the theme's accent (see useTweaks initializer);
     // users can still override via the color picker.
     "--accent": t.accent,
+    "--accent-contrast": accentContrastColor(t.accent, p.accent),
     "--accent-2": t.accent + "CC",
     "--accent-dim": t.accent + "80",
     "--accent-soft": t.accent + "26",
@@ -131,7 +153,14 @@ function loadFromStorage(defaults: TweakValues): TweakValues {
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
       return defaults;
-    return sanitizeTweaks({ ...defaults, ...(parsed as Partial<TweakValues>) }, defaults);
+    const persisted = parsed as Partial<TweakValues>;
+    const theme = isThemeName(persisted.theme) ? persisted.theme : defaults.theme;
+    const migrated =
+      typeof persisted.accent === "string" &&
+      LEGACY_DEFAULT_ACCENTS.has(persisted.accent.toLowerCase())
+        ? { ...persisted, accent: THEME_PALETTE[theme].accent }
+        : persisted;
+    return sanitizeTweaks({ ...defaults, ...migrated }, defaults);
   } catch {
     return defaults;
   }

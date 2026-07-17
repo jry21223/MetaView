@@ -84,7 +84,7 @@ def _model_spec_route(prompt_capability: str = "regular_quad_pyramid.line_plane_
 
 
 @pytest.mark.asyncio
-async def test_model_provided_problem_spec_drives_solid_geometry_kernel() -> None:
+async def test_router_spec_must_match_heuristic_before_driving_geometry_kernel() -> None:
     repo = _RecordingRepo()
     use_case = RunPipelineUseCase(
         repo,
@@ -92,7 +92,15 @@ async def test_model_provided_problem_spec_drives_solid_geometry_kernel() -> Non
         router_provider=_Router(_model_spec_route()),
     )
 
-    await use_case.execute("run-model-spec", PipelineRequest(prompt="这道空间几何题请给动画"))
+    await use_case.execute(
+        "run-model-spec",
+        PipelineRequest(
+            prompt=(
+                "正四棱锥 S-ABCD，底面边长为 2，高为 3，"
+                "求 SA 与底面 ABCD 的线面角"
+            )
+        ),
+    )
 
     last = repo.updates[-1]
     assert last["status"] == PipelineRunStatus.SUCCEEDED
@@ -100,13 +108,13 @@ async def test_model_provided_problem_spec_drives_solid_geometry_kernel() -> Non
     assert playbook["steps"][0]["snapshot"]["kind"] == "solid_geometry_scene"
     assert playbook["steps"][-1]["snapshot"]["formula_latex"]
     review = json.loads(last["review_json"])
-    assert "router:spec_source:model" in review["actions"]
+    assert "router:spec_source:heuristic_verified" in review["actions"]
     assert "router:skill_pack" in review["actions"]
     assert "skill:solid_geometry" in review["actions"]
 
 
 @pytest.mark.asyncio
-async def test_unsupported_routed_geometry_falls_back_without_calling_kernel(
+async def test_unsupported_routed_geometry_is_rejected_without_calling_kernel(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def _boom(_spec: Any) -> Any:
@@ -134,8 +142,8 @@ async def test_unsupported_routed_geometry_falls_back_without_calling_kernel(
 
     await use_case.execute("run-unsupported", PipelineRequest(prompt="正四棱锥 S-ABCD，求二面角 S-AB-C"))
 
-    assert llm.calls == 1
-    assert repo.updates[-1]["status"] == PipelineRunStatus.SUCCEEDED
+    assert llm.calls == 0
+    assert repo.updates[-1]["status"] == PipelineRunStatus.FAILED
     review = json.loads(repo.updates[-1]["review_json"])
-    assert "router:fallback:skill_not_handled:solid_geometry" in review["actions"]
-    assert "generator:generic_cir" in review["actions"]
+    assert review["issues"][0]["code"] == "capability.unsupported"
+    assert "coverage:mode:unsupported" in review["actions"]

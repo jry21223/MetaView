@@ -7,8 +7,11 @@ import sqlite3
 
 from app.application.dto.followup_dto import RunFollowUpRecord, RunVersionRecord
 from app.application.dto.pipeline_dto import PipelineRunResponse
+from app.domain.models.coverage import CoverageDecision
+from app.domain.models.lesson_plan import LessonPlan
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.domain.models.playbook import PlaybookScript
+from app.domain.models.quality_report import QualityReport
 from app.domain.models.review import CirReviewReport, PlaybookReviewVerdict
 
 
@@ -87,6 +90,43 @@ class SqliteRunRepository:
                 conn.execute(
                     "UPDATE pipeline_runs SET playbook_json=? WHERE run_id=?",
                     (playbook_json, run_id),
+                )
+                conn.commit()
+
+        await asyncio.to_thread(_sync)
+
+    async def update_quality_report(self, run_id: str, quality_report_json: str) -> None:
+        def _sync() -> None:
+            with self._connect() as conn:
+                conn.execute(
+                    "UPDATE pipeline_runs SET quality_report_json=? WHERE run_id=?",
+                    (quality_report_json, run_id),
+                )
+                conn.commit()
+
+        await asyncio.to_thread(_sync)
+
+    async def update_lesson_plan(self, run_id: str, lesson_plan_json: str) -> None:
+        def _sync() -> None:
+            with self._connect() as conn:
+                conn.execute(
+                    "UPDATE pipeline_runs SET lesson_plan_json=? WHERE run_id=?",
+                    (lesson_plan_json, run_id),
+                )
+                conn.commit()
+
+        await asyncio.to_thread(_sync)
+
+    async def update_coverage_decision(
+        self,
+        run_id: str,
+        coverage_decision_json: str,
+    ) -> None:
+        def _sync() -> None:
+            with self._connect() as conn:
+                conn.execute(
+                    "UPDATE pipeline_runs SET coverage_decision_json=? WHERE run_id=?",
+                    (coverage_decision_json, run_id),
                 )
                 conn.commit()
 
@@ -353,6 +393,17 @@ def _row_to_response(row: sqlite3.Row) -> PipelineRunResponse:
     review = None
     if "review_json" in row.keys() and row["review_json"]:
         review = _parse_review_json(row["review_json"])
+    quality_report = None
+    if "quality_report_json" in row.keys() and row["quality_report_json"]:
+        quality_report = QualityReport.model_validate_json(row["quality_report_json"])
+    lesson_plan = None
+    if "lesson_plan_json" in row.keys() and row["lesson_plan_json"]:
+        lesson_plan = LessonPlan.model_validate_json(row["lesson_plan_json"])
+    coverage_decision = None
+    if "coverage_decision_json" in row.keys() and row["coverage_decision_json"]:
+        coverage_decision = CoverageDecision.model_validate_json(
+            row["coverage_decision_json"]
+        )
     return PipelineRunResponse(
         run_id=row["run_id"],
         status=PipelineRunStatus(row["status"]),
@@ -361,6 +412,9 @@ def _row_to_response(row: sqlite3.Row) -> PipelineRunResponse:
         error=row["error"],
         created_at=row["created_at"],
         review=review,
+        quality_report=quality_report,
+        lesson_plan=lesson_plan,
+        coverage_decision=coverage_decision,
     )
 
 

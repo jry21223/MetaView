@@ -1,0 +1,11 @@
+{
+  "source": "structured-preset",
+  "id": "core-electron-flow",
+  "particleRole": "electron_flow",
+  "count": 11,
+  "radius": [0.7, 1.1],
+  "color": "#6f5bd5",
+  "opacity": [0.44, 0.8],
+  "pathBias": "directional",
+  "jitter": [1.5, 2.5]
+}

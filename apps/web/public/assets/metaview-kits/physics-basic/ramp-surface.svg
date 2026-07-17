@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 64" role="img" aria-label="Inclined ramp" data-asset-id="ramp-surface" data-asset-quality="v1">
+  <path d="M12 52 L108 52 L108 18 Z" fill="#dbe7f2" stroke="#345995" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M29 47 L101 22" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity=".66"/>
+  <path d="M20 52 h82" stroke="#1d335e" stroke-width="3" stroke-linecap="round" opacity=".22"/>
+</svg>
