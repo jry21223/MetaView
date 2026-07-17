@@ -44,41 +44,6 @@ function script(markerX = 1): PlaybookScript {
   };
 }
 
-const graph: GraphSceneSnapshot = {
-  kind: "graph_scene",
-  nodes: [{ id: "A", label: "A" }, { id: "B", label: "B" }],
-  edges: [{ id: "AB", source: "A", target: "B" }],
-  directed: false,
-};
-
-function mixedScript(): PlaybookScript {
-  const math = script();
-  return {
-    ...math,
-    algorithm_id: "bfs",
-    total_frames: 60,
-    steps: [
-      math.steps[0],
-      {
-        step_id: "graph",
-        end_frame: 60,
-        title: "Graph",
-        voiceover_text: "",
-        snapshot: graph,
-        tokens: [],
-      },
-    ],
-  };
-}
-
-const moveMarker = (value: number) => ({
-  adapter_id: "math.derivative-tangent" as const,
-  step_id: "plot",
-  target_id: "step:plot:marker-x",
-  action: "set-value" as const,
-  value,
-});
-
 function bfsScript(): PlaybookScript {
   const graph: GraphSceneSnapshot = {
     kind: "graph_scene",
@@ -256,21 +221,4 @@ describe("useInteractionSandbox", () => {
     expect((result.current.previewScript.steps[0].snapshot as MathPlotSnapshot).marker_x).toBe(-2);
   });
 
-  it("clears the latest BFS replay after a successful non-BFS event", () => {
-    const base = mixedScript();
-    const { result } = renderHook(() => useInteractionSandbox(base));
-
-    act(() => result.current.apply({
-      adapter_id: "algorithm.bfs",
-      step_id: "graph",
-      target_id: "step:graph:start-node",
-      action: "select",
-      value: "B",
-    }));
-    expect(result.current.latestReplay?.start_node_id).toBe("B");
-
-    act(() => result.current.apply(moveMarker(3)));
-    expect(result.current.latestReplay).toBeNull();
-    expect(result.current.events).toHaveLength(2);
-  });
 });

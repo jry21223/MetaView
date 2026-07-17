@@ -1,9 +1,17 @@
 import React from "react";
-import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { GraphSceneSnapshot, PlaybookScript } from "../types";
 import { PlaybookPlayer } from "./PlaybookPlayer";
+
+const playerMockState = vi.hoisted(() => ({
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+  pause: vi.fn(),
+  play: vi.fn(),
+  seekTo: vi.fn(),
+}));
 
 vi.mock("@remotion/player", async () => {
   const React = await import("react");
@@ -26,34 +34,35 @@ vi.mock("@remotion/player", async () => {
       ref: React.ForwardedRef<unknown>,
     ) {
       React.useImperativeHandle(ref, () => ({
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        pause: vi.fn(),
-        play: vi.fn(),
-        seekTo: vi.fn(),
+        addEventListener: playerMockState.addEventListener,
+        removeEventListener: playerMockState.removeEventListener,
+        pause: playerMockState.pause,
+        play: playerMockState.play,
+        seekTo: playerMockState.seekTo,
       }));
+      const snapshot = props.inputProps?.script?.steps[0]?.snapshot;
+      const markerX = snapshot?.kind === "math_plot" ? snapshot.marker_x : undefined;
+      const arrayValues =
+        snapshot?.kind === "algorithm_array" || snapshot?.kind === "algorithm_bars"
+          ? snapshot.array_values.join(",")
+          : undefined;
       const graphStep = props.inputProps?.script?.steps.find(
         (step) => step.snapshot.kind === "graph_scene",
       );
-      const graph = graphStep?.snapshot.kind === "graph_scene"
-        ? graphStep.snapshot
-        : null;
+      const graph = graphStep?.snapshot.kind === "graph_scene" ? graphStep.snapshot : null;
       return (
         <div
           data-testid="mock-remotion-player"
+          data-marker-x={markerX}
+          data-array-values={arrayValues}
           data-show-subtitles={String(props.inputProps?.showSubtitles)}
           data-show-inline-code={String(props.inputProps?.showInlineCode)}
           data-interaction-enabled={String(Boolean(props.inputProps?.onInteraction))}
-          data-has-interaction={String(Boolean(props.inputProps?.onInteraction))}
+          data-has-interaction={String(typeof props.inputProps?.onInteraction === "function")}
           data-current-node={graph?.current_node_id ?? ""}
           data-code-current={graphStep?.code_highlight?.variables?.current ?? ""}
           data-code-queue={graphStep?.code_highlight?.variables?.queue ?? ""}
           data-code-visited={graphStep?.code_highlight?.variables?.visited ?? ""}
-          data-marker-x={String(
-            props.inputProps?.script?.steps[0]?.snapshot.kind === "math_plot"
-              ? props.inputProps.script.steps[0].snapshot.marker_x
-              : "",
-          )}
         >
           {props.inputProps?.onInteraction && graphStep && (
             <button
@@ -128,10 +137,15 @@ function baseScript(overrides: Partial<PlaybookScript> = {}): PlaybookScript {
 }
 
 function derivativeScript(): PlaybookScript {
+  const base = baseScript();
   return baseScript({
+    total_frames: 60,
     steps: [
       {
-        ...baseScript().steps[0],
+        ...base.steps[0],
+        step_id: "plot",
+        end_frame: 30,
+        title: "Tangent",
         snapshot: {
           kind: "math_plot",
           curves: [
@@ -142,16 +156,18 @@ function derivativeScript(): PlaybookScript {
               emphasis: "accent",
             },
           ],
-          x_min: -3,
-          x_max: 3,
+          x_min: -5,
+          x_max: 5,
           y_min: -1,
-          y_max: 10,
+          y_max: 25,
           marker_x: 1,
-          x_label: "x",
-          y_label: "y",
         },
       },
-      baseScript().steps[1],
+      {
+        ...base.steps[1],
+        step_id: "summary",
+        end_frame: 60,
+      },
     ],
   });
 }
@@ -186,11 +202,7 @@ function bfsScript(withTrailingStep = false): PlaybookScript {
         lines: ["current = queue.dequeue()", "visit(current)"],
         active_line: 0,
         active_lines: [0],
-        variables: {
-          current: "A",
-          queue: "[B]",
-          visited: "{A}",
-        },
+        variables: { current: "A", queue: "[B]", visited: "{A}" },
       },
     }, ...(withTrailingStep ? [{
       ...baseScript().steps[1],
@@ -286,8 +298,8 @@ describe("PlaybookPlayer", () => {
     expect(learningConsole.textContent).toContain("n = 3");
   });
 
-  it("hides code sync for non-code lessons while keeping params above follow-up", () => {
-    const { queryByText, getByText, getByTestId } = render(
+  it("hides empty math params and lets follow-up occupy the remaining console", () => {
+    const { container, queryByText, getByTestId } = render(
       <PlaybookPlayer
         script={baseScript()}
         theme="light"
@@ -296,9 +308,23 @@ describe("PlaybookPlayer", () => {
     );
 
     expect(queryByText("Code Sync")).toBeNull();
-    expect(getByText("Params")).toBeTruthy();
+    expect(queryByText("Params")).toBeNull();
+    expect(container.querySelector(".playbook-player__params-card")).toBeNull();
+    expect(container.querySelector(".playbook-player__follow-card")).toBeTruthy();
     expect(getByTestId("followup-slot")).toBeTruthy();
-    expect(getByText("Ask a follow-up")).toBeTruthy();
+  });
+
+  it("shows math params when at least one editable control is available", () => {
+    const script = baseScript({
+      parameter_controls: [{ id: "a", label: "斜率 a", value: "1" }],
+    });
+
+    const { getByText, getByLabelText } = render(
+      <PlaybookPlayer script={script} theme="light" />,
+    );
+
+    expect(getByText("Params")).toBeTruthy();
+    expect(getByLabelText("斜率 a")).toBeTruthy();
   });
 
   it("keeps subtitles inside the composition and moves playback options into settings", () => {
@@ -364,7 +390,7 @@ describe("PlaybookPlayer", () => {
 
   it("uses a portrait shell with mobile tabs while keeping export and more actions visible", () => {
     const onOpenExport = vi.fn();
-    const { container } = render(
+    const { container, queryByRole } = render(
       <PlaybookPlayer
         script={baseScript()}
         theme="light"
@@ -387,7 +413,8 @@ describe("PlaybookPlayer", () => {
     expect(player?.getAttribute("data-show-subtitles")).toBe("false");
 
     const tabs = container.querySelectorAll(".playbook-player__mobile-tabs button");
-    expect(tabs).toHaveLength(5);
+    expect(tabs).toHaveLength(4);
+    expect(queryByRole("tab", { name: "参数" })).toBeNull();
 
     fireEvent.click(tabs[1]);
     expect(player?.getAttribute("data-show-subtitles")).toBe("true");
@@ -409,6 +436,29 @@ describe("PlaybookPlayer", () => {
 
     fireEvent.click(moreButton!);
     expect(container.querySelector(".playbook-player__mobile-sheet")).toBeTruthy();
+  });
+
+  it("leaves the params tab when a portrait lesson loses editable controls", () => {
+    const withParams = baseScript({
+      parameter_controls: [{ id: "a", label: "斜率 a", value: "1" }],
+    });
+    const view = render(
+      <PlaybookPlayer script={withParams} theme="light" layoutMode="portrait" />,
+    );
+
+    fireEvent.click(view.getByRole("tab", { name: "参数" }));
+    expect(view.getByRole("tab", { name: "参数" }).getAttribute("aria-selected")).toBe(
+      "true",
+    );
+
+    view.rerender(
+      <PlaybookPlayer script={baseScript()} theme="light" layoutMode="portrait" />,
+    );
+
+    expect(view.queryByRole("tab", { name: "参数" })).toBeNull();
+    expect(view.getByRole("tab", { name: "讲解" }).getAttribute("aria-selected")).toBe(
+      "true",
+    );
   });
 
   it("shows only the active code context in the portrait code tab", () => {
@@ -481,7 +531,7 @@ describe("PlaybookPlayer", () => {
   });
 
   it("opens follow-up content in a portrait bottom sheet", () => {
-    const { container, getByLabelText } = render(
+    const { container, getByLabelText, getByRole } = render(
       <PlaybookPlayer
         script={baseScript()}
         theme="light"
@@ -490,10 +540,7 @@ describe("PlaybookPlayer", () => {
       />,
     );
 
-    const followupTab = container.querySelectorAll<HTMLButtonElement>(
-      ".playbook-player__mobile-tabs button",
-    )[3];
-    fireEvent.click(followupTab);
+    fireEvent.click(getByRole("tab", { name: "追问" }));
 
     expect(container.querySelector(".playbook-player__mobile-sheet")).toBeTruthy();
     expect(getByLabelText("Ask follow-up")).toBeTruthy();
@@ -608,6 +655,74 @@ describe("PlaybookPlayer", () => {
     expect(queryByText("版本记录")).toBeNull();
   });
 
+  it("keeps the interaction sandbox disabled by default", () => {
+    const { getByTestId, queryByRole, queryByText } = render(
+      <PlaybookPlayer script={derivativeScript()} theme="light" />,
+    );
+
+    expect(queryByText("Explore")).toBeNull();
+    expect(queryByRole("slider", { name: "切点 x" })).toBeNull();
+    expect(getByTestId("mock-remotion-player").getAttribute("data-marker-x")).toBe("1");
+  });
+
+  it("lets an explicit Studio opt-in drive the ephemeral stage preview", async () => {
+    const { getByRole, getByTestId, getByText } = render(
+      <PlaybookPlayer
+        script={derivativeScript()}
+        theme="light"
+        enableInteractionSandbox
+      />,
+    );
+
+    expect(getByText("Explore")).toBeTruthy();
+    const slider = getByRole("slider", { name: "切点 x" });
+    fireEvent.change(slider, { target: { value: "3" } });
+    fireEvent.pointerUp(slider);
+
+    await waitFor(() => {
+      expect(getByTestId("mock-remotion-player").getAttribute("data-marker-x")).toBe("3");
+    });
+  });
+
+  it("disables interactions when the learning console is hidden", () => {
+    const { getByTestId, queryByRole, queryByText } = render(
+      <PlaybookPlayer
+        script={derivativeScript()}
+        theme="light"
+        enableInteractionSandbox
+        showLearningConsole={false}
+      />,
+    );
+
+    expect(queryByText("Explore")).toBeNull();
+    expect(queryByRole("slider", { name: "切点 x" })).toBeNull();
+    expect(getByTestId("mock-remotion-player").getAttribute("data-marker-x")).toBe("1");
+  });
+
+  it("keeps recovery controls available on an unbound step", async () => {
+    const { getByRole, queryByText, getByText } = render(
+      <PlaybookPlayer
+        script={derivativeScript()}
+        theme="light"
+        enableInteractionSandbox
+      />,
+    );
+
+    const slider = getByRole("slider", { name: "切点 x" });
+    fireEvent.change(slider, { target: { value: "3" } });
+    fireEvent.pointerUp(slider);
+    fireEvent.click(getByRole("button", { name: "下一步" }));
+
+    await waitFor(() => {
+      expect(getByText(/当前步骤没有交互目标/)).toBeTruthy();
+    });
+    fireEvent.click(getByRole("button", { name: "重置" }));
+    await waitFor(() => {
+      expect(queryByText("Explore")).toBeNull();
+    });
+  });
+
+
   it("shows algorithm params when replay can use array values from snapshots", () => {
     const script = baseScript({
       domain: "algorithm",
@@ -635,6 +750,71 @@ describe("PlaybookPlayer", () => {
     expect(getByText("Params")).toBeTruthy();
     expect(getByDisplayValue("3")).toBeTruthy();
     expect(getByDisplayValue("1")).toBeTruthy();
+  });
+
+  it("feeds replayed algorithm params back into the Remotion script props", async () => {
+    const script = baseScript({
+      domain: "algorithm",
+      algorithm_id: "bubble_sort",
+      initial_data: { array: ["3", "1", "2"] },
+      steps: [
+        {
+          ...baseScript().steps[0],
+          snapshot: {
+            kind: "algorithm_array",
+            array_values: ["3", "1", "2"],
+            active_indices: [],
+            swap_indices: [],
+            sorted_indices: [],
+            pointers: {},
+          },
+        },
+      ],
+    });
+    const { getByDisplayValue, getByTestId } = render(
+      <PlaybookPlayer script={script} theme="light" />,
+    );
+
+    expect(getByTestId("mock-remotion-player").getAttribute("data-array-values")).toBe(
+      "3,1,2",
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    fireEvent.change(getByDisplayValue("3"), { target: { value: "5" } });
+
+    await waitFor(() => {
+      expect(getByTestId("mock-remotion-player").getAttribute("data-array-values")).toBe(
+        "1,2,5",
+      );
+    });
+  });
+
+  it("wires mount play pause and unmount lifecycle to the Remotion player", async () => {
+    const { getByRole, unmount } = render(
+      <PlaybookPlayer script={baseScript()} theme="light" />,
+    );
+
+    await waitFor(() => {
+      expect(playerMockState.addEventListener).toHaveBeenCalledWith("play", expect.any(Function));
+      expect(playerMockState.addEventListener).toHaveBeenCalledWith("pause", expect.any(Function));
+    });
+
+    fireEvent.click(getByRole("button", { name: "播放" }));
+    expect(playerMockState.play).toHaveBeenCalledTimes(1);
+
+    const onPlay = playerMockState.addEventListener.mock.calls.find(
+      ([event]) => event === "play",
+    )?.[1] as (() => void) | undefined;
+    expect(onPlay).toBeTruthy();
+    act(() => onPlay?.());
+
+    fireEvent.click(getByRole("button", { name: "暂停" }));
+    expect(playerMockState.pause).toHaveBeenCalledTimes(1);
+
+    unmount();
+
+    expect(playerMockState.removeEventListener).toHaveBeenCalledWith("play", expect.any(Function));
+    expect(playerMockState.removeEventListener).toHaveBeenCalledWith("pause", expect.any(Function));
   });
 
   it("hides algorithm params when no replayable controls are available", () => {
@@ -759,6 +939,7 @@ describe("PlaybookPlayer", () => {
     });
   });
 
+
   it("reuses the five-tab portrait params surface without enabling canvas drag", () => {
     const view = render(
       <PlaybookPlayer
@@ -788,11 +969,7 @@ describe("PlaybookPlayer", () => {
 
   it("selects a BFS start and previews replay frames end to end", async () => {
     const view = render(
-      <PlaybookPlayer
-        script={bfsScript()}
-        theme="light"
-        enableInteractionSandbox
-      />,
+      <PlaybookPlayer script={bfsScript()} theme="light" enableInteractionSandbox />,
     );
     const player = view.getByTestId("mock-remotion-player");
 
@@ -821,11 +998,7 @@ describe("PlaybookPlayer", () => {
 
   it("keeps undo and reset available after navigating away from the BFS step", async () => {
     const view = render(
-      <PlaybookPlayer
-        script={bfsScript(true)}
-        theme="light"
-        enableInteractionSandbox
-      />,
+      <PlaybookPlayer script={bfsScript(true)} theme="light" enableInteractionSandbox />,
     );
     fireEvent.click(view.getByRole("button", { name: "模拟选择节点 B" }));
     await waitFor(() => expect(view.getByText("1 个未保存操作")).toBeTruthy());
