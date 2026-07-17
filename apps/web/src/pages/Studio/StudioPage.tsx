@@ -490,7 +490,7 @@ function ChatPanel({
             if ((refreshError as Error).name === "AbortError") throw refreshError;
             if (
               refreshError instanceof Error &&
-              refreshError.message === "已加载最新版本，请重新执行沙盒操作。"
+              refreshError.message === "已同步最新版本基线，请再次应用当前沙盒操作。"
             ) {
               throw refreshError;
             }
