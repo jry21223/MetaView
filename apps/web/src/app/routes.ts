@@ -15,7 +15,7 @@ export function stageToPath(stage: Stage, runId?: string | null): string {
       return runId ? `/run/${encodeURIComponent(runId)}` : "/create";
     case "history":
       return "/history";
-    case "templates":
+    case "cases":
       return "/cases";
     case "settings":
       return "/settings";
@@ -27,7 +27,7 @@ export function pathToStage(pathname: string): Stage {
   if (path === "/create") return "intake";
   if (path.startsWith("/run/") && path.length > "/run/".length) return "workbench";
   if (path === "/history") return "history";
-  if (path === "/templates" || path === "/cases") return "templates";
+  if (path === "/cases") return "cases";
   if (path === "/settings") return "settings";
   return "intake";
 }

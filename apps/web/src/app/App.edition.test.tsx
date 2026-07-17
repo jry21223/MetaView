@@ -87,6 +87,23 @@ describe("App edition shells", () => {
     expect(container.textContent).not.toContain("登录暂未开放");
   });
 
+  it("ops edition exposes self provider settings to guests", async () => {
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/account/me`, () =>
+        HttpResponse.json({ detail: "请先使用微信登录" }, { status: 401 }),
+      ),
+    );
+    vi.stubEnv("VITE_APP_EDITION", "ops");
+    window.history.pushState({}, "", "/settings");
+
+    const { App } = await import("./App");
+    const { getByLabelText, queryByText } = render(<App />);
+
+    expect(getByLabelText("API 密钥")).toBeTruthy();
+    expect(getByLabelText("接口地址")).toBeTruthy();
+    await waitFor(() => expect(queryByText("登录后继续使用")).toBeNull());
+  });
+
   it("ops edition opens the intake screen after WeChat login", async () => {
     let accountHits = 0;
     let dashboardHits = 0;

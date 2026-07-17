@@ -70,11 +70,6 @@ async def submit_pipeline(
     if settings.app_edition == "ops":
         owner_session = await require_wechat_session(request, settings, account_use_case)
         owner_user_id = owner_session.account.user_id
-        if _has_client_model_overrides(payload):
-            raise HTTPException(
-                status_code=400,
-                detail="运营版使用平台托管模型，不能提交客户端 Provider / Router 配置",
-            )
         consume_ledger_id = f"pipeline:{run_id}"
         try:
             await account_use_case.consume_generation_credit(
@@ -182,20 +177,6 @@ async def _execute_pipeline_with_optional_refund(
             session=owner_session,
             ledger_id=consume_ledger_id,
         )
-
-
-def _has_client_model_overrides(payload: PipelineRequest) -> bool:
-    return any(
-        (
-            payload.provider_api_key,
-            payload.provider_base_url,
-            payload.provider_model,
-            payload.router_mode,
-            payload.router_model,
-            payload.router_min_confidence is not None,
-            payload.router_timeout_s is not None,
-        )
-    )
 
 
 def _needs_router_rebuild(payload: PipelineRequest, router_mode: str) -> bool:

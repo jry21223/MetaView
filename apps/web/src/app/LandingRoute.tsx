@@ -98,7 +98,7 @@ export function LandingRoute({ appEdition }: { appEdition: AppEdition }) {
         isDark={mode === "dark"}
         onToggleTheme={toggleTheme}
         onStart={() => navigate("/create")}
-        onOpenTemplates={() => navigate("/templates")}
+        onOpenCases={() => navigate("/cases")}
       />
     </div>
   );

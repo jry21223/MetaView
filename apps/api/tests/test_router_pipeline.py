@@ -279,7 +279,7 @@ def test_request_router_minimum_below_default_refine_is_normalized(
     assert run["coverage_decision"]["confidence"] == minimum
 
 
-def test_ops_edition_rejects_client_provider_override(monkeypatch, tmp_path) -> None:
+def test_ops_edition_accepts_client_provider_override(monkeypatch, tmp_path) -> None:
     get_settings.cache_clear()
     db = str(tmp_path / "ops.db")
     init_db(db)
@@ -289,6 +289,10 @@ def test_ops_edition_rejects_client_provider_override(monkeypatch, tmp_path) -> 
     monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
     monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", db)
     monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    monkeypatch.setattr(
+        "app.presentation.router_pipeline.OpenAIProvider",
+        lambda **_kwargs: _MockLLM(),
+    )
     app = create_app()
     app.dependency_overrides[get_run_repo] = lambda: repo
     app.dependency_overrides[get_run_director_repo] = lambda: director_repo
@@ -297,13 +301,22 @@ def test_ops_edition_rejects_client_provider_override(monkeypatch, tmp_path) -> 
     with TestClient(app) as c:
         resp = c.post(
             "/api/v1/pipeline",
-            json={"prompt": "test", "provider_api_key": "sk-user"},
+            json={
+                "prompt": "test",
+                "provider_api_key": "sk-user",
+                "router_mode": "off",
+            },
+            headers={"Cookie": f"mv_session={session.token}"},
+        )
+        run_id = resp.json()["run_id"]
+        run = c.get(
+            f"/api/v1/runs/{run_id}",
             headers={"Cookie": f"mv_session={session.token}"},
         )
 
     get_settings.cache_clear()
-    assert resp.status_code == 400
-    assert "平台托管模型" in resp.json()["detail"]
+    assert resp.status_code == 202
+    assert run.status_code == 200
 
 
 def test_ops_pipeline_requires_wechat_session(monkeypatch, tmp_path) -> None:

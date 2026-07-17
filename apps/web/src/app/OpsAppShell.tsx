@@ -23,10 +23,10 @@ import {
 } from "../features/studio-editor/ui/IntakeScreen";
 import { StudioPage } from "../pages/Studio/StudioPage";
 import { HistoryPage } from "../pages/History/HistoryPage";
-import { TemplatesPage } from "../pages/Templates/TemplatesPage";
 import { SettingsPage } from "../pages/Settings/SettingsPage";
 import { OPEN_ACCOUNT_PANEL_FLAG } from "../pages/PaymentResultPage";
 import { usePipelineSubmit } from "../features/pipeline/hooks/usePipelineSubmit";
+import { useProviderSettings } from "../features/providers/hooks/useProviderSettings";
 import {
   GlobalTopbar,
   GlobalTopbarShell,
@@ -78,6 +78,11 @@ export function OpsAppShell() {
     status: accountStatus,
   } = useAccount();
   const accountAvatarUrl = account?.avatar_url ?? null;
+  const {
+    settings: providerSettings,
+    update: updateProvider,
+    isConfigured,
+  } = useProviderSettings();
 
   const css = useMemo(() => themeVars(t), [t]);
   const mode = themeMode(t);
@@ -122,7 +127,7 @@ export function OpsAppShell() {
     return () => mobileQuery.removeListener(revealTopbarOnMobile);
   }, []);
 
-  const submitWithPlatformProvider = async (
+  const submitWithProvider = async (
     prompt: string,
     sourceCode?: string | null,
     language?: string | null,
@@ -135,6 +140,7 @@ export function OpsAppShell() {
       language,
       sourceFilename,
       sourceSizeBytes,
+      provider: isConfigured ? providerSettings : undefined,
     });
 
   const handleSubmit = async (ctx: IntakeContext) => {
@@ -143,7 +149,7 @@ export function OpsAppShell() {
       setLoginOpen(true);
       return;
     }
-    const nextRunId = await submitWithPlatformProvider(
+    const nextRunId = await submitWithProvider(
       ctx.prompt,
       ctx.sourceCode,
       ctx.language,
@@ -154,16 +160,11 @@ export function OpsAppShell() {
   };
 
   const handleResubmitPrompt = async (prompt: string) => {
-    const nextRunId = await submitWithPlatformProvider(prompt);
+    const nextRunId = await submitWithProvider(prompt);
     enterRun(nextRunId);
   };
 
   const handleEditPrompt = (prompt: string) => {
-    setTopbarCollapsed(false);
-    routerNavigate("/create", { state: { prompt } });
-  };
-
-  const handleUseTemplate = (prompt: string) => {
     setTopbarCollapsed(false);
     routerNavigate("/create", { state: { prompt } });
   };
@@ -188,7 +189,7 @@ export function OpsAppShell() {
     const saved = readPendingOpsSubmission();
     if (!isLoggedIn || !saved || autoSubmitRef.current) return;
     autoSubmitRef.current = true;
-    void submitWithPlatformProvider(
+    void submitWithProvider(
       saved.prompt,
       saved.sourceCode,
       saved.language,
@@ -216,7 +217,7 @@ export function OpsAppShell() {
         <GlobalTopbar
           stage={stage}
           appEdition="ops"
-          isProviderConfigured
+          isProviderConfigured={isConfigured}
           accountBalanceYuan={account?.balance_yuan ?? null}
           accountName={account?.display_name ?? null}
           accountAvatarUrl={accountAvatarUrl}
@@ -224,6 +225,7 @@ export function OpsAppShell() {
           onNavigate={navigate}
           isDark={mode === "dark"}
           onToggleTheme={toggleTheme}
+          onOpenProviderSettings={() => navigate("settings")}
           onOpenAccountPanel={isLoggedIn ? openAccountPanel : requireLogin}
         />
       </GlobalTopbarShell>
@@ -245,7 +247,8 @@ export function OpsAppShell() {
           path="/run/:runId"
           element={<ErrorBoundary theme={mode}>{isLoggedIn ? (
             <StudioPage appEdition="ops" runId={activeRunId} t={t} onNavigate={navigate}
-              isProviderConfigured onOpenProviderSettings={openAccountPanel}
+              isProviderConfigured={isConfigured} providerSettings={providerSettings}
+              onOpenProviderSettings={() => navigate("settings")}
               onResubmitPrompt={(prompt) => void handleResubmitPrompt(prompt)} onEditPrompt={handleEditPrompt}
               topbarCollapsed={effectiveTopbarCollapsed} onToggleTopbar={() => setTopbarCollapsed((value) => !value)} />
           ) : <ProtectedOpsPage onLogin={requireLogin} />}</ErrorBoundary>}
@@ -258,16 +261,13 @@ export function OpsAppShell() {
           ) : <ProtectedOpsPage onLogin={requireLogin} />}</ErrorBoundary>}
         />
         <Route
-          path="/cases"
-          element={<ErrorBoundary theme={mode}><TemplatesPage onUseTemplate={handleUseTemplate} /></ErrorBoundary>}
-        />
-        <Route path="/templates" element={<Navigate to="/cases" replace />} />
-        <Route
           path="/settings"
           element={
             <ErrorBoundary theme={mode}>
               <SettingsPage
                 appEdition="ops"
+                providerSettings={providerSettings}
+                onUpdateProvider={updateProvider}
                 tweaks={t}
                 setTweak={setTweak}
                 isAuthenticated={isLoggedIn}

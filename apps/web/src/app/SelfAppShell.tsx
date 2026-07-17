@@ -20,7 +20,6 @@ import {
 } from "../features/studio-editor/ui/IntakeScreen";
 import { StudioPage } from "../pages/Studio/StudioPage";
 import { HistoryPage } from "../pages/History/HistoryPage";
-import { TemplatesPage } from "../pages/Templates/TemplatesPage";
 import { SettingsPage } from "../pages/Settings/SettingsPage";
 import { usePipelineSubmit } from "../features/pipeline/hooks/usePipelineSubmit";
 import { useProviderSettings } from "../features/providers/hooks/useProviderSettings";
@@ -151,11 +150,6 @@ export function SelfAppShell() {
     routerNavigate("/create", { state: { prompt } });
   };
 
-  const handleUseTemplate = async (prompt: string) => {
-    const nextRunId = await submitWithProvider(prompt);
-    enterRun(nextRunId);
-  };
-
   const handleOpenHistoryRun = (historyRunId: string) => {
     enterRun(historyRunId);
   };
@@ -218,16 +212,6 @@ export function SelfAppShell() {
               <HistoryPage
                 t={t}
                 onOpenInWorkbench={handleOpenHistoryRun}
-              />
-            </ErrorBoundary>
-          }
-        />
-        <Route
-          path="/templates"
-          element={
-            <ErrorBoundary theme={mode}>
-              <TemplatesPage
-                onUseTemplate={(prompt) => void handleUseTemplate(prompt)}
               />
             </ErrorBoundary>
           }

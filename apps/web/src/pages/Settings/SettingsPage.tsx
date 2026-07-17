@@ -20,6 +20,7 @@ type SetTweakFn = <K extends keyof TweakValues>(
 ) => void;
 
 interface SettingsPageProps {
+  /** Kept for host compatibility; self controls are also available in ops. */
   appEdition?: AppEdition;
 
   /** Provider state passed in by the host so changes survive navigation. */
@@ -88,7 +89,7 @@ export function SettingsPage({
   isAuthenticated = true,
   onRequireLogin,
 }: SettingsPageProps) {
-  const showProviderSettings = appEdition === "self";
+  const showProviderSettings = true;
   const [apiKey, setApiKey] = useState(providerSettings?.apiKey ?? "");
   const [baseUrl, setBaseUrl] = useState(
     providerSettings?.baseUrl ?? "https://api.openai.com/v1",
@@ -117,7 +118,7 @@ export function SettingsPage({
   >({ kind: "idle" });
 
   const tts = useTTS();
-  const showLocalTtsSettings = appEdition === "self";
+  const showLocalTtsSettings = true;
   const themeDefaultAccent = THEME_PALETTE[tweaks.theme].accent;
   const accentIsThemeDefault =
     tweaks.accent.toLowerCase() === themeDefaultAccent.toLowerCase();

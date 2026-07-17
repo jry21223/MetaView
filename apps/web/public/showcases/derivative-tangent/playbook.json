@@ -1,0 +1,64 @@
+{
+  "schema_version": "1.0.0",
+  "fps": 30,
+  "total_frames": 90,
+  "domain": "math",
+  "title": "Derivative tangent",
+  "summary": "Derivative tangent",
+  "parameter_controls": [],
+  "steps": [
+    {
+      "step_id": "derivative_tangent",
+      "end_frame": 90,
+      "title": "Derivative tangent",
+      "voiceover_text": "The derivative at x=1 is the slope of the tangent line.",
+      "snapshot": {
+        "kind": "math_plot",
+        "pack_id": "math-basic",
+        "asset_id": "derivative-tangent-preset",
+        "curves": [
+          {
+            "expression": "x^2",
+            "label": "f(x)=x^2",
+            "emphasis": "primary",
+            "semantic_role": "curve"
+          },
+          {
+            "expression": "2*x - 1",
+            "label": "tangent slope = 2",
+            "emphasis": "accent",
+            "semantic_role": "tangent"
+          }
+        ],
+        "x_min": -1,
+        "x_max": 3,
+        "y_min": -1,
+        "y_max": 5,
+        "marker_x": 1,
+        "shade_from": 0.85,
+        "shade_to": 1.15,
+        "x_label": "x",
+        "y_label": "f(x)",
+        "formula_latex": "f'(1)=2",
+        "caption": "The derivative at x=1 is the slope of the tangent line."
+      },
+      "code_highlight": null,
+      "tokens": []
+    }
+  ],
+  "algorithm_id": "derivative_tangent",
+  "initial_data": {
+    "scene_blueprint": [
+      "derivative_tangent"
+    ],
+    "visual_intent": [
+      "show_function_curve",
+      "highlight_tangent_slope"
+    ],
+    "emphasis_points": [
+      "formula",
+      "curve",
+      "tangent"
+    ]
+  }
+}

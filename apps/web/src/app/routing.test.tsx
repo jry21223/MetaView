@@ -25,6 +25,7 @@ describe("App routing", () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
     vi.doUnmock("../features/pipeline/hooks/usePipelinePoller");
     vi.resetModules();
     localStorage.clear();
@@ -86,6 +87,54 @@ describe("App routing", () => {
 
     await waitFor(() => expect(getByText("0 / 0 条")).toBeTruthy());
     expect(getByRole("searchbox")).toBeTruthy();
+  });
+
+  it("keeps public cases outside account and pipeline shells, including ops edition", async () => {
+    let accountHits = 0;
+    let pipelineHits = 0;
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/account/me`, () => {
+        accountHits += 1;
+        return HttpResponse.json({ detail: "must not be requested" }, { status: 500 });
+      }),
+      http.get(`${API_BASE_URL}/api/v1/pipeline`, () => {
+        pipelineHits += 1;
+        return HttpResponse.json({ detail: "must not be requested" }, { status: 500 });
+      }),
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ schemaVersion: "1.0", cases: [] }), { status: 200 }),
+      ),
+    );
+    vi.stubEnv("VITE_APP_EDITION", "ops");
+    window.history.pushState({}, "", "/cases");
+
+    const { App } = await import("./App");
+    const { getByRole } = render(<App />);
+
+    expect(getByRole("heading", { name: "精选案例" })).toBeTruthy();
+    await waitFor(() => expect(getByRole("alert")).toBeTruthy());
+    expect(accountHits).toBe(0);
+    expect(pipelineHits).toBe(0);
+  });
+
+  it("redirects the compatibility /templates path to public cases", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ schemaVersion: "1.0", cases: [] }), { status: 200 }),
+      ),
+    );
+    vi.stubEnv("VITE_APP_EDITION", "self");
+    window.history.pushState({}, "", "/templates");
+
+    const { App } = await import("./App");
+    const { getByRole } = render(<App />);
+
+    await waitFor(() => expect(window.location.pathname).toBe("/cases"));
+    expect(getByRole("heading", { name: "精选案例" })).toBeTruthy();
   });
 
   it("redirects unknown app paths back to the public landing page", async () => {

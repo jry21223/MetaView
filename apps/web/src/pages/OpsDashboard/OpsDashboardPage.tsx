@@ -710,7 +710,7 @@ function SideMenu({
   const navItems: Array<{ stage: Stage; label: string; icon: React.ReactNode }> = [
     { stage: "intake", label: "工作台", icon: <PlayCircleIcon /> },
     { stage: "history", label: "任务历史", icon: <HistoryIcon /> },
-    { stage: "templates", label: "模板", icon: <ViewModuleIcon /> },
+    { stage: "cases", label: "案例", icon: <ViewModuleIcon /> },
     { stage: "settings", label: "设置", icon: <SettingsIcon /> },
   ];
 

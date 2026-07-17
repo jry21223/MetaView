@@ -51,11 +51,7 @@ def _resolve_api_key(settings: Settings, payload: TtsSpeechRequest) -> str:
     Operators can either set ``METAVIEW_TTS_API_KEY`` directly or reuse
     ``METAVIEW_OPENAI_API_KEY`` for hobby setups.
     """
-    key = (
-        payload.api_key
-        if settings.app_edition == "self" and payload.api_key
-        else settings.tts_api_key or settings.openai_api_key or ""
-    ).strip()
+    key = (payload.api_key or settings.tts_api_key or settings.openai_api_key or "").strip()
     if not key:
         raise HTTPException(
             status_code=503,
@@ -65,13 +61,13 @@ def _resolve_api_key(settings: Settings, payload: TtsSpeechRequest) -> str:
 
 
 def _resolve_base_url(settings: Settings, payload: TtsSpeechRequest) -> str:
-    if settings.app_edition == "self" and payload.base_url:
+    if payload.base_url:
         return payload.base_url
     return settings.tts_base_url
 
 
 def _resolve_model(settings: Settings, payload: TtsSpeechRequest) -> str:
-    if settings.app_edition == "self" and payload.model:
+    if payload.model:
         return payload.model
     return settings.tts_model
 
@@ -110,11 +106,6 @@ async def synthesize_speech(
     """
     if settings.app_edition == "ops":
         await require_wechat_session(request, settings, account_use_case)
-        if payload.api_key or payload.base_url or payload.model:
-            raise HTTPException(
-                status_code=400,
-                detail="运营版使用平台托管 TTS，不能提交客户端 TTS 配置",
-            )
 
     api_key = _resolve_api_key(settings, payload)
     voice = payload.voice or settings.tts_default_voice

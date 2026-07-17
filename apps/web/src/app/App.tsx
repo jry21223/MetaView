@@ -1,9 +1,11 @@
-import { BrowserRouter, Route, Routes, useNavigate } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import type { AppEdition } from "../shared/config/constants";
 import { PaymentResultPage } from "../pages/PaymentResultPage";
 import { OpsDashboardPage } from "../pages/OpsDashboard/OpsDashboardPage";
 import { AssetShowcasePage } from "../pages/AssetShowcase/AssetShowcasePage";
 import { LandingRoute } from "./LandingRoute";
+import { CasesPage } from "../pages/Cases/CasesPage";
+import { CaseDetailPage } from "../pages/Cases/CaseDetailPage";
 import { OpsAppShell } from "./OpsAppShell";
 import { SelfAppShell } from "./SelfAppShell";
 import { stageToPath } from "./routes";
@@ -38,6 +40,9 @@ function AppRoutes() {
         }
       />
       <Route path="/asset-showcase" element={<AssetShowcasePage />} />
+      <Route path="/cases" element={<CasesPage />} />
+      <Route path="/cases/:slug" element={<CaseDetailPage />} />
+      <Route path="/templates" element={<Navigate to="/cases" replace />} />
       <Route
         path="/*"
         element={appEdition === "ops" ? <OpsAppShell /> : <SelfAppShell />}

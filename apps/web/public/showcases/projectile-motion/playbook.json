@@ -1,0 +1,106 @@
+{
+  "schema_version": "1.0.0",
+  "fps": 30,
+  "total_frames": 90,
+  "domain": "physics",
+  "title": "Projectile motion",
+  "summary": "Projectile motion",
+  "parameter_controls": [],
+  "steps": [
+    {
+      "step_id": "projectile_motion",
+      "end_frame": 90,
+      "title": "Projectile motion",
+      "voiceover_text": "Horizontal velocity stays constant while vertical acceleration bends the path.",
+      "snapshot": {
+        "kind": "physics_force_scene",
+        "pack_id": "physics-basic",
+        "objects": [
+          {
+            "id": "body",
+            "label": "projectile",
+            "x": 30,
+            "y": 42,
+            "asset_id": "projectile-body-dot"
+          }
+        ],
+        "vectors": [
+          {
+            "id": "vx",
+            "target": "body",
+            "semantic_role": "velocity",
+            "dx": 28,
+            "dy": 0,
+            "label": "v_x"
+          },
+          {
+            "id": "vy",
+            "target": "body",
+            "semantic_role": "velocity",
+            "dx": 0,
+            "dy": 18,
+            "label": "v_y"
+          },
+          {
+            "id": "g",
+            "target": "body",
+            "semantic_role": "acceleration",
+            "dx": 0,
+            "dy": 24,
+            "label": "g"
+          },
+          {
+            "id": "force",
+            "target": "body",
+            "semantic_role": "force",
+            "dx": -16,
+            "dy": 8,
+            "label": "F"
+          }
+        ],
+        "trajectory": [
+          [
+            18,
+            34
+          ],
+          [
+            31.5,
+            36.8
+          ],
+          [
+            45,
+            45
+          ],
+          [
+            58.5,
+            58.8
+          ],
+          [
+            72,
+            78
+          ]
+        ],
+        "formula_latex": "x=v_0t,\\quad y=\\frac12gt^2",
+        "caption": "Horizontal velocity stays constant while vertical acceleration bends the path."
+      },
+      "code_highlight": null,
+      "tokens": []
+    }
+  ],
+  "algorithm_id": "projectile_motion",
+  "initial_data": {
+    "scene_blueprint": [
+      "projectile_motion"
+    ],
+    "visual_intent": [
+      "projectile_motion",
+      "velocity_decomposition",
+      "gravity_acceleration"
+    ],
+    "emphasis_points": [
+      "vx constant",
+      "vy increases",
+      "g downward"
+    ]
+  }
+}
