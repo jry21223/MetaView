@@ -350,6 +350,7 @@ async def _resolve_base_director(
                     status_code=422,
                     detail="Stored version director is invalid",
                 ) from exc
+        return build_default_director(playbook, run_id)
     active = await director_repo.get(run_id)
     if active is not None:
         return active
