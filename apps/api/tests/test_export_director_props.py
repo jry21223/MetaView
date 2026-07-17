@@ -135,6 +135,55 @@ async def test_export_input_props_uses_version_director_when_requested(tmp_path)
     assert use_case.input_props["director"]["beats"][0]["camera_motion"] == "pan_right"
 
 
+@pytest.mark.asyncio
+async def test_export_rebuilds_missing_version_director_instead_of_using_current(
+    tmp_path,
+) -> None:
+    db = str(tmp_path / "export-legacy-version.db")
+    init_db(db)
+    run_repo = SqliteRunRepository(db)
+    director_repo = SqliteRunDirectorRepository(db)
+    export_repo = InMemoryExportJobRepository()
+    await _seed_run(run_repo, "run-legacy")
+    await director_repo.upsert(
+        _director("run-legacy", camera_motion="pan_right"),
+        "2026-06-05T00:00:00+00:00",
+    )
+    await run_repo.append_version(
+        "run-legacy",
+        version_id="legacy-version",
+        playbook_json=json.dumps(
+            {**_playbook(), "title": "Legacy version fixture"},
+            ensure_ascii=False,
+        ),
+        source="followup",
+        followup_id=None,
+        parent_version_id=None,
+        summary="legacy version without director",
+        created_at="2026-06-05T00:01:00+00:00",
+        director_json=None,
+    )
+    await export_repo.create(_job("job-legacy", "run-legacy"))
+    use_case = RecordingExportVideoUseCase(
+        export_repo,
+        run_repo,
+        director_repo,
+        web_app_dir=tmp_path,
+        artifacts_dir=tmp_path / "artifacts",
+    )
+
+    await use_case.execute(
+        "job-legacy",
+        "run-legacy",
+        with_audio=False,
+        tts=None,
+        version_id="legacy-version",
+    )
+
+    assert use_case.input_props is not None
+    assert use_case.input_props["director"]["beats"][0]["camera_motion"] == "push_in"
+
+
 async def _seed_run(repo: SqliteRunRepository, run_id: str) -> None:
     await repo.create(run_id, "prompt", "2026-06-05T00:00:00+00:00")
     await repo.update(
