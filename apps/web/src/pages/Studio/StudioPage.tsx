@@ -20,7 +20,6 @@ import {
   submitRunFollowUp,
   type RunVersionRecord,
 } from "../../features/followups/api/followupApi";
-import { getPipelineRun } from "../../features/pipeline/api/pipelineApi";
 import { FollowupCommitLog } from "../../features/followups/ui/FollowupCommitLog";
 import type {
   InteractionEvent,
@@ -473,14 +472,7 @@ function ChatPanel({
         if (err instanceof InteractionVersionRequestError && err.status === 409) {
           setHeadVersionId(undefined);
           try {
-            const [history, latestRun] = await Promise.all([
-              listRunFollowUps(runId!, controller.signal),
-              getPipelineRun(runId!, controller.signal),
-            ]);
-            if (latestRun.playbook) {
-              onPlaybookPatched(latestRun.playbook, latestRun.director);
-              setInteractionEpoch((current) => current + 1);
-            }
+            const history = await listRunFollowUps(runId!, controller.signal);
             setVersions(history.versions);
             setHeadVersionId(
               history.versions.find((version) => version.is_head)?.version_id ?? null,
@@ -489,11 +481,11 @@ function ChatPanel({
               ...current,
               {
                 from: "ai",
-                text: `（版本冲突：${err.message}。已加载最新版本，请重新执行沙盒操作。）`,
+                text: `（版本冲突：${err.message}。已同步最新版本基线，请再次应用当前沙盒操作。）`,
                 error: true,
               },
             ]);
-            throw new Error("已加载最新版本，请重新执行沙盒操作。");
+            throw new Error("已同步最新版本基线，请再次应用当前沙盒操作。");
           } catch (refreshError) {
             if ((refreshError as Error).name === "AbortError") throw refreshError;
             if (
