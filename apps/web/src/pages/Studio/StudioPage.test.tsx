@@ -43,6 +43,7 @@ vi.mock("../../features/playbook/engine/player/PlaybookPlayer", async () => {
       onExplainInteraction,
       onApplyInteractionVersion,
       interactionActionPending = false,
+      interactionSessionKey,
       enableInteractionSandbox = false,
     }: {
       script: PlaybookScript;
@@ -54,6 +55,7 @@ vi.mock("../../features/playbook/engine/player/PlaybookPlayer", async () => {
       onExplainInteraction?: (context: InteractionFollowUpContext) => Promise<void>;
       onApplyInteractionVersion?: (events: InteractionEvent[]) => Promise<void>;
       interactionActionPending?: boolean;
+      interactionSessionKey?: string;
       enableInteractionSandbox?: boolean;
     }) =>
       ReactModule.createElement(
@@ -62,6 +64,7 @@ vi.mock("../../features/playbook/engine/player/PlaybookPlayer", async () => {
           "data-testid": "mock-player",
           "data-interaction-sandbox": String(enableInteractionSandbox),
           "data-interaction-pending": String(interactionActionPending),
+          "data-interaction-session-key": interactionSessionKey,
         },
         onToggleTopbar
           ? ReactModule.createElement(
@@ -404,6 +407,8 @@ describe("StudioPage", () => {
 
     await waitFor(() => expect(listCalls).toBe(1));
     expect(postCalls).toBe(0);
+    const initialSessionKey = view.getByTestId("mock-player")
+      .getAttribute("data-interaction-session-key");
     fireEvent.click(view.getByRole("button", { name: "模拟应用到新版本" }));
 
     await waitFor(() => expect(view.getByText("Applied lesson")).toBeTruthy());
@@ -479,7 +484,7 @@ describe("StudioPage", () => {
     await waitFor(() => expect(listCalls).toBe(2));
   });
 
-  it("reloads the current head and reports a stale-base interaction conflict", async () => {
+  it("refreshes the current head without resetting sandbox state after a stale-base conflict", async () => {
     mockUsePipelinePoller.mockReturnValue({
       playbook: playbook("Original lesson"),
       director: null,
@@ -506,11 +511,6 @@ describe("StudioPage", () => {
           ],
         });
       }),
-      http.get(`${API_BASE_URL}/api/v1/runs/run-1`, () => HttpResponse.json({
-        status: "succeeded",
-        playbook: playbook("Concurrent lesson"),
-        director: null,
-      })),
       http.post(`${API_BASE_URL}/api/v1/runs/run-1/interaction-version`, () => {
         postCalls += 1;
         return HttpResponse.json(
@@ -538,7 +538,9 @@ describe("StudioPage", () => {
         .toBeTruthy();
     });
     expect(postCalls).toBe(1);
-    expect(view.getByText("Concurrent lesson")).toBeTruthy();
+    expect(view.getByText("Original lesson")).toBeTruthy();
+    expect(view.getByTestId("mock-player").getAttribute("data-interaction-session-key"))
+      .toBe(initialSessionKey);
     expect(view.queryByText(/已将沙盒操作应用为新版本/)).toBeNull();
     expect(listCalls).toBe(2);
     expect(view.getByRole("button", { name: "模拟应用到新版本" })).toBeTruthy();
