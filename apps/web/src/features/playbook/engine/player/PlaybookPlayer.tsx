@@ -307,13 +307,26 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     : undefined;
   const hasCurrentInteraction = currentInteractionBinding != null;
   const handleRendererInteraction = (event: RendererInteractionEvent) => {
+    if (event.type === "select-node") {
+      if (
+        currentInteractionBinding?.target_role !== "start-node" ||
+        event.step_id !== currentInteractionBinding.step_id
+      ) return;
+      interactionSandbox.apply({
+        adapter_id: "algorithm.bfs",
+        step_id: event.step_id,
+        target_id: currentInteractionBinding.id,
+        action: "select",
+        value: event.value,
+      });
+      return;
+    }
     if (event.phase === "cancel") {
       interactionSandbox.cancelPreview();
       return;
     }
     if (
       currentInteractionBinding?.target_role !== "marker-x" ||
-      event.target_role !== "marker-x" ||
       event.step_id !== currentInteractionBinding.step_id
     )
       return;
@@ -455,7 +468,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
             onInteraction:
               interactionEnabled &&
               !isPortraitLayout &&
-              currentInteractionBinding?.target_role === "marker-x"
+              currentInteractionBinding
                 ? handleRendererInteraction
                 : undefined,
           }}
