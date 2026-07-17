@@ -1,0 +1,16 @@
+{
+  "id": "binary-search-trace-preset",
+  "algorithm": "binary_search",
+  "language": "typescript",
+  "arrayValues": ["2", "4", "7", "11", "18", "25", "31"],
+  "target": "11",
+  "activeIndices": [3],
+  "searchRange": [0, 6],
+  "pointers": [
+    { "id": "low", "label": "low", "index": 0 },
+    { "id": "mid", "label": "mid", "index": 3 },
+    { "id": "high", "label": "high", "index": 6 }
+  ],
+  "activeLines": [2, 3],
+  "activeLine": 2
+}

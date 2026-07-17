@@ -1,437 +1,357 @@
-import { useRef, useState } from "react";
-import { MetaParticleField } from "../../../shared/ui/MetaParticleField";
+import { useLayoutEffect, useRef, useState } from "react";
+import {
+  CODE_FILE_ACCEPT,
+  languageFromCodeFilename,
+} from "../lib/codeFileLanguage";
 
-type IntakeDomain =
-  | "algorithm"
-  | "math"
-  | "code"
-  | "physics"
-  | "chemistry"
-  | "biology"
-  | "geography";
+const MAX_CODE_FILE_BYTES = 256 * 1024;
+const TEXTAREA_MIN_HEIGHT = 168;
+const TEXTAREA_MAX_HEIGHT = 320;
 
-type IntakeTemplate =
-  | "math-problem"
-  | "algorithm-code"
-  | "physics-problem"
-  | "chemistry-stoichiometry";
-
-const UNSUPPORTED_FILE_WARNING =
-  "当前只支持上传代码文件。图片、PDF、课件暂未接入生成管线。";
-const AUTO_DOMAIN_HINT = "将交给系统自动识别题目类型。";
-
-const TEMPLATE_GALLERY: Array<{
-  id: IntakeTemplate;
-  domain: IntakeDomain | null;
-  title: string;
-  desc: string;
-  prompt: string;
-  icon: "math" | "code" | "physics" | "chemistry";
-}> = [
+const EXAMPLE_PROMPTS = [
   {
-    id: "math-problem",
-    domain: "math",
-    title: "数学题",
-    desc: "函数、极限、积分、公式推导",
-    prompt: "生成一个数学题讲解：用步骤和图像解释函数、极限、积分或公式推导。",
-    icon: "math",
+    label: "导数与切线",
+    prompt:
+      "用动画解释导数的几何意义：曲线 y=x² 在点 (1,1) 处切线的斜率为什么是 2。",
   },
   {
-    id: "algorithm-code",
-    domain: "algorithm",
-    title: "算法代码",
-    desc: "排序、指针、变量变化、代码同步",
-    prompt: "生成一个算法代码讲解：展示代码同步高亮、变量变化和指针移动。",
-    icon: "code",
+    label: "二分查找",
+    prompt:
+      "演示在有序数组 [1,3,5,7,9,11] 里二分查找 7 的过程，标出 low/mid/high。",
   },
   {
-    id: "physics-problem",
-    domain: "physics",
-    title: "物理题",
-    desc: "受力、运动、能量过程",
-    prompt: "生成一个物理题讲解：展示受力、运动过程或能量变化。",
-    icon: "physics",
+    label: "抛体运动",
+    prompt:
+      "演示平抛运动：水平速度不变、竖直加速，画出抛物线轨迹和分速度矢量。",
   },
-  {
-    id: "chemistry-stoichiometry",
-    domain: "chemistry",
-    title: "化学计量",
-    desc: "配平、物质的量、反应比例关系",
-    prompt: "生成一个化学计量题讲解：展示方程式配平、物质的量换算和反应比例推导。",
-    icon: "chemistry",
-  },
-];
+] as const;
 
 export interface IntakeContext {
-  domain: IntakeDomain | null;
-  template: IntakeTemplate | "freeform";
-  title: string;
-  raw: string;
-  files: Array<{ name: string; size: number }>;
+  prompt: string;
   sourceCode?: string;
-  language?: string;
+  language?: string | null;
+  sourceFilename?: string;
+  sourceSizeBytes?: number;
 }
 
 interface IntakeScreenProps {
   onSubmit: (ctx: IntakeContext) => void | Promise<void>;
   isSubmitting?: boolean;
   submitError?: string | null;
+  /** Seeds the composer once on mount (e.g. editing a failed run's prompt). */
+  initialPrompt?: string;
 }
 
-function Icon({ kind }: { kind: (typeof TEMPLATE_GALLERY)[number]["icon"] }) {
-  if (kind === "code") {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-        <path d="m8 9-4 3 4 3" />
-        <path d="m16 9 4 3-4 3" />
-        <path d="m14 5-4 14" />
-      </svg>
-    );
-  }
-  if (kind === "physics") {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-        <path d="M4 18h16" />
-        <path d="M7 18 17 6" />
-        <path d="m14 6 3 0 0 3" />
-        <circle cx="9" cy="15" r="2" />
-      </svg>
-    );
-  }
-  if (kind === "chemistry") {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-        <path d="M9 3h6" />
-        <path d="M10 3v5l-4.8 8.3A3.2 3.2 0 0 0 8 21h8a3.2 3.2 0 0 0 2.8-4.7L14 8V3" />
-        <path d="M7.5 16h9" />
-        <circle cx="10" cy="18" r="0.8" />
-        <circle cx="14" cy="18" r="0.8" />
-      </svg>
-    );
-  }
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-      <path d="M4 18c4-10 8-10 12 0" />
-      <path d="M4 6h16" />
-      <path d="M6 14h12" />
-    </svg>
-  );
-}
+type LocalSubmitStatus = "idle" | "reading-file" | "submitting";
 
 function readFileAsText(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
+    reader.onload = () =>
+      resolve(typeof reader.result === "string" ? reader.result : "");
+    reader.onerror = () => reject(reader.error ?? new Error("file read failed"));
+    reader.onabort = () => reject(new Error("file read aborted"));
     reader.readAsText(file);
   });
 }
 
-const EXT_TO_LANGUAGE: Record<string, string> = {
-  ".py": "python",
-  ".js": "javascript",
-  ".ts": "typescript",
-  ".tsx": "typescript",
-  ".jsx": "javascript",
-  ".java": "java",
-  ".cpp": "cpp",
-  ".cc": "cpp",
-  ".cxx": "cpp",
-  ".c": "c",
-  ".h": "c",
-  ".hpp": "cpp",
-  ".cs": "csharp",
-  ".go": "go",
-  ".rs": "rust",
-  ".rb": "ruby",
-  ".swift": "swift",
-  ".kt": "kotlin",
-  ".kts": "kotlin",
-  ".php": "php",
-  ".r": "r",
-  ".m": "objc",
-  ".sh": "bash",
-  ".bash": "bash",
-  ".zsh": "bash",
-  ".sql": "sql",
-  ".html": "html",
-  ".css": "css",
-  ".json": "json",
-  ".yaml": "yaml",
-  ".yml": "yaml",
-};
-
-const CODE_ACCEPT = Object.keys(EXT_TO_LANGUAGE).join(",");
-
-function languageFromName(name: string): string | undefined {
-  const dotIndex = name.lastIndexOf(".");
-  if (dotIndex < 0) return undefined;
-  const ext = name.slice(dotIndex).toLowerCase();
-  return EXT_TO_LANGUAGE[ext];
+function resizeTextarea(element: HTMLTextAreaElement) {
+  element.style.height = `${TEXTAREA_MIN_HEIGHT}px`;
+  const contentHeight = element.scrollHeight;
+  const nextHeight = Math.min(
+    Math.max(contentHeight, TEXTAREA_MIN_HEIGHT),
+    TEXTAREA_MAX_HEIGHT,
+  );
+  element.style.height = `${nextHeight}px`;
+  element.style.overflowY =
+    contentHeight > TEXTAREA_MAX_HEIGHT ? "auto" : "hidden";
 }
 
-function inferDomain(raw: string, codeFile?: File): IntakeDomain | null {
-  if (codeFile) return "code";
-
-  const text = raw.toLowerCase();
-  if (
-    text.includes("排序") ||
-    text.includes("算法") ||
-    text.includes("二分") ||
-    text.includes("递归") ||
-    text.includes("search") ||
-    text.includes("pointer") ||
-    text.includes("array") ||
-    text.includes("function ") ||
-    text.includes("def ") ||
-    text.includes("class ")
-  ) {
-    return "algorithm";
-  }
-  if (
-    raw.includes("微分") ||
-    raw.includes("积分") ||
-    raw.includes("极限") ||
-    raw.includes("函数") ||
-    raw.includes("导数") ||
-    raw.includes("方程") ||
-    raw.includes("傅里叶")
-  ) {
-    return "math";
-  }
-  if (
-    raw.includes("斜面") ||
-    raw.includes("物理") ||
-    raw.includes("受力") ||
-    raw.includes("速度") ||
-    raw.includes("加速度") ||
-    raw.includes("能量") ||
-    raw.includes("力")
-  ) {
-    return "physics";
-  }
-  if (
-    raw.includes("化学") ||
-    raw.includes("配平") ||
-    raw.includes("物质的量") ||
-    raw.includes("摩尔") ||
-    raw.includes("反应") ||
-    text.includes("stoichiometry") ||
-    text.includes("mole")
-  ) {
-    return "chemistry";
-  }
-  return null;
+function fileSizeLabel(size: number): string {
+  if (size < 1024) return `${size} B`;
+  return `${Math.ceil(size / 1024)} KB`;
 }
 
 export function IntakeScreen({
   onSubmit,
   isSubmitting = false,
   submitError = null,
+  initialPrompt = "",
 }: IntakeScreenProps) {
-  const [input, setInput] = useState("");
-  const [files, setFiles] = useState<Array<{ name: string; size: number }>>([]);
-  const [fileObjects, setFileObjects] = useState<File[]>([]);
-  const [fileWarning, setFileWarning] = useState<string | null>(null);
-  const [thinking, setThinking] = useState("");
+  const [input, setInput] = useState(initialPrompt);
+  const [attachment, setAttachment] = useState<File | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [submitStatus, setSubmitStatus] =
+    useState<LocalSubmitStatus>("idle");
+  const [dragActive, setDragActive] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const pending = isSubmitting || Boolean(thinking);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const busyRef = useRef(false);
+  const pending = isSubmitting || submitStatus !== "idle";
 
-  const handleFiles = (list: FileList | null) => {
-    if (!list) return;
-    const arr = Array.from(list);
-    const supported = arr.filter((file) => languageFromName(file.name));
-    const unsupportedCount = arr.length - supported.length;
+  useLayoutEffect(() => {
+    if (textareaRef.current) resizeTextarea(textareaRef.current);
+  }, []);
 
-    setFileWarning(unsupportedCount > 0 ? UNSUPPORTED_FILE_WARNING : null);
-    if (supported.length === 0) return;
+  const handleFiles = (list: FileList | File[] | null) => {
+    if (!list || list.length === 0 || pending) return;
+    const candidates = Array.from(list);
 
-    setFileObjects((prev) => [...prev, ...supported]);
-    setFiles((prev) => [
-      ...prev,
-      ...supported.map((f) => ({ name: f.name, size: f.size })),
-    ]);
+    if (candidates.length !== 1) {
+      setFileError("一次只能上传一个代码文件。");
+      return;
+    }
+
+    const nextFile = candidates[0];
+    if (!languageFromCodeFilename(nextFile.name)) {
+      setFileError("不支持该文件类型，请选择代码文件。");
+      return;
+    }
+    if (nextFile.size > MAX_CODE_FILE_BYTES) {
+      setFileError("代码文件不能超过 256 KB。");
+      return;
+    }
+
+    setAttachment(nextFile);
+    setFileError(null);
   };
 
-  const removeFile = (index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
-    setFileObjects((prev) => prev.filter((_, i) => i !== index));
+  const removeFile = () => {
+    if (pending) return;
+    setAttachment(null);
+    setFileError(null);
+    if (fileRef.current) fileRef.current.value = "";
   };
 
   const submit = async () => {
-    if (!input.trim() && files.length === 0) return;
+    const prompt = input.trim();
+    if ((!prompt && !attachment) || pending || busyRef.current) return;
 
-    setThinking("正在理解题目…");
-    const codeFile = fileObjects.find((f) => languageFromName(f.name));
-    let sourceCode: string | undefined;
-    let language: string | undefined;
-
-    if (codeFile) {
-      try {
-        sourceCode = await readFileAsText(codeFile);
-        language = languageFromName(codeFile.name);
-      } catch {
-        sourceCode = undefined;
-        language = undefined;
-      }
-    }
-
-    const domain = inferDomain(input, codeFile);
-    setThinking("提交中…");
+    busyRef.current = true;
+    setFileError(null);
 
     try {
+      if (!attachment) {
+        setSubmitStatus("submitting");
+        await onSubmit({ prompt });
+        return;
+      }
+
+      setSubmitStatus("reading-file");
+      let sourceCode: string;
+      try {
+        sourceCode = await readFileAsText(attachment);
+      } catch {
+        setFileError("文件读取失败，请重新选择代码文件。");
+        return;
+      }
+
+      setSubmitStatus("submitting");
       await onSubmit({
-        domain,
-        template: "freeform",
-        title: input.trim().slice(0, 40) || codeFile?.name || "未命名",
-        raw: input,
-        files,
+        prompt: prompt || `讲解 ${attachment.name} 中的代码。`,
         sourceCode,
-        language,
+        language: languageFromCodeFilename(attachment.name),
+        sourceFilename: attachment.name,
+        sourceSizeBytes: attachment.size,
       });
     } catch {
-      // The shell exposes the submission error through submitError; stay on intake.
+      // The shell exposes request failures through submitError; stay on intake.
     } finally {
-      setThinking("");
+      busyRef.current = false;
+      setSubmitStatus("idle");
     }
   };
 
-  const pickTemplate = (tpl: (typeof TEMPLATE_GALLERY)[number]) => {
+  const pickExample = (prompt: string) => {
     if (pending) return;
-    void Promise.resolve(onSubmit({
-      domain: tpl.domain,
-      template: tpl.id,
-      title: tpl.title,
-      raw: tpl.prompt,
-      files: [],
-    })).catch(() => undefined);
+    setInput(prompt);
+    setFileError(null);
+    queueMicrotask(() => {
+      if (textareaRef.current) resizeTextarea(textareaRef.current);
+    });
   };
+
+  const statusText = isSubmitting
+    ? "正在提交…"
+    : submitStatus === "reading-file"
+      ? "正在读取代码文件…"
+      : submitStatus === "submitting"
+        ? "正在提交…"
+        : null;
 
   return (
     <main className="mv-intake-body">
-      <section className="mv-intake-hero" aria-label="MetaView intake">
-        <div className="mv-intake-hero-visual">
-          <MetaParticleField variant="canvas" className="mv-motion-decorative" />
-        </div>
-        <div className="mv-eyebrow-mini">THEORETICAL CANVAS / 学习过程可视化</div>
-        <h1 className="mv-intake-title">输入题目或代码，生成可播放的分步讲解</h1>
-        <p className="mv-intake-sub">
-          支持数学、算法、物理和代码追踪；生成后可继续追问修改，也可导出视频。
-        </p>
-      </section>
+      <div className="mv-intake-shell">
+        <header className="mv-intake-hero" aria-label="MetaView 创建讲解">
+          <h1 className="mv-intake-title">新建可视化讲解</h1>
+          <p className="mv-intake-sub">输入一道题、一个知识点，或粘贴代码。</p>
+        </header>
 
-      <section className="mv-intake-composer" aria-label="生成输入">
-        {files.length > 0 && (
-          <div className="mv-intake-files">
-            {files.map((f, i) => (
-              <div key={`${f.name}-${i}`} className="mv-intake-file">
-                <span className="mv-file-name">{f.name}</span>
-                <button type="button" onClick={() => removeFile(i)}>
-                  删除
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {(fileWarning || submitError) && (
-          <div
-            className={`mv-intake-warning${submitError ? " mv-intake-error" : ""}`}
-            role="alert"
+        <div className="mv-intake-layout">
+          <section
+            className={`mv-intake-composer${dragActive ? " is-dragging" : ""}`}
+            aria-label="生成输入"
+            onDragEnter={(event) => {
+              event.preventDefault();
+              if (!pending) setDragActive(true);
+            }}
+            onDragOver={(event) => {
+              event.preventDefault();
+              if (!pending) setDragActive(true);
+            }}
+            onDragLeave={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+                setDragActive(false);
+              }
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              setDragActive(false);
+              handleFiles(event.dataTransfer.files);
+            }}
           >
-            {submitError ?? fileWarning}
-          </div>
-        )}
-
-        <textarea
-          className="mv-intake-input"
-          rows={4}
-          placeholder="输入一道数学题、物理题，或粘贴一段算法/代码..."
-          value={input}
-          onChange={(e) => {
-            setInput(e.target.value);
-            const el = e.target;
-            el.style.height = "auto";
-            el.style.height = `${el.scrollHeight}px`;
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-              e.preventDefault();
-              void submit();
-            }
-          }}
-          style={{ resize: "none", overflow: "hidden", minHeight: 108 }}
-        />
-        {input.trim() && !inferDomain(input, fileObjects.find((f) => languageFromName(f.name))) && (
-          <div className="mv-intake-hint">{AUTO_DOMAIN_HINT}</div>
-        )}
-
-        <div className="mv-intake-actions">
-          <div className="mv-intake-toolrow">
-            <button
-              className="mv-intake-action mv-intake-attach"
-              type="button"
-              aria-label="上传代码文件"
-              title="上传代码文件"
-              onClick={() => fileRef.current?.click()}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-                <path d="M6 4h9l3 3v13H6z" />
-                <path d="M15 4v4h4" />
-                <path d="M9 13h6" />
-                <path d="M9 17h4" />
-              </svg>
-              <span>代码文件</span>
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
-              multiple
-              accept={CODE_ACCEPT}
-              style={{ display: "none" }}
-              onChange={(e) => {
-                handleFiles(e.target.files);
-                e.target.value = "";
+            <textarea
+              ref={textareaRef}
+              className="mv-intake-input"
+              rows={6}
+              placeholder="例如：用动画解释导数的几何意义，并演示切线如何随割线逼近……"
+              value={input}
+              disabled={pending}
+              onChange={(event) => {
+                setInput(event.target.value);
+                resizeTextarea(event.target);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                  event.preventDefault();
+                  void submit();
+                }
               }}
             />
-            <span className="mv-intake-hint">支持代码片段和代码文件</span>
-          </div>
 
-          <div className="mv-intake-submitrow">
-            {thinking && <span className="mv-intake-thinking">{thinking}</span>}
-            <button
-              className="mv-send mv-intake-send"
-              type="button"
-              onClick={() => void submit()}
-              disabled={pending || (!input.trim() && files.length === 0)}
-            >
-              生成讲解
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-                <path d="M5 12h14" />
-                <path d="m13 6 6 6-6 6" />
-              </svg>
-            </button>
-          </div>
+            {attachment && (
+              <div
+                className="mv-intake-file"
+                title={`${attachment.name} · ${fileSizeLabel(attachment.size)}`}
+              >
+                <span className="mv-file-name">{attachment.name}</span>
+                <small>{fileSizeLabel(attachment.size)}</small>
+                <button
+                  className="mv-intake-file__remove"
+                  type="button"
+                  aria-label={`删除 ${attachment.name}`}
+                  title="删除代码文件"
+                  disabled={pending}
+                  onClick={removeFile}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path d="m7 7 10 10M17 7 7 17" />
+                  </svg>
+                </button>
+              </div>
+            )}
+
+            {(fileError || submitError) && (
+              <div className="mv-intake-warning" role="alert">
+                {fileError ?? submitError}
+              </div>
+            )}
+
+            <div className="mv-intake-actions">
+              <div className="mv-intake-toolrow">
+                <button
+                  className="mv-intake-action mv-intake-attach"
+                  type="button"
+                  aria-label="上传代码文件"
+                  title="上传一个代码文件，最大 256 KB"
+                  disabled={pending}
+                  onClick={() => fileRef.current?.click()}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path d="M6 4h9l3 3v13H6z" />
+                    <path d="M15 4v4h4M9 13h6M9 17h4" />
+                  </svg>
+                  <span>{attachment ? "替换代码文件" : "添加代码文件"}</span>
+                </button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept={CODE_FILE_ACCEPT}
+                  disabled={pending}
+                  hidden
+                  onChange={(event) => {
+                    handleFiles(event.target.files);
+                    event.target.value = "";
+                  }}
+                />
+              </div>
+
+              <div className="mv-intake-submitrow">
+                {statusText ? (
+                  <span
+                    className="mv-intake-thinking"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {statusText}
+                  </span>
+                ) : (
+                  <span className="mv-intake-shortcut">⌘ / Ctrl + Enter</span>
+                )}
+                <button
+                  className="mv-send mv-intake-send"
+                  type="button"
+                  onClick={() => void submit()}
+                  disabled={pending || (!input.trim() && !attachment)}
+                >
+                  生成讲解
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path d="M5 12h14M13 6l6 6-6 6" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section className="mv-intake-examples" aria-labelledby="mv-intake-examples-title">
+            <div className="mv-intake-example-head">
+              <h2 id="mv-intake-examples-title">试试：</h2>
+            </div>
+            <div className="mv-intake-example-list">
+              {EXAMPLE_PROMPTS.map((example) => (
+                <button
+                  key={example.label}
+                  className="mv-intake-example"
+                  type="button"
+                  disabled={pending}
+                  onClick={() => pickExample(example.prompt)}
+                >
+                  {example.label}
+                </button>
+              ))}
+            </div>
+            <a className="mv-intake-cases-link" href="/cases">
+              查看精选案例
+              <span aria-hidden="true">→</span>
+            </a>
+          </section>
         </div>
-      </section>
-
-      <section className="mv-intake-templates" aria-label="常用模板">
-        {TEMPLATE_GALLERY.map((tpl) => (
-          <button
-            key={tpl.id}
-            className="mv-tpl-card"
-            type="button"
-            disabled={pending}
-            onClick={() => pickTemplate(tpl)}
-          >
-            <span className="mv-tpl-head">
-              <span className="mv-tpl-title">{tpl.title}</span>
-              <Icon kind={tpl.icon} />
-            </span>
-            <span className="mv-tpl-desc">{tpl.desc}</span>
-          </button>
-        ))}
-      </section>
+      </div>
     </main>
   );
 }

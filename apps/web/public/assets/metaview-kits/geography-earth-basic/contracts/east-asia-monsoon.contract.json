@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "east-asia-monsoon-contract",
+  "sceneTemplate": "east_asia_monsoon",
+  "rendererKind": "geo_map_scene",
+  "packId": "geography-earth-basic",
+  "requiredAssetIds": ["east-asia-land-110m", "east-asia-ocean-background", "monsoon-wind-arrow"],
+  "requiredSemanticRoles": ["map_layer", "ocean", "monsoon_flow"],
+  "caption": "East Asia monsoon must render a Natural Earth land map, ocean layer, and monsoon flow asset."
+}

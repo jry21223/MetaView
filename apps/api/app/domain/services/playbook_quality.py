@@ -1,34 +1,47 @@
 from __future__ import annotations
 
+import math
 import re
-from typing import Any
+from typing import Any, Literal
 
+from app.domain.contracts.playbook_contract import SUPPORTED_SNAPSHOT_KIND_SET
+from app.domain.models.coverage import CoverageDecision, CoverageMode
+from app.domain.models.lesson_plan import LessonPlan
 from app.domain.models.playbook import (
     AlgorithmArraySnapshot,
     AlgorithmBarsSnapshot,
     CodeHighlightOverlay,
     PlaybookScript,
 )
+from app.domain.models.quality_report import QualityReport
 from app.domain.models.review import (
     PlaybookIssueSeverity,
     PlaybookReviewIssue,
     PlaybookReviewStatus,
     PlaybookReviewVerdict,
 )
+from app.domain.services.asset_manifest_resolver import resolve_asset_by_id
 
 MIN_AGENT_STEPS = 8
 MAX_AGENT_STEPS = 14
+_DEFAULT_FPS = 30
+_DEFAULT_STEP_FRAMES = 120
+_MIN_STEP_SECONDS = 5.5
+_MAX_STEP_SECONDS = 12.0
+_VOICEOVER_HOLD_SECONDS = 0.6
+_CHINESE_CHARS_PER_SECOND = 4.8
+_ENGLISH_WORDS_PER_SECOND = 2.4
+_FRAME_INCREMENT = 6
 
-SUPPORTED_FRONTEND_SNAPSHOT_KINDS = {
-    "algorithm_array",
-    "algorithm_bars",
-    "algorithm_tree",
+SUPPORTED_FRONTEND_SNAPSHOT_KINDS = SUPPORTED_SNAPSHOT_KIND_SET
+
+_SUBJECT_VISUAL_DOMAINS = {"geography", "biology", "chemistry"}
+_ALGORITHM_FALLBACK_KINDS = {"algorithm_array", "algorithm_bars"}
+_MATH_VISUAL_KINDS = {
     "math_plot",
     "math_formula",
     "math_scene",
     "matrix_scene",
-    "table_scene",
-    "graph_scene",
     "stats_chart_scene",
     "iteration_trace_scene",
     "phase_portrait_scene",
@@ -37,9 +50,141 @@ SUPPORTED_FRONTEND_SNAPSHOT_KINDS = {
     "modeling_scene",
     "manifold_scene",
     "solid_geometry_scene",
-    "motion_scene",
     "katex_overlay",
-    "narration_card",
+    "motion_scene",
+}
+_RICH_MATH_VISUAL_KINDS = _MATH_VISUAL_KINDS - {"math_formula", "katex_overlay"}
+_RICH_MATH_PROMPT_MARKERS = {
+    "plot",
+    "graph",
+    "curve",
+    "tangent",
+    "derivative",
+    "geometry",
+    "vector",
+    "matrix",
+    "distribution",
+    "trajectory",
+    "图",
+    "曲线",
+    "切线",
+    "导数",
+    "几何",
+    "向量",
+    "矩阵",
+    "分布",
+    "轨迹",
+}
+_ANSWER_PROMPT_MARKERS = {
+    "explain",
+    "show",
+    "calculate",
+    "derive",
+    "compare",
+    "why",
+    "how",
+    "what",
+    "解释",
+    "讲解",
+    "演示",
+    "展示",
+    "说明",
+    "追踪",
+    "求",
+    "计算",
+    "推导",
+    "比较",
+    "为什么",
+    "如何",
+}
+_ANSWER_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "calculate",
+    "compare",
+    "derive",
+    "explain",
+    "for",
+    "how",
+    "in",
+    "is",
+    "of",
+    "please",
+    "show",
+    "the",
+    "to",
+    "what",
+    "why",
+    "with",
+    "解释",
+    "讲解",
+    "演示",
+    "展示",
+    "说明",
+    "追踪",
+    "计算",
+    "推导",
+    "比较",
+    "为什么",
+    "如何",
+    "结果",
+    "总结",
+    "结论",
+    "结束",
+    "完成",
+    "最后",
+}
+_ALGORITHM_STATE_PROMPT_MARKERS = {
+    "algorithm",
+    "bfs",
+    "dfs",
+    "search",
+    "sort",
+    "queue",
+    "stack",
+    "traversal",
+    "recursion",
+    "算法",
+    "搜索",
+    "排序",
+    "队列",
+    "栈",
+    "遍历",
+    "递归",
+}
+_BFS_PROMPT_MARKERS = {"bfs", "breadth-first", "breadth first", "广度优先"}
+_BFS_COMPLETE_PROMPT_MARKERS = {
+    "all nodes",
+    "complete traversal",
+    "every node",
+    "full traversal",
+    "visit order",
+    "全部节点",
+    "完整遍历",
+    "访问顺序",
+    "逐层点亮",
+}
+_GRAPH_TRAVERSAL_PROMPT_MARKERS = {
+    *_BFS_PROMPT_MARKERS,
+    "dfs",
+    "depth-first",
+    "depth first",
+    "traversal",
+    "遍历",
+    "深度优先",
+}
+_RECURSION_PROMPT_MARKERS = {"recursion", "recursive", "递归", "调用栈"}
+_PROJECTILE_PROMPT_MARKERS = {
+    "horizontal velocity",
+    "vertical velocity",
+    "velocity components",
+    "velocity decomposition",
+    "vx",
+    "vy",
+    "平抛",
+    "速度分解",
+    "分速度",
 }
 
 _FORBIDDEN_RENDERING_PATTERNS = (
@@ -53,16 +198,137 @@ _FORBIDDEN_RENDERING_PATTERNS = (
     "ffmpeg",
 )
 
+_LESSON_FACT_ALIASES: dict[str, tuple[str, ...]] = {
+    "derivative": ("derivative", "导数", "f'", "f′"),
+    "tangent": ("tangent", "切线"),
+    "slope": ("slope", "斜率"),
+    "breadth_first": ("bfs", "breadth-first", "breadth first", "广度优先"),
+    "queue": ("queue", "frontier", "队列"),
+    "visited": ("visited", "已访问", "访问集合"),
+    "order": ("visit_order", "visit order", "layer by layer", "访问顺序", "逐层"),
+    "factorial": ("factorial", "阶乘"),
+    "base_case": ("base_case", "base case", "基例", "递归出口"),
+    "recursive_call": ("recursive_call", "recursive call", "递归调用"),
+    "return_unwind": ("return_unwind", "unwind", "回溯", "返回"),
+    "factorial_result": ("factorial_result", "return_value", "返回值", "阶乘结果"),
+    "horizontal_velocity": (
+        "horizontal_velocity",
+        "horizontal velocity",
+        "velocity-x",
+        "v_x",
+        "水平速度",
+    ),
+    "vertical_velocity": (
+        "vertical_velocity",
+        "vertical velocity",
+        "velocity-y",
+        "v_y",
+        "竖直速度",
+    ),
+    "gravity": ("gravity", "重力", "g向下"),
+    "parabolic": ("parabolic", "parabola", "抛物线"),
+}
+
+_LESSON_VISUAL_ROLE_ALIASES: dict[str, tuple[str, ...]] = {
+    "curve": ("curves", "curve", "expression"),
+    "target_point": ("target_point", "marker_x", "point"),
+    "secant": ("secant", "割线"),
+    "tangent": ("tangent", "切线"),
+    "slope": ("slope", "斜率"),
+    "node": ("nodes", "node_ids", "node"),
+    "edge": ("edges", "edge"),
+    "current_node": (
+        "current",
+        "current_node",
+        "current_node_id",
+        "active_node",
+        "active_node_ids",
+    ),
+    "visited": ("visited", "visited_node_ids"),
+    "queue": ("queue", "queue_node_ids", "frontier", "frontier_node_ids"),
+    "stack_frame": ("frames", "stack_frame", "call_stack"),
+    "active_frame": ("active_frame", "active_frame_id", "current_frame_id"),
+    "code_line": ("code_trace", "active_line", "code_lines"),
+    "return_value": ("return_value", "returned_value", "result", "return", "returned"),
+    "object": ("objects", "object", "body_id"),
+    "trajectory": ("trajectory", "path_points", "trail"),
+    "horizontal_velocity": ("horizontal_velocity", "velocity-x", "v_x", "vx"),
+    "vertical_velocity": ("vertical_velocity", "velocity-y", "v_y", "vy"),
+    "gravity": ("gravity", "acceleration", "g"),
+}
+
+_LESSON_SCENE_SNAPSHOT_KINDS: dict[str, frozenset[str]] = {
+    "derivative_tangent": frozenset(("math_plot", "math_scene")),
+    "bfs_graph": frozenset(("graph_scene", "algorithm_tree")),
+    "recursion_stack": frozenset(("call_stack_scene",)),
+    "projectile_motion": frozenset(("physics_force_scene", "motion_scene", "math_scene")),
+}
+
 
 PlaybookCheckReport = PlaybookReviewVerdict
 
 
-def self_check_playbook(playbook: PlaybookScript, prompt: str) -> PlaybookCheckReport:
+def quality_gate_playbook(
+    playbook: PlaybookScript,
+    prompt: str,
+    *,
+    generator_path: str,
+    coverage_mode: CoverageMode | Literal["unknown"] = "unknown",
+    coverage_decision: CoverageDecision | None = None,
+    lesson_plan: LessonPlan | None = None,
+) -> QualityReport:
+    """Run the canonical backend quality gate for a candidate playbook."""
+    effective_coverage_mode = (
+        coverage_decision.mode if coverage_decision is not None else coverage_mode
+    )
+    return QualityReport.from_review_verdict(
+        _review_playbook(
+            playbook,
+            prompt,
+            enforce_agent_step_bounds=False,
+            coverage_decision=coverage_decision,
+            lesson_plan=lesson_plan,
+        ),
+        generator_path=generator_path,
+        coverage_mode=effective_coverage_mode,
+    )
+
+
+def self_check_playbook(
+    playbook: PlaybookScript,
+    prompt: str,
+    *,
+    lesson_plan: LessonPlan | None = None,
+) -> PlaybookCheckReport:
+    """Strict agent pre-check; final success still goes through ``quality_gate_playbook``."""
+    return _review_playbook(
+        playbook,
+        prompt,
+        enforce_agent_step_bounds=True,
+        coverage_decision=None,
+        lesson_plan=lesson_plan,
+    )
+
+
+def _review_playbook(
+    playbook: PlaybookScript,
+    prompt: str,
+    *,
+    enforce_agent_step_bounds: bool,
+    coverage_decision: CoverageDecision | None,
+    lesson_plan: LessonPlan | None,
+) -> PlaybookCheckReport:
     issues: list[PlaybookReviewIssue] = []
-    _check_structure(playbook, issues)
+    _check_structure(playbook, issues, enforce_step_bounds=enforce_agent_step_bounds)
     _check_timing(playbook, issues)
     _check_steps(playbook, prompt, issues)
+    _check_domain_quality(playbook, prompt, issues)
+    _check_assets(playbook, issues)
     _check_forbidden_rendering_paths(playbook, issues)
+    if coverage_decision is not None:
+        _check_coverage_boundary(coverage_decision, issues)
+    if lesson_plan is not None:
+        _check_lesson_plan_adherence(playbook, lesson_plan, issues)
     return playbook_review_verdict_from_issues(
         issues,
         clean_summary="Playbook passed API self-check.",
@@ -72,57 +338,142 @@ def self_check_playbook(playbook: PlaybookScript, prompt: str) -> PlaybookCheckR
     )
 
 
-def _check_structure(playbook: PlaybookScript, issues: list[PlaybookReviewIssue]) -> None:
+def _check_coverage_boundary(
+    coverage_decision: CoverageDecision,
+    issues: list[PlaybookReviewIssue],
+) -> None:
+    if coverage_decision.mode != "experimental":
+        return
+    if coverage_decision.fallback_policy == "text_only":
+        issues.append(
+            _issue(
+                "capability.text_only_required",
+                PlaybookIssueSeverity.ERROR,
+                "coverage_decision.fallback_policy",
+                (
+                    "Coverage requires a text-only fallback, but MetaView currently "
+                    "has no separate text-only content output contract."
+                ),
+                (
+                    "Reject this Playbook candidate until a supported text-only product "
+                    "surface exists."
+                ),
+                requires_repair=False,
+            )
+        )
+        return
+    if coverage_decision.fallback_policy == "limited_visual":
+        issues.append(
+            _issue(
+                "capability.limited_visual_unavailable",
+                PlaybookIssueSeverity.ERROR,
+                "coverage_decision.fallback_policy",
+                (
+                    "Coverage requires a limited-visual fallback, but its required visual "
+                    "validation capability is unavailable."
+                ),
+                (
+                    "Reject this Playbook candidate until a validated limited-visual "
+                    "product surface exists."
+                ),
+                requires_repair=False,
+            )
+        )
+
+
+def _check_structure(
+    playbook: PlaybookScript,
+    issues: list[PlaybookReviewIssue],
+    *,
+    enforce_step_bounds: bool,
+) -> None:
     if not playbook.title.strip():
-        issues.append(_issue(
-            "step.too_shallow",
-            PlaybookIssueSeverity.ERROR,
-            "title",
-            "Playbook title is empty.",
-            "Set a short title that names the lesson.",
-        ))
+        issues.append(
+            _issue(
+                "step.too_shallow",
+                PlaybookIssueSeverity.ERROR,
+                "title",
+                "Playbook title is empty.",
+                "Set a short title that names the lesson.",
+            )
+        )
     if not playbook.summary.strip():
-        issues.append(_issue(
-            "step.too_shallow",
-            PlaybookIssueSeverity.WARNING,
-            "summary",
-            "Playbook summary is empty.",
-            "Add a one-sentence summary of the lesson.",
-        ))
-    if len(playbook.steps) < MIN_AGENT_STEPS or len(playbook.steps) > MAX_AGENT_STEPS:
-        issues.append(_issue(
-            "step.too_shallow",
-            PlaybookIssueSeverity.ERROR,
-            "steps",
-            (
-                f"Playbook has {len(playbook.steps)} step(s); launch-safe "
-                f"bounds are {MIN_AGENT_STEPS}-{MAX_AGENT_STEPS}."
-            ),
-            "Regenerate with a concise but complete step sequence.",
-        ))
+        issues.append(
+            _issue(
+                "step.too_shallow",
+                PlaybookIssueSeverity.WARNING,
+                "summary",
+                "Playbook summary is empty.",
+                "Add a one-sentence summary of the lesson.",
+            )
+        )
+    if not playbook.steps:
+        issues.append(
+            _issue(
+                "scene.required_contract_missing",
+                PlaybookIssueSeverity.ERROR,
+                "steps",
+                "Playbook must contain at least one teaching scene.",
+                "Generate one or more SceneBlueprint-backed teaching steps.",
+            )
+        )
+    if enforce_step_bounds and (
+        len(playbook.steps) < MIN_AGENT_STEPS or len(playbook.steps) > MAX_AGENT_STEPS
+    ):
+        issues.append(
+            _issue(
+                "step.too_shallow",
+                PlaybookIssueSeverity.ERROR,
+                "steps",
+                (
+                    f"Playbook has {len(playbook.steps)} step(s); launch-safe "
+                    f"bounds are {MIN_AGENT_STEPS}-{MAX_AGENT_STEPS}."
+                ),
+                "Regenerate with a concise but complete step sequence.",
+            )
+        )
 
 
 def _check_timing(playbook: PlaybookScript, issues: list[PlaybookReviewIssue]) -> None:
     previous_end = 0
     for index, step in enumerate(playbook.steps):
         if step.end_frame <= previous_end:
-            issues.append(_issue(
-                "timeline.non_monotonic",
-                PlaybookIssueSeverity.ERROR,
-                f"steps[{index}].end_frame",
-                "Step end_frame values must be strictly increasing.",
-                "Increase each step end_frame beyond the previous step.",
-            ))
+            issues.append(
+                _issue(
+                    "timeline.non_monotonic",
+                    PlaybookIssueSeverity.ERROR,
+                    f"steps[{index}].end_frame",
+                    "Step end_frame values must be strictly increasing.",
+                    "Increase each step end_frame beyond the previous step.",
+                )
+            )
+        step_duration = step.end_frame - previous_end
+        estimated_frames = estimate_step_frames(step.voiceover_text, playbook.fps)
+        if step.voiceover_text.strip() and step_duration < estimated_frames - 12:
+            issues.append(
+                _issue(
+                    "timeline.voiceover_too_short",
+                    PlaybookIssueSeverity.WARNING,
+                    f"steps[{index}].end_frame",
+                    (
+                        f"Step duration ({step_duration} frames) appears shorter than the "
+                        f"estimated narration requirement ({estimated_frames} frames)."
+                    ),
+                    "Increase this step duration or shorten the narration text.",
+                )
+            )
         previous_end = step.end_frame
 
     if playbook.steps and playbook.total_frames < playbook.steps[-1].end_frame:
-        issues.append(_issue(
-            "timeline.exceeds_total_frames",
-            PlaybookIssueSeverity.ERROR,
-            "total_frames",
-            "total_frames does not cover the final step end_frame.",
-            "Set total_frames to at least the last step's end_frame.",
-        ))
+        issues.append(
+            _issue(
+                "timeline.exceeds_total_frames",
+                PlaybookIssueSeverity.ERROR,
+                "total_frames",
+                "total_frames does not cover the final step end_frame.",
+                "Set total_frames to at least the last step's end_frame.",
+            )
+        )
 
 
 def _check_steps(
@@ -132,22 +483,41 @@ def _check_steps(
 ) -> None:
     for index, step in enumerate(playbook.steps):
         if not step.voiceover_text.strip():
-            issues.append(_issue(
-                "step.empty_voiceover",
-                PlaybookIssueSeverity.ERROR,
-                f"steps[{index}].voiceover_text",
-                "Every step must have non-empty voiceover_text.",
-                "Write narration that explains why the step matters and what changes visually.",
-            ))
+            issues.append(
+                _issue(
+                    "step.empty_voiceover",
+                    PlaybookIssueSeverity.ERROR,
+                    f"steps[{index}].voiceover_text",
+                    "Every step must have non-empty voiceover_text.",
+                    "Write narration that explains why the step matters and what changes visually.",
+                )
+            )
         _check_snapshot(step.snapshot, f"steps[{index}].snapshot", issues)
+        _check_subject_visual_fallback(
+            playbook.domain,
+            step.snapshot,
+            f"steps[{index}].snapshot",
+            issues,
+        )
         if not step.layers:
-            issues.append(_issue(
-                "renderer.contract_risk",
-                PlaybookIssueSeverity.ERROR,
-                f"steps[{index}].layers",
-                "Every step must carry at least one renderer layer.",
-                "Mirror the primary snapshot into layers[0].body.",
-            ))
+            issues.append(
+                _issue(
+                    "renderer.contract_risk",
+                    PlaybookIssueSeverity.ERROR,
+                    f"steps[{index}].layers",
+                    "Every step must carry at least one renderer layer.",
+                    "Mirror the primary snapshot into layers[0].body.",
+                )
+            )
+            issues.append(
+                _issue(
+                    "scene.required_contract_missing",
+                    PlaybookIssueSeverity.ERROR,
+                    f"steps[{index}].layers",
+                    "The scene is missing its required primary renderer contract.",
+                    "Compile the scene through SceneBlueprint and mirror it into layers[0].body.",
+                )
+            )
         else:
             _check_primary_layer_mirror(
                 step.snapshot,
@@ -163,6 +533,13 @@ def _check_steps(
             )
         if step.code_highlight is not None:
             _check_code_highlight(step.code_highlight, index, issues)
+            _check_code_visual_state(
+                step.code_highlight,
+                step.snapshot,
+                index,
+                issues,
+                prompt=prompt,
+            )
         _check_narration_visual_match(index, step.title, step.voiceover_text, step.snapshot, issues)
 
     _check_final_step_answers_prompt(playbook, prompt, issues)
@@ -177,51 +554,83 @@ def _check_primary_layer_mirror(
     snapshot_kind = getattr(snapshot, "kind", None)
     layer_kind = getattr(primary_layer_body, "kind", None)
     if layer_kind != snapshot_kind:
-        issues.append(_issue(
-            "renderer.contract_risk",
-            PlaybookIssueSeverity.ERROR,
-            f"{path}.kind",
-            (
-                "Primary renderer layer kind must match the step snapshot kind; "
-                f"got {layer_kind!r} for snapshot kind {snapshot_kind!r}."
-            ),
-            "Mirror the primary snapshot into layers[0].body before adding overlay layers.",
-        ))
+        issues.append(
+            _issue(
+                "renderer.contract_risk",
+                PlaybookIssueSeverity.ERROR,
+                f"{path}.kind",
+                (
+                    "Primary renderer layer kind must match the step snapshot kind; "
+                    f"got {layer_kind!r} for snapshot kind {snapshot_kind!r}."
+                ),
+                "Mirror the primary snapshot into layers[0].body before adding overlay layers.",
+            )
+        )
         return
 
     if _snapshot_json(primary_layer_body) != _snapshot_json(snapshot):
-        issues.append(_issue(
-            "renderer.contract_risk",
-            PlaybookIssueSeverity.ERROR,
-            path,
-            "Primary renderer layer body must deeply equal the step snapshot.",
-            "Copy the full primary snapshot into layers[0].body and put overlays after it.",
-        ))
+        issues.append(
+            _issue(
+                "renderer.contract_risk",
+                PlaybookIssueSeverity.ERROR,
+                path,
+                "Primary renderer layer body must deeply equal the step snapshot.",
+                "Copy the full primary snapshot into layers[0].body and put overlays after it.",
+            )
+        )
 
 
 def _check_snapshot(snapshot: Any, path: str, issues: list[PlaybookReviewIssue]) -> None:
     kind = getattr(snapshot, "kind", None)
     if kind not in SUPPORTED_FRONTEND_SNAPSHOT_KINDS:
-        issues.append(_issue(
-            "snapshot.unsupported_kind",
-            PlaybookIssueSeverity.ERROR,
-            f"{path}.kind",
-            f"Snapshot kind {kind!r} is not registered in the frontend renderer registry.",
-            "Use one of the existing renderer-backed snapshot kinds.",
-        ))
+        issues.append(
+            _issue(
+                "snapshot.unsupported_kind",
+                PlaybookIssueSeverity.ERROR,
+                f"{path}.kind",
+                f"Snapshot kind {kind!r} is not registered in the frontend renderer registry.",
+                "Use one of the existing renderer-backed snapshot kinds.",
+            )
+        )
         return
     if not _snapshot_has_meaningful_payload(snapshot):
-        issues.append(_issue(
-            "snapshot.empty_payload",
-            PlaybookIssueSeverity.ERROR,
-            path,
-            f"Snapshot {kind!r} has no meaningful visual payload.",
-            (
-                "Add renderer-visible data such as array values, curves, scene objects, "
-                "or formula text."
-            ),
-        ))
+        issues.append(
+            _issue(
+                "snapshot.empty_payload",
+                PlaybookIssueSeverity.ERROR,
+                path,
+                f"Snapshot {kind!r} has no meaningful visual payload.",
+                (
+                    "Add renderer-visible data such as array values, curves, scene objects, "
+                    "or formula text."
+                ),
+            )
+        )
     _check_algorithm_indices(snapshot, path, issues)
+
+
+def _check_subject_visual_fallback(
+    domain: str,
+    snapshot: Any,
+    path: str,
+    issues: list[PlaybookReviewIssue],
+) -> None:
+    normalized_domain = domain.strip().lower()
+    kind = getattr(snapshot, "kind", None)
+    if normalized_domain in _SUBJECT_VISUAL_DOMAINS and kind in _ALGORITHM_FALLBACK_KINDS:
+        issues.append(
+            _issue(
+                "snapshot.domain_fallback",
+                PlaybookIssueSeverity.ERROR,
+                f"{path}.kind",
+                f"{normalized_domain} playbooks must not fall back to {kind}.",
+                (
+                    "Use a SceneBlueprint or subject semantic renderer such as geo_map_scene, "
+                    "bio_cell_scene, bio_process_scene, molecule_2d_scene, or reaction_scene "
+                    "instead of an algorithm array."
+                ),
+            )
+        )
 
 
 def _snapshot_json(snapshot: Any) -> dict[str, Any]:
@@ -263,6 +672,10 @@ def _snapshot_has_meaningful_payload(snapshot: Any) -> bool:
         return bool(data.get("columns") or data.get("rows"))
     if kind == "graph_scene":
         return bool(data.get("nodes") or data.get("edges"))
+    if kind == "call_stack_scene":
+        return bool(data.get("frames") or data.get("code_trace"))
+    if kind == "code_trace_scene":
+        return bool(data.get("lines") or data.get("array_values") or data.get("pointers"))
     if kind == "stats_chart_scene":
         return bool(data.get("series"))
     if kind == "iteration_trace_scene":
@@ -282,9 +695,7 @@ def _snapshot_has_meaningful_payload(snapshot: Any) -> bool:
         return bool(data.get("variables") or data.get("relations") or data.get("simulation_series"))
     if kind == "manifold_scene":
         return bool(
-            data.get("chart_name")
-            or data.get("param_surface")
-            or data.get("tangent_vectors")
+            data.get("chart_name") or data.get("param_surface") or data.get("tangent_vectors")
         )
     if kind == "solid_geometry_scene":
         return bool(
@@ -294,6 +705,24 @@ def _snapshot_has_meaningful_payload(snapshot: Any) -> bool:
             or data.get("vectors")
             or data.get("visible_elements")
         )
+    if kind == "bio_cell_scene":
+        return bool(data.get("structures") or data.get("callouts"))
+    if kind == "bio_process_scene":
+        return bool(data.get("steps") or data.get("connections") or data.get("callouts"))
+    if kind == "molecule_2d_scene":
+        return bool(data.get("atoms") or data.get("bonds") or data.get("molecule_asset_id"))
+    if kind == "reaction_scene":
+        return bool(
+            data.get("reactants")
+            or data.get("products")
+            or data.get("arrows")
+            or data.get("electron_flows")
+            or data.get("formula_latex")
+        )
+    if kind == "geo_map_scene":
+        return bool(data.get("layers") or data.get("flows") or data.get("pressure_centers"))
+    if kind == "physics_force_scene":
+        return bool(data.get("objects") or data.get("vectors") or data.get("trajectory"))
     if kind == "motion_scene":
         return bool(data.get("objects") or data.get("tracks"))
     if kind == "katex_overlay":
@@ -318,13 +747,15 @@ def _check_algorithm_indices(
         *snapshot.pointers.values(),
     ]
     if any(index < 0 or index >= count for index in indices):
-        issues.append(_issue(
-            "algorithm.invalid_state_transition",
-            PlaybookIssueSeverity.ERROR,
-            path,
-            "Algorithm snapshot references an array index outside array_values.",
-            "Keep active, swap, sorted, and pointer indices within the array length.",
-        ))
+        issues.append(
+            _issue(
+                "algorithm.invalid_state_transition",
+                PlaybookIssueSeverity.ERROR,
+                path,
+                "Algorithm snapshot references an array index outside array_values.",
+                "Keep active, swap, sorted, and pointer indices within the array length.",
+            )
+        )
 
 
 def _check_code_highlight(
@@ -335,13 +766,108 @@ def _check_code_highlight(
     line_count = len(code.lines)
     active_lines = [*code.active_lines, code.active_line]
     if any(line < 0 or line >= line_count for line in active_lines):
-        issues.append(_issue(
-            "code.line_out_of_range",
-            PlaybookIssueSeverity.ERROR,
-            f"steps[{step_index}].code_highlight.active_lines",
-            "Code highlight references a line outside the provided source lines.",
-            "Keep active_lines and active_line within the zero-based lines array.",
-        ))
+        issues.append(
+            _issue(
+                "code.line_out_of_range",
+                PlaybookIssueSeverity.ERROR,
+                f"steps[{step_index}].code_highlight.active_lines",
+                "Code highlight references a line outside the provided source lines.",
+                "Keep active_lines and active_line within the zero-based lines array.",
+            )
+        )
+
+
+def _check_code_visual_state(
+    code: CodeHighlightOverlay,
+    snapshot: Any,
+    step_index: int,
+    issues: list[PlaybookReviewIssue],
+    *,
+    prompt: str,
+) -> None:
+    data = _snapshot_json(snapshot)
+    normalized_prompt = prompt.casefold()
+    kind = data.get("kind")
+    mismatch = False
+    if kind == "graph_scene" and any(
+        marker in normalized_prompt for marker in _BFS_PROMPT_MARKERS
+    ):
+        required = {"current", "queue", "visited"}
+        if not required.issubset(code.variables):
+            mismatch = True
+        current = str(
+            data.get("current_node_id")
+            or next(iter(data.get("active_node_ids") or []), "done")
+        )
+        queue = list(
+            dict.fromkeys(
+                [
+                    *(str(item) for item in data.get("queue_node_ids") or []),
+                    *(str(item) for item in data.get("frontier_node_ids") or []),
+                ]
+            )
+        )
+        visited = [str(item) for item in data.get("visited_node_ids") or []]
+        mismatch = mismatch or not (
+            code.variables.get("current", "").strip() == current
+            and _code_state_tokens(code.variables.get("queue", "")) == queue
+            and _code_state_tokens(code.variables.get("visited", "")) == visited
+        )
+    elif kind == "call_stack_scene" and any(
+        marker in normalized_prompt for marker in _RECURSION_PROMPT_MARKERS
+    ):
+        current_frame = next(
+            (
+                frame
+                for frame in data.get("frames") or []
+                if isinstance(frame, dict) and frame.get("id") == data.get("current_frame_id")
+            ),
+            None,
+        )
+        visual_variables = (current_frame or {}).get("variables") or {}
+        mismatch = not visual_variables or any(
+            key not in code.variables
+            or not _code_state_value_equal(code.variables[key], value)
+            for key, value in visual_variables.items()
+        )
+    elif kind == "code_trace_scene" and any(
+        marker in normalized_prompt for marker in _RECURSION_PROMPT_MARKERS
+    ):
+        visual_variables = data.get("variables") or {}
+        mismatch = not visual_variables or any(
+            key not in code.variables
+            or not _code_state_value_equal(code.variables[key], value)
+            for key, value in visual_variables.items()
+        )
+
+    if mismatch:
+        issues.append(
+            _issue(
+                "code.state_mismatch",
+                PlaybookIssueSeverity.ERROR,
+                f"steps[{step_index}].code_highlight.variables",
+                "Code Sync variables do not match the visual execution state.",
+                "Synchronize the code variables with the current graph, stack, or trace state.",
+            )
+        )
+
+
+def _code_state_tokens(value: str) -> list[str]:
+    return re.findall(r"[A-Za-z0-9_.-]+", value)
+
+
+def _code_state_value_equal(left: Any, right: Any) -> bool:
+    left_text = str(left).strip()
+    right_text = str(right).strip()
+    try:
+        left_number = float(left_text)
+        right_number = float(right_text)
+    except ValueError:
+        return left_text == right_text
+    return math.isfinite(left_number) and math.isfinite(right_number) and math.isclose(
+        left_number,
+        right_number,
+    )
 
 
 def _check_narration_visual_match(
@@ -354,16 +880,18 @@ def _check_narration_visual_match(
     visual_tokens = _tokens_for_snapshot(snapshot) | _tokens_for_text(title)
     narration_tokens = _tokens_for_text(voiceover)
     if visual_tokens and narration_tokens and not (visual_tokens & narration_tokens):
-        issues.append(_issue(
-            "snapshot.narration_mismatch",
-            PlaybookIssueSeverity.WARNING,
-            f"steps[{index}].voiceover_text",
-            "Step narration does not appear to reference the visual snapshot.",
-            (
-                "Mention the key visual object, formula, array state, or scene element "
-                "in the narration."
-            ),
-        ))
+        issues.append(
+            _issue(
+                "snapshot.narration_mismatch",
+                PlaybookIssueSeverity.WARNING,
+                f"steps[{index}].voiceover_text",
+                "Step narration does not appear to reference the visual snapshot.",
+                (
+                    "Mention the key visual object, formula, array state, or scene element "
+                    "in the narration."
+                ),
+            )
+        )
 
 
 def _check_final_step_answers_prompt(
@@ -373,23 +901,451 @@ def _check_final_step_answers_prompt(
 ) -> None:
     if not playbook.steps:
         return
-    prompt_tokens = _tokens_for_text(prompt)
-    if len(prompt_tokens) < 3:
+    if not _prompt_requires_explicit_answer(prompt):
+        return
+    prompt_tokens = _tokens_for_text(prompt) - _ANSWER_STOPWORDS
+    if not prompt_tokens:
         return
     final = playbook.steps[-1]
-    final_tokens = (
-        _tokens_for_text(final.title)
-        | _tokens_for_text(final.voiceover_text)
-        | _tokens_for_text(playbook.summary)
+    final_tokens = _tokens_for_text(final.title) | _tokens_for_text(final.voiceover_text)
+    if not final_tokens or not (prompt_tokens & final_tokens):
+        issues.append(
+            _issue(
+                "step.does_not_answer_prompt",
+                PlaybookIssueSeverity.ERROR,
+                "steps[-1]",
+                "The final step may not answer the user's prompt.",
+                "Make the final narration explicitly state the requested conclusion or result.",
+            )
+        )
+
+
+def _prompt_requires_explicit_answer(prompt: str) -> bool:
+    normalized = prompt.strip().lower()
+    return any(marker in normalized for marker in _ANSWER_PROMPT_MARKERS)
+
+
+def _check_domain_quality(
+    playbook: PlaybookScript,
+    prompt: str,
+    issues: list[PlaybookReviewIssue],
+) -> None:
+    kinds = {getattr(step.snapshot, "kind", None) for step in playbook.steps}
+    domain = str(playbook.domain.value if hasattr(playbook.domain, "value") else playbook.domain)
+
+    if domain == "math":
+        math_kinds = kinds & _MATH_VISUAL_KINDS
+        normalized_prompt = prompt.lower()
+        needs_rich_visual = any(marker in normalized_prompt for marker in _RICH_MATH_PROMPT_MARKERS)
+        if not math_kinds or (needs_rich_visual and not (math_kinds & _RICH_MATH_VISUAL_KINDS)):
+            issues.append(
+                _issue(
+                    "math.low_visual_richness",
+                    PlaybookIssueSeverity.ERROR,
+                    "steps",
+                    "Math playbook lacks the renderer-visible structure required by the prompt.",
+                    "Use a math scene, plot, matrix, chart, or other semantic math renderer.",
+                )
+            )
+
+    normalized_prompt = prompt.lower()
+    if domain == "algorithm" and any(
+        marker in normalized_prompt for marker in _ALGORITHM_STATE_PROMPT_MARKERS
+    ):
+        algorithm_snapshots = [
+            step.snapshot
+            for step in playbook.steps
+            if getattr(step.snapshot, "kind", None)
+            in {
+                "algorithm_array",
+                "algorithm_bars",
+                "algorithm_tree",
+                "graph_scene",
+                "call_stack_scene",
+                "code_trace_scene",
+            }
+        ]
+        graph_traversal = any(
+            marker in normalized_prompt for marker in _GRAPH_TRAVERSAL_PROMPT_MARKERS
+        )
+        bfs = any(marker in normalized_prompt for marker in _BFS_PROMPT_MARKERS)
+        if graph_traversal:
+            graph_snapshots = [
+                snapshot
+                for snapshot in algorithm_snapshots
+                if getattr(snapshot, "kind", None) in {"graph_scene", "algorithm_tree"}
+            ]
+            has_required_state = any(
+                _snapshot_has_graph_traversal_state(snapshot, require_queue=bfs)
+                for snapshot in graph_snapshots
+            )
+        else:
+            has_required_state = any(
+                _snapshot_has_algorithm_state(snapshot) for snapshot in algorithm_snapshots
+            )
+        if not algorithm_snapshots or not has_required_state:
+            issues.append(
+                _issue(
+                    "algorithm.state_missing",
+                    PlaybookIssueSeverity.ERROR,
+                    "steps",
+                    (
+                        "Algorithm playbook has no current, visited, queue, stack, "
+                        "pointer, or active state."
+                    ),
+                    "Expose the changing algorithm state in the semantic snapshot fields.",
+                )
+            )
+        if bfs:
+            bfs_steps = [
+                step
+                for step in playbook.steps
+                if getattr(step.snapshot, "kind", None) == "graph_scene"
+            ]
+            if bfs_steps and any(step.code_highlight is None for step in bfs_steps):
+                issues.append(
+                    _issue(
+                        "code.sync_missing",
+                        PlaybookIssueSeverity.ERROR,
+                        "steps[*].code_highlight",
+                        "BFS steps require a parallel Code Sync track outside the video stage.",
+                        "Attach canonical BFS code lines and current/queue/visited variables.",
+                    )
+                )
+            _check_bfs_checkpoint_progression(
+                [step.snapshot for step in bfs_steps],
+                issues,
+                require_complete=any(
+                    marker in normalized_prompt for marker in _BFS_COMPLETE_PROMPT_MARKERS
+                ),
+            )
+
+    if domain in {"algorithm", "code", "computer_science"} and any(
+        marker in normalized_prompt for marker in _RECURSION_PROMPT_MARKERS
+    ):
+        recursion_snapshots = [
+            step.snapshot
+            for step in playbook.steps
+            if getattr(step.snapshot, "kind", None) in {"call_stack_scene", "code_trace_scene"}
+        ]
+        if not recursion_snapshots or not any(
+            _snapshot_has_algorithm_state(snapshot) for snapshot in recursion_snapshots
+        ):
+            issues.append(
+                _issue(
+                    "code.execution_state_missing",
+                    PlaybookIssueSeverity.ERROR,
+                    "steps",
+                    "Recursive code explanation lacks a structured call stack or code trace state.",
+                    "Use call_stack_scene or code_trace_scene with active frames and lines.",
+                )
+            )
+        recursion_steps = [
+            step
+            for step in playbook.steps
+            if getattr(step.snapshot, "kind", None) in {"call_stack_scene", "code_trace_scene"}
+        ]
+        if recursion_steps and any(step.code_highlight is None for step in recursion_steps):
+            issues.append(
+                _issue(
+                    "code.sync_missing",
+                    PlaybookIssueSeverity.ERROR,
+                    "steps[*].code_highlight",
+                    "Recursive execution steps require a parallel Code Sync track.",
+                    "Mirror the active code trace and current frame variables into code_highlight.",
+                )
+            )
+
+    if domain == "physics" and any(
+        marker in normalized_prompt for marker in _PROJECTILE_PROMPT_MARKERS
+    ):
+        if not any(_snapshot_has_projectile_state(step.snapshot) for step in playbook.steps):
+            issues.append(
+                _issue(
+                    "physics.state_missing",
+                    PlaybookIssueSeverity.ERROR,
+                    "steps",
+                    (
+                        "Projectile explanation lacks trajectory, body, velocity "
+                        "components, or gravity state."
+                    ),
+                    (
+                        "Use physics_force_scene or motion_scene with the projectile "
+                        "trajectory and vectors."
+                    ),
+                )
+            )
+
+
+def _check_bfs_checkpoint_progression(
+    snapshots: list[Any],
+    issues: list[PlaybookReviewIssue],
+    *,
+    require_complete: bool,
+) -> None:
+    states = [_snapshot_json(snapshot) for snapshot in snapshots]
+    visited_states = [
+        [str(node_id) for node_id in state.get("visited_node_ids") or []]
+        for state in states
+    ]
+    longest_visited = max(visited_states, key=len, default=[])
+    distinct_checkpoints = {
+        (
+            state.get("current_node_id"),
+            tuple(str(node_id) for node_id in state.get("visited_node_ids") or []),
+        )
+        for state in states
+    }
+    current_order: list[str] = []
+    for state in states:
+        current = state.get("current_node_id")
+        if current is None:
+            continue
+        current_id = str(current)
+        if not current_order or current_order[-1] != current_id:
+            current_order.append(current_id)
+    if len(distinct_checkpoints) > 1 and longest_visited and current_order != longest_visited:
+        issues.append(
+            _issue(
+                "algorithm.invalid_state_transition",
+                PlaybookIssueSeverity.ERROR,
+                "steps[*].snapshot.current_node_id",
+                "BFS skips or reorders a current-node checkpoint from the visited sequence.",
+                (
+                    "Use one visual checkpoint per dequeue; do not combine multiple visited "
+                    "nodes into one snapshot."
+                ),
+            )
+        )
+    if not require_complete or not states:
+        return
+
+    graph = max(states, key=lambda state: len(state.get("nodes") or []))
+    start = next(
+        (
+            str(state.get("current_node_id"))
+            for state in states
+            if state.get("current_node_id") is not None
+        ),
+        longest_visited[0] if longest_visited else None,
     )
-    if final_tokens and not (prompt_tokens & final_tokens):
-        issues.append(_issue(
-            "step.does_not_answer_prompt",
-            PlaybookIssueSeverity.WARNING,
-            "steps[-1]",
-            "The final step may not answer the user's prompt.",
-            "Make the final narration explicitly state the requested conclusion or result.",
-        ))
+    reachable = _reachable_graph_nodes(graph, start) if start else set()
+    if reachable and set(longest_visited) != reachable:
+        issues.append(
+            _issue(
+                "algorithm.invalid_state_transition",
+                PlaybookIssueSeverity.ERROR,
+                "steps[*].snapshot.visited_node_ids",
+                "BFS final visited state does not cover every node reachable from the start.",
+                "Finish the traversal and show one dequeue checkpoint per reachable node.",
+            )
+        )
+
+
+def _reachable_graph_nodes(graph: dict[str, Any], start: str) -> set[str]:
+    adjacency: dict[str, set[str]] = {}
+    directed = bool(graph.get("directed"))
+    for edge in graph.get("edges") or []:
+        if not isinstance(edge, dict):
+            continue
+        source = str(edge.get("source") or "")
+        target = str(edge.get("target") or "")
+        if not source or not target:
+            continue
+        adjacency.setdefault(source, set()).add(target)
+        if not directed:
+            adjacency.setdefault(target, set()).add(source)
+    reachable = {start}
+    queue = [start]
+    while queue:
+        current = queue.pop(0)
+        for neighbor in adjacency.get(current, set()):
+            if neighbor in reachable:
+                continue
+            reachable.add(neighbor)
+            queue.append(neighbor)
+    return reachable
+
+
+def _snapshot_has_algorithm_state(snapshot: Any) -> bool:
+    data = _snapshot_json(snapshot)
+    kind = data.get("kind")
+    state_fields = {
+        "algorithm_array": ("active_indices", "swap_indices", "sorted_indices", "pointers"),
+        "algorithm_bars": ("active_indices", "swap_indices", "sorted_indices", "pointers"),
+        "algorithm_tree": ("active_node_ids", "visited_node_ids", "path_edge_ids"),
+        "graph_scene": (
+            "current_node_id",
+            "active_node_ids",
+            "active_edge_ids",
+            "visited_node_ids",
+            "queue_node_ids",
+            "frontier_node_ids",
+        ),
+        "call_stack_scene": ("current_frame_id", "frames", "code_trace"),
+        "code_trace_scene": (
+            "active_lines",
+            "active_indices",
+            "search_range",
+            "pointers",
+            "variables",
+        ),
+    }
+    return any(data.get(field) for field in state_fields.get(str(kind), ()))
+
+
+def _snapshot_has_graph_traversal_state(snapshot: Any, *, require_queue: bool) -> bool:
+    data = _snapshot_json(snapshot)
+    kind = data.get("kind")
+    if kind == "graph_scene":
+        base = bool(
+            data.get("nodes")
+            and data.get("edges")
+            and (data.get("current_node_id") or data.get("active_node_ids"))
+            and data.get("visited_node_ids")
+        )
+        return base and (
+            not require_queue or bool(data.get("queue_node_ids") or data.get("frontier_node_ids"))
+        )
+    if kind == "algorithm_tree":
+        return bool(
+            data.get("nodes")
+            and data.get("edges")
+            and data.get("active_node_ids")
+            and data.get("visited_node_ids")
+            and not require_queue
+        )
+    return False
+
+
+def _snapshot_has_projectile_state(snapshot: Any) -> bool:
+    data = _snapshot_json(snapshot)
+    if data.get("kind") == "physics_force_scene":
+        vectors = data.get("vectors") or []
+        labels = {
+            str(vector.get("label") or vector.get("id") or "").lower()
+            for vector in vectors
+            if isinstance(vector, dict)
+        }
+        roles = {
+            str(vector.get("semantic_role") or "").lower()
+            for vector in vectors
+            if isinstance(vector, dict)
+        }
+        return bool(
+            data.get("objects")
+            and data.get("trajectory")
+            and ({"vx", "v_x"} & labels)
+            and ({"vy", "v_y"} & labels)
+            and ({"g", "gravity"} & labels or {"gravity", "acceleration"} & roles)
+        )
+    if data.get("kind") == "motion_scene":
+        properties_by_target: dict[str, set[str]] = {}
+        for track in data.get("tracks") or []:
+            if not isinstance(track, dict):
+                continue
+            properties_by_target.setdefault(str(track.get("target") or ""), set()).add(
+                str(track.get("property") or "")
+            )
+        return bool(
+            data.get("objects")
+            and any({"x", "y"}.issubset(properties) for properties in properties_by_target.values())
+        )
+    return False
+
+
+def estimate_step_frames(text: str, fps: int) -> int:
+    if not text.strip():
+        return _DEFAULT_STEP_FRAMES
+    text_fps = fps if fps > 0 else _DEFAULT_FPS
+    chinese_chars = len(re.findall(r"[\u4e00-\u9fff]", text))
+    english_words = len(
+        re.findall(
+            r"[A-Za-z0-9]+(?:['’][A-Za-z0-9]+)?",
+            re.sub(r"[\u4e00-\u9fff]", " ", text),
+        )
+    )
+    seconds = min(
+        _MAX_STEP_SECONDS,
+        max(
+            _MIN_STEP_SECONDS,
+            chinese_chars / _CHINESE_CHARS_PER_SECOND
+            + english_words / _ENGLISH_WORDS_PER_SECOND
+            + _VOICEOVER_HOLD_SECONDS,
+        ),
+    )
+    frames = seconds * text_fps
+    return max(_FRAME_INCREMENT, math.ceil(frames / _FRAME_INCREMENT) * _FRAME_INCREMENT)
+
+
+def _check_assets(playbook: PlaybookScript, issues: list[PlaybookReviewIssue]) -> None:
+    seen: set[tuple[str | None, str]] = set()
+    for step_index, step in enumerate(playbook.steps):
+        snapshots = [(step.snapshot, f"steps[{step_index}].snapshot")]
+        snapshots.extend(
+            (layer.body, f"steps[{step_index}].layers[{layer_index}].body")
+            for layer_index, layer in enumerate(step.layers[1:], start=1)
+        )
+        for snapshot, path in snapshots:
+            for asset_path, pack_id, asset_id in _asset_references(snapshot, path):
+                key = (pack_id, asset_id)
+                if key in seen:
+                    continue
+                seen.add(key)
+                if resolve_asset_by_id(pack_id, asset_id) is not None:
+                    continue
+                issues.append(
+                    _issue(
+                        "asset.missing",
+                        PlaybookIssueSeverity.ERROR,
+                        asset_path,
+                        f"Asset {asset_id!r} cannot be resolved from pack {pack_id or 'any'!r}.",
+                        "Use an asset id declared by the selected Asset Manifest.",
+                    )
+                )
+
+
+def _asset_references(
+    value: Any,
+    path: str,
+    inherited_pack_id: str | None = None,
+    snapshot_kind: str | None = None,
+) -> list[tuple[str, str | None, str]]:
+    data = _snapshot_json(value) if hasattr(value, "model_dump") else value
+    if isinstance(data, dict):
+        pack_id = data.get("pack_id") or inherited_pack_id
+        current_kind = data.get("kind") or snapshot_kind
+        refs: list[tuple[str, str | None, str]] = []
+        for key, child in data.items():
+            child_path = f"{path}.{key}"
+            if key.endswith("asset_id") and isinstance(child, str) and child.strip():
+                reference_pack_id = pack_id
+                if current_kind == "bio_process_scene" and ".connections[" in child_path:
+                    reference_pack_id = "core-visual-basic"
+                refs.append((child_path, reference_pack_id, child.strip()))
+            else:
+                refs.extend(
+                    _asset_references(
+                        child,
+                        child_path,
+                        pack_id,
+                        str(current_kind) if current_kind else None,
+                    )
+                )
+        return refs
+    if isinstance(data, list):
+        refs = []
+        for index, child in enumerate(data):
+            refs.extend(
+                _asset_references(
+                    child,
+                    f"{path}[{index}]",
+                    inherited_pack_id,
+                    snapshot_kind,
+                )
+            )
+        return refs
+    return []
 
 
 def _check_forbidden_rendering_paths(
@@ -399,25 +1355,399 @@ def _check_forbidden_rendering_paths(
     raw = playbook.model_dump_json().lower()
     for pattern in _FORBIDDEN_RENDERING_PATTERNS:
         if pattern in raw:
-            issues.append(_issue(
-                "renderer.contract_risk",
+            issues.append(
+                _issue(
+                    "renderer.contract_risk",
+                    PlaybookIssueSeverity.ERROR,
+                    "playbook",
+                    f"Playbook mentions forbidden rendering path {pattern!r}.",
+                    "Use only PlaybookScript consumed by the frontend Remotion renderer.",
+                )
+            )
+
+
+def _check_lesson_plan_adherence(
+    playbook: PlaybookScript,
+    lesson_plan: LessonPlan,
+    issues: list[PlaybookReviewIssue],
+) -> None:
+    evidence = _lesson_plan_evidence(playbook)
+    visual_tokens = _lesson_plan_visual_tokens(playbook)
+    required_facts = {
+        fact_id for scene in lesson_plan.scenes for fact_id in scene.required_fact_ids
+    }
+    required_roles = {
+        role for scene in lesson_plan.scenes for role in scene.required_visual_roles
+    }
+
+    for fact_id in sorted(required_facts):
+        aliases = _LESSON_FACT_ALIASES.get(fact_id)
+        if aliases is None:
+            issues.append(
+                _issue(
+                    "lesson_plan.fact_unverifiable",
+                    PlaybookIssueSeverity.WARNING,
+                    f"lesson_plan.required_fact_ids.{fact_id}",
+                    f"Required fact {fact_id!r} has no deterministic evidence matcher yet.",
+                    (
+                        "Register a deterministic fact check before treating this "
+                        "fact as verified."
+                    ),
+                )
+            )
+        elif not _contains_lesson_alias(evidence, aliases):
+            issues.append(
+                _issue(
+                    "lesson_plan.fact_missing",
+                    PlaybookIssueSeverity.ERROR,
+                    f"lesson_plan.required_fact_ids.{fact_id}",
+                    f"Playbook does not provide evidence for required fact {fact_id!r}.",
+                    "Repair the relevant scene and narration to cover this LessonPlan fact.",
+                )
+            )
+
+    for role in sorted(required_roles):
+        aliases = _LESSON_VISUAL_ROLE_ALIASES.get(role)
+        if aliases is None:
+            continue
+        if not _contains_lesson_visual_alias(visual_tokens, aliases):
+            issues.append(
+                _issue(
+                    "lesson_plan.visual_role_missing",
+                    PlaybookIssueSeverity.ERROR,
+                    f"lesson_plan.required_visual_roles.{role}",
+                    f"Playbook does not render required visual role {role!r}.",
+                    "Compile a scene containing this semantic visual role.",
+                )
+            )
+
+    snapshot_kinds = {step.snapshot.kind for step in playbook.steps}
+    preferred_scene_types = {
+        scene.preferred_scene_type
+        for scene in lesson_plan.scenes
+        if scene.preferred_scene_type is not None
+    }
+    for scene_type in sorted(preferred_scene_types):
+        accepted_kinds = _LESSON_SCENE_SNAPSHOT_KINDS.get(scene_type)
+        if accepted_kinds is None:
+            continue
+        if snapshot_kinds.isdisjoint(accepted_kinds):
+            issues.append(
+                _issue(
+                    "lesson_plan.scene_type_missing",
+                    PlaybookIssueSeverity.ERROR,
+                    f"lesson_plan.preferred_scene_type.{scene_type}",
+                    f"Playbook does not contain a renderer for scene type {scene_type!r}.",
+                    "Use a compatible SceneBlueprint or renderer-backed snapshot kind.",
+                )
+            )
+
+    _check_lesson_plan_exact_conclusion(
+        lesson_plan,
+        _lesson_plan_final_evidence(playbook),
+        required_facts,
+        issues,
+    )
+
+
+def _check_lesson_plan_exact_conclusion(
+    lesson_plan: LessonPlan,
+    final_evidence: str,
+    required_facts: set[str],
+    issues: list[PlaybookReviewIssue],
+) -> None:
+    if "factorial_result" in required_facts:
+        conclusion = re.sub(r"\s+", "", lesson_plan.expected_conclusion.casefold())
+        match = re.search(r"factorial\((\d+)\)=(\d+)", conclusion)
+        if match:
+            n, result = match.groups()
+            actual_values = _factorial_conclusion_values(final_evidence, n)
+            _check_exact_numeric_conclusion(
+                expected_value=float(result),
+                actual_values=actual_values,
+                required_marker=match.group(0),
+                issues=issues,
+            )
+    elif {"derivative", "tangent", "slope"} <= required_facts:
+        expected_values = _derivative_conclusion_values(lesson_plan.expected_conclusion)
+        if expected_values:
+            expected_value = expected_values[-1]
+            _check_exact_numeric_conclusion(
+                expected_value=expected_value,
+                actual_values=_derivative_conclusion_values(final_evidence),
+                required_marker=f"导数/切线斜率等于 {_format_lesson_number(expected_value)}",
+                issues=issues,
+            )
+
+
+def _check_exact_numeric_conclusion(
+    *,
+    expected_value: float,
+    actual_values: list[float],
+    required_marker: str,
+    issues: list[PlaybookReviewIssue],
+) -> None:
+    conflicting_values = [
+        value
+        for value in actual_values
+        if not math.isclose(value, expected_value, rel_tol=0.0, abs_tol=1e-12)
+    ]
+    if conflicting_values:
+        rendered_values = ", ".join(
+            sorted({_format_lesson_number(value) for value in conflicting_values})
+        )
+        issues.append(
+            _issue(
+                "lesson_plan.conclusion_conflict",
                 PlaybookIssueSeverity.ERROR,
-                "playbook",
-                f"Playbook mentions forbidden rendering path {pattern!r}.",
-                "Use only PlaybookScript consumed by the frontend Remotion renderer.",
-            ))
+                "lesson_plan.expected_conclusion",
+                (
+                    f"Final teaching scene states {rendered_values}, which conflicts with the "
+                    f"planned conclusion {required_marker!r}."
+                ),
+                "Repair the final teaching scene so every explicit result matches the plan.",
+            )
+        )
+        return
+
+    if not any(
+        math.isclose(value, expected_value, rel_tol=0.0, abs_tol=1e-12)
+        for value in actual_values
+    ):
+        issues.append(
+            _issue(
+                "lesson_plan.conclusion_missing",
+                PlaybookIssueSeverity.ERROR,
+                "lesson_plan.expected_conclusion",
+                f"Final teaching scene does not establish {required_marker!r}.",
+                "Repair the final teaching scene so it explicitly states the verified conclusion.",
+            )
+        )
+
+
+_LESSON_NUMBER_PATTERN = (
+    r"(?<![\w.])-?\d+(?:\.\d+)?(?![\w.])(?!(?:\s*)[+*/^%-])"
+)
+_DERIVATIVE_SUBJECT_PATTERN = (
+    r"(?:f\s*['′]\s*\([^\n)]{1,24}\)|derivative|tangent(?:'s)?\s+slope|"
+    r"slope\s+of\s+(?:the\s+)?tangent|导数|切线(?:的)?斜率)"
+)
+_DERIVATIVE_WORD_RESULT_PATTERN = re.compile(
+    rf"{_DERIVATIVE_SUBJECT_PATTERN}[^。！？!?；;\n]{{0,48}}?"
+    rf"(?:(?<!不)(?:等于|为|是)|\bis\b(?!\s+not\b)|\bequals\b)\s*"
+    rf"({_LESSON_NUMBER_PATTERN})",
+    flags=re.IGNORECASE,
+)
+_DERIVATIVE_EQUAL_RESULT_PATTERN = re.compile(
+    rf"{_DERIVATIVE_SUBJECT_PATTERN}\s*=\s*({_LESSON_NUMBER_PATTERN})",
+    flags=re.IGNORECASE,
+)
+_DERIVATIVE_FORMULA_RESULT_PATTERN = re.compile(
+    rf"f\s*['′]\s*\([^\n)]{{1,24}}\)\s*=\s*[^\n]{{1,180}}?"
+    rf"=\s*({_LESSON_NUMBER_PATTERN})",
+    flags=re.IGNORECASE,
+)
+
+
+def _derivative_conclusion_values(evidence: str) -> list[float]:
+    patterns = (
+        _DERIVATIVE_WORD_RESULT_PATTERN,
+        _DERIVATIVE_EQUAL_RESULT_PATTERN,
+        _DERIVATIVE_FORMULA_RESULT_PATTERN,
+    )
+    return [
+        float(match.group(1))
+        for pattern in patterns
+        for match in pattern.finditer(evidence)
+    ]
+
+
+def _factorial_conclusion_values(evidence: str, n: str) -> list[float]:
+    escaped_n = re.escape(n)
+    relationship = r"(?:=|等于|为|是|\bis\b|\bequals\b)"
+    patterns = (
+        rf"factorial\s*[（(]\s*{escaped_n}\s*[）)]\s*{relationship}\s*"
+        rf"({_LESSON_NUMBER_PATTERN})",
+        rf"(?<!\d){escaped_n}(?!\d)\s*!\s*{relationship}\s*"
+        rf"({_LESSON_NUMBER_PATTERN})",
+        rf"阶乘\s*{escaped_n}\s*{relationship}\s*({_LESSON_NUMBER_PATTERN})",
+        rf"(?<!\d){escaped_n}(?!\d)\s*的阶乘\s*{relationship}\s*"
+        rf"({_LESSON_NUMBER_PATTERN})",
+    )
+    values: list[float] = []
+    for pattern in patterns:
+        values.extend(
+            float(match.group(1))
+            for match in re.finditer(pattern, evidence, flags=re.IGNORECASE)
+        )
+    return values
+
+
+def _format_lesson_number(value: float) -> str:
+    return str(int(value)) if value.is_integer() else str(value)
+
+
+def _lesson_plan_evidence(playbook: PlaybookScript) -> str:
+    evidence: list[str] = [playbook.title, playbook.summary]
+    for step in playbook.steps:
+        evidence.extend((step.title, step.voiceover_text, step.snapshot.kind))
+        _collect_lesson_snapshot_evidence(
+            step.snapshot.model_dump(mode="json", exclude_none=True),
+            evidence,
+        )
+    return " ".join(evidence).casefold()
+
+
+_LESSON_VISUAL_STRUCTURAL_FIELDS = frozenset(
+    {
+        "active_line",
+        "active_lines",
+        "active_node_ids",
+        "code_trace",
+        "current_frame_id",
+        "current_node_id",
+        "curves",
+        "edges",
+        "frames",
+        "frontier_node_ids",
+        "marker_x",
+        "nodes",
+        "objects",
+        "path_points",
+        "points",
+        "queue_node_ids",
+        "segments",
+        "trail",
+        "trajectory",
+        "vectors",
+        "visited_node_ids",
+    }
+)
+_LESSON_VISUAL_DRAWABLE_FIELDS = frozenset(
+    {"curves", "edges", "frames", "nodes", "objects", "points", "segments", "vectors"}
+)
+
+
+def _lesson_plan_visual_tokens(playbook: PlaybookScript) -> set[str]:
+    tokens: set[str] = set()
+    for step in playbook.steps:
+        tokens.add(step.snapshot.kind.casefold())
+        _collect_lesson_visual_snapshot_tokens(
+            step.snapshot.model_dump(mode="json", exclude_none=True),
+            tokens,
+        )
+    return tokens
+
+
+def _lesson_plan_final_evidence(playbook: PlaybookScript) -> str:
+    if not playbook.steps:
+        return ""
+    final_step = playbook.steps[-1]
+    evidence = [final_step.title, final_step.voiceover_text, final_step.snapshot.kind]
+    _collect_lesson_snapshot_evidence(
+        final_step.snapshot.model_dump(mode="json", exclude_none=True),
+        evidence,
+    )
+    return "\n".join(evidence).casefold()
+
+
+def _collect_lesson_snapshot_evidence(value: Any, evidence: list[str]) -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if _has_lesson_semantic_value(child):
+                evidence.append(str(key))
+            _collect_lesson_snapshot_evidence(child, evidence)
+    elif isinstance(value, list):
+        for child in value:
+            _collect_lesson_snapshot_evidence(child, evidence)
+    elif isinstance(value, str) and value.strip():
+        evidence.append(value)
+
+
+def _collect_lesson_visual_snapshot_tokens(
+    value: Any,
+    tokens: set[str],
+    *,
+    inside_drawable: bool = False,
+) -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            normalized_key = key.casefold()
+            if normalized_key == "formula_latex" and isinstance(child, str):
+                if re.search(r"(?:\bm\b|m[_({]|f\s*['′])", child, flags=re.IGNORECASE):
+                    tokens.add("slope")
+                continue
+            if normalized_key in _LESSON_VISUAL_STRUCTURAL_FIELDS:
+                if _has_lesson_semantic_value(child):
+                    tokens.add(normalized_key)
+                if normalized_key in _LESSON_VISUAL_DRAWABLE_FIELDS:
+                    _collect_lesson_visual_snapshot_tokens(
+                        child,
+                        tokens,
+                        inside_drawable=True,
+                    )
+                continue
+            if inside_drawable and normalized_key in {"id", "label", "semantic_role", "state"}:
+                if isinstance(child, str) and child.strip():
+                    _add_lesson_visual_drawable_token(child, tokens)
+                continue
+            if inside_drawable and normalized_key == "variables" and isinstance(child, dict):
+                tokens.update(str(variable).casefold() for variable in child)
+                continue
+            if isinstance(child, (dict, list)):
+                _collect_lesson_visual_snapshot_tokens(
+                    child,
+                    tokens,
+                    inside_drawable=inside_drawable,
+                )
+    elif isinstance(value, list):
+        for child in value:
+            _collect_lesson_visual_snapshot_tokens(
+                child,
+                tokens,
+                inside_drawable=inside_drawable,
+            )
+
+
+def _add_lesson_visual_drawable_token(value: str, tokens: set[str]) -> None:
+    normalized = value.strip().casefold()
+    tokens.add(normalized)
+    for aliases in _LESSON_VISUAL_ROLE_ALIASES.values():
+        for alias in aliases:
+            normalized_alias = alias.casefold()
+            if normalized_alias == "g":
+                if normalized == normalized_alias:
+                    tokens.add(normalized_alias)
+            elif normalized_alias in normalized:
+                tokens.add(normalized_alias)
+
+
+def _has_lesson_semantic_value(value: Any) -> bool:
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, dict)):
+        return bool(value)
+    return value is not None
+
+
+def _contains_lesson_alias(evidence: str, aliases: tuple[str, ...]) -> bool:
+    return any(alias.casefold() in evidence for alias in aliases)
+
+
+def _contains_lesson_visual_alias(tokens: set[str], aliases: tuple[str, ...]) -> bool:
+    return any(alias.casefold() in tokens for alias in aliases)
 
 
 def _tokens_for_snapshot(snapshot: Any) -> set[str]:
     kind = str(getattr(snapshot, "kind", ""))
     data = snapshot.model_dump(mode="json", exclude_none=True)
-    tokens = set(kind.split("_"))
+    tokens = {token for token in kind.split("_") if len(token) >= 2}
     tokens.update(_tokens_for_text(_text_payload(data)))
     if kind.startswith("algorithm"):
         tokens.add("array")
     if kind.startswith("math"):
         tokens.add("math")
-    return {token for token in tokens if len(token) >= 2}
+    return tokens
 
 
 def _text_payload(value: Any) -> str:
@@ -431,8 +1761,15 @@ def _text_payload(value: Any) -> str:
 
 
 def _tokens_for_text(text: str) -> set[str]:
-    tokens = {token for token in re.findall(r"[a-zA-Z0-9_]+", text.lower()) if len(token) >= 2}
-    tokens.update(re.findall(r"[\u4e00-\u9fff]", text))
+    raw_tokens = re.findall(r"[a-zA-Z0-9_]+", text.lower())
+    tokens = {part for token in raw_tokens for part in token.split("_") if len(part) >= 2}
+    tokens.update(
+        symbol.lower()
+        for symbol in re.findall(r"(?<![A-Za-z])([A-Za-z])(?![A-Za-z])", text)
+        if symbol.lower() not in {"a", "i"}
+    )
+    for segment in re.findall(r"[\u4e00-\u9fff]+", text):
+        tokens.update(segment[index : index + 2] for index in range(len(segment) - 1))
     return tokens
 
 
@@ -467,6 +1804,8 @@ def _issue(
     path: str,
     message: str,
     suggestion: str,
+    *,
+    requires_repair: bool | None = None,
 ) -> PlaybookReviewIssue:
     return PlaybookReviewIssue(
         code=code,
@@ -474,5 +1813,9 @@ def _issue(
         path=path,
         message=message,
         suggestion=suggestion,
-        requires_repair=severity == PlaybookIssueSeverity.ERROR,
+        requires_repair=(
+            severity == PlaybookIssueSeverity.ERROR
+            if requires_repair is None
+            else requires_repair
+        ),
     )

@@ -66,7 +66,7 @@ export const RemotionRoot: React.FC = () => {
         defaultProps={{
           script: FALLBACK_SCRIPT,
           director: null,
-          theme: "dark",
+          theme: "light",
           showSubtitles: true,
           audioFiles: [],
         }}

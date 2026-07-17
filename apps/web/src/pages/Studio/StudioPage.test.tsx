@@ -10,10 +10,21 @@ import { API_BASE_URL } from "../../shared/config/constants";
 import { StudioPage } from "./StudioPage";
 
 const mockUsePipelinePoller = vi.hoisted(() => vi.fn());
+const mockCreateAssetAttributionReportForScript = vi.hoisted(() => vi.fn());
 
 vi.mock("../../features/pipeline/hooks/usePipelinePoller", () => ({
   usePipelinePoller: mockUsePipelinePoller,
 }));
+
+vi.mock("../../features/playbook/engine/assets/assetAttributionSummary", async () => {
+  const actual = await vi.importActual<typeof import("../../features/playbook/engine/assets/assetAttributionSummary")>(
+    "../../features/playbook/engine/assets/assetAttributionSummary",
+  );
+  return {
+    ...actual,
+    createAssetAttributionReportForScript: mockCreateAssetAttributionReportForScript,
+  };
+});
 
 vi.mock("../../features/playbook/engine/player/PlaybookPlayer", async () => {
   const ReactModule = await import("react");
@@ -24,12 +35,14 @@ vi.mock("../../features/playbook/engine/player/PlaybookPlayer", async () => {
       relatedSlot,
       topbarCollapsed = false,
       onToggleTopbar,
+      onOpenExport,
     }: {
       script: PlaybookScript;
       followupSlot?: React.ReactNode;
       relatedSlot?: React.ReactNode;
       topbarCollapsed?: boolean;
       onToggleTopbar?: () => void;
+      onOpenExport?: () => void;
     }) =>
       ReactModule.createElement(
         "div",
@@ -45,6 +58,13 @@ vi.mock("../../features/playbook/engine/player/PlaybookPlayer", async () => {
               topbarCollapsed ? "显示顶部栏" : "隐藏顶部栏",
             )
           : null,
+        onOpenExport
+          ? ReactModule.createElement(
+              "button",
+              { type: "button", onClick: onOpenExport },
+              "导出",
+            )
+          : null,
         ReactModule.createElement("strong", null, script.title),
         followupSlot,
         relatedSlot,
@@ -56,6 +76,8 @@ describe("StudioPage", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    sessionStorage.clear();
+    localStorage.clear();
   });
 
   it("navigates to intake when starting from an empty workbench", () => {
@@ -191,6 +213,140 @@ describe("StudioPage", () => {
     expect(queryByRole("button", { name: "改变初始条件" })).toBeNull();
   });
 
+  it("passes the active playbook's asset attribution report into export submission", async () => {
+    mockUsePipelinePoller.mockReturnValue({
+      playbook: playbook("Asset report lesson"),
+      director: null,
+      error: null,
+      isLoading: false,
+      status: "succeeded",
+    });
+    mockCreateAssetAttributionReportForScript.mockReturnValue({
+      generated_by: "visual_quality_gate",
+      entries: [
+        {
+          asset_id: "cc-by-diagram",
+          pack_id: "physics-basic",
+          license: "cc-by-4.0",
+          commercial_use_status: "allowed-with-attribution",
+          attribution: "Example Creator",
+          source_url: "https://example.test/asset",
+          license_url: "https://creativecommons.org/licenses/by/4.0/",
+          requires_attribution: true,
+          commercial_use_restricted: false,
+          share_alike: false,
+          unknown_license: false,
+          warning_codes: ["asset_requires_attribution"],
+          step_ids: ["step_01"],
+        },
+      ],
+      attribution_required: ["physics-basic/cc-by-diagram"],
+      license_risk: [],
+      commercial_export: {
+        allowed: true,
+        blockers: [],
+        review_required: [],
+        attribution_required: ["physics-basic/cc-by-diagram"],
+      },
+    });
+    let submittedBody: Record<string, unknown> | null = null;
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/runs/run-1/follow-ups`, () =>
+        HttpResponse.json({ followups: [], versions: [] }),
+      ),
+      http.post(`${API_BASE_URL}/api/v1/exports`, async ({ request }) => {
+        submittedBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({
+          job_id: "j1",
+          run_id: "run-1",
+          status: "queued",
+          progress: 0,
+          message: null,
+          output_url: null,
+          asset_report_url: null,
+          error: null,
+          with_audio: false,
+          created_at: "now",
+        });
+      }),
+      http.get(`${API_BASE_URL}/api/v1/exports/j1`, () =>
+        HttpResponse.json({
+          job_id: "j1",
+          run_id: "run-1",
+          status: "rendering",
+          progress: 0.5,
+          message: null,
+          output_url: null,
+          asset_report_url: null,
+          error: null,
+          with_audio: false,
+          created_at: "now",
+        }),
+      ),
+    );
+
+    const { getByRole, getByText } = render(
+      <StudioPage
+        runId="run-1"
+        t={TWEAK_DEFAULTS}
+        onNavigate={vi.fn()}
+        isProviderConfigured
+      />,
+    );
+
+    fireEvent.click(getByRole("button", { name: "导出" }));
+    await waitFor(() => {
+      expect(getByText("开始导出")).toBeTruthy();
+    });
+    fireEvent.click(getByText("开始导出"));
+
+    await waitFor(() => expect(submittedBody).not.toBeNull());
+    expect(submittedBody).toMatchObject({
+      run_id: "run-1",
+      asset_report: {
+        generated_by: "visual_quality_gate",
+        attribution_required: ["physics-basic/cc-by-diagram"],
+      },
+    });
+  });
+
+  it("collapses the empty follow-up panel when self provider is not configured", async () => {
+    mockUsePipelinePoller.mockReturnValue({
+      playbook: playbook("Provider setup lesson"),
+      director: null,
+      error: null,
+      isLoading: false,
+      status: "succeeded",
+    });
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/runs/run-1/follow-ups`, () =>
+        HttpResponse.json({ followups: [], versions: [] }),
+      ),
+    );
+    const onOpenProviderSettings = vi.fn();
+
+    const { getByRole, queryByPlaceholderText, queryByRole, queryByText } = render(
+      <StudioPage
+        runId="run-1"
+        t={TWEAK_DEFAULTS}
+        onNavigate={vi.fn()}
+        isProviderConfigured={false}
+        appEdition="self"
+        onOpenProviderSettings={onOpenProviderSettings}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(getByRole("button", { name: "配置本地 Provider" })).toBeTruthy();
+    });
+    expect(queryByPlaceholderText("还有什么想问的")).toBeNull();
+    expect(queryByRole("button", { name: "你能指出关键量吗？" })).toBeNull();
+    expect(queryByText("未配置本地 Provider 时将使用服务器模型。")).toBeNull();
+
+    fireEvent.click(getByRole("button", { name: "配置本地 Provider" }));
+    expect(onOpenProviderSettings).toHaveBeenCalledTimes(1);
+  });
+
   it("checks out a historical version without rendering a revert change record", async () => {
     mockUsePipelinePoller.mockReturnValue({
       playbook: playbook("Updated lesson"),
@@ -280,6 +436,99 @@ describe("StudioPage", () => {
 
     const alert = await findByRole("alert");
     expect(alert.textContent ?? "").toMatch(/版本不存在|恢复版本失败/);
+  });
+
+  it("renders a retryable error card on network failure instead of bouncing to intake", () => {
+    const onNavigate = vi.fn();
+    const retry = vi.fn();
+    mockUsePipelinePoller.mockReturnValue({
+      playbook: null,
+      director: null,
+      error: "连接服务器失败，请检查网络后重试",
+      errorKind: "network",
+      prompt: null,
+      createdAt: null,
+      isLoading: false,
+      status: "failed",
+      retry,
+    });
+
+    const { getByRole, getByText } = render(
+      <StudioPage
+        runId="run-1"
+        t={TWEAK_DEFAULTS}
+        onNavigate={onNavigate}
+        isProviderConfigured
+      />,
+    );
+
+    expect(onNavigate).not.toHaveBeenCalled();
+    expect(getByText("连接服务器失败，请检查网络后重试")).toBeTruthy();
+    fireEvent.click(getByRole("button", { name: "重试" }));
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers resubmit and edit actions when the backend reports the run failed", () => {
+    const onNavigate = vi.fn();
+    const onResubmitPrompt = vi.fn();
+    const onEditPrompt = vi.fn();
+    mockUsePipelinePoller.mockReturnValue({
+      playbook: null,
+      director: null,
+      error: "生成失败：脚本校验未通过",
+      errorKind: "run_failed",
+      prompt: "讲解二分查找",
+      createdAt: "2026-06-02T00:00:00.000Z",
+      isLoading: false,
+      status: "failed",
+      retry: vi.fn(),
+    });
+
+    const { getByRole, getByText } = render(
+      <StudioPage
+        runId="run-1"
+        t={TWEAK_DEFAULTS}
+        onNavigate={onNavigate}
+        isProviderConfigured
+        onResubmitPrompt={onResubmitPrompt}
+        onEditPrompt={onEditPrompt}
+      />,
+    );
+
+    expect(getByText("生成失败：脚本校验未通过")).toBeTruthy();
+    fireEvent.click(getByRole("button", { name: "重新生成" }));
+    expect(onResubmitPrompt).toHaveBeenCalledWith("讲解二分查找");
+    fireEvent.click(getByRole("button", { name: "返回修改题目" }));
+    expect(onEditPrompt).toHaveBeenCalledWith("讲解二分查找");
+    expect(onNavigate).not.toHaveBeenCalled();
+  });
+
+  it("falls back to intake navigation when no edit handler is provided", () => {
+    const onNavigate = vi.fn();
+    mockUsePipelinePoller.mockReturnValue({
+      playbook: null,
+      director: null,
+      error: "生成失败，请返回重试",
+      errorKind: "run_failed",
+      prompt: null,
+      createdAt: null,
+      isLoading: false,
+      status: "failed",
+      retry: vi.fn(),
+    });
+
+    const { getByRole, queryByRole } = render(
+      <StudioPage
+        runId="run-1"
+        t={TWEAK_DEFAULTS}
+        onNavigate={onNavigate}
+        isProviderConfigured
+      />,
+    );
+
+    expect(queryByRole("button", { name: "重新生成" })).toBeNull();
+    fireEvent.click(getByRole("button", { name: "返回修改题目" }));
+    expect(onNavigate).toHaveBeenCalledWith("intake");
   });
 });
 

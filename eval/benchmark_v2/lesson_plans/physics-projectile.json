@@ -1,0 +1,107 @@
+{
+  "schema_version": "1.0.0",
+  "domain": "physics",
+  "title": "平抛运动：水平匀速与竖直重力加速",
+  "learning_objectives": [
+    "把平抛运动分解为水平和竖直两个独立分量",
+    "说明重力只改变竖直速度而不改变水平速度",
+    "解释两个分运动为什么合成为抛物线轨迹"
+  ],
+  "prerequisites": [
+    "速度的矢量分解",
+    "匀速直线运动",
+    "匀加速直线运动"
+  ],
+  "misconceptions": [
+    "认为重力会让水平速度越来越大",
+    "认为竖直加速度恒定就代表竖直速度不变",
+    "把水平和竖直运动分开后误认为合轨迹仍是直线"
+  ],
+  "expected_conclusion": "平抛运动同时具有不变的水平速度和由重力产生的竖直加速度，两个分运动合成一条抛物线轨迹。",
+  "lesson_arc": "comparison",
+  "scenes": [
+    {
+      "scene_id": "projectile-components",
+      "teaching_goal": "建立物体及水平、竖直速度分量",
+      "strategy": "demonstration",
+      "required_fact_ids": ["horizontal_velocity", "vertical_velocity"],
+      "required_visual_roles": ["object", "horizontal_velocity", "vertical_velocity"],
+      "preferred_scene_type": "projectile_motion",
+      "narration_goal": "说明平抛初始水平速度非零、初始竖直速度为零，但两个方向需要分别分析。"
+    },
+    {
+      "scene_id": "projectile-component-comparison",
+      "teaching_goal": "比较相同时间内水平和竖直分量的不同变化规律",
+      "strategy": "comparison",
+      "required_fact_ids": ["gravity", "horizontal_velocity", "vertical_velocity"],
+      "required_visual_roles": [
+        "object",
+        "horizontal_velocity",
+        "vertical_velocity",
+        "gravity"
+      ],
+      "preferred_scene_type": "projectile_motion",
+      "narration_goal": "强调水平方向保持匀速，竖直速度则因向下重力加速度持续变化。"
+    },
+    {
+      "scene_id": "projectile-state-transition",
+      "teaching_goal": "展示运动状态随时间推进并形成弯曲轨迹",
+      "strategy": "state_transition",
+      "required_fact_ids": [
+        "parabolic",
+        "gravity",
+        "horizontal_velocity",
+        "vertical_velocity"
+      ],
+      "required_visual_roles": [
+        "object",
+        "trajectory",
+        "horizontal_velocity",
+        "vertical_velocity",
+        "gravity"
+      ],
+      "preferred_scene_type": "projectile_motion",
+      "narration_goal": "把每个时刻的位置变化与速度分量同步起来，显示竖直间隔逐渐增大。"
+    },
+    {
+      "scene_id": "projectile-trajectory-reason",
+      "teaching_goal": "解释两个分运动合成抛物线的原因",
+      "strategy": "derivation",
+      "required_fact_ids": [
+        "parabolic",
+        "gravity",
+        "horizontal_velocity",
+        "vertical_velocity"
+      ],
+      "required_visual_roles": [
+        "object",
+        "trajectory",
+        "horizontal_velocity",
+        "vertical_velocity",
+        "gravity"
+      ],
+      "preferred_scene_type": "projectile_motion",
+      "narration_goal": "连接水平位移随时间线性增长与竖直位移随时间平方增长，得到抛物线结论。"
+    },
+    {
+      "scene_id": "projectile-summary",
+      "teaching_goal": "总结水平、竖直分运动与整体轨迹",
+      "strategy": "summary",
+      "required_fact_ids": [
+        "parabolic",
+        "gravity",
+        "horizontal_velocity",
+        "vertical_velocity"
+      ],
+      "required_visual_roles": [
+        "object",
+        "trajectory",
+        "horizontal_velocity",
+        "vertical_velocity",
+        "gravity"
+      ],
+      "preferred_scene_type": "projectile_motion",
+      "narration_goal": "明确回答水平速度不变、竖直受重力加速以及轨迹为何是抛物线。"
+    }
+  ]
+}

@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://metaview.local/schemas/asset-manifest.schema.json",
+  "title": "MetaView Subject Visual Kit Manifest",
+  "type": "object",
+  "required": ["schemaVersion", "packId", "subject", "version", "license", "licenseMode", "sources", "assets"],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1.0.0" },
+    "packId": { "type": "string", "minLength": 1 },
+    "subject": {
+      "type": "string",
+      "enum": ["core", "math", "physics", "chemistry", "biology", "geography", "algorithm", "code"]
+    },
+    "version": { "type": "string", "minLength": 1 },
+    "license": {
+      "type": "string",
+      "enum": [
+        "public-domain",
+        "cc0",
+        "cc-by-3.0",
+        "cc-by",
+        "cc-by-4.0",
+        "cc-by-sa-4.0",
+        "mit",
+        "isc",
+        "bsd-3-clause",
+        "apache-2.0",
+        "internal",
+        "unknown"
+      ]
+    },
+    "licenseMode": {
+      "type": "string",
+      "enum": ["single", "mixed"]
+    },
+    "defaultLicense": {
+      "type": "string",
+      "enum": [
+        "public-domain",
+        "cc0",
+        "cc-by-3.0",
+        "cc-by",
+        "cc-by-4.0",
+        "cc-by-sa-4.0",
+        "mit",
+        "isc",
+        "bsd-3-clause",
+        "apache-2.0",
+        "internal",
+        "unknown"
+      ]
+    },
+    "sceneTemplates": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "rendererKinds": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "license", "sourceUrl", "licenseUrl"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "label": { "type": "string", "minLength": 1 },
+          "license": {
+            "type": "string",
+            "enum": [
+              "public-domain",
+              "cc0",
+              "cc-by-3.0",
+              "cc-by",
+              "cc-by-4.0",
+              "cc-by-sa-4.0",
+              "mit",
+              "isc",
+              "bsd-3-clause",
+              "apache-2.0",
+              "internal",
+              "unknown"
+            ]
+          },
+          "sourceUrl": { "type": ["string", "null"], "format": "uri" },
+          "licenseUrl": { "type": ["string", "null"], "format": "uri" },
+          "attribution": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      }
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "path",
+          "tags",
+          "semanticRoles",
+          "sourceId",
+          "license",
+          "commercialUseStatus",
+          "requiresAttribution",
+          "commercialUseAllowed",
+          "shareAlike",
+          "modificationAllowed",
+          "sourceUrl",
+          "licenseUrl",
+          "modifiedFrom"
+        ],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "type": {
+            "type": "string",
+            "enum": ["svg", "image", "geojson", "json", "lottie", "smiles", "pdb", "component", "particle_preset"]
+          },
+          "path": { "type": "string", "minLength": 1 },
+          "resourceUri": { "type": "string", "minLength": 1 },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "semanticRoles": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "sourceId": { "type": "string", "minLength": 1 },
+          "attribution": { "type": ["string", "null"] },
+          "license": {
+            "type": "string",
+            "enum": [
+              "public-domain",
+              "cc0",
+              "cc-by-3.0",
+              "cc-by",
+              "cc-by-4.0",
+              "cc-by-sa-4.0",
+              "mit",
+              "isc",
+              "bsd-3-clause",
+              "apache-2.0",
+              "internal",
+              "unknown"
+            ]
+          },
+          "commercialUseStatus": {
+            "type": "string",
+            "enum": ["allowed", "allowed-with-attribution", "restricted", "unknown"]
+          },
+          "requiresAttribution": { "type": "boolean" },
+          "commercialUseAllowed": { "type": "boolean" },
+          "shareAlike": { "type": "boolean" },
+          "modificationAllowed": { "type": "boolean" },
+          "sourceUrl": { "type": ["string", "null"], "format": "uri" },
+          "licenseUrl": { "type": ["string", "null"], "format": "uri" },
+          "modifiedFrom": { "type": ["string", "null"] },
+          "rendererHints": {
+            "type": "object",
+            "properties": {
+              "preferredRenderer": { "type": "string" },
+              "defaultSize": {
+                "type": "array",
+                "prefixItems": [{ "type": "number" }, { "type": "number" }],
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "anchor": {
+                "type": "string",
+                "enum": ["center", "topLeft", "baseline"]
+              },
+              "colorizable": { "type": "boolean" },
+              "strokeControlled": { "type": "boolean" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

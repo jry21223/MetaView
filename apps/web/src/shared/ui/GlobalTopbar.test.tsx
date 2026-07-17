@@ -42,8 +42,8 @@ describe("GlobalTopbar account avatar", () => {
     const { queryByText } = render(<GlobalTopbar {...baseProps} stage="workbench" appEdition="ops" />);
 
     expect(queryByText("运营面板")).toBeFalsy();
-    expect(queryByText("首页")).toBeTruthy();
-    expect(queryByText("工作台")).toBeNull();
+    expect(queryByText("工作台")).toBeTruthy();
+    expect(queryByText("首页")).toBeNull();
     expect(queryByText("任务历史")).toBeTruthy();
     expect(queryByText("模板")).toBeTruthy();
     expect(queryByText("设置")).toBeTruthy();
@@ -60,7 +60,7 @@ describe("GlobalTopbar account avatar", () => {
     );
 
     expect(getByText("MetaView")).toBeTruthy();
-    expect(queryByText("首页")).toBeNull();
+    expect(queryByText("工作台")).toBeNull();
     expect(queryByText("任务历史")).toBeNull();
     expect(queryByText("模板")).toBeNull();
     expect(queryByText("设置")).toBeNull();
@@ -82,7 +82,7 @@ describe("GlobalTopbar account avatar", () => {
       <GlobalTopbar {...baseProps} onNavigate={onNavigate} />,
     );
 
-    fireEvent.click(getByRole("button", { name: "首页" }));
+    fireEvent.click(getByRole("button", { name: "工作台" }));
     fireEvent.click(getByRole("button", { name: "任务历史" }));
     fireEvent.click(getByRole("button", { name: "模板" }));
     fireEvent.click(getByRole("button", { name: "设置" }));
@@ -104,8 +104,8 @@ describe("GlobalTopbar account avatar", () => {
     expect(pathData.some((d) => d.length > 120)).toBe(false);
   });
 
-  it("self mode shows provider status without account or recharge controls", () => {
-    const { queryByLabelText, queryByText, getByText } = render(
+  it("self mode shows a quiet provider dot without account or recharge controls", () => {
+    const { queryByLabelText, queryByText, getByTitle } = render(
       <GlobalTopbar
         {...baseProps}
         appEdition="self"
@@ -117,8 +117,40 @@ describe("GlobalTopbar account avatar", () => {
 
     expect(queryByLabelText("账户与充值")).toBeNull();
     expect(queryByText(/¥ 5\.00/)).toBeNull();
-    expect(getByText("模型已配置")).toBeTruthy();
+    expect(queryByText("模型已配置")).toBeNull();
+    expect(getByTitle("模型已配置")).toBeTruthy();
     expect(queryByLabelText("模型服务商设置")).toBeTruthy();
+  });
+
+  it("self mode stays quiet when no provider is configured", () => {
+    const { queryByText, queryByTitle, container } = render(
+      <GlobalTopbar
+        {...baseProps}
+        appEdition="self"
+        isProviderConfigured={false}
+        accountBalanceYuan={null}
+        accountName={null}
+        onOpenProviderSettings={vi.fn()}
+      />,
+    );
+
+    expect(queryByText("未配置模型")).toBeNull();
+    expect(queryByTitle("模型已配置")).toBeNull();
+    expect(container.querySelector(".mv-pulse-offline")).toBeNull();
+  });
+
+  it("self mode does not render a placeholder avatar", () => {
+    const { queryByText } = render(
+      <GlobalTopbar
+        {...baseProps}
+        appEdition="self"
+        accountBalanceYuan={null}
+        accountName={null}
+        onOpenProviderSettings={vi.fn()}
+      />,
+    );
+
+    expect(queryByText("MV")).toBeNull();
   });
 
   it("uses a square svg icon for provider settings instead of a font glyph", () => {

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "cell-structure-contract",
+  "sceneTemplate": "cell_structure",
+  "rendererKind": "bio_cell_scene",
+  "packId": "biology-basic",
+  "requiredAssetIds": ["cell-outline", "nucleus", "mitochondrion", "ribosome", "dna-helix"],
+  "requiredSemanticRoles": ["cell", "nucleus", "mitochondrion", "ribosome", "dna"],
+  "minimumStructureCount": 5,
+  "requiredCalloutTargets": ["nucleus", "mitochondrion"],
+  "caption": "Animal cell structure must render a cell boundary, organelles, DNA, and callouts from biology-basic assets."
+}

@@ -1,0 +1,431 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://metaview.local/schemas/scene-blueprint.schema.json",
+  "title": "MetaView SceneBlueprint",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["subject", "sceneType", "title", "visualIntent"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "subject": {
+      "type": "string",
+      "enum": ["algorithm", "biology", "chemistry", "geography", "math", "physics"]
+    },
+    "sceneType": {
+      "type": "string",
+      "enum": [
+        "bio_cell_scene",
+        "bio_process_scene",
+        "cell_structure",
+        "dna_replication",
+        "geo_map_scene",
+        "east_asia_monsoon",
+        "physics_force_scene",
+        "projectile_motion",
+        "molecule_2d_scene",
+        "molecule_2d_water",
+        "molecule_2d_methane",
+        "molecule_2d_glucose",
+        "reaction_scene",
+        "reaction_synthesis_water",
+        "math_plot",
+        "derivative_tangent",
+        "graph_scene",
+        "bfs_graph",
+        "call_stack_scene",
+        "recursion_stack",
+        "code_trace_scene",
+        "binary_search"
+      ]
+    },
+    "title": { "type": "string", "minLength": 1 },
+    "topic": { "type": "string", "minLength": 1 },
+    "audience": { "type": ["string", "null"] },
+    "style": { "type": ["string", "null"] },
+    "language": { "type": ["string", "null"] },
+    "visualIntent": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "emphasisPoints": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "requiredAssets": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "packId": { "type": "string", "minLength": 1 },
+    "durationFrames": { "type": "number", "exclusiveMinimum": 0 },
+    "durationSeconds": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+    "caption": { "type": "string", "minLength": 1 },
+    "mapRegion": { "type": "string", "minLength": 1 },
+    "flows": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/geoFlow" }
+    },
+    "pressureCenters": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/pressureCenter" }
+    },
+    "particlePreset": { "type": "string", "minLength": 1 },
+    "object": { "$ref": "#/$defs/physicsObject" },
+    "vectors": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/physicsVector" }
+    },
+    "trajectory": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/point" }
+    },
+    "assetId": { "type": ["string", "null"], "minLength": 1 },
+    "curves": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/mathCurve" }
+    },
+    "params": {
+      "type": "object",
+      "additionalProperties": { "type": "number" }
+    },
+    "xMin": { "type": "number" },
+    "xMax": { "type": "number" },
+    "yMin": { "type": ["number", "null"] },
+    "yMax": { "type": ["number", "null"] },
+    "markerX": { "type": ["number", "null"] },
+    "shadeFrom": { "type": ["number", "null"] },
+    "shadeTo": { "type": ["number", "null"] },
+    "xLabel": { "type": "string", "minLength": 1 },
+    "yLabel": { "type": "string", "minLength": 1 },
+    "formulaLatex": { "type": "string", "minLength": 1 },
+    "cellType": { "type": "string", "minLength": 1 },
+    "processId": { "type": "string", "minLength": 1 },
+    "structures": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/bioStructure" }
+    },
+    "steps": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/bioProcessStep" }
+    },
+    "processSteps": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/bioProcessStep" }
+    },
+    "connections": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/bioProcessConnection" }
+    },
+    "callouts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/callout" }
+    },
+    "moleculeId": { "type": "string", "minLength": 1 },
+    "moleculeAssetId": { "type": ["string", "null"], "minLength": 1 },
+    "smiles": { "type": "string", "minLength": 1 },
+    "atoms": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/moleculeAtom" }
+    },
+    "bonds": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/moleculeBond" }
+    },
+    "highlights": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "reactionId": { "type": "string", "minLength": 1 },
+    "reactants": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/reactionParticipant" }
+    },
+    "products": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/reactionParticipant" }
+    },
+    "arrows": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/reactionArrow" }
+    },
+    "electronFlows": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/reactionArrow" }
+    },
+    "graphNodes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/graphNode" }
+    },
+    "graphEdges": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/graphEdge" }
+    },
+    "currentNodeId": { "type": "string", "minLength": 1 },
+    "activeNodeIds": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "activeEdgeIds": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "visitedNodeIds": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "queueNodeIds": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "frontierNodeIds": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "stackFrames": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/callStackFrame" }
+    },
+    "currentFrameId": { "type": "string", "minLength": 1 },
+    "codeTrace": { "$ref": "#/$defs/callStackCodeTrace" },
+    "arrayValues": {
+      "type": "array",
+      "items": { "type": ["string", "number"] }
+    },
+    "target": { "type": ["string", "number"] },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": { "type": ["string", "number", "boolean", "null"] }
+    }
+  },
+  "$defs": {
+    "point": {
+      "type": "array",
+      "prefixItems": [{ "type": "number" }, { "type": "number" }],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "geoFlow": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "semanticRole": { "type": "string", "minLength": 1 },
+        "from": { "$ref": "#/$defs/point" },
+        "to": { "$ref": "#/$defs/point" },
+        "label": { "type": "string", "minLength": 1 },
+        "assetId": { "type": "string", "minLength": 1 },
+        "strength": { "type": "number" }
+      }
+    },
+    "pressureCenter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "x", "y", "label"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "enum": ["high", "low"] },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "label": { "type": "string", "minLength": 1 }
+      }
+    },
+    "physicsObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "semanticRole": { "type": "string", "minLength": 1 },
+        "assetId": { "type": "string", "minLength": 1 },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "radius": { "type": "number", "minimum": 0 }
+      }
+    },
+    "physicsVector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["semanticRole", "dx", "dy"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "target": { "type": "string", "minLength": 1 },
+        "semanticRole": { "type": "string", "minLength": 1 },
+        "dx": { "type": "number" },
+        "dy": { "type": "number" },
+        "label": { "type": "string", "minLength": 1 },
+        "magnitude": { "type": "string", "minLength": 1 }
+      }
+    },
+    "mathCurve": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expression"],
+      "properties": {
+        "expression": { "type": "string", "minLength": 1 },
+        "label": { "type": ["string", "null"], "minLength": 1 },
+        "emphasis": { "type": "string", "minLength": 1 },
+        "semanticRole": { "type": "string", "minLength": 1 }
+      }
+    },
+    "callout": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "targetId": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "side": { "type": "string", "enum": ["left", "right", "top", "bottom"] }
+      }
+    },
+    "bioStructure": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "semanticRole": { "type": "string", "minLength": 1 },
+        "label": { "type": ["string", "null"], "minLength": 1 },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "height": { "type": "number", "exclusiveMinimum": 0 },
+        "assetId": { "type": ["string", "null"], "minLength": 1 }
+      }
+    },
+    "bioProcessStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "semanticRole": { "type": "string", "minLength": 1 },
+        "label": { "type": ["string", "null"], "minLength": 1 },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "height": { "type": "number", "exclusiveMinimum": 0 },
+        "assetId": { "type": ["string", "null"], "minLength": 1 },
+        "description": { "type": ["string", "null"], "minLength": 1 }
+      }
+    },
+    "bioProcessConnection": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "from": { "type": "string", "minLength": 1 },
+        "to": { "type": "string", "minLength": 1 },
+        "semanticRole": { "type": "string", "minLength": 1 },
+        "label": { "type": ["string", "null"], "minLength": 1 },
+        "assetId": { "type": ["string", "null"], "minLength": 1 }
+      }
+    },
+    "moleculeAtom": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["element"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "element": { "type": "string", "minLength": 1 },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "charge": { "type": ["string", "null"], "minLength": 1 },
+        "label": { "type": ["string", "null"], "minLength": 1 },
+        "assetId": { "type": ["string", "null"], "minLength": 1 }
+      }
+    },
+    "moleculeBond": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "from": { "type": "string", "minLength": 1 },
+        "to": { "type": "string", "minLength": 1 },
+        "order": { "type": "number", "enum": [1, 2, 3] },
+        "label": { "type": ["string", "null"], "minLength": 1 },
+        "assetId": { "type": ["string", "null"], "minLength": 1 }
+      }
+    },
+    "reactionParticipant": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "formulaLatex": { "type": "string", "minLength": 1 },
+        "label": { "type": ["string", "null"], "minLength": 1 },
+        "coefficient": { "type": ["number", "null"] },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "assetId": { "type": ["string", "null"], "minLength": 1 }
+      }
+    },
+    "reactionArrow": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "semanticRole": { "type": "string", "minLength": 1 },
+        "from": { "$ref": "#/$defs/point" },
+        "to": { "$ref": "#/$defs/point" },
+        "label": { "type": ["string", "null"], "minLength": 1 },
+        "assetId": { "type": ["string", "null"], "minLength": 1 }
+      }
+    },
+    "graphNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
+    "graphEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "target"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "target": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "weight": { "type": "number" }
+      }
+    },
+    "callStackFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": ["string", "null"], "minLength": 1 },
+        "depth": { "type": ["number", "null"], "minimum": 0 },
+        "state": { "type": ["string", "null"], "minLength": 1 },
+        "assetId": { "type": ["string", "null"], "minLength": 1 },
+        "variables": {
+          "type": ["object", "null"],
+          "additionalProperties": { "type": ["string", "number", "boolean", "null"] }
+        }
+      }
+    },
+    "callStackCodeTrace": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "language": { "type": ["string", "null"], "minLength": 1 },
+        "lines": {
+          "type": ["array", "null"],
+          "items": { "type": "string" }
+        },
+        "activeLines": {
+          "type": ["array", "null"],
+          "items": { "type": "number", "minimum": 0 }
+        },
+        "activeLine": { "type": ["number", "null"], "minimum": 0 },
+        "assetId": { "type": ["string", "null"], "minLength": 1 }
+      }
+    }
+  }
+}

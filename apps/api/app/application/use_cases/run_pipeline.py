@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from json import JSONDecodeError
@@ -14,14 +15,21 @@ from app.application.agent.runtime_tool_hub import RuntimeToolHub
 from app.application.agent.types import AgentConstraints, AgentRequest
 from app.application.dto.pipeline_dto import PipelineRequest
 from app.application.ports.agent_provider import AgentProviderError, IAgentProvider
+from app.application.ports.coverage_resolver import ICoverageResolver
 from app.application.ports.director_repository import IRunDirectorRepository
+from app.application.ports.lesson_planner import ILessonPlanner
 from app.application.ports.llm_provider import ILLMProvider
 from app.application.ports.router_provider import IRouterProvider
 from app.application.ports.run_repository import IRunRepository
+from app.application.services.coverage_resolver import DefaultCoverageResolver
+from app.application.services.lesson_planner import RuleBasedLessonPlanner
 from app.config import GenerationMode, RouterMode
 from app.domain.models.cir import CirDocument, ExecutionMap
+from app.domain.models.coverage import CoverageDecision, CoverageMode
+from app.domain.models.lesson_plan import LessonPlan
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.domain.models.playbook import PlaybookScript
+from app.domain.models.quality_report import QualityReport
 from app.domain.models.review import (
     CirReviewIssue,
     CirReviewReport,
@@ -40,6 +48,7 @@ from app.domain.services.model_router import topic_route_from_decision
 from app.domain.services.playbook_builder import build_playbook
 from app.domain.services.playbook_quality import (
     playbook_review_verdict_from_issues,
+    quality_gate_playbook,
     self_check_playbook,
 )
 from app.domain.services.reviewer_prompt import (
@@ -60,6 +69,7 @@ logger = logging.getLogger(__name__)
 
 AGENT_SELF_REPAIR_ATTEMPTS = 2
 AGENT_REVIEWER_REPAIR_ATTEMPTS = 1
+CANONICAL_QUALITY_REPAIR_ATTEMPTS = 1
 
 
 @dataclass(frozen=True)
@@ -74,6 +84,7 @@ class ParseResult:
 @dataclass(frozen=True)
 class RouteContext:
     decision: RouteDecision
+    coverage_decision: CoverageDecision
     fallback: str = "none"
     router_model: str | None = None
 
@@ -95,6 +106,8 @@ class RunPipelineUseCase:
         router_mode: RouterMode | str = "hybrid",
         router_min_confidence: float = 0.72,
         router_refine_confidence: float = 0.55,
+        lesson_planner: ILessonPlanner | None = None,
+        coverage_resolver: ICoverageResolver | None = None,
     ) -> None:
         self._repo = run_repo
         self._llm = llm
@@ -114,6 +127,14 @@ class RunPipelineUseCase:
         )
         self._router_min_confidence = router_min_confidence
         self._router_refine_confidence = router_refine_confidence
+        self._lesson_planner = lesson_planner or RuleBasedLessonPlanner()
+        self._coverage_resolver = coverage_resolver or DefaultCoverageResolver(
+            skill_registry=self._skill_registry,
+            runtime_tool_hub=RuntimeToolHub(self._skill_registry),
+            min_confidence=router_min_confidence,
+            refine_confidence=router_refine_confidence,
+        )
+        self._coverage_by_run: dict[str, CoverageDecision] = {}
 
     async def execute(self, run_id: str, request: PipelineRequest) -> None:
         await self._repo.update(run_id, status=PipelineRunStatus.RUNNING)
@@ -123,16 +144,36 @@ class RunPipelineUseCase:
 
                 agent_pipeline = AgentPipeline(
                     route_request=self._route_request,
-                    try_execute_skill=self._try_execute_skill,
-                    fail_skill_consistency=self._fail_skill_consistency,
-                    build_route_context=lambda req, match: self._generic_route_context(
-                        req,
-                        route_match=match,
+                    prepare_route_context=self._prepare_route_context,
+                    can_execute_skill=lambda ctx: (
+                        isinstance(ctx, RouteContext)
+                        and ctx.coverage_decision.mode == "specialized"
                     ),
-                    execute_agent=lambda rid, req, ctx: self._execute_agent(
+                    try_execute_skill=lambda rid, req, match, ctx, plan: self._try_execute_skill(
+                        rid,
+                        req,
+                        match,
+                        route_context=ctx,  # type: ignore[arg-type]
+                        lesson_plan=plan,
+                    ),
+                    fail_skill_consistency=lambda rid, match, ctx, message: (
+                        self._fail_skill_consistency(
+                            rid,
+                            match,
+                            route_context=ctx,  # type: ignore[arg-type]
+                            message=message,
+                        )
+                    ),
+                    prepare_lesson_plan=lambda rid, req, ctx: self._prepare_lesson_plan(
                         rid,
                         req,
                         route_context=ctx,  # type: ignore[arg-type]
+                    ),
+                    execute_agent=lambda rid, req, ctx, plan: self._execute_agent(
+                        rid,
+                        req,
+                        route_context=ctx,  # type: ignore[arg-type]
+                        lesson_plan=plan,
                     ),
                 )
                 await self._run_with_total_timeout(
@@ -141,29 +182,85 @@ class RunPipelineUseCase:
                 )
                 return
 
-            route_match = await self._route_request(request)
-            if route_match is not None:
-                try:
-                    handled = await self._try_execute_skill(run_id, request, route_match)
-                except AssertionError as exc:
-                    await self._fail_skill_consistency(run_id, route_match, str(exc))
-                    return
-                if handled:
-                    return
-
-            route_context = self._generic_route_context(request, route_match=route_match)
             await self._run_with_total_timeout(
-                self._execute_single(run_id, request, route_context=route_context),
+                self._execute_routed_single_pipeline(run_id, request),
                 run_id=run_id,
             )
         except TimeoutError:
             timeout = self._pipeline_timeout_s
             logger.exception("Pipeline run %s timed out after %.1fs", run_id, timeout)
+            quality_report = _terminal_quality_report(
+                generator_path=("agent" if self._generation_mode == "agent" else "generic_cir"),
+                coverage_mode=self._coverage_mode_for_run(run_id),
+                code="pipeline.timeout",
+                path="pipeline",
+                message=f"Pipeline timed out after {timeout:.1f}s",
+                suggestion="Retry the run or reduce generation complexity.",
+            )
+            await self._persist_quality_report(run_id, quality_report)
             await self._repo.update(
                 run_id,
                 status=PipelineRunStatus.FAILED,
                 error=f"Pipeline timed out after {timeout:.1f}s",
             )
+        except Exception as exc:  # noqa: BLE001 - terminal state must always be persisted.
+            logger.exception("Pipeline run %s failed before candidate finalization", run_id)
+            quality_report = _terminal_quality_report(
+                generator_path=("agent" if self._generation_mode == "agent" else "generic_cir"),
+                coverage_mode=self._coverage_mode_for_run(run_id),
+                code="quality.generation_failed",
+                path="pipeline",
+                message=f"Pipeline failed before producing a valid candidate: {exc}",
+                suggestion="Inspect the provider or SkillPack failure and retry.",
+            )
+            await self._persist_quality_report(run_id, quality_report)
+            await self._repo.update(
+                run_id,
+                status=PipelineRunStatus.FAILED,
+                error=str(exc),
+            )
+        finally:
+            self._coverage_by_run.pop(run_id, None)
+
+    async def _execute_routed_single_pipeline(
+        self,
+        run_id: str,
+        request: PipelineRequest,
+    ) -> None:
+        route_match = await self._route_request(request)
+        route_context = await self._prepare_route_context(run_id, request, route_match)
+        if route_context is None:
+            return
+        lesson_plan = await self._prepare_lesson_plan(
+            run_id,
+            request,
+            route_context=route_context,
+        )
+        if route_match is not None and route_context.coverage_decision.mode == "specialized":
+            try:
+                handled = await self._try_execute_skill(
+                    run_id,
+                    request,
+                    route_match,
+                    route_context=route_context,
+                    lesson_plan=lesson_plan,
+                )
+            except AssertionError as exc:
+                await self._fail_skill_consistency(
+                    run_id,
+                    route_match,
+                    route_context=route_context,
+                    message=str(exc),
+                )
+                return
+            if handled:
+                return
+        await self._execute_single(
+            run_id,
+            request,
+            route_context=route_context,
+            lesson_plan=lesson_plan,
+        )
 
     async def _run_with_total_timeout(self, operation, *, run_id: str) -> None:
         timeout = self._pipeline_timeout_s
@@ -220,90 +317,285 @@ class RunPipelineUseCase:
 
         return None
 
+    async def _prepare_route_context(
+        self,
+        run_id: str,
+        request: PipelineRequest,
+        route_match: SkillRouteMatch | None,
+    ) -> RouteContext | None:
+        coverage_decision = self._coverage_resolver.resolve(
+            prompt=request.prompt,
+            source_code=request.source_code,
+            language=request.language,
+            explicit_domain=request.domain,
+            skill_mode_override=request.skill_mode_override,
+            route_match=route_match,
+        )
+        self._coverage_by_run[run_id] = coverage_decision
+        update_coverage_decision = getattr(self._repo, "update_coverage_decision", None)
+        if callable(update_coverage_decision):
+            await update_coverage_decision(
+                run_id,
+                coverage_decision.model_dump_json(),
+            )
+
+        route_context = self._generic_route_context(
+            request,
+            route_match=route_match,
+            coverage_decision=coverage_decision,
+        )
+        if coverage_decision.mode in {"specialized", "composable"}:
+            return route_context
+
+        actions = _coverage_review_actions(coverage_decision)
+        if coverage_decision.mode == "unsupported":
+            issue_code = "capability.unsupported"
+            suggestion = (
+                "Use a supported deterministic SkillPack or narrow the request to "
+                "a capability that MetaView can validate reliably."
+            )
+        elif coverage_decision.fallback_policy == "text_only":
+            issue_code = "capability.text_only_required"
+            suggestion = (
+                "Use a supported visual capability. MetaView does not yet expose a "
+                "separate text-only result surface, so this request cannot enter the "
+                "video pipeline safely."
+            )
+        else:
+            issue_code = "capability.limited_visual_unavailable"
+            suggestion = (
+                "Restore the missing visual validators or use a fully controlled "
+                "composition profile before generating a video."
+            )
+        report = _terminal_quality_report(
+            generator_path="capability_resolution",
+            coverage_mode=coverage_decision.mode,
+            code=issue_code,
+            path="coverage_decision",
+            message=coverage_decision.reason,
+            suggestion=suggestion,
+            actions=actions,
+        )
+        await self._persist_quality_report(run_id, report)
+        await self._repo.update(
+            run_id,
+            status=PipelineRunStatus.FAILED,
+            error=coverage_decision.reason,
+            review_json=PlaybookReviewVerdict(
+                status=PlaybookReviewStatus.BLOCKED,
+                summary=coverage_decision.reason,
+                issues=list(report.issues),
+                actions=actions,
+            ).model_dump_json(),
+        )
+        return None
+
     def _generic_route_context(
         self,
         request: PipelineRequest,
         *,
         route_match: SkillRouteMatch | None,
+        coverage_decision: CoverageDecision,
     ) -> RouteContext:
         topic_route = _resolve_route(request)
         if route_match is not None:
-            route_domain = (
-                route_match.domain
-                or (topic_route.domain.value if topic_route.domain else None)
+            route_domain = coverage_decision.domain or (
+                topic_route.domain.value if topic_route.domain else None
             )
             route = RouteDecision(
-                destination="generic_cir",
+                destination=(
+                    "deterministic_skill"
+                    if coverage_decision.mode == "specialized"
+                    else "generic_cir"
+                ),
                 domain=route_domain,
                 skill_id=route_match.skill_id,
                 confidence=route_match.confidence,
-                reason=route_match.reason or "skill_not_handled",
+                reason=coverage_decision.reason,
                 matched_capability=route_match.capability_id,
                 problem_spec=route_match.problem_spec,
                 needs_refinement=route_match.needs_refinement,
             )
             return RouteContext(
                 route,
-                fallback=f"skill_not_handled:{route_match.skill_id}",
+                coverage_decision,
+                fallback=(
+                    "none"
+                    if coverage_decision.mode == "specialized"
+                    else f"coverage:{coverage_decision.fallback_policy}"
+                ),
                 router_model=getattr(self._router_provider, "model_name", None),
             )
 
-        confidence = 0.62 if topic_route.domain is not None else 0.0
         route = RouteDecision(
             destination="generic_cir",
-            domain=topic_route.domain.value if topic_route.domain else None,
-            confidence=confidence,
-            reason=topic_route.reason or "topic_route",
+            domain=coverage_decision.domain,
+            confidence=coverage_decision.confidence,
+            reason=coverage_decision.reason,
             matched_capability=",".join(topic_route.matched_keywords) or None,
         )
         fallback = "router_disabled" if self._router_mode == "off" else "none"
         return RouteContext(
             route,
-            fallback=fallback,
+            coverage_decision,
+            fallback=(
+                fallback
+                if fallback != "none"
+                else f"coverage:{coverage_decision.fallback_policy}"
+            ),
             router_model=getattr(self._router_provider, "model_name", None),
         )
+
+    async def _prepare_lesson_plan(
+        self,
+        run_id: str,
+        request: PipelineRequest,
+        *,
+        route_context: RouteContext,
+    ) -> LessonPlan:
+        lesson_plan = await self._lesson_planner.plan(
+            prompt=request.prompt,
+            domain=(
+                route_context.coverage_decision.domain
+                or route_context.decision.domain
+                or request.domain
+            ),
+            route_decision=route_context.decision,
+            source_code=request.source_code,
+            language=request.language,
+        )
+        update_lesson_plan = getattr(self._repo, "update_lesson_plan", None)
+        if callable(update_lesson_plan):
+            await update_lesson_plan(run_id, lesson_plan.model_dump_json())
+        return lesson_plan
 
     async def _try_execute_skill(
         self,
         run_id: str,
         request: PipelineRequest,
         route_match: SkillRouteMatch,
+        *,
+        route_context: RouteContext,
+        lesson_plan: LessonPlan,
     ) -> bool:
+        if route_context.coverage_decision.mode != "specialized":
+            return False
         skill = self._skill_registry.get(route_match.skill_id)
         if skill is None:
             return False
 
-        problem_spec = None
-        spec_source = "none"
-        if route_match.problem_spec:
-            problem_spec = skill.validate_problem_spec(route_match.problem_spec)
-            if problem_spec is not None:
-                spec_source = "model"
-        if problem_spec is None:
-            heuristic_match = skill.heuristic_match(
-                SkillRouteInput(
-                    prompt=request.prompt,
-                    source_code=request.source_code,
-                    language=request.language,
-                )
+        heuristic_match = skill.heuristic_match(
+            SkillRouteInput(
+                prompt=request.prompt,
+                source_code=request.source_code,
+                language=request.language,
             )
-            if heuristic_match and heuristic_match.problem_spec:
-                problem_spec = skill.validate_problem_spec(heuristic_match.problem_spec)
-                if problem_spec is not None:
-                    spec_source = "heuristic"
+        )
+        if (
+            heuristic_match is None
+            or heuristic_match.skill_id != route_match.skill_id
+            or heuristic_match.capability_id != route_match.capability_id
+            or heuristic_match.problem_spec is None
+        ):
+            raise AssertionError(
+                "Specialized coverage lost its independently verified SkillPack "
+                "capability or ProblemSpec before execution."
+            )
+        problem_spec = skill.validate_problem_spec(heuristic_match.problem_spec)
+        if problem_spec is None:
+            raise AssertionError(
+                "Specialized coverage produced an invalid independently verified "
+                "ProblemSpec before execution."
+            )
+        spec_source = "heuristic_verified"
+        verified_route_match = route_match.model_copy(
+            update={"problem_spec": heuristic_match.problem_spec}
+        )
 
         result = await skill.execute(
             SkillExecutionContext(
                 run_id=run_id,
                 prompt=request.prompt,
-                route_match=route_match,
+                route_match=verified_route_match,
+                lesson_plan=lesson_plan,
             ),
             problem_spec,
         )
         if not result.handled or result.playbook_json is None:
-            return False
+            fallback_reason = result.fallback_reason or "skill_returned_no_playbook"
+            actions = [
+                "router:skill_pack",
+                f"router:skill_id:{route_match.skill_id}",
+                f"skill:execution_unhandled:{fallback_reason}",
+                *_coverage_review_actions(route_context.coverage_decision),
+            ]
+            report = _terminal_quality_report(
+                generator_path="skill_pack",
+                coverage_mode=route_context.coverage_decision.mode,
+                code="skill.execution_unhandled",
+                path="skill_pack",
+                message=(
+                    f"SkillPack {route_match.skill_id!r} declined or failed to produce "
+                    f"a PlaybookScript candidate: {fallback_reason}."
+                ),
+                suggestion=(
+                    "Fix the deterministic SkillPack or resolve the capability gap before "
+                    "retrying; do not continue through an unverified generic path."
+                ),
+                actions=actions,
+            )
+            await self._persist_quality_report(run_id, report)
+            await self._repo.update(
+                run_id,
+                status=PipelineRunStatus.FAILED,
+                error=report.summary,
+                review_json=PlaybookReviewVerdict(
+                    status=PlaybookReviewStatus.BLOCKED,
+                    summary=report.summary,
+                    issues=list(report.issues),
+                    actions=actions,
+                ).model_dump_json(),
+            )
+            return True
+        if result.lesson_plan is not None:
+            if result.lesson_plan.domain != lesson_plan.domain:
+                raise AssertionError(
+                    "SkillPack LessonPlan domain does not match the routed LessonPlan domain."
+                )
+            lesson_plan = result.lesson_plan
+            update_lesson_plan = getattr(self._repo, "update_lesson_plan", None)
+            if callable(update_lesson_plan):
+                await update_lesson_plan(run_id, lesson_plan.model_dump_json())
 
-        playbook = PlaybookScript.model_validate_json(result.playbook_json)
+        try:
+            playbook = PlaybookScript.model_validate_json(result.playbook_json)
+        except ValidationError as exc:
+            verdict = _playbook_schema_error_verdict(
+                exc,
+                actions=[
+                    "router:skill_pack",
+                    f"router:skill_id:{route_match.skill_id}",
+                    "skill:schema_validation:blocked",
+                ],
+            )
+            failure_quality = QualityReport.from_review_verdict(
+                verdict,
+                generator_path="skill_pack",
+                coverage_mode=route_context.coverage_decision.mode,
+            )
+            if failure_quality.status == "repairable":
+                failure_quality = _mark_quality_repair_unavailable(
+                    failure_quality,
+                    message="SkillPack output did not match the PlaybookScript schema.",
+                )
+            await self._persist_quality_report(run_id, failure_quality)
+            await self._repo.update(
+                run_id,
+                status=PipelineRunStatus.FAILED,
+                error=humanize_issues(verdict),
+                review_json=verdict.model_dump_json(),
+            )
+            return True
         review_report = CirReviewReport(status="clean")
         review_report.actions.extend([
             "router:skill_pack",
@@ -317,19 +609,44 @@ class RunPipelineUseCase:
             ),
             *result.review_actions,
         ])
-        await self._repo.update(
+        quality_report = quality_gate_playbook(
+            playbook,
+            request.prompt,
+            generator_path="skill_pack",
+            coverage_mode=route_context.coverage_decision.mode,
+            coverage_decision=route_context.coverage_decision,
+            lesson_plan=lesson_plan,
+        )
+        quality_report.actions = list(review_report.actions)
+        if quality_report.status == "repairable":
+            quality_report = quality_report.with_issue(
+                PlaybookReviewIssue(
+                    code="quality.repair_unavailable",
+                    severity=PlaybookIssueSeverity.ERROR,
+                    path="playbook",
+                    message=(
+                        "Deterministic SkillPack output failed the canonical gate and "
+                        "has no runtime repair path."
+                    ),
+                    suggestion="Fix the SkillPack compiler and rerun the deterministic skill.",
+                    requires_repair=False,
+                ),
+                action="quality:repair_unavailable:skill_pack",
+            )
+        await self._finalize_candidate(
             run_id,
-            status=PipelineRunStatus.SUCCEEDED,
-            playbook_json=result.playbook_json,
+            playbook,
+            quality_report,
             review_json=review_report.model_dump_json(),
         )
-        await self._upsert_default_director(run_id, playbook)
         return True
 
     async def _fail_skill_consistency(
         self,
         run_id: str,
         route_match: SkillRouteMatch,
+        *,
+        route_context: RouteContext,
         message: str,
     ) -> None:
         review_report = CirReviewReport(
@@ -349,6 +666,20 @@ class RunPipelineUseCase:
                 )
             ],
         )
+        await self._persist_quality_report(
+            run_id,
+            _terminal_quality_report(
+                generator_path="skill_pack",
+                coverage_mode=route_context.coverage_decision.mode,
+                code="skill.consistency_failed",
+                path="playbook",
+                message=(
+                    message or "Deterministic skill output failed consistency validation."
+                ),
+                suggestion="Fix the deterministic SkillPack output before retrying.",
+                actions=list(review_report.actions),
+            ),
+        )
         await self._repo.update(
             run_id,
             status=PipelineRunStatus.FAILED,
@@ -362,6 +693,7 @@ class RunPipelineUseCase:
         request: PipelineRequest,
         *,
         route_context: RouteContext,
+        lesson_plan: LessonPlan,
     ) -> None:
         """Generate via the Node sidecar (pi-agent-core) and persist the
         resulting PlaybookScript verbatim. Skips CIR parsing / playbook_builder
@@ -389,6 +721,7 @@ class RunPipelineUseCase:
                 provider_config=provider_config,
                 route_context=route_context,
                 review_report=review_report,
+                lesson_plan=lesson_plan,
             )
             playbook, review_report = await self._review_agent_playbook(
                 run_id,
@@ -397,16 +730,80 @@ class RunPipelineUseCase:
                 provider_config=provider_config,
                 route_context=route_context,
                 review_report=review_report,
+                lesson_plan=lesson_plan,
             )
-            await self._repo.update(
+            quality_report = _quality_report_with_review(
+                playbook,
+                request.prompt,
+                review_report,
+                generator_path="agent",
+                coverage_decision=route_context.coverage_decision,
+                lesson_plan=lesson_plan,
+            )
+            if quality_report.status == "repairable":
+                review_report = _with_playbook_review_actions(
+                    review_report,
+                    [*review_report.actions, "quality:repair_attempt:1"],
+                )
+                await self._persist_quality_report(run_id, quality_report)
+                await self._repo.update(
+                    run_id,
+                    status=PipelineRunStatus.REVIEWING,
+                    review_json=review_report.model_dump_json(),
+                )
+                playbook, review_report = await self._repair_agent_playbook_from_reviewer(
+                    run_id,
+                    request,
+                    playbook,
+                    [
+                        issue
+                        for issue in quality_report.issues
+                        if issue.severity == PlaybookIssueSeverity.ERROR
+                    ],
+                    provider_config=provider_config,
+                    route_context=route_context,
+                    review_report=review_report,
+                    lesson_plan=lesson_plan,
+                )
+                playbook, review_report = await self._review_agent_playbook(
+                    run_id,
+                    request,
+                    playbook,
+                    provider_config=provider_config,
+                    route_context=route_context,
+                    review_report=review_report,
+                    lesson_plan=lesson_plan,
+                )
+                quality_report = _quality_report_with_review(
+                    playbook,
+                    request.prompt,
+                    review_report,
+                    generator_path="agent",
+                    coverage_decision=route_context.coverage_decision,
+                    lesson_plan=lesson_plan,
+                )
+            if quality_report.status == "repairable":
+                quality_report = _mark_quality_repair_exhausted(quality_report)
+            await self._finalize_candidate(
                 run_id,
-                status=PipelineRunStatus.SUCCEEDED,
-                playbook_json=playbook.model_dump_json(),
+                playbook,
+                quality_report,
                 review_json=review_report.model_dump_json(),
             )
-            await self._upsert_default_director(run_id, playbook)
         except PipelineValidationError as exc:
             logger.exception("Pipeline run %s (agent mode) failed review", run_id)
+            failure_quality = QualityReport.from_review_verdict(
+                exc.report,
+                generator_path="agent",
+                coverage_mode=route_context.coverage_decision.mode,
+                attempts=_playbook_repair_attempts(exc.report.actions),
+            )
+            if failure_quality.status == "repairable":
+                failure_quality = _mark_quality_repair_exhausted(failure_quality)
+            await self._persist_quality_report(
+                run_id,
+                failure_quality,
+            )
             await self._repo.update(
                 run_id,
                 status=PipelineRunStatus.FAILED,
@@ -419,6 +816,17 @@ class RunPipelineUseCase:
                 exc,
                 actions=review_report.actions,
             )
+            failure_quality = QualityReport.from_review_verdict(
+                failure_review,
+                generator_path="agent",
+                coverage_mode=route_context.coverage_decision.mode,
+            )
+            if failure_quality.status == "repairable":
+                failure_quality = _mark_quality_repair_unavailable(
+                    failure_quality,
+                    message="Agent provider failed before a candidate could be repaired.",
+                )
+            await self._persist_quality_report(run_id, failure_quality)
             await self._repo.update(
                 run_id,
                 status=PipelineRunStatus.FAILED,
@@ -431,6 +839,17 @@ class RunPipelineUseCase:
                 exc,
                 actions=[*review_report.actions, "agent:schema_validation:blocked"],
             )
+            failure_quality = QualityReport.from_review_verdict(
+                failure_review,
+                generator_path="agent",
+                coverage_mode=route_context.coverage_decision.mode,
+            )
+            if failure_quality.status == "repairable":
+                failure_quality = _mark_quality_repair_unavailable(
+                    failure_quality,
+                    message="Unexpected agent failure prevented runtime repair.",
+                )
+            await self._persist_quality_report(run_id, failure_quality)
             await self._repo.update(
                 run_id,
                 status=PipelineRunStatus.FAILED,
@@ -447,6 +866,7 @@ class RunPipelineUseCase:
         provider_config: dict[str, Any] | None,
         route_context: RouteContext,
         review_report: PlaybookReviewVerdict,
+        lesson_plan: LessonPlan,
     ) -> tuple[PlaybookScript, PlaybookReviewVerdict]:
         assert self._agent_provider is not None
         generation_prompt = prompt
@@ -458,6 +878,7 @@ class RunPipelineUseCase:
                 request=request,
                 provider_config=provider_config,
                 route_context=route_context,
+                lesson_plan=lesson_plan,
             )
             last_payload = playbook_dict
             # Validate the sidecar payload against the canonical PlaybookScript
@@ -488,7 +909,7 @@ class RunPipelineUseCase:
                 )
                 continue
 
-            check = self_check_playbook(playbook, prompt)
+            check = self_check_playbook(playbook, prompt, lesson_plan=lesson_plan)
             check = _with_playbook_review_actions(
                 check,
                 [*review_report.actions, *check.actions, f"agent:self_check:{check.status.value}"],
@@ -526,6 +947,7 @@ class RunPipelineUseCase:
         provider_config: dict[str, Any] | None,
         route_context: RouteContext,
         review_report: PlaybookReviewVerdict,
+        lesson_plan: LessonPlan,
     ) -> tuple[PlaybookScript, PlaybookReviewVerdict]:
         if self._reviewer_mode == "off":
             return playbook, _with_playbook_review_actions(
@@ -603,6 +1025,7 @@ class RunPipelineUseCase:
                 provider_config=provider_config,
                 route_context=route_context,
                 review_report=review_report,
+                lesson_plan=lesson_plan,
             )
 
         raise PipelineValidationError(review_report)
@@ -632,6 +1055,7 @@ class RunPipelineUseCase:
         provider_config: dict[str, Any] | None,
         route_context: RouteContext,
         review_report: PlaybookReviewVerdict,
+        lesson_plan: LessonPlan,
     ) -> tuple[PlaybookScript, PlaybookReviewVerdict]:
         assert self._agent_provider is not None
         repair_prompt = _build_agent_reviewer_repair_prompt(request.prompt, playbook, blocking)
@@ -641,6 +1065,7 @@ class RunPipelineUseCase:
             request=request,
             provider_config=provider_config,
             route_context=route_context,
+            lesson_plan=lesson_plan,
         )
         try:
             repaired = PlaybookScript.model_validate(repaired_payload)
@@ -651,7 +1076,11 @@ class RunPipelineUseCase:
                     actions=[*review_report.actions, "agent:schema_validation:blocked"],
                 )
             ) from exc
-        check = self_check_playbook(repaired, request.prompt)
+        check = self_check_playbook(
+            repaired,
+            request.prompt,
+            lesson_plan=lesson_plan,
+        )
         check = _with_playbook_review_actions(
             check,
             [*review_report.actions, *check.actions, f"agent:self_check:{check.status.value}"],
@@ -668,15 +1097,26 @@ class RunPipelineUseCase:
         request: PipelineRequest,
         provider_config: dict[str, Any] | None,
         route_context: RouteContext,
+        lesson_plan: LessonPlan,
     ) -> dict[str, Any]:
         assert self._agent_provider is not None
         route_decision = route_context.decision.model_dump(mode="json")
+        available_tool_ids = frozenset(
+            route_context.coverage_decision.available_tool_ids
+        )
+        available_tools = [
+            tool
+            for tool in RuntimeToolHub(self._skill_registry).list_tools(route_decision)
+            if tool.name in available_tool_ids
+        ]
         agent_request = AgentRequest(
             run_id=run_id,
             prompt=prompt,
             source_code=request.source_code,
             language=request.language,
             route_decision=route_decision,
+            coverage_decision=route_context.coverage_decision,
+            lesson_plan=lesson_plan,
             provider_config=provider_config,
             playbook_schema=PlaybookScript.model_json_schema(),
             constraints=AgentConstraints(
@@ -685,14 +1125,18 @@ class RunPipelineUseCase:
                 legacy_single_enabled=True,
                 executable_tools_available=True,
             ),
-            available_tools=RuntimeToolHub(self._skill_registry).list_tools(route_decision),
+            available_tools=available_tools,
         )
         runner = getattr(self._agent_provider, "run", None)
         if callable(runner):
             result = await runner(agent_request)
             return result.playbook
         return await self._agent_provider.generate(
-            prompt,
+            _build_agent_generation_prompt(
+                prompt,
+                lesson_plan,
+                route_context.coverage_decision,
+            ),
             provider_config=provider_config,
             route_decision=route_decision,
         )
@@ -703,6 +1147,7 @@ class RunPipelineUseCase:
         request: PipelineRequest,
         *,
         route_context: RouteContext,
+        lesson_plan: LessonPlan,
     ) -> None:
         """Original single-shot pipeline: prompt → LLM → CIR JSON → builder."""
         review_report = CirReviewReport(
@@ -724,6 +1169,8 @@ class RunPipelineUseCase:
                 language=request.language,
                 skill_mode=route.skill_mode,
                 route_decision=route_context.decision,
+                coverage_decision=route_context.coverage_decision,
+                lesson_plan=lesson_plan,
             )
             raw = await self._llm.complete(system, user)
             parsed, review_report = await self._review_output(
@@ -744,15 +1191,81 @@ class RunPipelineUseCase:
                 source_code=request.source_code,
                 source_language=request.language,
             )
-            await self._repo.update(
+            quality_report = _quality_report_for_single(
+                playbook,
+                request.prompt,
+                review_report,
+                coverage_decision=route_context.coverage_decision,
+                lesson_plan=lesson_plan,
+            )
+
+            quality_attempts_allowed = CANONICAL_QUALITY_REPAIR_ATTEMPTS
+            for attempt in range(quality_attempts_allowed):
+                if quality_report.status != "repairable":
+                    break
+                review_report.attempts += 1
+                review_report.actions.append(f"quality:repair_attempt:{attempt + 1}")
+                quality_report.attempts = review_report.attempts
+                quality_report.actions = list(review_report.actions)
+                await self._persist_quality_report(run_id, quality_report)
+                await self._repo.update(
+                    run_id,
+                    status=PipelineRunStatus.REVIEWING,
+                    review_json=review_report.model_dump_json(),
+                )
+                raw = await self._regenerate(
+                    system,
+                    user,
+                    raw,
+                    _quality_issues_as_cir(quality_report.issues),
+                    "Repair the canonical Playbook quality issues before rebuilding the scene.",
+                )
+                previous_attempts = review_report.attempts
+                parsed, review_report = await self._review_output(
+                    run_id=run_id,
+                    request=request,
+                    system=system,
+                    user=user,
+                    raw=raw,
+                    initial_actions=list(review_report.actions),
+                )
+                review_report.attempts += previous_attempts
+                if parsed.cir is None:
+                    review_report.status = "failed"
+                    raise PipelineValidationError(review_report)
+                playbook = build_playbook(
+                    parsed.cir,
+                    execution_map=parsed.execution_map,
+                    source_code=request.source_code,
+                    source_language=request.language,
+                )
+                quality_report = _quality_report_for_single(
+                    playbook,
+                    request.prompt,
+                    review_report,
+                    coverage_decision=route_context.coverage_decision,
+                    lesson_plan=lesson_plan,
+                )
+
+            if quality_report.status == "repairable":
+                quality_report = _mark_quality_repair_exhausted(quality_report)
+
+            await self._finalize_candidate(
                 run_id,
-                status=PipelineRunStatus.SUCCEEDED,
-                playbook_json=playbook.model_dump_json(),
+                playbook,
+                quality_report,
                 review_json=review_report.model_dump_json(),
             )
-            await self._upsert_default_director(run_id, playbook)
         except PipelineValidationError as exc:
             logger.exception("Pipeline run %s failed review", run_id)
+            await self._persist_quality_report(
+                run_id,
+                _quality_report_from_cir_failure(
+                    exc.report,
+                    generator_path="generic_cir",
+                    coverage_mode=route_context.coverage_decision.mode,
+                ),
+            )
             await self._repo.update(
                 run_id,
                 status=PipelineRunStatus.FAILED,
@@ -761,6 +1274,18 @@ class RunPipelineUseCase:
             )
         except Exception as exc:
             logger.exception("Pipeline run %s failed", run_id)
+            await self._persist_quality_report(
+                run_id,
+                _terminal_quality_report(
+                    generator_path="generic_cir",
+                    coverage_mode=route_context.coverage_decision.mode,
+                    code="quality.generation_failed",
+                    path="pipeline",
+                    message=f"Generic CIR generation failed: {exc}",
+                    suggestion="Inspect the CIR generator output and retry.",
+                    actions=list(review_report.actions),
+                ),
+            )
             await self._repo.update(
                 run_id,
                 status=PipelineRunStatus.FAILED,
@@ -772,17 +1297,77 @@ class RunPipelineUseCase:
         self,
         run_id: str,
         playbook: PlaybookScript,
-    ) -> None:
+    ) -> PlaybookReviewIssue | None:
         if self._director_repo is None:
-            return
+            return None
         director = build_default_director(playbook, run_id)
         try:
             await self._director_repo.upsert(
                 director,
                 datetime.now(timezone.utc).isoformat(),
             )
-        except Exception:  # noqa: BLE001 - hidden metadata must not fail generation.
+        except Exception as exc:  # noqa: BLE001 - surfaced through the quality report.
             logger.warning("Failed to persist default director for run %s", run_id, exc_info=True)
+            return PlaybookReviewIssue(
+                code="director.persistence_failed",
+                severity=PlaybookIssueSeverity.ERROR,
+                path="director",
+                message=f"Default DirectorScript could not be persisted: {exc}",
+                suggestion="Retry Director persistence before declaring the run complete.",
+                requires_repair=False,
+            )
+        return None
+
+    async def _persist_quality_report(self, run_id: str, report: QualityReport) -> None:
+        update_quality_report = getattr(self._repo, "update_quality_report", None)
+        if callable(update_quality_report):
+            await update_quality_report(run_id, report.model_dump_json())
+
+    def _coverage_mode_for_run(self, run_id: str) -> CoverageMode:
+        decision = self._coverage_by_run.get(run_id)
+        return decision.mode if decision is not None else "experimental"
+
+    async def _finalize_candidate(
+        self,
+        run_id: str,
+        playbook: PlaybookScript,
+        quality_report: QualityReport,
+        *,
+        review_json: str,
+    ) -> bool:
+        if quality_report.status in {"repairable", "blocked"}:
+            await self._persist_quality_report(run_id, quality_report)
+            await self._repo.update(
+                run_id,
+                status=PipelineRunStatus.FAILED,
+                error=_humanize_quality_report(quality_report),
+                review_json=review_json,
+            )
+            return False
+
+        director_issue = await self._upsert_default_director(run_id, playbook)
+        if director_issue is not None:
+            quality_report = quality_report.with_issue(
+                director_issue,
+                action="director:persistence_failed",
+            )
+            await self._persist_quality_report(run_id, quality_report)
+            await self._repo.update(
+                run_id,
+                status=PipelineRunStatus.FAILED,
+                error=director_issue.message,
+                review_json=review_json,
+            )
+            return False
+
+        await self._persist_quality_report(run_id, quality_report)
+        await self._repo.update(
+            run_id,
+            status=PipelineRunStatus.SUCCEEDED,
+            playbook_json=playbook.model_dump_json(),
+            review_json=review_json,
+        )
+        return True
 
     async def _review_output(
         self,
@@ -1060,6 +1645,23 @@ def _blocking_playbook_review_issues(
     return [issue for issue in result.issues if issue.severity == PlaybookIssueSeverity.ERROR]
 
 
+def _build_agent_generation_prompt(
+    prompt: str,
+    lesson_plan: LessonPlan,
+    coverage_decision: CoverageDecision,
+) -> str:
+    return (
+        "[MetaView coverage decision]\n"
+        "BINDING read-only capability boundary. Respect mode, fallback_policy, "
+        "and missing_capabilities; do not invent unexecuted tool results.\n"
+        f"{coverage_decision.model_dump_json(indent=2)}\n\n"
+        "[MetaView LessonPlan]\n"
+        f"{lesson_plan.model_dump_json(indent=2)}\n\n"
+        "[user prompt]\n"
+        f"{prompt}"
+    )
+
+
 def _build_agent_self_repair_prompt(
     original_prompt: str,
     previous_payload: dict[str, Any] | None,
@@ -1111,6 +1713,228 @@ def _build_agent_repair_prompt(
         "PlaybookScript through the normal agent generation path:\n"
         f"{json.dumps(repair_payload, ensure_ascii=False, indent=2)}"
     )
+
+
+def _quality_report_with_review(
+    playbook: PlaybookScript,
+    prompt: str,
+    review: PlaybookReviewVerdict,
+    *,
+    generator_path: str,
+    coverage_decision: CoverageDecision,
+    lesson_plan: LessonPlan,
+) -> QualityReport:
+    canonical = quality_gate_playbook(
+        playbook,
+        prompt,
+        generator_path=generator_path,
+        coverage_mode=coverage_decision.mode,
+        coverage_decision=coverage_decision,
+        lesson_plan=lesson_plan,
+    )
+    unique: dict[tuple[str, str, str], PlaybookReviewIssue] = {}
+    for issue in [*canonical.issues, *review.issues]:
+        unique[(issue.code, issue.path, issue.message)] = issue
+    merged = playbook_review_verdict_from_issues(
+        list(unique.values()),
+        clean_summary="Playbook passed the canonical backend quality gate.",
+        warning_summary="Playbook passed the canonical backend quality gate with warnings.",
+        blocked_summary="Playbook failed the canonical backend quality gate.",
+        actions=list(review.actions),
+    )
+    return QualityReport.from_review_verdict(
+        merged,
+        generator_path=generator_path,
+        coverage_mode=coverage_decision.mode,
+        attempts=_playbook_repair_attempts(review.actions),
+    )
+
+
+def _quality_report_for_single(
+    playbook: PlaybookScript,
+    prompt: str,
+    review: CirReviewReport,
+    *,
+    coverage_decision: CoverageDecision,
+    lesson_plan: LessonPlan,
+) -> QualityReport:
+    report = quality_gate_playbook(
+        playbook,
+        prompt,
+        generator_path="generic_cir",
+        coverage_mode=coverage_decision.mode,
+        coverage_decision=coverage_decision,
+        lesson_plan=lesson_plan,
+    )
+    report.actions = list(review.actions)
+    report.attempts = review.attempts
+    return report
+
+
+def _playbook_repair_attempts(actions: list[str]) -> int:
+    return sum(
+        1
+        for action in actions
+        if action.startswith(
+            (
+                "agent:self_repair_attempt:",
+                "reviewer:repair_attempt:",
+                "quality:repair_attempt:",
+            )
+        )
+    )
+
+
+def _quality_issues_as_cir(
+    issues: list[PlaybookReviewIssue],
+) -> list[CirReviewIssue]:
+    return [
+        CirReviewIssue(
+            code=issue.code,
+            severity=(
+                ReviewSeverity.ERROR
+                if issue.severity == PlaybookIssueSeverity.ERROR
+                else ReviewSeverity.WARNING
+            ),
+            path=issue.path,
+            message=issue.message,
+            suggestion=issue.suggestion,
+        )
+        for issue in issues
+        if issue.severity == PlaybookIssueSeverity.ERROR
+    ]
+
+
+def _humanize_quality_report(report: QualityReport) -> str:
+    if not report.issues:
+        return "Pipeline output failed the canonical quality gate."
+    shown = report.issues[:5]
+    details = "; ".join(
+        f"{issue.code} at {issue.path}: {issue.message}" for issue in shown
+    )
+    suffix = "" if len(report.issues) <= 5 else f" (+{len(report.issues) - 5} more)"
+    return f"Canonical quality gate {report.status}: {details}{suffix}"
+
+
+def _mark_quality_repair_exhausted(report: QualityReport) -> QualityReport:
+    return report.with_issue(
+        PlaybookReviewIssue(
+            code="quality.repair_exhausted",
+            severity=PlaybookIssueSeverity.ERROR,
+            path="playbook",
+            message="Canonical quality repair attempts were exhausted.",
+            suggestion="Regenerate from a corrected prompt or fix the generator/compiler.",
+            requires_repair=False,
+        ),
+        action="quality:repair_exhausted",
+    )
+
+
+def _mark_quality_repair_unavailable(
+    report: QualityReport,
+    *,
+    message: str,
+) -> QualityReport:
+    return report.with_issue(
+        PlaybookReviewIssue(
+            code="quality.repair_unavailable",
+            severity=PlaybookIssueSeverity.ERROR,
+            path="playbook",
+            message=message,
+            suggestion="Fix the provider or generator failure before retrying.",
+            requires_repair=False,
+        ),
+        action="quality:repair_unavailable",
+    )
+
+
+def _terminal_quality_report(
+    *,
+    generator_path: str,
+    coverage_mode: CoverageMode,
+    code: str,
+    path: str,
+    message: str,
+    suggestion: str,
+    actions: list[str] | None = None,
+) -> QualityReport:
+    verdict = PlaybookReviewVerdict(
+        status=PlaybookReviewStatus.BLOCKED,
+        summary=message,
+        issues=[
+            PlaybookReviewIssue(
+                code=code,
+                severity=PlaybookIssueSeverity.ERROR,
+                path=path,
+                message=message,
+                suggestion=suggestion,
+                requires_repair=False,
+            )
+        ],
+        actions=list(actions or []),
+    )
+    return QualityReport.from_review_verdict(
+        verdict,
+        generator_path=generator_path,
+        coverage_mode=coverage_mode,
+    )
+
+
+def _quality_report_from_cir_failure(
+    report: CirReviewReport,
+    *,
+    generator_path: str,
+    coverage_mode: CoverageMode,
+) -> QualityReport:
+    issues = [
+        PlaybookReviewIssue(
+            code=_canonical_cir_quality_code(issue.code),
+            severity=(
+                PlaybookIssueSeverity.ERROR
+                if issue.severity == ReviewSeverity.ERROR
+                else PlaybookIssueSeverity.WARNING
+            ),
+            path=issue.path or "playbook",
+            message=issue.message,
+            suggestion=issue.suggestion,
+            requires_repair=False,
+        )
+        for issue in report.issues
+    ]
+    if not any(issue.severity == PlaybookIssueSeverity.ERROR for issue in issues):
+        issues.append(
+            PlaybookReviewIssue(
+                code="quality.generation_failed",
+                severity=PlaybookIssueSeverity.ERROR,
+                path="pipeline",
+                message="Generic CIR generation ended without a valid Playbook candidate.",
+                suggestion="Inspect the CIR output and retry generation.",
+                requires_repair=False,
+            )
+        )
+    verdict = playbook_review_verdict_from_issues(
+        issues,
+        clean_summary="Generic CIR generation failed.",
+        warning_summary="Generic CIR generation failed with warnings.",
+        blocked_summary="Generic CIR generation failed before candidate finalization.",
+        actions=list(report.actions),
+    )
+    return QualityReport.from_review_verdict(
+        verdict,
+        generator_path=generator_path,
+        coverage_mode=coverage_mode,
+        attempts=report.attempts,
+    )
+
+
+def _canonical_cir_quality_code(code: str) -> str:
+    normalized = re.sub(r"[^a-z0-9_]+", "_", code.strip().lower()).strip("_")
+    if "." in code and re.fullmatch(
+        r"[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+",
+        code,
+    ):
+        return code
+    return f"cir.{normalized or 'generation_failed'}"
 
 
 def try_parse_combined_output(raw: str) -> ParseResult:
@@ -1259,6 +2083,7 @@ def _route_review_actions(route_context: RouteContext, *, generator: str) -> lis
         f"router:confidence:{route.confidence:.2f}",
         f"router:fallback:{route_context.fallback}",
         f"generator:{generator}",
+        *_coverage_review_actions(route_context.coverage_decision),
     ]
     if route_context.router_model:
         actions.append(f"router:model:{route_context.router_model}")
@@ -1274,6 +2099,19 @@ def _route_review_actions(route_context: RouteContext, *, generator: str) -> lis
         actions.append("router:needs_refinement:true")
     if route.unsupported_reason:
         actions.append(f"router:unsupported:{route.unsupported_reason}")
+    return actions
+
+
+def _coverage_review_actions(decision: CoverageDecision) -> list[str]:
+    actions = [
+        f"coverage:mode:{decision.mode}",
+        f"coverage:fallback:{decision.fallback_policy}",
+        f"coverage:confidence:{decision.confidence:.2f}",
+    ]
+    if decision.domain:
+        actions.append(f"coverage:domain:{decision.domain}")
+    actions.extend(f"coverage:skill:{skill_id}" for skill_id in decision.matched_skill_ids)
+    actions.extend(f"coverage:missing:{item}" for item in decision.missing_capabilities)
     return actions
 
 

@@ -83,6 +83,8 @@ def test_ops_dashboard_aggregates_global_metrics_and_recent_rows(
     db = _db(tmp_path, "aggregate.db")
     admin = _session(db, role="admin", balance_cents=400)
     user = _session(db, role="user", balance_cents=900)
+    guest = _session(db, role="user", balance_cents=0)
+    _set_login_provider(db, guest.account.user_id, "guest")
     _seed_dashboard_data(db, user.account.user_id)
 
     with _client(monkeypatch, db) as client:
@@ -96,6 +98,9 @@ def test_ops_dashboard_aggregates_global_metrics_and_recent_rows(
     assert data["window_days"] == 7
     assert len(data["run_trend"]) == 7
     assert len(data["revenue_trend"]) == 7
+    assert _metric(data, "users")["value"] == "2"
+    assert _metric(data, "users")["helper"] == "近窗新增 2，活跃 1，管理员 1"
+    assert sum(_metric(data, "users")["data"]) == 2
     assert data["run_trend"][0] == {
         "date": _day(6),
         "total": 0,
@@ -273,6 +278,15 @@ def _seed_dashboard_data(db: str, user_id: str) -> None:
                 ("ledger-refund", user_id, None, 5, "refund", _iso(1)),
                 ("ledger-old", user_id, None, 10, "consume", _iso(20)),
             ],
+        )
+        conn.commit()
+
+
+def _set_login_provider(db: str, user_id: str, login_provider: str) -> None:
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            "UPDATE accounts SET login_provider = ?, wechat_openid = NULL WHERE user_id = ?",
+            (login_provider, user_id),
         )
         conn.commit()
 

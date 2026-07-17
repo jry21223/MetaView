@@ -11,6 +11,13 @@ math explanations that were not fully handled by deterministic SkillPacks.
   `math_formula`.
 - For monotonicity, orientation, tangent, or point-on-curve claims, rely on the
   corresponding validator/tool result when available.
+- For a derivative-as-tangent lesson, use repeated `math_plot` snapshots with
+  the original curve, an actual linear secant/tangent expression, and
+  `marker_x` at the target point. Label the tangent curve with
+  `semantic_role: tangent`, state the derivative/slope value in the final
+  narration, and record `derivative_tangent` in
+  `initial_data.scene_blueprint`.
+  Use `pack_id: math-basic` and `asset_id: derivative-tangent-preset`.
 
 ## Teaching Pattern
 

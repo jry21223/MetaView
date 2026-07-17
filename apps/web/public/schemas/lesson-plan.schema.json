@@ -1,0 +1,157 @@
+{
+  "$defs": {
+    "SceneIntent": {
+      "additionalProperties": false,
+      "description": "One pedagogical decision, without renderer or layout details.",
+      "properties": {
+        "scene_id": {
+          "minLength": 1,
+          "title": "Scene Id",
+          "type": "string"
+        },
+        "teaching_goal": {
+          "minLength": 1,
+          "title": "Teaching Goal",
+          "type": "string"
+        },
+        "strategy": {
+          "enum": [
+            "intuition",
+            "demonstration",
+            "derivation",
+            "comparison",
+            "state_transition",
+            "summary"
+          ],
+          "title": "Strategy",
+          "type": "string"
+        },
+        "required_fact_ids": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Required Fact Ids",
+          "type": "array"
+        },
+        "required_visual_roles": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Required Visual Roles",
+          "type": "array"
+        },
+        "preferred_scene_type": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Preferred Scene Type"
+        },
+        "narration_goal": {
+          "minLength": 1,
+          "title": "Narration Goal",
+          "type": "string"
+        }
+      },
+      "required": [
+        "scene_id",
+        "teaching_goal",
+        "strategy",
+        "required_fact_ids",
+        "required_visual_roles",
+        "preferred_scene_type",
+        "narration_goal"
+      ],
+      "title": "SceneIntent",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Renderer-independent teaching plan shared by every generation path.",
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "domain": {
+      "minLength": 1,
+      "title": "Domain",
+      "type": "string"
+    },
+    "title": {
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "learning_objectives": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Learning Objectives",
+      "type": "array"
+    },
+    "prerequisites": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Prerequisites",
+      "type": "array"
+    },
+    "misconceptions": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Misconceptions",
+      "type": "array"
+    },
+    "expected_conclusion": {
+      "minLength": 1,
+      "title": "Expected Conclusion",
+      "type": "string"
+    },
+    "lesson_arc": {
+      "enum": [
+        "intuition_to_abstraction",
+        "problem_to_solution",
+        "state_transition",
+        "comparison",
+        "derivation"
+      ],
+      "title": "Lesson Arc",
+      "type": "string"
+    },
+    "scenes": {
+      "items": {
+        "$ref": "#/$defs/SceneIntent"
+      },
+      "minItems": 1,
+      "title": "Scenes",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "domain",
+    "title",
+    "learning_objectives",
+    "prerequisites",
+    "misconceptions",
+    "expected_conclusion",
+    "lesson_arc",
+    "scenes"
+  ],
+  "title": "LessonPlan",
+  "type": "object"
+}

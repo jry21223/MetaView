@@ -10,12 +10,17 @@ import { appearTransform, useTimeline } from "../foundation";
 import { compileVisualTimeline, type VisualLayerState, type VisualStepState } from "./visualContinuity";
 import { snapshotSurface } from "./snapshotSurface";
 import { buildDirectorFramePlan } from "../director";
+import { AssetSvg } from "../assets/AssetSvg";
+import { visualQualityGate } from "../assets/visualQualityGate";
+import { assetAttributionEntryId, createAssetAttributionSummary } from "../assets/assetAttributionSummary";
 
 interface PlaybookCompositionProps {
   script: PlaybookScript;
   director?: DirectorScript | null;
   theme?: "dark" | "light";
   showSubtitles?: boolean;
+  /** Render diagnostic metadata and warning overlays for teacher/review surfaces. */
+  showDiagnostics?: boolean;
   showInlineCode?: boolean;
   /** Total frames for the bar-swap animation; forwarded to renderers. */
   swapDurationFrames?: number;
@@ -44,6 +49,37 @@ function SnapshotRenderer(props: RendererProps) {
     >
       Unknown snapshot kind
     </div>
+  );
+}
+
+function VisualQualityWarningIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      data-visual-quality-warning-icon="true"
+      viewBox="0 0 36 32"
+      style={{
+        position: "absolute",
+        top: 10,
+        right: 10,
+        width: 36,
+        height: 32,
+        zIndex: 30,
+        pointerEvents: "none",
+        opacity: 0.9,
+        filter: "drop-shadow(0 2px 6px rgba(0, 0, 0, 0.26))",
+      }}
+    >
+      <AssetSvg
+        assetId="core-warning-icon"
+        packId="core-visual-basic"
+        semanticRole="warning"
+        x={4}
+        y={2}
+        width={28}
+        height={28}
+      />
+    </svg>
   );
 }
 
@@ -187,13 +223,25 @@ function SceneCompositor({
 export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
   script,
   director = null,
-  theme = "dark",
+  theme = "light",
   showSubtitles = true,
+  showDiagnostics = false,
   showInlineCode = false,
   swapDurationFrames,
 }) => {
   const frame = useCurrentFrame();
   const visualTimeline = React.useMemo(() => compileVisualTimeline(script), [script]);
+  const visualQualityWarnings = React.useMemo(() => visualQualityGate(script), [script]);
+  const assetAttributionSummary = React.useMemo(
+    () => createAssetAttributionSummary(visualQualityWarnings),
+    [visualQualityWarnings],
+  );
+
+  React.useEffect(() => {
+    if (showDiagnostics && visualQualityWarnings.length > 0) {
+      console.warn("[MetaView visualQualityGate]", visualQualityWarnings);
+    }
+  }, [showDiagnostics, visualQualityWarnings]);
 
   const stepIndex = script.steps.findIndex((s) => frame < s.end_frame);
   const activeIndex = stepIndex === -1 ? script.steps.length - 1 : stepIndex;
@@ -261,7 +309,31 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
   };
 
   return (
-    <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
+    <div
+      data-visual-quality-warning-count={showDiagnostics ? visualQualityWarnings.length || undefined : undefined}
+      data-visual-quality-warning-codes={
+        showDiagnostics && visualQualityWarnings.length ? visualQualityWarnings.map((warning) => warning.code).join(",") : undefined
+      }
+      data-visual-quality-warning-steps={
+        showDiagnostics && visualQualityWarnings.length ? visualQualityWarnings.map((warning) => warning.step_id).join(",") : undefined
+      }
+      data-asset-attribution-count={assetAttributionSummary.attributionRequired.length || undefined}
+      data-asset-attribution-ids={
+        assetAttributionSummary.attributionRequired.length
+          ? assetAttributionSummary.attributionRequired.map(assetAttributionEntryId).join(",")
+          : undefined
+      }
+      data-asset-license-risk-count={assetAttributionSummary.licenseRisk.length || undefined}
+      data-asset-license-risk-ids={
+        assetAttributionSummary.licenseRisk.length
+          ? assetAttributionSummary.licenseRisk.map(assetAttributionEntryId).join(",")
+          : undefined
+      }
+      data-asset-attribution-summary={
+        assetAttributionSummary.entries.length ? JSON.stringify(assetAttributionSummary.entries) : undefined
+      }
+      style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}
+    >
       {/* Main content area */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
         {/* Visual track */}
@@ -270,6 +342,7 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
             width: hasCodeTrack ? `${vizRatio * 100}%` : "100%",
             height: "100%",
             overflow: "hidden",
+            position: "relative",
             background: visualBackground,
           }}
         >
@@ -294,6 +367,7 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
               frame={frame}
             />
           </div>
+          {showDiagnostics && visualQualityWarnings.length > 0 ? <VisualQualityWarningIcon /> : null}
         </div>
 
         {/* Code track */}

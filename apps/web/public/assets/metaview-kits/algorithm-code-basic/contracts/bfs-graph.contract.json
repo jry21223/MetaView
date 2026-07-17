@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "bfs-graph-contract",
+  "sceneTemplate": "bfs_graph",
+  "rendererKind": "graph_scene",
+  "packId": "algorithm-code-basic",
+  "presetAssetId": "bfs-graph-preset",
+  "requiredAssetIds": ["bfs-graph-preset", "graph-node", "visited-node", "queue-frame", "edge-active"],
+  "requiredStates": ["current", "visited", "queue", "active_edge"],
+  "minimumNodeCount": 5,
+  "minimumEdgeCount": 5,
+  "caption": "BFS graph must render graph structure, queue state, visited state, and active edge assets."
+}

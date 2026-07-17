@@ -1,4 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  matchPath,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import { ErrorBoundary } from "../shared/ui/ErrorBoundary";
 import { useAccount } from "../features/account";
 import { fetchWeChatLoginUrl } from "../features/account/api/accountApi";
@@ -11,9 +19,8 @@ import {
 } from "../features/studio-editor/hooks/useTweaks";
 import {
   IntakeScreen,
-  IntakeContext,
+  type IntakeContext,
 } from "../features/studio-editor/ui/IntakeScreen";
-import { TweaksPanel } from "../features/studio-editor/ui/TweaksPanel";
 import { StudioPage } from "../pages/Studio/StudioPage";
 import { HistoryPage } from "../pages/History/HistoryPage";
 import { TemplatesPage } from "../pages/Templates/TemplatesPage";
@@ -26,19 +33,38 @@ import {
   type Stage,
 } from "../shared/ui/GlobalTopbar";
 import { useVisualViewportHeight } from "../shared/hooks/useVisualViewportHeight";
+import { pathToStage, stageToPath } from "./routes";
 import { shouldCollapseWorkbenchTopbarByDefault } from "./workbenchChrome";
+
+function initialTopbarCollapsed(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    pathToStage(window.location.pathname) === "workbench" &&
+    shouldCollapseWorkbenchTopbarByDefault()
+  );
+}
+
+function promptFromLocationState(state: unknown): string {
+  if (!state || typeof state !== "object") return "";
+  const prompt = (state as { prompt?: unknown }).prompt;
+  return typeof prompt === "string" ? prompt : "";
+}
 
 export function OpsAppShell() {
   useVisualViewportHeight();
 
+  const location = useLocation();
+  const routerNavigate = useNavigate();
+  const stage = pathToStage(location.pathname);
+  const activeRunId =
+    matchPath("/run/:runId", location.pathname)?.params.runId ?? null;
+  const intakePrompt = stage === "intake" ? promptFromLocationState(location.state) : "";
+
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const [stage, setStage] = useState<Stage>("intake");
-  const [topbarCollapsed, setTopbarCollapsed] = useState(false);
+  const [topbarCollapsed, setTopbarCollapsed] = useState(initialTopbarCollapsed);
   const [accountModalOpen, setAccountModalOpen] = useState(false);
-  const [openedRunId, setOpenedRunId] = useState<string | null>(null);
   const {
     submit,
-    runId,
     isSubmitting,
     error: submitError,
   } = usePipelineSubmit();
@@ -55,16 +81,25 @@ export function OpsAppShell() {
   const effectiveTopbarCollapsed = stage === "workbench" && topbarCollapsed;
   const toggleTheme = () =>
     setTweak("theme", mode === "dark" ? "light" : "dark");
+  const openAccountPanel = () => setAccountModalOpen(true);
+
   const navigate = (nextStage: Stage) => {
-    if (nextStage !== "workbench") setTopbarCollapsed(false);
-    setStage(nextStage);
-  };
-  const enterWorkbench = () => {
-    setTopbarCollapsed(shouldCollapseWorkbenchTopbarByDefault());
-    setStage("workbench");
+    if (nextStage !== "workbench") {
+      setTopbarCollapsed(false);
+    }
+    routerNavigate(stageToPath(nextStage, activeRunId));
   };
 
-  const openAccountPanel = () => setAccountModalOpen(true);
+  const enterRun = (nextRunId: string) => {
+    setTopbarCollapsed(shouldCollapseWorkbenchTopbarByDefault());
+    routerNavigate(stageToPath("workbench", nextRunId));
+  };
+
+  useEffect(() => {
+    if (stage === "intake" && intakePrompt) {
+      routerNavigate("/create", { replace: true, state: null });
+    }
+  }, [stage, intakePrompt, routerNavigate]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
@@ -86,33 +121,47 @@ export function OpsAppShell() {
 
   const submitWithPlatformProvider = async (
     prompt: string,
-    domain?: string | null,
-    sourceCode?: string,
-    language?: string,
-  ) => {
-    await submit({ prompt, domain, sourceCode, language });
-  };
+    sourceCode?: string | null,
+    language?: string | null,
+    sourceFilename?: string | null,
+    sourceSizeBytes?: number | null,
+  ): Promise<string> =>
+    submit({
+      prompt,
+      sourceCode,
+      language,
+      sourceFilename,
+      sourceSizeBytes,
+    });
 
   const handleSubmit = async (ctx: IntakeContext) => {
-    setOpenedRunId(null);
-    await submitWithPlatformProvider(
-      ctx.raw || ctx.title,
-      ctx.domain,
+    const nextRunId = await submitWithPlatformProvider(
+      ctx.prompt,
       ctx.sourceCode,
       ctx.language,
+      ctx.sourceFilename,
+      ctx.sourceSizeBytes,
     );
-    enterWorkbench();
+    enterRun(nextRunId);
+  };
+
+  const handleResubmitPrompt = async (prompt: string) => {
+    const nextRunId = await submitWithPlatformProvider(prompt);
+    enterRun(nextRunId);
+  };
+
+  const handleEditPrompt = (prompt: string) => {
+    setTopbarCollapsed(false);
+    routerNavigate("/create", { state: { prompt } });
   };
 
   const handleUseTemplate = async (prompt: string) => {
-    setOpenedRunId(null);
-    await submitWithPlatformProvider(prompt, null);
-    enterWorkbench();
+    const nextRunId = await submitWithPlatformProvider(prompt);
+    enterRun(nextRunId);
   };
 
   const handleOpenHistoryRun = (historyRunId: string) => {
-    setOpenedRunId(historyRunId);
-    enterWorkbench();
+    enterRun(historyRunId);
   };
 
   const isLoggedIn = accountStatus === "authenticated" && account?.login_provider === "wechat";
@@ -163,57 +212,73 @@ export function OpsAppShell() {
         />
       </GlobalTopbarShell>
 
-      {stage === "intake" && (
-        <IntakeScreen
-          onSubmit={handleSubmit}
-          isSubmitting={isSubmitting}
-          submitError={submitError}
+      <Routes>
+        <Route
+          path="/create"
+          element={
+            <IntakeScreen
+              onSubmit={handleSubmit}
+              isSubmitting={isSubmitting}
+              submitError={submitError}
+              initialPrompt={intakePrompt}
+            />
+          }
         />
-      )}
-
-      {stage === "workbench" && (
-        <ErrorBoundary theme={mode}>
-          <StudioPage
-            appEdition="ops"
-            runId={openedRunId ?? runId}
-            t={t}
-            onNavigate={navigate}
-            isProviderConfigured
-            onOpenProviderSettings={openAccountPanel}
-            topbarCollapsed={effectiveTopbarCollapsed}
-            onToggleTopbar={() => setTopbarCollapsed((value) => !value)}
-          />
-        </ErrorBoundary>
-      )}
-
-      {stage === "history" && (
-        <ErrorBoundary theme={mode}>
-          <HistoryPage
-            t={t}
-            onOpenInWorkbench={handleOpenHistoryRun}
-          />
-        </ErrorBoundary>
-      )}
-
-      {stage === "templates" && (
-        <ErrorBoundary theme={mode}>
-          <TemplatesPage
-            onUseTemplate={handleUseTemplate}
-          />
-        </ErrorBoundary>
-      )}
-
-      {stage === "settings" && (
-        <ErrorBoundary theme={mode}>
-          <SettingsPage
-            appEdition="ops"
-            tweaks={t}
-            setTweak={setTweak}
-          />
-        </ErrorBoundary>
-      )}
-
-      <TweaksPanel t={t} setTweak={setTweak} />
+        <Route
+          path="/run/:runId"
+          element={
+            <ErrorBoundary theme={mode}>
+              <StudioPage
+                appEdition="ops"
+                runId={activeRunId}
+                t={t}
+                onNavigate={navigate}
+                isProviderConfigured
+                onOpenProviderSettings={openAccountPanel}
+                onResubmitPrompt={(prompt) => void handleResubmitPrompt(prompt)}
+                onEditPrompt={handleEditPrompt}
+                topbarCollapsed={effectiveTopbarCollapsed}
+                onToggleTopbar={() => setTopbarCollapsed((value) => !value)}
+              />
+            </ErrorBoundary>
+          }
+        />
+        <Route path="/run" element={<Navigate to="/create" replace />} />
+        <Route
+          path="/history"
+          element={
+            <ErrorBoundary theme={mode}>
+              <HistoryPage
+                t={t}
+                onOpenInWorkbench={handleOpenHistoryRun}
+              />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/templates"
+          element={
+            <ErrorBoundary theme={mode}>
+              <TemplatesPage
+                onUseTemplate={(prompt) => void handleUseTemplate(prompt)}
+              />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ErrorBoundary theme={mode}>
+              <SettingsPage
+                appEdition="ops"
+                tweaks={t}
+                setTweak={setTweak}
+              />
+            </ErrorBoundary>
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
 
       {accountModalOpen && (
         <RechargeModal
@@ -291,7 +356,7 @@ function OpsLoginGate({
           <div className="mv-avatar">MV</div>
         </div>
       </header>
-      <main className="mv-intake-body">
+      <main className="mv-intake-body mv-login-gate">
         <section className="mv-intake-hero">
           <div className="mv-eyebrow-mini">运营版</div>
           <h1 className="mv-intake-title">微信登录后继续使用</h1>
@@ -305,7 +370,7 @@ function OpsLoginGate({
           <div className="mv-settings-actions">
             <button
               type="button"
-              className="mv-send mv-intake-send"
+              className="mv-send mv-intake-send mv-login-gate__button"
               disabled={!loginUrl || isCheckingLogin}
               onClick={() => {
                 if (loginUrl) window.location.assign(loginUrl);

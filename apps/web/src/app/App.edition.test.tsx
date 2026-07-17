@@ -23,7 +23,7 @@ describe("App edition shells", () => {
     window.history.pushState({}, "", "/");
   });
 
-  it("self edition does not load account state on the intake screen", async () => {
+  it("self edition keeps the public landing route independent from account state", async () => {
     let accountHits = 0;
     let opsHits = 0;
     server.use(
@@ -45,28 +45,29 @@ describe("App edition shells", () => {
     vi.stubEnv("VITE_APP_EDITION", "self");
 
     const { App } = await import("./App");
-    const { container } = render(<App />);
-    expect(container.textContent).toContain("MetaView");
-    expect(container.querySelectorAll(".mv-top")).toHaveLength(1);
+    const { container, getByText } = render(<App />);
 
+    expect(getByText("把一道题，变成一段看得见的理解过程。")).toBeTruthy();
+    expect(container.querySelectorAll(".mv-landing-header")).toHaveLength(1);
+    expect(container.querySelectorAll(".mv-top")).toHaveLength(0);
     expect(accountHits).toBe(0);
     expect(opsHits).toBe(0);
   }, 20000);
 
-  it("self edition shows the canvas particle field on the intake screen", async () => {
+  it("public landing uses one calm lesson canvas without debug controls", async () => {
     vi.stubEnv("VITE_APP_EDITION", "self");
 
     const { App } = await import("./App");
-    const { container } = render(<App />);
+    const { container, queryByLabelText } = render(<App />);
 
     expect(container.textContent).toContain("MetaView");
-    expect(
-      container.querySelector('[data-testid="meta-particle-field"][data-variant="canvas"]'),
-    ).toBeTruthy();
+    expect(container.querySelectorAll(".mv-lesson-canvas--hero")).toHaveLength(1);
+    expect(container.querySelectorAll('[data-testid="meta-particle-field"]')).toHaveLength(0);
     expect(container.querySelector('[aria-label="MetaView logo animation"]')).toBeNull();
+    expect(queryByLabelText("打开设计调节面板")).toBeNull();
   }, 10000);
 
-  it("ops edition shows the login gate when account session is missing", async () => {
+  it("ops edition shows the login gate when account session is missing on /create", async () => {
     let accountHits = 0;
     server.use(
       http.get(`${API_BASE_URL}/api/v1/account/me`, () => {
@@ -78,6 +79,7 @@ describe("App edition shells", () => {
       }),
     );
     vi.stubEnv("VITE_APP_EDITION", "ops");
+    window.history.pushState({}, "", "/create");
 
     const { App } = await import("./App");
     const { container } = render(<App />);
@@ -86,7 +88,15 @@ describe("App edition shells", () => {
     await waitFor(() =>
       expect(container.textContent).toContain("登录暂未开放"),
     );
-    expect(container.textContent).not.toContain("把一道题变成可播放的理论画布");
+    expect(
+      container.querySelector(".mv-login-gate__button")?.classList.contains(
+        "mv-intake-send",
+      ),
+    ).toBe(true);
+    expect(
+      container.querySelector<HTMLButtonElement>(".mv-login-gate__button")?.disabled,
+    ).toBe(true);
+    expect(container.textContent).not.toContain("把一道题，变成一段看得见的理解过程。");
   });
 
   it("ops edition opens the intake screen after WeChat login", async () => {
@@ -115,13 +125,14 @@ describe("App edition shells", () => {
       }),
     );
     vi.stubEnv("VITE_APP_EDITION", "ops");
+    window.history.pushState({}, "", "/create");
 
     const { App } = await import("./App");
     const { container } = render(<App />);
 
     await waitFor(() => expect(accountHits).toBe(1));
     await waitFor(() => expect(dashboardHits).toBe(0));
-    expect(container.textContent).toContain("输入题目或代码，生成可播放的分步讲解");
+    expect(container.textContent).toContain("新建可视化讲解");
     expect(container.textContent).not.toContain("全局运营");
     expect(container.textContent).toContain("微信用户 · ¥ 5.00");
     expect(container.querySelectorAll(".mv-top")).toHaveLength(1);
@@ -137,7 +148,7 @@ describe("App edition shells", () => {
     vi.stubEnv("VITE_APP_EDITION", "self");
     vi.doMock("../features/pipeline/hooks/usePipelineSubmit", () => ({
       usePipelineSubmit: () => ({
-        submit: vi.fn().mockResolvedValue(undefined),
+        submit: vi.fn().mockResolvedValue("run-shell"),
         runId: "run-shell",
         isSubmitting: false,
         error: null,
@@ -152,16 +163,19 @@ describe("App edition shells", () => {
         status: "succeeded",
       }),
     }));
+    window.history.pushState({}, "", "/create");
 
     const { App } = await import("./App");
     const { container, getByRole, getByText } = render(<App />);
 
     expect(container.querySelectorAll(".mv-top")).toHaveLength(1);
-    fireEvent.click(getByRole("button", { name: /数学题/ }));
+    fireEvent.click(getByRole("button", { name: /二分查找/ }));
+    fireEvent.click(getByRole("button", { name: "生成讲解" }));
 
     await waitFor(() =>
       expect(getByRole("button", { name: "显示顶部栏" })).toBeTruthy(),
     );
+    expect(window.location.pathname).toBe("/run/run-shell");
     const shell = container.querySelector(".mv-top-shell");
     expect(shell).toBeTruthy();
     expect(container.querySelectorAll(".mv-top")).toHaveLength(1);

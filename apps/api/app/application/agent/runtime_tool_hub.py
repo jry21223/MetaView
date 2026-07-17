@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
 from dataclasses import asdict
+from functools import lru_cache
+from pathlib import Path
 from typing import Any, TypeVar
 
 from pydantic import BaseModel, Field, FiniteFloat, StrictStr, ValidationError
@@ -13,11 +16,27 @@ from app.domain.services.geometry_validators import (
     check_orientation,
     check_point_on_curve,
 )
+from app.domain.services.metaview_core import MetaViewCoreService
 from app.domain.services.playbook_quality import self_check_playbook
+from app.domain.services.scene_blueprint_compiler import compile_scene_blueprint_to_playbook
+from app.domain.services.scene_blueprint_schema import (
+    scene_blueprint_schema_metadata,
+    scene_blueprint_tool_schema,
+    validate_scene_blueprint,
+)
 from app.domain.skills.base import SkillExecutionContext, SkillRouteInput, SkillRouteMatch
 from app.domain.skills.registry import SkillRegistry, build_default_skill_registry
 
 ArgModelT = TypeVar("ArgModelT", bound=BaseModel)
+
+ASSET_MANIFEST_ROOT = (
+    Path(__file__).resolve().parents[5]
+    / "apps"
+    / "web"
+    / "public"
+    / "assets"
+    / "metaview-kits"
+)
 
 
 class _OrientationArgs(BaseModel):
@@ -79,6 +98,22 @@ class RuntimeToolHub:
                     "required": ["playbook", "prompt"],
                 },
                 domain="playbook",
+                deterministic=True,
+            ),
+            ToolManifest(
+                name="scene_blueprint.compile",
+                description=(
+                    "Compile a controlled SceneBlueprint into a renderer-ready "
+                    "PlaybookScript."
+                ),
+                args_schema={
+                    "type": "object",
+                    "properties": {
+                        "blueprint": scene_blueprint_tool_schema(),
+                    },
+                    "required": ["blueprint"],
+                },
+                domain="scene_blueprint",
                 deterministic=True,
             ),
             ToolManifest(
@@ -167,6 +202,8 @@ class RuntimeToolHub:
             return self._validate_playbook(name, args)
         if name == "playbook.self_check":
             return self._self_check_playbook(name, args)
+        if name == "scene_blueprint.compile":
+            return self._compile_scene_blueprint(name, args)
         if name == "animation_tool.list":
             return self._ok(name, {
                 "tools": [tool.model_dump(mode="json") for tool in list_animation_tools()]
@@ -340,6 +377,55 @@ class RuntimeToolHub:
         verdict = self_check_playbook(playbook, str(args.get("prompt", "")))
         return self._ok(name, verdict.model_dump(mode="json"))
 
+    def _compile_scene_blueprint(
+        self,
+        name: str,
+        args: dict[str, Any],
+    ) -> ToolExecutionResult:
+        blueprint = args.get("blueprint")
+        if not isinstance(blueprint, dict):
+            return self._error(
+                name,
+                "scene_blueprint.invalid_args",
+                "scene_blueprint.compile requires a blueprint object.",
+            )
+        schema_errors = validate_scene_blueprint(blueprint)
+        if schema_errors:
+            return self._error(
+                name,
+                "scene_blueprint.schema_invalid",
+                "SceneBlueprint schema validation failed.",
+                {"errors": schema_errors},
+            )
+        try:
+            playbook = compile_scene_blueprint_to_playbook(blueprint)
+        except (ValueError, ValidationError) as exc:
+            return self._error(
+                name,
+                "scene_blueprint.compile_failed",
+                str(exc),
+            )
+        playbook_json = playbook.model_dump(mode="json")
+        self_check = self_check_playbook(
+            playbook,
+            str(args.get("prompt") or blueprint.get("caption") or blueprint.get("title") or ""),
+        )
+        visual_quality = _metaview_core().validate_visual_quality(
+            playbook_script=playbook_json,
+        )
+        return self._ok(
+            name,
+            {
+                "valid": True,
+                "sceneType": blueprint.get("sceneType"),
+                "scene_blueprint": blueprint,
+                "scene_blueprint_schema": scene_blueprint_schema_metadata(valid=True),
+                "playbook": playbook_json,
+                "self_check": self_check.model_dump(mode="json"),
+                "visual_quality": visual_quality,
+            },
+        )
+
     def _ok(self, tool: str, result: Any) -> ToolExecutionResult:
         return ToolExecutionResult(tool=tool, ok=True, result=result)
 
@@ -362,3 +448,11 @@ def _dict_arg(value: Any) -> dict[str, Any]:
 
 def _optional_str(value: Any) -> str | None:
     return value if isinstance(value, str) else None
+
+
+@lru_cache
+def _metaview_core() -> MetaViewCoreService:
+    asset_packs: list[dict[str, Any]] = []
+    for manifest_path in sorted(ASSET_MANIFEST_ROOT.glob("*/manifest.json")):
+        asset_packs.append(json.loads(manifest_path.read_text(encoding="utf-8")))
+    return MetaViewCoreService(asset_packs=asset_packs)

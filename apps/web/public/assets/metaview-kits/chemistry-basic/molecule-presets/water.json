@@ -1,0 +1,22 @@
+{
+  "id": "water",
+  "source": "structured-preset",
+  "formula": "H2O",
+  "formulaLatex": "H_2O",
+  "geometry": "bent",
+  "caption": "Water is a bent polar molecule loaded from the chemistry-basic structured preset.",
+  "atoms": [
+    { "id": "o", "element": "O", "x": 50, "y": 42, "label": "oxygen" },
+    { "id": "h1", "element": "H", "x": 35, "y": 62, "label": "hydrogen" },
+    { "id": "h2", "element": "H", "x": 65, "y": 62, "label": "hydrogen" }
+  ],
+  "bonds": [
+    { "id": "oh1", "from": "o", "to": "h1", "order": 1, "label": "O-H bond" },
+    { "id": "oh2", "from": "o", "to": "h2", "order": 1, "label": "O-H bond" }
+  ],
+  "callouts": [
+    { "id": "water-bent-geometry", "target_id": "o", "label": "bent geometry", "side": "top" },
+    { "id": "water-polar-bond", "target_id": "h2", "label": "polar bonds", "side": "right" }
+  ],
+  "notes": "Internal deterministic 2D teaching preset; not a rendered molecule image."
+}

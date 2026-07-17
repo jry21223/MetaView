@@ -62,7 +62,7 @@ export function GlobalTopbar({
   hidePrimaryNav = false,
 }: GlobalTopbarProps) {
   const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
-  const isHome = stage === "workbench" || stage === "intake";
+  const isWorkbench = stage === "workbench" || stage === "intake";
   const isHistory = stage === "history";
   const isTemplates = stage === "templates";
   const isSettings = stage === "settings";
@@ -80,7 +80,7 @@ export function GlobalTopbar({
   return (
     <header className="mv-top">
       <div className="mv-brand">
-        <span className="mv-brand-strip" />
+        <img className="mv-brand-strip" src="/brand/metaview-mark.svg" alt="" />
         <span className="mv-brand-copy">
           <span className="mv-brand-name">MetaView</span>
           <span className="mv-brand-meta">THEORETICAL CANVAS</span>
@@ -90,15 +90,17 @@ export function GlobalTopbar({
       {!hidePrimaryNav && (
         <nav className="mv-nav">
           <button
-            className={`mv-nav-item ${isHome ? "is-active" : ""}`}
-            aria-current={isHome ? "page" : undefined}
+            className={`mv-nav-item ${isWorkbench ? "is-active" : ""}`}
+            aria-current={isWorkbench ? "page" : undefined}
             onClick={() => onNavigate("intake")}
             type="button"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-              <path d="M4 10.5 12 4l8 6.5V20H5v-7" />
+              <path d="M5 5h14v14H5z" />
+              <path d="M9 5v14" />
+              <path d="M9 10h10" />
             </svg>
-            首页
+            工作台
           </button>
           <button
             className={`mv-nav-item ${isHistory ? "is-active" : ""}`}
@@ -150,9 +152,25 @@ export function GlobalTopbar({
             {appEdition === "ops" ? "¥" : <ProviderSettingsIcon />}
           </button>
         )}
-        <div className="mv-status">
-          {appEdition === "ops" ? (
-            accountBalanceYuan != null ? (
+        {(appEdition === "ops" ||
+          accountBalanceYuan != null ||
+          isProviderConfigured) && (
+          <div className="mv-status">
+            {appEdition === "ops" ? (
+              accountBalanceYuan != null ? (
+                <>
+                  <span className="mv-pulse" />
+                  <span>
+                    {accountName ?? "ACCOUNT"} · ¥ {accountBalanceYuan}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="mv-pulse" />
+                  <span>账户同步中</span>
+                </>
+              )
+            ) : accountBalanceYuan != null ? (
               <>
                 <span className="mv-pulse" />
                 <span>
@@ -160,30 +178,15 @@ export function GlobalTopbar({
                 </span>
               </>
             ) : (
-              <>
-                <span className="mv-pulse" />
-                <span>账户同步中</span>
-              </>
-            )
-          ) : accountBalanceYuan != null ? (
-            <>
-              <span className="mv-pulse" />
-              <span>
-                {accountName ?? "ACCOUNT"} · ¥ {accountBalanceYuan}
-              </span>
-            </>
-          ) : isProviderConfigured ? (
-            <>
-              <span className="mv-pulse" />
-              <span>模型已配置</span>
-            </>
-          ) : (
-            <>
-              <span className="mv-pulse-offline" />
-              <span>未配置模型</span>
-            </>
-          )}
-        </div>
+              <span
+                className="mv-pulse"
+                role="img"
+                title="模型已配置"
+                aria-label="模型已配置"
+              />
+            )}
+          </div>
+        )}
         <button
           className="mv-icon-btn"
           title="切换主题"
@@ -208,17 +211,18 @@ export function GlobalTopbar({
             </svg>
           )}
         </button>
-        {avatarUrl ? (
-          <img
-            className="mv-avatar mv-avatar-img"
-            src={avatarUrl}
-            alt={`${accountName ?? "微信用户"}头像`}
-            referrerPolicy="no-referrer"
-            onError={() => setFailedAvatarUrl(avatarUrl)}
-          />
-        ) : (
-          <div className="mv-avatar">MV</div>
-        )}
+        {appEdition === "ops" &&
+          (avatarUrl ? (
+            <img
+              className="mv-avatar mv-avatar-img"
+              src={avatarUrl}
+              alt={`${accountName ?? "微信用户"}头像`}
+              referrerPolicy="no-referrer"
+              onError={() => setFailedAvatarUrl(avatarUrl)}
+            />
+          ) : (
+            <div className="mv-avatar">MV</div>
+          ))}
       </div>
     </header>
   );

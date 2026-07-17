@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "reaction-synthesis-water-contract",
+  "reactionId": "reaction_synthesis_water",
+  "arrowAssetId": "reaction-arrow",
+  "electronFlowAssetId": "electron-flow",
+  "reactantFormulas": ["H_2", "O_2"],
+  "productFormulas": ["H_2O"],
+  "formulaLatex": "2H_2 + O_2 \\rightarrow 2H_2O",
+  "reactants": [
+    { "id": "h2", "formulaLatex": "H_2", "label": "hydrogen", "coefficient": 2, "x": 18, "y": 48 },
+    { "id": "o2", "formulaLatex": "O_2", "label": "oxygen", "coefficient": 1, "x": 38, "y": 48 }
+  ],
+  "products": [
+    { "id": "h2o", "formulaLatex": "H_2O", "label": "water", "coefficient": 2, "x": 78, "y": 48 }
+  ],
+  "arrow": {
+    "id": "main-arrow",
+    "semanticRole": "reaction_arrow",
+    "from": [48, 48],
+    "to": [66, 48],
+    "label": "forms"
+  },
+  "electronFlow": {
+    "id": "electron-shift",
+    "semanticRole": "electron_flow",
+    "from": [39, 38],
+    "to": [58, 36],
+    "label": "bond rearrangement"
+  },
+  "caption": "A balanced reaction conserves each atom across reactants and products."
+}

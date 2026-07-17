@@ -15,6 +15,7 @@ import { CodeHighlightRenderer } from "../renderers/CodeHighlightRenderer";
 import { domainCapability } from "../domainCapabilities";
 import { getParamPanel } from "../param-panels/registry";
 import { hasReplayableAlgorithmParams } from "../param-panels/AlgorithmParamPanel";
+import { hasEditableMathParams } from "../param-panels/mathParams";
 import { resolveDirectorVoiceover } from "../director";
 import { emitNativeEvent } from "../../../../shared/native/emitNativeEvent";
 import { MobileSheet } from "./MobileSheet";
@@ -79,7 +80,7 @@ interface PlaybookPlayerProps {
 export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   script: baseScript,
   director = null,
-  theme = "dark",
+  theme = "light",
   swapDurationFrames = 24,
   onOpenExport,
   followupSlot,
@@ -105,6 +106,9 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     if (baseScript.domain === "algorithm") {
       return hasReplayableAlgorithmParams(baseScript);
     }
+    if (baseScript.domain === "math") {
+      return hasEditableMathParams(baseScript.parameter_controls);
+    }
     return true;
   }, [baseScript]);
   const initialPreviewFrame = useMemo(() => resolveInitialPreviewFrame(script), [script]);
@@ -113,9 +117,15 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   useEffect(() => {
     const id = setTimeout(() => {
       setOverrides((current) => (Object.keys(current).length > 0 ? {} : current));
+      setMobileTab((current) =>
+        current === "params" && !hasDomainPanel ? "narration" : current,
+      );
+      setMobileSheet((current) =>
+        current === "params" && !hasDomainPanel ? null : current,
+      );
     }, 0);
     return () => clearTimeout(id);
-  }, [baseScript]);
+  }, [baseScript, hasDomainPanel]);
 
   const tts = useTTS();
   // Push the playbook domain into useTTS so AUTO-voice resolution still
@@ -150,13 +160,14 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     [codeOverlay],
   );
 
-  // Show code panel slot for algorithm domain, or any script that has code highlights.
+  // Show the code slot for algorithm lessons, explicit code tracks, or a
+  // legacy snapshot that can be projected into the right-side console.
   const isAlgorithmDomain = script.domain === "algorithm";
   const hasAnyCode = useMemo(
     () => script.steps.some((s) => s.code_highlight != null),
     [script.steps],
   );
-  const showCodePanelSlot = isAlgorithmDomain || hasAnyCode;
+  const showCodePanelSlot = isAlgorithmDomain || hasAnyCode || codeOverlay != null;
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayerSettings, setShowPlayerSettings] = useState(false);
@@ -263,12 +274,17 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     currentNarrationFallback,
   );
   const showMobileConsole = isPortraitLayout && showLearningConsole;
+  const effectiveMobileTab =
+    mobileTab === "params" && !hasDomainPanel ? "narration" : mobileTab;
+  const effectiveMobileSheet =
+    mobileSheet === "params" && !hasDomainPanel ? null : mobileSheet;
+  const showStageSubtitles = !(showMobileConsole && effectiveMobileTab === "narration");
   const mobileSheetTitle =
-    mobileSheet === "code"
+    effectiveMobileSheet === "code"
       ? "全部代码"
-      : mobileSheet === "params"
+      : effectiveMobileSheet === "params"
         ? "参数"
-        : mobileSheet === "followup"
+        : effectiveMobileSheet === "followup"
           ? "追问"
           : "更多";
   const selectMobileTab = (tab: MobileTabKey) => {
@@ -344,7 +360,8 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
             script,
             director,
             theme,
-            showSubtitles: true,
+            showSubtitles: showStageSubtitles,
+            showInlineCode: false,
             swapDurationFrames,
           }}
           durationInFrames={script.total_frames}
@@ -459,7 +476,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
           stageSlot={stageSlot}
           controlsSlot={controlsSlot}
           showMobileConsole={showMobileConsole}
-          activeTab={mobileTab}
+          activeTab={effectiveMobileTab}
           onSelectTab={selectMobileTab}
           onOpenSheet={openMobileSheet}
           mobileCodeOverlay={mobileCodeOverlay}
@@ -532,11 +549,6 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
 
         {stageSlot}
 
-        <div className="playbook-player__caption">
-          <span aria-hidden="true" />
-          <p>{currentNarration || currentStep.title}</p>
-        </div>
-
         {controlsSlot}
       </div>
       )}
@@ -558,9 +570,9 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
         />
       )}
 
-      {showMobileConsole && mobileSheet && (
+      {showMobileConsole && effectiveMobileSheet && (
         <MobileSheet title={mobileSheetTitle} onClose={() => setMobileSheet(null)}>
-          {mobileSheet === "code" && (
+          {effectiveMobileSheet === "code" && (
             <div className="playbook-player__mobile-sheet-code">
               {codeOverlay ? (
                 <CodeHighlightRenderer overlay={codeOverlay} theme={theme} />
@@ -569,7 +581,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
               )}
             </div>
           )}
-          {mobileSheet === "params" && (
+          {effectiveMobileSheet === "params" && (
             <div className="playbook-player__mobile-sheet-section">
               {hasDomainPanel ? (
                 <ParamPanelSlot
@@ -584,14 +596,14 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
               )}
             </div>
           )}
-          {mobileSheet === "followup" && (
+          {effectiveMobileSheet === "followup" && (
             <div className="playbook-player__mobile-followup-sheet">
               {followupSlot ?? (
                 <div className="playbook-player__mobile-empty">当前讲解暂不能继续追问。</div>
               )}
             </div>
           )}
-          {mobileSheet === "more" && (
+          {effectiveMobileSheet === "more" && (
             <div className="playbook-player__mobile-more-sheet">
               <div className="playbook-player__mobile-sheet-actions">
                 {onOpenExport && (

@@ -711,6 +711,121 @@ class TestMathFallbackChain:
         # Either flavour of array snapshot is fine; the point is it's NOT formula.
         assert isinstance(snap, (AlgorithmArraySnapshot, AlgorithmBarsSnapshot))
 
+    def test_geography_map_visual_kind_uses_geo_scene_snapshot(self):
+        from app.domain.models.playbook import GeoMapSceneSnapshot
+
+        step = CirStep(
+            id="geo-1",
+            title="东亚季风底图",
+            narration="海陆热力差异让冬夏季风反向。",
+            visual_kind=VisualKind.MAP,
+            tokens=[
+                VisualToken(id="land", label="大陆"),
+                VisualToken(id="ocean", label="海洋"),
+            ],
+        )
+        cir = CirDocument(
+            title="东亚季风",
+            domain=TopicDomain.GEOGRAPHY,
+            summary="解释季风风向",
+            steps=[step],
+        )
+
+        playbook = build_playbook(cir, execution_map=None)
+
+        snap = playbook.steps[0].snapshot
+        assert isinstance(snap, GeoMapSceneSnapshot)
+        assert snap.kind == "geo_map_scene"
+        assert snap.pack_id == "geography-basic"
+        assert any(flow.semantic_role == "wind" for flow in snap.flows)
+        assert playbook.steps[0].layers[0].body.kind == "geo_map_scene"
+        payload = playbook.model_dump(mode="json")
+        flow = payload["steps"][0]["snapshot"]["flows"][0]
+        assert "from" in flow
+        assert "from_" not in flow
+
+    def test_physics_motion_visual_kind_uses_force_scene_snapshot(self):
+        from app.domain.models.playbook import PhysicsForceSceneSnapshot
+
+        step = CirStep(
+            id="physics-1",
+            title="平抛运动",
+            narration="水平速度保持不变，竖直方向受重力加速。",
+            visual_kind=VisualKind.MOTION,
+            tokens=[
+                VisualToken(id="vx", label="v_x"),
+                VisualToken(id="g", label="g"),
+            ],
+        )
+        cir = CirDocument(
+            title="平抛运动",
+            domain=TopicDomain.PHYSICS,
+            summary="解释平抛运动",
+            steps=[step],
+        )
+
+        playbook = build_playbook(cir, execution_map=None)
+
+        snap = playbook.steps[0].snapshot
+        assert isinstance(snap, PhysicsForceSceneSnapshot)
+        assert snap.kind == "physics_force_scene"
+        assert snap.pack_id == "physics-basic"
+        assert any(vector.semantic_role == "velocity" for vector in snap.vectors)
+        assert any(vector.semantic_role == "acceleration" for vector in snap.vectors)
+        assert playbook.steps[0].layers[0].body.kind == "physics_force_scene"
+
+    def test_biology_cell_visual_kind_uses_explainable_fallback(self, caplog):
+        from app.domain.models.playbook import NarrationCardSnapshot
+
+        step = CirStep(
+            id="bio-1",
+            title="细胞结构",
+            narration="细胞膜、细胞核和线粒体协同工作。",
+            visual_kind=VisualKind.CELL,
+            tokens=[VisualToken(id="nucleus", label="细胞核")],
+        )
+        cir = CirDocument(
+            title="细胞结构",
+            domain=TopicDomain.BIOLOGY,
+            summary="解释细胞结构",
+            steps=[step],
+        )
+
+        playbook = build_playbook(cir, execution_map=None)
+
+        snap = playbook.steps[0].snapshot
+        assert isinstance(snap, NarrationCardSnapshot)
+        assert snap.kind == "narration_card"
+        assert "bio-1" in caplog.text
+        assert "cell" in caplog.text
+        assert "biology" in caplog.text
+
+    def test_chemistry_molecule_visual_kind_uses_explainable_fallback(self, caplog):
+        from app.domain.models.playbook import NarrationCardSnapshot
+
+        step = CirStep(
+            id="chem-1",
+            title="水分子结构",
+            narration="氧原子和两个氢原子形成弯折结构。",
+            visual_kind=VisualKind.MOLECULE,
+            tokens=[VisualToken(id="oxygen", label="O")],
+        )
+        cir = CirDocument(
+            title="水分子",
+            domain=TopicDomain.CHEMISTRY,
+            summary="解释分子结构",
+            steps=[step],
+        )
+
+        playbook = build_playbook(cir, execution_map=None)
+
+        snap = playbook.steps[0].snapshot
+        assert isinstance(snap, NarrationCardSnapshot)
+        assert snap.kind == "narration_card"
+        assert "chem-1" in caplog.text
+        assert "molecule" in caplog.text
+        assert "chemistry" in caplog.text
+
 
 class TestLayeredOutput:
     """Phase 3: every MetaStep now carries a `layers` list alongside `snapshot`.

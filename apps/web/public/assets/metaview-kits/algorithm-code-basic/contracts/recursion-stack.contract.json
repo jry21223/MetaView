@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "recursion-stack-contract",
+  "sceneTemplate": "recursion_stack",
+  "rendererKind": "call_stack_scene",
+  "packId": "algorithm-code-basic",
+  "presetAssetId": "recursion-stack-preset",
+  "requiredAssetIds": ["recursion-stack-preset", "call-frame", "stack-frame", "active-line"],
+  "requiredStates": ["active_frame", "waiting_frame", "active_line"],
+  "minimumFrameCount": 3,
+  "caption": "Recursion stack must render active and waiting stack frames with a synchronized active code line."
+}

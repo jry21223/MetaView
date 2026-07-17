@@ -1,0 +1,338 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
+
+import { listAssetPacks, type AssetManifestEntry, type SubjectVisualKit } from "./assetRegistry";
+import { getLicenseRule, isKnownAssetLicense } from "./licenseRegistry";
+
+export type AssetAuditIssueCode =
+  | "missing_schema_version"
+  | "missing_license_mode"
+  | "missing_sources"
+  | "unknown_license"
+  | "missing_source"
+  | "missing_asset_file"
+  | "missing_attribution"
+  | "license_rule_mismatch"
+  | "renderer_kind_mismatch"
+  | "missing_scene_template_contract";
+
+export interface AssetAuditIssue {
+  code: AssetAuditIssueCode;
+  message: string;
+  packId: string;
+  assetId?: string;
+  sourceId?: string;
+}
+
+export interface AssetAuditReport {
+  ok: boolean;
+  errors: AssetAuditIssue[];
+}
+
+export interface AssetAuditOptions {
+  publicRoot?: string;
+  pathExists?: (assetPath: string) => boolean;
+}
+
+const REQUIRED_RENDERER_KINDS_BY_PACK: Record<string, string[]> = {
+  "algorithm-code-basic": ["graph_scene", "call_stack_scene", "code_trace_scene", "algorithm_array", "algorithm_tree"],
+  "biology-basic": ["bio_cell_scene", "bio_process_scene"],
+  "chemistry-basic": ["molecule_2d_scene", "reaction_scene"],
+  "core-visual-basic": [
+    "geo_map_scene",
+    "physics_force_scene",
+    "bio_cell_scene",
+    "bio_process_scene",
+    "molecule_2d_scene",
+    "reaction_scene",
+    "math_plot",
+    "math_formula",
+    "math_scene",
+    "katex_overlay",
+    "graph_scene",
+    "call_stack_scene",
+    "code_trace_scene",
+    "algorithm_array",
+    "algorithm_tree",
+    "motion_scene",
+  ],
+  "geography-basic": ["geo_map_scene"],
+  "geography-earth-basic": ["geo_map_scene"],
+  "math-basic": ["math_plot", "math_scene", "math_formula", "katex_overlay"],
+  "physics-basic": ["physics_force_scene"],
+};
+
+const REQUIRED_SCENE_TEMPLATE_CONTRACTS_BY_PACK: Record<
+  string,
+  Array<{
+    sceneTemplate: string;
+    assetId: string;
+    semanticRole: string;
+    rendererKind: string;
+    pathSuffix: string;
+  }>
+> = {
+  "algorithm-code-basic": [
+    {
+      sceneTemplate: "bfs_graph",
+      assetId: "bfs-graph-contract",
+      semanticRole: "bfs_graph_contract",
+      rendererKind: "graph_scene",
+      pathSuffix: "/contracts/bfs-graph.contract.json",
+    },
+    {
+      sceneTemplate: "recursion_stack",
+      assetId: "recursion-stack-contract",
+      semanticRole: "recursion_stack_contract",
+      rendererKind: "call_stack_scene",
+      pathSuffix: "/contracts/recursion-stack.contract.json",
+    },
+    {
+      sceneTemplate: "binary_search",
+      assetId: "binary-search-contract",
+      semanticRole: "binary_search_contract",
+      rendererKind: "code_trace_scene",
+      pathSuffix: "/contracts/binary-search.contract.json",
+    },
+  ],
+  "biology-basic": [
+    {
+      sceneTemplate: "cell_structure",
+      assetId: "cell-structure-contract",
+      semanticRole: "cell_structure_contract",
+      rendererKind: "bio_cell_scene",
+      pathSuffix: "/contracts/cell-structure.contract.json",
+    },
+    {
+      sceneTemplate: "dna_replication",
+      assetId: "dna-replication-contract",
+      semanticRole: "dna_replication_contract",
+      rendererKind: "bio_process_scene",
+      pathSuffix: "/contracts/dna-replication.contract.json",
+    },
+  ],
+  "chemistry-basic": [
+    {
+      sceneTemplate: "molecule_2d_water",
+      assetId: "water-molecule-contract",
+      semanticRole: "water_contract",
+      rendererKind: "molecule_2d_scene",
+      pathSuffix: "/contracts/water.contract.json",
+    },
+    {
+      sceneTemplate: "molecule_2d_methane",
+      assetId: "methane-molecule-contract",
+      semanticRole: "methane_contract",
+      rendererKind: "molecule_2d_scene",
+      pathSuffix: "/contracts/methane.contract.json",
+    },
+    {
+      sceneTemplate: "molecule_2d_glucose",
+      assetId: "glucose-smiles-contract",
+      semanticRole: "glucose_contract",
+      rendererKind: "molecule_2d_scene",
+      pathSuffix: "/contracts/glucose.contract.json",
+    },
+    {
+      sceneTemplate: "reaction_synthesis_water",
+      assetId: "reaction-synthesis-water-contract",
+      semanticRole: "reaction_synthesis_water_contract",
+      rendererKind: "reaction_scene",
+      pathSuffix: "/contracts/reaction-synthesis-water.contract.json",
+    },
+  ],
+};
+
+function sameStringSet(actual: string[], expected: string[]): boolean {
+  if (actual.length !== expected.length) return false;
+  const actualSet = new Set(actual);
+  return expected.every((item) => actualSet.has(item));
+}
+
+function pushError(errors: AssetAuditIssue[], issue: AssetAuditIssue) {
+  errors.push(issue);
+}
+
+function assetPathExists(assetPath: string, publicRoot: string) {
+  const root = path.resolve(publicRoot);
+  const localPath = path.resolve(root, assetPath.replace(/^\/+/, ""));
+  const relativePath = path.relative(root, localPath);
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) return false;
+  return existsSync(localPath);
+}
+
+function auditPackShape(errors: AssetAuditIssue[], pack: SubjectVisualKit) {
+  if (pack.schemaVersion !== "1.0.0") {
+    pushError(errors, {
+      code: "missing_schema_version",
+      packId: pack.packId,
+      message: `Asset pack "${pack.packId}" must declare schemaVersion "1.0.0".`,
+    });
+  }
+  if (pack.licenseMode !== "single" && pack.licenseMode !== "mixed") {
+    pushError(errors, {
+      code: "missing_license_mode",
+      packId: pack.packId,
+      message: `Asset pack "${pack.packId}" must declare licenseMode.`,
+    });
+  }
+  if (!Array.isArray(pack.sources) || pack.sources.length === 0) {
+    pushError(errors, {
+      code: "missing_sources",
+      packId: pack.packId,
+      message: `Asset pack "${pack.packId}" must declare at least one source.`,
+    });
+  }
+}
+
+function auditRendererKinds(errors: AssetAuditIssue[], pack: SubjectVisualKit) {
+  const expected = REQUIRED_RENDERER_KINDS_BY_PACK[pack.packId];
+  if (!expected || sameStringSet(pack.rendererKinds, expected)) return;
+  pushError(errors, {
+    code: "renderer_kind_mismatch",
+    packId: pack.packId,
+    message: `Asset pack "${pack.packId}" rendererKinds must be ${JSON.stringify(expected)}.`,
+  });
+}
+
+function auditSceneTemplateContracts(errors: AssetAuditIssue[], pack: SubjectVisualKit) {
+  const requirements = REQUIRED_SCENE_TEMPLATE_CONTRACTS_BY_PACK[pack.packId];
+  if (!requirements) return;
+
+  const sceneTemplates = new Set(pack.sceneTemplates);
+  for (const requirement of requirements) {
+    if (!sceneTemplates.has(requirement.sceneTemplate)) continue;
+
+    const asset = pack.assets.find((item) => item.id === requirement.assetId);
+    const hasContractRole = asset?.semanticRoles.some((role) => role.endsWith("_contract")) ?? false;
+    const validContract =
+      asset?.type === "json" &&
+      asset.path?.endsWith(requirement.pathSuffix) &&
+      hasContractRole;
+    const hasSpecificRole = asset?.semanticRoles.includes(requirement.semanticRole) ?? false;
+    const hasRenderer = asset?.rendererHints?.preferredRenderer === requirement.rendererKind;
+
+    if (validContract && hasSpecificRole && hasRenderer) continue;
+
+    pushError(errors, {
+      code: "missing_scene_template_contract",
+      packId: pack.packId,
+      assetId: requirement.assetId,
+      message: `Asset pack "${pack.packId}" sceneTemplate "${requirement.sceneTemplate}" must declare contract asset "${requirement.assetId}".`,
+    });
+  }
+}
+
+function auditSource(
+  errors: AssetAuditIssue[],
+  pack: SubjectVisualKit,
+  sourceId: string,
+  license: AssetManifestEntry["license"],
+  assetId?: string,
+) {
+  if (!sourceId || !pack.sources.some((source) => source.id === sourceId)) {
+    pushError(errors, {
+      code: "missing_source",
+      packId: pack.packId,
+      assetId,
+      sourceId,
+      message: `Asset pack "${pack.packId}" references missing source "${sourceId}".`,
+    });
+  }
+  if (!isKnownAssetLicense(license)) {
+    pushError(errors, {
+      code: "unknown_license",
+      packId: pack.packId,
+      assetId,
+      sourceId,
+      message: `Asset source "${sourceId}" uses unknown license.`,
+    });
+  }
+}
+
+function auditAsset(errors: AssetAuditIssue[], pack: SubjectVisualKit, asset: AssetManifestEntry) {
+  auditSource(errors, pack, asset.sourceId, asset.license, asset.id);
+
+  const licenseRule = getLicenseRule(asset.license);
+  if (!isKnownAssetLicense(asset.license)) {
+    pushError(errors, {
+      code: "unknown_license",
+      packId: pack.packId,
+      assetId: asset.id,
+      message: `Asset "${asset.id}" uses unknown license.`,
+    });
+  }
+
+  if ((asset.requiresAttribution || licenseRule.requiresAttribution) && !asset.attribution) {
+    pushError(errors, {
+      code: "missing_attribution",
+      packId: pack.packId,
+      assetId: asset.id,
+      message: `Asset "${asset.id}" requires attribution but none is recorded.`,
+    });
+  }
+
+  if (asset.commercialUseAllowed !== licenseRule.commercialUseAllowed && asset.license !== "unknown") {
+    pushError(errors, {
+      code: "license_rule_mismatch",
+      packId: pack.packId,
+      assetId: asset.id,
+      message: `Asset "${asset.id}" commercialUseAllowed does not match ${asset.license} policy.`,
+    });
+  }
+  if (asset.shareAlike !== licenseRule.shareAlike) {
+    pushError(errors, {
+      code: "license_rule_mismatch",
+      packId: pack.packId,
+      assetId: asset.id,
+      message: `Asset "${asset.id}" shareAlike does not match ${asset.license} policy.`,
+    });
+  }
+  if (asset.modificationAllowed !== licenseRule.modificationAllowed) {
+    pushError(errors, {
+      code: "license_rule_mismatch",
+      packId: pack.packId,
+      assetId: asset.id,
+      message: `Asset "${asset.id}" modificationAllowed does not match ${asset.license} policy.`,
+    });
+  }
+}
+
+function auditAssetFile(errors: AssetAuditIssue[], pack: SubjectVisualKit, asset: AssetManifestEntry, options: AssetAuditOptions) {
+  if (!asset.path) return;
+
+  const publicRoot = options.publicRoot ?? path.resolve(process.cwd(), "public");
+  const pathExists = options.pathExists ?? ((assetPath: string) => assetPathExists(assetPath, publicRoot));
+  if (pathExists(asset.path)) return;
+
+  pushError(errors, {
+    code: "missing_asset_file",
+    packId: pack.packId,
+    assetId: asset.id,
+    message: `Asset "${asset.id}" path "${asset.path}" does not exist under the public asset root.`,
+  });
+}
+
+export function auditAssetPacks(packs: SubjectVisualKit[], options: AssetAuditOptions = {}): AssetAuditReport {
+  const errors: AssetAuditIssue[] = [];
+  for (const pack of packs) {
+    auditPackShape(errors, pack);
+    auditRendererKinds(errors, pack);
+    auditSceneTemplateContracts(errors, pack);
+    for (const source of pack.sources ?? []) {
+      auditSource(errors, pack, source.id, source.license);
+    }
+    for (const asset of pack.assets) {
+      auditAsset(errors, pack, asset);
+      auditAssetFile(errors, pack, asset, options);
+    }
+  }
+  return {
+    ok: errors.length === 0,
+    errors,
+  };
+}
+
+export function auditRegisteredAssetPacks(options: AssetAuditOptions = {}): AssetAuditReport {
+  return auditAssetPacks(listAssetPacks(), options);
+}

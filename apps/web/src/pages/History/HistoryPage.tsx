@@ -12,8 +12,12 @@ import {
   type TimeWindow,
 } from "../../features/history/lib/historyFilters";
 import { PlaybookPlayer } from "../../features/playbook/engine/player/PlaybookPlayer";
+import { ConfirmDialog } from "../../shared/ui/ConfirmDialog";
+import { HistoryListSkeleton } from "./HistoryListSkeleton";
 import { AutoRefinedBadge } from "../../features/runs/AutoRefinedBadge";
 import { PromptDoctor } from "../../features/runs/PromptDoctor";
+import { CoverageDecisionSummary } from "../../features/runs/CoverageDecisionSummary";
+import { QualityReportSummary } from "../../features/runs/QualityReportSummary";
 import { RunProgressStepper } from "../../features/runs/RunProgressStepper";
 import { themeMode } from "../../features/studio-editor/hooks/useTweaks";
 import type { PipelineRunResult } from "../../entities/pipeline/types";
@@ -35,9 +39,72 @@ function StatusBadge({ status }: { status: PipelineRunResult["status"] }) {
   );
 }
 
+function HistorySearchIcon() {
+  return (
+    <svg
+      className="mv-history-icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <circle cx="11" cy="11" r="6" />
+      <path d="m16 16 4 4" />
+    </svg>
+  );
+}
+
+function HistoryRefreshIcon() {
+  return (
+    <svg
+      className="mv-history-icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M20 12a8 8 0 0 1-13.7 5.6" />
+      <path d="M4 12A8 8 0 0 1 17.7 6.4" />
+      <path d="M17 3v4h4" />
+      <path d="M7 21v-4H3" />
+    </svg>
+  );
+}
+
+function HistoryChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      className={`mv-history-icon mv-history-chevron${open ? " is-open" : ""}`}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <path d="m9 6 6 6-6 6" />
+    </svg>
+  );
+}
+
+function HistoryPointerIcon() {
+  return (
+    <svg
+      className="mv-history-icon mv-history-pointer"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M19 12H5" />
+      <path d="m11 6-6 6 6 6" />
+    </svg>
+  );
+}
+
 interface RunItemProps {
   run: PipelineRunResult;
   isSelected: boolean;
+  /** Stagger slot for the mount-time enter animation. */
+  enterIndex: number;
   onClick: () => void;
   onOpenInWorkbench: () => void;
   onDelete: () => void;
@@ -47,11 +114,16 @@ interface RunItemProps {
 function RunItem({
   run,
   isSelected,
+  enterIndex,
   onClick,
   onOpenInWorkbench,
   onDelete,
   isDeleting,
 }: RunItemProps) {
+  // Latch the mount-time stagger slot: list reorders after a background
+  // refresh must not shift the delay of an animation that already played.
+  // Stable keys keep existing nodes mounted, so the animation runs once.
+  const [mountEnterIndex] = useState(enterIndex);
   const title = run.playbook?.title ?? run.prompt ?? "未命名";
   const domain = run.playbook?.domain ?? "—";
   const date = new Date(run.created_at).toLocaleString("zh-CN", {
@@ -62,12 +134,19 @@ function RunItem({
   });
   const stepCount = run.playbook?.steps?.length ?? "—";
   const showPromptSubtitle = !!run.playbook?.title && !!run.prompt;
-  const itemClassName = ["mv-history-item", isSelected ? "is-selected" : ""]
+  const itemClassName = [
+    "mv-history-item",
+    "is-entering",
+    isSelected ? "is-selected" : "",
+  ]
     .filter(Boolean)
     .join(" ");
 
   return (
-    <div className={itemClassName}>
+    <div
+      className={itemClassName}
+      style={{ animationDelay: `${Math.min(mountEnterIndex, 10) * 30}ms` }}
+    >
       <button
         type="button"
         className="mv-history-item__main"
@@ -82,7 +161,11 @@ function RunItem({
           <span className="mv-history-item-subtitle">{run.prompt}</span>
         )}
         <div className="mv-history-item-meta">
-          <span className="mv-history-item-domain">{domain.toUpperCase()}</span>
+          <span
+            className={`mv-history-item-domain${domain === "—" ? " is-empty" : ""}`}
+          >
+            {domain.toUpperCase()}
+          </span>
           <span className="mv-history-item-date">{date}</span>
           <span className="mv-history-item-steps">{stepCount} 步</span>
         </div>
@@ -200,6 +283,9 @@ export function HistoryPage({
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const [deletingRunId, setDeletingRunId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [confirmingRun, setConfirmingRun] = useState<PipelineRunResult | null>(
+    null,
+  );
   const hasExtraStatusFilter =
     filter.status === "queued" || filter.status === "reviewing";
   const hasExtraFilter =
@@ -220,8 +306,9 @@ export function HistoryPage({
   );
   const stats = useMemo(() => computeHistoryStats(filtered), [filtered]);
 
+
   const handleDelete = async (run: PipelineRunResult) => {
-    if (!window.confirm("确定删除这条历史记录吗？")) return;
+    setConfirmingRun(null);
     setDeletingRunId(run.run_id);
     setDeleteError(null);
     try {
@@ -245,156 +332,196 @@ export function HistoryPage({
 
   return (
     <>
-      <main className="mv-history-main">
-        <aside className="mv-history-list">
+      <main className="mv-history-page">
+        <header className="mv-history-page-head">
+          <div className="mv-history-page-copy">
+            <div className="mv-eyebrow-mini">RUN ARCHIVE / 任务档案</div>
+            <h1>回看每一次讲解</h1>
+            <p>从生成记录中继续编辑、检查过程，或直接回放已经完成的讲解。</p>
+          </div>
           <StatsLine {...stats} />
+        </header>
 
-          <div className="mv-history-toolbar">
-            <input
-              type="search"
-              className="mv-history-search"
-              placeholder="🔍 搜索标题 / 摘要 / prompt…"
-              value={filter.search}
-              onChange={(e) =>
-                setFilter((f) => ({ ...f, search: e.target.value }))
-              }
-            />
+        <section className="mv-history-main" aria-label="任务历史与回放">
+          <aside className="mv-history-list" aria-label="任务记录">
+            <div className="mv-history-list-intro">
+              <span>RECORDS</span>
+              <strong>任务记录</strong>
+            </div>
 
-            <div
-              className="mv-history-status-chips"
-              role="group"
-              aria-label="状态筛选"
-            >
-              {PRIMARY_STATUS_CHIPS.map((chip) => {
-                const active = filter.status === chip.value;
-                return (
-                  <button
-                    key={chip.value}
-                    type="button"
-                    aria-pressed={active}
-                    className={`mv-history-chip${active ? " is-active" : ""}`}
-                    onClick={() =>
-                      setFilter((f) => ({ ...f, status: chip.value }))
+            <div className="mv-history-toolbar">
+              <div className="mv-history-search-wrap">
+                <HistorySearchIcon />
+                <input
+                  type="search"
+                  className="mv-history-search"
+                  placeholder="搜索标题 / 摘要 / prompt..."
+                  value={filter.search}
+                  onChange={(e) =>
+                    setFilter((f) => ({ ...f, search: e.target.value }))
+                  }
+                />
+              </div>
+
+              <div
+                className="mv-history-status-chips"
+                role="group"
+                aria-label="状态筛选"
+              >
+                {PRIMARY_STATUS_CHIPS.map((chip) => {
+                  const active = filter.status === chip.value;
+                  return (
+                    <button
+                      key={chip.value}
+                      type="button"
+                      aria-pressed={active}
+                      className={`mv-history-chip${active ? " is-active" : ""}`}
+                      onClick={() =>
+                        setFilter((f) => ({ ...f, status: chip.value }))
+                      }
+                    >
+                      {chip.label}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  className={moreFiltersClassName}
+                  aria-expanded={moreFiltersOpen}
+                  onClick={() => setMoreFiltersOpen((v) => !v)}
+                >
+                  <span>更多筛选</span>
+                  <HistoryChevronIcon open={moreFiltersOpen} />
+                </button>
+              </div>
+
+              {moreFiltersOpen && (
+                <div className="mv-history-more-filters">
+                  <select
+                    aria-label="学科筛选"
+                    className="mv-history-filter"
+                    value={filter.domain}
+                    onChange={(e) =>
+                      setFilter((f) => ({ ...f, domain: e.target.value }))
                     }
                   >
-                    {chip.label}
-                  </button>
-                );
-              })}
-              <button
-                type="button"
-                className={moreFiltersClassName}
-                aria-expanded={moreFiltersOpen}
-                onClick={() => setMoreFiltersOpen((v) => !v)}
-              >
-                更多筛选 {moreFiltersOpen ? "▾" : "▸"}
-              </button>
+                    <option value="">全部学科</option>
+                    {domains.map((d) => (
+                      <option key={d} value={d}>
+                        {d.toUpperCase()}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label="时间筛选"
+                    className="mv-history-filter"
+                    value={filter.timeWindow}
+                    onChange={(e) =>
+                      setFilter((f) => ({
+                        ...f,
+                        timeWindow: e.target.value as TimeWindow,
+                      }))
+                    }
+                  >
+                    <option value="all">全部时间</option>
+                    <option value="today">今天</option>
+                    <option value="week">本周</option>
+                    <option value="month">本月</option>
+                  </select>
+                  <select
+                    aria-label="其它状态筛选"
+                    className="mv-history-filter"
+                    value={hasExtraStatusFilter ? filter.status : ""}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === "queued" || v === "reviewing") {
+                        setFilter((f) => ({ ...f, status: v }));
+                      } else {
+                        setFilter((f) => ({ ...f, status: "all" }));
+                      }
+                    }}
+                  >
+                    <option value="">其它状态…</option>
+                    <option value="queued">排队</option>
+                    <option value="reviewing">审核中</option>
+                  </select>
+                </div>
+              )}
             </div>
 
-            {moreFiltersOpen && (
-              <div className="mv-history-more-filters">
-                <select
-                  aria-label="学科筛选"
-                  className="mv-history-filter"
-                  value={filter.domain}
-                  onChange={(e) =>
-                    setFilter((f) => ({ ...f, domain: e.target.value }))
-                  }
-                >
-                  <option value="">全部学科</option>
-                  {domains.map((d) => (
-                    <option key={d} value={d}>
-                      {d.toUpperCase()}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  aria-label="时间筛选"
-                  className="mv-history-filter"
-                  value={filter.timeWindow}
-                  onChange={(e) =>
-                    setFilter((f) => ({
-                      ...f,
-                      timeWindow: e.target.value as TimeWindow,
-                    }))
-                  }
-                >
-                  <option value="all">全部时间</option>
-                  <option value="today">今天</option>
-                  <option value="week">本周</option>
-                  <option value="month">本月</option>
-                </select>
-                <select
-                  aria-label="其它状态筛选"
-                  className="mv-history-filter"
-                  value={hasExtraStatusFilter ? filter.status : ""}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (v === "queued" || v === "reviewing") {
-                      setFilter((f) => ({ ...f, status: v }));
-                    } else {
-                      setFilter((f) => ({ ...f, status: "all" }));
-                    }
-                  }}
-                >
-                  <option value="">其它状态…</option>
-                  <option value="queued">排队</option>
-                  <option value="reviewing">审核中</option>
-                </select>
+            <div className="mv-history-list-head">
+              <span className="mv-history-list-count">
+                {isLoading ? "同步中" : `${filtered.length} / ${runs.length} 条`}
+              </span>
+              <div className="mv-history-list-actions">
+                <button type="button" className="mv-chip" onClick={refresh}>
+                  <HistoryRefreshIcon />
+                  <span>刷新</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="mv-history-list-body">
+              {error && (
+                <HistoryLoadError error={error} onRetry={refresh} />
+              )}
+              {deleteError && (
+                <div className="mv-history-error">{deleteError}</div>
+              )}
+              {isLoading && runs.length === 0 && !error && <HistoryListSkeleton />}
+              {!isLoading && !error && filtered.length === 0 && (
+                <CenterHint>没有匹配的记录</CenterHint>
+              )}
+              {filtered.map((run, index) => (
+                <RunItem
+                  key={run.run_id}
+                  run={run}
+                  isSelected={run.run_id === effectiveSelectedRunId}
+                  enterIndex={index}
+                  onClick={() => setSelectedRunId(run.run_id)}
+                  onOpenInWorkbench={() => onOpenInWorkbench?.(run.run_id)}
+                  onDelete={() => setConfirmingRun(run)}
+                  isDeleting={deletingRunId === run.run_id}
+                />
+              ))}
+            </div>
+          </aside>
+
+          <div className="mv-history-detail">
+            {!selectedRun && (
+              <div className="mv-history-empty-stage">
+                <div className="mv-history-empty-orbit" aria-hidden="true">
+                  <span />
+                  <i />
+                </div>
+                <div className="mv-history-empty-copy">
+                  <span>PLAYBACK CANVAS</span>
+                  <h2>选择一条记录，回到讲解现场</h2>
+                  <p>这里会显示画面、步骤和生成检查结果。</p>
+                  <small>
+                    <HistoryPointerIcon />
+                    从左侧任务记录开始
+                  </small>
+                </div>
               </div>
             )}
-          </div>
-
-          <div className="mv-history-list-head">
-            <span className="mv-history-list-count">
-              {isLoading ? "同步中" : `${filtered.length} / ${runs.length} 条`}
-            </span>
-            <div className="mv-history-list-actions">
-              <button type="button" className="mv-chip" onClick={refresh}>
-                ↻ 刷新
-              </button>
-            </div>
-          </div>
-
-          <div className="mv-history-list-body">
-            {error && (
-              <HistoryLoadError error={error} onRetry={refresh} />
+          {selectedRun &&
+            (selectedRun.status === "failed" ||
+              selectedRun.coverage_decision ||
+              selectedRun.quality_report) && (
+              <div className="mv-history-diagnostics">
+                {selectedRun.status === "failed" && (
+                  <PromptDoctor
+                    report={selectedRun.review ?? selectedRun.quality_report ?? null}
+                    error={selectedRun.error}
+                  />
+                )}
+                <CoverageDecisionSummary
+                  decision={selectedRun.coverage_decision ?? null}
+                />
+                <QualityReportSummary report={selectedRun.quality_report ?? null} />
+              </div>
             )}
-            {deleteError && (
-              <div className="mv-history-error">{deleteError}</div>
-            )}
-            {isLoading && runs.length === 0 && (
-              <CenterHint>正在同步历史记录</CenterHint>
-            )}
-            {!isLoading && !error && filtered.length === 0 && (
-              <CenterHint>没有匹配的记录</CenterHint>
-            )}
-            {filtered.map((run) => (
-              <RunItem
-                key={run.run_id}
-                run={run}
-                isSelected={run.run_id === effectiveSelectedRunId}
-                onClick={() => setSelectedRunId(run.run_id)}
-                onOpenInWorkbench={() => onOpenInWorkbench?.(run.run_id)}
-                onDelete={() => void handleDelete(run)}
-                isDeleting={deletingRunId === run.run_id}
-              />
-            ))}
-          </div>
-        </aside>
-
-        <div className="mv-history-detail">
-          {!selectedRun && (
-            <CenterHint>
-              ← 选择一条记录回放动画，或在工作台打开使用完整功能
-            </CenterHint>
-          )}
-          {selectedRun && selectedRun.status === "failed" && (
-            <PromptDoctor
-              report={selectedRun.review ?? null}
-              error={selectedRun.error}
-            />
-          )}
           {selectedRun &&
             (selectedRun.status === "queued" ||
               selectedRun.status === "running" ||
@@ -423,8 +550,21 @@ export function HistoryPage({
               />
             </>
           )}
-        </div>
+          </div>
+        </section>
       </main>
+
+      {confirmingRun && (
+        <ConfirmDialog
+          title="确定删除这条历史记录吗？"
+          description={confirmingRun.playbook?.title ?? confirmingRun.prompt ?? undefined}
+          confirmLabel="删除"
+          danger
+          busy={deletingRunId !== null}
+          onConfirm={() => void handleDelete(confirmingRun)}
+          onCancel={() => setConfirmingRun(null)}
+        />
+      )}
     </>
   );
 }

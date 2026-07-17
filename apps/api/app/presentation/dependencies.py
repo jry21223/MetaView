@@ -8,6 +8,7 @@ from fastapi import Depends
 
 from app.application.ports.account_repository import IAccountRepository
 from app.application.ports.agent_provider import IAgentProvider
+from app.application.ports.coverage_resolver import ICoverageResolver
 from app.application.ports.director_repository import IRunDirectorRepository
 from app.application.ports.export_repository import IExportJobRepository
 from app.application.ports.llm_provider import ILLMProvider
@@ -16,6 +17,7 @@ from app.application.ports.ops_dashboard_repository import IOpsDashboardReposito
 from app.application.ports.payment_gateway import IPaymentGateway
 from app.application.ports.router_provider import IRouterProvider
 from app.application.ports.run_repository import IRunRepository
+from app.application.services.coverage_resolver import DefaultCoverageResolver
 from app.application.use_cases.account import AccountUseCase
 from app.application.use_cases.newapi_topup import NewApiTopupUseCase
 from app.application.use_cases.ops_dashboard import OpsDashboardUseCase
@@ -204,6 +206,18 @@ def get_router_provider(
     return LLMRouterProvider(llm, model_name=model)
 
 
+def get_coverage_resolver(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> ICoverageResolver:
+    return DefaultCoverageResolver(
+        min_confidence=settings.router_min_confidence,
+        refine_confidence=min(
+            settings.router_refine_confidence,
+            settings.router_min_confidence,
+        ),
+    )
+
+
 @lru_cache
 def _get_agent_provider(
     base_url: str,
@@ -224,6 +238,7 @@ def _get_codex_agent_provider(
     effort: str | None,
     timeout_s: float,
     skills_dir: str,
+    codex_bin: str | None,
 ) -> CodexAgentProvider:
     return CodexAgentProvider(
         cwd=cwd,
@@ -231,6 +246,7 @@ def _get_codex_agent_provider(
         effort=effort,
         timeout_s=timeout_s,
         skills_dir=skills_dir,
+        codex_bin=codex_bin,
     )
 
 
@@ -252,6 +268,7 @@ def get_agent_provider(
             settings.codex_effort,
             settings.agent_timeout_s,
             settings.agent_skills_dir,
+            settings.codex_bin,
         )
     return _get_agent_provider(
         settings.agent_base_url,

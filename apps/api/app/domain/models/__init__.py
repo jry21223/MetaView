@@ -8,6 +8,7 @@ from app.domain.models.cir import (
     VisualToken,
 )
 from app.domain.models.execution import ExecutionParameterControl
+from app.domain.models.lesson_plan import LessonPlan, SceneIntent
 from app.domain.models.pipeline_run import (
     PipelineRunStatus,
     SandboxMode,
@@ -21,7 +22,10 @@ from app.domain.models.playbook import (
     AlgorithmBarsSnapshot,
     AlgorithmTreeSnapshot,
     AnySnapshot,
+    CallStackSceneSnapshot,
+    CodeTraceSceneSnapshot,
     ComplexPlaneSceneSnapshot,
+    GeoMapSceneSnapshot,
     GraphSceneSnapshot,
     IterationTraceSceneSnapshot,
     ManifoldSceneSnapshot,
@@ -31,11 +35,13 @@ from app.domain.models.playbook import (
     MotionSceneSnapshot,
     OptimizationSceneSnapshot,
     PhasePortraitSceneSnapshot,
+    PhysicsForceSceneSnapshot,
     PlaybookScript,
     SnapshotKind,
     StatsChartSceneSnapshot,
     TableSceneSnapshot,
 )
+from app.domain.models.quality_report import QualityReport
 from app.domain.models.review import (
     CirReviewIssue,
     CirReviewReport,
@@ -45,20 +51,31 @@ from app.domain.models.review import (
     PlaybookReviewVerdict,
     ReviewSeverity,
 )
+from app.domain.models.skill_recipe import (
+    AssetRequirement,
+    FactRequirement,
+    QualityExpectation,
+    SkillRecipe,
+)
 from app.domain.models.topic import TopicDomain, VisualKind
 
 __all__ = [
     "CirDocument", "CirStep", "VisualToken", "LayoutInstruction",
     "ExecutionMap", "ExecutionCheckpoint", "ExecutionArrayTrack", "ExecutionParameterControl",
+    "LessonPlan", "SceneIntent",
     "TopicDomain", "VisualKind",
     "PipelineRunStatus", "SandboxMode", "SandboxStatus", "UITheme",
     "ValidationSeverity", "ValidationStatus",
     "PlaybookScript", "MetaStep", "AlgorithmArraySnapshot", "AlgorithmBarsSnapshot",
     "AlgorithmTreeSnapshot", "MotionSceneSnapshot", "MatrixSceneSnapshot", "TableSceneSnapshot",
-    "GraphSceneSnapshot", "StatsChartSceneSnapshot", "IterationTraceSceneSnapshot",
+    "GraphSceneSnapshot", "CallStackSceneSnapshot", "CodeTraceSceneSnapshot",
+    "StatsChartSceneSnapshot",
+    "IterationTraceSceneSnapshot",
     "PhasePortraitSceneSnapshot", "ComplexPlaneSceneSnapshot", "OptimizationSceneSnapshot",
-    "ModelingSceneSnapshot", "ManifoldSceneSnapshot", "AnySnapshot", "SnapshotKind",
+    "ModelingSceneSnapshot", "ManifoldSceneSnapshot", "GeoMapSceneSnapshot",
+    "PhysicsForceSceneSnapshot", "AnySnapshot", "SnapshotKind",
     "ReviewSeverity", "CirReviewIssue", "CirReviewReport",
     "PlaybookIssueSeverity", "PlaybookReviewIssue", "PlaybookReviewStatus",
-    "PlaybookReviewVerdict",
+    "PlaybookReviewVerdict", "QualityReport",
+    "AssetRequirement", "FactRequirement", "QualityExpectation", "SkillRecipe",
 ]

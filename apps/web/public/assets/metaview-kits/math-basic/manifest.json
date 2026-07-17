@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "1.0.0",
+  "packId": "math-basic",
+  "subject": "math",
+  "version": "0.1.0",
+  "license": "internal",
+  "licenseMode": "single",
+  "defaultLicense": "internal",
+  "sceneTemplates": ["derivative_tangent", "integral_area"],
+  "rendererKinds": ["math_plot", "math_scene", "math_formula", "katex_overlay"],
+  "sources": [
+    {
+      "id": "metaview-internal",
+      "label": "MetaView internal math structured presets",
+      "license": "internal",
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "attribution": null
+    }
+  ],
+  "assets": [
+    {
+      "id": "derivative-tangent-preset",
+      "type": "json",
+      "path": "/assets/metaview-kits/math-basic/plot-presets/derivative-tangent.json",
+      "tags": ["derivative", "tangent", "slope", "math_plot", "structured_preset"],
+      "semanticRoles": ["derivative", "tangent", "slope", "plot"],
+      "sourceId": "metaview-internal",
+      "attribution": "MetaView internal structured math preset",
+      "license": "internal",
+      "commercialUseStatus": "allowed",
+      "commercialUseAllowed": true,
+      "requiresAttribution": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
+      "sourceUrl": null,
+      "licenseUrl": null,
+      "modifiedFrom": null,
+      "rendererHints": {
+        "preferredRenderer": "math_plot",
+        "defaultSize": [360, 220],
+        "anchor": "center",
+        "colorizable": true,
+        "strokeControlled": true
+      }
+    }
+  ]
+}

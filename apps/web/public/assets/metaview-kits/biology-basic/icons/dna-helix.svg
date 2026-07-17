@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 72" role="img" aria-label="DNA helix" data-asset-id="dna-helix" data-asset-quality="v1">
+  <path d="M13 8 C36 18 36 30 13 40 C36 50 36 61 13 66" fill="none" stroke="#2f80c9" stroke-width="4" stroke-linecap="round"/>
+  <path d="M35 8 C12 18 12 30 35 40 C12 50 12 61 35 66" fill="none" stroke="#d55343" stroke-width="4" stroke-linecap="round"/>
+  <path d="M17 17 H31 M15 29 H33 M16 51 H32 M18 61 H30" stroke="#64748b" stroke-width="3" stroke-linecap="round"/>
+</svg>

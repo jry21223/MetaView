@@ -40,23 +40,23 @@ def test_physics_mechanics_manifest_is_valid() -> None:
     assert payload["skill_id"] == "physics_mechanics"
     assert payload["domain"] == "physics"
     assert payload["execution_mode"] == "deterministic"
-    assert {
-        capability["capability_id"] for capability in payload["capabilities"]
-    } == {
+    assert {capability["capability_id"] for capability in payload["capabilities"]} == {
         "physics_mechanics.uniform_acceleration_1d",
         "physics_mechanics.projectile_motion",
         "physics_mechanics.newton_second_law",
         "physics_mechanics.incline_force",
     }
-    assert {
-        capability["output_schema"] for capability in payload["capabilities"]
-    } == {"PhysicsMechanicsProblemSpec"}
+    assert {capability["output_schema"] for capability in payload["capabilities"]} == {
+        "PhysicsMechanicsProblemSpec"
+    }
 
 
 def test_uniform_acceleration_heuristic_extracts_spec_without_answer_fields() -> None:
     skill = PhysicsMechanicsSkillPack()
     match = skill.heuristic_match(
-        SkillRouteInput(prompt="小球从静止开始做匀加速直线运动，加速度 2m/s²，求 5 秒后的速度和位移")
+        SkillRouteInput(
+            prompt="小球从静止开始做匀加速直线运动，加速度 2m/s²，求 5 秒后的速度和位移"
+        )
     )
 
     assert match is not None
@@ -115,7 +115,7 @@ async def test_execute_outputs_valid_playbook_with_formula_and_table() -> None:
 
 
 @pytest.mark.asyncio
-async def test_projectile_motion_uses_motion_scene() -> None:
+async def test_projectile_motion_uses_asset_backed_force_scene() -> None:
     skill = PhysicsMechanicsSkillPack()
     prompt = "一个物体以 10m/s 水平抛出，高度 20m，求落地时间和水平位移"
     match = skill.heuristic_match(SkillRouteInput(prompt=prompt))
@@ -131,7 +131,11 @@ async def test_projectile_motion_uses_motion_scene() -> None:
     assert result.handled is True
     assert result.playbook_json is not None
     playbook = PlaybookScript.model_validate_json(result.playbook_json)
-    assert "motion_scene" in {step.snapshot.kind for step in playbook.steps}
+    force_steps = [step for step in playbook.steps if step.snapshot.kind == "physics_force_scene"]
+    assert force_steps
+    force_snapshot = force_steps[0].snapshot.model_dump(mode="json")
+    assert force_snapshot["pack_id"] == "physics-basic"
+    assert any(item.get("asset_id") == "projectile-body-dot" for item in force_snapshot["objects"])
 
 
 @pytest.mark.asyncio

@@ -2,14 +2,14 @@ import React from "react";
 import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { DirectorScript, PlaybookScript } from "../types";
+import type { PlaybookScript } from "../types";
 import { PlaybookPlayer } from "./PlaybookPlayer";
 
 vi.mock("@remotion/player", async () => {
   const React = await import("react");
   return {
     Player: React.forwardRef(function MockPlayer(
-      props: { inputProps?: { showSubtitles?: boolean } },
+      props: { inputProps?: { showSubtitles?: boolean; showInlineCode?: boolean } },
       ref: React.ForwardedRef<unknown>,
     ) {
       React.useImperativeHandle(ref, () => ({
@@ -23,6 +23,7 @@ vi.mock("@remotion/player", async () => {
         <div
           data-testid="mock-remotion-player"
           data-show-subtitles={String(props.inputProps?.showSubtitles)}
+          data-show-inline-code={String(props.inputProps?.showInlineCode)}
         />
       );
     }),
@@ -82,39 +83,6 @@ function baseScript(overrides: Partial<PlaybookScript> = {}): PlaybookScript {
   };
 }
 
-function director(): DirectorScript {
-  return {
-    schema_version: "1.0.0",
-    source: "manual",
-    run_id: "run-1",
-    beats: [
-      {
-        beat_id: "beat_01",
-        step_id: "s1",
-        start_frame: 0,
-        end_frame: 45,
-        intent: "hook",
-        shot_type: "wide",
-        camera_motion: "hold",
-        pacing: "normal",
-        emphasis_terms: [],
-      },
-      {
-        beat_id: "beat_02",
-        step_id: "s2",
-        start_frame: 45,
-        end_frame: 90,
-        intent: "focus",
-        shot_type: "close",
-        camera_motion: "push_in",
-        pacing: "slow",
-        emphasis_terms: ["参数"],
-        focus_target: "formula",
-      },
-    ],
-  };
-}
-
 describe("PlaybookPlayer", () => {
   afterEach(() => {
     cleanup();
@@ -161,8 +129,47 @@ describe("PlaybookPlayer", () => {
     expect(getByText("Ask this step")).toBeTruthy();
   });
 
-  it("hides code sync for non-code lessons while keeping params above follow-up", () => {
-    const { queryByText, getByText, getByTestId } = render(
+  it("shows legacy call-stack code sync in the desktop learning console", () => {
+    const script = baseScript({
+      domain: "code",
+      title: "Recursive factorial",
+      steps: [
+        {
+          ...baseScript().steps[0],
+          snapshot: {
+            kind: "call_stack_scene",
+            frames: [
+              {
+                id: "factorial-3",
+                function_name: "factorial",
+                arguments: { n: "3" },
+                variables: { n: "3" },
+                state: "active",
+              },
+            ],
+            current_frame_id: "factorial-3",
+            code_trace: {
+              language: "python",
+              lines: ["def factorial(n):", "    return n * factorial(n - 1)"],
+              active_line: 1,
+              active_lines: [1],
+            },
+          },
+          code_highlight: undefined,
+        },
+      ],
+    });
+
+    const { getByRole, getByText } = render(<PlaybookPlayer script={script} theme="light" />);
+    const learningConsole = getByRole("complementary", { name: "Learning console" });
+
+    expect(getByText("Code Sync")).toBeTruthy();
+    expect(learningConsole.textContent).toContain("def factorial(n):");
+    expect(learningConsole.textContent).toContain("n = 3");
+  });
+
+  it("hides empty math params and lets follow-up occupy the remaining console", () => {
+    const { container, queryByText, getByTestId } = render(
       <PlaybookPlayer
         script={baseScript()}
         theme="light"
@@ -171,25 +178,26 @@ describe("PlaybookPlayer", () => {
     );
 
     expect(queryByText("Code Sync")).toBeNull();
-    expect(getByText("Params")).toBeTruthy();
+    expect(queryByText("Params")).toBeNull();
+    expect(container.querySelector(".playbook-player__params-card")).toBeNull();
+    expect(container.querySelector(".playbook-player__follow-card")).toBeTruthy();
     expect(getByTestId("followup-slot")).toBeTruthy();
-    expect(getByText("Ask a follow-up")).toBeTruthy();
   });
 
-  it("shows the current Director beat in the learning console", () => {
-    const { getAllByText, getByText } = render(
-      <PlaybookPlayer script={baseScript()} director={director()} theme="light" />,
+  it("shows math params when at least one editable control is available", () => {
+    const script = baseScript({
+      parameter_controls: [{ id: "a", label: "斜率 a", value: "1" }],
+    });
+
+    const { getByText, getByLabelText } = render(
+      <PlaybookPlayer script={script} theme="light" />,
     );
 
-    expect(getByText("Director")).toBeTruthy();
-    expect(getAllByText("manual").length).toBeGreaterThan(0);
-    expect(getByText("beat_01")).toBeTruthy();
-    expect(getByText("hook")).toBeTruthy();
-    expect(getByText("hold")).toBeTruthy();
-    expect(getByText("0-45")).toBeTruthy();
+    expect(getByText("Params")).toBeTruthy();
+    expect(getByLabelText("斜率 a")).toBeTruthy();
   });
 
-  it("keeps the narration panel above controls and moves playback options into settings", () => {
+  it("keeps subtitles inside the composition and moves playback options into settings", () => {
     const { container, getByRole, getByText, queryByText } = render(
       <PlaybookPlayer script={baseScript()} theme="light" />,
     );
@@ -197,18 +205,11 @@ describe("PlaybookPlayer", () => {
     expect(container.querySelector('[data-testid="mock-remotion-player"]')?.getAttribute("data-show-subtitles")).toBe(
       "true",
     );
-    const workspaceChildren = Array.from(
-      container.querySelector(".playbook-player__workspace")!.children,
+    expect(container.querySelector('[data-testid="mock-remotion-player"]')?.getAttribute("data-show-inline-code")).toBe(
+      "false",
     );
-    expect(
-      workspaceChildren.findIndex((child) =>
-        child.classList.contains("playbook-player__caption"),
-      ),
-    ).toBeLessThan(
-      workspaceChildren.findIndex((child) =>
-        child.classList.contains("playbook-player__controls"),
-      ),
-    );
+    expect(container.querySelector(".playbook-player__caption")).toBeNull();
+    expect(queryByText("先观察函数的基础形态。")).toBeNull();
 
     const controls = container.querySelector(".playbook-player__controls");
     expect(controls).toBeTruthy();
@@ -259,7 +260,7 @@ describe("PlaybookPlayer", () => {
 
   it("uses a portrait shell with mobile tabs while keeping export and more actions visible", () => {
     const onOpenExport = vi.fn();
-    const { container } = render(
+    const { container, queryByRole } = render(
       <PlaybookPlayer
         script={baseScript()}
         theme="light"
@@ -274,10 +275,22 @@ describe("PlaybookPlayer", () => {
     expect(container.querySelector(".playbook-player__console")).toBeNull();
     expect(container.querySelector(".playbook-player__stage")).toBeTruthy();
     expect(container.querySelector(".playbook-player__controls")).toBeTruthy();
-    expect(container.querySelector(".playbook-player__caption--mobile")).toBeTruthy();
+    expect(container.querySelector(".playbook-player__caption--mobile")).toBeNull();
+    expect(container.querySelector(".playbook-player__mobile-narration")?.textContent).toContain(
+      "先观察函数的基础形态。",
+    );
+    const player = container.querySelector('[data-testid="mock-remotion-player"]');
+    expect(player?.getAttribute("data-show-subtitles")).toBe("false");
 
     const tabs = container.querySelectorAll(".playbook-player__mobile-tabs button");
-    expect(tabs).toHaveLength(5);
+    expect(tabs).toHaveLength(4);
+    expect(queryByRole("tab", { name: "参数" })).toBeNull();
+
+    fireEvent.click(tabs[1]);
+    expect(player?.getAttribute("data-show-subtitles")).toBe("true");
+
+    fireEvent.click(tabs[0]);
+    expect(player?.getAttribute("data-show-subtitles")).toBe("false");
 
     const exportButton = container.querySelector<HTMLButtonElement>(
       ".playbook-player__header-actions .playbook-player__export-btn",
@@ -293,6 +306,29 @@ describe("PlaybookPlayer", () => {
 
     fireEvent.click(moreButton!);
     expect(container.querySelector(".playbook-player__mobile-sheet")).toBeTruthy();
+  });
+
+  it("leaves the params tab when a portrait lesson loses editable controls", () => {
+    const withParams = baseScript({
+      parameter_controls: [{ id: "a", label: "斜率 a", value: "1" }],
+    });
+    const view = render(
+      <PlaybookPlayer script={withParams} theme="light" layoutMode="portrait" />,
+    );
+
+    fireEvent.click(view.getByRole("tab", { name: "参数" }));
+    expect(view.getByRole("tab", { name: "参数" }).getAttribute("aria-selected")).toBe(
+      "true",
+    );
+
+    view.rerender(
+      <PlaybookPlayer script={baseScript()} theme="light" layoutMode="portrait" />,
+    );
+
+    expect(view.queryByRole("tab", { name: "参数" })).toBeNull();
+    expect(view.getByRole("tab", { name: "讲解" }).getAttribute("aria-selected")).toBe(
+      "true",
+    );
   });
 
   it("shows only the active code context in the portrait code tab", () => {
@@ -346,8 +382,26 @@ describe("PlaybookPlayer", () => {
     expect(queryByText("line8")).toBeNull();
   });
 
+  it("keeps stage subtitles when the portrait learning console is hidden", () => {
+    const { container } = render(
+      <PlaybookPlayer
+        script={baseScript()}
+        theme="light"
+        layoutMode="portrait"
+        showLearningConsole={false}
+      />,
+    );
+
+    expect(container.querySelector(".playbook-player__mobile-narration")).toBeNull();
+    expect(
+      container
+        .querySelector('[data-testid="mock-remotion-player"]')
+        ?.getAttribute("data-show-subtitles"),
+    ).toBe("true");
+  });
+
   it("opens follow-up content in a portrait bottom sheet", () => {
-    const { container, getByLabelText } = render(
+    const { container, getByLabelText, getByRole } = render(
       <PlaybookPlayer
         script={baseScript()}
         theme="light"
@@ -356,10 +410,7 @@ describe("PlaybookPlayer", () => {
       />,
     );
 
-    const followupTab = container.querySelectorAll<HTMLButtonElement>(
-      ".playbook-player__mobile-tabs button",
-    )[3];
-    fireEvent.click(followupTab);
+    fireEvent.click(getByRole("tab", { name: "追问" }));
 
     expect(container.querySelector(".playbook-player__mobile-sheet")).toBeTruthy();
     expect(getByLabelText("Ask follow-up")).toBeTruthy();

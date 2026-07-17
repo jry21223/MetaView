@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "methane-molecule-contract",
+  "moleculeId": "methane",
+  "assetId": "methane-molecule-preset",
+  "sourceAssetId": "methane-molecule-preset",
+  "smiles": "C",
+  "formula": "CH4",
+  "formulaLatex": "CH_4",
+  "elementCounts": {
+    "C": 1,
+    "H": 4
+  },
+  "minBondCount": 4
+}

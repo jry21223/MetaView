@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Projectile body asset" data-asset-quality="v2">
+  <defs>
+    <radialGradient id="projectile-core-v2" cx=".34" cy=".3" r=".72">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".92"/>
+      <stop offset=".28" stop-color="#7aa3d8"/>
+      <stop offset=".68" stop-color="#345995"/>
+      <stop offset="1" stop-color="#1d335e"/>
+    </radialGradient>
+    <filter id="projectile-shadow-v2" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="3" stdDeviation="2" flood-color="#10233f" flood-opacity=".34"/>
+    </filter>
+  </defs>
+  <g opacity=".24" stroke="#345995" stroke-linecap="round">
+    <path d="M7 41c9-9 19-13 31-12" stroke-width="5"/>
+    <path d="M12 51c8-7 17-10 27-9" stroke-width="3"/>
+  </g>
+  <circle cx="32" cy="32" r="20" fill="url(#projectile-core-v2)" filter="url(#projectile-shadow-v2)"/>
+  <circle cx="24" cy="23" r="6" fill="#ffffff" opacity=".42"/>
+  <path d="M17 38c8 9 21 13 32 5" fill="none" stroke="#172947" stroke-width="2.4" stroke-linecap="round" opacity=".32"/>
+  <circle cx="32" cy="32" r="25" fill="none" stroke="#345995" stroke-opacity=".16" stroke-width="5"/>
+  <circle cx="32" cy="32" r="29" fill="none" stroke="#d69e2e" stroke-opacity=".2" stroke-width="2" stroke-dasharray="4 5"/>
+</svg>

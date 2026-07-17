@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Annotated, Literal, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.models.execution import ExecutionParameterControl
 from app.domain.models.topic import TopicDomain
@@ -19,6 +19,8 @@ class SnapshotKind(str, Enum):
     MATRIX_SCENE = "matrix_scene"
     TABLE_SCENE = "table_scene"
     GRAPH_SCENE = "graph_scene"
+    CALL_STACK_SCENE = "call_stack_scene"
+    CODE_TRACE_SCENE = "code_trace_scene"
     STATS_CHART_SCENE = "stats_chart_scene"
     ITERATION_TRACE_SCENE = "iteration_trace_scene"
     PHASE_PORTRAIT_SCENE = "phase_portrait_scene"
@@ -27,6 +29,12 @@ class SnapshotKind(str, Enum):
     MODELING_SCENE = "modeling_scene"
     MANIFOLD_SCENE = "manifold_scene"
     SOLID_GEOMETRY_SCENE = "solid_geometry_scene"
+    BIO_CELL_SCENE = "bio_cell_scene"
+    BIO_PROCESS_SCENE = "bio_process_scene"
+    MOLECULE_2D_SCENE = "molecule_2d_scene"
+    REACTION_SCENE = "reaction_scene"
+    GEO_MAP_SCENE = "geo_map_scene"
+    PHYSICS_FORCE_SCENE = "physics_force_scene"
     MOTION_SCENE = "motion_scene"
     KATEX_OVERLAY = "katex_overlay"
     NARRATION_CARD = "narration_card"
@@ -76,6 +84,7 @@ class MathPlotCurve(BaseModel):
     expression: str
     label: str | None = None
     emphasis: str = "primary"  # primary | secondary | accent
+    semantic_role: str | None = None
 
 
 class MathPlotSnapshot(BaseModel):
@@ -86,7 +95,10 @@ class MathPlotSnapshot(BaseModel):
     """
 
     kind: Literal["math_plot"] = "math_plot"
+    pack_id: str | None = None
+    asset_id: str | None = None
     curves: list[MathPlotCurve] = Field(default_factory=list)
+    params: dict[str, float] = Field(default_factory=dict)
     x_min: float = -10.0
     x_max: float = 10.0
     y_min: float | None = None
@@ -97,6 +109,7 @@ class MathPlotSnapshot(BaseModel):
     x_label: str = "x"
     y_label: str = "y"
     formula_latex: str | None = None  # optional KaTeX label, e.g. "f(x) = x^2"
+    caption: str | None = None
 
 
 class MathFormulaSnapshot(BaseModel):
@@ -219,24 +232,84 @@ class GraphSceneNode(BaseModel):
     x: float | None = None
     y: float | None = None
     emphasis: SceneEmphasis = "secondary"
+    asset_id: str | None = None
 
 
 class GraphSceneEdge(BaseModel):
+    id: str | None = None
     source: str
     target: str
     label: str | None = None
     weight: float | None = None
     emphasis: SceneEmphasis = "secondary"
+    asset_id: str | None = None
 
 
 class GraphSceneSnapshot(BaseModel):
     kind: Literal["graph_scene"] = "graph_scene"
+    pack_id: str | None = None
+    asset_id: str | None = None
     nodes: list[GraphSceneNode] = Field(default_factory=list)
     edges: list[GraphSceneEdge] = Field(default_factory=list)
     directed: bool = False
     weighted: bool = False
+    current_node_id: str | None = None
     active_node_ids: list[str] = Field(default_factory=list)
     active_edge_ids: list[str] = Field(default_factory=list)
+    visited_node_ids: list[str] = Field(default_factory=list)
+    queue_node_ids: list[str] = Field(default_factory=list)
+    frontier_node_ids: list[str] = Field(default_factory=list)
+    caption: str | None = None
+
+
+class CallStackFrame(BaseModel):
+    id: str
+    label: str
+    depth: int = 0
+    state: str = "waiting"
+    asset_id: str | None = None
+    variables: dict[str, str] = Field(default_factory=dict)
+
+
+class CallStackCodeTrace(BaseModel):
+    language: str
+    lines: list[str] = Field(default_factory=list)
+    active_lines: list[int] = Field(default_factory=list)
+    active_line: int = 0
+    asset_id: str | None = None
+
+
+class CallStackSceneSnapshot(BaseModel):
+    kind: Literal["call_stack_scene"] = "call_stack_scene"
+    pack_id: str | None = None
+    asset_id: str | None = None
+    frames: list[CallStackFrame] = Field(default_factory=list)
+    code_trace: CallStackCodeTrace | None = None
+    current_frame_id: str | None = None
+    caption: str | None = None
+
+
+class CodeTracePointer(BaseModel):
+    id: str
+    label: str
+    index: int
+    asset_id: str | None = None
+
+
+class CodeTraceSceneSnapshot(BaseModel):
+    kind: Literal["code_trace_scene"] = "code_trace_scene"
+    pack_id: str | None = None
+    asset_id: str | None = None
+    language: str
+    lines: list[str] = Field(default_factory=list)
+    active_lines: list[int] = Field(default_factory=list)
+    active_line: int = 0
+    active_line_asset_id: str | None = None
+    array_values: list[str] = Field(default_factory=list)
+    active_indices: list[int] = Field(default_factory=list)
+    search_range: tuple[int, int] | None = None
+    pointers: list[CodeTracePointer] = Field(default_factory=list)
+    variables: dict[str, str] = Field(default_factory=dict)
     caption: str | None = None
 
 
@@ -426,6 +499,216 @@ class SolidGeometrySceneSnapshot(BaseModel):
     caption: str | None = None
 
 
+class BioCellStructure(BaseModel):
+    id: str
+    semantic_role: str
+    label: str | None = None
+    x: float
+    y: float
+    width: float
+    height: float
+    asset_id: str | None = None
+
+
+class BioCellCallout(BaseModel):
+    id: str
+    target_id: str
+    label: str
+    side: Literal["left", "right", "top", "bottom"] | None = None
+
+
+class BioCellSceneSnapshot(BaseModel):
+    kind: Literal["bio_cell_scene"] = "bio_cell_scene"
+    pack_id: str | None = None
+    cell_type: str | None = None
+    structures: list[BioCellStructure] = Field(default_factory=list)
+    callouts: list[BioCellCallout] = Field(default_factory=list)
+    caption: str | None = None
+
+
+class BioProcessStep(BaseModel):
+    id: str
+    semantic_role: str
+    label: str | None = None
+    x: float
+    y: float
+    width: float
+    height: float
+    asset_id: str | None = None
+    description: str | None = None
+
+
+class BioProcessConnection(BaseModel):
+    id: str
+    from_: str = Field(alias="from")
+    to: str
+    semantic_role: str
+    label: str | None = None
+    asset_id: str | None = None
+
+
+class BioProcessSceneSnapshot(BaseModel):
+    kind: Literal["bio_process_scene"] = "bio_process_scene"
+    pack_id: str | None = None
+    process_id: str
+    steps: list[BioProcessStep] = Field(default_factory=list)
+    connections: list[BioProcessConnection] = Field(default_factory=list)
+    callouts: list[BioCellCallout] = Field(default_factory=list)
+    caption: str | None = None
+
+
+class Molecule2DAtom(BaseModel):
+    id: str
+    element: str
+    x: float
+    y: float
+    charge: str | None = None
+    label: str | None = None
+    asset_id: str | None = None
+
+
+class Molecule2DBond(BaseModel):
+    id: str
+    from_: str = Field(alias="from")
+    to: str
+    order: Literal[1, 2, 3] = 1
+    label: str | None = None
+    asset_id: str | None = None
+
+
+class Molecule2DCallout(BaseModel):
+    id: str
+    target_id: str
+    label: str
+    side: Literal["left", "right", "top", "bottom"] | None = None
+
+
+class Molecule2DSceneSnapshot(BaseModel):
+    kind: Literal["molecule_2d_scene"] = "molecule_2d_scene"
+    pack_id: str | None = None
+    molecule_id: str
+    smiles: str | None = None
+    molecule_asset_id: str | None = None
+    atoms: list[Molecule2DAtom] = Field(default_factory=list)
+    bonds: list[Molecule2DBond] = Field(default_factory=list)
+    highlights: list[str] = Field(default_factory=list)
+    callouts: list[Molecule2DCallout] = Field(default_factory=list)
+    formula_latex: str | None = None
+    caption: str | None = None
+
+
+class ReactionParticipant(BaseModel):
+    id: str
+    formula_latex: str
+    label: str | None = None
+    coefficient: float | None = None
+    x: float
+    y: float
+    asset_id: str | None = None
+
+
+class ReactionArrow(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+    id: str
+    semantic_role: str = "reaction_arrow"
+    from_: tuple[float, float] = Field(alias="from")
+    to: tuple[float, float]
+    label: str | None = None
+    asset_id: str | None = None
+
+
+class ReactionElectronFlow(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+    id: str
+    semantic_role: str = "electron_flow"
+    from_: tuple[float, float] = Field(alias="from")
+    to: tuple[float, float]
+    label: str | None = None
+    asset_id: str | None = None
+
+
+class ReactionSceneSnapshot(BaseModel):
+    kind: Literal["reaction_scene"] = "reaction_scene"
+    pack_id: str | None = None
+    reaction_id: str
+    reactants: list[ReactionParticipant] = Field(default_factory=list)
+    products: list[ReactionParticipant] = Field(default_factory=list)
+    arrows: list[ReactionArrow] = Field(default_factory=list)
+    electron_flows: list[ReactionElectronFlow] = Field(default_factory=list)
+    callouts: list[Molecule2DCallout] = Field(default_factory=list)
+    formula_latex: str | None = None
+    caption: str | None = None
+
+
+class GeoMapLayer(BaseModel):
+    id: str
+    semantic_role: str
+    label: str | None = None
+    asset_id: str | None = None
+
+
+class GeoMapFlow(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+    id: str
+    semantic_role: str = "wind"
+    from_: tuple[float, float] = Field(alias="from")
+    to: tuple[float, float]
+    label: str | None = None
+    asset_id: str | None = None
+    strength: float | None = None
+
+
+class GeoPressureCenter(BaseModel):
+    id: str
+    kind: Literal["high", "low"]
+    x: float
+    y: float
+    label: str
+
+
+class GeoMapSceneSnapshot(BaseModel):
+    kind: Literal["geo_map_scene"] = "geo_map_scene"
+    pack_id: str = "geography-basic"
+    map_region: str = "east_asia"
+    layers: list[GeoMapLayer] = Field(default_factory=list)
+    flows: list[GeoMapFlow] = Field(default_factory=list)
+    pressure_centers: list[GeoPressureCenter] = Field(default_factory=list)
+    particle_preset: str | None = None
+    caption: str | None = None
+
+
+class PhysicsSceneObject(BaseModel):
+    id: str
+    label: str | None = None
+    x: float
+    y: float
+    asset_id: str | None = None
+    radius: float | None = None
+
+
+class PhysicsSceneVector(BaseModel):
+    id: str
+    target: str
+    semantic_role: str
+    dx: float
+    dy: float
+    label: str | None = None
+    magnitude: str | None = None
+
+
+class PhysicsForceSceneSnapshot(BaseModel):
+    kind: Literal["physics_force_scene"] = "physics_force_scene"
+    pack_id: str = "physics-basic"
+    objects: list[PhysicsSceneObject] = Field(default_factory=list)
+    vectors: list[PhysicsSceneVector] = Field(default_factory=list)
+    trajectory: list[tuple[float, float]] = Field(default_factory=list)
+    formula_latex: str | None = None
+    caption: str | None = None
+
+
 MotionStyle = Literal["primary", "secondary", "accent", "muted"]
 MotionTextStyle = Literal["title", "label", "caption"]
 MotionEasing = Literal["linear", "easeOut", "easeInOut", "spring"]
@@ -566,6 +849,8 @@ AnySnapshot = Annotated[
         MatrixSceneSnapshot,
         TableSceneSnapshot,
         GraphSceneSnapshot,
+        CallStackSceneSnapshot,
+        CodeTraceSceneSnapshot,
         StatsChartSceneSnapshot,
         IterationTraceSceneSnapshot,
         PhasePortraitSceneSnapshot,
@@ -574,6 +859,12 @@ AnySnapshot = Annotated[
         ModelingSceneSnapshot,
         ManifoldSceneSnapshot,
         SolidGeometrySceneSnapshot,
+        BioCellSceneSnapshot,
+        BioProcessSceneSnapshot,
+        Molecule2DSceneSnapshot,
+        ReactionSceneSnapshot,
+        GeoMapSceneSnapshot,
+        PhysicsForceSceneSnapshot,
         MotionSceneSnapshot,
         KaTeXOverlaySnapshot,
         NarrationCardSnapshot,

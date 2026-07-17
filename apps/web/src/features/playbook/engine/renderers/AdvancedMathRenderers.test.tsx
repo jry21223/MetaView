@@ -118,4 +118,48 @@ describe("advanced math renderers", () => {
     expect(markup).not.toContain('cy="-2.4"');
     expect(markup).toContain('cx="450"');
   });
+
+  it("marks BFS graph node and edge states with algorithm assets", () => {
+    const markup = render({
+      kind: "graph_scene",
+      pack_id: "algorithm-code-basic",
+      asset_id: "bfs-graph-preset",
+      nodes: [
+        { id: "S", label: "S", x: -3, y: 0 },
+        { id: "A", label: "A", x: -1, y: 0 },
+        { id: "B", label: "B", x: 1.1, y: -1.4 },
+        { id: "C", label: "C", x: 1.1, y: 1.4 },
+      ],
+      edges: [
+        { id: "S-A", source: "S", target: "A" },
+        { id: "A-B", source: "A", target: "B" },
+        { id: "A-C", source: "A", target: "C" },
+      ],
+      directed: true,
+      active_node_ids: ["A"],
+      visited_node_ids: ["S"],
+      queue_node_ids: ["B", "C"],
+      active_edge_ids: ["A-B"],
+      caption: "BFS expands the current node and appends neighbors to the queue.",
+    });
+
+    expect(markup).toContain("graph-scene-renderer");
+    expect(markup).toContain('data-pack-id="algorithm-code-basic"');
+    expect(markup).toContain('data-graph-asset-id="bfs-graph-preset"');
+    expect(markup).toContain('data-asset-id="graph-node"');
+    expect(markup).toContain('data-asset-id="queue-frame"');
+    expect(markup).toContain('data-node-state="current"');
+    expect(markup).toContain('data-node-state="visited"');
+    expect(markup).toContain('data-node-state="queue"');
+    expect(markup).toContain('data-edge-state="active"');
+    expect(markup).toContain('data-semantic-role="queue_panel"');
+    expect(markup).toContain('data-queue-node-id="B"');
+    expect(markup).toContain('data-queue-node-id="C"');
+    expect(markup).toContain('data-semantic-role="visited_set"');
+    expect(markup).toContain('data-visited-node-id="S"');
+    expect(markup).not.toContain("Code sync");
+    expect(markup).not.toContain('data-semantic-role="code_trace"');
+    expect(markup).not.toContain("data-code-line-state");
+    expect(markup).not.toContain('data-asset-id="active-line"');
+  });
 });

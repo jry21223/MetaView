@@ -1,64 +1,103 @@
 # Topic Routing
 
-Status: Active
+MetaView routes each prompt before building the CIR prompt. Topic routing chooses
+prompt guidance; Skill routing proposes a deterministic candidate. Neither is the
+final capability verdict. `CoverageResolver` validates both signals against registered
+manifests, ProblemSpec, tools and SceneBlueprint before LessonPlan/provider execution.
 
-MetaView routes prompts on the backend before selecting deterministic SkillPack,
-generic CIR, or agent generation. Routing chooses the generation path and skill
-match only; it does not change the CIR, PlaybookScript, or DirectorScript schema.
+## Modes
 
-## Source Of Truth
+- `specialized`: injects domain-specific prompt guidance for one existing
+  `TopicDomain`.
+- `generic`: injects generic visual pedagogy guidance and asks the LLM to choose
+  the final `cir.domain` itself.
 
-The backend is the routing authority:
-
-```text
-PipelineRequest
-  -> router_provider small model / hybrid router
-  -> SkillRegistry heuristic fallback
-  -> SkillRouteMatch | generic / agent fallback
-```
-
-Frontend `inferDomain` is only a UX hint. It may submit `domain=null`, and it
-must not block user submission when it cannot classify the prompt. In that case
-the UI should show a light message such as `将交给系统自动识别题目类型`.
-
-Do not move router-model logic into `IntakeScreen`.
-
-## Router Settings
-
-These request/settings fields remain the public routing contract:
-
-- `router_mode`: `off | heuristic | llm | hybrid`
-- `router_model`: optional small router model override
-- `router_min_confidence`: minimum confidence for accepting model route output
-- `router_timeout_s`: router model timeout
-
-Self-hosted clients may pass these through Provider settings. Ops edition rejects
-client router overrides and uses platform-managed routing.
-
-## Backend Order
-
-`RunPipelineUseCase._route_request()` is the main boundary:
-
-1. `skill_mode_override="generic"` skips SkillPack routing.
-2. `router_provider` runs in `llm` or `hybrid` mode when configured.
-3. Model matches at or above `router_min_confidence` become `SkillRouteMatch`.
-4. Mid-confidence matches are treated as refinement/fallback, not hard failure.
-5. `heuristic` or `hybrid` mode falls back to `SkillRegistry.heuristic_match()`.
-6. No SkillPack match falls back to generic CIR or agent path, depending on generation mode.
-
-`SkillRouteMatch` and `RouteDecision` are persisted in review actions so failures
-can be diagnosed without guessing.
-
-## SkillPack And Fallback
-
-High-confidence deterministic matches should execute the registered `SkillPack`.
-If a SkillPack declines or cannot validate its problem spec, the pipeline falls
-back to generic CIR or agent generation with route context attached. `generic` is
-not a domain; final PlaybookScript domains remain:
+`generic` is not a domain. Do not add `TopicDomain.GENERIC`; final CIR output
+must still use one of:
 
 ```text
 algorithm, math, code, physics, chemistry, biology, geography
 ```
 
-Source code remains a strong route signal for code-oriented skills, but the final
-decision still belongs to the backend router / SkillRegistry boundary.
+Do not confuse topic `SkillMode.SPECIALIZED` with CoverageDecision `specialized`.
+The latter requires a verified registered SkillPack and deterministic runtime contracts.
+
+## Auto Routing
+
+The main pipeline calls:
+
+```python
+route_topic(prompt, explicit_domain=request.domain, source_code=request.source_code)
+```
+
+Routing order:
+
+1. Valid explicit `domain` request wins and routes to `specialized`.
+2. Non-empty `source_code` routes to the `code` specialized skill.
+3. Keyword evidence is scored by match count and specificity; the strongest domain wins,
+   while the existing map order remains the final tie-breaker.
+4. No keyword match routes to `generic` with `domain=None`.
+
+The old behavior was:
+
+```text
+unknown prompt -> TopicDomain.ALGORITHM
+```
+
+The new behavior is:
+
+```text
+unknown prompt -> skill_mode=generic, domain_hint=None
+```
+
+This prevents vague or uncategorized prompts from inheriting algorithm-specific
+array/graph guidance. In the production pipeline, a request that also lacks verified
+Skill/profile evidence becomes `CoverageDecision(mode="unsupported")` and is rejected;
+the raw `route_topic()` helper still returns generic context for callers that only inspect routing.
+
+## Explicit Domain
+
+When the client passes `domain="physics"`, the route is:
+
+```text
+skill_mode=specialized
+domain=physics
+reason=explicit_domain
+```
+
+Invalid explicit domains are ignored and normal source-code/keyword/no-match
+routing continues.
+
+## Source Code
+
+When `source_code` is present and non-blank, the route is:
+
+```text
+skill_mode=specialized
+domain=code
+reason=source_code_present
+```
+
+This preserves code-line tracking and code explanation guidance.
+
+## Skill Override
+
+`PipelineRequest.skill_mode_override` is an optional dev/eval field:
+
+- `auto` or `None`: use normal route selection.
+- `generic`: force generic prompt mode, even if a keyword matches.
+- `specialized`: force specialized mode when a domain can be determined.
+
+If `specialized` is requested but no domain can be determined, the router falls
+back to generic mode with reason `skill_mode_override_specialized_no_domain`.
+
+Use this for A/B prompt comparison; it is not required for default user flows.
+
+Request-level `router_min_confidence` values below the configured refine threshold are valid;
+the effective refine threshold is clamped to the requested minimum before routing and Coverage
+resolution. A value of `0` is preserved rather than replaced by the default.
+
+`generic` prevents direct Skill execution, but does not erase an independently resolved
+domain or a registered SkillPack's negative capability evidence from CoverageDecision. An exact
+controlled composition profile may still be reported as `composable`; no Generalist Skill is
+registered and no SkillRecipe is executed in this phase.

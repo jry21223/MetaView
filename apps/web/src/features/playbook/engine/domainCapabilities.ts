@@ -8,32 +8,32 @@ export interface DomainCapability {
 }
 
 export const DOMAIN_CAPABILITIES: Record<string, DomainCapability> = {
-  algorithm: { domain: "algorithm", support: "full", primaryRenderer: "algorithm" },
+  algorithm: { domain: "algorithm", support: "full", primaryRenderer: "graph_scene/call_stack_scene/code_trace_scene/algorithm_array/algorithm_tree/code_highlight" },
   code: { domain: "code", support: "partial", primaryRenderer: "algorithm/code" },
   math: { domain: "math", support: "full", primaryRenderer: "math_scene/math_plot/math_formula" },
   physics: {
     domain: "physics",
     support: "partial",
-    primaryRenderer: "math_scene/formula/domain_cards",
-    message: "Physics currently uses scene/formula/card renderers; dedicated physics renderer is not implemented yet.",
+    primaryRenderer: "physics_force_scene/math_scene/formula/domain_cards",
+    message: "Physics has a force-scene renderer for flagship motion cases and falls back to formula/card renderers.",
   },
   chemistry: {
     domain: "chemistry",
-    support: "fallback",
-    primaryRenderer: "domain_cards",
-    message: "Chemistry currently uses fallback concept cards.",
+    support: "partial",
+    primaryRenderer: "molecule_2d_scene/domain_cards",
+    message: "Chemistry has a structured 2D molecule renderer for flagship molecule cases and falls back to concept cards.",
   },
   biology: {
     domain: "biology",
-    support: "fallback",
-    primaryRenderer: "domain_cards",
-    message: "Biology currently uses fallback concept cards.",
+    support: "partial",
+    primaryRenderer: "bio_cell_scene/domain_cards",
+    message: "Biology has a cell-scene renderer for flagship structure cases and falls back to concept cards.",
   },
   geography: {
     domain: "geography",
-    support: "fallback",
-    primaryRenderer: "domain_cards",
-    message: "Geography currently uses fallback concept cards.",
+    support: "partial",
+    primaryRenderer: "geo_map_scene/motion_scene/domain_cards",
+    message: "Geography has a map-scene renderer for flagship map cases and falls back to motion/card renderers.",
   },
 };
 

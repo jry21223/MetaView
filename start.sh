@@ -43,6 +43,21 @@ export VITE_APP_EDITION="$APP_EDITION"
 
 echo "=> 检查 MetaView 环境（$APP_EDITION_LABEL）..."
 
+load_env_file() {
+  local env_file="$1"
+  local line key value
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      ""|\#*) continue ;;
+    esac
+    key="${line%%=*}"
+    value="${line#*=}"
+    if [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+      export "$key=$value"
+    fi
+  done < "$env_file"
+}
+
 is_metaview_process() {
   local pid="$1"
   local cmd
@@ -62,7 +77,7 @@ is_metaview_process() {
 stop_known_metaview_processes() {
   local port="$1"
   local pids
-  pids="$(lsof -ti "tcp:$port" 2>/dev/null || true)"
+  pids="$(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)"
   [ -z "$pids" ] && return 0
 
   for pid in $pids; do
@@ -92,6 +107,10 @@ if [ ! -f .env ]; then
   echo "=> .env 文件不存在，从 .env.example 复制..."
   cp .env.example .env
 fi
+
+load_env_file .env
+export METAVIEW_APP_EDITION="$APP_EDITION"
+export VITE_APP_EDITION="$APP_EDITION"
 
 if [ ! -d node_modules ] || [ ! -d apps/web/node_modules ] || [ ! -d .venv ]; then
   echo "=> 安装依赖..."

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "custom-cell-layout-contract",
+  "sceneTemplate": "cell_structure_custom",
+  "rendererKind": "bio_cell_scene",
+  "packId": "biology-basic",
+  "requiredAssetIds": ["cell-outline", "nucleus", "mitochondrion"],
+  "requiredSemanticRoles": ["cell", "nucleus", "mitochondrion"],
+  "requiredCalloutTargets": ["nucleus", "mitochondrion-right"],
+  "caption": "Custom cell layouts must preserve structured positions while rendering core biology assets and callouts."
+}

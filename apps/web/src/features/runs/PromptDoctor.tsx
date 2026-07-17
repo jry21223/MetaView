@@ -45,17 +45,17 @@ export function PromptDoctor({
 
   return (
     <div className="mv-prompt-doctor" role="alert">
-      <div className="mv-prompt-doctor__header">
-        {attempts > 0
-          ? `生成失败（已尝试 ${attempts} 次自动修复）`
-          : "生成失败"}
-      </div>
+      <span className="mv-prompt-doctor__status">RESULT / 未生成</span>
+      <div className="mv-prompt-doctor__header">这次讲解没有生成成功</div>
+      {attempts > 0 && (
+        <p className="mv-prompt-doctor__attempts">
+          系统已自动修复 {attempts} 次，仍未通过生成检查。
+        </p>
+      )}
 
       {suggestions.length > 0 && (
         <>
-          <div className="mv-prompt-doctor__hint">
-            💡 试试以下建议来重新生成：
-          </div>
+          <div className="mv-prompt-doctor__hint">可调整的输入</div>
           <ul className="mv-prompt-doctor__pills">
             {suggestions.map((pill) => (
               <li key={pill.key}>
@@ -65,8 +65,8 @@ export function PromptDoctor({
                   onClick={() => onRetryWithSuggestion?.(pill.label)}
                   title={pill.message}
                 >
-                  <span className="mv-prompt-doctor__pill-code">{pill.code}</span>
                   <span className="mv-prompt-doctor__pill-text">{pill.label}</span>
+                  <span aria-hidden="true">→</span>
                 </button>
               </li>
             ))}

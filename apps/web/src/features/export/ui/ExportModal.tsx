@@ -5,6 +5,7 @@ import {
   buildDownloadUrl,
   getExportStatus,
   submitExport,
+  type ExportAssetReport,
   type ExportFormat,
   type ExportJobResponse,
   type ExportJobStatus,
@@ -13,11 +14,10 @@ import {
 
 interface ExportModalProps {
   runId: string | null;
-  versionId?: string | null;
-  hasUnpersistedPreview?: boolean;
   isDark: boolean;
   previewTitle?: string | null;
   accentColor?: string;
+  assetReport?: ExportAssetReport | null;
   onClose: () => void;
 }
 
@@ -92,13 +92,16 @@ function readJobStartedAt(job: ExportJobResponse | null): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function assetReportEntryId(entry: ExportAssetReport["entries"][number]): string {
+  return `${entry.pack_id ?? "any"}/${entry.asset_id}`;
+}
+
 export const ExportModal: React.FC<ExportModalProps> = ({
   runId,
-  versionId = null,
-  hasUnpersistedPreview = false,
   isDark,
   previewTitle,
   accentColor,
+  assetReport,
   onClose,
 }) => {
   const [withAudio, setWithAudio] = useState(false);
@@ -139,6 +142,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   const fileExtension = format.toUpperCase();
   const canDownload = job?.status === "completed" && job.output_url;
   const jobScope = runId ? (versionId ? `${runId}:${versionId}` : runId) : null;
+  const previewAssetReportEntries = assetReport?.entries.slice(0, 2) ?? [];
 
   useEffect(
     () => () => {
@@ -200,8 +204,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   };
 
   useEffect(() => {
-    if (!jobScope) return;
-    const jobId = readJobMap()[jobScope];
+    if (!runId) return;
+    const jobId = readJobMap()[runId];
     if (!jobId) return;
     let cancelled = false;
     getExportStatus(jobId)
@@ -215,19 +219,15 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         if (next.status !== "completed" && next.status !== "failed")
           pollUntilDone(jobId);
       })
-      .catch(() => clearJobMapping(jobScope));
+      .catch(() => clearJobMapping(runId));
     return () => {
       cancelled = true;
       abortRef.current?.abort();
     };
-  }, [jobScope]);
+  }, [runId]);
 
   const handleSubmit = async () => {
     if (!runId) return;
-    if (hasUnpersistedPreview) {
-      setError("当前预览还没有保存为版本，不能静默导出旧版本。请先等待追问保存完成。");
-      return;
-    }
     setError(null);
     setSubmitting(true);
     startedAtRef.current = null;
@@ -241,9 +241,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       }
       const created = await submitExport({
         run_id: runId,
-        version_id: versionId,
         with_audio: withAudio,
-        options: { quality, fps, format },
+        options: { quality, fps, format, theme: isDark ? "dark" : "light" },
+        ...(assetReport && { asset_report: assetReport }),
         ...(withAudio &&
           ttsConfig && {
             tts: {
@@ -260,7 +260,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       startedAtRef.current = startedAt;
       setElapsedMs(Date.now() - startedAt);
       setJob(created);
-      if (jobScope) persistJobMapping(jobScope, created.job_id);
+      persistJobMapping(runId, created.job_id);
       pollUntilDone(created.job_id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "提交失败");
@@ -376,6 +376,72 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         {!job && (
           <>
             {previewCard}
+            {assetReport && (
+              <div
+                style={{
+                  border: `1px solid ${assetReport.license_risk.length > 0 ? c.warn : c.border}`,
+                  borderRadius: 8,
+                  padding: "10px 12px",
+                  background: c.inputBg,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 8,
+                    fontSize: 12,
+                    color: c.text,
+                    fontWeight: 600,
+                  }}
+                >
+                  <span>资产授权检查</span>
+                  <span style={{ color: c.muted, fontWeight: 500 }}>
+                    {assetReport.entries.length} 项资产
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <span style={{ ...reportBadgeStyle(c.border, c.text), color: c.text }}>
+                    需署名 {assetReport.attribution_required.length}
+                  </span>
+                  <span
+                    style={{
+                      ...reportBadgeStyle(assetReport.license_risk.length > 0 ? c.warn : c.border, c.text),
+                      color: assetReport.license_risk.length > 0 ? c.warn : c.text,
+                    }}
+                  >
+                    授权风险 {assetReport.license_risk.length}
+                  </span>
+                </div>
+                {previewAssetReportEntries.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {previewAssetReportEntries.map((entry) => (
+                      <div
+                        key={assetReportEntryId(entry)}
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+                          gap: 8,
+                          fontSize: 11,
+                          color: c.muted,
+                        }}
+                      >
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {assetReportEntryId(entry)}
+                        </span>
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {entry.attribution ?? entry.license ?? "无署名要求"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <OptionRow label="画质" muted={c.muted}>
               <ChipGroup
                 items={QUALITY_OPTIONS}
@@ -438,14 +504,6 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 {error}
               </div>
             )}
-            {hasUnpersistedPreview && !error && (
-              <div
-                role="alert"
-                style={{ fontSize: 12, color: c.warn, lineHeight: 1.5 }}
-              >
-                当前预览还没有保存为版本，不能静默导出旧版本。
-              </div>
-            )}
             <div
               style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}
             >
@@ -462,18 +520,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={submitting || !runId || hasUnpersistedPreview}
+                disabled={submitting || !runId}
                 style={{
                   ...buttonBase,
                   border: `1px solid ${c.accent}`,
                   background: `${c.accent}1a`,
                   color: c.accent,
-                  cursor: submitting
-                    ? "wait"
-                    : hasUnpersistedPreview
-                      ? "not-allowed"
-                      : "pointer",
-                  opacity: hasUnpersistedPreview ? 0.58 : 1,
+                  cursor: submitting ? "wait" : "pointer",
                   fontWeight: 600,
                 }}
               >
@@ -582,6 +635,22 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   下载 {fileExtension} ↓
                 </a>
               )}
+              {job.asset_report_url && (
+                <a
+                  href={buildDownloadUrl(job.asset_report_url)}
+                  download
+                  style={{
+                    ...buttonBase,
+                    textDecoration: "none",
+                    border: `1px solid ${c.border}`,
+                    background: "transparent",
+                    color: c.text,
+                    fontWeight: 600,
+                  }}
+                >
+                  下载授权报告
+                </a>
+              )}
               <button
                 onClick={onClose}
                 style={{
@@ -615,6 +684,18 @@ const OptionRow: React.FC<OptionRowProps> = ({ label, muted, children }) => (
     {children}
   </div>
 );
+
+function reportBadgeStyle(border: string, text: string): React.CSSProperties {
+  return {
+    border: `1px solid ${border}`,
+    color: text,
+    borderRadius: 6,
+    padding: "3px 7px",
+    fontSize: 11,
+    lineHeight: 1.2,
+  };
+}
+
 interface ChipGroupItem<T extends string | number> {
   id: T;
   label: string;

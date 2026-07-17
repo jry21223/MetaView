@@ -9,6 +9,7 @@ from app.application.use_cases.run_pipeline import RunPipelineUseCase, _resolve_
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.domain.models.topic import TopicDomain
 from app.domain.services.domain_router import SkillMode
+from tests.coverage_test_utils import ComposableCoverageResolver
 
 
 def _cir_json(domain: str, title: str = "Router Test") -> str:
@@ -72,22 +73,28 @@ class RecordingRepo:
 
 
 @pytest.mark.asyncio
-async def test_unknown_prompt_uses_generic_prompt_not_algorithm_prompt() -> None:
+async def test_unknown_prompt_is_rejected_before_generic_generation() -> None:
     llm = CapturingLLM(returning=VALID_GENERIC_CIR_JSON)
     repo = RecordingRepo()
     use_case = RunPipelineUseCase(repo, llm, max_repair_attempts=0)
 
     await use_case.execute("run-1", PipelineRequest(prompt="some unrelated vague idea"))
 
-    assert "Skill mode: generic" in llm.last_system
-    assert "VISUAL + PEDAGOGY RULES for algorithms" not in llm.last_system
+    assert llm.last_system == ""
+    assert repo.updates[-1]["status"] == PipelineRunStatus.FAILED
+    assert "no reliably resolved domain" in (repo.updates[-1]["error"] or "")
 
 
 @pytest.mark.asyncio
 async def test_physics_prompt_uses_specialized_physics_prompt() -> None:
     llm = CapturingLLM(returning=VALID_PHYSICS_CIR_JSON)
     repo = RecordingRepo()
-    use_case = RunPipelineUseCase(repo, llm, max_repair_attempts=0)
+    use_case = RunPipelineUseCase(
+        repo,
+        llm,
+        max_repair_attempts=0,
+        coverage_resolver=ComposableCoverageResolver(default_domain="physics"),
+    )
 
     await use_case.execute("run-1", PipelineRequest(prompt="斜面小球受力分析"))
 

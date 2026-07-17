@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from app.domain.models.export_job import ExportJobStatus, ExportOptions, TtsConfig
+from app.domain.models.export_job import (
+    ExportAssetReport,
+    ExportJobStatus,
+    ExportOptions,
+    TtsConfig,
+)
 
 
 class ExportRequest(BaseModel):
@@ -11,6 +16,7 @@ class ExportRequest(BaseModel):
     with_audio: bool = False
     tts: TtsConfig | None = None
     options: ExportOptions | None = None
+    asset_report: ExportAssetReport | None = None
 
 
 class ExportJobResponse(BaseModel):
@@ -20,6 +26,8 @@ class ExportJobResponse(BaseModel):
     progress: float
     message: str | None = None
     output_url: str | None = None
+    asset_report_url: str | None = None
+    asset_report_warning: str | None = None
     error: str | None = None
     with_audio: bool
     created_at: str

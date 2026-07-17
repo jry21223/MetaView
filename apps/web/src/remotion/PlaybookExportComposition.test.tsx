@@ -1,79 +1,60 @@
+import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import type React from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { DirectorScript, PlaybookScript } from "../features/playbook/engine/types";
-import { PlaybookExportComposition } from "./PlaybookExportComposition";
+import type { PlaybookScript } from "../features/playbook/engine/types";
 
 vi.mock("remotion", () => ({
-  Audio: ({ src }: { src: string }) => <audio data-src={src} />,
+  Audio: ({ src }: { src: string }) => <audio src={src} />,
   Sequence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
 vi.mock("../features/playbook/engine/composition/PlaybookComposition", () => ({
   PlaybookComposition: ({
-    director,
-    showSubtitles,
+    showDiagnostics,
+    showInlineCode,
   }: {
-    director?: DirectorScript | null;
-    showSubtitles?: boolean;
+    showDiagnostics?: boolean;
+    showInlineCode?: boolean;
   }) => (
     <div
-      data-testid="mock-playbook-composition"
-      data-director-source={director?.source ?? "none"}
-      data-show-subtitles={String(showSubtitles)}
+      data-show-diagnostics={String(showDiagnostics)}
+      data-show-inline-code={String(showInlineCode)}
     />
   ),
 }));
 
-describe("PlaybookExportComposition", () => {
-  it("passes director and subtitle props to the shared playbook composition", () => {
+import { PlaybookExportComposition } from "./PlaybookExportComposition";
+
+const SCRIPT: PlaybookScript = {
+  fps: 30,
+  total_frames: 60,
+  domain: "math",
+  title: "Export diagnostics contract",
+  summary: "Diagnostics must never render into export output.",
+  parameter_controls: [],
+  steps: [
+    {
+      step_id: "s1",
+      end_frame: 60,
+      title: "Plot",
+      voiceover_text: "Show the plot.",
+      tokens: [],
+      snapshot: {
+        kind: "math_formula",
+        formula_latex: "y=x",
+      },
+    },
+  ],
+};
+
+describe("PlaybookExportComposition diagnostics", () => {
+  it("forces renderer diagnostics off", () => {
     const markup = renderToStaticMarkup(
-      <PlaybookExportComposition
-        script={script()}
-        director={director()}
-        theme="dark"
-        showSubtitles
-        audioFiles={["file:///tmp/step.mp3"]}
-      />,
+      <PlaybookExportComposition script={SCRIPT} theme="light" showSubtitles />,
     );
 
-    expect(markup).toContain('data-director-source="manual"');
-    expect(markup).toContain('data-show-subtitles="true"');
-    expect(markup).toContain('data-src="file:///tmp/step.mp3"');
+    expect(markup).toContain('data-show-diagnostics="false"');
+    expect(markup).toContain('data-show-inline-code="false"');
   });
 });
-
-function director(): DirectorScript {
-  return {
-    schema_version: "1.0.0",
-    source: "manual",
-    run_id: "run-1",
-    beats: [],
-  };
-}
-
-function script(): PlaybookScript {
-  return {
-    schema_version: "1.0.0",
-    fps: 30,
-    total_frames: 60,
-    domain: "math",
-    title: "Export",
-    summary: "Export fixture",
-    parameter_controls: [],
-    steps: [
-      {
-        step_id: "step_01",
-        end_frame: 60,
-        title: "Step",
-        voiceover_text: "Narration",
-        tokens: [],
-        snapshot: {
-          kind: "math_formula",
-          formula_latex: "x^2",
-        },
-      },
-    ],
-  };
-}

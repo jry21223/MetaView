@@ -41,5 +41,20 @@ describe("useTweaks", () => {
       swapFrames: TWEAK_DEFAULTS.swapFrames,
     });
     expect(themeVars(tweaks)["--accent"]).toBe(THEME_PALETTE.light.accent);
+    expect(themeVars(tweaks)["--accent-contrast"]).toBe("#0b0f0d");
+    expect(
+      themeVars({ ...tweaks, accent: "#111111" })["--accent-contrast"],
+    ).toBe("#ffffff");
+  });
+
+  it("migrates the legacy bright-green default to the current theme accent", () => {
+    localStorage.setItem(
+      "mv_tweaks",
+      JSON.stringify({ theme: "light", accent: "#10b981" }),
+    );
+
+    const { result } = renderHook(() => useTweaks(TWEAK_DEFAULTS));
+
+    expect(result.current[0].accent).toBe(THEME_PALETTE.light.accent);
   });
 });

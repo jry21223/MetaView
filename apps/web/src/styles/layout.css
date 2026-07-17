@@ -2,16 +2,12 @@
 
 /* Brand mark */
 .mv-brand-strip {
-  display: inline-block;
-  width: 22px;
-  height: 22px;
-  border-radius: 7px;
+  display: block;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
   flex-shrink: 0;
-  border: 1px solid var(--line);
-  background:
-    radial-gradient(circle at 50% 46%, var(--accent-soft), transparent 58%),
-    var(--surface);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.56);
+  object-fit: contain;
 }
 
 /* ───── Topbar ───── */
@@ -56,10 +52,10 @@
   display: grid;
   grid-template-columns: minmax(190px, 240px) 1fr auto;
   align-items: center;
-  min-height: 56px;
-  padding: calc(8px + var(--mv-safe-top)) 22px 8px;
-  border-bottom: 1px solid var(--line);
-  background: color-mix(in srgb, var(--surface) 64%, var(--bg));
+  min-height: 62px;
+  padding: calc(10px + var(--mv-safe-top)) 24px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
   gap: 20px;
   flex-shrink: 0;
   backdrop-filter: blur(12px);
@@ -148,7 +144,7 @@
 
 @media (max-width: 640px) {
   .mv-brand-strip {
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
   }
 }

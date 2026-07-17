@@ -29,9 +29,21 @@ from app.application.ports.director_repository import IRunDirectorRepository
 from app.application.ports.export_repository import IExportJobRepository
 from app.application.ports.run_repository import IRunRepository
 from app.domain.models.director import DirectorScript
-from app.domain.models.export_job import ExportJobStatus, ExportOptions, TtsConfig
 from app.domain.models.playbook import PlaybookScript
 from app.domain.services.director_builder import build_default_director
+from app.domain.models.export_job import (
+    ExportAssetReport,
+    ExportJobStatus,
+    ExportOptions,
+    TtsConfig,
+)
+from app.domain.models.pipeline_run import PipelineRunStatus
+from app.domain.models.quality_report import QualityReport
+from app.domain.models.review import PlaybookIssueSeverity, PlaybookReviewIssue
+from app.domain.services.playbook_quality import (
+    playbook_review_verdict_from_issues,
+    quality_gate_playbook,
+)
 
 _RENDER_TAIL_LINES = 40
 
@@ -71,11 +83,81 @@ class ExportVideoUseCase:
         version_id: str | None = None,
     ) -> None:
         try:
-            playbook_model, director = await self._get_export_payload(
-                run_id,
-                version_id=version_id,
+            run = await self._runs.get(run_id)
+            if run is None or run.playbook is None:
+                raise ValueError(f"Run {run_id!r} has no playbook to export")
+            if run.status != PipelineRunStatus.SUCCEEDED:
+                raise ValueError(f"Run {run_id!r} is not in succeeded state")
+            if version_id is not None:
+                playbook_json = await self._runs.get_version_playbook(run_id, version_id)
+                if playbook_json is None:
+                    raise ValueError(
+                        f"Version {version_id!r} not found for run {run_id!r}"
+                    )
+                playbook_model = PlaybookScript.model_validate_json(playbook_json)
+            else:
+                playbook_model = run.playbook
+            previous_quality = run.quality_report
+            export_quality = quality_gate_playbook(
+                playbook_model,
+                run.prompt,
+                generator_path=(
+                    previous_quality.generator_path if previous_quality else "export_recheck"
+                ),
+                coverage_decision=getattr(run, "coverage_decision", None),
+                lesson_plan=getattr(run, "lesson_plan", None),
+                coverage_mode=(
+                    run.coverage_decision.mode
+                    if getattr(run, "coverage_decision", None) is not None
+                    else (
+                        previous_quality.coverage_mode if previous_quality else "unknown"
+                    )
+                ),
             )
+            export_quality = _merge_export_quality(previous_quality, export_quality)
+            if export_quality.status == "repairable":
+                export_quality = export_quality.with_issue(
+                    PlaybookReviewIssue(
+                        code="export.not_ready",
+                        severity=PlaybookIssueSeverity.ERROR,
+                        path="playbook",
+                        message="Export readiness recheck found unresolved quality errors.",
+                        suggestion="Repair the PlaybookScript before starting export.",
+                        requires_repair=False,
+                    ),
+                    action="export:blocked",
+                )
+            update_quality_report = getattr(self._runs, "update_quality_report", None)
+            if callable(update_quality_report):
+                await update_quality_report(run_id, export_quality.model_dump_json())
+            if export_quality.status in {"repairable", "blocked"}:
+                codes = ", ".join(issue.code for issue in export_quality.issues[:5])
+                raise ValueError(f"Run {run_id!r} is not export-ready: {codes}")
+            job = await self._exports.get(job_id)
+
             playbook = playbook_model.model_dump()
+            try:
+                director = await self._get_export_director(
+                    run_id, version_id=version_id, playbook=playbook_model
+                )
+            except Exception as exc:  # noqa: BLE001 - export must fail closed on Director I/O.
+                director_quality = export_quality.with_issue(
+                    PlaybookReviewIssue(
+                        code="director.persistence_failed",
+                        severity=PlaybookIssueSeverity.ERROR,
+                        path="director",
+                        message=f"DirectorScript could not be loaded for export: {exc}",
+                        suggestion="Restore Director persistence before retrying export.",
+                        requires_repair=False,
+                    ),
+                    action="export:director_load_failed",
+                )
+                if callable(update_quality_report):
+                    await update_quality_report(run_id, director_quality.model_dump_json())
+                raise ValueError(
+                    f"Run {run_id!r} cannot export without its persisted DirectorScript"
+                ) from exc
+            opts = options or ExportOptions()
 
             job_dir = self._artifacts / job_id
             job_dir.mkdir(parents=True, exist_ok=True)
@@ -98,7 +180,7 @@ class ExportVideoUseCase:
 
             input_props = {
                 "script": playbook,
-                "theme": "dark",
+                "theme": opts.theme,
                 "showSubtitles": True,
                 "audioFiles": audio_files,
             }
@@ -109,7 +191,6 @@ class ExportVideoUseCase:
 
             # Resolve render options (issue #14). Defaults preserve historical
             # 1080p/30fps/mp4 behavior so existing callers keep working.
-            opts = options or ExportOptions()
             extension = _FORMAT_TO_EXTENSION.get(opts.format, "mp4")
             output_path = job_dir / f"video.{extension}"
 
@@ -122,12 +203,22 @@ class ExportVideoUseCase:
 
             await self._run_remotion_render(job_id, props_path, output_path, opts)
 
+            asset_report_path = None
+            if job is not None and job.asset_report is not None:
+                asset_report_path = _write_asset_report_sidecar(
+                    job_dir,
+                    job_id=job_id,
+                    run_id=run_id,
+                    asset_report=job.asset_report,
+                )
+
             await self._exports.update(
                 job_id,
                 status=ExportJobStatus.COMPLETED,
                 progress=1.0,
                 message="完成",
                 output_path=str(output_path),
+                asset_report_path=str(asset_report_path) if asset_report_path else None,
             )
         except Exception as exc:  # noqa: BLE001
             logger.exception("export job %s failed", job_id)
@@ -137,36 +228,19 @@ class ExportVideoUseCase:
                 error=str(exc),
             )
 
-    async def _get_export_payload(
+    async def _get_export_director(
         self,
         run_id: str,
         *,
         version_id: str | None,
-    ) -> tuple[PlaybookScript, DirectorScript | None]:
+        playbook: PlaybookScript,
+    ) -> DirectorScript | None:
         if version_id is not None:
-            playbook_json = await self._runs.get_version_playbook(run_id, version_id)
-            if playbook_json is None:
-                raise ValueError(f"Version {version_id!r} not found for run {run_id!r}")
-            playbook = PlaybookScript.model_validate_json(playbook_json)
             director_json = await self._runs.get_version_director(run_id, version_id)
-            director = (
-                DirectorScript.model_validate_json(director_json)
-                if director_json is not None
-                else build_default_director(playbook, run_id)
-            )
-            return playbook, director
-
-        run = await self._runs.get(run_id)
-        if run is None or run.playbook is None:
-            raise ValueError(f"Run {run_id!r} has no playbook to export")
-        return run.playbook, await self._get_export_director(run_id)
-
-    async def _get_export_director(self, run_id: str) -> DirectorScript | None:
-        try:
-            return await self._directors.get(run_id)
-        except Exception:  # noqa: BLE001 - export falls back to playbook-only props.
-            logger.warning("Failed to load director for export run %s", run_id, exc_info=True)
-            return None
+            if director_json is None:
+                return build_default_director(playbook, run_id)
+            return DirectorScript.model_validate_json(director_json)
+        return await self._directors.get(run_id)
 
     async def _generate_step_audio(
         self,
@@ -321,6 +395,23 @@ def _resolve_remotion_bin(web_dir: Path) -> Path:
     )
 
 
+def _write_asset_report_sidecar(
+    job_dir: Path,
+    *,
+    job_id: str,
+    run_id: str,
+    asset_report: ExportAssetReport,
+) -> Path:
+    report_path = job_dir / "asset-report.json"
+    payload = {
+        "job_id": job_id,
+        "run_id": run_id,
+        "asset_report": asset_report.model_dump(mode="json"),
+    }
+    report_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return report_path
+
+
 def _stretch_end_frames(playbook: dict[str, Any], audio_files: list[str]) -> dict[str, Any]:
     fps = int(playbook.get("fps", 30))
     steps = playbook.get("steps", [])
@@ -343,6 +434,37 @@ def _stretch_end_frames(playbook: dict[str, Any], audio_files: list[str]) -> dic
         step["end_frame"] = cumulative
     playbook["total_frames"] = max(1, cumulative)
     return playbook
+
+
+def _merge_export_quality(
+    previous: QualityReport | None,
+    current: QualityReport,
+) -> QualityReport:
+    if previous is None:
+        current.actions = [*current.actions, f"export:readiness:{current.status}"]
+        return current
+
+    unique: dict[tuple[str, str, str], PlaybookReviewIssue] = {}
+    previous_warnings = [
+        issue
+        for issue in previous.issues
+        if issue.severity == PlaybookIssueSeverity.WARNING
+    ]
+    for issue in [*previous_warnings, *current.issues]:
+        unique[(issue.code, issue.path, issue.message)] = issue
+    verdict = playbook_review_verdict_from_issues(
+        list(unique.values()),
+        clean_summary="Export readiness recheck passed.",
+        warning_summary="Export readiness recheck passed with warnings.",
+        blocked_summary="Export readiness recheck failed.",
+        actions=[*previous.actions, *current.actions, f"export:readiness:{current.status}"],
+    )
+    return QualityReport.from_review_verdict(
+        verdict,
+        generator_path=previous.generator_path,
+        coverage_mode=current.coverage_mode,
+        attempts=previous.attempts,
+    )
 
 
 def _probe_audio_duration_seconds(path: Path) -> float:

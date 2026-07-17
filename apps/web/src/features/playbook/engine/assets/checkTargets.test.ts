@@ -1,0 +1,33 @@
+import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+describe("asset check targets", () => {
+  it("keeps asset and Remotion gates in the dedicated visual-check path", () => {
+    const makefile = readFileSync(path.resolve(__dirname, "../../../../../../../Makefile"), "utf8");
+    const webPackage = readFileSync(path.resolve(__dirname, "../../../../../package.json"), "utf8");
+
+    expect(makefile).toMatch(/^asset-audit:/m);
+    expect(makefile).toMatch(/^asset-showcase:/m);
+    expect(makefile).toMatch(/^check: lint test build$/m);
+    expect(makefile).toMatch(/^visual-check: .*asset-audit/m);
+    expect(makefile).toMatch(/^visual-check: .*asset-showcase/m);
+    expect(webPackage).toContain('"showcase:smoke"');
+    expect(webPackage).toContain('"showcase:baseline"');
+    expect(webPackage).toContain('"showcase:baseline:release"');
+    expect(webPackage).toContain("SHOWCASE_BASELINE_REQUIRE_APPROVED=1");
+    expect(webPackage).toContain("SHOWCASE_BASELINE_REFERENCE=../../eval/reports/subject-visual-showcase-approved-reference.json");
+    expect(webPackage).toContain('"showcase:review-packet"');
+    expect(webPackage).toContain('"showcase:approve-reference"');
+    expect(makefile).toMatch(
+      /npm --workspace apps\/web run showcase:smoke\n\tnpm --workspace apps\/web run showcase:baseline\n\tnpm --workspace apps\/web run showcase:review-packet/,
+    );
+    expect(makefile).toMatch(/^asset-showcase-release:/m);
+    expect(makefile).toMatch(
+      /npm --workspace apps\/web run showcase:smoke\n\tnpm --workspace apps\/web run showcase:baseline:release\n\tnpm --workspace apps\/web run showcase:review-packet/,
+    );
+  });
+});

@@ -9,6 +9,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
+from app.domain.models.coverage import CoverageDecision
+from app.domain.models.lesson_plan import LessonPlan, SceneIntent
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.infrastructure.persistence.db_init import init_db
 from app.infrastructure.persistence.sqlite_account_repository import SqliteAccountRepository
@@ -32,6 +34,20 @@ class SequenceLLM:
         return self.responses.pop(0)
 
 
+class FailingUpsertDirectorRepository:
+    def __init__(self, delegate: SqliteRunDirectorRepository) -> None:
+        self.delegate = delegate
+
+    async def get(self, run_id: str):
+        return await self.delegate.get(run_id)
+
+    async def upsert(self, director, updated_at: str) -> None:
+        raise RuntimeError("director persistence unavailable")
+
+    async def delete(self, run_id: str) -> bool:
+        return await self.delegate.delete(run_id)
+
+
 @pytest.fixture
 def followup_client(
     monkeypatch,
@@ -44,12 +60,26 @@ def followup_client(
     init_db(db)
     repo = SqliteRunRepository(db)
     director_repo = SqliteRunDirectorRepository(db)
-    llm = SequenceLLM([_llm_payload([
-        {"op": "replace", "path": "/summary", "value": "改成更直观的版本。"},
-        {"op": "replace", "path": "/steps/0/title", "value": "先观察数组"},
-        {"op": "replace", "path": "/steps/1/voiceover_text", "value": "第二步强调交换原因。"},
-        {"op": "replace", "path": "/steps/0/layers/0/body/array_values", "value": ["3", "1"]},
-    ])])
+    llm = SequenceLLM(
+        [
+            _llm_payload(
+                [
+                    {"op": "replace", "path": "/summary", "value": "改成更直观的版本。"},
+                    {"op": "replace", "path": "/steps/0/title", "value": "先观察数组"},
+                    {
+                        "op": "replace",
+                        "path": "/steps/1/voiceover_text",
+                        "value": "第二步强调交换原因。",
+                    },
+                    {
+                        "op": "replace",
+                        "path": "/steps/0/layers/0/body/array_values",
+                        "value": ["3", "1"],
+                    },
+                ]
+            )
+        ]
+    )
     app = create_app()
     app.dependency_overrides[get_run_repo] = lambda: repo
     app.dependency_overrides[get_run_director_repo] = lambda: director_repo
@@ -62,6 +92,17 @@ def followup_client(
 def test_followup_applies_patch_persists_history_and_versions(followup_client) -> None:
     client, repo, director_repo, _llm = followup_client
     run_id = _seed_run(repo)
+    decision = CoverageDecision(
+        mode="specialized",
+        domain="algorithm",
+        confidence=0.9,
+        matched_skill_ids=["algorithm_graph_core"],
+        available_tool_ids=["skill.algorithm_graph_core.solve"],
+        missing_capabilities=[],
+        fallback_policy="use_skill",
+        reason="A deterministic algorithm SkillPack covers the original run.",
+    )
+    _run(repo.update_coverage_decision(run_id, decision.model_dump_json()))
 
     resp = client.post(f"/api/v1/runs/{run_id}/follow-up", json={"message": "换个角度讲"})
 
@@ -82,6 +123,11 @@ def test_followup_applies_patch_persists_history_and_versions(followup_client) -
     assert stored is not None
     assert stored.playbook is not None
     assert stored.playbook.summary == "改成更直观的版本。"
+    assert stored.quality_report is not None
+    assert stored.quality_report.generator_path == "followup_patch"
+    assert stored.quality_report.coverage_mode == "specialized"
+    assert stored.coverage_decision == decision
+    assert stored.quality_report.status in {"clean", "warnings"}
 
     history = client.get(f"/api/v1/runs/{run_id}/follow-ups").json()
     assert len(history["followups"]) == 1
@@ -93,6 +139,49 @@ def test_followup_applies_patch_persists_history_and_versions(followup_client) -
     assert history["versions"][1]["parent_version_id"] == history["versions"][0]["version_id"]
     assert history["versions"][1]["short_id"]
     assert history["versions"][1]["is_head"] is True
+
+
+def test_followup_gate_enforces_persisted_experimental_boundary(followup_client) -> None:
+    client, repo, _director_repo, _llm = followup_client
+    run_id = _seed_run(repo)
+    decision = CoverageDecision(
+        mode="experimental",
+        domain="algorithm",
+        confidence=0.55,
+        matched_skill_ids=[],
+        available_tool_ids=["playbook.schema.validate"],
+        missing_capabilities=["capability:controlled_composition:algorithm"],
+        fallback_policy="text_only",
+        reason="No verified visual execution path covers the original run.",
+    )
+    _run(repo.update_coverage_decision(run_id, decision.model_dump_json()))
+
+    response = client.post(
+        f"/api/v1/runs/{run_id}/follow-up",
+        json={"message": "换个角度讲"},
+    )
+
+    assert response.status_code == 422
+    assert "capability.text_only_required" in response.json()["detail"]
+    stored = _run(repo.get(run_id))
+    assert stored is not None
+    assert stored.coverage_decision == decision
+
+
+def test_followup_gate_preserves_persisted_lesson_plan_requirements(
+    followup_client,
+) -> None:
+    client, repo, _director_repo, _llm = followup_client
+    run_id = _seed_run(repo)
+    _run(repo.update_lesson_plan(run_id, _strict_stack_lesson_plan().model_dump_json()))
+
+    response = client.post(
+        f"/api/v1/runs/{run_id}/follow-up",
+        json={"message": "换个角度讲"},
+    )
+
+    assert response.status_code == 422
+    assert "lesson_plan.visual_role_missing" in response.json()["detail"]
 
 
 def test_followup_can_reply_without_creating_version(monkeypatch, tmp_path) -> None:
@@ -114,7 +203,9 @@ def test_followup_can_reply_without_creating_version(monkeypatch, tmp_path) -> N
     app.dependency_overrides[get_llm_provider] = lambda: llm
 
     with TestClient(app) as client:
-        resp = client.post(f"/api/v1/runs/{run_id}/follow-up", json={"message": "这里为什么要交换？"})
+        resp = client.post(
+            f"/api/v1/runs/{run_id}/follow-up", json={"message": "这里为什么要交换？"}
+        )
         history = client.get(f"/api/v1/runs/{run_id}/follow-ups").json()
 
     get_settings.cache_clear()
@@ -196,10 +287,12 @@ def test_followup_repairs_invalid_patch_once(monkeypatch, tmp_path) -> None:
     repo = SqliteRunRepository(db)
     director_repo = SqliteRunDirectorRepository(db)
     run_id = _seed_run(repo)
-    llm = SequenceLLM([
-        _llm_payload([{"op": "replace", "path": "/fps", "value": 24}]),
-        _llm_payload([{"op": "replace", "path": "/title", "value": "修复后的标题"}]),
-    ])
+    llm = SequenceLLM(
+        [
+            _llm_payload([{"op": "replace", "path": "/fps", "value": 24}]),
+            _llm_payload([{"op": "replace", "path": "/title", "value": "修复后的标题"}]),
+        ]
+    )
     app = create_app()
     app.dependency_overrides[get_run_repo] = lambda: repo
     app.dependency_overrides[get_run_director_repo] = lambda: director_repo
@@ -215,8 +308,8 @@ def test_followup_repairs_invalid_patch_once(monkeypatch, tmp_path) -> None:
 
 
 def test_followup_restore_version(followup_client) -> None:
-    client, _repo, director_repo, _llm = followup_client
-    run_id = _seed_run(_repo)
+    client, repo, director_repo, _llm = followup_client
+    run_id = _seed_run(repo)
     client.post(f"/api/v1/runs/{run_id}/follow-up", json={"message": "修改"})
     versions = client.get(f"/api/v1/runs/{run_id}/follow-ups").json()["versions"]
     original_version = versions[0]["version_id"]
@@ -230,6 +323,9 @@ def test_followup_restore_version(followup_client) -> None:
     active_director = _run(director_repo.get(run_id))
     assert active_director is not None
     assert active_director.beats[0].voiceover_text is None
+    restored = _run(repo.get(run_id))
+    assert restored is not None and restored.quality_report is not None
+    assert restored.quality_report.generator_path == "version_restore"
     versions_after = client.get(f"/api/v1/runs/{run_id}/follow-ups").json()["versions"]
     assert resp.json()["version_id"] == original_version
     assert len(versions_after) == 2
@@ -237,6 +333,86 @@ def test_followup_restore_version(followup_client) -> None:
     assert versions_after[0]["is_head"] is True
     assert versions_after[1]["source"] == "followup"
     assert versions_after[1]["is_head"] is False
+
+
+def test_restore_gate_preserves_persisted_lesson_plan_requirements(
+    followup_client,
+) -> None:
+    client, repo, _director_repo, _llm = followup_client
+    run_id = _seed_run(repo)
+    assert client.post(
+        f"/api/v1/runs/{run_id}/follow-up",
+        json={"message": "修改"},
+    ).status_code == 200
+    versions = client.get(f"/api/v1/runs/{run_id}/follow-ups").json()["versions"]
+    original_version = versions[0]["version_id"]
+    _run(repo.update_lesson_plan(run_id, _strict_stack_lesson_plan().model_dump_json()))
+
+    response = client.post(
+        f"/api/v1/runs/{run_id}/versions/{original_version}/restore"
+    )
+
+    assert response.status_code == 422
+    assert "lesson_plan.visual_role_missing" in response.json()["detail"]
+
+
+def test_followup_director_failure_does_not_activate_new_playbook_or_quality(
+    followup_client,
+) -> None:
+    client, repo, director_repo, llm = followup_client
+    run_id = _seed_run(repo)
+    first = client.post(f"/api/v1/runs/{run_id}/follow-up", json={"message": "修改"})
+    assert first.status_code == 200
+    before = _run(repo.get(run_id))
+    before_director = _run(director_repo.get(run_id))
+    assert before is not None and before.playbook is not None
+    assert before.quality_report is not None
+    assert before_director is not None
+    llm.responses = [
+        _llm_payload([{"op": "replace", "path": "/title", "value": "失败版本不应激活"}])
+    ]
+    client.app.dependency_overrides[get_run_director_repo] = lambda: (
+        FailingUpsertDirectorRepository(director_repo)
+    )
+
+    with pytest.raises(RuntimeError, match="director persistence unavailable"):
+        client.post(f"/api/v1/runs/{run_id}/follow-up", json={"message": "再次修改"})
+
+    after = _run(repo.get(run_id))
+    after_director = _run(director_repo.get(run_id))
+    assert after is not None
+    assert after.playbook == before.playbook
+    assert after.quality_report == before.quality_report
+    assert after_director == before_director
+
+
+def test_restore_director_failure_keeps_active_playbook_quality_and_director(
+    followup_client,
+) -> None:
+    client, repo, director_repo, _llm = followup_client
+    run_id = _seed_run(repo)
+    first = client.post(f"/api/v1/runs/{run_id}/follow-up", json={"message": "修改"})
+    assert first.status_code == 200
+    versions = client.get(f"/api/v1/runs/{run_id}/follow-ups").json()["versions"]
+    original_version = versions[0]["version_id"]
+    before = _run(repo.get(run_id))
+    before_director = _run(director_repo.get(run_id))
+    assert before is not None and before.playbook is not None
+    assert before.quality_report is not None
+    assert before_director is not None
+    client.app.dependency_overrides[get_run_director_repo] = lambda: (
+        FailingUpsertDirectorRepository(director_repo)
+    )
+
+    with pytest.raises(RuntimeError, match="director persistence unavailable"):
+        client.post(f"/api/v1/runs/{run_id}/versions/{original_version}/restore")
+
+    after = _run(repo.get(run_id))
+    after_director = _run(director_repo.get(run_id))
+    assert after is not None
+    assert after.playbook == before.playbook
+    assert after.quality_report == before.quality_report
+    assert after_director == before_director
 
 
 def test_followup_uses_selected_base_version(monkeypatch, tmp_path) -> None:
@@ -248,10 +424,12 @@ def test_followup_uses_selected_base_version(monkeypatch, tmp_path) -> None:
     repo = SqliteRunRepository(db)
     director_repo = SqliteRunDirectorRepository(db)
     run_id = _seed_run(repo)
-    llm = SequenceLLM([
-        _llm_payload([{"op": "replace", "path": "/summary", "value": "当前 HEAD 摘要。"}]),
-        _llm_payload([{"op": "replace", "path": "/title", "value": "从旧版本继续"}]),
-    ])
+    llm = SequenceLLM(
+        [
+            _llm_payload([{"op": "replace", "path": "/summary", "value": "当前 HEAD 摘要。"}]),
+            _llm_payload([{"op": "replace", "path": "/title", "value": "从旧版本继续"}]),
+        ]
+    )
     app = create_app()
     app.dependency_overrides[get_run_repo] = lambda: repo
     app.dependency_overrides[get_run_director_repo] = lambda: director_repo
@@ -284,24 +462,28 @@ def test_followup_coerces_numeric_parameter_contract(monkeypatch, tmp_path) -> N
     repo = SqliteRunRepository(db)
     director_repo = SqliteRunDirectorRepository(db)
     run_id = _seed_run(repo)
-    llm = SequenceLLM([
-        _llm_payload([
-            {
-                "op": "replace",
-                "path": "/parameter_controls",
-                "value": [
-                    {"id": "mass", "label": "质量", "value": 2},
-                    {"id": "angle", "label": "角度", "value": 30},
-                    {"id": "mu_s", "label": "静摩擦系数", "value": 0.5},
-                ],
-            },
-            {
-                "op": "replace",
-                "path": "/initial_data",
-                "value": {"mass": [2], "angle": [30], "mu_s": [0.5]},
-            },
-        ])
-    ])
+    llm = SequenceLLM(
+        [
+            _llm_payload(
+                [
+                    {
+                        "op": "replace",
+                        "path": "/parameter_controls",
+                        "value": [
+                            {"id": "mass", "label": "质量", "value": 2},
+                            {"id": "angle", "label": "角度", "value": 30},
+                            {"id": "mu_s", "label": "静摩擦系数", "value": 0.5},
+                        ],
+                    },
+                    {
+                        "op": "replace",
+                        "path": "/initial_data",
+                        "value": {"mass": [2], "angle": [30], "mu_s": [0.5]},
+                    },
+                ]
+            )
+        ]
+    )
     app = create_app()
     app.dependency_overrides[get_run_repo] = lambda: repo
     app.dependency_overrides[get_run_director_repo] = lambda: director_repo
@@ -441,9 +623,9 @@ def test_followup_ops_refunds_balance_when_patch_fails(monkeypatch, tmp_path) ->
     app = create_app()
     app.dependency_overrides[get_run_repo] = lambda: repo
     app.dependency_overrides[get_run_director_repo] = lambda: director_repo
-    app.dependency_overrides[get_llm_provider] = lambda: SequenceLLM([
-        _llm_payload([{"op": "replace", "path": "/fps", "value": 24}])
-    ])
+    app.dependency_overrides[get_llm_provider] = lambda: SequenceLLM(
+        [_llm_payload([{"op": "replace", "path": "/fps", "value": 24}])]
+    )
 
     with TestClient(app) as client:
         resp = client.post(
@@ -457,6 +639,30 @@ def test_followup_ops_refunds_balance_when_patch_fails(monkeypatch, tmp_path) ->
     assert _balance(db, owner.account.user_id) == 20
     assert _ledger_count(db, owner.account.user_id, "consume") == 1
     assert _ledger_count(db, owner.account.user_id, "refund") == 1
+
+
+def _strict_stack_lesson_plan() -> LessonPlan:
+    return LessonPlan(
+        schema_version="1.0.0",
+        domain="algorithm",
+        title="递归调用栈",
+        learning_objectives=["追踪 factorial(4) 的压栈与回溯。"],
+        prerequisites=[],
+        misconceptions=[],
+        expected_conclusion="factorial(4)=24",
+        lesson_arc="state_transition",
+        scenes=[
+            SceneIntent(
+                scene_id="stack_trace",
+                teaching_goal="展示调用栈状态和返回值传播。",
+                strategy="state_transition",
+                required_fact_ids=[],
+                required_visual_roles=["stack_frame", "active_frame", "return_value"],
+                preferred_scene_type="recursion_stack",
+                narration_goal="同步说明压栈和回溯。",
+            )
+        ],
+    )
 
 
 def _seed_run(repo: SqliteRunRepository, user_id: str | None = None) -> str:

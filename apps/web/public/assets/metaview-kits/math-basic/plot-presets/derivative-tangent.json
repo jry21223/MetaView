@@ -1,0 +1,13 @@
+{
+  "id": "derivative_tangent",
+  "source": "structured-preset",
+  "concept": "derivative as tangent slope",
+  "rendererKind": "math_plot",
+  "curves": [
+    { "expression": "x^2", "label": "f(x)=x^2", "semanticRole": "curve" },
+    { "expression": "2*x - 1", "label": "tangent slope = 2", "semanticRole": "tangent" }
+  ],
+  "marker": { "x": 1, "y": 1 },
+  "formula": "f'(1)=2",
+  "notes": "Internal deterministic preset; coordinates and tangent expression are structured data for the renderer."
+}

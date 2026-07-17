@@ -81,8 +81,8 @@ def client(monkeypatch) -> TestClient:
 @pytest.fixture
 def client_without_key(monkeypatch) -> TestClient:
     get_settings.cache_clear()
-    monkeypatch.delenv("METAVIEW_TTS_API_KEY", raising=False)
-    monkeypatch.delenv("METAVIEW_OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("METAVIEW_TTS_API_KEY", "")
+    monkeypatch.setenv("METAVIEW_OPENAI_API_KEY", "")
     monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
     monkeypatch.setattr(
         "app.presentation.router_tts.httpx.AsyncClient", _FakeAsyncClient
