@@ -168,8 +168,8 @@ describe("PlaybookPlayer", () => {
     expect(learningConsole.textContent).toContain("n = 3");
   });
 
-  it("hides code sync for non-code lessons while keeping params above follow-up", () => {
-    const { queryByText, getByText, getByTestId } = render(
+  it("hides empty math params and lets follow-up occupy the remaining console", () => {
+    const { container, queryByText, getByTestId } = render(
       <PlaybookPlayer
         script={baseScript()}
         theme="light"
@@ -178,9 +178,23 @@ describe("PlaybookPlayer", () => {
     );
 
     expect(queryByText("Code Sync")).toBeNull();
-    expect(getByText("Params")).toBeTruthy();
+    expect(queryByText("Params")).toBeNull();
+    expect(container.querySelector(".playbook-player__params-card")).toBeNull();
+    expect(container.querySelector(".playbook-player__follow-card")).toBeTruthy();
     expect(getByTestId("followup-slot")).toBeTruthy();
-    expect(getByText("Ask a follow-up")).toBeTruthy();
+  });
+
+  it("shows math params when at least one editable control is available", () => {
+    const script = baseScript({
+      parameter_controls: [{ id: "a", label: "斜率 a", value: "1" }],
+    });
+
+    const { getByText, getByLabelText } = render(
+      <PlaybookPlayer script={script} theme="light" />,
+    );
+
+    expect(getByText("Params")).toBeTruthy();
+    expect(getByLabelText("斜率 a")).toBeTruthy();
   });
 
   it("keeps subtitles inside the composition and moves playback options into settings", () => {
@@ -246,7 +260,7 @@ describe("PlaybookPlayer", () => {
 
   it("uses a portrait shell with mobile tabs while keeping export and more actions visible", () => {
     const onOpenExport = vi.fn();
-    const { container } = render(
+    const { container, queryByRole } = render(
       <PlaybookPlayer
         script={baseScript()}
         theme="light"
@@ -269,7 +283,8 @@ describe("PlaybookPlayer", () => {
     expect(player?.getAttribute("data-show-subtitles")).toBe("false");
 
     const tabs = container.querySelectorAll(".playbook-player__mobile-tabs button");
-    expect(tabs).toHaveLength(5);
+    expect(tabs).toHaveLength(4);
+    expect(queryByRole("tab", { name: "参数" })).toBeNull();
 
     fireEvent.click(tabs[1]);
     expect(player?.getAttribute("data-show-subtitles")).toBe("true");
@@ -291,6 +306,29 @@ describe("PlaybookPlayer", () => {
 
     fireEvent.click(moreButton!);
     expect(container.querySelector(".playbook-player__mobile-sheet")).toBeTruthy();
+  });
+
+  it("leaves the params tab when a portrait lesson loses editable controls", () => {
+    const withParams = baseScript({
+      parameter_controls: [{ id: "a", label: "斜率 a", value: "1" }],
+    });
+    const view = render(
+      <PlaybookPlayer script={withParams} theme="light" layoutMode="portrait" />,
+    );
+
+    fireEvent.click(view.getByRole("tab", { name: "参数" }));
+    expect(view.getByRole("tab", { name: "参数" }).getAttribute("aria-selected")).toBe(
+      "true",
+    );
+
+    view.rerender(
+      <PlaybookPlayer script={baseScript()} theme="light" layoutMode="portrait" />,
+    );
+
+    expect(view.queryByRole("tab", { name: "参数" })).toBeNull();
+    expect(view.getByRole("tab", { name: "讲解" }).getAttribute("aria-selected")).toBe(
+      "true",
+    );
   });
 
   it("shows only the active code context in the portrait code tab", () => {
@@ -363,7 +401,7 @@ describe("PlaybookPlayer", () => {
   });
 
   it("opens follow-up content in a portrait bottom sheet", () => {
-    const { container, getByLabelText } = render(
+    const { container, getByLabelText, getByRole } = render(
       <PlaybookPlayer
         script={baseScript()}
         theme="light"
@@ -372,10 +410,7 @@ describe("PlaybookPlayer", () => {
       />,
     );
 
-    const followupTab = container.querySelectorAll<HTMLButtonElement>(
-      ".playbook-player__mobile-tabs button",
-    )[3];
-    fireEvent.click(followupTab);
+    fireEvent.click(getByRole("tab", { name: "追问" }));
 
     expect(container.querySelector(".playbook-player__mobile-sheet")).toBeTruthy();
     expect(getByLabelText("Ask follow-up")).toBeTruthy();
