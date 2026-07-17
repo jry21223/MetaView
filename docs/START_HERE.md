@@ -65,7 +65,8 @@ The move from `/` to `/create` for direct creation is an intentional route behav
 8. `docs/agent-demo-acceptance.md` — how to prove agent / runtime-tool mode actually works.
 9. `docs/skill-pack-architecture.md` — deterministic SkillPack contract.
 10. `docs/frontend-shell.md` — frontend page and studio shell structure.
-11. `AGENTS.md` — required working rules for coding agents.
+11. `docs/showcase-cases.md` — public case schema, static playback boundary, and evidence language.
+12. `AGENTS.md` — required working rules for coding agents.
 
 ## What not to do now
 
@@ -77,8 +78,8 @@ The move from `/` to `/create` for direct creation is an intentional route behav
 
 ## Current next milestones
 
-1. Migrate the four Gold generators from static/repeated state to genuine visual progression.
-2. Make the four cases pass three independent live runs without hard failures.
+1. Keep the public `/cases` catalogue truthful while the four Gold generators move from static/repeated state to genuine visual progression.
+2. Make the four cases pass three independent live runs without hard failures before changing their public evidence labels.
 3. Compile SceneIntent into shared SceneBlueprint/Playbook assembly without removing legacy CIR in one step.
 4. Add SkillRecipe validation/execution for `composable` decisions without registering a universal SkillPack.
 5. Record Capability Gaps before adding the offline SkillForge authoring workflow.

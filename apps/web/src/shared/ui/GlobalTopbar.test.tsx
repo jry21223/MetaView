@@ -89,7 +89,7 @@ describe("GlobalTopbar account avatar", () => {
 
     expect(onNavigate).toHaveBeenNthCalledWith(1, "intake");
     expect(onNavigate).toHaveBeenNthCalledWith(2, "history");
-    expect(onNavigate).toHaveBeenNthCalledWith(3, "templates");
+    expect(onNavigate).toHaveBeenNthCalledWith(3, "cases");
     expect(onNavigate).toHaveBeenNthCalledWith(4, "settings");
   });
 

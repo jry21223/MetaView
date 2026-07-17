@@ -5,7 +5,7 @@ interface LandingPageProps {
   isDark: boolean;
   onToggleTheme: () => void;
   onStart: () => void;
-  onOpenTemplates: () => void;
+  onOpenCases: () => void;
 }
 
 type DemoDomain = "math" | "physics" | "algorithm";
@@ -652,7 +652,7 @@ export function LandingPage({
   isDark,
   onToggleTheme,
   onStart,
-  onOpenTemplates,
+  onOpenCases,
 }: LandingPageProps) {
   const [activeDomain, setActiveDomain] = useState<DemoDomain>("math");
   const [activeRailPanel, setActiveRailPanel] = useState<DemoRailPanel>("intro");
@@ -1176,7 +1176,7 @@ export function LandingPage({
         </div>
         <nav aria-label="页脚导航">
           <a href="#workflow">工作原理</a>
-          <button type="button" onClick={onOpenTemplates}>模板</button>
+          <button type="button" onClick={onOpenCases}>案例</button>
           <button type="button" onClick={onStart}>工作台</button>
         </nav>
       </footer>

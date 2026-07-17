@@ -23,7 +23,6 @@ import {
 } from "../features/studio-editor/ui/IntakeScreen";
 import { StudioPage } from "../pages/Studio/StudioPage";
 import { HistoryPage } from "../pages/History/HistoryPage";
-import { TemplatesPage } from "../pages/Templates/TemplatesPage";
 import { SettingsPage } from "../pages/Settings/SettingsPage";
 import { OPEN_ACCOUNT_PANEL_FLAG } from "../pages/PaymentResultPage";
 import { usePipelineSubmit } from "../features/pipeline/hooks/usePipelineSubmit";
@@ -170,11 +169,6 @@ export function OpsAppShell() {
     routerNavigate("/create", { state: { prompt } });
   };
 
-  const handleUseTemplate = (prompt: string) => {
-    setTopbarCollapsed(false);
-    routerNavigate("/create", { state: { prompt } });
-  };
-
   const handleOpenHistoryRun = (historyRunId: string) => {
     enterRun(historyRunId);
   };
@@ -266,11 +260,6 @@ export function OpsAppShell() {
             <HistoryPage t={t} onOpenInWorkbench={handleOpenHistoryRun} />
           ) : <ProtectedOpsPage onLogin={requireLogin} />}</ErrorBoundary>}
         />
-        <Route
-          path="/cases"
-          element={<ErrorBoundary theme={mode}><TemplatesPage onUseTemplate={handleUseTemplate} /></ErrorBoundary>}
-        />
-        <Route path="/templates" element={<Navigate to="/cases" replace />} />
         <Route
           path="/settings"
           element={

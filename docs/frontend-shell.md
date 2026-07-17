@@ -6,11 +6,12 @@
 
 ```text
 /             -> LandingRoute
+/cases        -> CasesPage (public, static assets only)
+/cases/:slug  -> CaseDetailPage (public, static playback only)
+/templates    -> redirect to /cases (compatibility path)
 /create       -> IntakeScreen
 /run/:runId   -> StudioPage
 /history      -> HistoryPage
-/cases        -> TemplatesPage（公开案例）
-/templates    -> 重定向到 /cases
 /settings     -> SettingsPage
 ```
 
@@ -25,7 +26,7 @@ type Stage =
   | "intake"
   | "workbench"
   | "history"
-  | "templates"
+  | "cases"
   | "settings";
 ```
 
@@ -44,7 +45,7 @@ intake                -> /create
 workbench + runId     -> /run/:runId
 workbench without id  -> /create
 history               -> /history
-templates             -> /cases（`/templates` 兼容重定向）
+cases                 -> /cases
 settings              -> /settings
 ```
 
@@ -91,7 +92,7 @@ interface GlobalTopbarProps {
 ```
 
 - `stage="intake" | "workbench"` 时“工作台”高亮。
-- “任务历史 / 案例 / 设置”分别对应独立路由。
+- “任务历史 / 案例 / 设置”分别对应独立路由；“案例”跳到公共 `/cases`，不进入应用壳。
 - Provider 状态在 self edition 中保持安静；未配置引导由输入和追问流程承担。
 - 工作台可在桌面端折叠 Topbar，移动端始终恢复可见。
 
@@ -160,5 +161,6 @@ mainStyle = {
 - 跨 Stage 共享 UI → `apps/web/src/shared/ui/`
 - 单 Stage 专用 → `apps/web/src/pages/<Stage>/` 或 `apps/web/src/features/<feature>/ui/`
 - Landing 样式 → `apps/web/src/styles/pages/landing.css`
+- Public showcase 页面样式 → `apps/web/src/styles/pages/cases.css`
 
 `shared/` 不得反向导入 `features/` 或 `pages/`。
