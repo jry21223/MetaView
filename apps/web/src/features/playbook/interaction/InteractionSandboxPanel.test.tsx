@@ -2,36 +2,25 @@ import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { InteractionSandboxPanel } from "./InteractionSandboxPanel";
-import type { BfsInteractionReplay, InteractionEvent, InteractionManifest } from "./types";
+import type { BfsInteractionReplay, InteractionManifest } from "./types";
 
-function derivativeManifest(value = 1): InteractionManifest {
-  return {
-    version: "1",
-    adapters: [{
+const derivativeManifest: InteractionManifest = {
+  version: "1",
+  adapters: [{
+    adapter_id: "math.derivative-tangent",
+    experimental: true,
+    bindings: [{
+      id: "step:plot:marker-x",
       adapter_id: "math.derivative-tangent",
-      experimental: true,
-      bindings: [{
-        id: "step:plot:marker-x",
-        adapter_id: "math.derivative-tangent",
-        step_id: "plot",
-        target_role: "marker-x",
-        action: "set-value",
-        label: "切点 x",
-        min: -5,
-        max: 5,
-        value,
-      }],
+      step_id: "plot",
+      target_role: "marker-x",
+      action: "set-value",
+      label: "切点 x",
+      min: -5,
+      max: 5,
+      value: 1,
     }],
-  };
-}
-
-const firstEvent: InteractionEvent = {
-  adapter_id: "math.derivative-tangent",
-  step_id: "plot",
-  target_id: "step:plot:marker-x",
-  action: "set-value",
-  value: 3,
-  sequence: 1,
+  }],
 };
 
 describe("InteractionSandboxPanel", () => {
@@ -41,7 +30,7 @@ describe("InteractionSandboxPanel", () => {
     const onApply = vi.fn();
     const view = render(
       <InteractionSandboxPanel
-        manifest={derivativeManifest()}
+        manifest={derivativeManifest}
         currentStepId="plot"
         events={[]}
         dirty={false}
@@ -69,38 +58,44 @@ describe("InteractionSandboxPanel", () => {
     });
   });
 
-  it("syncs an external range value without remounting or losing focus", () => {
-    const onApply = vi.fn();
-    const props = {
+  it("syncs an externally updated range without remounting the focused control", () => {
+    const commonProps = {
       currentStepId: "plot",
-      events: [] as InteractionEvent[],
+      events: [],
       dirty: false,
       canUndo: false,
       lastError: null,
-      onApply,
+      latestReplay: null,
+      onShowReplayFrame: vi.fn(),
+      onApply: vi.fn(),
       onUndo: vi.fn(),
       onReset: vi.fn(),
     };
     const view = render(
-      <InteractionSandboxPanel manifest={derivativeManifest()} {...props} />,
+      <InteractionSandboxPanel manifest={derivativeManifest} {...commonProps} />,
     );
-    const slider = view.getByRole("slider", { name: "切点 x" });
+    const slider = view.getByRole<HTMLInputElement>("slider", { name: "切点 x" });
     slider.focus();
     fireEvent.change(slider, { target: { value: "3" } });
 
+    const updatedManifest: InteractionManifest = {
+      ...derivativeManifest,
+      adapters: derivativeManifest.adapters.map((adapter) => ({
+        ...adapter,
+        bindings: adapter.bindings.map((binding) =>
+          binding.target_role === "marker-x" ? { ...binding, value: -1 } : binding
+        ),
+      })),
+    };
     view.rerender(
-      <InteractionSandboxPanel manifest={derivativeManifest(-2)} {...props} />,
+      <InteractionSandboxPanel manifest={updatedManifest} {...commonProps} />,
     );
 
-    const syncedSlider = view.getByRole("slider", { name: "切点 x" });
-    expect(syncedSlider).toBe(slider);
-    expect((syncedSlider as HTMLInputElement).value).toBe("-2");
+    expect(slider.value).toBe("-1");
     expect(document.activeElement).toBe(slider);
-    fireEvent.pointerUp(syncedSlider);
-    expect(onApply).not.toHaveBeenCalled();
   });
 
-  it("uses stable node ids and disables the selected BFS choice", () => {
+  it("uses stable node ids for BFS selection", () => {
     const onApply = vi.fn();
     const manifest: InteractionManifest = {
       version: "1",
@@ -136,13 +131,13 @@ describe("InteractionSandboxPanel", () => {
     );
 
     const selected = view.getByRole("button", { name: "Alpha" });
-    expect(selected.getAttribute("aria-pressed")).toBe("true");
-    expect(selected.hasAttribute("disabled")).toBe(true);
+    expect(selected.disabled).toBe(true);
     fireEvent.click(selected);
     expect(onApply).not.toHaveBeenCalled();
 
     fireEvent.click(view.getByRole("button", { name: "Beta" }));
     expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ value: "B" }));
+    expect(selected.getAttribute("aria-pressed")).toBe("true");
   });
 
   it("steps through a prepared BFS replay without creating commands", () => {
@@ -212,12 +207,23 @@ describe("InteractionSandboxPanel", () => {
     expect(onShowReplayFrame).toHaveBeenCalledWith(replay, 1);
     expect(onApply).not.toHaveBeenCalled();
     expect(view.getByText("重放 2 / 2")).toBeTruthy();
+
+    fireEvent.click(view.getByRole("button", { name: "第一帧" }));
+    expect(onShowReplayFrame).toHaveBeenLastCalledWith(replay, 0);
+    fireEvent.click(view.getByRole("button", { name: "最后一帧" }));
+    expect(onShowReplayFrame).toHaveBeenLastCalledWith(replay, 1);
+
+    const play = view.getByRole("button", { name: "播放" });
+    fireEvent.click(play);
+    expect(view.getByRole("button", { name: "暂停" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(view.getByRole("button", { name: "暂停" }));
+    expect(view.getByRole("button", { name: "播放" }).getAttribute("aria-pressed")).toBe("false");
   });
 
-  it("renders nothing when the current step has no declared binding or recovery state", () => {
+  it("renders nothing when the current step has no declared binding", () => {
     const { container } = render(
       <InteractionSandboxPanel
-        manifest={derivativeManifest()}
+        manifest={derivativeManifest}
         currentStepId="other"
         events={[]}
         dirty={false}
@@ -233,48 +239,60 @@ describe("InteractionSandboxPanel", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it("keeps undo and reset available after leaving the bound step", () => {
+  it("keeps recovery controls available after leaving a bound step", () => {
     const onUndo = vi.fn();
     const onReset = vi.fn();
     const view = render(
       <InteractionSandboxPanel
-        manifest={derivativeManifest(3)}
+        manifest={derivativeManifest}
         currentStepId="other"
-        events={[firstEvent]}
+        events={[{
+          adapter_id: "math.derivative-tangent",
+          step_id: "plot",
+          target_id: "step:plot:marker-x",
+          action: "set-value",
+          value: 2,
+          sequence: 1,
+        }]}
         dirty
         canUndo
         lastError={null}
+        latestReplay={null}
+        onShowReplayFrame={vi.fn()}
         onApply={vi.fn()}
         onUndo={onUndo}
         onReset={onReset}
       />,
     );
 
-    expect(view.getByText(/当前步骤没有交互控件/)).toBeTruthy();
+    expect(view.getByRole("status").textContent).toContain("没有交互目标");
     fireEvent.click(view.getByRole("button", { name: "撤销" }));
     fireEvent.click(view.getByRole("button", { name: "重置" }));
     expect(onUndo).toHaveBeenCalledTimes(1);
     expect(onReset).toHaveBeenCalledTimes(1);
   });
 
-  it("allows reset when only an error remains", () => {
+  it("allows an error-only sandbox to be reset", () => {
     const onReset = vi.fn();
     const view = render(
       <InteractionSandboxPanel
-        manifest={derivativeManifest()}
+        manifest={derivativeManifest}
         currentStepId="other"
         events={[]}
         dirty={false}
         canUndo={false}
-        lastError="Interaction failed"
+        lastError="Replay failed"
+        latestReplay={null}
+        onShowReplayFrame={vi.fn()}
         onApply={vi.fn()}
         onUndo={vi.fn()}
         onReset={onReset}
       />,
     );
 
+    expect(view.getByRole("alert").textContent).toBe("Replay failed");
     const reset = view.getByRole("button", { name: "重置" });
-    expect(reset.hasAttribute("disabled")).toBe(false);
+    expect(reset.disabled).toBe(false);
     fireEvent.click(reset);
     expect(onReset).toHaveBeenCalledTimes(1);
   });

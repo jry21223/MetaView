@@ -849,6 +849,7 @@
 
 .playbook-interaction__choice button:disabled,
 .playbook-interaction__actions button:disabled,
+.playbook-interaction__choice button:disabled,
 .playbook-interaction__replay-actions button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
@@ -883,13 +884,33 @@
 
 .playbook-interaction__replay-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 6px;
+}
+
+.playbook-interaction__inactive {
+  margin: 0;
+  color: var(--player-ink-3);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.graph-scene-renderer [data-interaction-target="start-node"]:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--player-accent, #82976f) 46%, transparent);
+  outline-offset: 3px;
 }
 
 .playbook-interaction__error {
   margin: 0;
   color: var(--warn);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.playbook-interaction__inactive {
+  margin: 0;
+  color: var(--player-ink-3);
   font-size: 11px;
   line-height: 1.5;
 }

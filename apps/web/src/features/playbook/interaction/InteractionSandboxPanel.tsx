@@ -129,6 +129,11 @@ function BfsReplayControls({
     onShowFrame(replay, bounded);
   }, [lastIndex, onShowFrame, replay]);
 
+  const showManualFrame = (nextIndex: number) => {
+    setPlaying(false);
+    showFrame(nextIndex);
+  };
+
   useEffect(() => {
     if (!playing || frameIndex >= lastIndex) return;
     const timeout = window.setTimeout(() => {
@@ -140,7 +145,7 @@ function BfsReplayControls({
   }, [frameIndex, lastIndex, playing, showFrame]);
 
   return (
-    <div className="playbook-interaction__replay" aria-label="BFS 重放">
+    <div className="playbook-interaction__replay" role="group" aria-label="BFS 重放">
       <div className="playbook-interaction__replay-status" aria-live="polite">
         <span>重放 {frameIndex + 1} / {replay.frames.length}</span>
         <small>
@@ -154,7 +159,14 @@ function BfsReplayControls({
       <div className="playbook-interaction__replay-actions">
         <button
           type="button"
-          onClick={() => showFrame(frameIndex - 1)}
+          onClick={() => showManualFrame(0)}
+          disabled={frameIndex === 0}
+        >
+          第一帧
+        </button>
+        <button
+          type="button"
+          onClick={() => showManualFrame(frameIndex - 1)}
           disabled={frameIndex === 0}
         >
           上一帧
@@ -172,10 +184,17 @@ function BfsReplayControls({
         </button>
         <button
           type="button"
-          onClick={() => showFrame(frameIndex + 1)}
+          onClick={() => showManualFrame(frameIndex + 1)}
           disabled={frameIndex >= lastIndex}
         >
           下一帧
+        </button>
+        <button
+          type="button"
+          onClick={() => showManualFrame(lastIndex)}
+          disabled={frameIndex >= lastIndex}
+        >
+          最后一帧
         </button>
       </div>
     </div>
@@ -237,8 +256,8 @@ export function InteractionSandboxPanel({
           )}
         </>
       ) : (
-        <p className="playbook-interaction__inactive">
-          当前步骤没有交互控件，未保存的沙盒预览仍然保留。
+        <p className="playbook-interaction__inactive" role="status">
+          当前步骤没有交互目标；仍可撤销或重置沙盒操作。
         </p>
       )}
 

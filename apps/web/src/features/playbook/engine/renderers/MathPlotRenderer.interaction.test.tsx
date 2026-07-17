@@ -55,6 +55,7 @@ describe("MathPlotRenderer interaction", () => {
 
     expect(marker.getAttribute("data-interaction-target")).toBe("marker-x");
     expect(marker.getAttribute("aria-valuenow")).toBe("1");
+    expect(marker.style.pointerEvents).toBe("all");
     expect(marker.querySelector('[data-interaction-hit-target="marker-x"]')).toBeTruthy();
 
     const globalKeyDown = vi.fn();

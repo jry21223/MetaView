@@ -103,10 +103,29 @@ function bfsScript(): PlaybookScript {
       title: "BFS",
       voiceover_text: "",
       snapshot: graph,
+      code_highlight: {
+        language: "pseudocode",
+        lines: ["current = queue.dequeue()", "visit(current)"],
+        active_line: 0,
+        active_lines: [0],
+        variables: {
+          current: "A",
+          queue: "[B]",
+          visited: "{A}",
+        },
+      },
       tokens: [],
     }],
   };
 }
+
+const moveMarker = (value: number) => ({
+  adapter_id: "math.derivative-tangent" as const,
+  step_id: "plot",
+  target_id: "step:plot:marker-x",
+  action: "set-value" as const,
+  value,
+});
 
 describe("useInteractionSandbox", () => {
   it("applies, undoes, and resets interactions without mutating the base script", () => {
@@ -165,7 +184,15 @@ describe("useInteractionSandbox", () => {
     expect(
       (result.current.previewScript.steps[0].snapshot as GraphSceneSnapshot).current_node_id,
     ).toBe("A");
+    expect(result.current.previewScript.steps[0].code_highlight?.variables).toMatchObject({
+      current: "A",
+      queue: "[]",
+      visited: "{C, B, A}",
+    });
     expect(result.current.events).toHaveLength(1);
+
+    act(() => result.current.reset());
+    expect(result.current.latestReplay).toBeNull();
   });
 
   it("keeps a rejected command out of the event history", () => {

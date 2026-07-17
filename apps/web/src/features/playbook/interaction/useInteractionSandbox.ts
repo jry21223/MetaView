@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useReducer } from "react";
 
 import type { PlaybookScript } from "../engine/types";
-import { applyInteraction, deriveInteractionManifest } from "./engine";
+import {
+  applyInteraction,
+  deriveInteractionManifest,
+  formatBfsCodeVariables,
+} from "./engine";
 import type {
   BfsInteractionReplay,
   InteractionCommand,
@@ -139,15 +143,34 @@ function showReplayFrame(
   if (!frame) return committedScript;
   const steps = committedScript.steps.map((step) => {
     if (step.step_id !== replay.step_id || step.snapshot.kind !== "graph_scene") return step;
+    const matchingLayerIndexes = step.layers
+      ?.map((layer, index) => layer.body.kind === "graph_scene" ? index : -1)
+      .filter((index) => index >= 0) ?? [];
+    if (step.layers?.length && matchingLayerIndexes.length !== 1) {
+      throw new Error("BFS replay requires exactly one graph_scene layer");
+    }
+    const targetLayerIndex = matchingLayerIndexes[0];
     const layers = step.layers?.map((layer, index) =>
-      index === 0 && layer.body.kind === "graph_scene"
-        ? { ...layer, body: frame.snapshot }
-        : layer
+      index === targetLayerIndex ? { ...layer, body: frame.snapshot } : layer
     );
+    const codeHighlight = step.code_highlight
+      ? {
+          ...step.code_highlight,
+          variables: {
+            ...step.code_highlight.variables,
+            ...formatBfsCodeVariables(
+              frame.current_node_id,
+              frame.queue_node_ids,
+              frame.visited_node_ids,
+            ),
+          },
+        }
+      : step.code_highlight;
     return {
       ...step,
       snapshot: frame.snapshot,
       ...(layers ? { layers } : {}),
+      ...(codeHighlight ? { code_highlight: codeHighlight } : {}),
     };
   });
   return { ...committedScript, steps };
@@ -179,13 +202,21 @@ function reducer(
     };
   }
   if (action.type === "show-replay-frame") {
-    const previewScript = showReplayFrame(
-      current.committedScript,
-      action.replay,
-      action.frameIndex,
-    );
-    assertSameTimeline(action.baseScript, previewScript);
-    return { ...current, previewScript, lastError: null };
+    try {
+      const previewScript = showReplayFrame(
+        current.committedScript,
+        action.replay,
+        action.frameIndex,
+      );
+      assertSameTimeline(action.baseScript, previewScript);
+      return { ...current, previewScript, lastError: null };
+    } catch (error) {
+      return {
+        ...current,
+        previewScript: current.committedScript,
+        lastError: error instanceof Error ? error.message : "BFS replay failed",
+      };
+    }
   }
 
   try {
