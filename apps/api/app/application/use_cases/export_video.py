@@ -29,8 +29,6 @@ from app.application.ports.director_repository import IRunDirectorRepository
 from app.application.ports.export_repository import IExportJobRepository
 from app.application.ports.run_repository import IRunRepository
 from app.domain.models.director import DirectorScript
-from app.domain.models.playbook import PlaybookScript
-from app.domain.services.director_builder import build_default_director
 from app.domain.models.export_job import (
     ExportAssetReport,
     ExportJobStatus,
@@ -38,8 +36,10 @@ from app.domain.models.export_job import (
     TtsConfig,
 )
 from app.domain.models.pipeline_run import PipelineRunStatus
+from app.domain.models.playbook import PlaybookScript
 from app.domain.models.quality_report import QualityReport
 from app.domain.models.review import PlaybookIssueSeverity, PlaybookReviewIssue
+from app.domain.services.director_builder import build_default_director
 from app.domain.services.playbook_quality import (
     playbook_review_verdict_from_issues,
     quality_gate_playbook,
