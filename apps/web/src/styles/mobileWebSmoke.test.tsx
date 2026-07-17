@@ -120,7 +120,7 @@ describe("mobile web smoke", () => {
       expect(container.querySelector(".mv-intake-hero")).toBeTruthy();
       expect(container.querySelector(".mv-intake-composer")).toBeTruthy();
       expect(container.querySelector(".mv-intake-send")).toBeTruthy();
-      expect(container.querySelectorAll(".mv-intake-example")).toHaveLength(4);
+      expect(container.querySelectorAll(".mv-intake-example")).toHaveLength(3);
       expect(
         container.querySelector<HTMLInputElement>('input[type="file"]')?.accept,
       ).toContain(".py");
@@ -151,7 +151,12 @@ describe("mobile web smoke", () => {
       );
       expect(container.querySelector(".playbook-player__export-btn")).toBeTruthy();
       expect(container.querySelector(".playbook-player__mobile-more-btn")).toBeTruthy();
-      expect(container.querySelectorAll(".playbook-player__mobile-tabs button")).toHaveLength(5);
+      expect(container.querySelectorAll(".playbook-player__mobile-tabs button")).toHaveLength(4);
+      expect(
+        Array.from(container.querySelectorAll(".playbook-player__mobile-tabs button")).some(
+          (tab) => tab.textContent?.includes("参数"),
+        ),
+      ).toBe(false);
       expect(container.querySelector(".playbook-player__console")).toBeNull();
     },
   );

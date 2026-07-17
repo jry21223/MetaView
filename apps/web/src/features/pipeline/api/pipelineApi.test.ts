@@ -12,9 +12,11 @@ describe("pipelineApi", () => {
         expect(request.credentials).toBe("include");
         expect(await request.json()).toMatchObject({
           prompt: "hello",
-          domain: "algorithm",
+          domain: null,
           source_code: "print('hello')",
           language: "python",
+          source_filename: "hello.py",
+          source_size_bytes: 14,
         });
         return HttpResponse.json({
           run_id: "run-1",
@@ -39,9 +41,11 @@ describe("pipelineApi", () => {
 
     const submitted = await submitPipeline({
       prompt: "hello",
-      domain: "algorithm",
+      domain: null,
       source_code: "print('hello')",
       language: "python",
+      source_filename: "hello.py",
+      source_size_bytes: 14,
     });
     const run = await getPipelineRun(submitted.run_id);
 

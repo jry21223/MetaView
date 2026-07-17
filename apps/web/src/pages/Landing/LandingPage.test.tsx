@@ -93,6 +93,36 @@ describe("LandingPage", () => {
     expect(stage?.querySelector("[data-scene-domain='physics']")).toBe(physicsLayer);
   });
 
+  it("describes the math canvas as the custom curve it actually renders", () => {
+    const { container } = renderLanding();
+    const mathLayer = container.querySelector<HTMLElement>("[data-scene-domain='math']");
+    const mathSvg = mathLayer?.querySelector("svg");
+    const tangent = mathLayer?.querySelector<SVGPathElement>(".mv-scene-tangent");
+    const focus = mathLayer?.querySelector<SVGCircleElement>(".mv-scene-focus");
+
+    expect(within(mathLayer as HTMLElement).getByText("f(x) = B(x)")).toBeTruthy();
+    expect(within(mathLayer as HTMLElement).getByText("f′(1) ≈ 1.83")).toBeTruthy();
+    expect(within(mathLayer as HTMLElement).getByText("P(1, B(1))")).toBeTruthy();
+    expect(mathLayer?.textContent).not.toContain("f(x) = x²");
+    expect(mathSvg?.getAttribute("aria-label")).toBe("自定义 Bézier 曲线与切线示意图");
+
+    const tangentCoordinates = tangent
+      ?.getAttribute("d")
+      ?.match(/^M([\d.]+) ([\d.]+)L([\d.]+) ([\d.]+)$/)
+      ?.slice(1)
+      .map(Number);
+    expect(tangentCoordinates).toHaveLength(4);
+
+    const [x1, y1, x2, y2] = tangentCoordinates as [number, number, number, number];
+    const focusX = Number(focus?.getAttribute("cx"));
+    const focusY = Number(focus?.getAttribute("cy"));
+    const slope = (y2 - y1) / (x2 - x1);
+    const tangentYAtFocus = y1 + slope * (focusX - x1);
+
+    expect(slope).toBeCloseTo(-1.1324, 3);
+    expect(tangentYAtFocus).toBeCloseTo(focusY, 2);
+  });
+
   it("encodes binary-search values by bar height while keeping range state explicit", () => {
     const { container, getByRole } = renderLanding();
 

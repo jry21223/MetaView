@@ -16,7 +16,7 @@ import {
 } from "../features/studio-editor/hooks/useTweaks";
 import {
   IntakeScreen,
-  IntakeContext,
+  type IntakeContext,
 } from "../features/studio-editor/ui/IntakeScreen";
 import { StudioPage } from "../pages/Studio/StudioPage";
 import { HistoryPage } from "../pages/History/HistoryPage";
@@ -116,30 +116,33 @@ export function SelfAppShell() {
 
   const submitWithProvider = async (
     prompt: string,
-    domain?: string | null,
-    sourceCode?: string,
-    language?: string,
+    sourceCode?: string | null,
+    language?: string | null,
+    sourceFilename?: string | null,
+    sourceSizeBytes?: number | null,
   ): Promise<string> =>
     submit({
       prompt,
-      domain,
       sourceCode,
       language,
+      sourceFilename,
+      sourceSizeBytes,
       provider: isConfigured ? providerSettings : undefined,
     });
 
   const handleSubmit = async (ctx: IntakeContext) => {
     const nextRunId = await submitWithProvider(
-      ctx.raw || ctx.title,
-      ctx.domain,
+      ctx.prompt,
       ctx.sourceCode,
       ctx.language,
+      ctx.sourceFilename,
+      ctx.sourceSizeBytes,
     );
     enterRun(nextRunId);
   };
 
   const handleResubmitPrompt = async (prompt: string) => {
-    const nextRunId = await submitWithProvider(prompt, null);
+    const nextRunId = await submitWithProvider(prompt);
     enterRun(nextRunId);
   };
 
@@ -149,7 +152,7 @@ export function SelfAppShell() {
   };
 
   const handleUseTemplate = async (prompt: string) => {
-    const nextRunId = await submitWithProvider(prompt, null);
+    const nextRunId = await submitWithProvider(prompt);
     enterRun(nextRunId);
   };
 

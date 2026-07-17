@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from app.application.dto.pipeline_dto import PipelineRequest
 from app.config import get_settings
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.infrastructure.persistence.db_init import init_db
@@ -213,6 +214,41 @@ def test_deleted_run_is_absent_from_list(client) -> None:
 def test_post_pipeline_rejects_empty_prompt(client) -> None:
     resp = client.post("/api/v1/pipeline", json={"prompt": ""})
     assert resp.status_code == 422
+
+
+def test_pipeline_request_defaults_text_language_to_none() -> None:
+    request = PipelineRequest(prompt="解释导数的几何意义")
+
+    assert request.domain is None
+    assert request.source_code is None
+    assert request.language is None
+    assert request.source_filename is None
+    assert request.source_size_bytes is None
+
+
+def test_post_pipeline_rejects_language_without_source_code(client) -> None:
+    response = client.post(
+        "/api/v1/pipeline",
+        json={"prompt": "解释导数", "language": "python"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_post_pipeline_accepts_single_code_file_metadata(client) -> None:
+    response = client.post(
+        "/api/v1/pipeline",
+        json={
+            "prompt": "讲解 solution.py 中的代码。",
+            "domain": None,
+            "source_code": "def solve():\n    return 42\n",
+            "language": "python",
+            "source_filename": "solution.py",
+            "source_size_bytes": 27,
+        },
+    )
+
+    assert response.status_code == 202
 
 
 def test_post_pipeline_returns_prompt_in_response(client) -> None:

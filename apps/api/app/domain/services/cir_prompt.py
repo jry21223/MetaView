@@ -308,7 +308,7 @@ def build_cir_prompt(
     prompt: str,
     domain_hint: TopicDomain | None,
     source_code: str | None = None,
-    language: str = "python",
+    language: str | None = None,
     skill_mode: SkillMode = SkillMode.SPECIALIZED,
     route_decision: RouteDecision | dict[str, Any] | None = None,
     coverage_decision: CoverageDecision | None = None,
@@ -343,7 +343,7 @@ You may change this if the topic clearly belongs to a different domain."""
     code_track = ""
     if source_code and source_code.strip():
         code_track = _CODE_TRACK_INSTRUCTION.format(
-            language=language or "python",
+            language=language or "unknown",
             numbered_source=_number_source(source_code),
         )
     # For algorithm domain: add pseudocode generation instruction.

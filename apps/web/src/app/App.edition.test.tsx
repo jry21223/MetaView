@@ -88,6 +88,14 @@ describe("App edition shells", () => {
     await waitFor(() =>
       expect(container.textContent).toContain("登录暂未开放"),
     );
+    expect(
+      container.querySelector(".mv-login-gate__button")?.classList.contains(
+        "mv-intake-send",
+      ),
+    ).toBe(true);
+    expect(
+      container.querySelector<HTMLButtonElement>(".mv-login-gate__button")?.disabled,
+    ).toBe(true);
     expect(container.textContent).not.toContain("把一道题，变成一段看得见的理解过程。");
   });
 

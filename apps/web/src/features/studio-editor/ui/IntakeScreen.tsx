@@ -1,80 +1,37 @@
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
+import {
+  CODE_FILE_ACCEPT,
+  languageFromCodeFilename,
+} from "../lib/codeFileLanguage";
 
-type IntakeDomain =
-  | "algorithm"
-  | "math"
-  | "code"
-  | "physics"
-  | "chemistry"
-  | "biology"
-  | "geography";
+const MAX_CODE_FILE_BYTES = 256 * 1024;
+const TEXTAREA_MIN_HEIGHT = 168;
+const TEXTAREA_MAX_HEIGHT = 320;
 
-const UNSUPPORTED_FILE_WARNING =
-  "当前只支持上传代码文件。图片、PDF、课件暂未接入生成管线。";
-
-/** One-line example prompts under the composer; the full gallery lives on the 模板 page. */
-const EXAMPLE_PROMPTS: Array<{
-  id: string;
-  domain: IntakeDomain;
-  label: string;
-  meta: string;
-  prompt: string;
-}> = [
+const EXAMPLE_PROMPTS = [
   {
-    id: "binary-search",
-    domain: "algorithm",
+    label: "导数与切线",
+    prompt:
+      "用动画解释导数的几何意义：曲线 y=x² 在点 (1,1) 处切线的斜率为什么是 2。",
+  },
+  {
     label: "二分查找",
-    meta: "指针 · 区间 · 代码行",
-    prompt: "生成一个算法讲解：演示二分查找的指针移动和区间收缩过程。",
+    prompt:
+      "演示在有序数组 [1,3,5,7,9,11] 里二分查找 7 的过程，标出 low/mid/high。",
   },
   {
-    id: "projectile-motion",
-    domain: "physics",
     label: "抛体运动",
-    meta: "受力 · 速度 · 轨迹",
-    prompt: "生成一个物理题讲解：演示抛体运动的受力分析、速度分解和轨迹。",
+    prompt:
+      "演示平抛运动：水平速度不变、竖直加速，画出抛物线轨迹和分速度矢量。",
   },
-  {
-    id: "balance-equation",
-    domain: "chemistry",
-    label: "配平方程",
-    meta: "方程式 · 物质的量",
-    prompt: "生成一个化学讲解：演示化学方程式配平和物质的量换算。",
-  },
-  {
-    id: "mendel-genetics",
-    domain: "biology",
-    label: "孟德尔遗传",
-    meta: "性状 · 概率 · 遗传图",
-    prompt: "生成一个生物讲解：演示孟德尔豌豆杂交实验的显隐性遗传规律。",
-  },
-];
-
-const DOMAIN_LABELS: Record<IntakeDomain, string> = {
-  algorithm: "算法",
-  math: "数学",
-  code: "代码",
-  physics: "物理",
-  chemistry: "化学",
-  biology: "生物",
-  geography: "地理",
-};
-
-const GENERATION_PATH = [
-  { index: "01", label: "理解题意", contract: "COVERAGE" },
-  { index: "02", label: "规划讲解", contract: "LESSON PLAN" },
-  { index: "03", label: "构建画面", contract: "PLAYBOOK" },
-  { index: "04", label: "编排播放", contract: "DIRECTOR" },
 ] as const;
 
 export interface IntakeContext {
-  domain: IntakeDomain | null;
-  template: string;
-  title: string;
-  raw: string;
-  files: Array<{ name: string; size: number }>;
+  prompt: string;
   sourceCode?: string;
-  language?: string;
+  language?: string | null;
+  sourceFilename?: string;
+  sourceSizeBytes?: number;
 }
 
 interface IntakeScreenProps {
@@ -85,112 +42,34 @@ interface IntakeScreenProps {
   initialPrompt?: string;
 }
 
+type LocalSubmitStatus = "idle" | "reading-file" | "submitting";
+
 function readFileAsText(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
+    reader.onload = () =>
+      resolve(typeof reader.result === "string" ? reader.result : "");
+    reader.onerror = () => reject(reader.error ?? new Error("file read failed"));
+    reader.onabort = () => reject(new Error("file read aborted"));
     reader.readAsText(file);
   });
 }
 
-const EXT_TO_LANGUAGE: Record<string, string> = {
-  ".py": "python",
-  ".js": "javascript",
-  ".ts": "typescript",
-  ".tsx": "typescript",
-  ".jsx": "javascript",
-  ".java": "java",
-  ".cpp": "cpp",
-  ".cc": "cpp",
-  ".cxx": "cpp",
-  ".c": "c",
-  ".h": "c",
-  ".hpp": "cpp",
-  ".cs": "csharp",
-  ".go": "go",
-  ".rs": "rust",
-  ".rb": "ruby",
-  ".swift": "swift",
-  ".kt": "kotlin",
-  ".kts": "kotlin",
-  ".php": "php",
-  ".r": "r",
-  ".m": "objc",
-  ".sh": "bash",
-  ".bash": "bash",
-  ".zsh": "bash",
-  ".sql": "sql",
-  ".html": "html",
-  ".css": "css",
-  ".json": "json",
-  ".yaml": "yaml",
-  ".yml": "yaml",
-};
-
-const CODE_ACCEPT = Object.keys(EXT_TO_LANGUAGE).join(",");
-
-function languageFromName(name: string): string | undefined {
-  const dotIndex = name.lastIndexOf(".");
-  if (dotIndex < 0) return undefined;
-  const ext = name.slice(dotIndex).toLowerCase();
-  return EXT_TO_LANGUAGE[ext];
+function resizeTextarea(element: HTMLTextAreaElement) {
+  element.style.height = `${TEXTAREA_MIN_HEIGHT}px`;
+  const contentHeight = element.scrollHeight;
+  const nextHeight = Math.min(
+    Math.max(contentHeight, TEXTAREA_MIN_HEIGHT),
+    TEXTAREA_MAX_HEIGHT,
+  );
+  element.style.height = `${nextHeight}px`;
+  element.style.overflowY =
+    contentHeight > TEXTAREA_MAX_HEIGHT ? "auto" : "hidden";
 }
 
-function inferDomain(raw: string, codeFile?: File): IntakeDomain | null {
-  // Hint-only heuristic: a null result never blocks submission — the
-  // backend topic router owns the final domain decision.
-  if (codeFile) return "code";
-
-  const text = raw.toLowerCase();
-  if (
-    text.includes("排序") ||
-    text.includes("算法") ||
-    text.includes("二分") ||
-    text.includes("递归") ||
-    text.includes("search") ||
-    text.includes("pointer") ||
-    text.includes("array") ||
-    text.includes("function ") ||
-    text.includes("def ") ||
-    text.includes("class ")
-  ) {
-    return "algorithm";
-  }
-  if (
-    raw.includes("微分") ||
-    raw.includes("积分") ||
-    raw.includes("极限") ||
-    raw.includes("函数") ||
-    raw.includes("导数") ||
-    raw.includes("方程") ||
-    raw.includes("傅里叶")
-  ) {
-    return "math";
-  }
-  if (
-    raw.includes("斜面") ||
-    raw.includes("物理") ||
-    raw.includes("受力") ||
-    raw.includes("速度") ||
-    raw.includes("加速度") ||
-    raw.includes("能量") ||
-    raw.includes("力")
-  ) {
-    return "physics";
-  }
-  if (
-    raw.includes("化学") ||
-    raw.includes("配平") ||
-    raw.includes("物质的量") ||
-    raw.includes("摩尔") ||
-    raw.includes("反应") ||
-    text.includes("stoichiometry") ||
-    text.includes("mole")
-  ) {
-    return "chemistry";
-  }
-  return null;
+function fileSizeLabel(size: number): string {
+  if (size < 1024) return `${size} B`;
+  return `${Math.ceil(size / 1024)} KB`;
 }
 
 export function IntakeScreen({
@@ -200,112 +79,112 @@ export function IntakeScreen({
   initialPrompt = "",
 }: IntakeScreenProps) {
   const [input, setInput] = useState(initialPrompt);
-  const [files, setFiles] = useState<Array<{ name: string; size: number }>>([]);
-  const [fileObjects, setFileObjects] = useState<File[]>([]);
-  const [fileWarning, setFileWarning] = useState<string | null>(null);
-  const [thinking, setThinking] = useState("");
-  const [selectedExample, setSelectedExample] = useState<
-    (typeof EXAMPLE_PROMPTS)[number] | null
-  >(null);
+  const [attachment, setAttachment] = useState<File | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [submitStatus, setSubmitStatus] =
+    useState<LocalSubmitStatus>("idle");
   const [dragActive, setDragActive] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const pending = isSubmitting || Boolean(thinking);
-  const attachedCodeFile = fileObjects.find((file) => languageFromName(file.name));
-  const inferredDomain = attachedCodeFile
-    ? "code"
-    : selectedExample?.domain ?? inferDomain(input);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const busyRef = useRef(false);
+  const pending = isSubmitting || submitStatus !== "idle";
 
-  const handleFiles = (list: FileList | null) => {
-    if (!list) return;
-    const arr = Array.from(list);
-    const supported = arr.filter((file) => languageFromName(file.name));
-    const unsupportedCount = arr.length - supported.length;
+  useLayoutEffect(() => {
+    if (textareaRef.current) resizeTextarea(textareaRef.current);
+  }, []);
 
-    setFileWarning(unsupportedCount > 0 ? UNSUPPORTED_FILE_WARNING : null);
-    if (supported.length === 0) return;
+  const handleFiles = (list: FileList | File[] | null) => {
+    if (!list || list.length === 0 || pending) return;
+    const candidates = Array.from(list);
 
-    setSelectedExample(null);
-    setFileObjects((prev) => [...prev, ...supported]);
-    setFiles((prev) => [
-      ...prev,
-      ...supported.map((f) => ({ name: f.name, size: f.size })),
-    ]);
+    if (candidates.length !== 1) {
+      setFileError("一次只能上传一个代码文件。");
+      return;
+    }
+
+    const nextFile = candidates[0];
+    if (!languageFromCodeFilename(nextFile.name)) {
+      setFileError("不支持该文件类型，请选择代码文件。");
+      return;
+    }
+    if (nextFile.size > MAX_CODE_FILE_BYTES) {
+      setFileError("代码文件不能超过 256 KB。");
+      return;
+    }
+
+    setAttachment(nextFile);
+    setFileError(null);
   };
 
-  const removeFile = (index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
-    setFileObjects((prev) => prev.filter((_, i) => i !== index));
+  const removeFile = () => {
+    if (pending) return;
+    setAttachment(null);
+    setFileError(null);
+    if (fileRef.current) fileRef.current.value = "";
   };
 
   const submit = async () => {
-    if (!input.trim() && files.length === 0) return;
+    const prompt = input.trim();
+    if ((!prompt && !attachment) || pending || busyRef.current) return;
 
-    setThinking("正在理解题目…");
-    const codeFile = fileObjects.find((f) => languageFromName(f.name));
-    let sourceCode: string | undefined;
-    let language: string | undefined;
-
-    if (codeFile) {
-      try {
-        sourceCode = await readFileAsText(codeFile);
-        language = languageFromName(codeFile.name);
-      } catch {
-        sourceCode = undefined;
-        language = undefined;
-      }
-    }
-
-    const domain = codeFile
-      ? "code"
-      : selectedExample?.domain ?? inferDomain(input);
-    setThinking("提交中…");
+    busyRef.current = true;
+    setFileError(null);
 
     try {
+      if (!attachment) {
+        setSubmitStatus("submitting");
+        await onSubmit({ prompt });
+        return;
+      }
+
+      setSubmitStatus("reading-file");
+      let sourceCode: string;
+      try {
+        sourceCode = await readFileAsText(attachment);
+      } catch {
+        setFileError("文件读取失败，请重新选择代码文件。");
+        return;
+      }
+
+      setSubmitStatus("submitting");
       await onSubmit({
-        domain,
-        template: selectedExample?.id ?? "freeform",
-        title:
-          selectedExample?.label ||
-          input.trim().slice(0, 40) ||
-          codeFile?.name ||
-          "未命名",
-        raw: input,
-        files,
+        prompt: prompt || `讲解 ${attachment.name} 中的代码。`,
         sourceCode,
-        language,
+        language: languageFromCodeFilename(attachment.name),
+        sourceFilename: attachment.name,
+        sourceSizeBytes: attachment.size,
       });
     } catch {
-      // The shell exposes the submission error through submitError; stay on intake.
+      // The shell exposes request failures through submitError; stay on intake.
     } finally {
-      setThinking("");
+      busyRef.current = false;
+      setSubmitStatus("idle");
     }
   };
 
-  const pickExample = (example: (typeof EXAMPLE_PROMPTS)[number]) => {
+  const pickExample = (prompt: string) => {
     if (pending) return;
-    setInput(example.prompt);
-    setSelectedExample(example);
-    setFileWarning(null);
+    setInput(prompt);
+    setFileError(null);
+    queueMicrotask(() => {
+      if (textareaRef.current) resizeTextarea(textareaRef.current);
+    });
   };
+
+  const statusText = isSubmitting
+    ? "正在提交…"
+    : submitStatus === "reading-file"
+      ? "正在读取代码文件…"
+      : submitStatus === "submitting"
+        ? "正在提交…"
+        : null;
 
   return (
     <main className="mv-intake-body">
       <div className="mv-intake-shell">
-        <header className="mv-intake-hero" aria-label="MetaView intake">
-          <div>
-            <p className="mv-intake-kicker">
-              <span aria-hidden="true" /> NEW VISUAL LESSON / 01
-            </p>
-            <h1 className="mv-intake-title">新建可视化讲解</h1>
-            <p className="mv-intake-sub">
-              输入一道题或一段代码，MetaView 会把它组织成可播放的分步画面。
-            </p>
-          </div>
-          <div className="mv-intake-outcomes" aria-label="讲解输出能力">
-            <span>可播放</span>
-            <span>可追问</span>
-            <span>可导出</span>
-          </div>
+        <header className="mv-intake-hero" aria-label="MetaView 创建讲解">
+          <h1 className="mv-intake-title">新建可视化讲解</h1>
+          <p className="mv-intake-sub">输入一道题、一个知识点，或粘贴代码。</p>
         </header>
 
         <div className="mv-intake-layout">
@@ -314,67 +193,33 @@ export function IntakeScreen({
             aria-label="生成输入"
             onDragEnter={(event) => {
               event.preventDefault();
-              setDragActive(true);
+              if (!pending) setDragActive(true);
             }}
             onDragOver={(event) => {
               event.preventDefault();
-              setDragActive(true);
+              if (!pending) setDragActive(true);
             }}
-            onDragLeave={() => setDragActive(false)}
+            onDragLeave={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+                setDragActive(false);
+              }
+            }}
             onDrop={(event) => {
               event.preventDefault();
               setDragActive(false);
               handleFiles(event.dataTransfer.files);
             }}
           >
-            <div className="mv-intake-composer__head">
-              <div>
-                <span>INPUT / 题目与代码</span>
-                <strong>从一道题或一段代码开始</strong>
-              </div>
-              <div
-                className={`mv-intake-domain-hint${inferredDomain ? " is-ready" : ""}`}
-                title="仅作输入提示，最终学科由生成管线判断"
-              >
-                <span>领域提示</span>
-                <strong>{inferredDomain ? DOMAIN_LABELS[inferredDomain] : "等待输入"}</strong>
-              </div>
-            </div>
-
-            {files.length > 0 && (
-              <div className="mv-intake-files">
-                {files.map((file, index) => (
-                  <div key={`${file.name}-${index}`} className="mv-intake-file">
-                    <span className="mv-file-name">{file.name}</span>
-                    <button type="button" onClick={() => removeFile(index)}>
-                      删除
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {(fileWarning || submitError) && (
-              <div
-                className={`mv-intake-warning${submitError ? " mv-intake-error" : ""}`}
-                role="alert"
-              >
-                {submitError ?? fileWarning}
-              </div>
-            )}
-
             <textarea
+              ref={textareaRef}
               className="mv-intake-input"
-              rows={7}
-              placeholder="例如：解释导数的几何意义，并演示切线如何随割线逼近……"
+              rows={6}
+              placeholder="例如：用动画解释导数的几何意义，并演示切线如何随割线逼近……"
               value={input}
-              aria-describedby="mv-intake-file-help"
+              disabled={pending}
               onChange={(event) => {
                 setInput(event.target.value);
-                setSelectedExample(null);
-                const element = event.target;
-                element.style.height = "auto";
-                element.style.height = `${element.scrollHeight}px`;
+                resizeTextarea(event.target);
               }}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
@@ -382,8 +227,40 @@ export function IntakeScreen({
                   void submit();
                 }
               }}
-              style={{ resize: "none", overflow: "hidden", minHeight: 228 }}
             />
+
+            {attachment && (
+              <div
+                className="mv-intake-file"
+                title={`${attachment.name} · ${fileSizeLabel(attachment.size)}`}
+              >
+                <span className="mv-file-name">{attachment.name}</span>
+                <small>{fileSizeLabel(attachment.size)}</small>
+                <button
+                  className="mv-intake-file__remove"
+                  type="button"
+                  aria-label={`删除 ${attachment.name}`}
+                  title="删除代码文件"
+                  disabled={pending}
+                  onClick={removeFile}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path d="m7 7 10 10M17 7 7 17" />
+                  </svg>
+                </button>
+              </div>
+            )}
+
+            {(fileError || submitError) && (
+              <div className="mv-intake-warning" role="alert">
+                {fileError ?? submitError}
+              </div>
+            )}
 
             <div className="mv-intake-actions">
               <div className="mv-intake-toolrow">
@@ -391,26 +268,27 @@ export function IntakeScreen({
                   className="mv-intake-action mv-intake-attach"
                   type="button"
                   aria-label="上传代码文件"
-                  title="上传代码文件"
+                  title="上传一个代码文件，最大 256 KB"
+                  disabled={pending}
                   onClick={() => fileRef.current?.click()}
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
                     <path d="M6 4h9l3 3v13H6z" />
-                    <path d="M15 4v4h4" />
-                    <path d="M9 13h6" />
-                    <path d="M9 17h4" />
+                    <path d="M15 4v4h4M9 13h6M9 17h4" />
                   </svg>
-                  <span>添加代码文件</span>
+                  <span>{attachment ? "替换代码文件" : "添加代码文件"}</span>
                 </button>
-                <span className="mv-intake-file-help" id="mv-intake-file-help">
-                  或拖入 .py / .js / .java 等代码文件
-                </span>
                 <input
                   ref={fileRef}
                   type="file"
-                  multiple
-                  accept={CODE_ACCEPT}
-                  style={{ display: "none" }}
+                  accept={CODE_FILE_ACCEPT}
+                  disabled={pending}
+                  hidden
                   onChange={(event) => {
                     handleFiles(event.target.files);
                     event.target.value = "";
@@ -419,76 +297,59 @@ export function IntakeScreen({
               </div>
 
               <div className="mv-intake-submitrow">
-                {thinking ? (
-                  <span className="mv-intake-thinking" role="status" aria-live="polite">
-                    {thinking}
+                {statusText ? (
+                  <span
+                    className="mv-intake-thinking"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {statusText}
                   </span>
                 ) : (
-                  <span className="mv-intake-count">{input.length} 字符 · ⌘ / Ctrl + Enter</span>
+                  <span className="mv-intake-shortcut">⌘ / Ctrl + Enter</span>
                 )}
                 <button
                   className="mv-send mv-intake-send"
                   type="button"
                   onClick={() => void submit()}
-                  disabled={pending || (!input.trim() && files.length === 0)}
+                  disabled={pending || (!input.trim() && !attachment)}
                 >
                   生成讲解
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-                    <path d="M5 12h14" />
-                    <path d="m13 6 6 6-6 6" />
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path d="M5 12h14M13 6l6 6-6 6" />
                   </svg>
                 </button>
               </div>
             </div>
           </section>
 
-          <aside className="mv-intake-guide" aria-label="生成路径与示例">
-            <section className="mv-intake-path" aria-labelledby="mv-intake-path-title">
-              <div className="mv-intake-guide__head">
-                <span>GENERATION PATH</span>
-                <h2 id="mv-intake-path-title">从题意到可播放画面</h2>
-              </div>
-              <ol>
-                {GENERATION_PATH.map((step) => (
-                  <li key={step.contract}>
-                    <span>{step.index}</span>
-                    <div>
-                      <strong>{step.label}</strong>
-                      <small>{step.contract}</small>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </section>
-
-            <section className="mv-intake-examples" aria-label="示例题目">
-              <div className="mv-intake-guide__head">
-                <span>EXAMPLE STARTS</span>
-                <h2>从一个可靠样例开始</h2>
-                <p>点击填入，可继续修改。</p>
-              </div>
-              <div className="mv-intake-example-list">
-                {EXAMPLE_PROMPTS.map((example, index) => (
-                  <button
-                    key={example.id}
-                    className={`mv-intake-example${selectedExample?.id === example.id ? " is-selected" : ""}`}
-                    type="button"
-                    disabled={pending}
-                    aria-pressed={selectedExample?.id === example.id}
-                    onClick={() => pickExample(example)}
-                  >
-                    <span>{String(index + 1).padStart(2, "0")} / {DOMAIN_LABELS[example.domain]}</span>
-                    <strong>{example.label}</strong>
-                    <small>{example.meta}</small>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-                      <path d="M5 12h14" />
-                      <path d="m13 6 6 6-6 6" />
-                    </svg>
-                  </button>
-                ))}
-              </div>
-            </section>
-          </aside>
+          <section className="mv-intake-examples" aria-labelledby="mv-intake-examples-title">
+            <div className="mv-intake-example-head">
+              <h2 id="mv-intake-examples-title">试试：</h2>
+            </div>
+            <div className="mv-intake-example-list">
+              {EXAMPLE_PROMPTS.map((example) => (
+                <button
+                  key={example.label}
+                  className="mv-intake-example"
+                  type="button"
+                  disabled={pending}
+                  onClick={() => pickExample(example.prompt)}
+                >
+                  {example.label}
+                </button>
+              ))}
+            </div>
+            <a className="mv-intake-cases-link" href="/cases">
+              查看精选案例
+              <span aria-hidden="true">→</span>
+            </a>
+          </section>
         </div>
       </div>
     </main>

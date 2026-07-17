@@ -6,6 +6,7 @@ import { AssetShowcasePage } from "../pages/AssetShowcase/AssetShowcasePage";
 import { LandingRoute } from "./LandingRoute";
 import { OpsAppShell } from "./OpsAppShell";
 import { SelfAppShell } from "./SelfAppShell";
+import { stageToPath } from "./routes";
 
 function resolveAppEdition(): AppEdition {
   return import.meta.env.VITE_APP_EDITION === "ops" ? "ops" : "self";
@@ -30,7 +31,7 @@ function AppRoutes() {
         path="/admin"
         element={
           appEdition === "ops" ? (
-            <OpsDashboardPage onNavigate={() => {}} />
+            <OpsDashboardRoute />
           ) : (
             <AdminUnavailable />
           )
@@ -42,6 +43,15 @@ function AppRoutes() {
         element={appEdition === "ops" ? <OpsAppShell /> : <SelfAppShell />}
       />
     </Routes>
+  );
+}
+
+function OpsDashboardRoute() {
+  const navigate = useNavigate();
+  return (
+    <OpsDashboardPage
+      onNavigate={(stage) => navigate(stageToPath(stage))}
+    />
   );
 }
 

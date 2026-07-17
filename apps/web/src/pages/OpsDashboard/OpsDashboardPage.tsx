@@ -1,50 +1,54 @@
 import React, { useMemo, useState } from "react";
-import MenuIcon from "@mui/icons-material/Menu";
-import RefreshIcon from "@mui/icons-material/Refresh";
 import HistoryIcon from "@mui/icons-material/History";
+import MenuIcon from "@mui/icons-material/Menu";
 import PlayCircleIcon from "@mui/icons-material/PlayCircle";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import SettingsIcon from "@mui/icons-material/Settings";
 import ViewModuleIcon from "@mui/icons-material/ViewModule";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import Avatar from "@mui/material/Avatar";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
-import CssBaseline from "@mui/material/CssBaseline";
 import Divider from "@mui/material/Divider";
 import Drawer from "@mui/material/Drawer";
-import Grid from "@mui/material/Grid";
 import IconButton from "@mui/material/IconButton";
 import List from "@mui/material/List";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import Paper from "@mui/material/Paper";
-import Stack from "@mui/material/Stack";
 import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
 import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
-import Typography from "@mui/material/Typography";
-import { alpha, createTheme, ThemeProvider } from "@mui/material/styles";
+import { ThemeProvider } from "@mui/material/styles";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
-import { BarChart, LineChart, PieChart } from "@mui/x-charts";
-import { RichTreeView } from "@mui/x-tree-view/RichTreeView";
+import { zhCN as dataGridZhCN } from "@mui/x-data-grid/locales";
+import {
+  BarChart,
+  LineChart,
+  PieChart,
+} from "@mui/x-charts";
 
 import {
   useOpsDashboard,
   type OpsDashboardResponse,
   type OpsDashboardWindowDays,
+  type OpsHealthStatus,
   type OpsHealthTreeItem,
   type OpsMetricCard,
   type OpsOrderRow,
   type OpsRunRow,
 } from "../../features/ops-dashboard";
+import { usePrefersReducedMotion } from "../../shared/hooks/usePrefersReducedMotion";
 import type { Stage } from "../../shared/ui/GlobalTopbar";
+import { OPS_THEME_VARS, opsDashboardTheme } from "./opsDashboardTheme";
 
-const drawerWidth = 248;
 const windowOptions: OpsDashboardWindowDays[] = [7, 30, 90];
+const dataGridLocaleText = dataGridZhCN.components.MuiDataGrid.defaultProps.localeText;
 
 interface OpsDashboardPageProps {
   accountName?: string | null;
@@ -55,40 +59,23 @@ interface OpsDashboardPageProps {
 }
 
 type TableTab = "runs" | "orders";
+type StatusTone = "positive" | "negative" | "warning" | "neutral";
 
-const theme = createTheme({
-  palette: {
-    mode: "light",
-    primary: { main: "#2563eb" },
-    success: { main: "#12805c" },
-    warning: { main: "#b7791f" },
-    error: { main: "#c2413a" },
-    background: {
-      default: "#f7f8fb",
-      paper: "#ffffff",
-    },
-  },
-  shape: { borderRadius: 8 },
-  typography: {
-    fontFamily: [
-      "Inter",
-      "-apple-system",
-      "BlinkMacSystemFont",
-      "PingFang SC",
-      "Noto Sans SC",
-      "sans-serif",
-    ].join(","),
-  },
-  components: {
-    MuiPaper: {
-      styleOverrides: {
-        root: {
-          backgroundImage: "none",
-        },
-      },
-    },
-  },
-});
+interface RunTableRow {
+  id: string;
+  title: string;
+  status: string;
+  domain: string;
+  createdAt: string;
+}
+
+interface OrderTableRow {
+  id: string;
+  order: string;
+  amount: string;
+  status: string;
+  createdAt: string;
+}
 
 export function OpsDashboardPage({
   accountName,
@@ -100,15 +87,9 @@ export function OpsDashboardPage({
   const [windowDays, setWindowDays] = useState<OpsDashboardWindowDays>(30);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [tableTab, setTableTab] = useState<TableTab>("runs");
-  const { dashboard, isLoading, error, errorStatus, refresh } = useOpsDashboard(windowDays);
+  const { dashboard, isLoading, error, errorStatus, refresh } =
+    useOpsDashboard(windowDays);
   const isPermissionError = errorStatus === 403;
-
-  const handleWindowChange = (
-    _: React.MouseEvent<HTMLElement>,
-    value: OpsDashboardWindowDays | null,
-  ) => {
-    if (value) setWindowDays(value);
-  };
 
   const drawer = (
     <SideMenu
@@ -124,69 +105,64 @@ export function OpsDashboardPage({
   );
 
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
-        <Box component="nav" sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}>
-          <Drawer
-            variant="temporary"
-            open={mobileOpen}
-            onClose={() => setMobileOpen(false)}
-            ModalProps={{ keepMounted: true }}
-            sx={{
-              display: { xs: "block", md: "none" },
-              "& .MuiDrawer-paper": { width: drawerWidth },
-            }}
-          >
-            {drawer}
-          </Drawer>
+    <ThemeProvider theme={opsDashboardTheme}>
+      <Box
+        className="mv-root mv-light mv-theme-light mv-density-compact mv-ops-dashboard"
+        style={OPS_THEME_VARS}
+      >
+        <Box component="nav" className="mv-ops-nav-desktop" aria-label="运营导航">
           <Drawer
             variant="permanent"
-            sx={{
-              display: { xs: "none", md: "block" },
-              "& .MuiDrawer-paper": {
-                width: drawerWidth,
-                boxSizing: "border-box",
-                borderRightColor: "divider",
-              },
-            }}
             open
+            slotProps={{
+              paper: { className: "mv-ops-sidebar", style: OPS_THEME_VARS },
+            }}
           >
             {drawer}
           </Drawer>
         </Box>
 
-        <Box component="main" sx={{ flexGrow: 1, minWidth: 0 }}>
+        <Drawer
+          variant="temporary"
+          open={mobileOpen}
+          onClose={() => setMobileOpen(false)}
+          ModalProps={{ keepMounted: true }}
+          slotProps={{
+            paper: { className: "mv-ops-sidebar", style: OPS_THEME_VARS },
+          }}
+        >
+          {drawer}
+        </Drawer>
+
+        <Box component="main" className="mv-ops-main">
           <MobileHeader onOpenMenu={() => setMobileOpen(true)} />
-          <Stack
-            spacing={2.5}
-            sx={{
-              width: "100%",
-              maxWidth: 1680,
-              mx: "auto",
-              px: { xs: 2, md: 3 },
-              py: { xs: 2, md: 3 },
-            }}
-          >
+          <div className="mv-ops-content" aria-busy={isLoading}>
             <Header
               windowDays={windowDays}
               generatedAt={dashboard?.generated_at ?? null}
-              onWindowChange={handleWindowChange}
+              onWindowChange={(_, value) => {
+                if (value !== null) setWindowDays(value);
+              }}
               onRefresh={refresh}
               isLoading={isLoading}
             />
 
             {isLoading && !dashboard && <LoadingPanel />}
-            {error && !isPermissionError && <ErrorPanel error={error} onRefresh={refresh} />}
+            {error && !isPermissionError && dashboard && (
+              <ErrorBanner error={error} onRefresh={refresh} />
+            )}
+            {error && !isPermissionError && !dashboard && (
+              <ErrorPanel error={error} onRefresh={refresh} />
+            )}
             {isPermissionError && <PermissionPanel />}
             {dashboard && !isPermissionError && (
-              <DashboardMainGrid
+              <DashboardContent
                 dashboard={dashboard}
                 tableTab={tableTab}
                 onTableTabChange={setTableTab}
               />
             )}
-          </Stack>
+          </div>
         </Box>
       </Box>
     </ThemeProvider>
@@ -195,25 +171,21 @@ export function OpsDashboardPage({
 
 function MobileHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
   return (
-    <Box
-      sx={{
-        display: { xs: "flex", md: "none" },
-        alignItems: "center",
-        gap: 1,
-        px: 2,
-        py: 1.5,
-        bgcolor: "background.paper",
-        borderBottom: 1,
-        borderColor: "divider",
-      }}
-    >
-      <IconButton aria-label="打开运营导航" onClick={onOpenMenu}>
-        <MenuIcon />
+    <header className="mv-ops-mobile-header">
+      <IconButton
+        className="mv-ops-mobile-header__menu"
+        aria-label="打开运营导航"
+        onClick={onOpenMenu}
+      >
+        <MenuIcon fontSize="small" />
       </IconButton>
-      <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-        MetaView 运营
-      </Typography>
-    </Box>
+      <img
+        className="mv-ops-mobile-header__mark"
+        src="/brand/metaview-mark.svg"
+        alt=""
+      />
+      <span className="mv-ops-mobile-header__title">MetaView 运营</span>
+    </header>
   );
 }
 
@@ -234,25 +206,26 @@ function Header({
   isLoading: boolean;
 }) {
   return (
-    <Stack
-      direction={{ xs: "column", lg: "row" }}
-      spacing={2}
-      sx={{ alignItems: { xs: "stretch", lg: "center" }, justifyContent: "space-between" }}
-    >
-      <Box>
-        <Typography variant="overline" sx={{ color: "text.secondary", letterSpacing: 0 }}>
-          MetaView Ops
-        </Typography>
-        <Typography variant="h4" sx={{ fontWeight: 800, lineHeight: 1.15 }}>
-          全局运营
-        </Typography>
-        <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.75 }}>
-          全站任务、收入、账户与充值状态。最近同步：
-          {generatedAt ? formatDateTime(generatedAt) : "等待同步"}
-        </Typography>
-      </Box>
-      <Stack direction="row" spacing={1.25} sx={{ alignItems: "center", flexWrap: "wrap" }}>
+    <header className="mv-ops-page-header">
+      <div className="mv-ops-page-header__copy">
+        <span className="mv-ops-eyebrow">OPS / 全局运营</span>
+        <h1 className="mv-ops-page-title">运营总览</h1>
+        <p className="mv-ops-page-summary">
+          <span>任务、收入、账户与平台状态</span>
+          <span className="mv-ops-sync-time" aria-live="polite">
+            最近同步：
+            {generatedAt ? (
+              <time dateTime={generatedAt}>{formatDateTime(generatedAt)}</time>
+            ) : (
+              "等待同步"
+            )}
+          </span>
+        </p>
+      </div>
+
+      <div className="mv-ops-header-actions">
         <ToggleButtonGroup
+          className="mv-ops-window-toggle"
           exclusive
           size="small"
           value={windowDays}
@@ -266,21 +239,27 @@ function Header({
           ))}
         </ToggleButtonGroup>
         <Button
+          className="mv-ops-refresh"
           variant="outlined"
           size="small"
-          startIcon={<RefreshIcon />}
+          startIcon={
+            <RefreshIcon
+              className={`mv-ops-refresh__icon${isLoading ? " is-spinning" : ""}`}
+              fontSize="small"
+            />
+          }
           onClick={onRefresh}
           disabled={isLoading}
           aria-label="刷新运营数据"
         >
-          刷新
+          <span className="mv-ops-refresh__label">刷新</span>
         </Button>
-      </Stack>
-    </Stack>
+      </div>
+    </header>
   );
 }
 
-function DashboardMainGrid({
+function DashboardContent({
   dashboard,
   tableTab,
   onTableTabChange,
@@ -289,194 +268,276 @@ function DashboardMainGrid({
   tableTab: TableTab;
   onTableTabChange: (tab: TableTab) => void;
 }) {
+  const prefersReducedMotion = usePrefersReducedMotion();
   const runLabels = dashboard.run_trend.map((point) => shortDate(point.date));
   const revenueLabels = dashboard.revenue_trend.map((point) => shortDate(point.date));
-  const healthTree = useMemo(() => toTreeItems(dashboard.health_tree), [dashboard.health_tree]);
-  const runRows = useMemo(() => dashboard.recent_runs.map(runTableRow), [dashboard.recent_runs]);
+  const runRows = useMemo(
+    () => dashboard.recent_runs.map(runTableRow),
+    [dashboard.recent_runs],
+  );
   const orderRows = useMemo(
     () => dashboard.recent_orders.map(orderTableRow),
     [dashboard.recent_orders],
   );
+  const paidOrders = dashboard.revenue_trend.reduce(
+    (total, point) => total + point.paid_orders,
+    0,
+  );
+  const revenueValue =
+    dashboard.kpis.find((metric) => metric.id === "revenue")?.value ?? "¥ 0.00";
 
   return (
-    <Stack spacing={2.5}>
-      <Grid container spacing={2} columns={12}>
+    <>
+      <section className="mv-ops-kpi-rail" aria-label="核心运营指标">
         {dashboard.kpis.map((metric) => (
-          <Grid key={metric.id} size={{ xs: 12, sm: 6, lg: 4, xl: 2 }}>
-            <MetricPanel metric={metric} />
-          </Grid>
+          <MetricPanel key={metric.id} metric={metric} />
         ))}
-      </Grid>
+      </section>
 
-      <Grid container spacing={2} columns={12}>
-        <Grid size={{ xs: 12, lg: 7 }}>
-          <Panel title="任务趋势" subtitle={`近 ${dashboard.window_days} 天生成状态`}>
+      <div className="mv-ops-analytics-grid">
+        <Panel
+          title="任务趋势"
+          subtitle={`近 ${dashboard.window_days} 天生成状态`}
+          action={<RunTrendLegend />}
+        >
+          <div role="img" aria-label={`近 ${dashboard.window_days} 天任务趋势图`}>
             <LineChart
-              height={280}
-              margin={{ top: 20, right: 28, bottom: 32, left: 42 }}
-              xAxis={[{ scaleType: "point", data: runLabels }]}
+              height={306}
+              margin={{ top: 18, right: 18, bottom: 30, left: 12 }}
+              xAxis={[
+                {
+                  scaleType: "point",
+                  data: runLabels,
+                  tickLabelStyle: { fontSize: 10, fill: "var(--ink-3)" },
+                },
+              ]}
+              yAxis={[
+                {
+                  width: 38,
+                  tickLabelStyle: { fontSize: 10, fill: "var(--ink-3)" },
+                },
+              ]}
+              grid={{ horizontal: true }}
+              hideLegend
+              skipAnimation={prefersReducedMotion}
               series={[
                 {
                   data: dashboard.run_trend.map((point) => point.total),
                   label: "全部任务",
-                  color: "#2563eb",
+                  color: "var(--accent)",
+                  curve: "monotoneX",
+                  showMark: false,
                 },
                 {
                   data: dashboard.run_trend.map((point) => point.succeeded),
                   label: "完成",
-                  color: "#12805c",
+                  color: "var(--mv-ops-positive)",
+                  curve: "monotoneX",
+                  showMark: false,
                 },
                 {
                   data: dashboard.run_trend.map((point) => point.failed),
                   label: "失败",
-                  color: "#c2413a",
+                  color: "var(--mv-ops-negative)",
+                  curve: "monotoneX",
+                  showMark: false,
+                },
+                {
+                  data: dashboard.run_trend.map((point) => point.in_flight),
+                  label: "进行中",
+                  color: "var(--warn)",
+                  curve: "monotoneX",
+                  showMark: false,
                 },
               ]}
             />
-          </Panel>
-        </Grid>
-        <Grid size={{ xs: 12, lg: 5 }}>
-          <Panel title="收入趋势" subtitle="按 paid_at 统计已支付订单">
+          </div>
+        </Panel>
+
+        <Panel title="收入趋势" subtitle="按支付完成时间统计">
+          <div className="mv-ops-revenue-summary" aria-label="收入摘要">
+            <div className="mv-ops-revenue-stat">
+              <span className="mv-ops-revenue-stat__label">窗口收入</span>
+              <strong className="mv-ops-revenue-stat__value">{revenueValue}</strong>
+            </div>
+            <div className="mv-ops-revenue-stat">
+              <span className="mv-ops-revenue-stat__label">已支付订单</span>
+              <strong className="mv-ops-revenue-stat__value">{paidOrders}</strong>
+            </div>
+          </div>
+          <div role="img" aria-label={`近 ${dashboard.window_days} 天充值收入趋势图`}>
             <BarChart
-              height={280}
-              margin={{ top: 20, right: 20, bottom: 32, left: 56 }}
-              xAxis={[{ scaleType: "band", data: revenueLabels }]}
+              height={242}
+              margin={{ top: 18, right: 12, bottom: 30, left: 10 }}
+              xAxis={[
+                {
+                  scaleType: "band",
+                  data: revenueLabels,
+                  tickLabelStyle: { fontSize: 10, fill: "var(--ink-3)" },
+                },
+              ]}
+              yAxis={[
+                {
+                  width: 48,
+                  tickLabelStyle: { fontSize: 10, fill: "var(--ink-3)" },
+                  valueFormatter: (value: number) => `¥${value}`,
+                },
+              ]}
+              grid={{ horizontal: true }}
+              hideLegend
+              skipAnimation={prefersReducedMotion}
               series={[
                 {
                   data: dashboard.revenue_trend.map((point) =>
                     Number((point.revenue_cents / 100).toFixed(2)),
                   ),
                   label: "充值收入",
-                  color: "#2563eb",
+                  color: "var(--accent)",
+                  valueFormatter: (value) => `¥ ${Number(value ?? 0).toFixed(2)}`,
                 },
               ]}
             />
-          </Panel>
-        </Grid>
-      </Grid>
+          </div>
+        </Panel>
+      </div>
 
-      <Grid container spacing={2} columns={12}>
-        <Grid size={{ xs: 12, lg: 8 }}>
-          <Panel
-            title={tableTab === "runs" ? "最近任务" : "最近订单"}
-            subtitle="全站最新记录，按创建时间倒序"
-            action={
-              <Tabs
-                value={tableTab}
-                onChange={(_, value: TableTab) => onTableTabChange(value)}
-                aria-label="运营明细表"
-              >
-                <Tab value="runs" label="任务" />
-                <Tab value="orders" label="订单" />
-              </Tabs>
-            }
-          >
-            <Box sx={{ height: 420, width: "100%" }}>
-              {tableTab === "runs" ? (
-                <DataGrid
-                  rows={runRows}
-                  columns={runColumns}
-                  density="compact"
-                  initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
-                  pageSizeOptions={[10, 20, 50]}
-                  disableRowSelectionOnClick
-                />
-              ) : (
-                <DataGrid
-                  rows={orderRows}
-                  columns={orderColumns}
-                  density="compact"
-                  initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
-                  pageSizeOptions={[10, 20, 50]}
-                  disableRowSelectionOnClick
-                />
-              )}
-            </Box>
-          </Panel>
-        </Grid>
-        <Grid size={{ xs: 12, lg: 4 }}>
-          <Stack spacing={2}>
-            <Panel title="状态分布" subtitle="窗口内任务状态">
-              <PieChart
-                height={220}
-                series={[
-                  {
-                    data: dashboard.status_distribution.map((item, index) => ({
-                      id: item.id,
-                      value: item.count,
-                      label: item.label,
-                      color: pieColors[index % pieColors.length],
-                    })),
-                    innerRadius: 48,
-                  },
-                ]}
+      <div className="mv-ops-activity-grid">
+        <Panel
+          title={tableTab === "runs" ? "最近任务" : "最近订单"}
+          subtitle="全站最新记录，按创建时间倒序"
+          action={
+            <Tabs
+              className="mv-ops-tabs"
+              value={tableTab}
+              onChange={(_, value: TableTab) => onTableTabChange(value)}
+              aria-label="运营明细表"
+            >
+              <Tab value="runs" label="任务" />
+              <Tab value="orders" label="订单" />
+            </Tabs>
+          }
+          flush
+        >
+          <div className="mv-ops-table">
+            {tableTab === "runs" ? (
+              <DataGrid
+                rows={runRows}
+                columns={runColumns}
+                getRowClassName={({ row }) =>
+                  row.status === "failed" ? "is-failed" : ""
+                }
+                density="compact"
+                initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
+                pageSizeOptions={[10, 20, 50]}
+                disableColumnMenu
+                disableRowSelectionOnClick
+                rowHeight={42}
+                columnHeaderHeight={42}
+                localeText={{ ...dataGridLocaleText, noRowsLabel: "暂无任务记录" }}
               />
-            </Panel>
-            <Panel title="运营健康树" subtitle="按任务、计费、账户分组">
-              <RichTreeView
-                items={healthTree}
-                defaultExpandedItems={["generation", "billing", "accounts"]}
-                sx={{ minHeight: 188, "& .MuiTreeItem-label": { fontSize: 13 } }}
+            ) : (
+              <DataGrid
+                rows={orderRows}
+                columns={orderColumns}
+                getRowClassName={({ row }) =>
+                  row.status === "pending" ? "is-pending" : ""
+                }
+                density="compact"
+                initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
+                pageSizeOptions={[10, 20, 50]}
+                disableColumnMenu
+                disableRowSelectionOnClick
+                rowHeight={42}
+                columnHeaderHeight={42}
+                localeText={{ ...dataGridLocaleText, noRowsLabel: "暂无订单记录" }}
               />
-            </Panel>
-          </Stack>
-        </Grid>
-      </Grid>
-    </Stack>
+            )}
+          </div>
+        </Panel>
+
+        <div className="mv-ops-side-stack">
+          <HealthPanel items={dashboard.health_tree} />
+          <TaskStructurePanel
+            statusDistribution={dashboard.status_distribution}
+            domainDistribution={dashboard.domain_distribution}
+            skipAnimation={prefersReducedMotion}
+          />
+        </div>
+      </div>
+    </>
   );
 }
 
-function MetricPanel({ metric }: { metric: OpsMetricCard }) {
-  const color = metric.trend === "down" ? "error.main" : metric.trend === "up" ? "success.main" : "text.secondary";
+function MetricPanel({
+  metric,
+}: {
+  metric: OpsMetricCard;
+}) {
+  const deltaLabel =
+    metric.delta_percent == null
+      ? "—"
+      : `${metric.delta_percent > 0 ? "+" : ""}${metric.delta_percent}%`;
   return (
-    <Paper variant="outlined" sx={{ p: 2, height: "100%" }}>
-      <Stack spacing={1.25}>
-        <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            {metric.label}
-          </Typography>
-          <Chip
-            size="small"
-            label={
-              metric.delta_percent == null
-                ? "持平"
-                : `${metric.delta_percent > 0 ? "+" : ""}${metric.delta_percent}%`
-            }
-            sx={{ color, bgcolor: (t) => alpha(t.palette.text.primary, 0.04) }}
-          />
-        </Stack>
-        <Typography variant="h5" sx={{ fontWeight: 800 }}>
-          {metric.value}
-        </Typography>
-        <Typography variant="caption" sx={{ color: "text.secondary", minHeight: 34 }}>
-          {metric.helper}
-        </Typography>
-        {metric.data.length > 0 && (
-          <MetricSparkline values={metric.data} />
-        )}
-      </Stack>
-    </Paper>
+    <article className="mv-ops-metric">
+      <div className="mv-ops-metric__topline">
+        <span className="mv-ops-metric__label">{metric.label}</span>
+        <Chip
+          className="mv-ops-delta"
+          size="small"
+          label={deltaLabel}
+          data-trend={metric.trend}
+          aria-label={
+            metric.delta_percent == null ? "暂无环比" : `较前一窗口 ${deltaLabel}`
+          }
+        />
+      </div>
+      <div className="mv-ops-metric__value">{metric.value}</div>
+      <div className="mv-ops-metric__helper">{metric.helper}</div>
+      {metric.data.length > 0 ? (
+        <MetricSparkline values={metric.data} />
+      ) : (
+        <div className="mv-ops-sparkline mv-ops-sparkline--empty" aria-hidden="true" />
+      )}
+    </article>
   );
 }
 
 function MetricSparkline({ values }: { values: number[] }) {
   const max = Math.max(...values, 1);
   return (
-    <Stack direction="row" spacing={0.4} sx={{ height: 54, alignItems: "flex-end" }}>
+    <div className="mv-ops-sparkline" aria-hidden="true">
       {values.map((value, index) => (
-        <Box
+        <span
           key={`${index}-${value}`}
-          sx={{
-            flex: 1,
-            height: `${Math.max(10, (value / max) * 100)}%`,
-            minWidth: 2,
-            borderRadius: 0.5,
-            bgcolor: index === values.length - 1 ? "primary.main" : "primary.light",
-            opacity: index === values.length - 1 ? 1 : 0.45,
-          }}
+          className="mv-ops-sparkline__bar"
+          data-latest={index === values.length - 1 ? "true" : undefined}
+          style={{ height: `${Math.max(8, (value / max) * 100)}%` }}
         />
       ))}
-    </Stack>
+    </div>
+  );
+}
+
+function RunTrendLegend() {
+  const items: Array<{ label: string; tone: string }> = [
+    { label: "全部", tone: "total" },
+    { label: "完成", tone: "positive" },
+    { label: "失败", tone: "negative" },
+    { label: "进行中", tone: "warning" },
+  ];
+  return (
+    <div className="mv-ops-chart-legend" aria-label="任务趋势图例">
+      {items.map((item) => (
+        <span key={item.label} className="mv-ops-chart-legend__item">
+          <span
+            className="mv-ops-chart-legend__swatch"
+            data-tone={item.tone}
+            aria-hidden="true"
+          />
+          {item.label}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -485,31 +546,157 @@ function Panel({
   subtitle,
   action,
   children,
+  flush = false,
 }: {
   title: string;
   subtitle: string;
   action?: React.ReactNode;
   children: React.ReactNode;
+  flush?: boolean;
 }) {
   return (
-    <Paper variant="outlined" sx={{ p: 2, height: "100%" }}>
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        spacing={1}
-        sx={{ alignItems: { xs: "stretch", sm: "center" }, justifyContent: "space-between", mb: 1.5 }}
-      >
-        <Box>
-          <Typography variant="subtitle1" sx={{ fontWeight: 750 }}>
-            {title}
-          </Typography>
-          <Typography variant="caption" sx={{ color: "text.secondary" }}>
-            {subtitle}
-          </Typography>
-        </Box>
+    <Paper component="section" variant="outlined" className="mv-ops-panel">
+      <header className="mv-ops-panel__header">
+        <div>
+          <h2 className="mv-ops-panel__title">{title}</h2>
+          <span className="mv-ops-panel__subtitle">{subtitle}</span>
+        </div>
         {action}
-      </Stack>
-      {children}
+      </header>
+      <div
+        className={`mv-ops-panel__body${flush ? " mv-ops-panel__body--flush" : ""}`}
+      >
+        {children}
+      </div>
     </Paper>
+  );
+}
+
+function TaskStructurePanel({
+  statusDistribution,
+  domainDistribution,
+  skipAnimation,
+}: {
+  statusDistribution: OpsDashboardResponse["status_distribution"];
+  domainDistribution: OpsDashboardResponse["domain_distribution"];
+  skipAnimation: boolean;
+}) {
+  const statusTotal = statusDistribution.reduce((total, item) => total + item.count, 0);
+  const maxDomainCount = Math.max(...domainDistribution.map((item) => item.count), 1);
+
+  return (
+    <Panel title="任务结构" subtitle="状态与学科分布">
+      <div className="mv-ops-structure">
+        {statusTotal > 0 ? (
+          <div className="mv-ops-status-layout">
+            <div className="mv-ops-donut" aria-hidden="true">
+              <PieChart
+                height={132}
+                hideLegend
+                skipAnimation={skipAnimation}
+                margin={0}
+                series={[
+                  {
+                    data: statusDistribution.map((item) => ({
+                      id: item.id,
+                      value: item.count,
+                      label: item.label,
+                      color: statusColor(item.id),
+                    })),
+                    innerRadius: 45,
+                    outerRadius: 59,
+                    paddingAngle: 2,
+                    cornerRadius: 2,
+                  },
+                ]}
+              />
+              <div className="mv-ops-donut__center">
+                <strong className="mv-ops-donut__value">{statusTotal}</strong>
+                <span className="mv-ops-donut__label">窗口任务</span>
+              </div>
+            </div>
+            <ul className="mv-ops-status-list" aria-label="任务状态分布">
+              {statusDistribution.map((item) => (
+                <li key={item.id} className="mv-ops-status-list__item">
+                  <span
+                    className="mv-ops-status-dot"
+                    data-tone={statusTone(item.id)}
+                    aria-hidden="true"
+                  />
+                  <span>{item.label}</span>
+                  <strong className="mv-ops-status-list__count">{item.count}</strong>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <div className="mv-ops-empty-inline">窗口内暂无任务</div>
+        )}
+
+        <div>
+          <span className="mv-ops-section-label">学科分布</span>
+          {domainDistribution.length > 0 ? (
+            <ul className="mv-ops-domain-list">
+              {domainDistribution.map((item) => (
+                <li key={item.id} className="mv-ops-domain-row">
+                  <span>{item.label}</span>
+                  <span className="mv-ops-domain-track" aria-hidden="true">
+                    <span
+                      className="mv-ops-domain-fill"
+                      style={{ width: `${(item.count / maxDomainCount) * 100}%` }}
+                    />
+                  </span>
+                  <strong className="mv-ops-domain-count">{item.count}</strong>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="mv-ops-empty-inline">暂无学科数据</div>
+          )}
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+function HealthPanel({ items }: { items: OpsHealthTreeItem[] }) {
+  return (
+    <Panel title="运行健康" subtitle="任务、计费与账户检查">
+      {items.length > 0 ? (
+        <ul className="mv-ops-health-list">
+          {items.map((item) => (
+            <li key={item.id} className="mv-ops-health-group">
+              <HealthRow item={item} group />
+              {item.children.length > 0 && (
+                <ul className="mv-ops-health-children">
+                  {item.children.map((child) => (
+                    <li key={child.id}>
+                      <HealthRow item={child} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div className="mv-ops-empty-inline">暂无健康检查结果</div>
+      )}
+    </Panel>
+  );
+}
+
+function HealthRow({ item, group = false }: { item: OpsHealthTreeItem; group?: boolean }) {
+  const tone = healthTone(item.status);
+  return (
+    <div className={`mv-ops-health-row${group ? " mv-ops-health-row--group" : ""}`}>
+      <span className="mv-ops-status-dot" data-tone={tone} aria-hidden="true" />
+      <span>{item.label}</span>
+      <strong className="mv-ops-health-value">{item.value}</strong>
+      <span className="mv-ops-health-state" data-tone={tone}>
+        {healthStatusLabel(item.status)}
+      </span>
+    </div>
   );
 }
 
@@ -528,186 +715,210 @@ function SideMenu({
   ];
 
   return (
-    <Stack sx={{ height: "100%", bgcolor: "background.paper" }}>
-      <Box sx={{ p: 2 }}>
-        <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
-          <Box
-            sx={{
-              width: 34,
-              height: 34,
-              borderRadius: 1.5,
-              bgcolor: "primary.main",
-              color: "primary.contrastText",
-              display: "grid",
-              placeItems: "center",
-              fontWeight: 800,
-            }}
-          >
-            MV
-          </Box>
-          <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: 800, lineHeight: 1.1 }}>
-              MetaView
-            </Typography>
-            <Typography variant="caption" sx={{ color: "text.secondary" }}>
-              运营后台
-            </Typography>
-          </Box>
-        </Stack>
-      </Box>
+    <div className="mv-ops-sidebar-inner">
+      <div className="mv-ops-brand">
+        <img className="mv-ops-brand__mark" src="/brand/metaview-mark.svg" alt="" />
+        <div>
+          <p className="mv-ops-brand__name">MetaView</p>
+          <span className="mv-ops-brand__meta">OPERATIONS</span>
+        </div>
+      </div>
       <Divider />
-      <List sx={{ p: 1, flex: 1 }}>
+      <span className="mv-ops-nav-label">Workspace</span>
+      <List className="mv-ops-nav-list">
         {navItems.map((item) => (
           <ListItemButton
             key={item.stage}
-            selected={false}
+            className="mv-ops-nav-item"
             onClick={() => onNavigate(item.stage)}
-            sx={{ borderRadius: 1, mb: 0.5 }}
           >
-            <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
+            <ListItemIcon>{item.icon}</ListItemIcon>
             <ListItemText primary={item.label} />
           </ListItemButton>
         ))}
       </List>
-      <Box sx={{ p: 2, borderTop: 1, borderColor: "divider" }}>
-        <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
-          {accountAvatarUrl ? (
-            <Box
-              component="img"
-              src={accountAvatarUrl}
-              alt={`${accountName ?? "管理员"}头像`}
-              sx={{ width: 36, height: 36, borderRadius: "50%" }}
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <Box
-              sx={{
-                width: 36,
-                height: 36,
-                borderRadius: "50%",
-                bgcolor: "grey.100",
-                display: "grid",
-                placeItems: "center",
-                fontWeight: 800,
-              }}
-            >
-              管
-            </Box>
-          )}
-          <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>
-              {accountName ?? "管理员"}
-            </Typography>
-            <Typography variant="caption" sx={{ color: "text.secondary" }} noWrap>
-              余额 ¥ {accountBalanceYuan ?? "同步中"}
-            </Typography>
-          </Box>
-          <IconButton size="small" aria-label="账户与充值" onClick={onOpenProviderSettings}>
+      <div className="mv-ops-account">
+        <Avatar
+          className="mv-ops-account__avatar"
+          src={accountAvatarUrl ?? undefined}
+          alt={accountAvatarUrl ? `${accountName ?? "管理员"}头像` : ""}
+          slotProps={{ img: { referrerPolicy: "no-referrer" } }}
+        >
+          管
+        </Avatar>
+        <div>
+          <div className="mv-ops-account__name">{accountName ?? "管理员"}</div>
+          <div className="mv-ops-account__meta">
+            {accountBalanceYuan ? `余额 ¥ ${accountBalanceYuan}` : "ADMIN ACCESS"}
+          </div>
+        </div>
+        {onOpenProviderSettings && (
+          <IconButton
+            className="mv-ops-account__action"
+            size="small"
+            aria-label="账户与充值"
+            onClick={onOpenProviderSettings}
+          >
             <ReceiptLongIcon fontSize="small" />
           </IconButton>
-        </Stack>
-      </Box>
-    </Stack>
+        )}
+      </div>
+    </div>
   );
 }
 
 function LoadingPanel() {
   return (
-    <Paper variant="outlined" sx={{ p: 4 }}>
-      <Stack spacing={2} sx={{ alignItems: "center" }}>
-        <CircularProgress size={28} />
-        <Typography variant="body2" sx={{ color: "text.secondary" }}>
-          同步运营数据
-        </Typography>
-      </Stack>
+    <Paper
+      component="section"
+      variant="outlined"
+      className="mv-ops-state-panel"
+      role="status"
+      aria-live="polite"
+    >
+      <div className="mv-ops-state-panel__content">
+        <CircularProgress size={26} />
+        <h2 className="mv-ops-state-panel__title">同步运营数据</h2>
+        <p className="mv-ops-state-panel__body">正在汇总最近窗口的任务与计费状态。</p>
+      </div>
     </Paper>
   );
 }
 
 function PermissionPanel() {
   return (
-    <Paper variant="outlined" sx={{ p: 4 }}>
-      <Stack spacing={1.5} sx={{ alignItems: "flex-start" }}>
-        <WarningAmberIcon color="warning" />
-        <Typography variant="h6" sx={{ fontWeight: 800 }}>
-          需要管理员权限
-        </Typography>
-        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+    <Paper component="section" variant="outlined" className="mv-ops-state-panel">
+      <div className="mv-ops-state-panel__content">
+        <WarningAmberIcon className="mv-ops-state-panel__icon" />
+        <h2 className="mv-ops-state-panel__title">需要管理员权限</h2>
+        <p className="mv-ops-state-panel__body">
           当前会话不是启用状态的 admin 账户，无法查看全站运营数据。
-        </Typography>
-      </Stack>
+        </p>
+      </div>
     </Paper>
   );
 }
 
 function ErrorPanel({ error, onRefresh }: { error: string; onRefresh: () => void }) {
   return (
-    <Paper variant="outlined" sx={{ p: 4 }}>
-      <Stack spacing={1.5} sx={{ alignItems: "flex-start" }}>
-        <Typography variant="h6" sx={{ fontWeight: 800 }}>
-          加载失败
-        </Typography>
-        <Typography variant="body2" sx={{ color: "text.secondary", whiteSpace: "pre-wrap" }}>
-          {error}
-        </Typography>
+    <Paper component="section" variant="outlined" className="mv-ops-state-panel">
+      <div className="mv-ops-state-panel__content">
+        <h2 className="mv-ops-state-panel__title">加载失败</h2>
+        <p className="mv-ops-state-panel__body">{error}</p>
         <Button variant="outlined" startIcon={<RefreshIcon />} onClick={onRefresh}>
           重新加载
         </Button>
-      </Stack>
+      </div>
     </Paper>
   );
 }
 
-const runColumns: GridColDef[] = [
-  { field: "title", headerName: "任务", flex: 1.2, minWidth: 180 },
-  { field: "status", headerName: "状态", width: 96 },
+function ErrorBanner({ error, onRefresh }: { error: string; onRefresh: () => void }) {
+  return (
+    <div className="mv-ops-error-banner" role="alert">
+      <p>刷新失败，当前仍显示上次成功数据：{error}</p>
+      <Button size="small" variant="outlined" onClick={onRefresh}>
+        重试
+      </Button>
+    </div>
+  );
+}
+
+const runColumns: GridColDef<RunTableRow>[] = [
+  { field: "title", headerName: "任务", flex: 1.25, minWidth: 180 },
+  {
+    field: "status",
+    headerName: "状态",
+    width: 100,
+    renderCell: ({ value }) => <StatusChip status={String(value)} kind="run" />,
+  },
   { field: "domain", headerName: "学科", width: 100 },
-  { field: "createdAt", headerName: "创建时间", width: 150 },
+  { field: "createdAt", headerName: "创建时间", width: 142 },
 ];
 
-const orderColumns: GridColDef[] = [
-  { field: "order", headerName: "订单", flex: 1, minWidth: 160 },
-  { field: "amount", headerName: "金额", width: 110 },
-  { field: "status", headerName: "状态", width: 96 },
-  { field: "createdAt", headerName: "创建时间", width: 150 },
+const orderColumns: GridColDef<OrderTableRow>[] = [
+  {
+    field: "order",
+    headerName: "订单",
+    flex: 1,
+    minWidth: 170,
+    cellClassName: "mv-ops-id-cell",
+  },
+  { field: "amount", headerName: "金额", width: 112 },
+  {
+    field: "status",
+    headerName: "状态",
+    width: 100,
+    renderCell: ({ value }) => <StatusChip status={String(value)} kind="order" />,
+  },
+  { field: "createdAt", headerName: "创建时间", width: 142 },
 ];
 
-function runTableRow(row: OpsRunRow) {
+function StatusChip({ status, kind }: { status: string; kind: "run" | "order" }) {
+  return (
+    <Chip
+      className="mv-ops-status"
+      size="small"
+      label={kind === "run" ? statusLabel(status) : orderStatusLabel(status)}
+      data-tone={statusTone(status)}
+    />
+  );
+}
+
+function runTableRow(row: OpsRunRow): RunTableRow {
   return {
     id: row.run_id,
-    title: row.title ?? row.prompt,
-    status: statusLabel(row.status),
+    title: row.title || row.prompt || "未命名任务",
+    status: row.status,
     domain: row.domain ?? "未识别",
     createdAt: formatDateTime(row.created_at),
   };
 }
 
-function orderTableRow(row: OpsOrderRow) {
+function orderTableRow(row: OpsOrderRow): OrderTableRow {
   return {
     id: row.order_id,
     order: row.order_id,
     amount: `¥ ${row.amount_yuan}`,
-    status: orderStatusLabel(row.status),
+    status: row.status,
     createdAt: formatDateTime(row.created_at),
   };
 }
 
-function toTreeItems(items: OpsHealthTreeItem[]): Array<{ id: string; label: string; children?: Array<{ id: string; label: string }> }> {
-  return items.map((item) => ({
-    id: item.id,
-    label: `${statusMark(item.status)} ${item.label} · ${item.value}`,
-    children: item.children.map((child) => ({
-      id: child.id,
-      label: `${statusMark(child.status)} ${child.label} · ${child.value}`,
-    })),
-  }));
+function statusTone(status: string): StatusTone {
+  if (status === "succeeded" || status === "paid") return "positive";
+  if (status === "failed") return "negative";
+  if (
+    status === "queued" ||
+    status === "running" ||
+    status === "reviewing" ||
+    status === "pending"
+  ) {
+    return "warning";
+  }
+  return "neutral";
 }
 
-function statusMark(status: string): string {
+function healthTone(status: OpsHealthStatus): StatusTone {
+  if (status === "ok") return "positive";
+  if (status === "bad") return "negative";
+  if (status === "warn") return "warning";
+  return "neutral";
+}
+
+function healthStatusLabel(status: OpsHealthStatus): string {
   if (status === "ok") return "正常";
-  if (status === "warn") return "关注";
   if (status === "bad") return "异常";
+  if (status === "warn") return "关注";
   return "记录";
+}
+
+function statusColor(status: string): string {
+  const tone = statusTone(status);
+  if (tone === "positive") return "var(--mv-ops-positive)";
+  if (tone === "negative") return "var(--mv-ops-negative)";
+  if (tone === "warning") return "var(--warn)";
+  return "var(--mv-ops-neutral)";
 }
 
 function statusLabel(status: string): string {
@@ -744,5 +955,3 @@ function shortDate(value: string): string {
   if (parts.length === 3) return `${parts[1]}/${parts[2]}`;
   return value;
 }
-
-const pieColors = ["#2563eb", "#12805c", "#c2413a", "#b7791f", "#64748b", "#7c3aed"];

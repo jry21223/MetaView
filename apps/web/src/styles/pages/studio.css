@@ -164,6 +164,8 @@
 .mv-intake-action:focus-visible,
 .mv-intake-send:focus-visible,
 .mv-intake-example:focus-visible,
+.mv-intake-file__remove:focus-visible,
+.mv-intake-cases-link:focus-visible,
 .mv-tpl-card:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--accent) 46%, transparent);
   outline-offset: 2px;
@@ -1747,6 +1749,7 @@
 /* ───── Intake / Landing ───── */
 /* ───── Launch-ready intake home ───── */
 .mv-intake-body {
+  --mv-intake-danger: color-mix(in srgb, var(--warn) 70%, var(--ink));
   flex: 1;
   min-height: calc(100vh - 58px);
   width: 100%;
@@ -1754,17 +1757,8 @@
   position: relative;
   overflow: auto;
   isolation: isolate;
-  padding: clamp(34px, 5.5vh, 58px) 24px 52px;
-  background:
-    radial-gradient(
-      circle at 24% 12%,
-      color-mix(in srgb, var(--accent) 7%, transparent),
-      transparent 30%
-    ),
-    linear-gradient(color-mix(in srgb, var(--line) 34%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--line) 34%, transparent) 1px, transparent 1px),
-    var(--bg);
-  background-size: auto, 40px 40px, 40px 40px, auto;
+  padding: clamp(36px, 6vh, 64px) 24px 52px;
+  background: var(--bg);
 }
 
 .mv-intake-body::before {
@@ -1772,16 +1766,7 @@
 }
 
 .mv-dark .mv-intake-body {
-  background:
-    radial-gradient(
-      circle at 24% 12%,
-      color-mix(in srgb, var(--accent) 7%, transparent),
-      transparent 30%
-    ),
-    linear-gradient(color-mix(in srgb, var(--line) 32%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--line) 32%, transparent) 1px, transparent 1px),
-    var(--bg);
-  background-size: auto, 40px 40px, 40px 40px, auto;
+  background: var(--bg);
 }
 
 .mv-dark .mv-intake-body::before {
@@ -1790,23 +1775,18 @@
 
 .mv-intake-hero,
 .mv-intake-composer,
-.mv-intake-guide {
+.mv-intake-examples {
   position: relative;
   z-index: 1;
 }
 
 .mv-intake-shell {
-  width: min(1120px, calc(100vw - 48px));
+  width: min(820px, calc(100vw - 48px));
   margin-inline: auto;
 }
 
 .mv-intake-hero {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 40px;
-  padding: 0 0 28px;
-  border-bottom: 1px solid var(--line);
+  padding: 0;
   text-align: left;
 }
 
@@ -2147,63 +2127,15 @@
   }
 }
 
-.mv-intake-kicker {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 12px;
-  color: var(--ink-3);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.11em;
-}
-
-.mv-intake-kicker span {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
-}
-
-.mv-intake-outcomes {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  padding-bottom: 4px;
-  color: var(--ink-3);
-  font-size: 11px;
-}
-
-.mv-intake-outcomes span {
-  position: relative;
-}
-
-.mv-intake-outcomes span:not(:last-child)::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  right: -11px;
-  width: 2px;
-  height: 2px;
-  border-radius: 50%;
-  background: var(--ink-3);
-}
-
 .mv-intake-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.65fr);
-  align-items: start;
-  gap: clamp(28px, 4vw, 52px);
-  padding-top: 30px;
+  padding-top: 24px;
 }
 
 .mv-intake-title {
   margin: 0;
   color: var(--ink);
   font-family: var(--font-headline, "Space Grotesk", sans-serif);
-  font-size: clamp(30px, 3.2vw, 42px);
+  font-size: clamp(30px, 4vw, 40px);
   font-weight: 620;
   letter-spacing: -0.035em;
   line-height: 1.12;
@@ -2211,8 +2143,7 @@
 }
 
 .mv-intake-sub {
-  max-width: 620px;
-  margin: 11px 0 0;
+  margin: 10px 0 0;
   color: var(--ink-2);
   font-size: 13.5px;
   line-height: 1.65;
@@ -2224,11 +2155,9 @@
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--line-2);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--surface) 96%, transparent);
-  box-shadow:
-    0 22px 54px rgba(42, 39, 30, 0.09),
-    inset 0 1px 0 rgba(255, 255, 255, 0.48);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--line-2) 34%, transparent);
   transition:
     border-color 180ms ease,
     box-shadow 180ms ease,
@@ -2236,100 +2165,43 @@
 }
 
 .mv-dark .mv-intake-composer {
-  background: color-mix(in srgb, var(--surface) 92%, #0f1512);
+  background: var(--surface);
   border-color: var(--line-2);
-  box-shadow:
-    0 22px 54px rgba(0, 0, 0, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.045);
-}
-
-.mv-intake-composer__head {
-  min-height: 68px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 13px 18px;
-  border-bottom: 1px solid var(--line);
-  background: color-mix(in srgb, var(--surface-2) 72%, var(--surface));
-}
-
-.mv-intake-composer__head > div:first-child {
-  display: grid;
-  gap: 5px;
-}
-
-.mv-intake-composer__head > div:first-child span,
-.mv-intake-domain-hint span,
-.mv-intake-guide__head > span {
-  color: var(--ink-3);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 8.5px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-}
-
-.mv-intake-composer__head > div:first-child strong {
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.mv-intake-domain-hint {
-  display: grid;
-  justify-items: end;
-  gap: 4px;
-}
-
-.mv-intake-domain-hint strong {
-  color: var(--ink-3);
-  font-size: 11.5px;
-  font-weight: 580;
-}
-
-.mv-intake-domain-hint.is-ready strong {
-  color: var(--accent);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--line-2) 38%, transparent);
 }
 
 .mv-intake-composer:focus-within {
   border-color: color-mix(in srgb, var(--accent) 32%, var(--line-2));
-  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  background: var(--surface);
   box-shadow:
-    0 12px 32px rgba(42, 39, 30, 0.07),
+    0 12px 32px color-mix(in srgb, var(--line-2) 30%, transparent),
     0 0 0 2px color-mix(in srgb, var(--accent) 6%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.54);
+    inset 0 1px 0 color-mix(in srgb, var(--line) 24%, transparent);
 }
 
 .mv-intake-composer.is-dragging {
   border-color: color-mix(in srgb, var(--accent) 64%, var(--line-2));
   background: color-mix(in srgb, var(--accent) 6%, var(--surface));
   box-shadow:
-    0 22px 54px rgba(42, 39, 30, 0.09),
+    0 12px 32px color-mix(in srgb, var(--line-2) 34%, transparent),
     0 0 0 3px var(--accent-soft);
 }
 
 .mv-dark .mv-intake-composer:focus-within {
-  background: color-mix(in srgb, var(--surface) 90%, #0f1512);
+  background: var(--surface);
   box-shadow:
-    0 12px 32px rgba(0, 0, 0, 0.24),
+    0 12px 32px color-mix(in srgb, var(--line-2) 34%, transparent),
     0 0 0 2px color-mix(in srgb, var(--accent) 7%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-}
-
-.mv-intake-files {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 14px 20px 0;
+    inset 0 1px 0 color-mix(in srgb, var(--line) 24%, transparent);
 }
 
 .mv-intake-warning {
-  margin: 12px 18px 0;
+  margin: 0 18px 12px;
   padding: 9px 10px;
-  border: 1px solid color-mix(in srgb, #b7664b 26%, transparent);
-  border-radius: 7px;
-  background: color-mix(in srgb, #b7664b 9%, transparent);
-  color: #9b523b;
+  border: 1px solid color-mix(in srgb, var(--mv-intake-danger) 26%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--mv-intake-danger) 9%, transparent);
+  color: var(--mv-intake-danger);
   font-size: 12px;
   line-height: 1.45;
 }
@@ -2338,8 +2210,10 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 28px;
-  padding: 0 10px;
+  max-width: calc(100% - 36px);
+  min-height: 32px;
+  margin: 0 18px 12px;
+  padding: 0 5px 0 11px;
   border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
   border-radius: 999px;
   background: var(--accent-soft);
@@ -2353,7 +2227,40 @@
   background: transparent;
   color: var(--ink-2);
   cursor: pointer;
-  font-size: 11px;
+}
+
+.mv-intake-file small {
+  flex: 0 0 auto;
+  color: var(--ink-3);
+  font-size: 10px;
+}
+
+.mv-intake-file .mv-file-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mv-intake-file .mv-intake-file__remove {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.mv-intake-file__remove:hover {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  color: var(--ink);
+}
+
+.mv-intake-file__remove svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.8;
 }
 
 .mv-intake-input {
@@ -2364,8 +2271,9 @@
   box-sizing: border-box;
   border: 0;
   outline: none;
-  min-height: 228px;
-  padding: 24px 22px 18px;
+  min-height: 168px;
+  max-height: 320px;
+  padding: 20px 20px 16px;
   background: transparent;
   color: var(--ink);
   font: inherit;
@@ -2382,8 +2290,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  min-height: 64px;
-  padding: 10px 12px 10px 14px;
+  min-height: 62px;
+  padding: 9px 10px 9px 12px;
   border-top: 1px solid color-mix(in srgb, var(--ink) 7%, transparent);
   background: color-mix(in srgb, var(--surface-2) 46%, transparent);
 }
@@ -2397,7 +2305,7 @@
 }
 
 .mv-intake-action {
-  min-height: 36px;
+  min-height: 40px;
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -2413,7 +2321,7 @@
 }
 
 .mv-intake-attach {
-  min-height: 36px;
+  min-height: 40px;
   gap: 6px;
   padding: 0 8px;
   border-color: var(--line);
@@ -2427,12 +2335,16 @@
   color: var(--ink);
 }
 
+.mv-intake-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .mv-intake-action span {
   display: inline;
 }
 
-.mv-intake-file-help,
-.mv-intake-count {
+.mv-intake-shortcut {
   color: var(--ink-3);
   font-size: 10px;
   line-height: 1.4;
@@ -2453,10 +2365,6 @@
   white-space: nowrap;
   color: var(--accent);
   font-size: 11px;
-}
-
-.mv-intake-error {
-  color: #b7664b;
 }
 
 .mv-intake-send {
@@ -2496,194 +2404,97 @@
   opacity: 0.52;
 }
 
+/* The auth gate is a quiet checkpoint, not the primary generation composer. */
+.mv-login-gate .mv-login-gate__button {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  color: color-mix(in srgb, var(--accent) 68%, var(--ink));
+  border-color: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.mv-login-gate .mv-login-gate__button:hover {
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--line-2));
+  color: color-mix(in srgb, var(--accent) 76%, var(--ink));
+}
+
+.mv-login-gate .mv-login-gate__button:active {
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface));
+}
+
+.mv-login-gate .mv-login-gate__button:disabled {
+  background: var(--surface-2);
+  border-color: var(--line);
+  color: var(--ink-3);
+  opacity: 1;
+}
+
 .mv-intake-examples {
   min-width: 0;
+  margin-top: 24px;
 }
 
-.mv-intake-guide {
-  min-width: 0;
-  display: grid;
-  gap: 30px;
+.mv-intake-example-head {
+  display: block;
 }
 
-.mv-intake-path {
-  padding-bottom: 28px;
-  border-bottom: 1px solid var(--line);
-}
-
-.mv-intake-guide__head {
-  display: grid;
-  gap: 6px;
-}
-
-.mv-intake-guide__head h2 {
+.mv-intake-example-head h2 {
   margin: 0;
-  color: var(--ink);
-  font-size: 16px;
-  font-weight: 610;
-  letter-spacing: -0.018em;
-  line-height: 1.35;
-}
-
-.mv-intake-guide__head p {
-  margin: 0;
-  color: var(--ink-3);
-  font-size: 11px;
-}
-
-.mv-intake-path ol {
-  display: grid;
-  gap: 0;
-  margin: 20px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.mv-intake-path li {
-  position: relative;
-  min-height: 56px;
-  display: grid;
-  grid-template-columns: 34px 1fr;
-  align-items: start;
-  gap: 10px;
-}
-
-.mv-intake-path li::after {
-  content: "";
-  position: absolute;
-  top: 28px;
-  bottom: 0;
-  left: 13px;
-  width: 1px;
-  background: var(--line-2);
-}
-
-.mv-intake-path li:last-child {
-  min-height: 30px;
-}
-
-.mv-intake-path li:last-child::after {
-  display: none;
-}
-
-.mv-intake-path li > span {
-  position: relative;
-  z-index: 1;
-  width: 27px;
-  height: 27px;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--line-2);
-  border-radius: 7px;
-  background: var(--surface);
-  color: var(--ink-3);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 8px;
-}
-
-.mv-intake-path li:first-child > span {
-  border-color: color-mix(in srgb, var(--accent) 44%, var(--line-2));
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.mv-intake-path li > div {
-  display: grid;
-  gap: 3px;
-  padding-top: 2px;
-}
-
-.mv-intake-path strong {
   color: var(--ink-2);
   font-size: 12px;
   font-weight: 580;
 }
 
-.mv-intake-path small {
+.mv-intake-cases-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 12px;
   color: var(--ink-3);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 7.5px;
-  letter-spacing: 0.08em;
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.mv-intake-cases-link:hover {
+  color: var(--accent);
 }
 
 .mv-intake-example-list {
-  margin-top: 14px;
-  border-top: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .mv-intake-example {
   appearance: none;
   position: relative;
   width: 100%;
-  min-height: 76px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 18px;
-  grid-template-rows: auto auto auto;
-  align-items: center;
-  gap: 4px 12px;
-  padding: 12px 8px 12px 0;
-  border: 0;
-  border-bottom: 1px solid var(--line);
-  background: transparent;
-  color: var(--ink);
-  text-align: left;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface) 68%, transparent);
+  color: var(--ink-2);
+  text-align: center;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 540;
   cursor: pointer;
   transition:
     background-color 150ms ease,
-    padding 150ms ease;
+    border-color 150ms ease,
+    color 150ms ease;
 }
 
-.mv-intake-example:hover,
-.mv-intake-example.is-selected {
-  padding-left: 10px;
-  background: color-mix(in srgb, var(--accent) 6%, transparent);
+.mv-intake-example:hover {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--line-2));
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+  color: var(--ink);
 }
 
 .mv-intake-example:disabled {
   cursor: not-allowed;
   opacity: 0.52;
-}
-
-.mv-intake-example > span,
-.mv-intake-example > strong,
-.mv-intake-example > small {
-  grid-column: 1;
-}
-
-.mv-intake-example > span {
-  color: var(--ink-3);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 7.5px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-}
-
-.mv-intake-example > strong {
-  font-size: 12.5px;
-  font-weight: 610;
-}
-
-.mv-intake-example > small {
-  color: var(--ink-3);
-  font-size: 9.5px;
-}
-
-.mv-intake-example > svg {
-  grid-column: 2;
-  grid-row: 1 / 4;
-  width: 15px;
-  height: 15px;
-  color: var(--ink-3);
-  stroke-width: 1.7;
-  transition:
-    color 150ms ease,
-    transform 150ms ease;
-}
-
-.mv-intake-example:hover > svg,
-.mv-intake-example.is-selected > svg {
-  color: var(--accent);
-  transform: translateX(2px);
 }
 
 .mv-tpl-card {
@@ -2740,23 +2551,7 @@
   }
 
   .mv-intake-shell {
-    width: min(760px, calc(100vw - 36px));
-  }
-
-  .mv-intake-layout {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 38px;
-  }
-
-  .mv-intake-guide {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 30px;
-  }
-
-  .mv-intake-path {
-    padding: 0 30px 0 0;
-    border-right: 1px solid var(--line);
-    border-bottom: 0;
+    width: min(820px, calc(100vw - 36px));
   }
 }
 
@@ -2808,10 +2603,7 @@
   }
 
   .mv-intake-hero {
-    align-items: start;
-    flex-direction: column;
-    gap: 18px;
-    padding-bottom: 22px;
+    padding: 0;
   }
 
   .mv-intake-title {
@@ -2830,26 +2622,12 @@
     overflow-wrap: anywhere;
   }
 
-  .mv-intake-outcomes {
-    padding-bottom: 0;
-  }
-
   .mv-intake-layout {
-    gap: 32px;
-    padding-top: 22px;
-  }
-
-  .mv-intake-composer__head {
-    min-height: 62px;
-    padding-inline: 14px;
-  }
-
-  .mv-intake-domain-hint span {
-    display: none;
+    padding-top: 20px;
   }
 
   .mv-intake-input {
-    min-height: 178px;
+    min-height: 168px;
     padding: 18px 16px 14px;
     font-size: 15px;
   }
@@ -2875,24 +2653,19 @@
     justify-content: flex-start;
   }
 
-  .mv-intake-file-help {
-    max-width: 180px;
-  }
-
   .mv-intake-send {
     min-width: 124px;
     min-height: 44px;
   }
 
-  .mv-intake-guide {
-    grid-template-columns: 1fr;
-    gap: 28px;
+  .mv-intake-example {
+    min-height: 44px;
   }
 
-  .mv-intake-path {
-    padding: 0 0 26px;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
+  .mv-intake-file .mv-intake-file__remove {
+    width: 44px;
+    height: 44px;
+    margin: -6px;
   }
 
   .mv-tpl-card {
@@ -2937,6 +2710,15 @@
 
   .mv-intake-input {
     min-height: 164px;
+  }
+
+  .mv-intake-example-list {
+    gap: 6px;
+  }
+
+  .mv-intake-example {
+    padding-inline: 6px;
+    font-size: 11px;
   }
 }
 
@@ -3214,4 +2996,170 @@
   margin: 0;
   font-size: 12px;
   color: var(--ink-3);
+}
+
+/* Intake is a quiet input sheet: one dominant composer and a compact sample rail. */
+.mv-intake-body {
+  padding: clamp(34px, 5.5vh, 58px) 24px 52px;
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--line) 30%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--line) 30%, transparent) 1px,
+      transparent 1px
+    ),
+    var(--bg);
+  background-size: 40px 40px, 40px 40px, auto;
+}
+
+.mv-dark .mv-intake-body {
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--line) 28%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--line) 28%, transparent) 1px,
+      transparent 1px
+    ),
+    var(--bg);
+  background-size: 40px 40px, 40px 40px, auto;
+}
+
+.mv-intake-shell {
+  width: min(1080px, calc(100vw - 48px));
+}
+
+.mv-intake-hero {
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.mv-intake-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(238px, 0.34fr);
+  align-items: start;
+  gap: clamp(26px, 3vw, 38px);
+  padding-top: 26px;
+}
+
+.mv-intake-composer {
+  border-radius: var(--radius);
+  box-shadow: 0 16px 36px color-mix(in srgb, var(--ink) 7%, transparent);
+}
+
+.mv-dark .mv-intake-composer {
+  box-shadow: 0 16px 36px color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.mv-intake-examples {
+  margin-top: 0;
+  padding: 4px 0 0 24px;
+  border-left: 1px solid var(--line);
+}
+
+.mv-intake-example-head h2 {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 620;
+}
+
+.mv-intake-example-list {
+  counter-reset: mv-intake-example;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.mv-intake-example {
+  counter-increment: mv-intake-example;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  min-height: 54px;
+  padding: 0 4px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.mv-intake-example::before {
+  content: counter(mv-intake-example, decimal-leading-zero);
+  color: var(--ink-3);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+}
+
+.mv-intake-example:hover {
+  border-color: var(--line-2);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+.mv-intake-cases-link {
+  min-height: 38px;
+  margin-top: 9px;
+}
+
+@media (max-width: 880px) {
+  .mv-intake-shell {
+    width: min(820px, calc(100vw - 40px));
+  }
+
+  .mv-intake-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mv-intake-examples {
+    padding: 4px 0 0;
+    border-left: 0;
+  }
+
+  .mv-intake-example-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    border-top: 0;
+  }
+
+  .mv-intake-example {
+    grid-template-columns: auto minmax(0, 1fr);
+    min-height: 48px;
+    padding: 0 11px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+  }
+}
+
+@media (max-width: 600px) {
+  .mv-intake-body {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .mv-intake-shell {
+    width: 100%;
+  }
+
+  .mv-intake-example-list {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .mv-intake-example {
+    min-height: 48px;
+    padding: 0 4px;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    border-radius: 0;
+    background: transparent;
+  }
 }

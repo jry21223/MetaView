@@ -57,6 +57,38 @@ def test_gold_templates_use_exact_controlled_composition_profiles(
     assert "physics.projectile_motion" not in decision.available_tool_ids
 
 
+@pytest.mark.parametrize(
+    ("prompt", "expected_domain"),
+    (
+        (GOLD_COMPOSABLE_CASES[0][0], "math"),
+        (GOLD_COMPOSABLE_CASES[3][0], "physics"),
+    ),
+)
+def test_text_requests_auto_route_without_domain_or_language(
+    prompt: str,
+    expected_domain: str,
+) -> None:
+    decision = DefaultCoverageResolver().resolve(
+        prompt=prompt,
+        explicit_domain=None,
+        language=None,
+    )
+
+    assert decision.domain == expected_domain
+    assert decision.mode == "composable"
+
+
+def test_code_attachment_routes_from_source_evidence_without_explicit_domain() -> None:
+    decision = DefaultCoverageResolver().resolve(
+        prompt="讲解这个附件中的程序",
+        source_code="def factorial(n):\n    return 1 if n <= 1 else n * factorial(n - 1)",
+        language="python",
+        explicit_domain=None,
+    )
+
+    assert decision.domain == "code"
+
+
 def test_registered_supported_skill_with_valid_spec_is_specialized() -> None:
     registry = build_default_skill_registry()
     prompt = "质量 2kg 的物体受到 10N 水平拉力，忽略摩擦，求加速度"

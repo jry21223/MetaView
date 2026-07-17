@@ -17,6 +17,7 @@ export const ISSUE_MESSAGE_MAP: Record<string, string> = {
   "parse.invalid_shape": "LLM 输出顶层结构错误",
   "parse.validation_error": "LLM 输出字段不符合 schema",
   "parse.missing_cir": "LLM 输出缺少 cir 字段",
+  "capability.text_only_required": "当前请求只能生成文本，无法进入可视化讲解流程",
 };
 
 /**
@@ -30,6 +31,8 @@ export const ISSUE_SUGGESTION_MAP: Record<string, string> = {
   formula_missing_latex: "需要写出公式本体（KaTeX）",
   duplicate_identical_layer: "不要重复同一种 layer；每一层有不同职责",
   "parse.invalid_json": "LLM 输出 JSON 格式有误。换种描述方式或简化问题",
+  "capability.text_only_required":
+    "补充希望展示的画面，或改用当前支持的可视化讲解方式",
 };
 
 export function humanizeIssue(issue: ReviewIssue): string {
@@ -37,9 +40,16 @@ export function humanizeIssue(issue: ReviewIssue): string {
 }
 
 export function suggestionForIssue(issue: ReviewIssue): string | null {
-  return (
-    issue.suggestion?.trim() ||
-    ISSUE_SUGGESTION_MAP[issue.code] ||
-    null
-  );
+  const mapped = ISSUE_SUGGESTION_MAP[issue.code];
+  if (mapped) return mapped;
+
+  const suggestion = issue.suggestion?.trim();
+  if (!suggestion) return null;
+
+  // Backend suggestions are diagnostic payloads and may be English-only.
+  // Keep those available in technical details instead of leaking them into
+  // the default zh-CN recovery UI.
+  return /[\u3400-\u9fff]/.test(suggestion)
+    ? suggestion
+    : "调整题目要求后重试；详细原因可在下方展开查看";
 }

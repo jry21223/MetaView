@@ -8,7 +8,7 @@ import pytest
 from app.application.dto.pipeline_dto import PipelineRequest
 from app.application.use_cases.run_pipeline import RunPipelineUseCase
 from app.domain.models.pipeline_run import PipelineRunStatus
-from app.domain.skills.base import SkillRouteMatch
+from app.domain.skills.base import SkillRouteInput, SkillRouteMatch
 from tests.coverage_test_utils import ComposableCoverageResolver
 
 _SOLID_PROMPT = (
@@ -66,12 +66,35 @@ class _StaticRouter:
         self._route = route
         self.model_name = "router-test"
         self.calls = 0
+        self.last_request: SkillRouteInput | None = None
 
-    async def route(self, **_: Any) -> SkillRouteMatch | None:
+    async def route(self, *, request: SkillRouteInput, **_: Any) -> SkillRouteMatch | None:
         self.calls += 1
+        self.last_request = request
         if isinstance(self._route, Exception):
             raise self._route
         return self._route
+
+
+@pytest.mark.asyncio
+async def test_text_request_does_not_send_a_false_python_signal_to_router() -> None:
+    router = _StaticRouter(None)
+    repo = _RecordingRepo()
+    use_case = RunPipelineUseCase(
+        repo,
+        _CapturingLLM(_generic_cir_json("math")),
+        router_provider=router,
+        coverage_resolver=ComposableCoverageResolver(default_domain="math"),
+    )
+
+    await use_case.execute(
+        "run-null-language",
+        PipelineRequest(prompt="用动画解释导数的几何意义"),
+    )
+
+    assert router.last_request is not None
+    assert router.last_request.source_code is None
+    assert router.last_request.language is None
 
 
 class _Agent:
