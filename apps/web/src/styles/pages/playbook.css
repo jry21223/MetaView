@@ -861,6 +861,35 @@
   gap: 8px;
 }
 
+.playbook-interaction__summary {
+  display: grid;
+  gap: 5px;
+  padding: 8px 9px;
+  border: 1px solid var(--player-line-soft);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--player-paper-soft) 72%, transparent);
+  color: var(--player-ink-3);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.playbook-interaction__summary > span {
+  color: var(--player-ink-2);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.playbook-interaction__summary ol {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.playbook-interaction__summary small {
+  font-size: 10px;
+}
+
 .playbook-interaction__range input {
   width: 100%;
   accent-color: var(--player-accent);
@@ -878,7 +907,8 @@
 }
 
 .playbook-interaction__choice button,
-.playbook-interaction__actions button {
+.playbook-interaction__actions button,
+.playbook-interaction__replay-actions button {
   min-height: 32px;
   border: 1px solid var(--player-line);
   border-radius: 7px;
@@ -898,6 +928,7 @@
 
 .playbook-interaction__choice button:focus-visible,
 .playbook-interaction__actions button:focus-visible,
+.playbook-interaction__replay-actions button:focus-visible,
 .playbook-interaction__range input:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--player-accent) 46%, transparent);
   outline-offset: 2px;
@@ -907,15 +938,75 @@
   justify-content: flex-end;
 }
 
+.playbook-interaction__actions .playbook-interaction__explain {
+  margin-right: auto;
+  border-color: color-mix(in srgb, var(--player-accent) 42%, var(--player-line));
+  color: var(--player-accent);
+}
+
+.playbook-interaction__actions button:disabled,
 .playbook-interaction__choice button:disabled,
-.playbook-interaction__actions button:disabled {
+.playbook-interaction__replay-actions button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+.playbook-interaction__replay {
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--player-line-soft);
+}
+
+.playbook-interaction__replay-status {
+  display: grid;
+  gap: 3px;
+  color: var(--player-ink-2);
+  font-size: 11px;
+}
+
+.playbook-interaction__replay-status small,
+.playbook-interaction__replay-order {
+  color: var(--player-ink-3);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.playbook-interaction__replay-order {
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.playbook-interaction__replay-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.playbook-interaction__inactive {
+  margin: 0;
+  color: var(--player-ink-3);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.graph-scene-renderer [data-interaction-target="start-node"]:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--player-accent, #82976f) 46%, transparent);
+  outline-offset: 3px;
 }
 
 .playbook-interaction__error {
   margin: 0;
   color: var(--warn);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.playbook-interaction__inactive {
+  margin: 0;
+  color: var(--player-ink-3);
   font-size: 11px;
   line-height: 1.5;
 }
@@ -1420,8 +1511,10 @@
 
 .playbook-player__mobile-param-panel .playbook-interaction__choice button,
 .playbook-player__mobile-param-panel .playbook-interaction__actions button,
+.playbook-player__mobile-param-panel .playbook-interaction__replay-actions button,
 .playbook-player__mobile-sheet-section .playbook-interaction__choice button,
-.playbook-player__mobile-sheet-section .playbook-interaction__actions button {
+.playbook-player__mobile-sheet-section .playbook-interaction__actions button,
+.playbook-player__mobile-sheet-section .playbook-interaction__replay-actions button {
   min-height: 44px;
 }
 

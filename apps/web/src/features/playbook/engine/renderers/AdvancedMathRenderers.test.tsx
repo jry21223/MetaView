@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render as renderComponent } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AnySnapshot, MetaStep, SnapshotKind } from "../types";
 import {
   ComplexPlaneSceneRenderer,
@@ -59,6 +60,8 @@ function render(snapshot: AnySnapshot): string {
 }
 
 describe("advanced math renderers", () => {
+  afterEach(cleanup);
+
   it.each(EXPECTED)("registers %s", (kind, renderer) => {
     expect(rendererRegistry.get(kind)).toBe(renderer);
   });
@@ -161,5 +164,50 @@ describe("advanced math renderers", () => {
     expect(markup).not.toContain('data-semantic-role="code_trace"');
     expect(markup).not.toContain("data-code-line-state");
     expect(markup).not.toContain('data-asset-id="active-line"');
+  });
+
+  it("emits stable graph-node selections from accessible pointer and keyboard targets", () => {
+    const snapshot = {
+      kind: "graph_scene" as const,
+      nodes: [{ id: "A", label: "Alpha" }, { id: "B", label: "Beta" }],
+      edges: [{ source: "A", target: "B" }],
+      directed: false,
+    };
+    const onInteraction = vi.fn();
+    const onParentKeyDown = vi.fn();
+    const view = renderComponent(
+      <div onKeyDown={onParentKeyDown}>
+        <GraphSceneRenderer {...props(snapshot)} onInteraction={onInteraction} />
+      </div>,
+    );
+    const alpha = view.getByRole("button", { name: "从 Alpha 开始 BFS" });
+
+    expect(alpha.getAttribute("tabindex")).toBe("0");
+    expect(alpha.getAttribute("data-interaction-target")).toBe("start-node");
+    expect(alpha.getAttribute("style")).toContain("pointer-events: all");
+
+    fireEvent.click(alpha);
+    expect(onInteraction).toHaveBeenLastCalledWith({
+      type: "select-node",
+      phase: "commit",
+      step_id: "s1",
+      target_role: "start-node",
+      value: "A",
+    });
+
+    fireEvent.keyDown(alpha, { key: "Enter" });
+    expect(onInteraction).toHaveBeenCalledTimes(2);
+    expect(onParentKeyDown).not.toHaveBeenCalled();
+  });
+
+  it("keeps graph nodes passive when no semantic interaction channel is supplied", () => {
+    const markup = render({
+      kind: "graph_scene",
+      nodes: [{ id: "A", label: "Alpha" }],
+      edges: [],
+    });
+
+    expect(markup).not.toContain('role="button"');
+    expect(markup).not.toContain('data-interaction-target="start-node"');
   });
 });

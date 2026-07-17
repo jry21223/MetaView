@@ -66,6 +66,11 @@ export type InteractionEvent = InteractionCommand & {
   sequence: number;
 };
 
+export interface InteractionFollowUpContext {
+  manifest_version: "1";
+  events: InteractionEvent[];
+}
+
 export interface BfsInteractionReplayFrame {
   index: number;
   current_node_id: string;

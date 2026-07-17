@@ -1,6 +1,6 @@
 import React from "react";
 import { useCurrentFrame } from "remotion";
-import type { DirectorScript, PlaybookScript } from "../types";
+import type { DirectorScript, PlaybookScript, SnapshotKind } from "../types";
 import { CodeHighlightRenderer } from "../renderers/CodeHighlightRenderer";
 import { useStepProgress } from "./useInterpolatedState";
 import type { RendererInteractionEvent, RendererProps } from "../renderers/types";
@@ -26,6 +26,8 @@ interface PlaybookCompositionProps {
   swapDurationFrames?: number;
   /** Browser-only semantic interaction channel; omitted by export renders. */
   onInteraction?: (event: RendererInteractionEvent) => void;
+  /** Snapshot kind that owns the semantic interaction target for this step. */
+  interactionTargetKind?: Extract<SnapshotKind, "math_plot" | "graph_scene">;
 }
 
 function stageBackground(theme: "dark" | "light"): string {
@@ -187,6 +189,7 @@ function SceneCompositor({
   director,
   script,
   frame,
+  interactionTargetKind,
 }: {
   baseProps: RendererProps;
   stepProgress: number;
@@ -194,25 +197,37 @@ function SceneCompositor({
   director?: DirectorScript | null;
   script: PlaybookScript;
   frame: number;
+  interactionTargetKind?: Extract<SnapshotKind, "math_plot" | "graph_scene">;
 }) {
   const layers = visualState?.layers;
   if (!layers || layers.length === 0) {
-    return <SnapshotRenderer {...baseProps} />;
+    const hasLegacySnapshotTarget =
+      baseProps.step.snapshot.kind === interactionTargetKind;
+    return (
+      <SnapshotRenderer
+        {...baseProps}
+        onInteraction={hasLegacySnapshotTarget ? baseProps.onInteraction : undefined}
+      />
+    );
   }
   const firstStageLayerKey = layers.find(
     (layerState) => snapshotSurface(layerState.layer.body.kind) === "stage",
   )?.visualKey;
-  const declaredMathLayerCount = baseProps.step.layers?.length
-    ? baseProps.step.layers.filter((layer) => layer.body.kind === "math_plot").length
-    : baseProps.step.snapshot.kind === "math_plot" ? 1 : 0;
-  const renderedMathLayers = layers.filter(
-    (layerState) => layerState.layer.body.kind === "math_plot",
-  );
+  const declaredTargetLayerCount = interactionTargetKind
+    ? baseProps.step.layers?.length
+      ? baseProps.step.layers.filter(
+          (layer) => layer.body.kind === interactionTargetKind,
+        ).length
+      : baseProps.step.snapshot.kind === interactionTargetKind ? 1 : 0
+    : 0;
+  const renderedTargetLayers = interactionTargetKind
+    ? layers.filter((layerState) => layerState.layer.body.kind === interactionTargetKind)
+    : [];
   const interactiveLayerKey =
     baseProps.onInteraction &&
-    declaredMathLayerCount === 1 &&
-    renderedMathLayers.length === 1
-      ? renderedMathLayers[0].visualKey
+    declaredTargetLayerCount === 1 &&
+    renderedTargetLayers.length === 1
+      ? renderedTargetLayers[0].visualKey
       : undefined;
   return (
     <div
@@ -250,6 +265,7 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
   showInlineCode = false,
   swapDurationFrames,
   onInteraction,
+  interactionTargetKind,
 }) => {
   const frame = useCurrentFrame();
   const visualTimeline = React.useMemo(() => compileVisualTimeline(script), [script]);
@@ -388,6 +404,7 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
               director={director}
               script={script}
               frame={frame}
+              interactionTargetKind={interactionTargetKind}
             />
           </div>
           {showDiagnostics && visualQualityWarnings.length > 0 ? <VisualQualityWarningIcon /> : null}

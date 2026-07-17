@@ -19,6 +19,7 @@ import {
   type RunVersionRecord,
 } from "../../features/followups/api/followupApi";
 import { FollowupCommitLog } from "../../features/followups/ui/FollowupCommitLog";
+import type { InteractionFollowUpContext } from "../../features/playbook/interaction/types";
 
 // ── Domain mapping ────────────────────────────────────────────────────────
 
@@ -61,6 +62,7 @@ interface ChatPanelProps {
   children: (slots: {
     followupSlot: React.ReactNode;
     relatedSlot: React.ReactNode;
+    onExplainInteraction?: (context: InteractionFollowUpContext) => Promise<void>;
   }) => React.ReactNode;
 }
 
@@ -128,7 +130,10 @@ function ChatPanel({
   const suggestions = DOMAIN_SUGGESTIONS[domain] ?? FALLBACK_SUGGESTIONS;
   const canModify = !!runId && !!playbook;
 
-  const send = async (text?: string) => {
+  const send = async (
+    text?: string,
+    interactionContext?: InteractionFollowUpContext,
+  ) => {
     const userText = (text ?? input).trim();
     if (!userText || pending || !canModify) return;
 
@@ -161,6 +166,7 @@ function ChatPanel({
         provider,
         abortRef.current.signal,
         activeVersionId,
+        interactionContext,
       );
       if (result.kind === "patch" && result.playbook) {
         onPlaybookPatched(result.playbook, result.director, result.version_id);
@@ -345,7 +351,11 @@ function ChatPanel({
       />
     ) : null;
 
-  return <>{children({ followupSlot, relatedSlot })}</>;
+  const onExplainInteraction = canModify
+    ? (context: InteractionFollowUpContext) => send("请解释我刚才的操作", context)
+    : undefined;
+
+  return <>{children({ followupSlot, relatedSlot, onExplainInteraction })}</>;
 }
 
 // ── StudioPage ────────────────────────────────────────────────────────────
@@ -472,12 +482,13 @@ export function StudioPage({
                 }
               }}
             >
-              {({ followupSlot, relatedSlot }) => (
+              {({ followupSlot, relatedSlot, onExplainInteraction }) => (
                 <PlaybookPlayer
                   script={activePlaybook}
                   director={activeDirector}
                   theme={isDark ? "dark" : "light"}
                   enableInteractionSandbox
+                  onExplainInteraction={onExplainInteraction}
                   swapDurationFrames={t.swapFrames}
                   onOpenExport={canExport ? () => setExportOpen(true) : undefined}
                   topbarCollapsed={topbarCollapsed}

@@ -117,6 +117,59 @@ describe("interaction manifest", () => {
 
     const noTangent: MathPlotSnapshot = { ...plot, curves: [plot.curves[0]] };
     expect(deriveInteractionManifest(script([step("plot", noTangent)])).adapters).toEqual([]);
+
+    const ambiguousGraphStep = {
+      ...step("graph", graph),
+      layers: [graph, { ...graph }].map((body, index) => ({
+        id: `graph-${index}`,
+        timing: { enter_at: 0, exit_at: 1, appear_anim: "none" as const, z_order: index },
+        body,
+      })),
+    };
+    expect(deriveInteractionManifest(script(
+      [ambiguousGraphStep],
+      { domain: "algorithm", algorithm_id: "bfs" },
+    )).adapters).toEqual([]);
+  });
+
+  it("binds BFS to the only rendered graph layer", () => {
+    const renderedGraph: GraphSceneSnapshot = {
+      kind: "graph_scene",
+      nodes: [{ id: "X" }, { id: "Y" }],
+      edges: [{ source: "X", target: "Y" }],
+    };
+    const layeredStep: MetaStep = {
+      ...step("graph", graph),
+      layers: [{
+        id: "rendered-graph",
+        timing: { enter_at: 0, exit_at: 1, appear_anim: "none", z_order: 0 },
+        body: renderedGraph,
+      }],
+    };
+    const manifest = deriveInteractionManifest(script(
+      [layeredStep],
+      { domain: "algorithm", algorithm_id: "bfs" },
+    ));
+
+    const binding = manifest.adapters[0].bindings.find(
+      (candidate) => candidate.target_role === "start-node",
+    );
+    expect(binding?.options?.map((option) => option.id))
+      .toEqual(["X", "Y"]);
+
+    const result = applyInteraction(
+      script([layeredStep], { domain: "algorithm", algorithm_id: "bfs" }),
+      {
+        adapter_id: "algorithm.bfs",
+        step_id: "graph",
+        target_id: "step:graph:start-node",
+        action: "select",
+        value: "Y",
+      },
+    );
+    expect((result.script.steps[0].snapshot as GraphSceneSnapshot).current_node_id).toBe("Y");
+    const rendered = result.script.steps[0].layers?.[0].body as GraphSceneSnapshot;
+    expect(rendered.current_node_id).toBe("Y");
   });
 
   it("does not expose known non-differentiable or boundary points", () => {
@@ -139,6 +192,22 @@ describe("interaction manifest", () => {
     };
     expect(deriveInteractionManifest(script([step("cusp", cusp)])).adapters).toEqual([]);
     expect(deriveInteractionManifest(script([step("boundary", boundary)])).adapters).toEqual([]);
+  });
+
+  it("fails closed when a step declares more than one math plot layer", () => {
+    const layered = step("plot", plot);
+    layered.layers = [
+      {
+        timing: { enter_at: 0, exit_at: 1, appear_anim: "fade", z_order: 0 },
+        body: plot,
+      },
+      {
+        timing: { enter_at: 0, exit_at: 1, appear_anim: "fade", z_order: 1 },
+        body: { ...plot, marker_x: 2 },
+      },
+    ];
+
+    expect(deriveInteractionManifest(script([layered])).adapters).toEqual([]);
   });
 });
 
@@ -195,10 +264,23 @@ describe("BFS interaction", () => {
       nodes: graph.nodes.map((node) => ({ ...node, emphasis: "accent", asset_id: "stale" })),
       edges: graph.edges.map((edge) => ({ ...edge, emphasis: "accent", asset_id: "stale" })),
     };
+    const graphStep = step("graph", staleGraph, 60);
+    graphStep.code_highlight = {
+      language: "pseudocode",
+      lines: ["current = queue.dequeue()", "visit(current)"],
+      active_line: 0,
+      active_lines: [0],
+      variables: {
+        current: "stale",
+        queue: "[stale]",
+        visited: "{stale}",
+        depth: "0",
+      },
+    };
     const base = script(
       [
         step("other-before", unrelated, 30),
-        step("graph", staleGraph, 60),
+        graphStep,
         step("other-after", unrelated, 90),
       ],
       { domain: "algorithm", algorithm_id: "bfs" },
@@ -219,6 +301,12 @@ describe("BFS interaction", () => {
     expect((result.script.steps[1].snapshot as GraphSceneSnapshot).current_node_id).toBe("C");
     expect((result.script.steps[2].snapshot as GraphSceneSnapshot).current_node_id).toBeUndefined();
     expect(result.replay?.frames[0].snapshot.nodes[0].asset_id).toBeUndefined();
+    expect(result.script.steps[1].code_highlight?.variables).toEqual({
+      current: "C",
+      queue: "[A]",
+      visited: "{C}",
+      depth: "0",
+    });
     expect(result.summary).toContain("Prepared BFS replay");
     expect((base.steps[1].snapshot as GraphSceneSnapshot).current_node_id).toBeUndefined();
   });

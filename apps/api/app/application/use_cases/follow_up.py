@@ -8,7 +8,11 @@ from typing import Any, Literal
 
 from pydantic import ValidationError
 
-from app.application.dto.followup_dto import FollowUpChatMessage, FollowUpRequest
+from app.application.dto.followup_dto import (
+    FollowUpChatMessage,
+    FollowUpRequest,
+    InteractionFollowUpContext,
+)
 from app.application.ports.llm_provider import ILLMProvider
 from app.domain.models.director import DirectorScript
 from app.domain.models.playbook import PlaybookScript
@@ -53,11 +57,20 @@ class FollowUpPatchUseCase:
         request: FollowUpRequest,
         director: DirectorScript | None = None,
     ) -> FollowUpPatchResult:
-        system = _build_system_prompt()
-        user = _build_user_prompt(playbook, director, request.message, request.messages)
+        allow_patch = request.intent == "conversation"
+        system = _build_system_prompt(request.intent)
+        user = _build_user_prompt(
+            playbook,
+            director,
+            request.message,
+            request.messages,
+            request.interaction_context,
+        )
         first_raw = await self._llm.complete(system, user)
         try:
-            return self._parse_and_apply(playbook, director, first_raw)
+            return self._parse_and_apply(
+                playbook, director, first_raw, allow_patch=allow_patch
+            )
         except FollowUpPatchError as first_error:
             repair_user = _build_repair_prompt(
                 playbook,
@@ -67,13 +80,17 @@ class FollowUpPatchUseCase:
                 first_error,
             )
             repair_raw = await self._llm.complete(system, repair_user)
-            return self._parse_and_apply(playbook, director, repair_raw)
+            return self._parse_and_apply(
+                playbook, director, repair_raw, allow_patch=allow_patch
+            )
 
     def _parse_and_apply(
         self,
         playbook: PlaybookScript,
         director: DirectorScript | None,
         raw: str,
+        *,
+        allow_patch: bool = True,
     ) -> FollowUpPatchResult:
         payload = _parse_llm_payload(raw)
         reply = str(payload.get("reply") or "").strip()
@@ -85,6 +102,15 @@ class FollowUpPatchUseCase:
             raise FollowUpPatchError("change_summary must be a non-empty string")
         if not isinstance(patch, list):
             raise FollowUpPatchError("patch must be a JSON array")
+        if not allow_patch:
+            return FollowUpPatchResult(
+                reply=reply,
+                change_summary="explain: interaction context",
+                patch=[],
+                target="reply",
+                playbook=None,
+                director=None,
+            )
         if len(patch) == 0:
             return FollowUpPatchResult(
                 reply=reply,
@@ -128,7 +154,13 @@ class FollowUpPatchUseCase:
         )
 
 
-def _build_system_prompt() -> str:
+def _build_system_prompt(intent: str = "conversation") -> str:
+    explicit_interaction_rule = (
+        "\n当前请求是用户显式点击“解释我的操作”后发起的。"
+        "只解释 interaction_context 中的语义事件，不得修改 Playbook；patch 必须为 []。\n"
+        if intent == "explain_interaction"
+        else ""
+    )
     return """你是 MetaView 的 Playbook 局部修改助手。
 你会收到当前 PlaybookScript JSON、用户追问和最近对话。
 如果用户只是追问概念、步骤原因或文字解释，可以只回答问题；
@@ -169,7 +201,7 @@ DirectorScript 的 /source 只能改成 "manual"；
 可以一次修改多个 step，也可以修改任意合法 renderer 的 snapshot/layers。
 parameter_controls.*.value 和 initial_data.*[] 必须是字符串，
 即使表示数字也写成 "2"。
-不要修改 fps、total_frames、end_frame；服务端会重新规范化时间线。"""
+不要修改 fps、total_frames、end_frame；服务端会重新规范化时间线。""" + explicit_interaction_rule
 
 
 def _build_user_prompt(
@@ -177,6 +209,7 @@ def _build_user_prompt(
     director: DirectorScript | None,
     message: str,
     messages: list[FollowUpChatMessage],
+    interaction_context: InteractionFollowUpContext | None = None,
 ) -> str:
     history = [
         {"role": item.role, "content": item.content}
@@ -188,6 +221,11 @@ def _build_user_prompt(
             "current_director": director.model_dump(mode="json") if director else None,
             "conversation": history,
             "user_request": message,
+            "interaction_context": (
+                interaction_context.model_dump(mode="json")
+                if interaction_context is not None
+                else None
+            ),
         },
         ensure_ascii=False,
     )

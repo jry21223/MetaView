@@ -1,5 +1,6 @@
 import { API_BASE_URL, readErrorMessage } from "../../../shared/api/httpClient";
 import type { DirectorScript, PlaybookScript } from "../../playbook/engine/types";
+import type { InteractionFollowUpContext } from "../../playbook/interaction/types";
 import type { ProviderSettings } from "../../providers/hooks/useProviderSettings";
 
 export interface FollowUpChatMessage {
@@ -51,8 +52,15 @@ export async function submitRunFollowUp(
   messages: FollowUpChatMessage[],
   provider?: ProviderSettings,
   signal?: AbortSignal,
-  baseVersionId?: string | null,
+  baseVersionIdOrInteractionContext?: string | null | InteractionFollowUpContext,
+  explicitInteractionContext?: InteractionFollowUpContext,
 ): Promise<FollowUpResponse> {
+  const hasInlineInteractionContext = baseVersionIdOrInteractionContext !== null
+    && typeof baseVersionIdOrInteractionContext === "object";
+  const baseVersionId = hasInlineInteractionContext
+    ? null : baseVersionIdOrInteractionContext;
+  const interactionContext = hasInlineInteractionContext
+    ? baseVersionIdOrInteractionContext : explicitInteractionContext;
   const response = await fetch(`${API_BASE_URL}/api/v1/runs/${runId}/follow-up`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -61,6 +69,8 @@ export async function submitRunFollowUp(
       message,
       messages,
       base_version_id: baseVersionId ?? null,
+      intent: interactionContext ? "explain_interaction" : "conversation",
+      interaction_context: interactionContext ?? null,
       provider_api_key: provider?.apiKey || null,
       provider_base_url: provider?.baseUrl || null,
       provider_model: provider?.model || null,

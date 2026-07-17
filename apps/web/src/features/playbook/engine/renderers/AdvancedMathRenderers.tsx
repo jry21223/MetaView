@@ -398,16 +398,43 @@ export const IterationTraceSceneRenderer: React.FC<RendererProps> = ({ step, fra
   );
 };
 
-export const GraphSceneRenderer: React.FC<RendererProps> = ({ step, frame, stepStartFrame, theme }) => {
+export const GraphSceneRenderer: React.FC<RendererProps> = ({
+  step,
+  frame,
+  stepStartFrame,
+  theme,
+  onInteraction,
+}) => {
   const snap = step.snapshot as GraphSceneSnapshot;
   return (
     <Shell title={step.title} caption={snap.caption} theme={theme}>
-      <GraphSvg graph={snap} theme={theme} opacity={progressOpacity(frame, stepStartFrame)} />
+      <GraphSvg
+        graph={snap}
+        theme={theme}
+        opacity={progressOpacity(frame, stepStartFrame)}
+        onNodeSelect={onInteraction ? (nodeId) => onInteraction({
+          type: "select-node",
+          phase: "commit",
+          step_id: step.step_id,
+          target_role: "start-node",
+          value: nodeId,
+        }) : undefined}
+      />
     </Shell>
   );
 };
 
-function GraphSvg({ graph, theme, opacity = 1 }: { graph: GraphSceneSnapshot; theme: ThemeName; opacity?: number }) {
+function GraphSvg({
+  graph,
+  theme,
+  opacity = 1,
+  onNodeSelect,
+}: {
+  graph: GraphSceneSnapshot;
+  theme: ThemeName;
+  opacity?: number;
+  onNodeSelect?: (nodeId: string) => void;
+}) {
   const colors = PALETTE[theme];
   const nodes = graph.nodes ?? [];
   const projectCompactCoords = shouldProjectCompactGraphCoords(nodes);
@@ -520,6 +547,21 @@ function GraphSvg({ graph, theme, opacity = 1 }: { graph: GraphSceneSnapshot; th
             opacity={opacity}
             data-node-id={node.id}
             data-node-state={state}
+            data-interaction-target={onNodeSelect ? "start-node" : undefined}
+            role={onNodeSelect ? "button" : undefined}
+            aria-label={onNodeSelect ? `从 ${node.label ?? node.id} 开始 BFS` : undefined}
+            tabIndex={onNodeSelect ? 0 : undefined}
+            style={onNodeSelect ? { cursor: "pointer", pointerEvents: "all" } : undefined}
+            onClick={onNodeSelect ? (event) => {
+              event.stopPropagation();
+              onNodeSelect(node.id);
+            } : undefined}
+            onKeyDown={onNodeSelect ? (event) => {
+              if (event.key !== "Enter" && event.key !== " ") return;
+              event.preventDefault();
+              event.stopPropagation();
+              onNodeSelect(node.id);
+            } : undefined}
           >
             <circle cx={node.x} cy={node.y} r={radius} fill="transparent" />
             <AssetSvg
