@@ -762,6 +762,106 @@
   margin: 0;
 }
 
+.playbook-interaction {
+  min-height: 0;
+  display: grid;
+  gap: 12px;
+  padding: 12px 13px 14px;
+  overflow-y: auto;
+}
+
+.playbook-interaction__notice,
+.playbook-interaction__range > span,
+.playbook-interaction__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.playbook-interaction__notice span,
+.playbook-interaction__range > span,
+.playbook-interaction__choice > span {
+  color: var(--player-ink-2);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.playbook-interaction__notice small,
+.playbook-interaction__range output {
+  color: var(--player-ink-3);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+}
+
+.playbook-interaction__range {
+  display: grid;
+  gap: 8px;
+}
+
+.playbook-interaction__range input {
+  width: 100%;
+  accent-color: var(--player-accent);
+}
+
+.playbook-interaction__choice {
+  display: grid;
+  gap: 8px;
+}
+
+.playbook-interaction__choice > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.playbook-interaction__choice button,
+.playbook-interaction__actions button {
+  min-height: 32px;
+  border: 1px solid var(--player-line);
+  border-radius: 7px;
+  background: var(--player-paper-strong);
+  color: var(--player-ink-2);
+  padding: 5px 9px;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.playbook-interaction__choice button[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--player-accent) 42%, var(--player-line));
+  background: var(--player-accent-soft);
+  color: var(--player-ink);
+}
+
+.playbook-interaction__choice button:focus-visible,
+.playbook-interaction__actions button:focus-visible,
+.playbook-interaction__range input:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--player-accent) 46%, transparent);
+  outline-offset: 2px;
+}
+
+.playbook-interaction__actions {
+  justify-content: flex-end;
+}
+
+.playbook-interaction__choice button:disabled,
+.playbook-interaction__actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.playbook-interaction__error {
+  margin: 0;
+  color: var(--warn);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.playbook-interaction + .math-param-panel {
+  border-top: 1px solid var(--player-line-soft);
+}
+
 .playbook-player__params-card {
   flex: 0 0 auto;
   max-height: min(280px, 30vh);
