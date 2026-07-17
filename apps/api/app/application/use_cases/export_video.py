@@ -31,6 +31,7 @@ from app.application.ports.run_repository import IRunRepository
 from app.domain.models.director import DirectorScript
 from app.domain.models.export_job import ExportJobStatus, ExportOptions, TtsConfig
 from app.domain.models.playbook import PlaybookScript
+from app.domain.services.director_builder import build_default_director
 
 _RENDER_TAIL_LINES = 40
 
@@ -151,7 +152,7 @@ class ExportVideoUseCase:
             director = (
                 DirectorScript.model_validate_json(director_json)
                 if director_json is not None
-                else await self._get_export_director(run_id)
+                else build_default_director(playbook, run_id)
             )
             return playbook, director
 
