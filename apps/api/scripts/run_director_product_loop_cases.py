@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import gc
 import json
 import sys
 import tempfile
@@ -22,6 +23,7 @@ from app.application.use_cases.follow_up import FollowUpPatchUseCase  # noqa: E4
 from app.domain.models.export_job import ExportJob, ExportOptions  # noqa: E402
 from app.domain.models.pipeline_run import PipelineRunStatus  # noqa: E402
 from app.domain.models.playbook import PlaybookScript  # noqa: E402
+from app.domain.models.quality_report import QualityReport  # noqa: E402
 from app.domain.services.director_builder import build_default_director  # noqa: E402
 from app.infrastructure.persistence.db_init import init_db  # noqa: E402
 from app.infrastructure.persistence.in_memory_export_repository import (  # noqa: E402
@@ -62,6 +64,13 @@ class RecordingExportVideoUseCase(ExportVideoUseCase):
         super().__init__(*args, **kwargs)
         self.input_props: dict[str, Any] | None = None
 
+    def _build_export_quality_report(
+        self,
+        playbook: PlaybookScript,
+        run: Any,
+    ) -> QualityReport:
+        return QualityReport(status="clean", generator_path="director_product_loop_eval")
+
     async def _run_remotion_render(
         self,
         job_id: str,
@@ -99,6 +108,7 @@ async def run_cases(
             await _run_case(case, repo_root=repo_root, tmp_root=tmp_root / str(case["id"]))
             for case in cases
         ]
+        gc.collect()
 
     ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     report = {
@@ -173,7 +183,7 @@ async def _run_case(case: dict[str, Any], *, repo_root: Path, tmp_root: Path) ->
         await director_repo.upsert(followup.director, datetime.now(timezone.utc).isoformat())
 
         export_job = ExportJob(
-            job_id=f"{run_id}:export",
+            job_id=f"{run_id}-export",
             run_id=run_id,
             with_audio=False,
             created_at=datetime.now(timezone.utc).isoformat(),

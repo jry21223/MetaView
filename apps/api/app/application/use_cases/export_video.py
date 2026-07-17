@@ -73,6 +73,28 @@ class ExportVideoUseCase:
         self._artifacts = artifacts_dir
         self._artifacts.mkdir(parents=True, exist_ok=True)
 
+    def _build_export_quality_report(
+        self,
+        playbook: PlaybookScript,
+        run: Any,
+    ) -> QualityReport:
+        previous_quality = run.quality_report
+        current_quality = quality_gate_playbook(
+            playbook,
+            run.prompt,
+            generator_path=(
+                previous_quality.generator_path if previous_quality else "export_recheck"
+            ),
+            coverage_decision=getattr(run, "coverage_decision", None),
+            lesson_plan=getattr(run, "lesson_plan", None),
+            coverage_mode=(
+                run.coverage_decision.mode
+                if getattr(run, "coverage_decision", None) is not None
+                else (previous_quality.coverage_mode if previous_quality else "unknown")
+            ),
+        )
+        return _merge_export_quality(previous_quality, current_quality)
+
     async def execute(
         self,
         job_id: str,
@@ -98,23 +120,7 @@ class ExportVideoUseCase:
             else:
                 playbook_model = run.playbook
             previous_quality = run.quality_report
-            export_quality = quality_gate_playbook(
-                playbook_model,
-                run.prompt,
-                generator_path=(
-                    previous_quality.generator_path if previous_quality else "export_recheck"
-                ),
-                coverage_decision=getattr(run, "coverage_decision", None),
-                lesson_plan=getattr(run, "lesson_plan", None),
-                coverage_mode=(
-                    run.coverage_decision.mode
-                    if getattr(run, "coverage_decision", None) is not None
-                    else (
-                        previous_quality.coverage_mode if previous_quality else "unknown"
-                    )
-                ),
-            )
-            export_quality = _merge_export_quality(previous_quality, export_quality)
+            export_quality = self._build_export_quality_report(playbook_model, run)
             if export_quality.status == "repairable":
                 export_quality = export_quality.with_issue(
                     PlaybookReviewIssue(
