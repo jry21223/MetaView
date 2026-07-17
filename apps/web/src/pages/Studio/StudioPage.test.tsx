@@ -5,6 +5,7 @@ import { http, HttpResponse } from "msw";
 
 import { TWEAK_DEFAULTS } from "../../features/studio-editor/hooks/useTweaks";
 import type { PlaybookScript } from "../../features/playbook/engine/types";
+import type { InteractionFollowUpContext } from "../../features/playbook/interaction/types";
 import { server } from "../../mocks/server";
 import { API_BASE_URL } from "../../shared/config/constants";
 import { StudioPage } from "./StudioPage";
@@ -36,6 +37,7 @@ vi.mock("../../features/playbook/engine/player/PlaybookPlayer", async () => {
       topbarCollapsed = false,
       onToggleTopbar,
       onOpenExport,
+      onExplainInteraction,
       enableInteractionSandbox = false,
     }: {
       script: PlaybookScript;
@@ -44,6 +46,7 @@ vi.mock("../../features/playbook/engine/player/PlaybookPlayer", async () => {
       topbarCollapsed?: boolean;
       onToggleTopbar?: () => void;
       onOpenExport?: () => void;
+      onExplainInteraction?: (context: InteractionFollowUpContext) => Promise<void>;
       enableInteractionSandbox?: boolean;
     }) =>
       ReactModule.createElement(
@@ -68,6 +71,26 @@ vi.mock("../../features/playbook/engine/player/PlaybookPlayer", async () => {
               "button",
               { type: "button", onClick: onOpenExport },
               "导出",
+            )
+          : null,
+        onExplainInteraction
+          ? ReactModule.createElement(
+              "button",
+              {
+                type: "button",
+                onClick: () => void onExplainInteraction({
+                  manifest_version: "1",
+                  events: [{
+                    adapter_id: "math.derivative-tangent",
+                    step_id: "step_01",
+                    target_id: "step:step_01:marker-x",
+                    action: "set-value",
+                    value: 3,
+                    sequence: 1,
+                  }],
+                }),
+              },
+              "模拟解释我的操作",
             )
           : null,
         ReactModule.createElement("strong", null, script.title),
@@ -192,6 +215,72 @@ describe("StudioPage", () => {
     });
     expect(getByText("Original lesson")).toBeTruthy();
     expect(onNavigate).not.toHaveBeenCalled();
+  });
+
+  it("sends semantic interaction context only after the explicit explain action", async () => {
+    mockUsePipelinePoller.mockReturnValue({
+      playbook: playbook("Explicit lesson"),
+      director: null,
+      error: null,
+      isLoading: false,
+      status: "succeeded",
+    });
+    let listCalls = 0;
+    let postCalls = 0;
+    let submittedBody: Record<string, unknown> | null = null;
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/runs/run-1/follow-ups`, () => {
+        listCalls += 1;
+        return HttpResponse.json({ followups: [], versions: [] });
+      }),
+      http.post(`${API_BASE_URL}/api/v1/runs/run-1/follow-up`, async ({ request }) => {
+        postCalls += 1;
+        submittedBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({
+          kind: "reply",
+          reply: "你把切点移到了 x=3，因此切线斜率会随局部导数变化。",
+          change_summary: "explain: interaction context",
+          version_id: null,
+          playbook: null,
+          director: null,
+        });
+      }),
+    );
+
+    const view = render(
+      <StudioPage
+        runId="run-1"
+        t={TWEAK_DEFAULTS}
+        onNavigate={vi.fn()}
+        isProviderConfigured
+      />,
+    );
+
+    await waitFor(() => expect(listCalls).toBe(1));
+    expect(postCalls).toBe(0);
+
+    fireEvent.click(view.getByRole("button", { name: "模拟解释我的操作" }));
+
+    await waitFor(() => {
+      expect(view.getByText(/你把切点移到了 x=3/)).toBeTruthy();
+    });
+    expect(postCalls).toBe(1);
+    expect(submittedBody).toMatchObject({
+      message: "请解释我刚才的操作",
+      intent: "explain_interaction",
+      interaction_context: {
+        manifest_version: "1",
+        events: [{
+          adapter_id: "math.derivative-tangent",
+          step_id: "step_01",
+          target_id: "step:step_01:marker-x",
+          action: "set-value",
+          value: 3,
+          sequence: 1,
+        }],
+      },
+    });
+    expect(view.getByText("Explicit lesson")).toBeTruthy();
   });
 
   it("uses guided follow-up suggestions for study sessions", async () => {

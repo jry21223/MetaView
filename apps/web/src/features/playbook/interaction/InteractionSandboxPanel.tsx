@@ -1,11 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 
+import {
+  buildInteractionFollowUpContext,
+  describeInteractionEvent,
+} from "./followUpContext";
 import type {
   BfsInteractionBinding,
   BfsInteractionReplay,
   DerivativeInteractionBinding,
   InteractionCommand,
   InteractionEvent,
+  InteractionFollowUpContext,
   InteractionManifest,
 } from "./types";
 
@@ -21,6 +26,7 @@ interface InteractionSandboxPanelProps {
   onApply: (command: InteractionCommand) => void;
   onUndo: () => void;
   onReset: () => void;
+  onExplainInteraction?: (context: InteractionFollowUpContext) => Promise<void>;
 }
 
 function RangeBinding({
@@ -213,13 +219,35 @@ export function InteractionSandboxPanel({
   onApply,
   onUndo,
   onReset,
+  onExplainInteraction,
 }: InteractionSandboxPanelProps) {
+  const [explainPending, setExplainPending] = useState(false);
   const binding = useMemo(
     () => manifest.adapters
       .flatMap((adapter) => adapter.bindings)
       .find((candidate) => candidate.step_id === currentStepId) ?? null,
     [currentStepId, manifest],
   );
+  const explanationContext = useMemo(
+    () => buildInteractionFollowUpContext(events),
+    [events],
+  );
+  const recentEventSummaries = useMemo(
+    () => events.slice(-4).map(describeInteractionEvent),
+    [events],
+  );
+
+  const explainInteraction = async () => {
+    if (!onExplainInteraction || !explanationContext || explainPending) return;
+    setExplainPending(true);
+    try {
+      await onExplainInteraction(explanationContext);
+    } catch {
+      // The owning follow-up surface renders request failures in its message stream.
+    } finally {
+      setExplainPending(false);
+    }
+  };
 
   if (!binding && !dirty && !lastError) return null;
 
@@ -229,6 +257,22 @@ export function InteractionSandboxPanel({
         <span>沙盒预览</span>
         <small>{dirty ? `${events.length} 个未保存操作` : "不会修改原课程"}</small>
       </div>
+
+      {recentEventSummaries.length > 0 && (
+        <div className="playbook-interaction__summary" aria-label="未保存操作摘要">
+          <span>最近操作</span>
+          <ol>
+            {recentEventSummaries.map((summary, index) => (
+              <li key={`${events.length - recentEventSummaries.length + index}:${summary}`}>
+                {summary}
+              </li>
+            ))}
+          </ol>
+          {events.length > recentEventSummaries.length && (
+            <small>另有 {events.length - recentEventSummaries.length} 个更早操作</small>
+          )}
+        </div>
+      )}
 
       {binding?.target_role === "marker-x" ? (
         <RangeBinding
@@ -268,6 +312,17 @@ export function InteractionSandboxPanel({
       )}
 
       <div className="playbook-interaction__actions">
+        {onExplainInteraction && (
+          <button
+            type="button"
+            className="playbook-interaction__explain"
+            onClick={explainInteraction}
+            disabled={!explanationContext || explainPending}
+            aria-busy={explainPending}
+          >
+            {explainPending ? "解释中…" : "解释我的操作"}
+          </button>
+        )}
         <button type="button" onClick={onUndo} disabled={!canUndo}>
           撤销
         </button>

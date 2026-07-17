@@ -913,6 +913,39 @@ describe("PlaybookPlayer", () => {
       .toBe("2");
   });
 
+  it("hands semantic sandbox events to AI only through the explicit explain button", async () => {
+    const onExplainInteraction = vi.fn().mockResolvedValue(undefined);
+    const view = render(
+      <PlaybookPlayer
+        script={derivativeScript()}
+        theme="light"
+        enableInteractionSandbox
+        onExplainInteraction={onExplainInteraction}
+      />,
+    );
+
+    expect(onExplainInteraction).not.toHaveBeenCalled();
+    const slider = view.getByRole("slider", { name: "切点 x" });
+    fireEvent.change(slider, { target: { value: "2" } });
+    fireEvent.pointerUp(slider);
+    expect(onExplainInteraction).not.toHaveBeenCalled();
+
+    fireEvent.click(view.getByRole("button", { name: "解释我的操作" }));
+
+    await waitFor(() => expect(onExplainInteraction).toHaveBeenCalledTimes(1));
+    expect(onExplainInteraction).toHaveBeenCalledWith({
+      manifest_version: "1",
+      events: [expect.objectContaining({
+        adapter_id: "math.derivative-tangent",
+        step_id: "plot",
+        target_id: "step:plot:marker-x",
+        action: "set-value",
+        value: 2,
+        sequence: 1,
+      })],
+    });
+  });
+
   it("keeps recovery controls after navigating away from the bound plot", async () => {
     const view = render(
       <PlaybookPlayer

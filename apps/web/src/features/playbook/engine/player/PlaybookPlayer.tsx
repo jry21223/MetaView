@@ -29,6 +29,7 @@ import { SPEED_STEPS } from "./playbackRates";
 import type { RendererInteractionEvent } from "../renderers/types";
 import { InteractionSandboxPanel } from "../../interaction/InteractionSandboxPanel";
 import { useInteractionSandbox } from "../../interaction/useInteractionSandbox";
+import type { InteractionFollowUpContext } from "../../interaction/types";
 
 export type PlaybookLayoutMode = "desktop" | "portrait";
 
@@ -76,6 +77,8 @@ interface PlaybookPlayerProps {
   showLearningConsole?: boolean;
   /** Opt-in browser-only sandbox controls. Read-only player surfaces leave this disabled. */
   enableInteractionSandbox?: boolean;
+  /** Explicit user-triggered handoff of normalized semantic events to follow-up AI. */
+  onExplainInteraction?: (context: InteractionFollowUpContext) => Promise<void>;
   topbarCollapsed?: boolean;
   onToggleTopbar?: () => void;
   layoutMode?: PlaybookLayoutMode;
@@ -91,6 +94,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   relatedSlot,
   showLearningConsole = true,
   enableInteractionSandbox = false,
+  onExplainInteraction,
   topbarCollapsed = false,
   onToggleTopbar,
   layoutMode,
@@ -335,6 +339,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
       onApply={interactionSandbox.apply}
       onUndo={interactionSandbox.undo}
       onReset={interactionSandbox.reset}
+      onExplainInteraction={onExplainInteraction}
     />
   ) : undefined;
   const isDark = theme === "dark";

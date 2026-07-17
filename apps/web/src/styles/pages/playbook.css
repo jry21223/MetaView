@@ -799,6 +799,35 @@
   gap: 8px;
 }
 
+.playbook-interaction__summary {
+  display: grid;
+  gap: 5px;
+  padding: 8px 9px;
+  border: 1px solid var(--player-line-soft);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--player-paper-soft) 72%, transparent);
+  color: var(--player-ink-3);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.playbook-interaction__summary > span {
+  color: var(--player-ink-2);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.playbook-interaction__summary ol {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.playbook-interaction__summary small {
+  font-size: 10px;
+}
+
 .playbook-interaction__range input {
   width: 100%;
   accent-color: var(--player-accent);
@@ -847,7 +876,12 @@
   justify-content: flex-end;
 }
 
-.playbook-interaction__choice button:disabled,
+.playbook-interaction__actions .playbook-interaction__explain {
+  margin-right: auto;
+  border-color: color-mix(in srgb, var(--player-accent) 42%, var(--player-line));
+  color: var(--player-accent);
+}
+
 .playbook-interaction__actions button:disabled,
 .playbook-interaction__choice button:disabled,
 .playbook-interaction__replay-actions button:disabled {

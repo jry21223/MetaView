@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { InteractionSandboxPanel } from "./InteractionSandboxPanel";
@@ -295,5 +295,46 @@ describe("InteractionSandboxPanel", () => {
     expect(reset.disabled).toBe(false);
     fireEvent.click(reset);
     expect(onReset).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows semantic event summaries and explains them only after an explicit click", async () => {
+    const onExplainInteraction = vi.fn().mockResolvedValue(undefined);
+    const event = {
+      adapter_id: "math.derivative-tangent" as const,
+      step_id: "plot",
+      target_id: "step:plot:marker-x",
+      action: "set-value" as const,
+      value: 3,
+      sequence: 1,
+    };
+    const view = render(
+      <InteractionSandboxPanel
+        manifest={derivativeManifest}
+        currentStepId="plot"
+        events={[event]}
+        dirty
+        canUndo
+        lastError={null}
+        latestReplay={null}
+        onShowReplayFrame={vi.fn()}
+        onApply={vi.fn()}
+        onUndo={vi.fn()}
+        onReset={vi.fn()}
+        onExplainInteraction={onExplainInteraction}
+      />,
+    );
+
+    expect(view.getByText("把切点 x 调到 3")).toBeTruthy();
+    expect(onExplainInteraction).not.toHaveBeenCalled();
+
+    fireEvent.click(view.getByRole("button", { name: "解释我的操作" }));
+
+    expect(onExplainInteraction).toHaveBeenCalledWith({
+      manifest_version: "1",
+      events: [event],
+    });
+    await waitFor(() => {
+      expect(view.getByRole("button", { name: "解释我的操作" })).toBeTruthy();
+    });
   });
 });

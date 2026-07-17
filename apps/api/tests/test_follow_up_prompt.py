@@ -18,9 +18,11 @@ class SequenceLLM:
     def __init__(self, responses: list[str]) -> None:
         self.responses = list(responses)
         self.calls = 0
+        self.requests: list[tuple[str, str]] = []
 
-    async def complete(self, system: str, user: str) -> str:  # noqa: ARG002
+    async def complete(self, system: str, user: str) -> str:
         self.calls += 1
+        self.requests.append((system, user))
         if len(self.responses) == 1:
             return self.responses[0]
         return self.responses.pop(0)
@@ -33,6 +35,85 @@ def test_followup_prompt_guides_students_without_direct_homework_answers() -> No
     assert "不要直接给出作业答案" in prompt
     assert "一次只问一个问题" in prompt
     assert "patch 必须是空数组 []" in prompt
+
+
+@pytest.mark.asyncio
+async def test_explicit_interaction_explanation_injects_semantic_context_without_patch() -> None:
+    llm = SequenceLLM([
+        _payload([{"op": "replace", "path": "/title", "value": "不应写入"}]),
+    ])
+    use_case = FollowUpPatchUseCase(llm, default_step_frames=60)
+    request = FollowUpRequest.model_validate(
+        {
+            "message": "请解释我刚才的操作",
+            "intent": "explain_interaction",
+            "interaction_context": {
+                "manifest_version": "1",
+                "events": [
+                    {
+                        "adapter_id": "math.derivative-tangent",
+                        "step_id": "step_01",
+                        "target_id": "step:step_01:marker-x",
+                        "action": "set-value",
+                        "value": 3,
+                        "sequence": 1,
+                    }
+                ],
+            },
+        }
+    )
+
+    result = await use_case.execute(_playbook(), request)
+
+    assert result.playbook is None
+    assert result.patch == []
+    assert result.change_summary == "explain: interaction context"
+    system, user = llm.requests[0]
+    assert "解释我的操作" in system
+    payload = json.loads(user)
+    assert payload["interaction_context"]["events"][0]["value"] == 3.0
+
+
+def test_interaction_context_rejects_raw_targets_and_implicit_attachment() -> None:
+    event = {
+        "adapter_id": "algorithm.bfs",
+        "step_id": "graph",
+        "target_id": "#graph > circle:first-child",
+        "action": "select",
+        "value": "A",
+        "sequence": 1,
+    }
+
+    with pytest.raises(ValueError, match="semantic start-node"):
+        FollowUpRequest.model_validate(
+            {
+                "message": "解释",
+                "intent": "explain_interaction",
+                "interaction_context": {"manifest_version": "1", "events": [event]},
+            }
+        )
+
+    event["target_id"] = "step:graph:start-node"
+    with pytest.raises(ValueError, match="only accepted for explicit explanation"):
+        FollowUpRequest.model_validate(
+            {
+                "message": "普通追问",
+                "interaction_context": {"manifest_version": "1", "events": [event]},
+            }
+        )
+
+    with pytest.raises(ValueError, match="Extra inputs are not permitted"):
+        FollowUpRequest.model_validate(
+            {
+                "message": "解释",
+                "intent": "explain_interaction",
+                "interaction_context": {
+                    "manifest_version": "1",
+                    "events": [event],
+                },
+                "patch": [{"op": "replace", "path": "/title", "value": "bad"}],
+            }
+        )
 
 
 @pytest.mark.asyncio
