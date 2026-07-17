@@ -1,18 +1,7 @@
 import React, { useMemo } from "react";
 import "katex/dist/katex.min.css";
 import type { ParamPanelProps } from "./types";
-
-const PARAM_ID_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
-
-interface NumericControl {
-  control: ParamPanelProps["script"]["parameter_controls"][number];
-  initial: number;
-}
-
-function parseNumber(value: string): number | null {
-  const n = Number(value.trim());
-  return Number.isFinite(n) ? n : null;
-}
+import { resolveEditableMathControls } from "./mathParams";
 
 function sliderRange(initial: number): { min: number; max: number; step: number } {
   const span = Math.max(5, Math.abs(initial) * 2);
@@ -30,19 +19,10 @@ export function MathParamPanel({
 }: ParamPanelProps): React.JSX.Element {
   const theme = isDark ? "dark" : "light";
 
-  const numericControls = useMemo<NumericControl[]>(() => {
-    const controls: NumericControl[] = [];
-    // Older playbooks (pre-execution_map) may serialize without
-    // parameter_controls at all — treat missing array as empty so we render
-    // the "no editable params" placeholder instead of throwing.
-    const list = script.parameter_controls ?? [];
-    for (const control of list) {
-      const initial = parseNumber(control.value);
-      if (initial == null || !PARAM_ID_RE.test(control.id)) continue;
-      controls.push({ control, initial });
-    }
-    return controls;
-  }, [script.parameter_controls]);
+  const numericControls = useMemo(
+    () => resolveEditableMathControls(script.parameter_controls),
+    [script.parameter_controls],
+  );
 
   const setScriptParam = (key: string, value: number): void => {
     onOverridesChange({

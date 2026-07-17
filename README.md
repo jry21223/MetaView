@@ -1,63 +1,180 @@
-# MetaView v2
+# MetaView
 
-MetaView v2 是一个面向教育场景的 AI 可视化讲解平台。它不是普通 PPT 生成器，也不是只把文本变成视频的工具；核心架构是“内容生成 + 导演层 + 可渲染视频”。
+> 把一道题，变成一段看得见、可以操作、可以继续追问的理解过程。
 
-当前主线请先读 [`docs/START_HERE.md`](docs/START_HERE.md)。
+MetaView 是一个面向教育场景的 AI 可视化讲解平台。它把题目、知识点或代码转成可播放、可逐步控制、可继续追问和修改的教学讲解，而不只是生成一组幻灯片或一段静态视频。
 
-## 核心管线
+核心产物是两份独立契约：
+
+- `PlaybookScript`：教学步骤、画面状态、公式、代码轨道、旁白和可调参数。
+- `DirectorScript`：镜头、节奏、焦点、强调词和观看顺序。
+
+二者最终统一进入 Remotion 播放器和导出链路。项目不使用 Manim、HTML iframe 或服务端 HTML 录屏作为另一套渲染出口。
+
+开发入口请先读 [`docs/START_HERE.md`](docs/START_HERE.md)。
+
+## 产品能力
+
+| 环节 | 能力 |
+|---|---|
+| 输入 | 输入题目或知识点、粘贴代码、上传一个不超过 256 KB 的受支持代码文件 |
+| 理解与规划 | 后端路由学科与主题，生成 `CoverageDecision` 和 renderer-independent `LessonPlan` |
+| 生成 | deterministic SkillPack、受控组合、Agent runtime 或 legacy single 路径生成 `PlaybookScript` |
+| 播放 | Remotion 帧驱动播放、逐步跳转、播放速度、字幕、TTS、桌面与移动竖屏布局 |
+| 参数互动 | 数学参数滑块；五种排序算法可修改输入数组并确定性重放 |
+| Code Sync | 代码语法高亮、当前行/操作标签、变量监视，并随教学步骤同步 |
+| Follow-up | 围绕当前讲解继续问；可只回答，也可安全修改 Playbook；修改版本可回看和恢复 |
+| 质量控制 | Agent 轻量自检、后端 canonical `QualityReport`、资产审计、视觉基线和 Benchmark V2 |
+| 导出 | 与播放器共用渲染器的 Remotion 视频导出；无音轨导出为稳定路径 |
+
+支持七个教学领域：`algorithm`、`math`、`code`、`physics`、`chemistry`、`biology`、`geography`。这表示管线和专用渲染能力覆盖这些领域，并不表示其中任意题目都达到同一质量等级；实际请求会由 CoverageResolver 判定为 `specialized`、`composable`、`experimental` 或 `unsupported`。
+
+## 交互式学习工作台
+
+MetaView 不是纯线性视频播放器。参数面板、Code Sync 和 Follow-up 构成三条协同的交互轨道：参数面板改变确定性状态，Code Sync 解释执行过程，Follow-up 负责教学问答或对讲解版本做受控修改。
+
+| 模块 | 能力 | 边界 |
+|---|---|---|
+| 步进控制 | 按步骤前进、后退或直接跳转 | 桌面与移动布局共用同一时间线 |
+| 数学参数面板 | 读取 `PlaybookScript.parameter_controls`，通过滑块或数字输入实时覆盖参数 | 参数变化只影响受控字段 |
+| 算法参数面板 | 修改输入数组并确定性重放排序过程 | 支持 `merge_sort`、`bubble_sort`、`quick_sort`、`selection_sort`、`insertion_sort` |
+| Code Sync | 同步显示代码、活动行、操作标签和变量变化 | 支持 JS/TS、Python、Java、Go、C/C++、Rust |
+| Follow-up | 返回解释，或对 Playbook 生成受约束修改 | 修改必须通过质量门 |
+| 版本记录 | 保存 initial / follow-up / restore 版本并恢复历史状态 | 恢复时同步 Playbook 与 Director |
+
+## Follow-up 不是普通聊天框
+
+工作台右侧的 Follow-up 模块以当前 Playbook 为上下文：
+
+1. 概念性追问可以只返回解释，不改变视频。
+2. “增加一步”“换一种讲法”“调整画面或参数”等请求可以生成 RFC 6902 子集 patch。
+3. 可修改路径限制在标题、摘要、步骤、参数、算法 ID 和初始数据，不能直接改写 FPS 或时间线终点。
+4. 修改后的 Playbook 会重新规范化时间线并进入 canonical quality gate。
+5. 只有通过质量门的修改才会保存为新版本；同时重新构建并保存 DirectorScript。
+6. 版本记录显示 initial / follow-up / restore、短 ID、摘要和 HEAD，可切换回历史版本。
+
+相关实现：
+
+- `apps/api/app/application/use_cases/follow_up.py`
+- `apps/api/app/presentation/router_runs.py`
+- `apps/web/src/features/followups/`
+- `apps/web/src/pages/Studio/StudioPage.tsx`
+
+## Code Sync 与代码高亮
+
+代码不是静态贴在画面旁边。`CodeHighlightOverlay` 与视觉 snapshot 并行，并在工作台中随步骤更新：
+
+- 语法 tokenizer 覆盖关键字、字符串、数字、注释和操作符；支持跨行 `/* ... */` 注释。
+- 当前执行行、相关行和操作标签会高亮。
+- 变量监视区显示当前状态，并对值变化给出视觉反馈。
+- BFS、递归调用栈和 `code_trace_scene` 可以从结构化状态构造 Code Sync 轨道。
+- Code Sync 保留在学习控制台中；默认不烧录进主舞台或导出视频，避免遮挡教学画面。
+
+相关实现：
+
+- `apps/web/src/features/playbook/engine/renderers/CodeHighlightRenderer.tsx`
+- `apps/web/src/features/playbook/engine/renderers/codeTokenizer.ts`
+- `apps/web/src/features/playbook/engine/player/resolveCodePanelOverlay.ts`
+
+## 生成与导演管线
 
 ```text
 User input
-  -> subject understanding / router
+  -> subject router
   -> CoverageDecision
   -> LessonPlan
-  -> SkillPack / agent / legacy CIR
+  -> SkillPack / SkillRecipe / Agent / legacy CIR
   -> PlaybookScript
+  -> canonical QualityReport
   -> DirectorScript
   -> RenderPlan
   -> Remotion preview / export
 ```
 
-- `LessonPlan` 是教学决策契约：负责学习目标、误区、结论、教学弧线与 SceneIntent，不包含 renderer 私有数据。
-- `CoverageDecision` 是能力边界：区分 specialized / composable / experimental / unsupported，并在生成前决定安全回退或拒绝。
-- `PlaybookScript` 是内容渲染契约：负责教学步骤、snapshot、公式、画面对象、旁白、代码高亮和可渲染场景数据。
-- `DirectorScript` 是导演契约：负责镜头意图、shot type、camera motion、pacing、focus target、emphasis terms 和观看节奏。
-- `RenderPlan` 是渲染适配层：把 DirectorScript 转换为 Remotion 可消费的 scale、translate、opacity、timing 等参数。
-- Remotion 是唯一视频预览/导出出口。
+- `CoverageDecision` 决定能力边界、回退或拒绝策略。
+- `LessonPlan` 只表达教学目标、误区、结论、教学弧线和 SceneIntent，不包含帧、坐标或 renderer 私有字段。
+- `PlaybookScript` 是唯一内容渲染契约。
+- `DirectorScript` 独立负责 shot、camera motion、pacing、focus target 和 emphasis。
+- `RenderPlan` 将导演意图适配为 Remotion 可消费的 scale、translate、opacity 和 timing。
 
-生成路径当前有两条：
+### 两种生成模式
 
-1. `single mode`: **CoverageDecision -> LessonPlan -> LLM -> CIR + ExecutionMap -> PlaybookScript -> DirectorScript**
-2. `agent mode`: **CoverageDecision -> LessonPlan -> Agent tool loop -> self-check -> PlaybookScript -> DirectorScript**
+| 模式 | 工作方式 | 适用场景 |
+|---|---|---|
+| `single` | LLM 生成 CIR + ExecutionMap，再构建 Playbook | 直接、可回滚的生成链路 |
+| `agent` | Agent 调用 RuntimeToolHub、动画工具和绘图工具生成 Playbook | 需要工具编排和确定性能力组合的内容 |
 
-确定性 SkillPack 同样通过 `SkillExecutionContext` 接收这份 LessonPlan。运行历史会独立
-保存能力判定、计划、PlaybookScript 和 QualityReport；CoverageDecision/LessonPlan 都不会被塞入最终视频契约。
+Agent runtime 可以列出和执行 deterministic SkillPack、SceneBlueprint compiler、schema/self-check、几何断言和动画工具；但 Agent 的自检只是前置检查，最终成功语义仍由 API 后端的 `QualityReport` 决定。
 
-项目仍不引入 Manim、HTML iframe 或服务端 HTML 视频渲染。管线契约见 [`docs/pipeline.md`](docs/pipeline.md)，Director 契约见 [`docs/director-layer.md`](docs/director-layer.md)。
+## 质量门、Benchmark 与资产治理
 
-## 功能概览
+### Canonical QualityReport
 
-- 支持 `algorithm`, `math`, `code`, `physics`, `chemistry`, `biology`, `geography` 七个教学领域。
-- 首发输入支持文本题目、粘贴代码和上传代码文件；暂不支持图片、截图、PDF、PPT/课件或任意附件生成。
-- 题目提交后先做 topic/Skill routing，再由 CoverageResolver 验证真实能力；未知、明确不支持或当前只能走未验证降级面的请求会在模型调用前 fail closed。
-- deterministic SkillPack 用于把确定性学科问题转成可靠的 PlaybookScript。
-- Director 层为每个 run 生成独立 DirectorScript，当前已有 rule-based 默认导演，后续会进入可见、可渲染、可编辑阶段。
-- 播放器提供参数面板、字幕、TTS、速度控制、历史记录、视频导出和 provider 配置。
-- 运行历史保留原始 `prompt`、PlaybookScript 和 DirectorScript，便于复盘不同输入与生成结果。
+SkillPack、Agent 和 single 三条路径在写入 `succeeded` 前都会运行 `quality_gate_playbook(...)`：
 
-## 目录结构
+```text
+candidate PlaybookScript
+  -> clean / warnings: 保存 DirectorScript 并成功
+  -> repairable: 执行一次与生成路径匹配的修复
+  -> blocked 或修复失败: fail closed
+```
 
-| 路径 | 内容 |
-|------|------|
-| `apps/api` | FastAPI 后端：生成管线、PlaybookScript、DirectorScript、运行历史、支付/导出 API |
-| `apps/web` | React 19 + Vite + Remotion 前端，按 Feature-Sliced Design 分层 |
-| `apps/agent` | agent sidecar，用于 `generation_mode=agent` 的生成链路 |
-| `docs` | 当前主线文档、Director 架构、管线、渲染器、路由和验收说明 |
-| `skills` | 各学科 prompt reference |
-| `data` | 本地 SQLite、导出文件和调试数据 |
-| `docker-compose.yml` | API + Web + agent 联调入口 |
+检查覆盖空步骤、无效时间线、旁白与 payload、renderer contract、缺失资产、学科错误降级、数学/算法/递归/抛体的最低语义状态、Code Sync 一致性、LessonPlan 事实与最终结论。Follow-up 修改、版本恢复和导出都会重新检查当前 Playbook。
+
+### Benchmark V2
+
+四个 Gold Case 是：
+
+- 导数与切线：`math-derivative-tangent`
+- BFS：`algorithm-bfs-tree`
+- 递归阶乘：`code-recursion-factorial`
+- 平抛运动：`physics-projectile`
+
+评分包含契约、知识正确性、教学结构、视觉覆盖、Code Sync、旁白一致性和导出就绪度。总分达到 90 仍不够：任一 hard-fail 都会让该次尝试失败。
+
+```bash
+make eval-gold
+make eval-gold LIVE=1 API=http://localhost:8000 REPEAT=3
+```
+
+Checked-in fixtures 用于回归和迁移验证，不作为发布质量证据。发布验收应基于真实生成的独立重复运行和 `eval/reports/` 证据。
+
+### 资产与 showcase
+
+资产系统包含 manifest schema、registry、license registry、路径审计、导出归因报告和 preflight。`make visual-check` 会执行：
+
+- 资产 manifest / 文件 / 许可证审计；
+- 结构化学科 showcase 的静态渲染 smoke；
+- 图片基线、漂移检查和 review packet 生成。
+
+内部 showcase 已覆盖地理季风、抛体运动、细胞/DNA、分子/化学反应、导数曲线、BFS、递归和代码追踪等结构化 fixture。它们是渲染器与资产质量证据，不等于已经发布给教师的公共成品案例。
+
+## 模板与内部 Showcase
+
+| 类型 | 用途 |
+|---|---|
+| `/templates` | 搜索和筛选 prompt 起点，点击后发起新的生成 |
+| `/asset-showcase` 与 fixture matrix | 验证 renderer、SceneBlueprint、资产包和视觉基线 |
+
+模板是生成起点；showcase fixture 是渲染器和资产的回归证据。两者都不应被当作真实生成质量的替代证明。
+
+## Edition 与访问边界
+
+前后端 edition 必须一致：`METAVIEW_APP_EDITION` 与 `VITE_APP_EDITION` 都设为 `self` 或都设为 `ops`。
+
+| 能力 | `self` | `ops` |
+|---|---|---|
+| 公共 Landing `/` | 可访问 | 可访问 |
+| 应用工作台 | 无账户体系 | 微信登录后访问 |
+| 模型来源 | 浏览器本地保存的 OpenAI 兼容 BYOK；也可使用服务端配置/mock | 平台托管模型 |
+| 客户端 Provider override | 允许 | 拒绝 |
+| 余额/充值/账户 | 不显示 | 登录后启用 |
+| 运行历史 | 本地 SQLite | 按微信账户隔离 |
+| 管理后台 | 不可用 | `/admin`，仍需 `role=admin` |
 
 ## 快速开始
+
+需要 Node.js、Python 和 `make`。推荐先使用默认 `self + single + mock` 配置确认完整管线。
 
 ```bash
 make bootstrap
@@ -66,10 +183,10 @@ cp .env.example .env
 make dev
 ```
 
-本地服务默认地址：
+默认本地地址：
 
 | 服务 | 地址 |
-|------|------|
+|---|---|
 | API | `http://localhost:8000` |
 | Web | `http://localhost:5173` |
 | Agent sidecar | `http://localhost:8001` |
@@ -79,26 +196,10 @@ make dev
 ```bash
 make dev-api
 make dev-web
+make dev-agent
 ```
 
-自用版和运营版可通过启动脚本进入：
-
-```bash
-./start.sh
-./start.sh op
-```
-
-未配置真实 LLM 时默认走内置 `mock` provider。前端 Provider 面板可填写 OpenAI 兼容接口，也支持本地 Ollama / vLLM 网关。
-
-## Edition 边界
-
-`METAVIEW_APP_EDITION` 和 `VITE_APP_EDITION` 必须保持一致：
-
-- `self` 是纯 BYOK 单机版。前端不请求账户接口，不显示余额、充值或微信登录；生成、追问和 TTS 可以使用浏览器本地保存的 OpenAI 兼容 provider 配置。后端仍使用本地 SQLite 保存运行历史。
-- `ops` 是 SaaS 用户版。所有用户态接口必须有有效微信登录 session；生成和 follow-up 使用平台托管模型并按账户余额扣费，客户端提交 provider/router/TTS key 会被拒绝。
-- 运营面板不在 UI 中暴露入口。管理员直接访问 `/admin`，后端仍要求 `METAVIEW_APP_EDITION=ops` 且当前账户 `role=admin`。
-
-## Docker
+Docker：
 
 ```bash
 cp .env.example .env
@@ -106,129 +207,94 @@ make start
 make stop
 ```
 
-`make start` 等价于 `docker compose up --build`，`make stop` 等价于 `docker compose down`。
-
-## 常用命令
+自用版与运营版也可以通过启动脚本进入：
 
 ```bash
-make lint
-make test
-make build
-make check
-make visual-check
-make eval-gold
+./start.sh
+./start.sh op
 ```
 
-`make check` 串联 ruff、eslint、pytest、tsc 和 Vite build；Remotion 静帧、资产审计与
-showcase 基线放在独立的 `make visual-check`。`make eval-gold` 对四个 Gold Case 执行
-严格 Benchmark V2；使用 `LIVE=1` 时会真实生成每例三次。
+## 常用验证命令
 
-Agent demo 验收见 [`docs/agent-demo-acceptance.md`](docs/agent-demo-acceptance.md)。生成的 `eval/reports/`、`eval/videos/`、`eval/shots/` 是本地证据，不应提交。
+| 命令 | 内容 |
+|---|---|
+| `make lint` | Ruff + ESLint 等静态检查 |
+| `make test` | API / Web / Agent / MCP 测试 |
+| `make build` | 前后端及相关构建检查 |
+| `make check` | `lint + test + build` 默认门禁 |
+| `make test-coverage` | 覆盖率检查 |
+| `make visual-check` | 资产审计 + showcase 重型视觉检查 |
+| `make eval-gold` | Benchmark V2 四个 Gold Case |
 
-## API 端点
+生成的 `eval/reports/`、`eval/videos/` 和 `eval/shots/` 是本地证据，不应提交。
+
+## 关键配置
+
+完整变量见 [`.env.example`](.env.example)。常用项：
+
+| 变量 | 说明 |
+|---|---|
+| `METAVIEW_APP_EDITION` / `VITE_APP_EDITION` | `self` 或 `ops`，必须一致 |
+| `METAVIEW_GENERATION_MODE` | `single` 或 `agent` |
+| `METAVIEW_MOCK_PROVIDER_ENABLED` | 未配置真实模型时是否允许 mock |
+| `METAVIEW_OPENAI_API_KEY` | 服务端 OpenAI 兼容 provider key |
+| `METAVIEW_OPENAI_BASE_URL` / `METAVIEW_OPENAI_MODEL` | 服务端兼容接口和模型 |
+| `METAVIEW_AGENT_PROVIDER` | Agent adapter：`http` 或 `codex` fallback |
+| `METAVIEW_AGENT_BASE_URL` / `METAVIEW_AGENT_SHARED_TOKEN` | Agent sidecar 地址和共享鉴权 token |
+| `METAVIEW_ROUTER_MODE` | `off` / `heuristic` / `llm` / `hybrid` |
+| `METAVIEW_HISTORY_DB_PATH` | 本地 SQLite 路径 |
+| `METAVIEW_PLAYBOOK_DEFAULT_FPS` | 默认帧率 |
+
+生产环境必须为登录、支付回调和下载地址配置公网 HTTPS，并关闭不适合生产的 mock/dev 选项。
+
+## API 概览
 
 | Method | Path | 说明 |
-|--------|------|------|
-| `POST` | `/api/v1/pipeline` | 提交题目，返回 `run_id` |
-| `GET` | `/api/v1/runs` | 运行历史列表 |
-| `GET` | `/api/v1/runs/{run_id}` | 单次运行结果，含 CoverageDecision、LessonPlan、PlaybookScript、DirectorScript 与原始 `prompt` |
+|---|---|---|
+| `POST` | `/api/v1/pipeline` | 创建生成任务 |
+| `GET` | `/api/v1/runs` | 运行历史 |
+| `GET` | `/api/v1/runs/{run_id}` | 读取运行结果、Coverage、LessonPlan、Playbook、QualityReport 与 Director |
+| `POST` | `/api/v1/runs/{run_id}/follow-up` | 追问或提交受控修改 |
+| `GET` | `/api/v1/runs/{run_id}/follow-ups` | 追问与版本记录 |
+| `POST` | `/api/v1/runs/{run_id}/versions/{version_id}/restore` | 恢复历史版本 |
 | `POST` | `/api/v1/exports` | 创建视频导出任务 |
-| `GET` | `/api/v1/exports/{job_id}` | 查询导出任务状态 |
+| `GET` | `/api/v1/exports/{job_id}` | 查询导出状态 |
+| `GET` | `/api/v1/exports/{job_id}/download` | 下载导出文件 |
 | `GET` | `/health` | 健康检查 |
 
-提交题目后，前端通过 `usePipelinePoller` 轮询 `/runs/{run_id}`，直到状态变为 `succeeded` 或 `failed`。
+## 目录结构
 
-## 配置
+| 路径 | 内容 |
+|---|---|
+| `apps/api` | FastAPI：生成管线、质量门、运行/版本持久化、账户、支付和导出 |
+| `apps/web` | React 19 + Vite + Remotion：工作台、播放器、Code Sync、参数面板和 Follow-up |
+| `apps/agent` | Agent sidecar：Drawing CLI、runtime/animation tools 和 Agent self-check |
+| `skills` | 学科 SkillPack / agent prompt reference |
+| `docs` | 架构、契约、质量门、Benchmark、资产和验收文档 |
+| `eval` | Benchmark 配置、Gold Case 与本地评测入口 |
+| `data` | 本地 SQLite、导出文件和调试数据 |
 
-后端配置统一使用 `METAVIEW_` 前缀环境变量，由 [`apps/api/app/config.py`](apps/api/app/config.py) 管理。前端配置集中在 [`apps/web/src/shared/config/constants.ts`](apps/web/src/shared/config/constants.ts)。完整变量列表见 [`.env.example`](.env.example)。
+后端遵循 Clean Architecture；前端采用 Feature-Sliced Design。新增 snapshot renderer 时必须同时更新后端判别联合、前端类型、renderer registry、质量契约和跨运行时一致性测试。
 
-关键变量：
+## 已知边界
 
-| 变量 | 默认 | 说明 |
-|------|------|------|
-| `METAVIEW_APP_EDITION` | `self` | 后端 edition：`self` / `ops` |
-| `VITE_APP_EDITION` | `self` | 前端 edition：`self` / `ops`，应与 `METAVIEW_APP_EDITION` 一致 |
-| `METAVIEW_GENERATION_MODE` | `single` | `single` 或 `agent`；`single` 当前仍是默认 rollback path |
-| `METAVIEW_AGENT_PROVIDER` | `http` | `agent` 模式 provider adapter：`http` sidecar 或 `codex` fallback |
-| `METAVIEW_AGENT_BASE_URL` | `http://agent:8001` | agent sidecar 地址 |
-| `METAVIEW_AGENT_SHARED_TOKEN` | - | API 调用 agent sidecar 的共享鉴权 token |
-| `METAVIEW_CODEX_BIN` | - | Codex SDK 可选 CLI 路径；留空使用 SDK 固定 runtime |
-| `METAVIEW_ROUTER_MODE` | `hybrid` | 路由模式：`off` / `heuristic` / `llm` / `hybrid` |
-| `METAVIEW_OPENAI_API_KEY` | - | 内置 OpenAI 兼容 provider 的 key |
-| `METAVIEW_OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI 兼容接口根地址 |
-| `METAVIEW_OPENAI_MODEL` | - | 默认模型名 |
-| `AGENT_DEFAULT_BASE_URL` | - | agent sidecar 默认 OpenAI 兼容接口根地址；未设置时读取 `METAVIEW_OPENAI_BASE_URL` |
-| `METAVIEW_PAYMENT_GATEWAY` | `easypay` | 支付网关选择：`wechat` / `easypay`，主路径为 `easypay` |
-| `METAVIEW_EPAY_PAY_TYPE` | `wxpay` | 开启 `easypay` 时创建订单的支付类型 |
-| `METAVIEW_PLAYBOOK_DEFAULT_FPS` | `30` | Remotion 默认帧率 |
-| `METAVIEW_PLAYBOOK_COMPOSITION_WIDTH` / `_HEIGHT` | `960` / `540` | 默认画布 |
+- 首发附件只支持文本和代码文件；图片、截图、PDF、PPT/课件和任意附件尚不支持生成。
+- Agent mode 需要按 [`docs/agent-demo-acceptance.md`](docs/agent-demo-acceptance.md) 独立验收。
+- CoverageResolver 只对受控 profile 提供专用或可组合能力，无法可靠覆盖的请求会降级或拒绝。
+- 学习工作台围绕步进、参数、Code Sync 和 Follow-up 设计，不是通用自由画布编辑器。
+- 有音轨视频导出仍为 beta；无法保证音频时序时应使用稳定的 silent export。
+- 化学分子路径在生产部署中依赖 RDKit；部署前应确认依赖和隔离策略。
 
-生产环境请使用公网且 `https` 的回调/跳转地址。微信 APIv3 相关配置保留为 legacy/deprecated，仅用于兼容回滚，不是充值主路径。
+## 文档索引
 
-## 播放器快捷键
-
-| 按键 | 功能 |
-|------|------|
-| `Space` | 播放 / 暂停 |
-| `←` / `→` | 上一步 / 下一步 |
-| `R` | 重置到第一步 |
-| `T` | 开启 / 关闭 TTS 朗读 |
-| `S` | 显示 / 隐藏字幕 |
-| `+` / `=` | 加速 |
-| `-` | 减速 |
-| `E` | 打开导出面板 |
-| `Esc` | 关闭 TTS 配置弹窗 |
-
-## 开发约束
-
-后端遵循整洁架构：
-
-- `presentation/` 只能导入 `application/`。
-- `application/` 只能通过 ports 组合 `domain/`。
-- `domain/` 不得导入外部 I/O 依赖。
-- `infrastructure/` 实现 `application/ports/` 协议，不得被 `domain/` 导入。
-
-前端遵循 Feature-Sliced Design：
-
-- `shared/` 不得导入 `features/` 或 `pages/`。
-- `entities/` 不得导入 `features`。
-- `features/` 之间禁止互相导入。
-- `engine/renderers/` 不得导入 `engine/player/` 或 `engine/composition/`。
-
-新增渲染器时同步扩展后端和前端类型：
-
-1. 在 `apps/web/src/features/playbook/engine/renderers/` 新增 renderer。
-2. 在 `renderers/types.ts` 扩展 snapshot 判别联合。
-3. 在 `renderers/registry.ts` 注册 renderer。
-4. 在 `apps/api/app/domain/models/playbook.py` 扩展 Python 类型。
-
-Director 相关字段不要塞回 Playbook step；DirectorScript 是独立契约。Remotion 尺寸和 FPS 必须从 `PLAYBOOK_DEFAULTS` 读取；组件内不要写死字面量。
-
-## 关键文件
-
-| 文件 | 用途 |
-|------|------|
-| `apps/api/app/config.py` | 后端配置入口 |
-| `apps/api/app/domain/models/playbook.py` | PlaybookScript, MetaStep, Snapshot 类型 |
-| `apps/api/app/domain/models/director.py` | DirectorScript, DirectorBeat, 镜头/节奏字段 |
-| `apps/api/app/domain/services/playbook_builder.py` | CIR -> PlaybookScript 映射 |
-| `apps/api/app/domain/services/director_builder.py` | PlaybookScript -> rule-based DirectorScript 映射 |
-| `apps/api/app/infrastructure/persistence/sqlite_director_repository.py` | DirectorScript 持久化 |
-| `apps/web/src/shared/config/constants.ts` | 前端配置常量 |
-| `apps/web/src/features/playbook/engine/types.ts` | 前端 PlaybookScript / DirectorScript 类型 |
-| `apps/web/src/features/playbook/engine/player/PlaybookPlayer.tsx` | Remotion 播放器入口 |
-| `apps/web/src/features/playbook/engine/renderers/registry.ts` | 渲染器注册表 |
-| `apps/web/src/features/playbook/engine/param-panels/registry.ts` | 参数面板注册表 |
-
-## 文档
-
-- [`docs/START_HERE.md`](docs/START_HERE.md) - 当前项目入口
-- [`docs/director-layer.md`](docs/director-layer.md) - Director 独立导演层契约
-- [`docs/README.md`](docs/README.md) - 开发文档索引
-- [`docs/pipeline.md`](docs/pipeline.md) - 生成、PlaybookScript、DirectorScript 挂载点和导出管线
-- [`docs/lesson-plan.md`](docs/lesson-plan.md) - 教学规划契约、三路径接线、持久化与边界
-- [`docs/frontend-shell.md`](docs/frontend-shell.md) - Stage 路由、GlobalTopbar、Studio 布局、Provider 配置
-- [`docs/remotion-skills.md`](docs/remotion-skills.md) - Remotion 组件、渲染器、注册表约定
-- [`docs/topic-routing.md`](docs/topic-routing.md) - 学科路由策略
-- [`docs/agent-demo-acceptance.md`](docs/agent-demo-acceptance.md) - agent/runtime-tool 验收
-- [`CONTRIBUTING.md`](CONTRIBUTING.md) - 分支策略、Conventional Commits、Hook
+- [`docs/START_HERE.md`](docs/START_HERE.md) — 当前主线与阅读顺序
+- [`docs/pipeline.md`](docs/pipeline.md) — 生成、Code Sync、Playbook、Director 和导出
+- [`docs/director-layer.md`](docs/director-layer.md) — 独立导演层
+- [`docs/lesson-plan.md`](docs/lesson-plan.md) — 教学规划契约
+- [`docs/coverage-and-fallback.md`](docs/coverage-and-fallback.md) — 能力判定与回退边界
+- [`docs/quality-gate.md`](docs/quality-gate.md) — canonical QualityReport
+- [`docs/benchmark-v2.md`](docs/benchmark-v2.md) — Gold Case 评分和 hard-fail
+- [`docs/assets.md`](docs/assets.md) — 资产包、showcase、审计和归因
+- [`docs/frontend-shell.md`](docs/frontend-shell.md) — 路由、工作台与 edition shell
+- [`docs/agent-demo-acceptance.md`](docs/agent-demo-acceptance.md) — Agent runtime 验收
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — 开发和提交约定

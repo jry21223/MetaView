@@ -157,6 +157,10 @@ export function PlaybookPortraitShell({
   hasDomainPanel,
   paramsContent,
 }: PlaybookPortraitShellProps) {
+  const visibleTabs = hasDomainPanel
+    ? MOBILE_TABS
+    : MOBILE_TABS.filter((tab) => tab.key !== "params");
+
   return (
     <div className="playbook-player__workspace">
       <header className="playbook-player__header">
@@ -186,7 +190,7 @@ export function PlaybookPortraitShell({
       {showMobileConsole && (
         <section className="playbook-player__mobile-console" aria-label="移动学习面板">
           <div className="playbook-player__mobile-tabs" role="tablist" aria-label="移动学习面板">
-            {MOBILE_TABS.map((tab) => (
+            {visibleTabs.map((tab) => (
               <button
                 key={tab.key}
                 type="button"

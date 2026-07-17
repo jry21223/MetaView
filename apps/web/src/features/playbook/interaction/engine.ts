@@ -40,14 +40,8 @@ function mathBindings(script: PlaybookScript): DerivativeInteractionBinding[] {
   if (script.domain !== "math") return [];
   return script.steps.flatMap((step) => {
     const snapshot = step.snapshot;
-    const declaredMathLayers = (step.layers ?? []).filter(
-      (layer) => layer.body.kind === "math_plot",
-    );
     if (
       snapshot.kind !== "math_plot" ||
-      (step.layers != null && step.layers.length > 0 && (
-        declaredMathLayers.length !== 1 || step.layers?.[0]?.body.kind !== "math_plot"
-      )) ||
       snapshot.marker_x == null ||
       !Number.isFinite(snapshot.marker_x) ||
       !Number.isFinite(snapshot.x_min) ||

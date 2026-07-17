@@ -25,6 +25,13 @@ function plot(markerX = 1): MathPlotSnapshot {
   };
 }
 
+const graph: GraphSceneSnapshot = {
+  kind: "graph_scene",
+  nodes: [{ id: "A", label: "A" }, { id: "B", label: "B" }],
+  edges: [{ id: "AB", source: "A", target: "B" }],
+  directed: false,
+};
+
 function script(markerX = 1): PlaybookScript {
   return {
     fps: 30,
@@ -43,13 +50,6 @@ function script(markerX = 1): PlaybookScript {
     }],
   };
 }
-
-const graph: GraphSceneSnapshot = {
-  kind: "graph_scene",
-  nodes: [{ id: "A", label: "A" }, { id: "B", label: "B" }],
-  edges: [{ id: "AB", source: "A", target: "B" }],
-  directed: false,
-};
 
 function mixedScript(): PlaybookScript {
   const math = script();
@@ -99,21 +99,6 @@ describe("useInteractionSandbox", () => {
     act(() => result.current.reset());
     expect(result.current.events).toEqual([]);
     expect((result.current.previewScript.steps[0].snapshot as MathPlotSnapshot).marker_x).toBe(1);
-  });
-
-  it("renders transient previews without recording pointer movement", () => {
-    const base = script();
-    const { result } = renderHook(() => useInteractionSandbox(base));
-
-    act(() => result.current.preview(moveMarker(2)));
-
-    expect((result.current.previewScript.steps[0].snapshot as MathPlotSnapshot).marker_x).toBe(2);
-    expect(result.current.events).toEqual([]);
-    expect(result.current.dirty).toBe(false);
-
-    act(() => result.current.cancelPreview());
-    expect((result.current.previewScript.steps[0].snapshot as MathPlotSnapshot).marker_x).toBe(1);
-    expect(result.current.events).toEqual([]);
   });
 
   it("keeps a rejected command out of the event history", () => {

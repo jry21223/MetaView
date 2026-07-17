@@ -858,13 +858,6 @@
   line-height: 1.5;
 }
 
-.playbook-interaction__inactive {
-  margin: 0;
-  color: var(--player-ink-3);
-  font-size: 11px;
-  line-height: 1.5;
-}
-
 .playbook-interaction + .math-param-panel {
   border-top: 1px solid var(--player-line-soft);
 }
