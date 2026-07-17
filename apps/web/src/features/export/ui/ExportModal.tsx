@@ -14,6 +14,8 @@ import {
 
 interface ExportModalProps {
   runId: string | null;
+  versionId?: string | null;
+  hasUnpersistedPreview?: boolean;
   isDark: boolean;
   previewTitle?: string | null;
   accentColor?: string;
@@ -98,6 +100,8 @@ function assetReportEntryId(entry: ExportAssetReport["entries"][number]): string
 
 export const ExportModal: React.FC<ExportModalProps> = ({
   runId,
+  versionId = null,
+  hasUnpersistedPreview = false,
   isDark,
   previewTitle,
   accentColor,
@@ -204,8 +208,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   };
 
   useEffect(() => {
-    if (!runId) return;
-    const jobId = readJobMap()[runId];
+    if (!jobScope) return;
+    const jobId = readJobMap()[jobScope];
     if (!jobId) return;
     let cancelled = false;
     getExportStatus(jobId)
@@ -219,15 +223,19 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         if (next.status !== "completed" && next.status !== "failed")
           pollUntilDone(jobId);
       })
-      .catch(() => clearJobMapping(runId));
+      .catch(() => clearJobMapping(jobScope));
     return () => {
       cancelled = true;
       abortRef.current?.abort();
     };
-  }, [runId]);
+  }, [jobScope]);
 
   const handleSubmit = async () => {
     if (!runId) return;
+    if (hasUnpersistedPreview) {
+      setError("当前预览还没有保存为版本，不能静默导出旧版本。请先等待追问保存完成。");
+      return;
+    }
     setError(null);
     setSubmitting(true);
     startedAtRef.current = null;
@@ -241,6 +249,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       }
       const created = await submitExport({
         run_id: runId,
+        version_id: versionId,
         with_audio: withAudio,
         options: { quality, fps, format, theme: isDark ? "dark" : "light" },
         ...(assetReport && { asset_report: assetReport }),
@@ -260,7 +269,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       startedAtRef.current = startedAt;
       setElapsedMs(Date.now() - startedAt);
       setJob(created);
-      persistJobMapping(runId, created.job_id);
+      persistJobMapping(jobScope ?? runId, created.job_id);
       pollUntilDone(created.job_id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "提交失败");
@@ -504,6 +513,14 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 {error}
               </div>
             )}
+            {hasUnpersistedPreview && !error && (
+              <div
+                role="alert"
+                style={{ fontSize: 12, color: c.warn, lineHeight: 1.5 }}
+              >
+                当前预览还没有保存为版本，不能静默导出旧版本。
+              </div>
+            )}
             <div
               style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}
             >
@@ -520,13 +537,18 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={submitting || !runId}
+                disabled={submitting || !runId || hasUnpersistedPreview}
                 style={{
                   ...buttonBase,
                   border: `1px solid ${c.accent}`,
                   background: `${c.accent}1a`,
                   color: c.accent,
-                  cursor: submitting ? "wait" : "pointer",
+                  cursor: submitting
+                    ? "wait"
+                    : hasUnpersistedPreview
+                      ? "not-allowed"
+                      : "pointer",
+                  opacity: hasUnpersistedPreview ? 0.58 : 1,
                   fontWeight: 600,
                 }}
               >
@@ -603,7 +625,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   onClick={() => {
                     if (pollTimer.current !== null)
                       window.clearTimeout(pollTimer.current);
-                    if (runId) clearJobMapping(runId);
+                    if (jobScope) clearJobMapping(jobScope);
                     setJob(null);
                     setError(null);
                     startedAtRef.current = null;
