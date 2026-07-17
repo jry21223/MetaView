@@ -36,29 +36,12 @@ function hasFiniteParams(snapshot: MathPlotSnapshot): boolean {
   return Object.values(snapshot.params ?? {}).every(Number.isFinite);
 }
 
-function uniqueMathPlot(step: MetaStep): MathPlotSnapshot | null {
-  if (step.snapshot.kind !== "math_plot") return null;
-  if (step.layers != null && step.layers.length > 0) {
-    const matches = step.layers.filter((layer) => layer.body.kind === "math_plot");
-    if (matches.length !== 1 || step.layers[0]?.body.kind !== "math_plot") return null;
-  }
-  return step.snapshot;
-}
-
-function uniqueGraphScene(step: MetaStep): GraphSceneSnapshot | null {
-  if (!step.layers?.length) {
-    return step.snapshot.kind === "graph_scene" ? step.snapshot : null;
-  }
-  const matches = step.layers.filter((layer) => layer.body.kind === "graph_scene");
-  return matches.length === 1 ? matches[0].body as GraphSceneSnapshot : null;
-}
-
 function mathBindings(script: PlaybookScript): DerivativeInteractionBinding[] {
   if (script.domain !== "math") return [];
   return script.steps.flatMap((step) => {
-    const snapshot = uniqueMathPlot(step);
+    const snapshot = step.snapshot;
     if (
-      !snapshot ||
+      snapshot.kind !== "math_plot" ||
       snapshot.marker_x == null ||
       !Number.isFinite(snapshot.marker_x) ||
       !Number.isFinite(snapshot.x_min) ||
@@ -99,10 +82,10 @@ function validGraph(snapshot: GraphSceneSnapshot): boolean {
 }
 
 function bfsBindings(script: PlaybookScript): BfsInteractionBinding[] {
-  if (script.domain !== "algorithm" || script.algorithm_id?.toLowerCase() !== "bfs") return [];
+  if (script.algorithm_id?.toLowerCase() !== "bfs") return [];
   return script.steps.flatMap((step) => {
-    const snapshot = uniqueGraphScene(step);
-    if (!snapshot || !validGraph(snapshot)) return [];
+    const snapshot = step.snapshot;
+    if (snapshot.kind !== "graph_scene" || !validGraph(snapshot)) return [];
     const selected = snapshot.current_node_id &&
       snapshot.nodes.some((node) => node.id === snapshot.current_node_id)
       ? snapshot.current_node_id
@@ -241,18 +224,6 @@ interface BfsState {
   activeEdgeIds: string[];
 }
 
-export function formatBfsCodeVariables(
-  current: string,
-  queue: readonly string[],
-  visited: readonly string[],
-): Record<"current" | "queue" | "visited", string> {
-  return {
-    current,
-    queue: `[${queue.join(", ")}]`,
-    visited: `{${visited.join(", ")}}`,
-  };
-}
-
 interface BfsNeighbor {
   nodeId: string;
   edgeId: string | null;
@@ -338,33 +309,10 @@ function replaySnapshot(
 }
 
 function withSnapshot(step: MetaStep, snapshot: MathPlotSnapshot | GraphSceneSnapshot): MetaStep {
-  const matchingLayers = step.layers
-    ?.map((layer, index) => layer.body.kind === snapshot.kind ? index : -1)
-    .filter((index) => index >= 0) ?? [];
-  if (step.layers?.length && matchingLayers.length !== 1) {
-    throw new InteractionEngineError(
-      `Interaction requires exactly one ${snapshot.kind} layer`,
-    );
-  }
-  const targetLayerIndex = matchingLayers[0];
   const layers = step.layers?.map((layer, index) =>
-    index === targetLayerIndex ? { ...layer, body: snapshot } : layer
+    index === 0 && layer.body.kind === snapshot.kind ? { ...layer, body: snapshot } : layer
   );
   return { ...step, snapshot, ...(layers ? { layers } : {}) };
-}
-
-function withBfsCodeState(step: MetaStep, state: BfsState): MetaStep {
-  if (!step.code_highlight) return step;
-  return {
-    ...step,
-    code_highlight: {
-      ...step.code_highlight,
-      variables: {
-        ...step.code_highlight.variables,
-        ...formatBfsCodeVariables(state.current, state.queue, state.visited),
-      },
-    },
-  };
 }
 
 function applyDerivative(
@@ -382,11 +330,9 @@ function applyDerivative(
 
   let updated = false;
   const steps = script.steps.map((step) => {
-    if (step.step_id !== command.step_id) return step;
-    const snapshot = uniqueMathPlot(step);
-    if (!snapshot) return step;
+    if (step.step_id !== command.step_id || step.snapshot.kind !== "math_plot") return step;
     updated = true;
-    return withSnapshot(step, updateMathSnapshot(snapshot, command.value));
+    return withSnapshot(step, updateMathSnapshot(step.snapshot, command.value));
   });
   if (!updated) throw new InteractionEngineError("Derivative step no longer exists");
   return {
@@ -404,24 +350,20 @@ function applyBfs(
   }
   const anchorIndex = script.steps.findIndex((step) => step.step_id === command.step_id);
   const anchor = script.steps[anchorIndex];
-  const graph = anchor ? uniqueGraphScene(anchor) : null;
-  if (!anchor || !graph) {
+  if (!anchor || anchor.snapshot.kind !== "graph_scene") {
     throw new InteractionEngineError("BFS graph step no longer exists");
   }
 
-  const trace = bfsTrace(graph, command.value);
+  const trace = bfsTrace(anchor.snapshot, command.value);
   const frames = trace.map((state, index) => ({
     index,
     current_node_id: state.current,
     visited_node_ids: state.visited,
     queue_node_ids: state.queue,
-    snapshot: replaySnapshot(graph, state),
+    snapshot: replaySnapshot(anchor.snapshot as GraphSceneSnapshot, state),
   }));
   const steps = [...script.steps];
-  steps[anchorIndex] = withBfsCodeState(
-    withSnapshot(anchor, frames[0].snapshot),
-    trace[0],
-  );
+  steps[anchorIndex] = withSnapshot(anchor, frames[0].snapshot);
   const visitOrder = trace.map((state) => state.current);
 
   return {

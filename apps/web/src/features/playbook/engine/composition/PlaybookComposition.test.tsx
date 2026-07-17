@@ -405,7 +405,6 @@ describe("PlaybookComposition", () => {
       <PlaybookComposition
         script={script}
         showSubtitles={false}
-        interactionTargetKind="math_plot"
         onInteraction={vi.fn()}
       />,
     );
@@ -549,7 +548,6 @@ describe("PlaybookComposition", () => {
       <PlaybookComposition
         script={layeredMathScript()}
         showSubtitles={false}
-        interactionTargetKind="math_plot"
         onInteraction={vi.fn()}
       />,
     );

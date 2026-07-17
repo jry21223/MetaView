@@ -16,13 +16,6 @@ export type RendererInteractionEvent =
       phase: "cancel";
       step_id: string;
       target_role: "marker-x";
-    }
-  | {
-      type: "select-node";
-      phase: "commit";
-      step_id: string;
-      target_role: "start-node";
-      value: string;
     };
 
 export interface RendererProps {
