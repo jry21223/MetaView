@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import builtins
 import json
 from pathlib import Path
 
 import pytest
 
+from app.domain.services import rdkit_molecule_compiler
 from app.domain.services.rdkit_molecule_compiler import compile_molecule_snapshot_from_smiles
 
 GLUCOSE_SMILES = "OC[C@H]1O[C@@H](O)[C@H](O)[C@H](O)[C@@H]1O"
@@ -65,4 +67,25 @@ def test_compile_molecule_snapshot_from_smiles_rejects_invalid_smiles() -> None:
             pack_id="chemistry-basic",
             molecule_id="broken",
             smiles="not-a-smiles",
+        )
+
+
+def test_missing_rdkit_fails_only_when_a_smiles_scene_is_requested(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rdkit_molecule_compiler._load_rdkit.cache_clear()
+    real_import = builtins.__import__
+
+    def import_without_rdkit(name: str, *args, **kwargs):
+        if name == "rdkit" or name.startswith("rdkit."):
+            raise ModuleNotFoundError("No module named 'rdkit'", name="rdkit")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", import_without_rdkit)
+
+    with pytest.raises(RuntimeError, match="required only for SMILES molecule scenes"):
+        compile_molecule_snapshot_from_smiles(
+            pack_id="chemistry-basic",
+            molecule_id="glucose",
+            smiles=GLUCOSE_SMILES,
         )
