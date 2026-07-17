@@ -1,5 +1,0 @@
-{
-  "title": "质量说明",
-  "body": "这是仓库现有 BFS graph PlaybookScript fixture 的精选预览，节点与队列状态由同一播放脚本驱动。",
-  "points": ["当前边和队列状态可通过步进复核", "poster 由现有 Remotion smoke fixture 生成", "当前不宣称线上生成已验证"]
-}

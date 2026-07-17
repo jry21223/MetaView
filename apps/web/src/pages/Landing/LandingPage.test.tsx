@@ -9,7 +9,7 @@ function renderLanding() {
     isDark: false,
     onToggleTheme: vi.fn(),
     onStart: vi.fn(),
-    onOpenCases: vi.fn(),
+    onOpenTemplates: vi.fn(),
   };
 
   return { ...render(<LandingPage {...props} />), props };
@@ -32,11 +32,11 @@ describe("LandingPage", () => {
 
     fireEvent.click(getByRole("button", { name: /开始生成/ }));
     fireEvent.click(getByRole("button", { name: "切换主题" }));
-    fireEvent.click(getByRole("button", { name: "案例" }));
+    fireEvent.click(getByRole("button", { name: "模板" }));
 
     expect(props.onStart).toHaveBeenCalledTimes(1);
     expect(props.onToggleTheme).toHaveBeenCalledTimes(1);
-    expect(props.onOpenCases).toHaveBeenCalledTimes(1);
+    expect(props.onOpenTemplates).toHaveBeenCalledTimes(1);
   });
 
   it("orders the landing narrative as visual, follow-up, workflow, then director", () => {

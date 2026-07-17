@@ -48,7 +48,7 @@ Agent mode is an active verification path, not the default production claim. To 
 
 - `/` is the public Landing page.
 - `/create` is the lesson creation entrypoint; use this path for bookmarks, external CTAs, and E2E flows that should open the workbench directly.
-- `/templates` opens the template library.
+- `/templates` is the only template catalogue. Published templates expand a static poster and then open `/templates/:templateId` in the shared `PlaybookPlayer`; pending templates stay visible but disabled.
 - `/admin` is the hidden operations dashboard and remains restricted to `ops` edition administrators.
 
 The move from `/` to `/create` for direct creation is an intentional route behavior change. Do not assume the root path opens the generator.
@@ -65,7 +65,7 @@ The move from `/` to `/create` for direct creation is an intentional route behav
 8. `docs/agent-demo-acceptance.md` — how to prove agent / runtime-tool mode actually works.
 9. `docs/skill-pack-architecture.md` — deterministic SkillPack contract.
 10. `docs/frontend-shell.md` — frontend page and studio shell structure.
-11. `docs/showcase-cases.md` — public case schema, static playback boundary, and evidence language.
+11. `docs/template-previews.md` — template-as-case registry, static playback boundary, and poster workflow.
 12. `AGENTS.md` — required working rules for coding agents.
 
 ## What not to do now
@@ -78,8 +78,8 @@ The move from `/` to `/create` for direct creation is an intentional route behav
 
 ## Current next milestones
 
-1. Keep the public `/cases` catalogue truthful while the four Gold generators move from static/repeated state to genuine visual progression.
-2. Make the four cases pass three independent live runs without hard failures before changing their public evidence labels.
+1. Keep the four published `/templates` cases correct, deterministic, and visually reviewed while the remaining templates stay explicitly marked as pending.
+2. Keep template playback, parameter changes, and preset follow-ups free of run, quota, LLM, and pipeline requests.
 3. Compile SceneIntent into shared SceneBlueprint/Playbook assembly without removing legacy CIR in one step.
 4. Add SkillRecipe validation/execution for `composable` decisions without registering a universal SkillPack.
 5. Record Capability Gaps before adding the offline SkillForge authoring workflow.

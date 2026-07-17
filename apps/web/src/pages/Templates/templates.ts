@@ -1,11 +1,13 @@
 /**
- * Preset prompts wired to the 模板 page. Each entry resolves to a concrete
- * user prompt that the pipeline already knows how to render. Grouped by
- * topic domain so the UI can lay them out per-section.
+ * Template catalog entries. Four published entries resolve to deterministic
+ * static Playbook cases; the remaining entries stay visible as honest
+ * "制作中" placeholders and never submit a pipeline run from this page.
  *
  * Adding a new template is a single object: pick a stable ``id``,
  * categorise it, write a one-line ``desc`` and a working ``prompt``.
  */
+
+import type { TemplatePreviewCaseId } from "./templatePreviewCases";
 
 export type TemplateDomain =
   | "algorithm"
@@ -22,7 +24,7 @@ export interface TemplateDef {
   title: string;
   desc: string;
   prompt: string;
-  previewFixtureId?: string;
+  previewCaseId?: TemplatePreviewCaseId;
 }
 
 export const TEMPLATE_DOMAIN_LABEL: Record<TemplateDomain, string> = {
@@ -53,7 +55,7 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
   },
   {
     id: "binary-search",
-    previewFixtureId: "binary_search",
+    previewCaseId: "binary-search",
     domain: "algorithm",
     title: "二分查找",
     desc: "有序数组中收敛区间的步骤可视化",
@@ -61,7 +63,7 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
   },
   {
     id: "bfs-tree",
-    previewFixtureId: "bfs_graph",
+    previewCaseId: "bfs-tree",
     domain: "algorithm",
     title: "二叉树 BFS",
     desc: "队列驱动的层序遍历",
@@ -78,7 +80,7 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
   },
   {
     id: "derivative-tangent",
-    previewFixtureId: "derivative_tangent",
+    previewCaseId: "derivative-tangent",
     domain: "math",
     title: "导数与切线",
     desc: "可拖动 marker_x 看切线如何变化",
@@ -117,7 +119,6 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
   },
   {
     id: "fib-memo",
-    previewFixtureId: "recursion_stack",
     domain: "code",
     title: "斐波那契 · 记忆化",
     desc: "递归 → 备忘录的步骤推进",
@@ -134,7 +135,7 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
   },
   {
     id: "projectile",
-    previewFixtureId: "projectile_motion",
+    previewCaseId: "projectile",
     domain: "physics",
     title: "抛体运动",
     desc: "初速度分解 + 轨迹绘制",
@@ -174,7 +175,6 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
   },
   {
     id: "dna-replication",
-    previewFixtureId: "dna_replication",
     domain: "biology",
     title: "DNA 复制",
     desc: "半保留 + 前导/后随链",
@@ -184,7 +184,6 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
   // ---- geography ----
   {
     id: "monsoon",
-    previewFixtureId: "east_asia_monsoon",
     domain: "geography",
     title: "东亚季风",
     desc: "海陆热力差驱动的季节风向",

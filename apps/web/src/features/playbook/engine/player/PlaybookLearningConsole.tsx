@@ -14,6 +14,7 @@ interface PlaybookLearningConsoleProps {
   baseScript: PlaybookScript;
   overrides: ScriptOverrides;
   onOverridesChange: (next: ScriptOverrides) => void;
+  parameterSlot?: React.ReactNode;
   interactionSlot?: React.ReactNode;
   followupSlot?: React.ReactNode;
   relatedSlot?: React.ReactNode;
@@ -30,6 +31,7 @@ export function PlaybookLearningConsole({
   baseScript,
   overrides,
   onOverridesChange,
+  parameterSlot,
   interactionSlot,
   followupSlot,
   relatedSlot,
@@ -66,13 +68,14 @@ export function PlaybookLearningConsole({
         </section>
       )}
 
-      {(interactionSlot || hasDomainPanel) && (
+      {(parameterSlot || interactionSlot || hasDomainPanel) && (
         <section className="playbook-player__console-card playbook-player__params-card">
           <div className="playbook-player__console-head">
-            <span>{interactionSlot ? "Explore" : "Params"}</span>
-            <small>{interactionSlot ? "Experimental" : baseScript.domain}</small>
+            <span>{interactionSlot && !parameterSlot ? "Explore" : "Params"}</span>
+            <small>{interactionSlot && !parameterSlot ? "Experimental" : baseScript.domain}</small>
           </div>
           <div className="playbook-player__param-body">
+            {parameterSlot}
             {interactionSlot}
             {hasDomainPanel && (
               <ParamPanelSlot

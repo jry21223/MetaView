@@ -57,7 +57,7 @@ describe("IntakeScreen smart-routed intake", () => {
     expect(queryByText("可导出")).toBeNull();
   });
 
-  it("offers exactly three prompt-only examples and a stable cases link", () => {
+  it("offers exactly three prompt-only examples and a stable templates link", () => {
     const { container, getByRole, getAllByRole, props } = renderIntake();
 
     const examples = getAllByRole("button").filter((button) =>
@@ -76,8 +76,8 @@ describe("IntakeScreen smart-routed intake", () => {
     ).toBe(
       "用动画解释导数的几何意义：曲线 y=x² 在点 (1,1) 处切线的斜率为什么是 2。",
     );
-    expect(getByRole("link", { name: "查看精选案例" }).getAttribute("href")).toBe(
-      "/cases",
+    expect(getByRole("link", { name: "查看模板案例" }).getAttribute("href")).toBe(
+      "/templates",
     );
   });
 

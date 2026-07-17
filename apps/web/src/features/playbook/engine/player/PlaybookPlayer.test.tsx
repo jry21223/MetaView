@@ -327,6 +327,24 @@ describe("PlaybookPlayer", () => {
     expect(getByLabelText("斜率 a")).toBeTruthy();
   });
 
+  it("renders deterministic custom params and resolves follow-up content for the current step", () => {
+    const script = baseScript();
+    const { getByText, getByTestId } = render(
+      <PlaybookPlayer
+        script={script}
+        theme="light"
+        parameterSlot={<div data-testid="static-params">Local parameter</div>}
+        followupSlot={({ currentStepId }) => (
+          <div data-testid="static-followup">Questions for {currentStepId}</div>
+        )}
+      />,
+    );
+
+    expect(getByText("Params")).toBeTruthy();
+    expect(getByTestId("static-params")).toBeTruthy();
+    expect(getByTestId("static-followup").textContent).toContain(script.steps[0].step_id);
+  });
+
   it("keeps subtitles inside the composition and moves playback options into settings", () => {
     const { container, getByRole, getByText, queryByText } = render(
       <PlaybookPlayer script={baseScript()} theme="light" />,

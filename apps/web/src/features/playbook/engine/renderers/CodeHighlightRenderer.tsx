@@ -61,6 +61,7 @@ export const CodeHighlightRenderer: React.FC<CodeHighlightRendererProps> = ({
   const tokenColors = theme === "dark" ? TOKEN_DARK : TOKEN_LIGHT;
   const activeSet = new Set(overlay.active_lines);
   const activeLineRef = useRef<HTMLDivElement | null>(null);
+  const codeScrollRef = useRef<HTMLDivElement | null>(null);
 
   // Track previous variables to detect value changes and trigger flash
   const prevVarsRef = useRef<Record<string, string>>({});
@@ -87,7 +88,17 @@ export const CodeHighlightRenderer: React.FC<CodeHighlightRendererProps> = ({
   }, [overlay.variables]);
 
   useEffect(() => {
-    activeLineRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    const activeLine = activeLineRef.current;
+    const scrollContainer = codeScrollRef.current;
+    if (!activeLine || !scrollContainer) return;
+
+    const activeBounds = activeLine.getBoundingClientRect();
+    const containerBounds = scrollContainer.getBoundingClientRect();
+    if (activeBounds.top < containerBounds.top) {
+      scrollContainer.scrollTop -= containerBounds.top - activeBounds.top;
+    } else if (activeBounds.bottom > containerBounds.bottom) {
+      scrollContainer.scrollTop += activeBounds.bottom - containerBounds.bottom;
+    }
   }, [overlay.active_line]);
 
   const hasVars = overlay.variables && Object.keys(overlay.variables).length > 0;
@@ -121,7 +132,7 @@ export const CodeHighlightRenderer: React.FC<CodeHighlightRendererProps> = ({
       </div>
 
       {/* Code lines */}
-      <div style={{ flex: 1, overflowY: "auto", overflowX: "auto" }}>
+      <div ref={codeScrollRef} style={{ flex: 1, overflowY: "auto", overflowX: "auto" }}>
         {(() => {
           const allTokens = tokenizeLines(
             overlay.lines.map((l) => l || " "),

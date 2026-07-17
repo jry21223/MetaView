@@ -23,7 +23,7 @@
 | [skill-recipe.md](./skill-recipe.md) | composable 请求的临时执行契约、确定性验证和安全边界 |
 | [quality-gate.md](./quality-gate.md) | 后端 Canonical QualityReport、修复、持久化、Director 与导出阻断语义 |
 | [frontend-shell.md](./frontend-shell.md) | Stage 路由、GlobalTopbar、Studio 布局、Provider 配置、snapshot support levels |
-| [showcase-cases.md](./showcase-cases.md) | `/cases` 精选案例、运行时 schema、静态 Playbook 播放和证据标签 |
+| [template-previews.md](./template-previews.md) | `/templates` 正式案例、统一 PlaybookPlayer、确定性参数与零请求边界 |
 | [animation-tool-registry.md](./animation-tool-registry.md) | 后端 animation tool registry 的扩展流程、当前工具和新增规则 |
 | [topic-routing.md](./topic-routing.md) | topic routing 模式、自动路由、显式 domain 和 skill override |
 | [remotion-skills.md](./remotion-skills.md) | Remotion 组件、渲染器、注册表和音频同步约定 |
