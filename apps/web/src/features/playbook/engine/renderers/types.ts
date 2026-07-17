@@ -3,6 +3,21 @@ import type { DirectorFramePlan } from "../director/framePlan";
 
 export type RendererRenderMode = "standalone" | "stage-base" | "stage-overlay";
 
+export type RendererInteractionEvent =
+  | {
+      type: "set-number";
+      phase: "preview" | "commit";
+      step_id: string;
+      target_role: "marker-x";
+      value: number;
+    }
+  | {
+      type: "set-number";
+      phase: "cancel";
+      step_id: string;
+      target_role: "marker-x";
+    };
+
 export interface RendererProps {
   step: MetaStep;
   prevStep: MetaStep | null;
@@ -36,6 +51,8 @@ export interface RendererProps {
   swapDurationFrames?: number;
   /** Per-frame director runtime plan for renderer-specific camera execution. */
   directorFrame?: DirectorFramePlan;
+  /** Optional semantic interaction channel used only by browser previews. */
+  onInteraction?: (event: RendererInteractionEvent) => void;
 }
 
 export type RendererComponent = React.FC<RendererProps>;

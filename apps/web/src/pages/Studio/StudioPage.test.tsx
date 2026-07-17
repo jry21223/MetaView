@@ -36,6 +36,7 @@ vi.mock("../../features/playbook/engine/player/PlaybookPlayer", async () => {
       topbarCollapsed = false,
       onToggleTopbar,
       onOpenExport,
+      enableInteractionSandbox = false,
     }: {
       script: PlaybookScript;
       followupSlot?: React.ReactNode;
@@ -43,10 +44,14 @@ vi.mock("../../features/playbook/engine/player/PlaybookPlayer", async () => {
       topbarCollapsed?: boolean;
       onToggleTopbar?: () => void;
       onOpenExport?: () => void;
+      enableInteractionSandbox?: boolean;
     }) =>
       ReactModule.createElement(
         "div",
-        { "data-testid": "mock-player" },
+        {
+          "data-testid": "mock-player",
+          "data-interaction-sandbox": String(enableInteractionSandbox),
+        },
         onToggleTopbar
           ? ReactModule.createElement(
               "button",
@@ -114,7 +119,7 @@ describe("StudioPage", () => {
     });
     const onToggleTopbar = vi.fn();
 
-    const { getByRole, rerender } = render(
+    const { getByRole, getByTestId, rerender } = render(
       <StudioPage
         runId="run-1"
         t={TWEAK_DEFAULTS}
@@ -124,6 +129,9 @@ describe("StudioPage", () => {
         onToggleTopbar={onToggleTopbar}
       />,
     );
+
+    expect(getByTestId("mock-player").getAttribute("data-interaction-sandbox"))
+      .toBe("true");
 
     fireEvent.click(getByRole("button", { name: "隐藏顶部栏" }));
     expect(onToggleTopbar).toHaveBeenCalledTimes(1);

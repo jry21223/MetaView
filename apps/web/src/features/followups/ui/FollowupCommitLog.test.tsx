@@ -32,7 +32,7 @@ describe("FollowupCommitLog", () => {
     expect(onRestore).not.toHaveBeenCalled();
   });
 
-  it("restores historical versions by clicking the whole card and disables them while pending", () => {
+  it("restores historical versions by clicking the whole card and disables them while pending", async () => {
     const onRestore = vi.fn();
     const { getByRole, getAllByRole, queryAllByText, rerender } = render(
       <FollowupCommitLog
@@ -51,6 +51,9 @@ describe("FollowupCommitLog", () => {
     expect(restoreCards).toHaveLength(2);
     fireEvent.click(restoreCards[0]);
     expect(onRestore).toHaveBeenCalledWith("version-1");
+    await waitFor(() => {
+      expect(getByRole("button", { name: "展开版本记录" })).toBeTruthy();
+    });
 
     rerender(
       <FollowupCommitLog
@@ -64,7 +67,7 @@ describe("FollowupCommitLog", () => {
     expect((getAllByRole("button", { name: /恢复版本/ })[0] as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("collapses the version list after choosing a historical card", () => {
+  it("collapses the version list after successfully choosing a historical card", async () => {
     const onRestore = vi.fn();
     const { getByRole, queryByText } = render(
       <FollowupCommitLog
@@ -79,13 +82,15 @@ describe("FollowupCommitLog", () => {
     fireEvent.click(getByRole("button", { name: "恢复版本 c0ffee12" }));
 
     expect(onRestore).toHaveBeenCalledWith("version-1");
-    expect(getByRole("button", { name: "展开版本记录" })).toBeTruthy();
-    expect(queryByText("c0ffee12")).toBeNull();
+    await waitFor(() => {
+      expect(getByRole("button", { name: "展开版本记录" })).toBeTruthy();
+      expect(queryByText("c0ffee12")).toBeNull();
+    });
   });
 
-  it("shows a visible error when restore fails", async () => {
+  it("keeps the version list expanded with a visible error when restore fails", async () => {
     const onRestore = vi.fn().mockRejectedValue(new Error("版本不存在"));
-    const { getByRole, queryByText } = render(
+    const { getByRole, getByText } = render(
       <FollowupCommitLog
         versions={versions()}
         pending={false}
@@ -100,8 +105,8 @@ describe("FollowupCommitLog", () => {
     await waitFor(() => {
       expect(getByRole("alert").textContent ?? "").toContain("版本不存在");
     });
-    expect(getByRole("button", { name: "展开版本记录" })).toBeTruthy();
-    expect(queryByText("c0ffee12")).toBeNull();
+    expect(getByRole("button", { name: "收起版本记录" })).toBeTruthy();
+    expect(getByText("c0ffee12")).toBeTruthy();
   });
 });
 

@@ -1,9 +1,17 @@
 import React from "react";
-import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { PlaybookScript } from "../types";
 import { PlaybookPlayer } from "./PlaybookPlayer";
+
+const playerMockState = vi.hoisted(() => ({
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+  pause: vi.fn(),
+  play: vi.fn(),
+  seekTo: vi.fn(),
+}));
 
 vi.mock("@remotion/player", async () => {
   const React = await import("react");
@@ -19,20 +27,26 @@ vi.mock("@remotion/player", async () => {
       ref: React.ForwardedRef<unknown>,
     ) {
       React.useImperativeHandle(ref, () => ({
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        pause: vi.fn(),
-        play: vi.fn(),
-        seekTo: vi.fn(),
+        addEventListener: playerMockState.addEventListener,
+        removeEventListener: playerMockState.removeEventListener,
+        pause: playerMockState.pause,
+        play: playerMockState.play,
+        seekTo: playerMockState.seekTo,
       }));
       const snapshot = props.inputProps?.script?.steps[0]?.snapshot;
       const markerX = snapshot?.kind === "math_plot" ? snapshot.marker_x : undefined;
+      const arrayValues =
+        snapshot?.kind === "algorithm_array" || snapshot?.kind === "algorithm_bars"
+          ? snapshot.array_values.join(",")
+          : undefined;
       return (
         <div
           data-testid="mock-remotion-player"
           data-marker-x={markerX}
+          data-array-values={arrayValues}
           data-show-subtitles={String(props.inputProps?.showSubtitles)}
           data-show-inline-code={String(props.inputProps?.showInlineCode)}
+          data-has-interaction={String(typeof props.inputProps?.onInteraction === "function")}
         />
       );
     }),
@@ -699,6 +713,71 @@ describe("PlaybookPlayer", () => {
     expect(getByDisplayValue("1")).toBeTruthy();
   });
 
+  it("feeds replayed algorithm params back into the Remotion script props", async () => {
+    const script = baseScript({
+      domain: "algorithm",
+      algorithm_id: "bubble_sort",
+      initial_data: { array: ["3", "1", "2"] },
+      steps: [
+        {
+          ...baseScript().steps[0],
+          snapshot: {
+            kind: "algorithm_array",
+            array_values: ["3", "1", "2"],
+            active_indices: [],
+            swap_indices: [],
+            sorted_indices: [],
+            pointers: {},
+          },
+        },
+      ],
+    });
+    const { getByDisplayValue, getByTestId } = render(
+      <PlaybookPlayer script={script} theme="light" />,
+    );
+
+    expect(getByTestId("mock-remotion-player").getAttribute("data-array-values")).toBe(
+      "3,1,2",
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    fireEvent.change(getByDisplayValue("3"), { target: { value: "5" } });
+
+    await waitFor(() => {
+      expect(getByTestId("mock-remotion-player").getAttribute("data-array-values")).toBe(
+        "1,2,5",
+      );
+    });
+  });
+
+  it("wires mount play pause and unmount lifecycle to the Remotion player", async () => {
+    const { getByRole, unmount } = render(
+      <PlaybookPlayer script={baseScript()} theme="light" />,
+    );
+
+    await waitFor(() => {
+      expect(playerMockState.addEventListener).toHaveBeenCalledWith("play", expect.any(Function));
+      expect(playerMockState.addEventListener).toHaveBeenCalledWith("pause", expect.any(Function));
+    });
+
+    fireEvent.click(getByRole("button", { name: "播放" }));
+    expect(playerMockState.play).toHaveBeenCalledTimes(1);
+
+    const onPlay = playerMockState.addEventListener.mock.calls.find(
+      ([event]) => event === "play",
+    )?.[1] as (() => void) | undefined;
+    expect(onPlay).toBeTruthy();
+    act(() => onPlay?.());
+
+    fireEvent.click(getByRole("button", { name: "暂停" }));
+    expect(playerMockState.pause).toHaveBeenCalledTimes(1);
+
+    unmount();
+
+    expect(playerMockState.removeEventListener).toHaveBeenCalledWith("play", expect.any(Function));
+    expect(playerMockState.removeEventListener).toHaveBeenCalledWith("pause", expect.any(Function));
+  });
+
   it("hides algorithm params when no replayable controls are available", () => {
     const script = baseScript({
       domain: "algorithm",
@@ -751,4 +830,103 @@ describe("PlaybookPlayer", () => {
       "0101",
     );
   });
+  it("keeps the interaction sandbox disabled unless a player surface opts in", () => {
+    const view = render(<PlaybookPlayer script={derivativeScript()} theme="light" />);
+
+    expect(view.queryByText("Explore")).toBeNull();
+    expect(view.queryByText("沙盒预览")).toBeNull();
+    expect(view.getByTestId("mock-remotion-player").getAttribute("data-has-interaction"))
+      .toBe("false");
+  });
+
+  it("does not expose interaction on a read-only player with no learning console", () => {
+    const view = render(
+      <PlaybookPlayer
+        script={derivativeScript()}
+        theme="light"
+        showLearningConsole={false}
+        enableInteractionSandbox
+      />,
+    );
+
+    expect(view.queryByText("沙盒预览")).toBeNull();
+    expect(view.getByTestId("mock-remotion-player").getAttribute("data-has-interaction"))
+      .toBe("false");
+  });
+
+  it("opts the desktop Studio-style player into direct sandbox manipulation", () => {
+    const view = render(
+      <PlaybookPlayer
+        script={derivativeScript()}
+        theme="light"
+        enableInteractionSandbox
+      />,
+    );
+
+    expect(view.getByText("Explore")).toBeTruthy();
+    expect(view.getByTestId("mock-remotion-player").getAttribute("data-has-interaction"))
+      .toBe("true");
+
+    const slider = view.getByRole("slider", { name: "切点 x" });
+    fireEvent.change(slider, { target: { value: "2" } });
+    fireEvent.pointerUp(slider);
+    expect(view.getByTestId("mock-remotion-player").getAttribute("data-marker-x"))
+      .toBe("2");
+  });
+
+  it("keeps recovery controls after navigating away from the bound plot", async () => {
+    const view = render(
+      <PlaybookPlayer
+        script={derivativeScript()}
+        theme="light"
+        enableInteractionSandbox
+      />,
+    );
+
+    const slider = view.getByRole("slider", { name: "切点 x" });
+    fireEvent.change(slider, { target: { value: "2" } });
+    fireEvent.pointerUp(slider);
+    fireEvent.click(view.getByRole("button", { name: "下一步" }));
+
+    await waitFor(() => {
+      expect(view.getByText(/当前步骤没有交互控件/)).toBeTruthy();
+    });
+    expect(view.queryByRole("slider", { name: "切点 x" })).toBeNull();
+    const reset = view.getByRole("button", { name: "重置" }) as HTMLButtonElement;
+    expect(reset.disabled).toBe(false);
+    fireEvent.click(reset);
+    await waitFor(() => {
+      expect(view.queryByText("Explore")).toBeNull();
+    });
+  });
+
+  it("defers BFS controls even when the interaction sandbox is enabled", () => {
+    const view = render(
+      <PlaybookPlayer script={bfsScript()} theme="light" enableInteractionSandbox />,
+    );
+
+    expect(view.queryByText("沙盒预览")).toBeNull();
+    expect(view.queryByRole("button", { name: "Alpha" })).toBeNull();
+    expect(view.getByTestId("mock-remotion-player").getAttribute("data-has-interaction"))
+      .toBe("false");
+  });
+
+  it("reuses the five-tab portrait params surface without enabling canvas drag", () => {
+    const view = render(
+      <PlaybookPlayer
+        script={derivativeScript()}
+        theme="light"
+        layoutMode="portrait"
+        enableInteractionSandbox
+      />,
+    );
+    expect(view.getAllByRole("tab")).toHaveLength(5);
+
+    fireEvent.click(view.getByRole("tab", { name: "参数" }));
+    expect(view.getByRole("slider", { name: "切点 x" })).toBeTruthy();
+    expect(view.getByText("沙盒预览")).toBeTruthy();
+    expect(view.getByTestId("mock-remotion-player").getAttribute("data-has-interaction"))
+      .toBe("false");
+  });
+
 });

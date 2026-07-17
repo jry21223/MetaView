@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer } from "react";
+import { useCallback, useEffect, useMemo, useReducer } from "react";
 
 import type { PlaybookScript } from "../engine/types";
 import { applyInteraction, deriveInteractionManifest } from "./engine";
@@ -12,6 +12,7 @@ import type {
 interface InteractionSandboxState {
   baseKey: string;
   baseScript: PlaybookScript;
+  committedScript: PlaybookScript;
   previewScript: PlaybookScript;
   commands: InteractionCommand[];
   events: InteractionEvent[];
@@ -26,6 +27,8 @@ interface InteractionSandboxBase {
 
 type InteractionSandboxAction =
   | ({ type: "sync" } & InteractionSandboxBase)
+  | ({ type: "preview"; command: InteractionCommand } & InteractionSandboxBase)
+  | ({ type: "cancel-preview" } & InteractionSandboxBase)
   | ({ type: "apply"; command: InteractionCommand } & InteractionSandboxBase)
   | ({ type: "undo" } & InteractionSandboxBase)
   | ({ type: "reset" } & InteractionSandboxBase);
@@ -52,6 +55,7 @@ function initialState(
   return {
     baseKey,
     baseScript,
+    committedScript: baseScript,
     previewScript: baseScript,
     commands: [],
     events: [],
@@ -82,16 +86,16 @@ function replay(
   baseKey: string,
   commands: InteractionCommand[],
 ): InteractionSandboxState {
-  let previewScript = baseScript;
+  let committedScript = baseScript;
   const appliedCommands: InteractionCommand[] = [];
   const events: InteractionEvent[] = [];
   let latestReplay: BfsInteractionReplay | null = null;
 
   for (const command of commands) {
     try {
-      const result = applyInteraction(previewScript, command, events.length + 1);
+      const result = applyInteraction(committedScript, command, events.length + 1);
       assertSameTimeline(baseScript, result.script);
-      previewScript = result.script;
+      committedScript = result.script;
       appliedCommands.push(command);
       events.push(result.event);
       latestReplay = result.replay ?? null;
@@ -99,7 +103,8 @@ function replay(
       return {
         baseKey,
         baseScript,
-        previewScript,
+        committedScript,
+        previewScript: committedScript,
         commands: appliedCommands,
         events,
         latestReplay,
@@ -111,7 +116,8 @@ function replay(
   return {
     baseKey,
     baseScript,
-    previewScript,
+    committedScript,
+    previewScript: committedScript,
     commands: appliedCommands,
     events,
     latestReplay,
@@ -137,18 +143,35 @@ function reducer(
       current.commands.slice(0, -1),
     );
   }
+  if (action.type === "cancel-preview") {
+    return {
+      ...current,
+      previewScript: current.committedScript,
+      lastError: null,
+    };
+  }
 
   try {
     const result = applyInteraction(
-      current.previewScript,
+      current.committedScript,
       action.command,
       current.events.length + 1,
     );
     assertSameTimeline(action.baseScript, result.script);
+    if (action.type === "preview") {
+      return {
+        ...current,
+        baseKey: action.baseKey,
+        baseScript: action.baseScript,
+        previewScript: result.script,
+        lastError: null,
+      };
+    }
     return {
       ...current,
       baseKey: action.baseKey,
       baseScript: action.baseScript,
+      committedScript: result.script,
       previewScript: result.script,
       commands: [...current.commands, action.command],
       events: [...current.events, result.event],
@@ -158,6 +181,7 @@ function reducer(
   } catch (error) {
     return {
       ...current,
+      previewScript: current.committedScript,
       lastError: error instanceof Error ? error.message : "Interaction failed",
     };
   }
@@ -171,6 +195,8 @@ export interface InteractionSandbox {
   dirty: boolean;
   canUndo: boolean;
   lastError: string | null;
+  preview: (command: InteractionCommand) => void;
+  cancelPreview: () => void;
   apply: (command: InteractionCommand) => void;
   undo: () => void;
   reset: () => void;
@@ -197,15 +223,21 @@ export function useInteractionSandbox(baseScript: PlaybookScript): InteractionSa
     () => deriveInteractionManifest(state.previewScript),
     [state.previewScript],
   );
-  const apply = (command: InteractionCommand) => {
+  const preview = useCallback((command: InteractionCommand) => {
+    dispatch({ type: "preview", baseScript, baseKey, command });
+  }, [baseKey, baseScript]);
+  const cancelPreview = useCallback(() => {
+    dispatch({ type: "cancel-preview", baseScript, baseKey });
+  }, [baseKey, baseScript]);
+  const apply = useCallback((command: InteractionCommand) => {
     dispatch({ type: "apply", baseScript, baseKey, command });
-  };
-  const undo = () => {
+  }, [baseKey, baseScript]);
+  const undo = useCallback(() => {
     dispatch({ type: "undo", baseScript, baseKey });
-  };
-  const reset = () => {
+  }, [baseKey, baseScript]);
+  const reset = useCallback(() => {
     dispatch({ type: "reset", baseScript, baseKey });
-  };
+  }, [baseKey, baseScript]);
 
   return {
     previewScript: state.previewScript,
@@ -215,6 +247,8 @@ export function useInteractionSandbox(baseScript: PlaybookScript): InteractionSa
     dirty: state.events.length > 0,
     canUndo: state.events.length > 0,
     lastError: state.lastError,
+    preview,
+    cancelPreview,
     apply,
     undo,
     reset,
