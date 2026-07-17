@@ -12,6 +12,7 @@ from app.domain.models.export_job import (
 
 class ExportRequest(BaseModel):
     run_id: str
+    version_id: str | None = None
     with_audio: bool = False
     tts: TtsConfig | None = None
     options: ExportOptions | None = None

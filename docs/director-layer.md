@@ -41,8 +41,10 @@ The backend already has a Director V0/V1 foundation:
 - `apps/api/app/domain/services/director_builder.py` builds a rule-based director from a `PlaybookScript`.
 - The first beat is treated as a hook with `push_in`; the final beat becomes a slow summary with `pull_out`.
 - Director scripts are stored separately through the run director repository and returned with run responses.
+- The player includes a read-only Director Inspector showing source, beat count, current beat, intent, shot type, camera motion, pacing, focus target, emphasis terms, and frame range.
+- Follow-up can persist DirectorScript patch revisions for camera, pacing, shot, voiceover, emphasis, and focus changes without rewriting PlaybookScript.
 
-This proves Director is a real architecture layer, but not yet a full director intelligence layer. Current source is usually `rule`; planner-assisted or manually patched direction is future work.
+This proves Director is a real architecture layer, but not yet a full director intelligence layer. Current source is usually `rule`; follow-up patches set `source="manual"`. Planner-assisted direction remains future work.
 
 ## Correct execution model
 
@@ -69,6 +71,8 @@ The renderer should not scatter ad-hoc `director.camera_motion` logic across com
 | `focus_target` | optional target id or visual object to keep in attention |
 | `voiceover_text` | optional director-level narration override; default should remain playbook voiceover |
 
+Renderer-consumed today: `camera_motion`, `pacing`, `voiceover_text` for non-rule directors, and math-scene camera planning via the Director frame plan. Inspector-consumed today: all fields in the table plus frame range and beat metadata. `intent`, `shot_type`, `focus_target`, and `emphasis_terms` are visible and patchable; renderer support for them remains incremental and adapter-specific.
+
 Recommended next field: `transition: cut | fade | reveal | morph | none`.
 
 Do not add a large film-production ontology yet. Add fields only when the renderer or inspector can consume them.
@@ -87,7 +91,7 @@ Director should change how the same content is watched, not what the subject res
 
 ### V1: visible rule director
 
-Goal: every successful run has an inspectable director timeline.
+Status: Complete for the MVP loop.
 
 Tasks:
 
@@ -100,7 +104,7 @@ Acceptance: a user can open a run and see how the lesson is directed.
 
 ### V2: render-impact director
 
-Goal: Director changes preview and export, not just metadata.
+Status: Active. `camera_motion` and light `pacing` are consumed through the Director frame plan / adapter path.
 
 Tasks:
 
@@ -113,14 +117,14 @@ Acceptance: the same PlaybookScript with different DirectorScripts produces visi
 
 ### V3: editable director
 
-Goal: allow users or follow-up patches to change direction without regenerating content.
+Status: Active for follow-up patches. Direct UI editing is not implemented.
 
 Tasks:
 
 1. Add a director patch use case.
-2. Allow local edits to `camera_motion`, `pacing`, `shot_type`, and later `transition`.
-3. Validate beat frame ranges and step ids.
-4. Persist patched director separately from PlaybookScript versions.
+2. Allow edits to `camera_motion`, `pacing`, `shot_type`, `voiceover_text`, `emphasis_terms`, and `focus_target`.
+3. Reject changes to `run_id`, `schema_version`, `beat_id`, `step_id`, `start_frame`, and `end_frame`.
+4. Persist patched director together with the follow-up version used by preview/export.
 
 Acceptance: a user can ask for a slower shot or a stronger summary pull-out and only DirectorScript changes.
 

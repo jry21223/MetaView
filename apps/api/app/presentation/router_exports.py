@@ -85,6 +85,16 @@ async def submit_export(
     run = await run_repo.get(payload.run_id)
     if run is None or run.playbook is None:
         raise HTTPException(status_code=404, detail=f"Run {payload.run_id!r} has no playbook")
+    if payload.version_id is not None:
+        version_playbook = await run_repo.get_version_playbook(
+            payload.run_id,
+            payload.version_id,
+        )
+        if version_playbook is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Version {payload.version_id!r} not found",
+            )
 
     job_id = str(uuid.uuid4())
     job = ExportJob(
@@ -113,6 +123,7 @@ async def submit_export(
         payload.with_audio,
         payload.tts,
         payload.options,
+        payload.version_id,
     )
 
     return _to_response(job, request, settings.api_prefix)

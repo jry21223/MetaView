@@ -223,6 +223,59 @@ def test_followup_can_reply_without_creating_version(monkeypatch, tmp_path) -> N
     assert history["versions"] == []
 
 
+def test_followup_director_patch_persists_version_without_rewriting_playbook(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("METAVIEW_OPENAI_API_KEY", "sk-server")
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    db = str(tmp_path / "director-followup.db")
+    init_db(db)
+    repo = SqliteRunRepository(db)
+    director_repo = SqliteRunDirectorRepository(db)
+    run_id = _seed_run(repo)
+    original = _run(repo.get(run_id))
+    assert original is not None
+    assert original.playbook is not None
+    llm = SequenceLLM([
+        _llm_payload(
+            [
+                {"op": "replace", "path": "/beats/1/camera_motion", "value": "push_in"},
+                {"op": "replace", "path": "/beats/1/pacing", "value": "slow"},
+            ],
+            target="director",
+        )
+    ])
+    app = create_app()
+    app.dependency_overrides[get_run_repo] = lambda: repo
+    app.dependency_overrides[get_run_director_repo] = lambda: director_repo
+    app.dependency_overrides[get_llm_provider] = lambda: llm
+
+    with TestClient(app) as client:
+        resp = client.post(
+            f"/api/v1/runs/{run_id}/follow-up",
+            json={"message": "把第二步镜头推近一点，讲慢一点"},
+        )
+        history = client.get(f"/api/v1/runs/{run_id}/follow-ups").json()
+
+    get_settings.cache_clear()
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["kind"] == "patch"
+    assert data["version_id"]
+    assert data["playbook"]["summary"] == original.playbook.summary
+    assert data["director"]["source"] == "manual"
+    assert data["director"]["beats"][1]["camera_motion"] == "push_in"
+    assert data["director"]["beats"][1]["pacing"] == "slow"
+    active_director = _run(director_repo.get(run_id))
+    assert active_director is not None
+    assert active_director.source == "manual"
+    stored = _run(repo.get(run_id))
+    assert stored is not None
+    assert stored.playbook == original.playbook
+    assert [v["version_number"] for v in history["versions"]] == [0, 1]
+    assert history["versions"][1]["is_head"] is True
 def test_explicit_interaction_explanation_cannot_create_a_version(followup_client) -> None:
     client, repo, _director_repo, llm = followup_client
     run_id = _seed_run(repo)
@@ -722,15 +775,15 @@ def _ledger_count(db: str, user_id: str, kind: str) -> int:
     return int(row[0])
 
 
-def _llm_payload(patch: list[dict]) -> str:
-    return json.dumps(
-        {
-            "reply": "已按要求更新。",
-            "change_summary": "refactor: update explanation",
-            "patch": patch,
-        },
-        ensure_ascii=False,
-    )
+def _llm_payload(patch: list[dict], *, target: str | None = None) -> str:
+    payload = {
+        "reply": "已按要求更新。",
+        "change_summary": "refactor: update explanation",
+        "patch": patch,
+    }
+    if target is not None:
+        payload["target"] = target
+    return json.dumps(payload, ensure_ascii=False)
 
 
 def _playbook() -> dict:

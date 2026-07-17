@@ -53,7 +53,11 @@ class IRunRepository(Protocol):
     async def delete(self, run_id: str, user_id: str | None = None) -> bool: ...
 
     async def ensure_initial_version(
-        self, run_id: str, playbook_json: str, created_at: str
+        self,
+        run_id: str,
+        playbook_json: str,
+        created_at: str,
+        director_json: str | None = None,
     ) -> str: ...
 
     async def append_followup(
@@ -79,13 +83,18 @@ class IRunRepository(Protocol):
         parent_version_id: str | None,
         summary: str,
         created_at: str,
+        director_json: str | None = None,
     ) -> int: ...
 
     async def attach_followup_version(self, followup_id: str, version_id: str) -> None: ...
 
     async def get_version_playbook(self, run_id: str, version_id: str) -> str | None: ...
 
+    async def get_version_director(self, run_id: str, version_id: str) -> str | None: ...
+
     async def get_head_version_id(self, run_id: str) -> str | None: ...
+
+    async def set_head_version(self, run_id: str, version_id: str | None) -> None: ...
 
     async def list_followups(self, run_id: str) -> list[RunFollowUpRecord]: ...
 

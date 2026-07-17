@@ -26,6 +26,7 @@ import { ExportSVG, MoreSVG, SettingsSVG, TopbarFoldIcon } from "./PlaybookPlaye
 import { PlaybookPortraitShell, type MobileTabKey } from "./PlaybookPortraitShell";
 import { clipCodeOverlay } from "./mobileCodeOverlay";
 import { SPEED_STEPS } from "./playbackRates";
+import { DirectorInspector } from "../director/DirectorInspector";
 import type { RendererInteractionEvent } from "../renderers/types";
 import { InteractionSandboxPanel } from "../../interaction/InteractionSandboxPanel";
 import { useInteractionSandbox } from "../../interaction/useInteractionSandbox";
@@ -656,6 +657,8 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
           followupSlot={followupSlot}
           relatedSlot={relatedSlot}
           relatedAlgorithmId={script.algorithm_id}
+          director={director}
+          currentStepId={currentStep.step_id}
         />
       )}
 
@@ -754,6 +757,13 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
                     暂无历史版本或相关讲解。
                   </div>
                 )}
+              </div>
+              <div className="playbook-player__mobile-director">
+                <span>Director</span>
+                <DirectorInspector
+                  director={director}
+                  currentStepId={currentStep.step_id}
+                />
               </div>
             </div>
           )}

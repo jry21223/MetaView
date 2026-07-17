@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import ValidationError
 
@@ -13,6 +14,7 @@ from app.application.dto.followup_dto import (
     InteractionFollowUpContext,
 )
 from app.application.ports.llm_provider import ILLMProvider
+from app.domain.models.director import DirectorScript
 from app.domain.models.playbook import PlaybookScript
 
 
@@ -25,7 +27,9 @@ class FollowUpPatchResult:
     reply: str
     change_summary: str
     patch: list[dict[str, Any]]
+    target: Literal["reply", "playbook", "director"]
     playbook: PlaybookScript | None
+    director: DirectorScript | None
 
 
 _ALLOWED_ROOTS = (
@@ -37,6 +41,10 @@ _ALLOWED_ROOTS = (
     "/initial_data",
 )
 
+_DIRECTOR_BEAT_PATH = re.compile(
+    r"^/beats/(\d+)/(shot_type|camera_motion|pacing|voiceover_text|emphasis_terms|focus_target)$"
+)
+
 
 class FollowUpPatchUseCase:
     def __init__(self, llm: ILLMProvider, *, default_step_frames: int) -> None:
@@ -44,27 +52,42 @@ class FollowUpPatchUseCase:
         self._default_step_frames = default_step_frames
 
     async def execute(
-        self, playbook: PlaybookScript, request: FollowUpRequest
+        self,
+        playbook: PlaybookScript,
+        request: FollowUpRequest,
+        director: DirectorScript | None = None,
     ) -> FollowUpPatchResult:
         allow_patch = request.intent == "conversation"
         system = _build_system_prompt(request.intent)
         user = _build_user_prompt(
             playbook,
+            director,
             request.message,
             request.messages,
             request.interaction_context,
         )
         first_raw = await self._llm.complete(system, user)
         try:
-            return self._parse_and_apply(playbook, first_raw, allow_patch=allow_patch)
+            return self._parse_and_apply(
+                playbook, director, first_raw, allow_patch=allow_patch
+            )
         except FollowUpPatchError as first_error:
-            repair_user = _build_repair_prompt(playbook, request.message, first_raw, first_error)
+            repair_user = _build_repair_prompt(
+                playbook,
+                director,
+                request.message,
+                first_raw,
+                first_error,
+            )
             repair_raw = await self._llm.complete(system, repair_user)
-            return self._parse_and_apply(playbook, repair_raw, allow_patch=allow_patch)
+            return self._parse_and_apply(
+                playbook, director, repair_raw, allow_patch=allow_patch
+            )
 
     def _parse_and_apply(
         self,
         playbook: PlaybookScript,
+        director: DirectorScript | None,
         raw: str,
         *,
         allow_patch: bool = True,
@@ -84,18 +107,38 @@ class FollowUpPatchUseCase:
                 reply=reply,
                 change_summary="explain: interaction context",
                 patch=[],
+                target="reply",
                 playbook=None,
+                director=None,
             )
         if len(patch) == 0:
             return FollowUpPatchResult(
                 reply=reply,
                 change_summary=change_summary,
                 patch=[],
+                target="reply",
                 playbook=None,
+                director=None,
+            )
+
+        target = _resolve_patch_target(payload.get("target"), patch)
+        if target == "director":
+            if director is None:
+                raise FollowUpPatchError(
+                    "director patch requested but no DirectorScript is available"
+                )
+            next_director = _apply_director_patch(director, patch)
+            return FollowUpPatchResult(
+                reply=reply,
+                change_summary=change_summary,
+                patch=patch,
+                target="director",
+                playbook=None,
+                director=next_director,
             )
 
         base = playbook.model_dump(mode="json")
-        patched = _apply_patch(base, patch)
+        patched = _apply_patch(base, patch, _is_allowed_playbook_path)
         patched = _normalize_timeline_and_layers(patched, self._default_step_frames)
         try:
             next_playbook = PlaybookScript.model_validate(patched)
@@ -105,7 +148,9 @@ class FollowUpPatchUseCase:
             reply=reply,
             change_summary=change_summary,
             patch=patch,
+            target="playbook",
             playbook=next_playbook,
+            director=None,
         )
 
 
@@ -118,33 +163,50 @@ def _build_system_prompt(intent: str = "conversation") -> str:
     )
     return """你是 MetaView 的 Playbook 局部修改助手。
 你会收到当前 PlaybookScript JSON、用户追问和最近对话。
-如果用户只是追问概念、步骤原因或文字解释，可以只回答问题；如果用户要求调整讲解、
-步骤、画面或参数，就在当前基础上修改 Playbook。
+如果用户只是追问概念、步骤原因或文字解释，可以只回答问题；
+如果用户要求调整讲解、步骤、画面或参数，就在当前基础上修改 Playbook。
 
 追问也是学习场景。默认用温和、动态的老师口吻引导学生：
 - 如果不知道用户年级，按高一/高二能听懂的程度解释。
 - 先连接当前 Playbook 里已经出现的知识，再提示下一小步。
 - 不要直接给出作业答案；一次只问一个问题，让学生自己补上关键一步。
 - 难点后用一句话小结、口诀或小练习检查理解。
-- 如果用户明确要求修改视频，可以改 Playbook；如果只是求解释，优先用空 patch。
+- 如果用户明确要求修改视频，可以改 Playbook；
+  如果只是求解释，优先用空 patch。
 
 只输出严格 JSON，不要 Markdown，不要代码围栏：
 {
   "reply": "给用户的简短中文说明",
   "change_summary": "像 git commit message 一样概括这次改动",
+  "target": "reply | playbook | director",
   "patch": [{"op": "replace", "path": "/summary", "value": "..."}]
 }
 
 patch 使用 RFC 6902 子集，只能使用 add/remove/replace。
 如果只是文字回答且不需要修改视频，patch 必须是空数组 []。
-允许修改的路径根：/title, /summary, /steps, /parameter_controls, /algorithm_id, /initial_data。
+如果用户要求调整镜头、节奏、观看方式、慢一点、快一点、推近、拉远、
+平移或强调某个对象，优先输出 target="director" 并 patch DirectorScript。
+如果用户要求修改知识内容、步骤、公式、画面对象、代码、
+题目数据或教学事实，
+输出 target="playbook" 并 patch PlaybookScript。
+不要为了“慢一点 / 推近一点 / 强调某个对象”重写 Playbook steps。
+允许修改的路径根：
+/title, /summary, /steps, /parameter_controls, /algorithm_id, /initial_data。
+DirectorScript 只允许修改：
+/beats/{i}/shot_type、/beats/{i}/camera_motion、/beats/{i}/pacing、
+/beats/{i}/voiceover_text、/beats/{i}/emphasis_terms、
+/beats/{i}/focus_target 和 /source。
+DirectorScript 的 /source 只能改成 "manual"；
+禁止修改 /run_id、/schema_version、beat_id、step_id、start_frame、end_frame。
 可以一次修改多个 step，也可以修改任意合法 renderer 的 snapshot/layers。
-parameter_controls.*.value 和 initial_data.*[] 必须是字符串，即使表示数字也写成 "2"。
+parameter_controls.*.value 和 initial_data.*[] 必须是字符串，
+即使表示数字也写成 "2"。
 不要修改 fps、total_frames、end_frame；服务端会重新规范化时间线。""" + explicit_interaction_rule
 
 
 def _build_user_prompt(
     playbook: PlaybookScript,
+    director: DirectorScript | None,
     message: str,
     messages: list[FollowUpChatMessage],
     interaction_context: InteractionFollowUpContext | None = None,
@@ -156,6 +218,7 @@ def _build_user_prompt(
     return json.dumps(
         {
             "current_playbook": playbook.model_dump(mode="json"),
+            "current_director": director.model_dump(mode="json") if director else None,
             "conversation": history,
             "user_request": message,
             "interaction_context": (
@@ -170,6 +233,7 @@ def _build_user_prompt(
 
 def _build_repair_prompt(
     playbook: PlaybookScript,
+    director: DirectorScript | None,
     message: str,
     raw: str,
     error: Exception,
@@ -177,10 +241,13 @@ def _build_repair_prompt(
     return json.dumps(
         {
             "current_playbook": playbook.model_dump(mode="json"),
+            "current_director": director.model_dump(mode="json") if director else None,
             "user_request": message,
             "previous_output": raw,
             "validation_error": str(error),
-            "instruction": "重新输出严格 JSON，只修正 patch/reply/change_summary。",
+            "instruction": (
+                "重新输出严格 JSON，只修正 patch/reply/change_summary/target。"
+            ),
         },
         ensure_ascii=False,
     )
@@ -207,7 +274,41 @@ def _strip_markdown_fences(text: str) -> str:
     return text
 
 
-def _apply_patch(document: dict[str, Any], patch: list[dict[str, Any]]) -> dict[str, Any]:
+def _resolve_patch_target(
+    value: Any,
+    patch: list[dict[str, Any]],
+) -> Literal["playbook", "director"]:
+    normalized = str(value or "").strip().lower()
+    if normalized == "director":
+        return "director"
+    if normalized == "playbook":
+        return "playbook"
+    if all(
+        isinstance(op, dict) and _is_allowed_director_path(str(op.get("path", "")))
+        for op in patch
+    ):
+        return "director"
+    return "playbook"
+
+
+def _apply_director_patch(
+    director: DirectorScript,
+    patch: list[dict[str, Any]],
+) -> DirectorScript:
+    base = director.model_dump(mode="json")
+    patched = _apply_patch(base, patch, _is_allowed_director_path)
+    patched["source"] = "manual"
+    try:
+        return DirectorScript.model_validate(patched)
+    except ValidationError as exc:
+        raise FollowUpPatchError(str(exc)) from exc
+
+
+def _apply_patch(
+    document: dict[str, Any],
+    patch: list[dict[str, Any]],
+    is_allowed_path,
+) -> dict[str, Any]:
     target = copy.deepcopy(document)
     for op in patch:
         if not isinstance(op, dict):
@@ -218,16 +319,26 @@ def _apply_patch(document: dict[str, Any], patch: list[dict[str, Any]]) -> dict[
             raise FollowUpPatchError(f"unsupported patch op: {operation!r}")
         if not isinstance(path, str) or not path.startswith("/"):
             raise FollowUpPatchError("patch path must start with '/'")
-        if not _is_allowed_path(path):
+        if not is_allowed_path(path):
             raise FollowUpPatchError(f"patch path is not allowed: {path}")
+        if (
+            path == "/source"
+            and operation in {"add", "replace"}
+            and op.get("value") != "manual"
+        ):
+            raise FollowUpPatchError('director source can only be changed to "manual"')
         if operation in {"add", "replace"} and "value" not in op:
             raise FollowUpPatchError(f"{operation} operation requires value")
         _apply_single_operation(target, operation, path, op.get("value"))
     return target
 
 
-def _is_allowed_path(path: str) -> bool:
+def _is_allowed_playbook_path(path: str) -> bool:
     return any(path == root or path.startswith(f"{root}/") for root in _ALLOWED_ROOTS)
+
+
+def _is_allowed_director_path(path: str) -> bool:
+    return path == "/source" or _DIRECTOR_BEAT_PATH.match(path) is not None
 
 
 def _apply_single_operation(

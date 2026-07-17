@@ -56,7 +56,9 @@ interface ChatPanelProps {
   onPlaybookPatched: (
     playbook: PlaybookScript,
     director?: DirectorScript | null,
+    versionId?: string | null,
   ) => void;
+  activeVersionId?: string | null;
   children: (slots: {
     followupSlot: React.ReactNode;
     relatedSlot: React.ReactNode;
@@ -79,6 +81,7 @@ function ChatPanel({
   providerSettings,
   onOpenProviderSettings,
   onPlaybookPatched,
+  activeVersionId = null,
   children,
 }: ChatPanelProps) {
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
@@ -162,10 +165,11 @@ function ChatPanel({
         history,
         provider,
         abortRef.current.signal,
+        activeVersionId,
         interactionContext,
       );
       if (result.kind === "patch" && result.playbook) {
-        onPlaybookPatched(result.playbook, result.director);
+        onPlaybookPatched(result.playbook, result.director, result.version_id);
       }
       setMsgs([
         ...nextMsgs,
@@ -197,7 +201,7 @@ function ChatPanel({
     setPending(true);
     try {
       const result = await restoreRunVersion(runId, versionId);
-      onPlaybookPatched(result.playbook, result.director);
+      onPlaybookPatched(result.playbook, result.director, result.version_id);
       setMsgs((current) => [
         ...current,
         {
@@ -403,6 +407,7 @@ export function StudioPage({
     runId: string;
     playbook: PlaybookScript;
     director?: DirectorScript | null;
+    versionId?: string | null;
   } | null>(null);
   const activePatchedRun =
     patchedPlaybook?.runId === runId ? patchedPlaybook : null;
@@ -410,6 +415,9 @@ export function StudioPage({
   const activeDirector = activePatchedRun
     ? (activePatchedRun.director ?? null)
     : director;
+  const activeVersionId = activePatchedRun?.versionId ?? null;
+  const hasUnpersistedPreview =
+    activePatchedRun !== null && activePatchedRun.versionId == null;
   const canExport = !!playbook && !!runId;
   const exportAssetReport = useMemo(
     () => (activePlaybook ? createAssetAttributionReportForScript(activePlaybook) : null),
@@ -429,6 +437,8 @@ export function StudioPage({
       {exportOpen && (
         <ExportModal
           runId={runId}
+          versionId={activeVersionId}
+          hasUnpersistedPreview={hasUnpersistedPreview}
           isDark={isDark}
           previewTitle={
             activePlaybook?.steps?.[0]?.title ?? activePlaybook?.title ?? null
@@ -460,12 +470,14 @@ export function StudioPage({
               isProviderConfigured={isProviderConfigured}
               providerSettings={providerSettings}
               onOpenProviderSettings={onOpenProviderSettings}
-              onPlaybookPatched={(next, nextDirector) => {
+              activeVersionId={activeVersionId}
+              onPlaybookPatched={(next, nextDirector, versionId) => {
                 if (runId) {
                   setPatchedPlaybook({
                     runId,
                     playbook: next,
                     director: nextDirector ?? null,
+                    versionId: versionId ?? null,
                   });
                 }
               }}

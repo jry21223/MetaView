@@ -503,10 +503,10 @@ describe("PlaybookComposition", () => {
 
   it.each([
     ["hold", undefined],
-    ["push_in", "transform:scale(1.0125)"],
-    ["pull_out", "transform:scale(1.0125)"],
-    ["pan_left", "transform:translateX(-7.00px)"],
-    ["pan_right", "transform:translateX(7.00px)"],
+    ["push_in", "transform:scale(1.0250)"],
+    ["pull_out", "transform:scale(1.0250)"],
+    ["pan_left", "transform:translateX(-12.00px)"],
+    ["pan_right", "transform:translateX(12.00px)"],
     ["focus_target", undefined],
   ] as const)("applies %s camera motion to the visual stage", (cameraMotion, expectedTransform) => {
     remotionState.frame = 30;
@@ -516,6 +516,7 @@ describe("PlaybookComposition", () => {
     );
 
     expect(markup).toContain(`data-camera-motion="${cameraMotion}"`);
+    expect(markup).toContain('data-director-pacing="normal"');
     if (expectedTransform) {
       expect(markup).toContain(expectedTransform);
     } else {
@@ -532,7 +533,7 @@ describe("PlaybookComposition", () => {
 
     expect(markup).toContain('data-camera-motion="push_in"');
     expect(markup).toContain('data-director-adapter="math_scene"');
-    expect(markup).not.toContain("transform:scale(1.0125)");
+    expect(markup).not.toContain("transform:scale(1.0250)");
   });
 
   it("merges simultaneous math plot layers into one scene", () => {

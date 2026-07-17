@@ -28,6 +28,7 @@ import httpx
 from app.application.ports.director_repository import IRunDirectorRepository
 from app.application.ports.export_repository import IExportJobRepository
 from app.application.ports.run_repository import IRunRepository
+from app.domain.models.director import DirectorScript
 from app.domain.models.export_job import (
     ExportAssetReport,
     ExportJobStatus,
@@ -35,8 +36,10 @@ from app.domain.models.export_job import (
     TtsConfig,
 )
 from app.domain.models.pipeline_run import PipelineRunStatus
+from app.domain.models.playbook import PlaybookScript
 from app.domain.models.quality_report import QualityReport
 from app.domain.models.review import PlaybookIssueSeverity, PlaybookReviewIssue
+from app.domain.services.director_builder import build_default_director
 from app.domain.services.playbook_quality import (
     playbook_review_verdict_from_issues,
     quality_gate_playbook,
@@ -70,6 +73,28 @@ class ExportVideoUseCase:
         self._artifacts = artifacts_dir
         self._artifacts.mkdir(parents=True, exist_ok=True)
 
+    def _build_export_quality_report(
+        self,
+        playbook: PlaybookScript,
+        run: Any,
+    ) -> QualityReport:
+        previous_quality = run.quality_report
+        current_quality = quality_gate_playbook(
+            playbook,
+            run.prompt,
+            generator_path=(
+                previous_quality.generator_path if previous_quality else "export_recheck"
+            ),
+            coverage_decision=getattr(run, "coverage_decision", None),
+            lesson_plan=getattr(run, "lesson_plan", None),
+            coverage_mode=(
+                run.coverage_decision.mode
+                if getattr(run, "coverage_decision", None) is not None
+                else (previous_quality.coverage_mode if previous_quality else "unknown")
+            ),
+        )
+        return _merge_export_quality(previous_quality, current_quality)
+
     async def execute(
         self,
         job_id: str,
@@ -77,6 +102,7 @@ class ExportVideoUseCase:
         with_audio: bool,
         tts: TtsConfig | None,
         options: ExportOptions | None = None,
+        version_id: str | None = None,
     ) -> None:
         try:
             run = await self._runs.get(run_id)
@@ -84,24 +110,16 @@ class ExportVideoUseCase:
                 raise ValueError(f"Run {run_id!r} has no playbook to export")
             if run.status != PipelineRunStatus.SUCCEEDED:
                 raise ValueError(f"Run {run_id!r} is not in succeeded state")
-            previous_quality = run.quality_report
-            export_quality = quality_gate_playbook(
-                run.playbook,
-                run.prompt,
-                generator_path=(
-                    previous_quality.generator_path if previous_quality else "export_recheck"
-                ),
-                coverage_decision=getattr(run, "coverage_decision", None),
-                lesson_plan=getattr(run, "lesson_plan", None),
-                coverage_mode=(
-                    run.coverage_decision.mode
-                    if getattr(run, "coverage_decision", None) is not None
-                    else (
-                        previous_quality.coverage_mode if previous_quality else "unknown"
+            if version_id is not None:
+                playbook_json = await self._runs.get_version_playbook(run_id, version_id)
+                if playbook_json is None:
+                    raise ValueError(
+                        f"Version {version_id!r} not found for run {run_id!r}"
                     )
-                ),
-            )
-            export_quality = _merge_export_quality(previous_quality, export_quality)
+                playbook_model = PlaybookScript.model_validate_json(playbook_json)
+            else:
+                playbook_model = run.playbook
+            export_quality = self._build_export_quality_report(playbook_model, run)
             if export_quality.status == "repairable":
                 export_quality = export_quality.with_issue(
                     PlaybookReviewIssue(
@@ -122,9 +140,11 @@ class ExportVideoUseCase:
                 raise ValueError(f"Run {run_id!r} is not export-ready: {codes}")
             job = await self._exports.get(job_id)
 
-            playbook = run.playbook.model_dump()
+            playbook = playbook_model.model_dump()
             try:
-                director = await self._get_export_director(run_id)
+                director = await self._get_export_director(
+                    run_id, version_id=version_id, playbook=playbook_model
+                )
             except Exception as exc:  # noqa: BLE001 - export must fail closed on Director I/O.
                 director_quality = export_quality.with_issue(
                     PlaybookReviewIssue(
@@ -213,7 +233,18 @@ class ExportVideoUseCase:
                 error=str(exc),
             )
 
-    async def _get_export_director(self, run_id: str):
+    async def _get_export_director(
+        self,
+        run_id: str,
+        *,
+        version_id: str | None,
+        playbook: PlaybookScript,
+    ) -> DirectorScript | None:
+        if version_id is not None:
+            director_json = await self._runs.get_version_director(run_id, version_id)
+            if director_json is None:
+                return build_default_director(playbook, run_id)
+            return DirectorScript.model_validate_json(director_json)
         return await self._directors.get(run_id)
 
     async def _generate_step_audio(
