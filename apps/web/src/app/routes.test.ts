@@ -7,7 +7,7 @@ describe("app route helpers", () => {
     expect(stageToPath("intake")).toBe("/create");
     expect(stageToPath("workbench", "run-1")).toBe("/run/run-1");
     expect(stageToPath("history")).toBe("/history");
-    expect(stageToPath("cases")).toBe("/cases");
+    expect(stageToPath("templates")).toBe("/templates");
     expect(stageToPath("settings")).toBe("/settings");
   });
 
@@ -21,7 +21,8 @@ describe("app route helpers", () => {
     expect(pathToStage("/run/run-1")).toBe("workbench");
     expect(pathToStage("/run/run-1/")).toBe("workbench");
     expect(pathToStage("/history")).toBe("history");
-    expect(pathToStage("/cases")).toBe("cases");
+    expect(pathToStage("/templates")).toBe("templates");
+    expect(pathToStage("/templates/bfs-tree")).toBe("templates");
     expect(pathToStage("/settings")).toBe("settings");
   });
 

@@ -1,4 +1,4 @@
-import { cleanup, render, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -89,7 +89,7 @@ describe("App routing", () => {
     expect(getByRole("searchbox")).toBeTruthy();
   });
 
-  it("keeps public cases outside account and pipeline shells, including ops edition", async () => {
+  it("keeps public templates outside account and pipeline shells, including ops edition", async () => {
     let accountHits = 0;
     let pipelineHits = 0;
     server.use(
@@ -102,39 +102,97 @@ describe("App routing", () => {
         return HttpResponse.json({ detail: "must not be requested" }, { status: 500 });
       }),
     );
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        new Response(JSON.stringify({ schemaVersion: "1.0", cases: [] }), { status: 200 }),
-      ),
-    );
     vi.stubEnv("VITE_APP_EDITION", "ops");
-    window.history.pushState({}, "", "/cases");
-
-    const { App } = await import("./App");
-    const { getByRole } = render(<App />);
-
-    expect(getByRole("heading", { name: "精选案例" })).toBeTruthy();
-    await waitFor(() => expect(getByRole("alert")).toBeTruthy());
-    expect(accountHits).toBe(0);
-    expect(pipelineHits).toBe(0);
-  });
-
-  it("redirects the compatibility /templates path to public cases", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        new Response(JSON.stringify({ schemaVersion: "1.0", cases: [] }), { status: 200 }),
-      ),
-    );
-    vi.stubEnv("VITE_APP_EDITION", "self");
     window.history.pushState({}, "", "/templates");
 
     const { App } = await import("./App");
     const { getByRole } = render(<App />);
 
-    await waitFor(() => expect(window.location.pathname).toBe("/cases"));
-    expect(getByRole("heading", { name: "精选案例" })).toBeTruthy();
+    expect(getByRole("heading", { name: "模板本身，就是可以播放的案例" })).toBeTruthy();
+    expect(accountHits).toBe(0);
+    expect(pipelineHits).toBe(0);
+  });
+
+  it("plays, adjusts parameters, and answers follow-ups without any network request", async () => {
+    let accountHits = 0;
+    let pipelineHits = 0;
+    const networkSpy = vi.fn();
+    vi.stubGlobal("fetch", networkSpy);
+    localStorage.setItem("mv_tts_settings", JSON.stringify({
+      enabled: true,
+      backend: "openai",
+      voice: "alloy",
+      rate: 1,
+    }));
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/account/me`, () => {
+        accountHits += 1;
+        return HttpResponse.json({ detail: "must not be requested" }, { status: 500 });
+      }),
+      http.get(`${API_BASE_URL}/api/v1/pipeline`, () => {
+        pipelineHits += 1;
+        return HttpResponse.json({ detail: "must not be requested" }, { status: 500 });
+      }),
+    );
+    vi.stubEnv("VITE_APP_EDITION", "self");
+    window.history.pushState({}, "", "/templates/derivative-tangent");
+
+    const { App } = await import("./App");
+    const { getByRole, getByText, queryByText } = render(<App />);
+
+    expect(getByText("静态案例 · 不调用模型")).toBeTruthy();
+    fireEvent.click(getByRole("button", { name: "播放" }));
+    fireEvent.change(getByRole("slider", { name: /切点 a/ }), { target: { value: "1.4" } });
+    fireEvent.click(getByRole("button", { name: "当前切点和斜率是多少？" }));
+    fireEvent.click(getByRole("button", { name: "播放器设置" }));
+
+    expect(getByText("切点 a=1.4，对应导数与切线斜率都是 2.8。")).toBeTruthy();
+    expect(queryByText("语音后端")).toBeNull();
+    expect(accountHits).toBe(0);
+    expect(pipelineHits).toBe(0);
+    expect(networkSpy).not.toHaveBeenCalled();
+  });
+
+  it("keeps pending template deep links unavailable instead of generating them", async () => {
+    vi.stubEnv("VITE_APP_EDITION", "ops");
+    window.history.pushState({}, "", "/templates/quick-sort");
+
+    const { App } = await import("./App");
+    const { getByRole, getByText } = render(<App />);
+
+    expect(getByRole("status").textContent).toContain("快速排序案例仍在制作");
+    expect(getByText("返回模板目录")).toBeTruthy();
+  });
+
+  it("redirects legacy case routes into the template catalog", async () => {
+    vi.stubEnv("VITE_APP_EDITION", "self");
+    window.history.pushState({}, "", "/cases/bfs-tree");
+
+    const { App } = await import("./App");
+    render(<App />);
+
+    await waitFor(() => expect(window.location.pathname).toBe("/templates/bfs-tree"));
+  });
+
+  it("redirects the old cases index to templates", async () => {
+    vi.stubEnv("VITE_APP_EDITION", "self");
+    window.history.pushState({}, "", "/cases");
+
+    const { App } = await import("./App");
+    const { getByRole } = render(<App />);
+
+    await waitFor(() => expect(window.location.pathname).toBe("/templates"));
+    expect(getByRole("heading", { name: "模板本身，就是可以播放的案例" })).toBeTruthy();
+  });
+
+  it("returns the retired factorial showcase link to the template catalog", async () => {
+    vi.stubEnv("VITE_APP_EDITION", "self");
+    window.history.pushState({}, "", "/cases/factorial-stack");
+
+    const { App } = await import("./App");
+    render(<App />);
+
+    await waitFor(() => expect(window.location.pathname).toBe("/templates"));
   });
 
   it("redirects unknown app paths back to the public landing page", async () => {

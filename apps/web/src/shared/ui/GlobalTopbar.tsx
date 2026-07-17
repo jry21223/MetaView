@@ -4,7 +4,7 @@ export type Stage =
   | "intake"
   | "workbench"
   | "history"
-  | "cases"
+  | "templates"
   | "settings";
 
 interface GlobalTopbarProps {
@@ -66,7 +66,7 @@ export function GlobalTopbar({
   const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
   const isWorkbench = stage === "workbench" || stage === "intake";
   const isHistory = stage === "history";
-  const isCases = stage === "cases";
+  const isTemplates = stage === "templates";
   const isSettings = stage === "settings";
   const avatarUrl =
     appEdition === "ops" &&
@@ -118,9 +118,9 @@ export function GlobalTopbar({
             任务历史
           </button>
           <button
-            className={`mv-nav-item ${isCases ? "is-active" : ""}`}
-            aria-current={isCases ? "page" : undefined}
-            onClick={() => onNavigate("cases")}
+            className={`mv-nav-item ${isTemplates ? "is-active" : ""}`}
+            aria-current={isTemplates ? "page" : undefined}
+            onClick={() => onNavigate("templates")}
             type="button"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
@@ -129,7 +129,7 @@ export function GlobalTopbar({
               <path d="M5 14h6v6H5z" />
               <path d="M13 14h6v6h-6z" />
             </svg>
-            案例
+            模板
           </button>
           <button
             className={`mv-nav-item ${isSettings ? "is-active" : ""}`}

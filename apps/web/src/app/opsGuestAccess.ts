@@ -7,7 +7,8 @@ export function isSafeOpsReturnPath(value: string | null | undefined): value is 
   return Boolean(
     value &&
       (value === "/create" ||
-        value === "/cases" ||
+        value === "/templates" ||
+        /^\/templates\/[^/]+$/.test(value) ||
         value === "/settings" ||
         value === "/history" ||
         /^\/run\/[^/]+$/.test(value)),

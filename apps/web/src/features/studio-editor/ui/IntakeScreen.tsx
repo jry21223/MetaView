@@ -356,8 +356,8 @@ export function IntakeScreen({
                 </button>
               ))}
             </div>
-            <a className="mv-intake-cases-link" href="/cases">
-              查看精选案例
+            <a className="mv-intake-cases-link" href="/templates">
+              查看模板案例
               <span aria-hidden="true">→</span>
             </a>
           </section>

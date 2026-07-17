@@ -38,6 +38,16 @@ import type {
 
 export type PlaybookLayoutMode = "desktop" | "portrait";
 
+export interface PlaybookSlotContext {
+  currentStepId: string;
+  currentStepIndex: number;
+  script: PlaybookScript;
+}
+
+export type PlaybookFollowupSlot =
+  | React.ReactNode
+  | ((context: PlaybookSlotContext) => React.ReactNode);
+
 const PORTRAIT_QUERY = "(max-width: 680px) and (orientation: portrait)";
 
 function resolveAutoLayoutMode(): PlaybookLayoutMode {
@@ -77,7 +87,12 @@ interface PlaybookPlayerProps {
    */
   swapDurationFrames?: number;
   onOpenExport?: () => void;
-  followupSlot?: React.ReactNode;
+  /** Custom deterministic parameter controls rendered in the existing Params panel. */
+  parameterSlot?: React.ReactNode;
+  /** A static node for Studio or a step-aware renderer for deterministic previews. */
+  followupSlot?: PlaybookFollowupSlot;
+  /** Keep false for surfaces that must never inherit persisted remote TTS settings. */
+  enableTTS?: boolean;
   relatedSlot?: React.ReactNode;
   showLearningConsole?: boolean;
   /** Opt-in browser-only sandbox controls. Read-only player surfaces leave this disabled. */
@@ -101,7 +116,9 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   theme = "light",
   swapDurationFrames = 24,
   onOpenExport,
+  parameterSlot,
   followupSlot,
+  enableTTS = true,
   relatedSlot,
   showLearningConsole = true,
   enableInteractionSandbox = false,
@@ -148,7 +165,8 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     }
     return true;
   }, [baseScript]);
-  const showDomainPanel = hasDomainPanel && !interactionEnabled;
+  const hasParameterPanel = Boolean(parameterSlot) || hasDomainPanel;
+  const showDomainPanel = hasDomainPanel && !interactionEnabled && !parameterSlot;
   const initialPreviewFrame = useMemo(() => resolveInitialPreviewFrame(script), [script]);
   const playerTimelineKey = useMemo(() => resolvePlayerTimelineKey(baseScript), [baseScript]);
 
@@ -156,14 +174,14 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     const id = setTimeout(() => {
       setOverrides((current) => (Object.keys(current).length > 0 ? {} : current));
       setMobileTab((current) =>
-        current === "params" && !hasDomainPanel ? "narration" : current,
+        current === "params" && !hasParameterPanel ? "narration" : current,
       );
       setMobileSheet((current) =>
-        current === "params" && !hasDomainPanel ? null : current,
+        current === "params" && !hasParameterPanel ? null : current,
       );
     }, 0);
     return () => clearTimeout(id);
-  }, [baseScript, hasDomainPanel]);
+  }, [baseScript, hasParameterPanel]);
 
   const tts = useTTS();
   // Push the playbook domain into useTTS so AUTO-voice resolution still
@@ -182,8 +200,8 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     prev,
     next,
   } = usePlaybookController(script, playerRef, {
-    isSpeaking: tts.speaking,
-    ttsEnabled: tts.enabled,
+    isSpeaking: enableTTS && tts.speaking,
+    ttsEnabled: enableTTS && tts.enabled,
   });
 
   const safeStepIndex = script.steps.length
@@ -259,7 +277,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     onPrev: prev,
     onNext: next,
     onReset: handleReset,
-    onToggleTTS: tts.toggle,
+    onToggleTTS: enableTTS ? tts.toggle : undefined,
     onSpeedUp: handleSpeedUp,
     onSpeedDown: handleSpeedDown,
     onOpenExport: onOpenExport,
@@ -271,7 +289,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   // Auto-narrate on step change.
   // ttsRef always holds the latest tts object, so no stale-closure risk on speak/backend changes.
   useEffect(() => {
-    if (!ttsRef.current.enabled) return;
+    if (!enableTTS || !ttsRef.current.enabled) return;
     const step = script.steps[safeStepIndex];
     if (!step) return;
     const fallback =
@@ -283,7 +301,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     const voice = resolveVoice(ttsRef.current.config.voice, script.domain);
     const rate = step.tts_rate ?? ttsRef.current.config.rate;
     ttsRef.current.speak(text, { voice, rate });
-  }, [safeStepIndex, director, script]); // script included so step data is never stale
+  }, [safeStepIndex, director, enableTTS, script]); // script included so step data is never stale
 
   const handleVoicePreview = useCallback(
     (voice: string, sampleText: string) => {
@@ -394,8 +412,15 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     currentStep,
     currentNarrationFallback,
   );
+  const resolvedFollowupSlot = typeof followupSlot === "function"
+    ? followupSlot({
+        currentStepId: currentStep.step_id,
+        currentStepIndex: safeStepIndex,
+        script: displayScript,
+      })
+    : followupSlot;
   const showMobileConsole = isPortraitLayout && showLearningConsole;
-  const hasControlPanel = showDomainPanel || showInteractionPanel;
+  const hasControlPanel = Boolean(parameterSlot) || showDomainPanel || showInteractionPanel;
   const effectiveMobileTab =
     mobileTab === "params" && !hasControlPanel ? "narration" : mobileTab;
   const effectiveMobileSheet =
@@ -419,6 +444,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   };
   const mobileParamsContent = (
     <>
+      {parameterSlot}
       {interactionSlot}
       {showDomainPanel && (
         <ParamPanelSlot
@@ -556,6 +582,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
               onClose={() => setShowPlayerSettings(false)}
               isDark={isDark}
               onPreview={handleVoicePreview}
+              showTTS={enableTTS}
             />
           )}
         </div>
@@ -694,8 +721,9 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
           baseScript={baseScript}
           overrides={overrides}
           onOverridesChange={setOverrides}
+          parameterSlot={parameterSlot}
           interactionSlot={interactionSlot}
-          followupSlot={followupSlot}
+          followupSlot={resolvedFollowupSlot}
           relatedSlot={relatedSlot}
           relatedAlgorithmId={script.algorithm_id}
           director={director}
@@ -725,7 +753,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
           )}
           {effectiveMobileSheet === "followup" && (
             <div className="playbook-player__mobile-followup-sheet">
-              {followupSlot ?? (
+              {resolvedFollowupSlot ?? (
                 <div className="playbook-player__mobile-empty">当前讲解暂不能继续追问。</div>
               )}
             </div>
@@ -750,7 +778,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
                   type="button"
                   className="playbook-player__mobile-action"
                   onClick={() => setMobileSheet("followup")}
-                  disabled={!followupSlot}
+                  disabled={!resolvedFollowupSlot}
                 >
                   继续追问
                 </button>

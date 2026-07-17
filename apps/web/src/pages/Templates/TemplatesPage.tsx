@@ -1,6 +1,5 @@
-import { useMemo, useState } from "react";
-import { PlaybookPlayer } from "../../features/playbook/engine/player/PlaybookPlayer";
-import { getSubjectVisualShowcaseEntry } from "../../features/playbook/engine/fixtures/subjectVisualShowcase";
+import { Fragment, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   TEMPLATES,
   TEMPLATE_DOMAIN_LABEL,
@@ -8,67 +7,62 @@ import {
   type TemplateDef,
   type TemplateDomain,
 } from "./templates";
-
-interface TemplatesPageProps {
-  /** Triggered when the user picks a template — host wires this to the
-   *  pipeline submit + navigation to workbench. */
-  onUseTemplate: (prompt: string) => void | Promise<void>;
-}
+import { getTemplatePreviewCase } from "./templatePreviewCases";
+import { TemplateLinePreview } from "./TemplateLinePreview";
 
 type DomainFilter = TemplateDomain | "all";
 
-export function TemplatesPage({
-  onUseTemplate,
-}: TemplatesPageProps) {
+export function TemplatesPage() {
+  const navigate = useNavigate();
   const [filter, setFilter] = useState<DomainFilter>("all");
   const [search, setSearch] = useState("");
-  const [selectedId, setSelectedId] = useState(TEMPLATES[0]?.id ?? "");
-  const selected = TEMPLATES.find((template) => template.id === selectedId) ?? TEMPLATES[0];
-  const preview = selected?.previewFixtureId ? getSubjectVisualShowcaseEntry(selected.previewFixtureId) : undefined;
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const grouped = useMemo(() => templatesByDomain(), []);
   const availableDomains = useMemo<TemplateDomain[]>(
-    () => grouped.map((g) => g.domain),
+    () => grouped.map((group) => group.domain),
     [grouped],
   );
-
   const filtered = useMemo<TemplateDef[]>(() => {
-    const q = search.trim().toLowerCase();
-    return TEMPLATES.filter((tpl) => {
-      if (filter !== "all" && tpl.domain !== filter) return false;
-      if (!q) return true;
-      return (
-        tpl.title.toLowerCase().includes(q) ||
-        tpl.desc.toLowerCase().includes(q) ||
-        tpl.prompt.toLowerCase().includes(q)
-      );
+    const query = search.trim().toLowerCase();
+    return TEMPLATES.filter((template) => {
+      if (filter !== "all" && template.domain !== filter) return false;
+      if (!query) return true;
+      return template.title.toLowerCase().includes(query) ||
+        template.desc.toLowerCase().includes(query) ||
+        template.prompt.toLowerCase().includes(query);
     });
   }, [filter, search]);
-
   const filteredGroups = useMemo(
-    () =>
-      grouped
-        .map((group) => ({
-          ...group,
-          items: filtered.filter((template) => template.domain === group.domain),
-        }))
-        .filter((group) => group.items.length > 0),
+    () => grouped
+      .map((group) => ({
+        ...group,
+        items: filtered.filter((template) => template.domain === group.domain),
+      }))
+      .filter((group) => group.items.length > 0),
     [filtered, grouped],
   );
+
+  const activateTemplate = (template: TemplateDef) => {
+    if (!template.previewCaseId) return;
+    if (selectedId === template.id) {
+      navigate(`/templates/${template.id}`);
+      return;
+    }
+    setSelectedId(template.id);
+  };
 
   return (
     <main className="mv-templates-body">
       <header className="mv-templates-head">
         <div className="mv-templates-head__copy">
           <div className="mv-eyebrow-mini">LESSON ATLAS / 讲解图谱</div>
-          <h1 className="mv-templates-title">从一个可靠样例开始</h1>
-          <p className="mv-templates-sub">
-            按学科浏览已经验证过的讲解起点，选中后仍可在工作台继续修改。
-          </p>
+          <h1 className="mv-templates-title">模板本身，就是可以播放的案例</h1>
+          <p className="mv-templates-sub">先展开查看真实画面，再进入完整 Playbook；整个过程不生成新任务。</p>
         </div>
         <div className="mv-templates-index-mark" aria-label={`${filtered.length} 个模板`}>
           <strong>{String(filtered.length).padStart(2, "0")}</strong>
-          <span>VISIBLE<br />STARTS</span>
+          <span>VISIBLE<br />TEMPLATES</span>
         </div>
       </header>
 
@@ -79,8 +73,11 @@ export function TemplatesPage({
             type="search"
             className="mv-text-input mv-templates-search"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="搜索标题、知识点或 prompt"
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setSelectedId(null);
+            }}
+            placeholder="搜索标题或知识点"
           />
         </label>
         <div className="mv-templates-filters" role="group" aria-label="学科筛选">
@@ -88,52 +85,34 @@ export function TemplatesPage({
             type="button"
             aria-pressed={filter === "all"}
             className={`mv-chip${filter === "all" ? " mv-chip-primary" : ""}`}
-            onClick={() => setFilter("all")}
+            onClick={() => {
+              setFilter("all");
+              setSelectedId(null);
+            }}
           >
             全部
           </button>
-          {availableDomains.map((d) => (
+          {availableDomains.map((domain) => (
             <button
-              key={d}
+              key={domain}
               type="button"
-              aria-pressed={filter === d}
-              className={`mv-chip${filter === d ? " mv-chip-primary" : ""}`}
-              onClick={() => setFilter(d)}
+              aria-pressed={filter === domain}
+              className={`mv-chip${filter === domain ? " mv-chip-primary" : ""}`}
+              onClick={() => {
+                setFilter(domain);
+                setSelectedId(null);
+              }}
             >
-              {TEMPLATE_DOMAIN_LABEL[d]}
+              {TEMPLATE_DOMAIN_LABEL[domain]}
             </button>
           ))}
         </div>
       </section>
 
-      {selected && (
-        <section className="mv-template-preview" aria-label="案例预览">
-          <div className="mv-template-preview__copy">
-            <div className="mv-eyebrow-mini">CASE PREVIEW</div>
-            <h2>{selected.title}</h2>
-            <p>{selected.desc}</p>
-            {preview ? (
-              <span className="mv-chip">{"\u53ef\u64ad\u653e\u9884\u89c8"}</span>
-            ) : (
-              <span className="mv-chip">{"\u6682\u65e0\u9759\u6001\u9884\u89c8"}</span>
-            )}
-            <button type="button" className="mv-send" onClick={() => void Promise.resolve(onUseTemplate(selected.prompt))}>
-              {"\u7528\u8fd9\u4e2a\u6848\u4f8b\u5f00\u59cb"}
-            </button>
-          </div>
-          <div className="mv-template-preview__stage">
-            {preview ? (
-              <PlaybookPlayer script={preview.script} theme="light" showLearningConsole layoutMode="desktop" />
-            ) : (
-              <p>{"\u8fd9\u4e2a\u6848\u4f8b\u5df2\u63d0\u4f9b\u9898\u76ee\u6a21\u677f\uff0c\u6682\u65e0\u786e\u5b9a\u6027\u9759\u6001\u64ad\u653e\u4f5c\u4e3a\u9884\u89c8\u3002"}</p>
-            )}
-          </div>
-        </section>
-      )}
       {filtered.length === 0 ? (
         <div className="mv-templates-empty">
           <span>NO MATCH</span>
-          <strong>没有匹配的讲解起点</strong>
+          <strong>没有匹配的讲解模板</strong>
           <p>试试更短的关键词，或切换到全部学科。</p>
         </div>
       ) : (
@@ -143,38 +122,58 @@ export function TemplatesPage({
               <header className="mv-template-domain__head">
                 <span>{String(groupIndex + 1).padStart(2, "0")}</span>
                 <h2>{TEMPLATE_DOMAIN_LABEL[group.domain]}</h2>
-                <small>{group.items.length} 个起点</small>
+                <small>{group.items.length} 个模板</small>
               </header>
               <div className="mv-template-list">
-                {group.items.map((template, index) => (
-                  <button
-                    key={template.id}
-                    type="button"
-                    className="mv-template-entry"
-                    aria-pressed={selected?.id === template.id}
-                    onClick={() => setSelectedId(template.id)}
-                  >
-                    <span className="mv-template-entry__index">
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                    <span className="mv-template-entry__copy">
-                      <strong>{template.title}</strong>
-                      <small>{template.desc}</small>
-                    </span>
-                    <span
-                      className="mv-template-entry__signal"
-                      data-domain={template.domain}
-                      aria-hidden="true"
-                    >
-                      <i />
-                      <i />
-                      <i />
-                    </span>
-                    <span className="mv-template-entry__action">
-                      {template.previewFixtureId ? "查看案例" : "查看模板"} <b>→</b>
-                    </span>
-                  </button>
-                ))}
+                {group.items.map((template, index) => {
+                  const selected = selectedId === template.id;
+                  const previewCase = template.previewCaseId
+                    ? getTemplatePreviewCase(template.previewCaseId)
+                    : null;
+                  const previewId = `template-preview-${template.id}`;
+                  return (
+                    <Fragment key={template.id}>
+                      <button
+                        type="button"
+                        className={`mv-template-entry${selected ? " is-selected" : ""}${previewCase ? " is-published" : " is-pending"}`}
+                        aria-label={`${template.title}，${previewCase ? (selected ? "进入完整案例" : "展开预览") : "制作中"}`}
+                        aria-expanded={previewCase ? selected : undefined}
+                        aria-controls={previewCase ? previewId : undefined}
+                        disabled={!previewCase}
+                        onClick={() => activateTemplate(template)}
+                      >
+                        <span className="mv-template-entry__index">{String(index + 1).padStart(2, "0")}</span>
+                        <span className="mv-template-entry__copy">
+                          <strong>{template.title}</strong>
+                          <small>{template.desc}</small>
+                        </span>
+                        <TemplateLinePreview caseId={template.previewCaseId} />
+                        <span className="mv-template-entry__action">
+                          {previewCase ? (selected ? "进入案例" : "展开预览") : "制作中"}
+                          {previewCase && <b>→</b>}
+                        </span>
+                      </button>
+                      {selected && previewCase && (
+                        <button
+                          id={previewId}
+                          type="button"
+                          className="mv-template-expanded-preview"
+                          onClick={() => navigate(`/templates/${template.id}`)}
+                          aria-label={`进入完整案例：${template.title}`}
+                        >
+                          <span className="mv-template-expanded-preview__media">
+                            <img src={previewCase.posterUrl} alt={previewCase.posterAlt} />
+                          </span>
+                          <span className="mv-template-expanded-preview__copy">
+                            <small>STATIC PLAYBOOK / {previewCase.buildScript(previewCase.defaultParams).steps.length} STEPS</small>
+                            <strong>再次点击，进入完整案例</strong>
+                            <span>左侧播放画面，右侧可调参数与固定 Follow-up。</span>
+                          </span>
+                        </button>
+                      )}
+                    </Fragment>
+                  );
+                })}
               </div>
             </section>
           ))}

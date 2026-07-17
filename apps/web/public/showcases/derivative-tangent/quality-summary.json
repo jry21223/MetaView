@@ -1,5 +1,0 @@
-{
-  "title": "质量说明",
-  "body": "这是从仓库现有数学 PlaybookScript fixture 生成的精选预览，播放器仍复用 MetaView 的 Remotion 画布。",
-  "points": ["画面对象与讲解步骤共享播放时间线", "poster 由现有 Remotion smoke fixture 生成", "当前不宣称线上生成已验证"]
-}

@@ -43,6 +43,12 @@ const POP_BEZIER = Easing.bezier(0.34, 1.56, 0.64, 1);
 const MOVE_FRAMES = 12;
 const POP_FRAMES = 10;
 const BREATH_PERIOD = 40; // frames per cycle, ~1.3s @30fps
+const POINTER_LABEL_ORDER = ["low", "mid", "high"];
+
+function pointerLabelRank(name: string): number {
+  const rank = POINTER_LABEL_ORDER.indexOf(name);
+  return rank === -1 ? POINTER_LABEL_ORDER.length : rank;
+}
 
 /**
  * Greedy index map: for each currentIndex find a unique prevIndex with the same
@@ -131,6 +137,14 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
   });
   // Used to draw arc Y-offset only for swap pairs (two cells in swap_indices that exchange).
   const swapSet = new Set(snap.swap_indices);
+  const pointerGroups = Array.from(
+    Object.entries(snap.pointers).reduce((groups, [name, index]) => {
+      const names = groups.get(index) ?? [];
+      names.push(name);
+      groups.set(index, names);
+      return groups;
+    }, new Map<number, string[]>()),
+  );
 
   return (
     <div
@@ -312,8 +326,15 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
 
       {/* Pointer arrows */}
       {Object.entries(snap.pointers).length > 0 && (
-        <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
-          {Object.entries(snap.pointers).map(([name, idx]) => {
+        <div
+          style={{
+            position: "relative",
+            width: snap.array_values.length * cellW + (snap.array_values.length - 1) * cellGap,
+            height: 34,
+            marginTop: 8,
+          }}
+        >
+          {pointerGroups.map(([idx, names]) => {
             const pointerOpacity = interpolate(elapsed, [0, 12], [0, 1], {
               easing: ENTER_BEZIER,
               extrapolateLeft: "clamp",
@@ -321,7 +342,7 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
             });
             return (
               <div
-                key={name}
+                key={idx}
                 style={{
                   display: "flex",
                   flexDirection: "column",
@@ -330,12 +351,18 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
                   fontSize: 13,
                   fontWeight: 600,
                   opacity: pointerOpacity,
-                  position: "relative",
-                  left: idx * cellPitch,
+                  position: "absolute",
+                  left: idx * cellPitch + cellW / 2,
+                  top: 0,
+                  transform: "translateX(-50%)",
                 }}
               >
                 ▲
-                <span>{name}</span>
+                <span>
+                  {[...names]
+                    .sort((left, right) => pointerLabelRank(left) - pointerLabelRank(right))
+                    .join(" · ")}
+                </span>
               </div>
             );
           })}

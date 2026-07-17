@@ -1,11 +1,12 @@
-import { BrowserRouter, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import type { AppEdition } from "../shared/config/constants";
 import { PaymentResultPage } from "../pages/PaymentResultPage";
 import { OpsDashboardPage } from "../pages/OpsDashboard/OpsDashboardPage";
 import { AssetShowcasePage } from "../pages/AssetShowcase/AssetShowcasePage";
 import { LandingRoute } from "./LandingRoute";
-import { CasesPage } from "../pages/Cases/CasesPage";
-import { CaseDetailPage } from "../pages/Cases/CaseDetailPage";
+import { TemplatesPage } from "../pages/Templates/TemplatesPage";
+import { TemplatePreviewPage } from "../pages/Templates/TemplatePreviewPage";
+import { PublicTemplatesLayout } from "../pages/Templates/PublicTemplatesLayout";
 import { OpsAppShell } from "./OpsAppShell";
 import { SelfAppShell } from "./SelfAppShell";
 import { stageToPath } from "./routes";
@@ -40,15 +41,30 @@ function AppRoutes() {
         }
       />
       <Route path="/asset-showcase" element={<AssetShowcasePage />} />
-      <Route path="/cases" element={<CasesPage />} />
-      <Route path="/cases/:slug" element={<CaseDetailPage />} />
-      <Route path="/templates" element={<Navigate to="/cases" replace />} />
+      <Route
+        path="/templates"
+        element={<PublicTemplatesLayout><TemplatesPage /></PublicTemplatesLayout>}
+      />
+      <Route path="/templates/:templateId" element={<TemplatePreviewPage />} />
+      <Route path="/cases" element={<Navigate to="/templates" replace />} />
+      <Route path="/cases/:slug" element={<LegacyCaseRedirect />} />
       <Route
         path="/*"
         element={appEdition === "ops" ? <OpsAppShell /> : <SelfAppShell />}
       />
     </Routes>
   );
+}
+
+const LEGACY_CASE_ROUTES: Record<string, string> = {
+  "derivative-tangent": "/templates/derivative-tangent",
+  "bfs-tree": "/templates/bfs-tree",
+  "projectile-motion": "/templates/projectile",
+};
+
+function LegacyCaseRedirect() {
+  const { slug = "" } = useParams<{ slug: string }>();
+  return <Navigate to={LEGACY_CASE_ROUTES[slug] ?? "/templates"} replace />;
 }
 
 function OpsDashboardRoute() {
