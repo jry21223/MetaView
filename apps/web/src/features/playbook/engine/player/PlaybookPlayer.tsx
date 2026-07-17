@@ -29,8 +29,12 @@ import { SPEED_STEPS } from "./playbackRates";
 import { DirectorInspector } from "../director/DirectorInspector";
 import type { RendererInteractionEvent } from "../renderers/types";
 import { InteractionSandboxPanel } from "../../interaction/InteractionSandboxPanel";
+import { deriveInteractionManifest } from "../../interaction/engine";
 import { useInteractionSandbox } from "../../interaction/useInteractionSandbox";
-import type { InteractionFollowUpContext } from "../../interaction/types";
+import type {
+  InteractionEvent,
+  InteractionFollowUpContext,
+} from "../../interaction/types";
 
 export type PlaybookLayoutMode = "desktop" | "portrait";
 
@@ -80,6 +84,12 @@ interface PlaybookPlayerProps {
   enableInteractionSandbox?: boolean;
   /** Explicit user-triggered handoff of normalized semantic events to follow-up AI. */
   onExplainInteraction?: (context: InteractionFollowUpContext) => Promise<void>;
+  /** Explicit user-triggered persistence of the current sandbox as a new version. */
+  onApplyInteractionVersion?: (events: InteractionEvent[]) => Promise<void>;
+  /** Prevent sandbox mutations while a Studio interaction action is in flight. */
+  interactionActionPending?: boolean;
+  /** Isolates browser-only sandbox history between runs with identical scripts. */
+  interactionSessionKey?: string;
   topbarCollapsed?: boolean;
   onToggleTopbar?: () => void;
   layoutMode?: PlaybookLayoutMode;
@@ -96,6 +106,9 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   showLearningConsole = true,
   enableInteractionSandbox = false,
   onExplainInteraction,
+  onApplyInteractionVersion,
+  interactionActionPending = false,
+  interactionSessionKey = "",
   topbarCollapsed = false,
   onToggleTopbar,
   layoutMode,
@@ -109,9 +122,19 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   const [playbackRate, setPlaybackRate] = useState(1);
   const [mobileTab, setMobileTab] = useState<MobileTabKey>("narration");
   const [mobileSheet, setMobileSheet] = useState<MobileTabKey | null>(null);
-  const script = useResolvedScript(baseScript, overrides);
-  const interactionSandbox = useInteractionSandbox(script);
-  const interactionEnabled = enableInteractionSandbox && showLearningConsole;
+  const resolvedScript = useResolvedScript(baseScript, overrides);
+  const canonicalInteractionManifest = useMemo(
+    () => deriveInteractionManifest(baseScript),
+    [baseScript],
+  );
+  const interactionEnabled = enableInteractionSandbox &&
+    showLearningConsole &&
+    canonicalInteractionManifest.adapters.length > 0;
+  // Persistence replays semantic events against the canonical run playbook.
+  // Pilot previews must use that same base, so frontend-only parameter
+  // overrides cannot produce a different result from the saved version.
+  const script = interactionEnabled ? baseScript : resolvedScript;
+  const interactionSandbox = useInteractionSandbox(script, interactionSessionKey);
   const displayScript = interactionEnabled ? interactionSandbox.previewScript : script;
   const interactionManifest = interactionSandbox.manifest;
   const capability = useMemo(() => domainCapability(script.domain), [script.domain]);
@@ -125,6 +148,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     }
     return true;
   }, [baseScript]);
+  const showDomainPanel = hasDomainPanel && !interactionEnabled;
   const initialPreviewFrame = useMemo(() => resolveInitialPreviewFrame(script), [script]);
   const playerTimelineKey = useMemo(() => resolvePlayerTimelineKey(baseScript), [baseScript]);
 
@@ -290,6 +314,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
         ? "math_plot"
         : undefined;
   const handleRendererInteraction = (event: RendererInteractionEvent) => {
+    if (interactionActionPending) return;
     if (event.type === "select-node") {
       if (
         currentInteractionBinding?.target_role !== "start-node" ||
@@ -327,8 +352,22 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   const showInteractionPanel = interactionEnabled && (
     hasCurrentInteraction || interactionSandbox.dirty || interactionSandbox.lastError != null
   );
+  const persistInteractionVersion = onApplyInteractionVersion
+    ? async (events: InteractionEvent[]) => {
+      try {
+        await onApplyInteractionVersion(events);
+        if (isPortraitLayout) setMobileSheet("followup");
+      } catch (error) {
+        if ((error as Error).name !== "AbortError" && isPortraitLayout) {
+          setMobileSheet("followup");
+        }
+        throw error;
+      }
+    }
+    : undefined;
   const interactionSlot = showInteractionPanel ? (
     <InteractionSandboxPanel
+      key={interactionSessionKey}
       manifest={interactionManifest}
       currentStepId={currentStep.step_id}
       events={interactionSandbox.events}
@@ -337,10 +376,12 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
       lastError={interactionSandbox.lastError}
       latestReplay={interactionSandbox.latestReplay}
       onShowReplayFrame={interactionSandbox.showReplayFrame}
-      onApply={interactionSandbox.apply}
+      onApply={interactionActionPending ? () => undefined : interactionSandbox.apply}
       onUndo={interactionSandbox.undo}
       onReset={interactionSandbox.reset}
       onExplainInteraction={onExplainInteraction}
+      onApplyVersion={persistInteractionVersion}
+      actionPending={interactionActionPending}
     />
   ) : undefined;
   const isDark = theme === "dark";
@@ -354,7 +395,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     currentNarrationFallback,
   );
   const showMobileConsole = isPortraitLayout && showLearningConsole;
-  const hasControlPanel = hasDomainPanel || showInteractionPanel;
+  const hasControlPanel = showDomainPanel || showInteractionPanel;
   const effectiveMobileTab =
     mobileTab === "params" && !hasControlPanel ? "narration" : mobileTab;
   const effectiveMobileSheet =
@@ -379,7 +420,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   const mobileParamsContent = (
     <>
       {interactionSlot}
-      {hasDomainPanel && (
+      {showDomainPanel && (
         <ParamPanelSlot
           domain={baseScript.domain}
           script={baseScript}
@@ -649,7 +690,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
           showCodePanelSlot={showCodePanelSlot}
           codeOverlay={codeOverlay}
           theme={theme}
-          hasDomainPanel={hasDomainPanel}
+          hasDomainPanel={showDomainPanel}
           baseScript={baseScript}
           overrides={overrides}
           onOverridesChange={setOverrides}

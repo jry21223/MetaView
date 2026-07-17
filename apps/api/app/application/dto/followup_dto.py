@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, FiniteFloat, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.application.dto.interaction_dto import InteractionFollowUpContext
 from app.domain.models.director import DirectorScript
 from app.domain.models.playbook import PlaybookScript
 
@@ -11,63 +12,6 @@ from app.domain.models.playbook import PlaybookScript
 class FollowUpChatMessage(BaseModel):
     role: Literal["user", "assistant"]
     content: str = Field(min_length=1, max_length=2000)
-
-
-class DerivativeInteractionEvent(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    adapter_id: Literal["math.derivative-tangent"]
-    step_id: str = Field(min_length=1, max_length=120)
-    target_id: str = Field(min_length=1, max_length=180)
-    action: Literal["set-value"]
-    value: FiniteFloat
-    sequence: int = Field(ge=1, le=10_000)
-
-    @model_validator(mode="after")
-    def validate_semantic_target(self) -> "DerivativeInteractionEvent":
-        if self.target_id != f"step:{self.step_id}:marker-x":
-            raise ValueError("derivative interaction target must be the semantic marker-x id")
-        return self
-
-
-class BfsInteractionEvent(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    adapter_id: Literal["algorithm.bfs"]
-    step_id: str = Field(min_length=1, max_length=120)
-    target_id: str = Field(min_length=1, max_length=180)
-    action: Literal["select"]
-    value: str = Field(min_length=1, max_length=120)
-    sequence: int = Field(ge=1, le=10_000)
-
-    @model_validator(mode="after")
-    def validate_semantic_target(self) -> "BfsInteractionEvent":
-        if self.target_id != f"step:{self.step_id}:start-node":
-            raise ValueError("BFS interaction target must be the semantic start-node id")
-        return self
-
-
-InteractionEvent = Annotated[
-    DerivativeInteractionEvent | BfsInteractionEvent,
-    Field(discriminator="adapter_id"),
-]
-
-
-class InteractionFollowUpContext(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    manifest_version: Literal["1"]
-    events: list[InteractionEvent] = Field(min_length=1, max_length=20)
-
-    @model_validator(mode="after")
-    def validate_event_order(self) -> "InteractionFollowUpContext":
-        sequences = [event.sequence for event in self.events]
-        if any(
-            current != previous + 1
-            for previous, current in zip(sequences, sequences[1:], strict=False)
-        ):
-            raise ValueError("interaction event sequences must be contiguous and increasing")
-        return self
 
 
 class FollowUpRequest(BaseModel):

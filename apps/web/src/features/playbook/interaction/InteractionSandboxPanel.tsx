@@ -27,14 +27,18 @@ interface InteractionSandboxPanelProps {
   onUndo: () => void;
   onReset: () => void;
   onExplainInteraction?: (context: InteractionFollowUpContext) => Promise<void>;
+  onApplyVersion?: (events: InteractionEvent[]) => Promise<void>;
+  actionPending?: boolean;
 }
 
 function RangeBinding({
   binding,
   onApply,
+  disabled = false,
 }: {
   binding: DerivativeInteractionBinding;
   onApply: (command: InteractionCommand) => void;
+  disabled?: boolean;
 }) {
   const current = binding.value;
   const [draftState, setDraftState] = useState(() => ({
@@ -44,7 +48,7 @@ function RangeBinding({
   const draft = draftState.source === binding ? draftState.value : current;
 
   const commit = () => {
-    if (!Number.isFinite(draft) || draft === current) return;
+    if (disabled || !Number.isFinite(draft) || draft === current) return;
     onApply({
       adapter_id: binding.adapter_id,
       step_id: binding.step_id,
@@ -71,6 +75,7 @@ function RangeBinding({
         step={step}
         value={draft}
         aria-label={binding.label}
+        disabled={disabled}
         onChange={(event) => setDraftState({
           source: binding,
           value: Number(event.currentTarget.value),
@@ -87,10 +92,12 @@ function ChoiceBinding({
   binding,
   selectedValue,
   onApply,
+  disabled = false,
 }: {
   binding: BfsInteractionBinding;
   selectedValue: string;
   onApply: (command: InteractionCommand) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="playbook-interaction__choice" role="group" aria-label={binding.label}>
@@ -101,7 +108,7 @@ function ChoiceBinding({
             key={option.id}
             type="button"
             aria-pressed={selectedValue === option.id}
-            disabled={selectedValue === option.id}
+            disabled={disabled || selectedValue === option.id}
             onClick={() => onApply({
               adapter_id: binding.adapter_id,
               step_id: binding.step_id,
@@ -121,19 +128,22 @@ function ChoiceBinding({
 function BfsReplayControls({
   replay,
   onShowFrame,
+  disabled = false,
 }: {
   replay: BfsInteractionReplay;
   onShowFrame: (replay: BfsInteractionReplay, frameIndex: number) => void;
+  disabled?: boolean;
 }) {
   const [frameIndex, setFrameIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const lastIndex = Math.max(0, replay.frames.length - 1);
 
   const showFrame = useCallback((nextIndex: number) => {
+    if (disabled) return;
     const bounded = Math.max(0, Math.min(nextIndex, lastIndex));
     setFrameIndex(bounded);
     onShowFrame(replay, bounded);
-  }, [lastIndex, onShowFrame, replay]);
+  }, [disabled, lastIndex, onShowFrame, replay]);
 
   const showManualFrame = (nextIndex: number) => {
     setPlaying(false);
@@ -141,14 +151,14 @@ function BfsReplayControls({
   };
 
   useEffect(() => {
-    if (!playing || frameIndex >= lastIndex) return;
+    if (disabled || !playing || frameIndex >= lastIndex) return;
     const timeout = window.setTimeout(() => {
       const nextIndex = frameIndex + 1;
       showFrame(nextIndex);
       if (nextIndex >= lastIndex) setPlaying(false);
     }, 700);
     return () => window.clearTimeout(timeout);
-  }, [frameIndex, lastIndex, playing, showFrame]);
+  }, [disabled, frameIndex, lastIndex, playing, showFrame]);
 
   return (
     <div className="playbook-interaction__replay" role="group" aria-label="BFS 重放">
@@ -166,14 +176,14 @@ function BfsReplayControls({
         <button
           type="button"
           onClick={() => showManualFrame(0)}
-          disabled={frameIndex === 0}
+          disabled={disabled || frameIndex === 0}
         >
           第一帧
         </button>
         <button
           type="button"
           onClick={() => showManualFrame(frameIndex - 1)}
-          disabled={frameIndex === 0}
+          disabled={disabled || frameIndex === 0}
         >
           上一帧
         </button>
@@ -183,7 +193,7 @@ function BfsReplayControls({
             if (frameIndex >= lastIndex) showFrame(0);
             setPlaying((value) => !value);
           }}
-          disabled={replay.frames.length < 2}
+          disabled={disabled || replay.frames.length < 2}
           aria-pressed={playing}
         >
           {playing ? "暂停" : "播放"}
@@ -191,14 +201,14 @@ function BfsReplayControls({
         <button
           type="button"
           onClick={() => showManualFrame(frameIndex + 1)}
-          disabled={frameIndex >= lastIndex}
+          disabled={disabled || frameIndex >= lastIndex}
         >
           下一帧
         </button>
         <button
           type="button"
           onClick={() => showManualFrame(lastIndex)}
-          disabled={frameIndex >= lastIndex}
+          disabled={disabled || frameIndex >= lastIndex}
         >
           最后一帧
         </button>
@@ -220,8 +230,10 @@ export function InteractionSandboxPanel({
   onUndo,
   onReset,
   onExplainInteraction,
+  onApplyVersion,
+  actionPending = false,
 }: InteractionSandboxPanelProps) {
-  const [explainPending, setExplainPending] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"explain" | "apply" | null>(null);
   const binding = useMemo(
     () => manifest.adapters
       .flatMap((adapter) => adapter.bindings)
@@ -236,16 +248,32 @@ export function InteractionSandboxPanel({
     () => events.slice(-4).map(describeInteractionEvent),
     [events],
   );
+  const controlsPending = actionPending || pendingAction !== null;
 
   const explainInteraction = async () => {
-    if (!onExplainInteraction || !explanationContext || explainPending) return;
-    setExplainPending(true);
+    if (!onExplainInteraction || !explanationContext || controlsPending) return;
+    setPendingAction("explain");
     try {
       await onExplainInteraction(explanationContext);
     } catch {
       // The owning follow-up surface renders request failures in its message stream.
     } finally {
-      setExplainPending(false);
+      setPendingAction(null);
+    }
+  };
+
+  const applyVersion = async () => {
+    if (!onApplyVersion || !dirty || events.length === 0 || controlsPending) return;
+    const eventSnapshot = events.map((event) => ({ ...event }));
+    setPendingAction("apply");
+    try {
+      await onApplyVersion(eventSnapshot);
+      onReset();
+    } catch {
+      // The owning Studio surface renders the outcome in follow-up and opens
+      // that sheet on portrait layouts.
+    } finally {
+      setPendingAction(null);
     }
   };
 
@@ -279,6 +307,7 @@ export function InteractionSandboxPanel({
           key={binding.id}
           binding={binding}
           onApply={onApply}
+          disabled={controlsPending}
         />
       ) : binding?.target_role === "start-node" ? (
         <>
@@ -290,12 +319,14 @@ export function InteractionSandboxPanel({
                 : binding.value
             }
             onApply={onApply}
+            disabled={controlsPending}
           />
           {latestReplay?.step_id === binding.step_id && (
             <BfsReplayControls
               key={`${latestReplay.step_id}:${latestReplay.start_node_id}`}
               replay={latestReplay}
               onShowFrame={onShowReplayFrame}
+              disabled={controlsPending}
             />
           )}
         </>
@@ -317,16 +348,31 @@ export function InteractionSandboxPanel({
             type="button"
             className="playbook-interaction__explain"
             onClick={explainInteraction}
-            disabled={!explanationContext || explainPending}
-            aria-busy={explainPending}
+            disabled={!explanationContext || controlsPending}
+            aria-busy={pendingAction === "explain"}
           >
-            {explainPending ? "解释中…" : "解释我的操作"}
+            {pendingAction === "explain" ? "解释中…" : "解释我的操作"}
           </button>
         )}
-        <button type="button" onClick={onUndo} disabled={!canUndo}>
+        {onApplyVersion && (
+          <button
+            type="button"
+            className="playbook-interaction__apply-version"
+            onClick={applyVersion}
+            disabled={!dirty || events.length === 0 || controlsPending}
+            aria-busy={pendingAction === "apply"}
+          >
+            {pendingAction === "apply" ? "应用中…" : "应用到新版本"}
+          </button>
+        )}
+        <button type="button" onClick={onUndo} disabled={!canUndo || controlsPending}>
           撤销
         </button>
-        <button type="button" onClick={onReset} disabled={!dirty && !lastError}>
+        <button
+          type="button"
+          onClick={onReset}
+          disabled={controlsPending || (!dirty && !lastError)}
+        >
           重置
         </button>
       </div>

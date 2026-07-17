@@ -6,7 +6,10 @@ import type {
   MathPlotSnapshot,
   PlaybookScript,
 } from "../engine/types";
-import { useInteractionSandbox } from "./useInteractionSandbox";
+import {
+  MAX_INTERACTION_EVENTS,
+  useInteractionSandbox,
+} from "./useInteractionSandbox";
 
 function plot(markerX = 1): MathPlotSnapshot {
   return {
@@ -221,4 +224,38 @@ describe("useInteractionSandbox", () => {
     expect((result.current.previewScript.steps[0].snapshot as MathPlotSnapshot).marker_x).toBe(-2);
   });
 
+  it("keeps the event history within the server contract limit", () => {
+    const { result } = renderHook(() => useInteractionSandbox(script()));
+
+    act(() => {
+      for (let index = 0; index < MAX_INTERACTION_EVENTS; index += 1) {
+        result.current.apply(moveMarker(index % 2 === 0 ? 2 : 3));
+      }
+    });
+    expect(result.current.events).toHaveLength(MAX_INTERACTION_EVENTS);
+
+    act(() => result.current.apply(moveMarker(4)));
+    expect(result.current.events).toHaveLength(MAX_INTERACTION_EVENTS);
+    expect(result.current.lastError).toContain(`最多记录 ${MAX_INTERACTION_EVENTS} 个操作`);
+
+    act(() => result.current.undo());
+    expect(result.current.events).toHaveLength(MAX_INTERACTION_EVENTS - 1);
+    expect(result.current.lastError).toBeNull();
+  });
+
+  it("isolates sandbox history between sessions with identical playbook content", () => {
+    const base = script();
+    const { result, rerender } = renderHook(
+      ({ sessionKey }) => useInteractionSandbox(base, sessionKey),
+      { initialProps: { sessionKey: "run-a" } },
+    );
+
+    act(() => result.current.apply(moveMarker(3)));
+    expect(result.current.events).toHaveLength(1);
+
+    rerender({ sessionKey: "run-b" });
+    expect(result.current.events).toEqual([]);
+    expect(result.current.dirty).toBe(false);
+    expect((result.current.previewScript.steps[0].snapshot as MathPlotSnapshot).marker_x).toBe(1);
+  });
 });

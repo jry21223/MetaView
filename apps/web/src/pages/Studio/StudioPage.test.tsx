@@ -5,7 +5,10 @@ import { http, HttpResponse } from "msw";
 
 import { TWEAK_DEFAULTS } from "../../features/studio-editor/hooks/useTweaks";
 import type { PlaybookScript } from "../../features/playbook/engine/types";
-import type { InteractionFollowUpContext } from "../../features/playbook/interaction/types";
+import type {
+  InteractionEvent,
+  InteractionFollowUpContext,
+} from "../../features/playbook/interaction/types";
 import { server } from "../../mocks/server";
 import { API_BASE_URL } from "../../shared/config/constants";
 import { StudioPage } from "./StudioPage";
@@ -38,6 +41,9 @@ vi.mock("../../features/playbook/engine/player/PlaybookPlayer", async () => {
       onToggleTopbar,
       onOpenExport,
       onExplainInteraction,
+      onApplyInteractionVersion,
+      interactionActionPending = false,
+      interactionSessionKey,
       enableInteractionSandbox = false,
     }: {
       script: PlaybookScript;
@@ -47,6 +53,9 @@ vi.mock("../../features/playbook/engine/player/PlaybookPlayer", async () => {
       onToggleTopbar?: () => void;
       onOpenExport?: () => void;
       onExplainInteraction?: (context: InteractionFollowUpContext) => Promise<void>;
+      onApplyInteractionVersion?: (events: InteractionEvent[]) => Promise<void>;
+      interactionActionPending?: boolean;
+      interactionSessionKey?: string;
       enableInteractionSandbox?: boolean;
     }) =>
       ReactModule.createElement(
@@ -54,6 +63,8 @@ vi.mock("../../features/playbook/engine/player/PlaybookPlayer", async () => {
         {
           "data-testid": "mock-player",
           "data-interaction-sandbox": String(enableInteractionSandbox),
+          "data-interaction-pending": String(interactionActionPending),
+          "data-interaction-session-key": interactionSessionKey,
         },
         onToggleTopbar
           ? ReactModule.createElement(
@@ -91,6 +102,24 @@ vi.mock("../../features/playbook/engine/player/PlaybookPlayer", async () => {
                 }),
               },
               "模拟解释我的操作",
+            )
+          : null,
+        onApplyInteractionVersion
+          ? ReactModule.createElement(
+              "button",
+              {
+                type: "button",
+                disabled: interactionActionPending,
+                onClick: () => void onApplyInteractionVersion([{
+                  adapter_id: "math.derivative-tangent",
+                  step_id: "step_01",
+                  target_id: "step:step_01:marker-x",
+                  action: "set-value",
+                  value: 3,
+                  sequence: 1,
+                }]).catch(() => undefined),
+              },
+              "模拟应用到新版本",
             )
           : null,
         ReactModule.createElement("strong", null, script.title),
@@ -197,7 +226,7 @@ describe("StudioPage", () => {
       ),
     );
 
-    const { getByPlaceholderText, getByRole, getByText } = render(
+    const { findByPlaceholderText, getByRole, getByText } = render(
       <StudioPage
         runId="run-1"
         t={TWEAK_DEFAULTS}
@@ -206,7 +235,7 @@ describe("StudioPage", () => {
       />,
     );
 
-    const input = getByPlaceholderText("还有什么想问的");
+    const input = await findByPlaceholderText("还有什么想问的");
     fireEvent.change(input, { target: { value: "这里为什么这样讲？" } });
     fireEvent.click(getByRole("button", { name: /发送/ }));
 
@@ -215,6 +244,48 @@ describe("StudioPage", () => {
     });
     expect(getByText("Original lesson")).toBeTruthy();
     expect(onNavigate).not.toHaveBeenCalled();
+  });
+
+  it("keeps history-dependent actions visibly disabled until the initial history is ready", async () => {
+    mockUsePipelinePoller.mockReturnValue({
+      playbook: playbook("Loading lesson"),
+      director: null,
+      error: null,
+      isLoading: false,
+      status: "succeeded",
+    });
+    let releaseHistory: (() => void) | undefined;
+    const historyGate = new Promise<void>((resolve) => {
+      releaseHistory = resolve;
+    });
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/runs/run-1/follow-ups`, async () => {
+        await historyGate;
+        return HttpResponse.json({ followups: [], versions: [] });
+      }),
+    );
+
+    const view = render(
+      <StudioPage
+        runId="run-1"
+        t={TWEAK_DEFAULTS}
+        onNavigate={vi.fn()}
+        isProviderConfigured
+      />,
+    );
+
+    expect(view.getByText("正在加载对话与版本记录…")).toBeTruthy();
+    expect(view.getByPlaceholderText<HTMLTextAreaElement>("正在加载记录").disabled).toBe(true);
+    expect(view.queryByRole("button", { name: "模拟解释我的操作" })).toBeNull();
+    expect(view.queryByRole("button", { name: "模拟应用到新版本" })).toBeNull();
+
+    releaseHistory?.();
+    await waitFor(() => {
+      expect(view.getByPlaceholderText<HTMLTextAreaElement>("还有什么想问的").disabled)
+        .toBe(false);
+    });
+    expect(view.getByRole("button", { name: "模拟解释我的操作" })).toBeTruthy();
+    expect(view.getByRole("button", { name: "模拟应用到新版本" })).toBeTruthy();
   });
 
   it("sends semantic interaction context only after the explicit explain action", async () => {
@@ -281,6 +352,198 @@ describe("StudioPage", () => {
       },
     });
     expect(view.getByText("Explicit lesson")).toBeTruthy();
+  });
+
+  it("applies sandbox events as a new version only after the explicit action", async () => {
+    mockUsePipelinePoller.mockReturnValue({
+      playbook: playbook("Original lesson"),
+      director: null,
+      error: null,
+      isLoading: false,
+      status: "succeeded",
+    });
+    let listCalls = 0;
+    let postCalls = 0;
+    let submittedBody: Record<string, unknown> | null = null;
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/runs/run-1/follow-ups`, () => {
+        listCalls += 1;
+        return HttpResponse.json({
+          followups: [],
+          versions: listCalls === 1
+            ? [
+              version("older", "00000000", 0, false, "initial", "initial"),
+              version("v1", "11111111", 1, true, "followup", "current"),
+            ]
+            : [
+              version("v1", "11111111", 1, false, "followup", "current"),
+              version("v2", "22222222", 2, true, "interaction", "move tangent"),
+            ],
+        });
+      }),
+      http.post(
+        `${API_BASE_URL}/api/v1/runs/run-1/interaction-version`,
+        async ({ request }) => {
+          postCalls += 1;
+          submittedBody = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json({
+            version_id: "v2",
+            summary: "interaction: move tangent",
+            playbook: playbook("Applied lesson"),
+            director: null,
+          });
+        },
+      ),
+    );
+
+    const view = render(
+      <StudioPage
+        runId="run-1"
+        t={TWEAK_DEFAULTS}
+        onNavigate={vi.fn()}
+        isProviderConfigured
+      />,
+    );
+
+    await waitFor(() => expect(listCalls).toBe(1));
+    expect(postCalls).toBe(0);
+    fireEvent.click(view.getByRole("button", { name: "模拟应用到新版本" }));
+
+    await waitFor(() => expect(view.getByText("Applied lesson")).toBeTruthy());
+    expect(postCalls).toBe(1);
+    expect(submittedBody).toEqual({
+      manifest_version: "1",
+      base_version_id: "v1",
+      events: [{
+        adapter_id: "math.derivative-tangent",
+        step_id: "step_01",
+        target_id: "step:step_01:marker-x",
+        action: "set-value",
+        value: 3,
+        sequence: 1,
+      }],
+    });
+    expect(view.getByText(/已将沙盒操作应用为新版本（v2）/)).toBeTruthy();
+    expect(view.getByText("interaction: move tangent")).toBeTruthy();
+    await waitFor(() => expect(listCalls).toBe(2));
+  });
+
+  it("uses a null base version for the first interaction version of a fresh run", async () => {
+    mockUsePipelinePoller.mockReturnValue({
+      playbook: playbook("Fresh lesson"),
+      director: null,
+      error: null,
+      isLoading: false,
+      status: "succeeded",
+    });
+    let listCalls = 0;
+    let submittedBody: Record<string, unknown> | null = null;
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/runs/run-1/follow-ups`, () => {
+        listCalls += 1;
+        return HttpResponse.json({
+          followups: [],
+          versions: listCalls === 1
+            ? []
+            : [version("v1", "11111111", 1, true, "interaction", "first interaction")],
+        });
+      }),
+      http.post(
+        `${API_BASE_URL}/api/v1/runs/run-1/interaction-version`,
+        async ({ request }) => {
+          submittedBody = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json({
+            version_id: "v1",
+            summary: "first interaction",
+            playbook: playbook("Fresh applied lesson"),
+            director: null,
+          });
+        },
+      ),
+    );
+
+    const view = render(
+      <StudioPage
+        runId="run-1"
+        t={TWEAK_DEFAULTS}
+        onNavigate={vi.fn()}
+        isProviderConfigured
+      />,
+    );
+
+    await waitFor(() => expect(listCalls).toBe(1));
+    fireEvent.click(view.getByRole("button", { name: "模拟应用到新版本" }));
+
+    await waitFor(() => expect(view.getByText("Fresh applied lesson")).toBeTruthy());
+    expect(submittedBody).toMatchObject({
+      manifest_version: "1",
+      base_version_id: null,
+    });
+    await waitFor(() => expect(listCalls).toBe(2));
+  });
+
+  it("refreshes the current head without resetting sandbox state after a stale-base conflict", async () => {
+    mockUsePipelinePoller.mockReturnValue({
+      playbook: playbook("Original lesson"),
+      director: null,
+      error: null,
+      isLoading: false,
+      status: "succeeded",
+    });
+    let listCalls = 0;
+    let postCalls = 0;
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/runs/run-1/follow-ups`, () => {
+        listCalls += 1;
+        return HttpResponse.json({
+          followups: [],
+          versions: [
+            version(
+              listCalls === 1 ? "v1" : "v2",
+              listCalls === 1 ? "11111111" : "22222222",
+              listCalls,
+              true,
+              "followup",
+              listCalls === 1 ? "current" : "concurrent update",
+            ),
+          ],
+        });
+      }),
+      http.post(`${API_BASE_URL}/api/v1/runs/run-1/interaction-version`, () => {
+        postCalls += 1;
+        return HttpResponse.json(
+          { detail: "Interaction sandbox base version is no longer current" },
+          { status: 409 },
+        );
+      }),
+    );
+
+    const view = render(
+      <StudioPage
+        runId="run-1"
+        t={TWEAK_DEFAULTS}
+        onNavigate={vi.fn()}
+        isProviderConfigured
+      />,
+    );
+
+    await waitFor(() => expect(listCalls).toBe(1));
+    expect(postCalls).toBe(0);
+    const initialSessionKey = view.getByTestId("mock-player")
+      .getAttribute("data-interaction-session-key");
+    fireEvent.click(view.getByRole("button", { name: "模拟应用到新版本" }));
+
+    await waitFor(() => {
+      expect(view.getByText(/Interaction sandbox base version is no longer current/))
+        .toBeTruthy();
+    });
+    expect(postCalls).toBe(1);
+    expect(view.getByText("Original lesson")).toBeTruthy();
+    expect(view.getByTestId("mock-player").getAttribute("data-interaction-session-key"))
+      .toBe(initialSessionKey);
+    expect(view.queryByText(/已将沙盒操作应用为新版本/)).toBeNull();
+    expect(listCalls).toBe(2);
+    expect(view.getByRole("button", { name: "模拟应用到新版本" })).toBeTruthy();
   });
 
   it("uses guided follow-up suggestions for study sessions", async () => {
@@ -491,6 +754,75 @@ describe("StudioPage", () => {
     });
     expect(getByText("已切换到选中的历史版本。")).toBeTruthy();
     expect(queryByText(/^revert: restore/)).toBeNull();
+  });
+
+  it("ignores an in-flight restore after switching to another run", async () => {
+    mockUsePipelinePoller.mockReturnValue({
+      playbook: playbook("Run one"),
+      director: null,
+      error: null,
+      isLoading: false,
+      status: "succeeded",
+    });
+    let restoreCalls = 0;
+    let releaseRestore: (() => void) | undefined;
+    const restoreGate = new Promise<void>((resolve) => {
+      releaseRestore = resolve;
+    });
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/runs/run-1/follow-ups`, () =>
+        HttpResponse.json({
+          followups: [],
+          versions: [
+            version("v0", "a1b2c3d4", 0, false, "initial", "initial playbook"),
+            version("v1", "c0ffee12", 1, true, "followup", "updated lesson"),
+          ],
+        }),
+      ),
+      http.get(`${API_BASE_URL}/api/v1/runs/run-2/follow-ups`, () =>
+        HttpResponse.json({ followups: [], versions: [] }),
+      ),
+      http.post(`${API_BASE_URL}/api/v1/runs/run-1/versions/v0/restore`, async () => {
+        restoreCalls += 1;
+        await restoreGate;
+        return HttpResponse.json({
+          version_id: "v0",
+          playbook: playbook("Stale restored lesson"),
+          director: null,
+        });
+      }),
+    );
+
+    const props = {
+      t: TWEAK_DEFAULTS,
+      onNavigate: vi.fn(),
+      isProviderConfigured: true,
+    };
+    const view = render(<StudioPage runId="run-1" {...props} />);
+
+    await waitFor(() => {
+      expect(view.getByRole("button", { name: "展开版本记录" })).toBeTruthy();
+    });
+    fireEvent.click(view.getByRole("button", { name: "展开版本记录" }));
+    fireEvent.click(view.getByRole("button", { name: "恢复版本 a1b2c3d4" }));
+    await waitFor(() => expect(restoreCalls).toBe(1));
+
+    mockUsePipelinePoller.mockReturnValue({
+      playbook: playbook("Run two"),
+      director: null,
+      error: null,
+      isLoading: false,
+      status: "succeeded",
+    });
+    view.rerender(<StudioPage runId="run-2" {...props} />);
+    releaseRestore?.();
+
+    await waitFor(() => expect(view.getByText("Run two")).toBeTruthy());
+    expect(view.queryByText("Stale restored lesson")).toBeNull();
+    expect(view.queryByText("已切换到选中的历史版本。")).toBeNull();
+    await waitFor(() => {
+      expect(view.getByRole("button", { name: "模拟应用到新版本" })).toBeTruthy();
+    });
   });
 
   it("shows a visible commit-log error when restoring a historical version fails", async () => {

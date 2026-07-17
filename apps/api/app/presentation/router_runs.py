@@ -17,10 +17,17 @@ from app.application.dto.followup_dto import (
     RestoreVersionResponse,
     RunFollowUpsResponse,
 )
+from app.application.dto.interaction_dto import (
+    ApplyInteractionVersionRequest,
+    ApplyInteractionVersionResponse,
+)
 from app.application.dto.pipeline_dto import PipelineRunResponse
 from app.application.ports.director_repository import IRunDirectorRepository
 from app.application.ports.llm_provider import ILLMProvider
-from app.application.ports.run_repository import IRunRepository
+from app.application.ports.run_repository import (
+    InteractionVersionConflictError,
+    IRunRepository,
+)
 from app.application.use_cases.account import AccountUseCase, InsufficientBalanceError
 from app.application.use_cases.follow_up import FollowUpPatchError, FollowUpPatchUseCase
 from app.config import Settings, get_settings
@@ -28,6 +35,10 @@ from app.domain.models.account import SessionAccount
 from app.domain.models.director import DirectorScript
 from app.domain.models.playbook import PlaybookScript
 from app.domain.services.director_builder import build_default_director
+from app.domain.services.interaction_apply import (
+    InteractionApplyError,
+    apply_interaction_events,
+)
 from app.domain.services.playbook_quality import quality_gate_playbook
 from app.infrastructure.llm.openai_provider import OpenAIProvider
 from app.presentation.dependencies import (
@@ -279,6 +290,87 @@ async def submit_followup(
         change_summary=result.change_summary,
         version_id=version_id,
         playbook=response_playbook,
+        director=director,
+    )
+
+
+@router.post(
+    "/{run_id}/interaction-version",
+    response_model=ApplyInteractionVersionResponse,
+)
+@write_limit()
+async def apply_interaction_version(
+    request: Request,
+    response: Response,
+    run_id: str,
+    payload: ApplyInteractionVersionRequest,
+    settings: Annotated[Settings, Depends(get_settings)],
+    run_repo: Annotated[IRunRepository, Depends(get_run_repo)],
+    account_use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
+) -> ApplyInteractionVersionResponse:
+    async with _RUN_LOCKS[run_id]:
+        owner = await _owner_session(request, response, settings, account_use_case)
+        owner_user_id = owner.account.user_id if owner is not None else None
+        run = await run_repo.get(run_id, user_id=owner_user_id)
+        if run is None or run.playbook is None:
+            raise HTTPException(status_code=404, detail=f"Run {run_id!r} has no playbook")
+
+        try:
+            applied = apply_interaction_events(run.playbook, payload.events)
+        except InteractionApplyError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+        quality_report = quality_gate_playbook(
+            applied.playbook,
+            run.prompt,
+            generator_path="interaction_version",
+            coverage_decision=getattr(run, "coverage_decision", None),
+            lesson_plan=getattr(run, "lesson_plan", None),
+            coverage_mode=(
+                run.coverage_decision.mode
+                if getattr(run, "coverage_decision", None) is not None
+                else (
+                    run.quality_report.coverage_mode
+                    if run.quality_report is not None
+                    else "unknown"
+                )
+            ),
+        )
+        quality_report.actions = [
+            *(run.quality_report.actions if run.quality_report is not None else []),
+            "interaction:quality_gate",
+        ]
+        if quality_report.status in {"repairable", "blocked"}:
+            codes = ", ".join(issue.code for issue in quality_report.issues[:5])
+            raise HTTPException(
+                status_code=422,
+                detail=f"Interaction version failed the canonical quality gate: {codes}",
+            )
+
+        now = _now()
+        current_json = run.playbook.model_dump_json()
+        version_id = str(uuid.uuid4())
+        next_json = applied.playbook.model_dump_json()
+        director = build_default_director(applied.playbook, run_id)
+        try:
+            await run_repo.commit_interaction_version(
+                run_id,
+                expected_base_version_id=payload.base_version_id,
+                version_id=version_id,
+                initial_playbook_json=current_json,
+                playbook_json=next_json,
+                quality_report_json=quality_report.model_dump_json(),
+                director=director,
+                summary=applied.summary,
+                created_at=now,
+            )
+        except InteractionVersionConflictError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    return ApplyInteractionVersionResponse(
+        version_id=version_id,
+        summary=applied.summary,
+        playbook=applied.playbook,
         director=director,
     )
 

@@ -7,7 +7,9 @@ import sqlite3
 
 from app.application.dto.followup_dto import RunFollowUpRecord, RunVersionRecord
 from app.application.dto.pipeline_dto import PipelineRunResponse
+from app.application.ports.run_repository import InteractionVersionConflictError
 from app.domain.models.coverage import CoverageDecision
+from app.domain.models.director import DirectorScript
 from app.domain.models.lesson_plan import LessonPlan
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.domain.models.playbook import PlaybookScript
@@ -301,6 +303,163 @@ class SqliteRunRepository:
 
         return await asyncio.to_thread(_sync)
 
+    async def commit_interaction_version(
+        self,
+        run_id: str,
+        *,
+        expected_base_version_id: str | None,
+        version_id: str,
+        initial_playbook_json: str,
+        playbook_json: str,
+        quality_report_json: str,
+        director: DirectorScript,
+        summary: str,
+        created_at: str,
+    ) -> None:
+        """Atomically compare-and-swap the active interaction version.
+
+        ``BEGIN IMMEDIATE`` serializes writers before the head is read.  The
+        initial snapshot, child version, director, active playbook, and quality
+        report therefore either become visible together or are all rolled back.
+        """
+
+        if director.run_id != run_id:
+            raise ValueError("interaction director run_id does not match the run")
+        director_json = director.model_dump_json()
+
+        def _sync() -> None:
+            conn = self._connect()
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                run_row = conn.execute(
+                    "SELECT playbook_json FROM pipeline_runs WHERE run_id=?",
+                    (run_id,),
+                ).fetchone()
+                if run_row is None:
+                    raise LookupError(f"Run {run_id!r} not found")
+                active_playbook_json = (
+                    str(run_row["playbook_json"])
+                    if run_row["playbook_json"]
+                    else None
+                )
+                try:
+                    if active_playbook_json is None:
+                        active_playbook = None
+                    else:
+                        active_playbook = PlaybookScript.model_validate_json(
+                            active_playbook_json
+                        ).model_dump(mode="json")
+                    expected_playbook = PlaybookScript.model_validate_json(
+                        initial_playbook_json
+                    ).model_dump(mode="json")
+                except ValueError:
+                    try:
+                        active_playbook = (
+                            json.loads(active_playbook_json)
+                            if active_playbook_json is not None
+                            else None
+                        )
+                        expected_playbook = json.loads(initial_playbook_json)
+                    except json.JSONDecodeError as exc:
+                        raise InteractionVersionConflictError(
+                            "Interaction sandbox source is no longer valid"
+                        ) from exc
+                if active_playbook is None:
+                    raise InteractionVersionConflictError(
+                        "Interaction sandbox source is no longer valid"
+                    )
+                if active_playbook != expected_playbook:
+                    raise InteractionVersionConflictError(
+                        "Interaction sandbox source lesson has changed"
+                    )
+
+                head_version_id = _head_version_id(
+                    conn,
+                    run_id,
+                    active_playbook_json=active_playbook_json,
+                )
+                if head_version_id is not None:
+                    if expected_base_version_id != head_version_id:
+                        raise InteractionVersionConflictError(
+                            "Interaction sandbox base version is no longer current"
+                        )
+                elif expected_base_version_id is not None:
+                    raise InteractionVersionConflictError(
+                        "Interaction sandbox base version is no longer current"
+                    )
+
+                parent_version_id = head_version_id
+                if parent_version_id is None:
+                    parent_version_id = f"{run_id}:v0"
+                    conn.execute(
+                        "INSERT INTO pipeline_run_versions"
+                        " (version_id, run_id, version_number, playbook_json,"
+                        " source, followup_id, parent_version_id, summary, created_at)"
+                        " VALUES (?, ?, 0, ?, 'initial', NULL, NULL, ?, ?)",
+                        (
+                            parent_version_id,
+                            run_id,
+                            initial_playbook_json,
+                            "initial playbook",
+                            created_at,
+                        ),
+                    )
+
+                next_number_row = conn.execute(
+                    "SELECT COALESCE(MAX(version_number), -1) + 1 AS next_number"
+                    " FROM pipeline_run_versions WHERE run_id=?",
+                    (run_id,),
+                ).fetchone()
+                version_number = int(
+                    next_number_row["next_number"] if next_number_row is not None else 0
+                )
+                conn.execute(
+                    "INSERT INTO pipeline_run_versions"
+                    " (version_id, run_id, version_number, playbook_json,"
+                    " source, followup_id, parent_version_id, summary, created_at)"
+                    " VALUES (?, ?, ?, ?, 'interaction', NULL, ?, ?, ?)",
+                    (
+                        version_id,
+                        run_id,
+                        version_number,
+                        playbook_json,
+                        parent_version_id,
+                        summary,
+                        created_at,
+                    ),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO pipeline_run_directors
+                        (run_id, director_json, source, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(run_id) DO UPDATE SET
+                        director_json=excluded.director_json,
+                        source=excluded.source,
+                        updated_at=excluded.updated_at
+                    """,
+                    (
+                        run_id,
+                        director_json,
+                        director.source,
+                        created_at,
+                        created_at,
+                    ),
+                )
+                conn.execute(
+                    "UPDATE pipeline_runs"
+                    " SET playbook_json=?, quality_report_json=? WHERE run_id=?",
+                    (playbook_json, quality_report_json, run_id),
+                )
+                conn.commit()
+            except BaseException:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
+
+        await asyncio.to_thread(_sync)
+
     async def attach_followup_version(self, followup_id: str, version_id: str) -> None:
         def _sync() -> None:
             with self._connect() as conn:
@@ -359,21 +518,7 @@ class SqliteRunRepository:
                     if active is not None and active["playbook_json"]
                     else None
                 )
-                if active_playbook_json is not None:
-                    active_head = conn.execute(
-                        "SELECT version_id FROM pipeline_run_versions"
-                        " WHERE run_id=? AND playbook_json=?"
-                        " ORDER BY version_number DESC LIMIT 1",
-                        (run_id, active_playbook_json),
-                    ).fetchone()
-                    if active_head is not None:
-                        return str(active_head["version_id"])
-                row = conn.execute(
-                    "SELECT version_id FROM pipeline_run_versions"
-                    " WHERE run_id=? ORDER BY version_number DESC LIMIT 1",
-                    (run_id,),
-                ).fetchone()
-                return str(row["version_id"]) if row is not None else None
+                return _head_version_id(conn, run_id, active_playbook_json)
 
         return await asyncio.to_thread(_sync)
 
@@ -454,6 +599,28 @@ class SqliteRunRepository:
 
         rows, head_version_id = await asyncio.to_thread(_sync)
         return [_version_row_to_record(row, head_version_id) for row in rows]
+
+
+def _head_version_id(
+    conn: sqlite3.Connection,
+    run_id: str,
+    active_playbook_json: str | None,
+) -> str | None:
+    if active_playbook_json is not None:
+        active_head = conn.execute(
+            "SELECT version_id FROM pipeline_run_versions"
+            " WHERE run_id=? AND playbook_json=?"
+            " ORDER BY version_number DESC LIMIT 1",
+            (run_id, active_playbook_json),
+        ).fetchone()
+        if active_head is not None:
+            return str(active_head["version_id"])
+    row = conn.execute(
+        "SELECT version_id FROM pipeline_run_versions"
+        " WHERE run_id=? ORDER BY version_number DESC LIMIT 1",
+        (run_id,),
+    ).fetchone()
+    return str(row["version_id"]) if row is not None else None
 
 
 def _row_to_response(row: sqlite3.Row) -> PipelineRunResponse:

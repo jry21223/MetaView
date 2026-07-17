@@ -8,6 +8,16 @@ import {
   sampleExpr,
   sampleVectorField,
 } from "./mathExpr";
+import interactionContract from "../../../../../eval/fixtures/interaction_math_expr_contract.json";
+
+describe("mathExpr — interaction server contract", () => {
+  it.each(interactionContract)(
+    "matches the safe server evaluator for $expression",
+    ({ expression, params, x, expected }) => {
+      expect(compileExpr(expression)({ ...params, x })).toBeCloseTo(expected, 10);
+    },
+  );
+});
 
 describe("mathExpr — evaluation", () => {
   it("evaluates arithmetic with precedence", () => {

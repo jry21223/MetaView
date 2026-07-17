@@ -40,9 +40,13 @@ export async function submitPipeline(
   return (await response.json()) as SubmitPipelineResponse;
 }
 
-export async function getPipelineRun(runId: string): Promise<PipelineRunResult> {
+export async function getPipelineRun(
+  runId: string,
+  signal?: AbortSignal,
+): Promise<PipelineRunResult> {
   const response = await fetch(`${API_BASE_URL}/api/v1/runs/${runId}`, {
     credentials: "include",
+    signal,
   });
   if (!response.ok) {
     throw new Error(await readErrorMessage(response, "Failed to fetch run"));

@@ -1,6 +1,9 @@
 import { API_BASE_URL, readErrorMessage } from "../../../shared/api/httpClient";
 import type { DirectorScript, PlaybookScript } from "../../playbook/engine/types";
-import type { InteractionFollowUpContext } from "../../playbook/interaction/types";
+import type {
+  InteractionEvent,
+  InteractionFollowUpContext,
+} from "../../playbook/interaction/types";
 import type { ProviderSettings } from "../../providers/hooks/useProviderSettings";
 
 export interface FollowUpChatMessage {
@@ -44,6 +47,23 @@ export interface FollowUpResponse {
   version_id: string | null;
   playbook: PlaybookScript | null;
   director?: DirectorScript | null;
+}
+
+export interface ApplyInteractionVersionResponse {
+  version_id: string;
+  summary: string;
+  playbook: PlaybookScript;
+  director: DirectorScript;
+}
+
+export class InteractionVersionRequestError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "InteractionVersionRequestError";
+    this.status = status;
+  }
 }
 
 export async function submitRunFollowUp(
@@ -97,13 +117,44 @@ export async function listRunFollowUps(
   return (await response.json()) as RunFollowUpsResponse;
 }
 
+export async function applyRunInteractionVersion(
+  runId: string,
+  events: InteractionEvent[],
+  baseVersionId?: string | null,
+  signal?: AbortSignal,
+): Promise<ApplyInteractionVersionResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/v1/runs/${runId}/interaction-version`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        manifest_version: "1",
+        events,
+        base_version_id: baseVersionId ?? null,
+      }),
+      signal,
+    },
+  );
+  if (!response.ok) {
+    throw new InteractionVersionRequestError(
+      await readErrorMessage(response, "Failed to apply interaction version"),
+      response.status,
+    );
+  }
+  return (await response.json()) as ApplyInteractionVersionResponse;
+}
+
 export async function restoreRunVersion(
   runId: string,
   versionId: string,
+  signal?: AbortSignal,
 ): Promise<{ version_id: string; playbook: PlaybookScript; director?: DirectorScript | null }> {
   const response = await fetch(`${API_BASE_URL}/api/v1/runs/${runId}/versions/${versionId}/restore`, {
     method: "POST",
     credentials: "include",
+    signal,
   });
   if (!response.ok) {
     throw new Error(await readErrorMessage(response, "Version restore failed"));

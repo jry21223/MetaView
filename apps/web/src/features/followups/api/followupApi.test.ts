@@ -3,7 +3,13 @@ import { http, HttpResponse } from "msw";
 
 import { server } from "../../../mocks/server";
 import { API_BASE_URL } from "../../../shared/config/constants";
-import { listRunFollowUps, restoreRunVersion, submitRunFollowUp } from "./followupApi";
+import {
+  applyRunInteractionVersion,
+  InteractionVersionRequestError,
+  listRunFollowUps,
+  restoreRunVersion,
+  submitRunFollowUp,
+} from "./followupApi";
 
 describe("followupApi", () => {
   it("submits run follow-ups with provider override and returns patched playbook", async () => {
@@ -151,6 +157,75 @@ describe("followupApi", () => {
     expect(history.versions[0].is_head).toBe(true);
     expect(restored.version_id).toBe("v0");
     expect(restored.playbook.title).toBe("Original");
+  });
+
+  it("applies normalized interactions to an explicit child version", async () => {
+    let requestBody: unknown = null;
+    server.use(
+      http.post(
+        `${API_BASE_URL}/api/v1/runs/run-1/interaction-version`,
+        async ({ request }) => {
+          expect(request.credentials).toBe("include");
+          requestBody = await request.json();
+          return HttpResponse.json({
+            version_id: "v2",
+            summary: "Moved the tangent point.",
+            playbook: playbook("Interaction version"),
+            director: { schema_version: "1.0.0", run_id: "run-1", beats: [] },
+          });
+        },
+      ),
+    );
+
+    const result = await applyRunInteractionVersion(
+      "run-1",
+      [{
+        adapter_id: "math.derivative-tangent",
+        step_id: "plot",
+        target_id: "step:plot:marker-x",
+        action: "set-value",
+        value: 3,
+        sequence: 1,
+      }],
+      "v1",
+    );
+
+    expect(result.version_id).toBe("v2");
+    expect(requestBody).toMatchObject({
+      manifest_version: "1",
+      base_version_id: "v1",
+      events: [{ target_id: "step:plot:marker-x", value: 3 }],
+    });
+  });
+
+  it("preserves the response status for interaction version conflicts", async () => {
+    server.use(
+      http.post(`${API_BASE_URL}/api/v1/runs/run-1/interaction-version`, () =>
+        HttpResponse.json({ detail: "stale interaction base" }, { status: 409 }),
+      ),
+    );
+
+    const request = applyRunInteractionVersion(
+      "run-1",
+      [{
+        adapter_id: "math.derivative-tangent",
+        step_id: "plot",
+        target_id: "step:plot:marker-x",
+        action: "set-value",
+        value: 3,
+        sequence: 1,
+      }],
+      "v1",
+    );
+
+    await expect(request).rejects.toEqual(expect.objectContaining({
+      name: "InteractionVersionRequestError",
+      message: "stale interaction base",
+      status: 409,
+    }));
+    await request.catch((error) => {
+      expect(error).toBeInstanceOf(InteractionVersionRequestError);
+    });
   });
 });
 

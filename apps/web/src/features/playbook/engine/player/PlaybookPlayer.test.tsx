@@ -903,6 +903,7 @@ describe("PlaybookPlayer", () => {
     );
 
     expect(view.getByText("Explore")).toBeTruthy();
+    expect(view.queryByText("此步骤无可调参数。")).toBeNull();
     expect(view.getByTestId("mock-remotion-player").getAttribute("data-has-interaction"))
       .toBe("true");
 
@@ -944,6 +945,92 @@ describe("PlaybookPlayer", () => {
         sequence: 1,
       })],
     });
+  });
+
+  it("persists semantic sandbox events only through the explicit apply button", async () => {
+    const onApplyInteractionVersion = vi.fn().mockResolvedValue(undefined);
+    const view = render(
+      <PlaybookPlayer
+        script={derivativeScript()}
+        theme="light"
+        enableInteractionSandbox
+        onApplyInteractionVersion={onApplyInteractionVersion}
+      />,
+    );
+
+    expect(onApplyInteractionVersion).not.toHaveBeenCalled();
+    const slider = view.getByRole("slider", { name: "切点 x" });
+    fireEvent.change(slider, { target: { value: "2" } });
+    fireEvent.pointerUp(slider);
+    expect(onApplyInteractionVersion).not.toHaveBeenCalled();
+
+    fireEvent.click(view.getByRole("button", { name: "应用到新版本" }));
+
+    await waitFor(() => expect(onApplyInteractionVersion).toHaveBeenCalledTimes(1));
+    expect(onApplyInteractionVersion).toHaveBeenCalledWith([
+      expect.objectContaining({
+        adapter_id: "math.derivative-tangent",
+        step_id: "plot",
+        target_id: "step:plot:marker-x",
+        action: "set-value",
+        value: 2,
+        sequence: 1,
+      }),
+    ]);
+  });
+
+  it("acknowledges a saved round-trip and clears identical-content sandbox history", async () => {
+    const onApplyInteractionVersion = vi.fn().mockResolvedValue(undefined);
+    const view = render(
+      <PlaybookPlayer
+        script={derivativeScript()}
+        theme="light"
+        enableInteractionSandbox
+        onApplyInteractionVersion={onApplyInteractionVersion}
+      />,
+    );
+
+    const slider = view.getByRole("slider", { name: "切点 x" });
+    fireEvent.change(slider, { target: { value: "2" } });
+    fireEvent.pointerUp(slider);
+    fireEvent.change(slider, { target: { value: "1" } });
+    fireEvent.pointerUp(slider);
+    expect(view.getByText("2 个未保存操作")).toBeTruthy();
+
+    fireEvent.click(view.getByRole("button", { name: "应用到新版本" }));
+
+    await waitFor(() => expect(onApplyInteractionVersion).toHaveBeenCalledTimes(1));
+    expect(onApplyInteractionVersion.mock.calls[0]?.[0]).toHaveLength(2);
+    await waitFor(() => {
+      expect(view.getByText("不会修改原课程")).toBeTruthy();
+      expect(
+        view.getByRole<HTMLButtonElement>("button", { name: "应用到新版本" }).disabled,
+      ).toBe(true);
+    });
+  });
+
+  it("opens the portrait follow-up sheet after an apply outcome", async () => {
+    const onApplyInteractionVersion = vi.fn().mockResolvedValue(undefined);
+    const view = render(
+      <PlaybookPlayer
+        script={derivativeScript()}
+        theme="light"
+        layoutMode="portrait"
+        enableInteractionSandbox
+        onApplyInteractionVersion={onApplyInteractionVersion}
+        followupSlot={<div>版本保存结果</div>}
+      />,
+    );
+
+    fireEvent.click(view.getByRole("tab", { name: "参数" }));
+    const slider = view.getByRole("slider", { name: "切点 x" });
+    fireEvent.change(slider, { target: { value: "2" } });
+    fireEvent.pointerUp(slider);
+    fireEvent.click(view.getByRole("button", { name: "应用到新版本" }));
+
+    await waitFor(() => expect(onApplyInteractionVersion).toHaveBeenCalledTimes(1));
+    expect(view.container.querySelector(".playbook-player__mobile-sheet")).toBeTruthy();
+    expect(view.getByText("版本保存结果")).toBeTruthy();
   });
 
   it("keeps recovery controls after navigating away from the bound plot", async () => {
