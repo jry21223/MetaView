@@ -119,7 +119,6 @@ class ExportVideoUseCase:
                 playbook_model = PlaybookScript.model_validate_json(playbook_json)
             else:
                 playbook_model = run.playbook
-            previous_quality = run.quality_report
             export_quality = self._build_export_quality_report(playbook_model, run)
             if export_quality.status == "repairable":
                 export_quality = export_quality.with_issue(
