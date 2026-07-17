@@ -3,7 +3,7 @@ import { useCurrentFrame } from "remotion";
 import type { DirectorScript, PlaybookScript } from "../types";
 import { CodeHighlightRenderer } from "../renderers/CodeHighlightRenderer";
 import { useStepProgress } from "./useInterpolatedState";
-import type { RendererProps } from "../renderers/types";
+import type { RendererInteractionEvent, RendererProps } from "../renderers/types";
 import { PLAYBOOK_LAYOUT } from "../../../../shared/config/constants";
 import { rendererRegistry } from "../renderers/registry";
 import { appearTransform, useTimeline } from "../foundation";
@@ -24,6 +24,8 @@ interface PlaybookCompositionProps {
   showInlineCode?: boolean;
   /** Total frames for the bar-swap animation; forwarded to renderers. */
   swapDurationFrames?: number;
+  /** Browser-only semantic interaction channel; omitted by export renders. */
+  onInteraction?: (event: RendererInteractionEvent) => void;
 }
 
 function stageBackground(theme: "dark" | "light"): string {
@@ -96,6 +98,7 @@ function LayerSlot({
   director,
   script,
   frame,
+  interactiveLayerKey,
 }: {
   layerState: VisualLayerState;
   baseProps: RendererProps;
@@ -104,6 +107,7 @@ function LayerSlot({
   director?: DirectorScript | null;
   script: PlaybookScript;
   frame: number;
+  interactiveLayerKey?: string;
 }) {
   const { layer } = layerState;
   const slice = useTimeline(layer.timing, stepProgress);
@@ -137,6 +141,9 @@ function LayerSlot({
   const appear = renderMode === "stage-base" || layerState.isVisualContinuation
     ? appearTransform("none", 1)
     : appearTransform(slice.anim, slice.progress);
+  const layerOnInteraction = layerState.visualKey === interactiveLayerKey
+    ? baseProps.onInteraction
+    : undefined;
   return (
     <div
       className="scene-compositor__layer"
@@ -162,6 +169,7 @@ function LayerSlot({
         isVisualContinuation: layerState.isVisualContinuation,
         renderMode,
         directorFrame: layerDirectorFrame,
+        onInteraction: layerOnInteraction,
       })}
     </div>
   );
@@ -194,6 +202,18 @@ function SceneCompositor({
   const firstStageLayerKey = layers.find(
     (layerState) => snapshotSurface(layerState.layer.body.kind) === "stage",
   )?.visualKey;
+  const declaredMathLayerCount = baseProps.step.layers?.length
+    ? baseProps.step.layers.filter((layer) => layer.body.kind === "math_plot").length
+    : baseProps.step.snapshot.kind === "math_plot" ? 1 : 0;
+  const renderedMathLayers = layers.filter(
+    (layerState) => layerState.layer.body.kind === "math_plot",
+  );
+  const interactiveLayerKey =
+    baseProps.onInteraction &&
+    declaredMathLayerCount === 1 &&
+    renderedMathLayers.length === 1
+      ? renderedMathLayers[0].visualKey
+      : undefined;
   return (
     <div
       className="scene-compositor"
@@ -214,6 +234,7 @@ function SceneCompositor({
           director={director}
           script={script}
           frame={frame}
+          interactiveLayerKey={interactiveLayerKey}
         />
       ))}
     </div>
@@ -228,6 +249,7 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
   showDiagnostics = false,
   showInlineCode = false,
   swapDurationFrames,
+  onInteraction,
 }) => {
   const frame = useCurrentFrame();
   const visualTimeline = React.useMemo(() => compileVisualTimeline(script), [script]);
@@ -306,6 +328,7 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
     visualKey: visualState?.visualKey,
     isVisualContinuation: visualState?.isVisualContinuation,
     directorFrame,
+    onInteraction,
   };
 
   return (

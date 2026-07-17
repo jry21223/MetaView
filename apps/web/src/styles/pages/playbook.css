@@ -1356,6 +1356,18 @@
   overflow: auto;
 }
 
+.playbook-player__mobile-param-panel .playbook-interaction__choice button,
+.playbook-player__mobile-param-panel .playbook-interaction__actions button,
+.playbook-player__mobile-sheet-section .playbook-interaction__choice button,
+.playbook-player__mobile-sheet-section .playbook-interaction__actions button {
+  min-height: 44px;
+}
+
+.playbook-player__mobile-param-panel .playbook-interaction__range input,
+.playbook-player__mobile-sheet-section .playbook-interaction__range input {
+  min-height: 44px;
+}
+
 .playbook-player__mobile-empty {
   min-height: 74px;
   display: grid;

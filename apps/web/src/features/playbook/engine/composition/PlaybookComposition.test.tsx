@@ -391,6 +391,28 @@ describe("PlaybookComposition", () => {
     expect(markup).not.toContain("Unknown snapshot kind");
   });
 
+  it("keeps a legacy plot interactive when an empty layers array falls back to its snapshot", () => {
+    const script = mathScript();
+    script.steps[0] = {
+      ...script.steps[0],
+      snapshot: {
+        ...(script.steps[0].snapshot as MathPlotSnapshot),
+        marker_x: 1,
+      },
+      layers: [],
+    };
+    const markup = renderToStaticMarkup(
+      <PlaybookComposition
+        script={script}
+        showSubtitles={false}
+        onInteraction={vi.fn()}
+      />,
+    );
+
+    expect(markup).toContain('role="slider"');
+    expect(markup).toContain('data-interaction-target="marker-x"');
+  });
+
   it("renders the motion scene demo through the renderer registry", () => {
     const markup = renderToStaticMarkup(<PlaybookComposition script={motionScript()} showSubtitles={false} />);
     expect(markup).toContain("motion-scene-renderer");
@@ -518,6 +540,20 @@ describe("PlaybookComposition", () => {
     expect(markup.match(/class="math-plot-renderer"/g)).toHaveLength(1);
     expect(markup).toContain("tangent");
     expect(markup).toContain("<polygon");
+  });
+
+  it("fails closed instead of attaching input to an ambiguous multi-plot layer", () => {
+    remotionState.frame = 30;
+    const markup = renderToStaticMarkup(
+      <PlaybookComposition
+        script={layeredMathScript()}
+        showSubtitles={false}
+        onInteraction={vi.fn()}
+      />,
+    );
+
+    expect(markup).not.toContain('role="slider"');
+    expect(markup).not.toContain('data-interaction-target="marker-x"');
   });
 
   it("renders only the first stage layer with full math scene chrome", () => {

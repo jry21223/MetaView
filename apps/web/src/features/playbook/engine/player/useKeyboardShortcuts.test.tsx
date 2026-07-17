@@ -5,7 +5,12 @@ import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 
 function Harness(props: Parameters<typeof useKeyboardShortcuts>[0]): React.ReactElement {
   useKeyboardShortcuts(props);
-  return <input data-testid="focus-target" />;
+  return (
+    <>
+      <input data-testid="focus-target" />
+      <div data-testid="slider-target" role="slider" tabIndex={0} aria-valuenow={1} />
+    </>
+  );
 }
 
 function press(key: string, target: EventTarget | null = document) {
@@ -66,6 +71,20 @@ describe("useKeyboardShortcuts", () => {
     press(" ", input);
     expect(onEscape).toHaveBeenCalledTimes(1);
     expect(onPlayPause).not.toHaveBeenCalled(); // suppressed while input focused
+  });
+
+  it("does not turn slider Arrow keys into lesson navigation", () => {
+    const onPrev = vi.fn();
+    const onNext = vi.fn();
+    const { getByTestId } = render(<Harness onPrev={onPrev} onNext={onNext} />);
+    const slider = getByTestId("slider-target");
+    slider.focus();
+
+    press("ArrowLeft", slider);
+    press("ArrowRight", slider);
+
+    expect(onPrev).not.toHaveBeenCalled();
+    expect(onNext).not.toHaveBeenCalled();
   });
 
   it("toggles TTS / subtitles via t / s", () => {
