@@ -80,7 +80,7 @@ export function GlobalTopbar({
   return (
     <header className="mv-top">
       <div className="mv-brand">
-        <span className="mv-brand-strip" />
+        <img className="mv-brand-strip" src="/brand/metaview-mark.svg" alt="" />
         <span className="mv-brand-copy">
           <span className="mv-brand-name">MetaView</span>
           <span className="mv-brand-meta">THEORETICAL CANVAS</span>

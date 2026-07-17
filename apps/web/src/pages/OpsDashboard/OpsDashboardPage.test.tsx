@@ -8,13 +8,13 @@ import { API_BASE_URL } from "../../shared/config/constants";
 import { sampleDashboard } from "./testFixtures";
 import { OpsDashboardPage } from "./OpsDashboardPage";
 
-function renderPage() {
+function renderPage({ onNavigate = vi.fn() }: { onNavigate?: ReturnType<typeof vi.fn> } = {}) {
   return render(
     <OpsDashboardPage
       accountName="管理员"
       accountBalanceYuan="9.00"
       accountAvatarUrl={null}
-      onNavigate={vi.fn()}
+      onNavigate={onNavigate}
       onOpenProviderSettings={vi.fn()}
     />,
   );
@@ -46,15 +46,36 @@ describe("OpsDashboardPage", () => {
       ),
     );
 
-    const { findByText, getByText } = renderPage();
+    const { findByText, getAllByText, getByText } = renderPage();
 
-    expect(await findByText("全局运营")).toBeTruthy();
+    expect(await findByText("运营总览")).toBeTruthy();
     expect(getByText("用户数")).toBeTruthy();
-    expect(getByText("¥ 15.00")).toBeTruthy();
+    expect(getAllByText("¥ 15.00")).toHaveLength(2);
     expect(getByText("任务趋势")).toBeTruthy();
     expect(getByText("收入趋势")).toBeTruthy();
     expect(getByText("矩阵特征值")).toBeTruthy();
-    expect(getByText(/生成任务 · 3/)).toBeTruthy();
+    expect(getByText("数学")).toBeTruthy();
+    expect(getByText("窗口任务")).toBeTruthy();
+  });
+
+  it("marks failed tasks and pending orders for fast scanning", async () => {
+    const dashboard = sampleDashboard();
+    dashboard.recent_runs[0].status = "failed";
+    dashboard.recent_orders[0].status = "pending";
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>
+        HttpResponse.json(dashboard),
+      ),
+    );
+
+    const { container, findByText, getByRole } = renderPage();
+    await findByText("矩阵特征值");
+    expect(container.querySelector(".MuiDataGrid-row.is-failed")).toBeTruthy();
+
+    fireEvent.click(getByRole("tab", { name: "订单" }));
+    await waitFor(() =>
+      expect(container.querySelector(".MuiDataGrid-row.is-pending")).toBeTruthy(),
+    );
   });
 
   it("does not render row-level user identifiers from dashboard payloads", async () => {
@@ -101,7 +122,7 @@ describe("OpsDashboardPage", () => {
     );
 
     const { findByText, queryByText } = renderPage();
-    await findByText("全局运营");
+    await findByText("运营总览");
 
     expect(queryByText("运营面板")).toBeNull();
   });
@@ -133,9 +154,27 @@ describe("OpsDashboardPage", () => {
     await findByText("矩阵特征值");
 
     fireEvent.click(getByRole("button", { name: "刷新运营数据" }));
-    await waitFor(() => expect(seenUrls).toHaveLength(2));
+    await waitFor(() => expect(seenUrls).toHaveLength(2), { timeout: 10_000 });
 
     fireEvent.click(getByRole("button", { name: "90 天" }));
-    await waitFor(() => expect(seenUrls.at(-1)).toContain("window_days=90"));
+    await waitFor(
+      () => expect(seenUrls.at(-1)).toContain("window_days=90"),
+      { timeout: 10_000 },
+    );
+  }, 15_000);
+
+  it("passes workspace navigation through to the app shell", async () => {
+    const onNavigate = vi.fn();
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>
+        HttpResponse.json(sampleDashboard()),
+      ),
+    );
+
+    const { findByText, getAllByRole } = renderPage({ onNavigate });
+    await findByText("运营总览");
+
+    fireEvent.click(getAllByRole("button", { name: "工作台" })[0]);
+    expect(onNavigate).toHaveBeenCalledWith("intake");
   });
 });

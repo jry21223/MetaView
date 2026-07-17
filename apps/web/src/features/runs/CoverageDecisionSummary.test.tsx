@@ -6,6 +6,13 @@ import type {
 } from "../../entities/pipeline/types";
 import { CoverageDecisionSummary } from "./CoverageDecisionSummary";
 
+const MODE_EXPECTATION: Record<CoverageMode, string> = {
+  specialized: "专用能力",
+  composable: "受控组合",
+  experimental: "实验性",
+  unsupported: "不支持",
+};
+
 function decision(mode: CoverageMode): CoverageDecision {
   const fallbackByMode: Record<CoverageMode, CoverageDecision["fallback_policy"]> = {
     specialized: "use_skill",
@@ -42,19 +49,22 @@ describe("CoverageDecisionSummary", () => {
 
     const summary = screen.getByLabelText("能力覆盖判定");
     expect(summary.getAttribute("data-coverage-mode")).toBe(mode);
-    expect(screen.getByText(mode)).not.toBeNull();
-    expect(screen.getByText("algorithm")).not.toBeNull();
+    expect(screen.getByText(MODE_EXPECTATION[mode])).not.toBeNull();
+    expect(screen.getByText("算法")).not.toBeNull();
     expect(screen.getByText("92%")).not.toBeNull();
   });
 
   it("shows a user-readable summary without engineering identifiers by default", () => {
     render(<CoverageDecisionSummary decision={decision("unsupported")} />);
 
-    expect(screen.getByText("unsupported coverage reason")).not.toBeNull();
+    expect(
+      screen.getByText("当前能力不足，暂时不能安全生成可播放讲解。"),
+    ).not.toBeNull();
+    expect(screen.queryByText("unsupported coverage reason")).toBeNull();
     expect(screen.queryByText("algorithm.binary_search")).toBeNull();
     expect(screen.queryByText("scene_blueprint.compile")).toBeNull();
     expect(screen.queryByText("algorithm.state_validator")).toBeNull();
-    expect(screen.getByText("reject")).not.toBeNull();
+    expect(screen.getByText("不生成")).not.toBeNull();
   });
 
   it("shows capability identifiers only in technical review mode", () => {
@@ -69,6 +79,7 @@ describe("CoverageDecisionSummary", () => {
     expect(screen.getByText("scene_blueprint.compile")).not.toBeNull();
     expect(screen.getByText("playbook.self_check")).not.toBeNull();
     expect(screen.getByText("algorithm.state_validator")).not.toBeNull();
+    expect(screen.getByText("unsupported coverage reason")).not.toBeNull();
   });
 
   it("renders nothing when the backend has no coverage decision", () => {

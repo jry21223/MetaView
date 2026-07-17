@@ -61,6 +61,22 @@ direct instructions first, then this file, then the rest of the repo docs.
   `build_default_skill_registry()`. Do not add skill-specific branches to
   `RunPipelineUseCase`.
 
+## Frontend Design Contract
+
+- Before changing any `apps/web` UI, layout, styling, interaction, or visible
+  copy, read the repository-root `DESIGN.md` in full and inspect the relevant
+  runtime theme implementation. Do not start from remembered or generic design
+  conventions.
+- Treat `DESIGN.md` as the product-design source of truth and reconcile it with
+  `shared/config/themePalette.ts`, `themeVars()`, and the affected page CSS. If
+  they disagree, do not silently choose one; update the implementation and the
+  documentation together or call out the unresolved migration explicitly.
+- App-shell and page styles must consume the semantic CSS variables defined by
+  the design contract. Do not introduce fixed colors, radii, or motion timings
+  in page JSX or CSS when an existing semantic token or documented role applies.
+- Validate visual changes at the viewports required by the `DESIGN.md` review
+  checklist, including the relevant desktop and mobile sizes.
+
 ## Validation
 
 - Match validation to risk. For broad changes, run `make check`.

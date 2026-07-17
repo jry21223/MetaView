@@ -64,7 +64,7 @@ class SqliteOpsDashboardRepository:
         with self._connect() as conn:
             accounts = conn.execute(
                 """
-                SELECT user_id, role, status, balance_cents, created_at
+                SELECT user_id, role, status, login_provider, balance_cents, created_at
                 FROM accounts
                 """
             ).fetchall()
@@ -243,20 +243,25 @@ def _build_kpis(
     revenue_trend: list[OpsRevenueTrendPoint],
     window: _Window,
 ) -> list[OpsMetricCard]:
-    total_users = len(accounts)
+    wechat_accounts = [row for row in accounts if row["login_provider"] == "wechat"]
+    wechat_user_ids = {row["user_id"] for row in wechat_accounts}
+    total_users = len(wechat_accounts)
     new_users = sum(
-        1 for row in accounts if _in_window(row["created_at"], window.start, window.end)
+        1
+        for row in wechat_accounts
+        if _in_window(row["created_at"], window.start, window.end)
     )
     active_users = len(
         {
             row["user_id"]
             for row in runs
-            if row["user_id"] and _in_window(row["created_at"], window.start, window.end)
+            if row["user_id"] in wechat_user_ids
+            and _in_window(row["created_at"], window.start, window.end)
         }
     )
     admin_users = sum(
         1
-        for row in accounts
+        for row in wechat_accounts
         if row["role"] == "admin" and row["status"] == "enabled"
     )
     run_total = sum(point.total for point in run_trend)
@@ -292,7 +297,7 @@ def _build_kpis(
             helper=f"近窗新增 {new_users}，活跃 {active_users}，管理员 {admin_users}",
             trend="up" if new_users > 0 else "neutral",
             delta_percent=_delta_percent(new_users, max(total_users - new_users, 0)),
-            data=_daily_new_users(accounts, window),
+            data=_daily_new_users(wechat_accounts, window),
         ),
         OpsMetricCard(
             id="runs",
