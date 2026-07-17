@@ -970,8 +970,8 @@ describe("PlaybookPlayer", () => {
     expect(onApplyInteractionVersion).toHaveBeenCalledWith([
       expect.objectContaining({
         adapter_id: "math.derivative-tangent",
-        step_id: "s1",
-        target_id: "step:s1:marker-x",
+        step_id: "plot",
+        target_id: "step:plot:marker-x",
         action: "set-value",
         value: 2,
         sequence: 1,
