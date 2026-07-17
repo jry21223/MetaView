@@ -29,6 +29,8 @@ interface SettingsPageProps {
   /** Appearance tweaks (theme / density / layout). */
   tweaks: TweakValues;
   setTweak: SetTweakFn;
+  isAuthenticated?: boolean;
+  onRequireLogin?: () => void;
 }
 
 const DENSITY_OPTIONS: Array<{ id: TweakValues["density"]; label: string }> = [
@@ -83,6 +85,8 @@ export function SettingsPage({
   onUpdateProvider,
   tweaks,
   setTweak,
+  isAuthenticated = true,
+  onRequireLogin,
 }: SettingsPageProps) {
   const showProviderSettings = appEdition === "self";
   const [apiKey, setApiKey] = useState(providerSettings?.apiKey ?? "");
@@ -161,6 +165,10 @@ export function SettingsPage({
    *  full playback. 503 from the proxy means the env var isn't configured;
    *  surface that message directly. */
   const handleTtsProbe = async () => {
+    if (!isAuthenticated && appEdition === "ops") {
+      onRequireLogin?.();
+      return;
+    }
     setTtsProbe({ kind: "loading" });
     try {
       const resp = await fetch(`${API_BASE_URL}/api/v1/tts/speech`, {

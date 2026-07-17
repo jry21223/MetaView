@@ -9,7 +9,8 @@
 /create       -> IntakeScreen
 /run/:runId   -> StudioPage
 /history      -> HistoryPage
-/templates    -> TemplatesPage
+/cases        -> TemplatesPage（公开案例）
+/templates    -> 重定向到 /cases
 /settings     -> SettingsPage
 ```
 
@@ -43,7 +44,7 @@ intake                -> /create
 workbench + runId     -> /run/:runId
 workbench without id  -> /create
 history               -> /history
-templates             -> /templates
+templates             -> /cases（`/templates` 兼容重定向）
 settings              -> /settings
 ```
 
@@ -54,8 +55,7 @@ settings              -> /settings
 `/create` 只呈现一个单列输入面，不在前端显示或推断学科、Coverage、Skill、
 LessonPlan 或 Director。教师可以输入题目/知识点、粘贴代码，或附加一个代码文件；
 “导数与切线 / 二分查找 / 抛体运动”三个按钮只填入自然语言 prompt，不提交、
-不选择模板，也不写入 domain。`/cases` 是精选案例的稳定目标路径，由后续公共案例
-阶段实现。
+不选择模板，也不写入 domain。`/cases` 是精选案例的规范地址：可浏览、筛选和播放确定性静态预览；没有可靠 fixture 的案例会明确标记“暂无静态预览”。选择案例只预填 `/create`，不会提交 pipeline。`/templates` 保留为兼容重定向。
 
 正常 Web 提交统一经过 `usePipelineSubmit`，始终发送 `domain: null`：
 
@@ -67,6 +67,11 @@ LessonPlan 或 Director。教师可以输入题目/知识点、粘贴代码，�
 这意味着 Web Intake 只收集证据，最终 domain 和能力路径由后端 Router、
 CoverageResolver 与 Skill registry 决定。API 仍允许内部调用方显式提供 domain，
 但应用 Shell 不使用该兼容入口。
+## 运营版游客边界
+
+运营版不再使用全局登录墙。游客可以浏览 `/`、`/create`、`/cases` 和 `/settings`，并在本地填写题目、代码、外观与浏览器语音设置。`/history` 与 `/run/:runId` 保持原路径并显示就地微信登录提示，页面不会挂载受保护的数据 Hook。
+
+游客点击“生成讲解”时，完整输入草稿先保存在 `sessionStorage`，随后打开独立微信登录对话框；不会先调用 pipeline。OAuth 回到 `/` 后只恢复受控站内路径，并在回到 `/create` 后自动提交一次已确认草稿。失败时草稿保留，取消登录或服务未配置也不会替换公共页面。账户、余额、充值、任务历史、已有运行、保存/导出和平台 TTS 仍要求登录。
 
 ## GlobalTopbar
 
@@ -86,7 +91,7 @@ interface GlobalTopbarProps {
 ```
 
 - `stage="intake" | "workbench"` 时“工作台”高亮。
-- “任务历史 / 模板 / 设置”分别对应独立路由。
+- “任务历史 / 案例 / 设置”分别对应独立路由。
 - Provider 状态在 self edition 中保持安静；未配置引导由输入和追问流程承担。
 - 工作台可在桌面端折叠 Topbar，移动端始终恢复可见。
 

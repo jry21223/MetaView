@@ -14,6 +14,7 @@ interface GlobalTopbarProps {
   accountBalanceYuan?: string | null;
   accountName?: string | null;
   accountAvatarUrl?: string | null;
+  accountState?: "loading" | "guest" | "authenticated";
   onNavigate: (stage: Stage) => void;
   isDark: boolean;
   onToggleTheme: () => void;
@@ -54,6 +55,7 @@ export function GlobalTopbar({
   accountBalanceYuan,
   accountName,
   accountAvatarUrl,
+  accountState = "authenticated",
   onNavigate,
   isDark,
   onToggleTheme,
@@ -75,7 +77,7 @@ export function GlobalTopbar({
   const accountOrProviderHandler =
     appEdition === "ops" ? onOpenAccountPanel : onOpenProviderSettings;
   const accountOrProviderLabel =
-    appEdition === "ops" ? "账户与充值" : "模型服务商设置";
+    appEdition === "ops" ? (accountState === "guest" ? "微信登录" : "账户与充值") : "模型服务商设置";
 
   return (
     <header className="mv-top">
@@ -127,7 +129,7 @@ export function GlobalTopbar({
               <path d="M5 14h6v6H5z" />
               <path d="M13 14h6v6h-6z" />
             </svg>
-            模板
+            案例
           </button>
           <button
             className={`mv-nav-item ${isSettings ? "is-active" : ""}`}
@@ -157,7 +159,9 @@ export function GlobalTopbar({
           isProviderConfigured) && (
           <div className="mv-status">
             {appEdition === "ops" ? (
-              accountBalanceYuan != null ? (
+              accountState === "guest" ? (
+                <span>登录后可查看账户与任务</span>
+              ) : accountBalanceYuan != null ? (
                 <>
                   <span className="mv-pulse" />
                   <span>

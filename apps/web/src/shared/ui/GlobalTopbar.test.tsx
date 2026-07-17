@@ -45,7 +45,7 @@ describe("GlobalTopbar account avatar", () => {
     expect(queryByText("工作台")).toBeTruthy();
     expect(queryByText("首页")).toBeNull();
     expect(queryByText("任务历史")).toBeTruthy();
-    expect(queryByText("模板")).toBeTruthy();
+    expect(queryByText("案例")).toBeTruthy();
     expect(queryByText("设置")).toBeTruthy();
   });
 
@@ -62,7 +62,7 @@ describe("GlobalTopbar account avatar", () => {
     expect(getByText("MetaView")).toBeTruthy();
     expect(queryByText("工作台")).toBeNull();
     expect(queryByText("任务历史")).toBeNull();
-    expect(queryByText("模板")).toBeNull();
+    expect(queryByText("案例")).toBeNull();
     expect(queryByText("设置")).toBeNull();
     expect(getByLabelText("账户与充值")).toBeTruthy();
     expect(getByLabelText("切换主题")).toBeTruthy();
@@ -84,7 +84,7 @@ describe("GlobalTopbar account avatar", () => {
 
     fireEvent.click(getByRole("button", { name: "工作台" }));
     fireEvent.click(getByRole("button", { name: "任务历史" }));
-    fireEvent.click(getByRole("button", { name: "模板" }));
+    fireEvent.click(getByRole("button", { name: "案例" }));
     fireEvent.click(getByRole("button", { name: "设置" }));
 
     expect(onNavigate).toHaveBeenNthCalledWith(1, "intake");

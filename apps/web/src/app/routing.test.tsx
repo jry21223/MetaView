@@ -99,7 +99,7 @@ describe("App routing", () => {
     expect(getByText("把一道题，变成一段看得见的理解过程。")).toBeTruthy();
   });
 
-  it("shows the ops login gate for logged-out /run/:runId deep links", async () => {
+  it("keeps logged-out /run/:runId deep links in place behind a route-level login prompt", async () => {
     server.use(
       http.get(`${API_BASE_URL}/api/v1/account/me`, () =>
         HttpResponse.json({ detail: "请先使用微信登录" }, { status: 401 }),
@@ -114,7 +114,7 @@ describe("App routing", () => {
     const { App } = await import("./App");
     const { getByText } = render(<App />);
 
-    await waitFor(() => expect(getByText("登录暂未开放，请联系管理员。")).toBeTruthy());
+    await waitFor(() => expect(getByText("登录后继续使用")).toBeTruthy());
     expect(window.location.pathname).toBe("/run/run-1");
   });
 });

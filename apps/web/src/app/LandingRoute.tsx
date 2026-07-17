@@ -11,6 +11,7 @@ import { LandingPage } from "../pages/Landing/LandingPage";
 import type { AppEdition } from "../shared/config/constants";
 import { THEME_PALETTE } from "../shared/config/themePalette";
 import { useVisualViewportHeight } from "../shared/hooks/useVisualViewportHeight";
+import { consumePostLoginPath } from "./opsGuestAccess";
 
 export function LandingRoute({ appEdition }: { appEdition: AppEdition }) {
   useVisualViewportHeight();
@@ -21,6 +22,12 @@ export function LandingRoute({ appEdition }: { appEdition: AppEdition }) {
     themeMode(t),
   );
   const mode = landingTheme;
+
+  useEffect(() => {
+    if (appEdition !== "ops") return;
+    const path = consumePostLoginPath();
+    if (path) navigate(path, { replace: true });
+  }, [appEdition, navigate]);
   const css = useMemo(
     () =>
       themeVars({

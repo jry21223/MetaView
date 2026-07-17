@@ -40,6 +40,7 @@ interface IntakeScreenProps {
   submitError?: string | null;
   /** Seeds the composer once on mount (e.g. editing a failed run's prompt). */
   initialPrompt?: string;
+  initialDraft?: IntakeContext | null;
 }
 
 type LocalSubmitStatus = "idle" | "reading-file" | "submitting";
@@ -77,9 +78,11 @@ export function IntakeScreen({
   isSubmitting = false,
   submitError = null,
   initialPrompt = "",
+  initialDraft = null,
 }: IntakeScreenProps) {
-  const [input, setInput] = useState(initialPrompt);
+  const [input, setInput] = useState(initialDraft?.prompt ?? initialPrompt);
   const [attachment, setAttachment] = useState<File | null>(null);
+  const [restoredAttachment, setRestoredAttachment] = useState<IntakeContext | null>(initialDraft?.sourceCode ? initialDraft : null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [submitStatus, setSubmitStatus] =
     useState<LocalSubmitStatus>("idle");
@@ -113,12 +116,14 @@ export function IntakeScreen({
     }
 
     setAttachment(nextFile);
+    setRestoredAttachment(null);
     setFileError(null);
   };
 
   const removeFile = () => {
     if (pending) return;
     setAttachment(null);
+    setRestoredAttachment(null);
     setFileError(null);
     if (fileRef.current) fileRef.current.value = "";
   };
@@ -131,6 +136,12 @@ export function IntakeScreen({
     setFileError(null);
 
     try {
+      if (restoredAttachment?.sourceCode) {
+        setSubmitStatus("submitting");
+        await onSubmit(restoredAttachment);
+        return;
+      }
+
       if (!attachment) {
         setSubmitStatus("submitting");
         await onSubmit({ prompt });
@@ -229,17 +240,17 @@ export function IntakeScreen({
               }}
             />
 
-            {attachment && (
+            {(attachment || restoredAttachment?.sourceCode) && (
               <div
                 className="mv-intake-file"
-                title={`${attachment.name} · ${fileSizeLabel(attachment.size)}`}
+                title={`${attachment?.name ?? restoredAttachment?.sourceFilename ?? "code"} · ${fileSizeLabel(attachment?.size ?? restoredAttachment?.sourceSizeBytes ?? 0)}`}
               >
-                <span className="mv-file-name">{attachment.name}</span>
-                <small>{fileSizeLabel(attachment.size)}</small>
+                <span className="mv-file-name">{attachment?.name ?? restoredAttachment?.sourceFilename ?? "code"}</span>
+                <small>{fileSizeLabel(attachment?.size ?? restoredAttachment?.sourceSizeBytes ?? 0)}</small>
                 <button
                   className="mv-intake-file__remove"
                   type="button"
-                  aria-label={`删除 ${attachment.name}`}
+                  aria-label={`删除 ${attachment?.name ?? restoredAttachment?.sourceFilename ?? "code"}`}
                   title="删除代码文件"
                   disabled={pending}
                   onClick={removeFile}

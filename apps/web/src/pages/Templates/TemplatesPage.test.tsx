@@ -11,15 +11,20 @@ describe("TemplatesPage lesson atlas", () => {
     vi.restoreAllMocks();
   });
 
-  it("runs the selected template prompt", () => {
+  it("previews a selected case and only starts it from the explicit CTA", () => {
     const onUseTemplate = vi.fn();
-    const { getByRole } = render(
+    const { getByRole, getByText } = render(
       <TemplatesPage onUseTemplate={onUseTemplate} />,
     );
 
-    fireEvent.click(getByRole("button", { name: /归并排序/ }));
+    fireEvent.click(getByRole("button", { name: /二分查找/ }));
 
-    expect(onUseTemplate).toHaveBeenCalledWith(TEMPLATES[0].prompt);
+    expect(onUseTemplate).not.toHaveBeenCalled();
+    expect(getByText("可播放预览")).toBeTruthy();
+    fireEvent.click(getByRole("button", { name: "用这个案例开始" }));
+    expect(onUseTemplate).toHaveBeenCalledWith(
+      TEMPLATES.find((template) => template.id === "binary-search")?.prompt,
+    );
   });
 
   it("filters the atlas by domain", () => {

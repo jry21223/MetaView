@@ -67,36 +67,24 @@ describe("App edition shells", () => {
     expect(queryByLabelText("打开设计调节面板")).toBeNull();
   }, 10000);
 
-  it("ops edition shows the login gate when account session is missing on /create", async () => {
+  it("ops edition keeps /create available when account session is missing", async () => {
     let accountHits = 0;
     server.use(
       http.get(`${API_BASE_URL}/api/v1/account/me`, () => {
         accountHits += 1;
         return HttpResponse.json({ detail: "请先使用微信登录" }, { status: 401 });
       }),
-      http.get(`${API_BASE_URL}/api/v1/auth/wechat/login-url`, () => {
-        return HttpResponse.json({ detail: "微信登录未配置" }, { status: 503 });
-      }),
     );
     vi.stubEnv("VITE_APP_EDITION", "ops");
     window.history.pushState({}, "", "/create");
 
     const { App } = await import("./App");
-    const { container } = render(<App />);
+    const { container, getByRole } = render(<App />);
 
     await waitFor(() => expect(accountHits).toBe(1));
-    await waitFor(() =>
-      expect(container.textContent).toContain("登录暂未开放"),
-    );
-    expect(
-      container.querySelector(".mv-login-gate__button")?.classList.contains(
-        "mv-intake-send",
-      ),
-    ).toBe(true);
-    expect(
-      container.querySelector<HTMLButtonElement>(".mv-login-gate__button")?.disabled,
-    ).toBe(true);
-    expect(container.textContent).not.toContain("把一道题，变成一段看得见的理解过程。");
+    expect(container.textContent).toContain("新建可视化讲解");
+    expect(getByRole("button", { name: "微信登录" })).toBeTruthy();
+    expect(container.textContent).not.toContain("登录暂未开放");
   });
 
   it("ops edition opens the intake screen after WeChat login", async () => {

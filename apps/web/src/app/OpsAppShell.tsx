@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   matchPath,
   Navigate,
@@ -9,8 +9,8 @@ import {
 } from "react-router-dom";
 import { ErrorBoundary } from "../shared/ui/ErrorBoundary";
 import { useAccount } from "../features/account";
-import { fetchWeChatLoginUrl } from "../features/account/api/accountApi";
 import { RechargeModal } from "../features/account/ui/RechargeModal";
+import { WeChatLoginDialog } from "../features/account/ui/WeChatLoginDialog";
 import {
   useTweaks,
   themeVars,
@@ -34,6 +34,7 @@ import {
 } from "../shared/ui/GlobalTopbar";
 import { useVisualViewportHeight } from "../shared/hooks/useVisualViewportHeight";
 import { pathToStage, stageToPath } from "./routes";
+import { clearPendingOpsSubmission, readPendingOpsSubmission, savePendingOpsSubmission, savePostLoginPath } from "./opsGuestAccess";
 import { shouldCollapseWorkbenchTopbarByDefault } from "./workbenchChrome";
 
 function initialTopbarCollapsed(): boolean {
@@ -63,6 +64,9 @@ export function OpsAppShell() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [topbarCollapsed, setTopbarCollapsed] = useState(initialTopbarCollapsed);
   const [accountModalOpen, setAccountModalOpen] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [pendingDraft] = useState(() => readPendingOpsSubmission());
+  const autoSubmitRef = useRef(false);
   const {
     submit,
     isSubmitting,
@@ -72,7 +76,6 @@ export function OpsAppShell() {
     account,
     refresh: refreshAccount,
     status: accountStatus,
-    error: accountError,
   } = useAccount();
   const accountAvatarUrl = account?.avatar_url ?? null;
 
@@ -135,6 +138,11 @@ export function OpsAppShell() {
     });
 
   const handleSubmit = async (ctx: IntakeContext) => {
+    if (!isLoggedIn) {
+      savePendingOpsSubmission(ctx);
+      setLoginOpen(true);
+      return;
+    }
     const nextRunId = await submitWithPlatformProvider(
       ctx.prompt,
       ctx.sourceCode,
@@ -155,9 +163,9 @@ export function OpsAppShell() {
     routerNavigate("/create", { state: { prompt } });
   };
 
-  const handleUseTemplate = async (prompt: string) => {
-    const nextRunId = await submitWithPlatformProvider(prompt);
-    enterRun(nextRunId);
+  const handleUseTemplate = (prompt: string) => {
+    setTopbarCollapsed(false);
+    routerNavigate("/create", { state: { prompt } });
   };
 
   const handleOpenHistoryRun = (historyRunId: string) => {
@@ -165,6 +173,10 @@ export function OpsAppShell() {
   };
 
   const isLoggedIn = accountStatus === "authenticated" && account?.login_provider === "wechat";
+  const requireLogin = () => {
+    savePostLoginPath(location.pathname);
+    setLoginOpen(true);
+  };
 
   useEffect(() => {
     if (!isLoggedIn || typeof window === "undefined") return;
@@ -172,24 +184,27 @@ export function OpsAppShell() {
     window.sessionStorage.removeItem(OPEN_ACCOUNT_PANEL_FLAG);
     window.queueMicrotask(() => setAccountModalOpen(true));
   }, [isLoggedIn]);
-
-  if (!isLoggedIn) {
-    return (
-      <div
-        className={`mv-root mv-${mode} mv-theme-${t.theme} mv-density-${t.density} mv-layout-${t.layout}`}
-        data-theme={t.theme}
-        style={css}
-      >
-        <OpsLoginGate
-          isLoading={accountStatus === "loading"}
-          accountError={accountError}
-          onRefreshAccount={refreshAccount}
-          onToggleTheme={toggleTheme}
-          isDark={mode === "dark"}
-        />
-      </div>
-    );
-  }
+  useEffect(() => {
+    const saved = readPendingOpsSubmission();
+    if (!isLoggedIn || !saved || autoSubmitRef.current) return;
+    autoSubmitRef.current = true;
+    void submitWithPlatformProvider(
+      saved.prompt,
+      saved.sourceCode,
+      saved.language,
+      saved.sourceFilename,
+      saved.sourceSizeBytes,
+    )
+      .then((runId) => {
+        clearPendingOpsSubmission();
+        enterRun(runId);
+      })
+      .catch(() => {
+        autoSubmitRef.current = false;
+      });
+  // This effect resumes exactly one confirmed guest submission after OAuth.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn]);
 
   return (
     <div
@@ -205,10 +220,11 @@ export function OpsAppShell() {
           accountBalanceYuan={account?.balance_yuan ?? null}
           accountName={account?.display_name ?? null}
           accountAvatarUrl={accountAvatarUrl}
+          accountState={isLoggedIn ? "authenticated" : "guest"}
           onNavigate={navigate}
           isDark={mode === "dark"}
           onToggleTheme={toggleTheme}
-          onOpenAccountPanel={openAccountPanel}
+          onOpenAccountPanel={isLoggedIn ? openAccountPanel : requireLogin}
         />
       </GlobalTopbarShell>
 
@@ -221,50 +237,31 @@ export function OpsAppShell() {
               isSubmitting={isSubmitting}
               submitError={submitError}
               initialPrompt={intakePrompt}
+              initialDraft={pendingDraft}
             />
           }
         />
         <Route
           path="/run/:runId"
-          element={
-            <ErrorBoundary theme={mode}>
-              <StudioPage
-                appEdition="ops"
-                runId={activeRunId}
-                t={t}
-                onNavigate={navigate}
-                isProviderConfigured
-                onOpenProviderSettings={openAccountPanel}
-                onResubmitPrompt={(prompt) => void handleResubmitPrompt(prompt)}
-                onEditPrompt={handleEditPrompt}
-                topbarCollapsed={effectiveTopbarCollapsed}
-                onToggleTopbar={() => setTopbarCollapsed((value) => !value)}
-              />
-            </ErrorBoundary>
-          }
+          element={<ErrorBoundary theme={mode}>{isLoggedIn ? (
+            <StudioPage appEdition="ops" runId={activeRunId} t={t} onNavigate={navigate}
+              isProviderConfigured onOpenProviderSettings={openAccountPanel}
+              onResubmitPrompt={(prompt) => void handleResubmitPrompt(prompt)} onEditPrompt={handleEditPrompt}
+              topbarCollapsed={effectiveTopbarCollapsed} onToggleTopbar={() => setTopbarCollapsed((value) => !value)} />
+          ) : <ProtectedOpsPage onLogin={requireLogin} />}</ErrorBoundary>}
         />
         <Route path="/run" element={<Navigate to="/create" replace />} />
         <Route
           path="/history"
-          element={
-            <ErrorBoundary theme={mode}>
-              <HistoryPage
-                t={t}
-                onOpenInWorkbench={handleOpenHistoryRun}
-              />
-            </ErrorBoundary>
-          }
+          element={<ErrorBoundary theme={mode}>{isLoggedIn ? (
+            <HistoryPage t={t} onOpenInWorkbench={handleOpenHistoryRun} />
+          ) : <ProtectedOpsPage onLogin={requireLogin} />}</ErrorBoundary>}
         />
         <Route
-          path="/templates"
-          element={
-            <ErrorBoundary theme={mode}>
-              <TemplatesPage
-                onUseTemplate={(prompt) => void handleUseTemplate(prompt)}
-              />
-            </ErrorBoundary>
-          }
+          path="/cases"
+          element={<ErrorBoundary theme={mode}><TemplatesPage onUseTemplate={handleUseTemplate} /></ErrorBoundary>}
         />
+        <Route path="/templates" element={<Navigate to="/cases" replace />} />
         <Route
           path="/settings"
           element={
@@ -273,12 +270,16 @@ export function OpsAppShell() {
                 appEdition="ops"
                 tweaks={t}
                 setTweak={setTweak}
+                isAuthenticated={isLoggedIn}
+                onRequireLogin={requireLogin}
               />
             </ErrorBoundary>
           }
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+
+      {loginOpen && <WeChatLoginDialog onClose={() => setLoginOpen(false)} />}
 
       {accountModalOpen && (
         <RechargeModal
@@ -291,110 +292,15 @@ export function OpsAppShell() {
   );
 }
 
-function OpsLoginGate({
-  isLoading,
-  accountError,
-  onRefreshAccount,
-  onToggleTheme,
-  isDark,
-}: {
-  isLoading: boolean;
-  accountError: string | null;
-  onRefreshAccount: () => void;
-  onToggleTheme: () => void;
-  isDark: boolean;
-}) {
-  const [loginState, setLoginState] = useState<
-    | { kind: "checking" }
-    | { kind: "ready"; url: string }
-    | { kind: "unavailable"; message: string }
-  >({ kind: "checking" });
-
-  useEffect(() => {
-    if (isLoading) return;
-    let cancelled = false;
-    fetchWeChatLoginUrl()
-      .then((url) => {
-        if (!cancelled) setLoginState({ kind: "ready", url });
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setLoginState({
-            kind: "unavailable",
-            message: err instanceof Error ? err.message : "微信登录暂未开放",
-          });
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isLoading]);
-
-  const loginUrl = loginState.kind === "ready" ? loginState.url : null;
-  const loginError =
-    loginState.kind === "unavailable" ? loginState.message : null;
-  const isCheckingLogin = isLoading || loginState.kind === "checking";
-  const loginUnavailable = loginState.kind === "unavailable";
-
+function ProtectedOpsPage({ onLogin }: { onLogin: () => void }) {
   return (
-    <>
-      <header className="mv-top">
-        <div className="mv-brand">
-          <span className="mv-brand-strip" />
-          <span className="mv-brand-name">MetaView</span>
-          <span className="mv-brand-meta">OPS</span>
-        </div>
-        <div className="mv-top-right">
-          <button
-            className="mv-icon-btn"
-            title="切换主题"
-            onClick={onToggleTheme}
-            type="button"
-          >
-            {isDark ? "☀" : "☾"}
-          </button>
-          <div className="mv-avatar">MV</div>
-        </div>
-      </header>
-      <main className="mv-intake-body mv-login-gate">
-        <section className="mv-intake-hero">
-          <div className="mv-eyebrow-mini">运营版</div>
-          <h1 className="mv-intake-title">微信登录后继续使用</h1>
-          <p className="mv-intake-sub">
-            {loginUnavailable
-              ? "登录暂未开放，请联系管理员。"
-              : "运营版需要微信登录后使用账户、余额、充值和平台托管模型。"}
-          </p>
-        </section>
-        <div className="mv-intake-composer">
-          <div className="mv-settings-actions">
-            <button
-              type="button"
-              className="mv-send mv-intake-send mv-login-gate__button"
-              disabled={!loginUrl || isCheckingLogin}
-              onClick={() => {
-                if (loginUrl) window.location.assign(loginUrl);
-              }}
-            >
-              {isCheckingLogin
-                ? "检查登录中…"
-                : loginUrl
-                  ? "微信登录"
-                  : "登录暂未开放"}
-            </button>
-            {loginUnavailable && (
-              <button type="button" className="mv-chip" onClick={onRefreshAccount}>
-                重新检查
-              </button>
-            )}
-          </div>
-          {(accountError || loginError) && (
-            <div className="mv-settings-probe-hint">
-              {loginError ?? accountError}
-            </div>
-          )}
-        </div>
-      </main>
-    </>
+    <main className="mv-intake-body mv-login-gate">
+      <section className="mv-intake-hero">
+        <div className="mv-eyebrow-mini">{"\u8d26\u6237\u5185\u5bb9"}</div>
+        <h1 className="mv-intake-title">{"\u767b\u5f55\u540e\u7ee7\u7eed\u4f7f\u7528"}</h1>
+        <p className="mv-intake-sub">{"\u4efb\u52a1\u5386\u53f2\u548c\u5df2\u6709\u8bb2\u89e3\u4ec5\u5bf9\u767b\u5f55\u8d26\u6237\u5f00\u653e\u3002"}</p>
+        <button type="button" className="mv-send mv-intake-send" onClick={onLogin}>{"\u5fae\u4fe1\u767b\u5f55"}</button>
+      </section>
+    </main>
   );
 }

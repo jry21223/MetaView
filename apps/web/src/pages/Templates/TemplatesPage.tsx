@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { PlaybookPlayer } from "../../features/playbook/engine/player/PlaybookPlayer";
+import { getSubjectVisualShowcaseEntry } from "../../features/playbook/engine/fixtures/subjectVisualShowcase";
 import {
   TEMPLATES,
   TEMPLATE_DOMAIN_LABEL,
@@ -20,6 +22,9 @@ export function TemplatesPage({
 }: TemplatesPageProps) {
   const [filter, setFilter] = useState<DomainFilter>("all");
   const [search, setSearch] = useState("");
+  const [selectedId, setSelectedId] = useState(TEMPLATES[0]?.id ?? "");
+  const selected = TEMPLATES.find((template) => template.id === selectedId) ?? TEMPLATES[0];
+  const preview = selected?.previewFixtureId ? getSubjectVisualShowcaseEntry(selected.previewFixtureId) : undefined;
 
   const grouped = useMemo(() => templatesByDomain(), []);
   const availableDomains = useMemo<TemplateDomain[]>(
@@ -101,6 +106,30 @@ export function TemplatesPage({
         </div>
       </section>
 
+      {selected && (
+        <section className="mv-template-preview" aria-label="案例预览">
+          <div className="mv-template-preview__copy">
+            <div className="mv-eyebrow-mini">CASE PREVIEW</div>
+            <h2>{selected.title}</h2>
+            <p>{selected.desc}</p>
+            {preview ? (
+              <span className="mv-chip">{"\u53ef\u64ad\u653e\u9884\u89c8"}</span>
+            ) : (
+              <span className="mv-chip">{"\u6682\u65e0\u9759\u6001\u9884\u89c8"}</span>
+            )}
+            <button type="button" className="mv-send" onClick={() => void Promise.resolve(onUseTemplate(selected.prompt))}>
+              {"\u7528\u8fd9\u4e2a\u6848\u4f8b\u5f00\u59cb"}
+            </button>
+          </div>
+          <div className="mv-template-preview__stage">
+            {preview ? (
+              <PlaybookPlayer script={preview.script} theme="light" showLearningConsole layoutMode="desktop" />
+            ) : (
+              <p>{"\u8fd9\u4e2a\u6848\u4f8b\u5df2\u63d0\u4f9b\u9898\u76ee\u6a21\u677f\uff0c\u6682\u65e0\u786e\u5b9a\u6027\u9759\u6001\u64ad\u653e\u4f5c\u4e3a\u9884\u89c8\u3002"}</p>
+            )}
+          </div>
+        </section>
+      )}
       {filtered.length === 0 ? (
         <div className="mv-templates-empty">
           <span>NO MATCH</span>
@@ -122,11 +151,8 @@ export function TemplatesPage({
                     key={template.id}
                     type="button"
                     className="mv-template-entry"
-                    onClick={() => {
-                      void Promise.resolve(onUseTemplate(template.prompt)).catch(
-                        () => undefined,
-                      );
-                    }}
+                    aria-pressed={selected?.id === template.id}
+                    onClick={() => setSelectedId(template.id)}
                   >
                     <span className="mv-template-entry__index">
                       {String(index + 1).padStart(2, "0")}
@@ -145,7 +171,7 @@ export function TemplatesPage({
                       <i />
                     </span>
                     <span className="mv-template-entry__action">
-                      使用模板 <b>→</b>
+                      {template.previewFixtureId ? "查看案例" : "查看模板"} <b>→</b>
                     </span>
                   </button>
                 ))}
