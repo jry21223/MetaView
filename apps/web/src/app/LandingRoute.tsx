@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -16,9 +16,11 @@ export function LandingRoute({ appEdition }: { appEdition: AppEdition }) {
   useVisualViewportHeight();
 
   const navigate = useNavigate();
-  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const mode = themeMode(t);
-  const landingTheme = mode;
+  const [t] = useTweaks(TWEAK_DEFAULTS);
+  const [landingTheme, setLandingTheme] = useState<"dark" | "light">(() =>
+    themeMode(t),
+  );
+  const mode = landingTheme;
   const css = useMemo(
     () =>
       themeVars({
@@ -29,8 +31,54 @@ export function LandingRoute({ appEdition }: { appEdition: AppEdition }) {
     [landingTheme, t],
   );
 
+  useEffect(() => {
+    const root = document.querySelector<HTMLElement>(".mv-landing");
+    if (!root) return;
+
+    const syncHiddenStoryPanels = () => {
+      root
+        .querySelectorAll<HTMLElement>(
+          ".mv-landing-story__track article[aria-hidden]",
+        )
+        .forEach((panel) => {
+          panel.toggleAttribute(
+            "inert",
+            panel.getAttribute("aria-hidden") === "true",
+          );
+        });
+    };
+
+    syncHiddenStoryPanels();
+
+    if (typeof MutationObserver === "undefined") {
+      return () => {
+        root
+          .querySelectorAll<HTMLElement>(
+            ".mv-landing-story__track article[inert]",
+          )
+          .forEach((panel) => panel.removeAttribute("inert"));
+      };
+    }
+
+    const observer = new MutationObserver(syncHiddenStoryPanels);
+    observer.observe(root, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["aria-hidden"],
+    });
+
+    return () => {
+      observer.disconnect();
+      root
+        .querySelectorAll<HTMLElement>(
+          ".mv-landing-story__track article[inert]",
+        )
+        .forEach((panel) => panel.removeAttribute("inert"));
+    };
+  }, []);
+
   const toggleTheme = () =>
-    setTweak("theme", mode === "dark" ? "light" : "dark");
+    setLandingTheme((current) => (current === "dark" ? "light" : "dark"));
 
   return (
     <div
