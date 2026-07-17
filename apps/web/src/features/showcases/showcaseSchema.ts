@@ -175,7 +175,9 @@ function semanticIssues(value: ShowcaseCase): Array<{ path: (string | number)[];
   return issues;
 }
 
-export function safeParseShowcaseCase(input: unknown): z.SafeParseReturnType<unknown, ShowcaseCase> {
+export function safeParseShowcaseCase(
+  input: unknown,
+): z.ZodSafeParseResult<ShowcaseCase> {
   const parsed = ShowcaseCaseSchema.safeParse(input);
   if (!parsed.success) return parsed;
   const issues = semanticIssues(parsed.data);
@@ -188,7 +190,7 @@ export function safeParseShowcaseCase(input: unknown): z.SafeParseReturnType<unk
         path: issue.path,
         message: issue.message,
       })),
-    ),
+    ) as z.ZodError<ShowcaseCase>,
   };
 }
 
@@ -198,7 +200,9 @@ export function parseShowcaseCase(input: unknown): ShowcaseCase {
   return parsed.data;
 }
 
-export function safeParseShowcaseManifest(input: unknown): z.SafeParseReturnType<unknown, ShowcaseManifest> {
+export function safeParseShowcaseManifest(
+  input: unknown,
+): z.ZodSafeParseResult<ShowcaseManifest> {
   const parsed = ShowcaseManifestSchema.safeParse(input);
   if (!parsed.success) return parsed;
   try {
@@ -212,7 +216,7 @@ export function safeParseShowcaseManifest(input: unknown): z.SafeParseReturnType
           path: ["cases"],
           message: error instanceof Error ? error.message : "案例清单无效。",
         },
-      ]),
+      ]) as z.ZodError<ShowcaseManifest>,
     };
   }
   return parsed;
