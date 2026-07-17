@@ -12,6 +12,7 @@ import { useResolvedScript, type ScriptOverrides } from "./useResolvedScript";
 import { resolveCodePanelOverlay } from "./resolveCodePanelOverlay";
 import { resolveInitialPreviewFrame, resolvePlayerTimelineKey } from "./previewFrame";
 import { CodeHighlightRenderer } from "../renderers/CodeHighlightRenderer";
+import type { RendererInteractionEvent } from "../renderers/types";
 import { domainCapability } from "../domainCapabilities";
 import { getParamPanel } from "../param-panels/registry";
 import { hasReplayableAlgorithmParams } from "../param-panels/AlgorithmParamPanel";
@@ -295,9 +296,37 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   }
 
   const currentStep = script.steps[safeStepIndex];
-  const hasCurrentInteraction = interactionManifest.adapters.some((adapter) =>
-    adapter.bindings.some((binding) => binding.step_id === currentStep.step_id)
-  );
+  const currentInteractionBinding = interactionEnabled
+    ? interactionManifest.adapters
+        .flatMap((adapter) => adapter.bindings)
+        .find(
+          (binding): binding is DerivativeInteractionBinding =>
+            binding.step_id === currentStep.step_id &&
+            binding.target_role === "marker-x",
+        )
+    : undefined;
+  const hasCurrentInteraction = currentInteractionBinding != null;
+  const handleRendererInteraction = (event: RendererInteractionEvent) => {
+    if (event.phase === "cancel") {
+      interactionSandbox.cancelPreview();
+      return;
+    }
+    if (
+      currentInteractionBinding?.target_role !== "marker-x" ||
+      event.target_role !== "marker-x" ||
+      event.step_id !== currentInteractionBinding.step_id
+    )
+      return;
+    const command = {
+      adapter_id: "math.derivative-tangent" as const,
+      step_id: event.step_id,
+      target_id: currentInteractionBinding.id,
+      action: "set-value" as const,
+      value: event.value,
+    };
+    if (event.phase === "preview") interactionSandbox.preview(command);
+    else interactionSandbox.apply(command);
+  };
   const showInteractionSlot = interactionEnabled && (
     hasCurrentInteraction ||
     interactionSandbox.dirty ||
@@ -316,6 +345,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
       onReset={interactionSandbox.reset}
     />
   ) : undefined;
+  const hasControlPanel = hasDomainPanel || showInteractionSlot;
   const isDark = theme === "dark";
   const currentNarrationFallback =
     currentStep.narration_template && currentStep.tokens.length > 0
@@ -328,9 +358,9 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   );
   const showMobileConsole = isPortraitLayout && showLearningConsole;
   const effectiveMobileTab =
-    mobileTab === "params" && !hasDomainPanel ? "narration" : mobileTab;
+    mobileTab === "params" && !hasControlPanel ? "narration" : mobileTab;
   const effectiveMobileSheet =
-    mobileSheet === "params" && !hasDomainPanel ? null : mobileSheet;
+    mobileSheet === "params" && !hasControlPanel ? null : mobileSheet;
   const showStageSubtitles = !(showMobileConsole && effectiveMobileTab === "narration");
   const mobileSheetTitle =
     effectiveMobileSheet === "code"
@@ -348,7 +378,6 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     setMobileSheet(sheet);
     emitNativeEvent("playbook.mobileSheetOpened", { sheet });
   };
-  const hasControlPanel = hasDomainPanel || showInteractionPanel;
   const mobileParamsContent = (
     <>
       {interactionSlot}

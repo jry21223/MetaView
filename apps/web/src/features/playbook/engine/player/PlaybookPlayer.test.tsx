@@ -34,11 +34,6 @@ vi.mock("@remotion/player", async () => {
           data-show-subtitles={String(props.inputProps?.showSubtitles)}
           data-show-inline-code={String(props.inputProps?.showInlineCode)}
           data-has-interaction={String(typeof props.inputProps?.onInteraction === "function")}
-          data-marker-x={String(
-            props.inputProps?.script?.steps[0]?.snapshot.kind === "math_plot"
-              ? props.inputProps.script.steps[0].snapshot.marker_x
-              : "",
-          )}
         />
       );
     }),
