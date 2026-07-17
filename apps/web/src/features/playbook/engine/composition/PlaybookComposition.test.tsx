@@ -405,6 +405,7 @@ describe("PlaybookComposition", () => {
       <PlaybookComposition
         script={script}
         showSubtitles={false}
+        interactionTargetKind="math_plot"
         onInteraction={vi.fn()}
       />,
     );
@@ -548,6 +549,7 @@ describe("PlaybookComposition", () => {
       <PlaybookComposition
         script={layeredMathScript()}
         showSubtitles={false}
+        interactionTargetKind="math_plot"
         onInteraction={vi.fn()}
       />,
     );
@@ -708,5 +710,94 @@ describe("PlaybookComposition", () => {
     expect(markup).toContain("补充说明");
     expect(markup).toContain('data-layer-kind="math_plot"');
     expect(markup).toContain('data-layer-kind="narration_card"');
+  });
+
+  it("exposes only the unique target layer without letting its wrapper block the stage", () => {
+    const graph = {
+      kind: "graph_scene" as const,
+      nodes: [{ id: "A" }, { id: "B" }],
+      edges: [{ source: "A", target: "B" }],
+    };
+    const script: PlaybookScript = {
+      fps: 30,
+      total_frames: 60,
+      domain: "algorithm",
+      algorithm_id: "bfs",
+      title: "BFS",
+      summary: "",
+      parameter_controls: [],
+      steps: [{
+        step_id: "graph",
+        end_frame: 60,
+        title: "Graph",
+        voiceover_text: "",
+        tokens: [],
+        snapshot: graph,
+        layers: [{
+          id: "graph-layer",
+          timing: { enter_at: 0, exit_at: 1, appear_anim: "none", z_order: 0 },
+          body: graph,
+        }, {
+          id: "caption-layer",
+          timing: { enter_at: 0, exit_at: 1, appear_anim: "none", z_order: 1 },
+          body: { kind: "narration_card", text: "Explain", position: "bottom" },
+        }],
+      }],
+    };
+
+    const markup = renderToStaticMarkup(
+      <PlaybookComposition
+        script={script}
+        showSubtitles={false}
+        interactionTargetKind="graph_scene"
+        onInteraction={vi.fn()}
+      />,
+    );
+
+    expect(layerOpenTag(markup, "graph_scene")).toContain("pointer-events:none");
+    expect(markup).toContain('data-interaction-target="start-node"');
+    expect(markup).toContain('role="button"');
+  });
+
+  it("fails closed when more than one layer matches the interaction target", () => {
+    const graph = {
+      kind: "graph_scene" as const,
+      nodes: [{ id: "A" }],
+      edges: [],
+    };
+    const script: PlaybookScript = {
+      fps: 30,
+      total_frames: 60,
+      domain: "algorithm",
+      algorithm_id: "bfs",
+      title: "Ambiguous BFS",
+      summary: "",
+      parameter_controls: [],
+      steps: [{
+        step_id: "graph",
+        end_frame: 60,
+        title: "Graph",
+        voiceover_text: "",
+        tokens: [],
+        snapshot: graph,
+        layers: [0, 1].map((zOrder) => ({
+          id: `graph-${zOrder}`,
+          timing: { enter_at: 0, exit_at: 1, appear_anim: "none" as const, z_order: zOrder },
+          body: graph,
+        })),
+      }],
+    };
+
+    const markup = renderToStaticMarkup(
+      <PlaybookComposition
+        script={script}
+        showSubtitles={false}
+        interactionTargetKind="graph_scene"
+        onInteraction={vi.fn()}
+      />,
+    );
+
+    expect(markup).not.toContain('data-interaction-target="start-node"');
+    expect(markup).not.toContain('role="button"');
   });
 });
