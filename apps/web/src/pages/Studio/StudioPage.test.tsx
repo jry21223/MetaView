@@ -407,8 +407,6 @@ describe("StudioPage", () => {
 
     await waitFor(() => expect(listCalls).toBe(1));
     expect(postCalls).toBe(0);
-    const initialSessionKey = view.getByTestId("mock-player")
-      .getAttribute("data-interaction-session-key");
     fireEvent.click(view.getByRole("button", { name: "模拟应用到新版本" }));
 
     await waitFor(() => expect(view.getByText("Applied lesson")).toBeTruthy());
@@ -531,6 +529,8 @@ describe("StudioPage", () => {
 
     await waitFor(() => expect(listCalls).toBe(1));
     expect(postCalls).toBe(0);
+    const initialSessionKey = view.getByTestId("mock-player")
+      .getAttribute("data-interaction-session-key");
     fireEvent.click(view.getByRole("button", { name: "模拟应用到新版本" }));
 
     await waitFor(() => {
