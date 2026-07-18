@@ -52,6 +52,30 @@ function firstPolylinePointCount(markup: string): number {
   return m[1].trim().split(/\s+/).filter(Boolean).length;
 }
 
+function polylinePoints(markup: string, index: number): string {
+  const matches = [...markup.matchAll(/<polyline[^>]*points="([^"]*)"/g)];
+  return matches[index]?.[1] ?? "";
+}
+
+function transitionSnap(
+  secantExpression: string,
+  markerX: number,
+  extra: Partial<MathPlotSnapshot> = {},
+): MathPlotSnapshot {
+  return makeSnap({
+    y_min: -2,
+    y_max: 9,
+    marker_x: markerX,
+    shade_from: markerX,
+    shade_to: markerX + 0.5,
+    curves: [
+      { expression: "x^2", label: "f(x)", emphasis: "primary", semantic_role: "curve" },
+      { expression: secantExpression, label: "割线", emphasis: "secondary", semantic_role: "slope" },
+    ],
+    ...extra,
+  });
+}
+
 describe("MathPlotRenderer", () => {
   it("is registered for the math_plot snapshot kind", () => {
     expect(rendererRegistry.get("math_plot")).toBe(MathPlotRenderer);
@@ -118,6 +142,68 @@ describe("MathPlotRenderer", () => {
     // Issue #61: the light background is now driven by THEME_PALETTE.light.surface2
     // (= #faf8f3) instead of the renderer-local #f5f7fa constant.
     expect(markup).toContain("#faf8f3");
+  });
+
+  it.each(["dark", "light"] as const)(
+    "interpolates compatible math plots at progress 0, 0.5, and 1 in the %s theme",
+    (theme) => {
+      const previousSnapshot = transitionSnap("3*x-2", 0);
+      const currentSnapshot = transitionSnap("2*x-1", 2);
+      const previousStep = plotStep(previousSnapshot, { step_id: "previous" });
+      const currentStep = plotStep(currentSnapshot, { step_id: "current" });
+      const previousMarkup = renderToStaticMarkup(
+        <MathPlotRenderer {...props(previousStep, { progress: 1, theme })} />,
+      );
+      const currentMarkup = renderToStaticMarkup(
+        <MathPlotRenderer {...props(currentStep, { progress: 1, theme })} />,
+      );
+      const at = (stepProgress: number) => renderToStaticMarkup(
+        <MathPlotRenderer
+          {...props(currentStep, { prevStep: previousStep, progress: 1, stepProgress, theme })}
+        />,
+      );
+      const start = at(0);
+      const middle = at(0.5);
+      const end = at(1);
+
+      expect(start).toContain('data-math-plot-transition="interpolated"');
+      expect(polylinePoints(start, 0)).toBe(polylinePoints(previousMarkup, 0));
+      expect(polylinePoints(middle, 0)).toBe(polylinePoints(previousMarkup, 0));
+      expect(polylinePoints(end, 0)).toBe(polylinePoints(currentMarkup, 0));
+      expect(polylinePoints(start, 1)).toBe(polylinePoints(previousMarkup, 1));
+      expect(polylinePoints(middle, 1)).not.toBe(polylinePoints(previousMarkup, 1));
+      expect(polylinePoints(middle, 1)).not.toBe(polylinePoints(currentMarkup, 1));
+      expect(polylinePoints(end, 1)).toBe(polylinePoints(currentMarkup, 1));
+      expect(middle).toContain("(1, 1)");
+    },
+  );
+
+  it("falls back to the current static plot when x ranges differ", () => {
+    const previousStep = plotStep(transitionSnap("3*x-2", 0, { x_min: -4 }));
+    const currentStep = plotStep(transitionSnap("2*x-1", 2));
+    const markup = renderToStaticMarkup(
+      <MathPlotRenderer
+        {...props(currentStep, { prevStep: previousStep, progress: 1, stepProgress: 0.5 })}
+      />,
+    );
+
+    expect(markup).toContain('data-math-plot-transition="static"');
+    expect(polylinePoints(markup, 1)).toBe(polylinePoints(render(currentStep.snapshot as MathPlotSnapshot), 1));
+  });
+
+  it("uses the static path without prevStep and when a curve cannot be parsed", () => {
+    const validStep = plotStep(transitionSnap("2*x-1", 2));
+    expect(renderToStaticMarkup(<MathPlotRenderer {...props(validStep)} />))
+      .toContain('data-math-plot-transition="static"');
+
+    const invalidStep = plotStep(transitionSnap("1 +", 2));
+    const invalidMarkup = renderToStaticMarkup(
+      <MathPlotRenderer
+        {...props(invalidStep, { prevStep: validStep, progress: 1, stepProgress: 0.5 })}
+      />,
+    );
+    expect(invalidMarkup).toContain('data-math-plot-transition="static"');
+    expect(invalidMarkup).toContain("<svg");
   });
 
   it("falls back to a message when no curve is drawable", () => {

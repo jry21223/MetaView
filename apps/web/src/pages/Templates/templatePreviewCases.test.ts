@@ -72,12 +72,26 @@ describe("template preview cases", () => {
   it("keeps derivative slope and tangent equation synchronized", () => {
     const item = getTemplatePreviewCase("derivative-tangent")!;
     const script = item.buildScript({ markerX: 2 });
+    const director = item.buildDirector(script);
     const tangent = script.steps.find((step) => step.step_id === "derivative-tangent");
+    const result = script.steps.find((step) => step.step_id === "derivative-result");
 
-    expect(tangent?.voiceover_text).toContain("4");
+    expect(script.steps).toHaveLength(6);
+    expect(script.steps.map((step, index) => step.end_frame - (script.steps[index - 1]?.end_frame ?? 0)))
+      .toEqual([90, 90, 90, 90, 90, 90]);
+    expect(script.steps[0].snapshot.kind).toBe("math_plot");
+    if (script.steps[0].snapshot.kind === "math_plot") {
+      expect(script.steps[0].snapshot.curves).toHaveLength(1);
+    }
+    expect(director.beats.find((beat) => beat.step_id === "derivative-secant-2")?.camera_motion)
+      .toBe("push_in");
+    expect(director.beats.find((beat) => beat.step_id === "derivative-secant-3")?.camera_motion)
+      .toBe("pull_out");
+    expect(result?.voiceover_text).toContain("4");
     expect(tangent?.snapshot.kind).toBe("math_plot");
     if (tangent?.snapshot.kind === "math_plot") {
       expect(tangent.snapshot.curves[1]?.expression).toBe("4*x-4");
+      expect(tangent.snapshot.formula_latex).toContain("4");
     }
   });
 
