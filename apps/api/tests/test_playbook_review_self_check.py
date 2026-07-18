@@ -654,9 +654,9 @@ def test_playbook_self_check_accepts_recursion_and_code_trace_scenes(
     assert verdict.issues == []
 
 
-def test_playbook_self_check_blocks_one_step_agent_playbook_as_too_shallow() -> None:
+def test_playbook_self_check_blocks_two_step_agent_playbook_as_too_shallow() -> None:
     payload = _valid_playbook().model_dump(mode="json")
-    payload["steps"] = payload["steps"][:1]
+    payload["steps"] = payload["steps"][:2]
     payload["total_frames"] = payload["steps"][-1]["end_frame"]
     playbook = PlaybookScript.model_validate(payload)
 
@@ -666,15 +666,21 @@ def test_playbook_self_check_blocks_one_step_agent_playbook_as_too_shallow() -> 
     assert any(issue.code == "step.too_shallow" for issue in verdict.issues)
 
 
-def test_playbook_self_check_accepts_eight_step_agent_playbook() -> None:
-    verdict = review_playbook_script(_valid_playbook(), prompt="Explain binary search.")
+@pytest.mark.parametrize("step_count", [3, 12])
+def test_playbook_self_check_accepts_agent_step_boundaries(step_count: int) -> None:
+    payload = _valid_playbook().model_dump(mode="json")
+    payload["steps"] = [_array_step(index) for index in range(1, step_count + 1)]
+    payload["total_frames"] = payload["steps"][-1]["end_frame"]
+    playbook = PlaybookScript.model_validate(payload)
+
+    verdict = review_playbook_script(playbook, prompt="Explain binary search.")
 
     assert verdict.status == PlaybookReviewStatus.CLEAN
 
 
-def test_playbook_self_check_blocks_fifteen_step_agent_playbook() -> None:
+def test_playbook_self_check_blocks_thirteen_step_agent_playbook() -> None:
     payload = _valid_playbook().model_dump(mode="json")
-    payload["steps"] = [_array_step(index) for index in range(1, 16)]
+    payload["steps"] = [_array_step(index) for index in range(1, 14)]
     payload["total_frames"] = payload["steps"][-1]["end_frame"]
     playbook = PlaybookScript.model_validate(payload)
 

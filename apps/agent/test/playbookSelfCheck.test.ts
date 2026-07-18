@@ -33,7 +33,7 @@ function makeStep(index: number): PlaybookOutput["steps"][number] {
   };
 }
 
-function validPlaybook(stepCount = 8): PlaybookOutput {
+function validPlaybook(stepCount = 3): PlaybookOutput {
   const steps = Array.from({ length: stepCount }, (_, index) =>
     makeStep(index + 1),
   );
@@ -122,28 +122,31 @@ describe("agent playbook self-check", () => {
     expect(report.issues).toEqual([]);
   });
 
-  it("blocks one-step product playbooks as too shallow", () => {
-    const report = selfCheckPlaybook(validPlaybook(1), "Scan the array");
+  it("allows the 3-step and 12-step boundaries", () => {
+    expect(selfCheckPlaybook(validPlaybook(3), "Scan the array").status).toBe("clean");
+    expect(selfCheckPlaybook(validPlaybook(12), "Scan the array").status).toBe("clean");
+  });
+
+  it("blocks two-step playbooks that lack a necessary teaching process", () => {
+    const report = selfCheckPlaybook(validPlaybook(2), "Scan the array");
 
     expect(report.status).toBe("blocked");
     expect(report.issues.map((issue) => issue.code)).toContain(
       "step.too_shallow",
     );
+    expect(report.issues.find((issue) => issue.code === "step.too_shallow")?.message)
+      .toContain("缺少必要的教学过程");
   });
 
-  it("accepts an eight-step product playbook", () => {
-    const report = selfCheckPlaybook(validPlaybook(8), "Scan the array");
-
-    expect(report.status).toBe("clean");
-  });
-
-  it("blocks fifteen-step product playbooks", () => {
-    const report = selfCheckPlaybook(validPlaybook(15), "Scan the array");
+  it("blocks thirteen-step playbooks and asks to merge fragmented steps", () => {
+    const report = selfCheckPlaybook(validPlaybook(13), "Scan the array");
 
     expect(report.status).toBe("blocked");
     expect(report.issues.map((issue) => issue.code)).toContain(
       "step.too_shallow",
     );
+    expect(report.issues.find((issue) => issue.code === "step.too_shallow")?.suggestion)
+      .toContain("合并重复或过于细碎的步骤");
   });
 
   it("blocks empty narration, empty snapshot payload, and invalid timing", () => {
@@ -443,7 +446,7 @@ describe("agent playbook self-check", () => {
       repairAttempt: 1,
     });
 
-    expect(prompt).toContain("agent self-check blocked");
+    expect(prompt).toContain("Agent Self-check 阻塞");
     expect(prompt).toContain('"repair_attempt": 1');
     expect(prompt).toContain('"code": "step.empty_voiceover"');
     expect(prompt).toContain("PlaybookScript");

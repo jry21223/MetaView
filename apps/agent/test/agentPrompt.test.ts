@@ -94,19 +94,19 @@ describe("agent prompt contracts", () => {
     );
 
     expect(prompt).toContain("[MetaView LessonPlan]");
-    expect(prompt).toContain("BINDING read-only teaching contract");
-    expect(prompt).toContain("cover every required fact");
+    expect(prompt).toContain("具有约束力的只读教学合同");
+    expect(prompt).toContain("覆盖每个 required fact");
     expect(prompt).toContain("LESSON_PLAN_ONLY_MARKER");
     expect(prompt).toContain("[MetaView route decision]");
     expect(prompt).toContain("[MetaView coverage decision]");
     expect(prompt).toContain("validator:geography.monsoon");
-    expect(prompt).toContain("available_tool_ids records relevant capability evidence");
+    expect(prompt).toContain("available_tool_ids 记录相关能力证据");
     expect(prompt).toContain("[user prompt]");
   });
 
   it("steers subject visual scenes through SceneBlueprint and semantic renderer paths", () => {
-    expect(SYSTEM_PROMPT).toContain("BINDING");
-    expect(SYSTEM_PROMPT).toMatch(/SceneIntents in\s+order/);
+    expect((SYSTEM_PROMPT.match(/[\u4e00-\u9fff]/g) ?? []).length).toBeGreaterThan(500);
+    expect(SYSTEM_PROMPT).toContain("按 SceneIntent 的顺序");
     expect(SYSTEM_PROMPT).toContain("SceneBlueprint");
     expect(SYSTEM_PROMPT).toContain("scene_blueprint.compile");
     expect(SYSTEM_PROMPT).toContain("SkillPack runtime tool");
@@ -116,7 +116,13 @@ describe("agent prompt contracts", () => {
     expect(SYSTEM_PROMPT).toContain("bio_process_scene");
     expect(SYSTEM_PROMPT).toContain("molecule_2d_scene");
     expect(SYSTEM_PROMPT).toContain("reaction_scene");
-    expect(SYSTEM_PROMPT).toContain("Do not use algorithm_array");
+    expect(SYSTEM_PROMPT).toContain("不得用 algorithm_array");
+    expect(SYSTEM_PROMPT).toContain("通常使用 4–8 个步骤");
+    expect(SYSTEM_PROMPT).toContain("实际允许 3–12 个步骤");
+    expect(SYSTEM_PROMPT).toContain("通常使用 1–2 句简洁旁白");
+    expect(SYSTEM_PROMPT).not.toMatch(/8\s*[-–]\s*14 steps/i);
+    expect(SYSTEM_PROMPT).not.toContain("≥ 3 sentences");
+    expect(SYSTEM_PROMPT).not.toContain("为什么需要这一步 / 这一步在做什么 / 学到了什么");
   });
 
   it("gives specific repair guidance for subject visual array fallbacks", () => {
@@ -145,11 +151,15 @@ describe("agent prompt contracts", () => {
     expect(prompt).toContain("LESSON_PLAN_ONLY_MARKER");
     expect(prompt).toContain('"lesson_plan"');
     expect(prompt).toContain('"coverage_decision"');
-    expect(prompt).toContain("Treat coverage_decision as binding");
-    expect(prompt).toContain("Treat lesson_plan as binding");
-    expect(prompt).toContain("matching SkillPack runtime tool");
+    expect(prompt).toContain("coverage_decision 具有约束力");
+    expect(prompt).toContain("lesson_plan 具有约束力");
+    expect(prompt).toContain("匹配的 SkillPack runtime tool");
     expect(prompt).toContain("SceneBlueprint");
     expect(prompt).toContain("geo_map_scene");
-    expect(prompt).toContain("Do not repair this by renaming algorithm_array");
+    expect(prompt).toContain("不得只把 algorithm_array 改名");
+    expect(prompt).toContain("通常使用 4–8 步");
+    expect(prompt).toContain("通常使用 1–2 个自然片段");
+    expect(prompt).not.toMatch(/8\s*[-–]\s*14 steps/i);
+    expect(prompt).not.toContain("每步固定三段式");
   });
 });

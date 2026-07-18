@@ -157,7 +157,7 @@ describe("animation tool bridge", () => {
       tools: Array<{ name: string; args_schema: { properties: Record<string, unknown> } }>;
     };
 
-    expect(SYSTEM_PROMPT).toContain("function plots, tangents");
+    expect(SYSTEM_PROMPT).toContain("函数图像、切线");
     expect(listDetails.tools[0].name).toBe("math.show_tangent");
     expect(listDetails.tools[0].args_schema.properties).toHaveProperty("tangent_expression");
 
@@ -185,19 +185,19 @@ describe("animation tool bridge", () => {
     expect(SYSTEM_PROMPT).toContain("animation_tool_list");
     expect(SYSTEM_PROMPT).toContain("animation_tool_expand");
     expect(SYSTEM_PROMPT).toContain("args_schema");
-    expect(SYSTEM_PROMPT).toContain("do not invent raw LayerSpec JSON");
+    expect(SYSTEM_PROMPT).toContain("不得虚构原始 LayerSpec JSON");
   });
 
   it("keeps the workflow prompt as a flat four-step checklist", () => {
     const workflow = SYSTEM_PROMPT.match(
-      /Workflow you MUST follow:[\s\S]*?Output discipline:/,
+      /必须遵循以下工作流程：[\s\S]*?旁白规则：/,
     )?.[0];
 
     expect(workflow).toBeTruthy();
-    expect(workflow).toContain("1. Call `plan_outline` FIRST");
-    expect(workflow).toContain("2. Use deterministic runtime and animation tools");
-    expect(workflow).toContain("3. Build each visual step");
-    expect(workflow).toContain("4. Verify claims and finish");
+    expect(workflow).toContain("1. 首先调用 `plan_outline`");
+    expect(workflow).toContain("2. 在猜测之前使用确定性的 runtime 与 animation 工具");
+    expect(workflow).toContain("3. 构建每个视觉步骤");
+    expect(workflow).toContain("4. 校验事实并完成");
     expect(workflow).not.toMatch(/^\s+[a-d]\./m);
     expect(workflow?.match(/^\d+\./gm)).toEqual(["1.", "2.", "3.", "4."]);
   });

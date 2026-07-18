@@ -68,6 +68,16 @@ def test_system_prompt_instructs_json_only_output() -> None:
     assert "JSON" in system
 
 
+def test_system_prompt_uses_adaptive_steps_and_concise_narration() -> None:
+    system, _ = build_cir_prompt("讲解导数", TopicDomain.MATH)
+
+    assert "通常使用 4–8 步，实际允许 3–12 步" in system
+    assert "通常使用 1–2 句简洁旁白" in system
+    assert "8–14" not in system
+    assert "≥ **3 句完整句子**" not in system
+    assert "为什么需要这一步" not in system
+
+
 def test_math_prompt_includes_layer_examples() -> None:
     """Phase 4: math domain prompt must surface the multi-layer step examples
     so the LLM can imitate the structure for Green's-theorem-style content."""
