@@ -6,6 +6,7 @@
   <a href="#先看它做出来的讲解">真实案例</a> ·
   <a href="#它不只生成一段视频">产品能力</a> ·
   <a href="#从输入到可播放的理解">工作原理</a> ·
+  <a href="#核心代码导航">核心代码</a> ·
   <a href="#快速开始">快速开始</a> ·
   <a href="#能力边界">能力边界</a> ·
   <a href="./docs/START_HERE.md">开发入口</a>
@@ -82,6 +83,48 @@ Follow-up 会带着原题、当前步骤和画布上下文继续工作：
 | `agent` | Agent 调用 RuntimeToolHub、动画工具和 deterministic SkillPack | 需要工具编排与确定性能力组合的内容 |
 
 Agent 自检只是前置检查。无论内容来自 SkillPack、Agent 还是 single 路径，最终成功语义都由 API 后端的 canonical `QualityReport` 决定。
+
+## 核心代码导航
+
+### 生成契约
+
+**核心文件：** [`playbook.py`](./apps/api/app/domain/models/playbook.py) · [`playbook_contract.py`](./apps/api/app/domain/contracts/playbook_contract.py) · [`types.ts`](./apps/web/src/features/playbook/engine/types.ts)
+
+- **解决了什么问题：** 让生成端、API 和播放器对“什么是可渲染讲解”使用同一份 `PlaybookScript` 结构。
+- **为什么这样设计：** 后端负责验证权威契约，前端保留对应的判别联合；生成方式可以变化，渲染出口不变。
+- **你能现场讲解什么：** 从一种 snapshot 的后端模型出发，对照前端类型，看它如何进入播放器。
+
+### Quality Gate
+
+**核心文件：** [`playbook_quality.py`](./apps/api/app/domain/services/playbook_quality.py) · [`quality_report.py`](./apps/api/app/domain/models/quality_report.py) · [`test_playbook_review_self_check.py`](./apps/api/tests/test_playbook_review_self_check.py)
+
+- **解决了什么问题：** 阻止“结构合法但内容错误、画面不可用”的 Playbook 被标记为成功。
+- **为什么这样设计：** API 是最终裁决者，统一输出 `clean / warnings / repairable / blocked`，避免各端各自定义成功。
+- **你能现场讲解什么：** 给候选 Playbook 制造一个时间线或语义错误，看质量门如何定位、尝试修复或 fail closed。
+
+### Follow-up
+
+**核心文件：** [`router_runs.py`](./apps/api/app/presentation/router_runs.py) · [`follow_up.py`](./apps/api/app/application/use_cases/follow_up.py) · [`sqlite_run_repository.py`](./apps/api/app/infrastructure/persistence/sqlite_run_repository.py)
+
+- **解决了什么问题：** 用户可以继续追问或安全修改已有讲解，而不必整份重新生成。
+- **为什么这样设计：** 修改被限制为白名单 patch，并在重新通过质量门后保存为可恢复版本；解释型追问可以不改 Playbook。
+- **你能现场讲解什么：** 从一条 Follow-up 请求追到 patch 校验、版本写入，再恢复到历史版本。
+
+### Interaction Engine
+
+**核心文件：** [`engine.ts`](./apps/web/src/features/playbook/interaction/engine.ts) · [`useInteractionSandbox.ts`](./apps/web/src/features/playbook/interaction/useInteractionSandbox.ts) · [`followUpContext.ts`](./apps/web/src/features/playbook/interaction/followUpContext.ts)
+
+- **解决了什么问题：** 让切点、BFS 起点等参数可以即时重算画面，同时不污染已保存的 Playbook。
+- **为什么这样设计：** 交互目标先由 manifest 明确声明，再在浏览器沙箱中确定性重放；只有用户确认后才进入持久化流程。
+- **你能现场讲解什么：** 改变导数切点或 BFS 起点，看事件如何生成新状态，并把当前交互上下文交给 Follow-up。
+
+### Benchmark
+
+**核心文件：** [`gold_cases.json`](./eval/benchmark_v2/gold_cases.json) · [`benchmark_v2.py`](./apps/api/eval/benchmark_v2.py) · [`runner.py`](./apps/api/eval/runner.py) · [`test_benchmark_v2_gold_cases.py`](./apps/api/tests/test_benchmark_v2_gold_cases.py)
+
+- **解决了什么问题：** 区分“能生成”与“知识、教学、视觉和 Code Sync 都达到产品要求”。
+- **为什么这样设计：** Gold Case 把期望声明成数据，评分器检查语义状态与 hard-fail，运行器支持独立重复运行，避免只为单个 fixture 调分。
+- **你能现场讲解什么：** 运行一个 Gold Case，逐项查看七维评分、hard-fail 和多次运行的稳定性报告。
 
 ## 支持范围
 
