@@ -568,6 +568,7 @@ export interface Molecule2DBond {
   from: string;
   to: string;
   order: 1 | 2 | 3;
+  stereo?: "wedge" | "dash" | null;
   label?: string | null;
   asset_id?: string | null;
 }

@@ -239,7 +239,7 @@ def _step_captions(scene_type: str, title: str, base_caption: str) -> list[str]:
         ],
         "molecule_2d_methane": [
             "甲烷分子先看 molecule_2d_scene，SMILES C 被解析到 methane structured preset。",
-            "中心碳原子和四个氢原子来自结构化 atom 数据，不是手画分子图。",
+            "methane 的中心碳原子和四个氢原子来自结构化 atom 数据，不是手画分子图。",
             "四条 C-H 键由 bond 数据生成，说明甲烷的连接关系由结构数据决定。",
             "tetrahedral geometry callout 把甲烷的空间构型和二维教学图对应起来。",
             "公式 CH4 与 SMILES C 同时出现，帮助学生连接结构式和机器可读输入。",
@@ -256,14 +256,14 @@ def _step_captions(scene_type: str, title: str, base_caption: str) -> list[str]:
             "图中的碳原子和氧原子来自 RDKit atom graph，氢原子通过分子式体现为隐式氢。",
             "每条 bond 都来自 RDKit 连接关系，renderer 只负责把结构数据画出来。",
             "SMILES 字段留在 snapshot 中，说明这个分子不是手写 SVG 或图片资产。",
-            "atom-core 和 bond-line 仍然来自 chemistry-basic，保证视觉语言统一。",
+            "glucose 的 atoms 和 bonds 由结构数据驱动的原生几何渲染，保证缩放和标注清晰。",
             "这一帧把 glucose molecule、SMILES、atoms 和 bonds 放进同一个 deterministic layout。",
             "结论回到 Glucose molecule：复杂分子应从 SMILES/RDKit 结构数据渲染。",
         ],
         "reaction_synthesis_water": [
             "合成水反应先看 reaction_scene，氢气和氧气作为 reactants 放在反应箭头左侧。",
-            "reaction_arrow 资产表示反应方向，从反应物指向生成物，避免用纯文字代替反应关系。",
-            "electron_flow 资产标出成键过程中的电子流向，让反应机制成为可见层。",
+            "reaction arrow 表示 H2 和 O2 指向 H2O 的反应方向，避免用纯文字代替反应关系。",
+            "H2、O2 和 H2O 只有具备可靠机制数据时才显示 electron flow，不用装饰箭头冒充反应机理。",
             "生成物 H2O 放在 products 区域，和左侧反应物形成一条守恒关系。",
             "balanced atoms callout 强调配平后的原子数守恒，不只是把公式背下来。",
             "公式 2H2 + O2 -> 2H2O 与图中 reactants、arrow 和 products 一一对应。",
@@ -292,9 +292,9 @@ def _step_captions(scene_type: str, title: str, base_caption: str) -> list[str]:
         ],
         "recursion_stack": [
             "递归栈先看 call_stack_scene：每一次 factorial 调用都会压入一个 call frame。",
-            "factorial(4) 是当前 active frame，call-frame 资产标出正在执行的调用。",
+            "factorial(4) 是当前 active frame，原生边框标出正在执行的调用。",
             "factorial(3) 和 factorial(2) 是等待返回的 stack frames，说明乘法还没有结算。",
-            "右侧 active-line 资产高亮 return n * factorial(n - 1)，对应新的递归调用。",
+            "右侧代码行以原生高亮显示 return n * factorial(n - 1)，对应新的递归调用。",
             "每个 frame 的 n 值显示当前调用保存的局部变量，避免把所有 n 混成同一个值。",
             "递归继续向 base case 推进，直到 factorial(1) 返回后才逐层弹栈。",
             "代码轨道和 call stack 同步，帮助学生把源代码行和运行时栈帧对应起来。",
@@ -305,7 +305,7 @@ def _step_captions(scene_type: str, title: str, base_caption: str) -> list[str]:
             "Binary search 的 low 和 high 指针标出当前仍可能包含目标值的有序区间。",
             (
                 "Binary search 的 mid 指针落在中点 11 上，"
-                "active-line 资产高亮本轮计算 midpoint 的代码。"
+                "原生代码高亮标出本轮计算 midpoint 的语句。"
             ),
             (
                 "Binary search 的当前 active index 对应 nums[mid]，"
@@ -461,7 +461,6 @@ def _recursion_stack_snapshot(blueprint: dict[str, Any]) -> CallStackSceneSnapsh
                 label="factorial(4)",
                 depth=0,
                 state="active",
-                asset_id="call-frame",
                 variables={"n": "4"},
             ),
             CallStackFrame(
@@ -469,7 +468,6 @@ def _recursion_stack_snapshot(blueprint: dict[str, Any]) -> CallStackSceneSnapsh
                 label="factorial(3)",
                 depth=1,
                 state="waiting",
-                asset_id="stack-frame",
                 variables={"n": "3"},
             ),
             CallStackFrame(
@@ -477,7 +475,6 @@ def _recursion_stack_snapshot(blueprint: dict[str, Any]) -> CallStackSceneSnapsh
                 label="factorial(2)",
                 depth=2,
                 state="waiting",
-                asset_id="stack-frame",
                 variables={"n": "2"},
             ),
         ],
@@ -491,7 +488,6 @@ def _recursion_stack_snapshot(blueprint: dict[str, Any]) -> CallStackSceneSnapsh
             ],
             active_lines=[3],
             active_line=3,
-            asset_id="active-line",
         ),
         current_frame_id="factorial-4",
         caption=str(

@@ -21,8 +21,8 @@ def test_resolve_molecule_preset_for_renderer_hydrates_water_public_asset() -> N
     )
     assert [atom.model_dump(mode="json", exclude_none=True) for atom in preset.atoms] == [
         {"id": "o", "element": "O", "x": 50.0, "y": 42.0, "label": "oxygen"},
-        {"id": "h1", "element": "H", "x": 35.0, "y": 62.0, "label": "hydrogen"},
-        {"id": "h2", "element": "H", "x": 65.0, "y": 62.0, "label": "hydrogen"},
+        {"id": "h1", "element": "H", "x": 30.2, "y": 57.3, "label": "hydrogen"},
+        {"id": "h2", "element": "H", "x": 69.8, "y": 57.3, "label": "hydrogen"},
     ]
     assert [
         bond.model_dump(mode="json", by_alias=True, exclude_none=True)

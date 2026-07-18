@@ -9,7 +9,6 @@ EXPECTED_PUBLIC_PACK_IDS = {
     "biology-basic",
     "chemistry-basic",
     "core-visual-basic",
-    "geography-basic",
     "geography-earth-basic",
     "math-basic",
     "physics-basic",
@@ -33,7 +32,7 @@ def _playbook() -> dict:
                 "tokens": [],
                 "snapshot": {
                     "kind": "geo_map_scene",
-                    "pack_id": "geography-basic",
+                    "pack_id": "geography-earth-basic",
                     "map_region": "east_asia",
                     "layers": [],
                     "flows": [],
@@ -86,19 +85,16 @@ def test_mcp_core_endpoints_expose_compilation_and_quality_services() -> None:
     capabilities = client.get("/api/v1/mcp/capabilities")
     assert capabilities.status_code == 200
     subjects = {subject["id"]: subject for subject in capabilities.json()["subjects"]}
-    assert set(subjects["geography"]["assetPacks"]) == {
-        "geography-basic",
-        "geography-earth-basic",
-    }
+    assert set(subjects["geography"]["assetPacks"]) == {"geography-earth-basic"}
     assert "geo_map_scene" in subjects["geography"]["renderers"]
 
     asset_packs = client.get("/api/v1/mcp/asset-packs", params={"subject": "geography"})
     assert asset_packs.status_code == 200
     geography_packs = {pack["packId"]: pack for pack in asset_packs.json()["packs"]}
-    assert set(geography_packs) == {"geography-basic", "geography-earth-basic"}
+    assert set(geography_packs) == {"geography-earth-basic"}
     assert (
-        geography_packs["geography-basic"]["resourceUri"]
-        == "metaview://kits/geography-basic/manifest"
+        geography_packs["geography-earth-basic"]["resourceUri"]
+        == "metaview://kits/geography-earth-basic/manifest"
     )
 
     resolved = client.post(
@@ -106,7 +102,7 @@ def test_mcp_core_endpoints_expose_compilation_and_quality_services() -> None:
         json={
             "subject": "geography",
             "sceneType": "east_asia_monsoon",
-            "semanticRoles": ["wind", "pressure_high"],
+            "semanticRoles": ["land", "coastline"],
         },
     )
     assert resolved.status_code == 200
@@ -115,8 +111,8 @@ def test_mcp_core_endpoints_expose_compilation_and_quality_services() -> None:
         asset["semanticRole"]: asset
         for asset in resolved_payload["assets"]
     }
-    assert resolved_assets["wind"]["assetId"] == "monsoon-wind-arrow"
-    assert resolved_assets["pressure_high"]["packId"] == "geography-earth-basic"
+    assert resolved_assets["land"]["assetId"] == "east-asia-land-110m"
+    assert resolved_assets["coastline"]["packId"] == "geography-earth-basic"
     assert resolved_payload["missing"] == []
 
     blueprint = client.post(
@@ -175,10 +171,7 @@ def test_mcp_capabilities_asset_packs_match_public_manifests() -> None:
     assert set(subjects["algorithm"]["assetPacks"]) == {"algorithm-code-basic"}
     assert set(subjects["biology"]["assetPacks"]) == {"biology-basic"}
     assert set(subjects["chemistry"]["assetPacks"]) == {"chemistry-basic"}
-    assert set(subjects["geography"]["assetPacks"]) == {
-        "geography-basic",
-        "geography-earth-basic",
-    }
+    assert set(subjects["geography"]["assetPacks"]) == {"geography-earth-basic"}
     assert set(subjects["math"]["assetPacks"]) == {"math-basic"}
     assert set(subjects["physics"]["assetPacks"]) == {"physics-basic"}
 
@@ -207,7 +200,7 @@ def test_mcp_resolve_assets_uses_public_manifest_discovery() -> None:
         json={
             "subject": "geography",
             "sceneType": "weather_pattern",
-            "semanticRoles": ["pressure_high"],
+            "semanticRoles": ["coastline"],
         },
     )
 
@@ -215,7 +208,7 @@ def test_mcp_resolve_assets_uses_public_manifest_discovery() -> None:
     payload = response.json()
     assert payload["missing"] == []
     assert payload["assets"][0]["packId"] == "geography-earth-basic"
-    assert payload["assets"][0]["assetId"] == "pressure-high-symbol"
+    assert payload["assets"][0]["assetId"] == "east-asia-coastline-110m"
 
 
 def test_mcp_visual_quality_reports_director_step_mismatch() -> None:

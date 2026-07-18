@@ -1,40 +1,13 @@
 import React from "react";
 
-import { AssetSvg } from "../assets/AssetSvg";
-import type { AssetManifestEntry } from "../assets/assetRegistry";
-import { resolveAssetById, resolveAssetByRole, resolveAssetForRenderer } from "../assets/assetResolver";
 import type { Molecule2DAtom, Molecule2DBond, Molecule2DCallout, Molecule2DSceneSnapshot } from "../types";
 import { CoreCalloutLabel } from "./CoreCalloutLabel";
 import { CoreFormulaTag } from "./CoreFormulaTag";
 import { CoreLabGrid } from "./CoreLabGrid";
 import type { RendererProps } from "./types";
 
-const DEFAULT_CHEMISTRY_PACK_ID = "chemistry-basic";
-
 function displayFormula(formula: string): string {
   return formula.replace(/_/g, "").replace(/\\/g, "");
-}
-
-function resolveMoleculeAsset(snapshot: Molecule2DSceneSnapshot, packId: string): AssetManifestEntry | undefined {
-  if (snapshot.molecule_asset_id) return resolveAssetById(packId, snapshot.molecule_asset_id);
-  return (
-    resolveAssetForRenderer("molecule_2d_scene", snapshot.molecule_id, packId) ??
-    resolveAssetByRole("chemistry", snapshot.molecule_id, packId) ??
-    resolveAssetByRole("chemistry", snapshot.molecule_id)
-  );
-}
-
-function resolvePrimitiveAsset(
-  semanticRole: "atom" | "bond",
-  packId: string,
-  assetId?: string | null,
-): AssetManifestEntry | undefined {
-  if (assetId) return resolveAssetById(packId, assetId);
-  return (
-    resolveAssetForRenderer("molecule_2d_scene", semanticRole, packId) ??
-    resolveAssetByRole("chemistry", semanticRole, packId) ??
-    resolveAssetByRole("chemistry", semanticRole)
-  );
 }
 
 function atomById(atoms: Molecule2DAtom[], id: string): Molecule2DAtom | undefined {
@@ -73,24 +46,51 @@ function renderBondLine(
   );
 }
 
-function renderBond(bond: Molecule2DBond, atoms: Molecule2DAtom[], packId: string) {
+function renderBond(bond: Molecule2DBond, atoms: Molecule2DAtom[]) {
   const from = atomById(atoms, bond.from);
   const to = atomById(atoms, bond.to);
   if (!from || !to) return null;
 
-  const bondAsset = resolvePrimitiveAsset("bond", packId, bond.asset_id);
   const offsets = bond.order === 1 ? [0] : bond.order === 2 ? [-1.4, 1.4] : [-2.4, 0, 2.4];
+  const stereoOffset = bondOffset(from, to, 3);
 
   return (
     <g
       key={bond.id}
       data-bond-id={bond.id}
       data-semantic-role="bond"
-      data-asset-id={bondAsset?.id ?? bond.asset_id ?? undefined}
-      data-asset-path={bondAsset?.path}
       data-bond-order={bond.order}
+      data-bond-stereo={bond.stereo ?? undefined}
     >
-      {offsets.map((offset) => renderBondLine(bond, from, to, offset, `${bond.id}-${offset}`))}
+      {bond.stereo === "wedge" ? (
+        <polygon
+          points={`${from.x},${from.y} ${to.x + stereoOffset.x},${to.y + stereoOffset.y} ${to.x - stereoOffset.x},${to.y - stereoOffset.y}`}
+          fill="#40546c"
+          opacity="0.82"
+        />
+      ) : bond.stereo === "dash" ? (
+        Array.from({ length: 6 }, (_, index) => {
+          const ratio = (index + 1) / 7;
+          const x = from.x + (to.x - from.x) * ratio;
+          const y = from.y + (to.y - from.y) * ratio;
+          const halfWidth = 0.35 + ratio * 2.2;
+          const offset = bondOffset(from, to, halfWidth);
+          return (
+            <line
+              key={`${bond.id}-dash-${index}`}
+              x1={x - offset.x}
+              y1={y - offset.y}
+              x2={x + offset.x}
+              y2={y + offset.y}
+              stroke="#40546c"
+              strokeWidth="0.9"
+              strokeLinecap="round"
+            />
+          );
+        })
+      ) : (
+        offsets.map((offset) => renderBondLine(bond, from, to, offset, `${bond.id}-${offset}`))
+      )}
       {bond.label ? (
         <text
           x={(from.x + to.x) / 2}
@@ -113,23 +113,34 @@ function atomRadius(atom: Molecule2DAtom): number {
   return 8.2;
 }
 
-function renderAtom(atom: Molecule2DAtom, packId: string) {
+function atomPalette(element: string): { fill: string; stroke: string; text: string } {
+  switch (element.toUpperCase()) {
+    case "O":
+      return { fill: "#f8e4df", stroke: "#b85c4a", text: "#7a3328" };
+    case "N":
+      return { fill: "#e5eaf5", stroke: "#667ba8", text: "#344668" };
+    case "H":
+      return { fill: "#fbfaf6", stroke: "#9aa39d", text: "#4f5852" };
+    case "C":
+      return { fill: "#ecefea", stroke: "#5d655f", text: "#313733" };
+    default:
+      return { fill: "#eef3ea", stroke: "#82976f", text: "#405137" };
+  }
+}
+
+function renderAtom(atom: Molecule2DAtom) {
   const radius = atomRadius(atom);
-  const atomAsset = resolvePrimitiveAsset("atom", packId, atom.asset_id);
+  const palette = atomPalette(atom.element);
 
   return (
     <g key={atom.id} data-atom-id={atom.id} data-element={atom.element} data-semantic-role="atom">
-      <AssetSvg
-        asset={atomAsset}
-        assetId={atom.asset_id ?? atomAsset?.id}
-        packId={packId}
-        subject="chemistry"
-        semanticRole="atom"
-        x={atom.x - radius}
-        y={atom.y - radius}
-        width={radius * 2}
-        height={radius * 2}
-        fallbackShape="circle"
+      <circle
+        cx={atom.x}
+        cy={atom.y}
+        r={radius}
+        fill={palette.fill}
+        stroke={palette.stroke}
+        strokeWidth="0.9"
       />
       <text
         x={atom.x}
@@ -137,7 +148,7 @@ function renderAtom(atom: Molecule2DAtom, packId: string) {
         textAnchor="middle"
         fontSize={atom.element.length > 1 ? "5" : "6.1"}
         fontWeight="820"
-        fill="#233044"
+        fill={palette.text}
       >
         {atom.element}
       </text>
@@ -186,8 +197,6 @@ function renderCallout(callout: Molecule2DCallout, atoms: Molecule2DAtom[]) {
 
 export const Molecule2DSceneRenderer: React.FC<RendererProps> = ({ step, theme }) => {
   const snap = step.snapshot as Molecule2DSceneSnapshot;
-  const packId = snap.pack_id ?? DEFAULT_CHEMISTRY_PACK_ID;
-  const moleculeAsset = resolveMoleculeAsset(snap, packId);
 
   return (
     <div
@@ -226,12 +235,10 @@ export const Molecule2DSceneRenderer: React.FC<RendererProps> = ({ step, theme }
           data-semantic-role="molecule"
           data-structured-molecule="true"
           data-smiles={snap.smiles ?? undefined}
-          data-asset-id={moleculeAsset?.id ?? snap.molecule_asset_id ?? undefined}
-          data-asset-path={moleculeAsset?.path}
-          data-asset-type={moleculeAsset?.type}
+          data-structured-preset-id={snap.molecule_asset_id ?? undefined}
         >
-          {snap.bonds.map((bond) => renderBond(bond, snap.atoms, packId))}
-          {snap.atoms.map((atom) => renderAtom(atom, packId))}
+          {snap.bonds.map((bond) => renderBond(bond, snap.atoms))}
+          {snap.atoms.map((atom) => renderAtom(atom))}
         </g>
 
         {(snap.callouts ?? []).map((callout) => renderCallout(callout, snap.atoms))}

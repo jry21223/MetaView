@@ -572,6 +572,7 @@ class Molecule2DBond(BaseModel):
     from_: str = Field(alias="from")
     to: str
     order: Literal[1, 2, 3] = 1
+    stereo: Literal["wedge", "dash"] | None = None
     label: str | None = None
     asset_id: str | None = None
 
@@ -671,7 +672,7 @@ class GeoPressureCenter(BaseModel):
 
 class GeoMapSceneSnapshot(BaseModel):
     kind: Literal["geo_map_scene"] = "geo_map_scene"
-    pack_id: str = "geography-basic"
+    pack_id: str = "geography-earth-basic"
     map_region: str = "east_asia"
     layers: list[GeoMapLayer] = Field(default_factory=list)
     flows: list[GeoMapFlow] = Field(default_factory=list)

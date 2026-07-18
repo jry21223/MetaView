@@ -13,6 +13,7 @@ function eastAsiaMonsoonSnapshot(extra: Partial<GeoMapSceneSnapshot> = {}): GeoM
     layers: [
       { id: "map", semantic_role: "map_layer", label: "东亚底图", asset_id: "east-asia-land-110m" },
       { id: "land", semantic_role: "land", label: "亚洲大陆" },
+      { id: "coastline", semantic_role: "coastline", label: "海岸线", asset_id: "east-asia-coastline-110m" },
       { id: "ocean", semantic_role: "ocean", label: "太平洋" },
     ],
     flows: [
@@ -22,7 +23,6 @@ function eastAsiaMonsoonSnapshot(extra: Partial<GeoMapSceneSnapshot> = {}): GeoM
         from: [78, 68],
         to: [42, 38],
         label: "夏季风",
-        asset_id: "monsoon-wind-arrow",
         strength: 1.1,
       },
     ],
@@ -73,7 +73,7 @@ describe("GeoMapSceneRenderer", () => {
     expect(markup).toContain('data-map-path-class="land"');
     expect(markup).toContain("<path");
     expect(markup).toContain('data-semantic-role="monsoon_flow"');
-    expect(markup).toContain('data-asset-id="monsoon-wind-arrow"');
+    expect(markup).toContain('data-asset-id="east-asia-coastline-110m"');
     expect(markup).not.toContain('data-missing-asset="true"');
   });
 
@@ -98,7 +98,7 @@ describe("GeoMapSceneRenderer", () => {
     const markup = renderToStaticMarkup(<GeoMapSceneRenderer {...props(snapshot)} />);
 
     expect(markup).toContain('data-asset-id="east-asia-land-110m"');
-    expect(markup).toContain('data-asset-id="monsoon-wind-arrow"');
+    expect(markup).toContain('data-semantic-role="monsoon_flow"');
     expect(markup).not.toContain('data-missing-asset="true"');
   });
 });

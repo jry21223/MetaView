@@ -99,14 +99,13 @@ describe("sceneBlueprintCompiler", () => {
     });
     expect(snapshot.flows[0]).toMatchObject({
       semantic_role: "monsoon_flow",
-      asset_id: "monsoon-wind-arrow",
     });
     expect(visualQualityGate(script)).toEqual([]);
 
     const markup = renderToStaticMarkup(<PlaybookComposition script={script} showSubtitles={false} />);
     expect(markup).toContain("geo-map-scene");
     expect(markup).toContain('data-asset-id="east-asia-land-110m"');
-    expect(markup).toContain('data-asset-id="monsoon-wind-arrow"');
+    expect(markup).toContain('data-semantic-role="monsoon_flow"');
     expect(markup).not.toContain("Unknown snapshot kind");
     expect(markup).not.toContain('data-missing-asset="true"');
   });
@@ -148,7 +147,7 @@ describe("sceneBlueprintCompiler", () => {
         from: [35, 30],
         to: [76, 64],
         label: "winter monsoon",
-        asset_id: "monsoon-wind-arrow",
+        asset_id: undefined,
         strength: 0.8,
       }),
     ]);
@@ -175,7 +174,6 @@ describe("sceneBlueprintCompiler", () => {
     expect(snapshot.pack_id).toBe("physics-basic");
     expect(snapshot.objects[0]).toMatchObject({
       id: "body",
-      asset_id: "projectile-body-dot",
     });
     expect(snapshot.trajectory?.length).toBeGreaterThanOrEqual(4);
     expect(snapshot.vectors.map((vector) => vector.semantic_role)).toEqual(
@@ -185,7 +183,7 @@ describe("sceneBlueprintCompiler", () => {
 
     const markup = renderToStaticMarkup(<PlaybookComposition script={script} showSubtitles={false} />);
     expect(markup).toContain("physics-force-scene");
-    expect(markup).toContain('data-asset-id="projectile-body-dot"');
+    expect(markup).toContain('data-object-id="body"');
     expect(markup).toContain('data-semantic-role="motion_trail"');
     expect(markup).not.toContain("Unknown snapshot kind");
     expect(markup).not.toContain('data-missing-asset="true"');
@@ -259,8 +257,8 @@ describe("sceneBlueprintCompiler", () => {
     );
 
     const markup = renderToStaticMarkup(<PlaybookComposition script={result.playbookScript} showSubtitles={false} />);
-    expect(markup).toContain('data-missing-asset="true"');
-    expect(markup).toContain('data-asset-id="missing-projectile-asset"');
+    expect(markup).toContain('data-object-id="body"');
+    expect(markup).not.toContain("missing-projectile-asset");
   });
 
   it("ignores raw SVG path hints so blueprint input stays an intent contract", () => {
@@ -359,9 +357,7 @@ describe("sceneBlueprintCompiler", () => {
     expect(snapshot.steps.map((processStep) => processStep.asset_id)).toEqual(
       expect.arrayContaining(["dna-helix", "replication-fork"]),
     );
-    expect(snapshot.connections.map((connection) => connection.asset_id)).toEqual(
-      expect.arrayContaining(["core-flow-arrow"]),
-    );
+    expect(snapshot.connections.every((connection) => connection.asset_id === undefined)).toBe(true);
     expect(visualQualityGate(script)).toEqual([]);
 
     const markup = renderToStaticMarkup(<PlaybookComposition script={script} showSubtitles={false} />);
@@ -402,13 +398,13 @@ describe("sceneBlueprintCompiler", () => {
     expect(snapshot.molecule_id).toBe("carbon_dioxide");
     expect(snapshot.smiles).toBe("O=C=O");
     expect(snapshot.atoms).toEqual([
-      { id: "o1", element: "O", x: 30, y: 50, label: "oxygen", asset_id: "atom-core" },
-      { id: "c", element: "C", x: 50, y: 50, label: "carbon", asset_id: "atom-core" },
-      { id: "o2", element: "O", x: 70, y: 50, label: "oxygen", asset_id: "atom-core" },
+      { id: "o1", element: "O", x: 30, y: 50, label: "oxygen", charge: undefined },
+      { id: "c", element: "C", x: 50, y: 50, label: "carbon", charge: undefined },
+      { id: "o2", element: "O", x: 70, y: 50, label: "oxygen", charge: undefined },
     ]);
     expect(snapshot.bonds).toEqual([
-      { id: "o1-c", from: "o1", to: "c", order: 2, asset_id: "bond-line" },
-      { id: "c-o2", from: "c", to: "o2", order: 2, asset_id: "bond-line" },
+      { id: "o1-c", from: "o1", to: "c", order: 2, stereo: undefined },
+      { id: "c-o2", from: "c", to: "o2", order: 2, stereo: undefined },
     ]);
     expect(snapshot.callouts).toEqual([
       { id: "linear", target_id: "c", label: "linear geometry", side: "top" },
@@ -440,23 +436,19 @@ describe("sceneBlueprintCompiler", () => {
     expect(elementCounts(snapshot.atoms)).toEqual(contract.elementCounts);
     expect(snapshot.bonds.length).toBeGreaterThanOrEqual(contract.minBondCount);
     expect(preset).toBeTruthy();
-    expect(snapshot.atoms).toEqual(preset!.atoms.map((atom) => ({ ...atom, asset_id: "atom-core" })));
-    expect(snapshot.bonds).toEqual(preset!.bonds.map((bond) => ({ ...bond, asset_id: "bond-line" })));
+    expect(snapshot.atoms).toEqual(preset!.atoms);
+    expect(snapshot.bonds).toEqual(preset!.bonds);
     expect(snapshot.callouts).toEqual(preset!.callouts);
     expect(snapshot.caption).toBe(preset!.caption);
-    expect(snapshot.atoms.map((atom) => atom.asset_id)).toEqual(
-      expect.arrayContaining(["atom-core"]),
-    );
-    expect(snapshot.bonds.map((bond) => bond.asset_id)).toEqual(
-      expect.arrayContaining(["bond-line"]),
-    );
+    expect(snapshot.atoms.every((atom) => atom.asset_id === undefined)).toBe(true);
+    expect(snapshot.bonds.every((bond) => bond.asset_id === undefined)).toBe(true);
     expect(visualQualityGate(script)).toEqual([]);
 
     const markup = renderToStaticMarkup(<PlaybookComposition script={script} showSubtitles={false} />);
     expect(markup).toContain("molecule-2d-scene");
     expect(markup).toContain('data-structured-molecule="true"');
     expect(markup).toContain(`data-molecule-id="${contract.moleculeId}"`);
-    expect(markup).toContain(`data-asset-id="${contract.assetId}"`);
+    expect(markup).toContain(`data-structured-preset-id="${contract.assetId}"`);
     expect(markup).toContain(contract.formula);
     expect(markup).toContain('data-element="O"');
     expect(markup).toContain('data-element="H"');
@@ -488,8 +480,8 @@ describe("sceneBlueprintCompiler", () => {
     expect(elementCounts(snapshot.atoms)).toEqual(contract.elementCounts);
     expect(snapshot.bonds.length).toBeGreaterThanOrEqual(contract.minBondCount);
     expect(preset).toBeTruthy();
-    expect(snapshot.atoms).toEqual(preset!.atoms.map((atom) => ({ ...atom, asset_id: "atom-core" })));
-    expect(snapshot.bonds).toEqual(preset!.bonds.map((bond) => ({ ...bond, asset_id: "bond-line" })));
+    expect(snapshot.atoms).toEqual(preset!.atoms);
+    expect(snapshot.bonds).toEqual(preset!.bonds);
     expect(snapshot.atoms).toHaveLength(5);
     expect(snapshot.bonds).toHaveLength(4);
     expect(visualQualityGate(script)).toEqual([]);
@@ -498,7 +490,7 @@ describe("sceneBlueprintCompiler", () => {
     expect(markup).toContain("molecule-2d-scene");
     expect(markup).toContain(`data-molecule-id="${contract.moleculeId}"`);
     expect(markup).toContain(`data-smiles="${contract.smiles}"`);
-    expect(markup).toContain(`data-asset-id="${contract.assetId}"`);
+    expect(markup).toContain(`data-structured-preset-id="${contract.assetId}"`);
     expect(markup).toContain(contract.formula);
     expect(markup).toContain('data-element="C"');
     expect(markup).toContain('data-element="H"');
@@ -537,7 +529,7 @@ describe("sceneBlueprintCompiler", () => {
     expect(markup).toContain("molecule-2d-scene");
     expect(markup).toContain(`data-molecule-id="${contract.moleculeId}"`);
     expect(markup).toContain(`data-smiles="${contract.smiles}"`);
-    expect(markup).toContain(`data-asset-id="${contract.assetId}"`);
+    expect(markup).toContain(`data-structured-preset-id="${contract.assetId}"`);
     expect(markup).toContain('data-element="C"');
     expect(markup).toContain('data-element="O"');
     expect(markup).toContain(contract.formula);
@@ -562,12 +554,9 @@ describe("sceneBlueprintCompiler", () => {
     }
     expect(snapshot.pack_id).toBe("chemistry-basic");
     expect(snapshot.reaction_id).toBe(contract.reactionId);
-    expect(snapshot.arrows.map((arrow) => arrow.asset_id)).toEqual(
-      expect.arrayContaining([contract.arrowAssetId]),
-    );
-    expect(snapshot.electron_flows.map((flow) => flow.asset_id)).toEqual(
-      expect.arrayContaining([contract.electronFlowAssetId]),
-    );
+    expect(snapshot.arrows).toHaveLength(1);
+    expect(snapshot.arrows[0].asset_id).toBeUndefined();
+    expect(snapshot.electron_flows).toEqual([]);
     expect(snapshot.reactants.map((participant) => participant.formula_latex)).toEqual(
       contract.reactantFormulas,
     );
@@ -580,8 +569,7 @@ describe("sceneBlueprintCompiler", () => {
     const markup = renderToStaticMarkup(<PlaybookComposition script={script} showSubtitles={false} />);
     expect(markup).toContain("reaction-scene");
     expect(markup).toContain(`data-reaction-id="${contract.reactionId}"`);
-    expect(markup).toContain(`data-asset-id="${contract.arrowAssetId}"`);
-    expect(markup).toContain(`data-asset-id="${contract.electronFlowAssetId}"`);
+    expect(markup).toContain('data-reaction-arrow-id="main-arrow"');
     expect(markup).not.toContain('data-missing-asset="true"');
   });
 
@@ -687,7 +675,7 @@ describe("sceneBlueprintCompiler", () => {
 
     const markup = renderToStaticMarkup(<PlaybookComposition script={script} showInlineCode={true} showSubtitles={false} />);
     expect(markup).toContain("graph-scene-renderer");
-    expect(markup).toContain('data-graph-asset-id="bfs-graph-preset"');
+    expect(markup).toContain('data-graph-id="bfs-graph-preset"');
     expect(markup).toContain('data-node-state="current"');
     expect(markup).toContain('data-node-state="queue"');
     expect(markup).toContain('data-edge-state="active"');
@@ -831,7 +819,6 @@ describe("sceneBlueprintCompiler", () => {
         label: "fib(5)",
         depth: 0,
         state: "waiting",
-        asset_id: "stack-frame",
         variables: { n: "5", pending: "fib(4)+fib(3)" },
       },
       {
@@ -839,7 +826,6 @@ describe("sceneBlueprintCompiler", () => {
         label: "fib(4)",
         depth: 1,
         state: "active",
-        asset_id: "call-frame",
         variables: { n: "4", branch: "left" },
       },
     ]);
@@ -854,7 +840,6 @@ describe("sceneBlueprintCompiler", () => {
       ],
       active_lines: [3],
       active_line: 3,
-      asset_id: "active-line",
     });
     expect(visualQualityGate(script)).toEqual([]);
 

@@ -5,8 +5,15 @@
   "rendererKind": "bio_process_scene",
   "packId": "biology-basic",
   "processId": "dna_replication",
-  "requiredAssetIds": ["dna-helix", "replication-fork", "core-flow-arrow"],
-  "requiredSemanticRoles": ["dna", "process_step", "flow_arrow"],
+  "requiredAssetIds": [
+    "dna-helix",
+    "replication-fork"
+  ],
+  "requiredSemanticRoles": [
+    "dna",
+    "process_step",
+    "flow_arrow"
+  ],
   "minimumStepCount": 3,
   "minimumConnectionCount": 2,
   "caption": "DNA replication must render template DNA, replication fork, new strands, and flow arrows from asset packs."

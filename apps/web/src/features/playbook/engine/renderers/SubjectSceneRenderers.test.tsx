@@ -31,10 +31,11 @@ vi.mock("remotion", async () => {
 function geoSnapshot(extra: Partial<GeoMapSceneSnapshot> = {}): GeoMapSceneSnapshot {
   return {
     kind: "geo_map_scene",
-    pack_id: "geography-basic",
+    pack_id: "geography-earth-basic",
     map_region: "east_asia",
     layers: [
-      { id: "land", semantic_role: "land", label: "亚洲大陆", asset_id: "east-asia-map-placeholder" },
+      { id: "land", semantic_role: "land", label: "亚洲大陆", asset_id: "east-asia-land-110m" },
+      { id: "coastline", semantic_role: "coastline", label: "海岸线", asset_id: "east-asia-coastline-110m" },
       { id: "ocean", semantic_role: "ocean", label: "太平洋" },
     ],
     flows: [
@@ -44,7 +45,6 @@ function geoSnapshot(extra: Partial<GeoMapSceneSnapshot> = {}): GeoMapSceneSnaps
         from: [78, 68],
         to: [42, 38],
         label: "夏季风",
-        asset_id: "monsoon-wind-arrow",
       },
     ],
     pressure_centers: [
@@ -62,7 +62,7 @@ function physicsSnapshot(extra: Partial<PhysicsForceSceneSnapshot> = {}): Physic
     kind: "physics_force_scene",
     pack_id: "physics-basic",
     objects: [
-      { id: "body", label: "小球", x: 30, y: 42, asset_id: "projectile-body-dot" },
+      { id: "body", label: "小球", x: 30, y: 42 },
     ],
     vectors: [
       { id: "vx", target: "body", semantic_role: "velocity", dx: 28, dy: 0, label: "v_x" },
@@ -125,10 +125,10 @@ function reactionSnapshot(extra: Partial<ReactionSceneSnapshot> = {}): ReactionS
       { id: "h2o", formula_latex: "H_2O", label: "water", coefficient: 2, x: 78, y: 48 },
     ],
     arrows: [
-      { id: "main-arrow", semantic_role: "reaction_arrow", from: [48, 48], to: [66, 48], asset_id: "reaction-arrow" },
+      { id: "main-arrow", semantic_role: "reaction_arrow", from: [48, 48], to: [66, 48] },
     ],
     electron_flows: [
-      { id: "electron-shift", semantic_role: "electron_flow", from: [39, 38], to: [58, 36], asset_id: "electron-flow" },
+      { id: "electron-shift", semantic_role: "electron_flow", from: [39, 38], to: [58, 36] },
     ],
     formula_latex: "2H_2 + O_2 \\rightarrow 2H_2O",
     caption: "A balanced reaction conserves atoms.",
@@ -228,7 +228,7 @@ describe("subject scene renderers", () => {
 
     expect(markup).toContain("molecule-2d-scene");
     expect(markup).toContain('data-molecule-id="water"');
-    expect(markup).toContain('data-asset-id="water-molecule-preset"');
+    expect(markup).toContain('data-structured-preset-id="water-molecule-preset"');
     expect(markup).toContain('data-structured-molecule="true"');
     expect(markup).toContain('data-element="O"');
   });
@@ -238,8 +238,8 @@ describe("subject scene renderers", () => {
 
     expect(markup).toContain("reaction-scene");
     expect(markup).toContain('data-reaction-id="reaction_synthesis_water"');
-    expect(markup).toContain('data-asset-id="reaction-arrow"');
-    expect(markup).toContain('data-asset-id="electron-flow"');
+    expect(markup).toContain('data-reaction-arrow-id="main-arrow"');
+    expect(markup).toContain('data-electron-flow-id="electron-shift"');
     expect(markup).toContain('data-semantic-role="reactant"');
     expect(markup).toContain('data-semantic-role="product"');
   });
@@ -252,7 +252,7 @@ describe("subject scene renderers", () => {
     expect(markup).toContain('data-semantic-role="wind"');
     expect(markup).toContain("夏季风");
     expect(markup).toContain("陆地低压");
-    expect(markup).toContain("moisture_particles");
+    expect(markup).toContain('data-asset-id="east-asia-coastline-110m"');
   });
 
   it("renders physics object, vectors, trajectory, and formula overlay", () => {

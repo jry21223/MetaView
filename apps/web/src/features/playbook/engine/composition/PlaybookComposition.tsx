@@ -10,7 +10,6 @@ import { appearTransform, useTimeline } from "../foundation";
 import { compileVisualTimeline, type VisualLayerState, type VisualStepState } from "./visualContinuity";
 import { snapshotSurface } from "./snapshotSurface";
 import { buildDirectorFramePlan } from "../director";
-import { AssetSvg } from "../assets/AssetSvg";
 import { visualQualityGate } from "../assets/visualQualityGate";
 import { assetAttributionEntryId, createAssetAttributionSummary } from "../assets/assetAttributionSummary";
 
@@ -72,17 +71,12 @@ function VisualQualityWarningIcon() {
         pointerEvents: "none",
         opacity: 0.9,
         filter: "drop-shadow(0 2px 6px rgba(0, 0, 0, 0.26))",
+        color: "var(--color-warning, #b97613)",
       }}
     >
-      <AssetSvg
-        assetId="core-warning-icon"
-        packId="core-visual-basic"
-        semanticRole="warning"
-        x={4}
-        y={2}
-        width={28}
-        height={28}
-      />
+      <path d="M18 3 L33 29 H3 Z" fill="currentColor" opacity="0.92" />
+      <line x1="18" y1="10" x2="18" y2="20" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" />
+      <circle cx="18" cy="25" r="1.5" fill="#fff" />
     </svg>
   );
 }

@@ -1,12 +1,9 @@
 import React from "react";
-import { AssetSvg } from "../assets/AssetSvg";
 import type { CodeTracePointer, CodeTraceSceneSnapshot } from "../types";
 import type { RendererProps } from "./types";
 
 const SVG_W = 900;
 const SVG_H = 506;
-const CORE_PACK_ID = "core-visual-basic";
-
 const COLORS = {
   dark: {
     bg: "#0a0c10",
@@ -104,16 +101,15 @@ export const CodeTraceSceneRenderer: React.FC<RendererProps> = ({ step, theme })
           return (
             <g key={`${index}-${line}`} data-code-line={index} data-code-line-state={active ? "active" : "idle"}>
               {active ? (
-                <AssetSvg
-                  assetId={snap.active_line_asset_id ?? "active-line"}
-                  packId={packId}
-                  subject="algorithm"
-                  semanticRole="active_line"
+                <rect
                   x={codeX - 10}
                   y={y - 23}
                   width={codeW}
                   height={30}
-                  fallbackShape="rect"
+                  rx="5"
+                  fill={`${colors.accent}16`}
+                  stroke={colors.accent}
+                  strokeWidth="1"
                 />
               ) : null}
               <text x={codeX} y={y} fill={active ? colors.accent : colors.muted} fontSize="14" fontFamily="monospace">
@@ -144,18 +140,12 @@ export const CodeTraceSceneRenderer: React.FC<RendererProps> = ({ step, theme })
         <g data-search-range={`${rangeStart}-${rangeEnd}`}>
           {arrayValues.length > 0 ? (
             <g data-search-range-flow={`${rangeStart}-${rangeEnd}`}>
-              <AssetSvg
-                assetId="core-flow-arrow"
-                packId={CORE_PACK_ID}
-                subject="core"
-                semanticRole="flow_arrow"
-                x={arrayX + rangeMin * cellW + 4}
-                y={arrayY - 24}
-                width={Math.max(44, (rangeMax - rangeMin + 1) * cellW - 14)}
-                height={16}
-                opacity="0.76"
-                preserveAspectRatio="none"
-                fallbackShape="rect"
+              <path
+                d={`M ${arrayX + rangeMin * cellW + 5} ${arrayY - 10} V ${arrayY - 18} H ${arrayX + (rangeMax + 1) * cellW - 11} V ${arrayY - 10}`}
+                fill="none"
+                stroke={colors.accent}
+                strokeWidth="1.6"
+                strokeLinecap="round"
               />
             </g>
           ) : null}
@@ -199,17 +189,7 @@ export const CodeTraceSceneRenderer: React.FC<RendererProps> = ({ step, theme })
           const y = pointerY(pointer);
           return (
             <g key={pointer.id} data-pointer-id={pointer.id} data-pointer-index={pointer.index}>
-              <AssetSvg
-                assetId={pointer.asset_id ?? "pointer-marker"}
-                packId={packId}
-                subject="algorithm"
-                semanticRole="pointer"
-                x={x}
-                y={y}
-                width={36}
-                height={32}
-                fallbackShape="rect"
-              />
+              <circle cx={x + 18} cy={y + 12} r="4" fill={colors.pointer} />
               <line
                 x1={x + 18}
                 y1={y + 30}

@@ -38,15 +38,14 @@ describe("CallStackSceneRenderer", () => {
           pack_id: "algorithm-code-basic",
           asset_id: "recursion-stack-preset",
           frames: [
-            { id: "f4", label: "factorial(4)", depth: 0, state: "waiting", asset_id: "stack-frame" },
-            { id: "f3", label: "factorial(3)", depth: 1, state: "active", asset_id: "call-frame" },
+            { id: "f4", label: "factorial(4)", depth: 0, state: "waiting" },
+            { id: "f3", label: "factorial(3)", depth: 1, state: "active" },
           ],
           code_trace: {
             language: "python",
             lines: ["def factorial(n):", "    if n == 1:", "        return 1", "    return n * factorial(n - 1)"],
             active_lines: [3],
             active_line: 3,
-            asset_id: "active-line",
           },
           current_frame_id: "f3",
           caption: "Recursive calls stack up until the base case returns.",
@@ -57,14 +56,10 @@ describe("CallStackSceneRenderer", () => {
     expect(markup).toContain("call-stack-scene");
     expect(markup).toContain('data-pack-id="algorithm-code-basic"');
     expect(markup).toContain('data-stack-asset-id="recursion-stack-preset"');
-    expect(markup).toContain('data-asset-id="call-frame"');
-    expect(markup).toContain('data-asset-id="stack-frame"');
-    expect(markup).toContain('data-asset-id="active-line"');
-    expect(markup).toContain('data-asset-id="core-timeline-arrow"');
-    expect(markup).toContain('data-semantic-role="timeline_arrow"');
     expect(markup).toContain('data-frame-transition="f4-to-f3"');
     expect(markup).toContain('data-frame-state="active"');
     expect(markup).toContain("factorial(3)");
+    expect(markup).not.toContain("stack-frame");
     expect(markup).not.toContain('data-missing-asset="true"');
   });
 });

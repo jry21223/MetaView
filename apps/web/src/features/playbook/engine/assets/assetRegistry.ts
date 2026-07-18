@@ -2,7 +2,6 @@ import biologyBasicManifest from "../../../../../public/assets/metaview-kits/bio
 import algorithmCodeBasicManifest from "../../../../../public/assets/metaview-kits/algorithm-code-basic/manifest.json";
 import chemistryBasicManifest from "../../../../../public/assets/metaview-kits/chemistry-basic/manifest.json";
 import coreVisualBasicManifest from "../../../../../public/assets/metaview-kits/core-visual-basic/manifest.json";
-import geographyBasicManifest from "../../../../../public/assets/metaview-kits/geography-basic/manifest.json";
 import geographyEarthBasicManifest from "../../../../../public/assets/metaview-kits/geography-earth-basic/manifest.json";
 import mathBasicManifest from "../../../../../public/assets/metaview-kits/math-basic/manifest.json";
 import physicsBasicManifest from "../../../../../public/assets/metaview-kits/physics-basic/manifest.json";
@@ -32,6 +31,7 @@ export type AssetLicense =
   | "internal";
 
 export type AssetCommercialUseStatus = "allowed" | "allowed-with-attribution" | "restricted" | "unknown";
+export type AssetTeachingUse = "formal" | "primitive" | "experimental" | "ui";
 
 export interface AssetSource {
   id: string;
@@ -68,6 +68,7 @@ export interface AssetManifestEntry {
   sourceUrl: string | null;
   licenseUrl: string | null;
   modifiedFrom: string | null;
+  teachingUse?: AssetTeachingUse;
   rendererHints?: AssetRendererHints;
 }
 
@@ -79,6 +80,7 @@ export interface SubjectVisualKit {
   license: AssetLicense;
   licenseMode: "single" | "mixed";
   defaultLicense?: AssetLicense;
+  defaultTeachingUse: AssetTeachingUse;
   sceneTemplates: string[];
   rendererKinds: string[];
   sources: AssetSource[];
@@ -90,7 +92,6 @@ const ASSET_PACKS: SubjectVisualKit[] = [
   biologyBasicManifest as SubjectVisualKit,
   chemistryBasicManifest as SubjectVisualKit,
   coreVisualBasicManifest as SubjectVisualKit,
-  geographyBasicManifest as SubjectVisualKit,
   geographyEarthBasicManifest as SubjectVisualKit,
   mathBasicManifest as SubjectVisualKit,
   physicsBasicManifest as SubjectVisualKit,
@@ -136,4 +137,13 @@ export function findAssetByRole(
     if (asset) return asset;
   }
   return undefined;
+}
+
+export function getAssetTeachingUse(
+  asset: AssetManifestEntry,
+  packId?: string | null,
+): AssetTeachingUse {
+  if (asset.teachingUse) return asset.teachingUse;
+  const pack = packId ? getAssetPack(packId) : ASSET_PACKS.find((candidate) => candidate.assets.includes(asset));
+  return pack?.defaultTeachingUse ?? "experimental";
 }

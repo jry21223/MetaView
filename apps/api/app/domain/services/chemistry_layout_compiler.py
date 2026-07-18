@@ -112,6 +112,7 @@ def _bond(raw: dict[str, Any], pack_id: str, index: int) -> Molecule2DBond:
         **{"from": from_id},
         to=to_id,
         order=raw.get("order", 1),
+        stereo=raw.get("stereo"),
         label=raw.get("label"),
         asset_id=raw.get("assetId")
         or raw.get("asset_id")
@@ -166,8 +167,8 @@ def compile_molecule_2d_snapshot(
             pack_id=pack_id,
             molecule_id=molecule_id,
             smiles=smiles or GLUCOSE_SMILES,
-            atom_asset_id=atom_asset_id or "atom-core",
-            bond_asset_id=bond_asset_id or "bond-line",
+            atom_asset_id=atom_asset_id,
+            bond_asset_id=bond_asset_id,
             caption=str(
                 blueprint.get("caption")
                 or "Glucose is rendered from RDKit SMILES structure data."
@@ -303,29 +304,10 @@ def compile_reaction_snapshot(blueprint: dict[str, Any]) -> ReactionSceneSnapsho
             _arrow(arrow, pack_id, index)
             for index, arrow in enumerate(blueprint.get("arrows") or [])
         ]
-        or [
-            _arrow(
-                {
-                    **reaction_contract["arrow"],
-                    "assetId": reaction_contract["arrowAssetId"],
-                },
-                pack_id,
-                0,
-            ),
-        ],
+        or [_arrow(reaction_contract["arrow"], pack_id, 0)],
         electron_flows=[
             _electron_flow(flow, pack_id, index)
             for index, flow in enumerate(raw_electron_flows)
-        ]
-        or [
-            _electron_flow(
-                {
-                    **reaction_contract["electronFlow"],
-                    "assetId": reaction_contract["electronFlowAssetId"],
-                },
-                pack_id,
-                0,
-            ),
         ],
         callouts=[
             _callout(callout, index)

@@ -736,10 +736,10 @@ class TestMathFallbackChain:
         snap = playbook.steps[0].snapshot
         assert isinstance(snap, GeoMapSceneSnapshot)
         assert snap.kind == "geo_map_scene"
-        assert snap.pack_id == "geography-basic"
+        assert snap.pack_id == "geography-earth-basic"
         assert any(flow.semantic_role == "wind" for flow in snap.flows)
         assert playbook.steps[0].layers[0].body.kind == "geo_map_scene"
-        payload = playbook.model_dump(mode="json")
+        payload = playbook.model_dump(mode="json", by_alias=True)
         flow = payload["steps"][0]["snapshot"]["flows"][0]
         assert "from" in flow
         assert "from_" not in flow

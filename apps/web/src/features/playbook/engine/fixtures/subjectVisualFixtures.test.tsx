@@ -40,7 +40,7 @@ describe("subject visual fixtures", () => {
 
     expect(markup).toContain("graph-scene-renderer");
     expect(markup).toContain('data-pack-id="algorithm-code-basic"');
-    expect(markup).toContain('data-graph-asset-id="bfs-graph-preset"');
+    expect(markup).toContain('data-graph-id="bfs-graph-preset"');
     expect(markup).toContain('data-node-state="current"');
     expect(markup).toContain('data-node-state="visited"');
     expect(markup).toContain('data-node-state="queue"');
@@ -62,10 +62,6 @@ describe("subject visual fixtures", () => {
     expect(markup).toContain("call-stack-scene");
     expect(markup).toContain('data-pack-id="algorithm-code-basic"');
     expect(markup).toContain('data-stack-asset-id="recursion-stack-preset"');
-    expect(markup).toContain('data-asset-id="call-frame"');
-    expect(markup).toContain('data-asset-id="stack-frame"');
-    expect(markup).toContain('data-asset-id="active-line"');
-    expect(markup).toContain('data-asset-id="core-timeline-arrow"');
     expect(markup).toContain('data-frame-state="active"');
     expect(markup).toContain('data-frame-id="fib-4"');
     expect(markup).toContain("fib(4)");
@@ -87,9 +83,6 @@ describe("subject visual fixtures", () => {
     expect(markup).toContain("code-trace-scene");
     expect(markup).toContain('data-pack-id="algorithm-code-basic"');
     expect(markup).toContain('data-trace-asset-id="binary-search-trace-preset"');
-    expect(markup).toContain('data-asset-id="core-flow-arrow"');
-    expect(markup).toContain('data-asset-id="active-line"');
-    expect(markup).toContain('data-asset-id="pointer-marker"');
     expect(markup).toContain('data-pointer-id="mid"');
     expect(markup).toContain('data-array-cell-state="active"');
     expect(markup).toContain("binarySearch");
@@ -118,7 +111,7 @@ describe("subject visual fixtures", () => {
 
     expect(markup).toContain("molecule-2d-scene");
     expect(markup).toContain('data-molecule-id="water"');
-    expect(markup).toContain('data-asset-id="water-molecule-preset"');
+    expect(markup).toContain('data-structured-preset-id="water-molecule-preset"');
     expect(markup).toContain('data-structured-molecule="true"');
     expect(markup).toContain('data-element="O"');
     expect(markup).toContain('data-element="H"');
@@ -134,7 +127,9 @@ describe("subject visual fixtures", () => {
     expect(markup).toContain("molecule-2d-scene");
     expect(markup).toContain('data-molecule-id="methane"');
     expect(markup).toContain('data-smiles="C"');
-    expect(markup).toContain('data-asset-id="methane-molecule-preset"');
+    expect(markup).toContain('data-structured-preset-id="methane-molecule-preset"');
+    expect(markup).toContain('data-bond-stereo="wedge"');
+    expect(markup).toContain('data-bond-stereo="dash"');
     expect(markup).toContain('data-element="C"');
     expect(markup).toContain('data-element="H"');
     expect(markup).not.toContain("Unknown snapshot kind");
@@ -148,8 +143,7 @@ describe("subject visual fixtures", () => {
 
     expect(markup).toContain("reaction-scene");
     expect(markup).toContain('data-reaction-id="reaction_synthesis_water"');
-    expect(markup).toContain('data-asset-id="reaction-arrow"');
-    expect(markup).toContain('data-asset-id="electron-flow"');
+    expect(markup).toContain('data-reaction-arrow-id="main-arrow"');
     expect(markup).toContain('data-semantic-role="reactant"');
     expect(markup).toContain('data-semantic-role="product"');
     expect(markup).not.toContain("Unknown snapshot kind");
@@ -179,7 +173,7 @@ describe("subject visual fixtures", () => {
     expect(markup).toContain('data-process-id="dna_replication"');
     expect(markup).toContain('data-asset-id="dna-helix"');
     expect(markup).toContain('data-asset-id="replication-fork"');
-    expect(markup).toContain('data-asset-id="core-flow-arrow"');
+    expect(markup).toContain('data-connection-id="template-to-fork"');
     expect(markup).toContain('data-semantic-role="callout"');
     expect(markup).not.toContain("Unknown snapshot kind");
     expect(markup).not.toContain('data-missing-asset="true"');
@@ -194,7 +188,7 @@ describe("subject visual fixtures", () => {
     expect(markup).toContain('data-asset-id="east-asia-land-110m"');
     expect(markup).toContain('data-natural-earth-layer="admin_0_countries"');
     expect(markup).toContain('data-map-path-class="land"');
-    expect(markup).toContain('data-asset-id="monsoon-wind-arrow"');
+    expect(markup).toContain('data-semantic-role="monsoon_flow"');
     expect(markup).not.toContain("Unknown snapshot kind");
     expect(markup).not.toContain('data-missing-asset="true"');
   });
@@ -205,8 +199,8 @@ describe("subject visual fixtures", () => {
     );
 
     expect(markup).toContain("physics-force-scene");
-    expect(markup).toContain('data-asset-id="projectile-body-dot"');
-    expect(markup).toContain('data-asset-id="force-vector-arrow"');
+    expect(markup).toContain('data-object-id="body"');
+    expect(markup).toContain('marker-end="url(#physics-arrow-velocity)"');
     expect(markup).toContain('data-semantic-role="motion_trail"');
     expect(markup).toContain('data-semantic-role="formula_card"');
     expect(markup).toContain('data-vector-component="vertical"');

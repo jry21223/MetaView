@@ -34,7 +34,6 @@ describe("subject visual showcase catalog", () => {
       "physics-basic",
       "biology-basic",
       "biology-basic",
-      "biology-basic",
       "chemistry-basic",
       "chemistry-basic",
       "chemistry-basic",
@@ -49,7 +48,6 @@ describe("subject visual showcase catalog", () => {
     expect(entries.map((entry) => entry.rendererKind)).toEqual([
       "geo_map_scene",
       "physics_force_scene",
-      "bio_cell_scene",
       "bio_cell_scene",
       "bio_process_scene",
       "molecule_2d_scene",
@@ -102,13 +100,13 @@ describe("subject visual showcase catalog", () => {
     expect(getSubjectVisualShowcaseEntry("east_asia_monsoon")?.contractCoverage).toMatchObject({
       status: "matched",
       contractIds: ["east-asia-monsoon-contract"],
-      requiredAssetIds: ["east-asia-land-110m", "east-asia-ocean-background", "monsoon-wind-arrow"],
+      requiredAssetIds: ["east-asia-coastline-110m", "east-asia-land-110m"],
       missingAssetIds: [],
     });
     expect(getSubjectVisualShowcaseEntry("projectile_motion")?.contractCoverage).toMatchObject({
       status: "matched",
       contractIds: ["projectile-motion-contract"],
-      requiredAssetIds: ["force-vector-arrow", "projectile-body-dot"],
+      requiredAssetIds: [],
       missingAssetIds: [],
     });
     expect(getSubjectVisualShowcaseEntry("molecule_2d_water")?.contractCoverage).toMatchObject({
@@ -116,17 +114,11 @@ describe("subject visual showcase catalog", () => {
       contractIds: ["water-molecule-contract"],
       missingAssetIds: [],
     });
-    expect(getSubjectVisualShowcaseEntry("cell_structure_custom")?.contractCoverage).toMatchObject({
-      status: "matched",
-      contractIds: ["custom-cell-layout-contract"],
-      requiredAssetIds: ["cell-outline", "mitochondrion", "nucleus"],
-      missingAssetIds: [],
-    });
     expect(getSubjectVisualShowcaseEntry("carbon_dioxide_molecule")?.contractCoverage).toMatchObject({
       status: "matched",
       contractIds: ["carbon-dioxide-structure-contract"],
-      requiredAssetIds: ["atom-core", "bond-line"],
-      renderedAssetIds: ["atom-core", "bond-line"],
+      requiredAssetIds: [],
+      renderedAssetIds: [],
       missingAssetIds: [],
     });
     expect(getSubjectVisualShowcaseEntry("derivative_tangent")?.contractCoverage).toMatchObject({
@@ -182,7 +174,7 @@ describe("subject visual showcase catalog", () => {
     expect(docs).toContain("per-fixture screenshot baseline");
     expect(docs).toContain("screenshotReview");
     expect(docs).toContain("contractCoverage");
-    expect(docs).toMatch(/all 15\s+showcase fixtures/);
+    expect(docs).toMatch(/all 14\s+showcase fixtures/);
     expect(docs).toContain("approved_reference_current");
     expect(docs).toContain("SHOWCASE_BASELINE_REQUIRE_APPROVED=1");
     for (const fixtureId of SHOWCASE_IDS) {

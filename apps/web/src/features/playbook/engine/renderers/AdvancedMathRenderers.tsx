@@ -17,8 +17,6 @@ import type {
 } from "../types";
 import { clamp01 } from "../foundation";
 import { sanitizeKatex } from "../../../../shared/lib/sanitizeKatex";
-import { AssetSvg } from "../assets/AssetSvg";
-import { resolveAssetById, resolveAssetByRole, resolveAssetForRenderer } from "../assets/assetResolver";
 import type { RendererProps } from "./types";
 
 type ThemeName = "dark" | "light";
@@ -465,8 +463,6 @@ function GraphSvg({
     ...(graph.frontier_node_ids ?? []),
   ]);
   const activeEdges = new Set(graph.active_edge_ids ?? []);
-  const packId = graph.pack_id ?? "algorithm-code-basic";
-  const graphAsset = graph.asset_id ? resolveAssetById(packId, graph.asset_id) : undefined;
   const showStatePanel = shouldRenderGraphAlgorithmStatePanel(graph, currentNodes, visitedNodes, queueNodes);
   const projection = showStatePanel
     ? { centerX: 312, centerY: 258, xScale: 78, yScale: 66 }
@@ -490,8 +486,7 @@ function GraphSvg({
       width="100%"
       height="100%"
       data-pack-id={graph.pack_id ?? undefined}
-      data-graph-asset-id={graph.asset_id ?? graphAsset?.id ?? undefined}
-      data-asset-id={graphAsset?.id ?? undefined}
+      data-graph-id={graph.asset_id ?? undefined}
     >
       <defs>
         <marker id="graph-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
@@ -504,17 +499,12 @@ function GraphSvg({
         if (!a || !b) return null;
         const edgeId = edge.id ?? `${edge.source}-${edge.target}`;
         const active = edge.emphasis === "accent" || activeEdges.has(edgeId);
-        const edgeAsset = edge.asset_id
-          ? resolveAssetById(packId, edge.asset_id)
-          : resolveAssetForRenderer("graph_scene", active ? "active_edge" : "graph_edge", packId) ??
-            resolveAssetByRole("algorithm", active ? "active_edge" : "graph_edge", packId);
         return (
           <g
             key={`${edge.source}-${edge.target}-${index}`}
             opacity={opacity}
             data-edge-id={edgeId}
             data-edge-state={active ? "active" : "idle"}
-            data-asset-id={edgeAsset?.id ?? edge.asset_id ?? undefined}
           >
             <line
               x1={a.x}
@@ -537,10 +527,17 @@ function GraphSvg({
       {layoutPositioned.map((node) => {
         const state = graphNodeState(node.id, currentNodes, visitedNodes, queueNodes);
         const active = state === "current" || node.emphasis === "accent";
-        const nodeAsset = resolveGraphNodeAsset(packId, node.asset_id, state);
-        const width = state === "queue" ? 76 : active ? 64 : 58;
-        const height = state === "queue" ? 52 : active ? 64 : 58;
-        const radius = Math.max(width, height) / 2;
+        const radius = active ? 32 : 29;
+        const nodeFill =
+          state === "current"
+            ? `${colors.accent}2e`
+            : state === "visited"
+              ? `${colors.secondary}22`
+              : state === "queue"
+                ? colors.card
+                : colors.bg;
+        const nodeStroke =
+          state === "current" ? colors.accent : state === "visited" ? colors.secondary : colors.line;
         return (
           <g
             key={node.id}
@@ -564,23 +561,18 @@ function GraphSvg({
             } : undefined}
           >
             <circle cx={node.x} cy={node.y} r={radius} fill="transparent" />
-            <AssetSvg
-              asset={nodeAsset}
-              assetId={node.asset_id ?? nodeAsset?.id}
-              packId={packId}
-              subject="algorithm"
-              semanticRole={nodeRoleForState(state)}
-              x={node.x - width / 2}
-              y={node.y - height / 2}
-              width={width}
-              height={height}
-              fallbackShape={state === "queue" ? "rect" : "circle"}
-              className="graph-node-asset"
+            <circle
+              cx={node.x}
+              cy={node.y}
+              r={radius}
+              fill={nodeFill}
+              stroke={nodeStroke}
+              strokeWidth={active ? 3 : 2}
             />
             <text
               x={node.x}
               y={node.y + 6}
-              fill={state === "queue" ? "#7a4b00" : colors.ink}
+              fill={colors.ink}
               fontSize={18}
               fontWeight={760}
               textAnchor="middle"
@@ -731,27 +723,6 @@ function graphNodeState(
   if (queueNodes.has(nodeId)) return "queue";
   if (visitedNodes.has(nodeId)) return "visited";
   return "default";
-}
-
-function nodeRoleForState(state: GraphNodeVisualState): string {
-  if (state === "queue") return "queue";
-  if (state === "visited") return "visited";
-  return "graph_node";
-}
-
-function resolveGraphNodeAsset(
-  packId: string,
-  assetId: string | null | undefined,
-  state: GraphNodeVisualState,
-) {
-  if (assetId) return resolveAssetById(packId, assetId);
-  const semanticRole = nodeRoleForState(state);
-  return (
-    resolveAssetForRenderer("graph_scene", semanticRole, packId) ??
-    resolveAssetByRole("algorithm", semanticRole, packId) ??
-    resolveAssetForRenderer("graph_scene", "graph_node", packId) ??
-    resolveAssetByRole("algorithm", "graph_node", packId)
-  );
 }
 
 function shouldProjectCompactGraphCoords(nodes: GraphSceneSnapshot["nodes"]): boolean {

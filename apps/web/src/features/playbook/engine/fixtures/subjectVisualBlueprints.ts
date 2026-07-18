@@ -9,7 +9,6 @@ export type SubjectVisualFixtureId =
   | "bfs_graph"
   | "carbon_dioxide_molecule"
   | "cell_structure"
-  | "cell_structure_custom"
   | "cubic_tangent"
   | "dna_replication"
   | "derivative_tangent"
@@ -25,7 +24,6 @@ export const SUBJECT_VISUAL_BLUEPRINT_IDS: readonly SubjectVisualFixtureId[] = [
   "east_asia_monsoon",
   "projectile_motion",
   "cell_structure",
-  "cell_structure_custom",
   "dna_replication",
   "molecule_2d_water",
   "molecule_2d_methane",
@@ -107,25 +105,6 @@ export const subjectVisualBlueprints: Record<SubjectVisualFixtureId, SceneBluepr
     title: "Cell structure",
     visualIntent: ["show_cell_structure", "label_core_organelles"],
     emphasisPoints: ["nucleus", "mitochondrion", "cell membrane"],
-  },
-  cell_structure_custom: {
-    id: "cell_structure_custom",
-    subject: "biology",
-    sceneType: "cell_structure",
-    title: "Custom cell layout",
-    visualIntent: ["show_cell_structure", "use_structured_layout"],
-    emphasisPoints: ["custom nucleus position", "custom mitochondrion callout"],
-    cellType: "plant",
-    structures: [
-      { id: "cell-wall", semanticRole: "cell", label: "cell wall", x: 48, y: 52, width: 72, height: 54 },
-      { id: "nucleus", semanticRole: "nucleus", label: "nucleus", x: 38, y: 44, width: 18, height: 16 },
-      { id: "mitochondrion-right", semanticRole: "mitochondrion", label: "mitochondrion", x: 65, y: 60, width: 14, height: 9 },
-    ],
-    callouts: [
-      { id: "nucleus-note", targetId: "nucleus", label: "gene control", side: "left" },
-      { id: "energy-note", targetId: "mitochondrion-right", label: "energy", side: "right" },
-    ],
-    caption: "Structured biology layout keeps external cell structure positions and callouts.",
   },
   dna_replication: {
     id: "dna_replication",

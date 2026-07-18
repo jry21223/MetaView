@@ -10,7 +10,7 @@ function projectileMotionSnapshot(extra: Partial<PhysicsForceSceneSnapshot> = {}
     kind: "physics_force_scene",
     pack_id: "physics-basic",
     objects: [
-      { id: "body", label: "小球", x: 30, y: 42, asset_id: "projectile-body-dot" },
+      { id: "body", label: "小球", x: 30, y: 42 },
     ],
     vectors: [
       { id: "vx", target: "body", semantic_role: "velocity", dx: 28, dy: 0, label: "v_x" },
@@ -50,61 +50,51 @@ function props(snapshot: PhysicsForceSceneSnapshot): RendererProps {
 }
 
 describe("PhysicsForceSceneRenderer", () => {
-  it("statically renders projectile_motion with the projectile asset", () => {
+  it("statically renders projectile_motion with native teaching geometry", () => {
     const markup = renderToStaticMarkup(<PhysicsForceSceneRenderer {...props(projectileMotionSnapshot())} />);
 
     expect(markup).toContain("physics-force-scene");
     expect(markup).toContain('data-object-id="body"');
-    expect(markup).toContain('data-asset-id="projectile-body-dot"');
-    expect(markup).toContain(
-      'data-asset-path="/assets/metaview-kits/physics-basic/projectile-body-dot.svg"',
-    );
-    expect(markup).toContain("<image");
-    expect(markup).toContain('data-asset-id="core-light-lab-grid"');
+    expect(markup).toContain("<circle");
+    expect(markup).toContain('data-semantic-role="lab_grid"');
     expect(markup).toContain('data-semantic-role="motion_trail"');
     expect(markup).toContain('data-semantic-role="formula_card"');
-    expect(markup).toContain('data-asset-id="core-formula-tag"');
     expect(markup).toContain('data-vector-component="horizontal"');
     expect(markup).toContain('data-vector-component="vertical"');
     expect(markup).toContain("v_y");
-    expect(markup).toContain('data-asset-id="force-vector-arrow"');
-    expect(markup).toContain(
-      'data-asset-path="/assets/metaview-kits/physics-basic/force-vector-arrow.svg"',
-    );
+    expect(markup).toContain('marker-end="url(#physics-arrow-velocity)"');
+    expect(markup).not.toContain("projectile-body-dot");
+    expect(markup).not.toContain("force-vector-arrow");
     expect(markup).not.toContain('data-missing-asset="true"');
   });
 
-  it("uses the physics object asset by semantic role when object.asset_id is absent", () => {
+  it("uses the same native object geometry when asset_id is absent", () => {
     const snapshot = projectileMotionSnapshot({
       objects: [{ id: "body", label: "小球", x: 30, y: 42 }],
     });
     const markup = renderToStaticMarkup(<PhysicsForceSceneRenderer {...props(snapshot)} />);
 
-    expect(markup).toContain('data-asset-id="projectile-body-dot"');
-    expect(markup).toContain(
-      'data-asset-path="/assets/metaview-kits/physics-basic/projectile-body-dot.svg"',
-    );
+    expect(markup).toContain('data-object-id="body"');
+    expect(markup).toContain("<circle");
   });
 
-  it("uses deterministic circle fallback when explicit object.asset_id is missing", () => {
+  it("ignores obsolete object asset ids and keeps deterministic native geometry", () => {
     const snapshot = projectileMotionSnapshot({
       objects: [{ id: "body", label: "小球", x: 30, y: 42, asset_id: "missing-projectile" }],
     });
     const markup = renderToStaticMarkup(<PhysicsForceSceneRenderer {...props(snapshot)} />);
 
-    expect(markup).toContain('data-asset-id="missing-projectile"');
-    expect(markup).toContain('data-missing-asset="true"');
     expect(markup).toContain("<circle");
-    expect(markup).not.toContain('data-asset-id="projectile-body-dot"');
+    expect(markup).not.toContain("missing-projectile");
   });
 
-  it("does not stretch the projectile object asset into velocity vectors", () => {
+  it("renders velocity as a thin native vector", () => {
     const snapshot = projectileMotionSnapshot({
       vectors: [{ id: "vx", target: "body", semantic_role: "velocity", dx: 28, dy: 0, label: "v_x" }],
     });
     const markup = renderToStaticMarkup(<PhysicsForceSceneRenderer {...props(snapshot)} />);
 
-    expect(markup.match(/data-asset-id="projectile-body-dot"/g)).toHaveLength(1);
+    expect(markup).toContain('data-vector-component="horizontal"');
     expect(markup).toContain('stroke-width="1.5"');
   });
 });

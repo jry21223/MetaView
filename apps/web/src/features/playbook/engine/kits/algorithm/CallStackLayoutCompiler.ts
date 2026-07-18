@@ -132,7 +132,7 @@ export function compileCallStackLayout(input: CallStackLayoutInput): CallStackLa
   const stackAssetId = resolveAssetId(input.packId, "recursion_stack", ["call_stack_scene", "call_stack"]);
   const callFrameAssetId = resolveAssetId(input.packId, "call_frame", ["active_frame"]);
   const stackFrameAssetId = resolveAssetId(input.packId, "stack_frame", ["waiting_frame"]);
-  const activeLineAssetId = resolveAssetId(input.packId, "active_line", ["code_trace"]);
+  const activeLineAssetId = resolveAssetId(input.packId, "active_line");
   const frames = normalizeFrames(input, callFrameAssetId, stackFrameAssetId);
   const currentFrameId = input.currentFrameId ?? frames.find((frame) => frame.state === "active")?.id ?? frames[0]?.id;
   const codeTrace = normalizeCodeTrace(input.codeTrace, activeLineAssetId);

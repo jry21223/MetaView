@@ -89,6 +89,7 @@ def resolve_molecule_preset_for_renderer(
                 **{"from": str(bond["from"])},
                 to=str(bond["to"]),
                 order=bond.get("order", 1),
+                stereo=bond.get("stereo"),
                 label=bond.get("label"),
             )
             for bond in raw.get("bonds", [])

@@ -1,7 +1,6 @@
 import React from "react";
 
 import { resolveGeoJsonAssetData, type GeoJsonFeatureCollection } from "../assets/assetGeoJson";
-import { AssetSvg } from "../assets/AssetSvg";
 import type { AssetManifestEntry } from "../assets/assetRegistry";
 import { resolveAssetById, resolveAssetByRole, resolveAssetForRenderer } from "../assets/assetResolver";
 import { compileGeoJsonToSvgPaths } from "../kits/geography/MapProjectionCompiler";
@@ -72,43 +71,11 @@ function uniqueAssets(assets: Array<AssetManifestEntry | undefined>): AssetManif
   });
 }
 
-function resolveMapAssets(snap: GeoMapSceneSnapshot, packId: string): {
-  ocean?: AssetManifestEntry;
-  overlays: AssetManifestEntry[];
-} {
-  const ocean = resolveLayerAsset(snap, packId, "ocean");
+function resolveMapAssets(snap: GeoMapSceneSnapshot, packId: string): AssetManifestEntry[] {
   const land = resolveLayerAsset(snap, packId, "land", ["map_layer"]);
   const boundary = resolveLayerAsset(snap, packId, "country_boundary");
   const coastline = resolveLayerAsset(snap, packId, "coastline");
-  return {
-    ocean,
-    overlays: uniqueAssets([land, boundary, coastline]),
-  };
-}
-
-function resolveFlowAsset(flow: GeoMapFlow, packId: string): AssetManifestEntry | undefined {
-  const semanticAsset =
-    resolveAssetForRenderer("geo_map_scene", flow.semantic_role, packId) ??
-    resolveAssetForRenderer("geo_map_scene", "wind", packId) ??
-    resolveAssetByRole("geography", flow.semantic_role, packId) ??
-    resolveAssetByRole("geography", "wind", packId);
-  const explicitAsset = resolveAssetById(packId, flow.asset_id);
-  return explicitAsset ?? semanticAsset;
-}
-
-function particlePresetPoints(
-  preset: GeoMapSceneSnapshot["particle_preset"],
-  progress: number,
-): Array<{ x: number; y: number; r: number; opacity: number }> {
-  if (!preset) return [];
-  const p = Math.max(0, Math.min(1, progress));
-  const baseCount = preset === "moisture_particles" ? 9 : 7;
-  return Array.from({ length: baseCount }, (_, index) => ({
-    x: 62 - index * 3.8 + p * 8,
-    y: 62 - (index % 3) * 8 + (preset === "wind_stream" ? Math.sin(index + p * Math.PI) * 1.4 : 0),
-    r: preset === "moisture_particles" ? 1.1 : 0.9,
-    opacity: preset === "current_flow" ? 0.5 : 0.68,
-  }));
+  return uniqueAssets([land, boundary, coastline]);
 }
 
 function pressureLabelPosition(
@@ -160,25 +127,9 @@ function naturalEarthLayer(data: GeoJsonFeatureCollection, asset: AssetManifestE
   return data.metadata?.natural_earth_layer ?? asset.semanticRoles[0] ?? asset.id;
 }
 
-function renderMapAsset(asset: AssetManifestEntry, packId: string) {
+function renderMapAsset(asset: AssetManifestEntry) {
   const geojson = resolveGeoJsonAssetData(asset);
-  if (!geojson) {
-    return (
-      <AssetSvg
-        key={asset.id}
-        asset={asset}
-        assetId={asset.id}
-        packId={packId}
-        subject="geography"
-        semanticRole={asset.semanticRoles[0]}
-        x={MAP_VIEWPORT.x}
-        y={MAP_VIEWPORT.y}
-        width={MAP_VIEWPORT.width}
-        height={MAP_VIEWPORT.height}
-        fallbackShape="rect"
-      />
-    );
-  }
+  if (!geojson) return null;
 
   const style = geoJsonLayerStyle(asset);
   const compiled = compileGeoJsonToSvgPaths(geojson, {
@@ -215,7 +166,6 @@ export const GeoMapSceneRenderer: React.FC<RendererProps> = ({ step, progress, t
   const snap = step.snapshot as GeoMapSceneSnapshot;
   const packId = snap.pack_id ?? DEFAULT_GEO_PACK_ID;
   const mapAssets = resolveMapAssets(snap, packId);
-  const particles = particlePresetPoints(snap.particle_preset, progress);
   const pressureCenters = snap.pressure_centers ?? [];
 
   return (
@@ -246,28 +196,9 @@ export const GeoMapSceneRenderer: React.FC<RendererProps> = ({ step, progress, t
           >
             <path d="M0,0 L5,2.5 L0,5 Z" fill="#1f8abd" />
           </marker>
-          <linearGradient id="geo-ocean" x1="0" x2="1" y1="0" y2="1">
-            <stop offset="0" stopColor="#dff3fb" />
-            <stop offset="1" stopColor="#b7d9ee" />
-          </linearGradient>
         </defs>
 
-        <rect x="0" y="0" width="100" height="100" rx="3" fill="url(#geo-ocean)" />
-        {mapAssets.ocean ? (
-          <AssetSvg
-            asset={mapAssets.ocean}
-            assetId={mapAssets.ocean.id}
-            packId={packId}
-            subject="geography"
-            semanticRole="ocean"
-            x={0}
-            y={0}
-            width={100}
-            height={100}
-            preserveAspectRatio="none"
-            fallbackShape="rect"
-          />
-        ) : null}
+        <rect x="0" y="0" width="100" height="100" rx="3" fill={theme === "dark" ? "#17242b" : "#eef5f4"} />
         <rect x="4" y="5" width="92" height="14" rx="3" fill="rgba(255,255,255,0.72)" />
         <text x="8" y="14" fontSize="5.2" fontWeight="760" fill="#182235">
           {step.title}
@@ -276,27 +207,14 @@ export const GeoMapSceneRenderer: React.FC<RendererProps> = ({ step, progress, t
           {snap.map_region ?? "world"}
         </text>
 
-        {mapAssets.overlays.length ? (
-          mapAssets.overlays.map((asset) => renderMapAsset(asset, packId))
-        ) : (
-          <AssetSvg
-            packId={packId}
-            subject="geography"
-            semanticRole="map_layer"
-            x={MAP_VIEWPORT.x}
-            y={MAP_VIEWPORT.y}
-            width={MAP_VIEWPORT.width}
-            height={MAP_VIEWPORT.height}
-            fallbackShape="rect"
-          />
-        )}
+        {mapAssets.map(renderMapAsset)}
 
         {pressureCenters.map((center, index) => {
           const label = pressureLabelPosition(center, pressureCenters, index);
           return (
             <g key={center.id} data-pressure-kind={center.kind}>
-              <circle cx={center.x} cy={center.y} r="5.6" fill={pressureClass(center.kind)} opacity="0.92" />
-              <text x={center.x} y={center.y + 1.6} textAnchor="middle" fontSize="5.2" fontWeight="800" fill="#fff">
+              <circle cx={center.x} cy={center.y} r="4.5" fill="#ffffff" stroke={pressureClass(center.kind)} strokeWidth="1.2" />
+              <text x={center.x} y={center.y + 1.4} textAnchor="middle" fontSize="4.4" fontWeight="800" fill={pressureClass(center.kind)}>
                 {center.kind === "high" ? "H" : "L"}
               </text>
               <text
@@ -314,19 +232,16 @@ export const GeoMapSceneRenderer: React.FC<RendererProps> = ({ step, progress, t
         })}
 
         {snap.flows.map((flow) => {
-          const flowAsset = resolveFlowAsset(flow, packId);
           return (
             <g
               key={flow.id}
               data-semantic-role={flow.semantic_role}
-              data-asset-id={flowAsset?.id ?? flow.asset_id ?? undefined}
-              data-asset-path={flowAsset?.path}
             >
               <path
                 d={flowPath(flow, progress)}
                 fill="none"
                 stroke="#1f8abd"
-                strokeWidth={2.6 + Math.min(1.2, flow.strength ?? 1)}
+                strokeWidth={1.2 + Math.min(0.55, (flow.strength ?? 1) * 0.3)}
                 strokeLinecap="round"
                 markerEnd="url(#geo-flow-arrow)"
                 opacity="0.9"
@@ -344,18 +259,6 @@ export const GeoMapSceneRenderer: React.FC<RendererProps> = ({ step, progress, t
             </g>
           );
         })}
-
-        {particles.map((particle, index) => (
-          <circle
-            key={index}
-            cx={particle.x}
-            cy={particle.y}
-            r={particle.r}
-            fill="#ffffff"
-            opacity={particle.opacity}
-            data-particle-preset={snap.particle_preset ?? undefined}
-          />
-        ))}
 
         {snap.layers.map((layer, index) => {
           const label = layerLabelPosition(index, snap.layers.length);

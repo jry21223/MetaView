@@ -206,15 +206,10 @@ async def test_execute_outputs_valid_playbook_with_graph_scene() -> None:
         "visited": "{A}",
     }
     node_asset_ids = {node.id: node.asset_id for node in graph_snapshot.nodes}
-    assert node_asset_ids == {
-        "A": "graph-node",
-        "B": "queue-frame",
-        "C": "queue-frame",
-        "D": "graph-node",
-    }
+    assert node_asset_ids == {"A": None, "B": None, "C": None, "D": None}
     edge_asset_ids = {edge.id: edge.asset_id for edge in graph_snapshot.edges}
-    assert edge_asset_ids["A->B"] == "edge-active"
-    assert edge_asset_ids["A->C"] == "edge-active"
+    assert edge_asset_ids["A->B"] is None
+    assert edge_asset_ids["A->C"] is None
 
     score = score_playbook("algorithm-bfs-runtime", result.playbook_json)
     assert score.passed, [(dim.name, dim.score, dim.issues) for dim in score.dimensions]

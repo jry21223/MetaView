@@ -543,6 +543,8 @@ def test_gold_case_missing_required_assets_hard_fails(
     expectations: dict[str, GoldCaseExpectation],
 ) -> None:
     expectation = expectations[case_id]
+    if not expectation.required_asset_ids:
+        pytest.skip("case uses native geometry and has no required asset ids")
     raw = _raw_after(
         _positive_playbook(case_id),
         lambda payload: _remove_required_assets(payload, set(expectation.required_asset_ids)),

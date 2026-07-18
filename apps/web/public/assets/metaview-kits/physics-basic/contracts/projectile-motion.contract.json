@@ -4,7 +4,12 @@
   "sceneTemplate": "projectile_motion",
   "rendererKind": "physics_force_scene",
   "packId": "physics-basic",
-  "requiredAssetIds": ["projectile-body-dot", "force-vector-arrow"],
-  "requiredSemanticRoles": ["object", "force"],
+  "requiredAssetIds": [],
+  "requiredSemanticRoles": [
+    "object",
+    "trajectory",
+    "velocity",
+    "acceleration"
+  ],
   "caption": "Projectile motion must render the projectile object asset and at least one vector arrow asset."
 }

@@ -164,20 +164,6 @@ describe("visualQualityGate", () => {
           asset_id: "missing-projectile",
           pack_id: "physics-basic",
         }),
-        expect.objectContaining({
-          code: "scene_contract_missing_asset",
-          step_id: "projectile_motion",
-          contract_id: "projectile-motion-contract",
-          asset_id: "projectile-body-dot",
-          rendered_asset_ids: ["missing-projectile"],
-        }),
-        expect.objectContaining({
-          code: "scene_contract_missing_asset",
-          step_id: "projectile_motion",
-          contract_id: "projectile-motion-contract",
-          asset_id: "force-vector-arrow",
-          rendered_asset_ids: ["missing-projectile"],
-        }),
       ]),
     );
   });
@@ -593,7 +579,7 @@ describe("visualQualityGate", () => {
     );
   });
 
-  it("warns when a chemistry reaction scene misses a contract-required flow asset", () => {
+  it("warns when a chemistry reaction scene references a retired arrow asset", () => {
     const warnings = visualQualityGate(
       script({
         domain: "chemistry",
@@ -634,13 +620,12 @@ describe("visualQualityGate", () => {
     expect(warnings).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: "scene_contract_missing_asset",
+          code: "missing_asset",
           step_id: "reaction_synthesis_water",
           domain: "chemistry",
           snapshot_kind: "reaction_scene",
           pack_id: "chemistry-basic",
-          contract_id: "reaction-synthesis-water-contract",
-          asset_id: "electron-flow",
+          asset_id: "reaction-arrow",
         }),
       ]),
     );
@@ -761,7 +746,6 @@ describe("visualQualityGate", () => {
             snapshot: {
               kind: "graph_scene",
               pack_id: "algorithm-code-basic",
-              asset_id: "bfs-graph-preset",
               nodes: [{ id: "A" }, { id: "B" }],
               edges: [{ id: "A-B", source: "A", target: "B" }],
               directed: true,
@@ -782,7 +766,7 @@ describe("visualQualityGate", () => {
     );
   });
 
-  it("warns when an algorithm flagship scene misses a contract-required rendered asset", () => {
+  it("accepts native BFS state geometry without retired queue assets", () => {
     const warnings = visualQualityGate(
       script({
         domain: "algorithm",
@@ -814,19 +798,7 @@ describe("visualQualityGate", () => {
       }),
     );
 
-    expect(warnings).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          code: "scene_contract_missing_asset",
-          step_id: "bfs_graph",
-          domain: "algorithm",
-          snapshot_kind: "graph_scene",
-          pack_id: "algorithm-code-basic",
-          contract_id: "bfs-graph-contract",
-          asset_id: "queue-frame",
-        }),
-      ]),
-    );
+    expect(warnings).toEqual([]);
   });
 
   it("warns when an algorithm array has no active state change", () => {

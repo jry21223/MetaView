@@ -458,13 +458,11 @@ async def test_runtime_tool_hub_compiles_subject_scene_blueprints(
         assert snapshot["kind"] not in {"algorithm_array", "algorithm_bars"}
         if blueprint["sceneType"] == "recursion_stack":
             assert snapshot["asset_id"] == "recursion-stack-preset"
-            assert snapshot["code_trace"]["asset_id"] == "active-line"
+            assert snapshot["code_trace"]["asset_id"] is None
         if blueprint["sceneType"] == "binary_search":
             assert snapshot["asset_id"] == "binary-search-trace-preset"
-            assert snapshot["active_line_asset_id"] == "active-line"
-            assert {pointer["asset_id"] for pointer in snapshot["pointers"]} == {
-                "pointer-marker"
-            }
+            assert snapshot["active_line_asset_id"] is None
+            assert {pointer["asset_id"] for pointer in snapshot["pointers"]} == {None}
 
 
 @pytest.mark.asyncio

@@ -9,7 +9,6 @@ import { CoreLabGrid } from "./CoreLabGrid";
 import type { RendererProps } from "./types";
 
 const DEFAULT_BIOLOGY_PACK_ID = "biology-basic";
-const CORE_PACK_ID = "core-visual-basic";
 
 function resolveProcessAsset(processStep: BioProcessStep, packId: string): AssetManifestEntry | undefined {
   if (processStep.asset_id) return resolveAssetById(packId, processStep.asset_id);
@@ -17,21 +16,6 @@ function resolveProcessAsset(processStep: BioProcessStep, packId: string): Asset
     resolveAssetForRenderer("bio_process_scene", processStep.semantic_role, packId) ??
     resolveAssetByRole("biology", processStep.semantic_role, packId) ??
     resolveAssetByRole("biology", processStep.semantic_role)
-  );
-}
-
-function resolveConnectionAsset(connection: BioProcessConnection): AssetManifestEntry | undefined {
-  if (connection.asset_id) {
-    return (
-      resolveAssetById(CORE_PACK_ID, connection.asset_id) ??
-      resolveAssetById(undefined, connection.asset_id)
-    );
-  }
-  return (
-    resolveAssetForRenderer("bio_process_scene", connection.semantic_role, CORE_PACK_ID) ??
-    resolveAssetForRenderer("bio_process_scene", connection.semantic_role) ??
-    resolveAssetByRole("core", connection.semantic_role, CORE_PACK_ID) ??
-    resolveAssetByRole("core", connection.semantic_role)
   );
 }
 
@@ -59,10 +43,7 @@ function renderConnection(connection: BioProcessConnection, steps: BioProcessSte
   if (!from || !to) return null;
 
   const geometry = connectionGeometry(from, to);
-  const asset = resolveConnectionAsset(connection);
   const visibleProgress = Math.max(0.2, progress);
-  const arrowWidth = Math.min(28, Math.max(12, geometry.distance * 0.72));
-  const arrowHeight = 7;
 
   return (
     <g
@@ -77,20 +58,8 @@ function renderConnection(connection: BioProcessConnection, steps: BioProcessSte
         stroke="#5b7c6a"
         strokeWidth="1.2"
         strokeLinecap="round"
-        opacity="0.56"
-      />
-      <AssetSvg
-        asset={asset}
-        assetId={connection.asset_id ?? asset?.id}
-        packId={CORE_PACK_ID}
-        subject="core"
-        semanticRole={connection.semantic_role}
-        x={geometry.midX - arrowWidth / 2}
-        y={geometry.midY - arrowHeight / 2}
-        width={arrowWidth}
-        height={arrowHeight}
-        transform={`rotate(${geometry.angle} ${geometry.midX} ${geometry.midY})`}
-        fallbackShape="rect"
+        opacity="0.78"
+        markerEnd="url(#bio-process-arrow)"
       />
       {connection.label ? (
         <text
@@ -166,6 +135,11 @@ export const BioProcessSceneRenderer: React.FC<RendererProps> = ({ step, progres
       }}
     >
       <svg width="100%" height="100%" viewBox="0 0 100 100" role="img" aria-label={step.title}>
+        <defs>
+          <marker id="bio-process-arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <path d="M0,0 L5,3 L0,6 Z" fill="#5b7c6a" />
+          </marker>
+        </defs>
         <CoreLabGrid rendererKind="bio_process_scene" theme={theme} lightFill="#f7fbf7" />
         <text x="8" y="12" fontSize="5.6" fontWeight="780" fill={theme === "dark" ? "#f8fafc" : "#182235"}>
           {step.title}

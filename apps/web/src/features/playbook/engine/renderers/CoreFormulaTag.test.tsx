@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { CoreFormulaTag } from "./CoreFormulaTag";
 
 describe("CoreFormulaTag", () => {
-  it("masks decorative asset strokes behind formula text", () => {
+  it("renders a native formula card with fitted text", () => {
     const markup = renderToStaticMarkup(
       <svg>
         <CoreFormulaTag
@@ -23,7 +23,8 @@ describe("CoreFormulaTag", () => {
       </svg>,
     );
 
-    expect(markup).toContain('data-formula-text-mask="true"');
+    expect(markup).toContain('data-semantic-role="formula_card"');
+    expect(markup).toContain('data-formula-tag-id="projectile-formula"');
     expect(markup).toContain('data-fitted-font-size="');
     expect(markup).toContain('font-size="2.');
   });

@@ -141,11 +141,7 @@ def _graph_snapshot(solution: GraphAlgorithmSolution) -> GraphSceneSnapshot:
                     if _edge_id(edge.source, edge.target) in active_edge_ids
                     else "secondary"
                 ),
-                asset_id=(
-                    "edge-active"
-                    if _edge_id(edge.source, edge.target) in active_edge_ids
-                    else None
-                ),
+                asset_id=None,
             )
             for edge in solution.edges
         ],
@@ -212,15 +208,9 @@ def _edge_ids_from_current(
 def _node_asset_id(
     node: str,
     graph_state: GraphVisualState,
-) -> str:
-    queue_nodes = set(graph_state["queue_node_ids"])
-    visited_nodes = set(graph_state["visited_node_ids"])
-    current = graph_state["current_node_id"]
-    if node in queue_nodes:
-        return "queue-frame"
-    if node in visited_nodes and node != current:
-        return "visited-node"
-    return "graph-node"
+) -> None:
+    del node, graph_state
+    return None
 
 
 def _node_positions(nodes: list[str]) -> dict[str, tuple[float, float]]:

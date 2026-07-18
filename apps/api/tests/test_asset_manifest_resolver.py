@@ -10,14 +10,16 @@ from app.domain.services.asset_manifest_resolver import (
 def test_asset_manifest_resolver_reads_public_manifest_assets() -> None:
     asset = resolve_asset_for_renderer(
         "geo_map_scene",
-        "pressure_high",
+        "coastline",
         pack_id="geography-earth-basic",
     )
 
     assert asset is not None
-    assert asset["id"] == "pressure-high-symbol"
-    assert asset["path"].endswith("/geography-earth-basic/symbols/pressure-high.svg")
-    assert asset["license"] == "internal"
+    assert asset["id"] == "east-asia-coastline-110m"
+    assert asset["path"].endswith(
+        "/geography-earth-basic/natural-earth/east-asia-coastline-110m.json"
+    )
+    assert asset["license"] == "public-domain"
 
 
 def test_asset_manifest_resolver_matches_id_and_subject_role() -> None:

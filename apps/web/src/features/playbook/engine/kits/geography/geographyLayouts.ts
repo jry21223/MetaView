@@ -87,6 +87,7 @@ export function compileGeoMapLayout(input: GeoMapLayoutInput): GeoMapSceneSnapsh
   const mapAssetId = resolveAssetIdByRole("geo_map_scene", "geography", input.packId, "map_layer", ["land"]);
   const landAssetId = resolveAssetIdByRole("geo_map_scene", "geography", input.packId, "land", ["map_layer"]);
   const oceanAssetId = resolveAssetIdByRole("geo_map_scene", "geography", input.packId, "ocean");
+  const coastlineAssetId = resolveAssetIdByRole("geo_map_scene", "geography", input.packId, "coastline");
   const mapRegion = input.mapRegion ?? "east_asia";
 
   return {
@@ -111,6 +112,12 @@ export function compileGeoMapLayout(input: GeoMapLayoutInput): GeoMapSceneSnapsh
         semantic_role: "ocean",
         label: "western Pacific",
         asset_id: oceanAssetId,
+      },
+      {
+        id: "coastline",
+        semantic_role: "coastline",
+        label: "East Asia coastline",
+        asset_id: coastlineAssetId,
       },
     ],
     flows: compileGeoFlows(input.flows, input.packId),

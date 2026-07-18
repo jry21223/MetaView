@@ -5,8 +5,14 @@
   "rendererKind": "code_trace_scene",
   "packId": "algorithm-code-basic",
   "presetAssetId": "binary-search-trace-preset",
-  "requiredAssetIds": ["binary-search-trace-preset", "active-line", "pointer-marker", "core-flow-arrow"],
-  "requiredPointerIds": ["low", "mid", "high"],
+  "requiredAssetIds": [
+    "binary-search-trace-preset"
+  ],
+  "requiredPointerIds": [
+    "low",
+    "mid",
+    "high"
+  ],
   "minimumArrayLength": 7,
   "caption": "Binary search must render code lines, active midpoint, low/mid/high pointers, and the search range."
 }

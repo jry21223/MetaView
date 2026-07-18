@@ -52,6 +52,7 @@ export type Molecule2DBondInput = {
   from: string;
   to: string;
   order?: 1 | 2 | 3;
+  stereo?: "wedge" | "dash" | null;
   label?: string | null;
   assetId?: string | null;
   asset_id?: string | null;
@@ -134,14 +135,14 @@ function withOptionalAtomFields(atom: Molecule2DAtom, input: Molecule2DAtomInput
   return next;
 }
 
-function compileAtom(input: Molecule2DAtomInput, packId: string, index: number): Molecule2DAtom {
+function compileAtom(input: Molecule2DAtomInput, index: number): Molecule2DAtom {
   return withOptionalAtomFields(
     {
       id: input.id ?? `${input.element.toLowerCase()}-${index + 1}`,
       element: input.element,
       x: numberOr(input.x, 50),
       y: numberOr(input.y, 50),
-      asset_id: input.assetId ?? input.asset_id ?? resolveChemistryAssetId("molecule_2d_scene", "atom", packId),
+      asset_id: input.assetId ?? input.asset_id,
     },
     input,
   );
@@ -150,39 +151,36 @@ function compileAtom(input: Molecule2DAtomInput, packId: string, index: number):
 function withOptionalBondFields(bond: Molecule2DBond, input: Molecule2DBondInput): Molecule2DBond {
   const next = { ...bond };
   if (input.label !== undefined) next.label = input.label;
+  if (input.stereo !== undefined) next.stereo = input.stereo;
   return next;
 }
 
-function compileBond(input: Molecule2DBondInput, packId: string, index: number): Molecule2DBond {
+function compileBond(input: Molecule2DBondInput, index: number): Molecule2DBond {
   return withOptionalBondFields(
     {
       id: input.id ?? `${input.from}-${input.to}-${index + 1}`,
       from: input.from,
       to: input.to,
       order: input.order ?? 1,
-      asset_id: input.assetId ?? input.asset_id ?? resolveChemistryAssetId("molecule_2d_scene", "bond", packId),
+      asset_id: input.assetId ?? input.asset_id,
     },
     input,
   );
 }
 
 function compileGlucoseLayout(input: Molecule2DLayoutInput, packId: string): Molecule2DSceneSnapshot {
-  const atomAssetId = resolveChemistryAssetId("molecule_2d_scene", "atom", packId);
-  const bondAssetId = resolveChemistryAssetId("molecule_2d_scene", "bond", packId);
   const atom = (id: string, element: string, x: number, y: number, label: string): Molecule2DAtom => ({
     id,
     element,
     x,
     y,
     label,
-    asset_id: atomAssetId,
   });
   const bond = (id: string, from: string, to: string): Molecule2DBond => ({
     id,
     from,
     to,
     order: 1,
-    asset_id: bondAssetId,
   });
 
   return {
@@ -251,8 +249,6 @@ export function compileMolecule2DLayout(input: Molecule2DLayoutInput): Molecule2
   const moleculeId = moleculeIdFor(input);
   const moleculeContract = resolveMoleculeContract(moleculeId);
   const resolvedSmiles = input.smiles ?? moleculeContract?.smiles;
-  const atomAssetId = resolveChemistryAssetId("molecule_2d_scene", "atom", packId);
-  const bondAssetId = resolveChemistryAssetId("molecule_2d_scene", "bond", packId);
   const hasStructuredInput = (input.atoms?.length ?? 0) > 0 && (input.bonds?.length ?? 0) > 0;
 
   if (hasStructuredInput) {
@@ -263,8 +259,8 @@ export function compileMolecule2DLayout(input: Molecule2DLayoutInput): Molecule2
       smiles: resolvedSmiles,
       molecule_asset_id:
         input.moleculeAssetId ?? moleculeContract?.assetId ?? resolveAssetForRenderer("molecule_2d_scene", moleculeId, packId)?.id,
-      atoms: input.atoms!.map((atom, index) => compileAtom(atom, packId, index)),
-      bonds: input.bonds!.map((bond, index) => compileBond(bond, packId, index)),
+      atoms: input.atoms!.map((atom, index) => compileAtom(atom, index)),
+      bonds: input.bonds!.map((bond, index) => compileBond(bond, index)),
       highlights: input.highlights,
       callouts: input.callouts?.map(compileCallout),
       formula_latex: input.formulaLatex ?? moleculeContract?.formulaLatex,
@@ -291,8 +287,8 @@ export function compileMolecule2DLayout(input: Molecule2DLayoutInput): Molecule2
       molecule_id: moleculeContract?.moleculeId ?? moleculePreset.moleculeId,
       smiles: resolvedSmiles ?? moleculePreset.smiles,
       molecule_asset_id: moleculeAssetId,
-      atoms: moleculePreset.atoms.map((atom) => ({ ...atom, asset_id: atomAssetId })),
-      bonds: moleculePreset.bonds.map((bond) => ({ ...bond, asset_id: bondAssetId })),
+      atoms: moleculePreset.atoms,
+      bonds: moleculePreset.bonds,
       callouts: moleculePreset.callouts,
       formula_latex: input.formulaLatex ?? moleculeContract?.formulaLatex ?? moleculePreset.formulaLatex,
       caption: input.caption ?? moleculePreset.caption,
@@ -306,13 +302,13 @@ export function compileMolecule2DLayout(input: Molecule2DLayoutInput): Molecule2
     smiles: resolvedSmiles,
     molecule_asset_id: moleculeAssetId,
     atoms: [
-      { id: "o", element: "O", x: 50, y: 42, asset_id: atomAssetId, label: "oxygen" },
-      { id: "h1", element: "H", x: 35, y: 62, asset_id: atomAssetId, label: "hydrogen" },
-      { id: "h2", element: "H", x: 65, y: 62, asset_id: atomAssetId, label: "hydrogen" },
+      { id: "o", element: "O", x: 50, y: 42, label: "oxygen" },
+      { id: "h1", element: "H", x: 30.2, y: 57.3, label: "hydrogen" },
+      { id: "h2", element: "H", x: 69.8, y: 57.3, label: "hydrogen" },
     ],
     bonds: [
-      { id: "oh1", from: "o", to: "h1", order: 1, asset_id: bondAssetId },
-      { id: "oh2", from: "o", to: "h2", order: 1, asset_id: bondAssetId },
+      { id: "oh1", from: "o", to: "h1", order: 1 },
+      { id: "oh2", from: "o", to: "h2", order: 1 },
     ],
     callouts: [
       { id: "bent-shape", target_id: "o", label: "bent geometry", side: "top" },
@@ -346,7 +342,7 @@ function compileParticipant(input: ReactionParticipantInput, index: number): Rea
   };
 }
 
-function compileArrow(input: ReactionArrowInput, packId: string, index: number): ReactionArrow {
+function compileArrow(input: ReactionArrowInput, index: number): ReactionArrow {
   const semanticRole = input.semanticRole ?? input.semantic_role ?? "reaction_arrow";
   return {
     id: input.id ?? `reaction-arrow-${index + 1}`,
@@ -354,11 +350,11 @@ function compileArrow(input: ReactionArrowInput, packId: string, index: number):
     from: input.from ?? [48, 48],
     to: input.to ?? [66, 48],
     label: input.label,
-    asset_id: input.assetId ?? input.asset_id ?? resolveChemistryAssetId("reaction_scene", semanticRole, packId),
+    asset_id: input.assetId ?? input.asset_id,
   };
 }
 
-function compileElectronFlow(input: ReactionElectronFlowInput, packId: string, index: number): ReactionElectronFlow {
+function compileElectronFlow(input: ReactionElectronFlowInput, index: number): ReactionElectronFlow {
   const semanticRole = input.semanticRole ?? input.semantic_role ?? "electron_flow";
   return {
     id: input.id ?? `electron-flow-${index + 1}`,
@@ -366,7 +362,7 @@ function compileElectronFlow(input: ReactionElectronFlowInput, packId: string, i
     from: input.from ?? [39, 38],
     to: input.to ?? [58, 36],
     label: input.label,
-    asset_id: input.assetId ?? input.asset_id ?? resolveChemistryAssetId("reaction_scene", semanticRole, packId),
+    asset_id: input.assetId ?? input.asset_id,
   };
 }
 
@@ -385,7 +381,7 @@ export function compileReactionLayout(input: ReactionLayoutInput): ReactionScene
       ? input.products.map(compileParticipant)
       : reactionContract.products.map(contractParticipant),
     arrows: input.arrows?.length
-      ? input.arrows.map((arrow, index) => compileArrow(arrow, packId, index))
+      ? input.arrows.map((arrow, index) => compileArrow(arrow, index))
       : [
           {
             id: reactionContract.arrow.id,
@@ -393,25 +389,11 @@ export function compileReactionLayout(input: ReactionLayoutInput): ReactionScene
             from: reactionContract.arrow.from,
             to: reactionContract.arrow.to,
             label: reactionContract.arrow.label,
-            asset_id:
-              resolveChemistryAssetId("reaction_scene", reactionContract.arrow.semanticRole, packId) ??
-              reactionContract.arrowAssetId,
           },
         ],
     electron_flows: electronFlows?.length
-      ? electronFlows.map((flow, index) => compileElectronFlow(flow, packId, index))
-      : [
-          {
-            id: reactionContract.electronFlow.id,
-            semantic_role: reactionContract.electronFlow.semanticRole,
-            from: reactionContract.electronFlow.from,
-            to: reactionContract.electronFlow.to,
-            label: reactionContract.electronFlow.label,
-            asset_id:
-              resolveChemistryAssetId("reaction_scene", reactionContract.electronFlow.semanticRole, packId) ??
-              reactionContract.electronFlowAssetId,
-          },
-        ],
+      ? electronFlows.map((flow, index) => compileElectronFlow(flow, index))
+      : [],
     callouts: input.callouts?.length
       ? input.callouts.map(compileCallout)
       : [{ id: "balanced", target_id: "main-arrow", label: "balanced atoms", side: "top" }],

@@ -24,7 +24,6 @@ function reactionSnapshot(extra: Partial<ReactionSceneSnapshot> = {}): ReactionS
         from: [48, 48],
         to: [66, 48],
         label: "forms",
-        asset_id: "reaction-arrow",
       },
     ],
     electron_flows: [
@@ -34,7 +33,6 @@ function reactionSnapshot(extra: Partial<ReactionSceneSnapshot> = {}): ReactionS
         from: [39, 38],
         to: [58, 36],
         label: "bond rearrangement",
-        asset_id: "electron-flow",
       },
     ],
     callouts: [
@@ -71,22 +69,22 @@ function props(snapshot: ReactionSceneSnapshot): RendererProps {
 }
 
 describe("ReactionSceneRenderer", () => {
-  it("statically renders a balanced water synthesis reaction with chemistry assets", () => {
+  it("statically renders a balanced water synthesis reaction with native geometry", () => {
     const markup = renderToStaticMarkup(<ReactionSceneRenderer {...props(reactionSnapshot())} />);
 
     expect(markup).toContain("reaction-scene");
     expect(markup).toContain('data-reaction-id="reaction_synthesis_water"');
-    expect(markup).toContain('data-asset-id="reaction-arrow"');
-    expect(markup).toContain('data-asset-id="electron-flow"');
-    expect(markup).toContain('data-asset-id="core-light-lab-grid"');
-    expect(markup).toContain('data-asset-id="core-callout-label"');
-    expect(markup).toContain('data-asset-id="core-formula-tag"');
+    expect(markup).toContain('data-reaction-arrow-id="main-arrow"');
+    expect(markup).toContain('data-electron-flow-id="electron-shift"');
+    expect(markup).toContain('data-semantic-role="lab_grid"');
+    expect(markup).toContain('data-semantic-role="formula_card"');
     expect(markup).toContain('data-semantic-role="reactant"');
     expect(markup).toContain('data-semantic-role="product"');
     expect(markup).toContain('data-semantic-role="reaction_arrow"');
     expect(markup).toContain('data-semantic-role="electron_flow"');
     expect(markup).toContain('data-semantic-role="callout"');
     expect(markup).toContain("balanced atoms");
+    expect(markup).not.toContain("reaction-arrow.svg");
     expect(markup).not.toContain('data-missing-asset="true"');
   });
 });

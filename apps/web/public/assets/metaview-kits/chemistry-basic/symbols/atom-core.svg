@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="MetaView atom core" data-asset-quality="v1">
-  <circle cx="32" cy="32" r="24" fill="#f9fbff" stroke="#4b6b8f" stroke-width="3"/>
-  <circle cx="32" cy="32" r="19" fill="#e5f0ff" opacity="0.82"/>
-  <path d="M14 34 C22 18 42 18 50 34" fill="none" stroke="#8ab3e6" stroke-width="2.2" stroke-linecap="round"/>
-  <path d="M16 39 C25 49 40 49 48 39" fill="none" stroke="#a8c56b" stroke-width="2" stroke-linecap="round"/>
-  <circle cx="45" cy="23" r="3.2" fill="#f2b84b"/>
-</svg>

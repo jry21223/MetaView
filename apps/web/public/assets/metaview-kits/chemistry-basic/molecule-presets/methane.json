@@ -8,16 +8,16 @@
   "caption": "Methane is a tetrahedral molecule loaded from a SMILES-addressable structured preset.",
   "atoms": [
     { "id": "c", "element": "C", "x": 50, "y": 48, "label": "carbon" },
-    { "id": "h1", "element": "H", "x": 50, "y": 26, "label": "hydrogen" },
+    { "id": "h1", "element": "H", "x": 50, "y": 24, "label": "hydrogen" },
     { "id": "h2", "element": "H", "x": 30, "y": 62, "label": "hydrogen" },
     { "id": "h3", "element": "H", "x": 70, "y": 62, "label": "hydrogen" },
-    { "id": "h4", "element": "H", "x": 50, "y": 75, "label": "hydrogen" }
+    { "id": "h4", "element": "H", "x": 50, "y": 74, "label": "hydrogen" }
   ],
   "bonds": [
     { "id": "ch1", "from": "c", "to": "h1", "order": 1 },
     { "id": "ch2", "from": "c", "to": "h2", "order": 1 },
-    { "id": "ch3", "from": "c", "to": "h3", "order": 1 },
-    { "id": "ch4", "from": "c", "to": "h4", "order": 1 }
+    { "id": "ch3", "from": "c", "to": "h3", "order": 1, "stereo": "wedge" },
+    { "id": "ch4", "from": "c", "to": "h4", "order": 1, "stereo": "dash" }
   ],
   "callouts": [
     { "id": "methane-carbon-center", "target_id": "c", "label": "central carbon", "side": "right" },

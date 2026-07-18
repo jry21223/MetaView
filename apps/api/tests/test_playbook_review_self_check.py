@@ -829,7 +829,7 @@ def test_playbook_self_check_accepts_scene_blueprint_subject_renderer_kind() -> 
             {
                 "id": "summer",
                 "semantic_role": "monsoon_flow",
-                "asset_id": "monsoon-wind-arrow",
+                "asset_id": None,
                 "from": [78, 68],
                 "to": [42, 38],
             }

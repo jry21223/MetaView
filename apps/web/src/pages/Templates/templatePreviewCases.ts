@@ -733,8 +733,7 @@ function projectileSnapshot(
   }
   return {
     kind: "physics_force_scene",
-    pack_id: "physics-basic",
-    objects: [{ id: "body", label: "", x, y, asset_id: "projectile-body-dot" }],
+    objects: [{ id: "body", label: "", x, y }],
     vectors,
     trajectory,
     formula_latex: formulaLatex,

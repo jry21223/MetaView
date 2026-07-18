@@ -49,7 +49,6 @@ function dnaReplicationSnapshot(extra: Partial<BioProcessSceneSnapshot> = {}): B
         to: "fork",
         semantic_role: "flow_arrow",
         label: "unzip",
-        asset_id: "core-flow-arrow",
       },
       {
         id: "fork-to-copy",
@@ -57,7 +56,6 @@ function dnaReplicationSnapshot(extra: Partial<BioProcessSceneSnapshot> = {}): B
         to: "copy",
         semantic_role: "flow_arrow",
         label: "copy",
-        asset_id: "core-flow-arrow",
       },
     ],
     callouts: [
@@ -100,9 +98,8 @@ describe("BioProcessSceneRenderer", () => {
     expect(markup).toContain('data-process-id="dna_replication"');
     expect(markup).toContain('data-asset-id="dna-helix"');
     expect(markup).toContain('data-asset-id="replication-fork"');
-    expect(markup).toContain('data-asset-id="core-flow-arrow"');
-    expect(markup).toContain('data-asset-id="core-light-lab-grid"');
-    expect(markup).toContain('data-asset-id="core-callout-label"');
+    expect(markup).toContain('data-connection-id="template-to-fork"');
+    expect(markup).toContain('data-semantic-role="lab_grid"');
     expect(markup).toContain('data-semantic-role="process_step"');
     expect(markup).toContain('data-semantic-role="callout"');
     expect(markup).not.toContain('data-missing-asset="true"');
