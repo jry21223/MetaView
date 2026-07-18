@@ -18,6 +18,10 @@ Router
   -> PlaybookScript
 ```
 
+Agent 的模型可见生成指引使用中文，工具名、Schema 字段、snapshot kind、semantic role、错误代码和 API 字段名保持原有技术标识符。步骤数量由教学内容决定：通常为 4–8 步，实际允许 3–12 步。只有知识状态、主要视觉对象或关系、教学目标，或需要观察的中间结论发生实质变化时才新增步骤；不得用空泛开场、重复解释或无新信息总结填充数量。
+
+旁白不再要求每步固定三句话。通常使用 1–2 句或 1–2 个自然字幕片段，与当前画面同步，并只补充画面无法直接表达的信息；标题、公式、标签、当前变量值、队列顺序和图中可见状态不应被逐字复述。
+
 正常 Web Intake 不预判 Router 结果。`usePipelineSubmit` 对所有应用内提交写入
 `domain: null`；纯文本同时写入 `source_code: null`、`language: null`、
 `source_filename: null` 与 `source_size_bytes: null`。因此一条普通数学或物理 prompt
@@ -117,17 +121,16 @@ SceneIntent 展开为多个步骤，但必须保持教学目标、所需事实�
 ```
 
 ### 强约束
-- `cir.steps` 长度 **8–14**（典型 10–12 步；trivial 题最少 8 步，深度题最多 14 步），
-  与 `execution_map.checkpoints` **一一对应**（共享 `step_id`）。
-- 每步 narration 合并后 ≥ 3 句 / ≥ 80 中文字（≥ 50 英文 words），必须依次回答
-  「为什么 → 做什么 → 学到什么」。**短/水/重复** 的 narration 会在 reviewer 复检阶段触发再生。
+- `cir.steps` 长度允许 **3–12**，通常使用 **4–8** 步，并与 `execution_map.checkpoints`
+  **一一对应**（共享 `step_id`）。不得为了固定数量拆分没有新知识状态或主要视觉状态的步骤。
+- narration 必须非空、与当前画面同步，并只补充画面无法直接表达的信息。通常使用 1–2 句自然旁白；不要求固定句数，也不要求套用固定问答顺序。
 - `duration_s` 推荐 ~4–5s/step（10 步 → 45s；12 步 → 54s），关键讲解步可分配更多时间，
   过渡步可以更短，但所有 checkpoint 区间长度之和必须等于 `duration_s`。
 - `checkpoint.start_s/end_s` 必须不重叠地分割 `[0, duration_s]`。
 - `code_lines` 仅在用户提供 `source_code` 时有意义，否则可全部为 `[]`。
 - `narration` 必须是 JSON 数组（不是裸字符串），见第 3 节。
 
-> 限制是写在 `cir_prompt.py` 的 system prompt 里的硬约束；触发 reviewer 复检的失败原因会
+> 这些规则写在 `cir_prompt.py` 的 system prompt 中；触发 reviewer 复检的失败原因会
 > 通过 `RunPipelineUseCase._regenerate` 反馈给 LLM 再来一遍（最多 `METAVIEW_MAX_REPAIR_ATTEMPTS` 次）。
 
 ### 兼容旧契约

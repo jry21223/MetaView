@@ -36,6 +36,7 @@ This is closer to previsualization, storyboarding, camera planning, and edit pac
 
 The backend already has a Director V0/V1 foundation:
 
+- `DirectorScript` 继续使用 `schema_version: "1.0.0"`；本次没有新增 CompositionPlan 或平行镜头数据模型。
 - `apps/api/app/domain/models/director.py` defines `DirectorScript` and `DirectorBeat`.
 - A beat currently includes `intent`, `shot_type`, `camera_motion`, `pacing`, `voiceover_text`, `emphasis_terms`, and `focus_target`.
 - `apps/api/app/domain/services/director_builder.py` builds a rule-based director from a `PlaybookScript`.
@@ -43,6 +44,8 @@ The backend already has a Director V0/V1 foundation:
 - Director scripts are stored separately through the run director repository and returned with run responses.
 - The player includes a read-only Director Inspector showing source, beat count, current beat, intent, shot type, camera motion, pacing, focus target, emphasis terms, and frame range.
 - Follow-up can persist DirectorScript patch revisions for camera, pacing, shot, voiceover, emphasis, and focus changes without rewriting PlaybookScript.
+- 通用 Stage Adapter 将 `push_in` 映射为 `1.00 → 1.08`，将 `pull_out` 映射为 `1.08 → 1.00`，并将 `pan_left` / `pan_right` 映射为 `0 → ±40px`。这些确定性变换同时供浏览器预览与 Remotion 导出使用。
+- `hold` 保持静止；通用 Stage Transform 不会为 `focus_target` 伪造缩放。`focus_target` 仍由能够稳定定位目标的具体 Adapter 逐步支持。
 
 This proves Director is a real architecture layer, but not yet a full director intelligence layer. Current source is usually `rule`; follow-up patches set `source="manual"`. Planner-assisted direction remains future work.
 
