@@ -97,4 +97,14 @@ describe("PhysicsForceSceneRenderer", () => {
     expect(markup).toContain("<circle");
     expect(markup).not.toContain('data-asset-id="projectile-body-dot"');
   });
+
+  it("does not stretch the projectile object asset into velocity vectors", () => {
+    const snapshot = projectileMotionSnapshot({
+      vectors: [{ id: "vx", target: "body", semantic_role: "velocity", dx: 28, dy: 0, label: "v_x" }],
+    });
+    const markup = renderToStaticMarkup(<PhysicsForceSceneRenderer {...props(snapshot)} />);
+
+    expect(markup.match(/data-asset-id="projectile-body-dot"/g)).toHaveLength(1);
+    expect(markup).toContain('stroke-width="1.5"');
+  });
 });

@@ -564,11 +564,7 @@
 }
 
 .playbook-player__settings-popover {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 10px);
   z-index: 100;
-  width: min(320px, calc(100vw - 48px));
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -579,6 +575,8 @@
   color: var(--player-settings-text);
   box-shadow: 0 14px 36px rgba(38, 34, 25, 0.16);
   font-size: 13px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .playbook-player__settings-section {
@@ -725,10 +723,6 @@
 .playbook-player__console-head span {
   font-size: 12px;
   font-weight: 560;
-}
-
-.playbook-player__director-card {
-  flex: 0 0 auto;
 }
 
 .director-inspector {
@@ -1261,10 +1255,6 @@
     height: 32px;
   }
 
-  .playbook-player__settings-popover {
-    right: 0;
-    max-width: calc(100vw - 28px);
-  }
 }
 
 .playbook-player--portrait {
@@ -1651,7 +1641,6 @@
 
 .playbook-player__mobile-setting > span,
 .playbook-player__mobile-setting-row > span,
-.playbook-player__mobile-director > span,
 .playbook-player__mobile-related > span {
   color: var(--player-ink-3);
   font-size: 12px;
@@ -1691,19 +1680,6 @@
   display: grid;
   gap: 8px;
   padding-top: 4px;
-}
-
-.playbook-player__mobile-director {
-  min-width: 0;
-  display: grid;
-  gap: 8px;
-  padding-top: 4px;
-}
-
-.playbook-player__mobile-director .director-inspector {
-  border: 1px solid var(--player-line);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--player-paper-strong) 72%, transparent);
 }
 
 /* ── TTS speaking pulse ───────────────────────────────────────────────────── */

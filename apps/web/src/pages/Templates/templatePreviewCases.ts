@@ -1,5 +1,4 @@
 import type {
-  DirectorScript,
   GraphSceneEdge,
   GraphSceneNode,
   GraphSceneSnapshot,
@@ -58,7 +57,6 @@ export interface TemplatePreviewCase {
   defaultParams: TemplatePreviewParams;
   controls: TemplatePreviewControl[];
   buildScript: (params: TemplatePreviewParams) => PlaybookScript;
-  buildDirector: (script: PlaybookScript) => DirectorScript;
   buildFollowups: (
     params: TemplatePreviewParams,
     script: PlaybookScript,
@@ -76,34 +74,6 @@ function step<T extends MetaStep["snapshot"]>(
     ...value,
     end_frame: (index + 1) * STEP_FRAMES,
     tokens: [],
-  };
-}
-
-function directorFor(templateId: TemplatePreviewCaseId, script: PlaybookScript): DirectorScript {
-  let startFrame = 0;
-  return {
-    schema_version: "1.0.0",
-    source: "manual",
-    run_id: `template-preview:${templateId}`,
-    beats: script.steps.map((item, index) => {
-      const isFirst = index === 0;
-      const isLast = index === script.steps.length - 1;
-      const beat = {
-        beat_id: `${templateId}-beat-${index + 1}`,
-        step_id: item.step_id,
-        start_frame: startFrame,
-        end_frame: item.end_frame,
-        intent: isFirst ? "hook" as const : isLast ? "summary" as const : "focus" as const,
-        shot_type: isFirst ? "wide" as const : isLast ? "medium" as const : "detail" as const,
-        camera_motion: isFirst ? "hold" as const : "focus_target" as const,
-        pacing: isLast ? "slow" as const : "normal" as const,
-        voiceover_text: item.voiceover_text,
-        emphasis_terms: [item.title],
-        focus_target: item.step_id,
-      };
-      startFrame = item.end_frame;
-      return beat;
-    }),
   };
 }
 
@@ -177,8 +147,9 @@ function binarySnapshot(
     (index) => index < low || index > high,
   );
   return {
-    kind: "algorithm_array",
+    kind: "algorithm_bars",
     array_values: BINARY_VALUES.map(String),
+    numeric_values: BINARY_VALUES,
     active_indices: mid == null ? [] : [mid],
     swap_indices: [],
     sorted_indices: discarded,
@@ -543,14 +514,14 @@ function lineExpression(slope: number, intercept: number): string {
 
 function derivativeSnapshot(
   markerX: number,
-  h: number | null,
+  h: number | null | undefined,
   caption: string,
   formulaLatex: string,
 ): MathPlotSnapshot {
   const curves: MathPlotSnapshot["curves"] = [
     { expression: "x^2", label: "f(x)=x²", emphasis: "primary", semantic_role: "curve" },
   ];
-  if (h != null) {
+  if (typeof h === "number") {
     const slope = 2 * markerX + h;
     const intercept = -markerX * (markerX + h);
     curves.push({
@@ -559,7 +530,7 @@ function derivativeSnapshot(
       emphasis: "secondary",
       semantic_role: "slope",
     });
-  } else {
+  } else if (h === null) {
     const slope = 2 * markerX;
     const intercept = -(markerX ** 2);
     curves.push({
@@ -580,8 +551,8 @@ function derivativeSnapshot(
     y_min: -2,
     y_max: 9,
     marker_x: markerX,
-    shade_from: h == null ? markerX - 0.08 : markerX,
-    shade_to: h == null ? markerX + 0.08 : markerX + h,
+    shade_from: h === undefined ? null : h === null ? markerX - 0.08 : markerX,
+    shade_to: h === undefined ? null : h === null ? markerX + 0.08 : markerX + h,
     x_label: "x",
     y_label: "f(x)",
     formula_latex: formulaLatex,
@@ -598,7 +569,7 @@ function buildDerivativeScript(params: TemplatePreviewParams): PlaybookScript {
       step_id: "derivative-curve",
       title: "观察函数曲线",
       voiceover_text: `先观察 f(x)=x²，并把切点放在 a=${fixed(markerX)}。`,
-      snapshot: derivativeSnapshot(markerX, 1.5, "导数来自切点附近的变化率。", "f(x)=x^2"),
+      snapshot: derivativeSnapshot(markerX, undefined, "先确认函数形状和切点位置，再引入割线。", "f(x)=x^2"),
     }),
   ];
   secants.forEach((h, index) => {
@@ -727,39 +698,44 @@ function projectileSnapshot(
   const [x, y] = trajectory[pointIndex];
   const time = values.flightTime * fraction;
   const vy = values.vy0 - GRAVITY * time;
+  const vectors: PhysicsForceSceneSnapshot["vectors"] = [
+    {
+      id: "vx",
+      target: "body",
+      semantic_role: "velocity",
+      dx: 16 * values.vx / values.speed,
+      dy: 0,
+      label: "vₓ",
+      magnitude: `${fixed(values.vx)} m/s`,
+    },
+  ];
+  if (Math.abs(vy) > 0.2) {
+    vectors.push({
+      id: "vy",
+      target: "body",
+      semantic_role: "velocity",
+      dx: 0,
+      dy: -16 * vy / values.speed,
+      label: "vᵧ",
+      magnitude: `${fixed(Math.abs(vy))} m/s`,
+    });
+  }
+  if (fraction > 0 && fraction < 1) {
+    vectors.push({
+      id: "g",
+      target: "body",
+      semantic_role: "acceleration",
+      dx: 0,
+      dy: 12,
+      label: "g",
+      magnitude: "9.8 m/s²",
+    });
+  }
   return {
     kind: "physics_force_scene",
     pack_id: "physics-basic",
-    objects: [{ id: "body", label: "小球", x, y, asset_id: "projectile-body-dot" }],
-    vectors: [
-      {
-        id: "vx",
-        target: "body",
-        semantic_role: "velocity",
-        dx: 20 * values.vx / values.speed,
-        dy: 0,
-        label: "vₓ",
-        magnitude: `${fixed(values.vx)} m/s`,
-      },
-      {
-        id: "vy",
-        target: "body",
-        semantic_role: "velocity",
-        dx: 0,
-        dy: -20 * vy / values.speed,
-        label: "vᵧ",
-        magnitude: `${fixed(vy)} m/s`,
-      },
-      {
-        id: "g",
-        target: "body",
-        semantic_role: "acceleration",
-        dx: 0,
-        dy: 16,
-        label: "g",
-        magnitude: "9.8 m/s²",
-      },
-    ],
+    objects: [{ id: "body", label: "", x, y, asset_id: "projectile-body-dot" }],
+    vectors,
     trajectory,
     formula_latex: formulaLatex,
     caption,
@@ -784,10 +760,12 @@ function buildProjectileScript(params: TemplatePreviewParams): PlaybookScript {
       moment.fraction,
       moment.text,
       moment.id === "apex"
-        ? `H_{max}=${fixed(values.maxHeight)}\\,m`
+        ? `vᵧ = 0   Hmax = ${fixed(values.maxHeight)} m`
         : moment.id === "landing"
-          ? `R=${fixed(values.range)}\\,m`
-          : "x=v_0\\cos\\theta\\,t,\\quad y=v_0\\sin\\theta\\,t-\\frac12gt^2",
+          ? `R = ${fixed(values.range)} m`
+          : moment.id === "launch"
+            ? "vₓ = v₀ cosθ   vᵧ = v₀ sinθ"
+            : `vₓ = ${fixed(values.vx)} m/s   vᵧ = v₀ sinθ − gt`,
     ),
   }));
   steps.push(step(steps.length, {
@@ -798,7 +776,7 @@ function buildProjectileScript(params: TemplatePreviewParams): PlaybookScript {
       values,
       0.5,
       `vₓ=${fixed(values.vx)} m/s 保持不变；最大高度 ${fixed(values.maxHeight)} m；射程 ${fixed(values.range)} m。`,
-      `T=${fixed(values.flightTime)}\\,s,\\quad H=${fixed(values.maxHeight)}\\,m,\\quad R=${fixed(values.range)}\\,m`,
+      `T = ${fixed(values.flightTime)} s   H = ${fixed(values.maxHeight)} m   R = ${fixed(values.range)} m`,
     ),
   }));
   return {
@@ -852,7 +830,6 @@ const TEMPLATE_PREVIEW_CASES: Record<TemplatePreviewCaseId, TemplatePreviewCase>
       resetPlayback: true,
     }],
     buildScript: buildBinarySearchScript,
-    buildDirector: (script) => directorFor("binary-search", script),
     buildFollowups: (params) => buildBinaryFollowups(params),
   },
   "bfs-tree": {
@@ -871,7 +848,6 @@ const TEMPLATE_PREVIEW_CASES: Record<TemplatePreviewCaseId, TemplatePreviewCase>
       resetPlayback: true,
     }],
     buildScript: buildBfsScript,
-    buildDirector: (script) => directorFor("bfs-tree", script),
     buildFollowups: (params) => buildBfsFollowups(params),
   },
   "derivative-tangent": {
@@ -892,7 +868,6 @@ const TEMPLATE_PREVIEW_CASES: Record<TemplatePreviewCaseId, TemplatePreviewCase>
       resetPlayback: false,
     }],
     buildScript: buildDerivativeScript,
-    buildDirector: (script) => directorFor("derivative-tangent", script),
     buildFollowups: buildDerivativeFollowups,
   },
   projectile: {
@@ -925,7 +900,6 @@ const TEMPLATE_PREVIEW_CASES: Record<TemplatePreviewCaseId, TemplatePreviewCase>
       },
     ],
     buildScript: buildProjectileScript,
-    buildDirector: (script) => directorFor("projectile", script),
     buildFollowups: buildProjectileFollowups,
   },
 };

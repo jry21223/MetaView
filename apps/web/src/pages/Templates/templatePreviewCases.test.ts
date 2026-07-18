@@ -17,15 +17,12 @@ describe("template preview cases", () => {
     for (const id of TEMPLATE_PREVIEW_CASE_IDS) {
       const item = getTemplatePreviewCase(id)!;
       const script = item.buildScript(item.defaultParams);
-      const director = item.buildDirector(script);
       const followups = item.buildFollowups(item.defaultParams, script);
 
       expect(script.steps.length).toBeGreaterThanOrEqual(5);
       expect(new Set(script.steps.map((step) => JSON.stringify(step.snapshot))).size).toBeGreaterThanOrEqual(5);
       expect(script.total_frames).toBe(script.steps.at(-1)?.end_frame);
       expect(new Set(script.steps.map((step) => step.step_id)).size).toBe(script.steps.length);
-      expect(director.source).toBe("manual");
-      expect(director.beats).toHaveLength(script.steps.length);
       for (const step of script.steps) {
         expect(followups[step.step_id]?.length).toBeGreaterThanOrEqual(2);
         expect(followups[step.step_id]?.length).toBeLessThanOrEqual(3);
@@ -52,8 +49,9 @@ describe("template preview cases", () => {
     const firstComparison = found.steps.find((step) => step.step_id === "binary-compare-1");
     expect(firstComparison?.code_highlight?.lines[firstComparison.code_highlight.active_line]).toContain("low = mid + 1");
     const missingResult = missing.steps.at(-1)?.snapshot;
-    expect(missingResult?.kind).toBe("algorithm_array");
-    if (missingResult?.kind === "algorithm_array") {
+    expect(missingResult?.kind).toBe("algorithm_bars");
+    if (missingResult?.kind === "algorithm_bars") {
+      expect(missingResult.numeric_values).toEqual([2, 4, 7, 11, 15, 19, 22, 28, 33, 40]);
       expect(missingResult.sorted_indices).toHaveLength(10);
       expect(missingResult.pointers.low).toBeGreaterThan(missingResult.pointers.high);
     }

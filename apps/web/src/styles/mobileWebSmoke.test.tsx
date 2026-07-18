@@ -186,6 +186,8 @@ describe("mobile web smoke", () => {
     expect(playbookCss).toContain("max-height: min(72vh, calc(var(--mv-vvh, 100vh) * 0.72));");
     expect(playbookCss).toContain("-webkit-overflow-scrolling: touch;");
     expect(studioCss).toContain("grid-template-columns: repeat(4, minmax(0, 1fr));");
+    expect(studioCss).toContain("flex: 0 0 14px;");
+    expect(studioCss).toContain("aspect-ratio: 1;");
     expect(studioCss).not.toContain(".mv-nav-item:nth-child(4)");
     expect(studioCss).toContain(".mv-meta-particle__canvas-node.is-mobile-hidden");
     expect(studioCss).toContain("@media (prefers-reduced-motion: reduce)");

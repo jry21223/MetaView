@@ -16,12 +16,9 @@ for (const id of TEMPLATE_PREVIEW_CASE_IDS) {
   const item = getTemplatePreviewCase(id);
   if (!item) continue;
   const script = item.buildScript(item.defaultParams);
-  const director = item.buildDirector(script);
   const playbookPath = path.join(outputDirectory, `${id}.playbook.json`);
-  const directorPath = path.join(outputDirectory, `${id}.director.json`);
   await fs.writeFile(playbookPath, `${JSON.stringify(script, null, 2)}\n`, "utf8");
-  await fs.writeFile(directorPath, `${JSON.stringify(director, null, 2)}\n`, "utf8");
-  manifest.push({ id, playbookPath, directorPath, posterFrame: item.posterFrame });
+  manifest.push({ id, playbookPath, posterFrame: item.posterFrame });
 }
 
 await fs.writeFile(

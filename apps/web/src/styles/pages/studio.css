@@ -78,6 +78,9 @@
 .mv-icon-btn svg {
   width: 14px;
   height: 14px;
+  min-width: 14px;
+  flex: 0 0 14px;
+  aspect-ratio: 1;
   display: block;
   stroke-width: 1.75;
 }

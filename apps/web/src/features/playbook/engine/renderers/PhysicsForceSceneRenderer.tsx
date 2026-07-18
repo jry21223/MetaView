@@ -54,7 +54,7 @@ function resolveObjectAsset(object: PhysicsSceneObject, packId: string | undefin
 }
 
 function isVectorAsset(asset: AssetManifestEntry | undefined): asset is AssetManifestEntry {
-  return Boolean(asset && (asset.tags.includes("vector") || asset.tags.includes("arrow")));
+  return Boolean(asset?.tags.includes("arrow"));
 }
 
 function resolveVectorAsset(vector: PhysicsSceneVector, packId: string | undefined): AssetManifestEntry | undefined {
@@ -103,10 +103,15 @@ function renderVector(
   const endY = target.y + vector.dy * p;
   const color = vectorColor(vector.semantic_role);
   const vectorAsset = resolveVectorAsset(vector, packId);
+  const component = vectorComponent(vector);
   const length = Math.max(8, Math.hypot(endX - target.x, endY - target.y));
   const angle = (Math.atan2(endY - target.y, endX - target.x) * 180) / Math.PI;
+  const labelX = component === "vertical" ? target.x - 2.2 : (target.x + endX) / 2;
+  const labelY = component === "horizontal" ? target.y - 2.6 : (target.y + endY) / 2;
+  const magnitudeX = component === "vertical" ? endX + 2.4 : endX + 1.8;
+  const magnitudeY = component === "horizontal" ? endY + 3.4 : endY + (endY < target.y ? -1.8 : 3.6);
   return (
-    <g key={vector.id} data-semantic-role={vector.semantic_role} data-vector-component={vectorComponent(vector)}>
+    <g key={vector.id} data-semantic-role={vector.semantic_role} data-vector-component={component}>
       {vectorAsset ? (
         <AssetSvg
           asset={vectorAsset}
@@ -128,21 +133,22 @@ function renderVector(
         x2={endX}
         y2={endY}
         stroke={color}
-        strokeWidth="3.2"
+        strokeWidth="1.5"
         strokeLinecap="round"
         markerEnd={`url(#physics-arrow-${vector.semantic_role})`}
       />
       <text
-        x={(target.x + endX) / 2 + 2}
-        y={(target.y + endY) / 2 - 3}
-        fontSize="4.6"
-        fontWeight="800"
+        x={labelX}
+        y={labelY}
+        fontSize="3.6"
+        fontWeight="700"
         fill={color}
+        textAnchor={component === "vertical" ? "end" : "middle"}
       >
         {vector.label}
       </text>
       {vector.magnitude ? (
-        <text x={endX + 3} y={endY + 3} fontSize="3.2" fill="#64748b">
+        <text x={magnitudeX} y={magnitudeY} fontSize="2.8" fill="#64748b">
           {vector.magnitude}
         </text>
       ) : null}
@@ -176,14 +182,14 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({ step, progr
             <marker
               key={role}
               id={`physics-arrow-${role}`}
-              markerWidth="9"
-              markerHeight="9"
-              refX="6"
-              refY="3"
+              markerWidth="6"
+              markerHeight="6"
+              refX="5"
+              refY="2.5"
               orient="auto"
               markerUnits="userSpaceOnUse"
             >
-              <path d="M0,0 L6,3 L0,6 Z" fill={vectorColor(role)} />
+              <path d="M0,0 L5,2.5 L0,5 Z" fill={vectorColor(role)} />
             </marker>
           ))}
         </defs>
@@ -255,9 +261,11 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({ step, progr
                 height={radius * 2}
                 fallbackShape="circle"
               />
-              <text x={object.x} y={object.y - 7} textAnchor="middle" fontSize="3.8" fontWeight="700" fill="#345995">
-                {object.label}
-              </text>
+              {object.label ? (
+                <text x={object.x} y={object.y - 7} textAnchor="middle" fontSize="3.8" fontWeight="700" fill="#345995">
+                  {object.label}
+                </text>
+              ) : null}
             </g>
           );
         })}
