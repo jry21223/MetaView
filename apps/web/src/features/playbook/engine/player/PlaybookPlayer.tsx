@@ -107,6 +107,8 @@ interface PlaybookPlayerProps {
   topbarCollapsed?: boolean;
   onToggleTopbar?: () => void;
   layoutMode?: PlaybookLayoutMode;
+  /** Optional settled opening frame for deterministic preview surfaces. */
+  initialFrame?: number;
 }
 
 export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
@@ -128,6 +130,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   topbarCollapsed = false,
   onToggleTopbar,
   layoutMode,
+  initialFrame,
 }) => {
   const playerRef = useRef<PlayerRef | null>(null);
   const resolvedLayoutMode = useAutoLayoutMode(layoutMode);
@@ -166,7 +169,10 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   }, [baseScript]);
   const hasParameterPanel = Boolean(parameterSlot) || hasDomainPanel;
   const showDomainPanel = hasDomainPanel && !interactionEnabled && !parameterSlot;
-  const initialPreviewFrame = useMemo(() => resolveInitialPreviewFrame(script), [script]);
+  const initialPreviewFrame = useMemo(
+    () => resolveInitialPreviewFrame(script, initialFrame),
+    [initialFrame, script],
+  );
   const playerTimelineKey = useMemo(() => resolvePlayerTimelineKey(baseScript), [baseScript]);
 
   useEffect(() => {

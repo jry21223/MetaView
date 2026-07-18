@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-labelledby="title desc">
+  <title id="title">MetaView</title>
+  <desc id="desc">MetaView 把题目、知识点或代码变成可播放、可操作、可继续追问的可视化理解过程。</desc>
+  <defs>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#e8e4da" stroke-width="1"/>
+    </pattern>
+    <clipPath id="canvas-clip">
+      <rect x="670" y="46" width="470" height="300" rx="18"/>
+    </clipPath>
+  </defs>
+
+  <rect width="1200" height="420" rx="28" fill="#f7f4ec"/>
+  <rect width="1200" height="420" rx="28" fill="url(#grid)" opacity=".82"/>
+  <rect x="1" y="1" width="1198" height="418" rx="27" fill="none" stroke="#ded9cc" stroke-width="2"/>
+
+  <g id="title-block" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif">
+    <text x="58" y="70" fill="#82976f" font-size="14" font-weight="750" letter-spacing="2.2">META / VIEW · EDUCATIONAL CANVAS</text>
+    <path d="M58 88H130" stroke="#82976f" stroke-width="3"/>
+
+    <text x="54" y="172" fill="#161a18" font-size="78" font-weight="760" letter-spacing="-2">MetaView</text>
+    <text x="58" y="221" fill="#1d2521" font-size="28" font-weight="650">把一道题，变成一段看得见的理解过程。</text>
+    <text x="58" y="262" fill="#5d655f" font-size="18">让公式、矢量、代码与解释共享同一条时间线。</text>
+
+    <g transform="translate(58 304)" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">
+      <rect width="144" height="34" rx="6" fill="#161a18"/>
+      <text x="18" y="22" fill="#f7f4ec">PLAYBOOK / 内容</text>
+      <path d="M158 17H182" stroke="#82976f" stroke-width="2"/>
+      <path d="m176 11 7 6-7 6" fill="none" stroke="#82976f" stroke-width="2"/>
+      <rect x="194" width="144" height="34" rx="6" fill="#f0ede5" stroke="#cfc9bb"/>
+      <text x="210" y="22" fill="#161a18">DIRECTOR / 焦点</text>
+      <path d="M352 17H376" stroke="#82976f" stroke-width="2"/>
+      <path d="m370 11 7 6-7 6" fill="none" stroke="#82976f" stroke-width="2"/>
+      <rect x="388" width="128" height="34" rx="6" fill="#e4eadf" stroke="#a9b89c"/>
+      <text x="405" y="22" fill="#34402f" font-weight="700">REMOTION / 输出</text>
+    </g>
+  </g>
+
+  <g id="lesson-canvas" clip-path="url(#canvas-clip)" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif">
+    <rect x="670" y="46" width="470" height="300" rx="18" fill="#fbfaf7"/>
+    <rect x="670" y="46" width="470" height="44" fill="#f0ede5"/>
+    <circle cx="696" cy="68" r="4" fill="#82976f"/>
+    <text x="710" y="73" fill="#5d655f" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">导数与切线 · STEP 05 / 06</text>
+    <rect x="1026" y="57" width="92" height="22" rx="5" fill="#ffffff" stroke="#d6d1c2"/>
+    <text x="1046" y="72" fill="#161a18" font-size="12" font-style="italic">f′(1) = 2</text>
+
+    <rect x="696" y="108" width="310" height="172" rx="8" fill="#faf9f5" stroke="#e4e0d6"/>
+    <g stroke="#ece9e1" stroke-width="1">
+      <path d="M716 132H986M716 172H986M716 212H986M716 252H986"/>
+      <path d="M731 120V264M791 120V264M851 120V264M911 120V264M971 120V264"/>
+    </g>
+    <path d="M716 252H986M851 120V264" stroke="#9aa39d" stroke-width="1.2"/>
+    <path d="M716 100Q851 404 986 100" fill="none" stroke="#82976f" stroke-width="3" stroke-linecap="round"/>
+    <path d="M841 292L981 152" fill="none" stroke="#c46a4b" stroke-width="2.4" stroke-linecap="round"/>
+    <circle cx="911" cy="222" r="12" fill="#d89c2b" opacity=".18"/>
+    <circle cx="911" cy="222" r="5" fill="#d89c2b"/>
+    <text x="919" y="214" fill="#161a18" font-size="11">P(1, 1)</text>
+
+    <rect x="1022" y="108" width="94" height="172" rx="8" fill="#ffffff" stroke="#e0dbcf"/>
+    <text x="1036" y="130" fill="#9aa39d" font-size="9" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">FOCUS</text>
+    <text x="1036" y="151" fill="#161a18" font-size="12" font-weight="700">切点与斜率</text>
+    <text x="1036" y="184" fill="#9aa39d" font-size="9" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">PARAM / a</text>
+    <path d="M1037 204H1101" stroke="#d6d1c2" stroke-width="5" stroke-linecap="round"/>
+    <path d="M1037 204H1082" stroke="#82976f" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="1082" cy="204" r="6" fill="#82976f"/>
+    <text x="1036" y="242" fill="#9aa39d" font-size="9" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">FOLLOW-UP</text>
+    <rect x="1036" y="252" width="66" height="10" rx="5" fill="#f0ede5"/>
+
+    <rect x="696" y="296" width="420" height="4" rx="2" fill="#dedbd3"/>
+    <rect x="696" y="296" width="342" height="4" rx="2" fill="#82976f"/>
+    <text x="696" y="326" fill="#5d655f" font-size="12">割线逐步逼近，斜率收敛到切点处的导数。</text>
+    <text x="1090" y="326" fill="#82976f" font-size="12" font-weight="700">5 / 6</text>
+  </g>
+
+  <g id="focus-frame" fill="none" stroke="#82976f" stroke-width="2">
+    <path d="M654 82V58a28 28 0 0 1 28-28h24"/>
+    <path d="M1156 82V58a28 28 0 0 0-28-28h-24"/>
+    <path d="M654 310v24a28 28 0 0 0 28 28h24"/>
+    <path d="M1156 310v24a28 28 0 0 1-28 28h-24"/>
+  </g>
+
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#8c948f">
+    <text x="58" y="390">MATH · PHYSICS · CHEMISTRY · BIOLOGY · GEOGRAPHY · ALGORITHM · CODE</text>
+    <text x="1140" y="390" text-anchor="end">PLAYABLE · TUNABLE · FOLLOW-UP READY</text>
+  </g>
+</svg>

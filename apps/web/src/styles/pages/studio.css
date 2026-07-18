@@ -289,14 +289,26 @@
 }
 
 .mv-followup-panel .mv-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   margin-bottom: 9px;
+  overflow: visible;
+  white-space: normal;
 }
 
 .mv-followup-panel .mv-suggestion {
+  flex: 0 1 auto;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 4px 10px;
   border-color: var(--player-line, var(--line));
   color: var(--player-ink-2, var(--ink-2));
   border-style: solid;
-  border-radius: 6px;
+  border-radius: 999px;
+  line-height: 1.35;
+  text-align: left;
+  white-space: normal;
 }
 
 .mv-followup-panel .mv-suggestion:hover:not(:disabled) {
@@ -2706,6 +2718,13 @@
 }
 
 @media (max-width: 380px) {
+  .mv-nav-item {
+    gap: 3px;
+    padding-inline: 2px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
   .mv-intake-body {
     padding-left: 12px;
     padding-right: 12px;

@@ -62,6 +62,7 @@ function TemplatePreviewContent({
     () => previewCase.buildFollowups(params, script),
     [params, previewCase, script],
   );
+  const settledOpeningFrame = Math.max(0, (script.steps[0]?.end_frame ?? 1) - 1);
 
   const updateParam = (id: string, value: TemplatePreviewParamValue, resetPlayback: boolean) => {
     setParams((current) => ({ ...current, [id]: value }));
@@ -79,6 +80,7 @@ function TemplatePreviewContent({
         <PlaybookPlayer
           key={`${previewCase.id}:${playbackRevision}`}
           script={script}
+          initialFrame={settledOpeningFrame}
           theme={theme}
           parameterSlot={(
             <TemplatePreviewControls

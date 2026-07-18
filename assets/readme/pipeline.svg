@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="430" viewBox="0 0 1200 430" role="img" aria-labelledby="title desc">
+  <title id="title">MetaView 生成与导演管线</title>
+  <desc id="desc">用户输入依次经过能力判断、教学规划、技能生成、PlaybookScript、质量门、DirectorScript、RenderPlan，最终进入 Remotion 播放与导出。</desc>
+
+  <rect width="1200" height="430" rx="26" fill="#faf8f3"/>
+  <rect x="1" y="1" width="1198" height="428" rx="25" fill="none" stroke="#e6e2d5" stroke-width="2"/>
+
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif">
+    <text x="54" y="58" fill="#161a18" font-size="30" font-weight="750">先把教学想清楚，再决定此刻看哪里。</text>
+    <text x="54" y="88" fill="#5d655f" font-size="16">内容契约与导演契约彼此独立，最终汇入同一条 Remotion 渲染出口。</text>
+  </g>
+
+  <g id="content-track" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif">
+    <text x="54" y="142" fill="#82976f" font-size="13" font-weight="750" letter-spacing="1.6">CONTENT TRACK / 内容轨</text>
+
+    <g transform="translate(54 160)">
+      <rect width="184" height="72" rx="14" fill="#f0ede5" stroke="#d6d1c2"/>
+      <text x="18" y="30" fill="#9aa39d" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">01 / INPUT</text>
+      <text x="18" y="54" fill="#161a18" font-size="18" font-weight="700">题目 / 知识点 / 代码</text>
+    </g>
+    <g transform="translate(276 160)">
+      <rect width="184" height="72" rx="14" fill="#f0ede5" stroke="#d6d1c2"/>
+      <text x="18" y="30" fill="#9aa39d" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">02 / BOUNDARY</text>
+      <text x="18" y="54" fill="#161a18" font-size="18" font-weight="700">CoverageDecision</text>
+    </g>
+    <g transform="translate(498 160)">
+      <rect width="184" height="72" rx="14" fill="#f0ede5" stroke="#d6d1c2"/>
+      <text x="18" y="30" fill="#9aa39d" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">03 / TEACHING</text>
+      <text x="18" y="54" fill="#161a18" font-size="18" font-weight="700">LessonPlan</text>
+    </g>
+    <g transform="translate(720 160)">
+      <rect width="184" height="72" rx="14" fill="#f0ede5" stroke="#d6d1c2"/>
+      <text x="18" y="30" fill="#9aa39d" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">04 / BUILD</text>
+      <text x="18" y="54" fill="#161a18" font-size="18" font-weight="700">SkillPack / Agent</text>
+    </g>
+    <g transform="translate(942 160)">
+      <rect width="204" height="72" rx="14" fill="#e4eadf" stroke="#a9b89c" stroke-width="2"/>
+      <text x="18" y="30" fill="#6f8363" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">05 / CONTENT CONTRACT</text>
+      <text x="18" y="54" fill="#34402f" font-size="18" font-weight="750">PlaybookScript</text>
+    </g>
+  </g>
+
+  <g id="arrows" fill="none" stroke="#aeb7b1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M238 196H266m-8-6 8 6-8 6"/>
+    <path d="M460 196H488m-8-6 8 6-8 6"/>
+    <path d="M682 196H710m-8-6 8 6-8 6"/>
+    <path d="M904 196H932m-8-6 8 6-8 6"/>
+    <path d="M1044 232V264a18 18 0 0 1-18 18H930m8-6-8 6 8 6"/>
+  </g>
+
+  <g id="direction-track" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif">
+    <text x="54" y="288" fill="#c07b28" font-size="13" font-weight="750" letter-spacing="1.6">QUALITY + DIRECTION / 质量与导演轨</text>
+
+    <g transform="translate(720 306)">
+      <rect width="204" height="72" rx="14" fill="#f8eddb" stroke="#e2b56e"/>
+      <text x="18" y="30" fill="#b47724" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">06 / QUALITY GATE</text>
+      <text x="18" y="54" fill="#604013" font-size="18" font-weight="750">QualityReport</text>
+    </g>
+    <g transform="translate(498 306)">
+      <rect width="184" height="72" rx="14" fill="#f8eddb" stroke="#e2b56e"/>
+      <text x="18" y="30" fill="#b47724" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">07 / DIRECTION</text>
+      <text x="18" y="54" fill="#604013" font-size="18" font-weight="750">DirectorScript</text>
+    </g>
+    <g transform="translate(276 306)">
+      <rect width="184" height="72" rx="14" fill="#f0ede5" stroke="#d6d1c2"/>
+      <text x="18" y="30" fill="#9aa39d" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">08 / ADAPT</text>
+      <text x="18" y="54" fill="#161a18" font-size="18" font-weight="700">RenderPlan</text>
+    </g>
+    <g transform="translate(54 306)">
+      <rect width="184" height="72" rx="14" fill="#1d2521" stroke="#1d2521"/>
+      <text x="18" y="30" fill="#9fb48d" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">09 / OUTPUT</text>
+      <text x="18" y="54" fill="#f7f4ec" font-size="16" font-weight="750">Remotion 输出</text>
+    </g>
+  </g>
+
+  <g fill="none" stroke="#aeb7b1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M720 342H692m8-6-8 6 8 6"/>
+    <path d="M498 342H470m8-6-8 6 8 6"/>
+    <path d="M276 342H248m8-6-8 6 8 6"/>
+  </g>
+
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#9aa39d">
+    <text x="1146" y="408" text-anchor="end">ONE RENDERING CONTRACT · NO ALTERNATE HTML VIDEO PATH</text>
+  </g>
+</svg>

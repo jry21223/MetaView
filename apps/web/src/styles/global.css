@@ -72,6 +72,23 @@ body.mv-modal-open {
   padding-right: var(--mv-safe-right);
 }
 
+/* Player routes need a definite block size so the flex/grid chain can use
+   the full Windows visual viewport instead of resolving height from 16:9
+   content width. Narrow portrait layouts return to document scrolling. */
+.mv-root--player {
+  height: var(--mv-vvh);
+  min-height: 0;
+  overflow-y: auto;
+}
+
+@media (max-width: 680px) and (orientation: portrait) {
+  .mv-root--player {
+    height: auto;
+    min-height: var(--mv-vvh);
+    overflow-y: visible;
+  }
+}
+
 pre,
 code,
 kbd,

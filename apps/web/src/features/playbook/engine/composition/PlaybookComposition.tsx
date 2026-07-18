@@ -422,7 +422,9 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
         <div
           style={{
             height: 3,
-            background: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)",
+            background: isDark
+              ? "var(--line, #1d2a23)"
+              : "var(--line, #e6e2d5)",
             position: "relative",
             overflow: "hidden",
           }}
@@ -434,7 +436,9 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
               top: 0,
               height: "100%",
               width: `${(frame / (script.total_frames || 1)) * 100}%`,
-              background: isDark ? "#4de8b0" : "#00896e",
+              background: isDark
+                ? "var(--accent, #9fb48d)"
+                : "var(--accent, #82976f)",
               borderRadius: "0 2px 2px 0",
               transition: "width 0.016s linear",
             }}
@@ -452,7 +456,9 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
                   top: 0,
                   width: 1,
                   height: "100%",
-                  background: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.12)",
+                  background: isDark
+                    ? "var(--line-2, #27332c)"
+                    : "var(--line-2, #d6d1c2)",
                 }}
               />
             );
@@ -494,7 +500,9 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
               flexShrink: 0,
               fontFamily: "IBM Plex Mono, monospace",
               fontSize: 11,
-              color: isDark ? "rgba(77,232,176,0.8)" : "rgba(0,120,90,0.8)",
+              color: isDark
+                ? "var(--accent, #9fb48d)"
+                : "var(--accent, #82976f)",
               whiteSpace: "nowrap",
             }}
           >

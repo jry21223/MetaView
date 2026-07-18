@@ -28,6 +28,10 @@ describe("THEME_PALETTE (issue #56)", () => {
       });
       const palette = THEME_PALETTE[theme];
       for (const [key, cssName] of Object.entries(PALETTE_TO_CSS_VAR)) {
+        if (key === "canvasPrimary") {
+          expect(vars[cssName]).toBe(THEME_PALETTE[theme].accent);
+          continue;
+        }
         expect(vars[cssName], `themeVars(${theme})[${cssName}]`).toBe(
           palette[key as keyof ThemePalette],
         );
@@ -40,6 +44,17 @@ describe("THEME_PALETTE (issue #56)", () => {
       expect(THEME_PALETTE[name].accentSoft, `${name}.accentSoft`).toMatch(
         /^#[0-9a-f]{8}$/i,
       );
+    }
+  });
+
+  it("publishes explicit canvas roles for every theme", () => {
+    for (const name of THEME_NAMES) {
+      const palette = THEME_PALETTE[name];
+      expect(palette.canvasGrid).toBeTruthy();
+      expect(palette.canvasAxis).toBeTruthy();
+      expect(palette.canvasPrimary).toBeTruthy();
+      expect(palette.canvasSecondary).toBeTruthy();
+      expect(palette.canvasFocus).toBeTruthy();
     }
   });
 });

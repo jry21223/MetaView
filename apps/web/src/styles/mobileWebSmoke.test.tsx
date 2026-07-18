@@ -172,6 +172,9 @@ describe("mobile web smoke", () => {
     const studioCss = readTextForCssContract(
       path.join(webRoot, "src/styles/pages/studio.css"),
     );
+    const settingsCss = readTextForCssContract(
+      path.join(webRoot, "src/styles/pages/settings.css"),
+    );
 
     expect(html).toContain("viewport-fit=cover");
     expect(globalCss).toContain("--mv-safe-top: env(safe-area-inset-top, 0px);");
@@ -191,5 +194,8 @@ describe("mobile web smoke", () => {
     expect(studioCss).not.toContain(".mv-nav-item:nth-child(4)");
     expect(studioCss).toContain(".mv-meta-particle__canvas-node.is-mobile-hidden");
     expect(studioCss).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(studioCss).toContain("white-space: nowrap;");
+    expect(settingsCss).toContain("grid-template-columns: repeat(3, minmax(0, 1fr));");
+    expect(settingsCss).toContain("overflow: visible;");
   });
 });

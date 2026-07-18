@@ -143,8 +143,16 @@ describe("MathPlotRenderer", () => {
         ],
       }),
     );
-    expect(markup).toContain("#4de8b0");
-    expect(markup).toContain("#7db8ff");
+    expect(markup).toContain("var(--canvas-primary");
+    expect(markup).toContain("var(--canvas-secondary");
+  });
+
+  it("uses semantic canvas roles for grid, axes, curves, and focus", () => {
+    const markup = render(makeSnap({ marker_x: 1, shade_from: 0.8, shade_to: 1.2 }));
+    expect(markup).toContain("var(--canvas-grid");
+    expect(markup).toContain("var(--canvas-axis");
+    expect(markup).toContain("var(--canvas-primary");
+    expect(markup).toContain("var(--canvas-focus");
   });
 
   it("marks derivative tangent curves and formula cards for visual quality checks", () => {

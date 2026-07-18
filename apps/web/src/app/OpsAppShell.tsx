@@ -213,7 +213,7 @@ export function OpsAppShell() {
 
   return (
     <div
-      className={`mv-root mv-${mode} mv-theme-${t.theme} mv-density-${t.density} mv-layout-${t.layout}`}
+      className={`mv-root mv-${mode} mv-theme-${t.theme} mv-density-${t.density} mv-layout-${t.layout}${stage === "workbench" || isTemplatePlayer ? " mv-root--player" : ""}`}
       data-theme={t.theme}
       style={css}
     >

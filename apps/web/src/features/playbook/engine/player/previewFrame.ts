@@ -1,10 +1,16 @@
 import { PLAYBOOK_DEFAULTS } from "../../../../shared/config/constants";
 import type { PlaybookScript } from "../types";
 
-export function resolveInitialPreviewFrame(script: PlaybookScript): number {
+export function resolveInitialPreviewFrame(
+  script: PlaybookScript,
+  requestedFrame?: number,
+): number {
   const lastFrame = Math.max(0, script.total_frames - 1);
   const firstStepLastFrame = Math.max(0, (script.steps[0]?.end_frame ?? script.total_frames) - 1);
-  return Math.min(PLAYBOOK_DEFAULTS.INITIAL_PREVIEW_FRAME, firstStepLastFrame, lastFrame);
+  const preferred = requestedFrame == null
+    ? PLAYBOOK_DEFAULTS.INITIAL_PREVIEW_FRAME
+    : Math.max(0, Math.floor(requestedFrame));
+  return Math.min(preferred, firstStepLastFrame, lastFrame);
 }
 
 export function resolvePlayerTimelineKey(script: PlaybookScript): string {

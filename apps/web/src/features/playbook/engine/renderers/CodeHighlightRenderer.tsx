@@ -6,6 +6,7 @@ interface CodeHighlightRendererProps {
   overlay: CodeHighlightOverlay;
   theme?: "dark" | "light";
   lineNumberOffset?: number;
+  showLanguageHeader?: boolean;
 }
 
 const DARK = {
@@ -56,6 +57,7 @@ export const CodeHighlightRenderer: React.FC<CodeHighlightRendererProps> = ({
   overlay,
   theme = "dark",
   lineNumberOffset = 0,
+  showLanguageHeader = true,
 }) => {
   const c = theme === "dark" ? DARK : LIGHT;
   const tokenColors = theme === "dark" ? TOKEN_DARK : TOKEN_LIGHT;
@@ -116,24 +118,26 @@ export const CodeHighlightRenderer: React.FC<CodeHighlightRendererProps> = ({
         overflow: "hidden",
       }}
     >
-      {/* Language badge */}
-      <div
-        style={{
-          padding: "4px 10px",
-          background: c.surface,
-          color: c.lineNum,
-          fontSize: 11,
-          letterSpacing: "0.05em",
-          borderBottom: `1px solid ${c.border}`,
-          flexShrink: 0,
-        }}
-      >
-        {overlay.language}
-      </div>
+      {showLanguageHeader && (
+        <div
+          style={{
+            padding: "4px 10px",
+            background: c.surface,
+            color: c.lineNum,
+            fontSize: 11,
+            letterSpacing: "0.05em",
+            borderBottom: `1px solid ${c.border}`,
+            flexShrink: 0,
+          }}
+        >
+          {overlay.language}
+        </div>
+      )}
 
       {/* Code lines */}
       <div ref={codeScrollRef} style={{ flex: 1, overflowY: "auto", overflowX: "auto" }}>
-        {(() => {
+        <div style={{ width: "max-content", minWidth: "100%" }}>
+          {(() => {
           const allTokens = tokenizeLines(
             overlay.lines.map((l) => l || " "),
             overlay.language,
@@ -199,6 +203,7 @@ export const CodeHighlightRenderer: React.FC<CodeHighlightRendererProps> = ({
                   padding: "0 10px 0 0",
                   lineHeight: "22px",
                   whiteSpace: "pre",
+                  overflow: "visible",
                   flex: 1,
                   fontFamily: "inherit",
                   fontSize: "inherit",
@@ -213,7 +218,8 @@ export const CodeHighlightRenderer: React.FC<CodeHighlightRendererProps> = ({
             </div>
           );
           });
-        })()}
+          })()}
+        </div>
       </div>
 
       {/* Variable watch panel */}

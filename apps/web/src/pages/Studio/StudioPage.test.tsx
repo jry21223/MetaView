@@ -560,7 +560,7 @@ describe("StudioPage", () => {
       ),
     );
 
-    const { getByRole, queryByRole } = render(
+    const { container, getByRole, queryByRole } = render(
       <StudioPage
         runId="run-1"
         t={TWEAK_DEFAULTS}
@@ -571,6 +571,10 @@ describe("StudioPage", () => {
 
     expect(getByRole("button", { name: "你能指出关键量吗？" })).toBeTruthy();
     expect(queryByRole("button", { name: "改变初始条件" })).toBeNull();
+    const suggestions = container.querySelector(".mv-suggestions");
+    const input = container.querySelector(".mv-chat-input-wrap");
+    expect(suggestions?.querySelectorAll(".mv-suggestion")).toHaveLength(3);
+    expect(suggestions?.nextElementSibling).toBe(input);
   });
 
   it("passes the active playbook's asset attribution report into export submission", async () => {

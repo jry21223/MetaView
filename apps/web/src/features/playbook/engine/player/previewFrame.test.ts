@@ -44,6 +44,14 @@ describe("resolveInitialPreviewFrame", () => {
     expect(resolveInitialPreviewFrame(script())).toBe(PLAYBOOK_DEFAULTS.INITIAL_PREVIEW_FRAME);
   });
 
+  it("accepts a settled first-step frame for deterministic previews", () => {
+    expect(resolveInitialPreviewFrame(script(), 58)).toBe(58);
+  });
+
+  it("clamps requested preview frames to the first step", () => {
+    expect(resolveInitialPreviewFrame(script(), 999)).toBe(59);
+  });
+
   it("never seeks past the first step", () => {
     expect(
       resolveInitialPreviewFrame(

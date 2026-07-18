@@ -1,6 +1,6 @@
 import React from "react";
 import "katex/dist/katex.min.css";
-import { Coordinates, LaTeX, Line, Mafs, Plot, Point, Polygon, Theme, Vector } from "mafs";
+import { Coordinates, LaTeX, Line, Mafs, Plot, Point, Polygon, Vector } from "mafs";
 import type {
   MathSceneAnnotation,
   MathSceneCurve,
@@ -21,19 +21,20 @@ import {
   type PlannedObject,
 } from "../math-scene-plan/plan";
 import { revealRegionVertices } from "./regionReveal";
+import { THEME_PALETTE } from "../../../../shared/config/themePalette";
 
 type Emphasis = "primary" | "secondary" | "accent";
 
 const EMPHASIS_COLORS: Record<"dark" | "light", Record<Emphasis, string>> = {
   dark: {
-    primary: Theme.blue,
-    secondary: Theme.violet,
-    accent: Theme.orange,
+    primary: `var(--canvas-primary, ${THEME_PALETTE.dark.canvasPrimary})`,
+    secondary: `var(--canvas-secondary, ${THEME_PALETTE.dark.canvasSecondary})`,
+    accent: `var(--canvas-focus, ${THEME_PALETTE.dark.canvasFocus})`,
   },
   light: {
-    primary: Theme.indigo,
-    secondary: Theme.violet,
-    accent: Theme.red,
+    primary: `var(--canvas-primary, ${THEME_PALETTE.light.canvasPrimary})`,
+    secondary: `var(--canvas-secondary, ${THEME_PALETTE.light.canvasSecondary})`,
+    accent: `var(--canvas-focus, ${THEME_PALETTE.light.canvasFocus})`,
   },
 };
 
@@ -280,8 +281,10 @@ function PointsLayer({
 
 function AnnotationsLayer({
   annotations,
+  theme,
 }: {
   annotations: PlannedObject<MathSceneAnnotation>[];
+  theme: "dark" | "light";
 }) {
   return (
     <>
@@ -294,7 +297,7 @@ function AnnotationsLayer({
           <LaTeX
             at={[a.x, a.y]}
             tex={annotationTex(a.text)}
-            color={Theme.foreground}
+            color={`var(--ink, ${THEME_PALETTE[theme].ink})`}
           />
         </g>
       ))}
@@ -473,7 +476,7 @@ export const MathSceneRenderer: React.FC<RendererProps> = ({
             </g>
           ))}
           <PointsLayer points={plan.points} theme={theme} />
-          <AnnotationsLayer annotations={plan.annotations} />
+          <AnnotationsLayer annotations={plan.annotations} theme={theme} />
         </Mafs>
       </div>
 

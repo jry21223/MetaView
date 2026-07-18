@@ -7,7 +7,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 describe("asset check targets", () => {
   it("keeps asset and Remotion gates in the dedicated visual-check path", () => {
-    const makefile = readFileSync(path.resolve(__dirname, "../../../../../../../Makefile"), "utf8");
+    const makefile = readFileSync(
+      path.resolve(__dirname, "../../../../../../../Makefile"),
+      "utf8",
+    ).replaceAll("\r\n", "\n");
     const webPackage = readFileSync(path.resolve(__dirname, "../../../../../package.json"), "utf8");
 
     expect(makefile).toMatch(/^asset-audit:/m);

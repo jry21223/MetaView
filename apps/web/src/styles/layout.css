@@ -107,16 +107,16 @@
     clamp(10px, 1.6vw, 24px)
     var(--mv-safe-bottom);
   background:
-    linear-gradient(rgba(77, 71, 58, 0.052) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(77, 71, 58, 0.052) 1px, transparent 1px),
+    linear-gradient(var(--canvas-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px),
     #f5f1e9;
   background-size: 32px 32px;
 }
 
 .mv-dark .mv-main--player {
   background:
-    linear-gradient(rgba(234, 238, 226, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(234, 238, 226, 0.045) 1px, transparent 1px),
+    linear-gradient(var(--canvas-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px),
     #101410;
 }
 

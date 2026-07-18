@@ -44,7 +44,11 @@ export function PlaybookLearningConsole({
           </div>
           <div className="playbook-player__code-body">
             {codeOverlay ? (
-              <CodeHighlightRenderer overlay={codeOverlay} theme={theme} />
+              <CodeHighlightRenderer
+                overlay={codeOverlay}
+                theme={theme}
+                showLanguageHeader={false}
+              />
             ) : (
               <div className="playbook-player__code-empty">
                 <span>{"</>"}</span>
@@ -59,7 +63,7 @@ export function PlaybookLearningConsole({
         <section className="playbook-player__console-card playbook-player__params-card">
           <div className="playbook-player__console-head">
             <span>{interactionSlot && !parameterSlot ? "Explore" : "Params"}</span>
-            <small>{interactionSlot && !parameterSlot ? "Experimental" : baseScript.domain}</small>
+            {interactionSlot && !parameterSlot && <small>Experimental</small>}
           </div>
           <div className="playbook-player__param-body">
             {parameterSlot}

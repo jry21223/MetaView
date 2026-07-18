@@ -28,6 +28,16 @@ export interface ThemePalette {
   accentSoft: string;
   /** Caution color. Bound to ``--warn``. */
   warn: string;
+  /** Low-contrast learning-canvas grid. Bound to ``--canvas-grid``. */
+  canvasGrid: string;
+  /** Coordinate axes and structural connectors. Bound to ``--canvas-axis``. */
+  canvasAxis: string;
+  /** Primary knowledge curve / active path. Bound to ``--canvas-primary``. */
+  canvasPrimary: string;
+  /** Secondary comparison curve / visited state. Bound to ``--canvas-secondary``. */
+  canvasSecondary: string;
+  /** Current point, tangent, or selected object. Bound to ``--canvas-focus``. */
+  canvasFocus: string;
 }
 
 const LIGHT_ACCENT = "#82976f";
@@ -81,6 +91,11 @@ export const THEME_PALETTE: Record<ThemeName, ThemeDescriptor> = {
     accent: DARK_ACCENT,
     accentSoft: `${DARK_ACCENT}26`,
     warn: "#e9a23b",
+    canvasGrid: "rgba(232,239,233,0.07)",
+    canvasAxis: "rgba(232,239,233,0.28)",
+    canvasPrimary: DARK_ACCENT,
+    canvasSecondary: "#c3cdb9",
+    canvasFocus: "#e9a23b",
   },
   light: {
     label: "Light",
@@ -94,6 +109,11 @@ export const THEME_PALETTE: Record<ThemeName, ThemeDescriptor> = {
     accent: LIGHT_ACCENT,
     accentSoft: `${LIGHT_ACCENT}26`,
     warn: "#e9a23b",
+    canvasGrid: "rgba(22,26,24,0.07)",
+    canvasAxis: "rgba(22,26,24,0.30)",
+    canvasPrimary: LIGHT_ACCENT,
+    canvasSecondary: "#65745a",
+    canvasFocus: "#b87824",
   },
   monokai: {
     label: "Monokai",
@@ -107,6 +127,11 @@ export const THEME_PALETTE: Record<ThemeName, ThemeDescriptor> = {
     accent: "#f92672",
     accentSoft: "#f9267226",
     warn: "#fd971f",
+    canvasGrid: "rgba(248,248,242,0.08)",
+    canvasAxis: "rgba(248,248,242,0.30)",
+    canvasPrimary: "#a6e22e",
+    canvasSecondary: "#66d9ef",
+    canvasFocus: "#fd971f",
   },
   nord: {
     label: "Nord",
@@ -120,6 +145,11 @@ export const THEME_PALETTE: Record<ThemeName, ThemeDescriptor> = {
     accent: "#88c0d0",
     accentSoft: "#88c0d026",
     warn: "#ebcb8b",
+    canvasGrid: "rgba(236,239,244,0.08)",
+    canvasAxis: "rgba(236,239,244,0.30)",
+    canvasPrimary: "#a3be8c",
+    canvasSecondary: "#88c0d0",
+    canvasFocus: "#ebcb8b",
   },
   "solarized-dark": {
     label: "Solarized Dark",
@@ -133,6 +163,11 @@ export const THEME_PALETTE: Record<ThemeName, ThemeDescriptor> = {
     accent: "#268bd2",
     accentSoft: "#268bd226",
     warn: "#b58900",
+    canvasGrid: "rgba(238,232,213,0.08)",
+    canvasAxis: "rgba(238,232,213,0.30)",
+    canvasPrimary: "#859900",
+    canvasSecondary: "#2aa198",
+    canvasFocus: "#b58900",
   },
   "solarized-light": {
     label: "Solarized Light",
@@ -146,6 +181,11 @@ export const THEME_PALETTE: Record<ThemeName, ThemeDescriptor> = {
     accent: "#268bd2",
     accentSoft: "#268bd226",
     warn: "#b58900",
+    canvasGrid: "rgba(7,54,66,0.08)",
+    canvasAxis: "rgba(7,54,66,0.28)",
+    canvasPrimary: "#82976f",
+    canvasSecondary: "#2aa198",
+    canvasFocus: "#b58900",
   },
 };
 
@@ -164,4 +204,9 @@ export const PALETTE_TO_CSS_VAR: Record<keyof ThemePalette, string> = {
   accent: "--accent",
   accentSoft: "--accent-soft",
   warn: "--warn",
+  canvasGrid: "--canvas-grid",
+  canvasAxis: "--canvas-axis",
+  canvasPrimary: "--canvas-primary",
+  canvasSecondary: "--canvas-secondary",
+  canvasFocus: "--canvas-focus",
 };

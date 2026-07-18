@@ -46,9 +46,9 @@ interface MathPalette {
 /**
  * Math-renderer palette. The shared studio palette (bg / text / narration)
  * comes from THEME_PALETTE so every named theme (dark / light / monokai /
- * nord / solarized) recolors the math plot in lockstep; curve-specific
- * colors (curvePrimary array, marker glow, shade fill) stay local because
- * THEME_PALETTE doesn't model them. Issue #61.
+ * nord / solarized) recolors the math plot in lockstep. Canvas structure,
+ * curves, and focus markers use the shared canvas semantic roles, with
+ * explicit palette fallbacks for SSR and Remotion exports.
  */
 function buildMathPalette(theme: "dark" | "light"): MathPalette {
   const studio = THEME_PALETTE[theme];
@@ -56,40 +56,48 @@ function buildMathPalette(theme: "dark" | "light"): MathPalette {
     ? {
         bg: studio.surface2,
         plotBg: "rgba(255,255,255,0.02)",
-        grid: "rgba(255,255,255,0.07)",
-        axis: "rgba(255,255,255,0.32)",
+        grid: `var(--canvas-grid, ${studio.canvasGrid})`,
+        axis: `var(--canvas-axis, ${studio.canvasAxis})`,
         axisLabel: studio.ink2,
         tick: studio.ink3,
         text: studio.ink,
         narration: studio.ink3,
         card: "rgba(255,255,255,0.06)",
         cardBorder: studio.line2,
-        curvePrimary: ["#4de8b0", "#7db8ff", "#ffd84d"],
-        curveSecondary: "rgba(200,168,248,0.9)",
-        curveAccent: "#ff9e8a",
-        marker: "#ffd84d",
-        markerGlow: "rgba(255,216,77,0.55)",
-        shade: "rgba(77,232,176,0.20)",
-        shadeStroke: "rgba(77,232,176,0.5)",
+        curvePrimary: [
+          `var(--canvas-primary, ${studio.canvasPrimary})`,
+          `var(--canvas-secondary, ${studio.canvasSecondary})`,
+          `var(--canvas-focus, ${studio.canvasFocus})`,
+        ],
+        curveSecondary: `var(--canvas-secondary, ${studio.canvasSecondary})`,
+        curveAccent: `var(--canvas-focus, ${studio.canvasFocus})`,
+        marker: `var(--canvas-focus, ${studio.canvasFocus})`,
+        markerGlow: `color-mix(in srgb, var(--canvas-focus, ${studio.canvasFocus}) 52%, transparent)`,
+        shade: `color-mix(in srgb, var(--canvas-primary, ${studio.canvasPrimary}) 18%, transparent)`,
+        shadeStroke: `color-mix(in srgb, var(--canvas-primary, ${studio.canvasPrimary}) 48%, transparent)`,
       }
     : {
         bg: studio.surface2,
         plotBg: "rgba(0,0,0,0.015)",
-        grid: "rgba(0,0,0,0.08)",
-        axis: "rgba(0,0,0,0.4)",
+        grid: `var(--canvas-grid, ${studio.canvasGrid})`,
+        axis: `var(--canvas-axis, ${studio.canvasAxis})`,
         axisLabel: studio.ink2,
         tick: studio.ink3,
         text: studio.ink,
         narration: studio.ink3,
         card: "rgba(0,0,0,0.04)",
         cardBorder: studio.line2,
-        curvePrimary: ["#0a8f6e", "#2563c0", "#b07d00"],
-        curveSecondary: "rgba(96,48,192,0.85)",
-        curveAccent: "#c05030",
-        marker: "#b07d00",
-        markerGlow: "rgba(176,125,0,0.4)",
-        shade: "rgba(10,143,110,0.16)",
-        shadeStroke: "rgba(10,143,110,0.45)",
+        curvePrimary: [
+          `var(--canvas-primary, ${studio.canvasPrimary})`,
+          `var(--canvas-secondary, ${studio.canvasSecondary})`,
+          `var(--canvas-focus, ${studio.canvasFocus})`,
+        ],
+        curveSecondary: `var(--canvas-secondary, ${studio.canvasSecondary})`,
+        curveAccent: `var(--canvas-focus, ${studio.canvasFocus})`,
+        marker: `var(--canvas-focus, ${studio.canvasFocus})`,
+        markerGlow: `color-mix(in srgb, var(--canvas-focus, ${studio.canvasFocus}) 44%, transparent)`,
+        shade: `color-mix(in srgb, var(--canvas-primary, ${studio.canvasPrimary}) 16%, transparent)`,
+        shadeStroke: `color-mix(in srgb, var(--canvas-primary, ${studio.canvasPrimary}) 44%, transparent)`,
       };
 }
 

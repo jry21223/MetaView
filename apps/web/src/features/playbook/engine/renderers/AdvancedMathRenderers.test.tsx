@@ -153,6 +153,9 @@ describe("advanced math renderers", () => {
     expect(markup).toContain('data-node-state="visited"');
     expect(markup).toContain('data-node-state="queue"');
     expect(markup).toContain('data-edge-state="active"');
+    expect(markup).toContain("var(--canvas-axis");
+    expect(markup).toContain("var(--canvas-secondary");
+    expect(markup).toContain("var(--canvas-focus");
     expect(markup).toContain('data-semantic-role="queue_panel"');
     expect(markup).toContain('data-queue-node-id="B"');
     expect(markup).toContain('data-queue-node-id="C"');

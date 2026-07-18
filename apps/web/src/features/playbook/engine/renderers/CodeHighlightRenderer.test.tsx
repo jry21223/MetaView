@@ -88,4 +88,30 @@ describe("CodeHighlightRenderer", () => {
     expect(markup).not.toContain("#3b82f6");
     expect(markup).not.toContain("#dbeafe");
   });
+
+  it("can hide its language row when a parent panel already labels the code", () => {
+    const markup = renderToStaticMarkup(
+      <CodeHighlightRenderer
+        overlay={overlay()}
+        theme="light"
+        showLanguageHeader={false}
+      />,
+    );
+
+    expect(markup).not.toContain(">python<");
+    expect(markup).toContain("bubble_sort");
+  });
+
+  it("uses one shared horizontal scroller instead of one scrollbar per source line", () => {
+    const markup = render(overlay({
+      lines: [
+        "const result = someVeryLongFunctionName(firstArgument, secondArgument, thirdArgument);",
+        "return result;",
+      ],
+    }));
+
+    expect(markup).toContain('overflow-y:auto;overflow-x:auto');
+    expect(markup).toContain('width:max-content;min-width:100%');
+    expect(markup.match(/overflow:visible/g)).toHaveLength(2);
+  });
 });

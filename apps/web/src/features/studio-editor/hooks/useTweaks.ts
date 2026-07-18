@@ -140,6 +140,11 @@ export function themeVars(t: TweakValues): Record<string, string> {
     "--accent-dim": t.accent + "80",
     "--accent-soft": t.accent + "26",
     "--warn": p.warn,
+    "--canvas-grid": p.canvasGrid,
+    "--canvas-axis": p.canvasAxis,
+    "--canvas-primary": t.accent,
+    "--canvas-secondary": p.canvasSecondary,
+    "--canvas-focus": p.canvasFocus,
     "--radius": "14px",
     "--radius-sm": "10px",
   };

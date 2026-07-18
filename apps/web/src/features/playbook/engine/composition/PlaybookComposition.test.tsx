@@ -446,6 +446,15 @@ describe("PlaybookComposition", () => {
     expect(matches).toHaveLength(1);
   });
 
+  it("uses semantic theme colors for the stage progress bar", () => {
+    const markup = renderToStaticMarkup(<PlaybookComposition script={mathScript()} />);
+
+    expect(markup).toContain("var(--line, #e6e2d5)");
+    expect(markup).toContain("var(--accent, #82976f)");
+    expect(markup).not.toContain("#00896e");
+    expect(markup).not.toContain("rgba(0,120,90,0.8)");
+  });
+
   it("uses long director beat voiceover when it is long enough", () => {
     const script = mathScript(120);
     const markup = renderToStaticMarkup(

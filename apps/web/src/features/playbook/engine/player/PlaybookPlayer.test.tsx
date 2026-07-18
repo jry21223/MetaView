@@ -267,6 +267,8 @@ describe("PlaybookPlayer", () => {
     expect(consoleText.indexOf("Code Sync")).toBeLessThan(consoleText.indexOf("Params"));
     expect(consoleText.indexOf("Params")).toBeLessThan(consoleText.indexOf("Follow-up"));
     expect(consoleText.indexOf("Follow-up")).toBeLessThan(consoleText.indexOf("Related lesson"));
+    expect(consoleText.match(/python/g)).toHaveLength(1);
+    expect(consoleText).not.toContain("algorithm");
   });
 
   it("shows legacy call-stack code sync in the desktop learning console", () => {

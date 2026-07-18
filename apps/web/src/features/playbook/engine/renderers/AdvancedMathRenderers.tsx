@@ -18,6 +18,7 @@ import type {
 import { clamp01 } from "../foundation";
 import { sanitizeKatex } from "../../../../shared/lib/sanitizeKatex";
 import type { RendererProps } from "./types";
+import { THEME_PALETTE } from "../../../../shared/config/themePalette";
 
 type ThemeName = "dark" | "light";
 
@@ -64,6 +65,22 @@ const PALETTE: Record<ThemeName, Palette> = {
     warn: "#be123c",
   },
 };
+
+function canvasPalette(theme: ThemeName): Palette {
+  const palette = THEME_PALETTE[theme];
+  return {
+    ...PALETTE[theme],
+    grid: `var(--canvas-grid, ${palette.canvasGrid})`,
+    line: `var(--canvas-axis, ${palette.canvasAxis})`,
+    primary: `var(--canvas-primary, ${palette.canvasPrimary})`,
+    secondary: `var(--canvas-secondary, ${palette.canvasSecondary})`,
+    accent: `var(--canvas-focus, ${palette.canvasFocus})`,
+  };
+}
+
+function softCanvasColor(color: string, strength: number): string {
+  return `color-mix(in srgb, ${color} ${strength}%, transparent)`;
+}
 
 function progressOpacity(frame: number, stepStartFrame: number, delay = 0): number {
   return clamp01((Math.max(0, frame - stepStartFrame) - delay) / 14);
@@ -433,7 +450,7 @@ function GraphSvg({
   opacity?: number;
   onNodeSelect?: (nodeId: string) => void;
 }) {
-  const colors = PALETTE[theme];
+  const colors = canvasPalette(theme);
   const nodes = graph.nodes ?? [];
   const projectCompactCoords = shouldProjectCompactGraphCoords(nodes);
   const positioned = nodes.map((node, index) => {
@@ -530,9 +547,9 @@ function GraphSvg({
         const radius = active ? 32 : 29;
         const nodeFill =
           state === "current"
-            ? `${colors.accent}2e`
+            ? softCanvasColor(colors.accent, 18)
             : state === "visited"
-              ? `${colors.secondary}22`
+              ? softCanvasColor(colors.secondary, 13)
               : state === "queue"
                 ? colors.card
                 : colors.bg;
@@ -623,7 +640,7 @@ function GraphAlgorithmStatePanel({
   queueNodes: string[];
   opacity: number;
 }) {
-  const colors = PALETTE[theme];
+  const colors = canvasPalette(theme);
   const current = currentNodes[0] ?? graph.current_node_id ?? "node";
 
   return (
@@ -646,7 +663,7 @@ function GraphAlgorithmStatePanel({
                 width="42"
                 height="30"
                 rx="8"
-                fill={`${colors.accent}22`}
+                fill={softCanvasColor(colors.accent, 13)}
                 stroke={colors.accent}
               />
               <text
@@ -675,7 +692,7 @@ function GraphAlgorithmStatePanel({
         {visitedNodes.length ? (
           visitedNodes.map((nodeId, index) => (
             <g key={nodeId} data-visited-node-id={nodeId}>
-              <circle cx={662 + index * 36} cy="224" r="15" fill={`${colors.secondary}24`} stroke={colors.secondary} />
+              <circle cx={662 + index * 36} cy="224" r="15" fill={softCanvasColor(colors.secondary, 14)} stroke={colors.secondary} />
               <text
                 x={662 + index * 36}
                 y="229"
