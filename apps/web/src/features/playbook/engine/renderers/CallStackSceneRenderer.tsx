@@ -1,11 +1,9 @@
 import React from "react";
-import { AssetSvg } from "../assets/AssetSvg";
 import type { CallStackFrame, CallStackSceneSnapshot } from "../types";
 import type { RendererProps } from "./types";
 
 const SVG_W = 900;
 const SVG_H = 506;
-const CORE_PACK_ID = "core-visual-basic";
 
 const COLORS = {
   dark: {
@@ -25,16 +23,6 @@ const COLORS = {
     accent: "#0f76a8",
   },
 } as const;
-
-function frameAssetId(frame: CallStackFrame, currentFrameId: string | null | undefined): string {
-  if (frame.asset_id) return frame.asset_id;
-  if (frame.state === "active" || frame.id === currentFrameId) return "call-frame";
-  return "stack-frame";
-}
-
-function frameRole(frame: CallStackFrame, currentFrameId: string | null | undefined): string {
-  return frameAssetId(frame, currentFrameId) === "call-frame" ? "call_frame" : "stack_frame";
-}
 
 function shortLine(line: string): string {
   return line.length > 58 ? `${line.slice(0, 55)}...` : line;
@@ -83,6 +71,11 @@ export const CallStackSceneRenderer: React.FC<RendererProps> = ({ step, theme })
         data-pack-id={packId}
         data-stack-asset-id={snap.asset_id ?? undefined}
       >
+        <defs>
+          <marker id="stack-flow-arrow" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto">
+            <path d="M0,0 L6,3.5 L0,7 Z" fill={colors.muted} />
+          </marker>
+        </defs>
         <rect x="0" y="0" width={SVG_W} height={SVG_H} fill={colors.bg} />
         <text x="44" y="50" fill={colors.ink} fontSize="28" fontWeight="760">
           {step.title}
@@ -106,38 +99,33 @@ export const CallStackSceneRenderer: React.FC<RendererProps> = ({ step, theme })
               key={frameTransitionKey(frame, nextFrame)}
               data-frame-transition={frameTransitionKey(frame, nextFrame)}
             >
-              <AssetSvg
-                assetId="core-timeline-arrow"
-                packId={CORE_PACK_ID}
-                subject="core"
-                semanticRole="timeline_arrow"
-                x={midX - 22}
-                y={midY - 5}
-                width={44}
-                height={10}
-                opacity="0.82"
-                transform={`rotate(90 ${midX} ${midY})`}
-                fallbackShape="rect"
+              <line
+                x1={midX}
+                y1={midY - 12}
+                x2={midX}
+                y2={midY + 12}
+                stroke={colors.muted}
+                strokeWidth="1.6"
+                markerEnd="url(#stack-flow-arrow)"
               />
             </g>
           );
         })}
         {frames.map((frame, index) => {
           const { x, y, width, height } = frameLayout(frame, index);
-          const assetId = frameAssetId(frame, snap.current_frame_id);
           const state = frame.id === snap.current_frame_id ? "active" : frame.state ?? "waiting";
+          const active = state === "active";
           return (
             <g key={frame.id} data-frame-id={frame.id} data-frame-state={state}>
-              <AssetSvg
-                assetId={assetId}
-                packId={packId}
-                subject="algorithm"
-                semanticRole={frameRole(frame, snap.current_frame_id)}
+              <rect
                 x={x}
                 y={y}
                 width={width}
                 height={height}
-                fallbackShape="rect"
+                rx="8"
+                fill={active ? `${colors.accent}18` : colors.panel}
+                stroke={active ? colors.accent : colors.line}
+                strokeWidth={active ? 2 : 1}
               />
               <text x={x + 22} y={y + 29} fill={colors.ink} fontSize="18" fontWeight="740">
                 {frame.label}
@@ -172,16 +160,15 @@ export const CallStackSceneRenderer: React.FC<RendererProps> = ({ step, theme })
           return (
             <g key={`${index}-${line}`} data-code-line={index} data-code-line-state={active ? "active" : "idle"}>
               {active ? (
-                <AssetSvg
-                  assetId={codeTrace?.asset_id ?? "active-line"}
-                  packId={packId}
-                  subject="algorithm"
-                  semanticRole="active_line"
+                <rect
                   x={codeX - 10}
                   y={y - 23}
                   width={codeW}
                   height={30}
-                  fallbackShape="rect"
+                  rx="5"
+                  fill={`${colors.accent}16`}
+                  stroke={colors.accent}
+                  strokeWidth="1"
                 />
               ) : null}
               <text x={codeX} y={y} fill={active ? colors.accent : colors.muted} fontSize="14" fontFamily="monospace">

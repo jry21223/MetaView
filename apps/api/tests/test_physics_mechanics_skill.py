@@ -135,7 +135,7 @@ async def test_projectile_motion_uses_asset_backed_force_scene() -> None:
     assert force_steps
     force_snapshot = force_steps[0].snapshot.model_dump(mode="json")
     assert force_snapshot["pack_id"] == "physics-basic"
-    assert any(item.get("asset_id") == "projectile-body-dot" for item in force_snapshot["objects"])
+    assert all(item.get("asset_id") is None for item in force_snapshot["objects"])
 
 
 @pytest.mark.asyncio

@@ -6,8 +6,18 @@
   "license": "internal",
   "licenseMode": "single",
   "defaultLicense": "internal",
-  "sceneTemplates": ["bfs_graph", "recursion_stack", "binary_search"],
-  "rendererKinds": ["graph_scene", "call_stack_scene", "code_trace_scene", "algorithm_array", "algorithm_tree"],
+  "sceneTemplates": [
+    "bfs_graph",
+    "recursion_stack",
+    "binary_search"
+  ],
+  "rendererKinds": [
+    "graph_scene",
+    "call_stack_scene",
+    "code_trace_scene",
+    "algorithm_array",
+    "algorithm_tree"
+  ],
   "sources": [
     {
       "id": "metaview-internal",
@@ -23,8 +33,15 @@
       "id": "bfs-graph-contract",
       "type": "json",
       "path": "/assets/metaview-kits/algorithm-code-basic/contracts/bfs-graph.contract.json",
-      "tags": ["bfs", "graph", "contract"],
-      "semanticRoles": ["scene_contract", "bfs_graph_contract"],
+      "tags": [
+        "bfs",
+        "graph",
+        "contract"
+      ],
+      "semanticRoles": [
+        "scene_contract",
+        "bfs_graph_contract"
+      ],
       "sourceId": "metaview-internal",
       "attribution": "MetaView internal algorithm scene contract for compiler alignment",
       "license": "internal",
@@ -38,7 +55,10 @@
       "modifiedFrom": null,
       "rendererHints": {
         "preferredRenderer": "graph_scene",
-        "defaultSize": [640, 360],
+        "defaultSize": [
+          640,
+          360
+        ],
         "anchor": "center",
         "colorizable": false,
         "strokeControlled": false
@@ -48,8 +68,15 @@
       "id": "recursion-stack-contract",
       "type": "json",
       "path": "/assets/metaview-kits/algorithm-code-basic/contracts/recursion-stack.contract.json",
-      "tags": ["recursion", "call-stack", "contract"],
-      "semanticRoles": ["scene_contract", "recursion_stack_contract"],
+      "tags": [
+        "recursion",
+        "call-stack",
+        "contract"
+      ],
+      "semanticRoles": [
+        "scene_contract",
+        "recursion_stack_contract"
+      ],
       "sourceId": "metaview-internal",
       "attribution": "MetaView internal algorithm call-stack contract for compiler alignment",
       "license": "internal",
@@ -63,7 +90,10 @@
       "modifiedFrom": null,
       "rendererHints": {
         "preferredRenderer": "call_stack_scene",
-        "defaultSize": [640, 360],
+        "defaultSize": [
+          640,
+          360
+        ],
         "anchor": "center",
         "colorizable": false,
         "strokeControlled": false
@@ -73,8 +103,15 @@
       "id": "binary-search-contract",
       "type": "json",
       "path": "/assets/metaview-kits/algorithm-code-basic/contracts/binary-search.contract.json",
-      "tags": ["binary-search", "code-trace", "contract"],
-      "semanticRoles": ["scene_contract", "binary_search_contract"],
+      "tags": [
+        "binary-search",
+        "code-trace",
+        "contract"
+      ],
+      "semanticRoles": [
+        "scene_contract",
+        "binary_search_contract"
+      ],
       "sourceId": "metaview-internal",
       "attribution": "MetaView internal algorithm code-trace contract for compiler alignment",
       "license": "internal",
@@ -88,118 +125,30 @@
       "modifiedFrom": null,
       "rendererHints": {
         "preferredRenderer": "code_trace_scene",
-        "defaultSize": [640, 360],
+        "defaultSize": [
+          640,
+          360
+        ],
         "anchor": "center",
         "colorizable": false,
         "strokeControlled": false
-      }
-    },
-    {
-      "id": "graph-node",
-      "type": "svg",
-      "path": "/assets/metaview-kits/algorithm-code-basic/graph/graph-node.svg",
-      "tags": ["graph", "node", "algorithm"],
-      "semanticRoles": ["graph_node", "node", "data_structure"],
-      "sourceId": "metaview-internal",
-      "attribution": "MetaView internal SVG primitive",
-      "license": "internal",
-      "commercialUseStatus": "allowed",
-      "commercialUseAllowed": true,
-      "requiresAttribution": false,
-      "shareAlike": false,
-      "modificationAllowed": true,
-      "sourceUrl": null,
-      "licenseUrl": null,
-      "modifiedFrom": null,
-      "rendererHints": {
-        "preferredRenderer": "graph_scene",
-        "defaultSize": [64, 64],
-        "anchor": "center",
-        "colorizable": false,
-        "strokeControlled": false
-      }
-    },
-    {
-      "id": "queue-frame",
-      "type": "svg",
-      "path": "/assets/metaview-kits/algorithm-code-basic/graph/queue-frame.svg",
-      "tags": ["queue", "frontier", "algorithm", "bfs"],
-      "semanticRoles": ["queue", "frontier"],
-      "sourceId": "metaview-internal",
-      "attribution": "MetaView internal SVG primitive",
-      "license": "internal",
-      "commercialUseStatus": "allowed",
-      "commercialUseAllowed": true,
-      "requiresAttribution": false,
-      "shareAlike": false,
-      "modificationAllowed": true,
-      "sourceUrl": null,
-      "licenseUrl": null,
-      "modifiedFrom": null,
-      "rendererHints": {
-        "preferredRenderer": "graph_scene",
-        "defaultSize": [76, 52],
-        "anchor": "center",
-        "colorizable": false,
-        "strokeControlled": false
-      }
-    },
-    {
-      "id": "visited-node",
-      "type": "svg",
-      "path": "/assets/metaview-kits/algorithm-code-basic/graph/visited-node.svg",
-      "tags": ["visited", "graph", "node", "algorithm"],
-      "semanticRoles": ["visited", "node_visited"],
-      "sourceId": "metaview-internal",
-      "attribution": "MetaView internal SVG primitive",
-      "license": "internal",
-      "commercialUseStatus": "allowed",
-      "commercialUseAllowed": true,
-      "requiresAttribution": false,
-      "shareAlike": false,
-      "modificationAllowed": true,
-      "sourceUrl": null,
-      "licenseUrl": null,
-      "modifiedFrom": null,
-      "rendererHints": {
-        "preferredRenderer": "graph_scene",
-        "defaultSize": [64, 64],
-        "anchor": "center",
-        "colorizable": false,
-        "strokeControlled": false
-      }
-    },
-    {
-      "id": "edge-active",
-      "type": "svg",
-      "path": "/assets/metaview-kits/algorithm-code-basic/graph/edge-active.svg",
-      "tags": ["graph", "edge", "active", "algorithm"],
-      "semanticRoles": ["graph_edge", "active_edge"],
-      "sourceId": "metaview-internal",
-      "attribution": "MetaView internal SVG primitive",
-      "license": "internal",
-      "commercialUseStatus": "allowed",
-      "commercialUseAllowed": true,
-      "requiresAttribution": false,
-      "shareAlike": false,
-      "modificationAllowed": true,
-      "sourceUrl": null,
-      "licenseUrl": null,
-      "modifiedFrom": null,
-      "rendererHints": {
-        "preferredRenderer": "graph_scene",
-        "defaultSize": [120, 28],
-        "anchor": "center",
-        "colorizable": true,
-        "strokeControlled": true
       }
     },
     {
       "id": "bfs-graph-preset",
       "type": "json",
       "path": "/assets/metaview-kits/algorithm-code-basic/graph/bfs-graph-preset.json",
-      "tags": ["bfs", "graph", "queue", "structured_preset"],
-      "semanticRoles": ["bfs", "graph", "graph_scene"],
+      "tags": [
+        "bfs",
+        "graph",
+        "queue",
+        "structured_preset"
+      ],
+      "semanticRoles": [
+        "bfs",
+        "graph",
+        "graph_scene"
+      ],
       "sourceId": "metaview-internal",
       "attribution": "MetaView internal structured algorithm preset",
       "license": "internal",
@@ -213,118 +162,31 @@
       "modifiedFrom": null,
       "rendererHints": {
         "preferredRenderer": "graph_scene",
-        "defaultSize": [640, 360],
+        "defaultSize": [
+          640,
+          360
+        ],
         "anchor": "center",
         "colorizable": true,
         "strokeControlled": true
       }
     },
     {
-      "id": "call-frame",
-      "type": "svg",
-      "path": "/assets/metaview-kits/algorithm-code-basic/code/call-frame.svg",
-      "tags": ["recursion", "call-stack", "frame", "active", "algorithm"],
-      "semanticRoles": ["call_frame", "active_frame", "call_stack"],
-      "sourceId": "metaview-internal",
-      "attribution": "MetaView internal SVG primitive",
-      "license": "internal",
-      "commercialUseStatus": "allowed",
-      "commercialUseAllowed": true,
-      "requiresAttribution": false,
-      "shareAlike": false,
-      "modificationAllowed": true,
-      "sourceUrl": null,
-      "licenseUrl": null,
-      "modifiedFrom": null,
-      "rendererHints": {
-        "preferredRenderer": "call_stack_scene",
-        "defaultSize": [250, 64],
-        "anchor": "center",
-        "colorizable": false,
-        "strokeControlled": false
-      }
-    },
-    {
-      "id": "stack-frame",
-      "type": "svg",
-      "path": "/assets/metaview-kits/algorithm-code-basic/code/stack-frame.svg",
-      "tags": ["recursion", "call-stack", "frame", "waiting", "algorithm"],
-      "semanticRoles": ["stack_frame", "waiting_frame", "call_stack"],
-      "sourceId": "metaview-internal",
-      "attribution": "MetaView internal SVG primitive",
-      "license": "internal",
-      "commercialUseStatus": "allowed",
-      "commercialUseAllowed": true,
-      "requiresAttribution": false,
-      "shareAlike": false,
-      "modificationAllowed": true,
-      "sourceUrl": null,
-      "licenseUrl": null,
-      "modifiedFrom": null,
-      "rendererHints": {
-        "preferredRenderer": "call_stack_scene",
-        "defaultSize": [250, 64],
-        "anchor": "center",
-        "colorizable": false,
-        "strokeControlled": false
-      }
-    },
-    {
-      "id": "active-line",
-      "type": "svg",
-      "path": "/assets/metaview-kits/algorithm-code-basic/code/active-line.svg",
-      "tags": ["code", "trace", "active-line", "algorithm"],
-      "semanticRoles": ["active_line", "active_code_line", "code_trace"],
-      "sourceId": "metaview-internal",
-      "attribution": "MetaView internal SVG primitive",
-      "license": "internal",
-      "commercialUseStatus": "allowed",
-      "commercialUseAllowed": true,
-      "requiresAttribution": false,
-      "shareAlike": false,
-      "modificationAllowed": true,
-      "sourceUrl": null,
-      "licenseUrl": null,
-      "modifiedFrom": null,
-      "rendererHints": {
-        "preferredRenderer": "code_trace_scene",
-        "defaultSize": [420, 30],
-        "anchor": "topLeft",
-        "colorizable": false,
-        "strokeControlled": false
-      }
-    },
-    {
-      "id": "pointer-marker",
-      "type": "svg",
-      "path": "/assets/metaview-kits/algorithm-code-basic/code/pointer-marker.svg",
-      "tags": ["code", "trace", "pointer", "index", "algorithm"],
-      "semanticRoles": ["pointer", "active_pointer", "index_pointer"],
-      "sourceId": "metaview-internal",
-      "attribution": "MetaView internal SVG primitive",
-      "license": "internal",
-      "commercialUseStatus": "allowed",
-      "commercialUseAllowed": true,
-      "requiresAttribution": false,
-      "shareAlike": false,
-      "modificationAllowed": true,
-      "sourceUrl": null,
-      "licenseUrl": null,
-      "modifiedFrom": null,
-      "rendererHints": {
-        "preferredRenderer": "code_trace_scene",
-        "defaultSize": [36, 32],
-        "anchor": "center",
-        "colorizable": false,
-        "strokeControlled": false
-      }
-    },
-    {
       "id": "binary-search-trace-preset",
       "type": "json",
       "path": "/assets/metaview-kits/algorithm-code-basic/code/binary-search-trace-preset.json",
-      "tags": ["binary-search", "code", "trace", "structured_preset", "algorithm"],
-      "semanticRoles": ["binary_search", "code_trace_scene", "code_trace"],
+      "tags": [
+        "binary-search",
+        "code",
+        "trace",
+        "structured_preset",
+        "algorithm"
+      ],
+      "semanticRoles": [
+        "binary_search",
+        "code_trace_scene",
+        "code_trace"
+      ],
       "sourceId": "metaview-internal",
       "attribution": "MetaView internal structured algorithm preset",
       "license": "internal",
@@ -338,7 +200,10 @@
       "modifiedFrom": null,
       "rendererHints": {
         "preferredRenderer": "code_trace_scene",
-        "defaultSize": [640, 360],
+        "defaultSize": [
+          640,
+          360
+        ],
         "anchor": "center",
         "colorizable": true,
         "strokeControlled": true
@@ -348,8 +213,17 @@
       "id": "recursion-stack-preset",
       "type": "json",
       "path": "/assets/metaview-kits/algorithm-code-basic/code/recursion-stack-preset.json",
-      "tags": ["recursion", "call-stack", "structured_preset", "algorithm"],
-      "semanticRoles": ["recursion_stack", "call_stack_scene", "stack_trace"],
+      "tags": [
+        "recursion",
+        "call-stack",
+        "structured_preset",
+        "algorithm"
+      ],
+      "semanticRoles": [
+        "recursion_stack",
+        "call_stack_scene",
+        "stack_trace"
+      ],
       "sourceId": "metaview-internal",
       "attribution": "MetaView internal structured algorithm preset",
       "license": "internal",
@@ -363,11 +237,15 @@
       "modifiedFrom": null,
       "rendererHints": {
         "preferredRenderer": "call_stack_scene",
-        "defaultSize": [640, 360],
+        "defaultSize": [
+          640,
+          360
+        ],
         "anchor": "center",
         "colorizable": true,
         "strokeControlled": true
       }
     }
-  ]
+  ],
+  "defaultTeachingUse": "formal"
 }

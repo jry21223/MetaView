@@ -13,6 +13,45 @@ from app.domain.services.algorithm_code_library import get_by_id
 from app.domain.services.physics_layout_compiler import compile_physics_force_snapshot
 from app.domain.services.playbook_quality import estimate_step_frames
 
+_RETIRED_TEACHING_ASSET_IDS = {
+    "active-line",
+    "call-frame",
+    "stack-frame",
+    "pointer-marker",
+    "graph-node",
+    "queue-frame",
+    "visited-node",
+    "edge-active",
+    "projectile-body-dot",
+    "force-vector-arrow",
+    "monsoon-wind-arrow",
+    "atom-core",
+    "bond-line",
+    "reaction-arrow",
+    "electron-flow",
+    "core-flow-arrow",
+    "core-timeline-arrow",
+    "core-light-lab-grid",
+    "core-formula-tag",
+    "core-callout-label",
+}
+
+
+def _strip_retired_teaching_assets(value: Any) -> None:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            is_retired_asset = (
+                key in {"asset_id", "assetId", "active_line_asset_id"}
+                and item in _RETIRED_TEACHING_ASSET_IDS
+            )
+            if is_retired_asset:
+                value[key] = None
+            else:
+                _strip_retired_teaching_assets(item)
+    elif isinstance(value, list):
+        for item in value:
+            _strip_retired_teaching_assets(item)
+
 
 def normalize_generated_playbook(
     playbook: PlaybookScript,
@@ -102,6 +141,7 @@ def normalize_generated_playbook(
         for layer in layers[1:]:
             if isinstance(layer, dict):
                 _apply_snapshot_defaults(layer.get("body"), requested_scenes)
+        _strip_retired_teaching_assets(step)
 
     if payload.get("steps"):
         payload["total_frames"] = cursor
@@ -139,7 +179,6 @@ def _horizontal_projectile_snapshot(step_index: int, step_count: int) -> dict[st
                 "x": x,
                 "y": y,
                 "radius": 3.2,
-                "assetId": "projectile-body-dot",
             },
             "vectors": [
                 {
@@ -223,7 +262,6 @@ def _factorial_recursion_snapshot(
                 "label": f"factorial({value})",
                 "depth": depth,
                 "state": state,
-                "asset_id": "call-frame" if depth == 0 else "stack-frame",
                 "variables": variables,
             }
         )
@@ -254,7 +292,6 @@ def _factorial_recursion_snapshot(
             ],
             "active_lines": [2 if current_n == 1 else 3],
             "active_line": 2 if current_n == 1 else 3,
-            "asset_id": "active-line",
         },
         "current_frame_id": f"factorial-{current_n}",
         "caption": caption,
@@ -326,13 +363,11 @@ def _apply_snapshot_defaults(
         )
         code_trace = snapshot.get("code_trace")
         if isinstance(code_trace, dict):
-            code_trace["asset_id"] = code_trace.get("asset_id") or "active-line"
+            code_trace["asset_id"] = code_trace.get("asset_id")
         return "recursion_stack"
     if kind == "code_trace_scene":
         snapshot["pack_id"] = snapshot.get("pack_id") or "algorithm-code-basic"
-        snapshot["active_line_asset_id"] = (
-            snapshot.get("active_line_asset_id") or "active-line"
-        )
+        snapshot["active_line_asset_id"] = snapshot.get("active_line_asset_id")
         return None
     if (
         kind == "physics_force_scene"
@@ -340,19 +375,14 @@ def _apply_snapshot_defaults(
         and snapshot.get("trajectory")
     ):
         snapshot["pack_id"] = snapshot.get("pack_id") or "physics-basic"
-        projectile_id = _projectile_subject_id(snapshot)
-        for item in snapshot.get("objects") or []:
-            if isinstance(item, dict) and item.get("id") == projectile_id:
-                item["asset_id"] = item.get("asset_id") or "projectile-body-dot"
         return "projectile_motion"
     return None
 
 
 def _normalize_call_stack(snapshot: dict[str, Any], *, factorial: bool) -> None:
     frames = [frame for frame in snapshot.get("frames") or [] if isinstance(frame, dict)]
-    for index, frame in enumerate(frames):
-        depth = frame.get("depth")
-        frame["asset_id"] = "call-frame" if depth == 0 or index == 0 else "stack-frame"
+    for frame in frames:
+        frame["asset_id"] = None
         variables = frame.setdefault("variables", {})
         if not isinstance(variables, dict):
             variables = {}
@@ -413,41 +443,15 @@ def _is_return_value_key(key: Any) -> bool:
 
 
 def _normalize_bfs_assets(snapshot: dict[str, Any]) -> None:
-    current = str(
-        snapshot.get("current_node_id")
-        or next(iter(snapshot.get("active_node_ids") or []), "")
-    )
-    queue = {
-        str(node_id)
-        for node_id in [
-            *(snapshot.get("queue_node_ids") or []),
-            *(snapshot.get("frontier_node_ids") or []),
-        ]
-    }
-    visited = {str(node_id) for node_id in snapshot.get("visited_node_ids") or []}
     for node in snapshot.get("nodes") or []:
         if not isinstance(node, dict) or node.get("id") is None:
             continue
-        node_id = str(node["id"])
-        if node_id in queue:
-            node["asset_id"] = "queue-frame"
-        elif node_id in visited and node_id != current:
-            node["asset_id"] = "visited-node"
-        else:
-            node["asset_id"] = "graph-node"
+        node.pop("asset_id", None)
 
-    active_edges = {str(edge_id) for edge_id in snapshot.get("active_edge_ids") or []}
     for edge in snapshot.get("edges") or []:
         if not isinstance(edge, dict):
             continue
-        source = str(edge.get("source") or "")
-        target = str(edge.get("target") or "")
-        aliases = {
-            str(edge.get("id") or ""),
-            f"{source}-{target}",
-            f"{source}->{target}",
-        }
-        edge["asset_id"] = "edge-active" if active_edges & aliases else None
+        edge["asset_id"] = None
 
 
 def _is_derivative_tangent(snapshot: dict[str, Any]) -> bool:
@@ -548,32 +552,3 @@ def _synchronize_code_highlight(
     if not isinstance(existing, dict):
         return canonical
     return {**existing, **canonical}
-
-
-def _projectile_subject_id(snapshot: dict[str, Any]) -> str | None:
-    objects = [item for item in snapshot.get("objects") or [] if isinstance(item, dict)]
-    object_ids = {str(item.get("id")) for item in objects if item.get("id") is not None}
-    velocity_targets = {
-        str(vector.get("target"))
-        for vector in snapshot.get("vectors") or []
-        if isinstance(vector, dict)
-        and "velocity" in str(vector.get("semantic_role") or "").casefold()
-        and str(vector.get("target")) in object_ids
-    }
-    if len(velocity_targets) == 1:
-        return next(iter(velocity_targets))
-
-    named_candidates = [
-        str(item["id"])
-        for item in objects
-        if item.get("id") is not None
-        and any(
-            alias in f"{item.get('id', '')} {item.get('label', '')}".casefold()
-            for alias in ("projectile", "ball", "小球", "物体")
-        )
-    ]
-    if len(named_candidates) == 1:
-        return named_candidates[0]
-    if len(objects) == 1 and objects[0].get("id") is not None:
-        return str(objects[0]["id"])
-    return None

@@ -19,7 +19,7 @@ export interface MetaViewPromptResult {
 }
 
 function suggestedManifestUri(subject: SubjectVisualKitSubject | undefined): string {
-  if (subject === "geography") return "metaview://kits/geography-basic/manifest";
+  if (subject === "geography") return "metaview://kits/geography-earth-basic/manifest";
   if (subject === "physics") return "metaview://kits/physics-basic/manifest";
   return "metaview://subjects";
 }

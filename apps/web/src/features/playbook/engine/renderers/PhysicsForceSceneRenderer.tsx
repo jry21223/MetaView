@@ -1,14 +1,9 @@
 import React from "react";
 
-import { AssetSvg } from "../assets/AssetSvg";
-import type { AssetManifestEntry } from "../assets/assetRegistry";
-import { resolveAssetById, resolveAssetByRole, resolveAssetForRenderer } from "../assets/assetResolver";
 import type { PhysicsForceSceneSnapshot, PhysicsSceneObject, PhysicsSceneVector } from "../types";
 import { CoreFormulaTag } from "./CoreFormulaTag";
 import { CoreLabGrid } from "./CoreLabGrid";
 import type { RendererProps } from "./types";
-
-const DEFAULT_PHYSICS_PACK_ID = "physics-basic";
 
 function objectById(objects: PhysicsSceneObject[], id: string): PhysicsSceneObject | undefined {
   return objects.find((object) => object.id === id);
@@ -42,37 +37,6 @@ function compactFormula(formula: string | null | undefined): string {
     .replace(/[{}]/g, "");
 }
 
-function resolveObjectAsset(object: PhysicsSceneObject, packId: string | undefined): AssetManifestEntry | undefined {
-  if (object.asset_id) {
-    return resolveAssetById(packId, object.asset_id);
-  }
-  return (
-    resolveAssetForRenderer("physics_force_scene", "object", packId) ??
-    resolveAssetByRole("physics", "object", packId) ??
-    resolveAssetByRole("physics", "object")
-  );
-}
-
-function isVectorAsset(asset: AssetManifestEntry | undefined): asset is AssetManifestEntry {
-  return Boolean(asset?.tags.includes("arrow"));
-}
-
-function resolveVectorAsset(vector: PhysicsSceneVector, packId: string | undefined): AssetManifestEntry | undefined {
-  const roleAsset =
-    resolveAssetForRenderer("physics_force_scene", vector.semantic_role, packId) ??
-    resolveAssetByRole("physics", vector.semantic_role, packId) ??
-    resolveAssetByRole("physics", vector.semantic_role);
-  if (isVectorAsset(roleAsset)) return roleAsset;
-  if (vector.semantic_role === "force") {
-    const forceAsset =
-      resolveAssetForRenderer("physics_force_scene", "force", packId) ??
-      resolveAssetByRole("physics", "force", packId) ??
-      resolveAssetByRole("physics", "force");
-    if (isVectorAsset(forceAsset)) return forceAsset;
-  }
-  return undefined;
-}
-
 function motionTrailDots(
   points: Array<[number, number]> | undefined,
   progress: number,
@@ -95,38 +59,19 @@ function renderVector(
   vector: PhysicsSceneVector,
   target: PhysicsSceneObject | undefined,
   progress: number,
-  packId: string | undefined,
 ) {
   if (!target) return null;
   const p = Math.max(0, Math.min(1, progress));
   const endX = target.x + vector.dx * p;
   const endY = target.y + vector.dy * p;
   const color = vectorColor(vector.semantic_role);
-  const vectorAsset = resolveVectorAsset(vector, packId);
   const component = vectorComponent(vector);
-  const length = Math.max(8, Math.hypot(endX - target.x, endY - target.y));
-  const angle = (Math.atan2(endY - target.y, endX - target.x) * 180) / Math.PI;
   const labelX = component === "vertical" ? target.x - 2.2 : (target.x + endX) / 2;
   const labelY = component === "horizontal" ? target.y - 2.6 : (target.y + endY) / 2;
   const magnitudeX = component === "vertical" ? endX + 2.4 : endX + 1.8;
   const magnitudeY = component === "horizontal" ? endY + 3.4 : endY + (endY < target.y ? -1.8 : 3.6);
   return (
     <g key={vector.id} data-semantic-role={vector.semantic_role} data-vector-component={component}>
-      {vectorAsset ? (
-        <AssetSvg
-          asset={vectorAsset}
-          packId={packId}
-          subject="physics"
-          semanticRole={vector.semantic_role}
-          x={target.x}
-          y={target.y - 3.2}
-          width={length}
-          height={6.4}
-          preserveAspectRatio="none"
-          opacity="0.24"
-          transform={`rotate(${angle} ${target.x} ${target.y})`}
-        />
-      ) : null}
       <line
         x1={target.x}
         y1={target.y}
@@ -158,7 +103,6 @@ function renderVector(
 
 export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({ step, progress, theme }) => {
   const snap = step.snapshot as PhysicsForceSceneSnapshot;
-  const packId = snap.pack_id ?? DEFAULT_PHYSICS_PACK_ID;
   const formulaText = compactFormula(snap.formula_latex);
   const trailDots = motionTrailDots(snap.trajectory, progress);
 
@@ -245,24 +189,19 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({ step, progr
         ) : null}
 
         {snap.objects.map((object) => {
-          const asset = resolveObjectAsset(object, packId);
           const radius = object.radius ?? 4.6;
           return (
-            <g key={object.id} data-object-id={object.id}>
-              <AssetSvg
-                asset={asset}
-                assetId={object.asset_id ?? asset?.id}
-                packId={packId}
-                subject="physics"
-                semanticRole="object"
-                x={object.x - radius}
-                y={object.y - radius}
-                width={radius * 2}
-                height={radius * 2}
-                fallbackShape="circle"
+            <g key={object.id} data-object-id={object.id} data-semantic-role="object">
+              <circle
+                cx={object.x}
+                cy={object.y}
+                r={radius}
+                fill={theme === "dark" ? "#dbe7d5" : "#82976f"}
+                stroke={theme === "dark" ? "#9fb48d" : "#53654a"}
+                strokeWidth="0.9"
               />
               {object.label ? (
-                <text x={object.x} y={object.y - 7} textAnchor="middle" fontSize="3.8" fontWeight="700" fill="#345995">
+                <text x={object.x} y={object.y - radius - 2.2} textAnchor="middle" fontSize="3.4" fontWeight="700" fill="#53654a">
                   {object.label}
                 </text>
               ) : null}
@@ -270,7 +209,7 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({ step, progr
           );
         })}
 
-        {snap.vectors.map((vector) => renderVector(vector, objectById(snap.objects, vector.target), progress, packId))}
+        {snap.vectors.map((vector) => renderVector(vector, objectById(snap.objects, vector.target), progress))}
 
         {snap.caption ? (
           <text x="50" y="94" textAnchor="middle" fontSize="3.8" fill={theme === "dark" ? "#cbd5e1" : "#64748b"}>

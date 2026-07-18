@@ -102,13 +102,8 @@ def test_scene_blueprint_compiler_builds_asset_backed_playbook(
 def test_scene_blueprint_compiler_preserves_flagship_asset_markers() -> None:
     cases = {
         "east_asia_monsoon": ("layers", "asset_id", "east-asia-land-110m"),
-        "projectile_motion": ("objects", "asset_id", "projectile-body-dot"),
         "cell_structure": ("structures", "asset_id", "nucleus"),
         "dna_replication": ("steps", "asset_id", "replication-fork"),
-        "molecule_2d_water": ("atoms", "asset_id", "atom-core"),
-        "molecule_2d_methane": ("atoms", "asset_id", "atom-core"),
-        "molecule_2d_glucose": ("atoms", "asset_id", "atom-core"),
-        "reaction_synthesis_water": ("arrows", "asset_id", "reaction-arrow"),
         "derivative_tangent": ("", "asset_id", "derivative-tangent-preset"),
         "bfs_graph": ("", "asset_id", "bfs-graph-preset"),
         "recursion_stack": ("", "asset_id", "recursion-stack-preset"),
@@ -176,7 +171,7 @@ def test_scene_blueprint_compiler_builds_geography_from_structured_layout_input(
             "from": [35.0, 30.0],
             "to": [76.0, 64.0],
             "label": "winter monsoon",
-            "asset_id": "monsoon-wind-arrow",
+            "asset_id": None,
             "strength": 0.8,
         }
     ]
@@ -317,13 +312,29 @@ def test_scene_blueprint_compiler_builds_molecule_from_structured_layout_input()
     assert snapshot["molecule_id"] == "carbon_dioxide"
     assert snapshot["smiles"] == "O=C=O"
     assert snapshot["atoms"] == [
-        {"id": "o1", "element": "O", "x": 30.0, "y": 50.0, "charge": None, "label": "oxygen", "asset_id": "atom-core"},
-        {"id": "c", "element": "C", "x": 50.0, "y": 50.0, "charge": None, "label": "carbon", "asset_id": "atom-core"},
-        {"id": "o2", "element": "O", "x": 70.0, "y": 50.0, "charge": None, "label": "oxygen", "asset_id": "atom-core"},
+        {"id": "o1", "element": "O", "x": 30.0, "y": 50.0, "charge": None, "label": "oxygen", "asset_id": None},
+        {"id": "c", "element": "C", "x": 50.0, "y": 50.0, "charge": None, "label": "carbon", "asset_id": None},
+        {"id": "o2", "element": "O", "x": 70.0, "y": 50.0, "charge": None, "label": "oxygen", "asset_id": None},
     ]
     assert snapshot["bonds"] == [
-        {"id": "o1-c", "from": "o1", "to": "c", "order": 2, "label": None, "asset_id": "bond-line"},
-        {"id": "c-o2", "from": "c", "to": "o2", "order": 2, "label": None, "asset_id": "bond-line"},
+        {
+            "id": "o1-c",
+            "from": "o1",
+            "to": "c",
+            "order": 2,
+            "stereo": None,
+            "label": None,
+            "asset_id": None,
+        },
+        {
+            "id": "c-o2",
+            "from": "c",
+            "to": "o2",
+            "order": 2,
+            "stereo": None,
+            "label": None,
+            "asset_id": None,
+        },
     ]
     assert snapshot["callouts"] == [
         {"id": "linear", "target_id": "c", "label": "linear geometry", "side": "top"},
@@ -361,10 +372,10 @@ def test_scene_blueprint_compiler_hydrates_water_from_molecule_preset() -> None:
         callout.model_dump(mode="json") for callout in preset.callouts
     ]
     assert snapshot["atoms"] == [
-        {**atom.model_dump(mode="json"), "asset_id": "atom-core"} for atom in preset.atoms
+        {**atom.model_dump(mode="json"), "asset_id": None} for atom in preset.atoms
     ]
     assert snapshot["bonds"] == [
-        {**bond.model_dump(mode="json", by_alias=True), "asset_id": "bond-line"}
+        {**bond.model_dump(mode="json", by_alias=True), "asset_id": None}
         for bond in preset.bonds
     ]
 
@@ -398,10 +409,10 @@ def test_scene_blueprint_compiler_hydrates_methane_from_smiles_preset() -> None:
     assert _element_counts(snapshot["atoms"]) == contract["elementCounts"]
     assert len(snapshot["bonds"]) >= contract["minBondCount"]
     assert snapshot["atoms"] == [
-        {**atom.model_dump(mode="json"), "asset_id": "atom-core"} for atom in preset.atoms
+        {**atom.model_dump(mode="json"), "asset_id": None} for atom in preset.atoms
     ]
     assert snapshot["bonds"] == [
-        {**bond.model_dump(mode="json", by_alias=True), "asset_id": "bond-line"}
+        {**bond.model_dump(mode="json", by_alias=True), "asset_id": None}
         for bond in preset.bonds
     ]
 
@@ -433,8 +444,8 @@ def test_scene_blueprint_compiler_builds_glucose_from_rdkit_smiles() -> None:
     assert len(snapshot["atoms"]) == 12
     assert len(snapshot["bonds"]) >= 12
     assert {atom["element"] for atom in snapshot["atoms"]} == {"C", "O"}
-    assert all(atom["asset_id"] == "atom-core" for atom in snapshot["atoms"])
-    assert all(bond["asset_id"] == "bond-line" for bond in snapshot["bonds"])
+    assert all(atom["asset_id"] is None for atom in snapshot["atoms"])
+    assert all(bond["asset_id"] is None for bond in snapshot["bonds"])
 
     verdict = self_check_playbook(playbook, "Explain glucose molecule from SMILES.")
     assert verdict.status == PlaybookReviewStatus.CLEAN
@@ -462,9 +473,7 @@ def test_scene_blueprint_compiler_builds_dna_replication_process_scene() -> None
         "replication-fork",
         "dna-helix",
     ]
-    assert {connection["asset_id"] for connection in snapshot["connections"]} == {
-        "core-flow-arrow"
-    }
+    assert {connection["asset_id"] for connection in snapshot["connections"]} == {None}
     assert snapshot["callouts"][0]["target_id"] == "fork"
     assert "base pairing" in snapshot["callouts"][0]["label"]
 
@@ -490,13 +499,9 @@ def test_scene_blueprint_compiler_builds_recursion_call_stack_scene() -> None:
     assert snapshot["pack_id"] == "algorithm-code-basic"
     assert snapshot["asset_id"] == "recursion-stack-preset"
     assert snapshot["current_frame_id"] == "factorial-4"
-    assert [frame["asset_id"] for frame in snapshot["frames"]] == [
-        "call-frame",
-        "stack-frame",
-        "stack-frame",
-    ]
+    assert [frame["asset_id"] for frame in snapshot["frames"]] == [None, None, None]
     assert snapshot["frames"][0]["variables"] == {"n": "4"}
-    assert snapshot["code_trace"]["asset_id"] == "active-line"
+    assert snapshot["code_trace"]["asset_id"] is None
     assert snapshot["code_trace"]["active_lines"] == [3]
     assert "factorial(n - 1)" in snapshot["code_trace"]["lines"][3]
     assert playbook.steps[0].code_highlight is not None
@@ -571,12 +576,12 @@ def test_scene_blueprint_compiler_builds_binary_search_code_trace_scene() -> Non
     assert snapshot["kind"] == "code_trace_scene"
     assert snapshot["pack_id"] == "algorithm-code-basic"
     assert snapshot["asset_id"] == "binary-search-trace-preset"
-    assert snapshot["active_line_asset_id"] == "active-line"
+    assert snapshot["active_line_asset_id"] is None
     assert snapshot["array_values"] == ["2", "4", "7", "11", "18", "25", "31"]
     assert snapshot["active_indices"] == [3]
     assert snapshot["search_range"] == [0, 6]
     assert [pointer["id"] for pointer in snapshot["pointers"]] == ["low", "mid", "high"]
-    assert {pointer["asset_id"] for pointer in snapshot["pointers"]} == {"pointer-marker"}
+    assert {pointer["asset_id"] for pointer in snapshot["pointers"]} == {None}
     assert "binarySearch" in snapshot["lines"][0]
     assert playbook.steps[0].code_highlight is not None
     assert playbook.steps[0].code_highlight.active_line == 2
@@ -644,12 +649,8 @@ def test_scene_blueprint_compiler_builds_water_synthesis_reaction_scene() -> Non
     assert [participant["formula_latex"] for participant in snapshot["products"]] == [
         *contract["productFormulas"],
     ]
-    assert {arrow["asset_id"] for arrow in snapshot["arrows"]} == {
-        contract["arrowAssetId"]
-    }
-    assert {flow["asset_id"] for flow in snapshot["electron_flows"]} == {
-        contract["electronFlowAssetId"]
-    }
+    assert {arrow["asset_id"] for arrow in snapshot["arrows"]} == {None}
+    assert snapshot["electron_flows"] == []
     assert snapshot["formula_latex"] == contract["formulaLatex"]
 
     verdict = self_check_playbook(playbook, "Explain water synthesis.")

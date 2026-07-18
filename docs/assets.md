@@ -10,11 +10,12 @@ Public manifests live under `apps/web/public/assets/metaview-kits/`.
 Each pack follows `manifest.schema.json` and includes:
 
 - `schemaVersion`: currently `1.0.0`.
-- `packId`: stable pack id, for example `geography-basic`.
+- `packId`: stable pack id, for example `geography-earth-basic`.
 - `subject`: one of `math`, `physics`, `chemistry`, `biology`, `geography`, `algorithm`, `code`.
 - `version`: pack version.
 - `license`: pack-level license.
 - `licenseMode`: `single` or `mixed`.
+- `defaultTeachingUse`: one of `formal`, `primitive`, `experimental`, or `ui`.
 - `sources`: source records with `id`, `label`, `license`, nullable `sourceUrl`, nullable `licenseUrl`, and optional `attribution`.
 - `sceneTemplates`: scene template ids that can use this pack.
 - `rendererKinds`: renderer snapshot kinds expected to consume it.
@@ -22,7 +23,7 @@ Each pack follows `manifest.schema.json` and includes:
   `sourceId`, `license`, `commercialUseStatus`, `requiresAttribution`,
   `commercialUseAllowed`, `shareAlike`, `modificationAllowed`, nullable
   `sourceUrl`, nullable `licenseUrl`, nullable `modifiedFrom`, optional
-  `attribution`, and optional `rendererHints`.
+  `attribution`, optional per-asset `teachingUse`, and optional `rendererHints`.
 
 The TypeScript registry is in
 `apps/web/src/features/playbook/engine/assets/assetRegistry.ts`.
@@ -53,7 +54,7 @@ Biology scenes can now accept `structures`, `steps`, `connections`, and
 helpers consume those inputs first, then fall back to deterministic flagship
 defaults when the fields are absent. Chemistry molecule scenes additionally
 hydrate structured JSON presets through `kits/chemistry/moleculePresetResolver.ts`
-before renderer asset ids are applied, so atom/bond/callout data comes from
+before native atom/bond geometry is rendered, so atom/bond/callout data comes from
 either the blueprint or the asset pack rather than a hand-written water molecule
 inside the compiler.
 The backend mirror uses `apps/api/app/domain/services/molecule_preset_resolver.py`
@@ -64,7 +65,7 @@ For larger molecule inputs, the API also exposes
 SMILES strings such as glucose into the same `molecule_2d_scene` atom/bond
 snapshot contract using RDKit 2D coordinates.
 The current supported scene blueprints are `east_asia_monsoon`,
-`projectile_motion`, `cell_structure`, `cell_structure_custom`,
+`projectile_motion`, `cell_structure`,
 `dna_replication`, `molecule_2d_water`, `molecule_2d_methane`,
 `molecule_2d_glucose`, `carbon_dioxide_molecule`,
 `reaction_synthesis_water`, `derivative_tangent`, `cubic_tangent`,
@@ -94,43 +95,34 @@ Current backend SkillPack adoption:
 
 ## Starter Packs
 
-- `geography-basic`: starter map-layer SVG plus internal monsoon wind SVG.
-- `core-visual-basic`: internal shared arrows, labels, icons, particle presets,
-  and grid backgrounds for renderer adapters across subjects. Shared callouts
-  render through the core callout adapter, so biology and chemistry scenes
-  consume `core-callout-label` instead of drawing independent label boxes in
-  each renderer. Shared formula cards render through `core-formula-tag` in
-  physics and chemistry renderers instead of hand-drawn per-renderer formula
-  boxes. Shared light lab backgrounds render through `core-light-lab-grid` in
-  physics, biology, and chemistry scenes so subject renderers no longer carry
-  separate hand-drawn grid paths for the main teaching surface.
+- `core-visual-basic`: experimental particle presets only. Teaching callouts,
+  formula cards, grids, timeline arrows, and warning symbols use native renderer
+  geometry rather than decorative SVG assets.
 - `geography-earth-basic`: Natural Earth-derived East Asia map GeoJSON and map
-  symbols for `geo_map_scene`. The SceneBlueprint path routes map layers,
-  flow arrows, pressure centers, and particle presets through a geography layout
+  layers for `geo_map_scene`. The SceneBlueprint path routes map layers,
+  native flow arrows, pressure centers, and optional particle presets through a geography layout
   compiler so custom flow/pressure input compiles into renderer snapshots.
-- `physics-basic`: internal SVGs for force vector, projectile object, block,
-  ramp, spring, and pulley roles. Projectile/object placement, vectors,
+- `physics-basic`: reusable block, ramp, spring, and pulley primitives.
+  Projectile/object placement, native vectors,
   trajectories, and formulas now route through a physics layout compiler.
 - `biology-basic`: internal organelle and DNA process SVGs for `bio_cell_scene`
   and `bio_process_scene`. The SceneBlueprint path routes custom cell
   structures, process steps, connections, and callouts through a biology layout
   compiler before emitting renderer snapshots.
-- `chemistry-basic`: internal atom/bond SVGs, reaction arrows, electron-flow
-  SVGs, SMILES-addressable structured molecule presets, and a glucose SMILES
+- `chemistry-basic`: SMILES-addressable structured molecule presets and a glucose SMILES
   fixture for API RDKit compilation into `molecule_2d_scene` and
   `reaction_scene`. The SceneBlueprint path routes custom atom/bond layouts and
-  reaction participants through chemistry layout compilers while preserving
+  reaction participants through chemistry layout compilers and native geometry while preserving
   preset/RDKit fallbacks.
 - `math-basic`: structured plot presets for math plot/formula scenes. The
   SceneBlueprint path routes custom curve expressions, numeric params, plot
   bounds, markers, shaded regions, and labels through a math layout compiler.
-- `algorithm-code-basic`: internal graph node, queue, visited, active-edge,
-  active-line, and pointer SVGs plus BFS graph, recursion-stack, and
+- `algorithm-code-basic`: BFS graph, recursion-stack, and
   binary-search presets for `graph_scene`, `call_stack_scene`, and
   `code_trace_scene`. The deterministic
   `algorithm_graph_core` SkillPack emits runtime `graph_scene` snapshots with
-  `pack_id`, `asset_id`, queue-node, visited-node, and active-edge asset refs so
-  generated BFS playbooks use the same assets as the showcase fixture.
+  `pack_id`, `asset_id`, queue-node, visited-node, and active-edge state so
+  generated BFS playbooks use the same native geometry as the showcase fixture.
   The SceneBlueprint path now routes BFS graph and binary-search code traces
   through small layout compilers, so structured blueprint input such as custom
   graph nodes or binary-search arrays is compiled into deterministic renderer
@@ -169,7 +161,7 @@ Phase 1 acceptance evidence:
   tests cover missing asset resolution, forbidden array fallback, asset policy
   warnings, and clean flagship fixtures.
 - `subjectVisualShowcase.ts` is the durable self-test matrix. It currently
-  covers 15 flagship fixtures across geography, physics, biology, chemistry,
+  covers 14 flagship fixtures across geography, physics, biology, chemistry,
   math, and algorithm, with required static markers and per-fixture screenshot
   quality thresholds.
 - `showcase:baseline` writes a golden-review queue for the generated PNGs:
@@ -180,7 +172,7 @@ Phase 1 acceptance evidence:
   seeing which scene asset contracts were matched. The baseline report also
   exposes `contractOk` and `contractIssues`; release readiness and approved
   reference stamping fail when any fixture is missing a required contract asset.
-  In the current matrix, all 15 showcase fixtures expose matched contract
+  In the current matrix, all 14 showcase fixtures expose matched contract
   coverage when their renderer consumes the required assets.
 
 Before treating this phase as closed in a release or branch handoff, run:
@@ -233,16 +225,15 @@ snapshot catalog.
 
 | Fixture | Domain | Asset pack | Renderer | Quality target |
 | --- | --- | --- | --- | --- |
-| `east_asia_monsoon` | geography | `geography-earth-basic` | `geo_map_scene` | Natural Earth map layer, monsoon flow asset, pressure centers |
-| `projectile_motion` | physics | `physics-basic` | `physics_force_scene` | projectile asset, vector asset, trajectory, motion trail |
+| `east_asia_monsoon` | geography | `geography-earth-basic` | `geo_map_scene` | Natural Earth land/coastline layers, native monsoon flow, pressure centers |
+| `projectile_motion` | physics | `physics-basic` | `physics_force_scene` | native projectile/vector geometry, trajectory, motion trail |
 | `cell_structure` | biology | `biology-basic` | `bio_cell_scene` | cell, nucleus, mitochondrion assets plus callouts |
-| `cell_structure_custom` | biology | `biology-basic` | `bio_cell_scene` | structured cell positions and external callout input |
-| `dna_replication` | biology | `biology-basic` | `bio_process_scene` | DNA helix, replication fork, core flow arrow, process callout |
+| `dna_replication` | biology | `biology-basic` | `bio_process_scene` | DNA helix, replication fork, native flow arrow, process callout |
 | `molecule_2d_water` | chemistry | `chemistry-basic` | `molecule_2d_scene` | structured atoms/bonds and molecule preset |
 | `molecule_2d_methane` | chemistry | `chemistry-basic` | `molecule_2d_scene` | SMILES C, structured atoms/bonds, tetrahedral callout |
 | `molecule_2d_glucose` | chemistry | `chemistry-basic` | `molecule_2d_scene` | glucose SMILES asset, structured ring layout, C6H12O6 formula |
 | `carbon_dioxide_molecule` | chemistry | `chemistry-basic` | `molecule_2d_scene` | structured atom/bond input, double bonds, CO2 formula |
-| `reaction_synthesis_water` | chemistry | `chemistry-basic` | `reaction_scene` | reactants/products plus reaction arrow and electron-flow assets |
+| `reaction_synthesis_water` | chemistry | `chemistry-basic` | `reaction_scene` | reactants/products plus native reaction geometry |
 | `derivative_tangent` | math | `math-basic` | `math_plot` | formula plus curve/tangent plot markers |
 | `cubic_tangent` | math | `math-basic` | `math_plot` | structured curve expressions, plot bounds, marker, shaded region |
 | `bfs_graph` | algorithm | `algorithm-code-basic` | `graph_scene` | graph node, queue, active-edge assets plus code track |

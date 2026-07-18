@@ -18,6 +18,7 @@ interface RawMoleculePresetBond {
   from: string;
   to: string;
   order: 1 | 2 | 3;
+  stereo?: "wedge" | "dash" | null;
   label?: string | null;
 }
 
@@ -91,6 +92,7 @@ export function resolveMoleculePresetForRenderer(
       from: bond.from,
       to: bond.to,
       order: bond.order,
+      stereo: bond.stereo,
       label: bond.label,
     })),
     callouts: rawPreset.callouts ?? [],

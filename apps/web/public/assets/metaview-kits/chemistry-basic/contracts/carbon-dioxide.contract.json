@@ -4,11 +4,11 @@
   "sceneTemplate": "carbon_dioxide",
   "rendererKind": "molecule_2d_scene",
   "packId": "chemistry-basic",
-  "requiredAssetIds": ["atom-core", "bond-line"],
+  "requiredAssetIds": [],
   "requiredElementCounts": {
     "C": 1,
     "O": 2
   },
   "requiredBondOrders": [2],
-  "caption": "Carbon dioxide must render structured atoms and double bonds using chemistry atom and bond assets."
+  "caption": "Carbon dioxide must render structured atoms and native double-bond geometry."
 }

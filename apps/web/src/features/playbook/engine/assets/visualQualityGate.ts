@@ -1,6 +1,8 @@
 import {
   findAssetById as findRegisteredAssetById,
   findAssetByRole as findRegisteredAssetByRole,
+  getAssetPack,
+  getAssetTeachingUse,
   type AssetManifestEntry,
   type SubjectVisualKitSubject,
 } from "./assetRegistry";
@@ -35,6 +37,7 @@ export type VisualQualityWarningCode =
   | "asset_commercial_use_restricted"
   | "asset_share_alike"
   | "asset_unknown_license"
+  | "asset_not_approved_for_teaching"
   | "low_biology_structure_assets"
   | "low_biology_process_assets"
   | "low_chemistry_structure_data"
@@ -145,6 +148,18 @@ function checkAssetPolicy(
     sourceUrl: asset.sourceUrl,
     licenseUrl: asset.licenseUrl,
   };
+
+  const registeredPack = packId ? getAssetPack(packId) : undefined;
+  if (asset.teachingUse || registeredPack) {
+    const teachingUse = getAssetTeachingUse(asset, packId);
+    if (teachingUse === "experimental" || teachingUse === "ui") {
+      warn(warnings, context, {
+        ...warningBase,
+        code: "asset_not_approved_for_teaching",
+        message: `Asset "${asset.id}" is classified as ${teachingUse} and is not approved for formal teaching scenes.`,
+      });
+    }
+  }
 
   if (!isKnownAssetLicense(asset.license)) {
     warn(warnings, context, {
@@ -798,17 +813,14 @@ function checkReactionScene(
   snapshot: ReactionSceneSnapshot,
 ) {
   const hasParticipants = snapshot.reactants.length > 0 && snapshot.products.length > 0;
-  const hasReactionAsset = [...snapshot.arrows, ...(snapshot.electron_flows ?? [])].some((item) => {
-    if (item.asset_id) return Boolean(resolveAsset(context, item.asset_id, snapshot.pack_id));
-    return Boolean(context.assets.findAssetByRole("chemistry", item.semantic_role, snapshot.pack_id));
-  });
+  const hasReactionGeometry = snapshot.arrows.length > 0;
 
-  if (!hasParticipants || !hasReactionAsset) {
+  if (!hasParticipants || !hasReactionGeometry) {
     warn(warnings, context, {
       code: "low_chemistry_reaction_assets",
       domain: context.domain,
       pack_id: snapshot.pack_id,
-      message: "reaction_scene should include reactants, products, and at least one resolvable reaction asset.",
+      message: "reaction_scene should include reactants, products, and at least one reaction arrow.",
     });
   }
 

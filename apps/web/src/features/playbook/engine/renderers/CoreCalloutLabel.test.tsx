@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { CoreCalloutLabel } from "./CoreCalloutLabel";
 
 describe("CoreCalloutLabel", () => {
-  it("masks decorative callout strokes behind label text", () => {
+  it("renders a native callout leader and label", () => {
     const markup = renderToStaticMarkup(
       <svg>
         <CoreCalloutLabel
@@ -17,7 +17,8 @@ describe("CoreCalloutLabel", () => {
       </svg>,
     );
 
-    expect(markup).toContain('data-callout-text-mask="true"');
+    expect(markup).toContain('data-semantic-role="callout"');
+    expect(markup).toContain('data-target-id="nucleus"');
     expect(markup).toContain(">stores DNA</text>");
   });
 });

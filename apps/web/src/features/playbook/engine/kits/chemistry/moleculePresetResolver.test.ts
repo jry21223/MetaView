@@ -18,13 +18,13 @@ describe("moleculePresetResolver", () => {
       caption: "Water is a bent polar molecule loaded from the chemistry-basic structured preset.",
     });
     expect(preset?.atoms).toEqual([
-      { id: "o", element: "O", x: 50, y: 42, label: "oxygen" },
-      { id: "h1", element: "H", x: 35, y: 62, label: "hydrogen" },
-      { id: "h2", element: "H", x: 65, y: 62, label: "hydrogen" },
+      { id: "o", element: "O", x: 50, y: 42, label: "oxygen", charge: undefined },
+      { id: "h1", element: "H", x: 30.2, y: 57.3, label: "hydrogen", charge: undefined },
+      { id: "h2", element: "H", x: 69.8, y: 57.3, label: "hydrogen", charge: undefined },
     ]);
     expect(preset?.bonds).toEqual([
-      { id: "oh1", from: "o", to: "h1", order: 1, label: "O-H bond" },
-      { id: "oh2", from: "o", to: "h2", order: 1, label: "O-H bond" },
+      { id: "oh1", from: "o", to: "h1", order: 1, label: "O-H bond", stereo: undefined },
+      { id: "oh2", from: "o", to: "h2", order: 1, label: "O-H bond", stereo: undefined },
     ]);
     expect(preset?.callouts).toEqual([
       { id: "water-bent-geometry", target_id: "o", label: "bent geometry", side: "top" },

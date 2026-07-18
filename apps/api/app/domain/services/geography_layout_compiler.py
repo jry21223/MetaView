@@ -116,6 +116,7 @@ def compile_geo_map_snapshot(blueprint: dict[str, Any]) -> GeoMapSceneSnapshot:
     map_asset_id = _asset_id_for_renderer(pack_id, "map_layer", ["land"])
     land_asset_id = _asset_id_for_renderer(pack_id, "land", ["map_layer"])
     ocean_asset_id = _asset_id_for_renderer(pack_id, "ocean")
+    coastline_asset_id = _asset_id_for_renderer(pack_id, "coastline")
     return GeoMapSceneSnapshot(
         pack_id=pack_id,
         map_region=map_region,
@@ -137,6 +138,12 @@ def compile_geo_map_snapshot(blueprint: dict[str, Any]) -> GeoMapSceneSnapshot:
                 semantic_role="ocean",
                 label="western Pacific",
                 asset_id=ocean_asset_id,
+            ),
+            GeoMapLayer(
+                id="coastline",
+                semantic_role="coastline",
+                label="East Asia coastline",
+                asset_id=coastline_asset_id,
             ),
         ],
         flows=_flows(blueprint, pack_id),

@@ -6,6 +6,7 @@ import { getLicenseRule, isKnownAssetLicense } from "./licenseRegistry";
 
 export type AssetAuditIssueCode =
   | "missing_schema_version"
+  | "missing_default_teaching_use"
   | "missing_license_mode"
   | "missing_sources"
   | "unknown_license"
@@ -56,7 +57,6 @@ const REQUIRED_RENDERER_KINDS_BY_PACK: Record<string, string[]> = {
     "algorithm_tree",
     "motion_scene",
   ],
-  "geography-basic": ["geo_map_scene"],
   "geography-earth-basic": ["geo_map_scene"],
   "math-basic": ["math_plot", "math_scene", "math_formula", "katex_overlay"],
   "physics-basic": ["physics_force_scene"],
@@ -174,6 +174,13 @@ function auditPackShape(errors: AssetAuditIssue[], pack: SubjectVisualKit) {
       code: "missing_license_mode",
       packId: pack.packId,
       message: `Asset pack "${pack.packId}" must declare licenseMode.`,
+    });
+  }
+  if (!["formal", "primitive", "experimental", "ui"].includes(pack.defaultTeachingUse)) {
+    pushError(errors, {
+      code: "missing_default_teaching_use",
+      packId: pack.packId,
+      message: `Asset pack "${pack.packId}" must declare a valid defaultTeachingUse.`,
     });
   }
   if (!Array.isArray(pack.sources) || pack.sources.length === 0) {

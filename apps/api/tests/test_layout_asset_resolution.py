@@ -11,7 +11,8 @@ def test_geography_layout_compiler_resolves_assets_through_manifest_resolver(
     resolved: dict[tuple[str, str], dict[str, Any]] = {
         ("geo_map_scene", "map_layer"): {"id": "manifest-map-layer"},
         ("geo_map_scene", "land"): {"id": "manifest-land-layer"},
-        ("geo_map_scene", "ocean"): {"id": "manifest-ocean-layer"},
+            ("geo_map_scene", "ocean"): {"id": "manifest-ocean-layer"},
+            ("geo_map_scene", "coastline"): {"id": "manifest-coastline-layer"},
         ("geo_map_scene", "wind"): {"id": "manifest-wind-arrow"},
     }
 
@@ -49,6 +50,7 @@ def test_geography_layout_compiler_resolves_assets_through_manifest_resolver(
         "manifest-map-layer",
         "manifest-land-layer",
         "manifest-ocean-layer",
+        "manifest-coastline-layer",
     ]
     assert snapshot.flows[0].asset_id == "manifest-wind-arrow"
 

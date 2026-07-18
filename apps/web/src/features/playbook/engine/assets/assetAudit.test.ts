@@ -12,6 +12,7 @@ function basePack(overrides: Partial<SubjectVisualKit> = {}): SubjectVisualKit {
     license: "internal",
     licenseMode: "single",
     defaultLicense: "internal",
+    defaultTeachingUse: "formal",
     sceneTemplates: ["physics_force_scene"],
     rendererKinds: ["physics_force_scene"],
     sources: [
@@ -123,7 +124,7 @@ describe("assetAudit", () => {
   it("fails starter packs whose rendererKinds drift from the dedicated renderer", () => {
     const report = auditAssetPacks([
       basePack({
-        packId: "geography-basic",
+        packId: "geography-earth-basic",
         subject: "geography",
         sceneTemplates: ["geo_map_scene"],
         rendererKinds: ["algorithm_array"],
@@ -134,7 +135,7 @@ describe("assetAudit", () => {
     expect(report.errors).toContainEqual(
       expect.objectContaining({
         code: "renderer_kind_mismatch",
-        packId: "geography-basic",
+        packId: "geography-earth-basic",
       }),
     );
   });

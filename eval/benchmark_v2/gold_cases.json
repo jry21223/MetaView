@@ -99,7 +99,7 @@
       "forbidden_snapshot_kinds": ["algorithm_array", "narration_card"],
       "required_scene_types": ["recursion_stack"],
       "required_semantic_roles": ["stack_frame", "active_frame", "code_line", "return_value"],
-      "required_asset_ids": ["recursion-stack-preset", "active-line"],
+      "required_asset_ids": ["recursion-stack-preset"],
       "required_text_facts": [
         {"id": "factorial", "any_of": ["factorial", "阶乘"]},
         {"id": "base_case", "any_of": ["base case", "基例", "终止条件", "n == 1"]},
@@ -149,7 +149,7 @@
       "forbidden_snapshot_kinds": ["algorithm_array", "narration_card"],
       "required_scene_types": ["projectile_motion"],
       "required_semantic_roles": ["object", "trajectory", "horizontal_velocity", "vertical_velocity", "gravity"],
-      "required_asset_ids": ["projectile-body-dot"],
+      "required_asset_ids": [],
       "required_text_facts": [
         {"id": "parabolic", "any_of": ["parabolic", "parabola", "抛物线"]},
         {"id": "gravity", "any_of": ["gravity", "gravitational", "重力"]},

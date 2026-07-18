@@ -47,14 +47,13 @@ describe("CodeTraceSceneRenderer", () => {
           ],
           active_lines: [2, 3],
           active_line: 2,
-          active_line_asset_id: "active-line",
           array_values: ["2", "4", "7", "11", "18", "25", "31"],
           active_indices: [3],
           search_range: [0, 6],
           pointers: [
-            { id: "low", label: "low", index: 0, asset_id: "pointer-marker" },
-            { id: "mid", label: "mid", index: 3, asset_id: "pointer-marker" },
-            { id: "high", label: "high", index: 6, asset_id: "pointer-marker" },
+            { id: "low", label: "low", index: 0 },
+            { id: "mid", label: "mid", index: 3 },
+            { id: "high", label: "high", index: 6 },
           ],
           variables: { target: "11", low: "0", mid: "3", high: "6" },
           caption: "Binary search checks the middle element before discarding half the range.",
@@ -65,15 +64,12 @@ describe("CodeTraceSceneRenderer", () => {
     expect(markup).toContain("code-trace-scene");
     expect(markup).toContain('data-pack-id="algorithm-code-basic"');
     expect(markup).toContain('data-trace-asset-id="binary-search-trace-preset"');
-    expect(markup).toContain('data-asset-id="core-flow-arrow"');
-    expect(markup).toContain('data-semantic-role="flow_arrow"');
     expect(markup).toContain('data-search-range-flow="0-6"');
-    expect(markup).toContain('data-asset-id="active-line"');
-    expect(markup).toContain('data-asset-id="pointer-marker"');
     expect(markup).toContain('data-code-line-state="active"');
     expect(markup).toContain('data-pointer-id="mid"');
     expect(markup).toContain('data-array-cell-state="active"');
     expect(markup).toContain("binarySearch");
+    expect(markup).not.toContain("pointer-marker");
     expect(markup).not.toContain('data-missing-asset="true"');
   });
 });

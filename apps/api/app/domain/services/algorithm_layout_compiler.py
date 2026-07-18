@@ -157,14 +157,13 @@ def compile_binary_search_code_trace_snapshot(
         lines=binary_search_lines(),
         active_lines=active_lines,
         active_line=2,
-        active_line_asset_id="active-line",
         array_values=values,
         active_indices=[mid],
         search_range=(low, high),
         pointers=[
-            CodeTracePointer(id="low", label="low", index=low, asset_id="pointer-marker"),
-            CodeTracePointer(id="mid", label="mid", index=mid, asset_id="pointer-marker"),
-            CodeTracePointer(id="high", label="high", index=high, asset_id="pointer-marker"),
+            CodeTracePointer(id="low", label="low", index=low),
+            CodeTracePointer(id="mid", label="mid", index=mid),
+            CodeTracePointer(id="high", label="high", index=high),
         ],
         variables={
             "target": target,

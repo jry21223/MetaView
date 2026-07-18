@@ -13,7 +13,7 @@ describe("MetaView MCP core discovery", () => {
         id: "geography",
         support: "partial",
         renderers: expect.arrayContaining(["geo_map_scene"]),
-        assetPacks: expect.arrayContaining(["geography-basic", "geography-earth-basic"]),
+        assetPacks: ["geography-earth-basic"],
         flagshipCases: ["east_asia_monsoon"],
       }),
     );
@@ -36,17 +36,10 @@ describe("MetaView MCP core discovery", () => {
     expect(result.packs).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          packId: "geography-basic",
-          subject: "geography",
-          version: "0.1.0",
-          semanticRoles: expect.arrayContaining(["land", "ocean", "map_layer", "wind"]),
-          resourceUri: "metaview://kits/geography-basic/manifest",
-        }),
-        expect.objectContaining({
           packId: "geography-earth-basic",
           subject: "geography",
           version: "0.1.0",
-          semanticRoles: expect.arrayContaining(["land", "coastline", "country_boundary", "monsoon_flow"]),
+          semanticRoles: expect.arrayContaining(["land", "map_layer", "coastline", "country_boundary"]),
           resourceUri: "metaview://kits/geography-earth-basic/manifest",
         }),
       ]),
@@ -57,30 +50,30 @@ describe("MetaView MCP core discovery", () => {
   it("reads manifests through controlled MCP resource URIs", () => {
     const core = createMetaViewCore();
 
-    const resource = core.readResource("metaview://kits/geography-basic/manifest");
+    const resource = core.readResource("metaview://kits/geography-earth-basic/manifest");
 
     expect(resource.mimeType).toBe("application/json");
     expect(JSON.parse(resource.text)).toEqual(
       expect.objectContaining({
-        packId: "geography-basic",
+        packId: "geography-earth-basic",
         subject: "geography",
         assets: expect.arrayContaining([
           expect.objectContaining({
-            id: "monsoon-wind-arrow",
-            resourceUri: "metaview://assets/geography-basic/monsoon-wind-arrow.svg",
-            license: "internal",
+            id: "east-asia-coastline-110m",
+            resourceUri: "metaview://assets/geography-earth-basic/east-asia-coastline-110m.json",
+            license: "public-domain",
           }),
         ]),
       }),
     );
   });
 
-  it("reads licensed asset resources through controlled MCP URIs", () => {
+  it("reads licensed GeoJSON asset resources through controlled MCP URIs", () => {
     const core = createMetaViewCore();
 
-    const resource = core.readResource("metaview://assets/geography-basic/east-asia-map-placeholder.svg");
+    const resource = core.readResource("metaview://assets/geography-earth-basic/east-asia-coastline-110m.json");
 
-    expect(resource.mimeType).toBe("image/svg+xml");
-    expect(resource.text).toContain('data-source="natural-earth"');
+    expect(resource.mimeType).toBe("text/plain");
+    expect(resource.text).toContain('"FeatureCollection"');
   });
 });

@@ -12,13 +12,13 @@ function waterSnapshot(extra: Partial<Molecule2DSceneSnapshot> = {}): Molecule2D
     molecule_id: "water",
     molecule_asset_id: "water-molecule-preset",
     atoms: [
-      { id: "o", element: "O", x: 50, y: 42, asset_id: "atom-core" },
-      { id: "h1", element: "H", x: 35, y: 62, asset_id: "atom-core" },
-      { id: "h2", element: "H", x: 65, y: 62, asset_id: "atom-core" },
+      { id: "o", element: "O", x: 50, y: 42 },
+      { id: "h1", element: "H", x: 30.2, y: 57.3 },
+      { id: "h2", element: "H", x: 69.8, y: 57.3 },
     ],
     bonds: [
-      { id: "oh1", from: "o", to: "h1", order: 1, asset_id: "bond-line" },
-      { id: "oh2", from: "o", to: "h2", order: 1, asset_id: "bond-line" },
+      { id: "oh1", from: "o", to: "h1", order: 1 },
+      { id: "oh2", from: "o", to: "h2", order: 1 },
     ],
     callouts: [{ id: "polar-callout", target_id: "o", label: "partial negative", side: "top" }],
     formula_latex: "H_2O",
@@ -57,19 +57,19 @@ describe("Molecule2DSceneRenderer", () => {
 
     expect(markup).toContain("molecule-2d-scene");
     expect(markup).toContain('data-molecule-id="water"');
-    expect(markup).toContain('data-asset-id="water-molecule-preset"');
+    expect(markup).toContain('data-structured-preset-id="water-molecule-preset"');
     expect(markup).toContain('data-structured-molecule="true"');
-    expect(markup).toContain('data-asset-id="atom-core"');
-    expect(markup).toContain('data-asset-id="bond-line"');
-    expect(markup).toContain('data-asset-id="core-light-lab-grid"');
-    expect(markup).toContain('data-asset-id="core-callout-label"');
-    expect(markup).toContain('data-asset-id="core-formula-tag"');
+    expect(markup).toContain('data-semantic-role="atom"');
+    expect(markup).toContain('data-semantic-role="bond"');
+    expect(markup).toContain('data-semantic-role="lab_grid"');
+    expect(markup).toContain('data-semantic-role="callout"');
+    expect(markup).toContain('data-semantic-role="formula_card"');
     expect(markup).toContain('data-element="O"');
     expect(markup).toContain('data-element="H"');
     expect(markup).not.toContain('data-missing-asset="true"');
   });
 
-  it("resolves atom and bond assets by semantic role when asset_id is absent", () => {
+  it("renders atoms and bonds natively when asset_id is absent", () => {
     const markup = renderToStaticMarkup(
       <Molecule2DSceneRenderer
         {...props(
@@ -84,8 +84,8 @@ describe("Molecule2DSceneRenderer", () => {
       />,
     );
 
-    expect(markup).toContain('data-asset-id="atom-core"');
-    expect(markup).toContain('data-asset-id="bond-line"');
+    expect(markup).toContain('data-atom-id="o"');
+    expect(markup).toContain('data-bond-id="oh1"');
     expect(markup).not.toContain('data-missing-asset="true"');
   });
 
@@ -113,9 +113,9 @@ describe("Molecule2DSceneRenderer", () => {
 
     expect(markup).toContain('data-molecule-id="carbon_dioxide"');
     expect(markup).toContain('data-structured-molecule="true"');
-    expect(markup).toContain('data-asset-id="atom-core"');
-    expect(markup).toContain('data-asset-id="bond-line"');
-    expect(markup).not.toContain('data-asset-id="water-molecule-preset"');
+    expect(markup).toContain('data-element="C"');
+    expect(markup).toContain('data-bond-order="2"');
+    expect(markup).not.toContain('data-structured-preset-id="water-molecule-preset"');
     expect(markup).not.toContain('data-missing-asset="true"');
   });
 });

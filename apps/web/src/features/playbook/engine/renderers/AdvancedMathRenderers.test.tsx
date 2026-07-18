@@ -148,9 +148,7 @@ describe("advanced math renderers", () => {
 
     expect(markup).toContain("graph-scene-renderer");
     expect(markup).toContain('data-pack-id="algorithm-code-basic"');
-    expect(markup).toContain('data-graph-asset-id="bfs-graph-preset"');
-    expect(markup).toContain('data-asset-id="graph-node"');
-    expect(markup).toContain('data-asset-id="queue-frame"');
+    expect(markup).toContain('data-graph-id="bfs-graph-preset"');
     expect(markup).toContain('data-node-state="current"');
     expect(markup).toContain('data-node-state="visited"');
     expect(markup).toContain('data-node-state="queue"');
@@ -163,7 +161,7 @@ describe("advanced math renderers", () => {
     expect(markup).not.toContain("Code sync");
     expect(markup).not.toContain('data-semantic-role="code_trace"');
     expect(markup).not.toContain("data-code-line-state");
-    expect(markup).not.toContain('data-asset-id="active-line"');
+    expect(markup).not.toContain("graph-node.svg");
   });
 
   it("emits stable graph-node selections from accessible pointer and keyboard targets", () => {

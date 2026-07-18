@@ -32,15 +32,12 @@ export type ChemistryReactionVectorContract = {
 
 export type ChemistryReactionContract = {
   reactionId: string;
-  arrowAssetId: string;
-  electronFlowAssetId: string;
   reactantFormulas: string[];
   productFormulas: string[];
   formulaLatex: string;
   reactants: ChemistryReactionParticipantContract[];
   products: ChemistryReactionParticipantContract[];
   arrow: ChemistryReactionVectorContract;
-  electronFlow: ChemistryReactionVectorContract;
   caption: string;
 };
 

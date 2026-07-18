@@ -13,7 +13,7 @@ describe("createVisualLessonPrompt", () => {
 
     expect(prompt.messages).toHaveLength(1);
     expect(prompt.messages[0].content.text).toContain("metaview.compile_scene_blueprint");
-    expect(prompt.messages[0].content.text).toContain("metaview://kits/geography-basic/manifest");
+    expect(prompt.messages[0].content.text).toContain("metaview://kits/geography-earth-basic/manifest");
     expect(prompt.messages[0].content.text).toContain("Do not hand-author SVG");
     expect(prompt.messages[0].content.text).toContain("PlaybookScript");
   });

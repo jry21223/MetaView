@@ -6,8 +6,16 @@
   "license": "internal",
   "licenseMode": "single",
   "defaultLicense": "internal",
-  "sceneTemplates": ["molecule_2d_water", "molecule_2d_methane", "molecule_2d_glucose", "reaction_synthesis_water"],
-  "rendererKinds": ["molecule_2d_scene", "reaction_scene"],
+  "sceneTemplates": [
+    "molecule_2d_water",
+    "molecule_2d_methane",
+    "molecule_2d_glucose",
+    "reaction_synthesis_water"
+  ],
+  "rendererKinds": [
+    "molecule_2d_scene",
+    "reaction_scene"
+  ],
   "sources": [
     {
       "id": "metaview-internal",
@@ -23,8 +31,17 @@
       "id": "water-molecule-preset",
       "type": "json",
       "path": "/assets/metaview-kits/chemistry-basic/molecule-presets/water.json",
-      "tags": ["molecule", "water", "h2o", "structured_preset"],
-      "semanticRoles": ["molecule", "water", "molecule_preset"],
+      "tags": [
+        "molecule",
+        "water",
+        "h2o",
+        "structured_preset"
+      ],
+      "semanticRoles": [
+        "molecule",
+        "water",
+        "molecule_preset"
+      ],
       "sourceId": "metaview-internal",
       "attribution": "MetaView internal structured molecule preset",
       "license": "internal",
@@ -38,7 +55,10 @@
       "modifiedFrom": null,
       "rendererHints": {
         "preferredRenderer": "molecule_2d_scene",
-        "defaultSize": [180, 130],
+        "defaultSize": [
+          180,
+          130
+        ],
         "anchor": "center",
         "colorizable": false,
         "strokeControlled": false
@@ -48,8 +68,16 @@
       "id": "water-molecule-contract",
       "type": "json",
       "path": "/assets/metaview-kits/chemistry-basic/contracts/water.contract.json",
-      "tags": ["molecule", "water", "h2o", "contract"],
-      "semanticRoles": ["molecule_contract", "water_contract"],
+      "tags": [
+        "molecule",
+        "water",
+        "h2o",
+        "contract"
+      ],
+      "semanticRoles": [
+        "molecule_contract",
+        "water_contract"
+      ],
       "sourceId": "metaview-internal",
       "attribution": "MetaView internal molecule contract for web/API compiler alignment",
       "license": "internal",
@@ -63,7 +91,10 @@
       "modifiedFrom": null,
       "rendererHints": {
         "preferredRenderer": "molecule_2d_scene",
-        "defaultSize": [180, 130],
+        "defaultSize": [
+          180,
+          130
+        ],
         "anchor": "center",
         "colorizable": false,
         "strokeControlled": false
@@ -73,8 +104,19 @@
       "id": "methane-molecule-preset",
       "type": "json",
       "path": "/assets/metaview-kits/chemistry-basic/molecule-presets/methane.json",
-      "tags": ["molecule", "methane", "ch4", "smiles", "structured_preset"],
-      "semanticRoles": ["molecule", "methane", "smiles", "molecule_preset"],
+      "tags": [
+        "molecule",
+        "methane",
+        "ch4",
+        "smiles",
+        "structured_preset"
+      ],
+      "semanticRoles": [
+        "molecule",
+        "methane",
+        "smiles",
+        "molecule_preset"
+      ],
       "sourceId": "metaview-internal",
       "attribution": "MetaView internal SMILES-addressable structured molecule preset",
       "license": "internal",
@@ -88,7 +130,10 @@
       "modifiedFrom": null,
       "rendererHints": {
         "preferredRenderer": "molecule_2d_scene",
-        "defaultSize": [180, 130],
+        "defaultSize": [
+          180,
+          130
+        ],
         "anchor": "center",
         "colorizable": false,
         "strokeControlled": false
@@ -98,8 +143,17 @@
       "id": "methane-molecule-contract",
       "type": "json",
       "path": "/assets/metaview-kits/chemistry-basic/contracts/methane.contract.json",
-      "tags": ["molecule", "methane", "ch4", "smiles", "contract"],
-      "semanticRoles": ["molecule_contract", "methane_contract"],
+      "tags": [
+        "molecule",
+        "methane",
+        "ch4",
+        "smiles",
+        "contract"
+      ],
+      "semanticRoles": [
+        "molecule_contract",
+        "methane_contract"
+      ],
       "sourceId": "metaview-internal",
       "attribution": "MetaView internal molecule contract for web/API compiler alignment",
       "license": "internal",
@@ -113,7 +167,10 @@
       "modifiedFrom": null,
       "rendererHints": {
         "preferredRenderer": "molecule_2d_scene",
-        "defaultSize": [180, 130],
+        "defaultSize": [
+          180,
+          130
+        ],
         "anchor": "center",
         "colorizable": false,
         "strokeControlled": false
@@ -123,8 +180,19 @@
       "id": "rdkit-smiles-glucose",
       "type": "smiles",
       "path": "/assets/metaview-kits/chemistry-basic/smiles/glucose.smi",
-      "tags": ["molecule", "glucose", "c6h12o6", "smiles", "rdkit"],
-      "semanticRoles": ["molecule", "glucose", "smiles", "molecule_preset"],
+      "tags": [
+        "molecule",
+        "glucose",
+        "c6h12o6",
+        "smiles",
+        "rdkit"
+      ],
+      "semanticRoles": [
+        "molecule",
+        "glucose",
+        "smiles",
+        "molecule_preset"
+      ],
       "sourceId": "metaview-internal",
       "attribution": "MetaView internal SMILES teaching fixture for RDKit compilation",
       "license": "internal",
@@ -138,7 +206,10 @@
       "modifiedFrom": null,
       "rendererHints": {
         "preferredRenderer": "molecule_2d_scene",
-        "defaultSize": [180, 130],
+        "defaultSize": [
+          180,
+          130
+        ],
         "anchor": "center",
         "colorizable": false,
         "strokeControlled": false
@@ -148,8 +219,17 @@
       "id": "glucose-smiles-contract",
       "type": "json",
       "path": "/assets/metaview-kits/chemistry-basic/contracts/glucose.contract.json",
-      "tags": ["molecule", "glucose", "c6h12o6", "smiles", "contract"],
-      "semanticRoles": ["molecule_contract", "glucose_contract"],
+      "tags": [
+        "molecule",
+        "glucose",
+        "c6h12o6",
+        "smiles",
+        "contract"
+      ],
+      "semanticRoles": [
+        "molecule_contract",
+        "glucose_contract"
+      ],
       "sourceId": "metaview-internal",
       "attribution": "MetaView internal molecule contract for web/API compiler alignment",
       "license": "internal",
@@ -163,7 +243,10 @@
       "modifiedFrom": null,
       "rendererHints": {
         "preferredRenderer": "molecule_2d_scene",
-        "defaultSize": [180, 130],
+        "defaultSize": [
+          180,
+          130
+        ],
         "anchor": "center",
         "colorizable": false,
         "strokeControlled": false
@@ -173,8 +256,17 @@
       "id": "reaction-synthesis-water-contract",
       "type": "json",
       "path": "/assets/metaview-kits/chemistry-basic/contracts/reaction-synthesis-water.contract.json",
-      "tags": ["reaction", "water", "synthesis", "balanced", "contract"],
-      "semanticRoles": ["reaction_contract", "reaction_synthesis_water_contract"],
+      "tags": [
+        "reaction",
+        "water",
+        "synthesis",
+        "balanced",
+        "contract"
+      ],
+      "semanticRoles": [
+        "reaction_contract",
+        "reaction_synthesis_water_contract"
+      ],
       "sourceId": "metaview-internal",
       "attribution": "MetaView internal reaction contract for web/API compiler alignment",
       "license": "internal",
@@ -188,111 +280,15 @@
       "modifiedFrom": null,
       "rendererHints": {
         "preferredRenderer": "reaction_scene",
-        "defaultSize": [260, 120],
+        "defaultSize": [
+          260,
+          120
+        ],
         "anchor": "center",
         "colorizable": false,
         "strokeControlled": false
       }
-    },
-    {
-      "id": "atom-core",
-      "type": "svg",
-      "path": "/assets/metaview-kits/chemistry-basic/symbols/atom-core.svg",
-      "tags": ["atom", "symbol", "molecule_2d"],
-      "semanticRoles": ["atom"],
-      "sourceId": "metaview-internal",
-      "attribution": "MetaView internal SVG primitive",
-      "license": "internal",
-      "commercialUseStatus": "allowed",
-      "commercialUseAllowed": true,
-      "requiresAttribution": false,
-      "shareAlike": false,
-      "modificationAllowed": true,
-      "sourceUrl": null,
-      "licenseUrl": null,
-      "modifiedFrom": null,
-      "rendererHints": {
-        "preferredRenderer": "molecule_2d_scene",
-        "defaultSize": [42, 42],
-        "anchor": "center",
-        "colorizable": true,
-        "strokeControlled": true
-      }
-    },
-    {
-      "id": "bond-line",
-      "type": "svg",
-      "path": "/assets/metaview-kits/chemistry-basic/symbols/bond-line.svg",
-      "tags": ["bond", "single_bond", "molecule_2d"],
-      "semanticRoles": ["bond"],
-      "sourceId": "metaview-internal",
-      "attribution": "MetaView internal SVG primitive",
-      "license": "internal",
-      "commercialUseStatus": "allowed",
-      "commercialUseAllowed": true,
-      "requiresAttribution": false,
-      "shareAlike": false,
-      "modificationAllowed": true,
-      "sourceUrl": null,
-      "licenseUrl": null,
-      "modifiedFrom": null,
-      "rendererHints": {
-        "preferredRenderer": "molecule_2d_scene",
-        "defaultSize": [96, 18],
-        "anchor": "center",
-        "colorizable": true,
-        "strokeControlled": true
-      }
-    },
-    {
-      "id": "reaction-arrow",
-      "type": "svg",
-      "path": "/assets/metaview-kits/chemistry-basic/symbols/reaction-arrow.svg",
-      "tags": ["reaction", "arrow", "process"],
-      "semanticRoles": ["reaction_arrow"],
-      "sourceId": "metaview-internal",
-      "attribution": "MetaView internal SVG primitive",
-      "license": "internal",
-      "commercialUseStatus": "allowed",
-      "commercialUseAllowed": true,
-      "requiresAttribution": false,
-      "shareAlike": false,
-      "modificationAllowed": true,
-      "sourceUrl": null,
-      "licenseUrl": null,
-      "modifiedFrom": null,
-      "rendererHints": {
-        "preferredRenderer": "reaction_scene",
-        "defaultSize": [128, 32],
-        "anchor": "center",
-        "colorizable": true,
-        "strokeControlled": true
-      }
-    },
-    {
-      "id": "electron-flow",
-      "type": "svg",
-      "path": "/assets/metaview-kits/chemistry-basic/symbols/electron-flow.svg",
-      "tags": ["electron", "flow", "mechanism"],
-      "semanticRoles": ["electron_flow"],
-      "sourceId": "metaview-internal",
-      "attribution": "MetaView internal SVG primitive",
-      "license": "internal",
-      "commercialUseStatus": "allowed",
-      "commercialUseAllowed": true,
-      "requiresAttribution": false,
-      "shareAlike": false,
-      "modificationAllowed": true,
-      "sourceUrl": null,
-      "licenseUrl": null,
-      "modifiedFrom": null,
-      "rendererHints": {
-        "preferredRenderer": "reaction_scene",
-        "defaultSize": [96, 48],
-        "anchor": "center",
-        "colorizable": true,
-        "strokeControlled": true
-      }
     }
-  ]
+  ],
+  "defaultTeachingUse": "formal"
 }

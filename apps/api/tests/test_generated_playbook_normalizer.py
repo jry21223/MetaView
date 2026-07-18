@@ -15,8 +15,8 @@ from app.domain.services.scene_blueprint_compiler import compile_scene_blueprint
     [
         ("derivative_tangent", "math", {"derivative-tangent-preset"}),
         ("bfs_graph", "algorithm", {"bfs-graph-preset"}),
-        ("recursion_stack", "algorithm", {"recursion-stack-preset", "active-line"}),
-        ("projectile_motion", "physics", {"projectile-body-dot"}),
+        ("recursion_stack", "algorithm", {"recursion-stack-preset"}),
+        ("projectile_motion", "physics", set()),
     ],
 )
 def test_normalizer_compiles_timeline_scene_metadata_and_assets(
@@ -75,12 +75,8 @@ def test_normalizer_compiles_timeline_scene_metadata_and_assets(
             assert step.code_highlight.variables["queue"] == (
                 f"[{', '.join(dict.fromkeys([*snapshot.queue_node_ids, *snapshot.frontier_node_ids]))}]"
             )
-            assert {node.asset_id for node in snapshot.nodes} <= {
-                "graph-node",
-                "queue-frame",
-                "visited-node",
-            }
-            assert {edge.asset_id for edge in snapshot.edges} <= {None, "edge-active"}
+            assert {node.asset_id for node in snapshot.nodes} == {None}
+            assert {edge.asset_id for edge in snapshot.edges} == {None}
 
 
 def test_normalizer_does_not_label_dfs_state_as_bfs() -> None:
@@ -175,7 +171,7 @@ def test_normalizer_synchronizes_stale_recursion_code_variables() -> None:
     assert code is not None
     assert snapshot.kind == "call_stack_scene"
     assert snapshot.current_frame_id == "factorial-4"
-    assert snapshot.frames[0].asset_id == "call-frame"
+    assert snapshot.frames[0].asset_id is None
     assert code.variables == {"n": "4"}
     assert code.lines == snapshot.code_trace.lines
     assert code.active_line == snapshot.code_trace.active_line
@@ -267,7 +263,7 @@ def test_normalizer_embeds_secondary_trace_and_prunes_unwound_frames() -> None:
         assert snapshot.code_trace is not None
         assert snapshot.code_trace.lines == code_lines
         assert snapshot.code_trace.active_line == 3
-        assert snapshot.code_trace.asset_id == "active-line"
+        assert snapshot.code_trace.asset_id is None
         assert step.code_highlight is not None
         current = next(
             frame for frame in snapshot.frames if frame.id == snapshot.current_frame_id
@@ -394,7 +390,7 @@ def test_normalizer_compiles_horizontal_projectile_to_renderer_coordinates() -> 
         assert len(snapshot.objects) == 1
         projectile = snapshot.objects[0]
         assert projectile.id == "projectile"
-        assert projectile.asset_id == "projectile-body-dot"
+        assert projectile.asset_id is None
         assert 0.0 <= projectile.x <= 100.0
         assert 0.0 <= projectile.y <= 100.0
         assert all(0.0 <= coordinate <= 100.0 for point in snapshot.trajectory for coordinate in point)
@@ -427,7 +423,7 @@ def test_normalizer_compiles_horizontal_projectile_to_renderer_coordinates() -> 
     assert vertical_dy[-1] == 18.0
 
 
-def test_normalizer_assigns_projectile_asset_only_to_velocity_target() -> None:
+def test_normalizer_keeps_projectile_objects_on_native_geometry() -> None:
     source = compile_scene_blueprint_to_playbook(
         {
             "id": "projectile_motion",
@@ -457,7 +453,7 @@ def test_normalizer_assigns_projectile_asset_only_to_velocity_target() -> None:
         if snapshot.get("kind") != "physics_force_scene":
             continue
         assets_by_id = {item["id"]: item.get("asset_id") for item in snapshot["objects"]}
-        assert assets_by_id["body"] == "projectile-body-dot"
+        assert assets_by_id["body"] is None
         assert assets_by_id["target"] is None
 
 

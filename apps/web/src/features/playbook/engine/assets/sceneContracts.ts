@@ -2,7 +2,6 @@ import bfsGraphContractJson from "../../../../../public/assets/metaview-kits/alg
 import binarySearchContractJson from "../../../../../public/assets/metaview-kits/algorithm-code-basic/contracts/binary-search.contract.json";
 import recursionStackContractJson from "../../../../../public/assets/metaview-kits/algorithm-code-basic/contracts/recursion-stack.contract.json";
 import cellStructureContractJson from "../../../../../public/assets/metaview-kits/biology-basic/contracts/cell-structure.contract.json";
-import customCellLayoutContractJson from "../../../../../public/assets/metaview-kits/biology-basic/contracts/custom-cell-layout.contract.json";
 import dnaReplicationContractJson from "../../../../../public/assets/metaview-kits/biology-basic/contracts/dna-replication.contract.json";
 import carbonDioxideContractJson from "../../../../../public/assets/metaview-kits/chemistry-basic/contracts/carbon-dioxide.contract.json";
 import glucoseContractJson from "../../../../../public/assets/metaview-kits/chemistry-basic/contracts/glucose.contract.json";
@@ -32,8 +31,6 @@ interface ChemistryMoleculeContractJson {
 interface ChemistryReactionContractJson {
   id: string;
   reactionId: string;
-  arrowAssetId: string;
-  electronFlowAssetId: string;
 }
 
 function chemistryMoleculeContract(contract: ChemistryMoleculeContractJson): SceneAssetContract {
@@ -52,7 +49,7 @@ function chemistryReactionContract(contract: ChemistryReactionContractJson): Sce
     sceneTemplate: contract.reactionId,
     rendererKind: "reaction_scene",
     packId: "chemistry-basic",
-    requiredAssetIds: [contract.arrowAssetId, contract.electronFlowAssetId],
+    requiredAssetIds: [],
   };
 }
 
@@ -60,7 +57,6 @@ const SCENE_ASSET_CONTRACTS: readonly SceneAssetContract[] = [
   eastAsiaMonsoonContractJson,
   projectileMotionContractJson,
   cellStructureContractJson,
-  customCellLayoutContractJson,
   dnaReplicationContractJson,
   carbonDioxideContractJson,
   chemistryMoleculeContract(waterContractJson),

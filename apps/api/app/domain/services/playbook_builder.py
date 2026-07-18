@@ -482,14 +482,20 @@ def _build_snapshot(
 
 def _build_geo_map_scene_snapshot(cir_step: CirStep) -> GeoMapSceneSnapshot:
     return GeoMapSceneSnapshot(
-        pack_id="geography-basic",
+        pack_id="geography-earth-basic",
         map_region="east_asia",
         layers=[
             GeoMapLayer(
                 id="land",
                 semantic_role="land",
                 label="大陆",
-                asset_id="east-asia-map-placeholder",
+                asset_id="east-asia-land-110m",
+            ),
+            GeoMapLayer(
+                id="coastline",
+                semantic_role="coastline",
+                label="海岸线",
+                asset_id="east-asia-coastline-110m",
             ),
             GeoMapLayer(id="ocean", semantic_role="ocean", label="海洋"),
         ],
@@ -500,7 +506,6 @@ def _build_geo_map_scene_snapshot(cir_step: CirStep) -> GeoMapSceneSnapshot:
                 from_=(78.0, 68.0),
                 to=(42.0, 38.0),
                 label="季风",
-                asset_id="monsoon-wind-arrow",
                 strength=1.0,
             )
         ],
@@ -522,7 +527,6 @@ def _build_physics_force_scene_snapshot(cir_step: CirStep) -> PhysicsForceSceneS
                 label="物体",
                 x=30.0,
                 y=42.0,
-                asset_id="projectile-body-dot",
             )
         ],
         vectors=[

@@ -6,8 +6,14 @@
   "license": "internal",
   "licenseMode": "single",
   "defaultLicense": "internal",
-  "sceneTemplates": ["cell_structure", "dna_replication"],
-  "rendererKinds": ["bio_cell_scene", "bio_process_scene"],
+  "sceneTemplates": [
+    "cell_structure",
+    "dna_replication"
+  ],
+  "rendererKinds": [
+    "bio_cell_scene",
+    "bio_process_scene"
+  ],
   "sources": [
     {
       "id": "metaview-internal",
@@ -23,8 +29,15 @@
       "id": "cell-structure-contract",
       "type": "json",
       "path": "/assets/metaview-kits/biology-basic/contracts/cell-structure.contract.json",
-      "tags": ["cell", "structure", "contract"],
-      "semanticRoles": ["scene_contract", "cell_structure_contract"],
+      "tags": [
+        "cell",
+        "structure",
+        "contract"
+      ],
+      "semanticRoles": [
+        "scene_contract",
+        "cell_structure_contract"
+      ],
       "sourceId": "metaview-internal",
       "attribution": "MetaView internal biology scene contract for compiler alignment",
       "license": "internal",
@@ -38,7 +51,10 @@
       "modifiedFrom": null,
       "rendererHints": {
         "preferredRenderer": "bio_cell_scene",
-        "defaultSize": [220, 160],
+        "defaultSize": [
+          220,
+          160
+        ],
         "anchor": "center",
         "colorizable": false,
         "strokeControlled": false
@@ -48,8 +64,16 @@
       "id": "dna-replication-contract",
       "type": "json",
       "path": "/assets/metaview-kits/biology-basic/contracts/dna-replication.contract.json",
-      "tags": ["dna", "replication", "process", "contract"],
-      "semanticRoles": ["scene_contract", "dna_replication_contract"],
+      "tags": [
+        "dna",
+        "replication",
+        "process",
+        "contract"
+      ],
+      "semanticRoles": [
+        "scene_contract",
+        "dna_replication_contract"
+      ],
       "sourceId": "metaview-internal",
       "attribution": "MetaView internal biology process contract for compiler alignment",
       "license": "internal",
@@ -63,7 +87,10 @@
       "modifiedFrom": null,
       "rendererHints": {
         "preferredRenderer": "bio_process_scene",
-        "defaultSize": [220, 120],
+        "defaultSize": [
+          220,
+          120
+        ],
         "anchor": "center",
         "colorizable": false,
         "strokeControlled": false
@@ -73,8 +100,14 @@
       "id": "cell-outline",
       "type": "svg",
       "path": "/assets/metaview-kits/biology-basic/icons/cell-outline.svg",
-      "tags": ["cell", "animal_cell", "structure"],
-      "semanticRoles": ["cell"],
+      "tags": [
+        "cell",
+        "animal_cell",
+        "structure"
+      ],
+      "semanticRoles": [
+        "cell"
+      ],
       "sourceId": "metaview-internal",
       "attribution": "MetaView internal SVG primitive",
       "license": "internal",
@@ -88,7 +121,10 @@
       "modifiedFrom": null,
       "rendererHints": {
         "preferredRenderer": "bio_cell_scene",
-        "defaultSize": [220, 160],
+        "defaultSize": [
+          220,
+          160
+        ],
         "anchor": "center",
         "colorizable": false,
         "strokeControlled": false
@@ -98,8 +134,14 @@
       "id": "cell-membrane",
       "type": "svg",
       "path": "/assets/metaview-kits/biology-basic/icons/cell-membrane.svg",
-      "tags": ["cell", "membrane", "boundary"],
-      "semanticRoles": ["membrane"],
+      "tags": [
+        "cell",
+        "membrane",
+        "boundary"
+      ],
+      "semanticRoles": [
+        "membrane"
+      ],
       "sourceId": "metaview-internal",
       "attribution": "MetaView internal SVG primitive",
       "license": "internal",
@@ -113,7 +155,10 @@
       "modifiedFrom": null,
       "rendererHints": {
         "preferredRenderer": "bio_cell_scene",
-        "defaultSize": [220, 160],
+        "defaultSize": [
+          220,
+          160
+        ],
         "anchor": "center",
         "colorizable": false,
         "strokeControlled": true
@@ -123,8 +168,14 @@
       "id": "nucleus",
       "type": "svg",
       "path": "/assets/metaview-kits/biology-basic/icons/nucleus.svg",
-      "tags": ["organelle", "nucleus", "dna"],
-      "semanticRoles": ["nucleus"],
+      "tags": [
+        "organelle",
+        "nucleus",
+        "dna"
+      ],
+      "semanticRoles": [
+        "nucleus"
+      ],
       "sourceId": "metaview-internal",
       "attribution": "MetaView internal SVG primitive",
       "license": "internal",
@@ -138,7 +189,10 @@
       "modifiedFrom": null,
       "rendererHints": {
         "preferredRenderer": "bio_cell_scene",
-        "defaultSize": [72, 64],
+        "defaultSize": [
+          72,
+          64
+        ],
         "anchor": "center",
         "colorizable": false,
         "strokeControlled": false
@@ -148,8 +202,14 @@
       "id": "mitochondrion",
       "type": "svg",
       "path": "/assets/metaview-kits/biology-basic/icons/mitochondrion.svg",
-      "tags": ["organelle", "mitochondrion", "energy"],
-      "semanticRoles": ["mitochondrion"],
+      "tags": [
+        "organelle",
+        "mitochondrion",
+        "energy"
+      ],
+      "semanticRoles": [
+        "mitochondrion"
+      ],
       "sourceId": "metaview-internal",
       "attribution": "MetaView internal SVG primitive",
       "license": "internal",
@@ -163,7 +223,10 @@
       "modifiedFrom": null,
       "rendererHints": {
         "preferredRenderer": "bio_cell_scene",
-        "defaultSize": [72, 44],
+        "defaultSize": [
+          72,
+          44
+        ],
         "anchor": "center",
         "colorizable": false,
         "strokeControlled": false
@@ -173,8 +236,14 @@
       "id": "dna-helix",
       "type": "svg",
       "path": "/assets/metaview-kits/biology-basic/icons/dna-helix.svg",
-      "tags": ["dna", "genetics", "nucleus"],
-      "semanticRoles": ["dna"],
+      "tags": [
+        "dna",
+        "genetics",
+        "nucleus"
+      ],
+      "semanticRoles": [
+        "dna"
+      ],
       "sourceId": "metaview-internal",
       "attribution": "MetaView internal SVG primitive",
       "license": "internal",
@@ -188,7 +257,10 @@
       "modifiedFrom": null,
       "rendererHints": {
         "preferredRenderer": "bio_cell_scene",
-        "defaultSize": [48, 72],
+        "defaultSize": [
+          48,
+          72
+        ],
         "anchor": "center",
         "colorizable": true,
         "strokeControlled": true
@@ -198,8 +270,16 @@
       "id": "replication-fork",
       "type": "svg",
       "path": "/assets/metaview-kits/biology-basic/icons/replication-fork.svg",
-      "tags": ["dna", "replication", "process", "fork"],
-      "semanticRoles": ["process_step", "dna_replication"],
+      "tags": [
+        "dna",
+        "replication",
+        "process",
+        "fork"
+      ],
+      "semanticRoles": [
+        "process_step",
+        "dna_replication"
+      ],
       "sourceId": "metaview-internal",
       "attribution": "MetaView internal SVG primitive",
       "license": "internal",
@@ -213,7 +293,10 @@
       "modifiedFrom": null,
       "rendererHints": {
         "preferredRenderer": "bio_process_scene",
-        "defaultSize": [72, 72],
+        "defaultSize": [
+          72,
+          72
+        ],
         "anchor": "center",
         "colorizable": true,
         "strokeControlled": true
@@ -223,8 +306,14 @@
       "id": "ribosome",
       "type": "svg",
       "path": "/assets/metaview-kits/biology-basic/icons/ribosome.svg",
-      "tags": ["organelle", "ribosome", "protein"],
-      "semanticRoles": ["ribosome"],
+      "tags": [
+        "organelle",
+        "ribosome",
+        "protein"
+      ],
+      "semanticRoles": [
+        "ribosome"
+      ],
       "sourceId": "metaview-internal",
       "attribution": "MetaView internal SVG primitive",
       "license": "internal",
@@ -238,11 +327,15 @@
       "modifiedFrom": null,
       "rendererHints": {
         "preferredRenderer": "bio_cell_scene",
-        "defaultSize": [34, 28],
+        "defaultSize": [
+          34,
+          28
+        ],
         "anchor": "center",
         "colorizable": false,
         "strokeControlled": false
       }
     }
-  ]
+  ],
+  "defaultTeachingUse": "primitive"
 }

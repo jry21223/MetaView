@@ -3,7 +3,7 @@
   "$id": "https://metaview.local/schemas/asset-manifest.schema.json",
   "title": "MetaView Subject Visual Kit Manifest",
   "type": "object",
-  "required": ["schemaVersion", "packId", "subject", "version", "license", "licenseMode", "sources", "assets"],
+  "required": ["schemaVersion", "packId", "subject", "version", "license", "licenseMode", "defaultTeachingUse", "sources", "assets"],
   "properties": {
     "schemaVersion": { "type": "string", "const": "1.0.0" },
     "packId": { "type": "string", "minLength": 1 },
@@ -32,6 +32,10 @@
     "licenseMode": {
       "type": "string",
       "enum": ["single", "mixed"]
+    },
+    "defaultTeachingUse": {
+      "type": "string",
+      "enum": ["formal", "primitive", "experimental", "ui"]
     },
     "defaultLicense": {
       "type": "string",
@@ -160,6 +164,10 @@
           "sourceUrl": { "type": ["string", "null"], "format": "uri" },
           "licenseUrl": { "type": ["string", "null"], "format": "uri" },
           "modifiedFrom": { "type": ["string", "null"] },
+          "teachingUse": {
+            "type": "string",
+            "enum": ["formal", "primitive", "experimental", "ui"]
+          },
           "rendererHints": {
             "type": "object",
             "properties": {

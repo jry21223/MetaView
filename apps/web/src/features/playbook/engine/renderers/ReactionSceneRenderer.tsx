@@ -1,8 +1,5 @@
 import React from "react";
 
-import { AssetSvg } from "../assets/AssetSvg";
-import type { AssetManifestEntry } from "../assets/assetRegistry";
-import { resolveAssetById, resolveAssetByRole, resolveAssetForRenderer } from "../assets/assetResolver";
 import type {
   Molecule2DCallout,
   ReactionArrow,
@@ -14,43 +11,6 @@ import { CoreCalloutLabel } from "./CoreCalloutLabel";
 import { CoreFormulaTag } from "./CoreFormulaTag";
 import { CoreLabGrid } from "./CoreLabGrid";
 import type { RendererProps } from "./types";
-
-const DEFAULT_CHEMISTRY_PACK_ID = "chemistry-basic";
-
-interface ResolvedReactionAsset {
-  asset?: AssetManifestEntry;
-  assetId?: string;
-}
-
-function resolveReactionAsset(
-  packId: string,
-  semanticRole: string,
-  assetId?: string | null,
-): ResolvedReactionAsset {
-  if (assetId) {
-    return {
-      asset: resolveAssetById(packId, assetId),
-      assetId,
-    };
-  }
-  const asset =
-    resolveAssetForRenderer("reaction_scene", semanticRole, packId) ??
-    resolveAssetByRole("chemistry", semanticRole, packId) ??
-    resolveAssetForRenderer("reaction_scene", semanticRole) ??
-    resolveAssetByRole("chemistry", semanticRole);
-  return {
-    asset,
-    assetId: asset?.id,
-  };
-}
-
-function vectorAngle(from: [number, number], to: [number, number]): number {
-  return (Math.atan2(to[1] - from[1], to[0] - from[0]) * 180) / Math.PI;
-}
-
-function vectorLength(from: [number, number], to: [number, number]): number {
-  return Math.max(8, Math.hypot(to[0] - from[0], to[1] - from[1]));
-}
 
 function participantFormula(participant: ReactionParticipant): string {
   const coefficient = participant.coefficient && participant.coefficient !== 1 ? String(participant.coefficient) : "";
@@ -94,28 +54,21 @@ function renderParticipant(participant: ReactionParticipant, role: "reactant" | 
   );
 }
 
-function renderReactionArrow(arrow: ReactionArrow, packId: string) {
-  const { asset, assetId } = resolveReactionAsset(packId, arrow.semantic_role, arrow.asset_id);
-  const length = vectorLength(arrow.from, arrow.to);
-  const angle = vectorAngle(arrow.from, arrow.to);
-  const height = 8;
+function renderReactionArrow(arrow: ReactionArrow) {
   const midX = (arrow.from[0] + arrow.to[0]) / 2;
   const midY = (arrow.from[1] + arrow.to[1]) / 2;
 
   return (
     <g key={arrow.id} data-reaction-arrow-id={arrow.id} data-semantic-role={arrow.semantic_role}>
-      <AssetSvg
-        asset={asset}
-        assetId={assetId ?? arrow.asset_id}
-        packId={packId}
-        subject="chemistry"
-        semanticRole={arrow.semantic_role}
-        x={arrow.from[0]}
-        y={arrow.from[1] - height / 2}
-        width={length}
-        height={height}
-        preserveAspectRatio="none"
-        transform={`rotate(${angle} ${arrow.from[0]} ${arrow.from[1]})`}
+      <line
+        x1={arrow.from[0]}
+        y1={arrow.from[1]}
+        x2={arrow.to[0]}
+        y2={arrow.to[1]}
+        stroke="#536177"
+        strokeWidth="1.35"
+        strokeLinecap="round"
+        markerEnd="url(#reaction-arrow-head)"
       />
       {arrow.label ? (
         <text x={midX} y={midY - 7} textAnchor="middle" fontSize="3.2" fontWeight="740" fill="#536177">
@@ -126,29 +79,20 @@ function renderReactionArrow(arrow: ReactionArrow, packId: string) {
   );
 }
 
-function renderElectronFlow(flow: ReactionElectronFlow, packId: string) {
-  const { asset, assetId } = resolveReactionAsset(packId, flow.semantic_role, flow.asset_id);
-  const length = vectorLength(flow.from, flow.to);
-  const angle = vectorAngle(flow.from, flow.to);
-  const height = 11;
+function renderElectronFlow(flow: ReactionElectronFlow) {
   const midX = (flow.from[0] + flow.to[0]) / 2;
   const midY = (flow.from[1] + flow.to[1]) / 2;
+  const bendY = Math.min(flow.from[1], flow.to[1]) - 10;
 
   return (
     <g key={flow.id} data-electron-flow-id={flow.id} data-semantic-role={flow.semantic_role}>
-      <AssetSvg
-        asset={asset}
-        assetId={assetId ?? flow.asset_id}
-        packId={packId}
-        subject="chemistry"
-        semanticRole={flow.semantic_role}
-        x={flow.from[0]}
-        y={flow.from[1] - height / 2}
-        width={length}
-        height={height}
-        preserveAspectRatio="none"
-        transform={`rotate(${angle} ${flow.from[0]} ${flow.from[1]})`}
-        opacity="0.9"
+      <path
+        d={`M ${flow.from[0]} ${flow.from[1]} Q ${midX} ${bendY} ${flow.to[0]} ${flow.to[1]}`}
+        fill="none"
+        stroke="#7b4260"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        markerEnd="url(#electron-flow-head)"
       />
       {flow.label ? (
         <text x={midX} y={midY - 5.6} textAnchor="middle" fontSize="2.8" fontWeight="700" fill="#7b4260">
@@ -225,14 +169,13 @@ function renderPlusSigns(reactants: ReactionParticipant[]) {
 
 export const ReactionSceneRenderer: React.FC<RendererProps> = ({ step, theme }) => {
   const snap = step.snapshot as ReactionSceneSnapshot;
-  const packId = snap.pack_id ?? DEFAULT_CHEMISTRY_PACK_ID;
 
   return (
     <div
       className="reaction-scene"
       data-theme={theme}
       data-reaction-id={snap.reaction_id}
-      data-pack-id={packId}
+      data-pack-id={snap.pack_id ?? undefined}
       style={{
         width: "100%",
         height: "100%",
@@ -244,6 +187,14 @@ export const ReactionSceneRenderer: React.FC<RendererProps> = ({ step, theme }) 
       }}
     >
       <svg width="100%" height="100%" viewBox="0 0 100 100" role="img" aria-label={step.title}>
+        <defs>
+          <marker id="reaction-arrow-head" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <path d="M0,0 L5,3 L0,6 Z" fill="#536177" />
+          </marker>
+          <marker id="electron-flow-head" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <path d="M0,0 L5,3 L0,6 Z" fill="#7b4260" />
+          </marker>
+        </defs>
         <CoreLabGrid rendererKind="reaction_scene" theme={theme} lightFill="#f8fbff" />
         <text x="8" y="12" fontSize="5.6" fontWeight="780" fill={theme === "dark" ? "#f8fafc" : "#172033"}>
           {step.title}
@@ -263,8 +214,8 @@ export const ReactionSceneRenderer: React.FC<RendererProps> = ({ step, theme }) 
         <g data-semantic-role="reaction" data-reaction-id={snap.reaction_id}>
           {snap.reactants.map((participant) => renderParticipant(participant, "reactant"))}
           {renderPlusSigns(snap.reactants)}
-          {snap.arrows.map((arrow) => renderReactionArrow(arrow, packId))}
-          {(snap.electron_flows ?? []).map((flow) => renderElectronFlow(flow, packId))}
+          {snap.arrows.map((arrow) => renderReactionArrow(arrow))}
+          {(snap.electron_flows ?? []).map((flow) => renderElectronFlow(flow))}
           {snap.products.map((participant) => renderParticipant(participant, "product"))}
         </g>
 

@@ -435,7 +435,7 @@ describe("PlaybookComposition", () => {
     expect(markup).toContain('data-visual-quality-warning-codes="unsupported_array_fallback"');
     expect(markup).toContain('data-visual-quality-warning-steps="array-fallback"');
     expect(markup).toContain('data-visual-quality-warning-icon="true"');
-    expect(markup).toContain('data-asset-id="core-warning-icon"');
+    expect(markup).toContain('data-visual-quality-warning-icon="true"');
     expect(markup).not.toContain('data-missing-asset="true"');
     expect(markup).toContain("domain-array-renderer");
   });
