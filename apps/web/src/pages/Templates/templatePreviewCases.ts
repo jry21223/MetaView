@@ -543,14 +543,14 @@ function lineExpression(slope: number, intercept: number): string {
 
 function derivativeSnapshot(
   markerX: number,
-  h: number | null,
+  h: number | null | undefined,
   caption: string,
   formulaLatex: string,
 ): MathPlotSnapshot {
   const curves: MathPlotSnapshot["curves"] = [
     { expression: "x^2", label: "f(x)=x²", emphasis: "primary", semantic_role: "curve" },
   ];
-  if (h != null) {
+  if (h !== undefined && h !== null) {
     const slope = 2 * markerX + h;
     const intercept = -markerX * (markerX + h);
     curves.push({
@@ -559,7 +559,7 @@ function derivativeSnapshot(
       emphasis: "secondary",
       semantic_role: "slope",
     });
-  } else {
+  } else if (h === null) {
     const slope = 2 * markerX;
     const intercept = -(markerX ** 2);
     curves.push({
@@ -580,8 +580,8 @@ function derivativeSnapshot(
     y_min: -2,
     y_max: 9,
     marker_x: markerX,
-    shade_from: h == null ? markerX - 0.08 : markerX,
-    shade_to: h == null ? markerX + 0.08 : markerX + h,
+    shade_from: h === undefined ? null : h === null ? markerX - 0.08 : markerX,
+    shade_to: h === undefined ? null : h === null ? markerX + 0.08 : markerX + h,
     x_label: "x",
     y_label: "f(x)",
     formula_latex: formulaLatex,
@@ -597,8 +597,8 @@ function buildDerivativeScript(params: TemplatePreviewParams): PlaybookScript {
     step(0, {
       step_id: "derivative-curve",
       title: "观察函数曲线",
-      voiceover_text: `先观察 f(x)=x²，并把切点放在 a=${fixed(markerX)}。`,
-      snapshot: derivativeSnapshot(markerX, 1.5, "导数来自切点附近的变化率。", "f(x)=x^2"),
+      voiceover_text: "先锁定主函数与切点；接下来只改变附近点的位置，主曲线始终保持不动。",
+      snapshot: derivativeSnapshot(markerX, undefined, "导数来自切点附近的变化率。", "f(x)=x^2"),
     }),
   ];
   secants.forEach((h, index) => {
@@ -606,7 +606,7 @@ function buildDerivativeScript(params: TemplatePreviewParams): PlaybookScript {
     steps.push(step(steps.length, {
       step_id: `derivative-secant-${index + 1}`,
       title: `缩小间隔 h=${h}`,
-      voiceover_text: `当 h=${h} 时，割线斜率是 ${fixed(secantSlope)}。h 越小，割线越接近切线。`,
+      voiceover_text: `观察割线绕切点逐渐转动；间隔缩小到 h=${h} 时，它的方向更接近稳定极限。`,
       snapshot: derivativeSnapshot(
         markerX,
         h,
@@ -618,7 +618,7 @@ function buildDerivativeScript(params: TemplatePreviewParams): PlaybookScript {
   steps.push(step(steps.length, {
     step_id: "derivative-tangent",
     title: "割线收敛为切线",
-    voiceover_text: `当 h 趋近于零，割线斜率趋近 ${fixed(slope)}，这就是切点处的导数。`,
+    voiceover_text: "当两点间隔趋近于零，割线稳定为切线；这个极限斜率就是切点处的导数。",
     snapshot: derivativeSnapshot(
       markerX,
       null,
@@ -654,6 +654,22 @@ function buildDerivativeScript(params: TemplatePreviewParams): PlaybookScript {
     }],
     algorithm_id: "derivative_tangent",
     initial_data: { function: ["x^2"], marker_x: [fixed(markerX)] },
+  };
+}
+
+function derivativeDirectorFor(script: PlaybookScript): DirectorScript {
+  const director = directorFor("derivative-tangent", script);
+  return {
+    ...director,
+    beats: director.beats.map((beat) => {
+      if (beat.step_id === "derivative-secant-2") {
+        return { ...beat, camera_motion: "push_in" as const };
+      }
+      if (beat.step_id === "derivative-secant-3") {
+        return { ...beat, camera_motion: "pull_out" as const };
+      }
+      return beat;
+    }),
   };
 }
 
@@ -892,7 +908,7 @@ const TEMPLATE_PREVIEW_CASES: Record<TemplatePreviewCaseId, TemplatePreviewCase>
       resetPlayback: false,
     }],
     buildScript: buildDerivativeScript,
-    buildDirector: (script) => directorFor("derivative-tangent", script),
+    buildDirector: derivativeDirectorFor,
     buildFollowups: buildDerivativeFollowups,
   },
   projectile: {

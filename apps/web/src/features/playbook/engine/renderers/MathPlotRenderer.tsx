@@ -102,6 +102,9 @@ const PALETTE: Record<"dark" | "light", MathPalette> = {
 
 const PLOT_H = SVG_H - MARGIN.top - MARGIN.bottom;
 const SAMPLES = MATH_PLOT.CURVE_SAMPLES;
+// Keeps title and formula chrome inside the viewport at the supported 1.08 camera scale.
+const CAMERA_SAFE_HEADER_INSET_PX = 44;
+const CAMERA_SAFE_HEADER_TOP_PX = 24;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -131,6 +134,176 @@ function curveColor(
   return colors.curvePrimary[primaryIndex % colors.curvePrimary.length];
 }
 
+function compileCurves(snap: MathPlotSnapshot): CompiledCurve[] {
+  let primaryCount = 0;
+  return (snap.curves ?? []).map((curve) => {
+    let fn: CompiledExpr | null = null;
+    try {
+      fn = compileExpr(curve.expression);
+    } catch {
+      fn = null;
+    }
+    const isPrimary = curve.emphasis !== "secondary" && curve.emphasis !== "accent";
+    const primaryIndex = isPrimary ? primaryCount++ : 0;
+    return {
+      expression: curve.expression,
+      label: curve.label,
+      emphasis: curve.emphasis,
+      semanticRole: curve.semantic_role,
+      fn,
+      points: fn ? sampleExpr(fn, snap.x_min, snap.x_max, SAMPLES, snap.params) : [],
+      primaryIndex,
+    };
+  });
+}
+
+function sameOptionalRange(
+  previous: number | null | undefined,
+  current: number | null | undefined,
+): boolean {
+  return previous == null && current == null
+    ? true
+    : Number.isFinite(previous) && Number.isFinite(current) && previous === current;
+}
+
+function uniqueMatchIndex(
+  curves: CompiledCurve[],
+  predicate: (curve: CompiledCurve) => boolean,
+  used: Set<number>,
+): number | null {
+  const matches = curves
+    .map((curve, index) => ({ curve, index }))
+    .filter(({ curve, index }) => !used.has(index) && predicate(curve));
+  return matches.length === 1 ? matches[0].index : null;
+}
+
+function matchedPreviousCurveIndex(
+  current: CompiledCurve,
+  currentIndex: number,
+  currentCurves: CompiledCurve[],
+  previousCurves: CompiledCurve[],
+  used: Set<number>,
+): number | null {
+  const semanticRole = current.semanticRole?.trim();
+  if (semanticRole) {
+    const currentRoleCount = currentCurves.filter(
+      (curve) => curve.semanticRole?.trim() === semanticRole,
+    ).length;
+    if (currentRoleCount !== 1) return null;
+    return uniqueMatchIndex(
+      previousCurves,
+      (curve) => curve.semanticRole?.trim() === semanticRole,
+      used,
+    );
+  }
+
+  const expressionMatch = uniqueMatchIndex(
+    previousCurves,
+    (curve) => curve.expression === current.expression,
+    used,
+  );
+  if (expressionMatch != null) return expressionMatch;
+
+  const previousAtIndex = previousCurves[currentIndex];
+  if (
+    currentCurves.length === 1 &&
+    previousCurves.length === 1 &&
+    !previousAtIndex?.semanticRole?.trim()
+  ) {
+    return currentIndex;
+  }
+  return null;
+}
+
+interface MathPlotTransition {
+  curves: CompiledCurve[];
+  markerX: number | null | undefined;
+  shadeFrom: number | null | undefined;
+  shadeTo: number | null | undefined;
+}
+
+function interpolateFinite(
+  previous: number | null | undefined,
+  current: number | null | undefined,
+  progress: number,
+): number | null | undefined {
+  if (!Number.isFinite(previous) || !Number.isFinite(current)) return current;
+  return (previous as number) + ((current as number) - (previous as number)) * progress;
+}
+
+function compatibleMathPlotTransition(
+  previous: MathPlotSnapshot,
+  current: MathPlotSnapshot,
+  currentCurves: CompiledCurve[],
+  progress: number,
+): MathPlotTransition | null {
+  if (
+    previous.x_min !== current.x_min ||
+    previous.x_max !== current.x_max ||
+    !sameOptionalRange(previous.y_min, current.y_min) ||
+    !sameOptionalRange(previous.y_max, current.y_max) ||
+    (previous.curves ?? []).length !== (current.curves ?? []).length ||
+    currentCurves.length === 0
+  ) {
+    return null;
+  }
+
+  const previousCurves = compileCurves(previous);
+  if (
+    previousCurves.length !== currentCurves.length ||
+    previousCurves.some((curve) => !curve.fn || curve.points.length === 0) ||
+    currentCurves.some((curve) => !curve.fn || curve.points.length === 0)
+  ) {
+    return null;
+  }
+
+  const previousLead = previousCurves.find((curve) => curve.fn);
+  const currentLead = currentCurves.find((curve) => curve.fn);
+  if (!previousLead || !currentLead || previousLead.expression !== currentLead.expression) {
+    return null;
+  }
+
+  const used = new Set<number>();
+  const interpolated: CompiledCurve[] = [];
+  for (let index = 0; index < currentCurves.length; index += 1) {
+    const currentCurve = currentCurves[index];
+    const previousIndex = matchedPreviousCurveIndex(
+      currentCurve,
+      index,
+      currentCurves,
+      previousCurves,
+      used,
+    );
+    if (previousIndex == null) return null;
+    const previousCurve = previousCurves[previousIndex];
+    if (previousCurve.points.length !== currentCurve.points.length) return null;
+    const points: SamplePoint[] = [];
+    for (let pointIndex = 0; pointIndex < currentCurve.points.length; pointIndex += 1) {
+      const from = previousCurve.points[pointIndex];
+      const to = currentCurve.points[pointIndex];
+      if (
+        !Number.isFinite(from.x) ||
+        !Number.isFinite(from.y) ||
+        !Number.isFinite(to.x) ||
+        !Number.isFinite(to.y) ||
+        from.x !== to.x
+      ) {
+        return null;
+      }
+      points.push({ x: to.x, y: from.y + (to.y - from.y) * progress });
+    }
+    used.add(previousIndex);
+    interpolated.push({ ...currentCurve, points });
+  }
+
+  return {
+    curves: interpolated,
+    markerX: interpolateFinite(previous.marker_x, current.marker_x, progress),
+    shadeFrom: interpolateFinite(previous.shade_from, current.shade_from, progress),
+    shadeTo: interpolateFinite(previous.shade_to, current.shade_to, progress),
+  };
+}
+
 interface CompiledCurve {
   expression: string;
   label: string | null | undefined;
@@ -145,9 +318,11 @@ interface CompiledCurve {
 
 export const MathPlotRenderer: React.FC<RendererProps> = ({
   step,
+  prevStep,
   frame,
   stepStartFrame,
   progress,
+  stepProgress,
   theme,
   onInteraction,
 }) => {
@@ -188,28 +363,17 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
   const xMin = snap.x_min;
   const xMax = snap.x_max;
 
-  const compiled = React.useMemo<CompiledCurve[]>(() => {
-    let primaryCount = 0;
-    return (snap.curves ?? []).map((c) => {
-      let fn: CompiledExpr | null = null;
-      try {
-        fn = compileExpr(c.expression);
-      } catch {
-        fn = null;
-      }
-      const isPrimary = c.emphasis !== "secondary" && c.emphasis !== "accent";
-      const primaryIndex = isPrimary ? primaryCount++ : 0;
-      return {
-        expression: c.expression,
-        label: c.label,
-        emphasis: c.emphasis,
-        semanticRole: c.semantic_role,
-        fn,
-        points: fn ? sampleExpr(fn, xMin, xMax, SAMPLES, snap.params) : [],
-        primaryIndex,
-      };
-    });
-  }, [snap.curves, snap.params, xMin, xMax]);
+  const currentCompiled = React.useMemo<CompiledCurve[]>(() => compileCurves(snap), [snap]);
+  const transition = React.useMemo(() => {
+    if (!prevStep || prevStep.snapshot.kind !== "math_plot") return null;
+    return compatibleMathPlotTransition(
+      prevStep.snapshot as MathPlotSnapshot,
+      snap,
+      currentCompiled,
+      clamp01(stepProgress ?? progress),
+    );
+  }, [currentCompiled, prevStep, progress, snap, stepProgress]);
+  const compiled = transition?.curves ?? currentCompiled;
 
   const drawable = compiled.filter((c) => c.points.length > 0);
 
@@ -256,8 +420,9 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
     snap.shade_to > snap.shade_from
   ) {
     const shadeReveal = clamp01((reveal - 0.15) / 0.85);
-    const shadeFrom = snap.shade_from;
-    const right = shadeFrom + (snap.shade_to - shadeFrom) * shadeReveal;
+    const shadeFrom = transition?.shadeFrom ?? snap.shade_from;
+    const shadeTo = transition?.shadeTo ?? snap.shade_to;
+    const right = shadeFrom + (shadeTo - shadeFrom) * shadeReveal;
     if (right > shadeFrom + 1e-9) {
       // Issue #44: reuse the lead curve's own samples (sampled at SAMPLES
       // density across [xMin, xMax]) so the shade's top edge exactly tracks
@@ -289,12 +454,13 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
 
   // Point marker on the lead curve.
   let marker: { px: number; py: number; mx: number; my: number; opacity: number } | null = null;
-  if (lead?.fn && snap.marker_x != null) {
-    const my = lead.fn({ ...(snap.params ?? {}), x: snap.marker_x });
+  const markerX = transition?.markerX ?? snap.marker_x;
+  if (lead?.fn && markerX != null) {
+    const my = lead.fn({ ...(snap.params ?? {}), x: markerX });
     if (Number.isFinite(my)) {
-      const xFrac = (snap.marker_x - xMin) / (xMax - xMin);
+      const xFrac = (markerX - xMin) / (xMax - xMin);
       const opacity = clamp01((reveal - Math.min(0.85, xFrac)) * 6);
-      marker = { px: sx(snap.marker_x), py: sy(my), mx: snap.marker_x, my, opacity };
+      marker = { px: sx(markerX), py: sy(my), mx: markerX, my, opacity };
     }
   }
 
@@ -310,6 +476,7 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
     <div
       className="math-plot-renderer"
       data-theme={theme}
+      data-math-plot-transition={transition ? "interpolated" : "static"}
       data-pack-id={snap.pack_id ?? undefined}
       data-plot-asset-id={snap.asset_id ?? undefined}
       style={{
@@ -328,7 +495,7 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
           alignItems: "center",
           justifyContent: "space-between",
           gap: 16,
-          padding: "12px 22px 4px",
+          padding: `${CAMERA_SAFE_HEADER_TOP_PX}px ${CAMERA_SAFE_HEADER_INSET_PX}px 4px`,
         }}
       >
         <h2
