@@ -357,7 +357,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-array-cell-state="active"',
       "binarySearch",
     ],
-    imageQuality: imageQuality(65000, 150, 0.09, 0.82, 0.8),
+    imageQuality: imageQuality(65000, 150, 0.04, 0.82, 0.8),
   },
 ];
 
