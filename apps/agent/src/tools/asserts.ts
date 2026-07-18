@@ -54,11 +54,8 @@ export function makeAssertTools(deps: AssertToolDeps): AgentTool[] {
   return [
     defineTool(
       "assert_orientation",
-      "Assert: parametric orientation",
-      "Ask the geometry validator whether a parametric curve already added " +
-        "to the current step traces clockwise or counterclockwise. Call this " +
-        "BEFORE writing narration that says 顺/逆时针. Pass the curve_id " +
-        "returned by add_curve_parametric.",
+      "校验参数曲线旋向",
+      "询问 geometry validator：当前步骤中已添加的参数曲线是 clockwise 还是 counterclockwise。旁白声称顺/逆时针前必须调用，并传入 add_curve_parametric 返回的 curve_id。",
       Type.Object({
         curve_id: Type.Integer(),
       }),
@@ -82,11 +79,8 @@ export function makeAssertTools(deps: AssertToolDeps): AgentTool[] {
 
     defineTool(
       "assert_passes_through",
-      "Assert: point on curve",
-      "Confirm that a parametric curve already added to the current step " +
-        "passes through a specific point (within an optional tolerance, " +
-        "default 0.01). Use this when narration claims '初始点 (x, y)' or " +
-        "'终点 (x, y)'.",
+      "校验曲线经过点",
+      "确认当前步骤中已添加的参数曲线是否在可选 tolerance（默认 0.01）内经过指定点。旁白声称“初始点 (x, y)”或“终点 (x, y)”时使用。",
       Type.Object({
         curve_id: Type.Integer(),
         x: Type.Number(),
@@ -121,10 +115,8 @@ export function makeAssertTools(deps: AssertToolDeps): AgentTool[] {
 
     defineTool(
       "assert_monotonic",
-      "Assert: monotonic over interval",
-      "Check whether a 1-D function y=f(x) is increasing, decreasing, mixed, " +
-        "or constant over an interval. Use this when narration claims " +
-        "'在该区间递增/递减'.",
+      "校验区间单调性",
+      "检查一维函数 y=f(x) 在指定区间是 increasing、decreasing、mixed 还是 constant。旁白声称“在该区间递增/递减”时使用。",
       Type.Object({
         expression: Type.String({ minLength: 1 }),
         x_min: Type.Number(),

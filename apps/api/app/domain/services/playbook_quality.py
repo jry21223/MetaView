@@ -22,8 +22,8 @@ from app.domain.models.review import (
 )
 from app.domain.services.asset_manifest_resolver import resolve_asset_by_id
 
-MIN_AGENT_STEPS = 8
-MAX_AGENT_STEPS = 14
+MIN_AGENT_STEPS = 3
+MAX_AGENT_STEPS = 12
 _DEFAULT_FPS = 30
 _DEFAULT_STEP_FRAMES = 120
 _MIN_STEP_SECONDS = 5.5
@@ -426,10 +426,15 @@ def _check_structure(
                 PlaybookIssueSeverity.ERROR,
                 "steps",
                 (
-                    f"Playbook has {len(playbook.steps)} step(s); launch-safe "
-                    f"bounds are {MIN_AGENT_STEPS}-{MAX_AGENT_STEPS}."
+                    f"Playbook 只有 {len(playbook.steps)} 步，讲解缺少必要的教学过程。"
+                    if len(playbook.steps) < MIN_AGENT_STEPS
+                    else f"Playbook 有 {len(playbook.steps)} 步，超过允许的 {MAX_AGENT_STEPS} 步。"
                 ),
-                "Regenerate with a concise but complete step sequence.",
+                (
+                    "补充必要的知识状态、推导阶段或视觉状态。"
+                    if len(playbook.steps) < MIN_AGENT_STEPS
+                    else "合并重复或过于细碎的步骤。"
+                ),
             )
         )
 

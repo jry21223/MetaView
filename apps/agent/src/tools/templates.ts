@@ -32,10 +32,8 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "template_array_swap",
-      "Template: array swap",
-      "Emit a 3-step sequence visualizing an array element swap: " +
-        "(1) highlight a[i] and a[j], (2) execute the swap, (3) show the " +
-        "result. Use for sorting demos.",
+      "模板：数组交换",
+      "生成三步数组元素交换序列：突出 a[i] 与 a[j]、执行交换、展示结果。用于排序演示。",
       Type.Object({
         values: Type.Array(Type.String(), { minItems: 2 }),
         i: Type.Integer({ minimum: 0 }),
@@ -86,9 +84,8 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "template_array_compare",
-      "Template: array compare",
-      "Emit a 2-step compare sequence: highlight a[i] and a[j], then state " +
-        "the comparison result (lt/gt/eq).",
+      "模板：数组比较",
+      "生成两步比较序列：突出 a[i] 与 a[j]，再说明比较结果 lt/gt/eq。",
       Type.Object({
         values: Type.Array(Type.String(), { minItems: 2 }),
         i: Type.Integer({ minimum: 0 }),
@@ -134,9 +131,8 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "template_pointer_step",
-      "Template: pointer step",
-      "Single step showing a pointer / index moving from prev_index to " +
-        "next_index along an array.",
+      "模板：指针移动",
+      "用单一步骤展示 pointer/index 沿数组从 prev_index 移动到 next_index。",
       Type.Object({
         values: Type.Array(Type.String(), { minItems: 1 }),
         prev_index: Type.Integer({ minimum: -1 }),
@@ -166,14 +162,13 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "template_tangent_at",
-      "Template: tangent line",
-      "One step showing the tangent line of ``y = f(x)`` at ``x = x0`` " +
-        "alongside the curve. Internally adds the curve plus a formula.",
+      "模板：切线",
+      "用单一步骤同时展示曲线与 ``y = f(x)`` 在 ``x = x0`` 处的切线，内部会添加曲线和公式。",
       Type.Object({
-        base_expression: Type.String({ minLength: 1, description: "f(x) string" }),
+        base_expression: Type.String({ minLength: 1, description: "f(x) 表达式字符串" }),
         derivative_expression: Type.String({
           minLength: 1,
-          description: "f'(x) string — the agent supplies the derivative explicitly",
+          description: "f'(x) 表达式字符串；由 Agent 明确提供导函数",
         }),
         x0: Type.Number(),
         x_min: Type.Number(),
@@ -201,9 +196,8 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "template_function_transform",
-      "Template: function transform",
-      "Single step showing a function ``f(x)`` and its transformed version " +
-        "(shift / scale on x or y). Exposes the transform parameter as a slider.",
+      "模板：函数变换",
+      "用单一步骤展示函数 ``f(x)`` 及其变换结果（x/y 方向平移或缩放），并将变换参数暴露为 slider。",
       Type.Object({
         base_expression: Type.String({ minLength: 1 }),
         transformed_expression: Type.String({ minLength: 1 }),
@@ -245,9 +239,8 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "template_riemann_sum",
-      "Template: Riemann sum",
-      "Three-step Riemann sum approximation: n=2, n=4, n=8 rectangles under " +
-        "y=f(x) on [a, b]. Use to motivate definite integrals.",
+      "模板：Riemann sum",
+      "用三步展示 Riemann sum 逼近：在 [a, b] 上依次使用 n=2、n=4、n=8 个矩形逼近 y=f(x)，用于引出定积分。",
       Type.Object({
         expression: Type.String({ minLength: 1 }),
         a: Type.Number(),
@@ -293,10 +286,8 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "template_parametric_trace",
-      "Template: parametric trace",
-      "Single step drawing a parametric curve plus several marker points " +
-        "at evenly spaced t values along [t_min, t_max]. Useful for showing " +
-        "the direction of motion without a vector field.",
+      "模板：参数轨迹",
+      "用单一步骤绘制参数曲线，并在 [t_min, t_max] 内等间隔的 t 值处添加 marker point；无需 vector field 即可表示运动方向。",
       Type.Object({
         expression_x: Type.String({ minLength: 1 }),
         expression_y: Type.String({ minLength: 1 }),
@@ -331,9 +322,8 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "template_force_diagram",
-      "Template: force diagram",
-      "Single step with a free-body diagram: each force is rendered as a " +
-        "labeled arrow from the origin.",
+      "模板：受力图",
+      "用单一步骤绘制 free-body diagram，每个力都从原点渲染为带标签的箭头。",
       Type.Object({
         forces: Type.Array(
           Type.Object({
@@ -368,8 +358,8 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "template_projectile_trajectory",
-      "Template: projectile",
-      "Four-step projectile motion: launch, mid-flight, apex, landing.",
+      "模板：抛体运动",
+      "用四步展示抛体运动的发射、飞行中段、最高点和落地。",
       Type.Object({
         v0: Type.Number({ minimum: 0 }),
         angle_deg: Type.Number(),
@@ -423,8 +413,8 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "template_shm",
-      "Template: simple harmonic motion",
-      "Three-step simple harmonic motion: position, velocity, energy curves.",
+      "模板：简谐运动",
+      "用三步展示简谐运动的位移、速度和能量曲线。",
       Type.Object({
         amplitude: Type.Number({ minimum: 0 }),
         omega: Type.Number({ minimum: 0 }),
@@ -465,14 +455,13 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "template_code_step",
-      "Template: code line",
-      "Highlight a single source line and the current values of selected " +
-        "variables. Use when explaining algorithm execution at line granularity.",
+      "模板：代码行",
+      "突出一行 source code 和所选变量的当前值，用于按代码行粒度解释 algorithm 执行。",
       Type.Object({
         source: Type.String({ minLength: 1 }),
         line_index: Type.Integer({ minimum: 0 }),
         variables: Type.Record(Type.String(), Type.String(), {
-          description: "var name -> displayed value",
+          description: "变量名到显示值的映射",
         }),
         start_step_index: Type.Integer({ minimum: 1 }),
       }),

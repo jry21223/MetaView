@@ -31,13 +31,13 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "plan_outline",
-      "Plan outline",
-      "Decide which 8-14 step titles to use for this playbook. Call this " +
-        "FIRST so subsequent begin_step calls have a stable index range. " +
-        "Domain must be one of algorithm/math/code/physics/chemistry/biology/geography.",
+      "规划教学步骤",
+      "根据教学内容决定本次 Playbook 的步骤标题。通常生成 4–8 个步骤，但不要求固定数量；实际允许 3–12 个步骤。" +
+        "必须首先调用，以便后续 begin_step 使用稳定的 index 范围。" +
+        "domain 必须是 algorithm/math/code/physics/chemistry/biology/geography 之一。",
       Type.Object({
-        domain: Type.String({ description: "lower-case topic domain" }),
-        step_titles: Type.Array(Type.String(), { minItems: 4, maxItems: 16 }),
+        domain: Type.String({ description: "小写主题 domain" }),
+        step_titles: Type.Array(Type.String(), { minItems: 3, maxItems: 12 }),
         title: Type.Optional(Type.String()),
         summary: Type.Optional(Type.String()),
       }),
@@ -54,9 +54,8 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "begin_step",
-      "Begin step",
-      "Open a new step. Subsequent draw / narration calls operate on this " +
-        "step until commit_step is called.",
+      "开始步骤",
+      "打开一个新步骤。在调用 commit_step 前，后续绘图和旁白调用都作用于当前步骤。",
       Type.Object({
         index: Type.Integer({ minimum: 1 }),
         title: Type.String({ minLength: 1, maxLength: 80 }),
@@ -71,11 +70,11 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "set_narration",
-      "Set narration",
-      "Replace the current step's narration text. Pass an array of strings " +
-        "(each element is a sentence). Must answer 为什么 → 做什么 → 学到了什么.",
+      "设置旁白",
+      "设置当前步骤的旁白。数组中的每个元素表示一个自然字幕片段，而不是必须完成的固定句式。" +
+        "优先使用 1–2 个片段，只有必要时才增加。旁白应与画面同步，并只补充画面无法直接表达的信息。",
       Type.Object({
-        text: Type.Array(Type.String(), { minItems: 1, maxItems: 8 }),
+        text: Type.Array(Type.String(), { minItems: 1, maxItems: 4 }),
       }),
       async (args) => {
         emitter.setNarration(args.text);
@@ -87,9 +86,8 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "set_axes",
-      "Set axes",
-      "Set the visible coordinate ranges and axis labels for the current " +
-        "step. Recommended for math scene/function steps.",
+      "设置坐标轴",
+      "设置当前步骤可见的坐标范围和轴标签，建议用于 math scene 或函数图像步骤。",
       Type.Object({
         x_min: Type.Number(),
         x_max: Type.Number(),
@@ -115,10 +113,8 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "add_curve_parametric",
-      "Add parametric curve",
-      "Add a parametric curve ``(x(t), y(t))`` over ``[t_min, t_max]``. " +
-        "Expressions use the same character set MathPlotRenderer accepts " +
-        "(sin/cos/exp/log + parameters).",
+      "添加参数曲线",
+      "在 ``[t_min, t_max]`` 上添加参数曲线 ``(x(t), y(t))``。expression 使用 MathPlotRenderer 接受的字符集（sin/cos/exp/log 与参数）。",
       Type.Object({
         expression_x: Type.String({ minLength: 1 }),
         expression_y: Type.String({ minLength: 1 }),
@@ -144,10 +140,8 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "add_curve_1d",
-      "Add 1D curve",
-      "Add a 1-D function y=f(x). Use this for typical math function plots, " +
-        "tangent lines, derivative comparisons, integrals (with shade_from/to " +
-        "set elsewhere).",
+      "添加一维曲线",
+      "添加一维函数 y=f(x)。用于常见函数图像、切线、导数比较和积分区域；shade_from/to 在其他调用中设置。",
       Type.Object({
         expression: Type.String({ minLength: 1 }),
         label: Type.String(),
@@ -171,8 +165,8 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "add_point",
-      "Add point",
-      "Mark a single point on the scene.",
+      "添加点",
+      "在当前画面中标记一个点。",
       Type.Object({
         x: Type.Number(),
         y: Type.Number(),
@@ -189,11 +183,9 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "add_arrow",
-      "Add arrow",
-      "Draw a single arrow from (x, y) with direction (dx, dy). Use this to " +
-        "indicate motion direction at concrete points. There is NO " +
-        "add_vector_field tool — drawing 20+ arrows just to show flow is " +
-        "forbidden unless the lesson is specifically teaching flow fields.",
+      "添加箭头",
+      "从 (x, y) 沿 (dx, dy) 方向绘制一个箭头，用于指出具体位置的运动方向。" +
+        "不存在 add_vector_field tool；除非课程专门讲解 flow field，否则禁止仅为表示流向而绘制 20 个以上箭头。",
       Type.Object({
         x: Type.Number(),
         y: Type.Number(),
@@ -211,8 +203,8 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "add_segment",
-      "Add segment",
-      "Draw a line segment (with optional arrowhead).",
+      "添加线段",
+      "绘制一条线段，并可选择添加箭头。",
       Type.Object({
         x0: Type.Number(),
         y0: Type.Number(),
@@ -233,8 +225,8 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "add_region",
-      "Add region",
-      "Fill a polygon defined by its vertices.",
+      "添加区域",
+      "填充由 vertices 定义的多边形区域。",
       Type.Object({
         vertices: Type.Array(
           Type.Tuple([Type.Number(), Type.Number()]),
@@ -257,8 +249,8 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "add_formula",
-      "Add formula",
-      "Attach a KaTeX formula to the current step (rendered as overlay).",
+      "添加公式",
+      "向当前步骤添加 KaTeX 公式，并作为 overlay 渲染。",
       Type.Object({
         latex: Type.String({ minLength: 1 }),
       }),
@@ -272,9 +264,8 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "add_array_tokens",
-      "Add array tokens",
-      "Populate the current step with a sequence of array element tokens. " +
-        "Use this for algorithm visualizations (sorting, search).",
+      "添加数组元素",
+      "向当前步骤加入一组数组元素 token，用于排序、查找等 algorithm 可视化。",
       Type.Object({
         values: Type.Array(Type.String(), { minItems: 1 }),
         emphasis_map: Type.Optional(Type.Record(Type.String(), EmphasisSchema)),
@@ -296,9 +287,8 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "add_parameter_control",
-      "Add parameter control",
-      "Expose a free parameter (e.g. ``a`` in ``a*x + b``) as a slider in " +
-        "the player. Use one per parameter referenced in your curve expressions.",
+      "添加参数控件",
+      "把自由参数（例如 ``a*x + b`` 中的 ``a``）作为播放器 slider。curve expression 引用的每个参数使用一个控件。",
       Type.Object({
         id: Type.String({ minLength: 1, maxLength: 32 }),
         label: Type.String(),
@@ -320,9 +310,8 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "commit_step",
-      "Commit step",
-      "Finalize the current step's data and append it to the playbook. " +
-        "After this you can either begin_step again or finalize_playbook.",
+      "提交步骤",
+      "完成当前步骤数据并追加到 Playbook。之后可以继续 begin_step，或调用 finalize_playbook。",
       Type.Object({}),
       async () => {
         const result = emitter.commitStep();
@@ -334,9 +323,8 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
   tools.push(
     defineTool<TSchema, { playbook: PlaybookOutput }>(
       "finalize_playbook",
-      "Finalize playbook",
-      "Materialize the complete PlaybookScript. The agent loop terminates " +
-        "after this — do NOT issue any more tool calls afterward.",
+      "完成 Playbook",
+      "生成完整的 PlaybookScript。调用后 Agent loop 会终止，不得再发起任何工具调用。",
       Type.Object({}),
       async () => toolResult({ playbook: emitter.finalize() }, { terminate: true }),
     ) as AgentTool,

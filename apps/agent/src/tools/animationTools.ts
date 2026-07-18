@@ -69,10 +69,8 @@ export function makeAnimationToolTools(deps: AnimationToolDeps): AgentTool[] {
   return [
     defineTool(
       "animation_tool_list",
-      "Animation tools: list",
-      "List backend-registered Animation Tool Registry macros. Call this " +
-        "before manually drawing common animation patterns so you can use a " +
-        "deterministic registry tool when one matches.",
+      "列出动画工具",
+      "列出后端 Animation Tool Registry 中已注册的 macro。手工绘制常见动画模式前先调用；如果已有匹配项，应使用确定性的 registry tool。",
       Type.Object({}),
       async () => {
         const data = await request<AnimationToolListResult>(
@@ -84,14 +82,12 @@ export function makeAnimationToolTools(deps: AnimationToolDeps): AgentTool[] {
 
     defineTool(
       "animation_tool_expand",
-      "Animation tools: expand",
-      "Expand one backend Animation Tool Registry macro into deterministic " +
-        "LayerSpec JSON. Use the returned layers as the source of truth for " +
-        "common animations instead of inventing raw layer JSON by hand.",
+      "展开动画工具",
+      "将一个后端 Animation Tool Registry macro 展开为确定性的 LayerSpec JSON。把返回的 layers 作为常见动画的事实来源，不要手工虚构原始 layer JSON。",
       Type.Object({
         tool: Type.String({ minLength: 1 }),
         args: Type.Record(Type.String(), Type.Unknown(), {
-          description: "Free-form JSON args for the selected animation tool.",
+          description: "所选 animation tool 的自由格式 JSON args。",
         }),
       }),
       async (args) => {

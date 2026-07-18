@@ -375,7 +375,7 @@ The output is a SINGLE JSON object with two layers:
 - 每一步只引入 **一个** 新概念；不要在同一步把定义、性质、应用一次塞完。
 - 第一次出现的术语必须先用一句日常类比，再给形式定义。
   例：「导数就像测速仪——它告诉你函数在这一点变化得多快。形式上 f'(x) = …」
-- 每一步 narration 顺序：**先「为什么需要这一步」→ 再「这一步做什么」→ 最后「得到了什么」**。
+- narration 必须与当前画面同步，只补充画面无法直接表达的信息；通常使用 1–2 句自然旁白。
 - 禁止术语堆砌：不允许连续出现两个未解释的专有名词。
 - 句子长度交替：短句用于强调，长句用于解释。
 - 用第二人称「你」「我们」，避免「该函数」「此变量」这种公文腔。
@@ -385,9 +385,9 @@ The output is a SINGLE JSON object with two layers:
 ## CRITICAL OUTPUT RULES
 1. Output ONLY valid JSON. No markdown fences, no explanations, no extra text.
 2. The JSON must match the schema exactly and be parseable by Python json.loads().
-3. Produce 8–14 steps in cir.steps (aim for 10–12 for typical topics; only go below 8
-   for trivial drill-style questions and only push to 14 when the topic genuinely
-   needs that many distinct milestones). ONE checkpoint per step (1:1).
+3. 根据教学内容决定 cir.steps 的必要数量，通常使用 4–8 步，实际允许 3–12 步。
+   不得为了数量拆分步骤；只有知识状态、主要视觉关系、教学目标或中间结论发生实质变化时才新增步骤。
+   ONE checkpoint per step (1:1).
 4. Every step must have a distinct visual state — no duplicate token configurations.
 5. execution_map.checkpoints[].step_id MUST match a cir.steps[].id.
 6. checkpoint.start_s / end_s must partition [0, duration_s] without gaps or overlap.
@@ -433,20 +433,13 @@ Example (bubble sort compare step):
    [{{}},[{{"t":"t0"}}," equals ",{{"t":"t1"}},", no swap."]]]]
 
 ## Narration Quality Rules
-- Narration must explain WHY this step matters, not just WHAT it shows.
-- Write as if speaking directly to a student: clear, friendly, educational.
-- Vary sentence length. Avoid starting every sentence the same way.
-
-## Narration Depth Rules (HARD REQUIREMENT — 用来对抗「太短」)
-- 每一步 narration 数组合并成纯文本后，长度必须 ≥ **3 句完整句子**（中文 ≥ 80 字 / 英文 ≥ 50 words）。
-  例外：纯结论收束步骤 (final recap) 可以 2 句。
-- 每一步必须依次回答三件事：
-  1. **为什么需要这一步**（动机 / 上一步留下的疑问）
-  2. **这一步在做什么**（具体操作或推导，配 token / 公式 / 图）
-  3. **你学到了什么**（一句话总结 / 提醒下一步要看的东西）
-- 引入新术语时额外加一句日常类比，不要因为「占行数」而堆形容词。
-- 严禁拿同一段 narration 复制粘贴改两个字凑步数；如果两步内容相近，合并它们或把第二步换成「对比 / 反例 / 极端情况」。
-- voiceover_text（如果你也输出）应当紧扣 narration 文本，**别只写一句「我们来看下一步」**。
+- narration 必须与当前画面同步，并只补充画面无法直接表达的信息。
+- 不规定最低句子数量。通常使用 1–2 句简洁旁白；只有推导转折、误区解释或最终结论确实需要时才加长。
+- 禁止逐字重复已经清楚显示的标题、公式、标签、当前变量值、队列、访问顺序或图中状态。
+- 优先指出学生此刻需要观察什么、当前变化为什么重要，以及它如何连接到下一步或结论。
+- 使用自然语言，不要机械套用“首先、然后、最后”，也不要每步重复“这一步我们将……”。
+- 严禁复制同一段 narration 后只改少量文字来凑步数；画面与知识状态没有实质变化时应合并步骤。
+- voiceover_text（如果输出）应紧扣 narration 文本，不要使用空泛的过渡句。
 
 ## Token Quality Rules
 - Labels must be concise (≤ 8 characters). Use actual values, not descriptions.
@@ -576,9 +569,8 @@ review/repair。不要用空对象或猜测默认值调用工具；不确定时�
    层之间的 z_order 是否反映正确的视觉前后关系？
    **不要把同一种 kind 的 layer 重复两次**——一个 step 里 math_scene 只能出现一次。
 10. 让一名零基础同学读你的 narration——他能复述出「这一步在干嘛、为什么」吗？
-11. 步数是否落在 8–14 之间？少于 8 步时，先问自己「有没有把动机、定义、例子、反例、推广、应用都讲过」；
-    多于 14 步时，把过渡步合并掉。
-12. 每一步 narration 合并后是否够 ≥3 句话、≥80 中文字 / ≥50 英文 words？短了就补「为什么 / 例子 / 学到了什么」。
+11. 步数是否由教学内容决定并落在 3–12 之间？通常使用 4–8 步；只有知识状态、主要视觉关系、教学目标或中间结论发生实质变化时才新增步骤。
+12. narration 是否与画面同步、通常保持 1–2 句，并避免逐字重复画面已显示的信息？
 13. 是否出现了「我们来看下一步 / 接下来 / 然后呢」这种过渡式 narration？有就改成实质内容。
 {code_track}"""
 

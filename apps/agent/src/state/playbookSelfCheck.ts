@@ -21,14 +21,14 @@ export class AgentSelfCheckError extends Error {
   report: SelfCheckReport;
 
   constructor(report: SelfCheckReport) {
-    super("agent self-check blocked PlaybookScript generation");
+    super("Agent Self-check 阻塞了 PlaybookScript 生成");
     this.name = "AgentSelfCheckError";
     this.report = report;
   }
 }
 
-const MIN_AGENT_STEPS = 8;
-const MAX_AGENT_STEPS = 14;
+const MIN_AGENT_STEPS = 3;
+const MAX_AGENT_STEPS = 12;
 
 const SUPPORTED_FRONTEND_SNAPSHOT_KINDS = new Set([
   "algorithm_array",
@@ -164,8 +164,8 @@ function checkStructure(
         "step.too_shallow",
         "error",
         "title",
-        "Playbook title is empty.",
-        "Set a short title that names the lesson.",
+        "Playbook title 为空。",
+        "设置一个能说明课程主题的简短 title。",
       ),
     );
   }
@@ -175,8 +175,8 @@ function checkStructure(
         "step.too_shallow",
         "warning",
         "summary",
-        "Playbook summary is empty.",
-        "Add a one-sentence summary of the lesson.",
+        "Playbook summary 为空。",
+        "补充一句简洁的课程摘要。",
       ),
     );
   }
@@ -189,8 +189,12 @@ function checkStructure(
         "step.too_shallow",
         "error",
         "steps",
-        `Playbook has ${playbook.steps.length} step(s); launch-safe bounds are ${MIN_AGENT_STEPS}-${MAX_AGENT_STEPS}.`,
-        "Regenerate with a concise but complete step sequence.",
+        playbook.steps.length < MIN_AGENT_STEPS
+          ? `Playbook 只有 ${playbook.steps.length} 步，少于允许的 ${MIN_AGENT_STEPS} 步，讲解缺少必要的教学过程。`
+          : `Playbook 有 ${playbook.steps.length} 步，超过允许的 ${MAX_AGENT_STEPS} 步。`,
+        playbook.steps.length < MIN_AGENT_STEPS
+          ? "补充必要的知识状态、推导阶段或视觉状态，使讲解形成完整教学过程。"
+          : "合并重复或过于细碎的步骤，只保留知识状态、主要视觉关系或教学目标发生实质变化的步骤。",
       ),
     );
   }
@@ -205,8 +209,8 @@ function checkTiming(playbook: PlaybookOutput, issues: SelfCheckIssue[]): void {
           "timeline.non_monotonic",
           "error",
           `steps[${index}].end_frame`,
-          "Step end_frame values must be strictly increasing.",
-          "Increase each step end_frame beyond the previous step.",
+          "各步骤的 end_frame 必须严格递增。",
+          "将当前步骤的 end_frame 调整到上一完整步骤之后。",
         ),
       );
     }
@@ -221,8 +225,8 @@ function checkTiming(playbook: PlaybookOutput, issues: SelfCheckIssue[]): void {
           "timeline.voiceover_too_short",
           "warning",
           `steps[${index}].end_frame`,
-          `Step duration (${stepDuration} frame${stepDuration === 1 ? "" : "s"}) appears shorter than the estimated narration requirement (${estimatedFrames} frames).`,
-          "Increase this step duration or shorten the narration_text so subtitles can remain aligned.",
+          `步骤时长为 ${stepDuration} 帧，短于旁白预计需要的 ${estimatedFrames} 帧。`,
+          "增加当前步骤时长或缩短 narration_text，确保字幕与画面同步。",
         ),
       );
     }
@@ -236,8 +240,8 @@ function checkTiming(playbook: PlaybookOutput, issues: SelfCheckIssue[]): void {
         "timeline.exceeds_total_frames",
         "error",
         "total_frames",
-        "total_frames does not cover the final step end_frame.",
-        "Set total_frames to at least the last step's end_frame.",
+        "total_frames 未覆盖最后一步的 end_frame。",
+        "将 total_frames 设置为不小于最后一步的 end_frame。",
       ),
     );
   }
@@ -255,8 +259,8 @@ function checkSteps(
           "step.empty_voiceover",
           "error",
           `steps[${index}].voiceover_text`,
-          "Every step must have non-empty voiceover_text.",
-          "Write narration that explains why the step matters and what changes visually.",
+          "每一步都必须包含非空的 voiceover_text。",
+          "补充与当前画面同步的自然旁白，指出学生需要观察的变化及其意义。",
         ),
       );
     }
@@ -273,8 +277,8 @@ function checkSteps(
           "renderer.contract_risk",
           "error",
           `steps[${index}].layers`,
-          "Every step must carry at least one renderer layer.",
-          "Mirror the primary snapshot into layers[0].body.",
+          "每一步至少需要一个 renderer layer。",
+          "将主要 snapshot 完整复制到 layers[0].body。",
         ),
       );
     } else {
@@ -319,8 +323,8 @@ function checkPrimaryLayerMirror(
         "renderer.contract_risk",
         "error",
         `${path}.kind`,
-        `Primary renderer layer kind must match the step snapshot kind; got ${JSON.stringify(layerKind)} for snapshot kind ${JSON.stringify(snapshotKind)}.`,
-        "Mirror the primary snapshot into layers[0].body before adding overlay layers.",
+        `主要 renderer layer kind 必须与步骤 snapshot kind 一致；当前 layer 为 ${JSON.stringify(layerKind)}，snapshot 为 ${JSON.stringify(snapshotKind)}。`,
+        "先将主要 snapshot 完整复制到 layers[0].body，再添加 overlay layer。",
       ),
     );
     return;
@@ -331,8 +335,8 @@ function checkPrimaryLayerMirror(
         "renderer.contract_risk",
         "error",
         path,
-        "Primary renderer layer body must deeply equal the step snapshot.",
-        "Copy the full primary snapshot into layers[0].body and put overlays after it.",
+        "主要 renderer layer body 必须与步骤 snapshot 深度一致。",
+        "将完整的主要 snapshot 复制到 layers[0].body，并把 overlay 放在其后。",
       ),
     );
   }
@@ -350,8 +354,8 @@ function checkSnapshot(
         "snapshot.unsupported_kind",
         "error",
         `${path}.kind`,
-        `Snapshot kind ${JSON.stringify(kind)} is not registered in the frontend renderer registry.`,
-        "Use one of the existing renderer-backed snapshot kinds.",
+        `Snapshot kind ${JSON.stringify(kind)} 未在前端 renderer registry 中注册。`,
+        "使用现有 renderer 已支持的 snapshot kind。",
       ),
     );
     return;
@@ -362,8 +366,8 @@ function checkSnapshot(
         "snapshot.empty_payload",
         "error",
         path,
-        `Snapshot ${JSON.stringify(kind)} has no meaningful visual payload.`,
-        "Add renderer-visible data such as array values, curves, scene objects, or formula text.",
+        `Snapshot ${JSON.stringify(kind)} 不包含有意义的视觉 payload。`,
+        "补充 renderer 可见的数据，例如 array values、curves、scene objects 或 formula text。",
       ),
     );
   }
@@ -386,8 +390,8 @@ function checkSubjectVisualFallback(
         "snapshot.domain_fallback",
         "error",
         `${path}.kind`,
-        `${normalizedDomain} playbooks must not fall back to ${kind}.`,
-        "Use a SceneBlueprint or subject semantic renderer such as geo_map_scene, bio_cell_scene, bio_process_scene, molecule_2d_scene, or reaction_scene instead of an algorithm array.",
+        `${normalizedDomain} Playbook 不得回退为 ${kind}。`,
+        "使用 SceneBlueprint 或学科语义 renderer，例如 geo_map_scene、bio_cell_scene、bio_process_scene、molecule_2d_scene 或 reaction_scene，不得使用 algorithm array 代替。",
       ),
     );
   }
@@ -448,8 +452,8 @@ function checkNarrationVisualMatch(
         "snapshot.narration_mismatch",
         "warning",
         `steps[${index}].voiceover_text`,
-        "Step narration does not appear to reference the visual snapshot.",
-        "Mention the key visual object, formula, array state, or scene element in the narration.",
+        "步骤旁白似乎没有关联当前 visual snapshot。",
+        "在旁白中指出关键视觉对象、公式、array state 或 scene element，但不要逐字重复画面。",
       ),
     );
   }
@@ -479,8 +483,8 @@ function checkFinalStepAnswersPrompt(
         "step.does_not_answer_prompt",
         "error",
         "steps[-1]",
-        "The final step may not answer the user's prompt.",
-        "Make the final narration explicitly state the requested conclusion or result.",
+        "最后一步可能没有回答用户请求。",
+        "在最后一步旁白中明确给出用户请求的结论或结果。",
       ),
     );
   }
@@ -498,8 +502,8 @@ function checkForbiddenRenderingPaths(
           "renderer.contract_risk",
           "error",
           "playbook",
-          `Playbook mentions forbidden rendering path ${JSON.stringify(pattern)}.`,
-          "Use only PlaybookScript consumed by the frontend Remotion renderer.",
+          `Playbook 提到了禁止使用的渲染路径 ${JSON.stringify(pattern)}。`,
+          "只能使用由前端 Remotion renderer 消费的 PlaybookScript。",
         ),
       );
     }

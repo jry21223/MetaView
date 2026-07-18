@@ -65,10 +65,8 @@ export function makeRuntimeToolTools(deps: RuntimeToolDeps): AgentTool[] {
   return [
     defineTool(
       "runtime_tool_list",
-      "Runtime tools: list",
-      "List backend RuntimeToolHub tools, including deterministic SkillPacks, " +
-        "schema validation, Playbook self-checks, geometry validators, and " +
-        "animation registry tools.",
+      "列出运行时工具",
+      "列出后端 RuntimeToolHub tools，包括确定性的 SkillPack、schema validation、Playbook Self-check、geometry validator 和 animation registry tool。",
       Type.Object({}),
       async () => {
         const data = await request<RuntimeToolListResult>("/api/v1/agent/runtime-tools");
@@ -78,13 +76,12 @@ export function makeRuntimeToolTools(deps: RuntimeToolDeps): AgentTool[] {
 
     defineTool(
       "runtime_tool_execute",
-      "Runtime tools: execute",
-      "Execute one backend RuntimeToolHub tool with free-form JSON args. " +
-        "Use this for deterministic kernels and validators instead of guessing.",
+      "执行运行时工具",
+      "使用自由格式 JSON args 执行一个后端 RuntimeToolHub tool。需要 kernel 或 validator 的确定性结果时使用，不得猜测。",
       Type.Object({
         tool: Type.String({ minLength: 1 }),
         args: Type.Record(Type.String(), Type.Unknown(), {
-          description: "Free-form JSON args for the selected runtime tool.",
+          description: "所选 runtime tool 的自由格式 JSON args。",
         }),
       }),
       async (args) => {
