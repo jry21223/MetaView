@@ -171,6 +171,31 @@ describe("advanced math renderers", () => {
     expect(markup).not.toContain("graph-node.svg");
   });
 
+  it("shows an explicit waiting state until BFS dequeues a current node", () => {
+    const waitingMarkup = render({
+      kind: "graph_scene",
+      pack_id: "algorithm-code-basic",
+      asset_id: "bfs-graph-preset",
+      nodes: [{ id: "A", label: "A" }],
+      edges: [],
+      current_node_id: null,
+      queue_node_ids: ["A"],
+    });
+    const activeMarkup = render({
+      kind: "graph_scene",
+      pack_id: "algorithm-code-basic",
+      asset_id: "bfs-graph-preset",
+      nodes: [{ id: "A", label: "A" }],
+      edges: [],
+      current_node_id: "A",
+    });
+
+    expect(waitingMarkup).toContain("— 未出队");
+    expect(waitingMarkup).not.toContain(">node<");
+    expect(activeMarkup).toContain(">A</text>");
+    expect(activeMarkup).not.toContain("— 未出队");
+  });
+
   it("emits stable graph-node selections from accessible pointer and keyboard targets", () => {
     const snapshot = {
       kind: "graph_scene" as const,

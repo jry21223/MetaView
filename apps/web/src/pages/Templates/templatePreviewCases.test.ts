@@ -6,11 +6,12 @@ import {
 } from "./templatePreviewCases";
 
 describe("template preview cases", () => {
-  it("publishes four complete deterministic Playbooks with step-aware follow-ups", () => {
+  it("publishes five complete deterministic Playbooks with step-aware follow-ups", () => {
     expect(TEMPLATE_PREVIEW_CASE_IDS).toEqual([
       "binary-search",
       "bfs-tree",
       "derivative-tangent",
+      "pole-polar",
       "projectile",
     ]);
 
@@ -24,8 +25,7 @@ describe("template preview cases", () => {
       expect(script.total_frames).toBe(script.steps.at(-1)?.end_frame);
       expect(new Set(script.steps.map((step) => step.step_id)).size).toBe(script.steps.length);
       for (const step of script.steps) {
-        expect(followups[step.step_id]?.length).toBeGreaterThanOrEqual(2);
-        expect(followups[step.step_id]?.length).toBeLessThanOrEqual(3);
+        expect(followups[step.step_id]).toHaveLength(3);
         if (step.code_highlight) {
           expect(step.code_highlight.active_line).toBeGreaterThanOrEqual(0);
           expect(step.code_highlight.active_line).toBeLessThan(step.code_highlight.lines.length);
@@ -53,7 +53,7 @@ describe("template preview cases", () => {
     if (missingResult?.kind === "algorithm_bars") {
       expect(missingResult.numeric_values).toEqual([2, 4, 7, 11, 15, 19, 22, 28, 33, 40]);
       expect(missingResult.sorted_indices).toHaveLength(10);
-      expect(missingResult.pointers.low).toBeGreaterThan(missingResult.pointers.high);
+      expect(missingResult.pointers).toEqual({});
     }
   });
 
@@ -90,5 +90,40 @@ describe("template preview cases", () => {
       expect(apex.snapshot.vectors.find((vector) => vector.id === "g")?.dy).toBeGreaterThan(0);
       expect(apex.snapshot.caption).toContain("10.2 m");
     }
+  });
+
+  it.each([4, 5, 8])("keeps pole-polar geometry valid at k=%s", (k) => {
+    const item = getTemplatePreviewCase("pole-polar")!;
+    const script = item.buildScript({ k });
+    const result = script.steps.find((step) => step.step_id === "pole-polar-result");
+    const tangentStep = script.steps.find((step) => step.step_id === "pole-polar-tangents");
+
+    expect(script.steps).toHaveLength(6);
+    expect(result?.snapshot.kind).toBe("math_scene");
+    expect(tangentStep?.snapshot.kind).toBe("math_scene");
+    if (tangentStep?.snapshot.kind !== "math_scene" || result?.snapshot.kind !== "math_scene") return;
+
+    const [pointA, pointB] = tangentStep.snapshot.points?.filter((point) => point.label === "A" || point.label === "B") ?? [];
+    for (const point of [pointA, pointB]) {
+      expect(point).toBeTruthy();
+      if (!point) continue;
+      expect(point.x ** 2 + point.y ** 2).toBeCloseTo(25, 8);
+      expect((k - point.x) * point.x + (k - point.y) * point.y).toBeCloseTo(0, 8);
+      expect(k * point.x + k * point.y).toBeCloseTo(25, 8);
+    }
+    expect(result.snapshot.formula_latex).toContain(`x+y=${Number((25 / k).toFixed(2))}`);
+    const followups = item.buildFollowups({ k }, script);
+    for (const step of script.steps) {
+      expect(followups[step.step_id]).toHaveLength(3);
+    }
+  });
+
+  it("clamps the pole control to its supported external-point interval", () => {
+    const item = getTemplatePreviewCase("pole-polar")!;
+    const below = item.buildScript({ k: -20 });
+    const above = item.buildScript({ k: 100 });
+
+    expect(below.parameter_controls?.[0]?.value).toBe("4");
+    expect(above.parameter_controls?.[0]?.value).toBe("8");
   });
 });

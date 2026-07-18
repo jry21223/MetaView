@@ -40,6 +40,16 @@ export function TemplateLinePreview({ caseId }: { caseId?: TemplatePreviewCaseId
           <circle className="is-accent" cx="83" cy="28" r="3.5" />
         </svg>
       )}
+      {caseId === "pole-polar" && (
+        <svg viewBox="0 0 160 56" fill="none">
+          <path className="is-guide" d="M18 48h126M42 53V5" />
+          <circle cx="76" cy="29" r="19" />
+          <path d="m94 13 34 4M94 45l34-28" />
+          <path className="is-accent" d="m94 13 0 32" />
+          <circle className="is-accent" cx="128" cy="17" r="3.5" />
+          <circle cx="94" cy="13" r="2.5" /><circle cx="94" cy="45" r="2.5" />
+        </svg>
+      )}
       {caseId === "projectile" && (
         <svg viewBox="0 0 160 56" fill="none">
           <path className="is-guide" d="M16 47h130" />

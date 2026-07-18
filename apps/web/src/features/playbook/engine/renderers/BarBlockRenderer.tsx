@@ -68,6 +68,12 @@ const ENTER_BEZIER = Easing.bezier(0.16, 1, 0.3, 1);
 const MOVE_FRAMES = 22;
 const MAX_BAR_HEIGHT = 360;
 const MIN_BAR_HEIGHT = 6;
+const POINTER_LABEL_ORDER = ["low", "mid", "high"];
+
+function pointerLabelRank(name: string): number {
+  const rank = POINTER_LABEL_ORDER.indexOf(name);
+  return rank === -1 ? POINTER_LABEL_ORDER.length : rank;
+}
 
 export const BarBlockRenderer: React.FC<RendererProps> = ({
   step,
@@ -124,6 +130,14 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
   const swapSet = new Set(snap.swap_indices);
   const activeSet = new Set(snap.active_indices);
   const sortedSet = new Set(snap.sorted_indices);
+  const pointerGroups = Array.from(
+    Object.entries(snap.pointers).reduce((groups, [name, index]) => {
+      const names = groups.get(index) ?? [];
+      names.push(name);
+      groups.set(index, names);
+      return groups;
+    }, new Map<number, string[]>()),
+  );
 
   const labelFont = Math.max(10, Math.min(16, barW * 0.32));
 
@@ -138,7 +152,9 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
         alignItems: "center",
         justifyContent: "center",
         fontFamily: "system-ui, -apple-system, sans-serif",
-        gap: 28,
+        // Keep the pointer row inside the 16:9 scene instead of letting the
+        // caption strip crop its labels at common desktop widths.
+        gap: 18,
         padding: "0 40px",
       }}
     >
@@ -356,8 +372,15 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
       </div>
 
       {Object.entries(snap.pointers).length > 0 && (
-        <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
-          {Object.entries(snap.pointers).map(([name, idx]) => {
+        <div
+          style={{
+            position: "relative",
+            width: n * barW + (n - 1) * barGap,
+            height: 34,
+            marginTop: 8,
+          }}
+        >
+          {pointerGroups.map(([idx, names]) => {
             const pointerOpacity = interpolate(elapsed, [0, 12], [0, 1], {
               easing: ENTER_BEZIER,
               extrapolateLeft: "clamp",
@@ -365,7 +388,8 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
             });
             return (
               <div
-                key={name}
+                key={idx}
+                data-pointer-index={idx}
                 style={{
                   display: "flex",
                   flexDirection: "column",
@@ -374,11 +398,18 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
                   fontSize: 13,
                   fontWeight: 600,
                   opacity: pointerOpacity,
-                  position: "relative",
-                  left: idx * pitch,
+                  position: "absolute",
+                  left: idx * pitch + barW / 2,
+                  top: 0,
+                  transform: "translateX(-50%)",
                 }}
               >
-                ▲<span>{name}</span>
+                ▲
+                <span>
+                  {[...names]
+                    .sort((left, right) => pointerLabelRank(left) - pointerLabelRank(right))
+                    .join(" · ")}
+                </span>
               </div>
             );
           })}

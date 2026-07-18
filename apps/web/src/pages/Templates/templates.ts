@@ -1,5 +1,5 @@
 /**
- * Template catalog entries. Four published entries resolve to deterministic
+ * Template catalog entries. Published entries resolve to deterministic
  * static Playbook cases; the remaining entries stay visible as honest
  * "制作中" placeholders and never submit a pipeline run from this page.
  *
@@ -85,6 +85,14 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
     title: "导数与切线",
     desc: "可拖动 marker_x 看切线如何变化",
     prompt: "画出 f(x) = x² 在不同点的切线，导数 f'(x) = 2x，用滑杆控制切点 x 的位置",
+  },
+  {
+    id: "pole-polar",
+    previewCaseId: "pole-polar",
+    domain: "math",
+    title: "极点与极线",
+    desc: "从圆外点的两条切线推导接触弦方程",
+    prompt: "已知圆 x²+y²=25 和圆外点 P=(k,k)，过 P 作两条切线，推导接触弦 AB 的方程，并用滑杆观察 k 改变时极线如何移动",
   },
   {
     id: "fourier-two-tone",

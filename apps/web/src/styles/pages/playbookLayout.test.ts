@@ -65,6 +65,22 @@ describe("playbook layout CSS", () => {
     expect(range).toContain("accent-color: var(--accent);");
   });
 
+  it("bridges light and dark math scenes into Mafs semantic theme variables", () => {
+    const dark = ruleBody('.math-scene-renderer[data-theme="dark"]');
+    const light = ruleBody('.math-scene-renderer[data-theme="light"]');
+    const mafs = ruleBody(".math-scene-renderer__stage .MafsView");
+
+    expect(dark).toContain("--msr-bg: var(--surface-2, #0e1412);");
+    expect(dark).toContain("--msr-text: var(--ink, #e8efe9);");
+    expect(light).toContain("--msr-bg: var(--surface-2, #faf8f3);");
+    expect(light).toContain("--msr-text: var(--ink, #161a18);");
+    expect(mafs).toContain("--mafs-bg: var(--msr-bg);");
+    expect(mafs).toContain("--mafs-fg: var(--msr-text);");
+    expect(mafs).toContain("--mafs-origin-color: var(--canvas-axis);");
+    expect(mafs).toContain("--mafs-line-color: var(--canvas-grid);");
+    expect(mafs).not.toContain("--mafs-fg-color");
+  });
+
   it("wraps real follow-up suggestion pills above the chat input", () => {
     const suggestions = ruleBody(".mv-followup-panel .mv-suggestions", studioCssPath);
     const suggestion = ruleBody(".mv-followup-panel .mv-suggestion", studioCssPath);

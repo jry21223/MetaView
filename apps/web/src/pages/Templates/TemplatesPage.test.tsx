@@ -42,12 +42,19 @@ describe("TemplatesPage lesson atlas", () => {
     expect(view.getByLabelText("current-path").textContent).toBe("/templates/binary-search");
   });
 
-  it("publishes four line-drawn previews and keeps the other templates disabled", () => {
+  it("publishes five line-drawn previews and keeps the other templates disabled", () => {
     const { container, getByRole } = renderPage();
 
-    expect(TEMPLATES).toHaveLength(20);
-    expect(container.querySelectorAll("[data-preview]")).toHaveLength(4);
+    expect(TEMPLATES).toHaveLength(21);
+    expect(container.querySelectorAll("[data-preview]")).toHaveLength(5);
     expect((getByRole("button", { name: "快速排序，制作中" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("opens the pole-polar template as a real case route", () => {
+    const view = renderPage();
+    fireEvent.click(view.getByRole("button", { name: "极点与极线，展开预览" }));
+    fireEvent.click(view.getByRole("button", { name: "极点与极线，进入完整案例" }));
+    expect(view.getByLabelText("current-path").textContent).toBe("/templates/pole-polar");
   });
 
   it("filters the atlas by domain and clears an expanded item that disappears", () => {

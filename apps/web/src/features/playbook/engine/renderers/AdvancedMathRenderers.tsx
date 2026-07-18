@@ -628,7 +628,7 @@ function GraphAlgorithmStatePanel({
   opacity: number;
 }) {
   const colors = canvasPalette(theme);
-  const current = currentNodes[0] ?? graph.current_node_id ?? "node";
+  const current = currentNodes[0] ?? graph.current_node_id;
 
   return (
     <g opacity={opacity} data-semantic-role="algorithm_state_panel">
@@ -700,8 +700,14 @@ function GraphAlgorithmStatePanel({
         <text x="646" y="266" fill={colors.muted} fontSize="13" fontWeight="700">
           Current
         </text>
-        <text x="714" y="266" fill={colors.accent} fontSize="15" fontWeight="780">
-          {current}
+        <text
+          x="714"
+          y="266"
+          fill={current ? colors.accent : colors.muted}
+          fontSize="15"
+          fontWeight="780"
+        >
+          {current ?? "— 未出队"}
         </text>
       </g>
     </g>

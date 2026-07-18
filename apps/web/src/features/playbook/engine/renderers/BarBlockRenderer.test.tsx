@@ -98,6 +98,31 @@ describe("BarBlockRenderer", () => {
     expect(markup).not.toMatch(/skew[XY]\(/);
   });
 
+  it("anchors binary-search pointers to the center of their indexed bars", () => {
+    const snap = makeBars([2, 4, 7, 11, 15, 19, 22, 28, 33, 40], {
+      pointers: { low: 0, mid: 4, high: 9 },
+    });
+    const markup = renderToStaticMarkup(BarBlockRenderer(props(barsStep(snap))));
+
+    expect(markup).toContain('data-pointer-index="0"');
+    expect(markup).toContain('data-pointer-index="4"');
+    expect(markup).toContain('data-pointer-index="9"');
+    expect(markup).toContain('left:36px');
+    expect(markup).toContain('left:372px');
+    expect(markup).toContain('left:792px');
+    expect(markup).toContain('transform:translateX(-50%)');
+  });
+
+  it("groups pointer labels that share the same bar", () => {
+    const snap = makeBars([2, 4, 7], {
+      pointers: { high: 1, low: 1, mid: 1 },
+    });
+    const markup = renderToStaticMarkup(BarBlockRenderer(props(barsStep(snap))));
+
+    expect(markup.match(/data-pointer-index="1"/g)).toHaveLength(1);
+    expect(markup).toContain("low · mid · high");
+  });
+
   it("is registered for the algorithm_bars snapshot kind", () => {
     expect(rendererRegistry.get("algorithm_bars")).toBe(DomainArrayRenderer);
   });
