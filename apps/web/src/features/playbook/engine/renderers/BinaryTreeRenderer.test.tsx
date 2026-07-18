@@ -97,7 +97,10 @@ describe("BinaryTreeRenderer", () => {
   });
 
   it("supports both light and dark themes", () => {
-    expect(() => render(defaultSnap(), { theme: "light" })).not.toThrow();
+    const light = render(defaultSnap(), { theme: "light" });
+    expect(light).toContain("var(--surface-2, #faf8f3)");
+    expect(light).toContain("var(--canvas-focus, #b87824)");
+    expect(light).not.toContain("#6030c0");
     expect(() => render(defaultSnap(), { theme: "dark" })).not.toThrow();
   });
 });

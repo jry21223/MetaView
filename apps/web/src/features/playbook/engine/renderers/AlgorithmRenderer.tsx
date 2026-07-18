@@ -2,40 +2,39 @@ import React from "react";
 import { Easing, interpolate } from "remotion";
 import type { AlgorithmArraySnapshot } from "../types";
 import type { RendererProps } from "./types";
+import { THEME_PALETTE } from "../../../../shared/config/themePalette";
+
+function soft(color: string, strength: number): string {
+  return `color-mix(in srgb, ${color} ${strength}%, transparent)`;
+}
+
+function buildPalette(theme: "dark" | "light") {
+  const palette = THEME_PALETTE[theme];
+  const surface = theme === "dark" ? "#111715" : "#ffffff";
+  const primary = `var(--canvas-primary, ${palette.canvasPrimary})`;
+  const secondary = `var(--canvas-secondary, ${palette.canvasSecondary})`;
+  const focus = `var(--canvas-focus, ${palette.canvasFocus})`;
+  return {
+    bg: `var(--surface-2, ${palette.surface2})`,
+    cell: `var(--surface, ${surface})`,
+    cellGradient: `linear-gradient(145deg, var(--surface, ${surface}), color-mix(in srgb, var(--surface-2, ${palette.surface2}) 82%, var(--line, ${palette.line})))`,
+    cellShadow: theme === "dark" ? "0 2px 6px rgba(0,0,0,0.35)" : "0 2px 6px rgba(22,26,24,0.10)",
+    border: `var(--line, ${palette.line})`,
+    text: `var(--ink, ${palette.ink})`,
+    active: focus,
+    swap: `var(--warn, ${palette.warn})`,
+    sorted: primary,
+    sortedShadow: soft(primary, 28),
+    pointer: secondary,
+    narration: `var(--ink-2, ${palette.ink2})`,
+    select: focus,
+    selectShadow: soft(focus, 36),
+  } as const;
+}
 
 const PALETTE = {
-  dark: {
-    bg: "#0a0c10",
-    cell: "#1a1e27",
-    cellGradient: "linear-gradient(145deg, #1e2330, #11151c)",
-    cellShadow: "0 2px 6px rgba(0,0,0,0.45)",
-    border: "rgba(255,255,255,0.08)",
-    text: "#e8ecf4",
-    active: "#4de8b0",
-    swap: "#ff9e8a",
-    sorted: "#5be8b4",
-    sortedShadow: "rgba(91,232,180,0.35)",
-    pointer: "#c8a8f8",
-    narration: "rgba(232,236,244,0.6)",
-    select: "#ffd84d",
-    selectShadow: "rgba(255,216,77,0.55)",
-  },
-  light: {
-    bg: "#f5f7fa",
-    cell: "#ffffff",
-    cellGradient: "linear-gradient(145deg, #ffffff, #eef1f5)",
-    cellShadow: "0 2px 6px rgba(0,0,0,0.10)",
-    border: "rgba(0,0,0,0.08)",
-    text: "#141820",
-    active: "#00896e",
-    swap: "#c05030",
-    sorted: "#1a7a5e",
-    sortedShadow: "rgba(26,122,94,0.30)",
-    pointer: "#6030c0",
-    narration: "rgba(20,24,32,0.6)",
-    select: "#d4a017",
-    selectShadow: "rgba(212,160,23,0.45)",
-  },
+  dark: buildPalette("dark"),
+  light: buildPalette("light"),
 } as const;
 
 const ENTER_BEZIER = Easing.bezier(0.16, 1, 0.3, 1);
@@ -253,18 +252,18 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
             border = colors.select;
             borderWidth = 2.5;
             textColor = colors.select;
-            bg = `${colors.select}18`;
+            bg = soft(colors.select, 10);
             liftY = -4;
             const phase = (elapsed * (Math.PI * 2)) / BREATH_PERIOD;
             breath = 0.65 + 0.35 * (0.5 + 0.5 * Math.sin(phase));
             glow = `0 0 14px ${colors.selectShadow}, ${colors.cellShadow}`;
           } else if (isSwap) {
-            bg = `${colors.swap}22`;
+            bg = soft(colors.swap, 13);
             border = colors.swap;
             textColor = colors.swap;
             glow = `0 4px 12px rgba(0,0,0,0.3)`;
           } else if (isSorted) {
-            bg = `${colors.sorted}18`;
+            bg = soft(colors.sorted, 10);
             border = colors.sorted;
             glow = `0 0 8px ${colors.sortedShadow}, ${colors.cellShadow}`;
           }

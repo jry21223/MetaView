@@ -57,12 +57,23 @@ describe("PhysicsForceSceneRenderer", () => {
     expect(markup).toContain('data-object-id="body"');
     expect(markup).toContain("<circle");
     expect(markup).toContain('data-semantic-role="lab_grid"');
-    expect(markup).toContain('data-semantic-role="motion_trail"');
+    expect(markup).not.toContain('data-semantic-role="motion_trail"');
     expect(markup).toContain('data-semantic-role="formula_card"');
     expect(markup).toContain('data-vector-component="horizontal"');
     expect(markup).toContain('data-vector-component="vertical"');
     expect(markup).toContain("v_y");
     expect(markup).toContain('marker-end="url(#physics-arrow-velocity)"');
+    expect(markup).toContain("var(--surface-2, #faf8f3)");
+    expect(markup).toContain("var(--physics-trajectory, #2f3431)");
+    expect(markup).toContain("var(--physics-velocity, #356b5c)");
+    expect(markup).toContain("var(--physics-acceleration, #8a5a00)");
+    expect(markup).toContain("var(--physics-force, #2f3431)");
+    expect(markup).not.toContain("var(--warn");
+    expect(markup).not.toContain("var(--canvas-primary");
+    expect(markup).toContain('data-semantic-role="trajectory"');
+    expect(markup).toContain('stroke-width="0.42"');
+    expect(markup).not.toContain("#1f8abd");
+    expect(markup).not.toContain("#8e44ad");
     expect(markup).not.toContain("projectile-body-dot");
     expect(markup).not.toContain("force-vector-arrow");
     expect(markup).not.toContain('data-missing-asset="true"');
@@ -95,6 +106,6 @@ describe("PhysicsForceSceneRenderer", () => {
     const markup = renderToStaticMarkup(<PhysicsForceSceneRenderer {...props(snapshot)} />);
 
     expect(markup).toContain('data-vector-component="horizontal"');
-    expect(markup).toContain('stroke-width="1.5"');
+    expect(markup).toContain('stroke-width="0.52"');
   });
 });

@@ -69,6 +69,10 @@ describe("CodeTraceSceneRenderer", () => {
     expect(markup).toContain('data-pointer-id="mid"');
     expect(markup).toContain('data-array-cell-state="active"');
     expect(markup).toContain("binarySearch");
+    expect(markup).toContain("var(--surface-2, #faf8f3)");
+    expect(markup).toContain("var(--canvas-primary, #82976f)");
+    expect(markup).toContain("var(--canvas-focus, #b87824)");
+    expect(markup).not.toContain("#0f76a8");
     expect(markup).not.toContain("pointer-marker");
     expect(markup).not.toContain('data-missing-asset="true"');
   });

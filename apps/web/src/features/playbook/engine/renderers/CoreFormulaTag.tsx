@@ -14,6 +14,8 @@ interface CoreFormulaTagProps {
   fontSize?: number | string;
   fontWeight?: number | string;
   textFill?: string;
+  fill?: string;
+  stroke?: string;
   opacity?: number | string;
 }
 
@@ -53,6 +55,8 @@ export function CoreFormulaTag({
   fontSize = 3.4,
   fontWeight = 760,
   textFill = "#243447",
+  fill = "#ffffff",
+  stroke = "#d6d1c2",
   opacity = 0.96,
 }: CoreFormulaTagProps) {
   const renderedTextX = textX ?? defaultTextX(x, width, textAnchor);
@@ -72,8 +76,8 @@ export function CoreFormulaTag({
         width={width}
         height={height}
         rx="1.6"
-        fill="#ffffff"
-        stroke="#d6d1c2"
+        fill={fill}
+        stroke={stroke}
         strokeWidth="0.45"
       />
       <text

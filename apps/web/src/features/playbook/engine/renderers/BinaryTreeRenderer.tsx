@@ -3,36 +3,37 @@ import { interpolate, spring, useVideoConfig } from "remotion";
 import { hierarchy, tree } from "d3-hierarchy";
 import type { AlgorithmTreeSnapshot } from "../types";
 import type { RendererProps } from "./types";
+import { THEME_PALETTE } from "../../../../shared/config/themePalette";
+
+function soft(color: string, strength: number): string {
+  return `color-mix(in srgb, ${color} ${strength}%, transparent)`;
+}
+
+function buildPalette(theme: "dark" | "light") {
+  const palette = THEME_PALETTE[theme];
+  const surface = theme === "dark" ? "#111715" : "#ffffff";
+  const primary = `var(--canvas-primary, ${palette.canvasPrimary})`;
+  const secondary = `var(--canvas-secondary, ${palette.canvasSecondary})`;
+  const focus = `var(--canvas-focus, ${palette.canvasFocus})`;
+  return {
+    bg: `var(--surface-2, ${palette.surface2})`,
+    nodeFill: `var(--surface, ${surface})`,
+    nodeBorder: `var(--line, ${palette.line})`,
+    nodeText: `var(--ink, ${palette.ink})`,
+    edge: `var(--canvas-axis, ${palette.canvasAxis})`,
+    active: focus,
+    activePulse: soft(focus, 18),
+    visited: secondary,
+    path: primary,
+    pathGlow: soft(primary, 38),
+    narration: `var(--ink-2, ${palette.ink2})`,
+    title: `var(--ink, ${palette.ink})`,
+  } as const;
+}
 
 const PALETTE = {
-  dark: {
-    bg: "#0a0c10",
-    nodeFill: "#1a1e27",
-    nodeBorder: "rgba(255,255,255,0.12)",
-    nodeText: "#e8ecf4",
-    edge: "rgba(255,255,255,0.15)",
-    active: "#4de8b0",
-    activePulse: "rgba(77,232,176,0.25)",
-    visited: "rgba(255,255,255,0.25)",
-    path: "#c8a8f8",
-    pathGlow: "rgba(200,168,248,0.6)",
-    narration: "rgba(232,236,244,0.6)",
-    title: "#e8ecf4",
-  },
-  light: {
-    bg: "#f5f7fa",
-    nodeFill: "#ffffff",
-    nodeBorder: "rgba(0,0,0,0.1)",
-    nodeText: "#141820",
-    edge: "rgba(0,0,0,0.15)",
-    active: "#00896e",
-    activePulse: "rgba(0,137,110,0.2)",
-    visited: "rgba(0,0,0,0.25)",
-    path: "#6030c0",
-    pathGlow: "rgba(96,48,192,0.5)",
-    narration: "rgba(20,24,32,0.6)",
-    title: "#141820",
-  },
+  dark: buildPalette("dark"),
+  light: buildPalette("light"),
 } as const;
 
 const SVG_W = 880;
@@ -200,7 +201,7 @@ export const BinaryTreeRenderer: React.FC<RendererProps> = ({
             let stroke: string = colors.nodeBorder;
             let textFill: string = colors.nodeText;
             if (isActive) {
-              fill = `${colors.active}22`;
+              fill = soft(colors.active, 13);
               stroke = colors.active;
               textFill = colors.active;
             } else if (isVisited) {

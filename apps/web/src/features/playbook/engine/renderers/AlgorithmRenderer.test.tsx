@@ -92,5 +92,9 @@ describe("AlgorithmRenderer", () => {
     const dark = render(defaultSnap());
     const light = render(defaultSnap(), { theme: "light" });
     expect(dark).not.toBe(light); // visual diff between themes
+    expect(light).toContain("var(--surface-2, #faf8f3)");
+    expect(light).toContain("var(--canvas-focus, #b87824)");
+    expect(light).not.toContain("#00896e");
+    expect(light).not.toContain("#6030c0");
   });
 });

@@ -156,6 +156,10 @@ describe("advanced math renderers", () => {
     expect(markup).toContain("var(--canvas-axis");
     expect(markup).toContain("var(--canvas-secondary");
     expect(markup).toContain("var(--canvas-focus");
+    expect(markup).toContain("var(--surface-2, #0e1412)");
+    expect(markup).toContain("var(--ink, #e8efe9)");
+    expect(markup).not.toContain("#f6f8fb");
+    expect(markup).not.toContain("#7c3aed");
     expect(markup).toContain('data-semantic-role="queue_panel"');
     expect(markup).toContain('data-queue-node-id="B"');
     expect(markup).toContain('data-queue-node-id="C"');

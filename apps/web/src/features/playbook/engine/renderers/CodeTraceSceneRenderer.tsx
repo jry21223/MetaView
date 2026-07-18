@@ -1,34 +1,36 @@
 import React from "react";
 import type { CodeTracePointer, CodeTraceSceneSnapshot } from "../types";
 import type { RendererProps } from "./types";
+import { THEME_PALETTE } from "../../../../shared/config/themePalette";
 
 const SVG_W = 900;
 const SVG_H = 506;
+function soft(color: string, strength: number): string {
+  return `color-mix(in srgb, ${color} ${strength}%, transparent)`;
+}
+
+function buildColors(theme: "dark" | "light") {
+  const palette = THEME_PALETTE[theme];
+  const surface = theme === "dark" ? "#111715" : "#ffffff";
+  const primary = `var(--canvas-primary, ${palette.canvasPrimary})`;
+  const focus = `var(--canvas-focus, ${palette.canvasFocus})`;
+  return {
+    bg: `var(--surface-2, ${palette.surface2})`,
+    panel: `var(--surface, ${surface})`,
+    ink: `var(--ink, ${palette.ink})`,
+    muted: `var(--ink-2, ${palette.ink2})`,
+    line: `var(--line, ${palette.line})`,
+    cell: `color-mix(in srgb, var(--surface-2, ${palette.surface2}) 86%, var(--line, ${palette.line}))`,
+    activeCell: soft(focus, 14),
+    rangeCell: soft(primary, 10),
+    accent: primary,
+    pointer: focus,
+  } as const;
+}
+
 const COLORS = {
-  dark: {
-    bg: "#0a0c10",
-    panel: "#141922",
-    ink: "#e8ecf4",
-    muted: "#9aa4b2",
-    line: "#303846",
-    cell: "#202937",
-    activeCell: "#173d58",
-    rangeCell: "#1c3140",
-    accent: "#58a6ff",
-    pointer: "#f5b642",
-  },
-  light: {
-    bg: "#f5f7fa",
-    panel: "#ffffff",
-    ink: "#172033",
-    muted: "#60708a",
-    line: "#d7dde6",
-    cell: "#edf2f7",
-    activeCell: "#dff2fb",
-    rangeCell: "#e7f1f6",
-    accent: "#0f76a8",
-    pointer: "#b97613",
-  },
+  dark: buildColors("dark"),
+  light: buildColors("light"),
 } as const;
 
 function shortLine(line: string): string {
@@ -107,7 +109,7 @@ export const CodeTraceSceneRenderer: React.FC<RendererProps> = ({ step, theme })
                   width={codeW}
                   height={30}
                   rx="5"
-                  fill={`${colors.accent}16`}
+                  fill={soft(colors.accent, 9)}
                   stroke={colors.accent}
                   strokeWidth="1"
                 />

@@ -39,43 +39,30 @@ interface Palette {
   warn: string;
 }
 
-const PALETTE: Record<ThemeName, Palette> = {
-  dark: {
-    bg: "#10141f",
-    card: "rgba(255,255,255,0.055)",
-    line: "rgba(255,255,255,0.16)",
-    grid: "rgba(255,255,255,0.08)",
-    ink: "#f5f7fb",
-    muted: "#aab4c8",
-    primary: "#72ddf7",
-    secondary: "#a78bfa",
-    accent: "#fbbf24",
-    warn: "#fb7185",
-  },
-  light: {
-    bg: "#f6f8fb",
-    card: "rgba(255,255,255,0.9)",
-    line: "rgba(20,32,54,0.14)",
-    grid: "rgba(20,32,54,0.08)",
-    ink: "#182235",
-    muted: "#64748b",
-    primary: "#0f76a8",
-    secondary: "#7c3aed",
-    accent: "#c27803",
-    warn: "#be123c",
-  },
-};
-
-function canvasPalette(theme: ThemeName): Palette {
+function buildPalette(theme: ThemeName): Palette {
   const palette = THEME_PALETTE[theme];
+  const surface = theme === "dark" ? "#111715" : "#ffffff";
   return {
-    ...PALETTE[theme],
-    grid: `var(--canvas-grid, ${palette.canvasGrid})`,
+    bg: `var(--surface-2, ${palette.surface2})`,
+    card: `var(--surface, ${surface})`,
     line: `var(--canvas-axis, ${palette.canvasAxis})`,
+    grid: `var(--canvas-grid, ${palette.canvasGrid})`,
+    ink: `var(--ink, ${palette.ink})`,
+    muted: `var(--ink-2, ${palette.ink2})`,
     primary: `var(--canvas-primary, ${palette.canvasPrimary})`,
     secondary: `var(--canvas-secondary, ${palette.canvasSecondary})`,
     accent: `var(--canvas-focus, ${palette.canvasFocus})`,
+    warn: `var(--warn, ${palette.warn})`,
   };
+}
+
+const PALETTE: Record<ThemeName, Palette> = {
+  dark: buildPalette("dark"),
+  light: buildPalette("light"),
+};
+
+function canvasPalette(theme: ThemeName): Palette {
+  return PALETTE[theme];
 }
 
 function softCanvasColor(color: string, strength: number): string {
