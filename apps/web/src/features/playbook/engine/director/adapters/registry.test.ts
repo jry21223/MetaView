@@ -81,7 +81,7 @@ describe("DirectorAdapterRegistry", () => {
     });
 
     expect(result.adapter).toBe("stage");
-    expect(result.stageTransform).toBe("scale(1.0250)");
+    expect(result.stageTransform).toBe("scale(1.0400)");
     expect(result.mathScene).toBeNull();
   });
 });

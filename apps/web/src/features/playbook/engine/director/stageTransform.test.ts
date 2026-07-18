@@ -17,27 +17,56 @@ function beat(cameraMotion: DirectorCameraMotion): DirectorBeat {
 }
 
 describe("stageTransformForBeat", () => {
-  it("keeps hold and focus_target out of the stage transform", () => {
+  it("keeps hold static and leaves focus_target to capable adapters", () => {
     expect(stageTransformForBeat(beat("hold"), 0.5)).toBeUndefined();
     expect(stageTransformForBeat(beat("focus_target"), 0.5)).toBeUndefined();
   });
 
-  it("returns conservative push and pull scales", () => {
-    expect(stageTransformForBeat(beat("push_in"), 0.5)).toBe("scale(1.0250)");
-    expect(stageTransformForBeat(beat("pull_out"), 0.5)).toBe("scale(1.0250)");
+  it.each([
+    [0, "scale(1.0000)"],
+    [0.5, "scale(1.0400)"],
+    [1, "scale(1.0800)"],
+  ])("maps push_in progress %s to %s", (progress, expected) => {
+    expect(stageTransformForBeat(beat("push_in"), progress)).toBe(expected);
   });
 
-  it("returns small pan transforms", () => {
-    expect(stageTransformForBeat(beat("pan_left"), 0.5)).toBe("translateX(-12.00px)");
-    expect(stageTransformForBeat(beat("pan_right"), 0.5)).toBe("translateX(12.00px)");
+  it.each([
+    [0, "scale(1.0800)"],
+    [0.5, "scale(1.0400)"],
+    [1, "scale(1.0000)"],
+  ])("maps pull_out progress %s to %s", (progress, expected) => {
+    expect(stageTransformForBeat(beat("pull_out"), progress)).toBe(expected);
+  });
+
+  it.each([
+    [0, "translateX(0.00px)", "translateX(0.00px)"],
+    [0.5, "translateX(-20.00px)", "translateX(20.00px)"],
+    [1, "translateX(-40.00px)", "translateX(40.00px)"],
+  ])("maps pan progress %s in both directions", (progress, left, right) => {
+    expect(stageTransformForBeat(beat("pan_left"), progress)).toBe(left);
+    expect(stageTransformForBeat(beat("pan_right"), progress)).toBe(right);
   });
 
   it("maps pacing to deterministic motion progress", () => {
     expect(stageTransformForBeat({ ...beat("push_in"), pacing: "fast" }, 0.25)).toBe(
-      "scale(1.0250)",
+      "scale(1.0400)",
+    );
+    expect(stageTransformForBeat({ ...beat("push_in"), pacing: "normal" }, 0.25)).toBe(
+      "scale(1.0200)",
     );
     expect(stageTransformForBeat({ ...beat("push_in"), pacing: "slow" }, 0.25)).toBe(
-      "scale(1.0078)",
+      "scale(1.0125)",
+    );
+  });
+
+  it("clamps out-of-range and invalid progress without jumps", () => {
+    expect(stageTransformForBeat(beat("push_in"), -1)).toBe("scale(1.0000)");
+    expect(stageTransformForBeat(beat("push_in"), 2)).toBe("scale(1.0800)");
+    expect(stageTransformForBeat(beat("pull_out"), Number.POSITIVE_INFINITY)).toBe(
+      "scale(1.0000)",
+    );
+    expect(stageTransformForBeat(beat("pan_right"), Number.NaN)).toBe(
+      "translateX(0.00px)",
     );
   });
 });

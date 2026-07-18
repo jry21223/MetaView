@@ -103,7 +103,7 @@ describe("buildDirectorFramePlan", () => {
     });
 
     expect(plan.debug.adapter).toBe("stage");
-    expect(plan.stage.transform).toBe("scale(1.0250)");
+    expect(plan.stage.transform).toBe("scale(1.0400)");
     expect(plan.stage.pacing).toBe("normal");
     expect(plan.mathScene).toBeNull();
   });

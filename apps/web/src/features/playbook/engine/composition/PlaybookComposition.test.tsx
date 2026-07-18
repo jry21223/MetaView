@@ -503,10 +503,10 @@ describe("PlaybookComposition", () => {
 
   it.each([
     ["hold", undefined],
-    ["push_in", "transform:scale(1.0250)"],
-    ["pull_out", "transform:scale(1.0250)"],
-    ["pan_left", "transform:translateX(-12.00px)"],
-    ["pan_right", "transform:translateX(12.00px)"],
+    ["push_in", "transform:scale(1.0400)"],
+    ["pull_out", "transform:scale(1.0400)"],
+    ["pan_left", "transform:translateX(-20.00px)"],
+    ["pan_right", "transform:translateX(20.00px)"],
     ["focus_target", undefined],
   ] as const)("applies %s camera motion to the visual stage", (cameraMotion, expectedTransform) => {
     remotionState.frame = 30;
