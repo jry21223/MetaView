@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { AUTO_VOICE, OPENAI_VOICES } from "./useTTS";
 import type { TTSConfig } from "./useTTS";
@@ -22,6 +22,15 @@ interface PlayerSettingsPopoverProps {
 }
 
 const SAMPLE_TEXT_DEFAULT = "你好，这是一段试听文字。Hello, this is a preview.";
+const POPOVER_GUTTER = 14;
+const POPOVER_GAP = 10;
+
+interface PopoverPosition {
+  left: number;
+  top: number;
+  width: number;
+  maxHeight: number;
+}
 
 export const PlayerSettingsPopover: React.FC<PlayerSettingsPopoverProps> = ({
   playbackRate,
@@ -40,6 +49,46 @@ export const PlayerSettingsPopover: React.FC<PlayerSettingsPopoverProps> = ({
 }) => {
   const popoverRef = useRef<HTMLDivElement>(null);
   const [sampleText, setSampleText] = useState(SAMPLE_TEXT_DEFAULT);
+  const [position, setPosition] = useState<PopoverPosition | null>(null);
+
+  useLayoutEffect(() => {
+    const popover = popoverRef.current;
+    const anchor = popover?.closest(".playbook-player__settings-anchor");
+    if (!popover || !(anchor instanceof HTMLElement)) return;
+
+    const updatePosition = () => {
+      const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+      const anchorRect = anchor.getBoundingClientRect();
+      const width = Math.min(320, Math.max(0, viewportWidth - POPOVER_GUTTER * 2));
+      const measuredHeight = popover.getBoundingClientRect().height;
+      const maxHeight = Math.max(160, viewportHeight - POPOVER_GUTTER * 2);
+      const height = Math.min(measuredHeight, maxHeight);
+      const left = Math.min(
+        Math.max(anchorRect.right - width, POPOVER_GUTTER),
+        Math.max(POPOVER_GUTTER, viewportWidth - width - POPOVER_GUTTER),
+      );
+      const preferredTop = anchorRect.top - height - POPOVER_GAP;
+      const belowTop = anchorRect.bottom + POPOVER_GAP;
+      const top = preferredTop >= POPOVER_GUTTER
+        ? preferredTop
+        : Math.min(belowTop, Math.max(POPOVER_GUTTER, viewportHeight - height - POPOVER_GUTTER));
+
+      setPosition({ left, top, width, maxHeight });
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    window.visualViewport?.addEventListener("resize", updatePosition);
+    window.visualViewport?.addEventListener("scroll", updatePosition);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+      window.visualViewport?.removeEventListener("resize", updatePosition);
+      window.visualViewport?.removeEventListener("scroll", updatePosition);
+    };
+  }, []);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -65,6 +114,12 @@ export const PlayerSettingsPopover: React.FC<PlayerSettingsPopoverProps> = ({
       ref={popoverRef}
       className="playbook-player__settings-popover"
       style={{
+        position: "fixed",
+        left: position?.left ?? POPOVER_GUTTER,
+        top: position?.top ?? POPOVER_GUTTER,
+        width: position?.width ?? `min(320px, calc(100vw - ${POPOVER_GUTTER * 2}px))`,
+        maxHeight: position?.maxHeight,
+        visibility: position ? "visible" : "hidden",
         "--player-settings-bg": bg,
         "--player-settings-border": border,
         "--player-settings-text": text,

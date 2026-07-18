@@ -4,9 +4,6 @@ import { PaymentResultPage } from "../pages/PaymentResultPage";
 import { OpsDashboardPage } from "../pages/OpsDashboard/OpsDashboardPage";
 import { AssetShowcasePage } from "../pages/AssetShowcase/AssetShowcasePage";
 import { LandingRoute } from "./LandingRoute";
-import { TemplatesPage } from "../pages/Templates/TemplatesPage";
-import { TemplatePreviewPage } from "../pages/Templates/TemplatePreviewPage";
-import { PublicTemplatesLayout } from "../pages/Templates/PublicTemplatesLayout";
 import { OpsAppShell } from "./OpsAppShell";
 import { SelfAppShell } from "./SelfAppShell";
 import { stageToPath } from "./routes";
@@ -41,11 +38,6 @@ function AppRoutes() {
         }
       />
       <Route path="/asset-showcase" element={<AssetShowcasePage />} />
-      <Route
-        path="/templates"
-        element={<PublicTemplatesLayout><TemplatesPage /></PublicTemplatesLayout>}
-      />
-      <Route path="/templates/:templateId" element={<TemplatePreviewPage />} />
       <Route path="/cases" element={<Navigate to="/templates" replace />} />
       <Route path="/cases/:slug" element={<LegacyCaseRedirect />} />
       <Route

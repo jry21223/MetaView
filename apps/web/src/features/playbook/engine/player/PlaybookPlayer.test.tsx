@@ -246,17 +246,27 @@ describe("PlaybookPlayer", () => {
       ],
     });
 
-    const { getByText, getByTestId } = render(
+    const { getByText, getByTestId, getByRole, queryByText } = render(
       <PlaybookPlayer
         script={script}
         theme="light"
+        parameterSlot={<div>Target parameter</div>}
         followupSlot={<div data-testid="followup-slot">Ask this step</div>}
+        relatedSlot={<div>Related lesson</div>}
       />,
     );
 
     expect(getByText("Code Sync")).toBeTruthy();
+    expect(getByText("Params")).toBeTruthy();
+    expect(getByText("Follow-up")).toBeTruthy();
+    expect(getByText("Related lesson")).toBeTruthy();
+    expect(queryByText("Director")).toBeNull();
     expect(getByTestId("followup-slot")).toBeTruthy();
     expect(getByText("Ask this step")).toBeTruthy();
+    const consoleText = getByRole("complementary", { name: "Learning console" }).textContent ?? "";
+    expect(consoleText.indexOf("Code Sync")).toBeLessThan(consoleText.indexOf("Params"));
+    expect(consoleText.indexOf("Params")).toBeLessThan(consoleText.indexOf("Follow-up"));
+    expect(consoleText.indexOf("Follow-up")).toBeLessThan(consoleText.indexOf("Related lesson"));
   });
 
   it("shows legacy call-stack code sync in the desktop learning console", () => {

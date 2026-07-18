@@ -12,7 +12,11 @@ import { TemplateLinePreview } from "./TemplateLinePreview";
 
 type DomainFilter = TemplateDomain | "all";
 
-export function TemplatesPage() {
+interface TemplatesPageProps {
+  onOpenTemplate?: (templateId: string) => void;
+}
+
+export function TemplatesPage({ onOpenTemplate }: TemplatesPageProps = {}) {
   const navigate = useNavigate();
   const [filter, setFilter] = useState<DomainFilter>("all");
   const [search, setSearch] = useState("");
@@ -42,11 +46,18 @@ export function TemplatesPage() {
       .filter((group) => group.items.length > 0),
     [filtered, grouped],
   );
+  const openTemplate = (templateId: string) => {
+    if (onOpenTemplate) {
+      onOpenTemplate(templateId);
+      return;
+    }
+    navigate(`/templates/${templateId}`);
+  };
 
   const activateTemplate = (template: TemplateDef) => {
     if (!template.previewCaseId) return;
     if (selectedId === template.id) {
-      navigate(`/templates/${template.id}`);
+      openTemplate(template.id);
       return;
     }
     setSelectedId(template.id);
@@ -158,7 +169,7 @@ export function TemplatesPage() {
                           id={previewId}
                           type="button"
                           className="mv-template-expanded-preview"
-                          onClick={() => navigate(`/templates/${template.id}`)}
+                          onClick={() => openTemplate(template.id)}
                           aria-label={`进入完整案例：${template.title}`}
                         >
                           <span className="mv-template-expanded-preview__media">

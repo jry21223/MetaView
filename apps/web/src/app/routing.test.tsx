@@ -89,13 +89,13 @@ describe("App routing", () => {
     expect(getByRole("searchbox")).toBeTruthy();
   });
 
-  it("keeps public templates outside account and pipeline shells, including ops edition", async () => {
+  it("renders public templates in the original ops app shell without starting a pipeline", async () => {
     let accountHits = 0;
     let pipelineHits = 0;
     server.use(
       http.get(`${API_BASE_URL}/api/v1/account/me`, () => {
         accountHits += 1;
-        return HttpResponse.json({ detail: "must not be requested" }, { status: 500 });
+        return HttpResponse.json({ detail: "请先使用微信登录" }, { status: 401 });
       }),
       http.get(`${API_BASE_URL}/api/v1/pipeline`, () => {
         pipelineHits += 1;
@@ -106,10 +106,12 @@ describe("App routing", () => {
     window.history.pushState({}, "", "/templates");
 
     const { App } = await import("./App");
-    const { getByRole } = render(<App />);
+    const { getByRole, getByText } = render(<App />);
 
     expect(getByRole("heading", { name: "模板本身，就是可以播放的案例" })).toBeTruthy();
-    expect(accountHits).toBe(0);
+    expect(getByText("工作台")).toBeTruthy();
+    expect(getByRole("button", { name: /模板/ }).getAttribute("aria-current")).toBe("page");
+    await waitFor(() => expect(accountHits).toBe(1));
     expect(pipelineHits).toBe(0);
   });
 
@@ -140,7 +142,7 @@ describe("App routing", () => {
     const { App } = await import("./App");
     const { getByRole, getByText, queryByText } = render(<App />);
 
-    expect(getByText("静态案例 · 不调用模型")).toBeTruthy();
+    expect(queryByText("Director")).toBeNull();
     fireEvent.click(getByRole("button", { name: "播放" }));
     fireEvent.change(getByRole("slider", { name: /切点 a/ }), { target: { value: "1.4" } });
     fireEvent.click(getByRole("button", { name: "当前切点和斜率是多少？" }));
@@ -148,6 +150,7 @@ describe("App routing", () => {
 
     expect(getByText("切点 a=1.4，对应导数与切线斜率都是 2.8。")).toBeTruthy();
     expect(queryByText("语音后端")).toBeNull();
+    expect(queryByText("Director")).toBeNull();
     expect(accountHits).toBe(0);
     expect(pipelineHits).toBe(0);
     expect(networkSpy).not.toHaveBeenCalled();

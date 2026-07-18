@@ -21,6 +21,8 @@ import {
 import { StudioPage } from "../pages/Studio/StudioPage";
 import { HistoryPage } from "../pages/History/HistoryPage";
 import { SettingsPage } from "../pages/Settings/SettingsPage";
+import { TemplatesPage } from "../pages/Templates/TemplatesPage";
+import { TemplatePreviewPage } from "../pages/Templates/TemplatePreviewPage";
 import { usePipelineSubmit } from "../features/pipeline/hooks/usePipelineSubmit";
 import { useProviderSettings } from "../features/providers/hooks/useProviderSettings";
 import { ProviderSettingsModal } from "../features/providers/ui/ProviderSettingsModal";
@@ -35,8 +37,9 @@ import { shouldCollapseWorkbenchTopbarByDefault } from "./workbenchChrome";
 
 function initialTopbarCollapsed(): boolean {
   if (typeof window === "undefined") return false;
+  const isTemplatePlayer = Boolean(matchPath("/templates/:templateId", window.location.pathname));
   return (
-    pathToStage(window.location.pathname) === "workbench" &&
+    (pathToStage(window.location.pathname) === "workbench" || isTemplatePlayer) &&
     shouldCollapseWorkbenchTopbarByDefault()
   );
 }
@@ -55,6 +58,7 @@ export function SelfAppShell() {
   const stage = pathToStage(location.pathname);
   const activeRunId =
     matchPath("/run/:runId", location.pathname)?.params.runId ?? null;
+  const isTemplatePlayer = Boolean(matchPath("/templates/:templateId", location.pathname));
   const intakePrompt = stage === "intake" ? promptFromLocationState(location.state) : "";
 
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
@@ -73,7 +77,7 @@ export function SelfAppShell() {
 
   const css = useMemo(() => themeVars(t), [t]);
   const mode = themeMode(t);
-  const effectiveTopbarCollapsed = stage === "workbench" && topbarCollapsed;
+  const effectiveTopbarCollapsed = (stage === "workbench" || isTemplatePlayer) && topbarCollapsed;
   const toggleTheme = () =>
     setTweak("theme", mode === "dark" ? "light" : "dark");
 
@@ -205,6 +209,23 @@ export function SelfAppShell() {
           }
         />
         <Route path="/run" element={<Navigate to="/create" replace />} />
+        <Route
+          path="/templates"
+          element={<TemplatesPage onOpenTemplate={(templateId) => {
+            setTopbarCollapsed(shouldCollapseWorkbenchTopbarByDefault());
+            routerNavigate(`/templates/${templateId}`);
+          }} />}
+        />
+        <Route
+          path="/templates/:templateId"
+          element={(
+            <TemplatePreviewPage
+              theme={mode}
+              topbarCollapsed={effectiveTopbarCollapsed}
+              onToggleTopbar={() => setTopbarCollapsed((value) => !value)}
+            />
+          )}
+        />
         <Route
           path="/history"
           element={
