@@ -108,7 +108,9 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-natural-earth-layer="admin_0_countries"',
       'data-semantic-role="monsoon_flow"',
     ],
-    imageQuality: imageQuality(220000, 300, 0.3, 0.5, 0.8),
+    // Natural Earth outlines and native semantic marks intentionally avoid the
+    // dense decorative SVG background retired from the teaching asset pack.
+    imageQuality: imageQuality(60000, 120, 0.04, 0.5, 0.7),
   },
   {
     id: "projectile_motion",
@@ -125,7 +127,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-semantic-role="formula_card"',
       'data-semantic-role="motion_trail"',
     ],
-    imageQuality: imageQuality(40000, 80, 0.035, 0.68, 0.72),
+    imageQuality: imageQuality(40000, 80, 0.028, 0.68, 0.72),
   },
   {
     id: "cell_structure",
@@ -142,7 +144,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-asset-id="nucleus"',
       'data-asset-id="mitochondrion"',
     ],
-    imageQuality: imageQuality(210000, 250, 0.055, 0.58, 0.7),
+    imageQuality: imageQuality(80000, 220, 0.055, 0.58, 0.7),
   },
   {
     id: "dna_replication",
@@ -160,7 +162,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-asset-id="replication-fork"',
       'data-semantic-role="flow_arrow"',
     ],
-    imageQuality: imageQuality(170000, 180, 0.035, 0.54, 0.7),
+    imageQuality: imageQuality(55000, 140, 0.035, 0.54, 0.7),
   },
   {
     id: "molecule_2d_water",
@@ -179,7 +181,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-structured-molecule="true"',
       WATER_CONTRACT.formula,
     ],
-    imageQuality: imageQuality(190000, 130, 0.025, 0.7, 0.7),
+    imageQuality: imageQuality(45000, 90, 0.025, 0.7, 0.7),
   },
   {
     id: "molecule_2d_methane",
@@ -199,7 +201,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-structured-molecule="true"',
       METHANE_CONTRACT.formula,
     ],
-    imageQuality: imageQuality(190000, 150, 0.03, 0.74, 0.7),
+    imageQuality: imageQuality(55000, 120, 0.03, 0.74, 0.7),
   },
   {
     id: "molecule_2d_glucose",
@@ -221,7 +223,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-element="O"',
       GLUCOSE_CONTRACT.formula,
     ],
-    imageQuality: imageQuality(210000, 150, 0.055, 0.72, 0.72),
+    imageQuality: imageQuality(80000, 150, 0.055, 0.72, 0.72),
   },
   {
     id: "carbon_dioxide_molecule",
@@ -243,7 +245,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-semantic-role="formula_card"',
       'data-structured-molecule="true"',
     ],
-    imageQuality: imageQuality(185000, 110, 0.025, 0.6, 0.7),
+    imageQuality: imageQuality(42000, 100, 0.025, 0.6, 0.7),
   },
   {
     id: "reaction_synthesis_water",
@@ -262,7 +264,7 @@ const SUBJECT_VISUAL_SHOWCASE_META: readonly SubjectVisualShowcaseMeta[] = [
       'data-semantic-role="reactant"',
       'data-semantic-role="product"',
     ],
-    imageQuality: imageQuality(170000, 150, 0.05, 0.58, 0.7),
+    imageQuality: imageQuality(42000, 120, 0.05, 0.58, 0.7),
   },
   {
     id: "derivative_tangent",
