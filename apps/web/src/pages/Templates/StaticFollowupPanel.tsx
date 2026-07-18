@@ -7,7 +7,16 @@ export function StaticFollowupPanel({ questions }: { questions: TemplatePreviewQ
 
   return (
     <div className="mv-static-followup">
-      <p>选择一个与当前步骤相关的问题：</p>
+      <div className="mv-static-followup__stream" aria-live="polite">
+        {selected ? (
+          <>
+            <div className="mv-static-followup__message is-user">{selected.question}</div>
+            <div className="mv-static-followup__message is-assistant">{selected.answer}</div>
+          </>
+        ) : (
+          <p>可以继续追问，也可以要求调整当前讲解。</p>
+        )}
+      </div>
       <div className="mv-static-followup__questions">
         {questions.map((item) => (
           <button
@@ -20,14 +29,17 @@ export function StaticFollowupPanel({ questions }: { questions: TemplatePreviewQ
           </button>
         ))}
       </div>
-      {selected ? (
-        <div className="mv-static-followup__answer" role="status" aria-live="polite">
-          <strong>{selected.question}</strong>
-          <p>{selected.answer}</p>
-        </div>
-      ) : (
-        <small>答案已随案例固定，不会调用模型或消耗额度。</small>
-      )}
+      <div className="mv-static-followup__input-row">
+        <input
+          type="text"
+          aria-label="继续追问"
+          placeholder="还有什么想问的"
+          readOnly
+          title="模板案例仅支持上方固定问题"
+        />
+        <button type="button" disabled aria-label="发送追问">发送 ↵</button>
+      </div>
+      <small>模板答案已固定，不会调用模型或消耗额度。</small>
     </div>
   );
 }

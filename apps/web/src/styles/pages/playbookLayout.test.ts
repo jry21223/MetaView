@@ -45,11 +45,16 @@ describe("playbook layout CSS", () => {
     expect(relatedCard).toContain("flex: 0 0 auto;");
   });
 
-  it("keeps deterministic follow-up questions top-aligned on tall Windows viewports", () => {
+  it("renders deterministic follow-up as one dialog with pills above its input", () => {
     const followup = ruleBody(".mv-static-followup", templatesCssPath);
+    const questions = ruleBody(".mv-static-followup__questions", templatesCssPath);
+    const input = ruleBody(".mv-static-followup__input-row", templatesCssPath);
 
     expect(followup).toContain("width: 100%;");
-    expect(followup).toContain("align-content: start;");
+    expect(followup).toContain("display: flex;");
+    expect(followup).toContain("flex-direction: column;");
+    expect(questions).toContain("flex-wrap: wrap;");
+    expect(input).toContain("grid-template-columns: minmax(0, 1fr) auto;");
   });
 
   it("uses a light semantic track for deterministic range controls", () => {

@@ -486,6 +486,7 @@ function buildBfsFollowups(params: TemplatePreviewParams): TemplatePreviewFollow
       "bfs-intro",
       ["为什么先把起点放进队列？", "队列保存已经发现、但还没有展开邻居的节点。"],
       ["为什么使用先进先出？", "先进先出保证先发现的浅层节点先被处理，因此形成逐层遍历。"],
+      ["visited 集合有什么作用？", "它记录已经发现的节点，避免同一个节点被重复入队和访问。"],
     ),
   };
   trace.forEach((state) => {
@@ -639,7 +640,7 @@ function buildDerivativeFollowups(params: TemplatePreviewParams, script: Playboo
       ["当前切点和斜率是多少？", `切点 a=${fixed(markerX)}，对应导数与切线斜率都是 ${fixed(slope)}。`],
       item.step_id.includes("secant")
         ? ["为什么还不是切线？", "当前仍连接两个不同的函数点；只有当 h 趋近零时，割线才收敛为切线。"]
-        : undefined,
+        : ["导数在图像上表示什么？", "导数表示当前切点处切线的斜率，也就是函数在这一点的瞬时变化率。"],
     ),
   ]));
 }
