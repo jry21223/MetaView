@@ -14,6 +14,10 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      # Provide a dummy key so the mock LLM provider initialises without error.
+      # Real API calls are not made during repository checks.
+      METAVIEW_LLM_API_KEY: dummy
 
     steps:
       - uses: actions/checkout@v4
@@ -37,17 +41,17 @@ jobs:
           python3 -m venv .venv
           .venv/bin/pip install -r apps/api/requirements-dev.txt
 
-      - name: Lint & test & build
-        env:
-          # Provide a dummy key so the mock LLM provider initialises without error.
-          # Real API calls are not made during `make check`.
-          METAVIEW_LLM_API_KEY: dummy
-        run: make check
+      - name: Lint
+        run: make lint
+
+      - name: Test
+        run: make test
+
+      - name: Build
+        run: make build
 
       - name: Coverage (PR-only)
         if: github.event_name == 'pull_request'
-        env:
-          METAVIEW_LLM_API_KEY: dummy
         run: make test-coverage
 
       - name: Upload coverage reports
