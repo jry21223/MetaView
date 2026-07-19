@@ -44,11 +44,23 @@ jobs:
       - name: Lint
         run: make lint
 
-      - name: Test
-        run: make test
+      - name: Test API
+        run: .venv/bin/pytest apps/api/tests -q
 
-      - name: Build
-        run: make build
+      - name: Test Web
+        run: npm --workspace apps/web run test
+
+      - name: Test Agent
+        run: npm --workspace apps/agent run test
+
+      - name: Test MCP
+        run: npm --workspace apps/mcp-server run test
+
+      - name: Build Web
+        run: npm --workspace apps/web run build
+
+      - name: Build Agent
+        run: npm --workspace apps/agent run build
 
       - name: Coverage (PR-only)
         if: github.event_name == 'pull_request'
