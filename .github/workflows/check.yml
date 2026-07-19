@@ -47,6 +47,15 @@ jobs:
       - name: Test API
         run: .venv/bin/pytest apps/api/tests -q
 
+      - name: Test Web mobile regression
+        run: npm --workspace apps/web run test -- src/styles/mobilePlayerRegression.test.ts
+
+      - name: Test Web player contracts
+        run: >-
+          npm --workspace apps/web run test --
+          src/features/playbook/engine/player/PlaybookPlayer.test.tsx
+          src/styles/mobileWebSmoke.test.tsx
+
       - name: Test Web
         run: npm --workspace apps/web run test
 
