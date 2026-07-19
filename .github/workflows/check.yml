@@ -57,7 +57,19 @@ jobs:
           src/styles/mobileWebSmoke.test.tsx
 
       - name: Test Web
-        run: npm --workspace apps/web run test
+        run: >-
+          npm --workspace apps/web run test --
+          --reporter=json
+          --outputFile=../../web-test-results.json
+
+      - name: Upload Web test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-test-results-${{ github.run_id }}
+          path: web-test-results.json
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Test Agent
         run: npm --workspace apps/agent run test
