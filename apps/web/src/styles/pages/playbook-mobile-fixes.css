@@ -1,0 +1,81 @@
+/* Mobile player corrections kept after the shared layout/player styles. */
+
+.playbook-player__ghost-btn {
+  display: inline-grid;
+  place-items: center;
+  line-height: 0;
+}
+
+.playbook-player__ghost-btn svg {
+  display: block;
+}
+
+/* Avoid platform emoji glyphs for the primary transport control. */
+.playbook-ctrl-btn--play {
+  font-size: 0;
+  overflow: hidden;
+}
+
+.playbook-ctrl-btn--play::before {
+  content: "";
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  background: currentColor;
+  -webkit-mask-image: var(--playbook-transport-icon);
+  mask-image: var(--playbook-transport-icon);
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+.playbook-ctrl-btn--play[aria-label="播放"] {
+  --playbook-transport-icon: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2024%2024%27%3E%3Cpath%20fill=%27black%27%20d=%27M8%205.25%2018%2012%208%2018.75Z%27/%3E%3C/svg%3E");
+}
+
+.playbook-ctrl-btn--play[aria-label="暂停"] {
+  --playbook-transport-icon: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2024%2024%27%3E%3Crect%20x=%277%27%20y=%275%27%20width=%273.5%27%20height=%2714%27%20rx=%271%27%20fill=%27black%27/%3E%3Crect%20x=%2713.5%27%20y=%275%27%20width=%273.5%27%20height=%2714%27%20rx=%271%27%20fill=%27black%27/%3E%3C/svg%3E");
+}
+
+@media (max-width: 680px) {
+  /* The previous mobile override forced the global navigation to remain open,
+     even after the player changed topbarCollapsed. Restore real collapse. */
+  .mv-top-shell.is-collapsed {
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transform: translateY(-10px);
+    pointer-events: none;
+  }
+
+  .mv-top-shell.is-collapsed > .mv-top {
+    min-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-bottom-color: transparent;
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+}
+
+@media (max-width: 680px) and (orientation: portrait) {
+  /* Keep the sticky lesson header below an iPhone status-bar safe area. */
+  .playbook-player--portrait .playbook-player__header {
+    top: var(--mv-safe-top);
+  }
+
+  /* Width, not an indefinite container height, owns the 16:9 mobile stage. */
+  .playbook-player--portrait .playbook-player__stage-shell {
+    width: 100%;
+    container-type: inline-size;
+  }
+
+  .playbook-player--portrait .playbook-player__stage {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+  }
+}
