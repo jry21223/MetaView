@@ -57,7 +57,8 @@ describe("PhysicsForceSceneRenderer", () => {
     expect(markup).toContain('data-object-id="body"');
     expect(markup).toContain("<circle");
     expect(markup).toContain('data-semantic-role="lab_grid"');
-    expect(markup).not.toContain('data-semantic-role="motion_trail"');
+    expect(markup).toContain('data-semantic-role="motion_trail"');
+    expect(markup).toContain('data-render-mode="native-trajectory"');
     expect(markup).toContain('data-semantic-role="formula_card"');
     expect(markup).toContain('data-vector-component="horizontal"');
     expect(markup).toContain('data-vector-component="vertical"');
@@ -71,7 +72,7 @@ describe("PhysicsForceSceneRenderer", () => {
     expect(markup).not.toContain("var(--warn");
     expect(markup).not.toContain("var(--canvas-primary");
     expect(markup).toContain('data-semantic-role="trajectory"');
-    expect(markup).toContain('stroke-width="0.42"');
+    expect(markup).toContain('stroke-width="0.7"');
     expect(markup).not.toContain("#1f8abd");
     expect(markup).not.toContain("#8e44ad");
     expect(markup).not.toContain("projectile-body-dot");

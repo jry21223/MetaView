@@ -166,16 +166,18 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({ step, progr
         ) : null}
 
         {snap.trajectory?.length ? (
-          <path
-            d={trajectoryPath(snap.trajectory, progress)}
-            fill="none"
-            stroke={colors.trajectory}
-            strokeWidth="0.42"
-            opacity="0.68"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            data-semantic-role="trajectory"
-          />
+          <g data-semantic-role="motion_trail" data-render-mode="native-trajectory">
+            <path
+              d={trajectoryPath(snap.trajectory, progress)}
+              fill="none"
+              stroke={colors.trajectory}
+              strokeWidth="0.7"
+              opacity="0.68"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              data-semantic-role="trajectory"
+            />
+          </g>
         ) : null}
 
         {snap.objects.map((object) => {

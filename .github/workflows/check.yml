@@ -14,6 +14,10 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      # Provide a dummy key so the mock LLM provider initialises without error.
+      # Real API calls are not made during repository checks.
+      METAVIEW_LLM_API_KEY: dummy
 
     steps:
       - uses: actions/checkout@v4
@@ -37,17 +41,50 @@ jobs:
           python3 -m venv .venv
           .venv/bin/pip install -r apps/api/requirements-dev.txt
 
-      - name: Lint & test & build
-        env:
-          # Provide a dummy key so the mock LLM provider initialises without error.
-          # Real API calls are not made during `make check`.
-          METAVIEW_LLM_API_KEY: dummy
-        run: make check
+      - name: Lint
+        run: make lint
+
+      - name: Test API
+        run: .venv/bin/pytest apps/api/tests -q
+
+      - name: Test Web mobile regression
+        run: npm --workspace apps/web run test -- src/styles/mobilePlayerRegression.test.ts
+
+      - name: Test Web player contracts
+        run: >-
+          npm --workspace apps/web run test --
+          src/features/playbook/engine/player/PlaybookPlayer.test.tsx
+          src/styles/mobileWebSmoke.test.tsx
+
+      - name: Test Web
+        run: >-
+          npm --workspace apps/web run test --
+          --reporter=json
+          --outputFile=../../web-test-results.json
+
+      - name: Upload Web test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-test-results-${{ github.run_id }}
+          path: web-test-results.json
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Test Agent
+        run: npm --workspace apps/agent run test
+
+      - name: Test MCP
+        run: npm --workspace apps/mcp-server run test
+
+      - name: Build Web
+        run: npm --workspace apps/web run build
+
+      - name: Build Agent
+        run: npm --workspace apps/agent run build
 
       - name: Coverage (PR-only)
         if: github.event_name == 'pull_request'
-        env:
-          METAVIEW_LLM_API_KEY: dummy
         run: make test-coverage
 
       - name: Upload coverage reports
