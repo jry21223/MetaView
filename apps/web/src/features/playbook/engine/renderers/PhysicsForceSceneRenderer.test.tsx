@@ -72,7 +72,7 @@ describe("PhysicsForceSceneRenderer", () => {
     expect(markup).not.toContain("var(--warn");
     expect(markup).not.toContain("var(--canvas-primary");
     expect(markup).toContain('data-semantic-role="trajectory"');
-    expect(markup).toContain('stroke-width="0.42"');
+    expect(markup).toContain('stroke-width="0.52"');
     expect(markup).not.toContain("#1f8abd");
     expect(markup).not.toContain("#8e44ad");
     expect(markup).not.toContain("projectile-body-dot");
