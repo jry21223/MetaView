@@ -9,6 +9,8 @@ import type {
 } from "../../features/playbook/engine/types";
 import { PUBLIC_GOLD_TEMPLATES } from "./gold-templates/publicGoldTemplates";
 import { manifestToPreviewCase } from "./gold-templates/manifest";
+import type { ConicFollowupCommand } from "../../features/playbook/interaction/types";
+import type { InteractionAdapter } from "../../features/playbook/interaction/types";
 
 export type TemplatePreviewCaseId = string;
 
@@ -19,6 +21,7 @@ export interface TemplatePreviewQuestion {
   id: string;
   question: string;
   answer: string;
+  operation?: ConicFollowupCommand;
 }
 
 export type TemplatePreviewFollowups = Record<string, TemplatePreviewQuestion[]>;
@@ -59,6 +62,7 @@ export interface TemplatePreviewCase {
     params: TemplatePreviewParams,
     script: PlaybookScript,
   ) => TemplatePreviewFollowups;
+  interactionAdapters?: readonly InteractionAdapter[];
 }
 
 const FPS = 30;

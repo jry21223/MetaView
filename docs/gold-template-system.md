@@ -16,12 +16,15 @@ at `contracts/conic-archetypes.json` is the source of truth for
 archetype IDs, capabilities, mathematical fact rules, visual invariants, and
 pedagogical rubrics. `GoldTemplateManifest` resolves that metadata by
 `archetypeId` and attaches the public case copy, parameter contract, poster,
-deterministic Playbook builder, and local follow-ups. `/templates`, detail
+deterministic Playbook builder, and five step-aware local Follow-up operations. `/templates`, detail
 playback, and poster export derive their public cases from this registry.
 
 The builder returns the same `PlaybookScript` consumed by the shared
-`PlaybookPlayer` and Remotion `playbook` composition. Loading or operating a
-public case does not call the API or model, create a run, or consume credits.
+`PlaybookPlayer` and Remotion `playbook` composition. Follow-up operations use
+the existing versioned semantic-interaction sandbox: local step edits remain
+scoped, timing changes retain a valid continuous timeline, and parameter edits
+rebuild through the Manifest-owned builder and shared conic kernel. Loading or
+operating a public case does not call the API or model, create a run, or consume credits.
 The frozen script is the reviewed product artifact, not evidence of generation
 quality.
 

@@ -50,6 +50,12 @@ strict rejection boundary.
    a declared full-scene ViewBox can opt out of object-introduction auto-zoom.
    Preview and export continue to use `PlaybookPlayer` / `PlaybookComposition`.
 
+The five public Follow-up intents also stay inside this boundary. They run
+through the existing versioned semantic-interaction engine: step-local edits
+preserve unrelated steps, pacing repairs the same Playbook timeline, and
+parameter edits clamp or reject by Manifest controls before rebuilding through
+the frozen builder and shared kernel.
+
 This record will be extended with final paths, validation evidence, and known
 limitations as the pack is implemented.
 

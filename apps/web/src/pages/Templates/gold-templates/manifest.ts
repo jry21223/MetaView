@@ -12,6 +12,11 @@ import type {
   TemplatePreviewFollowups,
   TemplatePreviewParams,
 } from "../templatePreviewCases";
+import type { InteractionAdapter } from "../../../features/playbook/interaction/types";
+import {
+  buildConicFollowupPresets,
+  createConicFollowupAdapter,
+} from "./conicFollowupAdapter";
 
 export type GoldTemplateVisibility = "public" | "hidden_eval";
 
@@ -43,11 +48,16 @@ export interface GoldTemplateManifest extends Omit<ConicArchetypeMetadata, "publ
     params: TemplatePreviewParams,
     script: PlaybookScript,
   ) => TemplatePreviewFollowups;
+  interactionAdapter: InteractionAdapter;
 }
 
 export type PublicGoldTemplateDefinition = Omit<
   GoldTemplateManifest,
-  "requiredCapabilities" | "expectedFacts" | "visualInvariants" | "pedagogicalRubric"
+  | "requiredCapabilities"
+  | "expectedFacts"
+  | "visualInvariants"
+  | "pedagogicalRubric"
+  | "interactionAdapter"
 >;
 
 const CATALOG_METADATA_FIELDS = [
@@ -71,12 +81,19 @@ export function attachPublicGoldTemplate(
       `Public case ${definition.caseId} does not match ${archetype.archetypeId}`,
     );
   }
+  const interactionAdapter = createConicFollowupAdapter(definition);
   return {
     ...definition,
     requiredCapabilities: archetype.requiredCapabilities,
     expectedFacts: archetype.expectedFacts,
     visualInvariants: archetype.visualInvariants,
     pedagogicalRubric: archetype.pedagogicalRubric,
+    buildFollowups: (params, script) => buildConicFollowupPresets(
+      definition,
+      script,
+      definition.buildFollowups(params, script),
+    ),
+    interactionAdapter,
   };
 }
 
@@ -96,5 +113,6 @@ export function manifestToPreviewCase(
     controls: [...(manifest.parameterSchema?.controls ?? [])],
     buildScript: manifest.buildPublicPlaybook,
     buildFollowups: manifest.buildFollowups,
+    interactionAdapters: [manifest.interactionAdapter],
   };
 }

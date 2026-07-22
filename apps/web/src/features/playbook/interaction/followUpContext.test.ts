@@ -44,4 +44,15 @@ describe("interaction follow-up context", () => {
       sequence: 1,
     })).toBe("把 BFS 起点选为 C");
   });
+
+  it("describes local conic Follow-up events without flattening their semantic intent", () => {
+    expect(describeInteractionEvent({
+      adapter_id: "math.conic-followup",
+      step_id: "ellipse-distance-sum",
+      target_id: "step:ellipse-distance-sum:slow-current-segment",
+      action: "slow-current-segment",
+      factor: 1.5,
+      sequence: 1,
+    })).toBe("把步骤 ellipse-distance-sum 放慢到 1.5 倍时长");
+  });
 });

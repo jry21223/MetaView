@@ -14,16 +14,16 @@ Status: Active
 
 ## 静态运行边界
 
-普通正式案例仍由 `apps/web/src/pages/Templates/templatePreviewCases.ts` 提供；教师级 Gold 案例由 `apps/web/src/pages/Templates/gold-templates/` 中统一的 `GoldTemplateManifest` 注册，再派生为同一 `TemplatePreviewCase`。Manifest 同时记录 `archetypeId`、数学事实、视觉不变量和教学 rubric。每项包含默认参数、参数控件、确定性 `PlaybookScript` 构建器和按步骤组织的固定问答；它不建立第二套 Director 或播放器契约。
+普通正式案例仍由 `apps/web/src/pages/Templates/templatePreviewCases.ts` 提供；教师级 Gold 案例由 `apps/web/src/pages/Templates/gold-templates/` 中统一的 `GoldTemplateManifest` 注册，再派生为同一 `TemplatePreviewCase`。Manifest 同时记录 `archetypeId`、数学事实、视觉不变量和教学 rubric。每项包含默认参数、参数控件、确定性 `PlaybookScript` 构建器和按步骤组织的本地 Follow-up 操作；它不建立第二套 Director 或播放器契约。
 
 以下行为全部在浏览器本地完成：
 
 - 播放和切换步骤；
 - 调整参数并重新构建脚本；
-- 点击预设 Follow-up 并显示固定答案；
+- 点击预设 Follow-up，并通过现有版本化 semantic-interaction 沙盒修改同一份 `PlaybookScript`；
 - 切换主题和返回模板目录。
 
-这条路径不得调用 API，不得创建 run，不得读取或扣减额度，不得调用 LLM，也不得触发 pipeline。离散参数改变后重新计算步骤并回到第一步；连续参数即时更新当前画面。Follow-up 不提供自由输入框，切换步骤时清除旧答案。
+这条路径不得调用 API，不得创建 run，不得读取或扣减额度，不得调用 LLM，也不得触发 pipeline。Gold 圆锥曲线案例的每一步固定提供五种语义操作：放慢当前段、换一种讲解、强调结论依据、调整一个有效参数、只补充当前一步。参数操作按 Manifest 控件范围夹紧或拒绝，再调用原 Gold builder 和共享圆锥曲线内核重建完整 Playbook；局部操作保留其他步骤，放慢操作顺延后续帧并保持连续时间线。Follow-up 不提供自由输入框，切换步骤时清除旧答案。
 
 静态模板播放器显式关闭 TTS 入口，避免继承浏览器里曾保存的远程 TTS 配置并意外请求服务端；Studio 和运营版 BYOK 的既有语音/模型配置不受影响。
 
@@ -42,7 +42,7 @@ Status: Active
 | `pole-polar` | 圆外点、两条切线、接触弦与极线方程 | 外点坐标 `k` |
 | `projectile` | 速度分解、最高点、落点、时间、高度和射程 | 初速度、角度 |
 
-每个默认案例至少有五个实际状态不同的步骤，每一步固定提供 3 个与当前步骤相关的问题。案例数据必须继续符合 `PlaybookScript`；不要为公开模板引入第二套播放器或渲染协议。
+每个默认案例至少有五个实际状态不同的步骤。普通正式案例每一步保留 3 个固定问题；六个 Gold 圆锥曲线案例每一步提供上述 5 个可执行且与当前步骤绑定的语义操作。案例数据必须继续符合 `PlaybookScript`；不要为公开模板引入第二套播放器或渲染协议。
 
 Gold 的公开冻结 Playbook 只用于展示和视觉基线，不能作为真实生成 Benchmark 的输入。隐藏变体及隔离规则见 [gold-template-system.md](./gold-template-system.md)。
 

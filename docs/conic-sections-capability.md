@@ -19,8 +19,11 @@ used when object-introduction auto-zoom would crop a required full curve.
 | `conic.pole-polar.circle` | `pole-polar` | external point coordinate | 6 |
 
 All cases use computed curves, points, segments, annotations, formulas, and
-semantic roles. Parameter changes rebuild the same Playbook contract and local
-follow-ups remain tied to the current step.
+semantic roles. Each step exposes five local semantic Follow-up intents for
+pacing, explanation, conclusion emphasis, validated parameter changes, and a
+current-step-only clarification. Parameter changes rebuild the same Playbook
+contract through the shared kernel; other operations remain tied to the current
+step and preserve a valid timeline.
 
 The public-safe metadata source of truth is
 `contracts/conic-archetypes.json`. Public case builders and the

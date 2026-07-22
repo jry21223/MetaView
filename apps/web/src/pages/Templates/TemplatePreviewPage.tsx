@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { PlaybookPlayer } from "../../features/playbook/engine/player/PlaybookPlayer";
+import type { PlaybookScript } from "../../features/playbook/engine/types";
+import { useInteractionSandbox } from "../../features/playbook/interaction/useInteractionSandbox";
 import { TEMPLATES } from "./templates";
 import { StaticFollowupPanel } from "./StaticFollowupPanel";
 import { TemplatePreviewControls } from "./TemplatePreviewControls";
@@ -57,15 +59,25 @@ function TemplatePreviewContent({
   const [params, setParams] = useState<TemplatePreviewParams>(() => ({ ...previewCase.defaultParams }));
   const [playbackRevision, setPlaybackRevision] = useState(0);
 
-  const script = useMemo(() => previewCase.buildScript(params), [params, previewCase]);
-  const followups = useMemo(
-    () => previewCase.buildFollowups(params, script),
+  const baseScript = useMemo(() => previewCase.buildScript(params), [params, previewCase]);
+  const sandbox = useInteractionSandbox(
+    baseScript,
+    previewCase.id,
+    previewCase.interactionAdapters,
+  );
+  const script = sandbox.previewScript;
+  const renderedParams = useMemo(
+    () => paramsFromScript(previewCase, params, script),
     [params, previewCase, script],
+  );
+  const followups = useMemo(
+    () => previewCase.buildFollowups(renderedParams, script),
+    [renderedParams, previewCase, script],
   );
   const settledOpeningFrame = Math.max(0, (script.steps[0]?.end_frame ?? 1) - 1);
 
   const updateParam = (id: string, value: TemplatePreviewParamValue, resetPlayback: boolean) => {
-    setParams((current) => ({ ...current, [id]: value }));
+    setParams({ ...renderedParams, [id]: value });
     if (resetPlayback) setPlaybackRevision((current) => current + 1);
   };
 
@@ -85,7 +97,7 @@ function TemplatePreviewContent({
           parameterSlot={(
             <TemplatePreviewControls
               previewCase={previewCase}
-              params={params}
+              params={renderedParams}
               onChange={updateParam}
               onReset={resetParams}
             />
@@ -94,6 +106,7 @@ function TemplatePreviewContent({
             <StaticFollowupPanel
               key={currentStepId}
               questions={followups[currentStepId] ?? []}
+              onApplyOperation={sandbox.apply}
             />
           )}
           enableTTS={false}
@@ -104,4 +117,18 @@ function TemplatePreviewContent({
       </div>
     </main>
   );
+}
+
+function paramsFromScript(
+  previewCase: NonNullable<ReturnType<typeof getTemplatePreviewCase>>,
+  fallback: TemplatePreviewParams,
+  script: PlaybookScript,
+): TemplatePreviewParams {
+  const scriptValues = new Map(
+    script.parameter_controls.map((control) => [control.id, control.value]),
+  );
+  return Object.fromEntries(previewCase.controls.map((control) => {
+    const value = scriptValues.get(control.id) ?? fallback[control.id];
+    return [control.id, control.kind === "select" ? String(value) : Number(value)];
+  }));
 }
