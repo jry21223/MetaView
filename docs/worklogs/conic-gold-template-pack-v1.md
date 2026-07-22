@@ -56,9 +56,6 @@ preserve unrelated steps, pacing repairs the same Playbook timeline, and
 parameter edits clamp or reject by Manifest controls before rebuilding through
 the frozen builder and shared kernel.
 
-This record will be extended with final paths, validation evidence, and known
-limitations as the pack is implemented.
-
 ## Implemented result
 
 - The public manifest is `apps/web/src/pages/Templates/gold-templates/manifest.ts`;
@@ -96,3 +93,44 @@ the live Gold boundary; it does not claim that the other five archetypes have
 specialized generation quality. The local API had no model key, so non-covered
 cases used existing mock/fallback behavior; the passing ellipse case used the
 new deterministic SkillPack rather than a public frozen Playbook.
+
+The permanent regression seam is
+`apps/api/tests/test_conic_gold_pipeline.py`. It runs a hidden prompt through
+`RunPipelineUseCase` in Agent mode, asserts specialized conic routing, validates
+the produced LessonPlan and Playbook against the canonical quality gate and
+renderer registry, then requires a passing Gold score with no warnings. A
+second test keeps an unsupported hyperbola variant as a real failure instead of
+substituting the public template.
+
+## Final verification record (2026-07-22)
+
+- `make check` passed: API 1020 passed / 3 skipped, Web 1145 passed, Agent 63
+  passed, MCP 18 passed, and Web/Agent builds completed.
+- `npm --workspace apps/web run test:visual:conics` passed 24/24 combinations:
+  six public cases at 1440x900 and 390x844 in light and dark themes. The suite
+  checks semantic objects, horizontal overflow, formula/stage/control clipping,
+  mobile parameter-panel behavior, top-bar collapse, and five local follow-ups.
+- `npm --workspace apps/web run template-previews:export` exported all 10 public
+  cases; `template-previews:posters` regenerated the six conic posters through
+  the shared Remotion composition. Only the durable conic poster change needed
+  by the discriminant LaTeX correction is retained.
+- `make visual-check` remained blocked twice by the unchanged
+  `projectile_motion` showcase: content pixel ratio 0.02351 is below its 0.028
+  threshold. No visual threshold or unrelated physics fixture was changed.
+- Recorded `make eval-gold` retained the existing strict baseline of 0/12
+  attempts. Recorded `make eval-conic-gold` reported the first missing hidden
+  result fixture and exited; hidden generated results are intentionally not
+  replaced with public frozen Playbooks. The live/Agent ellipse pass above is
+  the positive generation evidence for V1.
+
+## Known limitations
+
+- Specialized deterministic generation is currently limited to the horizontal
+  standard-ellipse focus-definition archetype. The other five archetypes are
+  public teacher templates and hidden evaluation definitions, not claimed
+  specialized Agent capabilities.
+- Vertical-major-axis generation, rotated/general quadratic conics, and
+  area-extremum proofs remain composable, generic, or experimental.
+- Recorded hidden-result fixtures are deliberately absent. A model-backed live
+  run requires a configured local API and provider key; no key was available in
+  this verification environment.

@@ -82,11 +82,16 @@ archetype catalog before deriving Benchmark V2 expectations.
 
 The live runner submits those prompts through the normal API Pipeline. It never
 imports a public template builder, and the scorer has no `caseId` answer branch.
-Mathematical kernels and focused tests verify geometry independently; the gate
-then checks schema, stated facts, pedagogical structure, required semantic
-objects, narration/visual agreement, timing, export readiness, and zero warning
-budget. Failed attempts remain in the timestamped local report. Thresholds and
-mandatory hard-fails are shared with existing Benchmark V2 cases.
+`apps/api/eval/conic_math_validation.py` resolves the archetype's deterministic
+rule and verifies the generated scene's parameters, geometry, and narration
+evidence. It checks focal definitions, directrices, asymptotes, discriminants,
+intersections, chord midpoints/loci, tangency, and pole/polar relations without
+branching on a hidden `caseId`. Invalid deterministic mathematics is an
+additional hard fail for conic expectations; the global 90-point threshold and
+the existing mandatory hard-fail set are unchanged. The gate then checks schema,
+stated facts, pedagogical structure, required semantic objects,
+narration/visual agreement, timing, export readiness, and zero warning budget.
+Failed attempts remain in the timestamped local report.
 
 Reports are written under ignored `eval/reports/`. A missing live
 QualityReport/warning count is itself an invalid live result; the harness does
