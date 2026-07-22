@@ -103,6 +103,8 @@ function snapshot(
     segments.push(
       { x0: values.k, y0: values.k, x1: ax, y1: ay, label: "PA", emphasis: stage === 2 ? "accent" : "secondary", semantic_role: "tangent" },
       { x0: values.k, y0: values.k, x1: bx, y1: by, label: "PB", emphasis: stage === 2 ? "accent" : "secondary", semantic_role: "tangent" },
+      { x0: 0, y0: 0, x1: ax, y1: ay, label: "OA", emphasis: "secondary", semantic_role: "radius_to_tangent" },
+      { x0: 0, y0: 0, x1: bx, y1: by, label: "OB", emphasis: "secondary", semantic_role: "radius_to_tangent" },
     );
   }
   if (showChord && !showPolar) {
@@ -120,9 +122,18 @@ function snapshot(
     });
   }
   const annotations: MathSceneSnapshot["annotations"] = [];
-  if (stage === 3) annotations.push({ x: midpoint + 0.5, y: midpoint + 0.5, text: "接触弦 AB", align: "ne" });
-  if (stage === 4) annotations.push({ x: ax + 0.45, y: ay + 0.65, text: "切点 A", align: "ne" });
-  if (showPolar) annotations.push({ x: midpoint + 2.9, y: midpoint - 2.5, text: "极线 l", align: "se" });
+  if (stage === 1) annotations.push({ x: -5.4, y: 5.3, text: `$OP^2=${fixed(2 * values.k ** 2)}>R^2$`, align: "nw", semantic_role: "validity_check" });
+  if (stage === 2) annotations.push({ x: -5.4, y: 5.3, text: "$OA\\perp PA,\\ OB\\perp PB$", align: "nw", semantic_role: "tangency_check" });
+  if (stage === 3) annotations.push({ x: midpoint + 0.5, y: midpoint + 0.5, text: "接触弦 AB", align: "ne", semantic_role: "relation_label" });
+  if (stage === 4) annotations.push({ x: ax + 0.45, y: ay + 0.65, text: "$A(a,b)$", align: "ne", semantic_role: "derivation_panel" });
+  if (stage === 5) annotations.push({ x: -5.4, y: 5.3, text: String.raw`$A,B:\quad kx+ky=${values.radius ** 2}$`, align: "nw", semantic_role: "verification_panel" });
+  if (showPolar) annotations.push({
+    x: midpoint + 4.6,
+    y: midpoint - 3.2,
+    text: "极线",
+    align: "se",
+    semantic_role: "relation_label",
+  });
   return {
     kind: "math_scene",
     camera_mode: "fixed",
@@ -154,13 +165,17 @@ function buildPlaybook(params: TemplatePreviewParams): PlaybookScript {
   const values = polePolarValues(params);
   const k = fixed(values.k);
   const sum = fixed(values.polarSum);
+  const [ax, ay] = values.pointA;
+  const [bx, by] = values.pointB;
+  const valueAtA = values.k * (ax + ay);
+  const valueAtB = values.k * (bx + by);
   const steps = [
-    step(0, { step_id: "pole-polar-setup", title: "确定圆与圆外点", voiceover_text: `圆 C 的半径是 ${values.radius}，外点 P=(${k},${k})。先确认 P 在圆外，才能作出两条实切线。`, snapshot: snapshot(values, 1, "先建立圆与圆外点 P。", `C:x^2+y^2=${values.radius ** 2}`) }),
-    step(1, { step_id: "pole-polar-tangents", title: "作出两条切线", voiceover_text: "从 P 向圆作 PA、PB 两条切线，半径 OA、OB 分别垂直于对应切线。", snapshot: snapshot(values, 2, "A、B 是从 P 引出的两条切线的切点。", "PA\\perp OA,\\quad PB\\perp OB") }),
-    step(2, { step_id: "pole-polar-chord", title: "连接两个切点", voiceover_text: "连接 A、B 得到接触弦。关于这个圆，AB 就是外点 P 的极线。", snapshot: snapshot(values, 3, "接触弦 AB 把两个切点连成一条直线。", "A,B\\in C") }),
-    step(3, { step_id: "pole-polar-tangent-equation", title: "写出切点处切线", voiceover_text: "若 A=(a,b)，圆在 A 点的切线方程是 ax+by=R²。", snapshot: snapshot(values, 4, "把切点坐标写进圆的切线公式。", "A(a,b):\\quad ax+by=R^2") }),
-    step(4, { step_id: "pole-polar-substitute-pole", title: "代入共同的外点 P", voiceover_text: `P=(${k},${k}) 同时在 A、B 两点的切线上，所以 A、B 都满足 kx+ky=R²。`, snapshot: snapshot(values, 5, `A、B 共同满足 x+y=${sum}。`, `ak+bk=R^2\\Rightarrow a+b=\\frac{R^2}{k}`) }),
-    step(5, { step_id: "pole-polar-result", title: "得到极线方程", voiceover_text: `因此 P=(${k},${k}) 关于圆的极线是 kx+ky=R²，也就是 x+y=${sum}。`, snapshot: snapshot(values, 6, `拖动 k 时，极线 x+y=${sum} 会与外点 P 同步移动。`, `\\boxed{kx+ky=R^2}\\iff\\boxed{x+y=${sum}}`) }),
+    step(0, { step_id: "pole-polar-setup", title: "观察目标：外点如何决定一条线", voiceover_text: `圆 C 的半径 R=${values.radius}，P=(${k},${k})。先验证 OP²=${fixed(2 * values.k ** 2)}>R²=25，所以 P 在圆外，两条实切线的构造才成立。`, snapshot: snapshot(values, 1, "第一步只检查构造条件：P 必须在圆外。", `OP^2=2k^2=${fixed(2 * values.k ** 2)}>R^2=25`) }),
+    step(1, { step_id: "pole-polar-tangents", title: "构造两条切线并验证切点", voiceover_text: "从 P 引 PA、PB，再连接 OA、OB。画面中 OA⊥PA、OB⊥PB，这两个直角确认 A、B 确实是切点。", snapshot: snapshot(values, 2, "半径与切线的垂直关系，是这一幕唯一需要确认的事实。", "OA\\perp PA,\\quad OB\\perp PB") }),
+    step(2, { step_id: "pole-polar-chord", title: "连接 A、B：猜想接触弦的方程", voiceover_text: "连接两个切点得到接触弦 AB。我们要寻找一个同时被 A、B 满足的一次方程；这条直线就是 P 关于圆 C 的极线。", snapshot: snapshot(values, 3, "先看见接触弦，再用切线方程证明它由 P 唯一决定。", "A,B\\in C\\quad\\text{且}\\quad A,B\\in l") }),
+    step(3, { step_id: "pole-polar-tangent-equation", title: "代数解释：切线方程从哪里来", voiceover_text: "设 A=(a,b)。向量 OA=(a,b) 是切线的法向量，而 A 在圆上，a²+b²=R²，因此 A 点切线为 ax+by=R²。", snapshot: snapshot(values, 4, "法向量给出左边，切点在圆上给出右边 R²。", "A(a,b):\\quad (a,b)\\cdot(x,y)=a^2+b^2=R^2") }),
+    step(4, { step_id: "pole-polar-substitute-pole", title: "代入 P：验证 A、B 共线", voiceover_text: `P=(${k},${k}) 同时在 A、B 处的两条切线上。对当前切点计算，k(a+b)=${fixed(valueAtA)}，k(x_B+y_B)=${fixed(valueAtB)}，都等于 R²=25，因此 A、B 共同满足 kx+ky=25。`, snapshot: snapshot(values, 5, `两个切点分别代入同一方程，数值均为 25。`, `A,B:\\quad kx+ky=R^2=25\\Rightarrow x+y=${sum}`) }),
+    step(5, { step_id: "pole-polar-result", title: "写出极线并总结联动关系", voiceover_text: `所以 P=(${k},${k}) 的极线是 kx+ky=25，即 x+y=${sum}。增大 k 时，25/k 变小，极线便向原点平移；构造、推导与参数变化由同一方程统一。`, snapshot: snapshot(values, 6, `当前画面只突出整条极线 x+y=${sum}，而不再突出单个切点。`, `\\boxed{kx+ky=R^2}\\iff\\boxed{x+y=${sum}}`) }),
   ];
   return {
     schema_version: "2.0.0",

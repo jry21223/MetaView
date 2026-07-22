@@ -1,12 +1,10 @@
 import type { MathSceneSnapshot, MetaStep, PlaybookScript } from "../../../features/playbook/engine/types";
 import {
   chordFromIntersection,
-  ellipseEccentricity,
   ellipseFocalDistanceSum,
   ellipseFoci,
   ellipseImplicit,
   ellipsePoint,
-  hyperbolaEccentricity,
   hyperbolaFocalDistanceDifference,
   hyperbolaFoci,
   hyperbolaPoint,
@@ -81,6 +79,7 @@ function buildEllipseFocus(params: TemplatePreviewParams): PlaybookScript {
   const t = clamp(numberParam(params, "t", 1), 0, 2 * Math.PI);
   const spec = { a, b };
   const [f1, f2] = ellipseFoci(spec);
+  const c = Math.sqrt(a * a - b * b);
   const p = ellipsePoint(spec, t);
   const d1 = Math.hypot(p.x - f1.x, p.y - f1.y);
   const d2 = Math.hypot(p.x - f2.x, p.y - f2.y);
@@ -88,24 +87,24 @@ function buildEllipseFocus(params: TemplatePreviewParams): PlaybookScript {
     kind: "math_scene", camera_mode: "fixed", x_min: -a - 1.5, x_max: a + 1.5, y_min: -b - 1.5, y_max: b + 1.5,
     x_label: "x", y_label: "y", curves: ellipseCurve(a, b),
     points: [
-      { ...f1, label: "$F_1$", emphasis: "secondary", semantic_role: "focus" },
-      { ...f2, label: "$F_2$", emphasis: "secondary", semantic_role: "focus" },
+      { ...f1, label: "$F_1$", emphasis: stage === 1 ? "accent" : "secondary", semantic_role: "focus" },
+      { ...f2, label: "$F_2$", emphasis: stage === 1 ? "accent" : "secondary", semantic_role: "focus" },
       ...(stage >= 2 ? [{ ...p, label: "P", emphasis: "accent", semantic_role: "moving_point" }] : []),
     ],
     segments: stage >= 3 ? [
-      { x0: p.x, y0: p.y, x1: f1.x, y1: f1.y, label: `PF₁=${fixed(d1)}`, emphasis: "secondary", semantic_role: "focal_distance" },
-      { x0: p.x, y0: p.y, x1: f2.x, y1: f2.y, label: `PF₂=${fixed(d2)}`, emphasis: "accent", semantic_role: "focal_distance" },
+      { x0: p.x, y0: p.y, x1: f1.x, y1: f1.y, label: `PF₁=${fixed(d1)}`, emphasis: stage === 3 ? "accent" : "secondary", semantic_role: "focal_distance" },
+      { x0: p.x, y0: p.y, x1: f2.x, y1: f2.y, label: `PF₂=${fixed(d2)}`, emphasis: stage === 3 ? "accent" : "secondary", semantic_role: "focal_distance" },
     ] : [],
     annotations: stage >= 4 ? [{ x: -a, y: b + 0.6, text: `$PF_1+PF_2=${fixed(d1 + d2)}=2a$`, align: "nw", semantic_role: "derivation_panel" }] : [],
     formula_latex: formula, caption,
   });
   const steps = [
-    sceneStep(0, "ellipse-foci", "先看两个焦点", "椭圆由两个固定焦点组织，并不是把圆随意压扁。", base(1, "F₁、F₂ 固定，曲线围绕它们展开。", String.raw`a=${a},\ b=${b}`)),
-    sceneStep(1, "ellipse-moving-point", "让点 P 沿椭圆移动", `当前参数 t=${fixed(t)}，P=(${fixed(p.x)},${fixed(p.y)})。`, base(2, "P 始终被确定性参数点限制在椭圆上。", String.raw`P(t)=(${a}\cos t,${b}\sin t)`)),
-    sceneStep(2, "ellipse-two-distances", "连接 P 与两个焦点", `当前 PF₁=${fixed(d1)}，PF₂=${fixed(d2)}。`, base(3, "两段距离分别变化。", String.raw`PF_1=${fixed(d1)},\ PF_2=${fixed(d2)}`)),
-    sceneStep(3, "ellipse-distance-sum", "比较距离和", `两段距离相加为 ${fixed(d1 + d2)}，恰好等于 2a=${fixed(2 * a)}。`, base(4, "单段长度会变，但距离和保持不变。", `PF_1+PF_2=2a=${fixed(2 * a)}`)),
-    sceneStep(4, "ellipse-shape-parameters", "改变 a 与 b", `当前离心率 e=${fixed(ellipseEccentricity(spec))}；a 与 b 改变时，焦点和形状同步重算。`, base(4, "参数变化不会破坏焦点定义。", String.raw`e=\frac{\sqrt{a^2-b^2}}a=${fixed(ellipseEccentricity(spec))}`)),
-    sceneStep(5, "ellipse-definition", "总结椭圆定义", `椭圆是到两个定点距离之和等于常数 2a 的点的轨迹；当前计算验证值为 ${fixed(ellipseFocalDistanceSum(spec, p))}。`, base(4, "定义、图形与数值在同一画面闭合。", String.raw`\boxed{PF_1+PF_2=2a}`)),
+    sceneStep(0, "ellipse-foci", "观察目标：寻找不变量", `先固定两个焦点 F₁、F₂；它们与中心的距离是 c=${fixed(c)}。`, base(1, "先记住两个定点，下一幕再引入动点。", String.raw`c=\sqrt{a^2-b^2}=${fixed(c)}`)),
+    sceneStep(1, "ellipse-moving-point", "改变 t：记录动点 P", `当 t=${fixed(t)} 时，P=(${fixed(p.x)},${fixed(p.y)})；改变 t 只改变 P 的位置，P 仍在同一椭圆上。`, base(2, "这一步只追踪 P 的位置，暂不计算距离。", String.raw`P(t)=(${a}\cos t,${b}\sin t)`)),
+    sceneStep(2, "ellipse-two-distances", "测量 PF₁ 与 PF₂", `连线后得 PF₁=${fixed(d1)}、PF₂=${fixed(d2)}。拖动 t 时，两段长度会一增一减。`, base(3, "先比较两个分量：它们都会变。", String.raw`PF_1=${fixed(d1)},\quad PF_2=${fixed(d2)}`)),
+    sceneStep(3, "ellipse-distance-sum", "提出猜想：距离和不变", `当前 PF₁+PF₂=${fixed(d1 + d2)}，恰好等于 2a=${fixed(2 * a)}。改变 t 后可继续检查这个猜想。`, base(4, "单段距离在变，但它们的和保持为 2a。", String.raw`PF_1+PF_2=${fixed(d1 + d2)}=2a`)),
+    sceneStep(4, "ellipse-shape-parameters", "代数解释：变化项相消", `由 b²=a²-c² 化简距离式，得 PF₁=a+c cos t，PF₂=a−c cos t；相加时变化项正好抵消。`, base(5, "不变不是图上的巧合：+ c cos t 与 − c cos t 相消。", String.raw`PF_1=a+c\cos t,\quad PF_2=a-c\cos t`)),
+    sceneStep(5, "ellipse-definition", "验证并写出椭圆定义", `确定性计算再次得到 ${fixed(ellipseFocalDistanceSum(spec, p))}=2a。因此，椭圆就是到两定点的距离之和等于常数 2a 的点的轨迹。`, base(5, "观察、猜想、代数解释与当前数值在这里闭合。", String.raw`\boxed{PF_1+PF_2=2a=${fixed(2 * a)}}`)),
   ];
   return playbook("椭圆的焦点定义", "看见椭圆上动点到两焦点距离之和恒为 2a。", "conic_ellipse_focus_definition", steps, [
     { id: "a", label: "长半轴 a", value: fixed(a), description: "满足 a>b>0" },
@@ -127,24 +126,26 @@ function buildParabola(params: TemplatePreviewParams): PlaybookScript {
     x_label: "x", y_label: "y",
     curves: [{ expression_x: `${p}*t^2`, expression_y: `${2 * p}*t`, t_min: -2.4, t_max: 2.4, label: "抛物线", emphasis: "primary", semantic_role: "conic_curve" }],
     points: [
-      { ...focus, label: "F", emphasis: "secondary", semantic_role: "focus" },
+      { ...focus, label: "F", emphasis: stage === 1 ? "accent" : "secondary", semantic_role: "focus" },
       ...(stage >= 2 ? [{ ...point, label: "P", emphasis: "accent", semantic_role: "moving_point" }] : []),
       ...(stage >= 3 ? [{ ...foot, label: "H", emphasis: "secondary", semantic_role: "projection_foot" }] : []),
     ],
     segments: [
-      { x0: -p, y0: -p * 5, x1: -p, y1: p * 5, label: "准线", emphasis: "secondary", semantic_role: "directrix" },
+      { x0: -p, y0: -p * 5, x1: -p, y1: p * 5, label: "准线", emphasis: stage === 1 ? "accent" : "secondary", semantic_role: "directrix" },
       ...(stage >= 3 ? [
         { x0: point.x, y0: point.y, x1: focus.x, y1: focus.y, label: `PF=${fixed(distances.focus)}`, emphasis: "accent", semantic_role: "focal_distance" },
         { x0: point.x, y0: point.y, x1: foot.x, y1: foot.y, label: `PH=${fixed(distances.directrix)}`, emphasis: "secondary", semantic_role: "directrix_distance" },
       ] : []),
-    ], formula_latex: formula, caption,
+    ],
+    annotations: [],
+    formula_latex: formula, caption,
   });
   const steps = [
-    sceneStep(0, "parabola-focus-directrix", "建立焦点与准线", `焦点 F=(${p},0)，准线是 x=${-p}。`, snapshot(1, "焦点和准线共同决定抛物线。", String.raw`F(${p},0),\ l:x=${-p}`)),
-    sceneStep(1, "parabola-moving-point", "选取曲线上动点", `参数 t=${fixed(t)} 给出 P=(${fixed(point.x)},${fixed(point.y)})。`, snapshot(2, "P 沿抛物线移动。", `P(t)=(${p}t^2,${2 * p}t)`)),
-    sceneStep(2, "parabola-project", "向准线作垂线", "H 是 P 到准线的垂足，所以 PH 是点到准线的距离。", snapshot(3, "PF 与 PH 在同一画面比较。", String.raw`PH\perp l`)),
-    sceneStep(3, "parabola-distance", "同步比较两段距离", `PF=${fixed(distances.focus)}，PH=${fixed(distances.directrix)}，两者相等。`, snapshot(3, "点移动时两段距离同步变化。", `PF=PH=${fixed(distances.focus)}`)),
-    sceneStep(4, "parabola-definition", "总结焦点—准线定义", "到定点 F 与定直线 l 距离相等的点的轨迹就是抛物线。", snapshot(3, "几何定义与参数方程互相验证。", String.raw`\boxed{PF=d(P,l)}`)),
+    sceneStep(0, "parabola-focus-directrix", "观察目标：寻找等距规则", `固定焦点 F=(${p},0) 与准线 l:x=${-p}，接下来只比较动点到它们的距离。`, snapshot(1, "一个定点、一条定直线，是整个定义的两个参照物。", String.raw`F(${p},0),\quad l:x=${-p}`)),
+    sceneStep(1, "parabola-moving-point", "改变 t：追踪曲线上的 P", `当 t=${fixed(t)} 时，P=(${fixed(point.x)},${fixed(point.y)})。拖动 t 会改变 P，但焦点和准线不动。`, snapshot(2, "这一幕只确定要测量的点 P。", String.raw`P(t)=(${p}t^2,${2 * p}t)`)),
+    sceneStep(2, "parabola-project", "构造可比的两段距离", `连接 PF，再作 PH⊥l。H=(${-p},${fixed(point.y)}) 是垂足，因此 PH 才是 P 到准线的最短距离。`, snapshot(3, "现在 PF 与 PH 表示同一个点 P 到两个参照物的距离。", String.raw`PH\perp l,\quad H(-p,2pt)`)),
+    sceneStep(3, "parabola-distance", "代数解释：为什么 PF=PH", `代入 P=(pt²,2pt) 后，PF 化简为 p(t²+1)；而 PH=x_P+p，也是 p(t²+1)。相等由参数式直接导出。`, snapshot(4, "两段距离随 t 同步改变，因为它们化简后是同一个式子。", String.raw`PF=\sqrt{p^2(t^2-1)^2+4p^2t^2}=p(t^2+1)=PH`)),
+    sceneStep(4, "parabola-definition", "数值验证并总结定义", `当前 PF=${fixed(distances.focus)}、PH=${fixed(distances.directrix)}，计算值一致。到定点 F 与定直线 l 距离相等的点的轨迹，就是抛物线。`, snapshot(4, "几何构造、代数化简和当前数值在这里共同验证定义。", String.raw`\boxed{PF=d(P,l)=${fixed(distances.focus)}}`)),
   ];
   return playbook("抛物线的焦点—准线定义", "比较动点到焦点和准线的距离。", "conic_parabola_focus_directrix", steps, [
     { id: "p", label: "焦参数 p", value: fixed(p), description: "保持 p>0" },
@@ -158,32 +159,40 @@ function buildHyperbola(params: TemplatePreviewParams): PlaybookScript {
   const u = clamp(numberParam(params, "u", 1), -1.7, 1.7);
   const spec = { a, b };
   const [f1, f2] = hyperbolaFoci(spec);
+  const c = Math.hypot(a, b);
   const p = hyperbolaPoint(spec, u);
+  const d1 = Math.hypot(p.x - f1.x, p.y - f1.y);
+  const d2 = Math.hypot(p.x - f2.x, p.y - f2.y);
   const difference = hyperbolaFocalDistanceDifference(spec, p);
   const span = a * 3.2;
   const snapshot = (stage: number, caption: string, formula: string): MathSceneSnapshot => ({
-    kind: "math_scene", camera_mode: "fixed", x_min: -span, x_max: span, y_min: -span * 0.75, y_max: span * 0.75, x_label: "x", y_label: "y",
+    kind: "math_scene", camera_mode: "fixed", x_min: -span, x_max: span, y_min: -span * 0.9, y_max: span * 0.9, x_label: "x", y_label: "y",
     curves: [1, -1].map((branch) => ({ expression_x: `${branch * a}*cosh(t)`, expression_y: `${b}*sinh(t)`, t_min: -1.8, t_max: 1.8, label: branch === 1 ? "右支" : "左支", emphasis: "primary", semantic_role: "conic_curve" })),
     points: [
-      { ...f1, label: "$F_1$", emphasis: "secondary", semantic_role: "focus" }, { ...f2, label: "$F_2$", emphasis: "secondary", semantic_role: "focus" },
+      ...(stage >= 5 ? [
+        { ...f1, label: "$F_1$", emphasis: "secondary", semantic_role: "focus" },
+        { ...f2, label: "$F_2$", emphasis: "secondary", semantic_role: "focus" },
+      ] : []),
       ...(stage >= 3 ? [{ ...p, label: "P", emphasis: "accent", semantic_role: "moving_point" }] : []),
     ],
     segments: stage >= 2 ? [
       { x0: -span, y0: -span * b / a, x1: span, y1: span * b / a, label: "渐近线", emphasis: "secondary", semantic_role: "asymptote" },
       { x0: -span, y0: span * b / a, x1: span, y1: -span * b / a, label: "渐近线", emphasis: "secondary", semantic_role: "asymptote" },
-      ...(stage >= 3 ? [
+      ...(stage >= 5 ? [
         { x0: p.x, y0: p.y, x1: f1.x, y1: f1.y, emphasis: "secondary", semantic_role: "focal_distance" },
         { x0: p.x, y0: p.y, x1: f2.x, y1: f2.y, emphasis: "accent", semantic_role: "focal_distance" },
       ] : []),
-    ] : [], formula_latex: formula, caption,
+    ] : [],
+    annotations: [],
+    formula_latex: formula, caption,
   });
   const steps = [
-    sceneStep(0, "hyperbola-branches", "辨认左右两支", "双曲线由互不相连的两支组成。", snapshot(1, "两支关于坐标轴和中心对称。", String.raw`\frac{x^2}{${a * a}}-\frac{y^2}{${b * b}}=1`)),
-    sceneStep(1, "hyperbola-asymptotes", "画出两条渐近线", `渐近线斜率是 ±b/a=±${fixed(b / a)}。`, snapshot(2, "曲线接近渐近线，但不会与它重合。", String.raw`y=\pm\frac ba x=\pm${fixed(b / a)}x`)),
-    sceneStep(2, "hyperbola-moving-point", "沿一支移动点 P", `当前 u=${fixed(u)}，P=(${fixed(p.x)},${fixed(p.y)})。`, snapshot(3, "参数增大时，点沿右支远离顶点。", String.raw`P(u)=(${a}\cosh u,${b}\sinh u)`)),
-    sceneStep(3, "hyperbola-focal-difference", "比较到两焦点的距离", `两焦点距离差的绝对值为 ${fixed(difference)}，恒等于 2a=${2 * a}。`, snapshot(3, "距离差是不变量。", `|PF_1-PF_2|=2a=${2 * a}`)),
-    sceneStep(4, "hyperbola-eccentricity", "观察离心率", `当前 e=${fixed(hyperbolaEccentricity(spec))}>1；改变 a、b 会同步改变开口和渐近线。`, snapshot(3, "离心率大于 1 是双曲线的特征。", String.raw`e=\frac{\sqrt{a^2+b^2}}a=${fixed(hyperbolaEccentricity(spec))}`)),
-    sceneStep(5, "hyperbola-summary", "总结渐近趋势", "越远离中心，双曲线越贴近两条渐近线，同时保持焦点距离差不变。", snapshot(3, "结构、渐近线和焦点定义共同描述双曲线。", String.raw`\boxed{|PF_1-PF_2|=2a}`)),
+    sceneStep(0, "hyperbola-branches", "观察目标：两支向哪里延伸", "先只看双曲线本身：它有互不相连的左、右两支，并关于坐标轴和原点对称。", snapshot(1, "先识别两支结构，下一幕再给出它们的参照方向。", String.raw`\frac{x^2}{${a * a}}-\frac{y^2}{${b * b}}=1`)),
+    sceneStep(1, "hyperbola-asymptotes", "提出猜想：两条参照线", `画出 y=±(b/a)x，当前斜率为 ±${fixed(b / a)}。从图上猜想：曲线越远离中心，越靠近这两条线。`, snapshot(2, "渐近线是待验证的方向，不是双曲线的一部分。", String.raw`y=\pm\frac ba x=\pm${fixed(b / a)}x`)),
+    sceneStep(2, "hyperbola-moving-point", "改变 u：比较 P 的方向", `当 u=${fixed(u)} 时，P=(${fixed(p.x)},${fixed(p.y)})，y/x=${fixed(p.y / p.x, 3)}。增大 |u| 时，这个比值会靠近 ±b/a。`, snapshot(3, "这一幕只跟踪动点方向 y/x 如何靠近渐近线斜率。", String.raw`P(u)=(${a}\cosh u,${b}\sinh u)`)),
+    sceneStep(3, "hyperbola-focal-difference", "代数验证渐近趋势", `由 y/x=(b/a)tanh u，当 u 趋向正、负无穷时，tanh u 趋向±1，因此 y/x 趋向±b/a。`, snapshot(4, "渐近线斜率来自参数式的极限，不只是目测结果。", String.raw`\frac yx=\frac ba\tanh u\longrightarrow\pm\frac ba`)),
+    sceneStep(4, "hyperbola-eccentricity", "建立第二个关系：焦距差", `现在引入 F₁、F₂。当前 PF₁=${fixed(d1)}、PF₂=${fixed(d2)}，两者不相等，但差的绝对值是 ${fixed(difference)}。`, snapshot(5, "分别测量两段焦距，关注它们的差而不是和。", String.raw`|PF_1-PF_2|=${fixed(difference)}`)),
+    sceneStep(5, "hyperbola-summary", "推导、验证并总结", `令 c=√(a²+b²)=${fixed(c)}，右支上 PF₁=c cosh u+a，PF₂=c cosh u−a，相减恒得 2a=${fixed(2 * a)}。当前数值 ${fixed(difference)} 与推导一致。`, snapshot(6, "双曲线同时具有渐近方向与焦距差不变两层结构。", String.raw`\boxed{|PF_1-PF_2|=2a=${fixed(difference)}}`)),
   ];
   return playbook("双曲线与渐近线", "理解双曲线两支、渐近趋势与焦点距离差。", "conic_hyperbola_asymptotes", steps, [
     { id: "a", label: "实半轴 a", value: fixed(a), description: "保持 a>0" },
@@ -219,12 +228,12 @@ function buildLineEllipse(params: TemplatePreviewParams): PlaybookScript {
     };
   };
   const steps = [
-    sceneStep(0, "line-ellipse-setup", "把直线代入椭圆", "联立后得到一元二次方程，几何交点数由实根个数决定。", snapshot([line], "当前参数先进入同一个确定性求交器。", String.raw`\frac{x^2}{25}+\frac{y^2}{9}=1`)),
-    sceneStep(1, "line-ellipse-secant", "Δ>0：两个交点", "参考直线 y=0 穿过椭圆，二次方程有两个不同实根。", snapshot([{ kind: "slope", slope: 0, intercept: 0 }], "两个实根对应 A、B。", String.raw`\Delta>0\Longleftrightarrow\text{相交}`)),
-    sceneStep(2, "line-ellipse-tangent", "Δ=0：交点合并", "参考直线 y=3 与椭圆相切，两个交点合并为一个切点。", snapshot([{ kind: "slope", slope: 0, intercept: 3 }], "重根对应唯一切点。", String.raw`\Delta=0\Longleftrightarrow\text{相切}`)),
-    sceneStep(3, "line-ellipse-disjoint", "Δ<0：没有实交点", "参考直线 y=3.8 位于椭圆外，方程没有实根。", snapshot([{ kind: "slope", slope: 0, intercept: 3.8 }], "无实根对应相离。", String.raw`\Delta<0\Longleftrightarrow\text{相离}`)),
+    sceneStep(0, "line-ellipse-setup", "观察目标：交点数如何变化", "拖动直线时，先只记录它与椭圆有 2、1 还是 0 个交点。要解释这个变化，需要把联立问题化为一元二次方程。", snapshot([line], "画面中的交点数，会与代入后的实根数一一对应。", String.raw`l\cap C\Longleftrightarrow Ax^2+Bx+C=0`)),
+    sceneStep(1, "line-ellipse-secant", "验证一：Δ>0 对应两交点", "取 y=0，代入后得 x²/25−1=0，有 x=±5 两个实根；画面中正好出现 A、B 两个交点。", snapshot([{ kind: "slope", slope: 0, intercept: 0 }], "两个不同实根与两个交点一一对应。", String.raw`x=\pm5\Rightarrow\Delta>0\Longleftrightarrow\text{相交}`)),
+    sceneStep(2, "line-ellipse-tangent", "验证二：Δ=0 对应唯一切点", "取 y=3，代入后只剩 x²/25=0，x=0 是重根；原来的两个交点在 T=(0,3) 合并。", snapshot([{ kind: "slope", slope: 0, intercept: 3 }], "重根不是两个可见交点，而是一个唯一切点。", String.raw`x^2=0\Rightarrow\Delta=0\Longleftrightarrow\text{相切}`)),
+    sceneStep(3, "line-ellipse-disjoint", "验证三：Δ<0 对应相离", "取 y=3.8，代入后 x²/25+3.8²/9=1 无实数解；画面中直线也完全位于椭圆外。", snapshot([{ kind: "slope", slope: 0, intercept: 3.8 }], "无实根与零个几何交点一致。", String.raw`\frac{x^2}{25}+\frac{3.8^2}{9}=1\Rightarrow\Delta<0\Longleftrightarrow\text{相离}`)),
     sceneStep(4, "line-ellipse-vertical", "单独处理竖直直线", "竖直直线没有斜率，直接令 x 为常数代入，不能伪造一个无限大斜率。", snapshot([{ kind: "vertical", x: 4 }], "x=4 仍得到两个有序交点。", String.raw`x=c\Rightarrow\frac{y^2}{b^2}=1-\frac{c^2}{a^2}`)),
-    sceneStep(5, "line-ellipse-current", "回到当前参数", `当前直线与椭圆${statusText}，判别式为 ${fixed(result.discriminant, 4)}。`, snapshot([line], `容差内的近重根按相切处理；当前状态为${statusText}。`, String.raw`\boxed{\Delta=${fixed(result.discriminant, 4)}}`)),
+    sceneStep(5, "line-ellipse-current", "回到当前参数并下结论", `当前判别式Δ=${fixed(result.discriminant, 4)}，所以直线与椭圆${statusText}；容差内的近重根按一个切点处理。`, snapshot([line], `先看Δ的符号，再读出交点数：当前结论为${statusText}。`, String.raw`\boxed{\Delta=${fixed(result.discriminant, 4)}\Rightarrow\text{${statusText}}}`)),
   ];
   return playbook("直线与椭圆的位置关系", "把交点个数与判别式正、零、负对应起来。", "conic_line_ellipse_position", steps, [
     { id: "lineType", label: "直线类型", value: lineType, description: "斜率式或竖直式" },
@@ -249,29 +258,33 @@ function buildChordLocus(params: TemplatePreviewParams): PlaybookScript {
   }).filter((point): point is { x: number; y: number } => point != null);
   const locusA = q / 2;
   const locusB = b * q / (2 * a);
+  const locusResidual = a * a * chord.midpoint.y * chord.midpoint.y
+    + b * b * chord.midpoint.x * (chord.midpoint.x - q);
   const snapshot = (stage: number, caption: string, formula: string): MathSceneSnapshot => ({
     kind: "math_scene", camera_mode: "fixed", x_min: -6, x_max: 6, y_min: -4, y_max: 4, x_label: "x", y_label: "y", curves: [
       ...ellipseCurve(a, b),
-      ...(stage >= 4 ? [{ expression_x: `${q / 2}+${locusA}*cos(t)`, expression_y: `${locusB}*sin(t)`, t_min: 0, t_max: 2 * Math.PI, label: "理论轨迹", emphasis: "secondary", semantic_role: "theoretical_locus" }] : []),
+      ...(stage >= 5 ? [{ expression_x: `${q / 2}+${locusA}*cos(t)`, expression_y: `${locusB}*sin(t)`, t_min: 0, t_max: 2 * Math.PI, label: "理论轨迹", emphasis: "secondary", semantic_role: "theoretical_locus" }] : []),
     ],
     segments: [{ ...lineSegment(line, 6), label: "动弦 AB", semantic_role: "chord" }],
     points: [
       { x: q, y: 0, label: "Q", emphasis: "secondary", semantic_role: "fixed_point" },
-      { ...chord.endpoints[0], label: "A", emphasis: "primary", semantic_role: "intersection_point" },
-      { ...chord.endpoints[1], label: "B", emphasis: "primary", semantic_role: "intersection_point" },
-      { ...chord.midpoint, label: "M", emphasis: "accent", semantic_role: "chord_midpoint" },
-      ...(stage >= 3 ? trail.map((point) => ({ ...point, emphasis: "secondary", semantic_role: "locus_trail" })) : []),
+      ...(stage >= 2 ? [
+        { ...chord.endpoints[0], label: "A", emphasis: "primary", semantic_role: "intersection_point" },
+        { ...chord.endpoints[1], label: "B", emphasis: "primary", semantic_role: "intersection_point" },
+      ] : []),
+      ...(stage >= 3 ? [{ ...chord.midpoint, label: "M", emphasis: "accent", semantic_role: "chord_midpoint" }] : []),
+      ...(stage >= 4 ? trail.map((point) => ({ ...point, emphasis: "secondary", semantic_role: "locus_trail" })) : []),
     ],
-    annotations: [{ x: -5.4, y: 3.3, text: `m=${fixed(slope)} · M(${fixed(chord.midpoint.x)},${fixed(chord.midpoint.y)})`, align: "nw", semantic_role: "derivation_panel" }],
+    annotations: stage >= 3 ? [{ x: -5.4, y: 3.3, text: `$M(${fixed(chord.midpoint.x)},${fixed(chord.midpoint.y)})$`, align: "nw", semantic_role: "derivation_panel" }] : [],
     formula_latex: formula, caption,
   });
   const steps = [
-    sceneStep(0, "chord-family", "建立过定点的动直线", `固定点 Q=(${fixed(q)},0) 在椭圆内部，任意有限斜率都给出一条实弦。`, snapshot(1, "直线绕 Q 转动。", `y=m(x-${fixed(q)})`)),
-    sceneStep(1, "chord-endpoints", "求出弦的两个端点", `当前交点 A、B 由同一个确定性二次方程求出，弦长为 ${fixed(chord.length)}。`, snapshot(2, "交点按直线参数稳定排序。", `AB=${fixed(chord.length)}`)),
-    sceneStep(2, "chord-midpoint", "标出中点 M", `M=(${fixed(chord.midpoint.x)},${fixed(chord.midpoint.y)})，它由 A、B 坐标平均得到。`, snapshot(2, "每条有效弦只对应一个中点。", String.raw`M=\frac{A+B}{2}`)),
-    sceneStep(3, "chord-trail", "保留中点运动尾迹", "随着斜率变化，中点形成有范围的轨迹，而不是随机散点。", snapshot(3, "无实交点或退化参数不会写入尾迹。", String.raw`m\mapsto M(m)`)),
-    sceneStep(4, "chord-vieta", "用韦达关系消去端点", "把直线代入椭圆，利用两根之和表达中点，再消去斜率。", snapshot(4, "代数关系给出理论轨迹。", `a^2y_M^2+b^2x_M(x_M-${fixed(q)})=0`)),
-    sceneStep(5, "chord-locus-result", "比较尾迹与理论轨迹", "采样尾迹落在理论小椭圆上；竖直弦对应轨迹端点，由极限补足。", snapshot(4, "运动观察与点差/韦达推导一致。", String.raw`\boxed{${a * a}y^2+${b * b}x(x-${fixed(q)})=0}`)),
+    sceneStep(0, "chord-family", "观察目标：弦的中点往哪里走", `固定 Q=(${fixed(q)},0)，让直线 y=m(x−${fixed(q)}) 绕 Q 转动。这一幕只确认所有动直线都经过同一定点。`, snapshot(1, "先建立直线族，下一幕再取它与椭圆的交点。", `y=m(x-${fixed(q)})`)),
+    sceneStep(1, "chord-endpoints", "从交点得到动弦 AB", `当前直线与椭圆交于 A、B，两点同时满足直线与椭圆方程，弦长 AB=${fixed(chord.length)}。`, snapshot(2, "A、B 是同一个二次方程的两个实根对应的交点。", String.raw`\frac{x^2}{25}+\frac{m^2(x-q)^2}{9}=1`)),
+    sceneStep(2, "chord-midpoint", "只追踪中点 M", `对当前动弦取坐标平均，得 M=(${fixed(chord.midpoint.x)},${fixed(chord.midpoint.y)})。改变 m 时，A、B、M 会一起重算。`, snapshot(3, "每条有效动弦只保留一个中点，避免让端点轨迹干扰观察。", String.raw`M\left(\frac{x_A+x_B}{2},\frac{y_A+y_B}{2}\right)`)),
+    sceneStep(3, "chord-trail", "积累尾迹并提出猜想", "改变斜率 m，保留每次的 M。散点排成一条封闭曲线，因此猜想中点轨迹是一个有范围的椭圆。", snapshot(4, "尾迹只是猜想依据；轨迹方程与端点还需要代数证明。", String.raw`m\mapsto M(m)`)),
+    sceneStep(4, "chord-vieta", "用韦达关系消去 A、B 与 m", `直线代入椭圆后，用两根之和求 x_M，再以 y_M=m(x_M−${fixed(q)}) 消去 m，得 ${a * a}y_M²+${b * b}x_M(x_M−${fixed(q)})=0。`, snapshot(5, "理论曲线现在才出现，用来检查之前的尾迹猜想。", String.raw`x_M=\frac{a^2m^2q}{b^2+a^2m^2}\Rightarrow a^2y_M^2+b^2x_M(x_M-${fixed(q)})=0`)),
+    sceneStep(5, "chord-locus-result", "代入验证并补足轨迹范围", `当前 M 代入轨迹方程，左边计算为 ${fixed(locusResidual, 6)}；尾迹与理论椭圆重合。竖直弦给出两个端点，由 m→±∞ 补足。`, snapshot(5, "数值残差为零，理论轨迹、采样尾迹和退化端点共同闭合。", String.raw`\boxed{${a * a}y^2+${b * b}x(x-${fixed(q)})=0}`)),
   ];
   return playbook("椭圆动弦与中点轨迹", "从动弦观察出发，用韦达关系验证中点轨迹。", "conic_ellipse_chord_midpoint_locus", steps, [
     { id: "fixedX", label: "定点横坐标 q", value: fixed(q), description: "自动限制在椭圆内部" },

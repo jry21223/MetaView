@@ -9,7 +9,10 @@ import { PUBLIC_GOLD_TEMPLATES } from "./publicGoldTemplates";
 
 describe("public gold template manifest", () => {
   it("attaches every public conic builder to the authoritative archetype metadata", () => {
-    expect(PUBLIC_GOLD_TEMPLATES).toHaveLength(CONIC_ARCHETYPE_CATALOG.length);
+    const conicTemplates = PUBLIC_GOLD_TEMPLATES.filter(
+      (item) => item.domain === "conic_sections",
+    );
+    expect(conicTemplates).toHaveLength(CONIC_ARCHETYPE_CATALOG.length);
 
     for (const archetype of CONIC_ARCHETYPE_CATALOG) {
       const manifest = PUBLIC_GOLD_TEMPLATES.find(
@@ -75,15 +78,26 @@ describe("public gold template manifest", () => {
   });
 
   it("keeps public identifiers and archetypes unique", () => {
+    expect(PUBLIC_GOLD_TEMPLATES).toHaveLength(10);
     expect(new Set(PUBLIC_GOLD_TEMPLATES.map((item) => item.caseId)).size)
       .toBe(PUBLIC_GOLD_TEMPLATES.length);
     expect(new Set(PUBLIC_GOLD_TEMPLATES.map((item) => item.archetypeId)).size)
       .toBe(PUBLIC_GOLD_TEMPLATES.length);
+    for (const item of PUBLIC_GOLD_TEMPLATES) {
+      expect(item.visibility).toBe("public");
+      expect(existsSync(resolve(`public${item.poster.url}`))).toBe(true);
+      expect(item.requiredCapabilities.length).toBeGreaterThan(0);
+      expect(item.expectedFacts.length).toBeGreaterThan(0);
+      expect(item.visualInvariants.length).toBeGreaterThan(0);
+    }
   });
 
   it("publishes exactly six conic teacher cases with complete deterministic contracts", () => {
-    expect(PUBLIC_GOLD_TEMPLATES).toHaveLength(6);
-    for (const item of PUBLIC_GOLD_TEMPLATES) {
+    const conicTemplates = PUBLIC_GOLD_TEMPLATES.filter(
+      (item) => item.domain === "conic_sections",
+    );
+    expect(conicTemplates).toHaveLength(6);
+    for (const item of conicTemplates) {
       const defaults = item.parameterSchema?.defaults ?? {};
       const script = item.buildPublicPlaybook(defaults);
       const followupMap = item.buildFollowups(defaults, script);
@@ -98,6 +112,97 @@ describe("public gold template manifest", () => {
       }
       expect(existsSync(resolve(`public${item.poster.url}`))).toBe(true);
     }
+  });
+
+  it("orders every public conic case as an explicit teacher-grade reasoning chain", () => {
+    const expectedTitleCues: Record<string, readonly string[]> = {
+      "ellipse-focus-definition": ["观察目标", "改变 t", "测量", "提出猜想", "代数解释", "验证"],
+      "parabola-focus-directrix": ["观察目标", "改变 t", "构造", "代数解释", "验证"],
+      "hyperbola-asymptotes": ["观察目标", "提出猜想", "改变 u", "代数验证", "焦距差", "总结"],
+      "line-ellipse-position": ["观察目标", "验证一", "验证二", "验证三", "竖直直线", "下结论"],
+      "ellipse-chord-midpoint-locus": ["观察目标", "动弦", "中点", "提出猜想", "韦达", "验证"],
+      "pole-polar": ["观察目标", "构造", "猜想", "代数解释", "验证", "总结"],
+    };
+
+    const conicManifests = PUBLIC_GOLD_TEMPLATES.filter(
+      (manifest) => manifest.archetypeId.startsWith("conic."),
+    );
+    expect(conicManifests).toHaveLength(6);
+    for (const manifest of conicManifests) {
+      const script = manifest.buildPublicPlaybook(manifest.parameterSchema?.defaults ?? {});
+      expect(script.steps.map((step, index) => step.title.includes(
+        expectedTitleCues[manifest.caseId][index],
+      ))).toEqual(script.steps.map(() => true));
+
+      for (const step of script.steps) {
+        expect(step.voiceover_text.length).toBeGreaterThan(24);
+        expect(step.snapshot.kind).toBe("math_scene");
+        if (step.snapshot.kind !== "math_scene") continue;
+        expect(step.snapshot.formula_latex?.trim()).toBeTruthy();
+        expect(step.snapshot.caption?.trim()).toBeTruthy();
+        expect(step.snapshot.caption).not.toBe(step.title);
+        expect(step.snapshot.caption).not.toBe(step.voiceover_text);
+      }
+    }
+  });
+
+  it("shows the derivation and a concrete conclusion check instead of only naming results", () => {
+    const byCase = new Map(PUBLIC_GOLD_TEMPLATES.filter(
+      (manifest) => manifest.archetypeId.startsWith("conic."),
+    ).map((manifest) => [
+      manifest.caseId,
+      manifest.buildPublicPlaybook(manifest.parameterSchema?.defaults ?? {}),
+    ]));
+
+    const ellipse = byCase.get("ellipse-focus-definition")!;
+    expect(ellipse.steps[4].snapshot.kind).toBe("math_scene");
+    expect(ellipse.steps[4].voiceover_text).toContain("变化项正好抵消");
+    expect(ellipse.steps.at(-1)?.voiceover_text).toContain("10=2a");
+
+    const parabola = byCase.get("parabola-focus-directrix")!;
+    expect(parabola.steps[3].snapshot.kind).toBe("math_scene");
+    if (parabola.steps[3].snapshot.kind === "math_scene") {
+      expect(parabola.steps[3].snapshot.formula_latex).toContain("p(t^2+1)=PH");
+    }
+    expect(parabola.steps.at(-1)?.voiceover_text).toMatch(/PF=\d+(?:\.\d+)?、PH=\d+(?:\.\d+)?/);
+
+    const hyperbola = byCase.get("hyperbola-asymptotes")!;
+    expect(hyperbola.steps[3].voiceover_text).toContain("tanh u");
+    expect(hyperbola.steps.at(-1)?.voiceover_text).toContain("当前数值 6 与推导一致");
+
+    const lineEllipse = byCase.get("line-ellipse-position")!;
+    expect(lineEllipse.steps.slice(1, 4).map((step) => step.voiceover_text)).toEqual([
+      expect.stringContaining("两个实根"),
+      expect.stringContaining("重根"),
+      expect.stringContaining("无实数解"),
+    ]);
+    expect(lineEllipse.steps.at(-1)?.voiceover_text).toContain("所以直线与椭圆相交");
+
+    const locus = byCase.get("ellipse-chord-midpoint-locus")!;
+    const firstLocusScene = locus.steps[0].snapshot;
+    const resultLocusScene = locus.steps.at(-1)?.snapshot;
+    expect(firstLocusScene.kind).toBe("math_scene");
+    expect(resultLocusScene?.kind).toBe("math_scene");
+    if (firstLocusScene.kind === "math_scene" && resultLocusScene?.kind === "math_scene") {
+      expect(firstLocusScene.points?.some((point) => point.semantic_role === "chord_midpoint"))
+        .toBe(false);
+      expect(resultLocusScene.points?.some((point) => point.semantic_role === "locus_trail"))
+        .toBe(true);
+      expect(resultLocusScene.curves?.some((curve) => curve.semantic_role === "theoretical_locus"))
+        .toBe(true);
+    }
+    expect(locus.steps.at(-1)?.voiceover_text).toContain("左边计算为 0");
+
+    const polePolar = byCase.get("pole-polar")!;
+    const tangencyScene = polePolar.steps[1].snapshot;
+    expect(tangencyScene.kind).toBe("math_scene");
+    if (tangencyScene.kind === "math_scene") {
+      expect(tangencyScene.segments?.filter(
+        (segment) => segment.semantic_role === "radius_to_tangent",
+      )).toHaveLength(2);
+    }
+    expect(polePolar.steps[4].voiceover_text).toContain("都等于 R²=25");
+    expect(polePolar.steps.at(-1)?.voiceover_text).toContain("x+y=5");
   });
 
   it("slows only the requested segment while preserving a valid Playbook timeline", () => {
@@ -115,7 +220,7 @@ describe("public gold template manifest", () => {
       target_id: `step:${target.step_id}:slow-current-segment`,
       action: "slow-current-segment",
       factor: 1.5,
-    }, 1, [manifest.interactionAdapter]);
+    }, 1, [manifest.interactionAdapter!]);
 
     const slowed = result.script.steps[2];
     expect(slowed.end_frame - previousEnd).toBe(Math.ceil(originalDuration * 1.5));
@@ -140,7 +245,7 @@ describe("public gold template manifest", () => {
       target_id: `${prefix}:change-explanation`,
       action: "change-explanation",
       explanation: "先比较两段距离的变化，再观察它们的和保持为 2a。",
-    }, 1, [manifest.interactionAdapter]).script;
+    }, 1, [manifest.interactionAdapter!]).script;
     expect(changed.steps[3].voiceover_text)
       .toBe("先比较两段距离的变化，再观察它们的和保持为 2a。");
     expect(changed.steps[2]).toEqual(base.steps[2]);
@@ -153,7 +258,7 @@ describe("public gold template manifest", () => {
       action: "emphasize-conclusion",
       reason: "P 在椭圆上，所以焦距和恒等于 2a。",
       semantic_role: "focal_distance",
-    }, 1, [manifest.interactionAdapter]).script;
+    }, 1, [manifest.interactionAdapter!]).script;
     expect(emphasized.steps[3].voiceover_text).toContain("焦距和恒等于 2a");
     const emphasizedSnapshot = emphasized.steps[3].snapshot;
     expect(emphasizedSnapshot.kind).toBe("math_scene");
@@ -171,7 +276,7 @@ describe("public gold template manifest", () => {
       target_id: `${prefix}:clarify-current-step`,
       action: "clarify-current-step",
       clarification: "这里只补充当前一步：单段距离变化不影响距离和。",
-    }, 1, [manifest.interactionAdapter]).script;
+    }, 1, [manifest.interactionAdapter!]).script;
     expect(clarified.steps[3].voiceover_text).toContain("这里只补充当前一步");
     expect(clarified.steps.filter((step) => step.step_id !== target.step_id))
       .toEqual(base.steps.filter((step) => step.step_id !== target.step_id));
@@ -189,7 +294,7 @@ describe("public gold template manifest", () => {
       action: "set-parameter",
       parameter_id: "k",
       value: 100,
-    }, 1, [manifest.interactionAdapter]);
+    }, 1, [manifest.interactionAdapter!]);
 
     expect(result.script.parameter_controls[0].value).toBe("8");
     expect(result.script.steps[0].voiceover_text).toContain("P=(8,8)");
@@ -218,7 +323,10 @@ describe("public gold template manifest", () => {
       "clarify-current-step",
     ];
 
-    for (const manifest of PUBLIC_GOLD_TEMPLATES) {
+    const conicManifests = PUBLIC_GOLD_TEMPLATES.filter(
+      (manifest) => manifest.domain === "conic_sections",
+    );
+    for (const manifest of conicManifests) {
       const params = manifest.parameterSchema?.defaults ?? {};
       const script = manifest.buildPublicPlaybook(params);
       const followups = manifest.buildFollowups(params, script);

@@ -3,9 +3,9 @@ import { expect, test, type Page } from "@playwright/test";
 const CASES = [
   ["ellipse-focus-definition", 6, ["conic_curve", "focus"], { focus: 2, focal_distance: 2 }],
   ["parabola-focus-directrix", 5, ["conic_curve", "focus", "directrix"], { focus: 1, directrix: 1, projection_foot: 1 }],
-  ["hyperbola-asymptotes", 6, ["conic_curve", "focus"], { conic_curve: 2, focus: 2, asymptote: 2 }],
+  ["hyperbola-asymptotes", 6, ["conic_curve"], { conic_curve: 2, focus: 2, asymptote: 2 }],
   ["line-ellipse-position", 6, ["conic_curve", "moving_line"], { moving_line: 1, discriminant_panel: 1 }],
-  ["ellipse-chord-midpoint-locus", 6, ["chord", "chord_midpoint"], { intersection_point: 2, chord_midpoint: 1, theoretical_locus: 1 }],
+  ["ellipse-chord-midpoint-locus", 6, ["chord", "fixed_point"], { intersection_point: 2, chord_midpoint: 1, theoretical_locus: 1 }],
   ["pole-polar", 6, ["conic_curve", "moving_point"], { tangent_point: 2, tangent: 2, polar_line: 1 }],
 ] as const;
 

@@ -6,7 +6,7 @@ import {
   getTemplatePreviewCase,
 } from "../src/pages/Templates/templatePreviewCases";
 
-const outputDirectory = path.resolve(process.argv[2] ?? "data/template-previews");
+const outputDirectory = path.resolve(process.argv[2] ?? "../../data/template-previews");
 await fs.mkdir(outputDirectory, { recursive: true });
 
 const manifest = [];

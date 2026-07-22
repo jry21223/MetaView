@@ -95,12 +95,43 @@ const LINE_PREVIEWS: Record<TemplatePreviewCaseId, ReactNode> = {
       <circle cx="94" cy="13" r="2.5" /><circle cx="94" cy="45" r="2.5" />
     </svg>
   ),
-  projectile: (
-    <svg viewBox="0 0 160 56" fill="none">
-      <path className="is-guide" d="M16 47h130" />
-      <path d="M25 45c26-36 61-39 108 0" />
-      <path className="is-accent" d="m27 44 18-20m0 0-1 7m1-7-7 2" />
-      <circle className="is-accent" cx="80" cy="17" r="3.5" />
+  "two-sum": (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="two-sum-hash-table">
+      <path className="is-guide" d="M16 13h75M16 23h56M16 33h68M16 43h48" />
+      <rect x="101" y="10" width="42" height="36" rx="3" />
+      <path className="is-guide" d="M101 22h42M122 10v36" />
+      <path className="is-accent" d="M75 31h23m-5-5 5 5-5 5" />
+      <circle className="is-accent" cx="23" cy="33" r="3" />
+    </svg>
+  ),
+  "redox-electron": (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="redox-electron-transfer">
+      <circle cx="31" cy="28" r="13" />
+      <circle cx="129" cy="28" r="13" />
+      <path className="is-guide" d="M48 28h64" />
+      <path className="is-accent" d="M48 20c18-15 46-15 64 0m-6-6 6 6-8 1" />
+      <circle className="is-accent" cx="70" cy="12" r="2.4" />
+      <circle className="is-accent" cx="89" cy="12" r="2.4" />
+      <path className="is-guide" d="m25 28 5 5 8-11m84 6 5 5 8-11" />
+    </svg>
+  ),
+  "dna-replication": (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="dna-replication-fork">
+      <path d="M18 14c18 0 24 28 42 28s24-28 42-28" />
+      <path d="M18 42c18 0 24-28 42-28s24 28 42 28" />
+      <path className="is-guide" d="m101 14 18 14-18 14m18-14h23" />
+      <path className="is-accent" d="M119 28c8-10 14-12 23-12m-23 12c8 10 14 12 23 12" />
+      <circle className="is-accent" cx="119" cy="28" r="3" />
+    </svg>
+  ),
+  monsoon: (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="east-asia-monsoon">
+      <path className="is-guide" d="M21 12c14 3 19 12 16 21-2 8 4 12 13 11 12-1 17-9 26-8 8 1 11 7 19 8" />
+      <path d="M103 9c9 4 14 10 13 17-1 8 7 10 20 12" />
+      <circle cx="48" cy="20" r="7" />
+      <circle cx="124" cy="37" r="7" />
+      <path className="is-accent" d="M118 35C94 30 76 24 57 20m7-4-7 4 6 5" />
+      <path className="is-guide is-dashed" d="M116 42C91 47 70 43 52 27" />
     </svg>
   ),
 };
