@@ -214,7 +214,7 @@ function buildLineEllipse(params: TemplatePreviewParams): PlaybookScript {
       kind: "math_scene", x_min: -7, x_max: 7, y_min: -5, y_max: 5, x_label: "x", y_label: "y", curves: ellipseCurve(a, b),
       segments: shown.map((item, index) => lineSegment(item, 7, index === shown.length - 1 ? "moving_line" : "reference_line")),
       points: displayedResult.points.map((point, index) => ({ ...point, label: displayedResult.status === "tangent" ? "T" : index === 0 ? "A" : "B", emphasis: "accent", semantic_role: displayedResult.status === "tangent" ? "tangent_point" : "intersection_point" })),
-      annotations: [{ x: -6.3, y: 4.2, text: `Δ=${fixed(displayedResult.discriminant, 3)} · ${displayedStatus}`, align: "nw", semantic_role: "discriminant_panel" }],
+      annotations: [{ x: -6.3, y: 4.2, text: String.raw`$\Delta=${fixed(displayedResult.discriminant, 3)}\;\cdot\;\text{${displayedStatus}}$`, align: "nw", semantic_role: "discriminant_panel" }],
       formula_latex: formula, caption,
     };
   };
