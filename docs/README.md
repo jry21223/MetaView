@@ -24,6 +24,8 @@
 | [quality-gate.md](./quality-gate.md) | 后端 Canonical QualityReport、修复、持久化、Director 与导出阻断语义 |
 | [frontend-shell.md](./frontend-shell.md) | Stage 路由、GlobalTopbar、Studio 布局、Provider 配置、snapshot support levels |
 | [template-previews.md](./template-previews.md) | `/templates` 正式案例、统一 PlaybookPlayer、确定性参数与零请求边界 |
+| [gold-template-system.md](./gold-template-system.md) | Public Gold Template、Hidden Variant、Manifest 与防泄漏边界 |
+| [conic-sections-capability.md](./conic-sections-capability.md) | 圆锥曲线题型母版、领域内核、Skill 路由与 V1 能力边界 |
 | [animation-tool-registry.md](./animation-tool-registry.md) | 后端 animation tool registry 的扩展流程、当前工具和新增规则 |
 | [topic-routing.md](./topic-routing.md) | topic routing 模式、自动路由、显式 domain 和 skill override |
 | [remotion-skills.md](./remotion-skills.md) | Remotion 组件、渲染器、注册表和音频同步约定 |
@@ -51,7 +53,7 @@
 | [agent-demo-acceptance.md](./agent-demo-acceptance.md) | AgentPipeline / runtime-tool demo 的最小验收证据和失败排查 |
 | [generation-review-workflow.md](./generation-review-workflow.md) | 本地和远端 generation review API 调用与输出位置 |
 | [skill-ab-eval.md](./skill-ab-eval.md) | Prompt-only 对比、真实 LLM 手工评估、输出和限制 |
-| [benchmark-v2.md](./benchmark-v2.md) | 四个 Gold Case、六维评分、稳定性统计与 recorded/live 命令 |
+| [benchmark-v2.md](./benchmark-v2.md) | Gold Case、隐藏题型包、严格评分、稳定性统计与 recorded/live 命令 |
 
 ## Reference
 

@@ -8,6 +8,7 @@ import {
 } from "./engine";
 import type {
   BfsInteractionReplay,
+  InteractionAdapter,
   InteractionCommand,
   InteractionEvent,
   InteractionManifest,
@@ -29,6 +30,7 @@ interface InteractionSandboxState {
 interface InteractionSandboxBase {
   baseKey: string;
   baseScript: PlaybookScript;
+  extensions: readonly InteractionAdapter[];
 }
 
 type InteractionSandboxAction =
@@ -75,20 +77,24 @@ function initialState(
   };
 }
 
-function assertSameTimeline(
+function assertValidTimeline(
   baseScript: PlaybookScript,
   previewScript: PlaybookScript,
 ): void {
-  const sameTimeline =
+  let previousEnd = 0;
+  const validTimeline =
     previewScript.fps === baseScript.fps &&
-    previewScript.total_frames === baseScript.total_frames &&
     previewScript.steps.length === baseScript.steps.length &&
     previewScript.steps.every((step, index) =>
       step.step_id === baseScript.steps[index]?.step_id &&
-      step.end_frame === baseScript.steps[index]?.end_frame
-    );
-  if (!sameTimeline) {
-    throw new Error("Interaction adapters cannot change the player timeline");
+      Number.isInteger(step.end_frame) &&
+      step.end_frame > previousEnd &&
+      Boolean((previousEnd = step.end_frame))
+    ) &&
+    Number.isInteger(previewScript.total_frames) &&
+    previewScript.total_frames === previousEnd;
+  if (!validTimeline) {
+    throw new Error("Interaction adapters must preserve a valid player timeline");
   }
 }
 
@@ -96,6 +102,7 @@ function replay(
   baseScript: PlaybookScript,
   baseKey: string,
   commands: InteractionCommand[],
+  extensions: readonly InteractionAdapter[],
 ): InteractionSandboxState {
   let committedScript = baseScript;
   const appliedCommands: InteractionCommand[] = [];
@@ -104,8 +111,13 @@ function replay(
 
   for (const command of commands) {
     try {
-      const result = applyInteraction(committedScript, command, events.length + 1);
-      assertSameTimeline(baseScript, result.script);
+      const result = applyInteraction(
+        committedScript,
+        command,
+        events.length + 1,
+        extensions,
+      );
+      assertValidTimeline(baseScript, result.script);
       committedScript = result.script;
       appliedCommands.push(command);
       events.push(result.event);
@@ -194,6 +206,7 @@ function reducer(
       action.baseScript,
       action.baseKey,
       current.commands.slice(0, -1),
+      action.extensions,
     );
   }
   if (action.type === "cancel-preview") {
@@ -210,7 +223,7 @@ function reducer(
         action.replay,
         action.frameIndex,
       );
-      assertSameTimeline(action.baseScript, previewScript);
+      assertValidTimeline(action.baseScript, previewScript);
       return { ...current, previewScript, lastError: null };
     } catch (error) {
       return {
@@ -234,8 +247,9 @@ function reducer(
       current.committedScript,
       action.command,
       current.events.length + 1,
+      action.extensions,
     );
-    assertSameTimeline(action.baseScript, result.script);
+    assertValidTimeline(action.baseScript, result.script);
     if (action.type === "preview") {
       return {
         ...current,
@@ -284,6 +298,7 @@ export interface InteractionSandbox {
 export function useInteractionSandbox(
   baseScript: PlaybookScript,
   sessionKey = "",
+  extensions: readonly InteractionAdapter[] = [],
 ): InteractionSandbox {
   const baseKey = useMemo(
     () => `${sessionKey}\u0000${scriptContentKey(baseScript)}`,
@@ -300,35 +315,35 @@ export function useInteractionSandbox(
 
   useEffect(() => {
     if (storedState.baseKey !== baseKey) {
-      dispatch({ type: "sync", baseScript, baseKey });
+      dispatch({ type: "sync", baseScript, baseKey, extensions });
     }
-  }, [baseKey, baseScript, storedState.baseKey]);
+  }, [baseKey, baseScript, extensions, storedState.baseKey]);
 
   const manifest = useMemo(
-    () => deriveInteractionManifest(state.previewScript),
-    [state.previewScript],
+    () => deriveInteractionManifest(state.previewScript, extensions),
+    [extensions, state.previewScript],
   );
   const preview = useCallback((command: InteractionCommand) => {
-    dispatch({ type: "preview", baseScript, baseKey, command });
-  }, [baseKey, baseScript]);
+    dispatch({ type: "preview", baseScript, baseKey, extensions, command });
+  }, [baseKey, baseScript, extensions]);
   const cancelPreview = useCallback(() => {
-    dispatch({ type: "cancel-preview", baseScript, baseKey });
-  }, [baseKey, baseScript]);
+    dispatch({ type: "cancel-preview", baseScript, baseKey, extensions });
+  }, [baseKey, baseScript, extensions]);
   const showReplayFrameAt = useCallback((
     replay: BfsInteractionReplay,
     frameIndex: number,
   ) => {
-    dispatch({ type: "show-replay-frame", baseScript, baseKey, replay, frameIndex });
-  }, [baseKey, baseScript]);
+    dispatch({ type: "show-replay-frame", baseScript, baseKey, extensions, replay, frameIndex });
+  }, [baseKey, baseScript, extensions]);
   const apply = useCallback((command: InteractionCommand) => {
-    dispatch({ type: "apply", baseScript, baseKey, command });
-  }, [baseKey, baseScript]);
+    dispatch({ type: "apply", baseScript, baseKey, extensions, command });
+  }, [baseKey, baseScript, extensions]);
   const undo = useCallback(() => {
-    dispatch({ type: "undo", baseScript, baseKey });
-  }, [baseKey, baseScript]);
+    dispatch({ type: "undo", baseScript, baseKey, extensions });
+  }, [baseKey, baseScript, extensions]);
   const reset = useCallback(() => {
-    dispatch({ type: "reset", baseScript, baseKey });
-  }, [baseKey, baseScript]);
+    dispatch({ type: "reset", baseScript, baseKey, extensions });
+  }, [baseKey, baseScript, extensions]);
 
   return {
     previewScript: state.previewScript,

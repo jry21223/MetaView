@@ -13,6 +13,7 @@ import {
   type DerivativeInteractionBinding,
   type DerivativeInteractionCommand,
   type InteractionAdapterManifest,
+  type InteractionAdapter,
   type InteractionBinding,
   type InteractionCommand,
   type InteractionManifest,
@@ -120,7 +121,10 @@ function bfsBindings(script: PlaybookScript): BfsInteractionBinding[] {
   });
 }
 
-export function deriveInteractionManifest(script: PlaybookScript): InteractionManifest {
+export function deriveInteractionManifest(
+  script: PlaybookScript,
+  extensions: readonly InteractionAdapter[] = [],
+): InteractionManifest {
   const adapters: InteractionAdapterManifest[] = [];
   const derivative = mathBindings(script);
   const bfs = bfsBindings(script);
@@ -130,11 +134,24 @@ export function deriveInteractionManifest(script: PlaybookScript): InteractionMa
   if (bfs.length) {
     adapters.push({ adapter_id: BFS_ADAPTER, experimental: true, bindings: bfs });
   }
+  for (const extension of extensions) {
+    if (adapters.some((adapter) => adapter.adapter_id === extension.adapter_id)) {
+      throw new InteractionEngineError(
+        `Interaction adapter ${extension.adapter_id} is already registered`,
+      );
+    }
+    const manifest = extension.deriveManifest(script);
+    if (manifest?.bindings.length) adapters.push(manifest);
+  }
   return { version: "1", adapters };
 }
 
-function requireBinding(script: PlaybookScript, command: InteractionCommand): InteractionBinding {
-  const binding = deriveInteractionManifest(script).adapters
+function requireBinding(
+  script: PlaybookScript,
+  command: InteractionCommand,
+  extensions: readonly InteractionAdapter[],
+): InteractionBinding {
+  const binding = deriveInteractionManifest(script, extensions).adapters
     .find((adapter) => adapter.adapter_id === command.adapter_id)
     ?.bindings.find((candidate) =>
       candidate.id === command.target_id &&
@@ -441,11 +458,12 @@ export function applyInteraction(
   script: PlaybookScript,
   command: InteractionCommand,
   sequence = 1,
+  extensions: readonly InteractionAdapter[] = [],
 ): InteractionResult {
   if (!Number.isInteger(sequence) || sequence < 1) {
     throw new InteractionEngineError("Interaction event sequence must be a positive integer");
   }
-  const binding = requireBinding(script, command);
+  const binding = requireBinding(script, command, extensions);
   if (command.adapter_id === DERIVATIVE_ADAPTER) {
     if (binding.adapter_id !== DERIVATIVE_ADAPTER) {
       throw new InteractionEngineError("Interaction binding type does not match the command");
@@ -453,9 +471,19 @@ export function applyInteraction(
     const applied = applyDerivative(script, command, binding);
     return { ...applied, event: { ...command, sequence } };
   }
-  if (binding.adapter_id !== BFS_ADAPTER) {
+  if (command.adapter_id === BFS_ADAPTER) {
+    if (binding.adapter_id !== BFS_ADAPTER) {
+      throw new InteractionEngineError("Interaction binding type does not match the command");
+    }
+    const applied = applyBfs(script, command);
+    return { ...applied, event: { ...command, sequence } };
+  }
+  const extension = extensions.find(
+    (candidate) => candidate.adapter_id === command.adapter_id,
+  );
+  if (!extension || binding.adapter_id !== extension.adapter_id) {
     throw new InteractionEngineError("Interaction binding type does not match the command");
   }
-  const applied = applyBfs(script, command);
+  const applied = extension.apply(script, command);
   return { ...applied, event: { ...command, sequence } };
 }

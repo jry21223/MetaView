@@ -117,6 +117,7 @@ export interface MathScenePoint {
   y: number;
   label?: string | null;
   emphasis?: string;
+  semantic_role?: string;
 }
 
 /** A curve in the math scene: implicit `y = f(x)` or parametric `(x(t), y(t))`. */
@@ -131,6 +132,7 @@ export interface MathSceneCurve {
   emphasis?: string;
   /** Render directional arrows along the curve. */
   arrows?: boolean;
+  semantic_role?: string;
 }
 
 /** Filled polygonal region in scene coordinates. */
@@ -138,6 +140,7 @@ export interface MathSceneRegion {
   vertices: Array<[number, number]>;
   label?: string | null;
   emphasis?: string;
+  semantic_role?: string;
 }
 
 /** Vector field `F(x, y) = (P, Q)` sampled on a grid. */
@@ -147,6 +150,7 @@ export interface MathSceneVectorField {
   /** Grid step in scene units; renderer auto-picks when null. */
   step?: number | null;
   label?: string | null;
+  semantic_role?: string;
 }
 
 /** Straight segment / arrow between two scene points. */
@@ -158,6 +162,7 @@ export interface MathSceneSegment {
   arrow?: boolean;
   label?: string | null;
   emphasis?: string;
+  semantic_role?: string;
 }
 
 /** Free-floating text label. `text` containing `$...$` is KaTeX-rendered. */
@@ -166,11 +171,14 @@ export interface MathSceneAnnotation {
   y: number;
   text: string;
   align?: "ne" | "nw" | "se" | "sw" | "center";
+  semantic_role?: string;
 }
 
 /** 2-D math scene: curves, regions, vector fields, segments, points. */
 export interface MathSceneSnapshot {
   kind: "math_scene";
+  /** Keep the declared view box when auto-focus would crop a teaching invariant. */
+  camera_mode?: "auto" | "fixed";
   x_min: number;
   x_max: number;
   y_min: number;

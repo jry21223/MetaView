@@ -4,16 +4,17 @@ import {
   TEMPLATE_PREVIEW_CASE_IDS,
   getTemplatePreviewCase,
 } from "./templatePreviewCases";
+import { PUBLIC_GOLD_TEMPLATES } from "./gold-templates/publicGoldTemplates";
 
 describe("template preview cases", () => {
-  it("publishes five complete deterministic Playbooks with step-aware follow-ups", () => {
-    expect(TEMPLATE_PREVIEW_CASE_IDS).toEqual([
+  it("publishes complete deterministic Playbooks with step-aware follow-ups", () => {
+    expect(new Set(TEMPLATE_PREVIEW_CASE_IDS)).toEqual(new Set([
+      ...PUBLIC_GOLD_TEMPLATES.map((item) => item.caseId),
       "binary-search",
       "bfs-tree",
       "derivative-tangent",
-      "pole-polar",
       "projectile",
-    ]);
+    ]));
 
     for (const id of TEMPLATE_PREVIEW_CASE_IDS) {
       const item = getTemplatePreviewCase(id)!;
@@ -25,7 +26,9 @@ describe("template preview cases", () => {
       expect(script.total_frames).toBe(script.steps.at(-1)?.end_frame);
       expect(new Set(script.steps.map((step) => step.step_id)).size).toBe(script.steps.length);
       for (const step of script.steps) {
-        expect(followups[step.step_id]).toHaveLength(3);
+        expect(followups[step.step_id]).toHaveLength(
+          PUBLIC_GOLD_TEMPLATES.some((manifest) => manifest.caseId === id) ? 5 : 3,
+        );
         if (step.code_highlight) {
           expect(step.code_highlight.active_line).toBeGreaterThanOrEqual(0);
           expect(step.code_highlight.active_line).toBeLessThan(step.code_highlight.lines.length);
@@ -114,7 +117,7 @@ describe("template preview cases", () => {
     expect(result.snapshot.formula_latex).toContain(`x+y=${Number((25 / k).toFixed(2))}`);
     const followups = item.buildFollowups({ k }, script);
     for (const step of script.steps) {
-      expect(followups[step.step_id]).toHaveLength(3);
+      expect(followups[step.step_id]).toHaveLength(5);
     }
   });
 

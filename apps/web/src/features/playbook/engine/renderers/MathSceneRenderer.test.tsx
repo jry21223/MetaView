@@ -213,6 +213,26 @@ describe("MathSceneRenderer", () => {
     expect(light).toContain('data-theme="light"');
   });
 
+  it("honors a fixed camera mode without changing the snapshot kind", () => {
+    const markup = render(makeScene({ camera_mode: "fixed" }));
+    expect(markup).toContain('data-camera-mode="fixed"');
+  });
+
+  it("exposes stable semantic roles without changing the snapshot kind", async () => {
+    const snapshot = makeScene({
+      points: [{ x: 2, y: 1.5, emphasis: "accent", semantic_role: "moving_point" }],
+      segments: [{ x0: 0, y0: 0, x1: 2, y1: 1.5, semantic_role: "focal_distance" }],
+      regions: [],
+      annotations: [],
+      vector_field: null,
+      formula_latex: null,
+      caption: null,
+    });
+    const { container } = renderDom(<MathSceneRenderer {...props(sceneStep(snapshot))} />);
+    await waitFor(() => expect(container.querySelector("[data-semantic-role='moving_point']")).not.toBeNull());
+    expect(container.querySelector("[data-semantic-role='focal_distance']")).not.toBeNull();
+  });
+
   it("omits the corner formula block when formula_latex is blank", () => {
     const markup = render(makeScene({ formula_latex: "" }));
     expect(markup).not.toContain("math-scene-renderer__formula");

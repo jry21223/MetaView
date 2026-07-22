@@ -40,6 +40,46 @@ export function TemplateLinePreview({ caseId }: { caseId?: TemplatePreviewCaseId
           <circle className="is-accent" cx="83" cy="28" r="3.5" />
         </svg>
       )}
+      {caseId === "ellipse-focus-definition" && (
+        <svg viewBox="0 0 160 56" fill="none">
+          <ellipse cx="80" cy="28" rx="52" ry="20" />
+          <circle cx="60" cy="28" r="2.5" /><circle cx="100" cy="28" r="2.5" />
+          <circle className="is-accent" cx="102" cy="12" r="3.5" />
+          <path className="is-guide" d="m60 28 42-16m0 0-2 16" />
+        </svg>
+      )}
+      {caseId === "parabola-focus-directrix" && (
+        <svg viewBox="0 0 160 56" fill="none">
+          <path d="M48 6c38 8 38 36 0 44" />
+          <path className="is-guide" d="M35 5v46m32-23H35" />
+          <circle cx="62" cy="28" r="2.5" />
+          <circle className="is-accent" cx="76" cy="15" r="3.5" />
+          <path className="is-accent" d="m76 15-14 13m14-13H35" />
+        </svg>
+      )}
+      {caseId === "hyperbola-asymptotes" && (
+        <svg viewBox="0 0 160 56" fill="none">
+          <path className="is-guide" d="m28 49 104-42M28 7l104 42" />
+          <path d="M63 6c-20 10-20 34 0 44M97 6c20 10 20 34 0 44" />
+          <circle className="is-accent" cx="108" cy="17" r="3.5" />
+        </svg>
+      )}
+      {caseId === "line-ellipse-position" && (
+        <svg viewBox="0 0 160 56" fill="none">
+          <ellipse cx="80" cy="28" rx="48" ry="19" />
+          <path className="is-accent" d="m24 45 112-34" />
+          <circle className="is-accent" cx="48" cy="38" r="3" />
+          <circle className="is-accent" cx="113" cy="18" r="3" />
+        </svg>
+      )}
+      {caseId === "ellipse-chord-midpoint-locus" && (
+        <svg viewBox="0 0 160 56" fill="none">
+          <ellipse cx="80" cy="28" rx="52" ry="20" />
+          <path className="is-guide" d="m34 45 92-31" />
+          <ellipse className="is-accent" cx="72" cy="28" rx="18" ry="7" />
+          <circle className="is-accent" cx="72" cy="28" r="3.5" />
+        </svg>
+      )}
       {caseId === "pole-polar" && (
         <svg viewBox="0 0 160 56" fill="none">
           <path className="is-guide" d="M18 48h126M42 53V5" />

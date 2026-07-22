@@ -496,6 +496,11 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument("--recorded", action="store_true", help="Load pre-generated fixtures")
     mode.add_argument("--live", action="store_true", help="Generate via real pipeline API")
     parser.add_argument("--benchmark-v2", action="store_true", help="Run expectation-driven V2")
+    parser.add_argument(
+        "--hidden-conic-manifest",
+        default=None,
+        help="Derive Benchmark V2 prompts and expectations from a hidden conic manifest",
+    )
     parser.add_argument("--prompts", default=str(PROMPTS_DEFAULT), help="Path to prompts YAML")
     parser.add_argument(
         "--expectations",
@@ -515,6 +520,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", default=None, help="JSON report path")
     parser.add_argument("--ids", nargs="*", help="Subset of prompt IDs")
     args = parser.parse_args(argv)
+
+    if args.hidden_conic_manifest:
+        from eval.conic_hidden_cases import load_hidden_conic_manifest
+
+        hidden_path = pathlib.Path(args.hidden_conic_manifest)
+        if not hidden_path.exists():
+            print(f"Error: hidden conic manifest not found: {hidden_path}", file=sys.stderr)
+            return 1
+        hidden_manifest = load_hidden_conic_manifest(hidden_path)
+        if not args.benchmark_v2:
+            print("Error: --hidden-conic-manifest requires --benchmark-v2", file=sys.stderr)
+            return 1
+        return _run_v2(args, hidden_manifest.prompts(), hidden_manifest.benchmark_suite())
 
     prompts_path = pathlib.Path(args.prompts)
     if not prompts_path.exists():

@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 
-.PHONY: bootstrap bootstrap-manim setup-hooks dev-web dev-api dev-agent dev review-real-generation start stop lint test test-coverage build asset-audit asset-showcase asset-showcase-release check visual-check docker-build docker-up docker-down eval eval-gold eval-shots eval-generate
+.PHONY: bootstrap bootstrap-manim setup-hooks dev-web dev-api dev-agent dev review-real-generation start stop lint test test-coverage build asset-audit asset-showcase asset-showcase-release check visual-check docker-build docker-up docker-down eval eval-gold eval-conic-gold eval-shots eval-generate
 
 DOCKER_COMPOSE_CMD := $(shell sh -lc 'if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then printf "%s" "docker compose"; elif command -v docker-compose >/dev/null 2>&1; then printf "%s" "docker-compose"; fi')
 
@@ -134,6 +134,16 @@ eval-gold:
 		--repeat $(or $(REPEAT),3) \
 		--prompts ../../eval/prompts/starter.yaml \
 		--expectations ../../eval/benchmark_v2/gold_cases.json
+
+# Hidden conic variants derive prompts and expectations from one eval-only
+# manifest. Public template Playbooks are never an input to this target.
+eval-conic-gold:
+	cd apps/api && ../../.venv/bin/python -m eval.runner --benchmark-v2 \
+		$(if $(LIVE),--live --api $(or $(API),http://localhost:8000),--recorded) \
+		--repeat $(or $(REPEAT),1) \
+		--hidden-conic-manifest ../../eval/hidden-cases/conic-sections/variants.json \
+		--fixtures-dir ../../eval/hidden-cases/conic-sections/results \
+		$(if $(ID),--ids $(ID),)
 
 # Render per-step PNG stills for one playbook fixture.
 # Usage: make eval-shots ID=sample_math_playbook

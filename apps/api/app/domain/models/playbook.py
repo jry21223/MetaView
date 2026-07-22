@@ -133,6 +133,7 @@ class MathScenePoint(BaseModel):
     y: float
     label: str | None = None
     emphasis: str = "primary"
+    semantic_role: str | None = None
 
 
 class MathSceneCurve(BaseModel):
@@ -143,12 +144,14 @@ class MathSceneCurve(BaseModel):
     label: str | None = None
     emphasis: str = "primary"
     arrows: bool = False
+    semantic_role: str | None = None
 
 
 class MathSceneRegion(BaseModel):
     vertices: list[tuple[float, float]] = Field(default_factory=list)
     label: str | None = None
     emphasis: str = "secondary"
+    semantic_role: str | None = None
 
 
 class MathSceneVectorField(BaseModel):
@@ -156,6 +159,7 @@ class MathSceneVectorField(BaseModel):
     expression_py: str
     step: float | None = None
     label: str | None = None
+    semantic_role: str | None = None
 
 
 class MathSceneSegment(BaseModel):
@@ -166,6 +170,7 @@ class MathSceneSegment(BaseModel):
     arrow: bool = False
     label: str | None = None
     emphasis: str = "primary"
+    semantic_role: str | None = None
 
 
 class MathSceneAnnotation(BaseModel):
@@ -173,6 +178,7 @@ class MathSceneAnnotation(BaseModel):
     y: float
     text: str
     align: str = "ne"
+    semantic_role: str | None = None
 
 
 class MathSceneSnapshot(BaseModel):
@@ -183,6 +189,7 @@ class MathSceneSnapshot(BaseModel):
     """
 
     kind: Literal["math_scene"] = "math_scene"
+    camera_mode: Literal["auto", "fixed"] = "auto"
     x_min: float = -5.0
     x_max: float = 5.0
     y_min: float = -5.0

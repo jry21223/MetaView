@@ -49,9 +49,10 @@ HardFailCondition = Literal[
     "missing_code_sync",
     "invalid_code_sync",
     "code_sync_state_mismatch",
+    "invalid_deterministic_math",
 ]
 
-_MANDATORY_HARD_FAILS: set[str] = {
+MANDATORY_HARD_FAILS: set[str] = {
     "schema_invalid",
     "unexpected_domain",
     "missing_required_snapshot_kind",
@@ -129,6 +130,16 @@ class CodeSyncExpectation(BaseModel):
         return self
 
 
+class DeterministicValidationExpectation(BaseModel):
+    """Optional domain evaluator contract derived from hidden instance data."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    validator: str = Field(min_length=1)
+    parameters: dict[str, Any]
+    tolerance: float = Field(default=1e-5, gt=0, le=1e-2)
+
+
 class GoldCaseExpectation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -145,6 +156,7 @@ class GoldCaseExpectation(BaseModel):
     required_state_values: dict[str, Any] = Field(default_factory=dict)
     expected_conclusion: ConclusionExpectation
     code_sync: CodeSyncExpectation = Field(default_factory=CodeSyncExpectation)
+    deterministic_validation: DeterministicValidationExpectation | None = None
     maximum_warning_count: int = Field(ge=0)
     hard_fail_conditions: list[HardFailCondition] = Field(min_length=1)
 
@@ -160,7 +172,7 @@ class GoldCaseExpectation(BaseModel):
         fact_ids = [fact.id for fact in [*self.required_text_facts, *self.forbidden_text_facts]]
         if len(fact_ids) != len(set(fact_ids)):
             raise ValueError("text fact ids must be unique within a case")
-        missing_conditions = _MANDATORY_HARD_FAILS - set(self.hard_fail_conditions)
+        missing_conditions = MANDATORY_HARD_FAILS - set(self.hard_fail_conditions)
         if missing_conditions:
             raise ValueError(
                 f"hard_fail_conditions must declare mandatory gates: {sorted(missing_conditions)}"
@@ -401,6 +413,19 @@ def score_benchmark_v2(
     for code, path, message in semantic_state_issues:
         collector.add(code, path, message)
 
+    deterministic_issues = []
+    if expectation.deterministic_validation is not None:
+        from eval.conic_math_validation import validate_conic_playbook
+
+        deterministic_issues = validate_conic_playbook(
+            expectation.deterministic_validation.validator,
+            expectation.deterministic_validation.parameters,
+            primary_snapshots,
+            tolerance=expectation.deterministic_validation.tolerance,
+        )
+        for issue in deterministic_issues:
+            collector.add("invalid_deterministic_math", issue.path, issue.message)
+
     code_sync = _assess_code_sync(expectation.code_sync, payload)
     for code, path, message in code_sync.issues:
         collector.add(code, path, message)
@@ -498,7 +523,7 @@ def score_benchmark_v2(
         V2DimensionResult(
             "knowledge_correctness",
             (10.0 * required_fact_ratio + (15.0 if conclusion_ok else 0.0))
-            if not forbidden_facts
+            if not forbidden_facts and not deterministic_issues
             else 0.0,
             25.0,
             _dimension_issues(
@@ -507,6 +532,7 @@ def score_benchmark_v2(
                     "missing_required_text_fact",
                     "forbidden_text_fact",
                     "expected_conclusion_not_met",
+                    "invalid_deterministic_math",
                 },
             ),
         ),

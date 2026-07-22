@@ -15,6 +15,7 @@ import { compileExpr, type CompiledExpr } from "../../../../shared/lib/mathExpr"
 import { sanitizeKatex } from "../../../../shared/lib/sanitizeKatex";
 import { clamp01 } from "../foundation";
 import { planCameraViewBox } from "../math-scene-plan/cameraPlanner";
+import { viewBoxFromSnapshot } from "../math-scene-plan/camera";
 import {
   buildMathSceneRenderPlan,
   type MathSceneRenderPlan,
@@ -93,12 +94,15 @@ function plannedObjectData(
   kind: string,
   key: string,
   progress: number,
+  semanticRole?: string,
 ): Record<string, string> {
-  return {
+  const result: Record<string, string> = {
     "data-math-scene-kind": kind,
     "data-math-scene-key": key,
     "data-math-scene-progress": progress.toFixed(3),
   };
+  if (semanticRole) result["data-semantic-role"] = semanticRole;
+  return result;
 }
 
 function RegionsLayer({
@@ -118,7 +122,7 @@ function RegionsLayer({
           progress,
         );
         return (
-          <g key={key} {...plannedObjectData("region", key, progress)}>
+          <g key={key} {...plannedObjectData("region", key, progress, region.semantic_role)}>
             <Polygon
               points={points}
               color={color}
@@ -266,7 +270,7 @@ function PointsLayer({
           <g
             key={key}
             opacity={fadeIn}
-            {...plannedObjectData("point", key, progress)}
+            {...plannedObjectData("point", key, progress, p.semantic_role)}
           >
             <Point x={p.x} y={p.y} color={color} />
             {p.label && p.label.trim() && (
@@ -292,7 +296,7 @@ function AnnotationsLayer({
         <g
           key={key}
           opacity={clamp01(progress * 1.5)}
-          {...plannedObjectData("annotation", key, progress)}
+          {...plannedObjectData("annotation", key, progress, a.semantic_role)}
         >
           <LaTeX
             at={[a.x, a.y]}
@@ -399,7 +403,10 @@ export const MathSceneRenderer: React.FC<RendererProps> = ({
     },
     [prevStep, snap, progress],
   );
-  const plan = directorFrame?.mathScene?.renderPlan ?? fallbackPlan;
+  const directedPlan = directorFrame?.mathScene?.renderPlan ?? fallbackPlan;
+  const plan = snap.camera_mode === "fixed"
+    ? { ...directedPlan, camera: viewBoxFromSnapshot(snap) }
+    : directedPlan;
   const elapsed = Math.max(0, frame - stepStartFrame);
   const titleOpacity = clamp01(elapsed / 8);
 
@@ -420,6 +427,7 @@ export const MathSceneRenderer: React.FC<RendererProps> = ({
     <div
       className={`math-scene-renderer${isOverlayMode ? " math-scene-renderer--overlay" : ""}`}
       data-theme={theme}
+      data-camera-mode={snap.camera_mode ?? "auto"}
     >
       {!isOverlayMode && (
         <div className="math-scene-renderer__title" style={{ opacity: titleOpacity }}>
@@ -443,6 +451,7 @@ export const MathSceneRenderer: React.FC<RendererProps> = ({
                 "vector_field",
                 plan.vectorField.key,
                 plan.vectorField.progress,
+                plan.vectorField.object.semantic_role,
               )}
             >
               <VectorFieldLayer
@@ -455,7 +464,7 @@ export const MathSceneRenderer: React.FC<RendererProps> = ({
             </g>
           )}
           {plan.curves.map(({ key, object: curve, progress: curveProgress }) => (
-            <g key={key} {...plannedObjectData("curve", key, curveProgress)}>
+            <g key={key} {...plannedObjectData("curve", key, curveProgress, curve.semantic_role)}>
               <CurveLayer
                 curve={curve}
                 theme={theme}
@@ -467,7 +476,7 @@ export const MathSceneRenderer: React.FC<RendererProps> = ({
             </g>
           ))}
           {plan.segments.map(({ key, object: segment, progress: segmentProgress }) => (
-            <g key={key} {...plannedObjectData("segment", key, segmentProgress)}>
+            <g key={key} {...plannedObjectData("segment", key, segmentProgress, segment.semantic_role)}>
               <SegmentLayer
                 segment={segment}
                 theme={theme}

@@ -1,7 +1,14 @@
 import { useState } from "react";
+import type { ConicFollowupCommand } from "../../features/playbook/interaction/types";
 import type { TemplatePreviewQuestion } from "./templatePreviewCases";
 
-export function StaticFollowupPanel({ questions }: { questions: TemplatePreviewQuestion[] }) {
+export function StaticFollowupPanel({
+  questions,
+  onApplyOperation,
+}: {
+  questions: TemplatePreviewQuestion[];
+  onApplyOperation?: (operation: ConicFollowupCommand) => void;
+}) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = questions.find((question) => question.id === selectedId) ?? null;
 
@@ -23,7 +30,10 @@ export function StaticFollowupPanel({ questions }: { questions: TemplatePreviewQ
             type="button"
             key={item.id}
             aria-pressed={selectedId === item.id}
-            onClick={() => setSelectedId(item.id)}
+            onClick={() => {
+              setSelectedId(item.id);
+              if (item.operation) onApplyOperation?.(item.operation);
+            }}
           >
             {item.question}
           </button>
@@ -39,7 +49,7 @@ export function StaticFollowupPanel({ questions }: { questions: TemplatePreviewQ
         />
         <button type="button" disabled aria-label="发送追问">发送 ↵</button>
       </div>
-      <small>模板答案已固定，不会调用模型或消耗额度。</small>
+      <small>所有调整都在当前案例本地完成，不会调用模型或消耗额度。</small>
     </div>
   );
 }

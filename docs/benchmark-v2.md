@@ -2,8 +2,8 @@
 
 Status: Eval
 
-Benchmark V2 is the strict product-quality gate for the four initial Gold
-Cases. The legacy scorer remains available as `legacy_structural_score` so a
+Benchmark V2 is the strict product-quality gate for the four initial Gold Cases
+and eval-only subject packs such as conic sections. The legacy scorer remains available as `legacy_structural_score` so a
 schema-valid but educationally weak result is visible rather than silently
 reclassified as good.
 
@@ -60,7 +60,44 @@ make eval-gold
 
 # Four cases x three independent real pipeline runs.
 make eval-gold LIVE=1 API=http://localhost:8000 REPEAT=3
+
+# Twelve eval-only conic variants derived from one hidden manifest.
+make eval-conic-gold LIVE=1 API=http://localhost:8000 REPEAT=1
+
+# One hidden case while developing a verified capability.
+make eval-conic-gold LIVE=1 API=http://localhost:8000 \
+  ID=conic-hidden-ellipse-focus-01 REPEAT=1
 ```
+
+## Hidden conic variants
+
+`eval/hidden-cases/conic-sections/variants.json` contains two variants for each
+of six archetypes. Variants change numbers, axis direction, line form,
+near-tangent conditions, chord families, or pole position. They retain their
+hidden prompt, parameters, conclusion aliases, forbidden claims, and exact
+instance evidence keyed by catalog fact ID, with no Playbook or duplicated fact
+rule descriptions. `apps/api/eval/conic_hidden_cases.py` validates those IDs and
+resolves shared fact rules, semantic roles, and state fields from the public-safe
+archetype catalog before deriving Benchmark V2 expectations.
+
+The live runner submits those prompts through the normal API Pipeline. It never
+imports a public template builder, and the scorer has no `caseId` answer branch.
+`apps/api/eval/conic_math_validation.py` resolves the archetype's deterministic
+rule and verifies the generated scene's parameters, geometry, and narration
+evidence. It checks focal definitions, directrices, asymptotes, discriminants,
+intersections, chord midpoints/loci, tangency, and pole/polar relations without
+branching on a hidden `caseId`. Invalid deterministic mathematics is an
+additional hard fail for conic expectations; the global 90-point threshold and
+the existing mandatory hard-fail set are unchanged. The gate then checks schema,
+stated facts, pedagogical structure, required semantic objects,
+narration/visual agreement, timing, export readiness, and zero warning budget.
+Failed attempts remain in the timestamped local report.
+
+Semantic-role presence is not treated as sufficient mathematical evidence:
+the deterministic validator also requires the expected object cardinality,
+including two distinct ellipse/hyperbola foci, both asymptotes, exact line/conic
+intersection counts, and two distinct tangent points/tangent segments for an
+outside pole.
 
 Reports are written under ignored `eval/reports/`. A missing live
 QualityReport/warning count is itself an invalid live result; the harness does
