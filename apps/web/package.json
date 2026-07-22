@@ -14,7 +14,7 @@
     "showcase:baseline:release": "SHOWCASE_BASELINE_REQUIRE_APPROVED=1 SHOWCASE_BASELINE_REFERENCE=../../eval/reports/subject-visual-showcase-approved-reference.json vite-node scripts/showcase-baseline-report.mjs",
     "showcase:review-packet": "vite-node scripts/showcase-review-packet.mjs",
     "showcase:approve-reference": "vite-node scripts/approve-showcase-reference.mjs",
-    "template-previews:export": "vite-node scripts/export-template-preview-cases.mjs",
+    "template-previews:export": "vite-node --script scripts/export-template-preview-cases.mjs",
     "template-previews:posters": "node scripts/render-template-preview-posters.mjs",
     "test:visual:conics": "playwright test --config playwright.conics.config.ts",
     "test": "vitest run",

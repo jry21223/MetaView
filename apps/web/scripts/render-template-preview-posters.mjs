@@ -4,7 +4,7 @@ import { renderStill, selectComposition } from "@remotion/renderer";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const inputDirectory = path.resolve(process.argv[2] ?? "data/template-previews");
+const inputDirectory = path.resolve(process.argv[2] ?? "../../data/template-previews");
 const outputDirectory = path.resolve(process.argv[3] ?? "public/template-previews");
 const requested = new Set(process.argv.slice(4));
 const manifest = JSON.parse(await fs.readFile(path.join(inputDirectory, "manifest.json"), "utf8"));
