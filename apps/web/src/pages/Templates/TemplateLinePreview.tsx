@@ -95,14 +95,6 @@ const LINE_PREVIEWS: Record<TemplatePreviewCaseId, ReactNode> = {
       <circle cx="94" cy="13" r="2.5" /><circle cx="94" cy="45" r="2.5" />
     </svg>
   ),
-  projectile: (
-    <svg viewBox="0 0 160 56" fill="none">
-      <path className="is-guide" d="M16 47h130" />
-      <path d="M25 45c26-36 61-39 108 0" />
-      <path className="is-accent" d="m27 44 18-20m0 0-1 7m1-7-7 2" />
-      <circle className="is-accent" cx="80" cy="17" r="3.5" />
-    </svg>
-  ),
   "two-sum": (
     <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="two-sum-hash-table">
       <path className="is-guide" d="M16 13h75M16 23h56M16 33h68M16 43h48" />

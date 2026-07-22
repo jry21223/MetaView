@@ -78,7 +78,7 @@ describe("public gold template manifest", () => {
   });
 
   it("keeps public identifiers and archetypes unique", () => {
-    expect(PUBLIC_GOLD_TEMPLATES).toHaveLength(11);
+    expect(PUBLIC_GOLD_TEMPLATES).toHaveLength(10);
     expect(new Set(PUBLIC_GOLD_TEMPLATES.map((item) => item.caseId)).size)
       .toBe(PUBLIC_GOLD_TEMPLATES.length);
     expect(new Set(PUBLIC_GOLD_TEMPLATES.map((item) => item.archetypeId)).size)

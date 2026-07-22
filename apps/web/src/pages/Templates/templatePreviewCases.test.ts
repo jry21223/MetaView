@@ -79,20 +79,6 @@ describe("template preview cases", () => {
     }
   });
 
-  it("recomputes projectile trajectory and preserves a downward gravity vector", () => {
-    const item = getTemplatePreviewCase("projectile")!;
-    const script = item.buildScript({ speed: 20, angle: 45 });
-    const apex = script.steps.find((step) => step.step_id === "projectile-apex");
-
-    expect(apex?.snapshot.kind).toBe("physics_force_scene");
-    if (apex?.snapshot.kind === "physics_force_scene") {
-      expect(apex.snapshot.trajectory?.[0]?.[1]).toBeCloseTo(apex.snapshot.trajectory?.at(-1)?.[1] ?? 0);
-      expect(apex.snapshot.vectors.find((vector) => vector.id === "gravity-acceleration")?.dy)
-        .toBeGreaterThan(0);
-      expect(apex.snapshot.caption).toContain("10.2 m");
-    }
-  });
-
   it.each([4, 5, 8])("keeps pole-polar geometry valid at k=%s", (k) => {
     const item = getTemplatePreviewCase("pole-polar")!;
     const script = item.buildScript({ k });

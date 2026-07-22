@@ -148,7 +148,13 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
     desc: "重力分解、摩擦力、加速度",
     prompt: "质量 2kg 物体在 30° 斜面上，摩擦系数 0.2，重力加速度 10m/s²，分析受力并求沿斜面方向的加速度",
   },
-  publicGoldEntry("projectile", "physics"),
+  {
+    id: "projectile",
+    domain: "physics",
+    title: "抛体运动",
+    desc: "初速度分解 + 轨迹绘制",
+    prompt: "一个物体以 20 m/s 初速度、45° 仰角抛出，画出轨迹并求最大高度和落地距离",
+  },
   {
     id: "spring-shm",
     domain: "physics",
