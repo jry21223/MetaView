@@ -16,6 +16,7 @@
     "showcase:approve-reference": "vite-node scripts/approve-showcase-reference.mjs",
     "template-previews:export": "vite-node scripts/export-template-preview-cases.mjs",
     "template-previews:posters": "node scripts/render-template-preview-posters.mjs",
+    "test:visual:conics": "playwright test --config playwright.conics.config.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -43,6 +44,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@playwright/test": "^1.61.1",
     "@remotion/bundler": "4.0.462",
     "@remotion/cli": "4.0.462",
     "@remotion/renderer": "4.0.462",
