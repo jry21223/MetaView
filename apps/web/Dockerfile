@@ -21,6 +21,7 @@ RUN --mount=type=cache,id=metaview-npm,target=/root/.npm,sharing=locked \
         --fetch-retry-maxtimeout=120000
 
 COPY apps/web ./apps/web
+COPY contracts ./contracts
 RUN npm --workspace apps/web run build
 
 FROM nginx:1.27-alpine

@@ -21,7 +21,8 @@ import type {
   TemplatePreviewParams,
   TemplatePreviewQuestion,
 } from "../templatePreviewCases";
-import type { GoldTemplateManifest } from "./manifest";
+import { resolveConicArchetype } from "../../../shared/domain/conicArchetypeCatalog";
+import { attachPublicGoldTemplate, type GoldTemplateManifest } from "./manifest";
 
 const FPS = 30;
 const STEP_FRAMES = 90;
@@ -287,23 +288,17 @@ function manifest(args: {
   prompt: string;
   defaults: TemplatePreviewParams;
   controls: NonNullable<GoldTemplateManifest["parameterSchema"]>["controls"];
-  facts: string[];
-  roles: string[];
-  steps: number;
   builder: (params: TemplatePreviewParams) => PlaybookScript;
 }): GoldTemplateManifest {
-  return {
+  const archetype = resolveConicArchetype(args.archetypeId);
+  return attachPublicGoldTemplate({
     caseId: args.caseId, archetypeId: args.archetypeId, subject: "high_school_math", domain: "conic_sections", topic: args.topic,
     visibility: "public", title: args.title, description: args.description, canonicalPrompt: args.prompt,
-    requiredCapabilities: [args.archetypeId, "math_scene.parametric_curve", "conic.deterministic_kernel"],
     parameterSchema: { defaults: args.defaults, controls: args.controls },
-    expectedFacts: args.facts.map((description, index) => ({ id: `${args.caseId}-fact-${index + 1}`, description, tolerance: 1e-8 })),
-    visualInvariants: [{ id: `${args.caseId}-visual`, description: "关键几何对象具备稳定语义角色", requiredSemanticRoles: args.roles }],
-    pedagogicalRubric: { objective: args.description, requiredPhases: ["观察", "推导", "验证", "总结"], minimumSteps: args.steps },
-    poster: { url: `/template-previews/${args.caseId}/poster.webp`, alt: `${args.title}的 Playbook 代表画面`, frame: args.steps * STEP_FRAMES - 40 },
+    poster: { url: `/template-previews/${args.caseId}/poster.webp`, alt: `${args.title}的 Playbook 代表画面`, frame: archetype.pedagogicalRubric.minimumSteps * STEP_FRAMES - 40 },
     buildPublicPlaybook: args.builder,
     buildFollowups: (params, script) => followups(script, "所有数值由同一个圆锥曲线纯函数内核验证，画面只呈现已通过约束的结果。", `当前参数会重新构建完整 Playbook；例如 ${Object.entries(params).map(([key, value]) => `${key}=${value}`).join("，")}。`),
-  };
+  });
 }
 
 export const CONIC_PUBLIC_GOLD_TEMPLATES: readonly GoldTemplateManifest[] = Object.freeze([
@@ -311,24 +306,24 @@ export const CONIC_PUBLIC_GOLD_TEMPLATES: readonly GoldTemplateManifest[] = Obje
     { id: "a", kind: "range", label: "长半轴 a", description: "3 到 7", min: 3, max: 7, step: 0.25, resetPlayback: false },
     { id: "b", kind: "range", label: "短半轴 b", description: "自动满足 b<a", min: 1, max: 6.5, step: 0.25, resetPlayback: false },
     { id: "t", kind: "range", label: "动点参数 t", description: "沿椭圆移动", min: 0, max: 6.28, step: 0.05, resetPlayback: false },
-  ], facts: ["焦点坐标正确", "动点在椭圆上", "焦点距离和等于 2a"], roles: ["conic_curve", "focus", "moving_point", "focal_distance"], steps: 6, builder: buildEllipseFocus }),
+  ], builder: buildEllipseFocus }),
   manifest({ caseId: "parabola-focus-directrix", archetypeId: "conic.parabola.focus-directrix", topic: "抛物线", title: "抛物线的焦点—准线定义", description: "同步比较动点到焦点和准线的距离", prompt: "用动点、焦点、准线和垂足解释抛物线定义。", defaults: { p: 1.5, t: 1.2 }, controls: [
     { id: "p", kind: "range", label: "焦参数 p", description: "保持 p>0", min: 0.5, max: 3, step: 0.1, resetPlayback: false },
     { id: "t", kind: "range", label: "动点参数 t", description: "控制 P", min: -2.2, max: 2.2, step: 0.05, resetPlayback: false },
-  ], facts: ["焦点和准线正确", "PF 等于点到准线距离"], roles: ["conic_curve", "focus", "directrix", "moving_point", "projection_foot"], steps: 5, builder: buildParabola }),
+  ], builder: buildParabola }),
   manifest({ caseId: "hyperbola-asymptotes", archetypeId: "conic.hyperbola.asymptotes", topic: "双曲线", title: "双曲线与渐近线", description: "理解两支结构、渐近趋势和焦点距离差", prompt: "展示双曲线两支、渐近线、焦点与动点的距离差。", defaults: { a: 3, b: 2, u: 1 }, controls: [
     { id: "a", kind: "range", label: "实半轴 a", description: "保持正值", min: 1.5, max: 5, step: 0.25, resetPlayback: false },
     { id: "b", kind: "range", label: "虚半轴 b", description: "改变渐近线", min: 1, max: 4, step: 0.25, resetPlayback: false },
     { id: "u", kind: "range", label: "动点参数 u", description: "沿右支移动", min: -1.7, max: 1.7, step: 0.05, resetPlayback: false },
-  ], facts: ["焦点和离心率正确", "渐近线斜率为正负 b/a", "焦点距离差为 2a"], roles: ["conic_curve", "asymptote", "focus", "moving_point"], steps: 6, builder: buildHyperbola }),
+  ], builder: buildHyperbola }),
   manifest({ caseId: "line-ellipse-position", archetypeId: "conic.line-ellipse.position", topic: "直线与椭圆", title: "直线与椭圆的位置关系", description: "对应相交、相切、相离与判别式状态", prompt: "联立直线与椭圆，展示 Δ>0、Δ=0、Δ<0 和竖直直线。", defaults: { lineType: "slope", slope: 0.35, intercept: 0, verticalX: 4 }, controls: [
     { id: "lineType", kind: "select", label: "直线类型", description: "覆盖斜率不存在", resetPlayback: false, options: [{ label: "斜率式", value: "slope" }, { label: "竖直线", value: "vertical" }] },
     { id: "slope", kind: "range", label: "斜率 m", description: "斜率式", min: -1.2, max: 1.2, step: 0.05, resetPlayback: false },
     { id: "intercept", kind: "range", label: "截距 q", description: "斜率式", min: -4, max: 4, step: 0.05, resetPlayback: false },
     { id: "verticalX", kind: "range", label: "竖直线 x", description: "竖直式", min: -6, max: 6, step: 0.05, resetPlayback: false },
-  ], facts: ["判别式状态与交点数一致", "竖直直线单独求交", "近相切使用尺度容差"], roles: ["conic_curve", "moving_line", "discriminant_panel"], steps: 6, builder: buildLineEllipse }),
+  ], builder: buildLineEllipse }),
   manifest({ caseId: "ellipse-chord-midpoint-locus", archetypeId: "conic.ellipse.chord-midpoint-locus", topic: "动弦与轨迹", title: "椭圆动弦与中点轨迹", description: "连接动弦、中点尾迹与韦达消元", prompt: "展示过椭圆内定点的动弦与中点轨迹，并用韦达关系验证。", defaults: { fixedX: 2, slope: 0.6 }, controls: [
     { id: "fixedX", kind: "range", label: "定点横坐标 q", description: "限制在椭圆内部", min: 0.8, max: 3.8, step: 0.1, resetPlayback: false },
     { id: "slope", kind: "range", label: "斜率 m", description: "控制动弦", min: -2.5, max: 2.5, step: 0.05, resetPlayback: false },
-  ], facts: ["端点满足椭圆和直线方程", "中点等于端点平均", "尾迹满足理论轨迹并保留范围"], roles: ["chord", "chord_midpoint", "locus_trail", "theoretical_locus"], steps: 6, builder: buildChordLocus }),
+  ], builder: buildChordLocus }),
 ]);

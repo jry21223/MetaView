@@ -1,4 +1,11 @@
 import type { PlaybookScript } from "../../../features/playbook/engine/types";
+import {
+  resolveConicArchetype,
+  type ConicArchetypeMetadata,
+  type ConicExpectedFactRule,
+  type ConicPedagogicalRubric,
+  type ConicVisualInvariant,
+} from "../../../shared/domain/conicArchetypeCatalog";
 import type {
   TemplatePreviewCase,
   TemplatePreviewCaseId,
@@ -9,25 +16,11 @@ import type {
 
 export type GoldTemplateVisibility = "public" | "hidden_eval";
 
-export interface ExpectedFact {
-  id: string;
-  description: string;
-  tolerance?: number;
-}
+export type ExpectedFact = ConicExpectedFactRule;
+export type VisualInvariant = ConicVisualInvariant;
+export type PedagogicalRubric = ConicPedagogicalRubric;
 
-export interface VisualInvariant {
-  id: string;
-  description: string;
-  requiredSemanticRoles: string[];
-}
-
-export interface PedagogicalRubric {
-  objective: string;
-  requiredPhases: string[];
-  minimumSteps: number;
-}
-
-export interface GoldTemplateManifest {
+export interface GoldTemplateManifest extends Omit<ConicArchetypeMetadata, "publicCaseId"> {
   caseId: string;
   archetypeId: string;
   subject: "high_school_math";
@@ -37,14 +30,10 @@ export interface GoldTemplateManifest {
   title: string;
   description: string;
   canonicalPrompt: string;
-  requiredCapabilities: string[];
   parameterSchema?: {
     controls: TemplatePreviewControl[];
     defaults: TemplatePreviewParams;
   };
-  expectedFacts: ExpectedFact[];
-  visualInvariants: VisualInvariant[];
-  pedagogicalRubric: PedagogicalRubric;
   poster: {
     url: string;
     alt: string;
@@ -55,6 +44,41 @@ export interface GoldTemplateManifest {
     params: TemplatePreviewParams,
     script: PlaybookScript,
   ) => TemplatePreviewFollowups;
+}
+
+export type PublicGoldTemplateDefinition = Omit<
+  GoldTemplateManifest,
+  "requiredCapabilities" | "expectedFacts" | "visualInvariants" | "pedagogicalRubric"
+>;
+
+const CATALOG_METADATA_FIELDS = [
+  "requiredCapabilities",
+  "expectedFacts",
+  "visualInvariants",
+  "pedagogicalRubric",
+] as const;
+
+export function attachPublicGoldTemplate(
+  definition: PublicGoldTemplateDefinition,
+): GoldTemplateManifest {
+  for (const field of CATALOG_METADATA_FIELDS) {
+    if (field in definition) {
+      throw new Error(`Public Gold Template metadata ${field} must come from the catalog`);
+    }
+  }
+  const archetype = resolveConicArchetype(definition.archetypeId);
+  if (definition.caseId !== archetype.publicCaseId) {
+    throw new Error(
+      `Public case ${definition.caseId} does not match ${archetype.archetypeId}`,
+    );
+  }
+  return {
+    ...definition,
+    requiredCapabilities: archetype.requiredCapabilities,
+    expectedFacts: archetype.expectedFacts,
+    visualInvariants: archetype.visualInvariants,
+    pedagogicalRubric: archetype.pedagogicalRubric,
+  };
 }
 
 export function manifestToPreviewCase(

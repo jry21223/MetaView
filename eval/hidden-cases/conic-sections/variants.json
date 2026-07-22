@@ -7,190 +7,156 @@
     {
       "caseId": "conic-hidden-ellipse-focus-01",
       "archetypeId": "conic.ellipse.focus-definition",
-      "title": "椭圆焦点定义：参数式条件",
       "prompt": "请为高中生讲解椭圆的焦点定义。已知长半轴 a=6，短半轴 b=4，用动点 P 展示它到两焦点距离之和为何保持为 12，并给出验证步骤。",
       "parameters": {"a": 6, "b": 4, "majorAxis": "x"},
-      "expectedFacts": [
-        {"id": "ellipse", "anyOf": ["椭圆", "ellipse"]},
-        {"id": "foci", "anyOf": ["焦点", "F1", "F2"]},
-        {"id": "sum", "anyOf": ["PF1+PF2=12", "PF_1+PF_2=12", "2a=12", "2a = 12"]}
-      ],
-      "requiredSemanticRoles": ["conic_curve", "focus", "moving_point", "focal_distance"],
-      "requiredStateFields": ["curves", "points", "segments"],
+      "factEvidence": {
+        "ellipse-point-on-curve": ["椭圆", "ellipse"],
+        "ellipse-foci": ["焦点", "F1", "F2"],
+        "ellipse-focal-distance-value": ["PF1+PF2=12", "PF_1+PF_2=12", "2a=12", "2a = 12"]
+      },
       "conclusionAliases": [["椭圆", "ellipse"], ["PF1+PF2", "PF_1+PF_2", "距离之和"], ["12", "2a"]],
       "forbiddenAliases": ["PF1+PF2=10", "PF_1+PF_2=10"]
     },
     {
       "caseId": "conic-hidden-ellipse-focus-02",
       "archetypeId": "conic.ellipse.focus-definition",
-      "title": "椭圆焦点定义：焦距条件",
       "prompt": "横轴椭圆长半轴 a=7、短半轴 b=5。不要把它说成压扁的圆；请通过焦点、动点和两段焦点距离解释定义，并验证距离和。",
       "parameters": {"a": 7, "b": 5, "majorAxis": "x"},
-      "expectedFacts": [
-        {"id": "focal_constant", "anyOf": ["14", "2a"]},
-        {"id": "focus_distance", "anyOf": ["距离之和", "PF1+PF2", "PF_1+PF_2"]}
-      ],
-      "requiredSemanticRoles": ["conic_curve", "focus", "moving_point", "focal_distance"],
-      "requiredStateFields": ["curves", "points", "segments"],
+      "factEvidence": {
+        "ellipse-focal-distance-value": ["14", "2a=14", "2a = 14"],
+        "ellipse-focal-distance-form": ["距离之和", "PF1+PF2", "PF_1+PF_2"]
+      },
       "conclusionAliases": [["椭圆"], ["距离之和", "PF1+PF2", "PF_1+PF_2"], ["14", "2a"]],
       "forbiddenAliases": ["距离差保持不变"]
     },
     {
       "caseId": "conic-hidden-parabola-focus-01",
       "archetypeId": "conic.parabola.focus-directrix",
-      "title": "抛物线焦点准线：右开口",
       "prompt": "抛物线 y²=8x。用焦点、准线、动点 P 和垂足 H 解释焦点—准线定义，动态比较 PF 与 PH。",
       "parameters": {"p": 2, "axis": "right"},
-      "expectedFacts": [
-        {"id": "focus", "anyOf": ["F(2,0)", "焦点"]},
-        {"id": "directrix", "anyOf": ["x=-2", "x = -2", "准线"]},
-        {"id": "equal_distance", "anyOf": ["PF=PH", "PF = PH", "距离相等"]}
-      ],
-      "requiredSemanticRoles": ["conic_curve", "focus", "directrix", "moving_point", "projection_foot"],
-      "requiredStateFields": ["curves", "points", "segments"],
+      "factEvidence": {
+        "parabola-focus": ["F(2,0)", "F(2, 0)"],
+        "parabola-directrix": ["x=-2", "x = -2"],
+        "parabola-equal-distances": ["PF=PH", "PF = PH", "距离相等"]
+      },
       "conclusionAliases": [["抛物线"], ["焦点"], ["准线"], ["相等", "PF=PH"]],
       "forbiddenAliases": ["PF+PH"]
     },
     {
       "caseId": "conic-hidden-parabola-focus-02",
       "archetypeId": "conic.parabola.focus-directrix",
-      "title": "抛物线焦点准线：上开口",
       "prompt": "对上开口抛物线 x²=12y，比较曲线上动点到焦点和准线的距离，并明确焦点、准线与垂足。",
       "parameters": {"p": 3, "axis": "up"},
-      "expectedFacts": [
-        {"id": "focus", "anyOf": ["F(0,3)", "焦点"]},
-        {"id": "directrix", "anyOf": ["y=-3", "y = -3", "准线"]},
-        {"id": "equal", "anyOf": ["距离相等", "PF=PH"]}
-      ],
-      "requiredSemanticRoles": ["conic_curve", "focus", "directrix", "moving_point", "projection_foot"],
-      "requiredStateFields": ["curves", "points", "segments"],
+      "factEvidence": {
+        "parabola-focus": ["F(0,3)", "F(0, 3)"],
+        "parabola-directrix": ["y=-3", "y = -3"],
+        "parabola-equal-distances": ["距离相等", "PF=PH", "PF = PH"]
+      },
       "conclusionAliases": [["抛物线"], ["焦点"], ["准线"], ["相等"]],
       "forbiddenAliases": ["x=-3"]
     },
     {
       "caseId": "conic-hidden-hyperbola-asymptote-01",
       "archetypeId": "conic.hyperbola.asymptotes",
-      "title": "双曲线渐近线：3-4-5 参数",
       "prompt": "讲解双曲线 x²/9-y²/16=1 的两支、焦点和渐近线。移动点 P，并验证两焦点距离差的绝对值。",
       "parameters": {"a": 3, "b": 4, "transverseAxis": "x"},
-      "expectedFacts": [
-        {"id": "asymptotes", "anyOf": ["y=±4x/3", "y = ±4x/3", "渐近线"]},
-        {"id": "difference", "anyOf": ["距离差", "2a=6", "2a = 6"]}
-      ],
-      "requiredSemanticRoles": ["conic_curve", "asymptote", "focus", "moving_point"],
-      "requiredStateFields": ["curves", "points", "segments"],
+      "factEvidence": {
+        "hyperbola-asymptotes": ["y=±4x/3", "y = ±4x/3"],
+        "hyperbola-focal-distance-difference": ["距离差"],
+        "hyperbola-focal-distance-value": ["2a=6", "2a = 6"]
+      },
       "conclusionAliases": [["双曲线"], ["渐近线"], ["距离差"], ["6", "2a"]],
       "forbiddenAliases": ["距离和保持不变"]
     },
     {
       "caseId": "conic-hidden-hyperbola-asymptote-02",
       "archetypeId": "conic.hyperbola.asymptotes",
-      "title": "双曲线渐近线：纵轴",
       "prompt": "对双曲线 y²/16-x²/9=1，展示上下两支与两条渐近线，说明离心率大于 1，并验证焦点距离差。",
       "parameters": {"a": 4, "b": 3, "transverseAxis": "y"},
-      "expectedFacts": [
-        {"id": "branches", "anyOf": ["上下两支", "两支"]},
-        {"id": "eccentricity", "anyOf": ["离心率", "e>1", "e > 1"]},
-        {"id": "difference", "anyOf": ["距离差", "8", "2a"]}
-      ],
-      "requiredSemanticRoles": ["conic_curve", "asymptote", "focus", "moving_point"],
-      "requiredStateFields": ["curves", "points", "segments"],
+      "factEvidence": {
+        "hyperbola-branches": ["上下两支", "两支"],
+        "hyperbola-eccentricity": ["离心率", "e>1", "e > 1"],
+        "hyperbola-focal-distance-difference": ["距离差"],
+        "hyperbola-focal-distance-value": ["8", "2a=8", "2a = 8"]
+      },
       "conclusionAliases": [["双曲线"], ["渐近线"], ["距离差"], ["8", "2a"]],
       "forbiddenAliases": ["左右两支"]
     },
     {
       "caseId": "conic-hidden-line-ellipse-01",
       "archetypeId": "conic.line-ellipse.position",
-      "title": "竖直直线与椭圆",
       "prompt": "椭圆 x²/25+y²/9=1 与竖直直线 x=c。让 c 从 4.9 变化到 5 再到 5.1，展示相交、相切、相离，并说明为何不能使用斜率式。",
       "parameters": {"a": 5, "b": 3, "lineKind": "vertical", "samples": [4.9, 5, 5.1]},
-      "expectedFacts": [
-        {"id": "states", "anyOf": ["相交", "相切", "相离"]},
-        {"id": "vertical", "anyOf": ["竖直", "斜率不存在", "x=c"]},
-        {"id": "discriminant", "anyOf": ["判别式", "Δ"]}
-      ],
-      "requiredSemanticRoles": ["conic_curve", "moving_line", "intersection_point", "discriminant_panel"],
-      "requiredStateFields": ["curves", "segments"],
+      "factEvidence": {
+        "line-ellipse-position-states": ["相交", "相切", "相离"],
+        "line-ellipse-vertical-line": ["竖直", "斜率不存在", "x=c"],
+        "line-ellipse-discriminant": ["判别式", "Δ"]
+      },
       "conclusionAliases": [["相交"], ["相切"], ["相离"], ["竖直", "斜率不存在"]],
       "forbiddenAliases": ["无限大斜率"]
     },
     {
       "caseId": "conic-hidden-line-ellipse-02",
       "archetypeId": "conic.line-ellipse.position",
-      "title": "近相切容差",
       "prompt": "对椭圆 x²/36+y²/16=1 和直线 y=kx+q，选择一组接近相切的参数，解释判别式、数值容差和两个交点合并的过程。",
       "parameters": {"a": 6, "b": 4, "nearTangent": true},
-      "expectedFacts": [
-        {"id": "discriminant", "anyOf": ["判别式", "Δ"]},
-        {"id": "tolerance", "anyOf": ["容差", "数值误差", "近相切"]},
-        {"id": "merge", "anyOf": ["合并", "重根", "切点"]}
-      ],
-      "requiredSemanticRoles": ["conic_curve", "moving_line", "tangent_point", "discriminant_panel"],
-      "requiredStateFields": ["curves", "segments"],
+      "factEvidence": {
+        "line-ellipse-discriminant": ["判别式", "Δ"],
+        "line-ellipse-tangent-tolerance": ["容差", "数值误差", "近相切"],
+        "line-ellipse-tangent-merge": ["合并", "重根", "切点"]
+      },
       "conclusionAliases": [["相切"], ["判别式", "Δ"], ["容差", "近相切"]],
       "forbiddenAliases": ["强制当作两个交点"]
     },
     {
       "caseId": "conic-hidden-chord-locus-01",
       "archetypeId": "conic.ellipse.chord-midpoint-locus",
-      "title": "过定点动弦",
       "prompt": "椭圆 x²/25+y²/9=1 内有定点 Q=(1,0)。动直线过 Q，展示弦 AB、中点 M、尾迹与理论轨迹，并用韦达关系说明取值范围。",
       "parameters": {"a": 5, "b": 3, "fixedPoint": [1, 0]},
-      "expectedFacts": [
-        {"id": "midpoint", "anyOf": ["中点", "M"]},
-        {"id": "vieta", "anyOf": ["韦达", "两根之和", "点差法"]},
-        {"id": "range", "anyOf": ["范围", "取值"]}
-      ],
-      "requiredSemanticRoles": ["chord", "chord_midpoint", "locus_trail", "theoretical_locus"],
-      "requiredStateFields": ["curves", "points", "segments"],
+      "factEvidence": {
+        "ellipse-chord-midpoint": ["中点", "M"],
+        "ellipse-chord-derivation": ["韦达", "两根之和", "点差法"],
+        "ellipse-chord-range": ["范围", "取值"]
+      },
       "conclusionAliases": [["中点"], ["轨迹"], ["韦达", "点差法"], ["范围", "取值"]],
       "forbiddenAliases": ["随机移动"]
     },
     {
       "caseId": "conic-hidden-chord-locus-02",
       "archetypeId": "conic.ellipse.chord-midpoint-locus",
-      "title": "平行弦族中点轨迹",
       "prompt": "在椭圆 x²/16+y²/4=1 中取斜率固定为 1/2 的平行弦族。展示各弦中点轨迹、有效截距范围和退化端点。",
       "parameters": {"a": 4, "b": 2, "slope": 0.5},
-      "expectedFacts": [
-        {"id": "parallel", "anyOf": ["平行弦", "斜率固定"]},
-        {"id": "midpoint", "anyOf": ["中点", "轨迹"]},
-        {"id": "range", "anyOf": ["范围", "退化", "端点"]}
-      ],
-      "requiredSemanticRoles": ["chord", "chord_midpoint", "locus_trail", "theoretical_locus"],
-      "requiredStateFields": ["curves", "points", "segments"],
+      "factEvidence": {
+        "ellipse-chord-family": ["平行弦", "斜率固定"],
+        "ellipse-chord-midpoint": ["中点", "轨迹"],
+        "ellipse-chord-range": ["范围", "退化", "端点"]
+      },
       "conclusionAliases": [["平行弦"], ["中点"], ["轨迹"], ["范围", "端点"]],
       "forbiddenAliases": ["所有截距都有效"]
     },
     {
       "caseId": "conic-hidden-pole-polar-01",
       "archetypeId": "conic.pole-polar.circle",
-      "title": "圆的极点极线：非对角外点",
       "prompt": "圆 x²+y²=16，外点 P=(5,3)。作两条切线并连接切点，验证切点、半径垂直关系和极线 5x+3y=16。",
       "parameters": {"radius": 4, "pole": [5, 3]},
-      "expectedFacts": [
-        {"id": "polar", "anyOf": ["5x+3y=16", "5x + 3y = 16", "极线"]},
-        {"id": "perpendicular", "anyOf": ["垂直", "⊥"]},
-        {"id": "tangent_points", "anyOf": ["切点", "接触弦"]}
-      ],
-      "requiredSemanticRoles": ["conic_curve", "moving_point", "tangent_point", "tangent", "polar_line"],
-      "requiredStateFields": ["curves", "points", "segments"],
+      "factEvidence": {
+        "polar-equation": ["5x+3y=16", "5x + 3y = 16"],
+        "radius-perpendicular-tangent": ["垂直", "⊥"],
+        "tangent-points-on-circle": ["切点", "接触弦"]
+      },
       "conclusionAliases": [["极线"], ["5x+3y=16", "5x + 3y = 16"], ["切点"]],
       "forbiddenAliases": ["5x+3y=25"]
     },
     {
       "caseId": "conic-hidden-pole-polar-02",
       "archetypeId": "conic.pole-polar.circle",
-      "title": "圆的极点极线：边界与移动",
       "prompt": "固定圆 x²+y²=9，让外点 P=(k,2) 在合法区域移动。展示两切点、接触弦与极线，并在 P 落到圆上或圆内时 fail closed。",
       "parameters": {"radius": 3, "poleFamily": ["k", 2]},
-      "expectedFacts": [
-        {"id": "polar", "anyOf": ["kx+2y=9", "kx + 2y = 9", "极线"]},
-        {"id": "outside", "anyOf": ["圆外", "合法区域"]},
-        {"id": "fail_closed", "anyOf": ["不成立", "停止", "fail closed", "无两条实切线"]}
-      ],
-      "requiredSemanticRoles": ["conic_curve", "moving_point", "tangent_point", "tangent", "polar_line"],
-      "requiredStateFields": ["curves", "points", "segments"],
+      "factEvidence": {
+        "polar-equation": ["kx+2y=9", "kx + 2y = 9"],
+        "pole-outside-circle": ["圆外", "合法区域"],
+        "pole-fail-closed": ["不成立", "停止", "fail closed", "无两条实切线"]
+      },
       "conclusionAliases": [["极线"], ["kx+2y=9", "kx + 2y = 9"], ["圆外", "合法区域"]],
       "forbiddenAliases": ["圆内仍有两条实切线"]
     }

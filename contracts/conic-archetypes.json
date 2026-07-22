@@ -1,0 +1,319 @@
+{
+  "schemaVersion": "1.0.0",
+  "subject": "high_school_math",
+  "domain": "conic_sections",
+  "archetypes": [
+    {
+      "archetypeId": "conic.ellipse.focus-definition",
+      "publicCaseId": "ellipse-focus-definition",
+      "requiredCapabilities": [
+        "conic.ellipse.focus-definition",
+        "math_scene.parametric_curve",
+        "conic.deterministic_kernel"
+      ],
+      "expectedFacts": [
+        {
+          "id": "ellipse-foci",
+          "description": "焦点坐标由长、短半轴确定",
+          "anyOf": ["焦点", "F1", "F2"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "ellipse-point-on-curve",
+          "description": "动点始终满足椭圆方程",
+          "anyOf": ["椭圆", "ellipse"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "ellipse-focal-distance-form",
+          "description": "动点到两焦点的距离和保持不变",
+          "anyOf": ["PF1+PF2", "PF_1+PF_2", "距离之和"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "ellipse-focal-distance-value",
+          "description": "焦点距离和的实例值等于 2a",
+          "anyOf": ["2a"],
+          "tolerance": 1e-8
+        }
+      ],
+      "visualInvariants": [
+        {
+          "id": "ellipse-focus-definition-visual",
+          "description": "椭圆、焦点、动点和两段焦距均可辨认",
+          "requiredSemanticRoles": ["conic_curve", "focus", "moving_point", "focal_distance"],
+          "requiredStateFields": ["curves", "points", "segments"]
+        }
+      ],
+      "pedagogicalRubric": {
+        "objective": "观察动点到两焦点距离之和恒定",
+        "requiredPhases": ["观察", "推导", "验证", "总结"],
+        "minimumSteps": 6
+      }
+    },
+    {
+      "archetypeId": "conic.parabola.focus-directrix",
+      "publicCaseId": "parabola-focus-directrix",
+      "requiredCapabilities": [
+        "conic.parabola.focus-directrix",
+        "math_scene.parametric_curve",
+        "conic.deterministic_kernel"
+      ],
+      "expectedFacts": [
+        {
+          "id": "parabola-focus",
+          "description": "焦点由焦参数与开口方向确定",
+          "anyOf": ["焦点"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "parabola-directrix",
+          "description": "准线由焦参数与开口方向确定",
+          "anyOf": ["准线"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "parabola-equal-distances",
+          "description": "曲线上动点到焦点和准线的距离相等",
+          "anyOf": ["PF=PH", "PF = PH", "距离相等"],
+          "tolerance": 1e-8
+        }
+      ],
+      "visualInvariants": [
+        {
+          "id": "parabola-focus-directrix-visual",
+          "description": "抛物线、焦点、准线、动点和垂足均可辨认",
+          "requiredSemanticRoles": ["conic_curve", "focus", "directrix", "moving_point", "projection_foot"],
+          "requiredStateFields": ["curves", "points", "segments"]
+        }
+      ],
+      "pedagogicalRubric": {
+        "objective": "同步比较动点到焦点和准线的距离",
+        "requiredPhases": ["观察", "推导", "验证", "总结"],
+        "minimumSteps": 5
+      }
+    },
+    {
+      "archetypeId": "conic.hyperbola.asymptotes",
+      "publicCaseId": "hyperbola-asymptotes",
+      "requiredCapabilities": [
+        "conic.hyperbola.asymptotes",
+        "math_scene.parametric_curve",
+        "conic.deterministic_kernel"
+      ],
+      "expectedFacts": [
+        {
+          "id": "hyperbola-branches",
+          "description": "双曲线由两支曲线组成",
+          "anyOf": ["两支"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "hyperbola-eccentricity",
+          "description": "双曲线离心率大于 1",
+          "anyOf": ["离心率", "e>1", "e > 1"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "hyperbola-asymptotes",
+          "description": "渐近线斜率由半轴之比确定",
+          "anyOf": ["渐近线"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "hyperbola-focal-distance-difference",
+          "description": "动点到两焦点的距离差保持不变",
+          "anyOf": ["距离差"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "hyperbola-focal-distance-value",
+          "description": "焦点距离差绝对值的实例值等于 2a",
+          "anyOf": ["2a"],
+          "tolerance": 1e-8
+        }
+      ],
+      "visualInvariants": [
+        {
+          "id": "hyperbola-asymptotes-visual",
+          "description": "双曲线两支、渐近线、焦点和动点均可辨认",
+          "requiredSemanticRoles": ["conic_curve", "asymptote", "focus", "moving_point"],
+          "requiredStateFields": ["curves", "points", "segments"]
+        }
+      ],
+      "pedagogicalRubric": {
+        "objective": "理解两支结构、渐近趋势和焦点距离差",
+        "requiredPhases": ["观察", "推导", "验证", "总结"],
+        "minimumSteps": 6
+      }
+    },
+    {
+      "archetypeId": "conic.line-ellipse.position",
+      "publicCaseId": "line-ellipse-position",
+      "requiredCapabilities": [
+        "conic.line-ellipse.position",
+        "math_scene.parametric_curve",
+        "conic.deterministic_kernel"
+      ],
+      "expectedFacts": [
+        {
+          "id": "line-ellipse-position-states",
+          "description": "参数变化覆盖相交、相切和相离状态",
+          "anyOf": ["相交", "相切", "相离"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "line-ellipse-discriminant",
+          "description": "判别式状态与交点数一致",
+          "anyOf": ["判别式", "Δ"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "line-ellipse-vertical-line",
+          "description": "竖直直线使用独立的一般直线表示求交",
+          "anyOf": ["竖直", "斜率不存在", "x=c"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "line-ellipse-tangent-tolerance",
+          "description": "近相切状态使用尺度化数值容差",
+          "anyOf": ["相切", "容差", "近相切", "重根"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "line-ellipse-tangent-merge",
+          "description": "近相切的两个交点在容差内合并为切点",
+          "anyOf": ["合并", "重根", "切点"],
+          "tolerance": 1e-8
+        }
+      ],
+      "visualInvariants": [
+        {
+          "id": "line-ellipse-position-visual",
+          "description": "椭圆、动直线、交点或切点和判别式面板均可辨认",
+          "requiredSemanticRoles": [
+            "conic_curve",
+            "moving_line",
+            "intersection_point",
+            "tangent_point",
+            "discriminant_panel"
+          ],
+          "requiredStateFields": ["curves", "segments"]
+        }
+      ],
+      "pedagogicalRubric": {
+        "objective": "对应相交、相切、相离与判别式状态",
+        "requiredPhases": ["观察", "推导", "验证", "总结"],
+        "minimumSteps": 6
+      }
+    },
+    {
+      "archetypeId": "conic.ellipse.chord-midpoint-locus",
+      "publicCaseId": "ellipse-chord-midpoint-locus",
+      "requiredCapabilities": [
+        "conic.ellipse.chord-midpoint-locus",
+        "math_scene.parametric_curve",
+        "conic.deterministic_kernel"
+      ],
+      "expectedFacts": [
+        {
+          "id": "ellipse-chord-family",
+          "description": "动弦属于题目给定的直线族",
+          "anyOf": ["平行弦", "斜率固定", "动弦"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "ellipse-chord-endpoints",
+          "description": "弦端点同时满足椭圆与直线方程",
+          "anyOf": ["弦", "交点"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "ellipse-chord-midpoint",
+          "description": "弦中点等于两个端点坐标的平均",
+          "anyOf": ["中点", "M", "韦达", "两根之和", "点差法"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "ellipse-chord-derivation",
+          "description": "中点关系由韦达关系或点差法推导",
+          "anyOf": ["韦达", "两根之和", "点差法"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "ellipse-chord-range",
+          "description": "中点轨迹保留有效范围和退化端点",
+          "anyOf": ["轨迹", "范围", "取值", "端点"],
+          "tolerance": 1e-8
+        }
+      ],
+      "visualInvariants": [
+        {
+          "id": "ellipse-chord-midpoint-locus-visual",
+          "description": "动弦、中点、尾迹和理论轨迹均可辨认",
+          "requiredSemanticRoles": ["chord", "chord_midpoint", "locus_trail", "theoretical_locus"],
+          "requiredStateFields": ["curves", "points", "segments"]
+        }
+      ],
+      "pedagogicalRubric": {
+        "objective": "连接动弦、中点尾迹与韦达消元",
+        "requiredPhases": ["观察", "推导", "验证", "总结"],
+        "minimumSteps": 6
+      }
+    },
+    {
+      "archetypeId": "conic.pole-polar.circle",
+      "publicCaseId": "pole-polar",
+      "requiredCapabilities": [
+        "conic.circle.tangent_points",
+        "conic.circle.polar_line",
+        "math_scene.parametric_curve"
+      ],
+      "expectedFacts": [
+        {
+          "id": "pole-outside-circle",
+          "description": "外点到圆心距离严格大于半径",
+          "anyOf": ["圆外", "合法区域"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "tangent-points-on-circle",
+          "description": "两个切点均满足圆方程",
+          "anyOf": ["切点", "接触弦"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "radius-perpendicular-tangent",
+          "description": "切点半径与对应切线垂直",
+          "anyOf": ["垂直", "⊥"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "polar-equation",
+          "description": "外点与半径唯一确定圆的极线方程",
+          "anyOf": ["极线"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "pole-fail-closed",
+          "description": "极点不在圆外时停止两条实切线构造",
+          "anyOf": ["不成立", "停止", "fail closed", "无两条实切线"],
+          "tolerance": 1e-8
+        }
+      ],
+      "visualInvariants": [
+        {
+          "id": "pole-polar-core-objects",
+          "description": "圆、外点、两个切点、两条切线和极线均可辨认",
+          "requiredSemanticRoles": ["conic_curve", "moving_point", "tangent_point", "tangent", "polar_line"],
+          "requiredStateFields": ["curves", "points", "segments"]
+        }
+      ],
+      "pedagogicalRubric": {
+        "objective": "理解外点、两条切线、接触弦和极线之间的关系",
+        "requiredPhases": ["观察", "构造", "推导", "验证", "总结"],
+        "minimumSteps": 6
+      }
+    }
+  ]
+}

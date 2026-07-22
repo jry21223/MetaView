@@ -11,11 +11,13 @@ generated result.
 ## Public manifest
 
 The public registry lives in
-`apps/web/src/pages/Templates/gold-templates/`. `GoldTemplateManifest` records the
-case ID, `archetypeId`, topic, capabilities, parameter contract, expected facts,
-visual invariants, pedagogical rubric, poster, deterministic Playbook builder,
-and local follow-ups. `/templates`, detail playback, and poster export derive
-their public cases from this registry.
+`apps/web/src/pages/Templates/gold-templates/`. The public-safe archetype catalog
+at `contracts/conic-archetypes.json` is the source of truth for
+archetype IDs, capabilities, mathematical fact rules, visual invariants, and
+pedagogical rubrics. `GoldTemplateManifest` resolves that metadata by
+`archetypeId` and attaches the public case copy, parameter contract, poster,
+deterministic Playbook builder, and local follow-ups. `/templates`, detail
+playback, and poster export derive their public cases from this registry.
 
 The builder returns the same `PlaybookScript` consumed by the shared
 `PlaybookPlayer` and Remotion `playbook` composition. Loading or operating a
@@ -30,11 +32,16 @@ Hidden prompts and expectations live in
 loads that path. Frontend source is tested to contain no import or reference to
 `eval/hidden-cases`, and the hidden manifest contains no Playbook or steps.
 
-`archetypeId` links a hidden prompt to its public teaching archetype. It permits
-shared capability names, mathematical fact rules, semantic roles, and pedagogy
-requirements. It does not select a public `caseId`, fetch a public builder, or
-copy a frozen script. `make eval-conic-gold LIVE=1` submits each hidden prompt to
-the real API Pipeline and evaluates the returned Playbook with Benchmark V2.
+`archetypeId` links a hidden prompt to the public-safe catalog entry. Hidden
+variants retain their identity, prompt, parameters, conclusion form, and narrow
+instance evidence aliases keyed by catalog fact ID. The catalog owns each fact
+rule's meaning; the variant keeps the exact values or forms required for that
+instance. The evaluation loader rejects unknown fact IDs, resolves capabilities,
+semantic roles, state fields, and pedagogy from the catalog, then combines them
+with the instance evidence. It does not select a public `caseId`, fetch a public
+builder, or copy a frozen script. `make eval-conic-gold LIVE=1` submits each
+hidden prompt to the real API Pipeline and evaluates the returned Playbook with
+Benchmark V2.
 
 This separation prevents a polished public case from becoming a benchmark
 shortcut: changing the public template cannot make a hidden attempt pass, and a

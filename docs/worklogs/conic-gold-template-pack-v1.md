@@ -57,9 +57,14 @@ limitations as the pack is implemented.
 
 - The public manifest is `apps/web/src/pages/Templates/gold-templates/manifest.ts`;
   six conic manifests feed the existing template catalogue and preview registry.
+- Shared public-safe archetype metadata lives in
+  `contracts/conic-archetypes.json`; both public manifests and
+  hidden evaluation variants resolve the same capability, fact, visual, and
+  pedagogy rules by `archetypeId`.
 - Hidden prompts are isolated in
   `eval/hidden-cases/conic-sections/variants.json`: 12 variants, two per
-  archetype, with no Playbook or step payload.
+  archetype, with only catalog-keyed instance fact evidence and no duplicated
+  shared metadata, Playbook, or step payload.
 - The pure TypeScript kernel is
   `apps/web/src/shared/domain/conicSections.ts`. No snapshot kind, renderer, or
   Playbook schema version was added. Optional `semantic_role` fields and the

@@ -22,6 +22,11 @@ All cases use computed curves, points, segments, annotations, formulas, and
 semantic roles. Parameter changes rebuild the same Playbook contract and local
 follow-ups remain tied to the current step.
 
+The public-safe metadata source of truth is
+`contracts/conic-archetypes.json`. Public case builders and the
+hidden benchmark loader both resolve it by `archetypeId`; hidden prompts and
+frozen public Playbooks remain in their separate runtime surfaces.
+
 ## Deterministic domain kernel
 
 `apps/web/src/shared/domain/conicSections.ts` is dependency-free TypeScript. It

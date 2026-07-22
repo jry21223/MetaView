@@ -73,10 +73,12 @@ make eval-conic-gold LIVE=1 API=http://localhost:8000 \
 
 `eval/hidden-cases/conic-sections/variants.json` contains two variants for each
 of six archetypes. Variants change numbers, axis direction, line form,
-near-tangent conditions, chord families, or pole position. They declare facts,
-semantic roles, state fields, conclusions, and forbidden claims, but contain no
-Playbook. `apps/api/eval/conic_hidden_cases.py` derives prompts and Benchmark V2
-expectations from that one eval-only manifest.
+near-tangent conditions, chord families, or pole position. They retain their
+hidden prompt, parameters, conclusion aliases, forbidden claims, and exact
+instance evidence keyed by catalog fact ID, with no Playbook or duplicated fact
+rule descriptions. `apps/api/eval/conic_hidden_cases.py` validates those IDs and
+resolves shared fact rules, semantic roles, and state fields from the public-safe
+archetype catalog before deriving Benchmark V2 expectations.
 
 The live runner submits those prompts through the normal API Pipeline. It never
 imports a public template builder, and the scorer has no `caseId` answer branch.

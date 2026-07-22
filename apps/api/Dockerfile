@@ -71,6 +71,7 @@ RUN --mount=type=cache,id=metaview-pip,target=/root/.cache/pip,sharing=locked \
         -r requirements-subjects.txt
 
 COPY apps/api ./apps/api
+COPY contracts ./contracts
 RUN mkdir -p ./skills
 RUN mkdir -p ./data
 COPY --from=web_deps /usr/local/bin/node /usr/local/bin/node
