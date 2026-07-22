@@ -85,7 +85,7 @@ function buildEllipseFocus(params: TemplatePreviewParams): PlaybookScript {
   const d1 = Math.hypot(p.x - f1.x, p.y - f1.y);
   const d2 = Math.hypot(p.x - f2.x, p.y - f2.y);
   const base = (stage: number, caption: string, formula: string): MathSceneSnapshot => ({
-    kind: "math_scene", x_min: -a - 1.5, x_max: a + 1.5, y_min: -b - 1.5, y_max: b + 1.5,
+    kind: "math_scene", camera_mode: "fixed", x_min: -a - 1.5, x_max: a + 1.5, y_min: -b - 1.5, y_max: b + 1.5,
     x_label: "x", y_label: "y", curves: ellipseCurve(a, b),
     points: [
       { ...f1, label: "$F_1$", emphasis: "secondary", semantic_role: "focus" },
@@ -123,7 +123,7 @@ function buildParabola(params: TemplatePreviewParams): PlaybookScript {
   const foot = { x: -p, y: point.y };
   const distances = parabolaDefinitionDistances(spec, point);
   const snapshot = (stage: number, caption: string, formula: string): MathSceneSnapshot => ({
-    kind: "math_scene", x_min: -p - 1.5, x_max: p * 5.5, y_min: -p * 5, y_max: p * 5,
+    kind: "math_scene", camera_mode: "fixed", x_min: -p - 1.5, x_max: p * 5.5, y_min: -p * 5, y_max: p * 5,
     x_label: "x", y_label: "y",
     curves: [{ expression_x: `${p}*t^2`, expression_y: `${2 * p}*t`, t_min: -2.4, t_max: 2.4, label: "抛物线", emphasis: "primary", semantic_role: "conic_curve" }],
     points: [
@@ -162,7 +162,7 @@ function buildHyperbola(params: TemplatePreviewParams): PlaybookScript {
   const difference = hyperbolaFocalDistanceDifference(spec, p);
   const span = a * 3.2;
   const snapshot = (stage: number, caption: string, formula: string): MathSceneSnapshot => ({
-    kind: "math_scene", x_min: -span, x_max: span, y_min: -span * 0.75, y_max: span * 0.75, x_label: "x", y_label: "y",
+    kind: "math_scene", camera_mode: "fixed", x_min: -span, x_max: span, y_min: -span * 0.75, y_max: span * 0.75, x_label: "x", y_label: "y",
     curves: [1, -1].map((branch) => ({ expression_x: `${branch * a}*cosh(t)`, expression_y: `${b}*sinh(t)`, t_min: -1.8, t_max: 1.8, label: branch === 1 ? "右支" : "左支", emphasis: "primary", semantic_role: "conic_curve" })),
     points: [
       { ...f1, label: "$F_1$", emphasis: "secondary", semantic_role: "focus" }, { ...f2, label: "$F_2$", emphasis: "secondary", semantic_role: "focus" },
@@ -211,7 +211,7 @@ function buildLineEllipse(params: TemplatePreviewParams): PlaybookScript {
     const displayedResult = intersectLineConic(ellipseImplicit({ a, b }), shown.at(-1)!, 1e-8);
     const displayedStatus = { secant: "相交", tangent: "相切", disjoint: "相离" }[displayedResult.status];
     return {
-      kind: "math_scene", x_min: -7, x_max: 7, y_min: -5, y_max: 5, x_label: "x", y_label: "y", curves: ellipseCurve(a, b),
+      kind: "math_scene", camera_mode: "fixed", x_min: -7, x_max: 7, y_min: -5, y_max: 5, x_label: "x", y_label: "y", curves: ellipseCurve(a, b),
       segments: shown.map((item, index) => lineSegment(item, 7, index === shown.length - 1 ? "moving_line" : "reference_line")),
       points: displayedResult.points.map((point, index) => ({ ...point, label: displayedResult.status === "tangent" ? "T" : index === 0 ? "A" : "B", emphasis: "accent", semantic_role: displayedResult.status === "tangent" ? "tangent_point" : "intersection_point" })),
       annotations: [{ x: -6.3, y: 4.2, text: String.raw`$\Delta=${fixed(displayedResult.discriminant, 3)}\;\cdot\;\text{${displayedStatus}}$`, align: "nw", semantic_role: "discriminant_panel" }],
@@ -250,7 +250,7 @@ function buildChordLocus(params: TemplatePreviewParams): PlaybookScript {
   const locusA = q / 2;
   const locusB = b * q / (2 * a);
   const snapshot = (stage: number, caption: string, formula: string): MathSceneSnapshot => ({
-    kind: "math_scene", x_min: -6, x_max: 6, y_min: -4, y_max: 4, x_label: "x", y_label: "y", curves: [
+    kind: "math_scene", camera_mode: "fixed", x_min: -6, x_max: 6, y_min: -4, y_max: 4, x_label: "x", y_label: "y", curves: [
       ...ellipseCurve(a, b),
       ...(stage >= 4 ? [{ expression_x: `${q / 2}+${locusA}*cos(t)`, expression_y: `${locusB}*sin(t)`, t_min: 0, t_max: 2 * Math.PI, label: "理论轨迹", emphasis: "secondary", semantic_role: "theoretical_locus" }] : []),
     ],

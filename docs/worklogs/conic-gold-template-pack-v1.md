@@ -106,10 +106,14 @@ substituting the public template.
 
 - `make check` passed: API 1020 passed / 3 skipped, Web 1145 passed, Agent 63
   passed, MCP 18 passed, and Web/Agent builds completed.
-- `npm --workspace apps/web run test:visual:conics` passed 24/24 combinations:
-  six public cases at 1440x900 and 390x844 in light and dark themes. The suite
-  checks semantic objects, horizontal overflow, formula/stage/control clipping,
-  mobile parameter-panel behavior, top-bar collapse, and five local follow-ups.
+- `npm --workspace apps/web run test:visual:conics` passed 84/84 combinations:
+  six public cases at all seven DESIGN.md review viewports (1440x900,
+  1366x768, 1920x1080, 1024x768, 720x900, 390x844, and 320x700) in light and
+  dark themes. The suite changes a real parameter, walks every Playbook step,
+  checks critical semantic-object cardinality, horizontal overflow,
+  formula/stage/control clipping, responsive parameter-panel behavior, top-bar
+  collapse, and five local follow-ups. Fixed-camera conic scenes prevent
+  object-introduction auto-zoom from cropping labels during step transitions.
 - `npm --workspace apps/web run template-previews:export` exported all 10 public
   cases; `template-previews:posters` regenerated the six conic posters through
   the shared Remotion composition. Only the durable conic poster change needed
