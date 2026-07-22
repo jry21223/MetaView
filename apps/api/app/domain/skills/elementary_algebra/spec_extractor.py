@@ -38,6 +38,8 @@ def try_extract_elementary_algebra(prompt: str) -> ElementaryAlgebraProblemSpec 
         _, equation = parse_equation(equation_text)
     except Exception:  # noqa: BLE001 - unsupported syntax falls back.
         return None
+    if len(equation.variables) != 1:
+        return None
     variable = equation.variables[0] if equation.variables else "x"
     if equation.relation != "=":
         return ElementaryAlgebraProblemSpec(
