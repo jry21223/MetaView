@@ -4,21 +4,17 @@ import {
   TEMPLATE_PREVIEW_CASE_IDS,
   getTemplatePreviewCase,
 } from "./templatePreviewCases";
+import { PUBLIC_GOLD_TEMPLATES } from "./gold-templates/publicGoldTemplates";
 
 describe("template preview cases", () => {
   it("publishes complete deterministic Playbooks with step-aware follow-ups", () => {
-    expect(TEMPLATE_PREVIEW_CASE_IDS).toEqual([
-      "ellipse-focus-definition",
-      "parabola-focus-directrix",
-      "hyperbola-asymptotes",
-      "line-ellipse-position",
-      "ellipse-chord-midpoint-locus",
+    expect(new Set(TEMPLATE_PREVIEW_CASE_IDS)).toEqual(new Set([
+      ...PUBLIC_GOLD_TEMPLATES.map((item) => item.caseId),
       "binary-search",
       "bfs-tree",
       "derivative-tangent",
-      "pole-polar",
       "projectile",
-    ]);
+    ]));
 
     for (const id of TEMPLATE_PREVIEW_CASE_IDS) {
       const item = getTemplatePreviewCase(id)!;

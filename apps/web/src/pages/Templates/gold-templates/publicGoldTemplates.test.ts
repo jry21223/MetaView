@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { CONIC_ARCHETYPE_CATALOG } from "../../../shared/domain/conicArchetypeCatalog";
@@ -58,6 +58,19 @@ describe("public gold template manifest", () => {
     const followups = manifest!.buildFollowups(manifest!.parameterSchema!.defaults, playbook);
     expect(playbook.steps).toHaveLength(6);
     expect(playbook.steps.every((step) => followups[step.step_id]?.length === 3)).toBe(true);
+  });
+
+  it("keeps the Gold manifest upstream of the legacy preview adapter", () => {
+    const publicRegistrySource = readFileSync(
+      resolve("src/pages/Templates/gold-templates/publicGoldTemplates.ts"),
+      "utf8",
+    );
+    const manifestSource = readFileSync(
+      resolve("src/pages/Templates/gold-templates/manifest.ts"),
+      "utf8",
+    );
+    expect(publicRegistrySource).not.toContain("getTemplatePreviewCase");
+    expect(manifestSource).not.toContain("as TemplatePreviewCaseId");
   });
 
   it("keeps public identifiers and archetypes unique", () => {

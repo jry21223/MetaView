@@ -428,6 +428,34 @@ export function circlePolarLine(
   });
 }
 
+export function circleTangentPoints(
+  center: Point2D,
+  radius: number,
+  pole: Point2D,
+): readonly [Point2D, Point2D] {
+  finitePoint(center, "circle center");
+  finitePoint(pole, "pole");
+  finitePositive(radius, "circle radius");
+  const dx = pole.x - center.x;
+  const dy = pole.y - center.y;
+  const squaredDistance = dx * dx + dy * dy;
+  if (squaredDistance <= radius * radius + CONIC_EPSILON) {
+    throw new RangeError("pole must lie strictly outside the circle");
+  }
+  const baseScale = radius * radius / squaredDistance;
+  const offsetScale = radius * Math.sqrt(squaredDistance - radius * radius)
+    / squaredDistance;
+  const base = {
+    x: center.x + baseScale * dx,
+    y: center.y + baseScale * dy,
+  };
+  const offset = { x: -offsetScale * dy, y: offsetScale * dx };
+  return [
+    { x: base.x + offset.x, y: base.y + offset.y },
+    { x: base.x - offset.x, y: base.y - offset.y },
+  ];
+}
+
 export function lineValue(line: GeneralLine, point: Point2D): number {
   return line.A * point.x + line.B * point.y + line.C;
 }

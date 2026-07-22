@@ -14,7 +14,7 @@ Status: Active
 
 ## 静态运行边界
 
-普通正式案例仍由 `apps/web/src/pages/Templates/templatePreviewCases.ts` 提供；教师级 Gold 案例由 `apps/web/src/pages/Templates/gold-templates/` 中统一的 `GoldTemplateManifest` 注册，再派生为同一 `TemplatePreviewCase`。Manifest 同时记录 `archetypeId`、数学事实、视觉不变量和教学 rubric。每项包含默认参数、参数控件、确定性 `PlaybookScript` 构建器、`DirectorScript` 和按步骤组织的固定问答。
+普通正式案例仍由 `apps/web/src/pages/Templates/templatePreviewCases.ts` 提供；教师级 Gold 案例由 `apps/web/src/pages/Templates/gold-templates/` 中统一的 `GoldTemplateManifest` 注册，再派生为同一 `TemplatePreviewCase`。Manifest 同时记录 `archetypeId`、数学事实、视觉不变量和教学 rubric。每项包含默认参数、参数控件、确定性 `PlaybookScript` 构建器和按步骤组织的固定问答；它不建立第二套 Director 或播放器契约。
 
 以下行为全部在浏览器本地完成：
 

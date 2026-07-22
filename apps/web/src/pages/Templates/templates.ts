@@ -89,7 +89,7 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
   },
   ...PUBLIC_GOLD_TEMPLATES.map((item) => ({
     id: item.caseId,
-    previewCaseId: item.caseId as TemplatePreviewCaseId,
+    previewCaseId: item.caseId,
     domain: "math" as const,
     title: item.title,
     desc: item.description,

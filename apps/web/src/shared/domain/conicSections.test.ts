@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   chordFromIntersection,
   circlePolarLine,
+  circleTangentPoints,
   distance,
   ellipseEccentricity,
   ellipseFocalDistanceSum,
@@ -109,6 +110,17 @@ describe("conic section deterministic kernel", () => {
   it("computes a circle polar and rejects a pole on or inside the circle", () => {
     const line = circlePolarLine({ x: 0, y: 0 }, 5, { x: 5, y: 5 });
     expect(lineValue(line, { x: 2.5, y: 2.5 })).toBeCloseTo(0, 12);
+    const tangentPoints = circleTangentPoints({ x: 0, y: 0 }, 5, { x: 5, y: 5 });
+    for (const tangentPoint of tangentPoints) {
+      expect(distance(tangentPoint, { x: 0, y: 0 })).toBeCloseTo(5, 12);
+      const radius = tangentPoint;
+      const tangent = { x: 5 - tangentPoint.x, y: 5 - tangentPoint.y };
+      expect(radius.x * tangent.x + radius.y * tangent.y).toBeCloseTo(0, 12);
+      expect(lineValue(line, tangentPoint)).toBeCloseTo(0, 12);
+    }
     expect(() => circlePolarLine({ x: 0, y: 0 }, 5, { x: 3, y: 4 })).toThrow("strictly outside");
+    expect(() => circleTangentPoints({ x: 0, y: 0 }, 5, { x: 3, y: 4 })).toThrow(
+      "strictly outside",
+    );
   });
 });

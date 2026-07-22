@@ -8,7 +8,6 @@ import {
 } from "../../../shared/domain/conicArchetypeCatalog";
 import type {
   TemplatePreviewCase,
-  TemplatePreviewCaseId,
   TemplatePreviewControl,
   TemplatePreviewFollowups,
   TemplatePreviewParams,
@@ -88,8 +87,8 @@ export function manifestToPreviewCase(
     throw new Error(`Hidden evaluation case ${manifest.caseId} cannot become a public preview`);
   }
   return {
-    id: manifest.caseId as TemplatePreviewCaseId,
-    templateId: manifest.caseId as TemplatePreviewCaseId,
+    id: manifest.caseId,
+    templateId: manifest.caseId,
     posterUrl: manifest.poster.url,
     posterAlt: manifest.poster.alt,
     posterFrame: manifest.poster.frame,
