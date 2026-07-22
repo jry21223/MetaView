@@ -35,6 +35,7 @@ def build_default_skill_registry() -> SkillRegistry:
     from app.domain.skills.biology_genetics.skill_pack import BiologyGeneticsSkillPack
     from app.domain.skills.calculus_core.skill_pack import CalculusCoreSkillPack
     from app.domain.skills.chemistry_stoichiometry.skill_pack import ChemistryStoichiometrySkillPack
+    from app.domain.skills.conic_sections.skill_pack import ConicSectionsSkillPack
     from app.domain.skills.elementary_algebra.skill_pack import ElementaryAlgebraSkillPack
     from app.domain.skills.geography_climate.skill_pack import GeographyClimateSkillPack
     from app.domain.skills.geography_earth.skill_pack import GeographyEarthSkillPack
@@ -53,6 +54,7 @@ def build_default_skill_registry() -> SkillRegistry:
             ElementaryAlgebraSkillPack(),
             LinearAlgebraSkillPack(),
             CalculusCoreSkillPack(),
+            ConicSectionsSkillPack(),
             PhysicsMechanicsSkillPack(),
             ChemistryStoichiometrySkillPack(),
             AlgorithmGraphCoreSkillPack(),

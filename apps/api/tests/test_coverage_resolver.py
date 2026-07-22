@@ -285,7 +285,7 @@ def test_unregistered_route_domain_does_not_resolve_an_unknown_prompt() -> None:
 def test_default_registry_does_not_register_a_generalist_composer() -> None:
     skill_ids = {skill.manifest.skill_id for skill in build_default_skill_registry().all()}
 
-    assert len(skill_ids) == 12
+    assert len(skill_ids) == 13
     assert not any("generalist" in skill_id or "composer" in skill_id for skill_id in skill_ids)
 
 

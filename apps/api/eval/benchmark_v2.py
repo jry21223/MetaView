@@ -51,7 +51,7 @@ HardFailCondition = Literal[
     "code_sync_state_mismatch",
 ]
 
-_MANDATORY_HARD_FAILS: set[str] = {
+MANDATORY_HARD_FAILS: set[str] = {
     "schema_invalid",
     "unexpected_domain",
     "missing_required_snapshot_kind",
@@ -160,7 +160,7 @@ class GoldCaseExpectation(BaseModel):
         fact_ids = [fact.id for fact in [*self.required_text_facts, *self.forbidden_text_facts]]
         if len(fact_ids) != len(set(fact_ids)):
             raise ValueError("text fact ids must be unique within a case")
-        missing_conditions = _MANDATORY_HARD_FAILS - set(self.hard_fail_conditions)
+        missing_conditions = MANDATORY_HARD_FAILS - set(self.hard_fail_conditions)
         if missing_conditions:
             raise ValueError(
                 f"hard_fail_conditions must declare mandatory gates: {sorted(missing_conditions)}"
