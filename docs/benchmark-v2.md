@@ -2,8 +2,8 @@
 
 Status: Eval
 
-Benchmark V2 is the strict product-quality gate for the four initial Gold
-Cases. The legacy scorer remains available as `legacy_structural_score` so a
+Benchmark V2 is the strict product-quality gate for the four initial Gold Cases
+and eval-only subject packs such as conic sections. The legacy scorer remains available as `legacy_structural_score` so a
 schema-valid but educationally weak result is visible rather than silently
 reclassified as good.
 
@@ -60,7 +60,31 @@ make eval-gold
 
 # Four cases x three independent real pipeline runs.
 make eval-gold LIVE=1 API=http://localhost:8000 REPEAT=3
+
+# Twelve eval-only conic variants derived from one hidden manifest.
+make eval-conic-gold LIVE=1 API=http://localhost:8000 REPEAT=1
+
+# One hidden case while developing a verified capability.
+make eval-conic-gold LIVE=1 API=http://localhost:8000 \
+  ID=conic-hidden-ellipse-focus-01 REPEAT=1
 ```
+
+## Hidden conic variants
+
+`eval/hidden-cases/conic-sections/variants.json` contains two variants for each
+of six archetypes. Variants change numbers, axis direction, line form,
+near-tangent conditions, chord families, or pole position. They declare facts,
+semantic roles, state fields, conclusions, and forbidden claims, but contain no
+Playbook. `apps/api/eval/conic_hidden_cases.py` derives prompts and Benchmark V2
+expectations from that one eval-only manifest.
+
+The live runner submits those prompts through the normal API Pipeline. It never
+imports a public template builder, and the scorer has no `caseId` answer branch.
+Mathematical kernels and focused tests verify geometry independently; the gate
+then checks schema, stated facts, pedagogical structure, required semantic
+objects, narration/visual agreement, timing, export readiness, and zero warning
+budget. Failed attempts remain in the timestamped local report. Thresholds and
+mandatory hard-fails are shared with existing Benchmark V2 cases.
 
 Reports are written under ignored `eval/reports/`. A missing live
 QualityReport/warning count is itself an invalid live result; the harness does

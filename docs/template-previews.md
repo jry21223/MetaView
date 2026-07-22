@@ -14,7 +14,7 @@ Status: Active
 
 ## 静态运行边界
 
-正式案例由 `apps/web/src/pages/Templates/templatePreviewCases.ts` 中类型化的 `TemplatePreviewCase` 注册表提供。每项包含默认参数、参数控件、确定性 `PlaybookScript` 构建器、`DirectorScript` 和按步骤组织的固定问答。
+普通正式案例仍由 `apps/web/src/pages/Templates/templatePreviewCases.ts` 提供；教师级 Gold 案例由 `apps/web/src/pages/Templates/gold-templates/` 中统一的 `GoldTemplateManifest` 注册，再派生为同一 `TemplatePreviewCase`。Manifest 同时记录 `archetypeId`、数学事实、视觉不变量和教学 rubric。每项包含默认参数、参数控件、确定性 `PlaybookScript` 构建器、`DirectorScript` 和按步骤组织的固定问答。
 
 以下行为全部在浏览器本地完成：
 
@@ -34,10 +34,17 @@ Status: Active
 | `binary-search` | low/mid/high 收缩、命中或未命中、代码同步、`O(log n)` | 目标值 |
 | `bfs-tree` | 当前节点、队列、访问集合、活动边和代码行 | 起始节点 |
 | `derivative-tangent` | 割线逼近、切点、切线和 `f'(a)=2a` | 切点 `a` |
+| `ellipse-focus-definition` | 两焦点、动点与焦点距离和 | `a`、`b`、动点参数 |
+| `parabola-focus-directrix` | 焦点、准线、垂足与等距性质 | `p`、动点参数 |
+| `hyperbola-asymptotes` | 两支、渐近线、焦点距离差 | `a`、`b`、动点参数 |
+| `line-ellipse-position` | 相交、相切、相离、竖直直线与判别式 | 直线类型及参数 |
+| `ellipse-chord-midpoint-locus` | 动弦、中点尾迹、理论轨迹与韦达关系 | 定点、斜率 |
 | `pole-polar` | 圆外点、两条切线、接触弦与极线方程 | 外点坐标 `k` |
 | `projectile` | 速度分解、最高点、落点、时间、高度和射程 | 初速度、角度 |
 
 每个默认案例至少有五个实际状态不同的步骤，每一步固定提供 3 个与当前步骤相关的问题。案例数据必须继续符合 `PlaybookScript`；不要为公开模板引入第二套播放器或渲染协议。
+
+Gold 的公开冻结 Playbook 只用于展示和视觉基线，不能作为真实生成 Benchmark 的输入。隐藏变体及隔离规则见 [gold-template-system.md](./gold-template-system.md)。
 
 ## 封面维护
 

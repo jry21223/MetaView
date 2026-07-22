@@ -36,7 +36,7 @@ MetaView 是一个面向教育场景的 AI 可视化讲解系统。输入一道�
 
 当前节点、队列、访问集合、活动边和代码行保持同步，让“先进先出”从一句定义变成可以逐步检查的执行过程。
 
-当前正式模板还包括二分查找和平抛运动；README 暂不使用仍在迁移或视觉质量不足的旧素材。仓库中的其他 fixture 主要用于渲染回归与视觉验收，不等同于已经发布给学习者的成品案例。
+当前正式模板还包括二分查找、平抛运动和六个高中圆锥曲线 Gold Template。Gold Case 同时是 `/templates` 中经过人工校验的公开教师案例；对应的 Hidden Benchmark Variant 只保存 eval-only 题目与事实要求，必须经过真实 Pipeline 生成，不能读取公开冻结 Playbook 获得通过。仓库中的其他 fixture 主要用于渲染回归与视觉验收，不等同于已经发布给学习者的成品案例。
 
 ## 它不只生成一段视频
 
@@ -232,7 +232,7 @@ candidate PlaybookScript
 
 质量检查覆盖时间线、旁白与 payload、renderer contract、缺失资产、学科错误降级、最低语义状态、Code Sync 一致性、LessonPlan 事实与最终结论。Follow-up 修改、版本恢复和导出也会重新检查当前 Playbook。
 
-Benchmark V2 的四个 Gold Case 是导数与切线、BFS、递归阶乘和平抛运动。总分达到 90 仍不够：任一 hard-fail 都会让该次尝试失败。Checked-in fixtures 只用于回归和迁移验证；发布验收应来自真实生成的独立重复运行与本地 `eval/reports/` 证据。
+Benchmark V2 的基础 Gold Case 包括导数与切线、BFS、递归阶乘和平抛运动；圆锥曲线包另有 12 个 eval-only Hidden Variant。总分达到 90 仍不够：任一 hard-fail 都会让该次尝试失败。公开 Gold Template 的冻结 Playbook 只用于展示，不进入隐藏评测。Checked-in fixtures 只用于回归和迁移验证；发布验收应来自真实生成的独立重复运行与本地 `eval/reports/` 证据。
 
 | 命令 | 内容 |
 |---|---|
@@ -243,6 +243,7 @@ Benchmark V2 的四个 Gold Case 是导数与切线、BFS、递归阶乘和平�
 | `make test-coverage` | 覆盖率检查 |
 | `make visual-check` | 资产审计、静态渲染 smoke、基线漂移与 review packet |
 | `make eval-gold` | Benchmark V2 四个 Gold Case |
+| `make eval-conic-gold LIVE=1` | 通过真实 Pipeline 运行圆锥曲线隐藏变体 |
 
 生成的 `eval/reports/`、`eval/videos/` 和 `eval/shots/` 是本地证据，不应提交。
 
@@ -298,6 +299,8 @@ Benchmark V2 的四个 Gold Case 是导数与切线、BFS、递归阶乘和平�
 - [`docs/coverage-and-fallback.md`](./docs/coverage-and-fallback.md) — 能力判定与回退边界
 - [`docs/quality-gate.md`](./docs/quality-gate.md) — canonical QualityReport
 - [`docs/benchmark-v2.md`](./docs/benchmark-v2.md) — Gold Case 评分与 hard-fail
+- [`docs/gold-template-system.md`](./docs/gold-template-system.md) — Public Gold 与 Hidden Benchmark 隔离
+- [`docs/conic-sections-capability.md`](./docs/conic-sections-capability.md) — 圆锥曲线能力包与边界
 - [`docs/template-previews.md`](./docs/template-previews.md) — 静态正式案例与封面维护
 - [`docs/assets.md`](./docs/assets.md) — 资产包、showcase、审计与归因
 - [`docs/frontend-shell.md`](./docs/frontend-shell.md) — 路由、工作台与 edition shell

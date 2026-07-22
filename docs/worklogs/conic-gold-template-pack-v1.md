@@ -45,8 +45,43 @@ strict rejection boundary.
 6. Stable semantic roles are a small compatible enhancement to `math_scene`
    objects, not a schema replacement. They allow renderer and benchmark checks
    without case-ID special handling.
-7. Playbook schema version and player protocol remain unchanged. Preview and
-   export continue to use `PlaybookPlayer` / `PlaybookComposition`.
+7. Playbook schema version and player protocol remain unchanged. The existing
+   `math_scene` snapshot gains only an optional `camera_mode: "fixed"` hint so
+   a declared full-scene ViewBox can opt out of object-introduction auto-zoom.
+   Preview and export continue to use `PlaybookPlayer` / `PlaybookComposition`.
 
 This record will be extended with final paths, validation evidence, and known
 limitations as the pack is implemented.
+
+## Implemented result
+
+- The public manifest is `apps/web/src/pages/Templates/gold-templates/manifest.ts`;
+  six conic manifests feed the existing template catalogue and preview registry.
+- Hidden prompts are isolated in
+  `eval/hidden-cases/conic-sections/variants.json`: 12 variants, two per
+  archetype, with no Playbook or step payload.
+- The pure TypeScript kernel is
+  `apps/web/src/shared/domain/conicSections.ts`. No snapshot kind, renderer, or
+  Playbook schema version was added. Optional `semantic_role` fields and the
+  optional fixed-camera hint were added compatibly to existing `math_scene`.
+- The API `conic_sections` SkillPack exposes only the verified horizontal
+  ellipse focus-definition route as specialized. Other conic requests keep
+  their real composable/generic/experimental coverage result.
+
+## Live benchmark evidence
+
+On 2026-07-22 the 12-case hidden manifest was submitted once to a local API
+configured with `METAVIEW_GENERATION_MODE=agent` and heuristic routing. The
+initial run preserved 0/12 passes in the ignored report
+`eval/reports/20260722_120006.json`: the supported ellipse output scored 100 but
+failed the zero-warning hard gate because all six voice-over durations were too
+short; the remaining cases retained their canonical-gate or coverage failures.
+
+The deterministic adapter duration was corrected without changing a threshold
+or expectation. Re-running `conic-hidden-ellipse-focus-01` through the same
+AgentPipeline/API boundary produced 100/100, zero warnings, and 1/1 pass in
+`eval/reports/20260722_120058.json`. This proves one supported archetype reaches
+the live Gold boundary; it does not claim that the other five archetypes have
+specialized generation quality. The local API had no model key, so non-covered
+cases used existing mock/fallback behavior; the passing ellipse case used the
+new deterministic SkillPack rather than a public frozen Playbook.
