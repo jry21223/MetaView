@@ -99,7 +99,17 @@
       "caseId": "conic-hidden-line-ellipse-02",
       "archetypeId": "conic.line-ellipse.position",
       "prompt": "对椭圆 x²/36+y²/16=1 和直线 y=kx+q，选择一组接近相切的参数，解释判别式、数值容差和两个交点合并的过程。",
-      "parameters": {"a": 6, "b": 4, "nearTangent": true},
+      "parameters": {
+        "a": 6,
+        "b": 4,
+        "majorAxis": "x",
+        "nearTangent": true,
+        "lineFamily": {
+          "kind": "slope",
+          "slope": 0,
+          "intercepts": [3.99999, 4, 4.00001]
+        }
+      },
       "factEvidence": {
         "line-ellipse-discriminant": ["判别式", "Δ"],
         "line-ellipse-tangent-tolerance": ["容差", "数值误差", "近相切"],
@@ -151,7 +161,11 @@
       "caseId": "conic-hidden-pole-polar-02",
       "archetypeId": "conic.pole-polar.circle",
       "prompt": "固定圆 x²+y²=9，让外点 P=(k,2) 在合法区域移动。展示两切点、接触弦与极线，并在 P 落到圆上或圆内时 fail closed。",
-      "parameters": {"radius": 3, "poleFamily": ["k", 2]},
+      "parameters": {
+        "radius": 3,
+        "poleFamily": ["k", 2],
+        "familySamples": [2, 2.2360679775, 2.5]
+      },
       "factEvidence": {
         "polar-equation": ["kx+2y=9", "kx + 2y = 9"],
         "pole-outside-circle": ["圆外", "合法区域"],

@@ -160,6 +160,52 @@ def test_hidden_manifest_derives_prompts_and_gold_expectations_without_playbooks
         assert set(variant.fact_evidence) <= {fact.id for fact in archetype.expected_facts}
 
 
+def test_hidden_expectations_embed_archetype_math_rules_without_case_id_dispatch() -> None:
+    manifest = load_hidden_conic_manifest()
+    suite = manifest.benchmark_suite()
+
+    for variant in manifest.variants:
+        deterministic = suite.by_id(variant.case_id).deterministic_validation
+        assert deterministic is not None
+        assert deterministic.validator == variant.archetype_id
+        assert deterministic.parameters == variant.parameters
+        assert "invalid_deterministic_math" in suite.by_id(variant.case_id).hard_fail_conditions
+
+
+def test_correct_ellipse_narration_with_wrong_focus_coordinates_hard_fails() -> None:
+    expectation, payload = _ellipse_skill_output()
+    for step in payload["steps"]:
+        snapshot = step["snapshot"]
+        for point in snapshot["points"]:
+            if point.get("semantic_role") == "focus":
+                point["x"] += 0.75
+
+    card = score_benchmark_v2(
+        expectation,
+        json.dumps(payload, ensure_ascii=False),
+        external_warning_count=0,
+    )
+
+    assert "invalid_deterministic_math" in {issue.code for issue in card.hard_failures}
+    assert any("focus" in issue.message.lower() for issue in card.hard_failures)
+
+
+def test_correct_ellipse_narration_with_wrong_curve_equation_hard_fails() -> None:
+    expectation, payload = _ellipse_skill_output()
+    for step in payload["steps"]:
+        curve = step["snapshot"]["curves"][0]
+        curve["expression_x"] = "5*cos(t)"
+
+    card = score_benchmark_v2(
+        expectation,
+        json.dumps(payload, ensure_ascii=False),
+        external_warning_count=0,
+    )
+
+    assert "invalid_deterministic_math" in {issue.code for issue in card.hard_failures}
+    assert any("curve" in issue.message.lower() for issue in card.hard_failures)
+
+
 def test_supported_hidden_variant_passes_gold_v2_from_skill_output() -> None:
     manifest = load_hidden_conic_manifest()
     variant = manifest.variants[0]
@@ -183,3 +229,24 @@ def test_supported_hidden_variant_passes_gold_v2_from_skill_output() -> None:
         external_warning_count=0,
     )
     assert card.passed, card.to_dict()
+
+
+def _ellipse_skill_output() -> tuple[object, dict[str, object]]:
+    manifest = load_hidden_conic_manifest()
+    variant = manifest.variants[0]
+    skill = ConicSectionsSkillPack()
+    match = skill.heuristic_match(SkillRouteInput(prompt=variant.prompt))
+    assert match is not None and match.problem_spec is not None
+    result = asyncio.run(
+        skill.execute(
+            SkillExecutionContext(
+                run_id="hidden-conic-negative",
+                prompt=variant.prompt,
+                route_match=match,
+            ),
+            skill.validate_problem_spec(match.problem_spec),
+        )
+    )
+    assert result.playbook_json is not None
+    expectation = manifest.benchmark_suite().by_id(variant.case_id)
+    return expectation, json.loads(result.playbook_json)

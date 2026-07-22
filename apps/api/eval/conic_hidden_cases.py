@@ -11,9 +11,11 @@ from eval.benchmark_v2 import (
     BenchmarkV2Suite,
     CodeSyncExpectation,
     ConclusionExpectation,
+    DeterministicValidationExpectation,
     GoldCaseExpectation,
     TextFactExpectation,
 )
+from eval.conic_math_validation import validate_conic_parameters
 
 DEFAULT_CONIC_HIDDEN_MANIFEST = (
     Path(__file__).parents[3] / "eval" / "hidden-cases" / "conic-sections" / "variants.json"
@@ -148,6 +150,7 @@ class HiddenConicManifest(BaseModel):
                 raise ValueError(
                     f"unknown conic fact IDs for {variant.case_id}: {sorted(unknown_fact_ids)}"
                 )
+            validate_conic_parameters(variant.archetype_id, variant.parameters)
         self._catalog = catalog
         return self
 
@@ -233,6 +236,10 @@ def _expectation(
             none_of=variant.forbidden_aliases,
         ),
         code_sync=CodeSyncExpectation(required=False),
+        deterministic_validation=DeterministicValidationExpectation(
+            validator=variant.archetype_id,
+            parameters=variant.parameters,
+        ),
         maximum_warning_count=0,
-        hard_fail_conditions=sorted(MANDATORY_HARD_FAILS),
+        hard_fail_conditions=sorted({*MANDATORY_HARD_FAILS, "invalid_deterministic_math"}),
     )
