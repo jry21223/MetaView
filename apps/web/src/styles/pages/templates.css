@@ -227,8 +227,14 @@
   transition: color var(--mv-template-motion-fast) ease;
 }
 
+.mv-template-entry__line-preview svg * {
+  vector-effect: non-scaling-stroke;
+}
+
 .mv-template-entry__line-preview .is-guide { stroke: var(--line); }
 .mv-template-entry__line-preview .is-accent { stroke: var(--accent); }
+.mv-template-entry__line-preview .is-dashed { stroke-dasharray: 4 3.5; }
+.mv-template-entry__line-preview .is-dotted { stroke-dasharray: 1 3; }
 
 .mv-template-entry:hover .mv-template-entry__line-preview,
 .mv-template-entry.is-selected .mv-template-entry__line-preview {

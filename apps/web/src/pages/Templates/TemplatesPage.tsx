@@ -67,9 +67,9 @@ export function TemplatesPage({ onOpenTemplate }: TemplatesPageProps = {}) {
     <main className="mv-templates-body">
       <header className="mv-templates-head">
         <div className="mv-templates-head__copy">
-          <div className="mv-eyebrow-mini">LESSON ATLAS / 讲解图谱</div>
-          <h1 className="mv-templates-title">模板本身，就是可以播放的案例</h1>
-          <p className="mv-templates-sub">先展开查看真实画面，再进入完整 Playbook；整个过程不生成新任务。</p>
+          <div className="mv-eyebrow-mini">从一个好问题开始</div>
+          <h1 className="mv-templates-title">挑一个感兴趣的知识点，从这里慢慢看懂它</h1>
+          <p className="mv-templates-sub">这些案例已经准备好了。先看一眼，再跟着完整讲解一步步走下去。</p>
         </div>
         <div className="mv-templates-index-mark" aria-label={`${filtered.length} 个模板`}>
           <strong>{String(filtered.length).padStart(2, "0")}</strong>

@@ -28,6 +28,14 @@ describe("TemplatesPage lesson atlas", () => {
     vi.restoreAllMocks();
   });
 
+  it("introduces the examples as ready-to-play teaching explanations", () => {
+    const view = renderPage();
+
+    expect(view.getByText("从一个好问题开始")).toBeTruthy();
+    expect(view.getByRole("heading", { name: "挑一个感兴趣的知识点，从这里慢慢看懂它" })).toBeTruthy();
+    expect(view.getByText("这些案例已经准备好了。先看一眼，再跟着完整讲解一步步走下去。")).toBeTruthy();
+  });
+
   it("expands a real poster on the first click and enters the player on the second", () => {
     const view = renderPage();
     const firstState = view.getByRole("button", { name: "二分查找，展开预览" });
