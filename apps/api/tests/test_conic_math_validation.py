@@ -27,6 +27,22 @@ def _scene(**items: object) -> dict[str, object]:
     }
 
 
+def test_ellipse_requires_both_distinct_expected_foci() -> None:
+    params = {"a": 5, "b": 3, "majorAxis": "x"}
+    scene = _scene(
+        curves=[_curve("5*cos(t)", "3*sin(t)")],
+        points=[
+            {"x": -4, "y": 0, "semantic_role": "focus"},
+            {"x": 4, "y": 0, "semantic_role": "focus"},
+        ],
+    )
+    assert validate_conic_playbook("conic.ellipse.focus-definition", params, [scene]) == []
+
+    scene["points"] = scene["points"][:1]  # type: ignore[index]
+    issues = validate_conic_playbook("conic.ellipse.focus-definition", params, [scene])
+    assert any("two distinct expected foci" in issue.message for issue in issues)
+
+
 def test_parabola_geometry_checks_focus_directrix_and_equal_distances() -> None:
     params = {"p": 2, "axis": "right"}
     scene = _scene(
@@ -43,6 +59,10 @@ def test_parabola_geometry_checks_focus_directrix_and_equal_distances() -> None:
     scene["points"][2]["x"] = -1  # type: ignore[index]
     issues = validate_conic_playbook("conic.parabola.focus-directrix", params, [scene])
     assert any("projection foot" in issue.message for issue in issues)
+
+    scene["points"][0]["x"] = 3  # type: ignore[index]
+    issues = validate_conic_playbook("conic.parabola.focus-directrix", params, [scene])
+    assert any("focus does not match" in issue.message for issue in issues)
 
 
 def test_hyperbola_geometry_checks_equation_foci_asymptotes_and_distance_difference() -> None:
@@ -64,6 +84,10 @@ def test_hyperbola_geometry_checks_equation_foci_asymptotes_and_distance_differe
     scene["segments"][0]["y1"] = 3  # type: ignore[index]
     issues = validate_conic_playbook("conic.hyperbola.asymptotes", params, [scene])
     assert any("asymptote slopes" in issue.message for issue in issues)
+
+    scene["segments"] = scene["segments"][:1]  # type: ignore[index]
+    issues = validate_conic_playbook("conic.hyperbola.asymptotes", params, [scene])
+    assert any("two expected asymptotes" in issue.message for issue in issues)
 
 
 def test_vertical_line_family_checks_secant_tangent_disjoint_and_discriminant() -> None:
@@ -101,7 +125,10 @@ def test_chord_midpoint_checks_endpoint_average_locus_and_range() -> None:
             {"x": -5, "y": 0, "semantic_role": "intersection_point"},
             {"x": 5, "y": 0, "semantic_role": "intersection_point"},
             {"x": 0, "y": 0, "semantic_role": "chord_midpoint"},
-        ]
+            {"x": 0, "y": 0, "semantic_role": "locus_trail"},
+            {"x": 0, "y": 0, "semantic_role": "theoretical_locus"},
+        ],
+        segments=[{"x0": -5, "y0": 0, "x1": 5, "y1": 0, "semantic_role": "chord"}],
     )
     assert validate_conic_playbook("conic.ellipse.chord-midpoint-locus", params, [scene]) == []
 
@@ -151,6 +178,13 @@ def test_pole_polar_checks_tangent_points_perpendicularity_and_line_equation() -
         "conic.pole-polar.circle", {"radius": 4, "pole": pole}, [scene]
     )
     assert any("polar line" in issue.message for issue in issues)
+
+    scene["points"] = scene["points"][:-1]  # type: ignore[index]
+    scene["segments"] = scene["segments"][:1] + scene["segments"][-1:]  # type: ignore[index]
+    issues = validate_conic_playbook(
+        "conic.pole-polar.circle", {"radius": 4, "pole": pole}, [scene]
+    )
+    assert any("two distinct tangent points" in issue.message for issue in issues)
 
 
 @pytest.mark.parametrize(

@@ -190,6 +190,27 @@ def test_correct_ellipse_narration_with_wrong_focus_coordinates_hard_fails() -> 
     assert any("focus" in issue.message.lower() for issue in card.hard_failures)
 
 
+def test_correct_ellipse_narration_with_only_one_focus_hard_fails() -> None:
+    expectation, payload = _ellipse_skill_output()
+    for step in payload["steps"]:
+        snapshot = step["snapshot"]
+        focuses = [
+            point for point in snapshot["points"] if point.get("semantic_role") == "focus"
+        ]
+        if len(focuses) >= 2:
+            snapshot["points"].remove(focuses[1])
+
+    card = score_benchmark_v2(
+        expectation,
+        json.dumps(payload, ensure_ascii=False),
+        external_warning_count=0,
+    )
+
+    assert not card.passed
+    assert "invalid_deterministic_math" in {issue.code for issue in card.hard_failures}
+    assert any("two distinct expected foci" in issue.message for issue in card.hard_failures)
+
+
 def test_correct_ellipse_narration_with_wrong_curve_equation_hard_fails() -> None:
     expectation, payload = _ellipse_skill_output()
     for step in payload["steps"]:

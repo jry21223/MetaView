@@ -420,7 +420,7 @@ def score_benchmark_v2(
         deterministic_issues = validate_conic_playbook(
             expectation.deterministic_validation.validator,
             expectation.deterministic_validation.parameters,
-            snapshots,
+            primary_snapshots,
             tolerance=expectation.deterministic_validation.tolerance,
         )
         for issue in deterministic_issues:

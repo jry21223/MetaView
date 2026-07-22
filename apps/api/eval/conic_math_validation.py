@@ -213,6 +213,15 @@ def _validate_ellipse(
             )
 
     focuses = _objects(scenes, "points", "focus")
+    actual_focuses = {_rounded_point(_xy(point), tolerance) for point in focuses}
+    required_focuses = {_rounded_point(point, tolerance) for point in expected_foci}
+    if not required_focuses <= actual_focuses:
+        diagnostics.append(
+            ConicMathDiagnostic(
+                "$.steps[*].snapshot.points",
+                "ellipse requires two distinct expected foci",
+            )
+        )
     for index, point in enumerate(focuses):
         actual = (float(point["x"]), float(point["y"]))
         if min(math.dist(actual, expected) for expected in expected_foci) > tolerance:
@@ -273,7 +282,14 @@ def _validate_parabola(
         tolerance,
         "parabola",
     )
-    for point in _objects(scenes, "points", "focus"):
+    focuses = _objects(scenes, "points", "focus")
+    if not any(math.dist(_xy(point), expected_focus) <= tolerance for point in focuses):
+        diagnostics.append(
+            ConicMathDiagnostic(
+                "$.steps[*].snapshot.points", "expected parabola focus is absent"
+            )
+        )
+    for point in focuses:
         if math.dist(_xy(point), expected_focus) > tolerance:
             diagnostics.append(
                 ConicMathDiagnostic(
@@ -291,6 +307,10 @@ def _validate_parabola(
                 )
             )
     directrices = _objects(scenes, "segments", "directrix")
+    if not directrices:
+        diagnostics.append(
+            ConicMathDiagnostic("$.steps[*].snapshot.segments", "parabola directrix is absent")
+        )
     for segment in directrices:
         if axis == "right":
             valid = (
@@ -349,7 +369,17 @@ def _validate_hyperbola(
         else (lambda x, y: y * y / (a * a) - x * x / (b * b) - 1)
     )
     diagnostics = _validate_curves(scenes, residual, tolerance, "hyperbola")
-    for point in _objects(scenes, "points", "focus"):
+    focuses = _objects(scenes, "points", "focus")
+    actual_focuses = {_rounded_point(_xy(point), tolerance) for point in focuses}
+    required_focuses = {_rounded_point(point, tolerance) for point in expected_foci}
+    if not required_focuses <= actual_focuses:
+        diagnostics.append(
+            ConicMathDiagnostic(
+                "$.steps[*].snapshot.points",
+                "hyperbola requires two distinct expected foci",
+            )
+        )
+    for point in focuses:
         actual = _xy(point)
         if min(math.dist(actual, expected) for expected in expected_foci) > tolerance:
             diagnostics.append(
@@ -394,11 +424,11 @@ def _validate_hyperbola(
             )
         else:
             actual_slopes.add(round(dy / dx, 8))
-    if actual_slopes and not expected_slopes <= actual_slopes:
+    if not expected_slopes <= actual_slopes:
         diagnostics.append(
             ConicMathDiagnostic(
                 "$.steps[*].snapshot.segments",
-                "asymptote slopes do not match the hyperbola parameters",
+                "asymptote slopes do not include the two expected asymptotes",
             )
         )
     return _unique(diagnostics)
@@ -486,9 +516,27 @@ def _validate_chord_locus(
     a = float(parameters["a"])
     b = float(parameters["b"])
     diagnostics: list[ConicMathDiagnostic] = []
+    max_distinct_endpoints = 0
+    has_midpoint = False
+    has_chord = False
+    has_locus_trail = False
+    has_theoretical_locus = False
     for scene in scenes:
         endpoints = _role_items(scene, "points", "intersection_point")
         midpoints = _role_items(scene, "points", "chord_midpoint")
+        max_distinct_endpoints = max(
+            max_distinct_endpoints,
+            len({_rounded_point(_xy(point), tolerance) for point in endpoints}),
+        )
+        has_midpoint = has_midpoint or bool(midpoints)
+        has_chord = has_chord or bool(_role_items(scene, "segments", "chord"))
+        has_locus_trail = has_locus_trail or bool(
+            _role_items(scene, "points", "locus_trail")
+        )
+        has_theoretical_locus = has_theoretical_locus or bool(
+            _role_items(scene, "points", "theoretical_locus")
+            or _role_items(scene, "curves", "theoretical_locus")
+        )
         if len(endpoints) >= 2 and midpoints:
             p1, p2, midpoint = _xy(endpoints[0]), _xy(endpoints[1]), _xy(midpoints[0])
             if math.dist(p1, p2) <= tolerance:
@@ -557,6 +605,30 @@ def _validate_chord_locus(
                         "theoretical locus curve violates the derived midpoint equation",
                     )
                 )
+    if max_distinct_endpoints < 2:
+        diagnostics.append(
+            ConicMathDiagnostic(
+                "$.steps[*].snapshot.points", "chord requires two distinct intersection endpoints"
+            )
+        )
+    if not has_midpoint:
+        diagnostics.append(
+            ConicMathDiagnostic("$.steps[*].snapshot.points", "chord midpoint is absent")
+        )
+    if not has_chord:
+        diagnostics.append(
+            ConicMathDiagnostic("$.steps[*].snapshot.segments", "chord segment is absent")
+        )
+    if not has_locus_trail:
+        diagnostics.append(
+            ConicMathDiagnostic("$.steps[*].snapshot.points", "midpoint locus trail is absent")
+        )
+    if not has_theoretical_locus:
+        diagnostics.append(
+            ConicMathDiagnostic(
+                "$.steps[*].snapshot", "theoretical midpoint locus is absent"
+            )
+        )
     return _unique(diagnostics)
 
 
@@ -567,6 +639,9 @@ def _validate_pole_polar(
     diagnostics = _validate_curves(
         scenes, lambda x, y: x * x + y * y - radius * radius, tolerance, "circle"
     )
+    max_tangent_points = 0
+    max_tangents = 0
+    has_polar = False
     for scene in scenes:
         poles = _role_items(scene, "points", "moving_point")
         tangencies = _role_items(scene, "points", "tangent_point")
@@ -585,6 +660,12 @@ def _validate_pole_polar(
                 )
             )
             continue
+        max_tangent_points = max(
+            max_tangent_points,
+            len({_rounded_point(_xy(point), tolerance) for point in tangencies}),
+        )
+        max_tangents = max(max_tangents, len(tangents))
+        has_polar = has_polar or bool(polars)
         for point in tangencies:
             tangent_point = _xy(point)
             if abs(tangent_point[0] ** 2 + tangent_point[1] ** 2 - radius**2) > tolerance:
@@ -638,6 +719,26 @@ def _validate_pole_polar(
                             "polar line does not satisfy x0*x+y0*y=r^2",
                         )
                     )
+    if max_tangent_points < 2:
+        diagnostics.append(
+            ConicMathDiagnostic(
+                "$.steps[*].snapshot.points",
+                "pole/polar construction requires two distinct tangent points",
+            )
+        )
+    if max_tangents < 2:
+        diagnostics.append(
+            ConicMathDiagnostic(
+                "$.steps[*].snapshot.segments",
+                "pole/polar construction requires two tangent segments",
+            )
+        )
+    if not has_polar:
+        diagnostics.append(
+            ConicMathDiagnostic(
+                "$.steps[*].snapshot.segments", "pole/polar construction requires a polar line"
+            )
+        )
     return _unique(diagnostics)
 
 

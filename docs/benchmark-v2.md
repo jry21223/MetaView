@@ -93,6 +93,12 @@ stated facts, pedagogical structure, required semantic objects,
 narration/visual agreement, timing, export readiness, and zero warning budget.
 Failed attempts remain in the timestamped local report.
 
+Semantic-role presence is not treated as sufficient mathematical evidence:
+the deterministic validator also requires the expected object cardinality,
+including two distinct ellipse/hyperbola foci, both asymptotes, exact line/conic
+intersection counts, and two distinct tangent points/tangent segments for an
+outside pole.
+
 Reports are written under ignored `eval/reports/`. A missing live
 QualityReport/warning count is itself an invalid live result; the harness does
 not invent a zero. Available latency, repair, token, and cost fields are
