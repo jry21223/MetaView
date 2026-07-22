@@ -8,11 +8,18 @@ import type {
   PhysicsForceSceneSnapshot,
   PlaybookScript,
 } from "../../features/playbook/engine/types";
+import { CONIC_PUBLIC_GOLD_TEMPLATES } from "./gold-templates/conicGoldTemplates";
+import { manifestToPreviewCase } from "./gold-templates/manifest";
 
 export type TemplatePreviewCaseId =
   | "binary-search"
   | "bfs-tree"
   | "derivative-tangent"
+  | "ellipse-focus-definition"
+  | "parabola-focus-directrix"
+  | "hyperbola-asymptotes"
+  | "line-ellipse-position"
+  | "ellipse-chord-midpoint-locus"
   | "pole-polar"
   | "projectile";
 
@@ -695,27 +702,36 @@ function polePolarSnapshot(
   const showPolar = stage === 6;
   const halfSpan = 5.8;
   const midpoint = values.sum / 2;
+  const viewMin = Math.min(
+    -values.radius - 1,
+    showPolar ? midpoint - halfSpan - 1 : Number.POSITIVE_INFINITY,
+  );
+  const viewMax = Math.max(
+    values.radius + 1,
+    values.k + 1,
+    showPolar ? midpoint + halfSpan + 1 : Number.NEGATIVE_INFINITY,
+  );
 
   const points: MathSceneSnapshot["points"] = [
-    { x: 0, y: 0, label: "O", emphasis: "secondary" },
-    { x: values.k, y: values.k, label: "P", emphasis: stage === 1 || stage === 5 ? "accent" : "primary" },
+    { x: 0, y: 0, label: "O", emphasis: "secondary", semantic_role: "center" },
+    { x: values.k, y: values.k, label: "P", emphasis: stage === 1 || stage === 5 ? "accent" : "primary", semantic_role: "moving_point" },
   ];
   if (showTangency) {
     points.push(
-      { x: ax, y: ay, label: "A", emphasis: stage === 4 ? "accent" : "primary" },
-      { x: bx, y: by, label: "B", emphasis: "primary" },
+      { x: ax, y: ay, label: "A", emphasis: stage === 4 ? "accent" : "primary", semantic_role: "tangent_point" },
+      { x: bx, y: by, label: "B", emphasis: "primary", semantic_role: "tangent_point" },
     );
   }
 
   const segments: MathSceneSnapshot["segments"] = [];
   if (showTangency) {
     segments.push(
-      { x0: values.k, y0: values.k, x1: ax, y1: ay, label: "PA", emphasis: stage === 2 ? "accent" : "secondary" },
-      { x0: values.k, y0: values.k, x1: bx, y1: by, label: "PB", emphasis: stage === 2 ? "accent" : "secondary" },
+      { x0: values.k, y0: values.k, x1: ax, y1: ay, label: "PA", emphasis: stage === 2 ? "accent" : "secondary", semantic_role: "tangent" },
+      { x0: values.k, y0: values.k, x1: bx, y1: by, label: "PB", emphasis: stage === 2 ? "accent" : "secondary", semantic_role: "tangent" },
     );
   }
   if (showChord && !showPolar) {
-    segments.push({ x0: ax, y0: ay, x1: bx, y1: by, label: "AB", emphasis: stage === 3 ? "accent" : "primary" });
+    segments.push({ x0: ax, y0: ay, x1: bx, y1: by, label: "AB", emphasis: stage === 3 ? "accent" : "primary", semantic_role: "polar_line" });
   }
   if (showPolar) {
     segments.push({
@@ -725,6 +741,7 @@ function polePolarSnapshot(
       y1: midpoint - halfSpan,
       label: "polar-line",
       emphasis: "accent",
+      semantic_role: "polar_line",
     });
   }
 
@@ -735,10 +752,11 @@ function polePolarSnapshot(
 
   return {
     kind: "math_scene",
-    x_min: -7,
-    x_max: 10,
-    y_min: -7,
-    y_max: 10,
+    camera_mode: "fixed",
+    x_min: viewMin,
+    x_max: viewMax,
+    y_min: viewMin,
+    y_max: viewMax,
     x_label: "x",
     y_label: "y",
     curves: [{
@@ -748,6 +766,7 @@ function polePolarSnapshot(
       t_max: 2 * Math.PI,
       label: "C",
       emphasis: stage === 1 ? "primary" : "secondary",
+      semantic_role: "conic_curve",
     }],
     points,
     segments,
@@ -1019,6 +1038,10 @@ function buildProjectileFollowups(params: TemplatePreviewParams, script: Playboo
 }
 
 const TEMPLATE_PREVIEW_CASES: Record<TemplatePreviewCaseId, TemplatePreviewCase> = {
+  ...Object.fromEntries(CONIC_PUBLIC_GOLD_TEMPLATES.map((item) => [
+    item.caseId,
+    manifestToPreviewCase(item),
+  ])) as Record<TemplatePreviewCaseId, TemplatePreviewCase>,
   "binary-search": {
     id: "binary-search",
     templateId: "binary-search",

@@ -6,8 +6,13 @@ import {
 } from "./templatePreviewCases";
 
 describe("template preview cases", () => {
-  it("publishes five complete deterministic Playbooks with step-aware follow-ups", () => {
+  it("publishes complete deterministic Playbooks with step-aware follow-ups", () => {
     expect(TEMPLATE_PREVIEW_CASE_IDS).toEqual([
+      "ellipse-focus-definition",
+      "parabola-focus-directrix",
+      "hyperbola-asymptotes",
+      "line-ellipse-position",
+      "ellipse-chord-midpoint-locus",
       "binary-search",
       "bfs-tree",
       "derivative-tangent",

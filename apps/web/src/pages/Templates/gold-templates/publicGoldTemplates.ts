@@ -1,10 +1,12 @@
 import { getTemplatePreviewCase } from "../templatePreviewCases";
 import type { GoldTemplateManifest } from "./manifest";
+import { CONIC_PUBLIC_GOLD_TEMPLATES } from "./conicGoldTemplates";
 
 const existingPolePolar = getTemplatePreviewCase("pole-polar");
 if (!existingPolePolar) throw new Error("The migrated pole-polar public case is missing");
 
 export const PUBLIC_GOLD_TEMPLATES: readonly GoldTemplateManifest[] = Object.freeze([
+  ...CONIC_PUBLIC_GOLD_TEMPLATES,
   {
     caseId: "pole-polar",
     archetypeId: "conic.pole-polar.circle",
