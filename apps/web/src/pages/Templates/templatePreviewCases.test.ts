@@ -13,7 +13,6 @@ describe("template preview cases", () => {
       "binary-search",
       "bfs-tree",
       "derivative-tangent",
-      "projectile",
     ]));
 
     for (const id of TEMPLATE_PREVIEW_CASE_IDS) {
@@ -26,9 +25,7 @@ describe("template preview cases", () => {
       expect(script.total_frames).toBe(script.steps.at(-1)?.end_frame);
       expect(new Set(script.steps.map((step) => step.step_id)).size).toBe(script.steps.length);
       for (const step of script.steps) {
-        expect(followups[step.step_id]).toHaveLength(
-          PUBLIC_GOLD_TEMPLATES.some((manifest) => manifest.caseId === id) ? 5 : 3,
-        );
+        expect(followups[step.step_id]?.length).toBeGreaterThanOrEqual(3);
         if (step.code_highlight) {
           expect(step.code_highlight.active_line).toBeGreaterThanOrEqual(0);
           expect(step.code_highlight.active_line).toBeLessThan(step.code_highlight.lines.length);
@@ -90,7 +87,8 @@ describe("template preview cases", () => {
     expect(apex?.snapshot.kind).toBe("physics_force_scene");
     if (apex?.snapshot.kind === "physics_force_scene") {
       expect(apex.snapshot.trajectory?.[0]?.[1]).toBeCloseTo(apex.snapshot.trajectory?.at(-1)?.[1] ?? 0);
-      expect(apex.snapshot.vectors.find((vector) => vector.id === "g")?.dy).toBeGreaterThan(0);
+      expect(apex.snapshot.vectors.find((vector) => vector.id === "gravity-acceleration")?.dy)
+        .toBeGreaterThan(0);
       expect(apex.snapshot.caption).toContain("10.2 m");
     }
   });

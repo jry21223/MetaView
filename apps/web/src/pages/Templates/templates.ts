@@ -38,6 +38,19 @@ export const TEMPLATE_DOMAIN_LABEL: Record<TemplateDomain, string> = {
   geography: "地理",
 };
 
+function publicGoldEntry(caseId: string, domain: TemplateDomain): TemplateDef {
+  const manifest = PUBLIC_GOLD_TEMPLATES.find((item) => item.caseId === caseId);
+  if (!manifest) throw new Error(`Missing public Gold Template manifest: ${caseId}`);
+  return {
+    id: manifest.caseId,
+    previewCaseId: manifest.caseId,
+    domain,
+    title: manifest.title,
+    desc: manifest.description,
+    prompt: manifest.canonicalPrompt,
+  };
+}
+
 export const TEMPLATES: ReadonlyArray<TemplateDef> = [
   // ---- algorithm ----
   {
@@ -87,7 +100,7 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
     desc: "可拖动 marker_x 看切线如何变化",
     prompt: "画出 f(x) = x² 在不同点的切线，导数 f'(x) = 2x，用滑杆控制切点 x 的位置",
   },
-  ...PUBLIC_GOLD_TEMPLATES.map((item) => ({
+  ...PUBLIC_GOLD_TEMPLATES.filter((item) => item.subject === "high_school_math").map((item) => ({
     id: item.caseId,
     previewCaseId: item.caseId,
     domain: "math" as const,
@@ -118,14 +131,7 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
   },
 
   // ---- code ----
-  {
-    id: "two-sum",
-    domain: "code",
-    title: "两数之和 · 哈希表",
-    desc: "Python 实现 + 哈希表查找过程",
-    prompt:
-      "讲解 LeetCode 两数之和的哈希表解法：```python\ndef two_sum(nums, target):\n    seen = {}\n    for i, n in enumerate(nums):\n        if target - n in seen:\n            return [seen[target - n], i]\n        seen[n] = i\n    return []\n```\n用 nums=[2,7,11,15], target=9 演示",
-  },
+  publicGoldEntry("two-sum", "code"),
   {
     id: "fib-memo",
     domain: "code",
@@ -142,14 +148,7 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
     desc: "重力分解、摩擦力、加速度",
     prompt: "质量 2kg 物体在 30° 斜面上，摩擦系数 0.2，重力加速度 10m/s²，分析受力并求沿斜面方向的加速度",
   },
-  {
-    id: "projectile",
-    previewCaseId: "projectile",
-    domain: "physics",
-    title: "抛体运动",
-    desc: "初速度分解 + 轨迹绘制",
-    prompt: "一个物体以 20 m/s 初速度、45° 仰角抛出，画出轨迹并求最大高度和落地距离",
-  },
+  publicGoldEntry("projectile", "physics"),
   {
     id: "spring-shm",
     domain: "physics",
@@ -159,13 +158,7 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
   },
 
   // ---- chemistry ----
-  {
-    id: "redox-electron",
-    domain: "chemistry",
-    title: "氧化还原 · 电子转移",
-    desc: "Zn + CuSO₄ → ZnSO₄ + Cu",
-    prompt: "讲解 Zn + CuSO₄ → ZnSO₄ + Cu 的氧化还原反应，标出电子转移方向和氧化态变化",
-  },
+  publicGoldEntry("redox-electron", "chemistry"),
   {
     id: "neutralization",
     domain: "chemistry",
@@ -182,22 +175,10 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
     desc: "糖酵解 → 三羧酸 → 电子传递链",
     prompt: "讲解细胞有氧呼吸的三个阶段：糖酵解、三羧酸循环、电子传递链，每个阶段产生多少 ATP",
   },
-  {
-    id: "dna-replication",
-    domain: "biology",
-    title: "DNA 复制",
-    desc: "半保留 + 前导/后随链",
-    prompt: "画出 DNA 半保留复制的过程，标出前导链和后随链的合成方向以及冈崎片段",
-  },
+  publicGoldEntry("dna-replication", "biology"),
 
   // ---- geography ----
-  {
-    id: "monsoon",
-    domain: "geography",
-    title: "东亚季风",
-    desc: "海陆热力差驱动的季节风向",
-    prompt: "解释东亚季风的形成：冬夏季海陆热力差异如何驱动风向反转，对降水的影响",
-  },
+  publicGoldEntry("monsoon", "geography"),
   {
     id: "plate-tectonics",
     domain: "geography",

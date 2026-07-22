@@ -50,11 +50,11 @@ describe("TemplatesPage lesson atlas", () => {
     expect(view.getByLabelText("current-path").textContent).toBe("/templates/binary-search");
   });
 
-  it("publishes ten line-drawn previews and keeps the other templates disabled", () => {
+  it("publishes fourteen line-drawn previews and keeps the other templates disabled", () => {
     const { container, getByRole } = renderPage();
 
     expect(TEMPLATES).toHaveLength(26);
-    expect(container.querySelectorAll("[data-preview]")).toHaveLength(10);
+    expect(container.querySelectorAll("[data-preview]")).toHaveLength(14);
     expect((getByRole("button", { name: "快速排序，制作中" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
