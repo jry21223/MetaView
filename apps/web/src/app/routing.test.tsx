@@ -108,7 +108,7 @@ describe("App routing", () => {
     const { App } = await import("./App");
     const { getByRole, getByText } = render(<App />);
 
-    expect(getByRole("heading", { name: "模板本身，就是可以播放的案例" })).toBeTruthy();
+    expect(getByRole("heading", { name: "挑一个感兴趣的知识点，从这里慢慢看懂它" })).toBeTruthy();
     expect(getByText("工作台")).toBeTruthy();
     expect(getByRole("button", { name: /模板/ }).getAttribute("aria-current")).toBe("page");
     await waitFor(() => expect(accountHits).toBe(1));
@@ -185,7 +185,7 @@ describe("App routing", () => {
     const { getByRole } = render(<App />);
 
     await waitFor(() => expect(window.location.pathname).toBe("/templates"));
-    expect(getByRole("heading", { name: "模板本身，就是可以播放的案例" })).toBeTruthy();
+    expect(getByRole("heading", { name: "挑一个感兴趣的知识点，从这里慢慢看懂它" })).toBeTruthy();
   });
 
   it("returns the retired factorial showcase link to the template catalog", async () => {
