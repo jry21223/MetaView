@@ -34,11 +34,16 @@ def test_ellipse_requires_both_distinct_expected_foci() -> None:
         points=[
             {"x": -4, "y": 0, "semantic_role": "focus"},
             {"x": 4, "y": 0, "semantic_role": "focus"},
+            {"x": 5, "y": 0, "semantic_role": "moving_point"},
+        ],
+        segments=[
+            {"x0": 5, "y0": 0, "x1": -4, "y1": 0, "semantic_role": "focal_distance"},
+            {"x0": 5, "y0": 0, "x1": 4, "y1": 0, "semantic_role": "focal_distance"},
         ],
     )
     assert validate_conic_playbook("conic.ellipse.focus-definition", params, [scene]) == []
 
-    scene["points"] = scene["points"][:1]  # type: ignore[index]
+    scene["points"] = [scene["points"][0], scene["points"][2]]  # type: ignore[index]
     issues = validate_conic_playbook("conic.ellipse.focus-definition", params, [scene])
     assert any("two distinct expected foci" in issue.message for issue in issues)
 

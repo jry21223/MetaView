@@ -243,10 +243,20 @@ def _validate_ellipse(
                     "moving point does not lie on the expected ellipse",
                 )
             )
+    has_complete_focal_segments = False
     for scene in scenes:
         moving = _role_items(scene, "points", "moving_point")
         segments = _role_items(scene, "segments", "focal_distance")
+        if moving and segments and len(segments) != 2:
+            diagnostics.append(
+                ConicMathDiagnostic(
+                    "$.steps[*].snapshot.segments",
+                    "ellipse focal-distance evidence must contain exactly two segments",
+                )
+            )
         if moving and len(segments) >= 2:
+            moving_point = _xy(moving[0])
+            matched_foci: set[tuple[int, int]] = set()
             lengths = [
                 math.hypot(
                     float(segment["x1"]) - float(segment["x0"]),
@@ -254,13 +264,42 @@ def _validate_ellipse(
                 )
                 for segment in segments[:2]
             ]
-            if abs(sum(lengths) - 2 * a) > tolerance:
+            for segment in segments[:2]:
+                ends = [
+                    (float(segment["x0"]), float(segment["y0"])),
+                    (float(segment["x1"]), float(segment["y1"])),
+                ]
+                if math.dist(ends[0], moving_point) <= tolerance:
+                    other = ends[1]
+                elif math.dist(ends[1], moving_point) <= tolerance:
+                    other = ends[0]
+                else:
+                    continue
+                if min(math.dist(other, focus) for focus in expected_foci) <= tolerance:
+                    matched_foci.add(_rounded_point(other, tolerance))
+            complete = required_focuses <= matched_foci
+            has_complete_focal_segments = has_complete_focal_segments or complete
+            if not complete:
+                diagnostics.append(
+                    ConicMathDiagnostic(
+                        "$.steps[*].snapshot.segments",
+                        "focal-distance segments must connect P to both expected foci",
+                    )
+                )
+            elif abs(sum(lengths) - 2 * a) > tolerance:
                 diagnostics.append(
                     ConicMathDiagnostic(
                         "$.steps[*].snapshot.segments",
                         "focal segment lengths do not sum to 2a",
                     )
                 )
+    if not has_complete_focal_segments:
+        diagnostics.append(
+            ConicMathDiagnostic(
+                "$.steps[*].snapshot.segments",
+                "ellipse requires both focal-distance segments from P to F1 and F2",
+            )
+        )
     return list(dict.fromkeys(diagnostics))
 
 
