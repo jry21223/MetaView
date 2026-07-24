@@ -205,6 +205,7 @@ function checkMathParameterContract(
   );
   const controls = new Map<string, number>();
   const seenControlIds = new Set<string>();
+  const controlIdsByLabel = new Map<string, string>();
   playbook.parameter_controls.forEach((control, index) => {
     const trimmedValue = control.value.trim();
     const numericValue = Number(trimmedValue);
@@ -212,12 +213,24 @@ function checkMathParameterContract(
     const invalidValue =
       !trimmedValue || !Number.isFinite(numericValue);
     const duplicateId = seenControlIds.has(control.id);
+    const normalizedLabel = control.label.trim().toLocaleLowerCase().replace(/\s+/g, " ");
+    const priorLabelId = normalizedLabel
+      ? controlIdsByLabel.get(normalizedLabel)
+      : undefined;
+    const duplicateMeaning =
+      priorLabelId !== undefined && priorLabelId !== control.id;
     seenControlIds.add(control.id);
-    if (invalidId || invalidValue || duplicateId) {
+    if (normalizedLabel && priorLabelId === undefined) {
+      controlIdsByLabel.set(normalizedLabel, control.id);
+    }
+    if (invalidId || invalidValue || duplicateId || duplicateMeaning) {
       const reasons = [
         ...(invalidId ? ["id must be a renderer-safe identifier"] : []),
         ...(invalidValue ? ["value must be a finite number"] : []),
         ...(duplicateId ? ["id must be unique"] : []),
+        ...(duplicateMeaning
+          ? [`label duplicates parameter ${JSON.stringify(priorLabelId)}`]
+          : []),
       ];
       issues.push(
         issue(
@@ -225,7 +238,7 @@ function checkMathParameterContract(
           "error",
           `parameter_controls[${index}]`,
           `Math parameter control ${JSON.stringify(control.id)} is invalid: ${reasons.join(", ")}.`,
-          "Use one unique ASCII identifier per control and provide a finite numeric default value.",
+          "Use one unique ASCII identifier and label per mathematical parameter, and provide a finite numeric default value.",
         ),
       );
       return;

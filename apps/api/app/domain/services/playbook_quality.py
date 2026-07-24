@@ -1123,6 +1123,7 @@ def _check_math_parameter_contract(
     bindings = _math_expression_bindings(playbook)
     controls: dict[str, float] = {}
     seen_ids: set[str] = set()
+    control_ids_by_label: dict[str, str] = {}
     for index, control in enumerate(playbook.parameter_controls):
         path = f"parameter_controls[{index}]"
         raw_value = control.value.strip()
@@ -1133,8 +1134,15 @@ def _check_math_parameter_contract(
             value = math.nan
         valid_value = bool(raw_value) and math.isfinite(value)
         duplicate = control.id in seen_ids
+        normalized_label = re.sub(r"\s+", " ", control.label.strip().casefold())
+        prior_label_id = control_ids_by_label.get(normalized_label)
+        duplicate_meaning = bool(normalized_label) and (
+            prior_label_id is not None and prior_label_id != control.id
+        )
         seen_ids.add(control.id)
-        if not valid_id or not valid_value or duplicate:
+        if normalized_label and prior_label_id is None:
+            control_ids_by_label[normalized_label] = control.id
+        if not valid_id or not valid_value or duplicate or duplicate_meaning:
             reasons = []
             if not valid_id:
                 reasons.append("id must be a renderer-safe identifier")
@@ -1142,6 +1150,8 @@ def _check_math_parameter_contract(
                 reasons.append("value must be a finite number")
             if duplicate:
                 reasons.append("id must be unique")
+            if duplicate_meaning:
+                reasons.append(f"label duplicates parameter {prior_label_id!r}")
             issues.append(
                 _issue(
                     "math.parameter_control_invalid",
@@ -1149,8 +1159,8 @@ def _check_math_parameter_contract(
                     path,
                     f"Math parameter control {control.id!r} is invalid: {', '.join(reasons)}.",
                     (
-                        "Use one unique ASCII identifier per control and provide a "
-                        "finite numeric default value."
+                        "Use one unique ASCII identifier and label per mathematical "
+                        "parameter, and provide a finite numeric default value."
                     ),
                 )
             )

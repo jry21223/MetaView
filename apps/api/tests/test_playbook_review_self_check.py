@@ -190,6 +190,13 @@ def test_gateway_accepts_vector_field_coordinate_variables() -> None:
         ),
         (
             [
+                {"id": "k", "label": "斜率 k", "value": "0.3"},
+                {"id": "k2", "label": "斜率 k", "value": "0.3"},
+            ],
+            "math.parameter_control_invalid",
+        ),
+        (
+            [
                 {"id": "a", "label": "Slope", "value": "1"},
                 {"id": "unused", "label": "Unused", "value": "2"},
             ],
@@ -201,8 +208,9 @@ def test_gateway_rejects_invalid_or_unused_math_controls(
     controls: list[dict[str, str]],
     expected_code: str,
 ) -> None:
+    expression = "k*x+k2" if controls[0]["id"] == "k" else "a*x"
     report = quality_gate_playbook(
-        _math_curve_playbook("a*x", parameter_controls=controls),
+        _math_curve_playbook(expression, parameter_controls=controls),
         "Vary a in y=a*x.",
         generator_path="agent",
     )

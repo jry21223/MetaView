@@ -229,6 +229,41 @@ describe("agent playbook self-check", () => {
     ).toHaveLength(2);
   });
 
+  it("blocks duplicate semantic controls that rename the same parameter", () => {
+    const playbook = validPlaybook();
+    playbook.domain = "math";
+    playbook.title = "Duplicate slope controls";
+    playbook.summary = "The same surviving slope must keep one control id.";
+    playbook.parameter_controls = [
+      { id: "k", label: "斜率 k", value: "0.3" },
+      { id: "k2", label: "斜率 k", value: "0.3" },
+    ];
+    playbook.steps.forEach((step) => {
+      const snapshot = {
+        kind: "math_scene",
+        curves: [
+          { expression_y: "k*x", label: "moving line" },
+          { expression_y: "k2*x", label: "renamed moving line" },
+        ],
+      };
+      step.title = "Moving line";
+      step.voiceover_text = "The same slope k drives every view of the line.";
+      step.narration_template = [step.voiceover_text];
+      step.snapshot = structuredClone(snapshot);
+      step.layers[0].body = structuredClone(snapshot);
+    });
+
+    const report = selfCheckPlaybook(
+      playbook,
+      "The moving line y = kx + t has an intercept determined by the condition.",
+    );
+
+    expect(report.status).toBe("blocked");
+    expect(report.issues.map((issue) => issue.code)).toContain(
+      "math.parameter_control_invalid",
+    );
+  });
+
   it("blocks math expressions outside the renderer grammar", () => {
     const playbook = validPlaybook();
     playbook.domain = "math";

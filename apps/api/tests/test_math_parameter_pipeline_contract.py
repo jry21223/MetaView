@@ -12,6 +12,7 @@ from tests.test_run_pipeline_agent_mode import (
     _RaisingLLM,
     _RecordingRepo,
     _SequenceAgent,
+    _SequenceReviewer,
 )
 
 PROMPT = """2019 Beijing Gaokao Humanities Mathematics, Problem 19 (14 points).
@@ -116,3 +117,65 @@ async def test_pipeline_fails_closed_when_parameter_repair_is_exhausted() -> Non
     assert "math.parameter_hardcoded" in {
         issue["code"] for issue in review["issues"]
     }
+
+
+@pytest.mark.asyncio
+async def test_pipeline_repairs_parameter_contract_warning_from_reviewer() -> None:
+    initial = _moving_line_playbook(
+        "k*x",
+        controls=[{"id": "k", "label": "Slope k", "value": "0.5"}],
+    )
+    repaired = _moving_line_playbook(
+        "k*x",
+        controls=[{"id": "k", "label": "Slope k", "value": "0.5"}],
+    )
+    reviewer = _SequenceReviewer(
+        [
+            json.dumps(
+                {
+                    "status": "warnings",
+                    "summary": "A symbolic parameter is inconsistent with the visual.",
+                    "issues": [
+                        {
+                            "code": "math.parameter_hardcoded",
+                            "severity": "warning",
+                            "path": "steps[2].snapshot.curves[1].expression_y",
+                            "message": "The narration and rendered family disagree.",
+                            "suggestion": "Keep k symbolic in every moving-line view.",
+                            "requires_repair": False,
+                        }
+                    ],
+                }
+            ),
+            json.dumps(
+                {
+                    "status": "clean",
+                    "summary": "The repaired parameter contract is consistent.",
+                    "issues": [],
+                }
+            ),
+        ]
+    )
+    agent = _SequenceAgent([initial, repaired])
+    repo = _RecordingRepo()
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        reviewer_llm=reviewer,
+        agent_provider=agent,
+        generation_mode="agent",
+    )
+
+    await use_case.execute(
+        "run-math-reviewer-warning-repair",
+        PipelineRequest(prompt=PROMPT, domain="math"),
+    )
+
+    assert len(agent.calls) == 2
+    assert "math.parameter_hardcoded" in agent.calls[1]["prompt"]
+    assert len(reviewer.calls) == 2
+    last = repo.updates[-1]
+    assert last["status"].value == "succeeded"
+    review = json.loads(last["review_json"])
+    assert "reviewer:status:blocked" in review["actions"]
+    assert "reviewer:repair_attempt:1" in review["actions"]
