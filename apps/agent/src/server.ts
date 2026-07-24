@@ -1,20 +1,10 @@
-/**
- * HTTP entry point for the MetaView agent sidecar.
- *
- * Exposes ``POST /generate`` with either the legacy body
- * ``{ prompt, provider?, route_decision?, coverage_decision?, lesson_plan? }`` or the wider
- * AgentRequest shape,
- * then returns ``{ playbook: PlaybookScript, provider, tool_events,
- * runtime_events }`` once the pi-agent-core loop has walked the Drawing CLI
- * flow. Health probe at ``GET /healthz``.
- */
+/** HTTP entry point for the MetaView Agent sidecar. */
 
 import express, { type Request, type Response } from "express";
 import pino from "pino";
 
-import { runAgentGeneration } from "./agent.js";
+import { runAgentGenerationWithTrace } from "./agent.js";
 import { hasValidSharedToken } from "./auth.js";
-import { AgentSelfCheckError } from "./state/playbookSelfCheck.js";
 
 const log = pino({ level: process.env.LOG_LEVEL ?? "info" });
 const PORT = Number(process.env.PORT ?? 8001);
@@ -28,7 +18,6 @@ const DEFAULT_API_KEY =
 const DEFAULT_BASE_URL =
   process.env.AGENT_DEFAULT_BASE_URL ?? process.env.METAVIEW_OPENAI_BASE_URL;
 const SHARED_TOKEN = process.env.AGENT_SHARED_TOKEN ?? process.env.METAVIEW_AGENT_SHARED_TOKEN;
-// Hard ceiling so a hung agent loop can't block the worker indefinitely.
 const GENERATE_TIMEOUT_MS = Number(process.env.AGENT_TIMEOUT_MS ?? 540_000);
 
 const app = express();
@@ -40,6 +29,8 @@ app.get("/healthz", (_req: Request, res: Response) => {
     provider: DEFAULT_PROVIDER,
     model: DEFAULT_MODEL,
     base_url: DEFAULT_BASE_URL ?? null,
+    harness: "transactional-step-draft-v1",
+    retries_owned_by: "api",
   });
 });
 
@@ -48,85 +39,61 @@ app.post("/generate", async (req: Request, res: Response) => {
     res.status(401).json({ detail: "missing or invalid agent token" });
     return;
   }
-  const {
-    run_id,
-    prompt,
-    source_code,
-    language,
-    provider,
-    provider_config,
-    route_decision,
-    coverage_decision,
-    lesson_plan,
-    playbook_schema,
-    constraints,
-    available_tools,
-  } = (req.body ?? {}) as {
-    run_id?: string;
-    prompt?: string;
-    source_code?: string | null;
-    language?: string | null;
-    provider?: { provider?: string; model?: string; api_key?: string; base_url?: string };
-    provider_config?: { provider?: string; model?: string; api_key?: string; base_url?: string };
-    route_decision?: Record<string, unknown>;
-    coverage_decision?: Record<string, unknown>;
-    lesson_plan?: Record<string, unknown>;
-    playbook_schema?: Record<string, unknown>;
-    constraints?: Record<string, unknown>;
-    available_tools?: Array<Record<string, unknown>>;
-  };
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const prompt = body.prompt;
   if (!prompt || typeof prompt !== "string") {
     res.status(400).json({ detail: "missing or invalid 'prompt' field" });
     return;
   }
-  const timeout = new Promise<never>((_, reject) =>
+  const timeout = new Promise<never>((_resolve, reject) =>
     setTimeout(
       () => reject(new Error(`agent timed out after ${GENERATE_TIMEOUT_MS}ms`)),
       GENERATE_TIMEOUT_MS,
     ),
   );
   try {
-    const playbook = await Promise.race([
-      runAgentGeneration({
+    const result = await Promise.race([
+      runAgentGenerationWithTrace({
         prompt,
-        runId: run_id,
-        sourceCode: source_code,
-        language,
-        provider: provider ?? provider_config,
-        routeDecision: route_decision,
-        coverageDecision: coverage_decision,
-        lessonPlan: lesson_plan,
-        playbookSchema: playbook_schema,
-        constraints,
-        availableTools: available_tools,
+        runId: typeof body.run_id === "string" ? body.run_id : undefined,
+        sourceCode: typeof body.source_code === "string" ? body.source_code : null,
+        language: typeof body.language === "string" ? body.language : null,
+        provider: coerceProvider(body.provider ?? body.provider_config),
+        routeDecision: coerceRecord(body.route_decision),
+        coverageDecision: coerceRecord(body.coverage_decision),
+        lessonPlan: coerceRecord(body.lesson_plan),
+        playbookSchema: coerceRecord(body.playbook_schema),
+        constraints: coerceRecord(body.constraints),
+        availableTools: coerceRecordArray(body.available_tools),
         apiBaseUrl: API_BASE_URL,
         agentSharedToken: SHARED_TOKEN,
         defaultProvider: DEFAULT_PROVIDER,
         defaultModel: DEFAULT_MODEL,
         defaultApiKey: DEFAULT_API_KEY,
         defaultBaseUrl: DEFAULT_BASE_URL,
+        renderedQualityEnabled: process.env.AGENT_RENDERED_QUALITY_GATE === "true",
+        repoRoot: process.env.METAVIEW_REPO_ROOT ?? process.cwd(),
       }),
       timeout,
     ]);
     res.json({
-      playbook,
+      playbook: result.playbook,
       provider: "pi",
-      tool_events: [],
-      runtime_events: [{ event: "sidecar.completed" }],
+      tool_events: result.toolEvents,
+      runtime_events: result.runtimeEvents,
       review: null,
-      artifacts: {},
+      artifacts: {
+        harness: "transactional-step-draft-v1",
+        complete_regeneration_count: 0,
+      },
     });
-  } catch (err) {
-    log.error({ err }, "generate failed");
-    if (err instanceof AgentSelfCheckError) {
-      res.status(500).json({
-        detail: err.message,
-        self_check: err.report,
-      });
-      return;
-    }
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ detail: message });
+  } catch (error) {
+    log.error({ err: error }, "generate failed");
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(500).json({
+      detail: message,
+      code: classifyError(message),
+    });
   }
 });
 
@@ -142,3 +109,42 @@ app.listen(PORT, () => {
     "agent sidecar listening",
   );
 });
+
+function coerceProvider(value: unknown): {
+  provider?: string;
+  model?: string;
+  api_key?: string;
+  base_url?: string;
+} | undefined {
+  const record = coerceRecord(value);
+  if (!record) return undefined;
+  return {
+    provider: typeof record.provider === "string" ? record.provider : undefined,
+    model: typeof record.model === "string" ? record.model : undefined,
+    api_key: typeof record.api_key === "string" ? record.api_key : undefined,
+    base_url: typeof record.base_url === "string" ? record.base_url : undefined,
+  };
+}
+
+function coerceRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
+}
+
+function coerceRecordArray(value: unknown): Array<Record<string, unknown>> | undefined {
+  return Array.isArray(value)
+    ? value.filter(
+        (item): item is Record<string, unknown> =>
+          item !== null && typeof item === "object" && !Array.isArray(item),
+      )
+    : undefined;
+}
+
+function classifyError(message: string): string {
+  if (message.includes("not allowed for this run")) return "agent.capability_denied";
+  if (message.includes("canonical")) return "agent.canonical_preflight_failed";
+  if (message.includes("draft") || message.includes("outline")) return "agent.transaction_invalid";
+  if (message.includes("timed out")) return "agent.timeout";
+  return "agent.generation_failed";
+}

@@ -1,11 +1,4 @@
-/**
- * L1 atomic drawing tools wired into pi-agent-core. Each tool mutates a
- * PlaybookEmitter and returns a small JSON result the LLM can read back.
- *
- * Tool definitions deliberately omit ``add_vector_field`` — to indicate flow
- * the agent must place individual arrows via ``add_arrow``. This is the
- * single biggest pedagogical guardrail in the new pipeline.
- */
+/** Transaction-safe semantic drawing tools. */
 
 import { Type, type TSchema } from "@earendil-works/pi-ai";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
@@ -24,6 +17,16 @@ const EmphasisSchema = Type.Union([
   Type.Literal("accent"),
 ]);
 
+const DomainSchema = Type.Union([
+  Type.Literal("algorithm"),
+  Type.Literal("math"),
+  Type.Literal("code"),
+  Type.Literal("physics"),
+  Type.Literal("chemistry"),
+  Type.Literal("biology"),
+  Type.Literal("geography"),
+]);
+
 export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
   const { emitter } = deps;
   const tools: AgentTool[] = [];
@@ -32,19 +35,20 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
     defineTool(
       "plan_outline",
       "Plan outline",
-      "Decide which 8-14 step titles to use for this playbook. Call this " +
-        "FIRST so subsequent begin_step calls have a stable index range. " +
-        "Domain must be one of algorithm/math/code/physics/chemistry/biology/geography.",
+      "Create the authoritative 8-14 step outline. Call exactly once before any draft.",
       Type.Object({
-        domain: Type.String({ description: "lower-case topic domain" }),
-        step_titles: Type.Array(Type.String(), { minItems: 4, maxItems: 16 }),
-        title: Type.Optional(Type.String()),
-        summary: Type.Optional(Type.String()),
+        domain: DomainSchema,
+        step_titles: Type.Array(Type.String({ minLength: 1, maxLength: 100 }), {
+          minItems: 8,
+          maxItems: 14,
+        }),
+        title: Type.Optional(Type.String({ minLength: 1, maxLength: 120 })),
+        summary: Type.Optional(Type.String({ minLength: 1, maxLength: 600 })),
       }),
       async (args) => {
         emitter.setOutline(args.domain, args.step_titles);
         if (args.title || args.summary) {
-          emitter.setSummary(args.title ?? "MetaView Playbook", args.summary ?? "");
+          emitter.setSummary(args.title ?? args.step_titles[0], args.summary ?? "");
         }
         return toolResult({ ok: true as const, step_count: args.step_titles.length });
       },
@@ -54,17 +58,13 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "begin_step",
-      "Begin step",
-      "Open a new step. Subsequent draw / narration calls operate on this " +
-        "step until commit_step is called.",
+      "Begin step draft",
+      "Open the next outline slot as an editable step draft. Draft indices must be contiguous.",
       Type.Object({
-        index: Type.Integer({ minimum: 1 }),
-        title: Type.String({ minLength: 1, maxLength: 80 }),
+        index: Type.Integer({ minimum: 1, maximum: 14 }),
+        title: Type.String({ minLength: 1, maxLength: 100 }),
       }),
-      async (args) => {
-        emitter.beginStep(args.index, args.title);
-        return toolResult({ ok: true as const });
-      },
+      async (args) => toolResult({ ok: true as const, draft_id: emitter.beginStep(args.index, args.title) }),
     ) as AgentTool,
   );
 
@@ -72,11 +72,8 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
     defineTool(
       "set_narration",
       "Set narration",
-      "Replace the current step's narration text. Pass an array of strings " +
-        "(each element is a sentence). Must answer 为什么 → 做什么 → 学到了什么.",
-      Type.Object({
-        text: Type.Array(Type.String(), { minItems: 1, maxItems: 8 }),
-      }),
+      "Replace narration on the active draft. Use sentences that explain why, what changes, and what is learned.",
+      Type.Object({ text: Type.Array(Type.String({ minLength: 1 }), { minItems: 1, maxItems: 8 }) }),
       async (args) => {
         emitter.setNarration(args.text);
         return toolResult({ ok: true as const, voiceover_length: args.text.join(" ").length });
@@ -88,8 +85,7 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
     defineTool(
       "set_axes",
       "Set axes",
-      "Set the visible coordinate ranges and axis labels for the current " +
-        "step. Recommended for math scene/function steps.",
+      "Set visible coordinate ranges and labels on the active draft.",
       Type.Object({
         x_min: Type.Number(),
         x_max: Type.Number(),
@@ -99,14 +95,7 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
         y_label: Type.Optional(Type.String()),
       }),
       async (args) => {
-        emitter.setAxes(
-          args.x_min,
-          args.x_max,
-          args.y_min,
-          args.y_max,
-          args.x_label,
-          args.y_label,
-        );
+        emitter.setAxes(args.x_min, args.x_max, args.y_min, args.y_max, args.x_label, args.y_label);
         return toolResult({ ok: true as const });
       },
     ) as AgentTool,
@@ -116,9 +105,7 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
     defineTool(
       "add_curve_parametric",
       "Add parametric curve",
-      "Add a parametric curve ``(x(t), y(t))`` over ``[t_min, t_max]``. " +
-        "Expressions use the same character set MathPlotRenderer accepts " +
-        "(sin/cos/exp/log + parameters).",
+      "Add a parametric curve (x(t), y(t)) to the active draft.",
       Type.Object({
         expression_x: Type.String({ minLength: 1 }),
         expression_y: Type.String({ minLength: 1 }),
@@ -126,18 +113,20 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
         t_max: Type.Number(),
         label: Type.String(),
         emphasis: EmphasisSchema,
+        semantic_role: Type.Optional(Type.String({ minLength: 1 })),
       }),
-      async (args) => {
-        const id = emitter.addCurveParametric(
-          args.expression_x,
-          args.expression_y,
-          args.t_min,
-          args.t_max,
-          args.label,
-          args.emphasis,
-        );
-        return toolResult({ curve_id: id });
-      },
+      async (args) =>
+        toolResult({
+          curve_id: emitter.addCurveParametric(
+            args.expression_x,
+            args.expression_y,
+            args.t_min,
+            args.t_max,
+            args.label,
+            args.emphasis,
+            args.semantic_role,
+          ),
+        }),
     ) as AgentTool,
   );
 
@@ -145,26 +134,26 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
     defineTool(
       "add_curve_1d",
       "Add 1D curve",
-      "Add a 1-D function y=f(x). Use this for typical math function plots, " +
-        "tangent lines, derivative comparisons, integrals (with shade_from/to " +
-        "set elsewhere).",
+      "Add y=f(x) to the active draft.",
       Type.Object({
         expression: Type.String({ minLength: 1 }),
         label: Type.String(),
         emphasis: EmphasisSchema,
         x_min: Type.Optional(Type.Number()),
         x_max: Type.Optional(Type.Number()),
+        semantic_role: Type.Optional(Type.String({ minLength: 1 })),
       }),
-      async (args) => {
-        const id = emitter.addCurve1D(
-          args.expression,
-          args.label,
-          args.emphasis,
-          args.x_min,
-          args.x_max,
-        );
-        return toolResult({ curve_id: id });
-      },
+      async (args) =>
+        toolResult({
+          curve_id: emitter.addCurve1D(
+            args.expression,
+            args.label,
+            args.emphasis,
+            args.x_min,
+            args.x_max,
+            args.semantic_role,
+          ),
+        }),
     ) as AgentTool,
   );
 
@@ -172,17 +161,18 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
     defineTool(
       "add_point",
       "Add point",
-      "Mark a single point on the scene.",
+      "Mark a point on the active draft.",
       Type.Object({
         x: Type.Number(),
         y: Type.Number(),
         label: Type.String(),
         emphasis: EmphasisSchema,
+        semantic_role: Type.Optional(Type.String({ minLength: 1 })),
       }),
-      async (args) => {
-        const id = emitter.addPoint(args.x, args.y, args.label, args.emphasis);
-        return toolResult({ point_id: id });
-      },
+      async (args) =>
+        toolResult({
+          point_id: emitter.addPoint(args.x, args.y, args.label, args.emphasis, args.semantic_role),
+        }),
     ) as AgentTool,
   );
 
@@ -190,21 +180,26 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
     defineTool(
       "add_arrow",
       "Add arrow",
-      "Draw a single arrow from (x, y) with direction (dx, dy). Use this to " +
-        "indicate motion direction at concrete points. There is NO " +
-        "add_vector_field tool — drawing 20+ arrows just to show flow is " +
-        "forbidden unless the lesson is specifically teaching flow fields.",
+      "Add one concrete direction/vector arrow. Do not fake a dense vector field.",
       Type.Object({
         x: Type.Number(),
         y: Type.Number(),
         dx: Type.Number(),
         dy: Type.Number(),
         label: Type.Optional(Type.String()),
+        semantic_role: Type.Optional(Type.String({ minLength: 1 })),
       }),
-      async (args) => {
-        const id = emitter.addArrow(args.x, args.y, args.dx, args.dy, args.label ?? "");
-        return toolResult({ segment_id: id });
-      },
+      async (args) =>
+        toolResult({
+          segment_id: emitter.addArrow(
+            args.x,
+            args.y,
+            args.dx,
+            args.dy,
+            args.label ?? "",
+            args.semantic_role,
+          ),
+        }),
     ) as AgentTool,
   );
 
@@ -212,7 +207,7 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
     defineTool(
       "add_segment",
       "Add segment",
-      "Draw a line segment (with optional arrowhead).",
+      "Add a line segment or arrow between two points.",
       Type.Object({
         x0: Type.Number(),
         y0: Type.Number(),
@@ -220,13 +215,22 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
         y1: Type.Number(),
         arrow: Type.Optional(Type.Boolean()),
         label: Type.Optional(Type.String()),
+        emphasis: Type.Optional(EmphasisSchema),
+        semantic_role: Type.Optional(Type.String({ minLength: 1 })),
       }),
-      async (args) => {
-        const id = emitter.addSegment(
-          args.x0, args.y0, args.x1, args.y1, args.arrow ?? false, args.label ?? "",
-        );
-        return toolResult({ segment_id: id });
-      },
+      async (args) =>
+        toolResult({
+          segment_id: emitter.addSegment(
+            args.x0,
+            args.y0,
+            args.x1,
+            args.y1,
+            args.arrow ?? false,
+            args.label ?? "",
+            args.emphasis ?? "primary",
+            args.semantic_role,
+          ),
+        }),
     ) as AgentTool,
   );
 
@@ -234,20 +238,19 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
     defineTool(
       "add_region",
       "Add region",
-      "Fill a polygon defined by its vertices.",
+      "Add a polygonal filled region.",
       Type.Object({
-        vertices: Type.Array(
-          Type.Tuple([Type.Number(), Type.Number()]),
-          { minItems: 3 },
-        ),
+        vertices: Type.Array(Type.Tuple([Type.Number(), Type.Number()]), { minItems: 3 }),
         label: Type.Optional(Type.String()),
         emphasis: Type.Optional(EmphasisSchema),
+        semantic_role: Type.Optional(Type.String({ minLength: 1 })),
       }),
       async (args) => {
         emitter.addRegion(
           args.vertices as Array<[number, number]>,
           args.label ?? "",
           args.emphasis ?? "secondary",
+          args.semantic_role,
         );
         return toolResult({ ok: true as const });
       },
@@ -258,10 +261,8 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
     defineTool(
       "add_formula",
       "Add formula",
-      "Attach a KaTeX formula to the current step (rendered as overlay).",
-      Type.Object({
-        latex: Type.String({ minLength: 1 }),
-      }),
+      "Attach a KaTeX formula to the active draft.",
+      Type.Object({ latex: Type.String({ minLength: 1 }) }),
       async (args) => {
         emitter.addFormula(args.latex);
         return toolResult({ ok: true as const });
@@ -273,22 +274,55 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
     defineTool(
       "add_array_tokens",
       "Add array tokens",
-      "Populate the current step with a sequence of array element tokens. " +
-        "Use this for algorithm visualizations (sorting, search).",
+      "Populate an algorithm array/bar state.",
       Type.Object({
         values: Type.Array(Type.String(), { minItems: 1 }),
         emphasis_map: Type.Optional(Type.Record(Type.String(), EmphasisSchema)),
       }),
       async (args) => {
-        const intMap: Record<number, "primary" | "secondary" | "accent"> = {};
-        if (args.emphasis_map) {
-          for (const [k, v] of Object.entries(args.emphasis_map)) {
-            const idx = Number(k);
-            if (Number.isFinite(idx)) intMap[idx] = v as "primary" | "secondary" | "accent";
+        const map: Record<number, "primary" | "secondary" | "accent"> = {};
+        for (const [key, value] of Object.entries(args.emphasis_map ?? {})) {
+          const index = Number(key);
+          if (Number.isInteger(index)) {
+            map[index] = value as "primary" | "secondary" | "accent";
           }
         }
-        emitter.addArrayTokens(args.values, intMap);
+        emitter.addArrayTokens(args.values, map);
         return toolResult({ ok: true as const, count: args.values.length });
+      },
+    ) as AgentTool,
+  );
+
+  tools.push(
+    defineTool(
+      "set_code_highlight",
+      "Set Code Sync state",
+      "Attach source lines, active lines, and variables. Set use_code_trace_snapshot when code is the primary visual.",
+      Type.Object({
+        source: Type.String({ minLength: 1 }),
+        language: Type.String({ minLength: 1 }),
+        active_lines: Type.Array(Type.Integer({ minimum: 0 }), { minItems: 1 }),
+        variables: Type.Optional(Type.Record(Type.String(), Type.String())),
+        operation_label: Type.Optional(Type.String()),
+        use_code_trace_snapshot: Type.Optional(Type.Boolean()),
+      }),
+      async (args) => {
+        const lines = args.source.split("\n");
+        const activeLines = [...new Set(args.active_lines as number[])].sort(
+          (a: number, b: number) => a - b,
+        );
+        emitter.setCodeHighlight(
+          {
+            language: String(args.language),
+            lines,
+            active_lines: activeLines,
+            active_line: activeLines[0],
+            variables: (args.variables ?? {}) as Record<string, string>,
+            operation_label: args.operation_label,
+          },
+          args.use_code_trace_snapshot ?? false,
+        );
+        return toolResult({ ok: true as const, line_count: lines.length });
       },
     ) as AgentTool,
   );
@@ -297,8 +331,7 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
     defineTool(
       "add_parameter_control",
       "Add parameter control",
-      "Expose a free parameter (e.g. ``a`` in ``a*x + b``) as a slider in " +
-        "the player. Use one per parameter referenced in your curve expressions.",
+      "Expose a declared parameter as a player control.",
       Type.Object({
         id: Type.String({ minLength: 1, maxLength: 32 }),
         label: Type.String(),
@@ -306,12 +339,43 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
         description: Type.Optional(Type.String()),
       }),
       async (args) => {
-        emitter.addParameterControl({
-          id: args.id,
-          label: args.label,
-          value: args.value,
-          description: args.description,
-        });
+        emitter.addParameterControl(args);
+        return toolResult({ ok: true as const });
+      },
+    ) as AgentTool,
+  );
+
+  tools.push(
+    defineTool(
+      "stash_step_draft",
+      "Stash step draft",
+      "Save the active draft without committing it. Templates use this so narration can be refined before commit.",
+      Type.Object({}),
+      async () => toolResult(emitter.stashCurrentDraft()),
+    ) as AgentTool,
+  );
+
+  tools.push(
+    defineTool(
+      "select_step_draft",
+      "Select step draft",
+      "Open a stashed draft for editing.",
+      Type.Object({ draft_id: Type.String({ minLength: 1 }) }),
+      async (args) => {
+        emitter.selectStepDraft(args.draft_id);
+        return toolResult({ ok: true as const, draft_id: args.draft_id });
+      },
+    ) as AgentTool,
+  );
+
+  tools.push(
+    defineTool(
+      "abort_step_draft",
+      "Abort step draft",
+      "Discard the most recently reserved draft.",
+      Type.Object({ draft_id: Type.Optional(Type.String({ minLength: 1 })) }),
+      async (args) => {
+        emitter.abortStepDraft(args.draft_id);
         return toolResult({ ok: true as const });
       },
     ) as AgentTool,
@@ -320,14 +384,30 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "commit_step",
-      "Commit step",
-      "Finalize the current step's data and append it to the playbook. " +
-        "After this you can either begin_step again or finalize_playbook.",
+      "Commit active step",
+      "Validate and commit the active draft. Commits must follow outline order.",
       Type.Object({}),
-      async () => {
-        const result = emitter.commitStep();
-        return toolResult(result);
-      },
+      async () => toolResult(emitter.commitStep()),
+    ) as AgentTool,
+  );
+
+  tools.push(
+    defineTool(
+      "commit_step_draft",
+      "Commit stashed step",
+      "Select and commit one stashed draft in outline order.",
+      Type.Object({ draft_id: Type.String({ minLength: 1 }) }),
+      async (args) => toolResult(emitter.commitStepDraft(args.draft_id)),
+    ) as AgentTool,
+  );
+
+  tools.push(
+    defineTool(
+      "commit_all_step_drafts",
+      "Commit all stashed steps",
+      "Commit all stashed drafts in outline order after any desired refinements.",
+      Type.Object({}),
+      async () => toolResult({ committed: emitter.commitAllStepDrafts() }),
     ) as AgentTool,
   );
 
@@ -335,8 +415,7 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
     defineTool<TSchema, { playbook: PlaybookOutput }>(
       "finalize_playbook",
       "Finalize playbook",
-      "Materialize the complete PlaybookScript. The agent loop terminates " +
-        "after this — do NOT issue any more tool calls afterward.",
+      "Compile the committed drafts. Finalization rejects open or unresolved drafts.",
       Type.Object({}),
       async () => toolResult({ playbook: emitter.finalize() }, { terminate: true }),
     ) as AgentTool,

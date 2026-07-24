@@ -1,7 +1,4 @@
-/**
- * Runtime ToolHub bridge. These generic tools expose FastAPI-side deterministic
- * skills, validators, schema checks, and registry tools to the pi agent loop.
- */
+/** Runtime ToolHub bridge with request-scoped capability enforcement. */
 
 import { Type } from "@earendil-works/pi-ai";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
@@ -9,10 +6,10 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { defineTool, toolResult } from "./common.js";
 
 export interface RuntimeToolDeps {
-  /** FastAPI base URL (e.g. ``http://api:8000``). */
   apiBaseUrl: string;
-  /** Shared token accepted by FastAPI's internal agent endpoints. */
   sharedToken?: string;
+  allowedRuntimeTools?: ReadonlySet<string>;
+  runId?: string;
 }
 
 interface RuntimeToolManifest {
@@ -36,65 +33,78 @@ interface RuntimeToolExecuteResult {
 
 export function makeRuntimeToolTools(deps: RuntimeToolDeps): AgentTool[] {
   const base = deps.apiBaseUrl.replace(/\/$/, "");
+  const allowed = deps.allowedRuntimeTools;
 
   async function request<T>(
     path: string,
     init: { method?: string; body?: unknown } = {},
   ): Promise<T> {
     const headers: Record<string, string> = {};
-    if (init.body !== undefined) {
-      headers["Content-Type"] = "application/json";
-    }
-    if (deps.sharedToken) {
-      headers["X-MetaView-Agent-Token"] = deps.sharedToken;
-    }
-    const resp = await fetch(`${base}${path}`, {
+    if (init.body !== undefined) headers["Content-Type"] = "application/json";
+    if (deps.sharedToken) headers["X-MetaView-Agent-Token"] = deps.sharedToken;
+    const response = await fetch(`${base}${path}`, {
       method: init.method ?? "GET",
       headers,
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
     });
-    if (!resp.ok) {
-      const detail = await resp.text().catch(() => "");
-      throw new Error(
-        `runtime tool ${path} HTTP ${resp.status}: ${detail.slice(0, 240)}`,
-      );
+    if (!response.ok) {
+      const detail = await response.text().catch(() => "");
+      throw new Error(`runtime tool ${path} HTTP ${response.status}: ${detail.slice(0, 240)}`);
     }
-    return (await resp.json()) as T;
+    return (await response.json()) as T;
+  }
+
+  function isAllowed(name: string): boolean {
+    return !allowed || allowed.has("*") || allowed.has(name) || name === "playbook.schema.validate" || name === "playbook.self_check";
+  }
+
+  function assertAllowed(name: string): void {
+    if (!isAllowed(name)) {
+      throw new Error(`runtime capability ${JSON.stringify(name)} is not allowed for this run`);
+    }
   }
 
   return [
     defineTool(
       "runtime_tool_list",
       "Runtime tools: list",
-      "List backend RuntimeToolHub tools, including deterministic SkillPacks, " +
-        "schema validation, Playbook self-checks, geometry validators, and " +
-        "animation registry tools.",
+      "List the deterministic backend capabilities authorized for the current run.",
       Type.Object({}),
       async () => {
         const data = await request<RuntimeToolListResult>("/api/v1/agent/runtime-tools");
-        return toolResult(data);
+        return toolResult({ tools: data.tools.filter((tool) => isAllowed(tool.name)) });
       },
     ) as AgentTool,
 
     defineTool(
       "runtime_tool_execute",
       "Runtime tools: execute",
-      "Execute one backend RuntimeToolHub tool with free-form JSON args. " +
-        "Use this for deterministic kernels and validators instead of guessing.",
+      "Execute one authorized deterministic backend capability.",
       Type.Object({
         tool: Type.String({ minLength: 1 }),
         args: Type.Record(Type.String(), Type.Unknown(), {
-          description: "Free-form JSON args for the selected runtime tool.",
+          description: "Arguments matching the selected runtime tool schema.",
         }),
       }),
       async (args) => {
+        assertAllowed(args.tool);
         const data = await request<RuntimeToolExecuteResult>(
           "/api/v1/agent/runtime-tools/execute",
           {
             method: "POST",
-            body: { tool: args.tool, args: args.args },
+            body: {
+              tool: args.tool,
+              args: args.args,
+              run_id: deps.runId,
+              allowed_tools: allowed ? [...allowed] : [],
+            },
           },
         );
+        if (!data.ok) {
+          const code = String(data.error?.code ?? "runtime_tool.failed");
+          const message = String(data.error?.message ?? `runtime tool ${args.tool} failed`);
+          throw new Error(`${code}: ${message}`);
+        }
         return toolResult(data);
       },
     ) as AgentTool,

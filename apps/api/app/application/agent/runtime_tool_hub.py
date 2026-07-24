@@ -24,6 +24,11 @@ from app.domain.services.scene_blueprint_schema import (
     scene_blueprint_tool_schema,
     validate_scene_blueprint,
 )
+from app.domain.services.scene_sequence_blueprint import (
+    compile_scene_sequence_blueprint,
+    scene_sequence_blueprint_tool_schema,
+)
+from app.domain.services.visual_progression_quality import validate_visual_progression
 from app.domain.skills.base import SkillExecutionContext, SkillRouteInput, SkillRouteMatch
 from app.domain.skills.registry import SkillRegistry, build_default_skill_registry
 
@@ -37,6 +42,11 @@ ASSET_MANIFEST_ROOT = (
     / "assets"
     / "metaview-kits"
 )
+_INTERNAL_TOOLS = frozenset({
+    "playbook.schema.validate",
+    "playbook.self_check",
+    "playbook.visual_progression.validate",
+})
 
 
 class _OrientationArgs(BaseModel):
@@ -77,7 +87,7 @@ class RuntimeToolHub:
             ),
             ToolManifest(
                 name="playbook.schema.validate",
-                description="Validate a candidate object against the PlaybookScript schema.",
+                description="Validate a candidate object against the canonical PlaybookScript schema.",
                 args_schema={
                     "type": "object",
                     "properties": {"playbook": {"type": "object"}},
@@ -88,7 +98,7 @@ class RuntimeToolHub:
             ),
             ToolManifest(
                 name="playbook.self_check",
-                description="Run MetaView PlaybookScript semantic and renderer self-checks.",
+                description="Run canonical Playbook semantic and renderer checks.",
                 args_schema={
                     "type": "object",
                     "properties": {
@@ -101,15 +111,37 @@ class RuntimeToolHub:
                 deterministic=True,
             ),
             ToolManifest(
+                name="playbook.visual_progression.validate",
+                description="Detect repeated or non-progressing visible states across Playbook steps.",
+                args_schema={
+                    "type": "object",
+                    "properties": {"playbook": {"type": "object"}},
+                    "required": ["playbook"],
+                },
+                domain="playbook",
+                deterministic=True,
+            ),
+            ToolManifest(
                 name="scene_blueprint.compile",
+                description="Compile one controlled SceneBlueprint into a renderer-ready PlaybookScript.",
+                args_schema={
+                    "type": "object",
+                    "properties": {"blueprint": scene_blueprint_tool_schema()},
+                    "required": ["blueprint"],
+                },
+                domain="scene_blueprint",
+                deterministic=True,
+            ),
+            ToolManifest(
+                name="scene_sequence_blueprint.compile",
                 description=(
-                    "Compile a controlled SceneBlueprint into a renderer-ready "
-                    "PlaybookScript."
+                    "Compile ordered semantic checkpoints into distinct Playbook steps, "
+                    "Director-ready transitions, and a source map."
                 ),
                 args_schema={
                     "type": "object",
                     "properties": {
-                        "blueprint": scene_blueprint_tool_schema(),
+                        "blueprint": scene_sequence_blueprint_tool_schema(),
                     },
                     "required": ["blueprint"],
                 },
@@ -125,7 +157,7 @@ class RuntimeToolHub:
             ),
             ToolManifest(
                 name="animation_tool.expand",
-                description="Expand one backend animation registry tool into Playbook layers.",
+                description="Expand one backend animation macro into validated LayerSpec data.",
                 args_schema={
                     "type": "object",
                     "properties": {
@@ -188,26 +220,47 @@ class RuntimeToolHub:
     def get_tool(self, name: str) -> ToolManifest | None:
         return next((tool for tool in self.list_tools() if tool.name == name), None)
 
-    async def execute_tool(self, name: str, args: dict[str, Any]) -> ToolExecutionResult:
+    async def execute_tool(
+        self,
+        name: str,
+        args: dict[str, Any],
+        *,
+        allowed_names: set[str] | frozenset[str] | None = None,
+    ) -> ToolExecutionResult:
+        if not self._tool_allowed(name, allowed_names):
+            return self._error(
+                name,
+                "runtime_tool.capability_denied",
+                f"Runtime tool {name!r} is not authorized for this run.",
+                {"allowed_tools": sorted(allowed_names or set())},
+            )
         if name == "skill.registry.list":
-            return self._ok(name, {
-                "skills": [
-                    manifest.model_dump(mode="json")
-                    for manifest in self._skill_registry.manifests()
-                ]
-            })
+            return self._ok(
+                name,
+                {
+                    "skills": [
+                        manifest.model_dump(mode="json")
+                        for manifest in self._skill_registry.manifests()
+                    ]
+                },
+            )
         if name.startswith("skill.") and name.endswith(".solve"):
             return await self._execute_skill_tool(name, args)
         if name == "playbook.schema.validate":
             return self._validate_playbook(name, args)
         if name == "playbook.self_check":
             return self._self_check_playbook(name, args)
+        if name == "playbook.visual_progression.validate":
+            return self._validate_visual_progression(name, args)
         if name == "scene_blueprint.compile":
             return self._compile_scene_blueprint(name, args)
+        if name == "scene_sequence_blueprint.compile":
+            return self._compile_scene_sequence_blueprint(name, args)
         if name == "animation_tool.list":
-            return self._ok(name, {
-                "tools": [tool.model_dump(mode="json") for tool in list_animation_tools()]
-            })
+            return self._ok(
+                name,
+                {"tools": [tool.model_dump(mode="json") for tool in list_animation_tools()]},
+            )
         if name == "animation_tool.expand":
             result = safe_expand_animation_call(
                 str(args.get("tool", "")),
@@ -255,6 +308,15 @@ class RuntimeToolHub:
             "runtime_tool.unknown_tool",
             f"Unknown runtime tool: {name}",
         )
+
+    @staticmethod
+    def _tool_allowed(
+        name: str,
+        allowed_names: set[str] | frozenset[str] | None,
+    ) -> bool:
+        if allowed_names is None or "*" in allowed_names:
+            return True
+        return name in allowed_names or name in _INTERNAL_TOOLS
 
     async def _execute_skill_tool(
         self,
@@ -340,25 +402,9 @@ class RuntimeToolHub:
                 name,
                 "playbook.schema.invalid",
                 "PlaybookScript schema validation failed.",
-                {"errors": exc.errors()},
-            )
-        return self._ok(name, {"valid": True, "playbook": playbook.model_dump(mode="json")})
-
-    def _validate_args(
-        self,
-        name: str,
-        model: type[ArgModelT],
-        args: dict[str, Any],
-    ) -> ArgModelT | ToolExecutionResult:
-        try:
-            return model.model_validate(args)
-        except ValidationError as exc:
-            return self._error(
-                name,
-                "runtime_tool.invalid_args",
-                "Runtime tool arguments are invalid.",
                 {"errors": exc.errors(include_url=False)},
             )
+        return self._ok(name, {"valid": True, "playbook": playbook.model_dump(mode="json")})
 
     def _self_check_playbook(
         self,
@@ -372,10 +418,27 @@ class RuntimeToolHub:
                 name,
                 "playbook.schema.invalid",
                 "PlaybookScript schema validation failed.",
-                {"errors": exc.errors()},
+                {"errors": exc.errors(include_url=False)},
             )
         verdict = self_check_playbook(playbook, str(args.get("prompt", "")))
         return self._ok(name, verdict.model_dump(mode="json"))
+
+    def _validate_visual_progression(
+        self,
+        name: str,
+        args: dict[str, Any],
+    ) -> ToolExecutionResult:
+        try:
+            playbook = PlaybookScript.model_validate(args.get("playbook"))
+        except ValidationError as exc:
+            return self._error(
+                name,
+                "playbook.schema.invalid",
+                "PlaybookScript schema validation failed.",
+                {"errors": exc.errors(include_url=False)},
+            )
+        report = validate_visual_progression(playbook)
+        return self._ok(name, report.model_dump(mode="json"))
 
     def _compile_scene_blueprint(
         self,
@@ -400,11 +463,7 @@ class RuntimeToolHub:
         try:
             playbook = compile_scene_blueprint_to_playbook(blueprint)
         except (ValueError, ValidationError) as exc:
-            return self._error(
-                name,
-                "scene_blueprint.compile_failed",
-                str(exc),
-            )
+            return self._error(name, "scene_blueprint.compile_failed", str(exc))
         playbook_json = playbook.model_dump(mode="json")
         self_check = self_check_playbook(
             playbook,
@@ -426,11 +485,68 @@ class RuntimeToolHub:
             },
         )
 
-    def _ok(self, tool: str, result: Any) -> ToolExecutionResult:
+    def _compile_scene_sequence_blueprint(
+        self,
+        name: str,
+        args: dict[str, Any],
+    ) -> ToolExecutionResult:
+        blueprint = args.get("blueprint")
+        if not isinstance(blueprint, dict):
+            return self._error(
+                name,
+                "scene_sequence_blueprint.invalid_args",
+                "scene_sequence_blueprint.compile requires a blueprint object.",
+            )
+        try:
+            compiled = compile_scene_sequence_blueprint(blueprint)
+        except (ValueError, ValidationError) as exc:
+            return self._error(
+                name,
+                "scene_sequence_blueprint.compile_failed",
+                str(exc),
+            )
+        playbook_json = compiled.playbook.model_dump(mode="json")
+        verdict = self_check_playbook(
+            compiled.playbook,
+            str(args.get("prompt") or blueprint.get("title") or ""),
+        )
+        return self._ok(
+            name,
+            {
+                "valid": True,
+                "sceneType": blueprint.get("sceneType"),
+                "playbook": playbook_json,
+                "source_map": compiled.source_map,
+                "checkpoint_snapshots": compiled.checkpoint_snapshots,
+                "self_check": verdict.model_dump(mode="json"),
+                "visual_quality": _metaview_core().validate_visual_quality(
+                    playbook_script=playbook_json,
+                ),
+            },
+        )
+
+    def _validate_args(
+        self,
+        name: str,
+        model: type[ArgModelT],
+        args: dict[str, Any],
+    ) -> ArgModelT | ToolExecutionResult:
+        try:
+            return model.model_validate(args)
+        except ValidationError as exc:
+            return self._error(
+                name,
+                "runtime_tool.invalid_args",
+                "Runtime tool arguments are invalid.",
+                {"errors": exc.errors(include_url=False)},
+            )
+
+    @staticmethod
+    def _ok(tool: str, result: Any) -> ToolExecutionResult:
         return ToolExecutionResult(tool=tool, ok=True, result=result)
 
+    @staticmethod
     def _error(
-        self,
         tool: str,
         code: str,
         message: str,

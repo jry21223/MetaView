@@ -1,235 +1,106 @@
-/**
- * Unit tests for PlaybookEmitter. These don't touch pi-agent-core — they
- * exercise the state machine that L1 / L2 / assert tools mutate.
- */
-
 import { describe, expect, it } from "vitest";
+
 import { PlaybookEmitter } from "../src/state/playbookEmitter.js";
 
-describe("PlaybookEmitter — step lifecycle", () => {
-  it("rejects draw calls without an open step", () => {
-    const e = new PlaybookEmitter();
-    expect(() => e.addPoint(0, 0, "p", "primary")).toThrow(/begin_step/);
+function outline(emitter: PlaybookEmitter, domain = "math"): void {
+  emitter.setOutline(
+    domain,
+    Array.from({ length: 8 }, (_, index) => `step ${index + 1}`),
+  );
+}
+
+function fillRemaining(emitter: PlaybookEmitter, start = 2): void {
+  for (let index = start; index <= 8; index += 1) {
+    emitter.beginStep(index, `step ${index}`);
+    emitter.addFormula(`x_${index}`);
+    emitter.setNarration([`第 ${index} 步建立可见公式。`]);
+    emitter.commitStep();
+  }
+}
+
+describe("PlaybookEmitter transactional lifecycle", () => {
+  it("requires one authoritative 8-14 step outline", () => {
+    const emitter = new PlaybookEmitter();
+    expect(() => emitter.beginStep(1, "missing outline")).toThrow(/plan_outline/);
+    expect(() => emitter.setOutline("math", ["only one"])).toThrow(/8-14/);
+    expect(() => emitter.setOutline("unknown", Array(8).fill("x"))).toThrow(/unsupported domain/);
   });
 
-  it("rejects begin_step while another is open", () => {
-    const e = new PlaybookEmitter();
-    e.beginStep(1, "first");
-    expect(() => e.beginStep(2, "second")).toThrow(/not committed/);
+  it("rejects duplicate or skipped indices at tool-call time", () => {
+    const emitter = new PlaybookEmitter();
+    outline(emitter);
+    expect(() => emitter.beginStep(2, "skip")).toThrow(/expected outline index 1/);
+    emitter.beginStep(1, "first");
+    emitter.addFormula("x");
+    emitter.setNarration(["建立第一个可见步骤。"]);
+    emitter.commitStep();
+    expect(() => emitter.beginStep(1, "duplicate")).toThrow(/expected outline index 2/);
   });
 
-  it("commit_step closes the current step", () => {
-    const e = new PlaybookEmitter();
-    e.beginStep(1, "intro");
-    expect(e.hasOpenStep()).toBe(true);
-    e.commitStep();
-    expect(e.hasOpenStep()).toBe(false);
-    expect(e.stepCount()).toBe(1);
+  it("stashes, refines, and explicitly commits a template draft", () => {
+    const emitter = new PlaybookEmitter();
+    outline(emitter);
+    emitter.beginStep(1, "draft");
+    emitter.addFormula("x^2");
+    emitter.setNarration(["初始旁白。"]);
+    const draft = emitter.stashCurrentDraft();
+    expect(emitter.draftCount()).toBe(1);
+    emitter.selectStepDraft(draft.draft_id);
+    emitter.setNarration(["修订后的旁白解释为什么、做什么和学到什么。"]);
+    emitter.commitStep();
+    fillRemaining(emitter);
+    const output = emitter.finalize();
+    expect(output.steps[0].voiceover_text).toContain("修订后的旁白");
   });
 
-  it("finalize auto-commits a forgotten open step", () => {
-    const e = new PlaybookEmitter();
-    e.beginStep(1, "forgot");
-    const out = e.finalize();
-    expect(out.steps).toHaveLength(1);
-  });
-});
-
-describe("PlaybookEmitter — parametric curve + orientation lookup", () => {
-  it("resolveParametricCurve returns the curve previously added", () => {
-    const e = new PlaybookEmitter();
-    e.beginStep(1, "circle");
-    const id = e.addCurveParametric("cos(t)", "-sin(t)", 0, 6.28, "C", "primary");
-    const resolved = e.resolveParametricCurve(id);
-    expect(resolved.ok).toBe(true);
-    if (resolved.ok) {
-      expect(resolved.expression_x).toBe("cos(t)");
-      expect(resolved.expression_y).toBe("-sin(t)");
-      expect(resolved.t_min).toBe(0);
-      expect(resolved.t_max).toBe(6.28);
-    }
+  it("never auto-commits unresolved drafts during finalization", () => {
+    const emitter = new PlaybookEmitter();
+    outline(emitter);
+    emitter.beginStep(1, "open");
+    emitter.addFormula("x");
+    emitter.setNarration(["尚未提交。"]);
+    expect(() => emitter.finalize()).toThrow(/open draft/);
   });
 
-  it("resolveParametricCurve refuses 1D curves", () => {
-    const e = new PlaybookEmitter();
-    e.beginStep(1, "plot");
-    const id = e.addCurve1D("x**2", "f", "primary");
-    const resolved = e.resolveParametricCurve(id);
-    expect(resolved.ok).toBe(false);
-    if (!resolved.ok) {
-      expect(resolved.reason).toMatch(/not a parametric curve/);
-    }
-  });
-});
-
-describe("PlaybookEmitter — finalize", () => {
-  it("emits Python PlaybookScript step_id instead of the internal id field", () => {
-    const e = new PlaybookEmitter();
-    e.beginStep(1, "array");
-    e.addArrayTokens(["3", "1"]);
-    e.commitStep();
-
-    const step = e.finalize().steps[0];
-
-    expect(step.step_id).toBe("step_01");
-    expect(step).not.toHaveProperty("id");
+  it("emits a real code_trace_scene and parallel Code Sync state", () => {
+    const emitter = new PlaybookEmitter();
+    outline(emitter, "code");
+    emitter.beginStep(1, "code");
+    emitter.setCodeHighlight(
+      {
+        language: "python",
+        lines: ["x = 1", "x += 1"],
+        active_lines: [1],
+        active_line: 1,
+        variables: { x: "2" },
+        operation_label: "increment",
+      },
+      true,
+    );
+    emitter.setNarration(["执行第二行并同步展示 x 的新值。"]);
+    emitter.commitStep();
+    fillRemaining(emitter);
+    const output = emitter.finalize();
+    expect(output.steps[0].snapshot.kind).toBe("code_trace_scene");
+    expect(output.steps[0].code_highlight?.variables.x).toBe("2");
   });
 
-  it("allocates longer end_frame for longer Chinese narration", () => {
-    const e = new PlaybookEmitter();
-    e.beginStep(1, "短旁白");
-    e.setNarration(["这是一个短的中文旁白。"]);
-    e.commitStep();
-    e.beginStep(2, "长旁白");
-    e.setNarration(["这是一段较长的中文旁白，用于验证字幕节奏会随文本增长自动变长。".repeat(3)]);
-    e.commitStep();
-
-    const out = e.finalize();
-    const firstDuration = out.steps[0].end_frame;
-    const secondDuration = out.steps[1].end_frame - out.steps[0].end_frame;
-
-    expect(secondDuration).toBeGreaterThan(firstDuration);
-  });
-
-  it("uses DEFAULT_STEP_FRAMES for steps with empty voiceover_text", () => {
-    const e = new PlaybookEmitter();
-    e.beginStep(1, "empty step");
-    e.commitStep();
-    const out = e.finalize();
-
-    expect(out.steps[0].end_frame).toBe(120);
-  });
-
-  it("uses per-step estimated narration durations and sets total_frames to the final end_frame", () => {
-    const e = new PlaybookEmitter();
-    e.beginStep(1, "short");
-    e.setNarration(["短字幕"]);
-    e.commitStep();
-    e.beginStep(2, "long");
-    e.setNarration(["这是一个更长的中文旁白，用于测试每步时间会被拉伸以匹配语音时长。".repeat(4)]);
-    e.commitStep();
-    e.beginStep(3, "empty");
-    e.commitStep();
-    const out = e.finalize();
-
-    expect(out.total_frames).toBe(out.steps.at(-1)!.end_frame);
-    expect(out.steps[1].end_frame).toBeGreaterThan(out.steps[0].end_frame);
-    expect(out.steps[2].end_frame - out.steps[1].end_frame).toBe(120);
-  });
-
-  it("never emits a vector_field field on any snapshot", () => {
-    const e = new PlaybookEmitter();
-    e.setOutline("math", ["a"]);
-    e.beginStep(1, "scene");
-    e.setAxes(-2, 2, -2, 2);
-    e.addCurveParametric("cos(t)", "sin(t)", 0, 6.28, "C", "primary");
-    e.addArrow(1, 0, 0, 0.5, "v");
-    e.commitStep();
-    const out = e.finalize();
-    for (const step of out.steps) {
-      const snapshot = step.snapshot as Record<string, unknown> | undefined;
-      expect(snapshot).toBeDefined();
-      expect(snapshot).not.toHaveProperty("vector_field");
-    }
-  });
-
-  it("aggregates parametric + segments into a single math_scene snapshot", () => {
-    const e = new PlaybookEmitter();
-    e.beginStep(1, "scene");
-    e.addCurveParametric("cos(t)", "sin(t)", 0, 6.28, "圆", "primary");
-    e.addPoint(1, 0, "起点", "accent");
-    e.addArrow(1, 0, 0, 1, "v");
-    e.commitStep();
-    const snap = e.finalize().steps[0].snapshot as Record<string, unknown>;
-    expect(snap.kind).toBe("math_scene");
-    expect((snap.curves as unknown[]).length).toBe(1);
-    expect((snap.points as unknown[]).length).toBe(1);
-    expect((snap.segments as unknown[]).length).toBe(1);
-  });
-
-  it("falls back to math_formula when only formula is set", () => {
-    const e = new PlaybookEmitter();
-    e.beginStep(1, "pure formula");
-    e.addFormula("e^{i\\pi} + 1 = 0");
-    e.commitStep();
-    const snap = e.finalize().steps[0].snapshot as Record<string, unknown>;
-    expect(snap.kind).toBe("math_formula");
-    expect(snap.formula_latex).toContain("e^{i");
-  });
-
-  it("uses algorithm_bars when token labels are all numeric", () => {
-    const e = new PlaybookEmitter();
-    e.beginStep(1, "array");
-    e.addArrayTokens(["3", "1", "4", "1", "5"]);
-    e.commitStep();
-    const step = e.finalize().steps[0];
-    const snap = step.snapshot as Record<string, unknown>;
-    expect(snap.kind).toBe("algorithm_bars");
-    expect(snap.array_values).toEqual(["3", "1", "4", "1", "5"]);
-    expect(snap.numeric_values).toEqual([3, 1, 4, 1, 5]);
-    expect(snap.active_indices).toEqual([]);
-    expect(snap.swap_indices).toEqual([]);
-    expect(snap.sorted_indices).toEqual([]);
-    expect(snap.pointers).toEqual({});
-    expect(snap).not.toHaveProperty("tokens");
-    expect(step.layers[0].body).toEqual(snap);
-  });
-
-  it("uses algorithm_array when labels contain non-numeric tokens", () => {
-    const e = new PlaybookEmitter();
-    e.beginStep(1, "array of strings");
-    e.addArrayTokens(["foo", "bar"]);
-    e.commitStep();
-    const snap = e.finalize().steps[0].snapshot as Record<string, unknown>;
-    expect(snap.kind).toBe("algorithm_array");
-    expect(snap.array_values).toEqual(["foo", "bar"]);
-    expect(snap.active_indices).toEqual([]);
-    expect(snap.swap_indices).toEqual([]);
-    expect(snap.sorted_indices).toEqual([]);
-    expect(snap.pointers).toEqual({});
-    expect(snap).not.toHaveProperty("tokens");
-  });
-
-  it("maps token emphasis into array active and sorted indices", () => {
-    const e = new PlaybookEmitter();
-    e.beginStep(1, "array emphasis");
-    e.addArrayTokens(["A", "B", "C"], { 0: "primary", 2: "accent" });
-    e.commitStep();
-    const snap = e.finalize().steps[0].snapshot as Record<string, unknown>;
-    expect(snap.kind).toBe("algorithm_array");
-    expect(snap.active_indices).toEqual([0]);
-    expect(snap.sorted_indices).toEqual([2]);
-  });
-
-  it("propagates the planned domain", () => {
-    const e = new PlaybookEmitter();
-    e.setOutline("physics", ["a", "b"]);
-    e.beginStep(1, "x");
-    e.commitStep();
-    expect(e.finalize().domain).toBe("physics");
-  });
-
-  it("sets total_frames based on number of committed steps", () => {
-    const e = new PlaybookEmitter();
-    for (let i = 1; i <= 3; i++) {
-      e.beginStep(i, `step ${i}`);
-      e.commitStep();
-    }
-    const out = e.finalize();
-    expect(out.total_frames).toBe(3 * 120); // DEFAULT_STEP_FRAMES = 120
-    expect(out.fps).toBe(30);
-  });
-});
-
-describe("PlaybookEmitter — parameter controls", () => {
-  it("dedupes parameter_controls by id", () => {
-    const e = new PlaybookEmitter();
-    e.addParameterControl({ id: "a", label: "x", value: "1" });
-    e.addParameterControl({ id: "a", label: "y", value: "2" });
-    e.beginStep(1, "s");
-    e.commitStep();
-    const out = e.finalize();
-    expect(out.parameter_controls).toHaveLength(1);
-    expect(out.parameter_controls[0].value).toBe("2");
+  it("applies compiled layers without asking the model to rewrite JSON", () => {
+    const emitter = new PlaybookEmitter();
+    outline(emitter);
+    emitter.beginStep(1, "compiled");
+    const snapshot = { kind: "math_plot", curves: [{ expression: "x^2" }] };
+    emitter.applyCompiledLayers(snapshot, [
+      {
+        timing: { enter_at: 0, exit_at: 1, appear_anim: "draw", z_order: 0 },
+        body: snapshot,
+      },
+    ]);
+    emitter.setNarration(["由注册表编译并直接应用图层。"]);
+    emitter.commitStep();
+    fillRemaining(emitter);
+    const output = emitter.finalize();
+    expect(output.steps[0].layers[0].timing.appear_anim).toBe("draw");
+    expect(output.steps[0].layers[0].body).toEqual(output.steps[0].snapshot);
   });
 });

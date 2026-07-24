@@ -1,13 +1,4 @@
-"""Agent-side callback endpoints.
-
-The Node sidecar (``apps/agent``) calls these during a generation run so
-geometric properties (orientation, point-on-curve, monotonicity) are checked
-by deterministic sympy code rather than left to LLM intuition.
-
-Endpoints are intentionally narrow — they accept the minimum payload needed
-and return a flat JSON object the TS side can pipe straight into a
-``toolResult`` message.
-"""
+"""Agent-side callback endpoints with request-scoped tool authorization."""
 
 from __future__ import annotations
 
@@ -21,10 +12,7 @@ from starlette.requests import Request
 from app.application.agent.runtime_tool_hub import RuntimeToolHub
 from app.application.agent.types import ToolExecutionResult, ToolManifest
 from app.config import get_settings
-from app.domain.animation_tools import (
-    AnimationToolInfo,
-    AnimationToolIssue,
-)
+from app.domain.animation_tools import AnimationToolInfo, AnimationToolIssue
 from app.domain.models.cir import LayerSpec
 from app.presentation.rate_limit import write_limit
 
@@ -71,11 +59,19 @@ class MonotonicResponse(BaseModel):
     reason: str
 
 
+class AuthorizedToolRequest(BaseModel):
+    run_id: str | None = Field(default=None, max_length=160)
+    allowed_tools: list[str] = Field(default_factory=list, max_length=256)
+
+    def allowed_names(self) -> set[str] | None:
+        return set(self.allowed_tools) if self.allowed_tools else None
+
+
 class AnimationToolListResponse(BaseModel):
     tools: list[AnimationToolInfo]
 
 
-class AnimationToolExpandRequest(BaseModel):
+class AnimationToolExpandRequest(AuthorizedToolRequest):
     tool: str = Field(min_length=1, max_length=128)
     args: dict[str, Any] = Field(default_factory=dict)
 
@@ -89,7 +85,7 @@ class RuntimeToolListResponse(BaseModel):
     tools: list[ToolManifest]
 
 
-class RuntimeToolExecuteRequest(BaseModel):
+class RuntimeToolExecuteRequest(AuthorizedToolRequest):
     tool: str = Field(min_length=1, max_length=160)
     args: dict[str, Any] = Field(default_factory=dict)
 
@@ -111,6 +107,7 @@ async def assert_orientation(
     request: Request,
     payload: OrientationRequest,
 ) -> OrientationResponse:
+    del request
     result = await RuntimeToolHub().execute_tool(
         "geometry.assert_orientation",
         payload.model_dump(mode="json"),
@@ -125,6 +122,7 @@ async def assert_passes_through(
     request: Request,
     payload: PointOnCurveRequest,
 ) -> PointOnCurveResponse:
+    del request
     result = await RuntimeToolHub().execute_tool(
         "geometry.assert_passes_through",
         payload.model_dump(mode="json"),
@@ -139,6 +137,7 @@ async def assert_monotonic(
     request: Request,
     payload: MonotonicRequest,
 ) -> MonotonicResponse:
+    del request
     result = await RuntimeToolHub().execute_tool(
         "geometry.assert_monotonic",
         payload.model_dump(mode="json"),
@@ -164,11 +163,15 @@ async def expand_animation_tool(
     payload: AnimationToolExpandRequest,
     token: Annotated[str | None, Header(alias="X-MetaView-Agent-Token")] = None,
 ) -> AnimationToolExpandResponse:
+    del request
     _require_agent_token(token)
     result = await RuntimeToolHub().execute_tool(
         "animation_tool.expand",
-        payload.model_dump(mode="json"),
+        {"tool": payload.tool, "args": payload.args},
+        allowed_names=payload.allowed_names(),
     )
+    if not result.ok:
+        raise HTTPException(status_code=403, detail=result.error)
     data = result.result if isinstance(result.result, dict) else {}
     return AnimationToolExpandResponse.model_validate(data)
 
@@ -188,5 +191,10 @@ async def execute_runtime_tool(
     payload: RuntimeToolExecuteRequest,
     token: Annotated[str | None, Header(alias="X-MetaView-Agent-Token")] = None,
 ) -> ToolExecutionResult:
+    del request
     _require_agent_token(token)
-    return await RuntimeToolHub().execute_tool(payload.tool, payload.args)
+    return await RuntimeToolHub().execute_tool(
+        payload.tool,
+        payload.args,
+        allowed_names=payload.allowed_names(),
+    )

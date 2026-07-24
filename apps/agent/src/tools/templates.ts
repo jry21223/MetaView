@@ -1,41 +1,44 @@
 /**
- * L2 templates — pedagogical macros that compose L1 primitives into typical
- * teaching sequences. The LLM is encouraged to prefer these because they
- * already encode "what to show + suggested narration cadence" for known
- * patterns. None of them emit a vector_field; that's the whole point.
+ * L2 pedagogical templates.
  *
- * Each template takes its semantic arguments, internally calls the same
- * emitter methods L1 tools use, and emits 1+ committed steps. The LLM is
- * still free to call ``set_narration`` after a template returns to refine
- * the wording for the specific lesson it's teaching.
+ * Templates create editable drafts and never commit them. All numeric geometry
+ * is derived by the deterministic safe-math kernel instead of being narrated
+ * without a corresponding visible object.
  */
 
 import { Type } from "@earendil-works/pi-ai";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 
 import type { PlaybookEmitter } from "../state/playbookEmitter.js";
+import {
+  derivativeAt,
+  evaluateExpression,
+  formatNumber,
+  sampleParametric,
+} from "../state/safeMath.js";
 import { defineTool, toolResult } from "./common.js";
 
 export interface TemplateToolDeps {
   emitter: PlaybookEmitter;
 }
 
+function stash(emitter: PlaybookEmitter): { draft_id: string; step_index: number } {
+  return emitter.stashCurrentDraft();
+}
+
 function makeStepRange(startIndex: number, count: number): number[] {
-  return Array.from({ length: count }, (_, i) => startIndex + i);
+  return Array.from({ length: count }, (_, index) => startIndex + index);
 }
 
 export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
   const { emitter } = deps;
   const tools: AgentTool[] = [];
 
-  // ── Algorithm domain ──────────────────────────────────────────────────
   tools.push(
     defineTool(
       "template_array_swap",
       "Template: array swap",
-      "Emit a 3-step sequence visualizing an array element swap: " +
-        "(1) highlight a[i] and a[j], (2) execute the swap, (3) show the " +
-        "result. Use for sorting demos.",
+      "Create three editable drafts: compare two array items, perform the swap, and show the result.",
       Type.Object({
         values: Type.Array(Type.String(), { minItems: 2 }),
         i: Type.Integer({ minimum: 0 }),
@@ -43,42 +46,43 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
         start_step_index: Type.Integer({ minimum: 1 }),
       }),
       async (args) => {
+        if (args.i >= args.values.length || args.j >= args.values.length) {
+          throw new Error("swap indices must be inside values");
+        }
         const indices = makeStepRange(args.start_step_index, 3);
-        const before = args.values;
+        const before = [...args.values];
         const after = [...before];
         [after[args.i], after[args.j]] = [after[args.j], after[args.i]];
-
-        const highlight: Record<number, "primary" | "secondary" | "accent"> = {
-          [args.i]: "primary", [args.j]: "primary",
-        };
+        const highlight = { [args.i]: "primary", [args.j]: "primary" } as const;
+        const drafts = [];
 
         emitter.beginStep(indices[0], `比较 a[${args.i}] 和 a[${args.j}]`);
         emitter.addArrayTokens(before, highlight);
         emitter.setNarration([
-          `先看 a[${args.i}] = ${before[args.i]} 和 a[${args.j}] = ${before[args.j]}。`,
-          `如果它们的顺序不满足排序要求，下一步就要交换。`,
+          `先同时观察 a[${args.i}] = ${before[args.i]} 和 a[${args.j}] = ${before[args.j]}。`,
+          "这一步只比较两个位置，不提前改变数组。",
+          "比较结果决定下一步是否执行交换。",
         ]);
-        emitter.commitStep();
+        drafts.push(stash(emitter));
 
-        emitter.beginStep(indices[1], `执行交换`);
+        emitter.beginStep(indices[1], "执行交换");
         emitter.addArrayTokens(before, highlight);
         emitter.setNarration([
-          `把 a[${args.i}] 和 a[${args.j}] 交换位置。`,
-          `这是 sorted-by-bubble/insertion 类算法的核心动作。`,
+          `现在交换索引 ${args.i} 和 ${args.j} 的值。`,
+          "高亮保持不变，让交换前后的对应位置可以直接比较。",
+          "数组其他位置不参与本次状态变化。",
         ]);
-        emitter.commitStep();
+        drafts.push(stash(emitter));
 
-        emitter.beginStep(indices[2], `交换之后`);
-        emitter.addArrayTokens(after, {
-          [args.i]: "accent", [args.j]: "accent",
-        });
+        emitter.beginStep(indices[2], "交换完成");
+        emitter.addArrayTokens(after, { [args.i]: "accent", [args.j]: "accent" });
         emitter.setNarration([
-          `交换完成后，数组在这两个位置上的值翻转了。`,
-          `数组其它部分保持不变，便于和上一步直观对比。`,
+          `交换后两个位置变成 ${after[args.i]} 和 ${after[args.j]}。`,
+          "只有目标索引发生变化，其余元素保持原顺序。",
+          "这就是排序算法中一次可验证的局部状态转移。",
         ]);
-        emitter.commitStep();
-
-        return toolResult({ step_indices: indices });
+        drafts.push(stash(emitter));
+        return toolResult({ draft_ids: drafts.map((draft) => draft.draft_id), step_indices: indices });
       },
     ) as AgentTool,
   );
@@ -87,46 +91,44 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
     defineTool(
       "template_array_compare",
       "Template: array compare",
-      "Emit a 2-step compare sequence: highlight a[i] and a[j], then state " +
-        "the comparison result (lt/gt/eq).",
+      "Create two editable drafts for a read-only comparison and its verdict.",
       Type.Object({
         values: Type.Array(Type.String(), { minItems: 2 }),
         i: Type.Integer({ minimum: 0 }),
         j: Type.Integer({ minimum: 0 }),
-        result: Type.Union([
-          Type.Literal("lt"),
-          Type.Literal("gt"),
-          Type.Literal("eq"),
-        ]),
+        result: Type.Union([Type.Literal("lt"), Type.Literal("gt"), Type.Literal("eq")]),
         start_step_index: Type.Integer({ minimum: 1 }),
       }),
       async (args) => {
+        if (args.i >= args.values.length || args.j >= args.values.length) {
+          throw new Error("comparison indices must be inside values");
+        }
         const indices = makeStepRange(args.start_step_index, 2);
-        const high: Record<number, "primary"> = {
-          [args.i]: "primary", [args.j]: "primary",
-        };
+        const emphasis = { [args.i]: "primary", [args.j]: "primary" } as const;
+        const drafts = [];
         emitter.beginStep(indices[0], `比较 a[${args.i}] 与 a[${args.j}]`);
-        emitter.addArrayTokens(args.values, high);
+        emitter.addArrayTokens(args.values, emphasis);
         emitter.setNarration([
-          `我们要确定 a[${args.i}] 和 a[${args.j}] 的相对大小。`,
-          `这一步只读不写——下一步再决定要不要动数组。`,
+          `比较 a[${args.i}] = ${args.values[args.i]} 与 a[${args.j}] = ${args.values[args.j]}。`,
+          "当前步骤只读取数据，因此数组状态保持不变。",
+          "下一步根据比较关系给出操作判断。",
         ]);
-        emitter.commitStep();
-
-        const verdictText =
-          args.result === "lt" ? `a[${args.i}] < a[${args.j}]，无需交换` :
-          args.result === "gt" ? `a[${args.i}] > a[${args.j}]，需要交换` :
-          `a[${args.i}] = a[${args.j}]，无需交换`;
-
-        emitter.beginStep(indices[1], `比较结果`);
-        emitter.addArrayTokens(args.values, high);
+        drafts.push(stash(emitter));
+        const verdict =
+          args.result === "lt"
+            ? `a[${args.i}] < a[${args.j}]`
+            : args.result === "gt"
+              ? `a[${args.i}] > a[${args.j}]`
+              : `a[${args.i}] = a[${args.j}]`;
+        emitter.beginStep(indices[1], "比较结果");
+        emitter.addArrayTokens(args.values, emphasis);
         emitter.setNarration([
-          `${verdictText}。`,
-          `这告诉我们下一步对数组要不要做改动。`,
-          `保持其它索引不变，方便顺着流程往下看。`,
+          `${verdict}。`,
+          "这个关系是后续分支或交换操作的直接依据。",
+          "因为这一步仍未写入数据，画面中的数组值不发生变化。",
         ]);
-        emitter.commitStep();
-        return toolResult({ step_indices: indices });
+        drafts.push(stash(emitter));
+        return toolResult({ draft_ids: drafts.map((draft) => draft.draft_id), step_indices: indices });
       },
     ) as AgentTool,
   );
@@ -135,8 +137,7 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
     defineTool(
       "template_pointer_step",
       "Template: pointer step",
-      "Single step showing a pointer / index moving from prev_index to " +
-        "next_index along an array.",
+      "Create one editable draft showing a pointer moving to the next array index.",
       Type.Object({
         values: Type.Array(Type.String(), { minItems: 1 }),
         prev_index: Type.Integer({ minimum: -1 }),
@@ -145,55 +146,75 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
         start_step_index: Type.Integer({ minimum: 1 }),
       }),
       async (args) => {
-        emitter.beginStep(args.start_step_index, args.label ?? `指针走到 ${args.next_index}`);
-        const emph: Record<number, "primary" | "secondary"> = {
+        if (args.next_index >= args.values.length) throw new Error("next_index is outside values");
+        emitter.beginStep(args.start_step_index, args.label ?? `指针移动到 ${args.next_index}`);
+        const emphasis: Record<number, "primary" | "secondary"> = {
           [args.next_index]: "primary",
         };
-        if (args.prev_index >= 0) emph[args.prev_index] = "secondary";
-        emitter.addArrayTokens(args.values, emph);
+        if (args.prev_index >= 0 && args.prev_index < args.values.length) {
+          emphasis[args.prev_index] = "secondary";
+        }
+        emitter.addArrayTokens(args.values, emphasis);
         emitter.setNarration([
           `指针从 ${args.prev_index} 移动到 ${args.next_index}。`,
-          `当前关心的位置 a[${args.next_index}] = ${args.values[args.next_index]}。`,
-          `这是循环 / 双指针类算法的状态推进。`,
+          `当前读取 a[${args.next_index}] = ${args.values[args.next_index]}。`,
+          "高亮位置就是下一次状态判断的输入。",
         ]);
-        emitter.commitStep();
-        return toolResult({ step_indices: [args.start_step_index] });
+        const draft = stash(emitter);
+        return toolResult({ draft_ids: [draft.draft_id], step_indices: [args.start_step_index] });
       },
     ) as AgentTool,
   );
 
-  // ── Math domain ───────────────────────────────────────────────────────
   tools.push(
     defineTool(
       "template_tangent_at",
-      "Template: tangent line",
-      "One step showing the tangent line of ``y = f(x)`` at ``x = x0`` " +
-        "alongside the curve. Internally adds the curve plus a formula.",
+      "Template: verified tangent",
+      "Create a curve, verified target point, and numerical tangent line at x0.",
       Type.Object({
-        base_expression: Type.String({ minLength: 1, description: "f(x) string" }),
-        derivative_expression: Type.String({
-          minLength: 1,
-          description: "f'(x) string — the agent supplies the derivative explicitly",
-        }),
+        base_expression: Type.String({ minLength: 1 }),
         x0: Type.Number(),
         x_min: Type.Number(),
         x_max: Type.Number(),
         start_step_index: Type.Integer({ minimum: 1 }),
       }),
       async (args) => {
-        emitter.beginStep(args.start_step_index, `f(x) 在 x = ${args.x0} 的切线`);
+        const y0 = evaluateExpression(args.base_expression, { x: args.x0 });
+        const slope = derivativeAt(args.base_expression, args.x0);
+        const yText = formatNumber(y0);
+        const slopeText = formatNumber(slope);
+        const tangentExpression = `${slopeText}*(x-(${formatNumber(args.x0)}))+(${yText})`;
+        emitter.beginStep(args.start_step_index, `x = ${args.x0} 处的切线`);
         emitter.setAxes(args.x_min, args.x_max);
-        emitter.addCurve1D(args.base_expression, "f(x)", "primary", args.x_min, args.x_max);
-        emitter.addFormula(
-          `f'(${args.x0}) = ${args.derivative_expression}|_{x=${args.x0}}`,
+        emitter.addCurve1D(
+          args.base_expression,
+          "f(x)",
+          "primary",
+          args.x_min,
+          args.x_max,
+          "curve",
         );
+        emitter.addCurve1D(
+          tangentExpression,
+          "切线",
+          "accent",
+          args.x_min,
+          args.x_max,
+          "tangent",
+        );
+        emitter.addPoint(args.x0, y0, `(${formatNumber(args.x0)}, ${yText})`, "accent", "target_point");
+        emitter.addFormula(`f'(${formatNumber(args.x0)})\\approx ${slopeText}`);
         emitter.setNarration([
-          `先画出 f(x) = ${args.base_expression} 的整条曲线。`,
-          `在 x = ${args.x0} 处的导数告诉我们这一点的切线斜率。`,
-          `切线沿着导数方向延伸，可以看到它在该点和曲线"擦肩而过"。`,
+          `先在曲线 f(x) = ${args.base_expression} 上定位 x = ${args.x0} 对应的点。`,
+          `安全数值核得到该点纵坐标 ${yText}，并估计导数为 ${slopeText}。`,
+          "画面中的第二条直线穿过目标点，其斜率与导数一致，因此它是该点的切线。",
         ]);
-        emitter.commitStep();
-        return toolResult({ step_indices: [args.start_step_index] });
+        const draft = stash(emitter);
+        return toolResult({
+          draft_ids: [draft.draft_id],
+          step_indices: [args.start_step_index],
+          verified: { x: args.x0, y: y0, slope, tangent_expression: tangentExpression },
+        });
       },
     ) as AgentTool,
   );
@@ -202,8 +223,7 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
     defineTool(
       "template_function_transform",
       "Template: function transform",
-      "Single step showing a function ``f(x)`` and its transformed version " +
-        "(shift / scale on x or y). Exposes the transform parameter as a slider.",
+      "Create a base/transformed function comparison and a parameter control.",
       Type.Object({
         base_expression: Type.String({ minLength: 1 }),
         transformed_expression: Type.String({ minLength: 1 }),
@@ -223,21 +243,28 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
       async (args) => {
         emitter.beginStep(args.start_step_index, `${args.transform_kind} 变换`);
         emitter.setAxes(args.x_min, args.x_max);
-        emitter.addCurve1D(args.base_expression, "原函数", "secondary", args.x_min, args.x_max);
-        emitter.addCurve1D(args.transformed_expression, "变换后", "primary", args.x_min, args.x_max);
+        emitter.addCurve1D(args.base_expression, "原函数", "secondary", args.x_min, args.x_max, "reference_curve");
+        emitter.addCurve1D(
+          args.transformed_expression,
+          "变换后",
+          "primary",
+          args.x_min,
+          args.x_max,
+          "transformed_curve",
+        );
         emitter.addParameterControl({
           id: args.param_id,
           label: args.param_label,
           value: String(args.param_initial),
-          description: `拖动看 ${args.param_id} 改变时曲线如何变化`,
+          description: `调整 ${args.param_id} 并确定性重放函数变换`,
         });
         emitter.setNarration([
-          `蓝色虚线是原函数 ${args.base_expression}，作为参考保留。`,
-          `紫色实线是 ${args.transformed_expression}，由参数 ${args.param_id} 控制。`,
-          `拖动下方的 ${args.param_label} 滑杆看效果。`,
+          `保留原函数 ${args.base_expression} 作为参照。`,
+          `变换后曲线 ${args.transformed_expression} 由参数 ${args.param_id} 控制。`,
+          "同时观察两条曲线，才能把参数变化和几何位移对应起来。",
         ]);
-        emitter.commitStep();
-        return toolResult({ step_indices: [args.start_step_index] });
+        const draft = stash(emitter);
+        return toolResult({ draft_ids: [draft.draft_id], step_indices: [args.start_step_index] });
       },
     ) as AgentTool,
   );
@@ -245,9 +272,8 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "template_riemann_sum",
-      "Template: Riemann sum",
-      "Three-step Riemann sum approximation: n=2, n=4, n=8 rectangles under " +
-        "y=f(x) on [a, b]. Use to motivate definite integrals.",
+      "Template: verified Riemann sum",
+      "Create n=2,4,8 left-endpoint Riemann rectangles with heights evaluated from f(x).",
       Type.Object({
         expression: Type.String({ minLength: 1 }),
         a: Type.Number(),
@@ -255,37 +281,43 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
         start_step_index: Type.Integer({ minimum: 1 }),
       }),
       async (args) => {
-        const indices = makeStepRange(args.start_step_index, 3);
-        for (let stage = 0; stage < 3; stage++) {
-          const n = [2, 4, 8][stage];
-          emitter.beginStep(indices[stage], `n = ${n} 个矩形逼近`);
+        if (!(args.b > args.a)) throw new Error("Riemann interval requires b > a");
+        const counts = [2, 4, 8];
+        const indices = makeStepRange(args.start_step_index, counts.length);
+        const drafts = [];
+        for (let stage = 0; stage < counts.length; stage += 1) {
+          const n = counts[stage];
+          const width = (args.b - args.a) / n;
+          emitter.beginStep(indices[stage], `n = ${n} 个左端点矩形`);
           emitter.setAxes(args.a - 0.5, args.b + 0.5);
-          emitter.addCurve1D(args.expression, "f(x)", "primary", args.a - 0.5, args.b + 0.5);
-          const step = (args.b - args.a) / n;
-          for (let i = 0; i < n; i++) {
-            const x0 = args.a + i * step;
-            const x1 = x0 + step;
+          emitter.addCurve1D(args.expression, "f(x)", "primary", args.a - 0.5, args.b + 0.5, "integrand");
+          let sum = 0;
+          for (let index = 0; index < n; index += 1) {
+            const x0 = args.a + index * width;
+            const x1 = x0 + width;
+            const height = evaluateExpression(args.expression, { x: x0 });
+            sum += width * height;
             emitter.addRegion(
               [
                 [x0, 0],
                 [x1, 0],
-                [x1, 0.5],
-                [x0, 0.5],
+                [x1, height],
+                [x0, height],
               ],
-              `R${i}`,
+              `R${index + 1}`,
               "secondary",
+              "riemann_rectangle",
             );
           }
+          emitter.addFormula(`S_${n}\\approx ${formatNumber(sum)}`);
           emitter.setNarration([
-            stage === 0
-              ? `用 ${n} 个矩形粗略覆盖曲线下面积，明显有缺口和溢出。`
-              : `把分段数加到 ${n}，每个矩形更窄，逼近也更准。`,
-            `每个矩形宽 ${step.toFixed(3)}，高用区间左端点的函数值。`,
-            `当 n → ∞，所有矩形面积之和就是定积分。`,
+            `把区间 [${args.a}, ${args.b}] 分成 ${n} 段，每段宽 ${formatNumber(width)}。`,
+            "每个矩形的高度由该小区间左端点的真实函数值计算，不使用固定占位高度。",
+            `这些矩形面积之和约为 ${formatNumber(sum)}；分段增多时会更接近定积分。`,
           ]);
-          emitter.commitStep();
+          drafts.push(stash(emitter));
         }
-        return toolResult({ step_indices: indices });
+        return toolResult({ draft_ids: drafts.map((draft) => draft.draft_id), step_indices: indices });
       },
     ) as AgentTool,
   );
@@ -293,10 +325,8 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
   tools.push(
     defineTool(
       "template_parametric_trace",
-      "Template: parametric trace",
-      "Single step drawing a parametric curve plus several marker points " +
-        "at evenly spaced t values along [t_min, t_max]. Useful for showing " +
-        "the direction of motion without a vector field.",
+      "Template: verified parametric trace",
+      "Create a parametric curve and real sampled marker points on that curve.",
       Type.Object({
         expression_x: Type.String({ minLength: 1 }),
         expression_y: Type.String({ minLength: 1 }),
@@ -306,8 +336,23 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
         start_step_index: Type.Integer({ minimum: 1 }),
       }),
       async (args) => {
-        emitter.beginStep(args.start_step_index, "参数曲线 + 时间标记");
-        emitter.setAxes(-3, 3, -3, 3);
+        const samples = sampleParametric(
+          args.expression_x,
+          args.expression_y,
+          args.t_min,
+          args.t_max,
+          args.n_markers,
+        );
+        const xs = samples.map((sample) => sample.x);
+        const ys = samples.map((sample) => sample.y);
+        const margin = 0.5;
+        emitter.beginStep(args.start_step_index, "参数曲线与时间标记");
+        emitter.setAxes(
+          Math.min(...xs) - margin,
+          Math.max(...xs) + margin,
+          Math.min(...ys) - margin,
+          Math.max(...ys) + margin,
+        );
         emitter.addCurveParametric(
           args.expression_x,
           args.expression_y,
@@ -315,30 +360,42 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
           args.t_max,
           "轨迹",
           "primary",
+          "trajectory",
         );
+        samples.forEach((sample, index) => {
+          emitter.addPoint(
+            sample.x,
+            sample.y,
+            `t${index + 1}`,
+            index === 0 || index === samples.length - 1 ? "accent" : "secondary",
+            "time_marker",
+          );
+        });
         emitter.setNarration([
-          `画出 (${args.expression_x}, ${args.expression_y}) 在 t∈[${args.t_min}, ${args.t_max}] 的轨迹。`,
-          `沿曲线放 ${args.n_markers} 个间隔相同的时间标记，方向一目了然。`,
-          `请用 assert_orientation 校验旋向，然后再决定 narration 用顺/逆时针。`,
+          `画出参数曲线 (${args.expression_x}, ${args.expression_y})。`,
+          `沿真实轨迹计算并放置 ${samples.length} 个等时间标记，每个标记都满足同一参数方程。`,
+          "标记的先后顺序展示运动方向，不再用旁白声称存在但画面中缺失的点。",
         ]);
-        emitter.commitStep();
-        return toolResult({ step_indices: [args.start_step_index] });
+        const draft = stash(emitter);
+        return toolResult({
+          draft_ids: [draft.draft_id],
+          step_indices: [args.start_step_index],
+          sampled_markers: samples,
+        });
       },
     ) as AgentTool,
   );
 
-  // ── Physics domain ────────────────────────────────────────────────────
   tools.push(
     defineTool(
       "template_force_diagram",
       "Template: force diagram",
-      "Single step with a free-body diagram: each force is rendered as a " +
-        "labeled arrow from the origin.",
+      "Create a verified free-body diagram draft with one arrow per declared force.",
       Type.Object({
         forces: Type.Array(
           Type.Object({
             name: Type.String(),
-            magnitude: Type.Number(),
+            magnitude: Type.Number({ minimum: 0 }),
             angle_deg: Type.Number(),
           }),
           { minItems: 1, maxItems: 6 },
@@ -348,19 +405,24 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
       async (args) => {
         emitter.beginStep(args.start_step_index, "受力分析");
         emitter.setAxes(-5, 5, -5, 5, "x", "y");
-        for (const f of args.forces) {
-          const rad = (f.angle_deg * Math.PI) / 180;
-          const dx = f.magnitude * Math.cos(rad);
-          const dy = f.magnitude * Math.sin(rad);
-          emitter.addArrow(0, 0, dx, dy, `${f.name} = ${f.magnitude}N @ ${f.angle_deg}°`);
+        for (const force of args.forces) {
+          const radians = (force.angle_deg * Math.PI) / 180;
+          emitter.addArrow(
+            0,
+            0,
+            force.magnitude * Math.cos(radians),
+            force.magnitude * Math.sin(radians),
+            `${force.name} = ${force.magnitude}N`,
+            "force_vector",
+          );
         }
         emitter.setNarration([
-          `先把所有作用力画到原点，方向由角度决定。`,
-          `每根箭头的长度按数值粗略缩放，方便目测合力方向。`,
-          `下一步把它们正交分解到 x/y 方向再求合力。`,
+          "把所有作用力统一画在受力对象的参考点上。",
+          "每根箭头的方向由输入角度确定，长度按力的大小缩放。",
+          "下一步可以在同一坐标系中分解分量并检查合力。",
         ]);
-        emitter.commitStep();
-        return toolResult({ step_indices: [args.start_step_index] });
+        const draft = stash(emitter);
+        return toolResult({ draft_ids: [draft.draft_id], step_indices: [args.start_step_index] });
       },
     ) as AgentTool,
   );
@@ -369,53 +431,53 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
     defineTool(
       "template_projectile_trajectory",
       "Template: projectile",
-      "Four-step projectile motion: launch, mid-flight, apex, landing.",
+      "Create launch, mid-flight, apex, and landing drafts from one deterministic projectile model.",
       Type.Object({
         v0: Type.Number({ minimum: 0 }),
         angle_deg: Type.Number(),
-        g: Type.Optional(Type.Number({ minimum: 0 })),
+        g: Type.Optional(Type.Number({ exclusiveMinimum: 0 })),
         start_step_index: Type.Integer({ minimum: 1 }),
       }),
       async (args) => {
-        const indices = makeStepRange(args.start_step_index, 4);
         const g = args.g ?? 9.8;
-        const rad = (args.angle_deg * Math.PI) / 180;
-        const vx0 = args.v0 * Math.cos(rad);
-        const vy0 = args.v0 * Math.sin(rad);
-        const range = (2 * vx0 * vy0) / g;
-        const apex = (vy0 * vy0) / (2 * g);
-
-        const titles = ["发射时刻", "上升中", "最高点", "落地"];
-        const ts = [0, vy0 / g / 2, vy0 / g, (2 * vy0) / g];
-        const captions = [
-          `初始速度 v0=${args.v0} m/s，仰角 ${args.angle_deg}°；分解成 vx, vy 两个分量。`,
-          `重力把 vy 慢慢拉小，水平速度不变。轨迹是抛物线。`,
-          `vy = 0 的瞬间到达最高点，高度 ≈ ${apex.toFixed(2)} m。`,
-          `再次落到 y = 0 时，水平距离 ≈ ${range.toFixed(2)} m。`,
-        ];
-        for (let k = 0; k < 4; k++) {
-          const t = ts[k];
-          const x = vx0 * t;
-          const y = vy0 * t - 0.5 * g * t * t;
-          emitter.beginStep(indices[k], titles[k]);
-          emitter.setAxes(-1, range + 1, -1, apex + 1, "水平距离 (m)", "高度 (m)");
+        const radians = (args.angle_deg * Math.PI) / 180;
+        const vx = args.v0 * Math.cos(radians);
+        const vy = args.v0 * Math.sin(radians);
+        const flightTime = (2 * vy) / g;
+        const range = vx * flightTime;
+        const apex = (vy * vy) / (2 * g);
+        const times = [0, flightTime / 2, vy / g, flightTime];
+        const titles = ["发射时刻", "飞行中", "最高点", "落地"];
+        const indices = makeStepRange(args.start_step_index, 4);
+        const drafts = [];
+        for (let index = 0; index < times.length; index += 1) {
+          const time = times[index];
+          const x = vx * time;
+          const y = vy * time - 0.5 * g * time * time;
+          const currentVy = vy - g * time;
+          emitter.beginStep(indices[index], titles[index]);
+          emitter.setAxes(-1, Math.max(1, range + 1), -1, Math.max(1, apex + 1), "x", "y");
           emitter.addCurveParametric(
-            `${vx0}*t`,
-            `${vy0}*t - 0.5*${g}*t*t`,
+            `${formatNumber(vx)}*t`,
+            `${formatNumber(vy)}*t-0.5*${formatNumber(g)}*t^2`,
             0,
-            (2 * vy0) / g,
+            flightTime,
             "轨迹",
             "secondary",
+            "trajectory",
           );
-          emitter.addPoint(x, y, titles[k], "accent");
+          emitter.addPoint(x, y, titles[index], "accent", "projectile");
+          emitter.addArrow(x, y, vx, 0, "v_x", "horizontal_velocity");
+          emitter.addArrow(x, y, 0, currentVy, "v_y", "vertical_velocity");
+          emitter.addArrow(x, y, 0, -g, "g", "gravity");
           emitter.setNarration([
-            captions[k],
-            `当前坐标 (${x.toFixed(2)}, ${y.toFixed(2)})。`,
-            `下一步看下一时刻的位置和速度。`,
+            `当前时刻 t = ${formatNumber(time)}，物体坐标为 (${formatNumber(x)}, ${formatNumber(y)})。`,
+            `水平速度保持 ${formatNumber(vx)}，竖直速度变为 ${formatNumber(currentVy)}。`,
+            "轨迹、速度分量和向下重力同时可见，避免只讲公式不展示状态。",
           ]);
-          emitter.commitStep();
+          drafts.push(stash(emitter));
         }
-        return toolResult({ step_indices: indices });
+        return toolResult({ draft_ids: drafts.map((draft) => draft.draft_id), step_indices: indices });
       },
     ) as AgentTool,
   );
@@ -424,72 +486,104 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
     defineTool(
       "template_shm",
       "Template: simple harmonic motion",
-      "Three-step simple harmonic motion: position, velocity, energy curves.",
+      "Create position, velocity, and constant total-energy drafts from one validated SHM parameter set.",
       Type.Object({
         amplitude: Type.Number({ minimum: 0 }),
-        omega: Type.Number({ minimum: 0 }),
+        omega: Type.Number({ exclusiveMinimum: 0 }),
         phase: Type.Optional(Type.Number()),
         start_step_index: Type.Integer({ minimum: 1 }),
       }),
       async (args) => {
-        const indices = makeStepRange(args.start_step_index, 3);
         const phase = args.phase ?? 0;
         const a = args.amplitude;
         const w = args.omega;
-        const exprs = [
-          { expr: `${a}*cos(${w}*x + ${phase})`, label: "x(t) 位移", title: "位移随时间" },
-          { expr: `-${a * w}*sin(${w}*x + ${phase})`, label: "v(t) 速度", title: "速度随时间" },
-          { expr: `0.5*${(a * w) ** 2}*sin(${w}*x + ${phase})^2 + 0.5*${a ** 2}*cos(${w}*x + ${phase})^2`, label: "总能量", title: "动能 + 势能" },
+        const energy = 0.5 * a * a * w * w;
+        const period = (2 * Math.PI) / w;
+        const entries = [
+          {
+            title: "位移随时间",
+            expression: `${formatNumber(a)}*cos(${formatNumber(w)}*x+${formatNumber(phase)})`,
+            label: "x(t)",
+            role: "position",
+          },
+          {
+            title: "速度随时间",
+            expression: `-${formatNumber(a * w)}*sin(${formatNumber(w)}*x+${formatNumber(phase)})`,
+            label: "v(t)",
+            role: "velocity",
+          },
+          {
+            title: "总能量守恒",
+            expression: formatNumber(energy),
+            label: "E(t)",
+            role: "total_energy",
+          },
         ];
-        for (let i = 0; i < 3; i++) {
-          emitter.beginStep(indices[i], exprs[i].title);
-          emitter.setAxes(0, (2 * Math.PI) / w * 2, undefined, undefined, "t (s)", exprs[i].label);
-          emitter.addCurve1D(exprs[i].expr, exprs[i].label, "primary");
+        const indices = makeStepRange(args.start_step_index, entries.length);
+        const drafts = [];
+        for (let index = 0; index < entries.length; index += 1) {
+          const entry = entries[index];
+          emitter.beginStep(indices[index], entry.title);
+          emitter.setAxes(0, period * 2, undefined, undefined, "t", entry.label);
+          emitter.addCurve1D(entry.expression, entry.label, "primary", 0, period * 2, entry.role);
+          emitter.addFormula(
+            index === 2
+              ? `E=\\frac12 A^2\\omega^2=${formatNumber(energy)}`
+              : `${entry.label}=${entry.expression}`,
+          );
           emitter.setNarration([
-            i === 0
-              ? `位移 x(t) = A·cos(ωt + φ)，A = ${a}，ω = ${w}。`
-              : i === 1
-                ? `速度 v(t) = -Aω·sin(ωt + φ)，比位移领先 π/2。`
-                : `动能 + 势能在简谐运动中恒等于 ½Aω²，能量守恒。`,
-            `这一步只画 ${exprs[i].label}，让你看清楚单一物理量的波形。`,
-            `下一步换另一种物理量观察它们的相位关系。`,
+            index === 0
+              ? `位移由 A cos(ωt+φ) 决定，振幅为 ${a}。`
+              : index === 1
+                ? `速度是位移的时间变化率，振幅为 Aω = ${formatNumber(a * w)}。`
+                : `总能量为 1/2·A²·ω² = ${formatNumber(energy)}，因此画面是一条常量线。`,
+            "该步骤只强调一个物理量，避免把三条曲线混在一起。",
+            "三步共享同一组 A、ω、φ，因此相位和能量结论可相互核对。",
           ]);
-          emitter.commitStep();
+          drafts.push(stash(emitter));
         }
-        return toolResult({ step_indices: indices });
+        return toolResult({ draft_ids: drafts.map((draft) => draft.draft_id), step_indices: indices });
       },
     ) as AgentTool,
   );
 
-  // ── Code domain ───────────────────────────────────────────────────────
   tools.push(
     defineTool(
       "template_code_step",
-      "Template: code line",
-      "Highlight a single source line and the current values of selected " +
-        "variables. Use when explaining algorithm execution at line granularity.",
+      "Template: code execution step",
+      "Create a real code_trace_scene and parallel Code Sync state for one source line.",
       Type.Object({
         source: Type.String({ minLength: 1 }),
+        language: Type.Optional(Type.String({ minLength: 1 })),
         line_index: Type.Integer({ minimum: 0 }),
-        variables: Type.Record(Type.String(), Type.String(), {
-          description: "var name -> displayed value",
-        }),
+        variables: Type.Record(Type.String(), Type.String()),
         start_step_index: Type.Integer({ minimum: 1 }),
       }),
       async (args) => {
-        emitter.beginStep(args.start_step_index, `执行第 ${args.line_index} 行`);
         const lines = args.source.split("\n");
-        const focus = lines[args.line_index] ?? "";
-        const varList = Object.entries(args.variables)
-          .map(([k, v]) => `${k} = ${v}`)
+        if (args.line_index >= lines.length) throw new Error("line_index is outside source");
+        emitter.beginStep(args.start_step_index, `执行第 ${args.line_index + 1} 行`);
+        emitter.setCodeHighlight(
+          {
+            language: args.language ?? "text",
+            lines,
+            active_lines: [args.line_index],
+            active_line: args.line_index,
+            variables: args.variables,
+            operation_label: lines[args.line_index].trim(),
+          },
+          true,
+        );
+        const variableText = Object.entries(args.variables)
+          .map(([name, value]) => `${name} = ${value}`)
           .join("，");
         emitter.setNarration([
-          `这一步执行：${focus.trim()}`,
-          `当前变量值：${varList || "（无变化）"}。`,
-          `执行后哪些状态会被更新——可以从这一行的赋值或调用判断出来。`,
+          `当前执行：${lines[args.line_index].trim()}。`,
+          `运行时变量为：${variableText || "无显式变量变化"}。`,
+          "代码行、变量和主画面使用同一结构化状态，因此 Code Sync 不再只是旁白描述。",
         ]);
-        emitter.commitStep();
-        return toolResult({ step_indices: [args.start_step_index] });
+        const draft = stash(emitter);
+        return toolResult({ draft_ids: [draft.draft_id], step_indices: [args.start_step_index] });
       },
     ) as AgentTool,
   );

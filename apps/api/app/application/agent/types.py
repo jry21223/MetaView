@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -9,10 +9,14 @@ from app.domain.models.lesson_plan import LessonPlan
 
 
 class AgentConstraints(BaseModel):
-    max_self_repair_attempts: int = 2
-    max_reviewer_repair_attempts: int = 1
+    # The API owns retry/repair. A sidecar request is exactly one model attempt.
+    max_self_repair_attempts: int = Field(default=0, ge=0, le=2)
+    max_reviewer_repair_attempts: int = Field(default=1, ge=0, le=2)
     legacy_single_enabled: bool = True
     executable_tools_available: bool = True
+    strict_tool_inventory: bool = True
+    repair_strategy: Literal["path_scoped_patch"] = "path_scoped_patch"
+    max_tool_events: int = Field(default=512, ge=32, le=2048)
 
 
 class ToolManifest(BaseModel):
@@ -24,12 +28,21 @@ class ToolManifest(BaseModel):
 
 
 class ToolEvent(BaseModel):
+    sequence: int
+    timestamp: str
     tool: str
+    attempt_id: str
     ok: bool
-    detail: dict[str, Any] | None = None
+    duration_ms: int = 0
+    args: Any = None
+    error: str | None = None
+    state_before: str | None = None
+    state_after: str | None = None
 
 
 class RuntimeEvent(BaseModel):
+    sequence: int
+    timestamp: str
     event: str
     detail: dict[str, Any] | None = None
 

@@ -85,43 +85,62 @@ function coverageDecision(): Record<string, unknown> {
 }
 
 describe("agent prompt contracts", () => {
-  it("hands the LessonPlan to the initial prompt as read-only context", () => {
+  it("injects the binding lesson, coverage, tool, source, and constraint contracts", () => {
+    const prompt = buildAgentPrompt({
+      prompt: "讲解东亚季风",
+      routeDecision: { destination: "agent", domain: "geography" },
+      lessonPlan: lessonPlan(),
+      coverageDecision: coverageDecision(),
+      sourceCode: "const season = 'summer';",
+      language: "typescript",
+      constraints: { repair_strategy: "path_scoped_patch" },
+      availableTools: [
+        { name: "scene_blueprint.compile" },
+        { name: "geometry.assert_orientation" },
+      ],
+      apiBaseUrl: "http://api.test",
+      defaultProvider: "openai",
+      defaultModel: "test",
+    });
+
+    expect(prompt).toContain("[MetaView LessonPlan]");
+    expect(prompt).toContain("BINDING read-only teaching contract");
+    expect(prompt).toContain("LESSON_PLAN_ONLY_MARKER");
+    expect(prompt).toContain("[MetaView coverage decision]");
+    expect(prompt).toContain("runtime-enforced capability boundary");
+    expect(prompt).toContain("scene_sequence_blueprint.compile");
+    expect(prompt).toContain("geometry.assert_orientation");
+    expect(prompt).toContain("language=typescript");
+    expect(prompt).toContain("0000: const season");
+    expect(prompt).toContain("path_scoped_patch");
+  });
+
+  it("retains the legacy positional prompt-builder signature", () => {
     const prompt = buildAgentPrompt(
       "讲解东亚季风",
       { destination: "agent", domain: "geography" },
       lessonPlan(),
       coverageDecision(),
     );
-
-    expect(prompt).toContain("[MetaView LessonPlan]");
-    expect(prompt).toContain("BINDING read-only teaching contract");
-    expect(prompt).toContain("cover every required fact");
     expect(prompt).toContain("LESSON_PLAN_ONLY_MARKER");
-    expect(prompt).toContain("[MetaView route decision]");
-    expect(prompt).toContain("[MetaView coverage decision]");
-    expect(prompt).toContain("validator:geography.monsoon");
-    expect(prompt).toContain("available_tool_ids records relevant capability evidence");
     expect(prompt).toContain("[user prompt]");
   });
 
-  it("steers subject visual scenes through SceneBlueprint and semantic renderer paths", () => {
-    expect(SYSTEM_PROMPT).toContain("BINDING");
-    expect(SYSTEM_PROMPT).toMatch(/SceneIntents in\s+order/);
-    expect(SYSTEM_PROMPT).toContain("SceneBlueprint");
-    expect(SYSTEM_PROMPT).toContain("scene_blueprint.compile");
-    expect(SYSTEM_PROMPT).toContain("SkillPack runtime tool");
-    expect(SYSTEM_PROMPT).toContain("geo_map_scene");
-    expect(SYSTEM_PROMPT).toContain("physics_force_scene");
-    expect(SYSTEM_PROMPT).toContain("bio_cell_scene");
-    expect(SYSTEM_PROMPT).toContain("bio_process_scene");
-    expect(SYSTEM_PROMPT).toContain("molecule_2d_scene");
-    expect(SYSTEM_PROMPT).toContain("reaction_scene");
-    expect(SYSTEM_PROMPT).toContain("Do not use algorithm_array");
+  it("defines executable draft, compiler, and capability rules", () => {
+    expect(SYSTEM_PROMPT).toContain("semantic step drafts");
+    expect(SYSTEM_PROMPT).toContain("runtime-enforced");
+    expect(SYSTEM_PROMPT).toContain("scene_sequence_blueprint.compile");
+    expect(SYSTEM_PROMPT).toContain("templates return editable");
+    expect(SYSTEM_PROMPT).toContain("animation_tool_expand applies");
+    expect(SYSTEM_PROMPT).toContain("set_code_highlight");
+    expect(SYSTEM_PROMPT).toContain("finalize_playbook rejects");
+    expect(SYSTEM_PROMPT).toContain("Never emit HTML");
   });
 
-  it("gives specific repair guidance for subject visual array fallbacks", () => {
+  it("builds a repair payload that explicitly forbids full regeneration", () => {
     const prompt = buildAgentSelfRepairPrompt({
       originalPrompt: "讲解东亚夏季风的海陆热力差异",
+      routeDecision: { destination: "agent", domain: "geography" },
       coverageDecision: coverageDecision(),
       lessonPlan: lessonPlan(),
       previousPlaybook: fallbackPlaybook(),
@@ -133,23 +152,16 @@ describe("agent prompt contracts", () => {
             code: "snapshot.domain_fallback",
             severity: "error",
             path: "steps[0].snapshot.kind",
-            message:
-              "geography playbooks must not fall back to algorithm_array.",
-            suggestion: "Use a SceneBlueprint or subject semantic renderer.",
           },
         ],
       },
     });
 
+    expect(prompt).toContain("path-scoped JSON Patch");
+    expect(prompt).toContain("do not rebuild the full Playbook");
     expect(prompt).toContain("snapshot.domain_fallback");
     expect(prompt).toContain("LESSON_PLAN_ONLY_MARKER");
-    expect(prompt).toContain('"lesson_plan"');
     expect(prompt).toContain('"coverage_decision"');
-    expect(prompt).toContain("Treat coverage_decision as binding");
-    expect(prompt).toContain("Treat lesson_plan as binding");
-    expect(prompt).toContain("matching SkillPack runtime tool");
-    expect(prompt).toContain("SceneBlueprint");
-    expect(prompt).toContain("geo_map_scene");
-    expect(prompt).toContain("Do not repair this by renaming algorithm_array");
+    expect(prompt).toContain('"lesson_plan"');
   });
 });

@@ -1,243 +1,156 @@
-/**
- * L2 template tests — verify each template emits the expected number of
- * steps and that the resulting snapshots stay free of vector_field.
- */
-
 import { describe, expect, it } from "vitest";
+
 import { PlaybookEmitter } from "../src/state/playbookEmitter.js";
 import { makeTemplateTools } from "../src/tools/templates.js";
 
 interface ToolHandle {
   name: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  invoke: (args: any) => Promise<any>;
+  invoke: (args: Record<string, unknown>) => Promise<Record<string, unknown>>;
+}
+
+function outlinedEmitter(domain = "math"): PlaybookEmitter {
+  const emitter = new PlaybookEmitter();
+  emitter.setOutline(domain, Array.from({ length: 8 }, (_, index) => `step ${index + 1}`));
+  return emitter;
 }
 
 function getTool(name: string, emitter: PlaybookEmitter): ToolHandle {
-  const tools = makeTemplateTools({ emitter });
-  const t = tools.find((tool) => tool.name === name);
-  if (!t) throw new Error(`tool ${name} not found`);
+  const tool = makeTemplateTools({ emitter }).find((candidate) => candidate.name === name);
+  if (!tool) throw new Error(`missing tool ${name}`);
   return {
-    name: t.name,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    invoke: async (args: any) => {
-      const result = await t.execute(`test_${name}`, args);
-      return result.details;
+    name,
+    invoke: async (args) => {
+      const result = await tool.execute(`test-${name}`, args);
+      return result.details as Record<string, unknown>;
     },
   };
 }
 
-describe("template_array_swap", () => {
-  it("emits 3 committed steps", async () => {
-    const emitter = new PlaybookEmitter();
-    const t = getTool("template_array_swap", emitter);
-    const result = await t.invoke({
-      values: ["3", "1", "4", "1", "5"],
-      i: 0,
-      j: 2,
-      start_step_index: 1,
-    });
-    expect(result.step_indices).toEqual([1, 2, 3]);
-    expect(emitter.stepCount()).toBe(3);
-    const out = emitter.finalize();
-    for (const step of out.steps) {
-      const snap = step.snapshot as Record<string, unknown>;
-      expect(snap).not.toHaveProperty("vector_field");
-    }
-  });
+function commitDrafts(emitter: PlaybookEmitter): void {
+  emitter.commitAllStepDrafts();
+}
 
-  it("swaps values between i and j by the last step", async () => {
-    const emitter = new PlaybookEmitter();
-    const t = getTool("template_array_swap", emitter);
-    await t.invoke({
-      values: ["A", "B", "C"],
-      i: 0,
-      j: 2,
-      start_step_index: 1,
-    });
-    const lastStep = emitter.finalize().steps[2];
-    const tokens = (lastStep.tokens as Array<{ label: string }>).map((tok) => tok.label);
-    expect(tokens).toEqual(["C", "B", "A"]);
-  });
-});
-
-describe("template_array_compare", () => {
-  it("emits 2 steps and embeds the result phrase in narration", async () => {
-    const emitter = new PlaybookEmitter();
-    const t = getTool("template_array_compare", emitter);
-    await t.invoke({
-      values: ["5", "2"],
-      i: 0,
-      j: 1,
-      result: "gt",
-      start_step_index: 5,
-    });
-    expect(emitter.stepCount()).toBe(2);
-    const out = emitter.finalize();
-    expect(out.steps[1].voiceover_text).toMatch(/需要交换/);
-  });
-});
-
-describe("template_tangent_at", () => {
-  it("emits a single function-kind step with the curve and the formula", async () => {
-    const emitter = new PlaybookEmitter();
-    const t = getTool("template_tangent_at", emitter);
-    await t.invoke({
-      base_expression: "x**2",
-      derivative_expression: "2*x",
-      x0: 1.5,
+describe("correct deterministic L2 templates", () => {
+  it("tangent template visibly emits curve, point, and tangent", async () => {
+    const emitter = outlinedEmitter();
+    await getTool("template_tangent_at", emitter).invoke({
+      base_expression: "x^2",
+      x0: 1,
       x_min: -3,
       x_max: 3,
       start_step_index: 1,
     });
-    const out = emitter.finalize();
-    expect(out.steps).toHaveLength(1);
-    const snap = out.steps[0].snapshot as Record<string, unknown>;
-    expect(snap.kind).toBe("math_plot");
-    expect((snap.curves as unknown[]).length).toBe(1);
-    expect(snap.formula_latex).toContain("2*x");
+    commitDrafts(emitter);
+    const step = emitter.finalize.bind(emitter);
+    expect(emitter.stepCount()).toBe(1);
+    // Inspect by selecting the committed output after completing the outline.
+    for (let index = 2; index <= 8; index += 1) {
+      emitter.beginStep(index, `step ${index}`);
+      emitter.addFormula(`x_${index}`);
+      emitter.setNarration([`第 ${index} 步。`]);
+      emitter.commitStep();
+    }
+    const snapshot = step().steps[0].snapshot as Record<string, unknown>;
+    expect(snapshot.kind).toBe("math_scene");
+    expect((snapshot.curves as unknown[])).toHaveLength(2);
+    expect((snapshot.points as unknown[])).toHaveLength(1);
+    expect(JSON.stringify(snapshot)).toContain("tangent");
   });
-});
 
-describe("template_function_transform", () => {
-  it("adds a parameter_control for the transform parameter", async () => {
-    const emitter = new PlaybookEmitter();
-    const t = getTool("template_function_transform", emitter);
-    await t.invoke({
-      base_expression: "sin(x)",
-      transformed_expression: "sin(x - a)",
-      transform_kind: "shift_x",
-      param_id: "a",
-      param_initial: 0,
-      param_label: "平移 a",
-      x_min: -6,
-      x_max: 6,
-      start_step_index: 1,
-    });
-    const out = emitter.finalize();
-    expect(out.parameter_controls).toHaveLength(1);
-    expect(out.parameter_controls[0].id).toBe("a");
-  });
-});
-
-describe("template_riemann_sum", () => {
-  it("emits 3 steps", async () => {
-    const emitter = new PlaybookEmitter();
-    const t = getTool("template_riemann_sum", emitter);
-    await t.invoke({
-      expression: "x**2",
+  it("Riemann rectangle heights come from the input function", async () => {
+    const emitter = outlinedEmitter();
+    await getTool("template_riemann_sum", emitter).invoke({
+      expression: "x^2",
       a: 0,
       b: 2,
       start_step_index: 1,
     });
-    expect(emitter.stepCount()).toBe(3);
+    commitDrafts(emitter);
+    for (let index = 4; index <= 8; index += 1) {
+      emitter.beginStep(index, `step ${index}`);
+      emitter.addFormula(`x_${index}`);
+      emitter.setNarration([`第 ${index} 步。`]);
+      emitter.commitStep();
+    }
+    const output = emitter.finalize();
+    const first = output.steps[0].snapshot as Record<string, unknown>;
+    const regions = first.regions as Array<{ vertices: Array<[number, number]> }>;
+    expect(regions[0].vertices[2][1]).toBe(0);
+    expect(regions[1].vertices[2][1]).toBe(1);
   });
-});
 
-describe("template_force_diagram", () => {
-  it("emits arrows for each force at the origin", async () => {
-    const emitter = new PlaybookEmitter();
-    const t = getTool("template_force_diagram", emitter);
-    await t.invoke({
-      forces: [
-        { name: "重力", magnitude: 10, angle_deg: -90 },
-        { name: "支持力", magnitude: 10, angle_deg: 90 },
-        { name: "摩擦力", magnitude: 3, angle_deg: 180 },
-      ],
+  it("parametric trace creates actual on-curve marker points", async () => {
+    const emitter = outlinedEmitter();
+    await getTool("template_parametric_trace", emitter).invoke({
+      expression_x: "cos(t)",
+      expression_y: "sin(t)",
+      t_min: 0,
+      t_max: Math.PI,
+      n_markers: 5,
       start_step_index: 1,
     });
-    const snap = emitter.finalize().steps[0].snapshot as Record<string, unknown>;
-    expect(snap.kind).toBe("math_scene");
-    const segs = snap.segments as Array<{ x0: number; y0: number }>;
-    expect(segs).toHaveLength(3);
-    for (const s of segs) {
-      expect(s.x0).toBe(0);
-      expect(s.y0).toBe(0);
+    commitDrafts(emitter);
+    for (let index = 2; index <= 8; index += 1) {
+      emitter.beginStep(index, `step ${index}`);
+      emitter.addFormula(`x_${index}`);
+      emitter.setNarration([`第 ${index} 步。`]);
+      emitter.commitStep();
     }
-    expect(snap).not.toHaveProperty("vector_field");
+    const snapshot = emitter.finalize().steps[0].snapshot as Record<string, unknown>;
+    expect((snapshot.points as unknown[])).toHaveLength(5);
   });
-});
 
-describe("template_projectile_trajectory", () => {
-  it("emits 4 sequential steps with the same parametric trajectory", async () => {
-    const emitter = new PlaybookEmitter();
-    const t = getTool("template_projectile_trajectory", emitter);
-    await t.invoke({
-      v0: 20,
-      angle_deg: 45,
-      g: 9.8,
-      start_step_index: 1,
-    });
-    expect(emitter.stepCount()).toBe(4);
-    const out = emitter.finalize();
-    for (const step of out.steps) {
-      const snap = step.snapshot as Record<string, unknown>;
-      expect(snap.kind).toBe("math_scene");
-      const curves = snap.curves as unknown[];
-      expect(curves.length).toBe(1);
-    }
-  });
-});
-
-describe("template_shm", () => {
-  it("emits 3 distinct curves", async () => {
-    const emitter = new PlaybookEmitter();
-    const t = getTool("template_shm", emitter);
-    await t.invoke({
-      amplitude: 1,
+  it("SHM total energy is constant for non-unit amplitude and omega", async () => {
+    const emitter = outlinedEmitter("physics");
+    await getTool("template_shm", emitter).invoke({
+      amplitude: 3,
       omega: 2,
+      phase: 0.4,
       start_step_index: 1,
     });
-    expect(emitter.stepCount()).toBe(3);
-    const out = emitter.finalize();
-    const expressions = out.steps.map((s) => {
-      const snap = s.snapshot as Record<string, unknown>;
-      const curves = snap.curves as Array<{ expression: string }>;
-      return curves[0].expression;
-    });
-    // Position, velocity, energy — three different expressions.
-    expect(new Set(expressions).size).toBe(3);
-  });
-});
-
-describe("template_code_step", () => {
-  it("emits a single step whose narration references the highlighted line", async () => {
-    const emitter = new PlaybookEmitter();
-    const t = getTool("template_code_step", emitter);
-    await t.invoke({
-      source: "def fib(n):\n    return fib(n-1) + fib(n-2)\n",
-      line_index: 1,
-      variables: { n: "5" },
-      start_step_index: 1,
-    });
-    const out = emitter.finalize();
-    expect(out.steps).toHaveLength(1);
-    expect(out.steps[0].voiceover_text).toMatch(/return fib/);
-  });
-});
-
-describe("templates never emit vector_field on any snapshot", () => {
-  it("scans every template's output", async () => {
-    const tools = makeTemplateTools({ emitter: new PlaybookEmitter() });
-    expect(tools.length).toBeGreaterThanOrEqual(10);
-    // Spot-check a representative sample with valid inputs.
-    const cases: Array<[string, Record<string, unknown>]> = [
-      ["template_array_swap", { values: ["1", "2"], i: 0, j: 1, start_step_index: 1 }],
-      ["template_pointer_step", { values: ["1", "2", "3"], prev_index: 0, next_index: 1, start_step_index: 1 }],
-      [
-        "template_parametric_trace",
-        { expression_x: "cos(t)", expression_y: "sin(t)", t_min: 0, t_max: 6.28, n_markers: 4, start_step_index: 1 },
-      ],
-    ];
-    for (const [name, args] of cases) {
-      const emitter = new PlaybookEmitter();
-      const t = getTool(name, emitter);
-      await t.invoke(args);
-      const out = emitter.finalize();
-      for (const step of out.steps) {
-        const snap = step.snapshot as Record<string, unknown> | undefined;
-        if (snap) expect(snap).not.toHaveProperty("vector_field");
-      }
+    commitDrafts(emitter);
+    for (let index = 4; index <= 8; index += 1) {
+      emitter.beginStep(index, `step ${index}`);
+      emitter.addFormula(`x_${index}`);
+      emitter.setNarration([`第 ${index} 步。`]);
+      emitter.commitStep();
     }
+    const energy = emitter.finalize().steps[2].snapshot as Record<string, unknown>;
+    const curves = energy.curves as Array<{ expression: string }>;
+    expect(curves[0].expression).toBe("18");
+  });
+
+  it("code template emits code trace and Code Sync", async () => {
+    const emitter = outlinedEmitter("code");
+    await getTool("template_code_step", emitter).invoke({
+      source: "x = 1\nx += 1",
+      language: "python",
+      line_index: 1,
+      variables: { x: "2" },
+      start_step_index: 1,
+    });
+    commitDrafts(emitter);
+    for (let index = 2; index <= 8; index += 1) {
+      emitter.beginStep(index, `step ${index}`);
+      emitter.addFormula(`x_${index}`);
+      emitter.setNarration([`第 ${index} 步。`]);
+      emitter.commitStep();
+    }
+    const step = emitter.finalize().steps[0];
+    expect(step.snapshot.kind).toBe("code_trace_scene");
+    expect(step.code_highlight?.active_line).toBe(1);
+  });
+
+  it("templates return editable drafts instead of silently committing", async () => {
+    const emitter = outlinedEmitter("algorithm");
+    const result = await getTool("template_array_swap", emitter).invoke({
+      values: ["3", "1", "2"],
+      i: 0,
+      j: 1,
+      start_step_index: 1,
+    });
+    expect(emitter.stepCount()).toBe(0);
+    expect(emitter.draftCount()).toBe(3);
+    expect(result.draft_ids).toHaveLength(3);
   });
 });

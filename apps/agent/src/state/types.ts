@@ -1,15 +1,26 @@
 /**
- * Internal builder types — what each L1 tool call produces in flight, before
- * the playbook is finalized via finalize_playbook. The shapes mirror
- * apps/api/app/domain/models/playbook.py but stay loose where the Python
- * model allows defaults (we fill them in at finalize time).
+ * Agent-side semantic draft types. The model edits StepDraft values; the
+ * PlaybookEmitter deterministically materialises the canonical Playbook wire
+ * shape consumed by the FastAPI schema and Remotion renderer.
  */
 
+export const SUPPORTED_DOMAINS = [
+  "algorithm",
+  "math",
+  "code",
+  "physics",
+  "chemistry",
+  "biology",
+  "geography",
+] as const;
+
+export type SupportedDomain = (typeof SUPPORTED_DOMAINS)[number];
 export type Emphasis = "primary" | "secondary" | "accent";
+export type DraftState = "empty" | "outlined" | "draft_open" | "finalized";
 
 export interface CurveBuilder {
   curve_id: number;
-  expression_x: string | null; // null for 1D curves
+  expression_x: string | null;
   expression_y: string;
   t_min: number | null;
   t_max: number | null;
@@ -18,6 +29,7 @@ export interface CurveBuilder {
   label: string;
   emphasis: Emphasis;
   is_parametric: boolean;
+  semantic_role?: string;
 }
 
 export interface PointBuilder {
@@ -26,6 +38,7 @@ export interface PointBuilder {
   y: number;
   label: string;
   emphasis: Emphasis;
+  semantic_role?: string;
 }
 
 export interface SegmentBuilder {
@@ -36,12 +49,15 @@ export interface SegmentBuilder {
   y1: number;
   arrow: boolean;
   label: string;
+  emphasis?: Emphasis;
+  semantic_role?: string;
 }
 
 export interface RegionBuilder {
   vertices: Array<[number, number]>;
   label: string;
   emphasis: Emphasis;
+  semantic_role?: string;
 }
 
 export interface ArrayTokenBuilder {
@@ -51,14 +67,32 @@ export interface ArrayTokenBuilder {
   emphasis: Emphasis;
 }
 
-export type VisualKind = "scene" | "array" | "function" | "formula" | "graph";
+export interface CodeHighlightOutput {
+  language: string;
+  lines: string[];
+  active_lines: number[];
+  active_line: number;
+  variables: Record<string, string>;
+  operation_label?: string;
+}
+
+export interface LayerOutput {
+  timing: {
+    enter_at: number;
+    exit_at: number;
+    appear_anim: "fade" | "draw" | "slide" | "scale" | "none";
+    z_order: number;
+  };
+  body: Record<string, unknown>;
+}
 
 export interface StepBuilder {
+  draft_id: string;
   index: number;
+  outline_title: string;
   title: string;
   narration: unknown[];
   voiceover_text: string;
-  // scene-style accumulators
   axes?: {
     x_min: number;
     x_max: number;
@@ -72,8 +106,11 @@ export interface StepBuilder {
   segments: SegmentBuilder[];
   regions: RegionBuilder[];
   formula_latex: string | null;
-  // array-style accumulator
   tokens: ArrayTokenBuilder[];
+  code_highlight: CodeHighlightOutput | null;
+  snapshot_override: Record<string, unknown> | null;
+  layers_override: LayerOutput[] | null;
+  provenance: Record<string, string>;
 }
 
 export interface ParameterControl {
@@ -84,24 +121,12 @@ export interface ParameterControl {
 }
 
 export interface PlaybookSkeleton {
-  domain: string | null;
+  domain: SupportedDomain | null;
   title: string | null;
   summary: string | null;
-  step_titles: string[]; // from plan_outline
-  steps: StepBuilder[];
+  step_titles: string[];
   parameter_controls: ParameterControl[];
   fps: number;
-  step_frames: number;
-}
-
-export interface LayerOutput {
-  timing: {
-    enter_at: number;
-    exit_at: number;
-    appear_anim: "fade" | "draw" | "slide" | "scale" | "none";
-    z_order: number;
-  };
-  body: Record<string, unknown>;
 }
 
 export interface MetaStepOutput {
@@ -116,18 +141,47 @@ export interface MetaStepOutput {
     value: string | null;
     emphasis: Emphasis;
   }>;
-  code_highlight: null;
+  code_highlight: CodeHighlightOutput | null;
   snapshot: Record<string, unknown>;
   layers: LayerOutput[];
 }
 
-/** PlaybookScript JSON shape (matches apps/api/app/domain/models/playbook.py). */
+/** PlaybookScript JSON shape used by the FastAPI contract. */
 export interface PlaybookOutput {
+  schema_version?: string;
   fps: number;
   total_frames: number;
-  domain: string;
+  domain: SupportedDomain;
   title: string;
   summary: string;
   steps: MetaStepOutput[];
   parameter_controls: ParameterControl[];
+  algorithm_id?: string | null;
+  initial_data?: Record<string, string[]>;
+}
+
+export interface ToolTraceEvent {
+  sequence: number;
+  timestamp: string;
+  tool: string;
+  attempt_id: string;
+  ok: boolean;
+  duration_ms: number;
+  args: unknown;
+  error?: string;
+  state_before?: string;
+  state_after?: string;
+}
+
+export interface RuntimeTraceEvent {
+  sequence: number;
+  timestamp: string;
+  event: string;
+  detail?: Record<string, unknown>;
+}
+
+export interface AgentGenerationResult {
+  playbook: PlaybookOutput;
+  toolEvents: ToolTraceEvent[];
+  runtimeEvents: RuntimeTraceEvent[];
 }
