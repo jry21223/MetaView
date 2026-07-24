@@ -50,7 +50,7 @@ export function usePlaybookController(
   gate?: PlaybackGate,
 ): PlaybookController {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [stepThrough, setStepThrough] = useState(true);
+  const [stepThrough, setStepThrough] = useState(false);
 
   const stepThroughRef = useRef(stepThrough);
   const prevFrameRef = useRef(0);

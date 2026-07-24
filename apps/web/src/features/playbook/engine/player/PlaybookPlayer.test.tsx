@@ -397,6 +397,9 @@ describe("PlaybookPlayer", () => {
     expect(getByText("播放速度")).toBeTruthy();
     expect(queryByText("字幕")).toBeNull();
     expect(getByText("播放模式")).toBeTruthy();
+    expect(getByRole("button", { name: "连播" })).toBeTruthy();
+    fireEvent.click(getByRole("button", { name: "连播" }));
+    expect(getByRole("button", { name: "步进" })).toBeTruthy();
     expect(getByText("语音朗读")).toBeTruthy();
   });
 
