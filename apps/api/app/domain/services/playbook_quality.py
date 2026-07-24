@@ -21,6 +21,11 @@ from app.domain.models.review import (
     PlaybookReviewVerdict,
 )
 from app.domain.services.asset_manifest_resolver import resolve_asset_by_id
+from app.domain.services.safe_math_expr import (
+    SafeMathExpressionError,
+    compile_safe_math_expression,
+    extract_safe_math_identifiers,
+)
 
 MIN_AGENT_STEPS = 8
 MAX_AGENT_STEPS = 14
@@ -32,6 +37,38 @@ _VOICEOVER_HOLD_SECONDS = 0.6
 _CHINESE_CHARS_PER_SECOND = 4.8
 _ENGLISH_WORDS_PER_SECOND = 2.4
 _FRAME_INCREMENT = 6
+_MATH_PARAMETER_ID_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_MOVING_LINE_PARAMETER_RE = re.compile(
+    r"\by\s*=\s*([A-Za-z_][A-Za-z0-9_]*)\s*\*?\s*x\s*[+-]\s*"
+    r"([A-Za-z_][A-Za-z0-9_]*)",
+    re.IGNORECASE,
+)
+_MOVING_LINE_MARKERS = (
+    "moving line",
+    "varying line",
+    "line family",
+    "动直线",
+    "运动直线",
+    "直线族",
+    "恒过",
+    "定点",
+)
+_DETERMINED_INTERCEPT_MARKERS = (
+    "determines the intercept",
+    "determine the intercept",
+    "intercept is determined",
+    "确定截距",
+    "截距确定",
+    "求出截距",
+)
+_EXPLICIT_PARAMETER_RE = re.compile(
+    r"(?:vary|varying|change|changing|drag)\s+(?:the\s+)?"
+    r"(?:free\s+)?parameter\s+([A-Za-z_][A-Za-z0-9_]*)",
+    re.IGNORECASE,
+)
+_EXPLICIT_PARAMETER_CN_RE = re.compile(
+    r"(?:改变|变化|拖动|调节)?\s*参数\s*([A-Za-z_][A-Za-z0-9_]*)"
+)
 
 SUPPORTED_FRONTEND_SNAPSHOT_KINDS = SUPPORTED_SNAPSHOT_KIND_SET
 
@@ -934,6 +971,7 @@ def _check_domain_quality(
     domain = str(playbook.domain.value if hasattr(playbook.domain, "value") else playbook.domain)
 
     if domain == "math":
+        _check_math_parameter_contract(playbook, prompt, issues)
         math_kinds = kinds & _MATH_VISUAL_KINDS
         normalized_prompt = prompt.lower()
         needs_rich_visual = any(marker in normalized_prompt for marker in _RICH_MATH_PROMPT_MARKERS)
@@ -1075,6 +1113,254 @@ def _check_domain_quality(
                     ),
                 )
             )
+
+
+def _check_math_parameter_contract(
+    playbook: PlaybookScript,
+    prompt: str,
+    issues: list[PlaybookReviewIssue],
+) -> None:
+    bindings = _math_expression_bindings(playbook)
+    controls: dict[str, float] = {}
+    seen_ids: set[str] = set()
+    for index, control in enumerate(playbook.parameter_controls):
+        path = f"parameter_controls[{index}]"
+        raw_value = control.value.strip()
+        valid_id = bool(_MATH_PARAMETER_ID_RE.fullmatch(control.id))
+        try:
+            value = float(raw_value)
+        except ValueError:
+            value = math.nan
+        valid_value = bool(raw_value) and math.isfinite(value)
+        duplicate = control.id in seen_ids
+        seen_ids.add(control.id)
+        if not valid_id or not valid_value or duplicate:
+            reasons = []
+            if not valid_id:
+                reasons.append("id must be a renderer-safe identifier")
+            if not valid_value:
+                reasons.append("value must be a finite number")
+            if duplicate:
+                reasons.append("id must be unique")
+            issues.append(
+                _issue(
+                    "math.parameter_control_invalid",
+                    PlaybookIssueSeverity.ERROR,
+                    path,
+                    f"Math parameter control {control.id!r} is invalid: {', '.join(reasons)}.",
+                    (
+                        "Use one unique ASCII identifier per control and provide a "
+                        "finite numeric default value."
+                    ),
+                )
+            )
+            continue
+        controls[control.id] = value
+
+    symbolic: set[str] = set()
+    missing: set[str] = set()
+    for source, intrinsic_names, fixed_params, path in bindings:
+        try:
+            identifiers = extract_safe_math_identifiers(source)
+            compiled = compile_safe_math_expression(source)
+        except SafeMathExpressionError as exc:
+            issues.append(
+                _issue(
+                    "math.parameter_control_invalid",
+                    PlaybookIssueSeverity.ERROR,
+                    path,
+                    f"Math expression cannot be rendered: {exc}.",
+                    "Use the supported renderer expression grammar and explicit multiplication.",
+                )
+            )
+            continue
+        expression_parameters = identifiers - intrinsic_names
+        symbolic.update(expression_parameters)
+        missing.update(expression_parameters - set(fixed_params) - set(controls))
+        if not _expression_has_finite_default(
+            compiled,
+            controls,
+            fixed_params,
+            intrinsic_names,
+        ):
+            issues.append(
+                _issue(
+                    "math.parameter_control_invalid",
+                    PlaybookIssueSeverity.ERROR,
+                    path,
+                    "Math expression has no finite sample with the declared default parameters.",
+                    (
+                        "Choose finite defaults that render the curve before the "
+                        "student moves a slider."
+                    ),
+                )
+            )
+
+    required_parameters = _required_interactive_parameters(prompt)
+    missing.update((required_parameters & symbolic) - set(controls))
+    if missing:
+        missing_names = sorted(missing)
+        issues.append(
+            _issue(
+                "math.parameter_control_missing",
+                PlaybookIssueSeverity.ERROR,
+                "parameter_controls",
+                (
+                    "Math expressions reference free parameter(s) without controls: "
+                    f"{', '.join(missing_names)}."
+                ),
+                (
+                    "Declare one parameter control per free identifier and keep the same "
+                    "identifier in every dynamic curve expression."
+                ),
+            )
+        )
+
+    condition_determined = _condition_determined_parameters(prompt)
+    unused = sorted((set(controls) - symbolic) | (set(controls) & condition_determined))
+    if unused:
+        issues.append(
+            _issue(
+                "math.parameter_control_unused",
+                PlaybookIssueSeverity.ERROR,
+                "parameter_controls",
+                (
+                    "Math parameter control(s) are unused or already fixed by the "
+                    f"problem constraints: {', '.join(unused)}."
+                ),
+                (
+                    "Remove fake controls and controls for quantities already "
+                    "determined by the problem; only surviving free parameters may "
+                    "remain interactive."
+                ),
+            )
+        )
+
+    hardcoded = sorted(required_parameters - symbolic)
+    if hardcoded:
+        issues.append(
+            _issue(
+                "math.parameter_hardcoded",
+                PlaybookIssueSeverity.ERROR,
+                "steps",
+                (
+                    "The prompt requires a moving line, but surviving free "
+                    f"parameter(s) were baked into numeric expressions: {', '.join(hardcoded)}."
+                ),
+                (
+                    "Keep each surviving free parameter symbolic in the moving-line "
+                    "curve and declare a matching parameter control."
+                ),
+            )
+        )
+
+
+def _required_interactive_parameters(prompt: str) -> set[str]:
+    normalized = prompt.casefold()
+    required = {
+        match.group(1)
+        for pattern in (_EXPLICIT_PARAMETER_RE, _EXPLICIT_PARAMETER_CN_RE)
+        for match in pattern.finditer(prompt)
+    }
+    if not any(marker in normalized for marker in _MOVING_LINE_MARKERS):
+        return required
+    match = _MOVING_LINE_PARAMETER_RE.search(prompt)
+    if match is None:
+        return required
+    slope, intercept = match.groups()
+    required.add(slope)
+    if not any(marker in normalized for marker in _DETERMINED_INTERCEPT_MARKERS):
+        required.add(intercept)
+    return required
+
+
+def _condition_determined_parameters(prompt: str) -> set[str]:
+    normalized = prompt.casefold()
+    if not any(marker in normalized for marker in _MOVING_LINE_MARKERS):
+        return set()
+    if not any(marker in normalized for marker in _DETERMINED_INTERCEPT_MARKERS):
+        return set()
+    match = _MOVING_LINE_PARAMETER_RE.search(prompt)
+    return {match.group(2)} if match is not None else set()
+
+
+def _math_expression_bindings(
+    playbook: PlaybookScript,
+) -> list[tuple[str, set[str], dict[str, float], str]]:
+    bindings: list[tuple[str, set[str], dict[str, float], str]] = []
+    for step_index, step in enumerate(playbook.steps):
+        snapshot = _snapshot_json(step.snapshot)
+        kind = snapshot.get("kind")
+        fixed_params = {
+            str(name): float(value)
+            for name, value in (snapshot.get("params") or {}).items()
+            if isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and math.isfinite(float(value))
+        }
+        if kind == "math_plot":
+            for curve_index, curve in enumerate(snapshot.get("curves") or []):
+                if not isinstance(curve, dict) or not isinstance(curve.get("expression"), str):
+                    continue
+                bindings.append(
+                    (
+                        curve["expression"],
+                        {"x"},
+                        fixed_params,
+                        f"steps[{step_index}].snapshot.curves[{curve_index}].expression",
+                    )
+                )
+        elif kind == "math_scene":
+            for curve_index, curve in enumerate(snapshot.get("curves") or []):
+                if not isinstance(curve, dict):
+                    continue
+                parametric = bool(curve.get("expression_x"))
+                intrinsic_names = {"t"} if parametric else {"x"}
+                for field in ("expression_x", "expression_y"):
+                    source = curve.get(field)
+                    if isinstance(source, str) and source.strip():
+                        bindings.append(
+                            (
+                                source,
+                                intrinsic_names,
+                                fixed_params,
+                                f"steps[{step_index}].snapshot.curves[{curve_index}].{field}",
+                            )
+                        )
+            vector_field = snapshot.get("vector_field")
+            if isinstance(vector_field, dict):
+                for field in ("expression_px", "expression_py"):
+                    source = vector_field.get(field)
+                    if isinstance(source, str) and source.strip():
+                        bindings.append(
+                            (
+                                source,
+                                {"x", "y"},
+                                fixed_params,
+                                f"steps[{step_index}].snapshot.vector_field.{field}",
+                            )
+                        )
+    return bindings
+
+
+def _expression_has_finite_default(
+    compiled: Any,
+    controls: dict[str, float],
+    fixed_params: dict[str, float],
+    intrinsic_names: set[str],
+) -> bool:
+    for sample in (-1.0, 0.0, 1.0):
+        scope = {
+            **fixed_params,
+            **controls,
+            **dict.fromkeys(intrinsic_names, sample),
+        }
+        try:
+            if math.isfinite(compiled(scope)):
+                return True
+        except SafeMathExpressionError:
+            continue
+    return False
 
 
 def _check_bfs_checkpoint_progression(

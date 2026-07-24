@@ -57,6 +57,252 @@ def _valid_playbook() -> PlaybookScript:
     )
 
 
+def _math_curve_playbook(
+    expression: str,
+    *,
+    parameter_controls: list[dict[str, str]] | None = None,
+    snapshot_params: dict[str, float] | None = None,
+) -> PlaybookScript:
+    payload = _valid_playbook().model_dump(mode="json")
+    payload["domain"] = "math"
+    payload["title"] = "Parameterized line"
+    payload["summary"] = "Show how a free parameter changes a line."
+    payload["parameter_controls"] = parameter_controls or []
+    for step in payload["steps"]:
+        snapshot = {
+            "kind": "math_plot",
+            "curves": [{"expression": expression, "label": "moving line"}],
+            "params": snapshot_params or {},
+            "x_min": -5,
+            "x_max": 5,
+            "x_label": "x",
+            "y_label": "y",
+        }
+        step["title"] = "Parameterized line"
+        step["voiceover_text"] = "The moving line changes with its free parameter."
+        step["snapshot"] = deepcopy(snapshot)
+        step["layers"] = [{"body": deepcopy(snapshot)}]
+        step["code_highlight"] = None
+    return PlaybookScript.model_validate(payload)
+
+
+def test_gateway_blocks_math_curves_with_uncontrolled_free_parameters() -> None:
+    report = quality_gate_playbook(
+        _math_curve_playbook("a*x"),
+        "Vary the free parameter a in y=a*x.",
+        generator_path="agent",
+    )
+
+    assert report.status == "repairable"
+    issue = next(
+        issue
+        for issue in report.issues
+        if issue.code == "math.parameter_control_missing"
+    )
+    assert issue.path == "parameter_controls"
+    assert issue.requires_repair is True
+
+
+def test_gateway_accepts_bound_controls_and_intrinsic_variables() -> None:
+    explicit = quality_gate_playbook(
+        _math_curve_playbook(
+            "a*x",
+            parameter_controls=[{"id": "a", "label": "Slope", "value": "2"}],
+        ),
+        "Vary the free parameter a in y=a*x.",
+        generator_path="agent",
+    )
+    parametric = _math_curve_playbook(
+        "x",
+        parameter_controls=[{"id": "a", "label": "Amplitude", "value": "2"}],
+    ).model_dump(mode="json")
+    for step in parametric["steps"]:
+        snapshot = {
+            "kind": "math_scene",
+            "curves": [
+                {
+                    "expression_x": "cos(t)",
+                    "expression_y": "a*sin(t)",
+                    "t_min": 0,
+                    "t_max": 6.28,
+                }
+            ],
+        }
+        step["snapshot"] = deepcopy(snapshot)
+        step["layers"] = [{"body": deepcopy(snapshot)}]
+    parametric_report = quality_gate_playbook(
+        PlaybookScript.model_validate(parametric),
+        "Vary amplitude a along parameter t.",
+        generator_path="agent",
+    )
+
+    assert explicit.status == "clean"
+    assert parametric_report.status == "clean"
+
+
+def test_gateway_accepts_fixed_snapshot_parameters_without_sliders() -> None:
+    report = quality_gate_playbook(
+        _math_curve_playbook("r*x", snapshot_params={"r": 2}),
+        "Plot the fixed line y=2x.",
+        generator_path="agent",
+    )
+
+    assert report.status == "clean"
+
+
+def test_gateway_accepts_vector_field_coordinate_variables() -> None:
+    payload = _math_curve_playbook("x").model_dump(mode="json")
+    for step in payload["steps"]:
+        snapshot = {
+            "kind": "math_scene",
+            "vector_field": {
+                "expression_px": "-y",
+                "expression_py": "x",
+            },
+        }
+        step["snapshot"] = deepcopy(snapshot)
+        step["layers"] = [{"body": deepcopy(snapshot)}]
+
+    report = quality_gate_playbook(
+        PlaybookScript.model_validate(payload),
+        "Show the vector field.",
+        generator_path="agent",
+    )
+
+    assert not {
+        issue.code
+        for issue in report.issues
+        if issue.code.startswith("math.parameter")
+    }
+
+
+@pytest.mark.parametrize(
+    ("controls", "expected_code"),
+    [
+        ([{"id": "a", "label": "Slope", "value": "nan"}], "math.parameter_control_invalid"),
+        ([{"id": "bad-id", "label": "Slope", "value": "1"}], "math.parameter_control_invalid"),
+        (
+            [
+                {"id": "a", "label": "Slope", "value": "1"},
+                {"id": "a", "label": "Duplicate", "value": "2"},
+            ],
+            "math.parameter_control_invalid",
+        ),
+        (
+            [
+                {"id": "a", "label": "Slope", "value": "1"},
+                {"id": "unused", "label": "Unused", "value": "2"},
+            ],
+            "math.parameter_control_unused",
+        ),
+    ],
+)
+def test_gateway_rejects_invalid_or_unused_math_controls(
+    controls: list[dict[str, str]],
+    expected_code: str,
+) -> None:
+    report = quality_gate_playbook(
+        _math_curve_playbook("a*x", parameter_controls=controls),
+        "Vary a in y=a*x.",
+        generator_path="agent",
+    )
+
+    assert report.status == "repairable"
+    assert expected_code in {issue.code for issue in report.issues}
+
+
+def test_gateway_rejects_math_expressions_that_cannot_render() -> None:
+    report = quality_gate_playbook(
+        _math_curve_playbook(
+            "a**x",
+            parameter_controls=[{"id": "a", "label": "Slope", "value": "2"}],
+        ),
+        "Vary a.",
+        generator_path="agent",
+    )
+
+    assert report.status == "repairable"
+    assert "math.parameter_control_invalid" in {
+        issue.code for issue in report.issues
+    }
+
+
+def test_gateway_blocks_a_hardcoded_moving_line_parameter() -> None:
+    report = quality_gate_playbook(
+        _math_curve_playbook("0.5*x"),
+        (
+            "The moving line y = kx + t satisfies a condition that determines "
+            "the intercept. Prove it always passes through a fixed point."
+        ),
+        generator_path="agent",
+    )
+
+    assert report.status == "repairable"
+    issue = next(
+        issue for issue in report.issues if issue.code == "math.parameter_hardcoded"
+    )
+    assert issue.path == "steps"
+    assert "k" in issue.message
+
+
+def test_gateway_accepts_exact_beijing_prompt_with_only_surviving_k_control() -> None:
+    prompt = """2019 北京高考文科数学第 19 题。
+直线 l: y = kx + t 与椭圆相交，乘积条件最终确定截距 t=0。
+证明这条动直线恒过定点，并展示约束后的直线族。"""
+    report = quality_gate_playbook(
+        _math_curve_playbook(
+            "k*x",
+            parameter_controls=[{"id": "k", "label": "斜率 k", "value": "0.5"}],
+        ),
+        prompt,
+        generator_path="agent",
+    )
+
+    assert not {
+        issue.code
+        for issue in report.issues
+        if issue.code.startswith("math.parameter")
+    }
+
+
+def test_gateway_blocks_condition_determined_intercept_control() -> None:
+    prompt = """2019 北京高考文科数学第 19 题。
+直线 l: y = kx + t 与椭圆相交，乘积条件最终确定截距 t=0。
+证明这条动直线恒过定点，并展示约束后的直线族。"""
+    report = quality_gate_playbook(
+        _math_curve_playbook(
+            "k*x+t",
+            parameter_controls=[
+                {"id": "k", "label": "斜率 k", "value": "0.5"},
+                {"id": "t", "label": "截距 t", "value": "0"},
+            ],
+        ),
+        prompt,
+        generator_path="agent",
+    )
+
+    assert report.status == "repairable"
+    issue = next(
+        issue
+        for issue in report.issues
+        if issue.code == "math.parameter_control_unused"
+    )
+    assert "t" in issue.message
+
+
+def test_gateway_detects_explicitly_varied_generic_parameter_hardcoding() -> None:
+    report = quality_gate_playbook(
+        _math_curve_playbook("2*x^2"),
+        "Vary parameter a in the curve y=a*x^2 and show how the graph changes.",
+        generator_path="agent",
+    )
+
+    assert report.status == "repairable"
+    assert "math.parameter_hardcoded" in {
+        issue.code for issue in report.issues
+    }
+
+
 def _bfs_playbook(*, skip_f_checkpoint: bool = False, include_code_sync: bool = True) -> PlaybookScript:
     nodes = [{"id": node, "label": node} for node in "ABCDEFG"]
     edges = [

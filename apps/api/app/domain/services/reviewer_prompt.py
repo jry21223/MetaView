@@ -74,6 +74,14 @@ Return ONLY strict JSON matching this shape:
 
 Use "blocked" for any error-level issue. Use "clean" only when there are no
 errors. Never return markdown fences, prose, or corrected PlaybookScript JSON.
+For math lessons, compare the original prompt, derivation, parameter_controls,
+and renderer-visible curve expressions. If the prompt asks for a moving or
+varying family, every parameter that remains free after all stated conditions
+must stay symbolic in the curve expression and have one effective control.
+Report math.parameter_hardcoded when such a parameter was replaced by a numeric
+example. Report missing, unused, or invalid controls with the matching
+math.parameter_control_* code. Do not require sliders for coordinate variables,
+intrinsic parametric variables, or quantities fixed by the derivation.
 Supported issue codes include:
 {", ".join(SUPPORTED_PLAYBOOK_REVIEW_CODES)}"""
 

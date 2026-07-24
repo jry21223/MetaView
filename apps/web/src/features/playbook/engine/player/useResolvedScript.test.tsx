@@ -41,6 +41,13 @@ function script(): PlaybookScript {
 }
 
 describe("useResolvedScript", () => {
+  it("injects parameter control defaults before the first interaction", () => {
+    const resolved = resolveScript(script(), {});
+    const snap = resolved.steps[0]?.snapshot as MathPlotSnapshot;
+
+    expect(snap.params).toEqual({ a: 1 });
+  });
+
   it("applies math params to math_plot snapshots", () => {
     const resolved = resolveScript(script(), { mathParams: { a: 3 } });
     expect(resolved.steps[0]?.snapshot.kind).toBe("math_plot");
@@ -64,6 +71,13 @@ describe("useResolvedScript", () => {
     const resolved = resolveScript(base, { mathParams: { a: 3 } });
     const snap = resolved.steps[0].snapshot as MathSceneSnapshot;
     expect(snap.params).toEqual({ b: 2, a: 3 });
+  });
+
+  it("restores parameter defaults when overrides are reset", () => {
+    const resolved = resolveScript(script(), { mathParams: undefined });
+    const snap = resolved.steps[0]?.snapshot as MathPlotSnapshot;
+
+    expect(snap.params).toEqual({ a: 1 });
   });
 });
 

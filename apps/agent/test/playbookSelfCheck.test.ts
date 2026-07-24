@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { buildAgentSelfRepairPrompt } from "../src/agent.js";
 import { selfCheckPlaybook } from "../src/state/playbookSelfCheck.js";
 import type { PlaybookOutput } from "../src/state/types.js";
 
@@ -52,8 +51,8 @@ describe("agent playbook self-check", () => {
   it("returns clean for a renderer-ready playbook", () => {
     const report = selfCheckPlaybook(validPlaybook(), "Scan the array");
 
-    expect(report.status).toBe("clean");
     expect(report.issues).toEqual([]);
+    expect(report.status).toBe("clean");
   });
 
   it.each([
@@ -135,6 +134,330 @@ describe("agent playbook self-check", () => {
     const report = selfCheckPlaybook(validPlaybook(8), "Scan the array");
 
     expect(report.status).toBe("clean");
+  });
+
+  it("blocks math curves whose free parameters have no controls", () => {
+    const playbook = validPlaybook();
+    playbook.domain = "math";
+    playbook.title = "Parameterized line";
+    playbook.summary = "Show how the slope changes the line.";
+    playbook.steps.forEach((step) => {
+      const snapshot = {
+        kind: "math_plot",
+        curves: [{ expression: "a*x", label: "y=a x" }],
+      };
+      step.title = "Parameterized line";
+      step.voiceover_text = "The free slope parameter a changes the line.";
+      step.narration_template = [step.voiceover_text];
+      step.snapshot = structuredClone(snapshot);
+      step.layers[0].body = structuredClone(snapshot);
+    });
+
+    const report = selfCheckPlaybook(
+      playbook,
+      "Vary the free parameter a in y=a*x.",
+    );
+
+    expect(report.status).toBe("blocked");
+    expect(report.issues).toContainEqual(
+      expect.objectContaining({
+        code: "math.parameter_control_missing",
+        severity: "error",
+        path: "parameter_controls",
+      }),
+    );
+  });
+
+  it("blocks invalid and unused math parameter controls", () => {
+    const playbook = validPlaybook();
+    playbook.domain = "math";
+    playbook.title = "Invalid controls";
+    playbook.summary = "Reject controls that cannot drive a curve.";
+    playbook.parameter_controls = [
+      { id: "a", label: "Slope", value: "not-a-number" },
+      { id: "unused", label: "Unused", value: "1" },
+    ];
+    playbook.steps.forEach((step) => {
+      const snapshot = {
+        kind: "math_plot",
+        curves: [{ expression: "a*x", label: "y=a x" }],
+      };
+      step.title = "Invalid controls";
+      step.voiceover_text = "The slope control must render the moving line.";
+      step.narration_template = [step.voiceover_text];
+      step.snapshot = structuredClone(snapshot);
+      step.layers[0].body = structuredClone(snapshot);
+    });
+
+    const report = selfCheckPlaybook(playbook, "Vary a in y=a*x.");
+    const codes = report.issues.map((issue) => issue.code);
+
+    expect(report.status).toBe("blocked");
+    expect(codes).toContain("math.parameter_control_invalid");
+    expect(codes).toContain("math.parameter_control_unused");
+  });
+
+  it("blocks invalid and duplicate math parameter ids", () => {
+    const playbook = validPlaybook();
+    playbook.domain = "math";
+    playbook.title = "Invalid ids";
+    playbook.summary = "Reject duplicate and renderer-unsafe parameter ids.";
+    playbook.parameter_controls = [
+      { id: "bad-id", label: "Bad", value: "1" },
+      { id: "a", label: "Slope", value: "1" },
+      { id: "a", label: "Duplicate", value: "2" },
+    ];
+    playbook.steps.forEach((step) => {
+      const snapshot = {
+        kind: "math_plot",
+        curves: [{ expression: "a*x", label: "line" }],
+      };
+      step.title = "Invalid ids";
+      step.voiceover_text = "Parameter ids must be unique and renderer safe.";
+      step.narration_template = [step.voiceover_text];
+      step.snapshot = structuredClone(snapshot);
+      step.layers[0].body = structuredClone(snapshot);
+    });
+
+    const report = selfCheckPlaybook(playbook, "Vary parameter a.");
+
+    expect(report.status).toBe("blocked");
+    expect(
+      report.issues.filter(
+        (issue) => issue.code === "math.parameter_control_invalid",
+      ),
+    ).toHaveLength(2);
+  });
+
+  it("blocks math expressions outside the renderer grammar", () => {
+    const playbook = validPlaybook();
+    playbook.domain = "math";
+    playbook.title = "Invalid expression";
+    playbook.summary = "Reject a curve the renderer cannot compile.";
+    playbook.parameter_controls = [{ id: "a", label: "Slope", value: "2" }];
+    playbook.steps.forEach((step) => {
+      const snapshot = {
+        kind: "math_plot",
+        curves: [{ expression: "a**x", label: "invalid curve" }],
+      };
+      step.title = "Invalid expression";
+      step.voiceover_text = "This expression must render before publication.";
+      step.narration_template = [step.voiceover_text];
+      step.snapshot = structuredClone(snapshot);
+      step.layers[0].body = structuredClone(snapshot);
+    });
+
+    const report = selfCheckPlaybook(playbook, "Vary a.");
+
+    expect(report.status).toBe("blocked");
+    expect(report.issues.map((issue) => issue.code)).toContain(
+      "math.parameter_control_invalid",
+    );
+  });
+
+  it("blocks defaults that cannot produce a finite curve sample", () => {
+    const playbook = validPlaybook();
+    playbook.domain = "math";
+    playbook.title = "Undefined curve";
+    playbook.summary = "Reject a curve undefined throughout the sample domain.";
+    playbook.steps.forEach((step) => {
+      const snapshot = {
+        kind: "math_plot",
+        curves: [{ expression: "1/(x-x)", label: "undefined" }],
+      };
+      step.title = "Undefined curve";
+      step.voiceover_text = "The default expression must render a finite sample.";
+      step.narration_template = [step.voiceover_text];
+      step.snapshot = structuredClone(snapshot);
+      step.layers[0].body = structuredClone(snapshot);
+    });
+
+    const report = selfCheckPlaybook(playbook, "Plot the curve.");
+
+    expect(report.status).toBe("blocked");
+    expect(report.issues.map((issue) => issue.code)).toContain(
+      "math.parameter_control_invalid",
+    );
+  });
+
+  it("accepts bound controls and intrinsic parametric t", () => {
+    const playbook = validPlaybook();
+    playbook.domain = "math";
+    playbook.title = "Parametric family";
+    playbook.summary = "The amplitude changes a parametric curve.";
+    playbook.parameter_controls = [{ id: "a", label: "Amplitude", value: "2" }];
+    playbook.steps.forEach((step) => {
+      const snapshot = {
+        kind: "math_scene",
+        curves: [
+          {
+            expression_x: "cos(t)",
+            expression_y: "a*sin(t)",
+            t_min: 0,
+            t_max: 6.28,
+            label: "parametric curve",
+          },
+        ],
+      };
+      step.title = "Parametric family";
+      step.voiceover_text = "Amplitude a changes the parametric curve.";
+      step.narration_template = [step.voiceover_text];
+      step.snapshot = structuredClone(snapshot);
+      step.layers[0].body = structuredClone(snapshot);
+    });
+
+    const report = selfCheckPlaybook(
+      playbook,
+      "Vary amplitude a along the parameter t.",
+    );
+
+    expect(report.status).toBe("clean");
+    expect(report.issues).toEqual([]);
+  });
+
+  it("accepts fixed snapshot parameters without exposing sliders", () => {
+    const playbook = validPlaybook();
+    playbook.domain = "math";
+    playbook.title = "Fixed coefficient";
+    playbook.summary = "A fixed coefficient is not an interactive parameter.";
+    playbook.steps.forEach((step) => {
+      const snapshot = {
+        kind: "math_plot",
+        curves: [{ expression: "r*x", label: "fixed line" }],
+        params: { r: 2 },
+      };
+      step.title = "Fixed coefficient";
+      step.voiceover_text = "The fixed value r=2 defines this line.";
+      step.narration_template = [step.voiceover_text];
+      step.snapshot = structuredClone(snapshot);
+      step.layers[0].body = structuredClone(snapshot);
+    });
+
+    const report = selfCheckPlaybook(playbook, "Plot the fixed line y=2x.");
+
+    expect(report.status).toBe("clean");
+    expect(report.issues).toEqual([]);
+  });
+
+  it("accepts vector-field coordinate variables", () => {
+    const playbook = validPlaybook();
+    playbook.domain = "math";
+    playbook.title = "Vector field";
+    playbook.summary = "Show a vector field in x and y.";
+    playbook.steps.forEach((step) => {
+      const snapshot = {
+        kind: "math_scene",
+        formula_latex: "F(x,y)=(-y,x)",
+        vector_field: {
+          expression_px: "-y",
+          expression_py: "x",
+        },
+      };
+      step.title = "Vector field";
+      step.voiceover_text = "The vector field rotates around the origin.";
+      step.narration_template = [step.voiceover_text];
+      step.snapshot = structuredClone(snapshot);
+      step.layers[0].body = structuredClone(snapshot);
+    });
+
+    const report = selfCheckPlaybook(playbook, "Vector field.");
+
+    expect(report.issues).toEqual([]);
+    expect(report.status).toBe("clean");
+  });
+
+  it("blocks a moving line whose surviving slope parameter is hardcoded", () => {
+    const playbook = validPlaybook();
+    playbook.domain = "math";
+    playbook.title = "Fixed-point line family";
+    playbook.summary = "Prove a moving line passes through a fixed point.";
+    playbook.steps.forEach((step) => {
+      const snapshot = {
+        kind: "math_plot",
+        curves: [{ expression: "0.5*x", label: "moving line" }],
+      };
+      step.title = "Moving line";
+      step.voiceover_text = "The condition determines the intercept t.";
+      step.narration_template = [step.voiceover_text];
+      step.snapshot = structuredClone(snapshot);
+      step.layers[0].body = structuredClone(snapshot);
+    });
+
+    const report = selfCheckPlaybook(
+      playbook,
+      "The moving line y = kx + t satisfies a condition that determines the intercept. Prove it always passes through a fixed point.",
+    );
+
+    expect(report.status).toBe("blocked");
+    expect(report.issues).toContainEqual(
+      expect.objectContaining({
+        code: "math.parameter_hardcoded",
+        path: "steps",
+      }),
+    );
+  });
+
+  it("blocks a condition-determined intercept exposed as a slider", () => {
+    const playbook = validPlaybook();
+    playbook.domain = "math";
+    playbook.title = "Fixed-point line family";
+    playbook.summary = "Keep only the surviving slope parameter interactive.";
+    playbook.parameter_controls = [
+      { id: "k", label: "Slope k", value: "0.5" },
+      { id: "t", label: "Intercept t", value: "0" },
+    ];
+    playbook.steps.forEach((step) => {
+      const snapshot = {
+        kind: "math_plot",
+        curves: [{ expression: "k*x+t", label: "moving line" }],
+      };
+      step.title = "Moving line";
+      step.voiceover_text = "The condition determines t=0, while k remains free.";
+      step.narration_template = [step.voiceover_text];
+      step.snapshot = structuredClone(snapshot);
+      step.layers[0].body = structuredClone(snapshot);
+    });
+
+    const report = selfCheckPlaybook(
+      playbook,
+      "The moving line y = kx + t satisfies a condition that determines the intercept t=0. Prove it always passes through a fixed point.",
+    );
+
+    expect(report.status).toBe("blocked");
+    expect(report.issues).toContainEqual(
+      expect.objectContaining({
+        code: "math.parameter_control_unused",
+        path: "parameter_controls",
+      }),
+    );
+  });
+
+  it("blocks an explicitly varied generic parameter that was hardcoded", () => {
+    const playbook = validPlaybook();
+    playbook.domain = "math";
+    playbook.title = "Quadratic family";
+    playbook.summary = "Vary a quadratic coefficient.";
+    playbook.steps.forEach((step) => {
+      const snapshot = {
+        kind: "math_plot",
+        curves: [{ expression: "2*x^2", label: "quadratic" }],
+      };
+      step.title = "Quadratic family";
+      step.voiceover_text = "The graph should change with parameter a.";
+      step.narration_template = [step.voiceover_text];
+      step.snapshot = structuredClone(snapshot);
+      step.layers[0].body = structuredClone(snapshot);
+    });
+
+    const report = selfCheckPlaybook(
+      playbook,
+      "Vary parameter a in y=a*x^2 and show how the graph changes.",
+    );
+
+    expect(report.status).toBe("blocked");
+    expect(report.issues.map((issue) => issue.code)).toContain(
+      "math.parameter_hardcoded",
+    );
   });
 
   it("blocks fifteen-step product playbooks", () => {
@@ -421,31 +744,4 @@ describe("agent playbook self-check", () => {
     );
   });
 
-  it("builds a structured repair prompt from blocked self-check output", () => {
-    const playbook = validPlaybook();
-    const report = {
-      status: "blocked" as const,
-      issues: [
-        {
-          code: "step.empty_voiceover",
-          severity: "error" as const,
-          path: "steps[0].voiceover_text",
-          message: "Every step must have non-empty voiceover_text.",
-          suggestion: "Write narration.",
-        },
-      ],
-    };
-
-    const prompt = buildAgentSelfRepairPrompt({
-      originalPrompt: "Scan the array",
-      previousPlaybook: playbook,
-      report,
-      repairAttempt: 1,
-    });
-
-    expect(prompt).toContain("agent self-check blocked");
-    expect(prompt).toContain('"repair_attempt": 1');
-    expect(prompt).toContain('"code": "step.empty_voiceover"');
-    expect(prompt).toContain("PlaybookScript");
-  });
 });

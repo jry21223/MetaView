@@ -95,6 +95,13 @@ Workflow you MUST follow:
    \`add_curve_*\` / \`add_point\` / \`add_arrow\` / \`add_segment\` /
    \`add_region\` / \`add_formula\` → \`set_narration\` → \`assert_*\` →
    \`commit_step\`.
+   For math families, first identify only the parameters that remain free after
+   every stated condition is applied. Call \`add_parameter_control\` once per
+   surviving free parameter before the first curve that uses it, and reference
+   the exact control id in every moving curve expression. Never replace a
+   surviving parameter with a convenient numeric example. Do not expose
+   variables fixed by the derivation, coordinate variables (\`x\`, \`y\`), or
+   the intrinsic parameter \`t\` of a parametric curve as sliders.
 4. Verify claims and finish. Any narration claiming "顺时针"/"逆时针"/
    "clockwise"/"counterclockwise" MUST be preceded by \`assert_orientation\`;
    if the verdict contradicts your draft, rewrite narration before
@@ -114,6 +121,9 @@ Output discipline:
   outputs instead of array placeholders.
 - Per step, prefer 1 chart-like visual element + a focused narration over a
   cluttered canvas.
+- A parameter control is valid only when its id is used by a renderer-visible
+  expression and its finite default renders on the first frame. Never add a
+  decorative slider that does not change the visual.
 - For math parametric trajectories, ALWAYS \`assert_orientation\` before
   saying clockwise/counterclockwise.
 `.trim();
@@ -347,6 +357,8 @@ export function buildAgentSelfRepairPrompt(
       "Keep PlaybookScript as the only rendering exit.",
       "Do not introduce raw HTML, iframe, Manim, or server video rendering.",
       "Use only renderer-supported snapshot kinds.",
+      "For math.parameter_hardcoded, restore each surviving free parameter as a symbolic curve identifier and call add_parameter_control with a finite default. Parameters fixed by the derivation must stay fixed.",
+      "For math.parameter_control_missing, math.parameter_control_unused, or math.parameter_control_invalid, make controls and renderer-visible curve identifiers a one-to-one binding; do not add decorative sliders.",
       "For snapshot.domain_fallback, rebuild through the matching SkillPack runtime tool or a SceneBlueprint-backed subject renderer such as geo_map_scene, physics_force_scene, bio_cell_scene, bio_process_scene, molecule_2d_scene, or reaction_scene. Do not repair this by renaming algorithm_array; replace the visual plan.",
       "Call finalize_playbook only after addressing all error-level self-check issues.",
     ],

@@ -1,5 +1,11 @@
 import type { PlaybookOutput } from "./types.js";
 import { estimateStepFrames } from "./playbookEmitter.js";
+import {
+  compileSafeMathExpression,
+  extractSafeMathIdentifiers,
+  SafeMathExpressionError,
+  type CompiledMathExpression,
+} from "./safeMathExpression.js";
 
 export type SelfCheckStatus = "clean" | "warnings" | "blocked";
 export type SelfCheckSeverity = "warning" | "error";
@@ -29,6 +35,31 @@ export class AgentSelfCheckError extends Error {
 
 const MIN_AGENT_STEPS = 8;
 const MAX_AGENT_STEPS = 14;
+const MATH_PARAMETER_ID_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const MOVING_LINE_PARAMETER_RE =
+  /\by\s*=\s*([A-Za-z_][A-Za-z0-9_]*)\s*\*?\s*x\s*[+-]\s*([A-Za-z_][A-Za-z0-9_]*)/i;
+const MOVING_LINE_MARKERS = [
+  "moving line",
+  "varying line",
+  "line family",
+  "动直线",
+  "运动直线",
+  "直线族",
+  "恒过",
+  "定点",
+];
+const DETERMINED_INTERCEPT_MARKERS = [
+  "determines the intercept",
+  "determine the intercept",
+  "intercept is determined",
+  "确定截距",
+  "截距确定",
+  "求出截距",
+];
+const EXPLICIT_PARAMETER_RE =
+  /(?:vary|varying|change|changing|drag)\s+(?:the\s+)?(?:free\s+)?parameter\s+([A-Za-z_][A-Za-z0-9_]*)/gi;
+const EXPLICIT_PARAMETER_CN_RE =
+  /(?:改变|变化|拖动|调节)?\s*参数\s*([A-Za-z_][A-Za-z0-9_]*)/g;
 
 const SUPPORTED_FRONTEND_SNAPSHOT_KINDS = new Set([
   "algorithm_array",
@@ -143,6 +174,7 @@ export function selfCheckPlaybook(
   checkStructure(playbook, issues);
   checkTiming(playbook, issues);
   checkSteps(playbook, prompt, issues);
+  checkMathParameterContract(playbook, prompt, issues);
   checkForbiddenRenderingPaths(playbook, issues);
 
   if (issues.some((issue) => issue.severity === "error")) {
@@ -152,6 +184,304 @@ export function selfCheckPlaybook(
     return { status: "warnings", issues };
   }
   return { status: "clean", issues: [] };
+}
+
+interface MathExpressionBinding {
+  source: string;
+  intrinsicNames: ReadonlySet<string>;
+  fixedParams: Readonly<Record<string, number>>;
+  path: string;
+}
+
+function checkMathParameterContract(
+  playbook: PlaybookOutput,
+  prompt: string,
+  issues: SelfCheckIssue[],
+): void {
+  if (playbook.domain.trim().toLowerCase() !== "math") return;
+
+  const expressions = playbook.steps.flatMap((step, index) =>
+    mathExpressionBindings(step.snapshot, `steps[${index}].snapshot`),
+  );
+  const controls = new Map<string, number>();
+  const seenControlIds = new Set<string>();
+  playbook.parameter_controls.forEach((control, index) => {
+    const trimmedValue = control.value.trim();
+    const numericValue = Number(trimmedValue);
+    const invalidId = !MATH_PARAMETER_ID_RE.test(control.id);
+    const invalidValue =
+      !trimmedValue || !Number.isFinite(numericValue);
+    const duplicateId = seenControlIds.has(control.id);
+    seenControlIds.add(control.id);
+    if (invalidId || invalidValue || duplicateId) {
+      const reasons = [
+        ...(invalidId ? ["id must be a renderer-safe identifier"] : []),
+        ...(invalidValue ? ["value must be a finite number"] : []),
+        ...(duplicateId ? ["id must be unique"] : []),
+      ];
+      issues.push(
+        issue(
+          "math.parameter_control_invalid",
+          "error",
+          `parameter_controls[${index}]`,
+          `Math parameter control ${JSON.stringify(control.id)} is invalid: ${reasons.join(", ")}.`,
+          "Use one unique ASCII identifier per control and provide a finite numeric default value.",
+        ),
+      );
+      return;
+    }
+    controls.set(control.id, numericValue);
+  });
+
+  const symbolicParameters = new Set<string>();
+  const missingParameters = new Set<string>();
+  for (const expression of expressions) {
+    let identifiers: Set<string>;
+    let compiled: CompiledMathExpression;
+    try {
+      identifiers = extractSafeMathIdentifiers(expression.source);
+      compiled = compileSafeMathExpression(expression.source);
+    } catch (error) {
+      const message =
+        error instanceof SafeMathExpressionError
+          ? error.message
+          : "unknown expression error";
+      issues.push(
+        issue(
+          "math.parameter_control_invalid",
+          "error",
+          expression.path,
+          `Math expression cannot be rendered: ${message}`,
+          "Use explicit multiplication, balanced parentheses, supported functions, and the ^ power operator.",
+        ),
+      );
+      continue;
+    }
+    const expressionParameters = [...identifiers].filter(
+      (name) => !expression.intrinsicNames.has(name),
+    );
+    for (const name of expressionParameters) {
+      symbolicParameters.add(name);
+      if (!(name in expression.fixedParams) && !controls.has(name)) {
+        missingParameters.add(name);
+      }
+    }
+    if (
+      !expressionHasFiniteDefault(
+        compiled,
+        controls,
+        expression.fixedParams,
+        expression.intrinsicNames,
+      )
+    ) {
+      issues.push(
+        issue(
+          "math.parameter_control_invalid",
+          "error",
+          expression.path,
+          "Math expression has no finite sample with the declared default parameters.",
+          "Choose finite defaults that render the curve before the student moves a slider.",
+        ),
+      );
+    }
+  }
+
+  const requiredParameters = requiredInteractiveParameters(prompt);
+  for (const name of requiredParameters) {
+    if (symbolicParameters.has(name) && !controls.has(name)) {
+      missingParameters.add(name);
+    }
+  }
+  const missing = [...missingParameters];
+  if (missing.length > 0) {
+    issues.push(
+      issue(
+        "math.parameter_control_missing",
+        "error",
+        "parameter_controls",
+        `Math expressions reference free parameter(s) without controls: ${missing.join(", ")}.`,
+        "Call add_parameter_control once per free parameter and keep the same identifier in every dynamic curve expression.",
+      ),
+    );
+  }
+
+  const conditionDetermined = conditionDeterminedParameters(prompt);
+  const unused = [...controls.keys()].filter(
+    (name) =>
+      !symbolicParameters.has(name) || conditionDetermined.has(name),
+  );
+  if (unused.length > 0) {
+    issues.push(
+      issue(
+        "math.parameter_control_unused",
+        "error",
+        "parameter_controls",
+        `Math parameter control(s) are unused or already fixed by the problem constraints: ${unused.join(", ")}.`,
+        "Remove fake controls and controls for quantities already determined by the problem; only surviving free parameters may remain interactive.",
+      ),
+    );
+  }
+
+  const hardcoded = [...requiredParameters].filter(
+    (name) => !symbolicParameters.has(name),
+  );
+  if (hardcoded.length > 0) {
+    issues.push(
+      issue(
+        "math.parameter_hardcoded",
+        "error",
+        "steps",
+        `The prompt requires a moving line, but surviving free parameter(s) were baked into numeric expressions: ${hardcoded.join(", ")}.`,
+        "Keep each surviving free parameter symbolic in the moving-line curve and declare a matching parameter control.",
+      ),
+    );
+  }
+}
+
+function requiredInteractiveParameters(prompt: string): Set<string> {
+  const normalized = prompt.toLowerCase();
+  const required = new Set<string>();
+  for (const pattern of [EXPLICIT_PARAMETER_RE, EXPLICIT_PARAMETER_CN_RE]) {
+    pattern.lastIndex = 0;
+    for (const match of prompt.matchAll(pattern)) {
+      required.add(match[1]);
+    }
+  }
+  if (!MOVING_LINE_MARKERS.some((marker) => normalized.includes(marker))) {
+    return required;
+  }
+  const match = MOVING_LINE_PARAMETER_RE.exec(prompt);
+  if (!match) return required;
+  const [, slope, intercept] = match;
+  required.add(slope);
+  if (
+    !DETERMINED_INTERCEPT_MARKERS.some((marker) =>
+      normalized.includes(marker)
+    )
+  ) {
+    required.add(intercept);
+  }
+  return required;
+}
+
+function conditionDeterminedParameters(prompt: string): Set<string> {
+  const normalized = prompt.toLowerCase();
+  if (
+    !MOVING_LINE_MARKERS.some((marker) => normalized.includes(marker)) ||
+    !DETERMINED_INTERCEPT_MARKERS.some((marker) =>
+      normalized.includes(marker)
+    )
+  ) {
+    return new Set();
+  }
+  const match = MOVING_LINE_PARAMETER_RE.exec(prompt);
+  return match ? new Set([match[2]]) : new Set();
+}
+
+function expressionHasFiniteDefault(
+  compiled: CompiledMathExpression,
+  controls: ReadonlyMap<string, number>,
+  fixedParams: Readonly<Record<string, number>>,
+  intrinsicNames: ReadonlySet<string>,
+): boolean {
+  for (const sample of [-1, 0, 1]) {
+    const scope = {
+      ...fixedParams,
+      ...Object.fromEntries(controls),
+      ...Object.fromEntries(
+        [...intrinsicNames].map((name) => [name, sample]),
+      ),
+    };
+    try {
+      if (Number.isFinite(compiled(scope))) return true;
+    } catch (error) {
+      if (!(error instanceof SafeMathExpressionError)) throw error;
+    }
+  }
+  return false;
+}
+
+function mathExpressionBindings(
+  snapshot: Record<string, unknown>,
+  path: string,
+): MathExpressionBinding[] {
+  const kind = String(snapshot.kind ?? "");
+  const fixedParams = Object.fromEntries(
+    Object.entries(
+      snapshot.params && typeof snapshot.params === "object"
+        ? (snapshot.params as Record<string, unknown>)
+        : {},
+    ).flatMap(([name, value]) =>
+      typeof value === "number" && Number.isFinite(value)
+        ? [[name, value] as const]
+        : [],
+    ),
+  );
+  if (kind === "math_plot") {
+    const curves = Array.isArray(snapshot.curves) ? snapshot.curves : [];
+    return curves.flatMap((curve, index) => {
+      if (!curve || typeof curve !== "object") return [];
+      const source = (curve as Record<string, unknown>).expression;
+      return typeof source === "string"
+        ? [{
+            source,
+            intrinsicNames: new Set(["x"]),
+            fixedParams,
+            path: `${path}.curves[${index}].expression`,
+          }]
+        : [];
+    });
+  }
+  if (kind !== "math_scene") return [];
+
+  const bindings: MathExpressionBinding[] = [];
+  const curves = Array.isArray(snapshot.curves) ? snapshot.curves : [];
+  for (const [index, curve] of curves.entries()) {
+    if (!curve || typeof curve !== "object") continue;
+    const data = curve as Record<string, unknown>;
+    const parametric = typeof data.expression_x === "string" && data.expression_x.trim();
+    const intrinsicNames = new Set([parametric ? "t" : "x"]);
+    if (typeof data.expression_x === "string") {
+      bindings.push({
+        source: data.expression_x,
+        intrinsicNames,
+        fixedParams,
+        path: `${path}.curves[${index}].expression_x`,
+      });
+    }
+    if (typeof data.expression_y === "string") {
+      bindings.push({
+        source: data.expression_y,
+        intrinsicNames,
+        fixedParams,
+        path: `${path}.curves[${index}].expression_y`,
+      });
+    }
+  }
+  const vectorField =
+    snapshot.vector_field && typeof snapshot.vector_field === "object"
+      ? (snapshot.vector_field as Record<string, unknown>)
+      : null;
+  if (vectorField) {
+    const intrinsicNames = new Set(["x", "y"]);
+    if (typeof vectorField.expression_px === "string") {
+      bindings.push({
+        source: vectorField.expression_px,
+        intrinsicNames,
+        fixedParams,
+        path: `${path}.vector_field.expression_px`,
+      });
+    }
+    if (typeof vectorField.expression_py === "string") {
+      bindings.push({
+        source: vectorField.expression_py,
+        intrinsicNames,
+        fixedParams,
+        path: `${path}.vector_field.expression_py`,
+      });
+    }
+  }
+  return bindings;
 }
 
 function checkStructure(
