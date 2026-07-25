@@ -14,6 +14,8 @@ const MUTABLE_ROOTS = new Set([
 ]);
 
 const IMMUTABLE_STEP_FIELDS = new Set(["step_id", "end_frame"]);
+/** Reject prototype-pollution path segments (case-sensitive exact match). */
+const FORBIDDEN_PATH_SEGMENTS = new Set(["__proto__", "prototype", "constructor"]);
 const MIN_STEP_SECONDS = 5.5;
 const MAX_STEP_SECONDS = 12;
 const VOICEOVER_HOLD_SECONDS = 0.6;
@@ -30,18 +32,21 @@ export function deriveRepairScope(issues: unknown): RepairScope {
   const rows = Array.isArray(issues) ? issues : [];
   const prefixes = new Set<string>();
   const codes = new Set<string>();
+  let sawProcessableIssue = false;
 
   for (const item of rows) {
     if (!isRecord(item)) continue;
     const code = typeof item.code === "string" ? item.code : "unknown";
     const path = typeof item.path === "string" ? item.path : "playbook";
     codes.add(code);
+    sawProcessableIssue = true;
     for (const prefix of prefixesForIssuePath(path)) prefixes.add(prefix);
   }
 
-  // A malformed or global report must not force full regeneration. It may still
-  // edit only the explicit mutable Playbook roots.
-  if (prefixes.size === 0) {
+  // Full-root fallback only for malformed/empty reports (no processable issues).
+  // Director-only issues intentionally yield an empty allowlist so patches fail.
+  // Explicit playbook/schema failures already expand via prefixesForIssuePath.
+  if (prefixes.size === 0 && !sawProcessableIssue) {
     for (const root of MUTABLE_ROOTS) prefixes.add(`/${root}`);
   }
   return { allowedPrefixes: [...prefixes].sort(), issueCodes: [...codes].sort() };
@@ -75,6 +80,7 @@ function validateOperation(operation: PatchOperation, scope: RepairScope): void 
     throw new Error("repair path must be an RFC 6901 pointer beginning with '/'");
   }
   const segments = decodePointer(operation.path);
+  assertSafePathSegments(segments, operation.path);
   const root = segments[0];
   if (!root || !MUTABLE_ROOTS.has(root)) {
     throw new Error(`repair path ${JSON.stringify(operation.path)} targets an immutable root`);
@@ -91,10 +97,23 @@ function validateOperation(operation: PatchOperation, scope: RepairScope): void 
   ) {
     throw new Error("primary layer timing is compiler-owned");
   }
-  if (!scope.allowedPrefixes.some((prefix) => pathMatchesPrefix(operation.path, prefix))) {
+  if (
+    scope.allowedPrefixes.length === 0 ||
+    !scope.allowedPrefixes.some((prefix) => pathMatchesPrefix(operation.path, prefix))
+  ) {
     throw new Error(
       `repair path ${JSON.stringify(operation.path)} is outside the issue-scoped allowlist ${JSON.stringify(scope.allowedPrefixes)}`,
     );
+  }
+}
+
+function assertSafePathSegments(segments: string[], path: string): void {
+  for (const segment of segments) {
+    if (FORBIDDEN_PATH_SEGMENTS.has(segment)) {
+      throw new Error(
+        `repair path ${JSON.stringify(path)} contains forbidden segment ${JSON.stringify(segment)}`,
+      );
+    }
   }
 }
 
@@ -125,6 +144,8 @@ function applySingleOperation(
 ): void {
   const segments = decodePointer(operation.path);
   if (segments.length === 0) throw new Error("root replacement is not allowed");
+  // Defense in depth: re-check even if validateOperation was skipped.
+  assertSafePathSegments(segments, operation.path);
   let parent: unknown = document;
   for (const segment of segments.slice(0, -1)) {
     parent = getChild(parent, segment, operation.path);
@@ -139,14 +160,23 @@ function applySingleOperation(
     throw new Error(`repair path ${JSON.stringify(operation.path)} has a non-container parent`);
   }
   if (operation.op === "remove") {
-    if (!(key in parent)) throw new Error(`repair remove path does not exist: ${operation.path}`);
+    if (!Object.prototype.hasOwnProperty.call(parent, key)) {
+      throw new Error(`repair remove path does not exist: ${operation.path}`);
+    }
     delete parent[key];
     return;
   }
-  if (operation.op === "replace" && !(key in parent)) {
+  if (operation.op === "replace" && !Object.prototype.hasOwnProperty.call(parent, key)) {
     throw new Error(`repair replace path does not exist: ${operation.path}`);
   }
-  parent[key] = structuredClone(operation.value);
+  // Own-property assignment avoids __proto__ setter pollution even if a
+  // forbidden segment check is ever bypassed.
+  Object.defineProperty(parent, key, {
+    value: structuredClone(operation.value),
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
 }
 
 function applyArrayOperation(
@@ -178,7 +208,9 @@ function getChild(parent: unknown, key: string, path: string): unknown {
     if (index < 0 || index >= parent.length) throw new Error(`path does not exist: ${path}`);
     return parent[index];
   }
-  if (!isRecord(parent) || !(key in parent)) throw new Error(`path does not exist: ${path}`);
+  if (!isRecord(parent) || !Object.prototype.hasOwnProperty.call(parent, key)) {
+    throw new Error(`path does not exist: ${path}`);
+  }
   return parent[key];
 }
 

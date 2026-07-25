@@ -5,19 +5,26 @@ import pino from "pino";
 
 import { runAgentGenerationWithTrace } from "./agent.js";
 import { hasValidSharedToken } from "./auth.js";
+import { resolveOptionalEnv } from "./env.js";
 
 const log = pino({ level: process.env.LOG_LEVEL ?? "info" });
 const PORT = Number(process.env.PORT ?? 8001);
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://api:8000";
 const DEFAULT_PROVIDER = process.env.AGENT_DEFAULT_PROVIDER ?? "openai";
 const DEFAULT_MODEL = process.env.AGENT_DEFAULT_MODEL ?? "gpt-4o-mini";
-const DEFAULT_API_KEY =
-  process.env.AGENT_DEFAULT_API_KEY ??
-  process.env.METAVIEW_OPENAI_API_KEY ??
-  process.env.OPENAI_API_KEY;
-const DEFAULT_BASE_URL =
-  process.env.AGENT_DEFAULT_BASE_URL ?? process.env.METAVIEW_OPENAI_BASE_URL;
-const SHARED_TOKEN = process.env.AGENT_SHARED_TOKEN ?? process.env.METAVIEW_AGENT_SHARED_TOKEN;
+const DEFAULT_API_KEY = resolveOptionalEnv(
+  process.env.AGENT_DEFAULT_API_KEY,
+  process.env.METAVIEW_OPENAI_API_KEY,
+  process.env.OPENAI_API_KEY,
+);
+const DEFAULT_BASE_URL = resolveOptionalEnv(
+  process.env.AGENT_DEFAULT_BASE_URL,
+  process.env.METAVIEW_OPENAI_BASE_URL,
+);
+const SHARED_TOKEN = resolveOptionalEnv(
+  process.env.AGENT_SHARED_TOKEN,
+  process.env.METAVIEW_AGENT_SHARED_TOKEN,
+);
 const GENERATE_TIMEOUT_MS = Number(process.env.AGENT_TIMEOUT_MS ?? 540_000);
 
 const app = express();
@@ -65,6 +72,8 @@ app.post("/generate", async (req: Request, res: Response) => {
         playbookSchema: coerceRecord(body.playbook_schema),
         constraints: coerceRecord(body.constraints),
         availableTools: coerceRecordArray(body.available_tools),
+        mode: coerceGenerateMode(body.mode),
+        repair: coerceRepairPayload(body.repair),
         apiBaseUrl: API_BASE_URL,
         agentSharedToken: SHARED_TOKEN,
         defaultProvider: DEFAULT_PROVIDER,
@@ -123,6 +132,31 @@ function coerceProvider(value: unknown): {
     model: typeof record.model === "string" ? record.model : undefined,
     api_key: typeof record.api_key === "string" ? record.api_key : undefined,
     base_url: typeof record.base_url === "string" ? record.base_url : undefined,
+  };
+}
+
+function coerceGenerateMode(value: unknown): "generate" | "repair" | undefined {
+  return value === "generate" || value === "repair" ? value : undefined;
+}
+
+function coerceRepairPayload(value: unknown): {
+  previous_playbook: Record<string, unknown>;
+  blocking_issues: unknown[];
+  original_prompt?: string;
+  reason?: string;
+} | undefined {
+  const record = coerceRecord(value);
+  if (!record) return undefined;
+  const previous = record.previous_playbook;
+  if (!previous || typeof previous !== "object" || Array.isArray(previous)) {
+    return undefined;
+  }
+  return {
+    previous_playbook: previous as Record<string, unknown>,
+    blocking_issues: Array.isArray(record.blocking_issues) ? record.blocking_issues : [],
+    original_prompt:
+      typeof record.original_prompt === "string" ? record.original_prompt : undefined,
+    reason: typeof record.reason === "string" ? record.reason : undefined,
   };
 }
 

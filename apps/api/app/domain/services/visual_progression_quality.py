@@ -80,7 +80,9 @@ def validate_visual_progression(playbook: PlaybookScript) -> VisualProgressionRe
 
     sparse_steps = 0
     for index, step in enumerate(playbook.steps):
-        payload_count = _visible_payload_count(step.snapshot.model_dump(mode="json", exclude_none=True))
+        payload_count = _visible_payload_count(
+            step.snapshot.model_dump(mode="json", exclude_none=True)
+        )
         if payload_count > 0:
             continue
         sparse_steps += 1
@@ -108,7 +110,8 @@ def validate_visual_progression(playbook: PlaybookScript) -> VisualProgressionRe
                         path=f"steps[{index}].animation_hint",
                         step_index=index,
                         message=(
-                            f"Transition {hint!r} is declared but the semantic snapshot does not change."
+                            f"Transition {hint!r} is declared but the "
+                            "semantic snapshot does not change."
                         ),
                         suggestion="Remove the transition or add the missing semantic state delta.",
                     )

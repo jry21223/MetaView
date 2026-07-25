@@ -55,7 +55,21 @@ export function makeRuntimeToolTools(deps: RuntimeToolDeps): AgentTool[] {
   }
 
   function isAllowed(name: string): boolean {
-    return !allowed || allowed.has("*") || allowed.has(name) || name === "playbook.schema.validate" || name === "playbook.self_check";
+    // Fail-closed: missing allowlist denies non-internal tools. "*" is not a
+    // superuser grant (API also rejects it as a wildcard).
+    if (!allowed) {
+      return (
+        name === "playbook.schema.validate" ||
+        name === "playbook.self_check" ||
+        name === "playbook.visual_progression.validate"
+      );
+    }
+    return (
+      allowed.has(name) ||
+      name === "playbook.schema.validate" ||
+      name === "playbook.self_check" ||
+      name === "playbook.visual_progression.validate"
+    );
   }
 
   function assertAllowed(name: string): void {

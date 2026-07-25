@@ -96,4 +96,61 @@ describe("path-scoped Playbook repair", () => {
     );
     expect(repaired.steps[0].layers[0].body).toEqual(repaired.steps[0].snapshot);
   });
+
+  it("rejects prototype-pollution path segments on add/replace and does not pollute Object.prototype", () => {
+    const original = playbook();
+    const scope = deriveRepairScope([
+      { code: "step.empty_voiceover", path: "steps[0].voiceover_text" },
+    ]);
+
+    expect(() =>
+      applyPlaybookPatch(
+        original,
+        [{ op: "add", path: "/steps/0/__proto__/polluted", value: "yes" }],
+        scope,
+      ),
+    ).toThrow(/forbidden segment/);
+
+    expect(() =>
+      applyPlaybookPatch(
+        original,
+        [{ op: "replace", path: "/steps/0/constructor/prototype/polluted", value: "yes" }],
+        scope,
+      ),
+    ).toThrow(/forbidden segment/);
+
+    expect(() =>
+      applyPlaybookPatch(
+        original,
+        [{ op: "add", path: "/steps/0/prototype/polluted", value: "yes" }],
+        scope,
+      ),
+    ).toThrow(/forbidden segment/);
+
+    // Object.prototype must remain clean after rejected pollution attempts.
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    expect(Object.prototype.hasOwnProperty.call(Object.prototype, "polluted")).toBe(false);
+  });
+
+  it("does not expand director-only issues to all mutable roots", () => {
+    const original = playbook();
+    const scope = deriveRepairScope([
+      { code: "director.plan_mismatch", path: "director.beats[0]" },
+    ]);
+    expect(scope.allowedPrefixes).toEqual([]);
+    expect(() =>
+      applyPlaybookPatch(
+        original,
+        [{ op: "replace", path: "/title", value: "should not be allowed" }],
+        scope,
+      ),
+    ).toThrow(/outside the issue-scoped allowlist/);
+  });
+
+  it("still expands explicit playbook/schema issues to mutable roots", () => {
+    const scope = deriveRepairScope([{ code: "schema.invalid", path: "schema" }]);
+    expect(scope.allowedPrefixes).toEqual(
+      expect.arrayContaining(["/title", "/summary", "/steps", "/parameter_controls"]),
+    );
+  });
 });

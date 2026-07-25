@@ -6,6 +6,11 @@ function getTool(name: string) {
   const tools = makeRuntimeToolTools({
     apiBaseUrl: "http://api.test",
     sharedToken: "secret",
+    // Fail-closed bridge: tests must supply an explicit allowlist.
+    allowedRuntimeTools: new Set([
+      "geometry.assert_monotonic",
+      "playbook.schema.validate",
+    ]),
   });
   const tool = tools.find((item) => item.name === name);
   if (!tool) throw new Error(`missing tool ${name}`);
@@ -59,8 +64,8 @@ describe("runtime tool bridge", () => {
     });
     const payload = result.details as { result: { verdict: string } };
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      "http://api.test/api/v1/agent/runtime-tools/execute",
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init).toEqual(
       expect.objectContaining({
         method: "POST",
         headers: {
@@ -69,7 +74,28 @@ describe("runtime tool bridge", () => {
         },
       }),
     );
+    const body = JSON.parse(String((init as RequestInit).body));
+    expect(body.tool).toBe("geometry.assert_monotonic");
+    expect(body.allowed_tools).toEqual(
+      expect.arrayContaining(["geometry.assert_monotonic"]),
+    );
     expect(payload.result.verdict).toBe("increasing");
     fetchMock.mockRestore();
+  });
+
+  it("denies execute when allowlist is missing", async () => {
+    const tools = makeRuntimeToolTools({
+      apiBaseUrl: "http://api.test",
+      sharedToken: "secret",
+    });
+    const execute = tools.find((item) => item.name === "runtime_tool_execute");
+    if (!execute) throw new Error("runtime_tool_execute missing");
+
+    await expect(
+      execute.execute("execute", {
+        tool: "geometry.assert_monotonic",
+        args: { expression: "x**2", x_min: 0.1, x_max: 2 },
+      }),
+    ).rejects.toThrow(/not allowed/);
   });
 });

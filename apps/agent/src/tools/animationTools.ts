@@ -79,9 +79,16 @@ export function makeAnimationToolTools(deps: AnimationToolDeps): AgentTool[] {
   }
 
   function assertAllowed(name: string): void {
-    if (allowed && !allowed.has("*") && !allowed.has(name)) {
-      throw new Error(`runtime capability ${name} is not allowed for this run`);
+    // Fail-closed: require an explicit allowlist. "*" is not a superuser grant.
+    if (allowed?.has(name)) return;
+    // Expand capability implies list so models can discover args_schema before expand.
+    if (
+      name === "animation_tool.list" &&
+      allowed?.has("animation_tool.expand")
+    ) {
+      return;
     }
+    throw new Error(`runtime capability ${name} is not allowed for this run`);
   }
 
   return [

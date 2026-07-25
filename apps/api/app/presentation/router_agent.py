@@ -5,15 +5,17 @@ from __future__ import annotations
 import secrets
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from starlette.requests import Request
 
 from app.application.agent.runtime_tool_hub import RuntimeToolHub
 from app.application.agent.types import ToolExecutionResult, ToolManifest
+from app.application.ports.run_repository import IRunRepository
 from app.config import get_settings
 from app.domain.animation_tools import AnimationToolInfo, AnimationToolIssue
 from app.domain.models.cir import LayerSpec
+from app.presentation.dependencies import get_run_repo
 from app.presentation.rate_limit import write_limit
 
 router = APIRouter(prefix="/agent", tags=["agent"])
@@ -61,10 +63,17 @@ class MonotonicResponse(BaseModel):
 
 class AuthorizedToolRequest(BaseModel):
     run_id: str | None = Field(default=None, max_length=160)
+    # Empty / omitted → empty set (deny non-internal). Never open all tools.
     allowed_tools: list[str] = Field(default_factory=list, max_length=256)
 
-    def allowed_names(self) -> set[str] | None:
-        return set(self.allowed_tools) if self.allowed_tools else None
+    def allowed_names(self) -> set[str]:
+        """Return the client-supplied allowlist.
+
+        Empty list and omitted field both yield an empty set so execute/expand
+        endpoints are fail-closed. ``"*"`` is not expanded here; the hub treats
+        it as a normal name (never a superuser grant for external callers).
+        """
+        return set(self.allowed_tools)
 
 
 class AnimationToolListResponse(BaseModel):
@@ -93,12 +102,52 @@ class RuntimeToolExecuteRequest(AuthorizedToolRequest):
 def _require_agent_token(
     token: Annotated[str | None, Header(alias="X-MetaView-Agent-Token")] = None,
 ) -> None:
-    expected = get_settings().agent_shared_token
+    """Fail closed: agent routes require a configured non-empty shared token."""
+    expected = (get_settings().agent_shared_token or "").strip()
     if not expected:
-        return
+        raise HTTPException(
+            status_code=401,
+            detail="agent shared token is not configured",
+        )
     if token and secrets.compare_digest(token, expected):
         return
     raise HTTPException(status_code=401, detail="missing or invalid agent token")
+
+
+async def _server_tool_inventory(
+    run_repo: IRunRepository,
+    run_id: str | None,
+) -> set[str]:
+    """Load the authoritative tool inventory for a pipeline run.
+
+    Source of truth is the persisted CoverageDecision.available_tool_ids.
+    Missing/unknown runs yield an empty inventory (deny non-internal tools).
+    """
+    normalized = (run_id or "").strip()
+    if not normalized:
+        return set()
+    run = await run_repo.get(normalized)
+    if run is None or run.coverage_decision is None:
+        return set()
+    inventory = set(run.coverage_decision.available_tool_ids)
+    # Sidecar list/expand are co-required when coverage grants expand.
+    if "animation_tool.expand" in inventory:
+        inventory.add("animation_tool.list")
+    if "scene_blueprint.compile" in inventory:
+        inventory.add("scene_sequence_blueprint.compile")
+    return inventory
+
+
+async def _effective_allowed_names(
+    run_repo: IRunRepository,
+    payload: AuthorizedToolRequest,
+) -> set[str]:
+    """Intersect client claims with server inventory; client cannot widen."""
+    server = await _server_tool_inventory(run_repo, payload.run_id)
+    client = {name for name in payload.allowed_names() if name and name != "*"}
+    if not client:
+        return server
+    return server & client
 
 
 @router.post("/assert/orientation", response_model=OrientationResponse)
@@ -106,8 +155,11 @@ def _require_agent_token(
 async def assert_orientation(
     request: Request,
     payload: OrientationRequest,
+    token: Annotated[str | None, Header(alias="X-MetaView-Agent-Token")] = None,
 ) -> OrientationResponse:
     del request
+    _require_agent_token(token)
+    # Trusted internal path: assert routes do not accept a client allowlist.
     result = await RuntimeToolHub().execute_tool(
         "geometry.assert_orientation",
         payload.model_dump(mode="json"),
@@ -121,8 +173,10 @@ async def assert_orientation(
 async def assert_passes_through(
     request: Request,
     payload: PointOnCurveRequest,
+    token: Annotated[str | None, Header(alias="X-MetaView-Agent-Token")] = None,
 ) -> PointOnCurveResponse:
     del request
+    _require_agent_token(token)
     result = await RuntimeToolHub().execute_tool(
         "geometry.assert_passes_through",
         payload.model_dump(mode="json"),
@@ -136,8 +190,10 @@ async def assert_passes_through(
 async def assert_monotonic(
     request: Request,
     payload: MonotonicRequest,
+    token: Annotated[str | None, Header(alias="X-MetaView-Agent-Token")] = None,
 ) -> MonotonicResponse:
     del request
+    _require_agent_token(token)
     result = await RuntimeToolHub().execute_tool(
         "geometry.assert_monotonic",
         payload.model_dump(mode="json"),
@@ -161,17 +217,25 @@ async def get_animation_tools(
 async def expand_animation_tool(
     request: Request,
     payload: AnimationToolExpandRequest,
+    run_repo: Annotated[IRunRepository, Depends(get_run_repo)],
     token: Annotated[str | None, Header(alias="X-MetaView-Agent-Token")] = None,
 ) -> AnimationToolExpandResponse:
     del request
     _require_agent_token(token)
+    allowed = await _effective_allowed_names(run_repo, payload)
     result = await RuntimeToolHub().execute_tool(
         "animation_tool.expand",
         {"tool": payload.tool, "args": payload.args},
-        allowed_names=payload.allowed_names(),
+        allowed_names=allowed,
     )
     if not result.ok:
-        raise HTTPException(status_code=403, detail=result.error)
+        status = (
+            403
+            if isinstance(result.error, dict)
+            and result.error.get("code") == "runtime_tool.capability_denied"
+            else 400
+        )
+        raise HTTPException(status_code=status, detail=result.error)
     data = result.result if isinstance(result.result, dict) else {}
     return AnimationToolExpandResponse.model_validate(data)
 
@@ -189,12 +253,14 @@ async def get_runtime_tools(
 async def execute_runtime_tool(
     request: Request,
     payload: RuntimeToolExecuteRequest,
+    run_repo: Annotated[IRunRepository, Depends(get_run_repo)],
     token: Annotated[str | None, Header(alias="X-MetaView-Agent-Token")] = None,
 ) -> ToolExecutionResult:
     del request
     _require_agent_token(token)
+    allowed = await _effective_allowed_names(run_repo, payload)
     return await RuntimeToolHub().execute_tool(
         payload.tool,
         payload.args,
-        allowed_names=payload.allowed_names(),
+        allowed_names=allowed,
     )

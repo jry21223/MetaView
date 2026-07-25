@@ -42,6 +42,11 @@ ASSET_MANIFEST_ROOT = (
     / "assets"
     / "metaview-kits"
 )
+# Preflight / quality validation tools that remain callable when a client
+# allowlist is present but does not list them. They are never a path to
+# skill.solve or scene_blueprint.compile. External execute/expand still
+# requires a non-None allowlist set from the router (empty set = deny
+# everything except these).
 _INTERNAL_TOOLS = frozenset({
     "playbook.schema.validate",
     "playbook.self_check",
@@ -87,7 +92,10 @@ class RuntimeToolHub:
             ),
             ToolManifest(
                 name="playbook.schema.validate",
-                description="Validate a candidate object against the canonical PlaybookScript schema.",
+                description=(
+                    "Validate a candidate object against the canonical "
+                    "PlaybookScript schema."
+                ),
                 args_schema={
                     "type": "object",
                     "properties": {"playbook": {"type": "object"}},
@@ -112,7 +120,10 @@ class RuntimeToolHub:
             ),
             ToolManifest(
                 name="playbook.visual_progression.validate",
-                description="Detect repeated or non-progressing visible states across Playbook steps.",
+                description=(
+                    "Detect repeated or non-progressing visible states "
+                    "across Playbook steps."
+                ),
                 args_schema={
                     "type": "object",
                     "properties": {"playbook": {"type": "object"}},
@@ -123,7 +134,10 @@ class RuntimeToolHub:
             ),
             ToolManifest(
                 name="scene_blueprint.compile",
-                description="Compile one controlled SceneBlueprint into a renderer-ready PlaybookScript.",
+                description=(
+                    "Compile one controlled SceneBlueprint into a "
+                    "renderer-ready PlaybookScript."
+                ),
                 args_schema={
                     "type": "object",
                     "properties": {"blueprint": scene_blueprint_tool_schema()},
@@ -314,7 +328,13 @@ class RuntimeToolHub:
         name: str,
         allowed_names: set[str] | frozenset[str] | None,
     ) -> bool:
-        if allowed_names is None or "*" in allowed_names:
+        # Trusted internal callers (assert routes, unit tests, in-process
+        # preflight) pass allowed_names=None and may use any registered tool.
+        # External execute/expand always pass a concrete set from the client
+        # request — empty set is deny-by-default for non-internal tools.
+        # The wildcard "*" is intentionally NOT a superuser grant: it is only
+        # treated as the literal tool name "*", which never matches real tools.
+        if allowed_names is None:
             return True
         return name in allowed_names or name in _INTERNAL_TOOLS
 

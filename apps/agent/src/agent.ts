@@ -9,6 +9,7 @@
 import { Agent, type AgentTool } from "@earendil-works/pi-agent-core";
 import { getModel, type Api, type KnownProvider, type Model } from "@earendil-works/pi-ai";
 
+import { resolveOptionalEnv } from "./env.js";
 import { deriveRepairScope } from "./state/jsonPatch.js";
 import { PlaybookEmitter } from "./state/playbookEmitter.js";
 import { validateRenderedQuality } from "./state/renderedQuality.js";
@@ -32,6 +33,13 @@ export interface ProviderConfig {
   base_url?: string;
 }
 
+export interface RepairPayload {
+  previous_playbook: PlaybookOutput | Record<string, unknown>;
+  blocking_issues: unknown[];
+  original_prompt?: string;
+  reason?: string;
+}
+
 export interface GenerateOptions {
   runId?: string;
   prompt: string;
@@ -44,6 +52,10 @@ export interface GenerateOptions {
   playbookSchema?: Record<string, unknown>;
   constraints?: Record<string, unknown>;
   availableTools?: Array<Record<string, unknown>>;
+  /** Explicit generation mode. Prefer this over embedding repair JSON in prompt text. */
+  mode?: "generate" | "repair";
+  /** Structured repair payload. When present, repair mode is entered without scanning prompt text. */
+  repair?: RepairPayload;
   apiBaseUrl: string;
   agentSharedToken?: string;
   defaultProvider: string;
@@ -115,7 +127,7 @@ export async function runAgentGenerationWithTrace(
 ): Promise<AgentGenerationResult> {
   const trace = new AgentTraceCollector();
   const attemptId = `${opts.runId ?? "run"}:attempt:1`;
-  const repairRequest = parseRepairRequest(opts.prompt);
+  const repairRequest = resolveRepairRequest(opts);
   const emitter = new PlaybookEmitter();
   const allowedRuntimeTools = effectiveRuntimeToolSet(opts.availableTools);
   const domain = effectiveDomain(opts.routeDecision, opts.coverageDecision);
@@ -151,20 +163,23 @@ export async function runAgentGenerationWithTrace(
     });
   } else {
     const drawingTools = makeDrawingTools({ emitter });
-    const animationTools =
-      allowedRuntimeTools.has("*") || allowedRuntimeTools.has("animation_tool.expand")
-        ? makeAnimationToolTools({
-            apiBaseUrl: opts.apiBaseUrl,
-            sharedToken: opts.agentSharedToken,
-            emitter,
-            allowedRuntimeTools,
-            runId: opts.runId,
-          })
-        : [];
+    const animationTools = allowedRuntimeTools.has("animation_tool.expand")
+      ? makeAnimationToolTools({
+          apiBaseUrl: opts.apiBaseUrl,
+          sharedToken: opts.agentSharedToken,
+          emitter,
+          allowedRuntimeTools,
+          runId: opts.runId,
+        })
+      : [];
     const templateTools = makeTemplateTools({ emitter }).filter((tool) =>
       templateAllowed(tool.name, domain),
     );
-    const assertTools = makeAssertTools({ emitter, apiBaseUrl: opts.apiBaseUrl });
+    const assertTools = makeAssertTools({
+      emitter,
+      apiBaseUrl: opts.apiBaseUrl,
+      sharedToken: opts.agentSharedToken,
+    });
     rawTools = [
       ...drawingTools,
       ...runtimeTools,
@@ -180,8 +195,8 @@ export async function runAgentGenerationWithTrace(
 
   const providerName = opts.provider?.provider ?? opts.defaultProvider;
   const modelName = opts.provider?.model ?? opts.defaultModel;
-  const apiKey = opts.provider?.api_key ?? opts.defaultApiKey;
-  const baseUrl = opts.provider?.base_url ?? opts.defaultBaseUrl;
+  const apiKey = resolveOptionalEnv(opts.provider?.api_key, opts.defaultApiKey);
+  const baseUrl = resolveOptionalEnv(opts.provider?.base_url, opts.defaultBaseUrl);
   const model = resolveModel(providerName, modelName, baseUrl);
   const agent = new Agent({
     initialState: {
@@ -264,7 +279,44 @@ interface ParsedRepairRequest {
   reason: string;
 }
 
-function parseRepairRequest(prompt: string): ParsedRepairRequest | null {
+/**
+ * Repair mode is entered only via explicit structured signals:
+ * - opts.mode === "repair", or
+ * - opts.repair object present, or
+ * - constraints.repair_strategy / mode explicitly requests repair (legacy prompt embedding).
+ *
+ * Free-text user prompts that merely mention previous_playbook + blocking_issues
+ * MUST NOT force repair mode (security contract).
+ */
+function resolveRepairRequest(opts: GenerateOptions): ParsedRepairRequest | null {
+  const structured = parseStructuredRepair(opts.repair);
+  if (structured) return structured;
+
+  const wantsRepair =
+    opts.mode === "repair" ||
+    opts.constraints?.repair_strategy != null ||
+    opts.constraints?.mode === "repair";
+  if (!wantsRepair) return null;
+
+  return parseRepairRequestFromPrompt(opts.prompt);
+}
+
+function parseStructuredRepair(repair: RepairPayload | undefined): ParsedRepairRequest | null {
+  if (!repair) return null;
+  if (!isPlaybookOutput(repair.previous_playbook)) {
+    throw new Error(
+      "repair.previous_playbook must be a complete PlaybookOutput when repair mode is requested",
+    );
+  }
+  return {
+    previousPlaybook: repair.previous_playbook,
+    blockingIssues: Array.isArray(repair.blocking_issues) ? repair.blocking_issues : [],
+    originalPrompt: typeof repair.original_prompt === "string" ? repair.original_prompt : "",
+    reason: typeof repair.reason === "string" ? repair.reason : "MetaView quality review",
+  };
+}
+
+function parseRepairRequestFromPrompt(prompt: string): ParsedRepairRequest | null {
   if (!prompt.includes("previous_playbook") || !prompt.includes("blocking_issues")) {
     return null;
   }
@@ -348,18 +400,24 @@ function buildRepairUserPrompt(
 function effectiveRuntimeToolSet(
   manifests: Array<Record<string, unknown>> | undefined,
 ): Set<string> {
+  // Fail-closed: missing inventory means only internal validation tools.
+  // Never inject "*" — the API treats "*" as a literal name, not a superuser grant.
   const names = new Set<string>([
     "playbook.schema.validate",
     "playbook.self_check",
     "playbook.visual_progression.validate",
   ]);
-  if (manifests === undefined) names.add("*");
   for (const manifest of manifests ?? []) {
     const name = manifest.name;
     if (typeof name === "string" && name.trim()) names.add(name);
   }
   if (names.has("scene_blueprint.compile")) {
     names.add("scene_sequence_blueprint.compile");
+  }
+  // Expand allowlist implies list so discovery tools stay usable without a
+  // separate inventory entry.
+  if (names.has("animation_tool.expand")) {
+    names.add("animation_tool.list");
   }
   return names;
 }
@@ -402,7 +460,8 @@ function filterAssertTools(
   };
   return tools.filter((tool) => {
     const runtimeName = mapping[tool.name];
-    return !runtimeName || allowedRuntimeTools.has("*") || allowedRuntimeTools.has(runtimeName);
+    // Fail-closed: require explicit allowlist entry (no "*" superuser).
+    return !runtimeName || allowedRuntimeTools.has(runtimeName);
   });
 }
 
@@ -457,11 +516,26 @@ async function canonicalPreflight(
     if (tool !== "playbook.schema.validate") {
       const status = String(payload.result?.status ?? "");
       if (status === "blocked") {
+        const report = payload.result ?? {};
         trace.runtime("sidecar.preflight.blocked", {
           tool,
-          report: payload.result ?? {},
+          report,
           repair_owner: "api",
         });
+        const issues = Array.isArray(report.issues) ? report.issues : [];
+        const first = issues.find(
+          (issue): issue is Record<string, unknown> =>
+            isRecord(issue) && issue.severity === "error",
+        );
+        const code =
+          typeof first?.code === "string"
+            ? first.code
+            : `${tool.replace(/\./g, "_")}_blocked`;
+        const message =
+          typeof first?.message === "string"
+            ? first.message
+            : `canonical preflight ${tool} blocked the candidate`;
+        throw new Error(`${code}: ${message}`);
       }
     }
   }

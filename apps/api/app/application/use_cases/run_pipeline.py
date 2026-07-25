@@ -12,7 +12,11 @@ from typing import Any
 from pydantic import ValidationError
 
 from app.application.agent.runtime_tool_hub import RuntimeToolHub
-from app.application.agent.types import AgentConstraints, AgentRequest
+from app.application.agent.types import (
+    AgentConstraints,
+    AgentRepairPayload,
+    AgentRequest,
+)
 from app.application.dto.pipeline_dto import PipelineRequest
 from app.application.ports.agent_provider import AgentProviderError, IAgentProvider
 from app.application.ports.coverage_resolver import ICoverageResolver
@@ -871,6 +875,8 @@ class RunPipelineUseCase:
         assert self._agent_provider is not None
         generation_prompt = prompt
         last_payload: dict[str, Any] | None = None
+        repair_mode = "generate"
+        repair_payload: dict[str, Any] | None = None
         for attempt in range(AGENT_SELF_REPAIR_ATTEMPTS + 1):
             playbook_dict = await self._run_agent_provider(
                 run_id,
@@ -879,6 +885,8 @@ class RunPipelineUseCase:
                 provider_config=provider_config,
                 route_context=route_context,
                 lesson_plan=lesson_plan,
+                mode=repair_mode,
+                repair=repair_payload,
             )
             last_payload = playbook_dict
             # Validate the sidecar payload against the canonical PlaybookScript
@@ -907,6 +915,15 @@ class RunPipelineUseCase:
                     last_payload,
                     check.issues,
                 )
+                repair_mode = "repair"
+                repair_payload = {
+                    "previous_playbook": last_payload,
+                    "blocking_issues": [
+                        issue.model_dump(mode="json") for issue in check.issues
+                    ],
+                    "original_prompt": prompt,
+                    "reason": "agent schema validation blocked the candidate PlaybookScript",
+                }
                 continue
 
             check = self_check_playbook(playbook, prompt, lesson_plan=lesson_plan)
@@ -935,6 +952,15 @@ class RunPipelineUseCase:
                 last_payload,
                 check.issues,
             )
+            repair_mode = "repair"
+            repair_payload = {
+                "previous_playbook": playbook.model_dump(mode="json"),
+                "blocking_issues": [
+                    issue.model_dump(mode="json") for issue in check.issues
+                ],
+                "original_prompt": prompt,
+                "reason": "agent self-check blocked the candidate PlaybookScript",
+            }
 
         raise PipelineValidationError(review_report)
 
@@ -1066,6 +1092,13 @@ class RunPipelineUseCase:
             provider_config=provider_config,
             route_context=route_context,
             lesson_plan=lesson_plan,
+            mode="repair",
+            repair={
+                "previous_playbook": playbook.model_dump(mode="json"),
+                "blocking_issues": [issue.model_dump(mode="json") for issue in blocking],
+                "original_prompt": request.prompt,
+                "reason": "third-party reviewer blocked the candidate PlaybookScript",
+            },
         )
         try:
             repaired = PlaybookScript.model_validate(repaired_payload)
@@ -1098,6 +1131,8 @@ class RunPipelineUseCase:
         provider_config: dict[str, Any] | None,
         route_context: RouteContext,
         lesson_plan: LessonPlan,
+        mode: str = "generate",
+        repair: dict[str, Any] | AgentRepairPayload | None = None,
     ) -> dict[str, Any]:
         assert self._agent_provider is not None
         route_decision = route_context.decision.model_dump(mode="json")
@@ -1109,6 +1144,20 @@ class RunPipelineUseCase:
             for tool in RuntimeToolHub(self._skill_registry).list_tools(route_decision)
             if tool.name in available_tool_ids
         ]
+        repair_payload: AgentRepairPayload | None = None
+        if repair is not None:
+            repair_payload = (
+                repair
+                if isinstance(repair, AgentRepairPayload)
+                else AgentRepairPayload.model_validate(repair)
+            )
+        constraints = AgentConstraints(
+            max_self_repair_attempts=AGENT_SELF_REPAIR_ATTEMPTS,
+            max_reviewer_repair_attempts=AGENT_REVIEWER_REPAIR_ATTEMPTS,
+            legacy_single_enabled=True,
+            executable_tools_available=True,
+            repair_strategy="path_scoped_patch" if mode == "repair" else None,
+        )
         agent_request = AgentRequest(
             run_id=run_id,
             prompt=prompt,
@@ -1119,13 +1168,10 @@ class RunPipelineUseCase:
             lesson_plan=lesson_plan,
             provider_config=provider_config,
             playbook_schema=PlaybookScript.model_json_schema(),
-            constraints=AgentConstraints(
-                max_self_repair_attempts=AGENT_SELF_REPAIR_ATTEMPTS,
-                max_reviewer_repair_attempts=AGENT_REVIEWER_REPAIR_ATTEMPTS,
-                legacy_single_enabled=True,
-                executable_tools_available=True,
-            ),
+            constraints=constraints,
             available_tools=available_tools,
+            mode="repair" if mode == "repair" else "generate",
+            repair=repair_payload,
         )
         runner = getattr(self._agent_provider, "run", None)
         if callable(runner):
@@ -1701,16 +1747,17 @@ def _build_agent_repair_prompt(
         "previous_playbook": previous_payload,
         "blocking_issues": [issue.model_dump(mode="json") for issue in issues],
         "instructions": [
-            "Repair by returning a complete PlaybookScript JSON object.",
+            "You are in path-scoped repair mode.",
+            "Call apply_playbook_patch exactly once with the smallest RFC 6902 patch.",
+            "Only edit paths allowed by the issue-scoped repair allowlist.",
+            "Do not recreate the lesson, plan a new outline, or call generation tools.",
             "Keep PlaybookScript as the only rendering exit.",
             "Do not introduce raw HTML, iframe, Manim, or server video rendering.",
-            "Use only renderer-supported snapshot kinds.",
         ],
     }
     return (
         "Your previous MetaView agent output failed review. "
-        "Repair it using this structured feedback and return a complete "
-        "PlaybookScript through the normal agent generation path:\n"
+        "Apply a path-scoped JSON Patch repair using this structured feedback:\n"
         f"{json.dumps(repair_payload, ensure_ascii=False, indent=2)}"
     )
 

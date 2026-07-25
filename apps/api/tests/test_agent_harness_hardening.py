@@ -64,6 +64,59 @@ async def test_runtime_tool_allowlist_is_enforced_but_internal_validation_remain
     assert internal.error["code"] == "playbook.schema.invalid"
 
 
+@pytest.mark.asyncio
+async def test_empty_allowlist_denies_scene_blueprint_compile() -> None:
+    hub = RuntimeToolHub()
+    denied = await hub.execute_tool(
+        "scene_blueprint.compile",
+        {"blueprint": {}},
+        allowed_names=set(),
+    )
+    assert denied.ok is False
+    assert denied.error is not None
+    assert denied.error["code"] == "runtime_tool.capability_denied"
+
+
+@pytest.mark.asyncio
+async def test_star_allowlist_is_not_superuser() -> None:
+    hub = RuntimeToolHub()
+    denied = await hub.execute_tool(
+        "scene_blueprint.compile",
+        {"blueprint": {}},
+        allowed_names={"*"},
+    )
+    assert denied.ok is False
+    assert denied.error is not None
+    assert denied.error["code"] == "runtime_tool.capability_denied"
+
+
+@pytest.mark.asyncio
+async def test_empty_allowlist_still_allows_internal_validation_tools() -> None:
+    hub = RuntimeToolHub()
+    # Internal tools remain available for preflight even with an empty allowlist.
+    result = await hub.execute_tool(
+        "playbook.schema.validate",
+        {"playbook": {}},
+        allowed_names=set(),
+    )
+    assert result.ok is False
+    assert result.error is not None
+    assert result.error["code"] == "playbook.schema.invalid"
+
+
+@pytest.mark.asyncio
+async def test_empty_allowlist_denies_skill_solve() -> None:
+    hub = RuntimeToolHub()
+    denied = await hub.execute_tool(
+        "skill.some_pack.solve",
+        {"run_id": "r1", "prompt": "x"},
+        allowed_names=set(),
+    )
+    assert denied.ok is False
+    assert denied.error is not None
+    assert denied.error["code"] == "runtime_tool.capability_denied"
+
+
 def test_scene_sequence_blueprint_compiles_distinct_derivative_checkpoints() -> None:
     compiled = compile_scene_sequence_blueprint(
         {
@@ -270,11 +323,14 @@ def test_director_focus_resolves_to_new_visible_semantic_object() -> None:
             MathScenePoint(x=1, y=1, label="target", emphasis="accent", semantic_role="target"),
         ]
     )
+    # Keep the focus beat non-terminal so summary-last-step rules do not force hold.
+    third = second.model_copy(deep=True)
     director = build_default_director(
         _playbook(
             [
                 _step(1, first, "先显示参考点。"),
                 _step(2, second, "再加入目标点。", hint="focus"),
+                _step(3, third, "总结观察。"),
             ]
         ),
         "run-director-semantic-delta",

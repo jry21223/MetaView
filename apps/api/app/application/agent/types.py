@@ -15,8 +15,17 @@ class AgentConstraints(BaseModel):
     legacy_single_enabled: bool = True
     executable_tools_available: bool = True
     strict_tool_inventory: bool = True
-    repair_strategy: Literal["path_scoped_patch"] = "path_scoped_patch"
+    # Only set when the API intentionally opens path-scoped repair for this attempt.
+    # Default None so ordinary generate requests do not flip the sidecar into repair.
+    repair_strategy: Literal["path_scoped_patch"] | None = None
     max_tool_events: int = Field(default=512, ge=32, le=2048)
+
+
+class AgentRepairPayload(BaseModel):
+    previous_playbook: dict[str, Any]
+    blocking_issues: list[dict[str, Any]] = Field(default_factory=list)
+    original_prompt: str = ""
+    reason: str = "MetaView quality review"
 
 
 class ToolManifest(BaseModel):
@@ -66,6 +75,10 @@ class AgentRequest(BaseModel):
     playbook_schema: dict[str, Any] = Field(default_factory=dict)
     constraints: AgentConstraints = Field(default_factory=AgentConstraints)
     available_tools: list[ToolManifest] = Field(default_factory=list)
+    # Explicit generate vs path-scoped repair. Prefer structured `repair` over
+    # embedding previous_playbook JSON in free-text prompt.
+    mode: Literal["generate", "repair"] = "generate"
+    repair: AgentRepairPayload | None = None
 
 
 class AgentResult(BaseModel):

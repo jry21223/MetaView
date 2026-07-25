@@ -7,6 +7,11 @@ function getTool(name: string) {
   const tools = makeAnimationToolTools({
     apiBaseUrl: "http://api.test/",
     sharedToken: "secret",
+    // Fail-closed bridge: tests must supply an explicit allowlist.
+    allowedRuntimeTools: new Set([
+      "animation_tool.list",
+      "animation_tool.expand",
+    ]),
   });
   const tool = tools.find((item) => item.name === name);
   if (!tool) throw new Error(`tool ${name} not found`);
@@ -99,6 +104,7 @@ describe("animation tool bridge", () => {
         body: JSON.stringify({
           tool: "math.show_function",
           args: { expression: "x**2", x_min: -2, x_max: 2 },
+          allowed_tools: ["animation_tool.list", "animation_tool.expand"],
         }),
       }),
     );
@@ -186,6 +192,41 @@ describe("animation tool bridge", () => {
     expect(SYSTEM_PROMPT).toContain("animation_tool_expand");
     expect(SYSTEM_PROMPT).toContain("args_schema");
     expect(SYSTEM_PROMPT).toContain("do not invent raw LayerSpec JSON");
+  });
+
+  it("allows list when only expand is in the allowlist", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ tools: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const tools = makeAnimationToolTools({
+      apiBaseUrl: "http://api.test/",
+      sharedToken: "secret",
+      allowedRuntimeTools: new Set(["animation_tool.expand"]),
+    });
+    const list = tools.find((item) => item.name === "animation_tool_list");
+    if (!list) throw new Error("animation_tool_list missing");
+
+    await expect(list.execute("list", {})).resolves.toBeTruthy();
+    expect(fetchMock).toHaveBeenCalled();
+  });
+
+  it("still denies list when neither list nor expand is allowed", async () => {
+    const tools = makeAnimationToolTools({
+      apiBaseUrl: "http://api.test/",
+      sharedToken: "secret",
+      allowedRuntimeTools: new Set(["scene_blueprint.compile"]),
+    });
+    const list = tools.find((item) => item.name === "animation_tool_list");
+    if (!list) throw new Error("animation_tool_list missing");
+
+    await expect(list.execute("list", {})).rejects.toThrow(
+      /animation_tool\.list is not allowed/,
+    );
   });
 
   it("keeps the workflow prompt as a flat four-step checklist", () => {
