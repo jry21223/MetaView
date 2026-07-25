@@ -215,6 +215,50 @@ describe("animation tool bridge", () => {
     expect(fetchMock).toHaveBeenCalled();
   });
 
+  it("filters the registry to concrete macros when they appear in the inventory", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          tools: [
+            {
+              name: "math.show_function",
+              description: "Show a function.",
+              args_schema: { type: "object", properties: {} },
+            },
+            {
+              name: "math.show_tangent",
+              description: "Show a tangent.",
+              args_schema: { type: "object", properties: {} },
+            },
+            {
+              name: "graph.bfs",
+              description: "BFS.",
+              args_schema: { type: "object", properties: {} },
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const tools = makeAnimationToolTools({
+      apiBaseUrl: "http://api.test/",
+      sharedToken: "secret",
+      allowedRuntimeTools: new Set([
+        "animation_tool.list",
+        "animation_tool.expand",
+        "math.show_function",
+      ]),
+    });
+    const list = tools.find((item) => item.name === "animation_tool_list");
+    if (!list) throw new Error("animation_tool_list missing");
+
+    const result = await list.execute("list", {});
+    const details = result.details as { tools: Array<{ name: string }> };
+    expect(details.tools.map((tool) => tool.name)).toEqual(["math.show_function"]);
+  });
+
   it("still denies list when neither list nor expand is allowed", async () => {
     const tools = makeAnimationToolTools({
       apiBaseUrl: "http://api.test/",

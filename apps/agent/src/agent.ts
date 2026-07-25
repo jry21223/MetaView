@@ -64,6 +64,8 @@ export interface GenerateOptions {
   defaultBaseUrl?: string;
   renderedQualityEnabled?: boolean;
   repoRoot?: string;
+  /** Abort in-flight model/tool work when the HTTP generate timeout fires. */
+  signal?: AbortSignal;
 }
 
 export const SYSTEM_PROMPT = `You are MetaView's educational scene planner.
@@ -125,12 +127,14 @@ export async function runAgentGeneration(opts: GenerateOptions): Promise<Playboo
 export async function runAgentGenerationWithTrace(
   opts: GenerateOptions,
 ): Promise<AgentGenerationResult> {
+  throwIfAborted(opts.signal);
   const trace = new AgentTraceCollector();
   const attemptId = `${opts.runId ?? "run"}:attempt:1`;
   const repairRequest = resolveRepairRequest(opts);
   const emitter = new PlaybookEmitter();
   const allowedRuntimeTools = effectiveRuntimeToolSet(opts.availableTools);
   const domain = effectiveDomain(opts.routeDecision, opts.coverageDecision);
+  const signal = opts.signal;
   trace.runtime("sidecar.attempt.started", {
     attempt_id: attemptId,
     domain,
@@ -146,19 +150,21 @@ export async function runAgentGenerationWithTrace(
     sharedToken: opts.agentSharedToken,
     allowedRuntimeTools,
     runId: opts.runId,
+    signal,
   });
   let rawTools: AgentTool[];
   let systemPrompt = SYSTEM_PROMPT;
+  let repairScope: ReturnType<typeof deriveRepairScope> | null = null;
   if (repairRequest) {
-    const scope = deriveRepairScope(repairRequest.blockingIssues);
+    repairScope = deriveRepairScope(repairRequest.blockingIssues);
     rawTools = makeRepairTools({
       previousPlaybook: repairRequest.previousPlaybook,
-      scope,
+      scope: repairScope,
     });
-    systemPrompt = buildRepairSystemPrompt(scope.allowedPrefixes);
+    systemPrompt = buildRepairSystemPrompt(repairScope.allowedPrefixes);
     trace.runtime("sidecar.repair_mode.started", {
-      issue_codes: scope.issueCodes,
-      allowed_prefixes: scope.allowedPrefixes,
+      issue_codes: repairScope.issueCodes,
+      allowed_prefixes: repairScope.allowedPrefixes,
       strategy: "path_scoped_json_patch",
     });
   } else {
@@ -170,6 +176,7 @@ export async function runAgentGenerationWithTrace(
           emitter,
           allowedRuntimeTools,
           runId: opts.runId,
+          signal,
         })
       : [];
     const templateTools = makeTemplateTools({ emitter }).filter((tool) =>
@@ -179,6 +186,7 @@ export async function runAgentGenerationWithTrace(
       emitter,
       apiBaseUrl: opts.apiBaseUrl,
       sharedToken: opts.agentSharedToken,
+      signal,
     });
     rawTools = [
       ...drawingTools,
@@ -206,6 +214,7 @@ export async function runAgentGenerationWithTrace(
     },
     getApiKey: () => apiKey,
     afterToolCall: async (context: { result: { details: unknown } }) => {
+      throwIfAborted(signal);
       const playbook = extractRuntimePlaybook(context.result.details);
       if (!playbook) return undefined;
       runtimePlaybook = playbook;
@@ -218,9 +227,14 @@ export async function runAgentGenerationWithTrace(
   });
 
   const userPrompt = repairRequest
-    ? buildRepairUserPrompt(repairRequest, deriveRepairScope(repairRequest.blockingIssues))
+    ? buildRepairUserPrompt(repairRequest, repairScope ?? deriveRepairScope(repairRequest.blockingIssues))
     : buildAgentPrompt(opts);
-  await agent.prompt(userPrompt);
+  throwIfAborted(signal);
+  await Promise.race([
+    agent.prompt(userPrompt),
+    abortPromise(signal),
+  ]);
+  throwIfAborted(signal);
   const playbook = runtimePlaybook ?? emitter.finalize();
   playbook.initial_data = {
     ...(playbook.initial_data ?? {}),
@@ -238,6 +252,7 @@ export async function runAgentGenerationWithTrace(
       repoRoot: opts.repoRoot,
       theme: "dark",
       maximumFrames: 14,
+      signal,
     });
     trace.runtime("sidecar.rendered_quality.completed", {
       status: rendered.status,
@@ -260,6 +275,7 @@ export async function runAgentGenerationWithTrace(
       );
     }
   }
+  throwIfAborted(signal);
   trace.runtime("sidecar.attempt.completed", {
     step_count: playbook.steps.length,
     tool_call_count: trace.toolEvents.length,
@@ -465,12 +481,42 @@ function filterAssertTools(
   });
 }
 
+function throwIfAborted(signal?: AbortSignal): void {
+  if (!signal?.aborted) return;
+  const reason = signal.reason;
+  throw reason instanceof Error
+    ? reason
+    : new Error(typeof reason === "string" ? reason : "agent generation aborted");
+}
+
+function abortPromise(signal?: AbortSignal): Promise<never> {
+  if (!signal) return new Promise(() => undefined);
+  if (signal.aborted) return Promise.reject(abortReason(signal));
+  return new Promise((_resolve, reject) => {
+    signal.addEventListener(
+      "abort",
+      () => {
+        reject(abortReason(signal));
+      },
+      { once: true },
+    );
+  });
+}
+
+function abortReason(signal: AbortSignal): Error {
+  const reason = signal.reason;
+  return reason instanceof Error
+    ? reason
+    : new Error(typeof reason === "string" ? reason : "agent generation aborted");
+}
+
 async function canonicalPreflight(
   opts: GenerateOptions,
   playbook: PlaybookOutput,
   allowedRuntimeTools: ReadonlySet<string>,
   trace: AgentTraceCollector,
 ): Promise<void> {
+  throwIfAborted(opts.signal);
   const base = opts.apiBaseUrl.replace(/\/$/, "");
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (opts.agentSharedToken) headers["X-MetaView-Agent-Token"] = opts.agentSharedToken;
@@ -479,6 +525,7 @@ async function canonicalPreflight(
     "playbook.self_check",
     "playbook.visual_progression.validate",
   ]) {
+    throwIfAborted(opts.signal);
     const args =
       tool === "playbook.self_check"
         ? { playbook, prompt: opts.prompt }
@@ -492,6 +539,7 @@ async function canonicalPreflight(
         run_id: opts.runId,
         allowed_tools: [...allowedRuntimeTools],
       }),
+      signal: opts.signal,
     });
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
@@ -582,16 +630,37 @@ function extractRuntimePlaybook(details: unknown): PlaybookOutput | null {
 }
 
 function isPlaybookOutput(value: unknown): value is PlaybookOutput {
-  return (
-    isRecord(value) &&
-    typeof value.fps === "number" &&
-    typeof value.total_frames === "number" &&
-    typeof value.domain === "string" &&
-    typeof value.title === "string" &&
-    typeof value.summary === "string" &&
-    Array.isArray(value.steps) &&
-    Array.isArray(value.parameter_controls)
-  );
+  if (
+    !isRecord(value) ||
+    typeof value.fps !== "number" ||
+    !Number.isFinite(value.fps) ||
+    value.fps <= 0 ||
+    typeof value.total_frames !== "number" ||
+    !Number.isFinite(value.total_frames) ||
+    value.total_frames < 1 ||
+    typeof value.domain !== "string" ||
+    typeof value.title !== "string" ||
+    typeof value.summary !== "string" ||
+    !Array.isArray(value.steps) ||
+    value.steps.length === 0 ||
+    !Array.isArray(value.parameter_controls)
+  ) {
+    return false;
+  }
+  return value.steps.every((step) => {
+    if (!isRecord(step)) return false;
+    if (typeof step.step_id !== "string" || !step.step_id.trim()) return false;
+    if (typeof step.title !== "string") return false;
+    if (typeof step.voiceover_text !== "string") return false;
+    if (typeof step.end_frame !== "number" || !Number.isFinite(step.end_frame)) {
+      return false;
+    }
+    if (!isRecord(step.snapshot) || typeof step.snapshot.kind !== "string") {
+      return false;
+    }
+    if (!Array.isArray(step.layers)) return false;
+    return true;
+  });
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -43,15 +43,23 @@ export interface RenderedQualityOptions {
   repoRoot?: string;
   theme?: "dark" | "light";
   maximumFrames?: number;
+  /** Per-frame render timeout in ms. Defaults to AGENT_RENDER_TIMEOUT_MS or 120s. */
+  frameTimeoutMs?: number;
+  signal?: AbortSignal;
+  /** Keep temp shot dirs for debugging. Defaults to false. */
+  keepArtifacts?: boolean;
 }
 
 const execFileAsync = promisify(execFile);
+const DEFAULT_FRAME_TIMEOUT_MS = 120_000;
 
 export async function validateRenderedQuality(
   playbook: PlaybookOutput,
   options: RenderedQualityOptions = {},
 ): Promise<RenderedQualityReport> {
   if (options.enabled === false) return emptyReport();
+  if (options.signal?.aborted) throw abortError(options.signal);
+
   const repoRoot = resolve(options.repoRoot ?? process.cwd());
   const scriptPath = join(repoRoot, "apps", "web", "scripts", "render-shots.mjs");
   const workspaceRoot = join(repoRoot, "eval", "shots");
@@ -59,31 +67,97 @@ export async function validateRenderedQuality(
   const runDir = await mkdtemp(join(workspaceRoot, "agent-quality-")).catch(async () => {
     return mkdtemp(join(tmpdir(), "metaview-agent-quality-"));
   });
-  const playbookPath = join(runDir, "playbook.json");
-  await writeFile(playbookPath, `${JSON.stringify(playbook, null, 2)}\n`, "utf8");
+  const frameTimeoutMs = resolveFrameTimeoutMs(options.frameTimeoutMs);
+  const keepArtifacts = options.keepArtifacts === true;
 
-  const selections = representativeFrames(playbook, options.maximumFrames ?? 14);
-  const decoded: DecodedFrame[] = [];
-  for (const selection of selections) {
-    const outDir = join(runDir, `step-${String(selection.stepIndex + 1).padStart(2, "0")}`);
-    await mkdir(outDir, { recursive: true });
-    await execFileAsync(process.execPath, [scriptPath, playbookPath, outDir], {
-      cwd: repoRoot,
-      env: {
-        ...process.env,
-        SHOT_FRAME: String(selection.frame),
-        SHOT_LABEL: `agent-quality-${selection.stepIndex + 1}`,
-        SHOT_THEME: options.theme ?? "dark",
-      },
-      maxBuffer: 20 * 1024 * 1024,
-    });
-    const files = (await readdir(outDir)).filter((file) => file.endsWith(".png")).sort();
-    if (!files[0]) throw new Error(`rendered quality gate produced no PNG for step ${selection.stepIndex}`);
-    const png = await readFile(join(outDir, files[0]));
-    const image = decodePng(png);
-    decoded.push({ ...selection, ...image, sha256: createHash("sha256").update(png).digest("hex") });
+  try {
+    const playbookPath = join(runDir, "playbook.json");
+    await writeFile(playbookPath, `${JSON.stringify(playbook, null, 2)}\n`, "utf8");
+
+    const selections = representativeFrames(playbook, options.maximumFrames ?? 14);
+    const decoded: DecodedFrame[] = [];
+    for (const selection of selections) {
+      if (options.signal?.aborted) throw abortError(options.signal);
+      const outDir = join(runDir, `step-${String(selection.stepIndex + 1).padStart(2, "0")}`);
+      await mkdir(outDir, { recursive: true });
+      try {
+        await execFileAsync(process.execPath, [scriptPath, playbookPath, outDir], {
+          cwd: repoRoot,
+          env: {
+            ...process.env,
+            SHOT_FRAME: String(selection.frame),
+            SHOT_LABEL: `agent-quality-${selection.stepIndex + 1}`,
+            SHOT_THEME: options.theme ?? "dark",
+          },
+          maxBuffer: 20 * 1024 * 1024,
+          timeout: frameTimeoutMs,
+          killSignal: "SIGKILL",
+          signal: options.signal,
+        });
+      } catch (error) {
+        if (isAbortError(error) || options.signal?.aborted) throw abortError(options.signal);
+        if (isTimeoutError(error)) {
+          throw new Error(
+            `rendered_quality.timeout: frame render for step ${selection.stepIndex} exceeded ${frameTimeoutMs}ms`,
+          );
+        }
+        throw new Error(
+          `rendered_quality.render_failed: step ${selection.stepIndex}: ${errorMessage(error)}`,
+        );
+      }
+      const files = (await readdir(outDir)).filter((file) => file.endsWith(".png")).sort();
+      if (!files[0]) {
+        throw new Error(
+          `rendered_quality.no_png: gate produced no PNG for step ${selection.stepIndex}`,
+        );
+      }
+      const png = await readFile(join(outDir, files[0]));
+      const image = decodePng(png);
+      decoded.push({
+        ...selection,
+        ...image,
+        sha256: createHash("sha256").update(png).digest("hex"),
+      });
+    }
+    return analyzeRenderedFrames(decoded, playbook);
+  } finally {
+    if (!keepArtifacts) {
+      await rm(runDir, { recursive: true, force: true }).catch(() => undefined);
+    }
   }
-  return analyzeRenderedFrames(decoded, playbook);
+}
+
+function resolveFrameTimeoutMs(override?: number): number {
+  if (typeof override === "number" && Number.isFinite(override) && override > 0) {
+    return Math.round(override);
+  }
+  const fromEnv = Number(process.env.AGENT_RENDER_TIMEOUT_MS ?? DEFAULT_FRAME_TIMEOUT_MS);
+  return Number.isFinite(fromEnv) && fromEnv > 0 ? Math.round(fromEnv) : DEFAULT_FRAME_TIMEOUT_MS;
+}
+
+function isTimeoutError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const code = (error as { code?: string }).code;
+  const killed = (error as { killed?: boolean }).killed;
+  return code === "ETIMEDOUT" || killed === true;
+}
+
+function isAbortError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const name = (error as { name?: string }).name;
+  const code = (error as { code?: string }).code;
+  return name === "AbortError" || code === "ABORT_ERR";
+}
+
+function abortError(signal?: AbortSignal): Error {
+  const reason = signal?.reason;
+  if (reason instanceof Error) return reason;
+  return new Error("rendered quality gate aborted");
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
 }
 
 export interface DecodedFrame {
@@ -194,6 +268,7 @@ function representativeFrames(
   playbook: PlaybookOutput,
   maximumFrames: number,
 ): Array<{ stepIndex: number; frame: number }> {
+  const limit = Math.max(1, Math.floor(maximumFrames));
   const selections: Array<{ stepIndex: number; frame: number }> = [];
   let start = 0;
   for (let index = 0; index < playbook.steps.length; index += 1) {
@@ -202,9 +277,10 @@ function representativeFrames(
     selections.push({ stepIndex: index, frame });
     start = end;
   }
-  if (selections.length <= maximumFrames) return selections;
-  return Array.from({ length: maximumFrames }, (_, index) => {
-    const sourceIndex = Math.round((index * (selections.length - 1)) / (maximumFrames - 1));
+  if (selections.length === 0 || selections.length <= limit) return selections;
+  if (limit === 1) return [selections[0]];
+  return Array.from({ length: limit }, (_, index) => {
+    const sourceIndex = Math.round((index * (selections.length - 1)) / (limit - 1));
     return selections[sourceIndex];
   });
 }

@@ -17,6 +17,7 @@ export interface AssertToolDeps {
   apiBaseUrl: string;
   /** Shared token for X-MetaView-Agent-Token (required by API assert routes). */
   sharedToken?: string;
+  signal?: AbortSignal;
 }
 
 interface OrientationResult {
@@ -37,10 +38,14 @@ interface MonotonicResult {
 }
 
 export function makeAssertTools(deps: AssertToolDeps): AgentTool[] {
-  const { emitter, apiBaseUrl, sharedToken } = deps;
+  const { emitter, apiBaseUrl, sharedToken, signal } = deps;
   const base = apiBaseUrl.replace(/\/$/, "");
 
   async function post<T>(path: string, body: unknown): Promise<T> {
+    if (signal?.aborted) {
+      const reason = signal.reason;
+      throw reason instanceof Error ? reason : new Error("assert request aborted");
+    }
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
@@ -51,6 +56,7 @@ export function makeAssertTools(deps: AssertToolDeps): AgentTool[] {
       method: "POST",
       headers,
       body: JSON.stringify(body),
+      signal,
     });
     if (!resp.ok) {
       const detail = await resp.text().catch(() => "");

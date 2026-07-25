@@ -1,6 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { mkdtemp, readdir, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-import { analyzeRenderedFrames, type DecodedFrame } from "../src/state/renderedQuality.js";
+import {
+  analyzeRenderedFrames,
+  validateRenderedQuality,
+  type DecodedFrame,
+} from "../src/state/renderedQuality.js";
 import type { PlaybookOutput } from "../src/state/types.js";
 
 function frame(stepIndex: number, mutate?: (rgba: Uint8Array, width: number, height: number) => void): DecodedFrame {
@@ -95,5 +102,34 @@ describe("rendered-frame quality gate", () => {
     });
     const report = analyzeRenderedFrames([clipped]);
     expect(report.issues.some((issue) => issue.code === "visual.content_clipped")).toBe(true);
+  });
+
+  it("cleans temporary shot directories after a failed frame render", async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), "metaview-rq-repo-"));
+    const scriptDir = join(repoRoot, "apps", "web", "scripts");
+    const { mkdir } = await import("node:fs/promises");
+    await mkdir(scriptDir, { recursive: true });
+    await writeFile(
+      join(scriptDir, "render-shots.mjs"),
+      "console.error('forced failure'); process.exit(1);\n",
+      "utf8",
+    );
+
+    await expect(
+      validateRenderedQuality(playbook(), {
+        enabled: true,
+        repoRoot,
+        maximumFrames: 1,
+        frameTimeoutMs: 5_000,
+      }),
+    ).rejects.toThrow(/rendered_quality\.render_failed/);
+
+    const shotsRoot = join(repoRoot, "eval", "shots");
+    const remaining = await readdir(shotsRoot).catch(() => [] as string[]);
+    expect(remaining.filter((name) => name.startsWith("agent-quality-"))).toEqual([]);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 });

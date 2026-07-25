@@ -10,6 +10,7 @@ export interface RuntimeToolDeps {
   sharedToken?: string;
   allowedRuntimeTools?: ReadonlySet<string>;
   runId?: string;
+  signal?: AbortSignal;
 }
 
 interface RuntimeToolManifest {
@@ -39,6 +40,10 @@ export function makeRuntimeToolTools(deps: RuntimeToolDeps): AgentTool[] {
     path: string,
     init: { method?: string; body?: unknown } = {},
   ): Promise<T> {
+    if (deps.signal?.aborted) {
+      const reason = deps.signal.reason;
+      throw reason instanceof Error ? reason : new Error("runtime tool request aborted");
+    }
     const headers: Record<string, string> = {};
     if (init.body !== undefined) headers["Content-Type"] = "application/json";
     if (deps.sharedToken) headers["X-MetaView-Agent-Token"] = deps.sharedToken;
@@ -46,6 +51,7 @@ export function makeRuntimeToolTools(deps: RuntimeToolDeps): AgentTool[] {
       method: init.method ?? "GET",
       headers,
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
+      signal: deps.signal,
     });
     if (!response.ok) {
       const detail = await response.text().catch(() => "");

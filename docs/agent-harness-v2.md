@@ -54,18 +54,25 @@ The compiler returns source-map metadata from checkpoint IDs to Playbook step pa
 
 ## Repair protocol
 
-API review prompts still contain `previous_playbook` and `blocking_issues`. The sidecar recognizes this structured payload and switches to repair mode:
+Repair mode is entered **only** through structured `AgentRequest` fields:
+
+- `mode: "repair"`, and/or
+- a structured `repair` payload (`previous_playbook`, `blocking_issues`, …), and/or
+- `constraints.repair_strategy = "path_scoped_patch"`.
+
+Free-text user prompts that merely mention `previous_playbook` and `blocking_issues` **must not** switch the sidecar into repair mode. The API may still embed those keys in a review prompt as human-readable context, but the authoritative switch is the structured request envelope.
 
 ```text
-previous Playbook
+AgentRequest.mode/repair
   -> derive allowed paths from issue paths
   -> model proposes RFC 6902 add/remove/replace operations
   -> apply in isolation
+  -> force compiler-owned step_id / end_frame
   -> recompute timeline and primary-layer mirror
   -> canonical validation
 ```
 
-The patch tool rejects unrelated paths and immutable derived fields. The API remains the owner of the shared repair budget and acceptance decision.
+The patch tool rejects unrelated paths, forbidden path segments, and immutable derived fields. Whole-step replaces cannot rewrite `step_id`. Unknown issue paths fail closed (empty allowlist). The API remains the owner of the shared repair budget and acceptance decision; sidecar-facing `max_self_repair_attempts` is always `0`.
 
 ## Observability
 
@@ -90,6 +97,8 @@ Set `AGENT_RENDERED_QUALITY_GATE=true` to run representative frames through the 
 - edge clipping risk;
 - exact duplicate frames;
 - consecutive pixel delta and missing scene progression.
+
+Each frame render has an explicit timeout (`AGENT_RENDER_TIMEOUT_MS`, default 120s) and the temporary shot directory is deleted in a `finally` block unless debugging keeps artifacts. The outer `/generate` timeout aborts in-flight tool fetches and the quality gate via `AbortSignal`.
 
 The gate is opt-in during rollout. Existing deterministic visual suites remain the reference for threshold calibration.
 

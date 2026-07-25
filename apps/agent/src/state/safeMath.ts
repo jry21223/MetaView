@@ -39,6 +39,11 @@ const CONSTANTS: Record<string, number> = {
   pi: Math.PI,
 };
 
+/** Hard caps so hostile or accidental expressions cannot exhaust the event loop. */
+const MAX_EXPRESSION_LENGTH = 256;
+const MAX_PARSE_DEPTH = 32;
+const MAX_FUNCTION_ARGS = 8;
+
 class TokenStream {
   private readonly tokens: Token[];
   private cursor = 0;
@@ -123,11 +128,19 @@ export function evaluateExpression(
   expression: string,
   variables: Record<string, number> = {},
 ): number {
+  if (typeof expression !== "string" || expression.length === 0) {
+    throw new Error("expression must be a non-empty string");
+  }
+  if (expression.length > MAX_EXPRESSION_LENGTH) {
+    throw new Error(
+      `expression exceeds the ${MAX_EXPRESSION_LENGTH}-character safety limit`,
+    );
+  }
   const normalizedVariables = Object.fromEntries(
     Object.entries(variables).map(([key, value]) => [key.toLowerCase(), value]),
   );
   const stream = new TokenStream(expression);
-  const value = parseAdditive(stream, normalizedVariables);
+  const value = parseAdditive(stream, normalizedVariables, 0);
   const trailing = stream.consume();
   if (trailing.kind !== "eof") {
     throw new Error(`unexpected trailing token ${describeToken(trailing)}`);
@@ -138,25 +151,41 @@ export function evaluateExpression(
   return value;
 }
 
-function parseAdditive(stream: TokenStream, variables: Record<string, number>): number {
-  let value = parseMultiplicative(stream, variables);
+function assertParseDepth(depth: number): void {
+  if (depth > MAX_PARSE_DEPTH) {
+    throw new Error(`expression exceeds the ${MAX_PARSE_DEPTH}-level parse depth limit`);
+  }
+}
+
+function parseAdditive(
+  stream: TokenStream,
+  variables: Record<string, number>,
+  depth: number,
+): number {
+  assertParseDepth(depth);
+  let value = parseMultiplicative(stream, variables, depth + 1);
   while (true) {
     const next = stream.peek();
     if (next.kind !== "operator" || !["+", "-"].includes(next.value)) break;
     const operator = stream.consume() as Extract<Token, { kind: "operator" }>;
-    const right = parseMultiplicative(stream, variables);
+    const right = parseMultiplicative(stream, variables, depth + 1);
     value = operator.value === "+" ? value + right : value - right;
   }
   return value;
 }
 
-function parseMultiplicative(stream: TokenStream, variables: Record<string, number>): number {
-  let value = parsePower(stream, variables);
+function parseMultiplicative(
+  stream: TokenStream,
+  variables: Record<string, number>,
+  depth: number,
+): number {
+  assertParseDepth(depth);
+  let value = parsePower(stream, variables, depth + 1);
   while (true) {
     const next = stream.peek();
     if (next.kind !== "operator" || !["*", "/", "%"].includes(next.value)) break;
     const operator = stream.consume() as Extract<Token, { kind: "operator" }>;
-    const right = parsePower(stream, variables);
+    const right = parsePower(stream, variables, depth + 1);
     if ((operator.value === "/" || operator.value === "%") && right === 0) {
       throw new Error("division by zero");
     }
@@ -167,31 +196,46 @@ function parseMultiplicative(stream: TokenStream, variables: Record<string, numb
   return value;
 }
 
-function parsePower(stream: TokenStream, variables: Record<string, number>): number {
-  const left = parseUnary(stream, variables);
+function parsePower(
+  stream: TokenStream,
+  variables: Record<string, number>,
+  depth: number,
+): number {
+  assertParseDepth(depth);
+  const left = parseUnary(stream, variables, depth + 1);
   const next = stream.peek();
   if (next.kind === "operator" && next.value === "^") {
     stream.consume();
-    return left ** parsePower(stream, variables);
+    return left ** parsePower(stream, variables, depth + 1);
   }
   return left;
 }
 
-function parseUnary(stream: TokenStream, variables: Record<string, number>): number {
+function parseUnary(
+  stream: TokenStream,
+  variables: Record<string, number>,
+  depth: number,
+): number {
+  assertParseDepth(depth);
   const token = stream.peek();
   if (token.kind === "operator" && (token.value === "+" || token.value === "-")) {
     stream.consume();
-    const value = parseUnary(stream, variables);
+    const value = parseUnary(stream, variables, depth + 1);
     return token.value === "-" ? -value : value;
   }
-  return parsePrimary(stream, variables);
+  return parsePrimary(stream, variables, depth + 1);
 }
 
-function parsePrimary(stream: TokenStream, variables: Record<string, number>): number {
+function parsePrimary(
+  stream: TokenStream,
+  variables: Record<string, number>,
+  depth: number,
+): number {
+  assertParseDepth(depth);
   const token = stream.consume();
   if (token.kind === "number") return token.value;
   if (token.kind === "left") {
-    const value = parseAdditive(stream, variables);
+    const value = parseAdditive(stream, variables, depth + 1);
     stream.expect("right");
     return value;
   }
@@ -204,7 +248,10 @@ function parsePrimary(stream: TokenStream, variables: Record<string, number>): n
     const args: number[] = [];
     if (stream.peek().kind !== "right") {
       while (true) {
-        args.push(parseAdditive(stream, variables));
+        if (args.length >= MAX_FUNCTION_ARGS) {
+          throw new Error(`function ${name} exceeds the ${MAX_FUNCTION_ARGS}-argument limit`);
+        }
+        args.push(parseAdditive(stream, variables, depth + 1));
         if (stream.peek().kind !== "comma") break;
         stream.consume();
       }

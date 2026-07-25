@@ -1151,9 +1151,11 @@ class RunPipelineUseCase:
                 if isinstance(repair, AgentRepairPayload)
                 else AgentRepairPayload.model_validate(repair)
             )
+        # Sidecar is exactly one model attempt. Keep API loop counters local;
+        # never advertise multi-attempt self-repair to the agent request.
         constraints = AgentConstraints(
-            max_self_repair_attempts=AGENT_SELF_REPAIR_ATTEMPTS,
-            max_reviewer_repair_attempts=AGENT_REVIEWER_REPAIR_ATTEMPTS,
+            max_self_repair_attempts=0,
+            max_reviewer_repair_attempts=0,
             legacy_single_enabled=True,
             executable_tools_available=True,
             repair_strategy="path_scoped_patch" if mode == "repair" else None,

@@ -52,39 +52,38 @@ app.post("/generate", async (req: Request, res: Response) => {
     res.status(400).json({ detail: "missing or invalid 'prompt' field" });
     return;
   }
-  const timeout = new Promise<never>((_resolve, reject) =>
-    setTimeout(
-      () => reject(new Error(`agent timed out after ${GENERATE_TIMEOUT_MS}ms`)),
-      GENERATE_TIMEOUT_MS,
-    ),
-  );
+  const controller = new AbortController();
+  const timeoutError = new Error(`agent timed out after ${GENERATE_TIMEOUT_MS}ms`);
+  const timer = setTimeout(() => {
+    controller.abort(timeoutError);
+  }, GENERATE_TIMEOUT_MS);
+  // Avoid keeping the event loop alive solely for the timer handle.
+  timer.unref?.();
   try {
-    const result = await Promise.race([
-      runAgentGenerationWithTrace({
-        prompt,
-        runId: typeof body.run_id === "string" ? body.run_id : undefined,
-        sourceCode: typeof body.source_code === "string" ? body.source_code : null,
-        language: typeof body.language === "string" ? body.language : null,
-        provider: coerceProvider(body.provider ?? body.provider_config),
-        routeDecision: coerceRecord(body.route_decision),
-        coverageDecision: coerceRecord(body.coverage_decision),
-        lessonPlan: coerceRecord(body.lesson_plan),
-        playbookSchema: coerceRecord(body.playbook_schema),
-        constraints: coerceRecord(body.constraints),
-        availableTools: coerceRecordArray(body.available_tools),
-        mode: coerceGenerateMode(body.mode),
-        repair: coerceRepairPayload(body.repair),
-        apiBaseUrl: API_BASE_URL,
-        agentSharedToken: SHARED_TOKEN,
-        defaultProvider: DEFAULT_PROVIDER,
-        defaultModel: DEFAULT_MODEL,
-        defaultApiKey: DEFAULT_API_KEY,
-        defaultBaseUrl: DEFAULT_BASE_URL,
-        renderedQualityEnabled: process.env.AGENT_RENDERED_QUALITY_GATE === "true",
-        repoRoot: process.env.METAVIEW_REPO_ROOT ?? process.cwd(),
-      }),
-      timeout,
-    ]);
+    const result = await runAgentGenerationWithTrace({
+      prompt,
+      runId: typeof body.run_id === "string" ? body.run_id : undefined,
+      sourceCode: typeof body.source_code === "string" ? body.source_code : null,
+      language: typeof body.language === "string" ? body.language : null,
+      provider: coerceProvider(body.provider ?? body.provider_config),
+      routeDecision: coerceRecord(body.route_decision),
+      coverageDecision: coerceRecord(body.coverage_decision),
+      lessonPlan: coerceRecord(body.lesson_plan),
+      playbookSchema: coerceRecord(body.playbook_schema),
+      constraints: coerceRecord(body.constraints),
+      availableTools: coerceRecordArray(body.available_tools),
+      mode: coerceGenerateMode(body.mode),
+      repair: coerceRepairPayload(body.repair),
+      apiBaseUrl: API_BASE_URL,
+      agentSharedToken: SHARED_TOKEN,
+      defaultProvider: DEFAULT_PROVIDER,
+      defaultModel: DEFAULT_MODEL,
+      defaultApiKey: DEFAULT_API_KEY,
+      defaultBaseUrl: DEFAULT_BASE_URL,
+      renderedQualityEnabled: process.env.AGENT_RENDERED_QUALITY_GATE === "true",
+      repoRoot: process.env.METAVIEW_REPO_ROOT ?? process.cwd(),
+      signal: controller.signal,
+    });
     res.json({
       playbook: result.playbook,
       provider: "pi",
@@ -103,6 +102,8 @@ app.post("/generate", async (req: Request, res: Response) => {
       detail: message,
       code: classifyError(message),
     });
+  } finally {
+    clearTimeout(timer);
   }
 });
 

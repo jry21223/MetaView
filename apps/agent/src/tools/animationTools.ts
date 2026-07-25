@@ -13,7 +13,13 @@ export interface AnimationToolDeps {
   emitter?: PlaybookEmitter;
   allowedRuntimeTools?: ReadonlySet<string>;
   runId?: string;
+  signal?: AbortSignal;
 }
+
+const ANIMATION_CAPABILITIES = new Set([
+  "animation_tool.list",
+  "animation_tool.expand",
+]);
 
 interface AnimationToolInfo {
   name: string;
@@ -63,6 +69,9 @@ export function makeAnimationToolTools(deps: AnimationToolDeps): AgentTool[] {
     path: string,
     init: { method?: string; body?: unknown } = {},
   ): Promise<T> {
+    if (deps.signal?.aborted) {
+      throw abortError(deps.signal);
+    }
     const headers: Record<string, string> = {};
     if (init.body !== undefined) headers["Content-Type"] = "application/json";
     if (deps.sharedToken) headers["X-MetaView-Agent-Token"] = deps.sharedToken;
@@ -70,6 +79,7 @@ export function makeAnimationToolTools(deps: AnimationToolDeps): AgentTool[] {
       method: init.method ?? "GET",
       headers,
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
+      signal: deps.signal,
     });
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
@@ -95,12 +105,16 @@ export function makeAnimationToolTools(deps: AnimationToolDeps): AgentTool[] {
     defineTool(
       "animation_tool_list",
       "Animation tools: list",
-      "List only animation registry tools allowed for the current run.",
+      "List animation registry macros authorized for the current run inventory. " +
+        "When the allowlist only grants animation_tool.list/expand, the full " +
+        "deterministic registry is in scope; concrete macro names narrow the list.",
       Type.Object({}),
       async () => {
         assertAllowed("animation_tool.list");
         const result = await request<AnimationToolListResult>("/api/v1/agent/animation-tools");
-        return toolResult(result);
+        return toolResult({
+          tools: filterAnimationRegistry(result.tools, allowed),
+        });
       },
     ) as AgentTool,
 
@@ -168,6 +182,31 @@ export function makeAnimationToolTools(deps: AnimationToolDeps): AgentTool[] {
       },
     ) as AgentTool,
   ];
+}
+
+function filterAnimationRegistry(
+  tools: AnimationToolInfo[],
+  allowed?: ReadonlySet<string>,
+): AnimationToolInfo[] {
+  if (!allowed) return [];
+  const concreteMacros = tools
+    .map((tool) => tool.name)
+    .filter((name) => allowed.has(name) && !ANIMATION_CAPABILITIES.has(name));
+  // Inventory may enumerate concrete macros (e.g. math.show_function). When it
+  // does, only those macros are discoverable. Capability-only inventories grant
+  // the full deterministic registry for the authorized expand/list capability.
+  if (concreteMacros.length > 0) {
+    return tools.filter((tool) => allowed.has(tool.name));
+  }
+  if (allowed.has("animation_tool.expand") || allowed.has("animation_tool.list")) {
+    return tools;
+  }
+  return [];
+}
+
+function abortError(signal: AbortSignal): Error {
+  const reason = signal.reason;
+  return reason instanceof Error ? reason : new Error("animation tool request aborted");
 }
 
 function materializeLayerSpec(spec: LayerSpecWire): LayerOutput {

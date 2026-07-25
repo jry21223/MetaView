@@ -153,4 +153,52 @@ describe("path-scoped Playbook repair", () => {
       expect.arrayContaining(["/title", "/summary", "/steps", "/parameter_controls"]),
     );
   });
+
+  it("preserves compiler-owned step_id under whole-step replace", () => {
+    const original = playbook();
+    const scope = deriveRepairScope([
+      { code: "snapshot.empty_payload", path: "steps[2].snapshot" },
+    ]);
+    const repaired = applyPlaybookPatch(
+      original,
+      [
+        {
+          op: "replace",
+          path: "/steps/2",
+          value: {
+            ...original.steps[2],
+            step_id: "hijacked",
+            end_frame: 1,
+            voiceover_text: "整步替换后的旁白，身份字段必须仍由编译器持有。",
+            snapshot: { kind: "math_formula", formula_latex: "g(x)" },
+            layers: [
+              {
+                timing: { enter_at: 0, exit_at: 1, appear_anim: "fade", z_order: 0 },
+                body: { kind: "math_formula", formula_latex: "g(x)" },
+              },
+            ],
+          },
+        },
+      ],
+      scope,
+    );
+    expect(repaired.steps[2].step_id).toBe("step_03");
+    expect(repaired.steps[2].voiceover_text).toContain("整步替换后的旁白");
+    expect(repaired.steps[2].end_frame).toBeGreaterThan(original.steps[1].end_frame);
+  });
+
+  it("fail-closes unknown issue paths instead of unlocking all steps", () => {
+    const original = playbook();
+    const scope = deriveRepairScope([
+      { code: "mystery.issue", path: "something.unknown.field" },
+    ]);
+    expect(scope.allowedPrefixes).toEqual([]);
+    expect(() =>
+      applyPlaybookPatch(
+        original,
+        [{ op: "replace", path: "/steps/0/title", value: "should not land" }],
+        scope,
+      ),
+    ).toThrow(/outside the issue-scoped allowlist/);
+  });
 });

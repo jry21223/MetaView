@@ -240,11 +240,23 @@ def _base_blueprint_payload(payload: dict[str, Any]) -> dict[str, Any]:
     return {key: deepcopy(value) for key, value in payload.items() if key not in excluded}
 
 
-def _deep_merge(base: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
+_MAX_MERGE_DEPTH = 32
+
+
+def _deep_merge(
+    base: dict[str, Any],
+    patch: dict[str, Any],
+    *,
+    depth: int = 0,
+) -> dict[str, Any]:
+    if depth > _MAX_MERGE_DEPTH:
+        raise ValueError(
+            f"stateDelta nesting exceeds the {_MAX_MERGE_DEPTH}-level safety limit"
+        )
     result = deepcopy(base)
     for key, value in patch.items():
         if isinstance(value, dict) and isinstance(result.get(key), dict):
-            result[key] = _deep_merge(result[key], value)
+            result[key] = _deep_merge(result[key], value, depth=depth + 1)
         elif value is None:
             result.pop(key, None)
         else:

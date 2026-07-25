@@ -121,17 +121,35 @@ function prefixesForIssuePath(path: string): string[] {
   const normalized = path.trim();
   const stepMatch = normalized.match(/steps\[(\d+)\]/);
   if (stepMatch) return [`/steps/${stepMatch[1]}`];
+  // RFC 6901-style step paths from structured validators.
+  const pointerStep = normalized.match(/^\/?steps\/(\d+)(?:\/|$)/);
+  if (pointerStep) return [`/steps/${pointerStep[1]}`];
   if (normalized === "steps" || normalized.startsWith("steps.")) return ["/steps"];
-  if (normalized.startsWith("title")) return ["/title"];
-  if (normalized.startsWith("summary")) return ["/summary"];
-  if (normalized.startsWith("parameter_controls")) return ["/parameter_controls"];
-  if (normalized.startsWith("initial_data")) return ["/initial_data"];
-  if (normalized.startsWith("director")) return [];
-  if (normalized.startsWith("lesson_plan")) return ["/steps", "/summary"];
-  if (normalized === "playbook" || normalized.startsWith("schema")) {
+  if (normalized.startsWith("title") || normalized === "/title") return ["/title"];
+  if (normalized.startsWith("summary") || normalized === "/summary") return ["/summary"];
+  if (normalized.startsWith("parameter_controls") || normalized.startsWith("/parameter_controls")) {
+    return ["/parameter_controls"];
+  }
+  if (normalized.startsWith("initial_data") || normalized.startsWith("/initial_data")) {
+    return ["/initial_data"];
+  }
+  if (normalized.startsWith("algorithm_id") || normalized === "/algorithm_id") {
+    return ["/algorithm_id"];
+  }
+  if (normalized.startsWith("director") || normalized.startsWith("/director")) return [];
+  if (normalized.startsWith("lesson_plan") || normalized.startsWith("/lesson_plan")) {
+    return ["/steps", "/summary"];
+  }
+  if (
+    normalized === "playbook" ||
+    normalized === "/playbook" ||
+    normalized.startsWith("schema") ||
+    normalized.startsWith("/schema")
+  ) {
     return [...MUTABLE_ROOTS].map((root) => `/${root}`);
   }
-  return ["/steps"];
+  // Fail closed: unknown issue paths must not unlock the entire step tree.
+  return [];
 }
 
 function pathMatchesPrefix(path: string, prefix: string): boolean {
@@ -222,12 +240,19 @@ function normalizeDerivedFields(
   const next = structuredClone(playbook);
   const fps = Number.isFinite(next.fps) && next.fps > 0 ? Math.round(next.fps) : 30;
   next.fps = fps;
-  const originalDurations = stepDurationsById(original.steps);
+  // Index-keyed durations so whole-step replaces cannot break identity lookup by
+  // smuggling a different step_id into the patched object.
+  const originalDurationsByIndex = stepDurationsByIndex(original.steps);
+  const originalStepIdsByIndex = original.steps.map(
+    (step, index) => step.step_id || `step_${String(index + 1).padStart(2, "0")}`,
+  );
   const recomputeDurations = durationRecomputeStepIndices(operations);
   let cursor = 0;
   next.steps = next.steps.map((step, index) => {
-    const normalized = normalizeStep(step, index, fps);
-    const preservedDuration = originalDurations.get(normalized.step_id);
+    const compilerOwnedId =
+      originalStepIdsByIndex[index] ?? `step_${String(index + 1).padStart(2, "0")}`;
+    const normalized = normalizeStep(step, index, fps, compilerOwnedId);
+    const preservedDuration = originalDurationsByIndex.get(index);
     const duration = recomputeDurations === null || recomputeDurations.has(index)
       ? estimateStepFrames(normalized.voiceover_text, fps)
       : preservedDuration ?? estimateStepFrames(normalized.voiceover_text, fps);
@@ -243,11 +268,12 @@ function normalizeDerivedFields(
   return next;
 }
 
-function stepDurationsById(steps: MetaStepOutput[]): Map<string, number> {
-  const durations = new Map<string, number>();
+function stepDurationsByIndex(steps: MetaStepOutput[]): Map<number, number> {
+  const durations = new Map<number, number>();
   let previousEnd = 0;
-  for (const step of steps) {
-    durations.set(step.step_id, Math.max(1, step.end_frame - previousEnd));
+  for (let index = 0; index < steps.length; index += 1) {
+    const step = steps[index];
+    durations.set(index, Math.max(1, step.end_frame - previousEnd));
     previousEnd = step.end_frame;
   }
   return durations;
@@ -272,7 +298,12 @@ function durationRecomputeStepIndices(operations: PatchOperation[]): Set<number>
   return indices;
 }
 
-function normalizeStep(step: MetaStepOutput, index: number, fps: number): MetaStepOutput {
+function normalizeStep(
+  step: MetaStepOutput,
+  index: number,
+  fps: number,
+  compilerOwnedStepId: string,
+): MetaStepOutput {
   if (!isRecord(step.snapshot) || typeof step.snapshot.kind !== "string") {
     throw new Error(`steps[${index}] requires a typed snapshot`);
   }
@@ -301,7 +332,8 @@ function normalizeStep(step: MetaStepOutput, index: number, fps: number): MetaSt
     : [step.voiceover_text];
   return {
     ...step,
-    step_id: String(step.step_id || `step_${String(index + 1).padStart(2, "0")}`),
+    // Whole-step replace may smuggle a different step_id; identity stays compiler-owned.
+    step_id: compilerOwnedStepId,
     title: String(step.title ?? "").trim(),
     voiceover_text: String(step.voiceover_text ?? "").trim(),
     narration_template: narration,
