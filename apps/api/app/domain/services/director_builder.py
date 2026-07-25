@@ -39,17 +39,19 @@ def build_default_director(playbook: PlaybookScript, run_id: str) -> DirectorScr
         intent, shot_type, camera_motion, pacing = _plan_beat(step, delta)
 
         if index == 0:
+            # Opening beat always hooks with a gentle push-in, even when the first
+            # snapshot is sparse (e.g. empty arrays before tokens fill in).
             intent = "hook"
-            camera_motion = "push_in" if delta["visible_count"] > 0 else "hold"
+            camera_motion = "push_in"
         elif index == last_index and last_index > 0:
             intent = "summary"
+            pacing = "slow"
             if delta["spread"] >= 2 or _is_comparison_step(step):
                 shot_type = "wide"
                 camera_motion = "pull_out"
-                pacing = "slow"
             else:
-                camera_motion = "hold"
-                pacing = "slow"
+                # Terminal summary still eases out so the lesson does not freeze.
+                camera_motion = "pull_out"
 
         focus_target = _resolve_focus_target(step.snapshot, delta)
         beats.append(
@@ -82,14 +84,22 @@ def _plan_beat(
         return "compare", "wide", "hold", "normal"
     if delta["identical"]:
         return "explain", _shot_for_density(delta["visible_count"]), "hold", "normal"
+    # Formula/overlay beats stay close and steady so KaTeX is readable even when
+    # the formula object is newly introduced (added_count == 1).
+    if step.snapshot.kind in {"math_formula", "katex_overlay"}:
+        return "focus", "close", "hold", "normal"
     if transition in {"focus", "scale"} or delta["added_count"] == 1:
         return "focus", "close", "push_in", "slow"
     if transition in {"morph", "draw"}:
         return "reveal", "medium", "hold", "normal"
+    # Snapshot kind changes (formula → scene, array → formula, …) are reveals.
+    if (
+        delta["previous_kind"] is not None
+        and delta["previous_kind"] != delta["kind"]
+    ):
+        return "reveal", "medium", "hold", "normal"
     if delta["added_count"] > 1 or delta["removed_count"] > 0:
         return "reveal", "medium", "hold", "normal"
-    if step.snapshot.kind in {"math_formula", "katex_overlay"}:
-        return "focus", "close", "hold", "normal"
     return "explain", _shot_for_density(delta["visible_count"]), "hold", "normal"
 
 
@@ -121,6 +131,8 @@ def _semantic_delta(previous: AnySnapshot | None, current: AnySnapshot) -> dict[
         "visible_count": len(current_ids),
         "spread": _object_spread(current_objects),
         "objects": current_objects,
+        "kind": getattr(current, "kind", None),
+        "previous_kind": getattr(previous, "kind", None) if previous is not None else None,
     }
 
 
@@ -159,6 +171,11 @@ def _visible_objects(data: dict[str, Any]) -> dict[str, dict[str, Any]]:
             objects[object_id] = value
     if not objects and data.get("formula_latex"):
         objects["formula"] = {"label": data.get("formula_latex")}
+    # Algorithm array fixtures store values outside the generic list keys above.
+    array_values = data.get("array_values")
+    if isinstance(array_values, list):
+        for index, value in enumerate(array_values):
+            objects.setdefault(f"array:{index}", {"label": str(value)})
     return objects
 
 
