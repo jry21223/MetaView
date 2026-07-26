@@ -54,14 +54,24 @@ function publicGoldEntry(caseId: string, domain: TemplateDomain): TemplateDef {
 export const TEMPLATES: ReadonlyArray<TemplateDef> = [
   // ---- algorithm ----
   {
+    id: "sliding-window",
+    previewCaseId: "sliding-window",
+    domain: "algorithm",
+    title: "滑动窗口最大值",
+    desc: "固定窗口右移，维护窗口内最大值",
+    prompt: "对数组 [1,3,-1,-3,5,3,6,7] 用滑动窗口求每个窗口最大值，窗口大小可调，展示左右边界与当前最大值",
+  },
+  {
     id: "merge-sort",
+    previewCaseId: "merge-sort",
     domain: "algorithm",
     title: "归并排序",
-    desc: "数组分治 → 合并的全过程可视化",
+    desc: "数组分治与合并的全过程可视化",
     prompt: "把归并排序的过程画出来，数组是 [5,2,8,1,9,3,7,4]，每一步展示分治和合并",
   },
   {
     id: "quick-sort",
+    previewCaseId: "quick-sort",
     domain: "algorithm",
     title: "快速排序",
     desc: "选 pivot、分区、递归的对比演示",

@@ -1,3 +1,6 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -13,6 +16,9 @@ describe("template preview cases", () => {
       "binary-search",
       "bfs-tree",
       "derivative-tangent",
+      "sliding-window",
+      "merge-sort",
+      "quick-sort",
     ]));
 
     for (const id of TEMPLATE_PREVIEW_CASE_IDS) {
@@ -37,6 +43,22 @@ describe("template preview cases", () => {
       }
     }
   });
+
+  it.each(["sliding-window", "merge-sort", "quick-sort"])(
+    "publishes a real poster asset for %s",
+    (id) => {
+      const item = getTemplatePreviewCase(id)!;
+      const script = item.buildScript(item.defaultParams);
+      const posterPath = path.resolve(
+        process.cwd(),
+        "public",
+        item.posterUrl.replace(/^\//, ""),
+      );
+
+      expect(existsSync(posterPath)).toBe(true);
+      expect(script.steps.some((step) => step.end_frame === item.posterFrame)).toBe(false);
+    },
+  );
 
   it("recomputes binary-search found and missing targets without a pipeline", () => {
     const item = getTemplatePreviewCase("binary-search")!;

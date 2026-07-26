@@ -31,6 +31,9 @@ Status: Active
 
 | 模板 ID | 内容 | 参数 |
 |---|---|---|
+| `sliding-window` | 固定窗口右移、窗口最大值、代码同步、`O(n)` | 窗口大小 `k` |
+| `merge-sort` | 分治拆分、区间合并、有序写回、`O(n log n)` | 排序方向（v1 升序） |
+| `quick-sort` | Lomuto 分区、pivot 归位、递归区间、`O(n log n)` 平均 | pivot 策略（v1 last） |
 | `binary-search` | low/mid/high 收缩、命中或未命中、代码同步、`O(log n)` | 目标值 |
 | `bfs-tree` | 当前节点、队列、访问集合、活动边和代码行 | 起始节点 |
 | `derivative-tangent` | 割线逼近、切点、切线和 `f'(a)=2a` | 切点 `a` |

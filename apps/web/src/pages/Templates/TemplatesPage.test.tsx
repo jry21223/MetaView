@@ -50,12 +50,12 @@ describe("TemplatesPage lesson atlas", () => {
     expect(view.getByLabelText("current-path").textContent).toBe("/templates/binary-search");
   });
 
-  it("publishes thirteen line-drawn previews and keeps the other templates disabled", () => {
+  it("publishes sixteen line-drawn previews and keeps the other templates disabled", () => {
     const { container, getByRole } = renderPage();
 
-    expect(TEMPLATES).toHaveLength(26);
-    expect(container.querySelectorAll("[data-preview]")).toHaveLength(13);
-    expect((getByRole("button", { name: "快速排序，制作中" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(TEMPLATES).toHaveLength(27);
+    expect(container.querySelectorAll("[data-preview]")).toHaveLength(16);
+    expect((getByRole("button", { name: "斐波那契 · 记忆化，制作中" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("opens the pole-polar template as a real case route", () => {
