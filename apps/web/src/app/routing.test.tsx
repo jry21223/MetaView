@@ -158,12 +158,12 @@ describe("App routing", () => {
 
   it("keeps pending template deep links unavailable instead of generating them", async () => {
     vi.stubEnv("VITE_APP_EDITION", "ops");
-    window.history.pushState({}, "", "/templates/quick-sort");
+    window.history.pushState({}, "", "/templates/fib-memo");
 
     const { App } = await import("./App");
     const { getByRole, getByText } = render(<App />);
 
-    expect(getByRole("status").textContent).toContain("快速排序案例仍在制作");
+    expect(getByRole("status").textContent).toContain("斐波那契 · 记忆化案例仍在制作");
     expect(getByText("返回模板目录")).toBeTruthy();
   });
 

@@ -6,6 +6,9 @@ import type {
   MetaStep,
   PlaybookScript,
 } from "../../features/playbook/engine/types";
+import { MERGE_SORT_PREVIEW_CASE } from "./algorithm-cases/mergeSortCase";
+import { QUICK_SORT_PREVIEW_CASE } from "./algorithm-cases/quickSortCase";
+import { SLIDING_WINDOW_PREVIEW_CASE } from "./algorithm-cases/slidingWindowCase";
 import { PUBLIC_GOLD_TEMPLATES } from "./gold-templates/publicGoldTemplates";
 import { manifestToPreviewCase } from "./gold-templates/manifest";
 import type { ConicFollowupCommand } from "../../features/playbook/interaction/types";
@@ -660,6 +663,9 @@ const TEMPLATE_PREVIEW_CASES: Record<TemplatePreviewCaseId, TemplatePreviewCase>
     item.caseId,
     manifestToPreviewCase(item),
   ])),
+  "sliding-window": SLIDING_WINDOW_PREVIEW_CASE,
+  "merge-sort": MERGE_SORT_PREVIEW_CASE,
+  "quick-sort": QUICK_SORT_PREVIEW_CASE,
   "binary-search": {
     id: "binary-search",
     templateId: "binary-search",

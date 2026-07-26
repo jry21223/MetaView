@@ -1,4 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@earendil-works/pi-agent-core", () => ({
+  Agent: class MockAgent {},
+}));
+vi.mock("@earendil-works/pi-ai", () => {
+  const schemaFactory = (): Record<string, never> => ({});
+  return {
+    getModel: vi.fn(),
+    Type: new Proxy({}, { get: () => schemaFactory }),
+  };
+});
+
 import {
   SYSTEM_PROMPT,
   buildAgentPrompt,
@@ -119,6 +131,13 @@ describe("agent prompt contracts", () => {
     expect(SYSTEM_PROMPT).toContain("Do not use algorithm_array");
   });
 
+  it("requires surviving math parameters to stay bound to visible curves", () => {
+    expect(SYSTEM_PROMPT).toContain("remain free after");
+    expect(SYSTEM_PROMPT).toContain("add_parameter_control");
+    expect(SYSTEM_PROMPT).toMatch(/Never replace a\s+surviving parameter/);
+    expect(SYSTEM_PROMPT).toContain("decorative slider");
+  });
+
   it("gives specific repair guidance for subject visual array fallbacks", () => {
     const prompt = buildAgentSelfRepairPrompt({
       originalPrompt: "讲解东亚夏季风的海陆热力差异",
@@ -151,5 +170,33 @@ describe("agent prompt contracts", () => {
     expect(prompt).toContain("SceneBlueprint");
     expect(prompt).toContain("geo_map_scene");
     expect(prompt).toContain("Do not repair this by renaming algorithm_array");
+  });
+
+  it("gives specific repair guidance for hardcoded math parameters", () => {
+    const previous = fallbackPlaybook();
+    previous.domain = "math";
+    const prompt = buildAgentSelfRepairPrompt({
+      originalPrompt:
+        "The moving line y=kx+t has a determined intercept and passes through a fixed point.",
+      previousPlaybook: previous,
+      repairAttempt: 1,
+      report: {
+        status: "blocked",
+        issues: [
+          {
+            code: "math.parameter_hardcoded",
+            severity: "error",
+            path: "steps",
+            message: "The surviving slope k was baked into a numeric curve.",
+            suggestion: "Keep k symbolic and add a matching control.",
+          },
+        ],
+      },
+    });
+
+    expect(prompt).toContain("math.parameter_hardcoded");
+    expect(prompt).toContain("add_parameter_control");
+    expect(prompt).toContain("one-to-one binding");
+    expect(prompt).toContain("Parameters fixed by the derivation must stay fixed");
   });
 });

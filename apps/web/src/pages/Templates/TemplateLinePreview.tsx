@@ -21,6 +21,53 @@ const LINE_PREVIEWS: Record<TemplatePreviewCaseId, ReactNode> = {
       <path className="is-accent" d="M20 52h40" />
     </svg>
   ),
+  "sliding-window": (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="sliding-window-max">
+      {[18, 36, 54, 72, 90, 108, 126, 144].map((x, index) => (
+        <rect
+          key={x}
+          className={index >= 2 && index <= 4 ? "is-accent" : undefined}
+          x={x - 6}
+          y={index % 2 === 0 ? 18 : 24}
+          width="12"
+          height={index % 2 === 0 ? 22 : 16}
+          rx="2"
+        />
+      ))}
+      <path className="is-accent" d="M42 10h48M42 10v4m48-4v4" />
+      <path className="is-guide" d="M16 48h128" />
+    </svg>
+  ),
+  "merge-sort": (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="merge-sort-divide">
+      <path className="is-guide" d="M80 8v12M48 28 80 20m32 8L80 20M32 44 48 28m16 16L48 28m48 16L112 28m16 16-16-16" />
+      <rect x="20" y="40" width="10" height="10" rx="1.5" />
+      <rect className="is-accent" x="34" y="36" width="10" height="14" rx="1.5" />
+      <rect x="48" y="42" width="10" height="8" rx="1.5" />
+      <rect className="is-accent" x="62" y="34" width="10" height="16" rx="1.5" />
+      <rect x="88" y="38" width="10" height="12" rx="1.5" />
+      <rect className="is-accent" x="102" y="32" width="10" height="18" rx="1.5" />
+      <rect x="116" y="40" width="10" height="10" rx="1.5" />
+      <rect x="130" y="36" width="10" height="14" rx="1.5" />
+    </svg>
+  ),
+  "quick-sort": (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="quick-sort-partition">
+      {[22, 38, 54, 70, 86, 102, 118, 134].map((x, index) => (
+        <rect
+          key={x}
+          className={index === 6 ? "is-accent" : undefined}
+          x={x - 6}
+          y={14 + (index % 4) * 3}
+          width="12"
+          height={18 + (7 - index) * 2}
+          rx="2"
+        />
+      ))}
+      <path className="is-accent" d="M118 8v6m-3-3 3 3 3-3" />
+      <path className="is-guide" d="M16 50h50m20 0h58" />
+    </svg>
+  ),
   "derivative-tangent": (
     <svg viewBox="0 0 160 56" fill="none">
       <path className="is-guide" d="M18 45h124M40 50V7" />

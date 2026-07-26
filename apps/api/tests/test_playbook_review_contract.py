@@ -5,12 +5,16 @@ import json
 import pytest
 from pydantic import ValidationError
 
+from app.domain.models.playbook import PlaybookScript
 from app.domain.models.review import (
     PlaybookReviewIssue,
     PlaybookReviewStatus,
     PlaybookReviewVerdict,
 )
-from app.domain.services.reviewer_prompt import parse_playbook_reviewer_output
+from app.domain.services.reviewer_prompt import (
+    build_playbook_reviewer_prompt,
+    parse_playbook_reviewer_output,
+)
 
 
 def test_playbook_review_accepts_clean_warnings_and_blocked_verdicts() -> None:
@@ -146,3 +150,66 @@ def test_invalid_playbook_reviewer_schema_becomes_reviewer_invalid_output() -> N
 
     assert verdict.status == PlaybookReviewStatus.BLOCKED
     assert verdict.issues[0].code == "reviewer.invalid_output"
+
+
+def test_math_parameter_reviewer_findings_are_normalized_at_parse_boundary() -> None:
+    verdict = parse_playbook_reviewer_output(
+        json.dumps(
+            {
+                "status": "warnings",
+                "summary": "The moving parameter is hardcoded.",
+                "issues": [
+                    {
+                        "code": "math.parameter_hardcoded",
+                        "severity": "warning",
+                        "path": "steps[1].snapshot.curves[0].expression",
+                        "message": "The moving line uses a numeric slope.",
+                        "requires_repair": False,
+                    }
+                ],
+            }
+        )
+    )
+
+    assert verdict.status == PlaybookReviewStatus.BLOCKED
+    assert verdict.issues[0].severity.value == "error"
+    assert verdict.issues[0].requires_repair is True
+
+
+def test_math_reviewer_checks_surviving_free_parameters_against_curves() -> None:
+    playbook = PlaybookScript.model_validate(
+        {
+            "fps": 30,
+            "total_frames": 60,
+            "domain": "math",
+            "title": "Moving line",
+            "summary": "Show a line family.",
+            "steps": [
+                {
+                    "step_id": "step-1",
+                    "end_frame": 60,
+                    "title": "Moving line",
+                    "voiceover_text": "The line moves.",
+                    "snapshot": {
+                        "kind": "math_plot",
+                        "curves": [{"expression": "0.5*x"}],
+                    },
+                }
+            ],
+            "parameter_controls": [],
+        }
+    )
+    self_check = PlaybookReviewVerdict(
+        status=PlaybookReviewStatus.CLEAN,
+        summary="Deterministic checks passed.",
+    )
+
+    system, _ = build_playbook_reviewer_prompt(
+        "The moving line y=kx+t has a determined intercept.",
+        playbook,
+        self_check,
+    )
+
+    assert "math.parameter_hardcoded" in system
+    assert "remains free after all stated conditions" in system
+    assert "quantities fixed by the derivation" in system

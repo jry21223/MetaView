@@ -8,6 +8,7 @@ import type {
   MetaStep,
   PlaybookScript,
 } from "../types";
+import { resolveEditableMathControls } from "../param-panels/mathParams";
 import { getReplay } from "../replay/registry";
 import type { ReplayedStep } from "../replay/types";
 
@@ -54,6 +55,20 @@ function cleanMathParams(params: Record<string, number> | undefined): Record<str
   if (!params) return null;
   const entries = Object.entries(params).filter(([, value]) => Number.isFinite(value));
   return entries.length > 0 ? Object.fromEntries(entries) : null;
+}
+
+function resolveInitialMathParams(
+  script: PlaybookScript,
+  overrides: Record<string, number> | undefined,
+): Record<string, number> | undefined {
+  const defaults = Object.fromEntries(
+    resolveEditableMathControls(script.parameter_controls).map(
+      ({ control, initial }) => [control.id, initial],
+    ),
+  );
+  const cleanOverrides = cleanMathParams(overrides);
+  const merged = { ...defaults, ...(cleanOverrides ?? {}) };
+  return Object.keys(merged).length > 0 ? merged : undefined;
 }
 
 /**
@@ -218,7 +233,10 @@ export function applyMathPlotOverride(
 
 export function resolveScript(base: PlaybookScript, overrides: ScriptOverrides): PlaybookScript {
   const withAlgorithm = applyAlgorithmArrayOverride(base, overrides.array);
-  const withMathParams = applyMathParamOverride(withAlgorithm, overrides.mathParams);
+  const withMathParams = applyMathParamOverride(
+    withAlgorithm,
+    resolveInitialMathParams(withAlgorithm, overrides.mathParams),
+  );
   return applyMathPlotOverride(withMathParams, overrides.mathPlot);
 }
 

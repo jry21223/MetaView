@@ -172,6 +172,17 @@ def _tokenize(source: str) -> list[_Token]:
     return tokens
 
 
+def extract_safe_math_identifiers(source: str) -> set[str]:
+    """Return variable identifiers accepted by the renderer expression grammar."""
+
+    names = {
+        str(token.value)
+        for token in _tokenize((source or "").strip())
+        if token.kind == "name"
+    }
+    return names - set(_CONSTANTS) - set(_FUNCTIONS)
+
+
 class _Parser:
     def __init__(self, tokens: list[_Token]) -> None:
         self._tokens = tokens
