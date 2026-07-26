@@ -315,6 +315,33 @@ describe("agent playbook self-check", () => {
     );
   });
 
+  it("samples curve defaults inside the declared plot range", () => {
+    const playbook = validPlaybook();
+    playbook.domain = "math";
+    playbook.steps.forEach((step) => {
+      const snapshot = {
+        kind: "math_plot",
+        curves: [{ expression: "sqrt(x-2)", label: "shifted square root" }],
+        x_min: 2,
+        x_max: 6,
+      };
+      step.snapshot = structuredClone(snapshot);
+      step.layers[0].body = structuredClone(snapshot);
+    });
+
+    const report = selfCheckPlaybook(
+      playbook,
+      "Plot y=sqrt(x-2) on x from 2 to 6.",
+    );
+
+    expect(report.status).toBe("clean");
+    expect(
+      report.issues.filter(
+        (issue) => issue.code === "math.parameter_control_invalid",
+      ),
+    ).toEqual([]);
+  });
+
   it("accepts bound controls and intrinsic parametric t", () => {
     const playbook = validPlaybook();
     playbook.domain = "math";
@@ -350,6 +377,42 @@ describe("agent playbook self-check", () => {
     expect(report.issues).toEqual([]);
   });
 
+  it("treats parametric components as one parameterized view", () => {
+    const playbook = validPlaybook();
+    playbook.domain = "math";
+    playbook.parameter_controls = [
+      { id: "a", label: "Amplitude", value: "2" },
+    ];
+    playbook.steps.forEach((step) => {
+      const snapshot = {
+        kind: "math_scene",
+        curves: [
+          {
+            expression_x: "t",
+            expression_y: "a*t",
+            t_min: -2,
+            t_max: 2,
+            label: "varying line",
+          },
+        ],
+      };
+      step.snapshot = structuredClone(snapshot);
+      step.layers[0].body = structuredClone(snapshot);
+    });
+
+    const report = selfCheckPlaybook(
+      playbook,
+      "Vary parameter a in the parametric line.",
+    );
+
+    expect(report.status).toBe("clean");
+    expect(
+      report.issues.filter((issue) =>
+        issue.code.startsWith("math.parameter"),
+      ),
+    ).toEqual([]);
+  });
+
   it("accepts fixed snapshot parameters without exposing sliders", () => {
     const playbook = validPlaybook();
     playbook.domain = "math";
@@ -372,6 +435,31 @@ describe("agent playbook self-check", () => {
 
     expect(report.status).toBe("clean");
     expect(report.issues).toEqual([]);
+  });
+
+  it("does not make a determined Chinese parameter interactive", () => {
+    const playbook = validPlaybook();
+    playbook.domain = "math";
+    playbook.steps.forEach((step) => {
+      const snapshot = {
+        kind: "math_plot",
+        curves: [{ expression: "2*x", label: "fixed line" }],
+      };
+      step.snapshot = structuredClone(snapshot);
+      step.layers[0].body = structuredClone(snapshot);
+    });
+
+    const report = selfCheckPlaybook(
+      playbook,
+      "参数 a 已由题设确定为 2，绘制固定曲线 y=2x。",
+    );
+
+    expect(report.status).toBe("clean");
+    expect(
+      report.issues.filter((issue) =>
+        issue.code.startsWith("math.parameter"),
+      ),
+    ).toEqual([]);
   });
 
   it("accepts vector-field coordinate variables", () => {
@@ -427,7 +515,215 @@ describe("agent playbook self-check", () => {
     expect(report.issues).toContainEqual(
       expect.objectContaining({
         code: "math.parameter_hardcoded",
-        path: "steps",
+        path: "steps[0].snapshot.curves[0].expression",
+      }),
+    );
+  });
+
+  it("blocks a hardcoded parameter in any moving-line view", () => {
+    const playbook = validPlaybook();
+    playbook.domain = "math";
+    playbook.parameter_controls = [
+      { id: "k", label: "Slope k", value: "0.5" },
+    ];
+    playbook.steps.forEach((step) => {
+      const snapshot = {
+        kind: "math_plot",
+        curves: [{ expression: "k*x", label: "line" }],
+      };
+      step.snapshot = structuredClone(snapshot);
+      step.layers[0].body = structuredClone(snapshot);
+    });
+    const hardcodedSnapshot = {
+      kind: "math_plot",
+      curves: [{ expression: "0.5*x", label: "line" }],
+    };
+    playbook.steps[1].snapshot = structuredClone(hardcodedSnapshot);
+    playbook.steps[1].layers[0].body = structuredClone(hardcodedSnapshot);
+
+    const report = selfCheckPlaybook(
+      playbook,
+      "The moving line y = kx + t satisfies a condition that determines the intercept. Vary parameter k in every view.",
+    );
+
+    expect(report.status).toBe("blocked");
+    expect(report.issues).toContainEqual(
+      expect.objectContaining({
+        code: "math.parameter_hardcoded",
+        path: "steps[1].snapshot.curves[0].expression",
+      }),
+    );
+  });
+
+  it("tracks a moving curve family across renderer kinds", () => {
+    const playbook = validPlaybook();
+    playbook.domain = "math";
+    playbook.parameter_controls = [
+      { id: "k", label: "Slope k", value: "0.5" },
+    ];
+    playbook.steps.forEach((step) => {
+      const snapshot = {
+        kind: "math_plot",
+        curves: [{ expression: "k*x", label: "line" }],
+      };
+      step.snapshot = structuredClone(snapshot);
+      step.layers[0].body = structuredClone(snapshot);
+    });
+    const hardcodedScene = {
+      kind: "math_scene",
+      curves: [{ expression_y: "0.5*x", label: "line" }],
+    };
+    playbook.steps[1].snapshot = structuredClone(hardcodedScene);
+    playbook.steps[1].layers[0].body = structuredClone(hardcodedScene);
+
+    const report = selfCheckPlaybook(
+      playbook,
+      "The moving line y=kx has a determined intercept. Vary parameter k in every view.",
+    );
+
+    expect(report.status).toBe("blocked");
+    expect(report.issues).toContainEqual(
+      expect.objectContaining({
+        code: "math.parameter_hardcoded",
+        path: "steps[1].snapshot.curves[0]",
+      }),
+    );
+  });
+
+  it("tracks a moving curve family when its label changes", () => {
+    const playbook = validPlaybook();
+    playbook.domain = "math";
+    playbook.parameter_controls = [
+      { id: "k", label: "Slope k", value: "0.5" },
+    ];
+    playbook.steps.forEach((step) => {
+      const snapshot = {
+        kind: "math_plot",
+        curves: [{ expression: "k*x", label: "symbolic line" }],
+      };
+      step.snapshot = structuredClone(snapshot);
+      step.layers[0].body = structuredClone(snapshot);
+    });
+    const hardcodedScene = {
+      kind: "math_scene",
+      curves: [
+        { expression_y: "0.5*x", label: "worked example line" },
+      ],
+    };
+    playbook.steps[1].snapshot = structuredClone(hardcodedScene);
+    playbook.steps[1].layers[0].body = structuredClone(hardcodedScene);
+
+    const report = selfCheckPlaybook(
+      playbook,
+      "The moving line y=kx varies with parameter k in every view.",
+    );
+
+    expect(report.status).toBe("blocked");
+    expect(report.issues).toContainEqual(
+      expect.objectContaining({
+        code: "math.parameter_hardcoded",
+        path: "steps[1].snapshot.curves[0]",
+      }),
+    );
+  });
+
+  it.each(["x*0.5", "-0.5*x"])(
+    "tracks the equivalent moving-curve shape %s",
+    (hardcodedExpression) => {
+      const playbook = validPlaybook();
+      playbook.domain = "math";
+      playbook.parameter_controls = [
+        { id: "k", label: "Slope k", value: "0.5" },
+      ];
+      playbook.steps.forEach((step) => {
+        const snapshot = {
+          kind: "math_plot",
+          curves: [{ expression: "k*x", label: "line" }],
+        };
+        step.snapshot = structuredClone(snapshot);
+        step.layers[0].body = structuredClone(snapshot);
+      });
+      const hardcodedSnapshot = {
+        kind: "math_plot",
+        curves: [{ expression: hardcodedExpression, label: "line" }],
+      };
+      playbook.steps[1].snapshot = structuredClone(hardcodedSnapshot);
+      playbook.steps[1].layers[0].body = structuredClone(hardcodedSnapshot);
+
+      const report = selfCheckPlaybook(
+        playbook,
+        "The moving line y=kx varies with parameter k in every view.",
+      );
+
+      expect(report.status).toBe("blocked");
+      expect(report.issues).toContainEqual(
+        expect.objectContaining({
+          code: "math.parameter_hardcoded",
+          path: "steps[1].snapshot.curves[0].expression",
+        }),
+      );
+    },
+  );
+
+  it("does not treat a reordered reference as the moving curve", () => {
+    const playbook = validPlaybook();
+    playbook.domain = "math";
+    playbook.parameter_controls = [
+      { id: "k", label: "Slope k", value: "0.5" },
+    ];
+    playbook.steps.forEach((step) => {
+      const snapshot = {
+        kind: "math_plot",
+        curves: [
+          { expression: "k*x", label: "moving line" },
+          { expression: "x^2", label: "reference parabola" },
+        ],
+      };
+      step.snapshot = structuredClone(snapshot);
+      step.layers[0].body = structuredClone(snapshot);
+    });
+    const referenceSnapshot = {
+      kind: "math_plot",
+      curves: [{ expression: "x^2", label: "reference parabola" }],
+    };
+    playbook.steps[1].snapshot = structuredClone(referenceSnapshot);
+    playbook.steps[1].layers[0].body = structuredClone(referenceSnapshot);
+
+    const report = selfCheckPlaybook(
+      playbook,
+      "The moving line y=kx varies with parameter k in every moving-line view.",
+    );
+
+    expect(report.issues).not.toContainEqual(
+      expect.objectContaining({
+        code: "math.parameter_hardcoded",
+        path: "steps[1].snapshot.curves[0].expression",
+      }),
+    );
+  });
+
+  it("blocks a hardcoded slope in a reduced moving-line equation", () => {
+    const playbook = validPlaybook();
+    playbook.domain = "math";
+    playbook.steps.forEach((step) => {
+      const snapshot = {
+        kind: "math_plot",
+        curves: [{ expression: "0.5*x", label: "moving line" }],
+      };
+      step.snapshot = structuredClone(snapshot);
+      step.layers[0].body = structuredClone(snapshot);
+    });
+
+    const report = selfCheckPlaybook(
+      playbook,
+      "Visualize the moving line y=kx after the condition determines the intercept t=0.",
+    );
+
+    expect(report.status).toBe("blocked");
+    expect(report.issues).toContainEqual(
+      expect.objectContaining({
+        code: "math.parameter_hardcoded",
+        message: expect.stringContaining("k"),
       }),
     );
   });

@@ -991,7 +991,6 @@ class RunPipelineUseCase:
                 playbook,
                 review_report,
             )
-            result = _enforce_math_parameter_review_contract(result)
             result = _merge_playbook_reviews(review_report, result)
             result = _with_playbook_review_actions(
                 result,
@@ -1520,39 +1519,6 @@ def _merge_playbook_reviews(
         warning_summary=reviewer.summary,
         blocked_summary=reviewer.summary,
         actions=[*self_check.actions, *reviewer.actions],
-    )
-
-
-_MATH_PARAMETER_CONTRACT_CODES = {
-    "math.parameter_hardcoded",
-    "math.parameter_control_missing",
-    "math.parameter_control_unused",
-    "math.parameter_control_invalid",
-}
-
-
-def _enforce_math_parameter_review_contract(
-    verdict: PlaybookReviewVerdict,
-) -> PlaybookReviewVerdict:
-    """Parameter-contract findings are blocking even if a reviewer underspecifies them."""
-    normalized_issues = [
-        issue.model_copy(
-            update={
-                "severity": PlaybookIssueSeverity.ERROR,
-                "requires_repair": True,
-            }
-        )
-        if issue.code in _MATH_PARAMETER_CONTRACT_CODES
-        else issue
-        for issue in verdict.issues
-    ]
-    if normalized_issues == verdict.issues:
-        return verdict
-    return verdict.model_copy(
-        update={
-            "status": PlaybookReviewStatus.BLOCKED,
-            "issues": normalized_issues,
-        }
     )
 
 

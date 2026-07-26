@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import re
+from dataclasses import dataclass
 from typing import Any, Literal
 
 from app.domain.contracts.playbook_contract import SUPPORTED_SNAPSHOT_KIND_SET
@@ -43,6 +44,10 @@ _MOVING_LINE_PARAMETER_RE = re.compile(
     r"([A-Za-z_][A-Za-z0-9_]*)",
     re.IGNORECASE,
 )
+_MOVING_LINE_SLOPE_RE = re.compile(
+    r"\by\s*=\s*([A-Za-z_][A-Za-z0-9_]*)\s*\*?\s*x\b",
+    re.IGNORECASE,
+)
 _MOVING_LINE_MARKERS = (
     "moving line",
     "varying line",
@@ -67,10 +72,23 @@ _EXPLICIT_PARAMETER_RE = re.compile(
     re.IGNORECASE,
 )
 _EXPLICIT_PARAMETER_CN_RE = re.compile(
-    r"(?:改变|变化|拖动|调节)?\s*参数\s*([A-Za-z_][A-Za-z0-9_]*)"
+    r"(?:改变|变化|拖动|调节)\s*参数\s*([A-Za-z_][A-Za-z0-9_]*)"
 )
 
 SUPPORTED_FRONTEND_SNAPSHOT_KINDS = SUPPORTED_SNAPSHOT_KIND_SET
+
+
+@dataclass(frozen=True)
+class _MathExpressionBinding:
+    source: str
+    intrinsic_names: set[str]
+    fixed_params: dict[str, float]
+    path: str
+    view_key: str
+    family_key: str
+    view_path: str
+    moving_target: bool
+    sample_values: tuple[float, ...]
 
 _SUBJECT_VISUAL_DOMAINS = {"geography", "biology", "chemistry"}
 _ALGORITHM_FALLBACK_KINDS = {"algorithm_array", "algorithm_bars"}
@@ -1121,6 +1139,7 @@ def _check_math_parameter_contract(
     issues: list[PlaybookReviewIssue],
 ) -> None:
     bindings = _math_expression_bindings(playbook)
+    required_parameters = _required_interactive_parameters(prompt)
     controls: dict[str, float] = {}
     seen_ids: set[str] = set()
     control_ids_by_label: dict[str, str] = {}
@@ -1169,35 +1188,44 @@ def _check_math_parameter_contract(
 
     symbolic: set[str] = set()
     missing: set[str] = set()
-    for source, intrinsic_names, fixed_params, path in bindings:
+    identifiers_by_view: dict[str, set[str]] = {}
+    binding_by_view: dict[str, _MathExpressionBinding] = {}
+    for binding in bindings:
         try:
-            identifiers = extract_safe_math_identifiers(source)
-            compiled = compile_safe_math_expression(source)
+            identifiers = extract_safe_math_identifiers(binding.source)
+            compiled = compile_safe_math_expression(binding.source)
         except SafeMathExpressionError as exc:
             issues.append(
                 _issue(
                     "math.parameter_control_invalid",
                     PlaybookIssueSeverity.ERROR,
-                    path,
+                    binding.path,
                     f"Math expression cannot be rendered: {exc}.",
                     "Use the supported renderer expression grammar and explicit multiplication.",
                 )
             )
             continue
-        expression_parameters = identifiers - intrinsic_names
+        expression_parameters = identifiers - binding.intrinsic_names
         symbolic.update(expression_parameters)
-        missing.update(expression_parameters - set(fixed_params) - set(controls))
+        missing.update(
+            expression_parameters - set(binding.fixed_params) - set(controls)
+        )
+        identifiers_by_view.setdefault(binding.view_key, set()).update(
+            expression_parameters
+        )
+        binding_by_view[binding.view_key] = binding
         if not _expression_has_finite_default(
             compiled,
             controls,
-            fixed_params,
-            intrinsic_names,
+            binding.fixed_params,
+            binding.intrinsic_names,
+            binding.sample_values,
         ):
             issues.append(
                 _issue(
                     "math.parameter_control_invalid",
                     PlaybookIssueSeverity.ERROR,
-                    path,
+                    binding.path,
                     "Math expression has no finite sample with the declared default parameters.",
                     (
                         "Choose finite defaults that render the curve before the "
@@ -1206,7 +1234,6 @@ def _check_math_parameter_contract(
                 )
             )
 
-    required_parameters = _required_interactive_parameters(prompt)
     missing.update((required_parameters & symbolic) - set(controls))
     if missing:
         missing_names = sorted(missing)
@@ -1246,7 +1273,40 @@ def _check_math_parameter_contract(
             )
         )
 
-    hardcoded = sorted(required_parameters - symbolic)
+    target_families = {
+        binding.family_key
+        for view_key, binding in binding_by_view.items()
+        if binding.moving_target
+        or bool(identifiers_by_view.get(view_key, set()) & required_parameters)
+    }
+    hardcoded_by_path: dict[str, set[str]] = {}
+    for view_key, binding in binding_by_view.items():
+        if binding.family_key not in target_families:
+            continue
+        hardcoded = required_parameters - identifiers_by_view.get(view_key, set())
+        if hardcoded:
+            hardcoded_by_path[binding.view_path] = hardcoded
+    hardcoded_in_moving_views = set().union(
+        *hardcoded_by_path.values()
+    ) if hardcoded_by_path else set()
+    for path, names in hardcoded_by_path.items():
+        issues.append(
+            _issue(
+                "math.parameter_hardcoded",
+                PlaybookIssueSeverity.ERROR,
+                path,
+                (
+                    "A moving curve expression hardcodes surviving free "
+                    f"parameter(s): {', '.join(sorted(names))}."
+                ),
+                (
+                    "Keep each surviving free parameter symbolic in every moving "
+                    "curve expression and declare a matching parameter control."
+                ),
+            )
+        )
+
+    hardcoded = sorted(required_parameters - symbolic - hardcoded_in_moving_views)
     if hardcoded:
         issues.append(
             _issue(
@@ -1276,6 +1336,9 @@ def _required_interactive_parameters(prompt: str) -> set[str]:
         return required
     match = _MOVING_LINE_PARAMETER_RE.search(prompt)
     if match is None:
+        slope_match = _MOVING_LINE_SLOPE_RE.search(prompt)
+        if slope_match is not None:
+            required.add(slope_match.group(1))
         return required
     slope, intercept = match.groups()
     required.add(slope)
@@ -1296,8 +1359,8 @@ def _condition_determined_parameters(prompt: str) -> set[str]:
 
 def _math_expression_bindings(
     playbook: PlaybookScript,
-) -> list[tuple[str, set[str], dict[str, float], str]]:
-    bindings: list[tuple[str, set[str], dict[str, float], str]] = []
+) -> list[_MathExpressionBinding]:
+    bindings: list[_MathExpressionBinding] = []
     for step_index, step in enumerate(playbook.steps):
         snapshot = _snapshot_json(step.snapshot)
         kind = snapshot.get("kind")
@@ -1312,12 +1375,26 @@ def _math_expression_bindings(
             for curve_index, curve in enumerate(snapshot.get("curves") or []):
                 if not isinstance(curve, dict) or not isinstance(curve.get("expression"), str):
                     continue
+                path = (
+                    f"steps[{step_index}].snapshot.curves[{curve_index}].expression"
+                )
                 bindings.append(
-                    (
-                        curve["expression"],
-                        {"x"},
-                        fixed_params,
-                        f"steps[{step_index}].snapshot.curves[{curve_index}].expression",
+                    _MathExpressionBinding(
+                        source=curve["expression"],
+                        intrinsic_names={"x"},
+                        fixed_params=fixed_params,
+                        path=path,
+                        view_key=f"steps[{step_index}]:math_plot:{curve_index}",
+                        family_key=_curve_family_key(
+                            [curve["expression"]],
+                            {"x"},
+                        ),
+                        view_path=path,
+                        moving_target=_is_moving_curve(curve),
+                        sample_values=_range_samples(
+                            snapshot.get("x_min"),
+                            snapshot.get("x_max"),
+                        ),
                     )
                 )
         elif kind == "math_scene":
@@ -1326,15 +1403,37 @@ def _math_expression_bindings(
                     continue
                 parametric = bool(curve.get("expression_x"))
                 intrinsic_names = {"t"} if parametric else {"x"}
+                sample_values = (
+                    _range_samples(curve.get("t_min"), curve.get("t_max"))
+                    if parametric
+                    else _range_samples(snapshot.get("x_min"), snapshot.get("x_max"))
+                )
+                curve_sources = [
+                    source
+                    for field in ("expression_x", "expression_y")
+                    if isinstance((source := curve.get(field)), str)
+                    and source.strip()
+                ]
+                family_key = _curve_family_key(curve_sources, intrinsic_names)
                 for field in ("expression_x", "expression_y"):
                     source = curve.get(field)
                     if isinstance(source, str) and source.strip():
                         bindings.append(
-                            (
-                                source,
-                                intrinsic_names,
-                                fixed_params,
-                                f"steps[{step_index}].snapshot.curves[{curve_index}].{field}",
+                            _MathExpressionBinding(
+                                source=source,
+                                intrinsic_names=intrinsic_names,
+                                fixed_params=fixed_params,
+                                path=(
+                                    f"steps[{step_index}].snapshot.curves"
+                                    f"[{curve_index}].{field}"
+                                ),
+                                view_key=f"steps[{step_index}]:math_scene:{curve_index}",
+                                family_key=family_key,
+                                view_path=(
+                                    f"steps[{step_index}].snapshot.curves[{curve_index}]"
+                                ),
+                                moving_target=_is_moving_curve(curve),
+                                sample_values=sample_values,
                             )
                         )
             vector_field = snapshot.get("vector_field")
@@ -1343,14 +1442,86 @@ def _math_expression_bindings(
                     source = vector_field.get(field)
                     if isinstance(source, str) and source.strip():
                         bindings.append(
-                            (
-                                source,
-                                {"x", "y"},
-                                fixed_params,
-                                f"steps[{step_index}].snapshot.vector_field.{field}",
+                            _MathExpressionBinding(
+                                source=source,
+                                intrinsic_names={"x", "y"},
+                                fixed_params=fixed_params,
+                                path=f"steps[{step_index}].snapshot.vector_field.{field}",
+                                view_key=f"steps[{step_index}]:vector_field",
+                                family_key="vector_field",
+                                view_path=f"steps[{step_index}].snapshot.vector_field",
+                                moving_target=False,
+                                sample_values=_range_samples(
+                                    snapshot.get("x_min"),
+                                    snapshot.get("x_max"),
+                                ),
                             )
                         )
     return bindings
+
+
+def _is_moving_curve(curve: dict[str, Any]) -> bool:
+    hint = " ".join(
+        str(curve.get(field) or "").casefold()
+        for field in ("label", "semantic_role")
+    )
+    return any(marker in hint for marker in _MOVING_LINE_MARKERS)
+
+
+def _curve_family_key(
+    sources: list[str],
+    intrinsic_names: set[str],
+) -> str:
+    """Match curve formulas after abstracting numeric and free-parameter values."""
+    return "|".join(
+        _expression_shape(source, intrinsic_names)
+        for source in sources
+    )
+
+
+def _expression_shape(source: str, intrinsic_names: set[str]) -> str:
+    normalized = re.sub(
+        r"(?<![A-Za-z0-9_])(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?",
+        "#",
+        source.casefold(),
+    )
+
+    def replace_identifier(match: re.Match[str]) -> str:
+        name = match.group(0)
+        remainder = normalized[match.end():]
+        if name in intrinsic_names or re.match(r"\s*\(", remainder):
+            return name
+        return "#"
+
+    normalized = re.sub(
+        r"[A-Za-z_][A-Za-z0-9_]*",
+        replace_identifier,
+        normalized,
+    )
+    normalized = re.sub(r"\s+", "", normalized)
+    normalized = re.sub(r"(^|[(*+/^,])[-+]#", r"\1#", normalized)
+    normalized = re.sub(
+        r"(?:[#a-z_][#a-z0-9_]*(?:\^#)?)(?:\*(?:[#a-z_][#a-z0-9_]*(?:\^#)?))+",
+        lambda match: "*".join(sorted(match.group(0).split("*"))),
+        normalized,
+    )
+    if re.fullmatch(r"[#a-z0-9_*^]+(?:\+[#a-z0-9_*^]+)+", normalized):
+        normalized = "+".join(sorted(normalized.split("+")))
+    return normalized
+
+
+def _range_samples(start: Any, end: Any) -> tuple[float, ...]:
+    if (
+        isinstance(start, (int, float))
+        and not isinstance(start, bool)
+        and math.isfinite(float(start))
+        and isinstance(end, (int, float))
+        and not isinstance(end, bool)
+        and math.isfinite(float(end))
+    ):
+        lower, upper = sorted((float(start), float(end)))
+        return (lower, (lower + upper) / 2, upper)
+    return (-1.0, 0.0, 1.0)
 
 
 def _expression_has_finite_default(
@@ -1358,8 +1529,9 @@ def _expression_has_finite_default(
     controls: dict[str, float],
     fixed_params: dict[str, float],
     intrinsic_names: set[str],
+    sample_values: tuple[float, ...],
 ) -> bool:
-    for sample in (-1.0, 0.0, 1.0):
+    for sample in sample_values:
         scope = {
             **fixed_params,
             **controls,

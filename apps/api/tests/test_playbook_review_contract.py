@@ -152,6 +152,30 @@ def test_invalid_playbook_reviewer_schema_becomes_reviewer_invalid_output() -> N
     assert verdict.issues[0].code == "reviewer.invalid_output"
 
 
+def test_math_parameter_reviewer_findings_are_normalized_at_parse_boundary() -> None:
+    verdict = parse_playbook_reviewer_output(
+        json.dumps(
+            {
+                "status": "warnings",
+                "summary": "The moving parameter is hardcoded.",
+                "issues": [
+                    {
+                        "code": "math.parameter_hardcoded",
+                        "severity": "warning",
+                        "path": "steps[1].snapshot.curves[0].expression",
+                        "message": "The moving line uses a numeric slope.",
+                        "requires_repair": False,
+                    }
+                ],
+            }
+        )
+    )
+
+    assert verdict.status == PlaybookReviewStatus.BLOCKED
+    assert verdict.issues[0].severity.value == "error"
+    assert verdict.issues[0].requires_repair is True
+
+
 def test_math_reviewer_checks_surviving_free_parameters_against_curves() -> None:
     playbook = PlaybookScript.model_validate(
         {
