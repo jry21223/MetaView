@@ -287,6 +287,20 @@ function barsSnapshot(args: {
   sorted?: readonly number[];
   pointers?: Record<string, number>;
 }): MetaStep["snapshot"] {
+  const pointers = sanitizePointers(args.pointers ?? {});
+  const lo = pointers.lo;
+  const hi = pointers.hi;
+  const ranges =
+    lo != null && hi != null && lo <= hi
+      ? [{
+          id: "active-partition",
+          start: lo,
+          end: hi,
+          role: "partition" as const,
+          label: `partition [${lo}, ${hi}]`,
+          emphasis: "primary" as const,
+        }]
+      : [];
   return {
     kind: "algorithm_bars",
     array_values: args.array.map(String),
@@ -294,7 +308,8 @@ function barsSnapshot(args: {
     active_indices: [...(args.active ?? [])],
     swap_indices: [...(args.swap ?? [])],
     sorted_indices: [...(args.sorted ?? [])],
-    pointers: sanitizePointers(args.pointers ?? {}),
+    pointers,
+    ranges,
   };
 }
 

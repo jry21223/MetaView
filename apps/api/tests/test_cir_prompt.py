@@ -187,3 +187,11 @@ def test_physics_prompt_limits_array_to_quantity_tables() -> None:
     assert "compact quantity table" in system
     assert 'visual_kind="array" only' in system
     assert 'Use visual_kind="array" to show forces' not in system
+
+
+def test_algorithm_prompt_selects_cells_or_bars_by_primary_relation() -> None:
+    system, _ = build_cir_prompt("讲解滑动窗口最大值", TopicDomain.ALGORITHM)
+    assert '"primary_relation": "position | range | membership | magnitude | order | swap | state_transition"' in system
+    assert "Never choose bars merely because every token is numeric." in system
+    assert "position / range / membership / state_transition → algorithm_array" in system
+    assert "magnitude / order / swap → algorithm_bars" in system

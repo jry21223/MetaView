@@ -11,7 +11,7 @@ import {
 } from "./slidingWindowCase";
 
 describe("slidingWindowCase", () => {
-  it("builds a default script with unique steps, frames, and algorithm_bars snapshots", () => {
+  it("builds a default script around indexed cells, a window range, and auxiliary lanes", () => {
     const script = buildSlidingWindowScript(SLIDING_WINDOW_PREVIEW_CASE.defaultParams);
 
     expect(script.schema_version).toBe("2.0.0");
@@ -24,9 +24,20 @@ describe("slidingWindowCase", () => {
     expect(new Set(snapshotKeys).size).toBeGreaterThanOrEqual(5);
 
     for (const step of script.steps) {
-      expect(step.snapshot.kind).toBe("algorithm_bars");
-      if (step.snapshot.kind !== "algorithm_bars") continue;
-      expect(step.snapshot.numeric_values).toEqual([...SLIDING_WINDOW_VALUES]);
+      expect(step.snapshot.kind).toBe("algorithm_array");
+      if (step.snapshot.kind !== "algorithm_array") continue;
+      expect(step.snapshot.array_values).toEqual(SLIDING_WINDOW_VALUES.map(String));
+      expect(step.snapshot.sorted_indices).toEqual([]);
+      expect(step.snapshot.ranges).toEqual([
+        expect.objectContaining({
+          id: "active-window",
+          role: "window",
+        }),
+      ]);
+      expect(step.snapshot.auxiliary_lanes?.map((lane) => lane.role)).toEqual([
+        "deque",
+        "result",
+      ]);
       expect(step.end_frame % 90).toBe(0);
 
       if (step.code_highlight) {

@@ -131,6 +131,13 @@ describe("agent prompt contracts", () => {
     expect(SYSTEM_PROMPT).toContain("Do not use algorithm_array");
   });
 
+  it("chooses array cells or bars from teaching semantics rather than numeric labels", () => {
+    expect(SYSTEM_PROMPT).toContain("Never choose bars merely because the values are numeric");
+    expect(SYSTEM_PROMPT).toContain("position/range/membership");
+    expect(SYSTEM_PROMPT).toContain("magnitude/order/swap");
+    expect(SYSTEM_PROMPT).toContain("add_algorithm_range");
+  });
+
   it("requires surviving math parameters to stay bound to visible curves", () => {
     expect(SYSTEM_PROMPT).toContain("remain free after");
     expect(SYSTEM_PROMPT).toContain("add_parameter_control");

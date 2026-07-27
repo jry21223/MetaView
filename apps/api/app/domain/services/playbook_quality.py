@@ -800,6 +800,15 @@ def _check_algorithm_indices(
         *snapshot.swap_indices,
         *snapshot.sorted_indices,
         *snapshot.pointers.values(),
+        *snapshot.element_states.keys(),
+        *(range_.start for range_ in snapshot.ranges),
+        *(range_.end for range_ in snapshot.ranges),
+        *(
+            item.index
+            for lane in snapshot.auxiliary_lanes
+            for item in lane.items
+            if item.index is not None
+        ),
     ]
     if any(index < 0 or index >= count for index in indices):
         issues.append(
@@ -808,7 +817,7 @@ def _check_algorithm_indices(
                 PlaybookIssueSeverity.ERROR,
                 path,
                 "Algorithm snapshot references an array index outside array_values.",
-                "Keep active, swap, sorted, and pointer indices within the array length.",
+                "Keep element, range, auxiliary-lane, and pointer indices within the array length.",
             )
         )
 
@@ -1639,8 +1648,24 @@ def _snapshot_has_algorithm_state(snapshot: Any) -> bool:
     data = _snapshot_json(snapshot)
     kind = data.get("kind")
     state_fields = {
-        "algorithm_array": ("active_indices", "swap_indices", "sorted_indices", "pointers"),
-        "algorithm_bars": ("active_indices", "swap_indices", "sorted_indices", "pointers"),
+        "algorithm_array": (
+            "active_indices",
+            "swap_indices",
+            "sorted_indices",
+            "pointers",
+            "ranges",
+            "element_states",
+            "auxiliary_lanes",
+        ),
+        "algorithm_bars": (
+            "active_indices",
+            "swap_indices",
+            "sorted_indices",
+            "pointers",
+            "ranges",
+            "element_states",
+            "auxiliary_lanes",
+        ),
         "algorithm_tree": ("active_node_ids", "visited_node_ids", "path_edge_ids"),
         "graph_scene": (
             "current_node_id",

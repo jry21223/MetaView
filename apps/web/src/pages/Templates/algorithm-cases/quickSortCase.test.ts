@@ -118,6 +118,18 @@ describe("quickSortCase playbook", () => {
       expect(firstPlace.snapshot.sorted_indices).toContain(6);
       expect(firstPlace.snapshot.pointers.pivot).toBe(6);
     }
+
+    const firstPartition = script.steps.find((step) => step.step_id === "quick-pivot-1");
+    if (firstPartition?.snapshot.kind === "algorithm_bars") {
+      expect(firstPartition.snapshot.ranges).toEqual([{
+        id: "active-partition",
+        start: 0,
+        end: 7,
+        role: "partition",
+        label: "partition [0, 7]",
+        emphasis: "primary",
+      }]);
+    }
   });
 
   it("keeps every teaching step visually focused", () => {

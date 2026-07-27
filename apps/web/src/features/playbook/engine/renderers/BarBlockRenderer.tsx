@@ -11,6 +11,10 @@ import {
 } from "./animationTemplates";
 import { buildPrevIndexMap } from "./prevIndexMap";
 import { THEME_PALETTE } from "../../../../shared/config/themePalette";
+import {
+  AlgorithmAuxiliaryLanes,
+  AlgorithmRangeOverlay,
+} from "./AlgorithmSequenceOverlays";
 
 /**
  * Theme-reactive palette built on the app's CSS variables (see
@@ -97,11 +101,13 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
 
   const n = snap.numeric_values.length;
 
-  const titleOpacity = interpolate(elapsed, [0, 8], [0, 1], {
-    easing: ENTER_BEZIER,
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
+  const titleOpacity = prevStep
+    ? 1
+    : interpolate(elapsed, [0, 8], [0, 1], {
+        easing: ENTER_BEZIER,
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+      });
   if (!n) {
     return (
       <div
@@ -121,7 +127,11 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
     );
   }
 
-  const heightRef = Math.max(...snap.numeric_values.map((v) => Math.abs(v)), 1);
+  const domainMin = Math.min(0, ...snap.numeric_values);
+  const domainMax = Math.max(0, ...snap.numeric_values);
+  const domainSpan = Math.max(domainMax - domainMin, 1);
+  const pixelsPerUnit = MAX_BAR_HEIGHT / domainSpan;
+  const zeroAxisY = domainMax * pixelsPerUnit;
   const barW = Math.max(10, Math.min(72, Math.floor(960 / n) - 8));
   const barGap = Math.max(4, Math.min(14, Math.floor(barW * 0.18)));
   const pitch = barW + barGap;
@@ -171,32 +181,44 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
         {step.title}
       </h2>
 
-      {/* Bar field — flat 2D bars on a single baseline */}
+      {/* Bar field — signed values share a real zero axis. */}
       <div
+        data-zero-axis={zeroAxisY}
         style={{
           display: "flex",
-          alignItems: "flex-end",
           gap: barGap,
           position: "relative",
           height: MAX_BAR_HEIGHT + 8,
           paddingTop: 24,
-          borderBottom: `1px solid ${c.floor(theme)}`,
         }}
       >
+        <div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: 24 + zeroAxisY,
+            borderTop: `1px solid ${c.floor(theme)}`,
+            zIndex: 0,
+          }}
+        />
         {snap.numeric_values.map((val, i) => {
           const label = snap.array_values[i] ?? String(val);
-          // value-driven fill strength: shorter bars lean toward the base
-          // line color, taller bars saturate toward the accent. Keeps the
-          // whole field in one hue family (theme accent) instead of a
-          // rainbow heatmap.
-          const t = Math.abs(val) / heightRef; // 0..1
+          const rawBarHeight = Math.abs(val) * pixelsPerUnit;
+          const t = rawBarHeight / MAX_BAR_HEIGHT;
           const fillRatio = 0.35 + 0.65 * t; // 0.35..1
-          const barH = Math.max(MIN_BAR_HEIGHT, t * MAX_BAR_HEIGHT);
+          const barH = Math.max(MIN_BAR_HEIGHT, rawBarHeight);
 
           const prevIdx = prevIndexMap[i];
           const isActive = activeSet.has(i);
           const isSwap = swapSet.has(i);
           const isSorted = sortedSet.has(i);
+          const elementStates = snap.element_states?.[i] ?? [];
+          const isEntering = elementStates.includes("entering");
+          const isLeaving = elementStates.includes("leaving");
+          const isMaximum = elementStates.includes("maximum");
+          const isPivot = elementStates.includes("pivot");
 
           // ── Motion accumulators ──
           let tx = 0;
@@ -274,6 +296,20 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
             face = c.barBase(theme);
             opacity = Math.max(0.5, fillRatio);
           }
+          if (isMaximum) {
+            face = c.accent(theme);
+            opacity = 1;
+            outline = c.accent(theme);
+            labelColor = c.text(theme);
+          } else if (isPivot) {
+            face = c.warn(theme);
+            opacity = 1;
+            outline = c.warn(theme);
+            labelColor = c.text(theme);
+          }
+          if (isEntering) {
+            outline = c.accent(theme);
+          }
 
           // ── Staggered entry ──
           const entryStart = Math.max(0, i * 1.4);
@@ -289,8 +325,23 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
             extrapolateRight: "clamp",
           });
           const renderedH =
-            prevIdx === -1 || prevIdx === i ? Math.max(MIN_BAR_HEIGHT, barH * entryGrow) : barH;
-          const finalOpacity = entryOpacity * writeOpacity;
+            prevIdx === -1 ? Math.max(MIN_BAR_HEIGHT, barH * entryGrow) : barH;
+          const barTop = val >= 0 ? zeroAxisY - renderedH : zeroAxisY;
+          const negativeLabelInside = val < 0 && renderedH >= labelFont + 10;
+          const valueLabelPosition =
+            val < 0
+              ? negativeLabelInside
+                ? "inside-negative"
+                : "above-short-negative"
+              : "outside";
+          const valueLabelTop =
+            val >= 0
+              ? barTop - 22
+              : negativeLabelInside
+                ? barTop + renderedH - labelFont - 5
+                : barTop - 22;
+          const finalOpacity =
+            (prevIdx >= 0 ? 1 : entryOpacity) * writeOpacity * (isLeaving ? 0.42 : 1);
 
           const glow =
             shadowOpacity > 0
@@ -300,24 +351,27 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
           return (
             <div
               key={i}
+              data-bar-index={i}
+              data-bar-direction={val < 0 ? "negative" : "positive"}
+              data-element-states={elementStates.join(" ") || undefined}
               style={{
                 position: "relative",
                 width: barW,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "flex-end",
+                height: MAX_BAR_HEIGHT,
                 transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
-                transformOrigin: "bottom center",
+                transformOrigin: `center ${zeroAxisY}px`,
                 opacity: finalOpacity,
                 zIndex,
               }}
             >
               {/* value label above the bar */}
               <span
+                data-value-label-position={valueLabelPosition}
                 style={{
                   position: "absolute",
-                  top: -22,
+                  top: valueLabelTop,
+                  left: "50%",
+                  transform: "translateX(-50%)",
                   fontSize: labelFont,
                   fontWeight: 600,
                   color: labelColor,
@@ -345,15 +399,33 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
                 style={{
                   width: barW,
                   height: renderedH,
+                  position: "absolute",
+                  top: barTop,
+                  left: 0,
                   background: face,
                   opacity,
                   border: `1px solid ${outline}`,
-                  borderBottom: "none",
-                  borderTopLeftRadius: 3,
-                  borderTopRightRadius: 3,
+                  borderRadius: 3,
                   boxShadow: `0 1px 2px ${c.barShadow(theme)}${glow}`,
                 }}
               />
+              {(isMaximum || isPivot) && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: barTop + 4,
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    color: c.text(theme),
+                    fontFamily: '"IBM Plex Mono", ui-monospace, monospace',
+                    fontSize: 8,
+                    fontWeight: 700,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {isMaximum ? "MAX" : "PIVOT"}
+                </span>
+              )}
               {/* index label below the baseline */}
               <span
                 style={{
@@ -369,6 +441,15 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
             </div>
           );
         })}
+        <AlgorithmRangeOverlay
+          ranges={snap.ranges ?? []}
+          previousRanges={prevSnap?.ranges}
+          itemWidth={barW}
+          gap={barGap}
+          itemHeight={MAX_BAR_HEIGHT}
+          elapsed={elapsed}
+          theme={theme}
+        />
       </div>
 
       {Object.entries(snap.pointers).length > 0 && (
@@ -381,11 +462,13 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
           }}
         >
           {pointerGroups.map(([idx, names]) => {
-            const pointerOpacity = interpolate(elapsed, [0, 12], [0, 1], {
-              easing: ENTER_BEZIER,
-              extrapolateLeft: "clamp",
-              extrapolateRight: "clamp",
-            });
+            const pointerOpacity = prevSnap
+              ? 1
+              : interpolate(elapsed, [0, 12], [0, 1], {
+                  easing: ENTER_BEZIER,
+                  extrapolateLeft: "clamp",
+                  extrapolateRight: "clamp",
+                });
             return (
               <div
                 key={idx}
@@ -415,6 +498,12 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
           })}
         </div>
       )}
+
+      <AlgorithmAuxiliaryLanes
+        lanes={snap.auxiliary_lanes ?? []}
+        width={n * barW + (n - 1) * barGap}
+        theme={theme}
+      />
 
     </div>
   );

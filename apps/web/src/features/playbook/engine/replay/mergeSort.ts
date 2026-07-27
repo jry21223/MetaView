@@ -1,5 +1,10 @@
 import type { ReplayedStep } from "./types";
-import { addSortedIndex, compareValues, range, snapshot } from "./algorithms/_helpers";
+import {
+  addSortedIndex,
+  compareValues,
+  range,
+  sortingSnapshot as snapshot,
+} from "./algorithms/_helpers";
 
 export function mergeSort(input: string[]): ReplayedStep[] {
   const arr = [...input];

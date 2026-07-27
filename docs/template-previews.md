@@ -31,7 +31,7 @@ Status: Active
 
 | 模板 ID | 内容 | 参数 |
 |---|---|---|
-| `sliding-window` | 固定窗口右移、窗口最大值、代码同步、`O(n)` | 窗口大小 `k` |
+| `sliding-window` | 等宽数组格上的固定窗口右移、进入/离开元素、单调队列、结果轨道、代码同步、`O(n)` | 窗口大小 `k` |
 | `merge-sort` | 分治拆分、区间合并、有序写回、`O(n log n)` | 排序方向（v1 升序） |
 | `quick-sort` | Lomuto 分区、pivot 归位、递归区间、`O(n log n)` 平均 | pivot 策略（v1 last） |
 | `binary-search` | low/mid/high 收缩、命中或未命中、代码同步、`O(log n)` | 目标值 |

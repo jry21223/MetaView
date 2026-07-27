@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Annotated, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.domain.models.execution import ExecutionParameterControl
 from app.domain.models.topic import TopicDomain
@@ -40,6 +40,43 @@ class SnapshotKind(str, Enum):
     NARRATION_CARD = "narration_card"
 
 
+class AlgorithmRange(BaseModel):
+    id: str
+    start: int = Field(ge=0)
+    end: int = Field(ge=0)
+    role: Literal[
+        "window",
+        "search_range",
+        "partition",
+        "merge_range",
+        "current_subarray",
+        "best_subarray",
+    ]
+    label: str | None = None
+    emphasis: Literal["primary", "secondary", "accent", "muted"] | None = None
+
+    @model_validator(mode="after")
+    def validate_bounds(self) -> AlgorithmRange:
+        if self.end < self.start:
+            raise ValueError("end must be greater than or equal to start")
+        return self
+
+
+class AlgorithmAuxiliaryItem(BaseModel):
+    id: str
+    label: str
+    value: str | None = None
+    index: int | None = Field(default=None, ge=0)
+    emphasis: Literal["primary", "secondary", "accent", "muted"] | None = None
+
+
+class AlgorithmAuxiliaryLane(BaseModel):
+    id: str
+    role: Literal["deque", "result", "auxiliary_array"]
+    label: str
+    items: list[AlgorithmAuxiliaryItem] = Field(default_factory=list)
+
+
 class AlgorithmArraySnapshot(BaseModel):
     kind: Literal["algorithm_array"] = "algorithm_array"
     array_values: list[str] = Field(default_factory=list)
@@ -47,6 +84,12 @@ class AlgorithmArraySnapshot(BaseModel):
     swap_indices: list[int] = Field(default_factory=list)
     sorted_indices: list[int] = Field(default_factory=list)
     pointers: dict[str, int] = Field(default_factory=dict)
+    ranges: list[AlgorithmRange] = Field(default_factory=list)
+    element_states: dict[
+        int,
+        list[Literal["entering", "leaving", "maximum", "pivot"]],
+    ] = Field(default_factory=dict)
+    auxiliary_lanes: list[AlgorithmAuxiliaryLane] = Field(default_factory=list)
 
 
 class AlgorithmBarsSnapshot(BaseModel):
@@ -63,6 +106,12 @@ class AlgorithmBarsSnapshot(BaseModel):
     swap_indices: list[int] = Field(default_factory=list)
     sorted_indices: list[int] = Field(default_factory=list)
     pointers: dict[str, int] = Field(default_factory=dict)
+    ranges: list[AlgorithmRange] = Field(default_factory=list)
+    element_states: dict[
+        int,
+        list[Literal["entering", "leaving", "maximum", "pivot"]],
+    ] = Field(default_factory=dict)
+    auxiliary_lanes: list[AlgorithmAuxiliaryLane] = Field(default_factory=list)
 
 
 class AlgorithmTreeSnapshot(BaseModel):

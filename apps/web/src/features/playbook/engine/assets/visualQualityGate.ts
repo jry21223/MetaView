@@ -848,13 +848,16 @@ function checkAlgorithmLinearScene(
     snapshot.active_indices.length > 0 ||
       snapshot.swap_indices.length > 0 ||
       snapshot.sorted_indices.length > 0 ||
-      Object.keys(snapshot.pointers).length > 0,
+      Object.keys(snapshot.pointers).length > 0 ||
+      (snapshot.ranges?.length ?? 0) > 0 ||
+      Object.keys(snapshot.element_states ?? {}).length > 0 ||
+      (snapshot.auxiliary_lanes?.some((lane) => lane.items.length > 0) ?? false),
   );
   if (hasDataStructure && !hasStateChange) {
     warn(warnings, context, {
       code: "low_algorithm_state_visuals",
       domain: context.domain,
-      message: `algorithm ${snapshot.kind} should show an active index, pointer, swap, or sorted state.`,
+      message: `algorithm ${snapshot.kind} should show an active index, semantic range, pointer, auxiliary lane, swap, or sorted state.`,
     });
   }
 }

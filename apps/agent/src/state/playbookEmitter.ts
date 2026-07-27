@@ -6,6 +6,8 @@
  */
 
 import type {
+  AlgorithmAuxiliaryLaneBuilder,
+  AlgorithmRangeBuilder,
   ArrayTokenBuilder,
   CurveBuilder,
   Emphasis,
@@ -14,6 +16,7 @@ import type {
   PlaybookOutput,
   PlaybookSkeleton,
   PointBuilder,
+  PrimaryRelation,
   RegionBuilder,
   SegmentBuilder,
   StepBuilder,
@@ -79,6 +82,9 @@ export class PlaybookEmitter {
       regions: [],
       formula_latex: null,
       tokens: [],
+      primary_relation: "position",
+      algorithm_ranges: [],
+      algorithm_auxiliary_lanes: [],
     };
   }
 
@@ -208,14 +214,32 @@ export class PlaybookEmitter {
     step.formula_latex = latex;
   }
 
-  addArrayTokens(values: string[], emphasisMap?: Record<number, Emphasis>): void {
+  addArrayTokens(
+    values: string[],
+    emphasisMap?: Record<number, Emphasis>,
+    primaryRelation: PrimaryRelation = "position",
+  ): void {
     const step = this.requireStep("add_array_tokens");
+    step.primary_relation = primaryRelation;
     step.tokens = values.map<ArrayTokenBuilder>((v, i) => ({
       id: `t${i}`,
       label: String(v),
       value: String(v),
       emphasis: emphasisMap?.[i] ?? "secondary",
     }));
+  }
+
+  addAlgorithmRange(range: AlgorithmRangeBuilder): void {
+    const step = this.requireStep("add_algorithm_range");
+    if (range.end < range.start) {
+      throw new Error("algorithm range end must be greater than or equal to start");
+    }
+    step.algorithm_ranges.push(range);
+  }
+
+  addAlgorithmAuxiliaryLane(lane: AlgorithmAuxiliaryLaneBuilder): void {
+    const step = this.requireStep("add_algorithm_auxiliary_lane");
+    step.algorithm_auxiliary_lanes.push(lane);
   }
 
   addParameterControl(control: ParameterControl): void {
@@ -390,7 +414,8 @@ function serializeSnapshot(step: StepBuilder): Record<string, unknown> {
   if (kind === "array") {
     const labels = step.tokens.map((t) => t.label);
     const numericValues = labels.map((label) => Number(label));
-    const allNumeric =
+    const useBars = ["magnitude", "order", "swap"].includes(step.primary_relation);
+    const hasValidNumericScale =
       labels.every((label) => label.trim() !== "") &&
       numericValues.every((value) => Number.isFinite(value));
     const activeIndices = step.tokens
@@ -405,8 +430,11 @@ function serializeSnapshot(step: StepBuilder): Record<string, unknown> {
       swap_indices: [] as number[],
       sorted_indices: sortedIndices,
       pointers: {} as Record<string, number>,
+      ranges: step.algorithm_ranges,
+      element_states: {} as Record<number, string[]>,
+      auxiliary_lanes: step.algorithm_auxiliary_lanes,
     };
-    if (allNumeric) {
+    if (useBars && hasValidNumericScale) {
       return {
         kind: "algorithm_bars",
         ...base,

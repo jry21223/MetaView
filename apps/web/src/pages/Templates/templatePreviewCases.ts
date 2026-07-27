@@ -156,6 +156,16 @@ function binarySnapshot(
     pointers.high = high;
   }
   if (mid != null) pointers.mid = mid;
+  const ranges = low <= high
+    ? [{
+        id: "search-range",
+        start: low,
+        end: high,
+        role: "search_range" as const,
+        label: `search [${low}, ${high}]`,
+        emphasis: "primary" as const,
+      }]
+    : [];
   return {
     kind: "algorithm_bars",
     array_values: BINARY_VALUES.map(String),
@@ -164,6 +174,7 @@ function binarySnapshot(
     swap_indices: [],
     sorted_indices: discarded,
     pointers,
+    ranges,
   };
 }
 

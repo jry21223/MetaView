@@ -62,6 +62,18 @@ describe("AlgorithmRenderer", () => {
     }
   });
 
+  it("keeps unchanged cells visible at the exact start of a later step", () => {
+    const snap = defaultSnap();
+    const previous = arrayStep(snap, { step_id: "previous", end_frame: 60 });
+    const markup = render(snap, {
+      prevStep: previous,
+      frame: 60,
+      stepStartFrame: 60,
+    });
+
+    expect(markup).toMatch(/data-array-index="2"[^>]*opacity:1/);
+  });
+
   it("renders the step title without duplicating shared subtitles", () => {
     const markup = render(defaultSnap());
     expect(markup).toContain("比较 arr[0] 和 arr[1]");
@@ -73,6 +85,51 @@ describe("AlgorithmRenderer", () => {
     expect(markup).toContain(">i<");
     expect(markup).toContain(">j<");
     expect(markup).toContain(">pivot<");
+  });
+
+  it("renders continuous ranges, element transitions, and auxiliary lanes", () => {
+    const markup = render(defaultSnap({
+      active_indices: [2],
+      ranges: [{
+        id: "active-window",
+        start: 1,
+        end: 3,
+        role: "window",
+        label: "window k=3",
+        emphasis: "primary",
+      }],
+      element_states: {
+        0: ["leaving"],
+        2: ["pivot"],
+        3: ["entering", "maximum"],
+      },
+      auxiliary_lanes: [
+        {
+          id: "deque",
+          role: "deque",
+          label: "MONOTONIC DEQUE · indices",
+          items: [{ id: "d3", label: "i=3", value: "nums[i]=1", index: 3 }],
+        },
+        {
+          id: "result",
+          role: "result",
+          label: "RESULT",
+          items: [{ id: "r0", label: "8" }],
+        },
+      ],
+    }));
+
+    expect(markup).toContain('data-range-role="window"');
+    expect(markup).toContain('data-range-start="1"');
+    expect(markup).toContain('data-range-end="3"');
+    expect(markup).toContain("window k=3");
+    expect(markup).toContain('data-element-states="leaving"');
+    expect(markup).toContain('data-element-states="pivot"');
+    expect(markup).toContain(">PIVOT<");
+    expect(markup).toContain('data-element-states="entering maximum"');
+    expect(markup).toContain("MONOTONIC DEQUE · indices");
+    expect(markup).toContain("nums[i]=1");
+    expect(markup).toContain("RESULT");
   });
 
   it("falls back to the narration string when the array is empty", () => {

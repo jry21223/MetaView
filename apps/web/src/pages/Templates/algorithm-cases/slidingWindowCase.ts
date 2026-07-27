@@ -99,49 +99,82 @@ export function slidingWindowTrace(
   return frames;
 }
 
-function rangeIndices(from: number, to: number): number[] {
-  const out: number[] = [];
-  for (let i = from; i <= to; i += 1) out.push(i);
-  return out;
-}
-
 function slidingSnapshot(args: {
   left: number | null;
   right: number | null;
   maxIndex: number | null;
-  completedLeftBound?: number;
+  deque?: readonly number[];
+  maxima?: readonly number[];
+  enteringIndex?: number;
+  leavingIndex?: number;
 }): MetaStep["snapshot"] {
   const values = [...SLIDING_WINDOW_VALUES];
   const { left, right, maxIndex } = args;
-  const completedLeftBound = args.completedLeftBound ?? -1;
-
-  const active =
-    left != null && right != null && left <= right
-      ? rangeIndices(left, right)
-      : [];
-
-  // Indices fully left of the active window behave as "already passed".
-  const sorted = values
-    .map((_, index) => index)
-    .filter((index) => {
-      if (left != null && index < left) return true;
-      if (left == null && completedLeftBound >= 0 && index <= completedLeftBound) return true;
-      return false;
-    });
 
   const pointers: Record<string, number> = {};
   if (left != null) pointers.left = left;
   if (right != null) pointers.right = right;
   if (maxIndex != null) pointers.max = maxIndex;
 
+  const elementStates: Record<number, Array<"entering" | "leaving" | "maximum">> = {};
+  const addElementState = (
+    index: number | undefined | null,
+    state: "entering" | "leaving" | "maximum",
+  ) => {
+    if (index == null || index < 0 || index >= values.length) return;
+    elementStates[index] = [...(elementStates[index] ?? []), state];
+  };
+  addElementState(args.enteringIndex, "entering");
+  addElementState(args.leavingIndex, "leaving");
+  addElementState(maxIndex, "maximum");
+
+  const ranges =
+    left != null && right != null && left <= right
+      ? [{
+          id: "active-window",
+          start: left,
+          end: right,
+          role: "window" as const,
+          label: `window k=${right - left + 1}`,
+          emphasis: "primary" as const,
+        }]
+      : [];
+  const deque = args.deque ?? [];
+  const maxima = args.maxima ?? [];
+
   return {
-    kind: "algorithm_bars",
+    kind: "algorithm_array",
     array_values: values.map(String),
-    numeric_values: values,
-    active_indices: active,
+    active_indices: maxIndex == null ? [] : [maxIndex],
     swap_indices: [],
-    sorted_indices: sorted,
+    sorted_indices: [],
     pointers,
+    ranges,
+    element_states: elementStates,
+    auxiliary_lanes: [
+      {
+        id: "monotonic-deque",
+        role: "deque",
+        label: "MONOTONIC DEQUE · indices",
+        items: deque.map((index, position) => ({
+          id: `deque-${position}-${index}`,
+          label: `i=${index}`,
+          value: `nums[i]=${values[index]}`,
+          index,
+          emphasis: position === 0 ? "primary" : "secondary",
+        })),
+      },
+      {
+        id: "window-maxima",
+        role: "result",
+        label: "RESULT",
+        items: maxima.map((value, index) => ({
+          id: `result-${index}`,
+          label: String(value),
+          emphasis: index === maxima.length - 1 ? "accent" : "muted",
+        })),
+      },
+    ],
   };
 }
 
@@ -177,6 +210,8 @@ export function buildSlidingWindowScript(params: TemplatePreviewParams): Playboo
         left: 0,
         right: windowSize - 1,
         maxIndex: null,
+        deque: [],
+        maxima: [],
       }),
       code_highlight: codeHighlight(
         0,
@@ -196,6 +231,8 @@ export function buildSlidingWindowScript(params: TemplatePreviewParams): Playboo
           left: first.left,
           right: first.right,
           maxIndex: first.maxIndex,
+          deque: first.deque,
+          maxima: first.maxima,
         }),
         code_highlight: codeHighlight(
           7,
@@ -224,6 +261,10 @@ export function buildSlidingWindowScript(params: TemplatePreviewParams): Playboo
           left: frame.left,
           right: frame.right,
           maxIndex: frame.maxIndex,
+          deque: frame.deque,
+          maxima: frame.maxima,
+          enteringIndex: frame.right,
+          leavingIndex: frames[index]?.left,
         }),
         code_highlight: codeHighlight(
           7,
@@ -251,7 +292,8 @@ export function buildSlidingWindowScript(params: TemplatePreviewParams): Playboo
         left: last?.left ?? null,
         right: last?.right ?? null,
         maxIndex: last?.maxIndex ?? null,
-        completedLeftBound: last?.left ?? -1,
+        deque: last?.deque ?? [],
+        maxima: resultMaxima,
       }),
       code_highlight: codeHighlight(
         9,

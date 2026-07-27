@@ -66,6 +66,58 @@ describe("BarBlockRenderer", () => {
     expect(hs).toContain(120);
   });
 
+  it("keeps unchanged bars visible at the exact start of a later step", () => {
+    const snap = makeBars([9, 3]);
+    const previous = barsStep(snap);
+    const markup = renderToStaticMarkup(BarBlockRenderer(props(barsStep(snap), {
+      prevStep: previous,
+      frame: 90,
+      stepStartFrame: 90,
+    })));
+
+    expect(markup).toMatch(/data-bar-index="0"[^>]*opacity:1/);
+    expect(markup).toContain("height:360px");
+  });
+
+  it("uses a signed zero axis for negative values and still supports range overlays", () => {
+    const snap = makeBars([-3, -1, 3], {
+      element_states: {
+        0: ["leaving"],
+        1: ["entering", "pivot"],
+        2: ["maximum"],
+      },
+      ranges: [{
+        id: "search",
+        start: 0,
+        end: 2,
+        role: "search_range",
+        label: "search range",
+      }],
+    });
+    const markup = renderToStaticMarkup(BarBlockRenderer(props(barsStep(snap))));
+
+    expect(markup.match(/data-bar-direction="negative"/g)).toHaveLength(2);
+    expect(markup.match(/data-bar-direction="positive"/g)).toHaveLength(1);
+    expect(markup).toContain('data-zero-axis="180"');
+    expect(markup).toContain("height:180px");
+    expect(markup).toContain("height:60px");
+    expect(markup).toContain('data-range-role="search_range"');
+    expect(markup).toContain('data-element-states="leaving"');
+    expect(markup).toContain('data-element-states="entering pivot"');
+    expect(markup).toContain('data-element-states="maximum"');
+    expect(markup).toContain(">PIVOT<");
+    expect(markup).toContain(">MAX<");
+    expect(markup).toContain('data-value-label-position="inside-negative"');
+  });
+
+  it("places a short negative value label above the zero axis instead of over its index", () => {
+    const markup = renderToStaticMarkup(
+      BarBlockRenderer(props(barsStep(makeBars([-1, 20])))),
+    );
+
+    expect(markup).toContain('data-value-label-position="above-short-negative"');
+  });
+
   it("highlights active and sorted indices via the theme accent variable", () => {
     const snap = makeBars([5, 2, 8], { active_indices: [0], sorted_indices: [2] });
     const markup = renderToStaticMarkup(BarBlockRenderer(props(barsStep(snap))));

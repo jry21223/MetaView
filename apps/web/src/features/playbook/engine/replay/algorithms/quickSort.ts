@@ -1,5 +1,10 @@
 import type { ReplayedStep } from "../types";
-import { addSortedIndex, compareValues, range, snapshot } from "./_helpers";
+import {
+  addSortedIndex,
+  compareValues,
+  range,
+  sortingSnapshot as snapshot,
+} from "./_helpers";
 
 export function quickSort(input: string[]): ReplayedStep[] {
   const arr = [...input];

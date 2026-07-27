@@ -52,6 +52,44 @@ export interface ArrayTokenBuilder {
 }
 
 export type VisualKind = "scene" | "array" | "function" | "formula" | "graph";
+export type PrimaryRelation =
+  | "position"
+  | "range"
+  | "membership"
+  | "magnitude"
+  | "order"
+  | "swap"
+  | "state_transition";
+
+export interface AlgorithmRangeBuilder {
+  id: string;
+  start: number;
+  end: number;
+  role:
+    | "window"
+    | "search_range"
+    | "partition"
+    | "merge_range"
+    | "current_subarray"
+    | "best_subarray";
+  label?: string;
+  emphasis?: "primary" | "secondary" | "accent" | "muted";
+}
+
+export interface AlgorithmAuxiliaryItemBuilder {
+  id: string;
+  label: string;
+  value?: string;
+  index?: number;
+  emphasis?: "primary" | "secondary" | "accent" | "muted";
+}
+
+export interface AlgorithmAuxiliaryLaneBuilder {
+  id: string;
+  role: "deque" | "result" | "auxiliary_array";
+  label: string;
+  items: AlgorithmAuxiliaryItemBuilder[];
+}
 
 export interface StepBuilder {
   index: number;
@@ -74,6 +112,9 @@ export interface StepBuilder {
   formula_latex: string | null;
   // array-style accumulator
   tokens: ArrayTokenBuilder[];
+  primary_relation: PrimaryRelation;
+  algorithm_ranges: AlgorithmRangeBuilder[];
+  algorithm_auxiliary_lanes: AlgorithmAuxiliaryLaneBuilder[];
 }
 
 export interface ParameterControl {

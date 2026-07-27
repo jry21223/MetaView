@@ -157,15 +157,26 @@ describe("PlaybookEmitter — finalize", () => {
     expect(snap.formula_latex).toContain("e^{i");
   });
 
-  it("uses algorithm_bars when token labels are all numeric", () => {
+  it("defaults numeric tokens to cells when no magnitude relation is declared", () => {
     const e = new PlaybookEmitter();
     e.beginStep(1, "array");
     e.addArrayTokens(["3", "1", "4", "1", "5"]);
     e.commitStep();
     const step = e.finalize().steps[0];
     const snap = step.snapshot as Record<string, unknown>;
-    expect(snap.kind).toBe("algorithm_bars");
+    expect(snap.kind).toBe("algorithm_array");
     expect(snap.array_values).toEqual(["3", "1", "4", "1", "5"]);
+    expect(snap).not.toHaveProperty("numeric_values");
+  });
+
+  it("uses algorithm_bars only when the teaching relation requires magnitude", () => {
+    const e = new PlaybookEmitter();
+    e.beginStep(1, "array");
+    e.addArrayTokens(["3", "1", "4", "1", "5"], undefined, "magnitude");
+    e.commitStep();
+    const step = e.finalize().steps[0];
+    const snap = step.snapshot as Record<string, unknown>;
+    expect(snap.kind).toBe("algorithm_bars");
     expect(snap.numeric_values).toEqual([3, 1, 4, 1, 5]);
     expect(snap.active_indices).toEqual([]);
     expect(snap.swap_indices).toEqual([]);
@@ -199,6 +210,44 @@ describe("PlaybookEmitter — finalize", () => {
     expect(snap.kind).toBe("algorithm_array");
     expect(snap.active_indices).toEqual([0]);
     expect(snap.sorted_indices).toEqual([2]);
+  });
+
+  it("serializes algorithm ranges and auxiliary lanes without renderer geometry", () => {
+    const e = new PlaybookEmitter();
+    e.beginStep(1, "sliding window");
+    e.addArrayTokens(["1", "3", "-1", "-3"], undefined, "range");
+    e.addAlgorithmRange({
+      id: "window",
+      start: 1,
+      end: 3,
+      role: "window",
+      label: "k=3",
+      emphasis: "primary",
+    });
+    e.addAlgorithmAuxiliaryLane({
+      id: "deque",
+      role: "deque",
+      label: "MONOTONIC DEQUE",
+      items: [{ id: "d1", label: "i=1", value: "nums[i]=3", index: 1 }],
+    });
+    e.commitStep();
+
+    const snap = e.finalize().steps[0].snapshot as Record<string, unknown>;
+    expect(snap.kind).toBe("algorithm_array");
+    expect(snap.ranges).toEqual([{
+      id: "window",
+      start: 1,
+      end: 3,
+      role: "window",
+      label: "k=3",
+      emphasis: "primary",
+    }]);
+    expect(snap.auxiliary_lanes).toEqual([{
+      id: "deque",
+      role: "deque",
+      label: "MONOTONIC DEQUE",
+      items: [{ id: "d1", label: "i=1", value: "nums[i]=3", index: 1 }],
+    }]);
   });
 
   it("propagates the planned domain", () => {

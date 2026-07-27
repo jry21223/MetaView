@@ -37,5 +37,11 @@ eval/shots/
 *.sqlite
 *.sqlite3
 
+# Local promo and market research work
+/apps/web/scripts/render-promo.mjs
+/apps/web/src/remotion/promo/
+/docs/promo/
+/research/
+
 # OS and editor files
 .DS_Store

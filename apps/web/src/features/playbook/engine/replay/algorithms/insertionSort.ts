@@ -1,5 +1,5 @@
 import type { ReplayedStep } from "../types";
-import { compareValues, range, snapshot } from "./_helpers";
+import { compareValues, range, sortingSnapshot as snapshot } from "./_helpers";
 
 export function insertionSort(input: string[]): ReplayedStep[] {
   const arr = [...input];

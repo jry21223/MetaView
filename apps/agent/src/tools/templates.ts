@@ -53,7 +53,7 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
         };
 
         emitter.beginStep(indices[0], `比较 a[${args.i}] 和 a[${args.j}]`);
-        emitter.addArrayTokens(before, highlight);
+        emitter.addArrayTokens(before, highlight, "order");
         emitter.setNarration([
           `先看 a[${args.i}] = ${before[args.i]} 和 a[${args.j}] = ${before[args.j]}。`,
           `如果它们的顺序不满足排序要求，下一步就要交换。`,
@@ -61,7 +61,7 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
         emitter.commitStep();
 
         emitter.beginStep(indices[1], `执行交换`);
-        emitter.addArrayTokens(before, highlight);
+        emitter.addArrayTokens(before, highlight, "swap");
         emitter.setNarration([
           `把 a[${args.i}] 和 a[${args.j}] 交换位置。`,
           `这是 sorted-by-bubble/insertion 类算法的核心动作。`,
@@ -71,7 +71,7 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
         emitter.beginStep(indices[2], `交换之后`);
         emitter.addArrayTokens(after, {
           [args.i]: "accent", [args.j]: "accent",
-        });
+        }, "order");
         emitter.setNarration([
           `交换完成后，数组在这两个位置上的值翻转了。`,
           `数组其它部分保持不变，便于和上一步直观对比。`,
@@ -106,7 +106,7 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
           [args.i]: "primary", [args.j]: "primary",
         };
         emitter.beginStep(indices[0], `比较 a[${args.i}] 与 a[${args.j}]`);
-        emitter.addArrayTokens(args.values, high);
+        emitter.addArrayTokens(args.values, high, "order");
         emitter.setNarration([
           `我们要确定 a[${args.i}] 和 a[${args.j}] 的相对大小。`,
           `这一步只读不写——下一步再决定要不要动数组。`,
@@ -119,7 +119,7 @@ export function makeTemplateTools(deps: TemplateToolDeps): AgentTool[] {
           `a[${args.i}] = a[${args.j}]，无需交换`;
 
         emitter.beginStep(indices[1], `比较结果`);
-        emitter.addArrayTokens(args.values, high);
+        emitter.addArrayTokens(args.values, high, "order");
         emitter.setNarration([
           `${verdictText}。`,
           `这告诉我们下一步对数组要不要做改动。`,

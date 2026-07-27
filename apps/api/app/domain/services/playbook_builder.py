@@ -363,9 +363,8 @@ def _build_layer_body(
             emphasis=spec.narration_card.emphasis or "primary",
         )
     if kind in (LayerKind.ARRAY_BOXES, LayerKind.BAR_BLOCKS):
-        # These layers always read the parent step's tokens + execution_map,
-        # so we just route through the legacy array builder. The renderer
-        # decides whether to draw bars or boxes based on the snapshot kind.
+        # Layer names are layout hints; the teaching relation remains the
+        # final authority for cells vs bars across legacy and layered CIR.
         return _build_array_snapshot(cir_step, checkpoint, execution_map)
     if kind == LayerKind.TREE_GRAPH:
         return _build_tree_snapshot(cir_step, checkpoint)
@@ -860,6 +859,8 @@ def _build_array_snapshot(
     cir_step: CirStep,
     checkpoint: ExecutionCheckpoint | None,
     execution_map: ExecutionMap | None,
+    *,
+    representation: str | None = None,
 ) -> AlgorithmArraySnapshot | AlgorithmBarsSnapshot:
     # Prefer array_track values when available
     array_values: list[str] = []
@@ -891,9 +892,15 @@ def _build_array_snapshot(
             if m and t.value and t.value.isdigit():
                 pointers[m.group(1)] = int(t.value)
 
-    # When every element is numeric, render as height-encoded bar blocks (issue #31).
+    if representation is None:
+        representation = (
+            "bars"
+            if cir_step.primary_relation in {"magnitude", "order", "swap"}
+            else "cells"
+        )
+
     parsed = [_try_parse_number(v) for v in array_values]
-    if array_values and all(n is not None for n in parsed):
+    if representation == "bars" and array_values and all(n is not None for n in parsed):
         return AlgorithmBarsSnapshot(
             array_values=array_values,
             numeric_values=[n for n in parsed if n is not None],
@@ -901,6 +908,9 @@ def _build_array_snapshot(
             swap_indices=swap_indices,
             sorted_indices=sorted_indices,
             pointers=pointers,
+            ranges=cir_step.ranges,
+            element_states=cir_step.element_states,
+            auxiliary_lanes=cir_step.auxiliary_lanes,
         )
 
     return AlgorithmArraySnapshot(
@@ -909,6 +919,9 @@ def _build_array_snapshot(
         swap_indices=swap_indices,
         sorted_indices=sorted_indices,
         pointers=pointers,
+        ranges=cir_step.ranges,
+        element_states=cir_step.element_states,
+        auxiliary_lanes=cir_step.auxiliary_lanes,
     )
 
 

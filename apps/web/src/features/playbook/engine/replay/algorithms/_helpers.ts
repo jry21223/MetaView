@@ -45,21 +45,18 @@ function parseNumeric(values: readonly string[]): number[] | null {
   return out;
 }
 
-/**
- * Build a per-step snapshot. When every element parses as a number the snapshot
- * is emitted as a height-encoded bar block (`algorithm_bars`); otherwise it
- * falls back to the flat-cell `algorithm_array` form.
- */
+/** Build a per-step snapshot from an explicit teaching representation. */
 export function snapshot(
   arr: readonly string[],
   active: number[],
   sorted: number[],
   swap: number[] = [],
   pointers: Record<string, number> = {},
+  representation: "cells" | "bars" = "cells",
 ): AlgorithmArraySnapshot | AlgorithmBarsSnapshot {
   const sortedIndices = [...sorted].sort((a, b) => a - b);
-  const numeric = parseNumeric(arr);
-  if (numeric) {
+  const numeric = representation === "bars" ? parseNumeric(arr) : null;
+  if (representation === "bars" && numeric) {
     return {
       kind: "algorithm_bars",
       array_values: [...arr],
@@ -78,4 +75,15 @@ export function snapshot(
     sorted_indices: sortedIndices,
     pointers,
   };
+}
+
+/** Sorting algorithms explicitly teach magnitude/order/swap relations. */
+export function sortingSnapshot(
+  arr: readonly string[],
+  active: number[],
+  sorted: number[],
+  swap: number[] = [],
+  pointers: Record<string, number> = {},
+): AlgorithmArraySnapshot | AlgorithmBarsSnapshot {
+  return snapshot(arr, active, sorted, swap, pointers, "bars");
 }

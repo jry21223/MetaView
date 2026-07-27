@@ -1,4 +1,6 @@
 """Tests for the deterministic CIR → PlaybookScript mapping."""
+import pytest
+
 from app.domain.models.cir import (
     CirDocument,
     CirStep,
@@ -10,6 +12,7 @@ from app.domain.models.cir import (
 from app.domain.models.playbook import (
     AlgorithmArraySnapshot,
     AlgorithmBarsSnapshot,
+    AlgorithmRange,
     AlgorithmTreeSnapshot,
 )
 from app.domain.models.topic import TopicDomain, VisualKind
@@ -27,6 +30,7 @@ def _make_array_cir() -> CirDocument:
                 title="初始数组",
                 narration="原始数组为 [5, 3, 1, 4, 2]",
                 visual_kind=VisualKind.ARRAY,
+                primary_relation="order",
                 tokens=[
                     VisualToken(id="t0", label="5"),
                     VisualToken(id="t1", label="3"),
@@ -40,6 +44,7 @@ def _make_array_cir() -> CirDocument:
                 title="第一次比较",
                 narration="比较 5 和 3，5 > 3，发生交换",
                 visual_kind=VisualKind.ARRAY,
+                primary_relation="swap",
                 tokens=[
                     VisualToken(id="t0", label="3"),
                     VisualToken(id="t1", label="5"),
@@ -53,6 +58,7 @@ def _make_array_cir() -> CirDocument:
                 title="排序完成",
                 narration="数组已完全排序",
                 visual_kind=VisualKind.ARRAY,
+                primary_relation="order",
                 tokens=[
                     VisualToken(id="t0", label="1", emphasis="accent"),
                     VisualToken(id="t1", label="2", emphasis="accent"),
@@ -141,7 +147,7 @@ class TestBuildPlaybook:
 
         assert playbook.total_frames == playbook.steps[-1].end_frame
 
-    def test_numeric_array_renders_as_bars(self):
+    def test_explicit_order_relation_renders_numeric_array_as_bars(self):
         cir = _make_array_cir()
         playbook = build_playbook(cir, execution_map=None)
 
@@ -152,6 +158,85 @@ class TestBuildPlaybook:
         first = playbook.steps[0].snapshot
         assert isinstance(first, AlgorithmBarsSnapshot)
         assert first.numeric_values == [5.0, 3.0, 1.0, 4.0, 2.0]
+
+    def test_numeric_array_defaults_to_cells_when_no_magnitude_relation_is_declared(self):
+        cir = CirDocument(
+            title="固定窗口",
+            domain=TopicDomain.ALGORITHM,
+            summary="位置和区间是主要教学关系",
+            steps=[
+                CirStep(
+                    id="s1",
+                    title="窗口覆盖前三项",
+                    narration="窗口由索引范围决定",
+                    visual_kind=VisualKind.ARRAY,
+                    tokens=[
+                        VisualToken(id="t0", label="1"),
+                        VisualToken(id="t1", label="3"),
+                        VisualToken(id="t2", label="-1"),
+                    ],
+                )
+            ],
+        )
+
+        snap = build_playbook(cir, execution_map=None).steps[0].snapshot
+        assert isinstance(snap, AlgorithmArraySnapshot)
+        assert snap.kind == "algorithm_array"
+
+    def test_array_semantics_survive_cir_to_playbook_compilation(self):
+        cir = CirDocument(
+            title="滑动窗口",
+            domain=TopicDomain.ALGORITHM,
+            summary="窗口、队列和结果保持为结构化语义",
+            steps=[
+                CirStep(
+                    id="s1",
+                    title="窗口右移",
+                    narration="索引 0 离开，索引 3 进入",
+                    visual_kind=VisualKind.ARRAY,
+                    primary_relation="range",
+                    tokens=[
+                        VisualToken(id="t0", label="1"),
+                        VisualToken(id="t1", label="3"),
+                        VisualToken(id="t2", label="-1"),
+                        VisualToken(id="t3", label="-3"),
+                    ],
+                    ranges=[{
+                        "id": "window",
+                        "start": 1,
+                        "end": 3,
+                        "role": "window",
+                        "label": "k=3",
+                    }],
+                    element_states={0: ["leaving"], 3: ["entering"]},
+                    auxiliary_lanes=[{
+                        "id": "deque",
+                        "role": "deque",
+                        "label": "MONOTONIC DEQUE",
+                        "items": [{
+                            "id": "d1",
+                            "label": "i=1",
+                            "value": "nums[i]=3",
+                            "index": 1,
+                        }],
+                    }],
+                )
+            ],
+        )
+
+        snap = build_playbook(cir, execution_map=None).steps[0].snapshot
+        assert isinstance(snap, AlgorithmArraySnapshot)
+        assert snap.ranges[0].model_dump() == {
+            "id": "window",
+            "start": 1,
+            "end": 3,
+            "role": "window",
+            "label": "k=3",
+            "emphasis": None,
+        }
+        assert snap.element_states == {0: ["leaving"], 3: ["entering"]}
+        assert snap.auxiliary_lanes[0].role == "deque"
+        assert snap.auxiliary_lanes[0].items[0].index == 1
 
     def test_non_numeric_array_stays_as_cells(self):
         cir = CirDocument(
@@ -899,6 +984,49 @@ class TestLayeredOutput:
         assert z == sorted(z)
         # Snapshot (compat) mirrors the first layer's body for legacy renderers.
         assert playbook_step.snapshot is not None
+
+    @pytest.mark.parametrize(
+        ("primary_relation", "layer_kind", "expected_kind"),
+        [
+            ("order", "array_boxes", "algorithm_bars"),
+            ("range", "bar_blocks", "algorithm_array"),
+        ],
+    )
+    def test_array_layers_follow_primary_relation(
+        self,
+        primary_relation,
+        layer_kind,
+        expected_kind,
+    ):
+        from app.domain.models.cir import LayerKind, LayerSpec
+
+        step = CirStep(
+            id="algorithm-layer",
+            title="语义决定数组表现",
+            narration="按主要教学关系选择表现",
+            visual_kind=VisualKind.ARRAY,
+            primary_relation=primary_relation,
+            tokens=[
+                VisualToken(id="t0", label="3"),
+                VisualToken(id="t1", label="1"),
+            ],
+            layers=[LayerSpec(kind=LayerKind(layer_kind))],
+        )
+        cir = CirDocument(
+            title="数组表现",
+            domain=TopicDomain.ALGORITHM,
+            summary="验证语义选择",
+            steps=[step],
+        )
+
+        playbook = build_playbook(cir, execution_map=None)
+
+        assert playbook.steps[0].layers[0].body.kind == expected_kind
+
+
+    def test_algorithm_range_rejects_reversed_bounds(self):
+        with pytest.raises(ValueError, match="end must be greater than or equal to start"):
+            AlgorithmRange(id="bad-window", start=3, end=1, role="window")
 
     def test_unrenderable_layer_is_dropped_silently(self):
         """A katex_overlay without latex text should not crash the build."""

@@ -95,6 +95,12 @@ Workflow you MUST follow:
    \`add_curve_*\` / \`add_point\` / \`add_arrow\` / \`add_segment\` /
    \`add_region\` / \`add_formula\` → \`set_narration\` → \`assert_*\` →
    \`commit_step\`.
+   For algorithm sequences, pass \`primary_relation\` to \`add_array_tokens\`.
+   Use cells for position/range/membership/state-transition teaching and bars
+   only for magnitude/order/swap teaching. Never choose bars merely because the values are numeric.
+   Express a window, search interval, or partition through
+   \`add_algorithm_range\`; use \`add_algorithm_auxiliary_lane\` for a deque,
+   result sequence, or helper array instead of hiding it in narration.
    For math families, first identify only the parameters that remain free after
    every stated condition is applied. Call \`add_parameter_control\` once per
    surviving free parameter before the first curve that uses it, and reference

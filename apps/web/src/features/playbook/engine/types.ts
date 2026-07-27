@@ -31,6 +31,41 @@ export type SnapshotKind =
   | "katex_overlay"
   | "narration_card";
 
+export type AlgorithmRangeRole =
+  | "window"
+  | "search_range"
+  | "partition"
+  | "merge_range"
+  | "current_subarray"
+  | "best_subarray";
+
+export interface AlgorithmRange {
+  id: string;
+  /** Inclusive index bounds. */
+  start: number;
+  end: number;
+  role: AlgorithmRangeRole;
+  label?: string;
+  emphasis?: "primary" | "secondary" | "accent" | "muted";
+}
+
+export type AlgorithmElementState = "entering" | "leaving" | "maximum" | "pivot";
+
+export interface AlgorithmAuxiliaryItem {
+  id: string;
+  label: string;
+  value?: string;
+  index?: number;
+  emphasis?: "primary" | "secondary" | "accent" | "muted";
+}
+
+export interface AlgorithmAuxiliaryLane {
+  id: string;
+  role: "deque" | "result" | "auxiliary_array";
+  label: string;
+  items: AlgorithmAuxiliaryItem[];
+}
+
 export interface AlgorithmArraySnapshot {
   kind: "algorithm_array";
   array_values: string[];
@@ -38,6 +73,9 @@ export interface AlgorithmArraySnapshot {
   swap_indices: number[];
   sorted_indices: number[];
   pointers: Record<string, number>;
+  ranges?: AlgorithmRange[];
+  element_states?: Record<number, AlgorithmElementState[]>;
+  auxiliary_lanes?: AlgorithmAuxiliaryLane[];
 }
 
 /** Array elements drawn as height-encoded rectangular bars (bar block view). */
@@ -51,6 +89,9 @@ export interface AlgorithmBarsSnapshot {
   swap_indices: number[];
   sorted_indices: number[];
   pointers: Record<string, number>;
+  ranges?: AlgorithmRange[];
+  element_states?: Record<number, AlgorithmElementState[]>;
+  auxiliary_lanes?: AlgorithmAuxiliaryLane[];
 }
 
 export interface AlgorithmTreeSnapshot {

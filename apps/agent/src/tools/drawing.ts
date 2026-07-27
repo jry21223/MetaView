@@ -278,6 +278,15 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
       Type.Object({
         values: Type.Array(Type.String(), { minItems: 1 }),
         emphasis_map: Type.Optional(Type.Record(Type.String(), EmphasisSchema)),
+        primary_relation: Type.Optional(Type.Union([
+          Type.Literal("position"),
+          Type.Literal("range"),
+          Type.Literal("membership"),
+          Type.Literal("magnitude"),
+          Type.Literal("order"),
+          Type.Literal("swap"),
+          Type.Literal("state_transition"),
+        ])),
       }),
       async (args) => {
         const intMap: Record<number, "primary" | "secondary" | "accent"> = {};
@@ -287,7 +296,7 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
             if (Number.isFinite(idx)) intMap[idx] = v as "primary" | "secondary" | "accent";
           }
         }
-        emitter.addArrayTokens(args.values, intMap);
+        emitter.addArrayTokens(args.values, intMap, args.primary_relation ?? "position");
         return toolResult({ ok: true as const, count: args.values.length });
       },
     ) as AgentTool,
@@ -339,6 +348,72 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
         "after this — do NOT issue any more tool calls afterward.",
       Type.Object({}),
       async () => toolResult({ playbook: emitter.finalize() }, { terminate: true }),
+    ) as AgentTool,
+  );
+
+  tools.push(
+    defineTool(
+      "add_algorithm_range",
+      "Add algorithm range",
+      "Add a semantic inclusive index range such as a sliding window, search range, or partition. " +
+        "Provide indices and role only; the renderer owns the pixels.",
+      Type.Object({
+        id: Type.String({ minLength: 1 }),
+        start: Type.Integer({ minimum: 0 }),
+        end: Type.Integer({ minimum: 0 }),
+        role: Type.Union([
+          Type.Literal("window"),
+          Type.Literal("search_range"),
+          Type.Literal("partition"),
+          Type.Literal("merge_range"),
+          Type.Literal("current_subarray"),
+          Type.Literal("best_subarray"),
+        ]),
+        label: Type.Optional(Type.String()),
+        emphasis: Type.Optional(Type.Union([
+          Type.Literal("primary"),
+          Type.Literal("secondary"),
+          Type.Literal("accent"),
+          Type.Literal("muted"),
+        ])),
+      }),
+      async (args) => {
+        emitter.addAlgorithmRange(args);
+        return toolResult({ ok: true as const });
+      },
+    ) as AgentTool,
+  );
+
+  tools.push(
+    defineTool(
+      "add_algorithm_auxiliary_lane",
+      "Add algorithm auxiliary lane",
+      "Add a semantic deque, result, or auxiliary-array lane beneath the main sequence.",
+      Type.Object({
+        id: Type.String({ minLength: 1 }),
+        role: Type.Union([
+          Type.Literal("deque"),
+          Type.Literal("result"),
+          Type.Literal("auxiliary_array"),
+        ]),
+        label: Type.String({ minLength: 1 }),
+        items: Type.Array(Type.Object({
+          id: Type.String({ minLength: 1 }),
+          label: Type.String({ minLength: 1 }),
+          value: Type.Optional(Type.String()),
+          index: Type.Optional(Type.Integer({ minimum: 0 })),
+          emphasis: Type.Optional(Type.Union([
+            Type.Literal("primary"),
+            Type.Literal("secondary"),
+            Type.Literal("accent"),
+            Type.Literal("muted"),
+          ])),
+        })),
+      }),
+      async (args) => {
+        emitter.addAlgorithmAuxiliaryLane(args);
+        return toolResult({ ok: true as const });
+      },
     ) as AgentTool,
   );
 

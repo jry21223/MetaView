@@ -193,11 +193,17 @@ end_frame_i = (i+1) * 60                               # 无 execution_map（兼
 
 | `visual_kind` | snapshot `kind` | 渲染器 |
 |---|---|---|
-| `array`（元素全为数值） | `algorithm_bars` | `BarBlockRenderer` |
-| `array`（含非数值） | `algorithm_array` | `AlgorithmRenderer` |
+| `array` + `primary_relation=position/range/membership/state_transition` | `algorithm_array` | `AlgorithmRenderer` |
+| `array` + `primary_relation=magnitude/order/swap`（且数值尺度合法） | `algorithm_bars` | `BarBlockRenderer` |
 | `graph` | `algorithm_tree` | `BinaryTreeRenderer` |
 | `function`（有合法 `plot`） | `math_plot` | `MathPlotRenderer` |
 | `function`（无 `plot` / 表达式全部非法） | 降级为 `array` | 同上 |
+
+数组表现由教学语义选择，而不是由元素能否解析成数字自动选择。不确定时默认
+`algorithm_array`；只有明确需要编码大小、顺序或交换关系时才使用柱状图。
+`algorithm_array` 与 `algorithm_bars` 共享 `ranges`、`element_states` 和
+`auxiliary_lanes`：窗口、搜索区间和 partition 使用 `ranges`，deque、结果序列与辅助数组
+使用独立轨道，不得借用 `sorted_indices` 表达“已经离开窗口”。
 
 ## 6. Math 函数图（`visual_kind="function"`）
 

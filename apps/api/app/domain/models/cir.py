@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from app.domain.models.execution import ExecutionParameterControl
 from app.domain.models.playbook import (
+    AlgorithmAuxiliaryLane,
+    AlgorithmRange,
     GraphSceneSnapshot,
     MotionSceneSnapshot,
     StatsChartSceneSnapshot,
@@ -26,6 +29,16 @@ class VisualToken(BaseModel):
     label: str
     value: str | None = None
     emphasis: str = "secondary"
+
+PrimaryRelation = Literal[
+    "position",
+    "range",
+    "membership",
+    "magnitude",
+    "order",
+    "swap",
+    "state_transition",
+]
 
 
 class EdgeRef(BaseModel):
@@ -253,6 +266,15 @@ class CirStep(BaseModel):
     title: str
     narration: str | list  # LLM may output a JSON array despite schema hint
     visual_kind: VisualKind
+    # Renderer choice follows the teaching relation, never the token data type.
+    # Position is the safe default because cells do not imply a magnitude scale.
+    primary_relation: PrimaryRelation = "position"
+    ranges: list[AlgorithmRange] = Field(default_factory=list)
+    element_states: dict[
+        int,
+        list[Literal["entering", "leaving", "maximum", "pivot"]],
+    ] = Field(default_factory=dict)
+    auxiliary_lanes: list[AlgorithmAuxiliaryLane] = Field(default_factory=list)
     layout: LayoutInstruction = Field(default_factory=LayoutInstruction)
     tokens: list[VisualToken] = Field(default_factory=list)
     edges: list[EdgeRef] | None = None

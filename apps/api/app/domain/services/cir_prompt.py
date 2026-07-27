@@ -16,6 +16,14 @@ _DOMAIN_GUIDANCE: dict[TopicDomain, str] = {
 VISUAL + PEDAGOGY RULES for algorithms:
 - Step template (use as the narrative spine): 直觉一句类比 → 伪代码思路 → 在样本数据上走一步 → 总结这一步学到了什么。
 - Use visual_kind="array" for sorting, searching, two-pointer, sliding-window, DP table problems.
+- Choose the array representation from the primary teaching relation, not the token data type:
+  position / range / membership / state_transition → algorithm_array
+  magnitude / order / swap → algorithm_bars
+  Never choose bars merely because every token is numeric.
+- Set primary_relation on every array step. When uncertain, use "position".
+- Use ranges for continuous index intervals such as a window, search range, or partition.
+  Use auxiliary_lanes for deques, result sequences, or auxiliary arrays instead of hiding
+  those states in narration. Do not reuse sorted_indices for elements that merely left a window.
 - Use visual_kind="graph" ONLY for explicit tree/graph traversal (BFS, DFS, BST operations).
 - For graph steps, populate the "edges" array with explicit parent→child refs like
   {"from_id": "node_root", "to_id": "node_left"}. Do NOT rely on token id naming conventions.
@@ -195,6 +203,36 @@ _COMBINED_SCHEMA = """{
         "title": "string — step title (≤ 30 chars)",
         "narration": "JSON array — see Narration Output Format section",
         "visual_kind": "array | graph | function | scene | formula",
+        "primary_relation": "position | range | membership | magnitude | order | swap | state_transition",
+        "ranges": [
+          {
+            "id": "string",
+            "start": "integer — inclusive index",
+            "end": "integer — inclusive index",
+            "role": "window | search_range | partition | merge_range | current_subarray | best_subarray",
+            "label": "optional short label",
+            "emphasis": "primary | secondary | accent | muted"
+          }
+        ],
+        "element_states": {
+          "0": ["entering | leaving | maximum | pivot"]
+        },
+        "auxiliary_lanes": [
+          {
+            "id": "string",
+            "role": "deque | result | auxiliary_array",
+            "label": "short lane label",
+            "items": [
+              {
+                "id": "string",
+                "label": "string",
+                "value": "optional string",
+                "index": "optional non-negative integer",
+                "emphasis": "primary | secondary | accent | muted"
+              }
+            ]
+          }
+        ],
         "tokens": [
           {
             "id": "string — unique id like t0, t1, node_root",
@@ -541,7 +579,8 @@ review/repair。不要用空对象或猜测默认值调用工具；不确定时�
 - 每个 layer 的 timing.enter_at/exit_at 都是 0..1 区间，归一化到当前 step 的进度。
 - 一个 step 可以只有 1 个 layer（等价于不写 layers），也可以最多 4 个 layer。
 - 推荐组合（按域）：
-  - 算法：array_boxes + narration_card（提示这一步要注意什么）
+  - 算法：position/range/membership 使用 array_boxes，magnitude/order/swap 使用
+    bar_blocks；两者都可叠加 narration_card，最终表现以 primary_relation 为准。
   - math 2D 几何：math_scene(region) → math_scene(vector_field) → katex_overlay → math_formula
   - math 1D：math_plot + katex_overlay（角落公式）
   - math 抽象：math_formula + narration_card（强调要点）

@@ -3,6 +3,10 @@ import { Easing, interpolate } from "remotion";
 import type { AlgorithmArraySnapshot } from "../types";
 import type { RendererProps } from "./types";
 import { THEME_PALETTE } from "../../../../shared/config/themePalette";
+import {
+  AlgorithmAuxiliaryLanes,
+  AlgorithmRangeOverlay,
+} from "./AlgorithmSequenceOverlays";
 
 function soft(color: string, strength: number): string {
   return `color-mix(in srgb, ${color} ${strength}%, transparent)`;
@@ -129,11 +133,13 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
     prevSnap?.array_values ?? null,
   );
 
-  const titleOpacity = interpolate(elapsed, [0, 8], [0, 1], {
-    easing: ENTER_BEZIER,
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
+  const titleOpacity = prevStep
+    ? 1
+    : interpolate(elapsed, [0, 8], [0, 1], {
+        easing: ENTER_BEZIER,
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+      });
   // Used to draw arc Y-offset only for swap pairs (two cells in swap_indices that exchange).
   const swapSet = new Set(snap.swap_indices);
   const pointerGroups = Array.from(
@@ -178,6 +184,11 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
           const isActive = snap.active_indices.includes(i);
           const isSwap = snap.swap_indices.includes(i);
           const isSorted = snap.sorted_indices.includes(i);
+          const elementStates = snap.element_states?.[i] ?? [];
+          const isEntering = elementStates.includes("entering");
+          const isLeaving = elementStates.includes("leaving");
+          const isMaximum = elementStates.includes("maximum");
+          const isPivot = elementStates.includes("pivot");
           const prevIdx = prevIndexMap[i];
 
           // ── Movement: translateX from old position to new ──
@@ -216,7 +227,7 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
               extrapolateLeft: "clamp",
               extrapolateRight: "clamp",
             });
-          } else if (prevIdx === i) {
+          } else if (prevIdx === i && !prevSnap) {
             // Unchanged cells: wave bounce from bottom
             entryY = interpolate(waveElapsed, [0, 10], [20, 0], {
               easing: Easing.out(Easing.quad),
@@ -231,12 +242,19 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
           }
 
           // ── Static enter opacity (wave-staggered) ──
-          const cellOpacity = interpolate(
-            elapsed,
-            [Math.max(0, waveDelay), Math.max(0, waveDelay) + 8],
-            [0, 1],
-            { easing: ENTER_BEZIER, extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-          );
+          const cellOpacity =
+            prevIdx >= 0
+              ? 1
+              : interpolate(
+                  elapsed,
+                  [Math.max(0, waveDelay), Math.max(0, waveDelay) + 8],
+                  [0, 1],
+                  {
+                    easing: ENTER_BEZIER,
+                    extrapolateLeft: "clamp",
+                    extrapolateRight: "clamp",
+                  },
+                );
 
           // ── Visual layer (priority: active > swap > sorted) ──
           let bg: string = colors.cellGradient;
@@ -267,10 +285,25 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
             border = colors.sorted;
             glow = `0 0 8px ${colors.sortedShadow}, ${colors.cellShadow}`;
           }
+          if (isEntering) {
+            border = colors.active;
+            borderWidth = Math.max(borderWidth, 2);
+          }
+          if (isPivot && !isActive) {
+            border = colors.swap;
+            borderWidth = Math.max(borderWidth, 2);
+            textColor = colors.swap;
+            bg = soft(colors.swap, 10);
+          }
+          if (isLeaving) {
+            breath *= 0.42;
+          }
 
           return (
             <div
               key={i}
+              data-array-index={i}
+              data-element-states={elementStates.join(" ") || undefined}
               style={{
                 width: cellW,
                 height: cellH,
@@ -290,6 +323,34 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
               }}
             >
               {val}
+              {isMaximum && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: -18,
+                    color: colors.active,
+                    fontFamily: '"IBM Plex Mono", ui-monospace, monospace',
+                    fontSize: 9,
+                    fontWeight: 700,
+                  }}
+                >
+                  MAX
+                </span>
+              )}
+              {isPivot && !isMaximum && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: -18,
+                    color: colors.swap,
+                    fontFamily: '"IBM Plex Mono", ui-monospace, monospace',
+                    fontSize: 9,
+                    fontWeight: 700,
+                  }}
+                >
+                  PIVOT
+                </span>
+              )}
               {/* Sorted checkmark */}
               {isSorted && !isActive && !isSwap && (
                 <span
@@ -321,6 +382,15 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
             </div>
           );
         })}
+        <AlgorithmRangeOverlay
+          ranges={snap.ranges ?? []}
+          previousRanges={prevSnap?.ranges}
+          itemWidth={cellW}
+          gap={cellGap}
+          itemHeight={cellH}
+          elapsed={elapsed}
+          theme={theme}
+        />
       </div>
 
       {/* Pointer arrows */}
@@ -334,11 +404,13 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
           }}
         >
           {pointerGroups.map(([idx, names]) => {
-            const pointerOpacity = interpolate(elapsed, [0, 12], [0, 1], {
-              easing: ENTER_BEZIER,
-              extrapolateLeft: "clamp",
-              extrapolateRight: "clamp",
-            });
+            const pointerOpacity = prevSnap
+              ? 1
+              : interpolate(elapsed, [0, 12], [0, 1], {
+                  easing: ENTER_BEZIER,
+                  extrapolateLeft: "clamp",
+                  extrapolateRight: "clamp",
+                });
             return (
               <div
                 key={idx}
@@ -367,6 +439,12 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
           })}
         </div>
       )}
+
+      <AlgorithmAuxiliaryLanes
+        lanes={snap.auxiliary_lanes ?? []}
+        width={snap.array_values.length * cellW + (snap.array_values.length - 1) * cellGap}
+        theme={theme}
+      />
 
     </div>
   );

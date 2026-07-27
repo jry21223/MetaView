@@ -70,6 +70,16 @@ describe("template preview cases", () => {
     expect(missing.steps.at(-1)?.title).toBe("确认不存在");
     const firstComparison = found.steps.find((step) => step.step_id === "binary-compare-1");
     expect(firstComparison?.code_highlight?.lines[firstComparison.code_highlight.active_line]).toContain("low = mid + 1");
+    if (firstComparison?.snapshot.kind === "algorithm_bars") {
+      expect(firstComparison.snapshot.ranges).toEqual([{
+        id: "search-range",
+        start: 0,
+        end: 9,
+        role: "search_range",
+        label: "search [0, 9]",
+        emphasis: "primary",
+      }]);
+    }
     const missingResult = missing.steps.at(-1)?.snapshot;
     expect(missingResult?.kind).toBe("algorithm_bars");
     if (missingResult?.kind === "algorithm_bars") {

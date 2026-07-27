@@ -5,6 +5,7 @@ import { quickSort } from "../algorithms/quickSort";
 import { selectionSort } from "../algorithms/selectionSort";
 import { insertionSort } from "../algorithms/insertionSort";
 import { mergeSort } from "../mergeSort";
+import { snapshot } from "../algorithms/_helpers";
 
 const numericSort = (a: string, b: string): number => Number(a) - Number(b);
 
@@ -25,6 +26,13 @@ const ALGORITHMS: Array<[string, AlgorithmReplay]> = [
   ["insertionSort", insertionSort],
   ["mergeSort", mergeSort],
 ];
+
+describe("algorithm replay representation", () => {
+  it("defaults numeric sequences to cells and requires an explicit bars choice", () => {
+    expect(snapshot(["3", "1"], [], []).kind).toBe("algorithm_array");
+    expect(snapshot(["3", "1"], [], [], [], {}, "bars").kind).toBe("algorithm_bars");
+  });
+});
 
 describe.each(ALGORITHMS)("%s replay", (name, sort) => {
   it.each(CASES)("produces correct final sorted state — %s", (_label, input) => {
