@@ -13,7 +13,6 @@ import { PUBLIC_GOLD_TEMPLATES } from "./gold-templates/publicGoldTemplates";
 export type TemplateDomain =
   | "algorithm"
   | "math"
-  | "code"
   | "physics"
   | "chemistry"
   | "biology"
@@ -31,7 +30,6 @@ export interface TemplateDef {
 export const TEMPLATE_DOMAIN_LABEL: Record<TemplateDomain, string> = {
   algorithm: "算法",
   math: "数学",
-  code: "代码",
   physics: "物理",
   chemistry: "化学",
   biology: "生物",
@@ -140,11 +138,11 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
     prompt: "可视化二维向量场 F = (-y, x) 在单位圆上的环路积分，解释旋度的几何含义",
   },
 
-  // ---- code ----
-  publicGoldEntry("two-sum", "code"),
+  // ---- code-driven algorithms ----
+  publicGoldEntry("two-sum", "algorithm"),
   {
     id: "fib-memo",
-    domain: "code",
+    domain: "algorithm",
     title: "斐波那契 · 记忆化",
     desc: "递归 → 备忘录的步骤推进",
     prompt: "讲解带备忘录的斐波那契数列 fib(6) 的计算过程，展示哪些子问题被缓存复用",

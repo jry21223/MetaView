@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, within } from "@testing-library/react";
 import React from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -73,6 +73,19 @@ describe("TemplatesPage lesson atlas", () => {
     expect(view.getByRole("heading", { name: "数学" })).toBeTruthy();
     expect(view.queryByRole("heading", { name: "算法" })).toBeNull();
     expect(view.queryByRole("button", { name: "进入完整案例：二分查找" })).toBeNull();
+  });
+
+  it("groups code-driven algorithm lessons under the algorithm domain", () => {
+    const view = renderPage();
+    const algorithmSection = view
+      .getByRole("heading", { name: "算法" })
+      .closest("section");
+
+    expect(algorithmSection).not.toBeNull();
+    expect(view.queryByRole("button", { name: "代码" })).toBeNull();
+    expect(view.queryByRole("heading", { name: "代码" })).toBeNull();
+    expect(within(algorithmSection as HTMLElement).getByText("两数之和 · 哈希表")).toBeTruthy();
+    expect(within(algorithmSection as HTMLElement).getByText("斐波那契 · 记忆化")).toBeTruthy();
   });
 
   it("shows a helpful empty state for unmatched searches", () => {
