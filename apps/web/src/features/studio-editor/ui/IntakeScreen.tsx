@@ -8,6 +8,11 @@ const MAX_CODE_FILE_BYTES = 256 * 1024;
 const TEXTAREA_MIN_HEIGHT = 168;
 const TEXTAREA_MAX_HEIGHT = 320;
 
+/** Kill switch for new-run generation while output quality is under active tuning. */
+const GENERATION_DISABLED = true;
+const GENERATION_DISABLED_MESSAGE =
+  "MetaView 目前处于测试阶段，生成效果仍在优化中，新建生成功能暂时关闭，感谢理解。";
+
 const EXAMPLE_PROMPTS = [
   {
     label: "导数与切线",
@@ -129,6 +134,7 @@ export function IntakeScreen({
   };
 
   const submit = async () => {
+    if (GENERATION_DISABLED) return;
     const prompt = input.trim();
     if ((!prompt && !attachment) || pending || busyRef.current) return;
 
@@ -196,6 +202,11 @@ export function IntakeScreen({
         <header className="mv-intake-hero" aria-label="MetaView 创建讲解">
           <h1 className="mv-intake-title">新建可视化讲解</h1>
           <p className="mv-intake-sub">输入一道题、一个知识点，或粘贴代码。</p>
+          {GENERATION_DISABLED && (
+            <p className="mv-intake-announcement" role="note">
+              {GENERATION_DISABLED_MESSAGE}
+            </p>
+          )}
         </header>
 
         <div className="mv-intake-layout">
@@ -323,7 +334,8 @@ export function IntakeScreen({
                   className="mv-send mv-intake-send"
                   type="button"
                   onClick={() => void submit()}
-                  disabled={pending || (!input.trim() && !attachment)}
+                  disabled={GENERATION_DISABLED || pending || (!input.trim() && !attachment)}
+                  title={GENERATION_DISABLED ? GENERATION_DISABLED_MESSAGE : undefined}
                 >
                   生成讲解
                   <svg
