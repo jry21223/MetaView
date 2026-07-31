@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -81,35 +81,22 @@ describe("IntakeScreen smart-routed intake", () => {
     );
   });
 
-  it.each([
-    "求函数 f(x)=x² 在 x=1 处的导数",
-    "解释速度为什么会随时间变化",
-    "逐行解释递归函数的返回过程",
-  ])("submits text without exposing a frontend domain for %s", async (prompt) => {
-    const { getByRole, getByPlaceholderText, props } = renderIntake();
-
-    fireEvent.change(getByPlaceholderText(/例如：用动画解释导数/), {
-      target: { value: prompt },
-    });
-    fireEvent.click(getByRole("button", { name: "生成讲解" }));
-
-    await waitFor(() => expect(props.onSubmit).toHaveBeenCalledTimes(1));
-    expect(props.onSubmit).toHaveBeenCalledWith({ prompt });
-    expect(props.onSubmit.mock.calls[0][0]).not.toHaveProperty("domain");
-    expect(props.onSubmit.mock.calls[0][0]).not.toHaveProperty("language");
-  });
-
-  it("uses Ctrl/Cmd + Enter without submitting empty input", async () => {
-    const { getByPlaceholderText, props } = renderIntake();
+  it("shows a testing-in-progress announcement and keeps generation disabled", async () => {
+    const { getByRole, getByPlaceholderText, getByText, props } = renderIntake();
     const textarea = getByPlaceholderText(/例如：用动画解释导数/);
 
-    fireEvent.keyDown(textarea, { key: "Enter", ctrlKey: true });
-    expect(props.onSubmit).not.toHaveBeenCalled();
+    expect(
+      getByText("MetaView 目前处于测试阶段，生成效果仍在优化中，新建生成功能暂时关闭，感谢理解。"),
+    ).toBeTruthy();
 
-    fireEvent.change(textarea, { target: { value: "讲解抛体运动" } });
+    fireEvent.change(textarea, { target: { value: "求函数 f(x)=x² 在 x=1 处的导数" } });
+    const submitButton = getByRole("button", { name: "生成讲解" }) as HTMLButtonElement;
+    expect(submitButton.disabled).toBe(true);
+
+    fireEvent.click(submitButton);
     fireEvent.keyDown(textarea, { key: "Enter", metaKey: true });
 
-    await waitFor(() => expect(props.onSubmit).toHaveBeenCalledTimes(1));
+    expect(props.onSubmit).not.toHaveBeenCalled();
   });
 
   it("seeds initialPrompt and caps textarea growth at 320px", () => {
@@ -184,60 +171,18 @@ describe("IntakeScreen smart-routed intake", () => {
     expect(queryByText("large.py")).toBeNull();
   });
 
-  it("submits real code metadata while leaving domain ownership to the backend", async () => {
+  it("keeps generation disabled even with a valid code file attached", () => {
     const { container, getByRole, getByText, props } = renderIntake();
     const file = pythonFile();
 
     fireEvent.change(fileInput(container), { target: { files: [file] } });
     expect(getByText("solution.py")).toBeTruthy();
-    fireEvent.click(getByRole("button", { name: "生成讲解" }));
 
-    await waitFor(() => expect(props.onSubmit).toHaveBeenCalledTimes(1));
-    expect(props.onSubmit).toHaveBeenCalledWith({
-      prompt: "讲解 solution.py 中的代码。",
-      sourceCode: "def solve():\n    return 42\n",
-      language: "python",
-      sourceFilename: "solution.py",
-      sourceSizeBytes: file.size,
-    });
-    expect(props.onSubmit.mock.calls[0][0]).not.toHaveProperty("domain");
-  });
+    const submitButton = getByRole("button", { name: "生成讲解" }) as HTMLButtonElement;
+    expect(submitButton.disabled).toBe(true);
+    fireEvent.click(submitButton);
 
-  it("surfaces file read failures and does not submit", async () => {
-    vi.spyOn(FileReader.prototype, "readAsText").mockImplementation(function (
-      this: FileReader,
-    ) {
-      queueMicrotask(() => this.onerror?.(new ProgressEvent("error")));
-    });
-    const { container, getByRole, getByText, props } = renderIntake();
-
-    fireEvent.change(fileInput(container), {
-      target: { files: [pythonFile()] },
-    });
-    fireEvent.click(getByRole("button", { name: "生成讲解" }));
-
-    await waitFor(() =>
-      expect(getByText("文件读取失败，请重新选择代码文件。")).toBeTruthy(),
-    );
     expect(props.onSubmit).not.toHaveBeenCalled();
-  });
-
-  it("does not submit twice while an asynchronous submission is pending", async () => {
-    let resolveSubmit: (() => void) | undefined;
-    const onSubmit = vi.fn(
-      () => new Promise<void>((resolve) => (resolveSubmit = resolve)),
-    );
-    const { getByRole, getByPlaceholderText } = renderIntake({ onSubmit });
-    fireEvent.change(getByPlaceholderText(/例如：用动画解释导数/), {
-      target: { value: "讲解二分查找" },
-    });
-    const submitButton = getByRole("button", { name: "生成讲解" });
-
-    fireEvent.click(submitButton);
-    fireEvent.click(submitButton);
-
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
-    resolveSubmit?.();
   });
 
   it("exposes pending and submit errors accessibly", () => {
