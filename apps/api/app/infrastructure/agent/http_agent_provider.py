@@ -61,11 +61,7 @@ class HttpAgentProvider:
 
     async def _post_generate(self, body: dict[str, Any]) -> AgentResult:
         url = f"{self._base_url}/generate"
-        headers = (
-            {"X-MetaView-Agent-Token": self._shared_token}
-            if self._shared_token
-            else None
-        )
+        headers = {"X-MetaView-Agent-Token": self._shared_token} if self._shared_token else None
         try:
             async with httpx.AsyncClient(timeout=self._timeout_s) as client:
                 resp = await client.post(url, json=body, headers=headers)
@@ -76,17 +72,37 @@ class HttpAgentProvider:
 
         if resp.status_code >= 400:
             try:
-                detail = resp.json()
+                error_payload = resp.json()
             except ValueError:
-                detail = resp.text[:500]
+                error_payload = None
             structured_failure = (
-                detail.get("self_check")
-                if isinstance(detail, dict) and isinstance(detail.get("self_check"), dict)
+                error_payload.get("self_check")
+                if isinstance(error_payload, dict)
+                and isinstance(error_payload.get("self_check"), dict)
                 else None
             )
+            runtime_events = (
+                _list_of_dicts(error_payload.get("runtime_events"))
+                if isinstance(error_payload, dict)
+                else []
+            )
+            artifacts = (
+                error_payload.get("artifacts")
+                if isinstance(error_payload, dict)
+                and isinstance(error_payload.get("artifacts"), dict)
+                else {}
+            )
+            public_detail = (
+                error_payload.get("detail")
+                if isinstance(error_payload, dict) and isinstance(error_payload.get("detail"), str)
+                else "request failed"
+            )
             raise AgentProviderError(
-                f"agent sidecar returned {resp.status_code}: {detail!r}",
+                f"agent sidecar returned {resp.status_code}: {public_detail[:500]}",
                 structured_failure=structured_failure,
+                runtime_events=runtime_events,
+                artifacts=artifacts,
+                status_code=resp.status_code,
             )
 
         try:
@@ -110,9 +126,7 @@ class HttpAgentProvider:
             runtime_events=_list_of_dicts(payload.get("runtime_events")),
             review=payload.get("review") if isinstance(payload.get("review"), dict) else None,
             artifacts=(
-                payload.get("artifacts")
-                if isinstance(payload.get("artifacts"), dict)
-                else {}
+                payload.get("artifacts") if isinstance(payload.get("artifacts"), dict) else {}
             ),
         )
 

@@ -97,6 +97,37 @@ class SqliteRunRepository:
 
         await asyncio.to_thread(_sync)
 
+    async def mark_started(self, run_id: str, started_at: str) -> None:
+        def _sync() -> None:
+            with self._connect() as conn:
+                conn.execute(
+                    "UPDATE pipeline_runs SET started_at=? WHERE run_id=?",
+                    (started_at, run_id),
+                )
+                conn.commit()
+
+        await asyncio.to_thread(_sync)
+
+    async def mark_finished(
+        self,
+        run_id: str,
+        finished_at: str,
+        *,
+        generator_path: str | None = None,
+        total_duration_ms: int | None = None,
+    ) -> None:
+        def _sync() -> None:
+            with self._connect() as conn:
+                conn.execute(
+                    "UPDATE pipeline_runs"
+                    " SET finished_at=?, generator_path=?, total_duration_ms=?"
+                    " WHERE run_id=?",
+                    (finished_at, generator_path, total_duration_ms, run_id),
+                )
+                conn.commit()
+
+        await asyncio.to_thread(_sync)
+
     async def update_quality_report(self, run_id: str, quality_report_json: str) -> None:
         def _sync() -> None:
             with self._connect() as conn:
@@ -164,18 +195,11 @@ class SqliteRunRepository:
                     ).fetchone()
                     if owned is None:
                         return False
-                conn.execute(
-                    "DELETE FROM pipeline_run_directors WHERE run_id=?", (run_id,)
-                )
-                conn.execute(
-                    "DELETE FROM pipeline_run_versions WHERE run_id=?", (run_id,)
-                )
-                conn.execute(
-                    "DELETE FROM pipeline_run_followups WHERE run_id=?", (run_id,)
-                )
-                cursor = conn.execute(
-                    "DELETE FROM pipeline_runs WHERE run_id=?", (run_id,)
-                )
+                conn.execute("DELETE FROM pipeline_run_spans WHERE run_id=?", (run_id,))
+                conn.execute("DELETE FROM pipeline_run_directors WHERE run_id=?", (run_id,))
+                conn.execute("DELETE FROM pipeline_run_versions WHERE run_id=?", (run_id,))
+                conn.execute("DELETE FROM pipeline_run_followups WHERE run_id=?", (run_id,))
+                cursor = conn.execute("DELETE FROM pipeline_runs WHERE run_id=?", (run_id,))
                 conn.commit()
                 return cursor.rowcount > 0
 
@@ -338,9 +362,7 @@ class SqliteRunRepository:
                 if run_row is None:
                     raise LookupError(f"Run {run_id!r} not found")
                 active_playbook_json = (
-                    str(run_row["playbook_json"])
-                    if run_row["playbook_json"]
-                    else None
+                    str(run_row["playbook_json"]) if run_row["playbook_json"] else None
                 )
                 try:
                     if active_playbook_json is None:
@@ -504,10 +526,7 @@ class SqliteRunRepository:
                     "SELECT active_version_id FROM pipeline_runs WHERE run_id=?",
                     (run_id,),
                 ).fetchone()
-                if (
-                    active_version is not None
-                    and active_version["active_version_id"]
-                ):
+                if active_version is not None and active_version["active_version_id"]:
                     return str(active_version["active_version_id"])
                 active = conn.execute(
                     "SELECT playbook_json FROM pipeline_runs WHERE run_id=?",
@@ -537,8 +556,7 @@ class SqliteRunRepository:
         def _sync() -> list[sqlite3.Row]:
             with self._connect() as conn:
                 return conn.execute(
-                    "SELECT * FROM pipeline_run_followups"
-                    " WHERE run_id=? ORDER BY created_at ASC",
+                    "SELECT * FROM pipeline_run_followups WHERE run_id=? ORDER BY created_at ASC",
                     (run_id,),
                 ).fetchall()
 
@@ -593,7 +611,9 @@ class SqliteRunRepository:
                 head_version_id = (
                     active_version_id
                     if active_version_id is not None
-                    else str(head["version_id"]) if head is not None else None
+                    else str(head["version_id"])
+                    if head is not None
+                    else None
                 )
                 return rows, head_version_id
 
@@ -638,9 +658,7 @@ def _row_to_response(row: sqlite3.Row) -> PipelineRunResponse:
         lesson_plan = LessonPlan.model_validate_json(row["lesson_plan_json"])
     coverage_decision = None
     if "coverage_decision_json" in row.keys() and row["coverage_decision_json"]:
-        coverage_decision = CoverageDecision.model_validate_json(
-            row["coverage_decision_json"]
-        )
+        coverage_decision = CoverageDecision.model_validate_json(row["coverage_decision_json"])
     return PipelineRunResponse(
         run_id=row["run_id"],
         status=PipelineRunStatus(row["status"]),
@@ -670,8 +688,7 @@ def _parse_review_json(raw: str) -> CirReviewReport | PlaybookReviewVerdict:
 def _has_playbook_issue(data: dict) -> bool:
     issues = data.get("issues")
     return isinstance(issues, list) and any(
-        isinstance(issue, dict) and "requires_repair" in issue
-        for issue in issues
+        isinstance(issue, dict) and "requires_repair" in issue for issue in issues
     )
 
 
@@ -689,9 +706,7 @@ def _followup_row_to_record(row: sqlite3.Row) -> RunFollowUpRecord:
 
 
 def _version_row_to_record(row: sqlite3.Row, head_version_id: str | None) -> RunVersionRecord:
-    summary = row["summary"] or row["followup_summary"] or _fallback_version_summary(
-        row["source"]
-    )
+    summary = row["summary"] or row["followup_summary"] or _fallback_version_summary(row["source"])
     return RunVersionRecord(
         version_id=row["version_id"],
         short_id=_short_version_id(row["version_id"]),

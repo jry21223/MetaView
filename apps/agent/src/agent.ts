@@ -13,6 +13,10 @@ import {
   selfCheckPlaybook,
   type SelfCheckReport,
 } from "./state/playbookSelfCheck.js";
+import {
+  AttemptTelemetryCollector,
+  type AttemptTelemetry,
+} from "./telemetry.js";
 import type { PlaybookOutput } from "./state/types.js";
 import { makeAssertTools } from "./tools/asserts.js";
 import { makeAnimationToolTools } from "./tools/animationTools.js";
@@ -45,6 +49,7 @@ export interface GenerateOptions {
   defaultModel: string;
   defaultApiKey?: string;
   defaultBaseUrl?: string;
+  abortSignal?: AbortSignal;
 }
 
 export const SYSTEM_PROMPT =
@@ -136,8 +141,35 @@ Output discipline:
 
 const MAX_SELF_REPAIR_ATTEMPTS = 2;
 
+/** One sidecar attempt as observed from the inside. */
+export interface AttemptRecord {
+  attempt_index: number;
+  started_at: string;
+  finished_at: string | null;
+  duration_ms: number | null;
+  outcome: "running" | "succeeded" | "failed";
+  self_check_status: SelfCheckReport["status"] | null;
+  self_check_issue_codes: string[];
+  error_code: string | null;
+  telemetry: AttemptTelemetry;
+}
+
+/**
+ * Mutable sink the caller owns, so attempt telemetry survives a thrown
+ * `AgentSelfCheckError` and a failed run is still measurable.
+ */
+export type AttemptSink = AttemptRecord[];
+
+export class AgentGenerationAbortedError extends Error {
+  constructor() {
+    super("agent generation aborted");
+    this.name = "AgentGenerationAbortedError";
+  }
+}
+
 export async function runAgentGeneration(
   opts: GenerateOptions,
+  attemptSink?: AttemptSink,
 ): Promise<PlaybookOutput> {
   let userPrompt = buildAgentPrompt(
     opts.prompt,
@@ -148,8 +180,56 @@ export async function runAgentGeneration(
   let lastReport: SelfCheckReport | null = null;
 
   for (let attempt = 0; attempt <= MAX_SELF_REPAIR_ATTEMPTS; attempt++) {
-    const playbook = await runAgentAttempt(opts, userPrompt);
-    const report = selfCheckPlaybook(playbook, opts.prompt);
+    const attemptStartedAt = Date.now();
+    let attemptRecord: AttemptRecord | undefined;
+    const collector = attemptSink
+      ? new AttemptTelemetryCollector(attemptStartedAt, (telemetry) => {
+          if (attemptRecord) {
+            attemptRecord.telemetry = telemetry;
+          }
+        })
+      : undefined;
+    if (attemptSink && collector) {
+      attemptRecord = {
+        attempt_index: attempt,
+        started_at: new Date(attemptStartedAt).toISOString(),
+        finished_at: null,
+        duration_ms: null,
+        outcome: "running",
+        self_check_status: null,
+        self_check_issue_codes: [],
+        error_code: null,
+        telemetry: collector.snapshot(),
+      };
+      attemptSink.push(attemptRecord);
+    }
+    let playbook: PlaybookOutput;
+    let report: SelfCheckReport;
+    try {
+      playbook = await runAgentAttempt(opts, userPrompt, collector);
+      report = selfCheckPlaybook(playbook, opts.prompt);
+    } catch (error) {
+      if (attemptRecord && collector) {
+        const finishedAt = Date.now();
+        attemptRecord.finished_at = new Date(finishedAt).toISOString();
+        attemptRecord.duration_ms = finishedAt - attemptStartedAt;
+        attemptRecord.outcome = "failed";
+        attemptRecord.error_code =
+          error instanceof Error ? error.name : "AgentError";
+        attemptRecord.telemetry = collector.snapshot();
+      }
+      throw error;
+    }
+    const finishedAt = Date.now();
+    if (attemptRecord && collector) {
+      attemptRecord.finished_at = new Date(finishedAt).toISOString();
+      attemptRecord.duration_ms = finishedAt - attemptStartedAt;
+      attemptRecord.outcome = "succeeded";
+      attemptRecord.self_check_status = report.status;
+      attemptRecord.self_check_issue_codes = issueCodes(report);
+      attemptRecord.error_code = null;
+      attemptRecord.telemetry = collector.snapshot();
+    }
     if (report.status !== "blocked") {
       return playbook;
     }
@@ -173,9 +253,19 @@ export async function runAgentGeneration(
   );
 }
 
+function issueCodes(report: SelfCheckReport): string[] {
+  if (!Array.isArray(report.issues)) {
+    return [];
+  }
+  return report.issues
+    .map((issue) => (issue as { code?: unknown }).code)
+    .filter((code): code is string => typeof code === "string");
+}
+
 async function runAgentAttempt(
   opts: GenerateOptions,
   userPrompt: string,
+  collector?: AttemptTelemetryCollector,
 ): Promise<PlaybookOutput> {
   const emitter = new PlaybookEmitter();
   let runtimePlaybook: PlaybookOutput | null = null;
@@ -224,7 +314,33 @@ async function runAgentAttempt(
     },
   });
 
-  await agent.prompt(userPrompt);
+  const unsubscribe = collector ? agent.subscribe(collector.handle) : undefined;
+  let subscribed = unsubscribe !== undefined;
+  const stopCollecting = (): void => {
+    if (!subscribed) {
+      return;
+    }
+    subscribed = false;
+    unsubscribe?.();
+  };
+  const abortAgent = (): void => {
+    stopCollecting();
+    agent.abort();
+  };
+  if (opts.abortSignal?.aborted) {
+    abortAgent();
+    throw new AgentGenerationAbortedError();
+  }
+  opts.abortSignal?.addEventListener("abort", abortAgent, { once: true });
+  try {
+    await agent.prompt(userPrompt);
+    if (opts.abortSignal?.aborted) {
+      throw new AgentGenerationAbortedError();
+    }
+  } finally {
+    opts.abortSignal?.removeEventListener("abort", abortAgent);
+    stopCollecting();
+  }
 
   if (runtimePlaybook) {
     return runtimePlaybook;

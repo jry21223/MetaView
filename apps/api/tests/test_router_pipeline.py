@@ -17,6 +17,7 @@ from app.infrastructure.persistence.sqlite_director_repository import (
     SqliteRunDirectorRepository,
 )
 from app.infrastructure.persistence.sqlite_run_repository import SqliteRunRepository
+from app.infrastructure.persistence.sqlite_span_repository import SqliteRunSpanRepository
 from app.main import create_app as _create_app
 from app.presentation.dependencies import (
     get_agent_provider,
@@ -25,6 +26,7 @@ from app.presentation.dependencies import (
     get_reviewer_llm_provider,
     get_run_director_repo,
     get_run_repo,
+    get_span_repo,
 )
 from tests.coverage_test_utils import ComposableCoverageResolver
 
@@ -34,42 +36,43 @@ def create_app():
     app.dependency_overrides[get_coverage_resolver] = lambda: ComposableCoverageResolver()
     return app
 
-_VALID_CIR = json.dumps({
-    "cir": {
-        "version": "0.1.0",
-        "title": "Test",
-        "domain": "algorithm",
-        "summary": "Test summary.",
-        "steps": [
-            {
-                "id": "step_01",
-                "title": "Step 1",
-                "narration": "Test narration.",
-                "visual_kind": "array",
-                "tokens": [
-                    {"id": "t0", "label": "A", "value": None, "emphasis": "primary"}
-                ],
-                "annotations": [],
-            }
-        ],
-    },
-    "execution_map": {
-        "duration_s": 2,
-        "checkpoints": [
-            {
-                "id": "cp1",
-                "step_index": 0,
-                "step_id": "step_01",
-                "visual_kind": "array",
-                "title": "Step 1",
-                "summary": "Show the active array state.",
-                "start_s": 0,
-                "end_s": 2,
-                "array_focus_indices": [0],
-            }
-        ],
-    },
-})
+
+_VALID_CIR = json.dumps(
+    {
+        "cir": {
+            "version": "0.1.0",
+            "title": "Test",
+            "domain": "algorithm",
+            "summary": "Test summary.",
+            "steps": [
+                {
+                    "id": "step_01",
+                    "title": "Step 1",
+                    "narration": "Test narration.",
+                    "visual_kind": "array",
+                    "tokens": [{"id": "t0", "label": "A", "value": None, "emphasis": "primary"}],
+                    "annotations": [],
+                }
+            ],
+        },
+        "execution_map": {
+            "duration_s": 2,
+            "checkpoints": [
+                {
+                    "id": "cp1",
+                    "step_index": 0,
+                    "step_id": "step_01",
+                    "visual_kind": "array",
+                    "title": "Step 1",
+                    "summary": "Show the active array state.",
+                    "start_s": 0,
+                    "end_s": 2,
+                    "array_focus_indices": [0],
+                }
+            ],
+        },
+    }
+)
 
 
 class _MockLLM:
@@ -135,6 +138,7 @@ def client(tmp_path):
     db = str(tmp_path / "test.db")
     init_db(db)
     repo = SqliteRunRepository(db)
+    span_repo = SqliteRunSpanRepository(db)
     director_repo = SqliteRunDirectorRepository(db)
 
     app = create_app()
@@ -142,6 +146,7 @@ def client(tmp_path):
     # rate limiting so they don't bump into the production threshold.
     app.state.limiter.enabled = False
     app.dependency_overrides[get_run_repo] = lambda: repo
+    app.dependency_overrides[get_span_repo] = lambda: span_repo
     app.dependency_overrides[get_run_director_repo] = lambda: director_repo
     app.dependency_overrides[get_llm_provider] = lambda: _MockLLM()
 
@@ -155,6 +160,7 @@ def test_post_pipeline_returns_202_with_run_id(client) -> None:
     data = resp.json()
     assert "run_id" in data
     assert data["status"] == "queued"
+    assert "telemetry" not in data
 
 
 def test_get_run_returns_404_for_unknown_id(client) -> None:
@@ -172,6 +178,9 @@ def test_get_run_returns_run_after_creation(client) -> None:
     assert data["run_id"] == run_id
     assert data["quality_report"]["status"] in {"clean", "warnings"}
     assert data["quality_report"]["generator_path"] == "generic_cir"
+    assert data["telemetry"]["generator_path"] == "generic_cir"
+    assert data["telemetry"]["single_model_requests"] == 1
+    assert data["telemetry"]["time_to_final_result_ms"] is not None
 
 
 def test_list_runs_returns_array(client) -> None:
@@ -182,6 +191,7 @@ def test_list_runs_returns_array(client) -> None:
     assert resp.status_code == 200
     assert isinstance(resp.json(), list)
     assert len(resp.json()) >= 2
+    assert all("telemetry" not in run for run in resp.json())
 
 
 def test_delete_run_removes_created_run(client) -> None:

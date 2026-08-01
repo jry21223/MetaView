@@ -8,8 +8,10 @@ import pytest
 from app.application.dto.pipeline_dto import PipelineRequest
 from app.application.use_cases.run_pipeline import RunPipelineUseCase as _RunPipelineUseCase
 from app.domain.models.pipeline_run import PipelineRunStatus
+from app.domain.models.run_span import RunStage
 from app.infrastructure.persistence.db_init import init_db
 from app.infrastructure.persistence.sqlite_run_repository import SqliteRunRepository
+from app.infrastructure.persistence.sqlite_span_repository import SqliteRunSpanRepository
 from tests.coverage_test_utils import ComposableCoverageResolver
 
 RunPipelineUseCase = partial(
@@ -114,21 +116,25 @@ async def test_bad_shape_reviewer_fixes_and_persists_review(repo) -> None:
         }
     )
     generator = SequenceLLM([bad])
-    reviewer = SequenceLLM([
-        json.dumps(
-            {
-                "action": "correct",
-                "issues": [],
-                "corrected": json.loads(fixed),
-                "fix_instructions": None,
-            }
-        )
-    ])
+    reviewer = SequenceLLM(
+        [
+            json.dumps(
+                {
+                    "action": "correct",
+                    "issues": [],
+                    "corrected": json.loads(fixed),
+                    "fix_instructions": None,
+                }
+            )
+        ]
+    )
+    span_repo = SqliteRunSpanRepository(repo._db_path)
     use_case = RunPipelineUseCase(
         repo,
         generator,
         reviewer_llm=reviewer,
         max_repair_attempts=1,
+        span_repo=span_repo,
     )
     await repo.create("run-1", "画函数", "2024-01-01T00:00:00+00:00")
 
@@ -141,6 +147,15 @@ async def test_bad_shape_reviewer_fixes_and_persists_review(repo) -> None:
     assert result.review is not None
     assert result.review.attempts == 1
     assert result.review.status == "repaired"
+    spans = await span_repo.list_for_run("run-1")
+    reviewer_span = next(span for span in spans if span.stage == RunStage.REVIEWER)
+    assert reviewer_span.status == "ok"
+    assert reviewer_span.model_turns == 1
+    assert reviewer_span.metadata == {
+        "review_kind": "cir",
+        "review_action": "correct",
+        "review_issue_codes": [],
+    }
 
 
 @pytest.mark.asyncio
@@ -166,16 +181,18 @@ async def test_formula_vector_field_critic_returns_corrected_scene(repo) -> None
     )
     fixed = _combined(_valid_scene_cir())
     generator = SequenceLLM([bad])
-    reviewer = SequenceLLM([
-        json.dumps(
-            {
-                "action": "correct",
-                "issues": [],
-                "corrected": json.loads(fixed),
-                "fix_instructions": None,
-            }
-        )
-    ])
+    reviewer = SequenceLLM(
+        [
+            json.dumps(
+                {
+                    "action": "correct",
+                    "issues": [],
+                    "corrected": json.loads(fixed),
+                    "fix_instructions": None,
+                }
+            )
+        ]
+    )
     use_case = RunPipelineUseCase(
         repo,
         generator,
@@ -442,7 +459,13 @@ async def test_canonical_gate_repairs_with_generator_when_reviewer_is_off(repo) 
         ],
     }
     generator = SequenceLLM([_combined(cir, invalid_map), _combined(cir, fixed_map)])
-    use_case = RunPipelineUseCase(repo, generator, reviewer_mode="off")
+    span_repo = SqliteRunSpanRepository(repo._db_path)
+    use_case = RunPipelineUseCase(
+        repo,
+        generator,
+        reviewer_mode="off",
+        span_repo=span_repo,
+    )
     await repo.create("run-quality-repair", "看数组", "2024-01-01T00:00:00+00:00")
 
     await use_case.execute(
@@ -458,3 +481,19 @@ async def test_canonical_gate_repairs_with_generator_when_reviewer_is_off(repo) 
     assert result.quality_report.status in {"clean", "warnings"}
     assert result.quality_report.attempts == 1
     assert "quality:repair_attempt:1" in result.quality_report.actions
+    spans = await span_repo.list_for_run("run-quality-repair")
+    quality_gates = [span for span in spans if span.stage == RunStage.QUALITY_GATE]
+    quality_gates.sort(key=lambda span: span.attempt_index)
+    assert [span.attempt_index for span in quality_gates] == [0, 1]
+    assert [span.status for span in quality_gates] == ["error", "ok"]
+    assert len({span.parent_span_id for span in quality_gates}) == 1
+    repair_span = next(span for span in spans if span.stage == RunStage.QUALITY_REPAIR)
+    repair_generation = next(
+        span
+        for span in spans
+        if span.stage == RunStage.GENERATION_SINGLE and span.parent_span_id == repair_span.span_id
+    )
+    assert repair_span.attempt_index == 0
+    assert repair_span.metadata["repair_reason"] == "canonical_quality"
+    assert "algorithm.invalid_state_transition" in repair_span.metadata["issue_codes"]
+    assert repair_generation.metadata["reason"] == "canonical_quality"

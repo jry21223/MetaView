@@ -17,6 +17,7 @@ from app.application.ports.ops_dashboard_repository import IOpsDashboardReposito
 from app.application.ports.payment_gateway import IPaymentGateway
 from app.application.ports.router_provider import IRouterProvider
 from app.application.ports.run_repository import IRunRepository
+from app.application.ports.span_repository import IRunSpanRepository
 from app.application.services.coverage_resolver import DefaultCoverageResolver
 from app.application.use_cases.account import AccountUseCase
 from app.application.use_cases.newapi_topup import NewApiTopupUseCase
@@ -42,6 +43,7 @@ from app.infrastructure.persistence.sqlite_ops_dashboard_repository import (
     SqliteOpsDashboardRepository,
 )
 from app.infrastructure.persistence.sqlite_run_repository import SqliteRunRepository
+from app.infrastructure.persistence.sqlite_span_repository import SqliteRunSpanRepository
 from app.infrastructure.router.llm_router_provider import LLMRouterProvider
 
 logger = logging.getLogger(__name__)
@@ -50,6 +52,11 @@ logger = logging.getLogger(__name__)
 @lru_cache
 def _get_run_repo(db_path: str) -> SqliteRunRepository:
     return SqliteRunRepository(db_path)
+
+
+@lru_cache
+def _get_span_repo(db_path: str) -> SqliteRunSpanRepository:
+    return SqliteRunSpanRepository(db_path)
 
 
 @lru_cache
@@ -95,6 +102,12 @@ def _get_openai_provider(
 
 def get_run_repo(settings: Annotated[Settings, Depends(get_settings)]) -> IRunRepository:
     return _get_run_repo(settings.history_db_path)
+
+
+def get_span_repo(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> IRunSpanRepository:
+    return _get_span_repo(settings.history_db_path)
 
 
 def get_run_director_repo(
@@ -306,8 +319,7 @@ _MOCK_ALGORITHM_CIR: dict = {
             "id": "step_01",
             "title": "Initial State",
             "narration": (
-                "This is a mock response."
-                " Configure an API key to generate real content."
+                "This is a mock response. Configure an API key to generate real content."
             ),
             "visual_kind": "array",
             "tokens": [
@@ -409,8 +421,6 @@ class _MockLLMProvider:
         from app.domain.services.domain_router import keyword_hint
 
         payload = (
-            _MOCK_MATH_CIR
-            if keyword_hint(user or "") == TopicDomain.MATH
-            else _MOCK_ALGORITHM_CIR
+            _MOCK_MATH_CIR if keyword_hint(user or "") == TopicDomain.MATH else _MOCK_ALGORITHM_CIR
         )
         return json.dumps(payload)

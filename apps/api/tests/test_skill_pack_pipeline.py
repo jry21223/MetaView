@@ -11,6 +11,7 @@ from app.application.dto.pipeline_dto import PipelineRequest
 from app.application.use_cases.run_pipeline import RunPipelineUseCase
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.domain.models.playbook import PlaybookScript
+from app.domain.models.run_span import RunSpan, RunStage
 from app.domain.skills.base import (
     SkillCapability,
     SkillExecutionContext,
@@ -37,9 +38,7 @@ class _RecordingRepo:
         self.quality_reports.append({"run_id": run_id, "report": json.loads(quality_report_json)})
 
     async def update_lesson_plan(self, run_id: str, lesson_plan_json: str) -> None:
-        self.lesson_plans.append(
-            {"run_id": run_id, "lesson_plan": json.loads(lesson_plan_json)}
-        )
+        self.lesson_plans.append({"run_id": run_id, "lesson_plan": json.loads(lesson_plan_json)})
 
     @property
     def final_status(self) -> PipelineRunStatus:
@@ -48,6 +47,17 @@ class _RecordingRepo:
     @property
     def review_json(self) -> str:
         return self.updates[-1].get("review_json") or "{}"
+
+
+class _CaptureSpanRepo:
+    def __init__(self) -> None:
+        self._spans: dict[str, RunSpan] = {}
+
+    async def record(self, span: RunSpan) -> None:
+        self._spans[span.span_id] = span
+
+    async def list_for_run(self, run_id: str) -> list[RunSpan]:
+        return [span for span in self._spans.values() if span.run_id == run_id]
 
 
 class _FailingLLM:
@@ -263,7 +273,13 @@ async def test_new_skill_can_run_without_pipeline_changes() -> None:
     skill = FakeSkillPack()
     registry = SkillRegistry([skill])
     repo = _RecordingRepo()
-    use_case = RunPipelineUseCase(repo, _FailingLLM(), skill_registry=registry)
+    span_repo = _CaptureSpanRepo()
+    use_case = RunPipelineUseCase(
+        repo,
+        _FailingLLM(),
+        skill_registry=registry,
+        span_repo=span_repo,
+    )
 
     await use_case.execute("run-fake", PipelineRequest(prompt="fake skill test"))
 
@@ -275,15 +291,24 @@ async def test_new_skill_can_run_without_pipeline_changes() -> None:
     assert repo.lesson_plans[-1]["lesson_plan"] == (
         skill.contexts[0].lesson_plan.model_dump(mode="json")
     )
+    spans = await span_repo.list_for_run("run-fake")
+    skill_span = next(span for span in spans if span.stage == RunStage.SKILL_PACK)
+    quality_span = next(span for span in spans if span.stage == RunStage.QUALITY_GATE)
+    assert skill_span.status == "ok"
+    assert skill_span.metadata["skill_id"] == "fake_skill"
+    assert quality_span.status == "ok"
+    assert quality_span.metadata["quality_status"] == "clean"
 
 
 @pytest.mark.asyncio
 async def test_specialized_skill_quality_error_cannot_succeed() -> None:
     repo = _RecordingRepo()
+    span_repo = _CaptureSpanRepo()
     use_case = RunPipelineUseCase(
         repo,
         _FailingLLM(),
         skill_registry=SkillRegistry([MissingAssetSkillPack()]),
+        span_repo=span_repo,
     )
 
     await use_case.execute(
@@ -298,6 +323,13 @@ async def test_specialized_skill_quality_error_cannot_succeed() -> None:
         "asset.missing",
         "quality.repair_unavailable",
     }
+    spans = await span_repo.list_for_run("run-missing-asset")
+    skill_span = next(span for span in spans if span.stage == RunStage.SKILL_PACK)
+    quality_span = next(span for span in spans if span.stage == RunStage.QUALITY_GATE)
+    assert skill_span.status == "ok"
+    assert quality_span.status == "error"
+    assert quality_span.error_code == "asset.missing"
+    assert quality_span.metadata["quality_status"] == "repairable"
 
 
 @pytest.mark.asyncio

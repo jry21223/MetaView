@@ -51,6 +51,16 @@ class GenerationMetrics:
     repair_count: int | None = None
     input_tokens: int | None = None
     output_tokens: int | None = None
+    cache_read_tokens: int | None = None
+    cache_write_tokens: int | None = None
+    generation_model_turns: int | None = None
+    tool_batches: int | None = None
+    tool_calls: int | None = None
+    single_model_requests: int | None = None
+    agent_provider_calls: int | None = None
+    agent_attempts: int | None = None
+    reviewer_calls: int | None = None
+    quality_repair_calls: int | None = None
     estimated_cost: float | None = None
     warning_count: int | None = None
     run_id: str | None = None
@@ -104,6 +114,16 @@ def _generate_live_v2(
         repair_count=result.repair_count,
         input_tokens=result.input_tokens,
         output_tokens=result.output_tokens,
+        cache_read_tokens=result.cache_read_tokens,
+        cache_write_tokens=result.cache_write_tokens,
+        generation_model_turns=result.generation_model_turns,
+        tool_batches=result.tool_batches,
+        tool_calls=result.tool_calls,
+        single_model_requests=result.single_model_requests,
+        agent_provider_calls=result.agent_provider_calls,
+        agent_attempts=result.agent_attempts,
+        reviewer_calls=result.reviewer_calls,
+        quality_repair_calls=result.quality_repair_calls,
         estimated_cost=result.estimated_cost,
         warning_count=result.warning_count,
         run_id=result.run_id,
@@ -326,11 +346,13 @@ def _run_v2(
     report = _v2_report(attempts_by_case, "live" if args.live else "recorded", repeats)
     report_path = _write_report(report, args.output)
     print(f"\n  Report saved: {report_path}")
-    return 0 if all(
-        attempt.card.passed
-        for attempts in attempts_by_case.values()
-        for attempt in attempts
-    ) else 1
+    return (
+        0
+        if all(
+            attempt.card.passed for attempts in attempts_by_case.values() for attempt in attempts
+        )
+        else 1
+    )
 
 
 def _structure_signature(raw_json: str) -> str | None:
@@ -395,9 +417,7 @@ def _summarize_attempts(attempts: list[V2Attempt]) -> dict[str, Any]:
         "attempt_count": len(attempts),
         "passed_attempts": sum(attempt.card.passed for attempt in attempts),
         "success_rate": (
-            sum(attempt.card.passed for attempt in attempts) / len(attempts)
-            if attempts
-            else 0.0
+            sum(attempt.card.passed for attempt in attempts) / len(attempts) if attempts else 0.0
         ),
         "structure_similarity": _structure_similarity(
             [attempt.structure_signature for attempt in attempts]
@@ -407,6 +427,28 @@ def _summarize_attempts(attempts: list[V2Attempt]) -> dict[str, Any]:
         "repair_count": _optional_stats([attempt.metrics.repair_count for attempt in attempts]),
         "input_tokens": _optional_stats([attempt.metrics.input_tokens for attempt in attempts]),
         "output_tokens": _optional_stats([attempt.metrics.output_tokens for attempt in attempts]),
+        "cache_read_tokens": _optional_stats(
+            [attempt.metrics.cache_read_tokens for attempt in attempts]
+        ),
+        "cache_write_tokens": _optional_stats(
+            [attempt.metrics.cache_write_tokens for attempt in attempts]
+        ),
+        "generation_model_turns": _optional_stats(
+            [attempt.metrics.generation_model_turns for attempt in attempts]
+        ),
+        "tool_batches": _optional_stats([attempt.metrics.tool_batches for attempt in attempts]),
+        "tool_calls": _optional_stats([attempt.metrics.tool_calls for attempt in attempts]),
+        "single_model_requests": _optional_stats(
+            [attempt.metrics.single_model_requests for attempt in attempts]
+        ),
+        "agent_provider_calls": _optional_stats(
+            [attempt.metrics.agent_provider_calls for attempt in attempts]
+        ),
+        "agent_attempts": _optional_stats([attempt.metrics.agent_attempts for attempt in attempts]),
+        "reviewer_calls": _optional_stats([attempt.metrics.reviewer_calls for attempt in attempts]),
+        "quality_repair_calls": _optional_stats(
+            [attempt.metrics.quality_repair_calls for attempt in attempts]
+        ),
         "estimated_cost": _optional_stats([attempt.metrics.estimated_cost for attempt in attempts]),
     }
 
@@ -458,9 +500,7 @@ def _v2_report(
         "attempt_count": len(attempts),
         "passed_attempts": sum(attempt.card.passed for attempt in attempts),
         "success_rate": (
-            sum(attempt.card.passed for attempt in attempts) / len(attempts)
-            if attempts
-            else 0.0
+            sum(attempt.card.passed for attempt in attempts) / len(attempts) if attempts else 0.0
         ),
         "cases": [
             {

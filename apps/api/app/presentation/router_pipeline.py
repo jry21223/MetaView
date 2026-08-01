@@ -14,6 +14,7 @@ from app.application.ports.director_repository import IRunDirectorRepository
 from app.application.ports.llm_provider import ILLMProvider
 from app.application.ports.router_provider import IRouterProvider
 from app.application.ports.run_repository import IRunRepository
+from app.application.ports.span_repository import IRunSpanRepository
 from app.application.use_cases.account import AccountUseCase, InsufficientBalanceError
 from app.application.use_cases.run_pipeline import RunPipelineUseCase
 from app.config import Settings, get_settings
@@ -30,6 +31,7 @@ from app.presentation.dependencies import (
     get_router_provider,
     get_run_director_repo,
     get_run_repo,
+    get_span_repo,
 )
 from app.presentation.edition_policy import require_wechat_session
 from app.presentation.rate_limit import write_limit
@@ -37,7 +39,12 @@ from app.presentation.rate_limit import write_limit
 router = APIRouter(prefix="/pipeline", tags=["pipeline"])
 
 
-@router.post("", response_model=PipelineRunResponse, status_code=202)
+@router.post(
+    "",
+    response_model=PipelineRunResponse,
+    response_model_exclude={"telemetry"},
+    status_code=202,
+)
 @write_limit()
 async def submit_pipeline(
     request: Request,
@@ -45,6 +52,7 @@ async def submit_pipeline(
     background_tasks: BackgroundTasks,
     settings: Annotated[Settings, Depends(get_settings)],
     run_repo: Annotated[IRunRepository, Depends(get_run_repo)],
+    span_repo: Annotated[IRunSpanRepository, Depends(get_span_repo)],
     director_repo: Annotated[IRunDirectorRepository, Depends(get_run_director_repo)],
     llm: Annotated[ILLMProvider, Depends(get_llm_provider)],
     reviewer_llm: Annotated[ILLMProvider | None, Depends(get_reviewer_llm_provider)],
@@ -136,9 +144,8 @@ async def submit_pipeline(
         router_mode=router_mode,
         router_min_confidence=router_min_confidence,
         router_refine_confidence=router_refine_confidence,
-        coverage_resolver=(
-            coverage_resolver if payload.router_min_confidence is None else None
-        ),
+        coverage_resolver=(coverage_resolver if payload.router_min_confidence is None else None),
+        span_repo=span_repo,
     )
     background_tasks.add_task(
         _execute_pipeline_with_optional_refund,

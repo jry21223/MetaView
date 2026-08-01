@@ -14,6 +14,16 @@ class LiveGenerationResult:
     repair_count: int | None
     input_tokens: int | None
     output_tokens: int | None
+    cache_read_tokens: int | None
+    cache_write_tokens: int | None
+    generation_model_turns: int | None
+    tool_batches: int | None
+    tool_calls: int | None
+    single_model_requests: int | None
+    agent_provider_calls: int | None
+    agent_attempts: int | None
+    reviewer_calls: int | None
+    quality_repair_calls: int | None
     estimated_cost: float | None
     warning_count: int | None
 
@@ -105,6 +115,48 @@ def generate_live_playbook_with_metadata(
                 repair_count=_repair_count(data),
                 input_tokens=_integer_metric(data, "input_tokens", "inputTokens"),
                 output_tokens=_integer_metric(data, "output_tokens", "outputTokens"),
+                cache_read_tokens=_integer_metric(
+                    data,
+                    "cache_read_tokens",
+                    "cacheReadTokens",
+                ),
+                cache_write_tokens=_integer_metric(
+                    data,
+                    "cache_write_tokens",
+                    "cacheWriteTokens",
+                ),
+                generation_model_turns=_integer_metric(
+                    data,
+                    "generation_model_turns",
+                    "generationModelTurns",
+                ),
+                tool_batches=_integer_metric(data, "tool_batches", "toolBatches"),
+                tool_calls=_integer_metric(data, "tool_calls", "toolCalls"),
+                single_model_requests=_integer_metric(
+                    data,
+                    "single_model_requests",
+                    "singleModelRequests",
+                ),
+                agent_provider_calls=_integer_metric(
+                    data,
+                    "agent_provider_calls",
+                    "agentProviderCalls",
+                ),
+                agent_attempts=_integer_metric(
+                    data,
+                    "agent_attempts",
+                    "agentAttempts",
+                ),
+                reviewer_calls=_integer_metric(
+                    data,
+                    "reviewer_calls",
+                    "reviewerCalls",
+                ),
+                quality_repair_calls=_integer_metric(
+                    data,
+                    "quality_repair_calls",
+                    "qualityRepairCalls",
+                ),
                 estimated_cost=_number_metric(data, "estimated_cost", "estimatedCost"),
                 warning_count=warning_count,
             )

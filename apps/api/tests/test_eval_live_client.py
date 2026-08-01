@@ -32,15 +32,17 @@ def test_generate_live_playbook_submits_and_polls_current_api(monkeypatch) -> No
         assert json == {"prompt": "hello", "domain": "code"}
         return _Response({"run_id": "run-1"})
 
-    statuses = iter([
-        {"run_id": "run-1", "status": "running"},
-        {
-            "run_id": "run-1",
-            "status": "succeeded",
-            "playbook": {"title": "ok"},
-            "quality_report": {"attempts": 0, "issues": []},
-        },
-    ])
+    statuses = iter(
+        [
+            {"run_id": "run-1", "status": "running"},
+            {
+                "run_id": "run-1",
+                "status": "succeeded",
+                "playbook": {"title": "ok"},
+                "quality_report": {"attempts": 0, "issues": []},
+            },
+        ]
+    )
 
     def get(url: str, *, timeout: int) -> _Response:
         calls.append(url)
@@ -85,7 +87,20 @@ def test_generate_live_playbook_preserves_available_metrics_and_nulls(monkeypatc
                 "status": "succeeded",
                 "playbook": {"title": "ok"},
                 "review": {"attempts": 2, "issues": [{"severity": "warning"}]},
-                "telemetry": {"input_tokens": 123, "outputTokens": 45},
+                "telemetry": {
+                    "input_tokens": 123,
+                    "outputTokens": 45,
+                    "cache_read_tokens": 80,
+                    "cache_write_tokens": 10,
+                    "generation_model_turns": 4,
+                    "tool_batches": 3,
+                    "tool_calls": 7,
+                    "single_model_requests": 0,
+                    "agent_provider_calls": 2,
+                    "agent_attempts": 3,
+                    "reviewer_calls": 2,
+                    "quality_repair_calls": 1,
+                },
             }
         ),
     )
@@ -101,6 +116,17 @@ def test_generate_live_playbook_preserves_available_metrics_and_nulls(monkeypatc
     assert result.repair_count == 2
     assert result.input_tokens == 123
     assert result.output_tokens == 45
+    assert result.cache_read_tokens == 80
+    assert result.cache_write_tokens == 10
+    assert result.generation_model_turns == 4
+    assert result.tool_batches == 3
+    assert result.tool_calls == 7
+    assert not hasattr(result, "total_model_requests")
+    assert result.single_model_requests == 0
+    assert result.agent_provider_calls == 2
+    assert result.agent_attempts == 3
+    assert result.reviewer_calls == 2
+    assert result.quality_repair_calls == 1
     assert result.warning_count == 1
     assert result.estimated_cost is None
 
@@ -148,5 +174,16 @@ def test_generate_live_playbook_reads_repair_count_from_quality_report(monkeypat
     assert result.repair_count == 3
     assert result.input_tokens is None
     assert result.output_tokens is None
+    assert result.cache_read_tokens is None
+    assert result.cache_write_tokens is None
+    assert result.generation_model_turns is None
+    assert result.tool_batches is None
+    assert result.tool_calls is None
+    assert not hasattr(result, "total_model_requests")
+    assert result.single_model_requests is None
+    assert result.agent_provider_calls is None
+    assert result.agent_attempts is None
+    assert result.reviewer_calls is None
+    assert result.quality_repair_calls is None
     assert result.estimated_cost is None
     assert result.warning_count == 0

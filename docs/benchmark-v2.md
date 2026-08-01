@@ -101,8 +101,12 @@ outside pole.
 
 Reports are written under ignored `eval/reports/`. A missing live
 QualityReport/warning count is itself an invalid live result; the harness does
-not invent a zero. Available latency, repair, token, and cost fields are
-recorded, and unsupported telemetry stays `null`.
+not invent a zero. Available latency, repair, token, cache read/write,
+generation model-turn, tool-batch/tool-call, single-provider, agent-provider,
+agent-attempt, reviewer, quality-repair, and cost fields are recorded;
+unsupported telemetry stays `null`. These meanings and their deliberate lack
+of a partial `total_model_requests` are defined in
+[`pipeline-observability.md`](./pipeline-observability.md).
 
 The checked-in legacy CIR fixtures currently serve as negative migration
 evidence and are expected to fail the strict V2 gate. Do not lower thresholds

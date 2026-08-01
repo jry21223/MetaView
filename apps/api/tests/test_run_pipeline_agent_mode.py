@@ -19,6 +19,14 @@ from app.application.agent.types import AgentRequest, AgentResult
 from app.application.dto.pipeline_dto import PipelineRequest
 from app.application.ports.agent_provider import AgentProviderError
 from app.application.use_cases.run_pipeline import RunPipelineUseCase as _RunPipelineUseCase
+from app.domain.models.quality_report import QualityReport
+from app.domain.models.review import (
+    PlaybookIssueSeverity,
+    PlaybookReviewIssue,
+    PlaybookReviewStatus,
+    PlaybookReviewVerdict,
+)
+from app.domain.models.run_span import RunSpan, RunStage
 from app.domain.skills.registry import SkillRegistry
 from tests.coverage_test_utils import ComposableCoverageResolver
 
@@ -47,14 +55,10 @@ class _RecordingRepo:
         self.updates.append({"run_id": run_id, **kwargs})
 
     async def update_quality_report(self, run_id: str, quality_report_json: str) -> None:
-        self.quality_reports.append(
-            {"run_id": run_id, "report": json.loads(quality_report_json)}
-        )
+        self.quality_reports.append({"run_id": run_id, "report": json.loads(quality_report_json)})
 
     async def update_lesson_plan(self, run_id: str, lesson_plan_json: str) -> None:
-        self.lesson_plans.append(
-            {"run_id": run_id, "lesson_plan": json.loads(lesson_plan_json)}
-        )
+        self.lesson_plans.append({"run_id": run_id, "lesson_plan": json.loads(lesson_plan_json)})
 
 
 class _RecordingDirectorRepo:
@@ -69,6 +73,17 @@ class _RecordingDirectorRepo:
 
     async def delete(self, run_id: str) -> bool:
         return False
+
+
+class _CaptureSpanRepo:
+    def __init__(self) -> None:
+        self._spans: dict[str, RunSpan] = {}
+
+    async def record(self, span: RunSpan) -> None:
+        self._spans[span.span_id] = span
+
+    async def list_for_run(self, run_id: str) -> list[RunSpan]:
+        return [span for span in self._spans.values() if span.run_id == run_id]
 
 
 class _RaisingLLM:
@@ -87,11 +102,13 @@ class _FakeAgent:
         provider_config: dict[str, Any] | None = None,
         route_decision: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        self.calls.append({
-            "prompt": prompt,
-            "provider_config": provider_config,
-            "route_decision": route_decision,
-        })
+        self.calls.append(
+            {
+                "prompt": prompt,
+                "provider_config": provider_config,
+                "route_decision": route_decision,
+            }
+        )
         return self.playbook
 
 
@@ -112,6 +129,114 @@ class _RunOnlyAgent:
         )
 
 
+class _TelemetryRunAgent:
+    async def run(self, request: AgentRequest) -> AgentResult:  # noqa: ARG002
+        return AgentResult(
+            playbook=_MIN_PLAYBOOK,
+            provider="pi",
+            runtime_events=[
+                {
+                    "event": "agent.attempt.completed",
+                    "detail": {
+                        "attempt_index": 0,
+                        "started_at": "2026-08-01T04:00:00.100Z",
+                        "finished_at": "2026-08-01T04:00:00.900Z",
+                        "duration_ms": 800,
+                        "outcome": "succeeded",
+                        "error_code": None,
+                        "provider": "openai",
+                        "model": "gpt-test",
+                        "model_turns": 2,
+                        "tool_batches": 1,
+                        "tool_calls": 2,
+                        "usage": {
+                            "input_tokens": 250,
+                            "output_tokens": 35,
+                            "cache_read_tokens": 80,
+                            "cache_write_tokens": 10,
+                        },
+                    },
+                },
+                {
+                    "event": "agent.self_check.completed",
+                    "detail": {
+                        "attempt_index": 0,
+                        "status": "clean",
+                        "issue_codes": [],
+                    },
+                },
+                {
+                    "event": "sidecar.completed",
+                    "detail": {
+                        "started_at": "2026-08-01T04:00:00.000Z",
+                        "finished_at": "2026-08-01T04:00:01.000Z",
+                        "duration_ms": 1_000,
+                        "outcome": "succeeded",
+                    },
+                },
+            ],
+            artifacts={
+                "usage": {
+                    "input_tokens": 250,
+                    "output_tokens": 35,
+                    "cache_read_tokens": 80,
+                    "cache_write_tokens": 10,
+                },
+                "attempts": 1,
+            },
+        )
+
+
+class _TelemetryFailingRunAgent:
+    async def run(self, request: AgentRequest) -> AgentResult:  # noqa: ARG002
+        runtime_events = [
+            {
+                "event": "agent.attempt.completed",
+                "detail": {
+                    "attempt_index": 0,
+                    "started_at": "2026-08-01T04:00:00.100Z",
+                    "finished_at": "2026-08-01T04:00:00.900Z",
+                    "duration_ms": 800,
+                    "outcome": "failed",
+                    "error_code": "ProviderError",
+                    "model_turns": 1,
+                    "tool_batches": 0,
+                    "tool_calls": 0,
+                    "usage": {
+                        "input_tokens": 12,
+                        "output_tokens": 3,
+                        "cache_read_tokens": 2,
+                        "cache_write_tokens": 0,
+                    },
+                },
+            },
+            {
+                "event": "sidecar.failed",
+                "detail": {
+                    "started_at": "2026-08-01T04:00:00.000Z",
+                    "finished_at": "2026-08-01T04:00:01.000Z",
+                    "duration_ms": 1_000,
+                    "outcome": "failed",
+                    "error_code": "ProviderError",
+                },
+            },
+        ]
+        raise AgentProviderError(
+            "agent sidecar returned 500: provider failed",
+            runtime_events=runtime_events,
+            artifacts={
+                "usage": {
+                    "input_tokens": 12,
+                    "output_tokens": 3,
+                    "cache_read_tokens": 2,
+                    "cache_write_tokens": 0,
+                },
+                "attempts": 1,
+            },
+            status_code=500,
+        )
+
+
 class _SequenceAgent:
     def __init__(self, playbooks: list[dict[str, Any]]) -> None:
         self.playbooks = playbooks
@@ -123,11 +248,13 @@ class _SequenceAgent:
         provider_config: dict[str, Any] | None = None,
         route_decision: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        self.calls.append({
-            "prompt": prompt,
-            "provider_config": provider_config,
-            "route_decision": route_decision,
-        })
+        self.calls.append(
+            {
+                "prompt": prompt,
+                "provider_config": provider_config,
+                "route_decision": route_decision,
+            }
+        )
         index = min(len(self.calls) - 1, len(self.playbooks) - 1)
         return self.playbooks[index]
 
@@ -196,9 +323,7 @@ def _algorithm_step(index: int) -> dict[str, Any]:
             {"id": "t3", "label": "2", "value": "2", "emphasis": "secondary"},
         ],
         "code_highlight": None,
-        "narration_template": [
-            f"Show the array state {index} and explain the array result."
-        ],
+        "narration_template": [f"Show the array state {index} and explain the array result."],
         "snapshot": snapshot,
         "layers": [
             {
@@ -256,11 +381,13 @@ def _motion_step(index: int) -> dict[str, Any]:
 
 
 def _reviewer_response(status: str, issues: list[dict[str, Any]] | None = None) -> str:
-    return json.dumps({
-        "status": status,
-        "summary": f"Reviewer returned {status}.",
-        "issues": issues or [],
-    })
+    return json.dumps(
+        {
+            "status": status,
+            "summary": f"Reviewer returned {status}.",
+            "issues": issues or [],
+        }
+    )
 
 
 def _blocking_issue(code: str = "review.final_answer_missing") -> dict[str, Any]:
@@ -309,9 +436,7 @@ async def test_agent_mode_routes_to_agent_provider() -> None:
         reviewer_mode="off",
     )
 
-    await use_case.execute(
-        "run-1", PipelineRequest(prompt="hello math", domain="algorithm")
-    )
+    await use_case.execute("run-1", PipelineRequest(prompt="hello math", domain="algorithm"))
 
     assert "[MetaView LessonPlan]" in agent.calls[0]["prompt"]
     assert agent.calls[0]["prompt"].endswith("[user prompt]\nhello math")
@@ -366,6 +491,71 @@ async def test_agent_mode_calls_wide_run_contract_when_available() -> None:
     assert request.lesson_plan.domain == "math"
     assert repo.lesson_plans[-1]["lesson_plan"] == request.lesson_plan.model_dump(mode="json")
     assert repo.updates[-1]["status"].value == "succeeded"
+
+
+@pytest.mark.asyncio
+async def test_agent_mode_records_provider_sidecar_and_attempt_span_tree() -> None:
+    repo = _RecordingRepo()
+    span_repo = _CaptureSpanRepo()
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        agent_provider=_TelemetryRunAgent(),
+        generation_mode="agent",
+        reviewer_mode="off",
+        span_repo=span_repo,
+    )
+
+    await use_case.execute(
+        "run-agent-telemetry",
+        PipelineRequest(prompt="hello math", domain="math"),
+    )
+
+    spans = await span_repo.list_for_run("run-agent-telemetry")
+    provider = next(span for span in spans if span.stage == RunStage.GENERATION_AGENT_PROVIDER)
+    sidecar = next(span for span in spans if span.stage == RunStage.AGENT_SIDECAR)
+    attempt = next(span for span in spans if span.stage == RunStage.AGENT_ATTEMPT)
+    assert provider.status == "ok"
+    assert sidecar.parent_span_id == provider.span_id
+    assert sidecar.started_at == "2026-08-01T04:00:00.000Z"
+    assert attempt.parent_span_id == sidecar.span_id
+    assert attempt.started_at == "2026-08-01T04:00:00.100Z"
+    assert attempt.input_tokens == 250
+    assert attempt.model_turns == 2
+    assert attempt.tool_calls == 2
+
+
+@pytest.mark.asyncio
+async def test_agent_mode_retains_failed_sidecar_attempt_under_error_provider_span() -> None:
+    repo = _RecordingRepo()
+    span_repo = _CaptureSpanRepo()
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        agent_provider=_TelemetryFailingRunAgent(),
+        generation_mode="agent",
+        reviewer_mode="off",
+        span_repo=span_repo,
+    )
+
+    await use_case.execute(
+        "run-agent-failed-telemetry",
+        PipelineRequest(prompt="hello math", domain="math"),
+    )
+
+    spans = await span_repo.list_for_run("run-agent-failed-telemetry")
+    provider = next(span for span in spans if span.stage == RunStage.GENERATION_AGENT_PROVIDER)
+    sidecar = next(span for span in spans if span.stage == RunStage.AGENT_SIDECAR)
+    attempt = next(span for span in spans if span.stage == RunStage.AGENT_ATTEMPT)
+    assert provider.status == "error"
+    assert provider.error_code == "agent.provider_error"
+    assert sidecar.parent_span_id == provider.span_id
+    assert sidecar.status == "error"
+    assert attempt.parent_span_id == sidecar.span_id
+    assert attempt.status == "error"
+    assert attempt.input_tokens == 12
+    assert attempt.cache_read_tokens == 2
+    assert attempt.model_turns == 1
 
 
 @pytest.mark.asyncio
@@ -476,6 +666,7 @@ async def test_agent_mode_math_always_requires_reviewer_in_math_domain() -> None
 @pytest.mark.asyncio
 async def test_agent_mode_clean_output_records_self_check_and_reviewer_status() -> None:
     repo = _RecordingRepo()
+    span_repo = _CaptureSpanRepo()
     agent = _FakeAgent(_MIN_PLAYBOOK)
     reviewer = _SequenceReviewer([_reviewer_response("clean")])
     use_case = RunPipelineUseCase(
@@ -484,6 +675,7 @@ async def test_agent_mode_clean_output_records_self_check_and_reviewer_status() 
         reviewer_llm=reviewer,
         agent_provider=agent,
         generation_mode="agent",
+        span_repo=span_repo,
     )
 
     await use_case.execute(
@@ -496,6 +688,14 @@ async def test_agent_mode_clean_output_records_self_check_and_reviewer_status() 
     assert "agent:self_check:clean" in review["actions"]
     assert "reviewer:model:critic-test" in review["actions"]
     assert "reviewer:status:clean" in review["actions"]
+    spans = await span_repo.list_for_run("run-clean")
+    reviewer_span = next(span for span in spans if span.stage == RunStage.REVIEWER)
+    quality_span = next(span for span in spans if span.stage == RunStage.QUALITY_GATE)
+    assert reviewer_span.status == "ok"
+    assert reviewer_span.model == "critic-test"
+    assert reviewer_span.model_turns == 1
+    assert quality_span.status == "ok"
+    assert quality_span.metadata["quality_status"] == "clean"
 
 
 @pytest.mark.asyncio
@@ -507,12 +707,14 @@ async def test_agent_mode_self_check_blocked_repairs_before_persisting() -> None
     agent = _SequenceAgent([blocked, repaired])
     reviewer = _SequenceReviewer([_reviewer_response("clean")])
     repo = _RecordingRepo()
+    span_repo = _CaptureSpanRepo()
     use_case = RunPipelineUseCase(
         repo,
         _RaisingLLM(),
         reviewer_llm=reviewer,
         agent_provider=agent,
         generation_mode="agent",
+        span_repo=span_repo,
     )
 
     await use_case.execute(
@@ -529,6 +731,16 @@ async def test_agent_mode_self_check_blocked_repairs_before_persisting() -> None
     assert "agent:self_check:blocked" in review["actions"]
     assert "agent:self_repair_attempt:1" in review["actions"]
     assert "agent:self_check:clean" in review["actions"]
+    spans = await span_repo.list_for_run("run-self-repair")
+    provider_spans = [span for span in spans if span.stage == RunStage.GENERATION_AGENT_PROVIDER]
+    provider_spans.sort(key=lambda span: span.attempt_index)
+    assert [span.attempt_index for span in provider_spans] == [0, 1]
+    assert len({span.parent_span_id for span in provider_spans}) == 1
+    assert [span.metadata["reason"] for span in provider_spans] == [
+        "initial",
+        "agent_self_repair",
+    ]
+    assert "step.empty_voiceover" in provider_spans[1].metadata["issue_codes"]
 
 
 @pytest.mark.asyncio
@@ -537,17 +749,21 @@ async def test_agent_mode_reviewer_blocked_repairs_and_reruns_reviewer() -> None
     repaired = _playbook_copy()
     repaired["title"] = "Repaired Sample"
     agent = _SequenceAgent([initial, repaired])
-    reviewer = _SequenceReviewer([
-        _reviewer_response("blocked", [_blocking_issue()]),
-        _reviewer_response("clean"),
-    ])
+    reviewer = _SequenceReviewer(
+        [
+            _reviewer_response("blocked", [_blocking_issue()]),
+            _reviewer_response("clean"),
+        ]
+    )
     repo = _RecordingRepo()
+    span_repo = _CaptureSpanRepo()
     use_case = RunPipelineUseCase(
         repo,
         _RaisingLLM(),
         reviewer_llm=reviewer,
         agent_provider=agent,
         generation_mode="agent",
+        span_repo=span_repo,
     )
 
     await use_case.execute(
@@ -566,15 +782,103 @@ async def test_agent_mode_reviewer_blocked_repairs_and_reruns_reviewer() -> None
     assert "reviewer:status:blocked" in review["actions"]
     assert "reviewer:repair_attempt:1" in review["actions"]
     assert "reviewer:status:clean" in review["actions"]
+    spans = await span_repo.list_for_run("run-reviewer-repair")
+    reviewer_spans = [span for span in spans if span.stage == RunStage.REVIEWER]
+    reviewer_spans.sort(key=lambda span: span.attempt_index)
+    assert [span.attempt_index for span in reviewer_spans] == [0, 1]
+    assert len({span.parent_span_id for span in reviewer_spans}) == 1
+    assert all(span.model_turns == 1 for span in reviewer_spans)
+    provider_spans = [span for span in spans if span.stage == RunStage.GENERATION_AGENT_PROVIDER]
+    provider_spans.sort(key=lambda span: span.attempt_index)
+    assert provider_spans[1].metadata["reason"] == "reviewer_repair"
+    assert provider_spans[1].metadata["issue_codes"] == ["review.final_answer_missing"]
+
+
+@pytest.mark.asyncio
+async def test_agent_canonical_repair_records_quality_gates_as_sibling_attempts(
+    monkeypatch,
+) -> None:
+    gate_calls = 0
+
+    def quality_gate_sequence(*args: Any, **kwargs: Any) -> QualityReport:  # noqa: ARG001
+        nonlocal gate_calls
+        gate_calls += 1
+        if gate_calls == 1:
+            issue = PlaybookReviewIssue(
+                code="algorithm.invalid_state_transition",
+                severity=PlaybookIssueSeverity.ERROR,
+                path="steps[1].snapshot",
+                message="The first candidate has a repairable transition.",
+                suggestion="Repair the transition.",
+                requires_repair=True,
+            )
+            verdict = PlaybookReviewVerdict(
+                status=PlaybookReviewStatus.BLOCKED,
+                summary="Repair the transition.",
+                issues=[issue],
+                actions=[],
+            )
+        else:
+            verdict = PlaybookReviewVerdict(
+                status=PlaybookReviewStatus.CLEAN,
+                summary="The repaired candidate is clean.",
+                issues=[],
+                actions=["quality:repair_attempt:1"],
+            )
+        return QualityReport.from_review_verdict(
+            verdict,
+            generator_path="agent",
+            coverage_mode="composable",
+        )
+
+    monkeypatch.setattr(
+        "app.application.use_cases.run_pipeline._quality_report_with_review",
+        quality_gate_sequence,
+    )
+    repo = _RecordingRepo()
+    span_repo = _CaptureSpanRepo()
+    agent = _SequenceAgent([_playbook_copy(), _playbook_copy()])
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        agent_provider=agent,
+        generation_mode="agent",
+        reviewer_mode="off",
+        span_repo=span_repo,
+    )
+
+    await use_case.execute(
+        "run-agent-canonical-repair",
+        PipelineRequest(prompt="Show the array", domain="algorithm"),
+    )
+
+    spans = await span_repo.list_for_run("run-agent-canonical-repair")
+    quality_gates = sorted(
+        (span for span in spans if span.stage == RunStage.QUALITY_GATE),
+        key=lambda span: span.attempt_index,
+    )
+    assert [span.attempt_index for span in quality_gates] == [0, 1]
+    assert len({span.parent_span_id for span in quality_gates}) == 1
+    assert [span.status for span in quality_gates] == ["error", "ok"]
+    repair = next(span for span in spans if span.stage == RunStage.QUALITY_REPAIR)
+    repair_provider = next(
+        span
+        for span in spans
+        if span.stage == RunStage.GENERATION_AGENT_PROVIDER
+        and span.parent_span_id == repair.span_id
+    )
+    assert repair_provider.metadata["reason"] == "quality_repair"
 
 
 @pytest.mark.asyncio
 async def test_agent_mode_reviewer_blocked_after_max_attempts_fails() -> None:
     agent = _SequenceAgent([_playbook_copy(), _playbook_copy()])
-    reviewer = _SequenceReviewer([
-        _reviewer_response("blocked", [_blocking_issue("review.missing_answer")]),
-        _reviewer_response("blocked", [_blocking_issue("review.still_missing_answer")]),
-    ])
+    reviewer = _SequenceReviewer(
+        [
+            _reviewer_response("blocked", [_blocking_issue("review.missing_answer")]),
+            _reviewer_response("blocked", [_blocking_issue("review.still_missing_answer")]),
+        ]
+    )
     repo = _RecordingRepo()
     use_case = RunPipelineUseCase(
         repo,
@@ -769,9 +1073,7 @@ async def test_agent_mode_rejects_invalid_third_party_reviewer_output() -> None:
         generation_mode="agent",
     )
 
-    await use_case.execute(
-        "run-1", PipelineRequest(prompt="hello math", domain="algorithm")
-    )
+    await use_case.execute("run-1", PipelineRequest(prompt="hello math", domain="algorithm"))
 
     last = repo.updates[-1]
     assert last["status"].value == "failed"
@@ -784,24 +1086,26 @@ async def test_agent_mode_rejects_invalid_third_party_reviewer_output() -> None:
 async def test_agent_mode_persists_third_party_reviewer_warnings() -> None:
     repo = _RecordingRepo()
     agent = _FakeAgent(_MIN_PLAYBOOK)
-    reviewer = _SequenceReviewer([
-        json.dumps(
-            {
-                "status": "warnings",
-                "summary": "Useful but shallow.",
-                "issues": [
-                    {
-                        "code": "step.too_shallow",
-                        "severity": "warning",
-                        "path": "steps[0]",
-                        "message": "The step could carry more reasoning.",
-                        "suggestion": "Add a comparison or decision point.",
-                        "requires_repair": False,
-                    }
-                ],
-            }
-        )
-    ])
+    reviewer = _SequenceReviewer(
+        [
+            json.dumps(
+                {
+                    "status": "warnings",
+                    "summary": "Useful but shallow.",
+                    "issues": [
+                        {
+                            "code": "step.too_shallow",
+                            "severity": "warning",
+                            "path": "steps[0]",
+                            "message": "The step could carry more reasoning.",
+                            "suggestion": "Add a comparison or decision point.",
+                            "requires_repair": False,
+                        }
+                    ],
+                }
+            )
+        ]
+    )
     use_case = RunPipelineUseCase(
         repo,
         _RaisingLLM(),
@@ -810,9 +1114,7 @@ async def test_agent_mode_persists_third_party_reviewer_warnings() -> None:
         generation_mode="agent",
     )
 
-    await use_case.execute(
-        "run-1", PipelineRequest(prompt="hello math", domain="algorithm")
-    )
+    await use_case.execute("run-1", PipelineRequest(prompt="hello math", domain="algorithm"))
 
     last = repo.updates[-1]
     assert last["status"].value == "succeeded"
@@ -841,9 +1143,7 @@ async def test_single_mode_does_not_call_agent() -> None:
         agent_provider=agent,
         generation_mode="single",
     )
-    await use_case.execute(
-        "run-1", PipelineRequest(prompt="single", domain="algorithm")
-    )
+    await use_case.execute("run-1", PipelineRequest(prompt="single", domain="algorithm"))
 
     # Agent must never be invoked.
     assert agent.calls == []

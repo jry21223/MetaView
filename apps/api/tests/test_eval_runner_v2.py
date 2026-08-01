@@ -51,6 +51,16 @@ def test_v2_summary_keeps_unavailable_api_metrics_null() -> None:
         "repair_count",
         "input_tokens",
         "output_tokens",
+        "cache_read_tokens",
+        "cache_write_tokens",
+        "generation_model_turns",
+        "tool_batches",
+        "tool_calls",
+        "single_model_requests",
+        "agent_provider_calls",
+        "agent_attempts",
+        "reviewer_calls",
+        "quality_repair_calls",
         "estimated_cost",
     ):
         assert summary[metric] == {"values": [None, None, None], "mean": None, "sum": None}
@@ -126,6 +136,16 @@ def test_v2_live_runner_reports_real_metrics_and_preserves_missing_cost(
                 repair_count=1,
                 input_tokens=100,
                 output_tokens=50,
+                cache_read_tokens=40,
+                cache_write_tokens=5,
+                generation_model_turns=2,
+                tool_batches=1,
+                tool_calls=3,
+                single_model_requests=0,
+                agent_provider_calls=1,
+                agent_attempts=2,
+                reviewer_calls=2,
+                quality_repair_calls=1,
                 estimated_cost=None,
                 warning_count=0,
                 run_id="live-run",
@@ -152,6 +172,17 @@ def test_v2_live_runner_reports_real_metrics_and_preserves_missing_cost(
     assert summary["repair_count"]["mean"] == 1.0
     assert summary["input_tokens"]["sum"] == 300.0
     assert summary["output_tokens"]["sum"] == 150.0
+    assert summary["cache_read_tokens"]["sum"] == 120.0
+    assert summary["cache_write_tokens"]["sum"] == 15.0
+    assert summary["generation_model_turns"]["sum"] == 6.0
+    assert summary["tool_batches"]["sum"] == 3.0
+    assert summary["tool_calls"]["sum"] == 9.0
+    assert "total_model_requests" not in summary
+    assert summary["single_model_requests"]["sum"] == 0.0
+    assert summary["agent_provider_calls"]["sum"] == 3.0
+    assert summary["agent_attempts"]["sum"] == 6.0
+    assert summary["reviewer_calls"]["sum"] == 6.0
+    assert summary["quality_repair_calls"]["sum"] == 3.0
     assert summary["estimated_cost"] == {
         "values": [None, None, None],
         "mean": None,

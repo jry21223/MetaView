@@ -26,6 +26,12 @@ def _create_pipeline_runs(conn: sqlite3.Connection) -> None:
     _add_column_if_missing(conn, "pipeline_runs", "quality_report_json", "TEXT")
     _add_column_if_missing(conn, "pipeline_runs", "lesson_plan_json", "TEXT")
     _add_column_if_missing(conn, "pipeline_runs", "coverage_decision_json", "TEXT")
+    # Run-level telemetry. ``created_at`` alone cannot separate queue time from
+    # execution time, so start/finish are tracked explicitly.
+    _add_column_if_missing(conn, "pipeline_runs", "started_at", "TEXT")
+    _add_column_if_missing(conn, "pipeline_runs", "finished_at", "TEXT")
+    _add_column_if_missing(conn, "pipeline_runs", "generator_path", "TEXT")
+    _add_column_if_missing(conn, "pipeline_runs", "total_duration_ms", "INTEGER")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS pipeline_run_followups (
             followup_id    TEXT PRIMARY KEY,
@@ -68,6 +74,54 @@ def _create_pipeline_runs(conn: sqlite3.Connection) -> None:
             updated_at    TEXT NOT NULL,
             FOREIGN KEY(run_id) REFERENCES pipeline_runs(run_id)
         )
+    """)
+
+
+def _create_pipeline_run_spans(conn: sqlite3.Connection) -> None:
+    """Per-stage telemetry for a run.
+
+    One row per stage attempt. Retry structure lives in
+    ``parent_span_id`` + ``attempt_index`` rather than a summary counter, so a
+    query can tell a sidecar self-repair apart from a canonical quality repair.
+    """
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS pipeline_run_spans (
+            span_id              TEXT PRIMARY KEY,
+            run_id               TEXT NOT NULL,
+            parent_span_id       TEXT,
+            stage                TEXT NOT NULL,
+            attempt_index        INTEGER NOT NULL DEFAULT 0,
+            status               TEXT NOT NULL,
+
+            started_at           TEXT NOT NULL,
+            finished_at          TEXT,
+            duration_ms          INTEGER,
+
+            provider             TEXT,
+            model                TEXT,
+
+            input_tokens         INTEGER,
+            output_tokens        INTEGER,
+            cache_read_tokens    INTEGER,
+            cache_write_tokens   INTEGER,
+
+            model_turns          INTEGER,
+            tool_batches         INTEGER,
+            tool_calls           INTEGER,
+
+            error_code           TEXT,
+            metadata_json        TEXT,
+
+            FOREIGN KEY(run_id) REFERENCES pipeline_runs(run_id)
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_pipeline_run_spans_run_id
+        ON pipeline_run_spans(run_id, started_at)
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_pipeline_run_spans_stage
+        ON pipeline_run_spans(stage)
     """)
 
 
@@ -211,9 +265,7 @@ def _migrate_legacy_pipeline_runs(conn: sqlite3.Connection) -> None:
     _create_pipeline_runs(conn)
     legacy_cols = _columns(conn, "pipeline_runs_legacy")
     status_expr = (
-        "COALESCE(NULLIF(status, ''), 'succeeded')"
-        if "status" in legacy_cols
-        else "'succeeded'"
+        "COALESCE(NULLIF(status, ''), 'succeeded')" if "status" in legacy_cols else "'succeeded'"
     )
     error_expr = "error_message" if "error_message" in legacy_cols else "NULL"
     review_expr = "review_json" if "review_json" in legacy_cols else "NULL"
@@ -241,6 +293,9 @@ def init_db(db_path: str) -> None:
         _create_newapi_topups(conn)
         _create_wechat_replay_cache(conn)
         _migrate_legacy_pipeline_runs(conn)
+        # The legacy migration may rename and recreate ``pipeline_runs``. Build
+        # the dependent span table only after that canonical table is final.
+        _create_pipeline_run_spans(conn)
         try:
             conn.execute("ALTER TABLE pipeline_runs ADD COLUMN review_json TEXT")
         except sqlite3.OperationalError as exc:

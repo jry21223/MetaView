@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import uuid
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -28,6 +29,7 @@ from app.application.ports.run_repository import (
     InteractionVersionConflictError,
     IRunRepository,
 )
+from app.application.ports.span_repository import IRunSpanRepository
 from app.application.use_cases.account import AccountUseCase, InsufficientBalanceError
 from app.application.use_cases.follow_up import FollowUpPatchError, FollowUpPatchUseCase
 from app.config import Settings, get_settings
@@ -46,15 +48,21 @@ from app.presentation.dependencies import (
     get_llm_provider,
     get_run_director_repo,
     get_run_repo,
+    get_span_repo,
 )
 from app.presentation.edition_policy import require_wechat_session
 from app.presentation.rate_limit import read_limit, write_limit
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 _RUN_LOCKS: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+logger = logging.getLogger(__name__)
 
 
-@router.get("", response_model=list[PipelineRunResponse])
+@router.get(
+    "",
+    response_model=list[PipelineRunResponse],
+    response_model_exclude={"__all__": {"telemetry"}},
+)
 @read_limit()
 async def list_runs(
     request: Request,
@@ -78,6 +86,7 @@ async def get_run(
     settings: Annotated[Settings, Depends(get_settings)],
     run_repo: Annotated[IRunRepository, Depends(get_run_repo)],
     director_repo: Annotated[IRunDirectorRepository, Depends(get_run_director_repo)],
+    span_repo: Annotated[IRunSpanRepository, Depends(get_span_repo)],
     account_use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
 ) -> PipelineRunResponse:
     owner = await _owner_session(request, response, settings, account_use_case)
@@ -86,6 +95,10 @@ async def get_run(
     if run is None:
         raise HTTPException(status_code=404, detail=f"Run {run_id!r} not found")
     run.director = await director_repo.get(run_id)
+    try:
+        run.telemetry = await span_repo.summarize(run_id)
+    except Exception:  # noqa: BLE001 - read telemetry is best-effort too.
+        logger.warning("Failed to summarize telemetry for run %s", run_id, exc_info=True)
     return run
 
 

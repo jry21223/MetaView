@@ -39,6 +39,17 @@ class IRunRepository(Protocol):
 
     async def update_playbook_json(self, run_id: str, playbook_json: str) -> None: ...
 
+    async def mark_started(self, run_id: str, started_at: str) -> None: ...
+
+    async def mark_finished(
+        self,
+        run_id: str,
+        finished_at: str,
+        *,
+        generator_path: str | None = None,
+        total_duration_ms: int | None = None,
+    ) -> None: ...
+
     async def update_quality_report(self, run_id: str, quality_report_json: str) -> None: ...
 
     async def update_lesson_plan(self, run_id: str, lesson_plan_json: str) -> None: ...

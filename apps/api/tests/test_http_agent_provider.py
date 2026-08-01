@@ -171,9 +171,7 @@ async def test_run_posts_wide_agent_request_and_returns_agent_result() -> None:
     assert seen["provider"] == {"model": "gpt-4o-mini"}
     assert seen["route_decision"] == {"destination": "generic_cir"}
     assert seen["coverage_decision"]["mode"] == "experimental"
-    assert seen["coverage_decision"]["missing_capabilities"] == [
-        "validator:line_graph"
-    ]
+    assert seen["coverage_decision"]["missing_capabilities"] == ["validator:line_graph"]
     assert seen["lesson_plan"] == lesson_plan.model_dump(mode="json")
     assert seen["playbook_schema"] == {"type": "object"}
     assert seen["available_tools"][0]["name"] == "playbook.schema.validate"
@@ -189,10 +187,18 @@ async def test_forwards_provider_config_when_user_key_supplied() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         seen.update(json.loads(request.content))
         return httpx.Response(
-            200, json={"playbook": {
-                "fps": 30, "total_frames": 1, "domain": "math",
-                "title": "t", "summary": "s", "steps": [], "parameter_controls": [],
-            }}
+            200,
+            json={
+                "playbook": {
+                    "fps": 30,
+                    "total_frames": 1,
+                    "domain": "math",
+                    "title": "t",
+                    "summary": "s",
+                    "steps": [],
+                    "parameter_controls": [],
+                }
+            },
         )
 
     provider = _make_provider_with_handler(handler)
@@ -241,6 +247,70 @@ async def test_500_response_raises_agent_provider_error() -> None:
         await provider.generate("prompt")
     assert "500" in str(excinfo.value)
     assert "sidecar exploded" in str(excinfo.value)
+
+
+@pytest.mark.asyncio
+async def test_500_response_preserves_telemetry_without_echoing_response_body() -> None:
+    runtime_events = [
+        {
+            "event": "agent.attempt.completed",
+            "detail": {
+                "attempt_index": 0,
+                "outcome": "failed",
+                "started_at": "2026-08-01T04:00:00Z",
+                "finished_at": "2026-08-01T04:00:01Z",
+                "duration_ms": 1_000,
+                "error_code": "Error",
+                "model_turns": 1,
+                "usage": {
+                    "input_tokens": 12,
+                    "output_tokens": 3,
+                    "cache_read_tokens": 2,
+                    "cache_write_tokens": 0,
+                },
+            },
+        },
+        {
+            "event": "sidecar.failed",
+            "detail": {
+                "started_at": "2026-08-01T04:00:00Z",
+                "finished_at": "2026-08-01T04:00:01Z",
+                "duration_ms": 1_000,
+                "error_code": "Error",
+            },
+        },
+    ]
+    artifacts = {
+        "usage": {
+            "input_tokens": 12,
+            "output_tokens": 3,
+            "cache_read_tokens": 2,
+            "cache_write_tokens": 0,
+        },
+        "attempts": 1,
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            500,
+            json={
+                "detail": "provider failed",
+                "runtime_events": runtime_events,
+                "artifacts": artifacts,
+                "playbook": {"prompt": "LEAK_ME"},
+            },
+        )
+
+    provider = _make_provider_with_handler(handler)
+    with pytest.raises(AgentProviderError) as excinfo:
+        await provider.generate("prompt")
+
+    error = excinfo.value
+    assert error.status_code == 500
+    assert error.runtime_events == runtime_events
+    assert error.artifacts == artifacts
+    assert "provider failed" in str(error)
+    assert "LEAK_ME" not in str(error)
 
 
 @pytest.mark.asyncio

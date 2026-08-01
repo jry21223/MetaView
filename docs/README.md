@@ -18,6 +18,7 @@
 | [START_HERE.md](./START_HERE.md) | 当前唯一入门入口：产品主线、部署默认、Director/Playbook 边界、下一步优先级 |
 | [director-layer.md](./director-layer.md) | Director 独立导演层：运镜、节奏、镜头、强调、RenderPlan 和阶段路线 |
 | [pipeline.md](./pipeline.md) | single / agent 生成路径、PlaybookScript、DirectorScript 挂载点、视频导出管线 |
+| [pipeline-observability.md](./pipeline-observability.md) | Pipeline run/span schema、阶段树、计数语义、诊断 SQL 与 process E2E |
 | [lesson-plan.md](./lesson-plan.md) | 三条生成路径共享的教学规划契约、持久化、边界与当前限制 |
 | [coverage-and-fallback.md](./coverage-and-fallback.md) | CoverageDecision 四种能力模式、受控组合、阻断与持久化边界 |
 | [skill-recipe.md](./skill-recipe.md) | composable 请求的临时执行契约、确定性验证和安全边界 |

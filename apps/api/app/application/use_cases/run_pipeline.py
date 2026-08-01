@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import re
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from json import JSONDecodeError
@@ -12,7 +13,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from app.application.agent.runtime_tool_hub import RuntimeToolHub
-from app.application.agent.types import AgentConstraints, AgentRequest
+from app.application.agent.types import AgentConstraints, AgentRequest, AgentResult
 from app.application.dto.pipeline_dto import PipelineRequest
 from app.application.ports.agent_provider import AgentProviderError, IAgentProvider
 from app.application.ports.coverage_resolver import ICoverageResolver
@@ -21,8 +22,16 @@ from app.application.ports.lesson_planner import ILessonPlanner
 from app.application.ports.llm_provider import ILLMProvider
 from app.application.ports.router_provider import IRouterProvider
 from app.application.ports.run_repository import IRunRepository
+from app.application.ports.span_repository import IRunSpanRepository
+from app.application.services.agent_span_translator import record_agent_result_spans
 from app.application.services.coverage_resolver import DefaultCoverageResolver
 from app.application.services.lesson_planner import RuleBasedLessonPlanner
+from app.application.services.run_telemetry import (
+    RunTelemetry,
+    SpanHandle,
+    activate,
+    current_telemetry,
+)
 from app.config import GenerationMode, RouterMode
 from app.domain.models.cir import CirDocument, ExecutionMap
 from app.domain.models.coverage import CoverageDecision, CoverageMode
@@ -40,6 +49,7 @@ from app.domain.models.review import (
     ReviewSeverity,
 )
 from app.domain.models.route_decision import RouteDecision
+from app.domain.models.run_span import RunStage, TokenUsage
 from app.domain.services.cir_prompt import build_cir_prompt
 from app.domain.services.cir_quality import validate_cir_quality
 from app.domain.services.director_builder import build_default_director
@@ -70,6 +80,65 @@ logger = logging.getLogger(__name__)
 AGENT_SELF_REPAIR_ATTEMPTS = 2
 AGENT_REVIEWER_REPAIR_ATTEMPTS = 1
 CANONICAL_QUALITY_REPAIR_ATTEMPTS = 1
+TELEMETRY_FLUSH_TIMEOUT_S = 0.25
+_UNSET = object()
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _provided_update_values(
+    *,
+    playbook_json: str | None | object,
+    error: str | None | object,
+    review_json: str | None | object,
+) -> dict[str, str | None]:
+    values: dict[str, str | None] = {}
+    for key, value in (
+        ("playbook_json", playbook_json),
+        ("error", error),
+        ("review_json", review_json),
+    ):
+        if value is not _UNSET:
+            assert isinstance(value, str) or value is None
+            values[key] = value
+    return values
+
+
+async def _best_effort(target: Any, method: str, *args: Any, **kwargs: Any) -> None:
+    """Call an optional telemetry method on a collaborator.
+
+    Missing (test fakes) and failing (disk full, locked DB) are both tolerated:
+    observability must never change a run's outcome.
+    """
+    func = getattr(target, method, None)
+    if not callable(func):
+        return
+    try:
+        await func(*args, **kwargs)
+    except Exception:  # noqa: BLE001 - telemetry must never fail a run.
+        logger.warning("Telemetry call %s failed", method, exc_info=True)
+
+
+async def _record_agent_spans_best_effort(
+    result: AgentResult | None,
+    *,
+    runtime_events: list[dict[str, Any]] | None = None,
+    artifacts: dict[str, Any] | None = None,
+    parent_span_id: str | None = None,
+) -> None:
+    """Translate sidecar telemetry without affecting generation semantics."""
+    try:
+        await record_agent_result_spans(
+            current_telemetry(),
+            result,
+            runtime_events=runtime_events,
+            artifacts=artifacts,
+            parent_span_id=parent_span_id,
+        )
+    except Exception:  # noqa: BLE001 - telemetry must never fail a run.
+        logger.warning("Failed to translate agent telemetry", exc_info=True)
 
 
 @dataclass(frozen=True)
@@ -87,6 +156,14 @@ class RouteContext:
     coverage_decision: CoverageDecision
     fallback: str = "none"
     router_model: str | None = None
+
+
+@dataclass(frozen=True)
+class PendingTerminalUpdate:
+    status: PipelineRunStatus
+    playbook_json: str | None | object = _UNSET
+    error: str | None | object = _UNSET
+    review_json: str | None | object = _UNSET
 
 
 class RunPipelineUseCase:
@@ -108,8 +185,10 @@ class RunPipelineUseCase:
         router_refine_confidence: float = 0.55,
         lesson_planner: ILessonPlanner | None = None,
         coverage_resolver: ICoverageResolver | None = None,
+        span_repo: IRunSpanRepository | None = None,
     ) -> None:
         self._repo = run_repo
+        self._span_repo = span_repo
         self._llm = llm
         self._reviewer_llm = reviewer_llm
         self._max_repair_attempts = max(0, max_repair_attempts)
@@ -135,9 +214,113 @@ class RunPipelineUseCase:
             refine_confidence=router_refine_confidence,
         )
         self._coverage_by_run: dict[str, CoverageDecision] = {}
+        # One telemetry recorder per in-flight run. Populated in ``execute`` and
+        # dropped in its ``finally`` so concurrent runs never share a recorder.
+        # Taken from the QualityReport that actually gets persisted, so it
+        # reflects the path after any fallback rather than the configured mode.
+        self._generator_path_by_run: dict[str, str] = {}
+        self._quality_outcome_by_run: dict[str, tuple[str, str | None]] = {}
+        self._terminal_update_by_run: dict[str, PendingTerminalUpdate] = {}
 
     async def execute(self, run_id: str, request: PipelineRequest) -> None:
+        telemetry = RunTelemetry(self._span_repo, run_id)
+        started_perf = time.perf_counter()
+        externally_cancelled = False
+        await _best_effort(self._repo, "mark_started", run_id, _utc_now_iso())
         await self._repo.update(run_id, status=PipelineRunStatus.RUNNING)
+        try:
+            with activate(telemetry):
+                async with telemetry.span(RunStage.PIPELINE_TOTAL) as total_span:
+                    await self._execute_inner(run_id, request, total_span)
+                    if total_span.status == "running":
+                        status, error_code = self._quality_outcome_by_run.get(
+                            run_id,
+                            ("ok", None),
+                        )
+                        total_span.status = status  # type: ignore[assignment]
+                        if error_code is not None:
+                            total_span.set_error(error_code)
+        except asyncio.CancelledError:
+            externally_cancelled = True
+            raise
+        finally:
+            finished_at = _utc_now_iso()
+            total_duration_ms = int((time.perf_counter() - started_perf) * 1000)
+            generator_path = self._generator_path_by_run.pop(run_id, None)
+            try:
+                # The generation timeout wraps only generation work. Ordered
+                # telemetry drains afterward and is bounded so a locked sink
+                # can delay, but never fail or time out, the run itself.
+                await _best_effort(
+                    telemetry,
+                    "flush",
+                    timeout_s=TELEMETRY_FLUSH_TIMEOUT_S,
+                )
+                if externally_cancelled:
+                    self._terminal_update_by_run.pop(run_id, None)
+                else:
+                    await _best_effort(
+                        self._repo,
+                        "mark_finished",
+                        run_id,
+                        finished_at,
+                        generator_path=generator_path,
+                        total_duration_ms=total_duration_ms,
+                    )
+                    await self._commit_terminal_update(run_id)
+            finally:
+                self._coverage_by_run.pop(run_id, None)
+                self._quality_outcome_by_run.pop(run_id, None)
+
+    async def _update_run(
+        self,
+        run_id: str,
+        *,
+        status: PipelineRunStatus,
+        playbook_json: str | None | object = _UNSET,
+        error: str | None | object = _UNSET,
+        review_json: str | None | object = _UNSET,
+    ) -> None:
+        if status in {PipelineRunStatus.SUCCEEDED, PipelineRunStatus.FAILED}:
+            self._terminal_update_by_run[run_id] = PendingTerminalUpdate(
+                status=status,
+                playbook_json=playbook_json,
+                error=error,
+                review_json=review_json,
+            )
+            return
+        values = _provided_update_values(
+            playbook_json=playbook_json,
+            error=error,
+            review_json=review_json,
+        )
+        await self._repo.update(
+            run_id,
+            status=status,
+            **values,
+        )
+
+    async def _commit_terminal_update(self, run_id: str) -> None:
+        update = self._terminal_update_by_run.pop(run_id, None)
+        if update is None:
+            return
+        values = _provided_update_values(
+            playbook_json=update.playbook_json,
+            error=update.error,
+            review_json=update.review_json,
+        )
+        await self._repo.update(
+            run_id,
+            status=update.status,
+            **values,
+        )
+
+    async def _execute_inner(
+        self,
+        run_id: str,
+        request: PipelineRequest,
+        total_span: SpanHandle,
+    ) -> None:
         try:
             if self._generation_mode == "agent" and self._agent_provider is not None:
                 from app.application.agent.pipeline import AgentPipeline
@@ -188,6 +371,11 @@ class RunPipelineUseCase:
             )
         except TimeoutError:
             timeout = self._pipeline_timeout_s
+            # The exception is handled here rather than re-raised, so the span
+            # status has to be set explicitly — otherwise a timed-out run would
+            # be recorded as a clean one.
+            total_span.status = "timeout"
+            total_span.set_error("pipeline.timeout")
             logger.exception("Pipeline run %s timed out after %.1fs", run_id, timeout)
             quality_report = _terminal_quality_report(
                 generator_path=("agent" if self._generation_mode == "agent" else "generic_cir"),
@@ -198,12 +386,14 @@ class RunPipelineUseCase:
                 suggestion="Retry the run or reduce generation complexity.",
             )
             await self._persist_quality_report(run_id, quality_report)
-            await self._repo.update(
+            await self._update_run(
                 run_id,
                 status=PipelineRunStatus.FAILED,
                 error=f"Pipeline timed out after {timeout:.1f}s",
             )
         except Exception as exc:  # noqa: BLE001 - terminal state must always be persisted.
+            total_span.status = "error"
+            total_span.set_error("quality.generation_failed")
             logger.exception("Pipeline run %s failed before candidate finalization", run_id)
             quality_report = _terminal_quality_report(
                 generator_path=("agent" if self._generation_mode == "agent" else "generic_cir"),
@@ -214,13 +404,11 @@ class RunPipelineUseCase:
                 suggestion="Inspect the provider or SkillPack failure and retry.",
             )
             await self._persist_quality_report(run_id, quality_report)
-            await self._repo.update(
+            await self._update_run(
                 run_id,
                 status=PipelineRunStatus.FAILED,
                 error=str(exc),
             )
-        finally:
-            self._coverage_by_run.pop(run_id, None)
 
     async def _execute_routed_single_pipeline(
         self,
@@ -236,6 +424,13 @@ class RunPipelineUseCase:
             request,
             route_context=route_context,
         )
+        if route_match is None or route_context.coverage_decision.mode != "specialized":
+            await current_telemetry().record_completed(
+                RunStage.SKILL_PACK,
+                duration_ms=0,
+                status="skipped",
+                metadata={"reason": "no_specialized_route"},
+            )
         if route_match is not None and route_context.coverage_decision.mode == "specialized":
             try:
                 handled = await self._try_execute_skill(
@@ -274,7 +469,24 @@ class RunPipelineUseCase:
             raise
 
     async def _route_request(self, request: PipelineRequest) -> SkillRouteMatch | None:
+        async with current_telemetry().span(RunStage.ROUTER) as span:
+            match = await self._route_request_inner(request, span)
+            span.merge_metadata(
+                {
+                    "router_mode": self._router_mode,
+                    "matched": match is not None,
+                    "skill_id": match.skill_id if match is not None else None,
+                }
+            )
+            return match
+
+    async def _route_request_inner(
+        self,
+        request: PipelineRequest,
+        span: SpanHandle,
+    ) -> SkillRouteMatch | None:
         if request.skill_mode_override == "generic":
+            span.merge_metadata({"skipped": "skill_mode_override=generic"})
             return None
 
         mode = self._router_mode
@@ -286,9 +498,16 @@ class RunPipelineUseCase:
                     source_code=request.source_code,
                     language=request.language,
                 )
+                span.set_model(model=getattr(self._router_provider, "model_name", None))
                 model_match = await self._router_provider.route(
                     request=route_input,
                     manifests=self._skill_registry.manifests(),
+                )
+                span.merge_metadata(
+                    {
+                        "router_llm": "ok",
+                        "confidence": (model_match.confidence if model_match is not None else None),
+                    }
                 )
                 if (
                     model_match is not None
@@ -304,6 +523,7 @@ class RunPipelineUseCase:
                         model_match.confidence,
                     )
             except Exception as exc:  # noqa: BLE001 - route fallback is intentional.
+                span.merge_metadata({"router_llm": "failed"})
                 logger.warning("Skill router failed; falling back to registry heuristic: %s", exc)
 
         if mode in {"heuristic", "hybrid"}:
@@ -323,14 +543,22 @@ class RunPipelineUseCase:
         request: PipelineRequest,
         route_match: SkillRouteMatch | None,
     ) -> RouteContext | None:
-        coverage_decision = self._coverage_resolver.resolve(
-            prompt=request.prompt,
-            source_code=request.source_code,
-            language=request.language,
-            explicit_domain=request.domain,
-            skill_mode_override=request.skill_mode_override,
-            route_match=route_match,
-        )
+        async with current_telemetry().span(RunStage.COVERAGE_RESOLUTION) as span:
+            coverage_decision = self._coverage_resolver.resolve(
+                prompt=request.prompt,
+                source_code=request.source_code,
+                language=request.language,
+                explicit_domain=request.domain,
+                skill_mode_override=request.skill_mode_override,
+                route_match=route_match,
+            )
+            span.merge_metadata(
+                {
+                    "mode": coverage_decision.mode,
+                    "domain": coverage_decision.domain,
+                    "available_tool_count": len(coverage_decision.available_tool_ids),
+                }
+            )
         self._coverage_by_run[run_id] = coverage_decision
         update_coverage_decision = getattr(self._repo, "update_coverage_decision", None)
         if callable(update_coverage_decision):
@@ -377,7 +605,7 @@ class RunPipelineUseCase:
             actions=actions,
         )
         await self._persist_quality_report(run_id, report)
-        await self._repo.update(
+        await self._update_run(
             run_id,
             status=PipelineRunStatus.FAILED,
             error=coverage_decision.reason,
@@ -439,9 +667,7 @@ class RunPipelineUseCase:
             route,
             coverage_decision,
             fallback=(
-                fallback
-                if fallback != "none"
-                else f"coverage:{coverage_decision.fallback_policy}"
+                fallback if fallback != "none" else f"coverage:{coverage_decision.fallback_policy}"
             ),
             router_model=getattr(self._router_provider, "model_name", None),
         )
@@ -453,17 +679,24 @@ class RunPipelineUseCase:
         *,
         route_context: RouteContext,
     ) -> LessonPlan:
-        lesson_plan = await self._lesson_planner.plan(
-            prompt=request.prompt,
-            domain=(
-                route_context.coverage_decision.domain
-                or route_context.decision.domain
-                or request.domain
-            ),
-            route_decision=route_context.decision,
-            source_code=request.source_code,
-            language=request.language,
-        )
+        async with current_telemetry().span(RunStage.LESSON_PLAN) as span:
+            lesson_plan = await self._lesson_planner.plan(
+                prompt=request.prompt,
+                domain=(
+                    route_context.coverage_decision.domain
+                    or route_context.decision.domain
+                    or request.domain
+                ),
+                route_decision=route_context.decision,
+                source_code=request.source_code,
+                language=request.language,
+            )
+            span.merge_metadata(
+                {
+                    "planner": type(self._lesson_planner).__name__,
+                    "scene_count": len(lesson_plan.scenes),
+                }
+            )
         update_lesson_plan = getattr(self._repo, "update_lesson_plan", None)
         if callable(update_lesson_plan):
             await update_lesson_plan(run_id, lesson_plan.model_dump_json())
@@ -512,15 +745,26 @@ class RunPipelineUseCase:
             update={"problem_spec": heuristic_match.problem_spec}
         )
 
-        result = await skill.execute(
-            SkillExecutionContext(
-                run_id=run_id,
-                prompt=request.prompt,
-                route_match=verified_route_match,
-                lesson_plan=lesson_plan,
-            ),
-            problem_spec,
-        )
+        async with current_telemetry().span(
+            RunStage.SKILL_PACK,
+            metadata={
+                "skill_id": route_match.skill_id,
+                "capability_id": route_match.capability_id,
+            },
+        ) as skill_span:
+            result = await skill.execute(
+                SkillExecutionContext(
+                    run_id=run_id,
+                    prompt=request.prompt,
+                    route_match=verified_route_match,
+                    lesson_plan=lesson_plan,
+                ),
+                problem_spec,
+            )
+            skill_span.merge_metadata({"handled": result.handled})
+            if not result.handled or result.playbook_json is None:
+                skill_span.status = "error"
+                skill_span.set_error("skill.execution_unhandled")
         if not result.handled or result.playbook_json is None:
             fallback_reason = result.fallback_reason or "skill_returned_no_playbook"
             actions = [
@@ -545,7 +789,7 @@ class RunPipelineUseCase:
                 actions=actions,
             )
             await self._persist_quality_report(run_id, report)
-            await self._repo.update(
+            await self._update_run(
                 run_id,
                 status=PipelineRunStatus.FAILED,
                 error=report.summary,
@@ -589,7 +833,7 @@ class RunPipelineUseCase:
                     message="SkillPack output did not match the PlaybookScript schema.",
                 )
             await self._persist_quality_report(run_id, failure_quality)
-            await self._repo.update(
+            await self._update_run(
                 run_id,
                 status=PipelineRunStatus.FAILED,
                 error=humanize_issues(verdict),
@@ -597,26 +841,47 @@ class RunPipelineUseCase:
             )
             return True
         review_report = CirReviewReport(status="clean")
-        review_report.actions.extend([
-            "router:skill_pack",
-            f"router:skill_id:{route_match.skill_id}",
-            f"router:confidence:{route_match.confidence}",
-            f"router:spec_source:{spec_source}",
-            *(
-                [f"router:capability:{route_match.capability_id}"]
-                if route_match.capability_id
-                else []
-            ),
-            *result.review_actions,
-        ])
-        quality_report = quality_gate_playbook(
-            playbook,
-            request.prompt,
-            generator_path="skill_pack",
-            coverage_mode=route_context.coverage_decision.mode,
-            coverage_decision=route_context.coverage_decision,
-            lesson_plan=lesson_plan,
+        review_report.actions.extend(
+            [
+                "router:skill_pack",
+                f"router:skill_id:{route_match.skill_id}",
+                f"router:confidence:{route_match.confidence}",
+                f"router:spec_source:{spec_source}",
+                *(
+                    [f"router:capability:{route_match.capability_id}"]
+                    if route_match.capability_id
+                    else []
+                ),
+                *result.review_actions,
+            ]
         )
+        async with current_telemetry().span(RunStage.QUALITY_GATE) as quality_span:
+            quality_report = quality_gate_playbook(
+                playbook,
+                request.prompt,
+                generator_path="skill_pack",
+                coverage_mode=route_context.coverage_decision.mode,
+                coverage_decision=route_context.coverage_decision,
+                lesson_plan=lesson_plan,
+            )
+            quality_span.merge_metadata(
+                {
+                    "quality_status": quality_report.status,
+                    "quality_issue_codes": [issue.code for issue in quality_report.issues],
+                }
+            )
+            if quality_report.status in {"repairable", "blocked"}:
+                quality_span.status = "error"
+                quality_span.set_error(
+                    next(
+                        (
+                            issue.code
+                            for issue in quality_report.issues
+                            if issue.severity == PlaybookIssueSeverity.ERROR
+                        ),
+                        "quality.blocked",
+                    )
+                )
         quality_report.actions = list(review_report.actions)
         if quality_report.status == "repairable":
             quality_report = quality_report.with_issue(
@@ -673,14 +938,12 @@ class RunPipelineUseCase:
                 coverage_mode=route_context.coverage_decision.mode,
                 code="skill.consistency_failed",
                 path="playbook",
-                message=(
-                    message or "Deterministic skill output failed consistency validation."
-                ),
+                message=(message or "Deterministic skill output failed consistency validation."),
                 suggestion="Fix the deterministic SkillPack output before retrying.",
                 actions=list(review_report.actions),
             ),
         )
-        await self._repo.update(
+        await self._update_run(
             run_id,
             status=PipelineRunStatus.FAILED,
             error=message or "Deterministic skill output failed consistency validation.",
@@ -701,6 +964,12 @@ class RunPipelineUseCase:
         CLI commit_step / finalize_playbook tools.
         """
         assert self._agent_provider is not None  # for type-checkers
+        await current_telemetry().record_completed(
+            RunStage.SKILL_PACK,
+            duration_ms=0,
+            status="skipped",
+            metadata={"reason": "no_specialized_result"},
+        )
         provider_config: dict[str, Any] | None = None
         if request.provider_api_key:
             provider_config = {
@@ -732,55 +1001,30 @@ class RunPipelineUseCase:
                 review_report=review_report,
                 lesson_plan=lesson_plan,
             )
-            quality_report = _quality_report_with_review(
+            quality_gate_parent_span_id = current_telemetry().active_parent_span_id
+            quality_report = await self._quality_gate_for_agent(
                 playbook,
                 request.prompt,
                 review_report,
-                generator_path="agent",
                 coverage_decision=route_context.coverage_decision,
                 lesson_plan=lesson_plan,
+                parent_span_id=quality_gate_parent_span_id,
             )
             if quality_report.status == "repairable":
-                review_report = _with_playbook_review_actions(
+                (
+                    playbook,
                     review_report,
-                    [*review_report.actions, "quality:repair_attempt:1"],
-                )
-                await self._persist_quality_report(run_id, quality_report)
-                await self._repo.update(
-                    run_id,
-                    status=PipelineRunStatus.REVIEWING,
-                    review_json=review_report.model_dump_json(),
-                )
-                playbook, review_report = await self._repair_agent_playbook_from_reviewer(
+                    quality_report,
+                ) = await self._repair_agent_canonical_quality(
                     run_id,
                     request,
                     playbook,
-                    [
-                        issue
-                        for issue in quality_report.issues
-                        if issue.severity == PlaybookIssueSeverity.ERROR
-                    ],
+                    quality_report,
                     provider_config=provider_config,
                     route_context=route_context,
                     review_report=review_report,
                     lesson_plan=lesson_plan,
-                )
-                playbook, review_report = await self._review_agent_playbook(
-                    run_id,
-                    request,
-                    playbook,
-                    provider_config=provider_config,
-                    route_context=route_context,
-                    review_report=review_report,
-                    lesson_plan=lesson_plan,
-                )
-                quality_report = _quality_report_with_review(
-                    playbook,
-                    request.prompt,
-                    review_report,
-                    generator_path="agent",
-                    coverage_decision=route_context.coverage_decision,
-                    lesson_plan=lesson_plan,
+                    quality_gate_parent_span_id=quality_gate_parent_span_id,
                 )
             if quality_report.status == "repairable":
                 quality_report = _mark_quality_repair_exhausted(quality_report)
@@ -804,7 +1048,7 @@ class RunPipelineUseCase:
                 run_id,
                 failure_quality,
             )
-            await self._repo.update(
+            await self._update_run(
                 run_id,
                 status=PipelineRunStatus.FAILED,
                 error=humanize_issues(exc.report),
@@ -827,7 +1071,7 @@ class RunPipelineUseCase:
                     message="Agent provider failed before a candidate could be repaired.",
                 )
             await self._persist_quality_report(run_id, failure_quality)
-            await self._repo.update(
+            await self._update_run(
                 run_id,
                 status=PipelineRunStatus.FAILED,
                 error=humanize_issues(failure_review),
@@ -850,12 +1094,90 @@ class RunPipelineUseCase:
                     message="Unexpected agent failure prevented runtime repair.",
                 )
             await self._persist_quality_report(run_id, failure_quality)
-            await self._repo.update(
+            await self._update_run(
                 run_id,
                 status=PipelineRunStatus.FAILED,
                 error=str(exc),
                 review_json=failure_review.model_dump_json(),
             )
+
+    async def _repair_agent_canonical_quality(
+        self,
+        run_id: str,
+        request: PipelineRequest,
+        playbook: PlaybookScript,
+        quality_report: QualityReport,
+        *,
+        provider_config: dict[str, Any] | None,
+        route_context: RouteContext,
+        review_report: PlaybookReviewVerdict,
+        lesson_plan: LessonPlan,
+        quality_gate_parent_span_id: str | None,
+    ) -> tuple[PlaybookScript, PlaybookReviewVerdict, QualityReport]:
+        blocking = [
+            issue
+            for issue in quality_report.issues
+            if issue.severity == PlaybookIssueSeverity.ERROR
+        ]
+        async with current_telemetry().span(
+            RunStage.QUALITY_REPAIR,
+            metadata={
+                "repair_reason": "canonical_quality",
+                "issue_codes": [issue.code for issue in blocking],
+            },
+        ) as repair_span:
+            review_report = _with_playbook_review_actions(
+                review_report,
+                [*review_report.actions, "quality:repair_attempt:1"],
+            )
+            await self._persist_quality_report(run_id, quality_report)
+            await self._repo.update(
+                run_id,
+                status=PipelineRunStatus.REVIEWING,
+                review_json=review_report.model_dump_json(),
+            )
+            playbook, review_report = await self._repair_agent_playbook_from_reviewer(
+                run_id,
+                request,
+                playbook,
+                blocking,
+                provider_config=provider_config,
+                route_context=route_context,
+                review_report=review_report,
+                lesson_plan=lesson_plan,
+                repair_reason="quality_repair",
+            )
+            playbook, review_report = await self._review_agent_playbook(
+                run_id,
+                request,
+                playbook,
+                provider_config=provider_config,
+                route_context=route_context,
+                review_report=review_report,
+                lesson_plan=lesson_plan,
+            )
+            quality_report = await self._quality_gate_for_agent(
+                playbook,
+                request.prompt,
+                review_report,
+                coverage_decision=route_context.coverage_decision,
+                lesson_plan=lesson_plan,
+                parent_span_id=quality_gate_parent_span_id,
+            )
+            repair_span.merge_metadata({"quality_status": quality_report.status})
+            if quality_report.status in {"repairable", "blocked"}:
+                repair_span.status = "error"
+                repair_span.set_error(
+                    next(
+                        (
+                            issue.code
+                            for issue in quality_report.issues
+                            if issue.severity == PlaybookIssueSeverity.ERROR
+                        ),
+                        "quality.repair_failed",
+                    )
+                )
+            return playbook, review_report, quality_report
 
     async def _generate_agent_playbook_with_self_check(
         self,
@@ -871,6 +1193,7 @@ class RunPipelineUseCase:
         assert self._agent_provider is not None
         generation_prompt = prompt
         last_payload: dict[str, Any] | None = None
+        repair_issue_codes: list[str] = []
         for attempt in range(AGENT_SELF_REPAIR_ATTEMPTS + 1):
             playbook_dict = await self._run_agent_provider(
                 run_id,
@@ -879,6 +1202,8 @@ class RunPipelineUseCase:
                 provider_config=provider_config,
                 route_context=route_context,
                 lesson_plan=lesson_plan,
+                reason="initial" if attempt == 0 else "agent_self_repair",
+                issue_codes=repair_issue_codes,
             )
             last_payload = playbook_dict
             # Validate the sidecar payload against the canonical PlaybookScript
@@ -907,6 +1232,7 @@ class RunPipelineUseCase:
                     last_payload,
                     check.issues,
                 )
+                repair_issue_codes = [issue.code for issue in check.issues]
                 continue
 
             check = self_check_playbook(playbook, prompt, lesson_plan=lesson_plan)
@@ -935,6 +1261,7 @@ class RunPipelineUseCase:
                 last_payload,
                 check.issues,
             )
+            repair_issue_codes = [issue.code for issue in check.issues]
 
         raise PipelineValidationError(review_report)
 
@@ -962,11 +1289,10 @@ class RunPipelineUseCase:
             should_require_reviewer = self._reviewer_mode == "always" or (
                 self._reviewer_mode == "math_always" and route_context.decision.domain == "math"
             )
-            if (
-                not should_require_reviewer
-                and review_report.status
-                in {PlaybookReviewStatus.CLEAN, PlaybookReviewStatus.WARNINGS}
-            ):
+            if not should_require_reviewer and review_report.status in {
+                PlaybookReviewStatus.CLEAN,
+                PlaybookReviewStatus.WARNINGS,
+            }:
                 return playbook, _with_playbook_review_actions(
                     review_report,
                     [*review_report.actions, "reviewer:skipped_on_clean_self_check"],
@@ -1001,9 +1327,8 @@ class RunPipelineUseCase:
             if not blocking:
                 return playbook, result
 
-            if (
-                attempt >= attempts_allowed
-                or any(issue.code == "reviewer.invalid_output" for issue in blocking)
+            if attempt >= attempts_allowed or any(
+                issue.code == "reviewer.invalid_output" for issue in blocking
             ):
                 raise PipelineValidationError(result)
 
@@ -1026,6 +1351,7 @@ class RunPipelineUseCase:
                 route_context=route_context,
                 review_report=review_report,
                 lesson_plan=lesson_plan,
+                repair_reason="reviewer_repair",
             )
 
         raise PipelineValidationError(review_report)
@@ -1042,8 +1368,26 @@ class RunPipelineUseCase:
             playbook,
             self_check,
         )
-        raw = await self._reviewer_llm.complete(system, user)
-        return parse_playbook_reviewer_output(raw)
+        async with current_telemetry().span(
+            RunStage.REVIEWER,
+            provider=getattr(self._reviewer_llm, "provider_name", None),
+            model=getattr(self._reviewer_llm, "model_name", None),
+            metadata={"review_kind": "playbook"},
+        ) as span:
+            span.set_counters(model_turns=1)
+            raw = await self._reviewer_llm.complete(system, user)
+            result = parse_playbook_reviewer_output(raw)
+            issue_codes = [issue.code for issue in result.issues]
+            span.merge_metadata(
+                {
+                    "review_status": result.status.value,
+                    "review_issue_codes": issue_codes,
+                }
+            )
+            if result.status == PlaybookReviewStatus.BLOCKED:
+                span.status = "error"
+                span.set_error(issue_codes[0] if issue_codes else "reviewer.blocked")
+            return result
 
     async def _repair_agent_playbook_from_reviewer(
         self,
@@ -1056,6 +1400,7 @@ class RunPipelineUseCase:
         route_context: RouteContext,
         review_report: PlaybookReviewVerdict,
         lesson_plan: LessonPlan,
+        repair_reason: str,
     ) -> tuple[PlaybookScript, PlaybookReviewVerdict]:
         assert self._agent_provider is not None
         repair_prompt = _build_agent_reviewer_repair_prompt(request.prompt, playbook, blocking)
@@ -1066,6 +1411,8 @@ class RunPipelineUseCase:
             provider_config=provider_config,
             route_context=route_context,
             lesson_plan=lesson_plan,
+            reason=repair_reason,
+            issue_codes=[issue.code for issue in blocking],
         )
         try:
             repaired = PlaybookScript.model_validate(repaired_payload)
@@ -1098,12 +1445,12 @@ class RunPipelineUseCase:
         provider_config: dict[str, Any] | None,
         route_context: RouteContext,
         lesson_plan: LessonPlan,
+        reason: str,
+        issue_codes: list[str] | None = None,
     ) -> dict[str, Any]:
         assert self._agent_provider is not None
         route_decision = route_context.decision.model_dump(mode="json")
-        available_tool_ids = frozenset(
-            route_context.coverage_decision.available_tool_ids
-        )
+        available_tool_ids = frozenset(route_context.coverage_decision.available_tool_ids)
         available_tools = [
             tool
             for tool in RuntimeToolHub(self._skill_registry).list_tools(route_decision)
@@ -1128,18 +1475,45 @@ class RunPipelineUseCase:
             available_tools=available_tools,
         )
         runner = getattr(self._agent_provider, "run", None)
-        if callable(runner):
-            result = await runner(agent_request)
-            return result.playbook
-        return await self._agent_provider.generate(
-            _build_agent_generation_prompt(
-                prompt,
-                lesson_plan,
-                route_context.coverage_decision,
-            ),
-            provider_config=provider_config,
-            route_decision=route_decision,
-        )
+        provider_metadata: dict[str, Any] = {
+            "contract": "run" if callable(runner) else "legacy.generate",
+            "reason": reason,
+        }
+        if issue_codes:
+            provider_metadata["issue_codes"] = issue_codes
+        async with current_telemetry().span(
+            RunStage.GENERATION_AGENT_PROVIDER,
+            metadata=provider_metadata,
+        ) as provider_span:
+            if callable(runner):
+                try:
+                    result = await runner(agent_request)
+                except AgentProviderError as exc:
+                    provider_span.set_error("agent.provider_error")
+                    if exc.status_code is not None:
+                        provider_span.merge_metadata({"status_code": exc.status_code})
+                    await _record_agent_spans_best_effort(
+                        None,
+                        runtime_events=exc.runtime_events,
+                        artifacts=exc.artifacts,
+                        parent_span_id=provider_span.span_id,
+                    )
+                    raise
+                provider_span.set_model(provider=result.provider)
+                await _record_agent_spans_best_effort(
+                    result,
+                    parent_span_id=provider_span.span_id,
+                )
+                return result.playbook
+            return await self._agent_provider.generate(
+                _build_agent_generation_prompt(
+                    prompt,
+                    lesson_plan,
+                    route_context.coverage_decision,
+                ),
+                provider_config=provider_config,
+                route_decision=route_decision,
+            )
 
     async def _execute_single(
         self,
@@ -1172,7 +1546,7 @@ class RunPipelineUseCase:
                 coverage_decision=route_context.coverage_decision,
                 lesson_plan=lesson_plan,
             )
-            raw = await self._llm.complete(system, user)
+            raw = await self._complete_single(system, user, reason="initial")
             parsed, review_report = await self._review_output(
                 run_id=run_id,
                 request=request,
@@ -1191,7 +1565,7 @@ class RunPipelineUseCase:
                 source_code=request.source_code,
                 source_language=request.language,
             )
-            quality_report = _quality_report_for_single(
+            quality_report = await self._quality_gate_for_single(
                 playbook,
                 request.prompt,
                 review_report,
@@ -1213,13 +1587,25 @@ class RunPipelineUseCase:
                     status=PipelineRunStatus.REVIEWING,
                     review_json=review_report.model_dump_json(),
                 )
-                raw = await self._regenerate(
-                    system,
-                    user,
-                    raw,
-                    _quality_issues_as_cir(quality_report.issues),
-                    "Repair the canonical Playbook quality issues before rebuilding the scene.",
-                )
+                quality_issue_codes = [issue.code for issue in quality_report.issues]
+                async with current_telemetry().span(
+                    RunStage.QUALITY_REPAIR,
+                    metadata={
+                        "repair_reason": "canonical_quality",
+                        "issue_codes": quality_issue_codes,
+                    },
+                ):
+                    raw = await self._regenerate(
+                        system,
+                        user,
+                        raw,
+                        _quality_issues_as_cir(quality_report.issues),
+                        (
+                            "Repair the canonical Playbook quality issues before "
+                            "rebuilding the scene."
+                        ),
+                        reason="canonical_quality",
+                    )
                 previous_attempts = review_report.attempts
                 parsed, review_report = await self._review_output(
                     run_id=run_id,
@@ -1239,7 +1625,7 @@ class RunPipelineUseCase:
                     source_code=request.source_code,
                     source_language=request.language,
                 )
-                quality_report = _quality_report_for_single(
+                quality_report = await self._quality_gate_for_single(
                     playbook,
                     request.prompt,
                     review_report,
@@ -1266,7 +1652,7 @@ class RunPipelineUseCase:
                     coverage_mode=route_context.coverage_decision.mode,
                 ),
             )
-            await self._repo.update(
+            await self._update_run(
                 run_id,
                 status=PipelineRunStatus.FAILED,
                 error=humanize_issues(exc.report),
@@ -1286,12 +1672,122 @@ class RunPipelineUseCase:
                     actions=list(review_report.actions),
                 ),
             )
-            await self._repo.update(
+            await self._update_run(
                 run_id,
                 status=PipelineRunStatus.FAILED,
                 error=str(exc),
                 review_json=review_report.model_dump_json(),
             )
+
+    async def _complete_single(
+        self,
+        system: str,
+        user: str,
+        *,
+        reason: str,
+        issue_codes: list[str] | None = None,
+    ) -> str:
+        metadata: dict[str, Any] = {"reason": reason}
+        if issue_codes:
+            metadata["quality_issue_codes"] = issue_codes
+        async with current_telemetry().span(
+            RunStage.GENERATION_SINGLE,
+            provider=getattr(self._llm, "provider_name", None),
+            model=getattr(self._llm, "model_name", None),
+            metadata=metadata,
+        ) as span:
+            span.set_counters(model_turns=1)
+            complete_with_usage = getattr(self._llm, "complete_with_usage", None)
+            if not callable(complete_with_usage):
+                return await self._llm.complete(system, user)
+            raw, usage = await complete_with_usage(system, user)
+            if isinstance(usage, TokenUsage):
+                span.add_usage(
+                    input_tokens=usage.input_tokens,
+                    output_tokens=usage.output_tokens,
+                    cache_read_tokens=usage.cache_read_tokens,
+                    cache_write_tokens=usage.cache_write_tokens,
+                )
+            return raw
+
+    async def _quality_gate_for_single(
+        self,
+        playbook: PlaybookScript,
+        prompt: str,
+        review_report: CirReviewReport,
+        *,
+        coverage_decision: CoverageDecision,
+        lesson_plan: LessonPlan,
+    ) -> QualityReport:
+        async with current_telemetry().span(RunStage.QUALITY_GATE) as span:
+            report = _quality_report_for_single(
+                playbook,
+                prompt,
+                review_report,
+                coverage_decision=coverage_decision,
+                lesson_plan=lesson_plan,
+            )
+            span.merge_metadata(
+                {
+                    "quality_status": report.status,
+                    "quality_issue_codes": [issue.code for issue in report.issues],
+                }
+            )
+            if report.status in {"repairable", "blocked"}:
+                span.status = "error"
+                span.set_error(
+                    next(
+                        (
+                            issue.code
+                            for issue in report.issues
+                            if issue.severity == PlaybookIssueSeverity.ERROR
+                        ),
+                        "quality.blocked",
+                    )
+                )
+            return report
+
+    async def _quality_gate_for_agent(
+        self,
+        playbook: PlaybookScript,
+        prompt: str,
+        review_report: PlaybookReviewVerdict,
+        *,
+        coverage_decision: CoverageDecision,
+        lesson_plan: LessonPlan,
+        parent_span_id: str | None = None,
+    ) -> QualityReport:
+        async with current_telemetry().span(
+            RunStage.QUALITY_GATE,
+            parent_span_id=parent_span_id,
+        ) as span:
+            report = _quality_report_with_review(
+                playbook,
+                prompt,
+                review_report,
+                generator_path="agent",
+                coverage_decision=coverage_decision,
+                lesson_plan=lesson_plan,
+            )
+            span.merge_metadata(
+                {
+                    "quality_status": report.status,
+                    "quality_issue_codes": [issue.code for issue in report.issues],
+                }
+            )
+            if report.status in {"repairable", "blocked"}:
+                span.status = "error"
+                span.set_error(
+                    next(
+                        (
+                            issue.code
+                            for issue in report.issues
+                            if issue.severity == PlaybookIssueSeverity.ERROR
+                        ),
+                        "quality.blocked",
+                    )
+                )
+            return report
 
     async def _upsert_default_director(
         self,
@@ -1319,6 +1815,21 @@ class RunPipelineUseCase:
         return None
 
     async def _persist_quality_report(self, run_id: str, report: QualityReport) -> None:
+        # Single choke point for every terminal report, so this is where the
+        # run's true generator path becomes known.
+        self._generator_path_by_run[run_id] = report.generator_path
+        if report.status in {"repairable", "blocked"}:
+            error_code = next(
+                (
+                    issue.code
+                    for issue in report.issues
+                    if issue.severity == PlaybookIssueSeverity.ERROR
+                ),
+                "quality.blocked",
+            )
+            self._quality_outcome_by_run[run_id] = ("error", error_code)
+        else:
+            self._quality_outcome_by_run[run_id] = ("ok", None)
         update_quality_report = getattr(self._repo, "update_quality_report", None)
         if callable(update_quality_report):
             await update_quality_report(run_id, report.model_dump_json())
@@ -1335,9 +1846,40 @@ class RunPipelineUseCase:
         *,
         review_json: str,
     ) -> bool:
+        async with current_telemetry().span(RunStage.FINALIZE) as span:
+            finalized = await self._finalize_candidate_inner(
+                run_id,
+                playbook,
+                quality_report,
+                review_json=review_json,
+            )
+            span.merge_metadata(
+                {
+                    "quality_status": quality_report.status,
+                    "finalized": finalized,
+                }
+            )
+            if not finalized:
+                span.status = "error"
+                span.set_error(
+                    next(
+                        (issue.code for issue in quality_report.issues),
+                        "quality.blocked",
+                    )
+                )
+            return finalized
+
+    async def _finalize_candidate_inner(
+        self,
+        run_id: str,
+        playbook: PlaybookScript,
+        quality_report: QualityReport,
+        *,
+        review_json: str,
+    ) -> bool:
         if quality_report.status in {"repairable", "blocked"}:
             await self._persist_quality_report(run_id, quality_report)
-            await self._repo.update(
+            await self._update_run(
                 run_id,
                 status=PipelineRunStatus.FAILED,
                 error=_humanize_quality_report(quality_report),
@@ -1352,7 +1894,7 @@ class RunPipelineUseCase:
                 action="director:persistence_failed",
             )
             await self._persist_quality_report(run_id, quality_report)
-            await self._repo.update(
+            await self._update_run(
                 run_id,
                 status=PipelineRunStatus.FAILED,
                 error=director_issue.message,
@@ -1361,7 +1903,7 @@ class RunPipelineUseCase:
             return False
 
         await self._persist_quality_report(run_id, quality_report)
-        await self._repo.update(
+        await self._update_run(
             run_id,
             status=PipelineRunStatus.SUCCEEDED,
             playbook_json=playbook.model_dump_json(),
@@ -1430,8 +1972,24 @@ class RunPipelineUseCase:
         if self._reviewer_llm is not None:
             try:
                 reviewer_system, reviewer_user = build_reviewer_prompt(user, raw, blocking)
-                review_raw = await self._reviewer_llm.complete(reviewer_system, reviewer_user)
-                result = ReviewResult.model_validate_json(_strip_markdown_fences(review_raw))
+                async with current_telemetry().span(
+                    RunStage.REVIEWER,
+                    provider=getattr(self._reviewer_llm, "provider_name", None),
+                    model=getattr(self._reviewer_llm, "model_name", None),
+                    metadata={"review_kind": "cir"},
+                ) as span:
+                    span.set_counters(model_turns=1)
+                    review_raw = await self._reviewer_llm.complete(
+                        reviewer_system,
+                        reviewer_user,
+                    )
+                    result = ReviewResult.model_validate_json(_strip_markdown_fences(review_raw))
+                    span.merge_metadata(
+                        {
+                            "review_action": result.action,
+                            "review_issue_codes": [issue.code for issue in result.issues],
+                        }
+                    )
                 if result.action == "correct" and result.corrected is not None:
                     return json.dumps(result.corrected, ensure_ascii=False)
                 if result.action == "regenerate" and result.fix_instructions:
@@ -1449,10 +2007,11 @@ class RunPipelineUseCase:
         raw: str,
         blocking: list[CirReviewIssue],
         fix_instructions: str | None,
+        *,
+        reason: str | None = None,
     ) -> str:
         issue_lines = "\n".join(
-            f"- {issue.code} at {issue.path}: {issue.message}"
-            for issue in blocking
+            f"- {issue.code} at {issue.path}: {issue.message}" for issue in blocking
         )
         instruction_text = fix_instructions or "Fix every listed issue and return valid JSON only."
         repair_system = f"""{system}
@@ -1470,7 +2029,14 @@ Blocking issues:
 
 Repair instructions:
 {instruction_text}"""
-        return await self._llm.complete(repair_system, repair_user)
+        return await self._complete_single(
+            repair_system,
+            repair_user,
+            reason=(
+                reason or ("reviewer_instructions" if fix_instructions else "deterministic_review")
+            ),
+            issue_codes=[issue.code for issue in blocking],
+        )
 
 
 def _parse_combined_output(raw: str) -> tuple[CirDocument, ExecutionMap | None]:
@@ -1809,9 +2375,7 @@ def _humanize_quality_report(report: QualityReport) -> str:
     if not report.issues:
         return "Pipeline output failed the canonical quality gate."
     shown = report.issues[:5]
-    details = "; ".join(
-        f"{issue.code} at {issue.path}: {issue.message}" for issue in shown
-    )
+    details = "; ".join(f"{issue.code} at {issue.path}: {issue.message}" for issue in shown)
     suffix = "" if len(report.issues) <= 5 else f" (+{len(report.issues) - 5} more)"
     return f"Canonical quality gate {report.status}: {details}{suffix}"
 
@@ -1984,14 +2548,9 @@ def humanize_issues(report: CirReviewReport | PlaybookReviewVerdict) -> str:
     if not report.issues:
         return "Pipeline output failed review."
     shown = report.issues[:5]
-    parts = [
-        f"{issue.code} at {issue.path or '<root>'}: {issue.message}"
-        for issue in shown
-    ]
+    parts = [f"{issue.code} at {issue.path or '<root>'}: {issue.message}" for issue in shown]
     suffix = (
-        ""
-        if len(report.issues) <= len(shown)
-        else f" (+{len(report.issues) - len(shown)} more)"
+        "" if len(report.issues) <= len(shown) else f" (+{len(report.issues) - len(shown)} more)"
     )
     attempts = getattr(report, "attempts", 0)
     prefix = f"Pipeline output failed review after {attempts} repair attempt(s): "

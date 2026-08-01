@@ -9,6 +9,7 @@ from app.domain.models.pipeline_run import PipelineRunStatus
 from app.domain.models.playbook import PlaybookScript
 from app.domain.models.quality_report import QualityReport
 from app.domain.models.review import CirReviewReport, PlaybookReviewVerdict
+from app.domain.models.run_span import RunTelemetrySummary
 
 
 class PipelineRequest(BaseModel):
@@ -93,3 +94,4 @@ class PipelineRunResponse(BaseModel):
     quality_report: QualityReport | None = None
     lesson_plan: LessonPlan | None = None
     coverage_decision: CoverageDecision | None = None
+    telemetry: RunTelemetrySummary | None = None

@@ -13,9 +13,15 @@ class AgentProviderError(RuntimeError):
         message: str,
         *,
         structured_failure: dict[str, Any] | None = None,
+        runtime_events: list[dict[str, Any]] | None = None,
+        artifacts: dict[str, Any] | None = None,
+        status_code: int | None = None,
     ) -> None:
         super().__init__(message)
         self.structured_failure = structured_failure
+        self.runtime_events = runtime_events or []
+        self.artifacts = artifacts or {}
+        self.status_code = status_code
 
 
 class IAgentProvider(Protocol):

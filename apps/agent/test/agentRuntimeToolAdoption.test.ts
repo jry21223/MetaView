@@ -1,10 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { AttemptSink } from "../src/agent.js";
 import type { PlaybookOutput } from "../src/state/types.js";
 
 const agentMock = vi.hoisted(() => ({
   prompts: [] as string[],
   models: [] as Array<{ provider: string; id: string; baseUrl: string }>,
   getModelCalls: [] as Array<{ provider: string; model: string }>,
+  listeners: [] as Array<(event: unknown) => void | Promise<void>>,
+  subscribeCalls: 0,
+  promptError: null as Error | null,
+  hangPrompt: false,
+  abortCalls: 0,
 }));
 
 vi.mock("@earendil-works/pi-ai", async (importOriginal) => {
@@ -27,6 +33,7 @@ vi.mock("@earendil-works/pi-ai", async (importOriginal) => {
 
 vi.mock("@earendil-works/pi-agent-core", () => ({
   Agent: class MockAgent {
+    private resolveAbort: (() => void) | null = null;
     private readonly options: {
       initialState: {
         model: unknown;
@@ -53,6 +60,27 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
 
     async prompt(prompt: string): Promise<void> {
       agentMock.prompts.push(prompt);
+      for (const listener of agentMock.listeners) {
+        await listener({
+          type: "message_end",
+          message: {
+            role: "assistant",
+            provider: "test",
+            model: "test-model",
+            usage: { input: 12, output: 3, cacheRead: 2, cacheWrite: 0 },
+            content: [],
+          },
+        });
+      }
+      if (agentMock.promptError) {
+        throw agentMock.promptError;
+      }
+      if (agentMock.hangPrompt) {
+        await new Promise<void>((resolve) => {
+          this.resolveAbort = resolve;
+        });
+        return;
+      }
       const runtimeExecute = this.options.initialState.tools.find(
         (tool) => tool.name === "runtime_tool_execute",
       );
@@ -72,6 +100,21 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
       };
       const result = await runtimeExecute.execute("runtime-call-1", args);
       await this.options.afterToolCall?.({ args, result, isError: false });
+    }
+
+    subscribe(listener: (event: unknown) => void | Promise<void>): () => void {
+      agentMock.subscribeCalls += 1;
+      agentMock.listeners.push(listener);
+      return () => {
+        agentMock.listeners = agentMock.listeners.filter(
+          (candidate) => candidate !== listener,
+        );
+      };
+    }
+
+    abort(): void {
+      agentMock.abortCalls += 1;
+      this.resolveAbort?.();
     }
   },
 }));
@@ -141,6 +184,11 @@ describe("agent runtime SceneBlueprint adoption", () => {
     agentMock.prompts = [];
     agentMock.models = [];
     agentMock.getModelCalls = [];
+    agentMock.listeners = [];
+    agentMock.subscribeCalls = 0;
+    agentMock.promptError = null;
+    agentMock.hangPrompt = false;
+    agentMock.abortCalls = 0;
   });
 
   it("returns the PlaybookScript produced by scene_blueprint.compile", async () => {
@@ -184,6 +232,7 @@ describe("agent runtime SceneBlueprint adoption", () => {
     expect(agentMock.prompts[0]).toContain("LESSON_PLAN_ONLY_MARKER");
     expect(JSON.stringify(result)).not.toContain("LESSON_PLAN_ONLY_MARKER");
     expect(JSON.stringify(result)).not.toContain("algorithm_array");
+    expect(agentMock.subscribeCalls).toBe(0);
   });
 
   it("creates an OpenAI-compatible fallback model for unregistered custom models", async () => {
@@ -219,6 +268,136 @@ describe("agent runtime SceneBlueprint adoption", () => {
       provider: "deepseek",
       id: "deepseek-v4-pro",
       baseUrl: "https://api.deepseek.com/v1",
+    });
+  });
+
+  it("keeps telemetry observed before a failed provider attempt", async () => {
+    agentMock.promptError = new Error("provider failed");
+    const { runAgentGeneration } = await import("../src/agent.js");
+    const attempts: AttemptSink = [];
+
+    await expect(
+      runAgentGeneration(
+        {
+          prompt: "explain failure",
+          apiBaseUrl: "http://api.test",
+          defaultProvider: "openai",
+          defaultModel: "gpt-4o-mini",
+          defaultApiKey: "test-key",
+        },
+        attempts,
+      ),
+    ).rejects.toThrow("provider failed");
+
+    expect(attempts).toHaveLength(1);
+    expect(attempts[0]).toMatchObject({
+      attempt_index: 0,
+      outcome: "failed",
+      self_check_status: null,
+      self_check_issue_codes: [],
+      error_code: "Error",
+      telemetry: {
+        model_turns: 1,
+        usage: {
+          input_tokens: 12,
+          output_tokens: 3,
+          cache_read_tokens: 2,
+          cache_write_tokens: 0,
+        },
+      },
+    });
+    expect(attempts[0]?.started_at).toMatch(/Z$/);
+    expect(attempts[0]?.finished_at).toMatch(/Z$/);
+  });
+
+  it("keeps every attempt when AgentSelfCheckError is thrown", async () => {
+    const blocked = sceneBlueprintPlaybook();
+    blocked.steps[0]!.voiceover_text = "";
+    vi.spyOn(global, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        tool: "scene_blueprint.compile",
+        ok: true,
+        result: {
+          valid: true,
+          sceneType: "east_asia_monsoon",
+          playbook: blocked,
+        },
+        error: null,
+      }),
+    } as Response);
+    const { runAgentGeneration } = await import("../src/agent.js");
+    const attempts: AttemptSink = [];
+
+    await expect(
+      runAgentGeneration(
+        {
+          prompt: "讲解东亚夏季风的海陆热力差异",
+          apiBaseUrl: "http://api.test",
+          defaultProvider: "openai",
+          defaultModel: "gpt-4o-mini",
+          defaultApiKey: "test-key",
+        },
+        attempts,
+      ),
+    ).rejects.toMatchObject({
+      name: "AgentSelfCheckError",
+      report: { status: "blocked" },
+    });
+
+    expect(attempts).toHaveLength(3);
+    expect(attempts.map((attempt) => attempt.attempt_index)).toEqual([0, 1, 2]);
+    expect(attempts.map((attempt) => attempt.self_check_status)).toEqual([
+      "blocked",
+      "blocked",
+      "blocked",
+    ]);
+    expect(attempts.every((attempt) => attempt.telemetry.model_turns === 1)).toBe(
+      true,
+    );
+    expect(agentMock.listeners).toHaveLength(0);
+  });
+
+  it("aborts pi-agent and snapshots the in-flight attempt on timeout", async () => {
+    agentMock.hangPrompt = true;
+    const { runAgentGeneration } = await import("../src/agent.js");
+    const { runWithGenerationTimeout } = await import(
+      "../src/generationTimeout.js"
+    );
+    const attempts: AttemptSink = [];
+
+    await expect(
+      runWithGenerationTimeout(
+        async (abortSignal) =>
+          await runAgentGeneration(
+            {
+              prompt: "explain a timeout",
+              apiBaseUrl: "http://api.test",
+              defaultProvider: "openai",
+              defaultModel: "gpt-4o-mini",
+              defaultApiKey: "test-key",
+              abortSignal,
+            },
+            attempts,
+          ),
+        10,
+      ),
+    ).rejects.toMatchObject({ name: "AgentGenerationTimeoutError" });
+
+    expect(agentMock.abortCalls).toBe(1);
+    expect(agentMock.listeners).toHaveLength(0);
+    expect(attempts).toHaveLength(1);
+    expect(attempts[0]).toMatchObject({
+      attempt_index: 0,
+      telemetry: {
+        model_turns: 1,
+        usage: {
+          input_tokens: 12,
+          output_tokens: 3,
+          cache_read_tokens: 2,
+          cache_write_tokens: 0,
+        },
+      },
     });
   });
 });
