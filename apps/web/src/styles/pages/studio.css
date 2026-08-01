@@ -2165,6 +2165,18 @@
   text-wrap: balance;
 }
 
+.mv-intake-announcement {
+  margin: 14px 0 0;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  color: color-mix(in srgb, var(--warn) 70%, var(--ink));
+  font-size: 12.5px;
+  line-height: 1.55;
+  text-wrap: balance;
+}
+
 .mv-intake-composer {
   width: 100%;
   min-width: 0;

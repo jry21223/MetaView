@@ -168,14 +168,12 @@ describe("App edition shells", () => {
         status: "succeeded",
       }),
     }));
-    window.history.pushState({}, "", "/create");
+    window.history.pushState({}, "", "/run/run-shell");
 
     const { App } = await import("./App");
     const { container, getByRole, getByText } = render(<App />);
 
     expect(container.querySelectorAll(".mv-top")).toHaveLength(1);
-    fireEvent.click(getByRole("button", { name: /二分查找/ }));
-    fireEvent.click(getByRole("button", { name: "生成讲解" }));
 
     await waitFor(() =>
       expect(getByRole("button", { name: "显示顶部栏" })).toBeTruthy(),
