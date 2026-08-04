@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && npm run seo:generate",
     "lint": "eslint .",
+    "seo:generate": "vite-node scripts/generate-seo-pages.mjs",
     "asset:audit": "vite-node scripts/asset-audit.mjs",
     "showcase:export": "vite-node scripts/export-subject-visual-fixtures.mjs",
     "showcase:smoke": "vite-node scripts/render-showcase-smoke.mjs",
