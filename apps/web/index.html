@@ -3,16 +3,51 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>演算视界 MetaView · 让理解过程被看见</title>
+    <meta name="theme-color" content="#f4f1ea" />
+    <!-- metaview:seo:start -->
+    <title>MetaView 教育可视化平台｜让理解过程被看见</title>
     <meta
       name="description"
-      content="MetaView 把题目和代码转化为可播放、可追问、可调整并可导出的分步可视化讲解。"
+      content="MetaView 将数学、算法、物理等知识转化为可分步播放、可调参数、可追问并可导出的交互式可视化讲解。"
     />
+    <meta
+      name="robots"
+      content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
+    />
+    <meta
+      name="googlebot"
+      content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
+    />
+    <meta
+      name="bingbot"
+      content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
+    />
+    <link rel="canonical" href="/" />
+    <meta property="og:site_name" content="演算视界 MetaView" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="MetaView 教育可视化平台｜让理解过程被看见" />
+    <meta
+      property="og:description"
+      content="将数学、算法、物理等知识转化为可分步播放、可调参数、可追问的交互式可视化讲解。"
+    />
+    <meta property="og:url" content="/" />
+    <meta property="og:image" content="/brand/metaview-og-image.png" />
+    <meta property="og:image:alt" content="MetaView 教育可视化平台" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="MetaView 教育可视化平台｜让理解过程被看见" />
+    <meta
+      name="twitter:description"
+      content="将抽象知识转化为可播放、可调整、可追问的交互式理解过程。"
+    />
+    <meta name="twitter:image" content="/brand/metaview-og-image.png" />
+    <script id="metaview-structured-data" type="application/ld+json">
+      {"@context":"https://schema.org","@graph":[{"@type":"WebSite","name":"MetaView 教育可视化平台","alternateName":"演算视界 MetaView","url":"/","description":"MetaView 将数学、算法、物理等知识转化为可分步播放、可调参数、可追问并可导出的交互式可视化讲解。","inLanguage":"zh-CN"},{"@type":"SoftwareApplication","name":"演算视界 MetaView","applicationCategory":"EducationalApplication","operatingSystem":"Web","url":"/","description":"MetaView 将数学、算法、物理等知识转化为可分步播放、可调参数、可追问并可导出的交互式可视化讲解。","image":"/brand/metaview-og-image.png","isAccessibleForFree":true,"inLanguage":"zh-CN"}]}
+    </script>
+    <!-- metaview:seo:end -->
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <meta name="og:image" content="/brand/metaview-og-image.png" />
-    <meta name="og:title" content="演算视界 MetaView" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -25,30 +60,130 @@
         min-height: 100dvh;
         display: grid;
         place-items: center;
-        gap: 10px;
-        align-content: center;
-        background: #f4f1ea;
+        padding: 28px;
+        background:
+          radial-gradient(circle at 15% 10%, rgba(104, 145, 118, 0.12), transparent 34%),
+          #f4f1ea;
         color: #161a18;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        text-align: center;
+        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
-      .mv-boot-fallback strong {
-        font-size: 18px;
-        font-weight: 650;
+      .mv-boot-fallback__content {
+        width: min(760px, 100%);
+        display: grid;
+        gap: 18px;
+        padding: clamp(26px, 5vw, 52px);
+        border: 1px solid rgba(22, 26, 24, 0.14);
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.62);
+        box-shadow: 0 24px 80px rgba(22, 26, 24, 0.08);
       }
-      .mv-boot-fallback span {
-        max-width: 360px;
-        color: #5d655f;
+      .mv-boot-fallback__content--catalog {
+        width: min(960px, 100%);
+      }
+      .mv-boot-fallback__eyebrow {
+        margin: 0;
+        color: #47634f;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+      }
+      .mv-boot-fallback h1 {
+        max-width: 760px;
+        margin: 0;
+        font-family: "Space Grotesk", Inter, sans-serif;
+        font-size: clamp(32px, 7vw, 64px);
+        line-height: 1.02;
+        letter-spacing: -0.045em;
+        text-wrap: balance;
+      }
+      .mv-boot-fallback p {
+        max-width: 720px;
+        margin: 0;
+        color: #4f5b54;
+        font-size: 15px;
+        line-height: 1.75;
+      }
+      .mv-boot-fallback__prompt {
+        padding: 14px 16px;
+        border-left: 3px solid #66876f;
+        background: rgba(102, 135, 111, 0.08);
+      }
+      .mv-boot-fallback nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .mv-boot-fallback a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 40px;
+        padding: 0 14px;
+        border: 1px solid rgba(22, 26, 24, 0.18);
+        border-radius: 999px;
+        color: #173a24;
         font-size: 13px;
+        font-weight: 650;
+        text-decoration: none;
+      }
+      .mv-boot-fallback a:hover,
+      .mv-boot-fallback a:focus-visible {
+        border-color: #47634f;
+        outline: none;
+        background: rgba(71, 99, 79, 0.08);
+      }
+      .mv-boot-fallback small {
+        color: #6d766f;
+        font-size: 12px;
         line-height: 1.6;
+      }
+      .mv-boot-fallback__links {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 10px;
+        margin: 4px 0;
+        padding: 0;
+        list-style: none;
+      }
+      .mv-boot-fallback__links li {
+        display: grid;
+        gap: 7px;
+        padding: 14px;
+        border: 1px solid rgba(22, 26, 24, 0.12);
+        border-radius: 16px;
+      }
+      .mv-boot-fallback__links a {
+        min-height: auto;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+      }
+      .mv-boot-fallback__links span {
+        color: #6d766f;
+        font-size: 12px;
+        line-height: 1.55;
+      }
+      .mv-boot-fallback__back {
+        justify-self: start;
       }
     </style>
   </head>
   <body>
     <div id="root">
-      <div class="mv-boot-fallback" role="status">
-        <strong>MetaView 正在启动</strong>
-        <span>如果页面长时间停留在这里，请刷新并确认浏览器允许 JavaScript。</span>
+      <div class="mv-boot-fallback" role="status" aria-live="polite">
+        <!-- metaview:fallback:start -->
+        <main class="mv-boot-fallback__content">
+          <p class="mv-boot-fallback__eyebrow">METAVIEW EDUCATION</p>
+          <h1>把一道题，变成一段看得见的理解过程。</h1>
+          <p>MetaView 将数学、算法、物理等知识转化为可分步播放、可调参数、可追问并可导出的交互式可视化讲解。</p>
+          <nav aria-label="MetaView 公开入口">
+            <a href="/templates">浏览交互式案例</a>
+            <a href="/templates/binary-search">二分查找可视化</a>
+            <a href="/templates/derivative-tangent">导数与切线可视化</a>
+          </nav>
+          <small>应用正在加载；即使 JavaScript 暂不可用，公开内容仍可被浏览与索引。</small>
+        </main>
+        <!-- metaview:fallback:end -->
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
