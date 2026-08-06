@@ -214,11 +214,40 @@ function AnimatedFollowupThread({
   isSelected: boolean;
   isPlaying: boolean;
 }) {
-  const skipMotion = shouldSkipFollowupMotion();
+  const [skipMotion, setSkipMotion] = useState(shouldSkipFollowupMotion);
   const [animation, setAnimation] = useState<FollowupAnimationState>(() =>
     skipMotion ? followupCompleteState(demo) : EMPTY_FOLLOWUP_ANIMATION,
   );
   const threadRef = useRef<HTMLDivElement | null>(null);
+
+  // React live to OS reduced-motion changes mid-session: the rail effect
+  // subscribes to the same query, so flipping the preference stops/resumes
+  // the follow-up typing animation as well.
+  useEffect(() => {
+    if (
+      typeof window === "undefined" ||
+      typeof window.matchMedia !== "function"
+    ) {
+      return;
+    }
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = (event: MediaQueryListEvent) => setSkipMotion(event.matches);
+    query.addEventListener?.("change", onChange);
+    return () => query.removeEventListener?.("change", onChange);
+  }, []);
+
+  // When the preference flips mid-animation: reduce → jump straight to the
+  // complete state (the rAF loop below cancels itself via its skipMotion
+  // dependency); back off → restart the animation from the beginning.
+  // Guarded state adjustment during render (React's documented pattern for
+  // syncing state to a prop) instead of a setState-in-effect.
+  const [prevSkipMotion, setPrevSkipMotion] = useState(skipMotion);
+  if (prevSkipMotion !== skipMotion) {
+    setPrevSkipMotion(skipMotion);
+    setAnimation(
+      skipMotion ? followupCompleteState(demo) : EMPTY_FOLLOWUP_ANIMATION,
+    );
+  }
 
   useEffect(() => {
     if (!isSelected || !isPlaying || skipMotion) return;

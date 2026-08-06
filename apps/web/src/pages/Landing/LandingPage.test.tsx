@@ -1,7 +1,76 @@
-import { cleanup, fireEvent, render, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { LandingPage } from "./LandingPage";
+
+/** Controllable matchMedia stub: queries remember their listeners and can be
+ *  flipped by the test, which fires the same "change" events the browser
+ *  would. Defaults mirror happy-dom's real viewport (desktop, no reduce). */
+function installMatchMediaMock() {
+  const states = new Map<
+    string,
+    { matches: boolean; listeners: Set<(event: MediaQueryListEvent) => void> }
+  >();
+  const getState = (query: string) => {
+    let state = states.get(query);
+    if (!state) {
+      state = {
+        matches:
+          query === "(prefers-reduced-motion: reduce)"
+            ? false
+            : query === "(min-width: 901px)"
+              ? true
+              : false,
+        listeners: new Set(),
+      };
+      states.set(query, state);
+    }
+    return state;
+  };
+
+  vi.stubGlobal(
+    "matchMedia",
+    (query: string): MediaQueryList => {
+      const state = getState(query);
+      return {
+        get matches() {
+          return state.matches;
+        },
+        media: query,
+        onchange: null,
+        addEventListener: (
+          type: string,
+          listener: (event: MediaQueryListEvent) => void,
+        ) => {
+          if (type === "change") state.listeners.add(listener);
+        },
+        removeEventListener: (
+          type: string,
+          listener: (event: MediaQueryListEvent) => void,
+        ) => {
+          if (type === "change") state.listeners.delete(listener);
+        },
+        addListener: (listener: (event: MediaQueryListEvent) => void) => {
+          state.listeners.add(listener);
+        },
+        removeListener: (listener: (event: MediaQueryListEvent) => void) => {
+          state.listeners.delete(listener);
+        },
+        dispatchEvent: () => true,
+      } as unknown as MediaQueryList;
+    },
+  );
+
+  return {
+    setMatches(query: string, matches: boolean) {
+      const state = getState(query);
+      state.matches = matches;
+      for (const listener of state.listeners) {
+        listener({ matches, media: query } as MediaQueryListEvent);
+      }
+    },
+  };
+}
 
 function renderLanding() {
   const props = {
@@ -16,7 +85,10 @@ function renderLanding() {
 }
 
 describe("LandingPage", () => {
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
 
   it("presents the real product workflow and routes primary actions to creation", () => {
     const { getByRole, getByText, props } = renderLanding();
@@ -168,6 +240,28 @@ describe("LandingPage", () => {
     expect(curve()?.getAttribute("style")).toContain("animation: none");
     expect(curve()?.getAttribute("style")).toContain("stroke-dashoffset");
     expect(analysis()?.getAttribute("style")).toContain("animation: none");
+  });
+
+  it("reacts live to prefers-reduced-motion changes in the follow-up demo", () => {
+    const { setMatches } = installMatchMediaMock();
+    const { container } = renderLanding();
+
+    const activeSummary = () =>
+      container.querySelector<HTMLElement>(
+        ".mv-landing-followup-demo__thread.is-active .mv-landing-followup-demo__message.is-ai small",
+      );
+
+    // Motion enabled: the reply has not finished typing yet.
+    expect(activeSummary()?.classList.contains("is-visible")).toBe(false);
+
+    // Flip to reduced motion mid-session: the thread jumps to the complete
+    // state (full reply) and the animation loop stops.
+    act(() => setMatches("(prefers-reduced-motion: reduce)", true));
+    expect(activeSummary()?.classList.contains("is-visible")).toBe(true);
+
+    // Flip back: the animation restarts from the beginning.
+    act(() => setMatches("(prefers-reduced-motion: reduce)", false));
+    expect(activeSummary()?.classList.contains("is-visible")).toBe(false);
   });
 
   it("shows follow-up as contextual replies and reversible lesson revisions", () => {
