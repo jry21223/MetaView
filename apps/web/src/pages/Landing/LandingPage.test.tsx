@@ -242,6 +242,82 @@ describe("LandingPage", () => {
     expect(analysis()?.getAttribute("style")).toContain("animation: none");
   });
 
+  it("supports the ARIA tabs keyboard pattern on both tablists", () => {
+    const { container, getByRole } = renderLanding();
+    const demoTablist = getByRole("tablist", { name: "学科画面示例" });
+    const followupTablist = getByRole("tablist", { name: "追问方式" });
+    const demoStage = container.querySelector<HTMLElement>(
+      ".mv-landing-capability .mv-lesson-stage",
+    );
+    const threadStack = container.querySelector<HTMLElement>(
+      ".mv-landing-followup-demo__thread-stack",
+    );
+
+    // Panels are wired to their tablists via id / aria-controls pairs.
+    expect(demoStage?.getAttribute("role")).toBe("tabpanel");
+    expect(demoStage?.getAttribute("aria-labelledby")).toBe(
+      "landing-demo-tab-math",
+    );
+    expect(threadStack?.getAttribute("role")).toBe("tabpanel");
+    expect(threadStack?.getAttribute("aria-labelledby")).toBe(
+      "landing-followup-tab-explain",
+    );
+
+    const mathTab = getByRole("tab", { name: /数学/ });
+    const physicsTab = getByRole("tab", { name: /物理/ });
+    const algorithmTab = getByRole("tab", { name: /算法/ });
+    expect(mathTab.getAttribute("aria-controls")).toBe("landing-demo-panel");
+    expect(physicsTab.getAttribute("aria-controls")).toBe("landing-demo-panel");
+
+    // Roving tabindex: only the active tab is in the tab order.
+    expect(mathTab.tabIndex).toBe(0);
+    expect(physicsTab.tabIndex).toBe(-1);
+    expect(algorithmTab.tabIndex).toBe(-1);
+
+    // ArrowRight moves focus and activates the next tab.
+    fireEvent.keyDown(demoTablist, { key: "ArrowRight" });
+    expect(physicsTab.getAttribute("aria-selected")).toBe("true");
+    expect(physicsTab.tabIndex).toBe(0);
+    expect(mathTab.tabIndex).toBe(-1);
+    expect(document.activeElement).toBe(physicsTab);
+    expect(demoStage?.getAttribute("aria-labelledby")).toBe(
+      "landing-demo-tab-physics",
+    );
+
+    // ArrowLeft moves back; Home / End jump to the first / last tab.
+    fireEvent.keyDown(demoTablist, { key: "ArrowLeft" });
+    expect(mathTab.getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(mathTab);
+
+    fireEvent.keyDown(demoTablist, { key: "End" });
+    expect(algorithmTab.getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(algorithmTab);
+    fireEvent.keyDown(demoTablist, { key: "Home" });
+    expect(mathTab.getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(mathTab);
+
+    // The follow-up tablist uses the same pattern, with wrap-around.
+    const explainTab = getByRole("tab", { name: "解释这一步" });
+    const reviseTab = getByRole("tab", { name: "调整讲解" });
+    expect(explainTab.getAttribute("aria-controls")).toBe(
+      "landing-followup-panel",
+    );
+    expect(explainTab.tabIndex).toBe(0);
+    expect(reviseTab.tabIndex).toBe(-1);
+
+    fireEvent.keyDown(followupTablist, { key: "ArrowRight" });
+    expect(reviseTab.getAttribute("aria-selected")).toBe("true");
+    expect(reviseTab.tabIndex).toBe(0);
+    expect(document.activeElement).toBe(reviseTab);
+    expect(threadStack?.getAttribute("aria-labelledby")).toBe(
+      "landing-followup-tab-revise",
+    );
+
+    fireEvent.keyDown(followupTablist, { key: "ArrowRight" });
+    expect(explainTab.getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(explainTab);
+  });
+
   it("reacts live to prefers-reduced-motion changes in the follow-up demo", () => {
     const { setMatches } = installMatchMediaMock();
     const { container } = renderLanding();

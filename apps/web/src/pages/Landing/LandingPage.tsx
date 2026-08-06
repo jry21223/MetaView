@@ -1,4 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+} from "react";
 
 import {
   type FollowupAnimationPhase,
@@ -127,6 +134,46 @@ function shouldSkipFollowupMotion() {
     typeof window.matchMedia !== "function" ||
     window.matchMedia("(prefers-reduced-motion: reduce)").matches
   );
+}
+
+/** WAI-ARIA APG tabs keyboard pattern: arrows move focus and activate the
+ *  adjacent tab (wrap-around), Home/End jump to the first/last tab. */
+function handleTablistKeyDown<T extends string>(
+  event: KeyboardEvent<HTMLDivElement>,
+  options: {
+    ids: readonly T[];
+    activeId: T;
+    tabId: (id: T) => string;
+    onSelect: (id: T) => void;
+  },
+) {
+  const index = options.ids.indexOf(options.activeId);
+  if (index < 0) return;
+  let nextIndex: number | null = null;
+  switch (event.key) {
+    case "ArrowRight":
+    case "ArrowDown":
+      nextIndex = (index + 1) % options.ids.length;
+      break;
+    case "ArrowLeft":
+    case "ArrowUp":
+      nextIndex = (index - 1 + options.ids.length) % options.ids.length;
+      break;
+    case "Home":
+      nextIndex = 0;
+      break;
+    case "End":
+      nextIndex = options.ids.length - 1;
+      break;
+    default:
+      return;
+  }
+  event.preventDefault();
+  const nextId = options.ids[nextIndex];
+  options.onSelect(nextId);
+  event.currentTarget
+    .querySelector<HTMLElement>(`#${options.tabId(nextId)}`)
+    ?.focus();
 }
 
 function numberFromCssVariable(
@@ -619,7 +666,10 @@ function LessonCanvas({
         <div
           className="mv-lesson-stage"
           data-active-domain={domain}
-          aria-label={`${story.label}画面：${story.scene}`}
+          role={hero ? undefined : "tabpanel"}
+          id={hero ? undefined : "landing-demo-panel"}
+          aria-labelledby={hero ? undefined : `landing-demo-tab-${domain}`}
+          aria-label={hero ? `${story.label}画面：${story.scene}` : undefined}
         >
           {canvasStories.map((item) => (
             <div
@@ -993,13 +1043,24 @@ export function LandingPage({
                 role="tablist"
                 aria-label="学科画面示例"
                 data-active-domain={activeDomain}
+                onKeyDown={(event) =>
+                  handleTablistKeyDown(event, {
+                    ids: DEMO_STORIES.map((story) => story.id),
+                    activeId: activeDomain,
+                    tabId: (id) => `landing-demo-tab-${id}`,
+                    onSelect: (id) => activateDomain(id, true),
+                  })
+                }
               >
                 {DEMO_STORIES.map((story) => (
                   <button
                     key={story.id}
                     type="button"
                     role="tab"
+                    id={`landing-demo-tab-${story.id}`}
                     aria-selected={activeDomain === story.id}
+                    aria-controls="landing-demo-panel"
+                    tabIndex={activeDomain === story.id ? 0 : -1}
                     className={activeDomain === story.id ? "is-active" : ""}
                     onClick={() => activateDomain(story.id, true)}
                   >
@@ -1103,13 +1164,24 @@ export function LandingPage({
                 role="tablist"
                 aria-label="追问方式"
                 data-active-mode={followupMode}
+                onKeyDown={(event) =>
+                  handleTablistKeyDown(event, {
+                    ids: FOLLOWUP_DEMOS.map((demo) => demo.id),
+                    activeId: followupMode,
+                    tabId: (id) => `landing-followup-tab-${id}`,
+                    onSelect: (id) => setFollowupMode(id),
+                  })
+                }
               >
                 {FOLLOWUP_DEMOS.map((demo) => (
                   <button
                     key={demo.id}
                     type="button"
                     role="tab"
+                    id={`landing-followup-tab-${demo.id}`}
                     aria-selected={followupMode === demo.id}
+                    aria-controls="landing-followup-panel"
+                    tabIndex={followupMode === demo.id ? 0 : -1}
                     className={followupMode === demo.id ? "is-active" : ""}
                     onClick={() => setFollowupMode(demo.id)}
                   >
@@ -1120,7 +1192,13 @@ export function LandingPage({
 
               <div className="mv-landing-followup-demo__viewport">
                 <div className="mv-landing-followup-demo__camera">
-                  <div className="mv-landing-followup-demo__thread-stack" aria-live="polite">
+                  <div
+                    className="mv-landing-followup-demo__thread-stack"
+                    role="tabpanel"
+                    id="landing-followup-panel"
+                    aria-labelledby={`landing-followup-tab-${followupMode}`}
+                    aria-live="polite"
+                  >
                     {FOLLOWUP_DEMOS.map((demo) => (
                       <AnimatedFollowupThread
                         key={`${demo.id}-${followupMode === demo.id ? "active" : "inactive"}-${followupInView ? "playing" : "idle"}`}
