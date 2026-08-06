@@ -242,6 +242,60 @@ describe("LandingPage", () => {
     expect(analysis()?.getAttribute("style")).toContain("animation: none");
   });
 
+  it("announces follow-up completion via a dedicated live region", () => {
+    const { setMatches } = installMatchMediaMock();
+    const { container } = renderLanding();
+
+    // The thread stack itself is no longer a live region: the visible typing
+    // text is aria-hidden, so a dedicated visually-hidden status element
+    // carries the announcement for the active thread instead.
+    const threadStack = container.querySelector<HTMLElement>(
+      ".mv-landing-followup-demo__thread-stack",
+    );
+    expect(threadStack?.hasAttribute("aria-live")).toBe(false);
+
+    const status = container.querySelector<HTMLElement>(
+      ".mv-landing-followup-demo__thread.is-active [role='status']",
+    );
+    expect(status?.classList.contains("mv-landing-visually-hidden")).toBe(
+      true,
+    );
+    expect(status?.textContent?.trim()).toBe("");
+
+    // The versions row is a labelled group, not an unnamed div.
+    expect(
+      container
+        .querySelector(".mv-landing-followup-demo__versions")
+        ?.getAttribute("role"),
+    ).toBe("group");
+
+    // When the reply completes, the status region carries the announcement.
+    act(() => setMatches("(prefers-reduced-motion: reduce)", true));
+    expect(status?.textContent).toContain("TEXT REPLY");
+  });
+
+  it("aligns the story rail when an article button receives focus", () => {
+    const scrollTo = vi.fn();
+    vi.stubGlobal("scrollTo", scrollTo);
+    const { container } = renderLanding();
+
+    const physicsButton = container.querySelector<HTMLElement>(
+      "[data-demo-domain='physics'] button",
+    );
+    fireEvent.focus(physicsButton as HTMLElement);
+
+    // Focus activates the panel and scrolls the page to the rail position
+    // where it is fully visible.
+    expect(
+      container
+        .querySelector("[data-demo-domain='physics']")
+        ?.classList.contains("is-active"),
+    ).toBe(true);
+    expect(scrollTo).toHaveBeenCalledWith(
+      expect.objectContaining({ behavior: "smooth", top: expect.any(Number) }),
+    );
+  });
+
   it("supports the ARIA tabs keyboard pattern on both tablists", () => {
     const { container, getByRole } = renderLanding();
     const demoTablist = getByRole("tablist", { name: "学科画面示例" });

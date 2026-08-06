@@ -351,6 +351,12 @@ function AnimatedFollowupThread({
 
   const animationPhase: FollowupAnimationPhase = followupPhase(animation);
 
+  // Live announcement for assistive tech: the visible typing text is
+  // aria-hidden, so a dedicated visually-hidden status region announces the
+  // completed reply (matching what the status line reveals visually).
+  const liveAnnouncement =
+    isSelected && animation.complete ? `${demo.status} · ${demo.summary}` : "";
+
   return (
     <div
       ref={threadRef}
@@ -401,12 +407,17 @@ function AnimatedFollowupThread({
 
       <div
         className={`mv-landing-followup-demo__versions${demo.id === "revise" ? " is-revised" : ""}${animation.complete ? " is-visible" : ""}`}
+        role="group"
         aria-label={demo.id === "revise" ? "已从版本 v1 更新到 v2" : "当前保持版本 v1"}
       >
         <span><code>v1</code><small>{demo.id === "revise" ? "可恢复" : "HEAD"}</small></span>
         <i />
         <span><code>{demo.id === "revise" ? "v2" : "—"}</code><small>{demo.id === "revise" ? "HEAD" : "未创建新版本"}</small></span>
       </div>
+
+      <span className="mv-landing-visually-hidden" role="status">
+        {liveAnnouncement || "\u00A0"}
+      </span>
     </div>
   );
 }
@@ -1103,10 +1114,7 @@ export function LandingPage({
                     <button
                       type="button"
                       onClick={() => activateDomain(story.id)}
-                      onFocus={() => {
-                        setActiveDomain(story.id);
-                        setActiveRailPanel(story.id);
-                      }}
+                      onFocus={() => activateDomain(story.id, true)}
                     >
                       <span>{story.index} / {story.label}</span>
                       <h3>{story.title}</h3>
@@ -1197,7 +1205,6 @@ export function LandingPage({
                     role="tabpanel"
                     id="landing-followup-panel"
                     aria-labelledby={`landing-followup-tab-${followupMode}`}
-                    aria-live="polite"
                   >
                     {FOLLOWUP_DEMOS.map((demo) => (
                       <AnimatedFollowupThread
