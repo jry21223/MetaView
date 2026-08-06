@@ -1,5 +1,22 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
+import {
+  type FollowupAnimationPhase,
+  type FollowupAnimationState,
+  type FollowupCameraShot,
+  EMPTY_FOLLOWUP_ANIMATION,
+  followupCompleteState,
+  followupPhase,
+  followupStateAt,
+} from "./followupTimeline";
+import { clampPanOffset, followupDesiredCenter } from "./cameraMath";
+import {
+  railOffsetPercent,
+  railPanelIndex,
+  railProgressFromScroll,
+  railTargetPosition,
+} from "./railMath";
+
 interface LandingPageProps {
   appEdition: "self" | "ops";
   isDark: boolean;
@@ -102,29 +119,6 @@ const FOLLOWUP_DEMOS = [
 }>;
 
 type FollowupDemo = (typeof FOLLOWUP_DEMOS)[number];
-type FollowupCameraShot = "wide" | "prompt" | "response";
-
-interface FollowupAnimationState {
-  prompt: string;
-  response: string;
-  cameraShot: FollowupCameraShot;
-  promptVisible: boolean;
-  promptTyping: boolean;
-  responseVisible: boolean;
-  responseTyping: boolean;
-  complete: boolean;
-}
-
-const EMPTY_FOLLOWUP_ANIMATION: FollowupAnimationState = {
-  prompt: "",
-  response: "",
-  cameraShot: "wide",
-  promptVisible: false,
-  promptTyping: false,
-  responseVisible: false,
-  responseTyping: false,
-  complete: false,
-};
 
 function shouldSkipFollowupMotion() {
   return (
@@ -196,10 +190,13 @@ function setFollowupCameraShot(
     1.075,
   );
   const maxPan = numberFromCssVariable(viewport, "--mv-followup-closeup-pan", 24);
-  const desiredX = viewport.clientWidth * (shot === "prompt" ? 0.6 : 0.5);
-  const desiredY = viewport.clientHeight * 0.52;
-  const panX = Math.max(-maxPan, Math.min(maxPan, desiredX - targetCenterX));
-  const panY = Math.max(-maxPan, Math.min(maxPan, desiredY - targetCenterY));
+  const desired = followupDesiredCenter(
+    viewport.clientWidth,
+    viewport.clientHeight,
+    shot,
+  );
+  const panX = clampPanOffset(desired.x, targetCenterX, maxPan);
+  const panY = clampPanOffset(desired.y, targetCenterY, maxPan);
 
   camera.style.setProperty("--mv-followup-camera-x", `${panX}px`);
   camera.style.setProperty("--mv-followup-camera-y", `${panY}px`);
@@ -219,72 +216,18 @@ function AnimatedFollowupThread({
 }) {
   const skipMotion = shouldSkipFollowupMotion();
   const [animation, setAnimation] = useState<FollowupAnimationState>(() =>
-    skipMotion
-      ? {
-          prompt: demo.prompt,
-          response: demo.response,
-          cameraShot: "wide",
-          promptVisible: true,
-          promptTyping: false,
-          responseVisible: true,
-          responseTyping: false,
-          complete: true,
-        }
-      : EMPTY_FOLLOWUP_ANIMATION,
+    skipMotion ? followupCompleteState(demo) : EMPTY_FOLLOWUP_ANIMATION,
   );
   const threadRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!isSelected || !isPlaying || skipMotion) return;
 
-    const introDelayMs = 420;
-    const cameraTravelMs = 760;
-    const promptCharacterMs = 44;
-    const promptHoldMs = 320;
-    const responseCharacterMs = 32;
-    const responseHoldMs = 620;
-    const promptFocusAt = introDelayMs;
-    const promptTypingAt = promptFocusAt + cameraTravelMs;
-    const promptTypedAt = promptTypingAt + demo.prompt.length * promptCharacterMs;
-    const responseFocusAt = promptTypedAt + promptHoldMs;
-    const responseTypingAt = responseFocusAt + cameraTravelMs;
-    const responseTypedAt =
-      responseTypingAt + demo.response.length * responseCharacterMs;
-    const returnWideAt = responseTypedAt + responseHoldMs;
-    const completeAt = returnWideAt + cameraTravelMs;
     const startedAt = window.performance.now();
     let animationFrame: number | null = null;
 
     const animate = (timestamp: number) => {
-      const elapsed = timestamp - startedAt;
-      const promptElapsed = Math.max(0, elapsed - promptTypingAt);
-      const promptCount = Math.min(
-        demo.prompt.length,
-        Math.floor(promptElapsed / promptCharacterMs),
-      );
-      const responseElapsed = Math.max(0, elapsed - responseTypingAt);
-      const responseCount = Math.min(
-        demo.response.length,
-        Math.floor(responseElapsed / responseCharacterMs),
-      );
-      const cameraShot: FollowupCameraShot =
-        elapsed >= returnWideAt
-          ? "wide"
-          : elapsed >= responseFocusAt
-            ? "response"
-            : elapsed >= promptFocusAt
-              ? "prompt"
-              : "wide";
-      const nextState: FollowupAnimationState = {
-        prompt: demo.prompt.slice(0, promptCount),
-        response: demo.response.slice(0, responseCount),
-        cameraShot,
-        promptVisible: elapsed >= promptFocusAt,
-        promptTyping: elapsed >= promptTypingAt,
-        responseVisible: elapsed >= responseFocusAt,
-        responseTyping: elapsed >= responseTypingAt,
-        complete: elapsed >= completeAt,
-      };
+      const nextState = followupStateAt(timestamp - startedAt, demo);
 
       setAnimation((current) =>
         current.prompt === nextState.prompt &&
@@ -330,19 +273,7 @@ function AnimatedFollowupThread({
     return () => observer.disconnect();
   }, [animation.cameraShot, isSelected]);
 
-  const animationPhase = animation.complete
-    ? "complete"
-    : animation.cameraShot === "wide" && animation.responseVisible
-      ? "return"
-      : animation.responseTyping
-        ? "response"
-        : animation.responseVisible
-          ? "response-focus"
-          : animation.promptTyping
-            ? "prompt"
-            : animation.promptVisible
-              ? "prompt-focus"
-              : "focus";
+  const animationPhase: FollowupAnimationPhase = followupPhase(animation);
 
   return (
     <div
@@ -724,7 +655,6 @@ export function LandingPage({
 
     const desktopQuery = window.matchMedia("(min-width: 901px)");
     const reduceMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const lastPanelIndex = DEMO_RAIL_PANELS.length - 1;
     let targetPosition = 0;
     let renderedPosition = 0;
     let animationFrame: number | null = null;
@@ -734,13 +664,15 @@ export function LandingPage({
       const track = storyTrackRef.current;
       if (!track) return;
 
-      const panelOffset = 100 / DEMO_RAIL_PANELS.length;
       track.style.setProperty(
         "--mv-landing-story-offset",
-        `${-position * panelOffset}%`,
+        `${railOffsetPercent(position, DEMO_RAIL_PANELS.length)}%`,
       );
 
-      const panel = DEMO_RAIL_PANELS[Math.min(lastPanelIndex, Math.round(position))];
+      const panel =
+        DEMO_RAIL_PANELS[
+          railPanelIndex(position, DEMO_RAIL_PANELS.length)
+        ];
       setActiveRailPanel((current) => (current === panel ? current : panel));
       if (panel !== "intro") {
         setActiveDomain((current) => (current === panel ? current : panel));
@@ -789,8 +721,10 @@ export function LandingPage({
 
       const sectionTop = window.scrollY + section.getBoundingClientRect().top;
       const travel = Math.max(section.offsetHeight - window.innerHeight, 1);
-      const progress = Math.min(1, Math.max(0, (window.scrollY - sectionTop) / travel));
-      targetPosition = progress * lastPanelIndex;
+      targetPosition = railTargetPosition(
+        railProgressFromScroll(window.scrollY, sectionTop, travel),
+        DEMO_RAIL_PANELS.length,
+      );
 
       if (reduceMotionQuery.matches) {
         renderedPosition = targetPosition;
