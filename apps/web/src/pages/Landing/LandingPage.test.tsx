@@ -144,6 +144,32 @@ describe("LandingPage", () => {
     );
   });
 
+  it("freezes a scene at its final state when its domain is re-activated", () => {
+    const { container, getByRole } = renderLanding();
+
+    const curve = () =>
+      container.querySelector<SVGPathElement>(
+        ".mv-landing-capability [data-scene-domain='math'] .mv-scene-curve--animated",
+      );
+    const analysis = () =>
+      container.querySelector<SVGElement>(
+        ".mv-landing-capability [data-scene-domain='math'] .mv-scene-analysis",
+      );
+
+    // First activation animates: no inline freeze styles.
+    expect(curve()?.getAttribute("style")).toBeNull();
+    expect(analysis()?.getAttribute("style")).toBeNull();
+
+    fireEvent.click(getByRole("tab", { name: /物理/ }));
+    fireEvent.click(getByRole("tab", { name: /数学/ }));
+
+    // Re-activation after the domain already played: inline styles pin the
+    // scene at its drawn state so the CSS animation cannot replay.
+    expect(curve()?.getAttribute("style")).toContain("animation: none");
+    expect(curve()?.getAttribute("style")).toContain("stroke-dashoffset");
+    expect(analysis()?.getAttribute("style")).toContain("animation: none");
+  });
+
   it("shows follow-up as contextual replies and reversible lesson revisions", () => {
     const { container, getByRole, getByText, props } = renderLanding();
     const followupFrame = container.querySelector(".mv-landing-followup-demo");

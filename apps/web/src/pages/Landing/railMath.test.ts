@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  railActivatedIndex,
   railOffsetPercent,
   railPanelIndex,
   railProgressFromScroll,
@@ -13,6 +14,26 @@ describe("railMath", () => {
       expect(railOffsetPercent(0, 4)).toBe(-0);
       expect(railOffsetPercent(1, 4)).toBe(-25);
       expect(railOffsetPercent(2.5, 4)).toBe(-62.5);
+    });
+  });
+
+  describe("railActivatedIndex", () => {
+    it("activates the panel whose midpoint the position has crossed", () => {
+      expect(railActivatedIndex(0.49, 4)).toBe(0);
+      expect(railActivatedIndex(0.5, 4)).toBe(1);
+      expect(railActivatedIndex(1.49, 4)).toBe(1);
+      expect(railActivatedIndex(1.5, 4)).toBe(2);
+    });
+
+    it("clamps to the first panel", () => {
+      expect(railActivatedIndex(-1, 4)).toBe(0);
+      expect(railActivatedIndex(0, 4)).toBe(0);
+    });
+
+    it("clamps to the last panel", () => {
+      expect(railActivatedIndex(3.49, 4)).toBe(3);
+      expect(railActivatedIndex(3.5, 4)).toBe(3);
+      expect(railActivatedIndex(99, 4)).toBe(3);
     });
   });
 

@@ -12,6 +12,13 @@ export function railPanelIndex(position: number, panelCount: number): number {
   return Math.min(panelCount - 1, Math.max(0, Math.round(position)));
 }
 
+/** Panel index to activate for a raw position — the panel whose midpoint the
+ *  position has crossed, so a panel is only activated once it is centered.
+ *  Clamped to the valid range. */
+export function railActivatedIndex(position: number, panelCount: number): number {
+  return Math.min(panelCount - 1, Math.max(0, Math.floor(position + 0.5)));
+}
+
 /** Position (0-based panel index) for a scroll progress in [0, 1]. */
 export function railTargetPosition(progress: number, panelCount: number): number {
   return clamp01(progress) * (panelCount - 1);
