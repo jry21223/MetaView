@@ -458,12 +458,14 @@ function MathScene() {
           className="mv-scene-curve mv-scene-curve--animated"
           d="M74 264C155 258 211 242 260 216C316 186 361 139 400 84C427 46 450 34 476 52C508 74 535 129 572 230"
         />
-        <path className="mv-scene-tangent" d="M245 264.9L443 40.68" />
-        <circle className="mv-scene-focus-ring" cx="361" cy="133.54" r="24" />
-        <circle className="mv-scene-focus" cx="361" cy="133.54" r="8" />
-        <path className="mv-scene-guide" d="M361 133.54V278M136 133.54H361" />
-        <text className="mv-scene-label" x="374" y="151">P(1, B(1))</text>
-        <text className="mv-scene-label mv-scene-label--muted" x="420" y="78">切线</text>
+        <g className="mv-scene-analysis">
+          <path className="mv-scene-tangent" d="M245 264.9L443 40.68" />
+          <circle className="mv-scene-focus-ring" cx="361" cy="133.54" r="24" />
+          <circle className="mv-scene-focus" cx="361" cy="133.54" r="8" />
+          <path className="mv-scene-guide" d="M361 133.54V278M136 133.54H361" />
+          <text className="mv-scene-label" x="374" y="151">P(1, B(1))</text>
+          <text className="mv-scene-label mv-scene-label--muted" x="420" y="78">切线</text>
+        </g>
       </svg>
     </div>
   );
@@ -489,15 +491,17 @@ function PhysicsScene() {
           className="mv-scene-curve mv-scene-curve--animated"
           d="M84 278C166 116 294 76 438 130C500 153 545 202 579 278"
         />
-        <path className="mv-scene-vector" d="M356 105H457" />
-        <path className="mv-scene-vector" d="M356 105V206" />
-        <path className="mv-scene-vector mv-scene-vector--result" d="M356 105L457 206" />
-        <path className="mv-scene-arrow" d="m448 97 9 8-9 8M348 197l8 9 8-9M445 205l12 1-1-12" />
-        <circle className="mv-scene-focus-ring" cx="356" cy="105" r="24" />
-        <circle className="mv-scene-focus" cx="356" cy="105" r="9" />
-        <text className="mv-scene-label" x="401" y="92">vₓ</text>
-        <text className="mv-scene-label" x="370" y="163">vᵧ</text>
-        <text className="mv-scene-label mv-scene-label--muted" x="455" y="190">v</text>
+        <g className="mv-scene-analysis">
+          <path className="mv-scene-vector" d="M356 105H457" />
+          <path className="mv-scene-vector" d="M356 105V206" />
+          <path className="mv-scene-vector mv-scene-vector--result" d="M356 105L457 206" />
+          <path className="mv-scene-arrow" d="m448 97 9 8-9 8M348 197l8 9 8-9M445 205l12 1-1-12" />
+          <circle className="mv-scene-focus-ring" cx="356" cy="105" r="24" />
+          <circle className="mv-scene-focus" cx="356" cy="105" r="9" />
+          <text className="mv-scene-label" x="401" y="92">vₓ</text>
+          <text className="mv-scene-label" x="370" y="163">vᵧ</text>
+          <text className="mv-scene-label mv-scene-label--muted" x="455" y="190">v</text>
+        </g>
       </svg>
     </div>
   );

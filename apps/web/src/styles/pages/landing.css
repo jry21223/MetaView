@@ -728,6 +728,15 @@ body:has(.mv-landing),
   animation: mvLandingPathDraw 1.7s 420ms ease forwards;
 }
 
+/* 先绘制轨迹/曲线（420ms 延迟 + 1.7s 描边），受力分析等解读元素在完成后才淡入 */
+.mv-lesson-scene-layer.is-active .mv-scene-analysis {
+  animation: mvLandingAnalysisIn 480ms 2250ms ease both;
+}
+
+.mv-lesson-scene-layer.is-active .mv-scene-analysis .mv-scene-focus-ring {
+  animation: mvLandingFocus 3.4s 2250ms ease-in-out infinite;
+}
+
 .mv-scene-tangent,
 .mv-scene-vector,
 .mv-algorithm-shift {
@@ -2057,6 +2066,11 @@ body:has(.mv-landing),
   to { stroke-dashoffset: 0; }
 }
 
+@keyframes mvLandingAnalysisIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 @keyframes mvLandingBarRise {
   from { transform: scaleY(0.12); }
   to { transform: scaleY(1); }
@@ -2664,5 +2678,10 @@ body:has(.mv-landing),
 
   .mv-scene-curve--animated {
     stroke-dashoffset: 0;
+  }
+
+  .mv-scene-analysis {
+    animation: none;
+    opacity: 1;
   }
 }
