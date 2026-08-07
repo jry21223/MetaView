@@ -598,7 +598,7 @@ comet
 
 | Surface | Current breakpoints |
 |---|---|
-| Landing | `1080px`, `820px`, `640px`, `390px` |
+| Landing | `1080px`, `900px`, `640px`, `380px` |
 | App shell / Studio | `900px`, `720px`, `680px`, `640px`, `380px` |
 | Player | `1180px`, `920px`, `680px` |
 | Tools / Ops | `1024px`, `640px` |
