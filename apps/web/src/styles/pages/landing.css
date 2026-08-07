@@ -1325,13 +1325,13 @@ body:has(.mv-landing),
 }
 
 .mv-landing-director {
-  --director-bg: #101410;
-  --director-surface: #151b17;
-  --director-ink: #e8efe9;
-  --director-ink-2: #9ba8a0;
-  --director-ink-3: #657169;
-  --director-line: #27332c;
-  --director-accent: #9fb48d;
+  --director-bg: var(--bg);
+  --director-surface: var(--surface);
+  --director-ink: var(--ink);
+  --director-ink-2: var(--ink-2);
+  --director-ink-3: var(--ink-3);
+  --director-line: var(--line-2);
+  --director-accent: var(--accent);
   overflow: hidden;
   border: 0;
   background: var(--director-bg);
