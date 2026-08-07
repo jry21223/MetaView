@@ -291,7 +291,7 @@ body:has(.mv-landing),
 
 .mv-landing-hero h1 strong {
   font-family: var(--font-headline, "Space Grotesk", sans-serif);
-  font-size: clamp(64px, 6.4vw, 92px);
+  font-size: clamp(48px, 5.5vw, 72px);
   font-weight: 620;
   letter-spacing: -0.065em;
   line-height: 0.88;
@@ -300,7 +300,7 @@ body:has(.mv-landing),
 
 .mv-landing-hero h1 span {
   max-width: 11em;
-  font-size: clamp(38px, 3.7vw, 54px);
+  font-size: clamp(38px, 3.7vw, 44px);
   font-weight: 620;
   letter-spacing: -0.045em;
   line-height: 1.08;
@@ -311,7 +311,7 @@ body:has(.mv-landing),
   max-width: 430px;
   margin: 24px 0 0;
   color: var(--ink-2);
-  font-size: clamp(16px, 1.45vw, 19px);
+  font-size: clamp(15px, 1.3vw, 17px);
   line-height: 1.65;
   animation: mvLandingCopyIn 620ms 220ms ease both;
 }
@@ -993,7 +993,7 @@ body:has(.mv-landing),
 
 .mv-landing-section {
   position: relative;
-  padding: 112px 24px;
+  padding: clamp(78px, 9vw, 116px) 24px;
 }
 
 .mv-landing-section__inner {
@@ -1952,7 +1952,7 @@ body:has(.mv-landing),
 }
 
 .mv-landing-final {
-  padding: 118px 24px;
+  padding: clamp(78px, 9vw, 116px) 24px;
   border-bottom: 1px solid var(--line);
   background:
     linear-gradient(color-mix(in srgb, var(--line) 42%, transparent) 1px, transparent 1px),
@@ -2489,7 +2489,7 @@ body:has(.mv-landing),
 
   .mv-landing-section,
   .mv-landing-final {
-    padding: 76px 14px;
+    padding: 70px 14px;
   }
 
   .mv-landing-section-head h2,
