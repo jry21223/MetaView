@@ -710,7 +710,6 @@ styles/
   global.css
   layout.css
   pages/
-    landing.css
     landing/
       shell.css
       content.css

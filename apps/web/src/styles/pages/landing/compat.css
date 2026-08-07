@@ -1,0 +1,69 @@
+
+@keyframes mvLandingHeaderIn {
+  from { opacity: 0; transform: translate(-50%, -5px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@keyframes mvLandingCopyIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes mvLandingCanvasIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes mvLandingPathDraw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes mvLandingAnalysisIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes mvLandingBarRise {
+  from { transform: scaleY(0.12); }
+  to { transform: scaleY(1); }
+}
+
+@keyframes mvLandingFocus {
+  0%, 100% { opacity: 0.42; transform: scale(0.94); }
+  50% { opacity: 0.72; transform: scale(1.04); }
+}
+
+@keyframes mvLandingPipelineTravel {
+  0%, 8% { transform: translateX(0); }
+  92%, 100% { transform: translateX(calc(100% - 8px)); }
+}
+
+@keyframes mvLandingVersionLine {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes mvLandingTypeCursor {
+  0%, 48% { opacity: 1; }
+  49%, 100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mv-landing *,
+  .mv-landing *::before,
+  .mv-landing *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .mv-scene-curve--animated {
+    stroke-dashoffset: 0;
+  }
+
+  .mv-scene-analysis {
+    animation: none;
+    opacity: 1;
+  }
+}
