@@ -2145,7 +2145,23 @@ body:has(.mv-landing),
   }
 
   .mv-landing-nav {
-    display: none;
+    grid-row: 2;
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    width: max-content;
+    max-width: 100%;
+    margin-inline: auto;
+    gap: 2px;
+    padding: 6px 0 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mv-landing-nav a {
+    flex-shrink: 0;
+    padding-inline: 10px;
+    font-size: 12px;
+    white-space: nowrap;
   }
 
   .mv-landing-hero {
@@ -2490,7 +2506,7 @@ body:has(.mv-landing),
 
   .mv-landing-demo-toolbar button {
     flex: 1;
-    min-height: 42px;
+    min-height: 44px;
     justify-content: center;
   }
 
@@ -2553,7 +2569,7 @@ body:has(.mv-landing),
   }
 
   .mv-landing-followup-demo__modes button {
-    min-height: 42px;
+    min-height: 44px;
   }
 
   .mv-landing-followup-demo__thread {
