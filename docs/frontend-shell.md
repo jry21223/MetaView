@@ -161,7 +161,7 @@ mainStyle = {
 - 公共 Landing 路由与主题装配 → `apps/web/src/app/LandingRoute.tsx`
 - 跨 Stage 共享 UI → `apps/web/src/shared/ui/`
 - 单 Stage 专用 → `apps/web/src/pages/<Stage>/` 或 `apps/web/src/features/<feature>/ui/`
-- Landing 样式 → `apps/web/src/styles/pages/landing.css`
+- Landing 样式 → `apps/web/src/styles/pages/landing/`（shell / content / responsive / compat 四份）
 - Public template 页面样式 → `apps/web/src/styles/pages/templates.css`
 
 `shared/` 不得反向导入 `features/` 或 `pages/`。
