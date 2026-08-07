@@ -2130,6 +2130,24 @@ body:has(.mv-landing),
   }
 }
 
+/* Tighten the header in the 901-980px band so the centered grid
+   (brand | nav | actions) fits without a horizontal scrollbar. */
+@media (min-width: 901px) and (max-width: 980px) {
+  .mv-landing-header {
+    grid-template-columns: minmax(150px, 1fr) auto minmax(150px, 1fr);
+    gap: 16px;
+  }
+
+  .mv-landing-nav {
+    gap: 2px;
+  }
+
+  .mv-landing-nav a {
+    padding-inline: 9px;
+    font-size: 12px;
+  }
+}
+
 @media (max-width: 900px) {
   .mv-landing-followup-demo__viewport {
     --mv-followup-closeup-scale: 1.06;
