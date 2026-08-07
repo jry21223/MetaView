@@ -345,7 +345,7 @@ body:has(.mv-landing),
 .mv-landing-button--primary {
   border-color: var(--accent);
   background: var(--accent);
-  color: var(--accent-contrast, #ffffff) !important;
+  color: var(--accent-contrast, #ffffff);
   cursor: pointer;
 }
 
@@ -403,6 +403,10 @@ body:has(.mv-landing),
   border-radius: 10px 10px 0 0;
   background: color-mix(in srgb, var(--surface) 92%, var(--bg));
   box-shadow: 0 10px 28px rgba(49, 51, 42, 0.07);
+}
+
+.mv-dark .mv-landing-question {
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.26);
 }
 
 .mv-landing-question span,
@@ -737,8 +741,7 @@ body:has(.mv-landing),
 }
 
 .mv-scene-tangent,
-.mv-scene-vector,
-.mv-algorithm-shift {
+.mv-scene-vector {
   fill: none;
   stroke: var(--accent);
   stroke-width: 3;
@@ -1086,13 +1089,25 @@ body:has(.mv-landing),
   z-index: 3;
   top: -4px;
   left: 0;
+  width: 100%;
+  height: 8px;
+  pointer-events: none;
+  animation: mvLandingPipelineTravel 8s ease-in-out infinite;
+}
+
+/* The visual dot rides the full-width traveler so translateX percentages
+   (element-relative) resolve against the li width, not the 8px dot. */
+.mv-landing-pipeline__progress::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 8px;
   height: 8px;
   border: 2px solid var(--surface-2);
   border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
-  animation: mvLandingPipelineTravel 8s ease-in-out infinite;
 }
 
 .mv-landing-proof-line {
@@ -1169,6 +1184,8 @@ body:has(.mv-landing),
   transition: transform 320ms cubic-bezier(0.2, 0.75, 0.24, 1);
 }
 
+/* Pills are track-sized and tracks are gapless (gap: 0), so sliding one
+   column means moving 100% of the pill's own width. */
 .mv-landing-demo-toolbar[data-active-domain="physics"]::before {
   transform: translateX(100%);
 }
@@ -1214,7 +1231,7 @@ body:has(.mv-landing),
 }
 
 .mv-landing-capability .mv-lesson-canvas {
-  box-shadow: 0 24px 64px rgba(45, 48, 40, 0.1);
+  box-shadow: var(--landing-shadow);
 }
 
 .mv-landing-story {
@@ -1681,7 +1698,7 @@ body:has(.mv-landing),
 }
 
 .mv-landing-followup-demo__modes[data-active-mode="revise"]::before {
-  transform: translateX(calc(100% + 6px));
+  transform: translateX(100%);
 }
 
 .mv-landing-followup-demo__modes button {
@@ -2078,8 +2095,8 @@ body:has(.mv-landing),
 }
 
 @keyframes mvLandingPipelineTravel {
-  0%, 8% { left: 0; }
-  92%, 100% { left: calc(100% - 8px); }
+  0%, 8% { transform: translateX(0); }
+  92%, 100% { transform: translateX(calc(100% - 8px)); }
 }
 
 @keyframes mvLandingVersionLine {
