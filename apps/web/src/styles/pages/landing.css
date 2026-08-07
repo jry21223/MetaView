@@ -637,28 +637,24 @@ body:has(.mv-landing),
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  filter: blur(2.5px);
   transform: translate3d(0, 11px, 0) scale(0.992);
   transform-origin: center;
   transition:
     opacity 240ms ease,
-    filter 260ms ease,
     transform 340ms cubic-bezier(0.3, 0, 0.7, 0.2),
     visibility 0s linear 360ms;
-  will-change: opacity, filter, transform;
 }
 
 .mv-lesson-scene-layer.is-active {
   z-index: 1;
   opacity: 1;
   visibility: visible;
-  filter: blur(0);
   transform: translate3d(0, 0, 0) scale(1);
   transition:
     opacity 340ms 55ms ease,
-    filter 340ms 25ms ease,
     transform 440ms 25ms cubic-bezier(0.2, 0.75, 0.24, 1),
     visibility 0s;
+  will-change: opacity, transform;
 }
 
 .mv-lesson-scene {
@@ -684,7 +680,6 @@ body:has(.mv-landing),
   border: 1px solid var(--line);
   border-radius: 8px;
   background: color-mix(in srgb, var(--surface) 86%, transparent);
-  backdrop-filter: blur(8px);
 }
 
 .mv-lesson-formula span {
@@ -813,7 +808,6 @@ body:has(.mv-landing),
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 8px;
   line-height: 1.4;
-  backdrop-filter: blur(8px);
 }
 
 .mv-lesson-code span,
@@ -924,7 +918,6 @@ body:has(.mv-landing),
   border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--line));
   border-radius: 7px;
   background: color-mix(in srgb, var(--surface) 86%, transparent);
-  backdrop-filter: blur(8px);
 }
 
 .mv-lesson-focus-note strong {
@@ -948,7 +941,6 @@ body:has(.mv-landing),
   font-size: 10.5px;
   line-height: 1.45;
   text-align: center;
-  backdrop-filter: blur(8px);
 }
 
 .mv-lesson-timeline {
