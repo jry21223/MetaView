@@ -8,12 +8,10 @@ import {
 } from "react";
 
 import {
-  type FollowupAnimationPhase,
   type FollowupAnimationState,
   type FollowupCameraShot,
   EMPTY_FOLLOWUP_ANIMATION,
   followupCompleteState,
-  followupPhase,
   followupStateAt,
 } from "./followupTimeline";
 import { clampPanOffset, followupDesiredCenter } from "./cameraMath";
@@ -349,8 +347,6 @@ function AnimatedFollowupThread({
     return () => observer.disconnect();
   }, [animation.cameraShot, isSelected]);
 
-  const animationPhase: FollowupAnimationPhase = followupPhase(animation);
-
   // Live announcement for assistive tech: the visible typing text is
   // aria-hidden, so a dedicated visually-hidden status region announces the
   // completed reply (matching what the status line reveals visually).
@@ -361,7 +357,6 @@ function AnimatedFollowupThread({
     <div
       ref={threadRef}
       className={`mv-landing-followup-demo__thread${isSelected ? " is-active" : ""}`}
-      data-animation-phase={animationPhase}
       data-camera-shot={animation.cameraShot}
       aria-hidden={!isSelected}
     >
@@ -1090,7 +1085,6 @@ export function LandingPage({
               <div
                 className="mv-landing-story__track"
                 ref={storyTrackRef}
-                data-active-panel={activeRailPanel}
               >
                 <div
                   className="mv-landing-section-head mv-landing-section-head--story"
