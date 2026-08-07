@@ -62,7 +62,8 @@
     stroke-dashoffset: 0;
   }
 
-  .mv-scene-analysis {
+  /* 与 content.css 中 .is-active .mv-scene-analysis 同特异性，确保覆盖动画而非被动画覆盖 */
+  .mv-lesson-scene-layer.is-active .mv-scene-analysis {
     animation: none;
     opacity: 1;
   }

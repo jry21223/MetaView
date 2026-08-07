@@ -453,7 +453,7 @@ function SunIcon() {
 
 // Inline styles that freeze a scene at its final drawn state so scroll-driven
 // re-activation does not replay the path-draw / analysis-fade animations.
-// TODO(css): once landing.css can be edited, replace these with a single rule:
+// TODO(css): replace these with rules in the landing stylesheet, e.g.:
 //   .mv-lesson-scene-layer.has-played .mv-scene-curve--animated { animation: none; stroke-dashoffset: 0 }
 //   .mv-lesson-scene-layer.has-played .mv-scene-analysis { animation: none; opacity: 1 }
 //   .mv-lesson-scene-layer.has-played .mv-algorithm-bar rect { animation: none }
