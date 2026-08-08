@@ -7,6 +7,8 @@ import {
   METAVIEW_INDEX_ROBOTS,
   METAVIEW_NOINDEX_FOLLOW_ROBOTS,
   METAVIEW_NOINDEX_ROBOTS,
+  PUBLIC_INDEXABLE_PATHS,
+  resolvePublicUrl,
   resolveSeoRoute,
 } from "./seoConfig";
 
@@ -72,6 +74,28 @@ describe("SeoManager", () => {
   it("normalizes trailing slashes before resolving route policy", () => {
     expect(resolveSeoRoute("/templates/binary-search/").kind).toBe("template");
     expect(resolveSeoRoute("/settings/").kind).toBe("private");
+  });
+
+  it("keeps every sitemap route unique, canonical, and indexable", () => {
+    expect(new Set(PUBLIC_INDEXABLE_PATHS).size).toBe(
+      PUBLIC_INDEXABLE_PATHS.length,
+    );
+
+    for (const pathname of PUBLIC_INDEXABLE_PATHS) {
+      const route = resolveSeoRoute(pathname);
+      expect(route.indexable, pathname).toBe(true);
+      expect(route.canonicalPath, pathname).toBe(pathname);
+      expect(route.robots, pathname).toBe(METAVIEW_INDEX_ROBOTS);
+    }
+  });
+
+  it("preserves an explicitly configured deployment base path", () => {
+    expect(
+      resolvePublicUrl(
+        "/templates/binary-search",
+        "https://learn.example/metaview/",
+      ),
+    ).toBe("https://learn.example/metaview/templates/binary-search");
   });
 });
 

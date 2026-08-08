@@ -126,9 +126,9 @@ function renderFallbackBlock(routePath) {
       "        <h1>把一道题，变成一段看得见的理解过程。</h1>",
       `        <p>${escapeHtml(route.description)}</p>`,
       "        <nav aria-label=\"MetaView 公开入口\">",
-      "          <a href=\"/templates\">浏览交互式案例</a>",
-      "          <a href=\"/templates/binary-search\">二分查找可视化</a>",
-      "          <a href=\"/templates/derivative-tangent\">导数与切线可视化</a>",
+      `          <a href="${publicHref("/templates")}">浏览交互式案例</a>`,
+      `          <a href="${publicHref("/templates/binary-search")}">二分查找可视化</a>`,
+      `          <a href="${publicHref("/templates/derivative-tangent")}">导数与切线可视化</a>`,
       "        </nav>",
       "        <small>应用正在加载；即使 JavaScript 暂不可用，公开内容仍可被浏览与索引。</small>",
       "      </main>",
@@ -139,7 +139,7 @@ function renderFallbackBlock(routePath) {
   if (route.kind === "templates") {
     const links = PUBLISHED_TEMPLATES.map(
       (template) =>
-        `          <li><a href="/templates/${escapeAttribute(template.id)}">${escapeHtml(template.title)}</a><span>${escapeHtml(template.desc)}</span></li>`,
+        `          <li><a href="${publicHref(`/templates/${template.id}`)}">${escapeHtml(template.title)}</a><span>${escapeHtml(template.desc)}</span></li>`,
     ).join("\n");
     return [
       "<!-- metaview:fallback:start -->",
@@ -150,7 +150,7 @@ function renderFallbackBlock(routePath) {
       "        <ul class=\"mv-boot-fallback__links\">",
       links,
       "        </ul>",
-      "        <a class=\"mv-boot-fallback__back\" href=\"/\">返回 MetaView 首页</a>",
+      `        <a class="mv-boot-fallback__back" href="${publicHref("/")}">返回 MetaView 首页</a>`,
       "      </main>",
       "      <!-- metaview:fallback:end -->",
     ].join("\n");
@@ -165,8 +165,8 @@ function renderFallbackBlock(routePath) {
       `        <p>${escapeHtml(route.description)}</p>`,
       `        <p class="mv-boot-fallback__prompt"><strong>讲解目标：</strong>${escapeHtml(route.template.prompt)}</p>`,
       "        <nav aria-label=\"案例入口\">",
-      `          <a href="${escapeAttribute(routePath)}">进入完整交互案例</a>`,
-      "          <a href=\"/templates\">浏览全部案例</a>",
+      `          <a href="${publicHref(routePath)}">进入完整交互案例</a>`,
+      `          <a href="${publicHref("/templates")}">浏览全部案例</a>`,
       "        </nav>",
       "        <small>播放器正在加载。MetaView 会同步呈现步骤、画面、公式或代码状态。</small>",
       "      </main>",
@@ -180,8 +180,8 @@ function renderFallbackBlock(routePath) {
     `        <h1>${escapeHtml(route.title)}</h1>`,
     `        <p>${escapeHtml(route.description)}</p>`,
     "        <nav aria-label=\"MetaView 公开入口\">",
-    "          <a href=\"/\">返回首页</a>",
-    "          <a href=\"/templates\">浏览公开案例</a>",
+    `          <a href="${publicHref("/")}">返回首页</a>`,
+    `          <a href="${publicHref("/templates")}">浏览公开案例</a>`,
     "        </nav>",
     "      </main>",
     "      <!-- metaview:fallback:end -->",
@@ -235,6 +235,10 @@ function escapeAttribute(value) {
 
 function escapeXml(value) {
   return escapeAttribute(value);
+}
+
+function publicHref(routePath) {
+  return escapeAttribute(resolvePublicUrl(routePath, siteBase));
 }
 
 function assertMarker(html, pattern, label) {
