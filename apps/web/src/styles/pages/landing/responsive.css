@@ -9,14 +9,6 @@
     gap: 36px;
   }
 
-  .mv-landing-hero h1 strong {
-    font-size: clamp(58px, 6.2vw, 76px);
-  }
-
-  .mv-landing-hero h1 span {
-    font-size: clamp(34px, 3.7vw, 44px);
-  }
-
   .mv-lesson-workspace {
     min-height: 340px;
   }
