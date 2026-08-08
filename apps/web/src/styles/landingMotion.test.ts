@@ -63,6 +63,21 @@ describe("Landing causal scene motion", () => {
     expect(contentCss).toMatch(
       /\.mv-lesson-scene-layer\.is-active \.mv-scene-vector-(?:arrows|labels)[\s\S]*mvLandingLabelReveal/s,
     );
+
+    const componentTiming = contentCss.match(
+      /\.mv-lesson-scene-layer\.is-active \.mv-scene-vector-branch--component\s*\{[^}]*mvLandingLineGrow\s+(\d+)ms\s+(\d+)ms/s,
+    );
+    const resultTiming = contentCss.match(
+      /\.mv-lesson-scene-layer\.is-active \.mv-scene-vector-branch--result\s*\{[^}]*mvLandingLineGrow\s+(\d+)ms\s+(\d+)ms/s,
+    );
+    const annotationTiming = contentCss.match(
+      /\.mv-lesson-scene-layer\.is-active \.mv-scene-vector-arrows,[\s\S]*?animation:\s*mvLandingLabelReveal\s+(\d+)ms\s+(\d+)ms/s,
+    );
+    const componentEnd = Number(componentTiming?.[1]) + Number(componentTiming?.[2]);
+    const resultEnd = Number(resultTiming?.[1]) + Number(resultTiming?.[2]);
+
+    expect(Number(resultTiming?.[2])).toBeGreaterThanOrEqual(componentEnd);
+    expect(Number(annotationTiming?.[2])).toBeGreaterThanOrEqual(resultEnd);
   });
 
   it("pins every causal physics layer in reduced-motion mode", () => {

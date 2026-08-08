@@ -226,6 +226,7 @@ describe("LandingPage", () => {
 
     expect(componentVectors).toHaveLength(2);
     expect(resultVector).toBeTruthy();
+    expect(resultVector?.classList.contains("mv-scene-vector--result")).toBe(true);
     for (const vector of [...componentVectors, resultVector as SVGPathElement]) {
       expect(vector.getAttribute("d")).toMatch(new RegExp(`^M${focusX} ${focusY}`));
       expect(vector.getAttribute("pathLength")).toBe("1");

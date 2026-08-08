@@ -527,7 +527,7 @@ function PhysicsScene() {
           <g className="mv-scene-vectors">
             <path pathLength="1" className="mv-scene-vector mv-scene-vector-branch mv-scene-vector-branch--component" d="M356 105L457 105" />
             <path pathLength="1" className="mv-scene-vector mv-scene-vector-branch mv-scene-vector-branch--component" d="M356 105L356 206" />
-            <path pathLength="1" className="mv-scene-vector mv-scene-vector-branch mv-scene-vector-branch--result" d="M356 105L457 206" />
+            <path pathLength="1" className="mv-scene-vector mv-scene-vector--result mv-scene-vector-branch mv-scene-vector-branch--result" d="M356 105L457 206" />
           </g>
           <g className="mv-scene-vector-arrows">
             <path className="mv-scene-arrow" d="m448 97 9 8-9 8" />
