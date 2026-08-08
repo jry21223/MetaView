@@ -471,7 +471,6 @@ function MathScene() {
           d="M74 264C155 258 211 242 260 216C316 186 361 139 400 84C427 46 450 34 476 52C508 74 535 129 572 230"
         />
         <g className="mv-scene-analysis">
-          <path className="mv-scene-tangent" d="M245 264.9L443 40.68" />
           <circle
             className="mv-scene-focus-ring"
             cx="361"
@@ -479,9 +478,18 @@ function MathScene() {
             r="24"
           />
           <circle className="mv-scene-focus" cx="361" cy="133.54" r="8" />
-          <path className="mv-scene-guide" d="M361 133.54V278M136 133.54H361" />
-          <text className="mv-scene-label" x="374" y="151">P(1, B(1))</text>
-          <text className="mv-scene-label mv-scene-label--muted" x="420" y="78">切线</text>
+          <g className="mv-scene-tangent">
+            <path pathLength="1" className="mv-scene-tangent-branch" d="M361 133.54L245 264.9" />
+            <path pathLength="1" className="mv-scene-tangent-branch" d="M361 133.54L443 40.68" />
+          </g>
+          <g className="mv-scene-guide">
+            <path pathLength="1" className="mv-scene-guide-branch" d="M361 133.54L361 278" />
+            <path pathLength="1" className="mv-scene-guide-branch" d="M361 133.54L136 133.54" />
+          </g>
+          <g className="mv-scene-analysis-labels">
+            <text className="mv-scene-label" x="374" y="151">P(1, B(1))</text>
+            <text className="mv-scene-label mv-scene-label--muted" x="420" y="78">切线</text>
+          </g>
         </g>
       </svg>
     </div>
