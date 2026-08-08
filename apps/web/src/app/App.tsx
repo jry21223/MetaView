@@ -6,6 +6,7 @@ import { AssetShowcasePage } from "../pages/AssetShowcase/AssetShowcasePage";
 import { LandingRoute } from "./LandingRoute";
 import { OpsAppShell } from "./OpsAppShell";
 import { SelfAppShell } from "./SelfAppShell";
+import { SeoManager } from "./SeoManager";
 import { stageToPath } from "./routes";
 
 function resolveAppEdition(): AppEdition {
@@ -15,6 +16,7 @@ function resolveAppEdition(): AppEdition {
 export function App() {
   return (
     <BrowserRouter>
+      <SeoManager />
       <AppRoutes />
     </BrowserRouter>
   );

@@ -24,6 +24,7 @@
 | [quality-gate.md](./quality-gate.md) | 后端 Canonical QualityReport、修复、持久化、Director 与导出阻断语义 |
 | [frontend-shell.md](./frontend-shell.md) | Stage 路由、GlobalTopbar、Studio 布局、Provider 配置、snapshot support levels |
 | [template-previews.md](./template-previews.md) | `/templates` 正式案例、统一 PlaybookPlayer、确定性参数与零请求边界 |
+| [seo-geo.md](./seo-geo.md) | 公共路由的索引边界、canonical / social metadata、JSON-LD、sitemap 与构建验证 |
 | [gold-template-system.md](./gold-template-system.md) | Public Gold Template、Hidden Variant、Manifest 与防泄漏边界 |
 | [conic-sections-capability.md](./conic-sections-capability.md) | 圆锥曲线题型母版、领域内核、Skill 路由与 V1 能力边界 |
 | [animation-tool-registry.md](./animation-tool-registry.md) | 后端 animation tool registry 的扩展流程、当前工具和新增规则 |
