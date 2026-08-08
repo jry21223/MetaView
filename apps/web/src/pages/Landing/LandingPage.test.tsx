@@ -219,27 +219,21 @@ describe("LandingPage", () => {
   it("freezes a scene at its final state when its domain is re-activated", () => {
     const { container, getByRole } = renderLanding();
 
-    const curve = () =>
-      container.querySelector<SVGPathElement>(
-        ".mv-landing-capability [data-scene-domain='math'] .mv-scene-curve--animated",
-      );
-    const analysis = () =>
-      container.querySelector<SVGElement>(
-        ".mv-landing-capability [data-scene-domain='math'] .mv-scene-analysis",
+    const layer = () =>
+      container.querySelector<HTMLElement>(
+        ".mv-landing-capability [data-scene-domain='math']",
       );
 
-    // First activation animates: no inline freeze styles.
-    expect(curve()?.getAttribute("style")).toBeNull();
-    expect(analysis()?.getAttribute("style")).toBeNull();
+    // First activation animates: the layer carries no freeze class.
+    expect(layer()?.classList.contains("has-played")).toBe(false);
 
     fireEvent.click(getByRole("tab", { name: /物理/ }));
     fireEvent.click(getByRole("tab", { name: /数学/ }));
 
-    // Re-activation after the domain already played: inline styles pin the
-    // scene at its drawn state so the CSS animation cannot replay.
-    expect(curve()?.getAttribute("style")).toContain("animation: none");
-    expect(curve()?.getAttribute("style")).toContain("stroke-dashoffset");
-    expect(analysis()?.getAttribute("style")).toContain("animation: none");
+    // Re-activation after the domain already played: the layer carries
+    // has-played so the stylesheet pins the scene at its drawn state and
+    // the CSS animation cannot replay.
+    expect(layer()?.classList.contains("has-played")).toBe(true);
   });
 
   it("announces follow-up completion via a dedicated live region", () => {

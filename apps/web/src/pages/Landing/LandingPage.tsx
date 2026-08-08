@@ -3,7 +3,6 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  type CSSProperties,
   type KeyboardEvent,
 } from "react";
 
@@ -451,17 +450,7 @@ function SunIcon() {
   );
 }
 
-// Inline styles that freeze a scene at its final drawn state so scroll-driven
-// re-activation does not replay the path-draw / analysis-fade animations.
-// TODO(css): replace these with rules in the landing stylesheet, e.g.:
-//   .mv-lesson-scene-layer.has-played .mv-scene-curve--animated { animation: none; stroke-dashoffset: 0 }
-//   .mv-lesson-scene-layer.has-played .mv-scene-analysis { animation: none; opacity: 1 }
-//   .mv-lesson-scene-layer.has-played .mv-algorithm-bar rect { animation: none }
-const PLAYED_CURVE_STYLE: CSSProperties = { animation: "none", strokeDashoffset: 0 };
-const PLAYED_ANALYSIS_STYLE: CSSProperties = { animation: "none", opacity: 1 };
-const PLAYED_ANIM_STYLE: CSSProperties = { animation: "none" };
-
-function MathScene({ suppressReplay = false }: { suppressReplay?: boolean }) {
+function MathScene() {
   return (
     <div className="mv-lesson-scene mv-lesson-scene--math">
       <div className="mv-lesson-formula">
@@ -480,19 +469,14 @@ function MathScene({ suppressReplay = false }: { suppressReplay?: boolean }) {
         <path
           className="mv-scene-curve mv-scene-curve--animated"
           d="M74 264C155 258 211 242 260 216C316 186 361 139 400 84C427 46 450 34 476 52C508 74 535 129 572 230"
-          style={suppressReplay ? PLAYED_CURVE_STYLE : undefined}
         />
-        <g
-          className="mv-scene-analysis"
-          style={suppressReplay ? PLAYED_ANALYSIS_STYLE : undefined}
-        >
+        <g className="mv-scene-analysis">
           <path className="mv-scene-tangent" d="M245 264.9L443 40.68" />
           <circle
             className="mv-scene-focus-ring"
             cx="361"
             cy="133.54"
             r="24"
-            style={suppressReplay ? PLAYED_ANIM_STYLE : undefined}
           />
           <circle className="mv-scene-focus" cx="361" cy="133.54" r="8" />
           <path className="mv-scene-guide" d="M361 133.54V278M136 133.54H361" />
@@ -504,7 +488,7 @@ function MathScene({ suppressReplay = false }: { suppressReplay?: boolean }) {
   );
 }
 
-function PhysicsScene({ suppressReplay = false }: { suppressReplay?: boolean }) {
+function PhysicsScene() {
   return (
     <div className="mv-lesson-scene mv-lesson-scene--physics">
       <div className="mv-lesson-formula">
@@ -523,12 +507,8 @@ function PhysicsScene({ suppressReplay = false }: { suppressReplay?: boolean }) 
         <path
           className="mv-scene-curve mv-scene-curve--animated"
           d="M84 278C166 116 294 76 438 130C500 153 545 202 579 278"
-          style={suppressReplay ? PLAYED_CURVE_STYLE : undefined}
         />
-        <g
-          className="mv-scene-analysis"
-          style={suppressReplay ? PLAYED_ANALYSIS_STYLE : undefined}
-        >
+        <g className="mv-scene-analysis">
           <path className="mv-scene-vector" d="M356 105H457" />
           <path className="mv-scene-vector" d="M356 105V206" />
           <path className="mv-scene-vector mv-scene-vector--result" d="M356 105L457 206" />
@@ -538,7 +518,6 @@ function PhysicsScene({ suppressReplay = false }: { suppressReplay?: boolean }) 
             cx="356"
             cy="105"
             r="24"
-            style={suppressReplay ? PLAYED_ANIM_STYLE : undefined}
           />
           <circle className="mv-scene-focus" cx="356" cy="105" r="9" />
           <text className="mv-scene-label" x="401" y="92">vₓ</text>
@@ -550,7 +529,7 @@ function PhysicsScene({ suppressReplay = false }: { suppressReplay?: boolean }) 
   );
 }
 
-function AlgorithmScene({ suppressReplay = false }: { suppressReplay?: boolean }) {
+function AlgorithmScene() {
   return (
     <div className="mv-lesson-scene mv-lesson-scene--algorithm">
       <div className="mv-lesson-code" aria-label="二分查找当前代码">
@@ -563,35 +542,35 @@ function AlgorithmScene({ suppressReplay = false }: { suppressReplay?: boolean }
         <path className="mv-algorithm-baseline" d="M70 282H574" />
         <g className="mv-algorithm-bars">
           <g className="mv-algorithm-bar is-discarded">
-            <rect x="83" y="256" width="44" height="26" rx="5" style={suppressReplay ? PLAYED_ANIM_STYLE : undefined} />
+            <rect x="83" y="256" width="44" height="26" rx="5" />
             <text x="98" y="273">3</text>
           </g>
           <g className="mv-algorithm-bar is-discarded">
-            <rect x="145" y="244" width="44" height="38" rx="5" style={suppressReplay ? PLAYED_ANIM_STYLE : undefined} />
+            <rect x="145" y="244" width="44" height="38" rx="5" />
             <text x="157" y="273">8</text>
           </g>
           <g className="mv-algorithm-bar is-discarded">
-            <rect x="207" y="233" width="44" height="49" rx="5" style={suppressReplay ? PLAYED_ANIM_STYLE : undefined} />
+            <rect x="207" y="233" width="44" height="49" rx="5" />
             <text x="214" y="273">12</text>
           </g>
           <g className="mv-algorithm-bar is-discarded">
-            <rect x="269" y="221" width="44" height="61" rx="5" style={suppressReplay ? PLAYED_ANIM_STYLE : undefined} />
+            <rect x="269" y="221" width="44" height="61" rx="5" />
             <text x="276" y="273">17</text>
           </g>
           <g className="mv-algorithm-bar is-mid">
-            <rect x="331" y="205" width="44" height="77" rx="5" style={suppressReplay ? PLAYED_ANIM_STYLE : undefined} />
+            <rect x="331" y="205" width="44" height="77" rx="5" />
             <text x="338" y="273">24</text>
           </g>
           <g className="mv-algorithm-bar is-in-range">
-            <rect x="393" y="188" width="44" height="94" rx="5" style={suppressReplay ? PLAYED_ANIM_STYLE : undefined} />
+            <rect x="393" y="188" width="44" height="94" rx="5" />
             <text x="400" y="273">31</text>
           </g>
           <g className="mv-algorithm-bar is-in-range">
-            <rect x="455" y="160" width="44" height="122" rx="5" style={suppressReplay ? PLAYED_ANIM_STYLE : undefined} />
+            <rect x="455" y="160" width="44" height="122" rx="5" />
             <text x="462" y="273">46</text>
           </g>
           <g className="mv-algorithm-bar is-in-range">
-            <rect x="517" y="134" width="44" height="148" rx="5" style={suppressReplay ? PLAYED_ANIM_STYLE : undefined} />
+            <rect x="517" y="134" width="44" height="148" rx="5" />
             <text x="524" y="273">59</text>
           </g>
         </g>
@@ -619,17 +598,16 @@ function AlgorithmScene({ suppressReplay = false }: { suppressReplay?: boolean }
 function LessonCanvas({
   domain,
   hero = false,
-  suppressReplay = false,
+  hasPlayed = false,
 }: {
   domain: DemoDomain;
   hero?: boolean;
-  suppressReplay?: boolean;
+  hasPlayed?: boolean;
 }) {
   const story = DEMO_STORIES.find((item) => item.id === domain) ?? DEMO_STORIES[0];
   const canvasStories = hero ? [story] : DEMO_STORIES;
 
-  const layerSuppressReplay = (item: DemoStory) =>
-    suppressReplay && domain === item.id;
+  const layerHasPlayed = (item: DemoStory) => hasPlayed && domain === item.id;
 
   return (
     <div className={`mv-lesson-canvas${hero ? " mv-lesson-canvas--hero" : ""}`}>
@@ -680,19 +658,13 @@ function LessonCanvas({
           {canvasStories.map((item) => (
             <div
               key={item.id}
-              className={`mv-lesson-scene-layer${domain === item.id ? " is-active" : ""}`}
+              className={`mv-lesson-scene-layer${domain === item.id ? " is-active" : ""}${layerHasPlayed(item) ? " has-played" : ""}`}
               data-scene-domain={item.id}
               aria-hidden={domain !== item.id}
             >
-              {item.id === "math" && (
-                <MathScene suppressReplay={layerSuppressReplay(item)} />
-              )}
-              {item.id === "physics" && (
-                <PhysicsScene suppressReplay={layerSuppressReplay(item)} />
-              )}
-              {item.id === "algorithm" && (
-                <AlgorithmScene suppressReplay={layerSuppressReplay(item)} />
-              )}
+              {item.id === "math" && <MathScene />}
+              {item.id === "physics" && <PhysicsScene />}
+              {item.id === "algorithm" && <AlgorithmScene />}
 
               <div className="mv-lesson-focus-note">
                 <span>DIRECTOR FOCUS</span>
@@ -733,9 +705,10 @@ export function LandingPage({
   const visualRef = useRef<HTMLDivElement | null>(null);
   const storyTrackRef = useRef<HTMLDivElement | null>(null);
   // Domains whose scene animation has already played once. Re-activating a
-  // played domain freezes its scene at the final drawn state (see the
-  // PLAYED_* inline styles in the scene components) instead of replaying the
-  // ~2.3s path-draw + analysis fade on every scroll reversal.
+  // played domain freezes its scene at the final drawn state (the layer gets a
+  // has-played class, see the .has-played rules in the landing stylesheet)
+  // instead of replaying the ~2.3s path-draw + analysis fade on every scroll
+  // reversal.
   const [playedDomains, setPlayedDomains] = useState<ReadonlySet<DemoDomain>>(
     () => new Set(),
   );
@@ -1077,7 +1050,7 @@ export function LandingPage({
               </div>
               <LessonCanvas
                 domain={activeDomain}
-                suppressReplay={playedDomains.has(activeDomain)}
+                hasPlayed={playedDomains.has(activeDomain)}
               />
             </div>
 
