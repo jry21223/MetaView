@@ -54,6 +54,7 @@
   .mv-landing *::after {
     scroll-behavior: auto !important;
     animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
@@ -66,5 +67,11 @@
   .mv-lesson-scene-layer.is-active .mv-scene-analysis {
     animation: none;
     opacity: 1;
+  }
+
+  /* 焦点环不做脉冲，停在自然状态（opacity 1）；与 .has-played 选择器形状一致 */
+  .mv-lesson-scene-layer.is-active .mv-scene-analysis .mv-scene-focus-ring,
+  .mv-lesson-scene-layer.is-active .mv-scene-focus-ring {
+    animation: none;
   }
 }
