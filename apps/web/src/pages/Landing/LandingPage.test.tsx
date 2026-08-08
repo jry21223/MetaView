@@ -158,7 +158,7 @@ describe("LandingPage", () => {
       "physics",
     );
     expect(getByText("抛体运动分解")).toBeTruthy();
-    expect(getByText("水平速度保持不变，竖直速度持续受到重力改变。")).toBeTruthy();
+    expect(getByText("速度先沿轨迹切线方向，再分解为水平 vₓ 与竖直 vᵧ。")).toBeTruthy();
     expect(stage?.getAttribute("data-active-domain")).toBe("physics");
     expect(physicsLayer?.classList.contains("is-active")).toBe(true);
     expect(mathLayer?.classList.contains("is-active")).toBe(false);
@@ -212,6 +212,9 @@ describe("LandingPage", () => {
   it("builds physics vectors outward from the moving point", () => {
     const { container } = renderLanding();
     const physicsLayer = container.querySelector<HTMLElement>("[data-scene-domain='physics']");
+    expect(physicsLayer?.querySelector("svg")?.getAttribute("aria-label")).toBe(
+      "抛体运动切向速度及分解示意图",
+    );
     const focus = physicsLayer?.querySelector<SVGCircleElement>(".mv-scene-focus");
     const componentVectors = Array.from(
       physicsLayer?.querySelectorAll<SVGPathElement>(".mv-scene-vector-branch--component") ?? [],
@@ -221,6 +224,9 @@ describe("LandingPage", () => {
     );
     const arrows = physicsLayer?.querySelector<SVGGElement>(".mv-scene-vector-arrows");
     const labels = physicsLayer?.querySelector<SVGGElement>(".mv-scene-vector-labels");
+    const projections = Array.from(
+      physicsLayer?.querySelectorAll<SVGPathElement>(".mv-scene-vector-projection") ?? [],
+    );
     const focusX = Number(focus?.getAttribute("cx"));
     const focusY = Number(focus?.getAttribute("cy"));
 
@@ -232,7 +238,41 @@ describe("LandingPage", () => {
       expect(vector.getAttribute("pathLength")).toBe("1");
     }
     expect(arrows?.querySelectorAll("path")).toHaveLength(3);
-    expect(labels?.textContent).toBe("vₓvᵧv");
+    expect(labels?.textContent).toContain("v");
+    expect(labels?.textContent).toContain("vₓ");
+    expect(labels?.textContent).toContain("vᵧ");
+
+    const trajectory = physicsLayer?.querySelector<SVGPathElement>(".mv-scene-curve");
+    const trajectoryJoin = trajectory
+      ?.getAttribute("d")
+      ?.match(/C[\d.]+ [\d.]+ [\d.]+ [\d.]+ ([\d.]+) ([\d.]+)C/)
+      ?.slice(1)
+      .map(Number) as [number, number];
+    expect([focusX, focusY]).toEqual(trajectoryJoin);
+
+    const resultCoordinates = resultVector
+      ?.getAttribute("d")
+      ?.match(/^M([\d.]+) ([\d.]+)L([\d.]+) ([\d.]+)$/)
+      ?.slice(1)
+      .map(Number) as [number, number, number, number];
+    const [, , resultX, resultY] = resultCoordinates;
+    const resultSlope = (resultY - focusY) / (resultX - focusX);
+    const trajectoryTangentSlope = (153 - 130) / (500 - 438);
+    expect(resultSlope).toBeCloseTo(trajectoryTangentSlope, 2);
+
+    const componentEnds = componentVectors.map((vector) =>
+      vector
+        .getAttribute("d")
+        ?.match(/^M[\d.]+ [\d.]+L([\d.]+) ([\d.]+)$/)
+        ?.slice(1)
+        .map(Number),
+    );
+    expect(componentEnds).toContainEqual([resultX, focusY]);
+    expect(componentEnds).toContainEqual([focusX, resultY]);
+    expect(projections.map((projection) => projection.getAttribute("d"))).toEqual([
+      `M${resultX} ${focusY}L${resultX} ${resultY}`,
+      `M${focusX} ${resultY}L${resultX} ${resultY}`,
+    ]);
   });
 
   it("encodes binary-search values by bar height while keeping range state explicit", () => {

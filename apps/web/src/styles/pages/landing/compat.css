@@ -82,8 +82,8 @@
 
   .mv-lesson-scene-layer.is-active .mv-scene-focus,
   .mv-lesson-scene-layer.is-active .mv-scene-analysis-labels,
-  .mv-lesson-scene-layer.is-active .mv-scene-vector-arrows,
-  .mv-lesson-scene-layer.is-active .mv-scene-vector-labels {
+  .mv-lesson-scene-layer.is-active .mv-scene-vector-annotation,
+  .mv-lesson-scene-layer.is-active .mv-scene-vector-projections {
     animation: none;
     opacity: 1;
     transform: none;

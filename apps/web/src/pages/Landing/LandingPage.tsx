@@ -68,7 +68,7 @@ const DEMO_STORIES: DemoStory[] = [
     title: "把受力、速度与轨迹放进同一个因果画面。",
     description:
       "矢量、轨迹和时间同步推进，学生看到的不只是答案，而是每一步如何影响下一步。",
-    subtitle: "水平速度保持不变，竖直速度持续受到重力改变。",
+    subtitle: "速度先沿轨迹切线方向，再分解为水平 vₓ 与竖直 vᵧ。",
   },
   {
     id: "algorithm",
@@ -503,7 +503,7 @@ function PhysicsScene() {
         <span>v = vₓ + vᵧ</span>
         <strong>g = 9.8 m/s²</strong>
       </div>
-      <svg viewBox="0 0 640 360" role="img" aria-label="抛体运动速度分解示意图">
+      <svg viewBox="0 0 640 360" role="img" aria-label="抛体运动切向速度及分解示意图">
         <g className="mv-scene-grid">
           <path d="M72 54V310M136 54V310M200 54V310M264 54V310M328 54V310M392 54V310M456 54V310M520 54V310M584 54V310" />
           <path d="M72 54H584M72 118H584M72 182H584M72 246H584M72 310H584" />
@@ -519,25 +519,29 @@ function PhysicsScene() {
         <g className="mv-scene-analysis">
           <circle
             className="mv-scene-focus-ring"
-            cx="356"
-            cy="105"
+            cx="438"
+            cy="130"
             r="24"
           />
-          <circle className="mv-scene-focus" cx="356" cy="105" r="9" />
+          <circle className="mv-scene-focus" cx="438" cy="130" r="9" />
           <g className="mv-scene-vectors">
-            <path pathLength="1" className="mv-scene-vector mv-scene-vector-branch mv-scene-vector-branch--component" d="M356 105L457 105" />
-            <path pathLength="1" className="mv-scene-vector mv-scene-vector-branch mv-scene-vector-branch--component" d="M356 105L356 206" />
-            <path pathLength="1" className="mv-scene-vector mv-scene-vector--result mv-scene-vector-branch mv-scene-vector-branch--result" d="M356 105L457 206" />
+            <path pathLength="1" className="mv-scene-vector mv-scene-vector--result mv-scene-vector-branch mv-scene-vector-branch--result" d="M438 130L534 165.61" />
+            <path pathLength="1" className="mv-scene-vector mv-scene-vector-branch mv-scene-vector-branch--component" d="M438 130L534 130" />
+            <path pathLength="1" className="mv-scene-vector mv-scene-vector-branch mv-scene-vector-branch--component" d="M438 130L438 165.61" />
+          </g>
+          <g className="mv-scene-vector-projections">
+            <path className="mv-scene-vector-projection" d="M534 130L534 165.61" />
+            <path className="mv-scene-vector-projection" d="M438 165.61L534 165.61" />
           </g>
           <g className="mv-scene-vector-arrows">
-            <path className="mv-scene-arrow" d="m448 97 9 8-9 8" />
-            <path className="mv-scene-arrow" d="m348 197 8 9 8-9" />
-            <path className="mv-scene-arrow mv-scene-arrow--result" d="m445 205 12 1-1-12" />
+            <path className="mv-scene-arrow mv-scene-arrow--result mv-scene-vector-annotation mv-scene-vector-annotation--result" d="M522.4 168.65 534 165.61 527.18 155.72" />
+            <path className="mv-scene-arrow mv-scene-vector-annotation mv-scene-vector-annotation--component" d="m525 122 9 8-9 8" />
+            <path className="mv-scene-arrow mv-scene-vector-annotation mv-scene-vector-annotation--component" d="m430 156.61 8 9 8-9" />
           </g>
           <g className="mv-scene-vector-labels">
-            <text className="mv-scene-label" x="401" y="92">vₓ</text>
-            <text className="mv-scene-label" x="370" y="163">vᵧ</text>
-            <text className="mv-scene-label mv-scene-label--muted" x="455" y="190">v</text>
+            <text className="mv-scene-label mv-scene-vector-annotation mv-scene-vector-annotation--result" x="510" y="153">v</text>
+            <text className="mv-scene-label mv-scene-vector-annotation mv-scene-vector-annotation--component" x="482" y="118">vₓ</text>
+            <text className="mv-scene-label mv-scene-vector-annotation mv-scene-vector-annotation--component" x="448" y="157">vᵧ</text>
           </g>
         </g>
       </svg>

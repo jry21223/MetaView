@@ -61,7 +61,10 @@ describe("Landing causal scene motion", () => {
       /\.mv-lesson-scene-layer\.is-active \.mv-scene-vector-branch--result\s*\{[^}]*mvLandingLineGrow/s,
     );
     expect(contentCss).toMatch(
-      /\.mv-lesson-scene-layer\.is-active \.mv-scene-vector-(?:arrows|labels)[\s\S]*mvLandingLabelReveal/s,
+      /\.mv-lesson-scene-layer\.is-active \.mv-scene-vector-annotation--result\s*\{[^}]*mvLandingLabelReveal/s,
+    );
+    expect(contentCss).toMatch(
+      /\.mv-lesson-scene-layer\.is-active \.mv-scene-vector-annotation--component\s*\{[^}]*mvLandingLabelReveal/s,
     );
 
     const componentTiming = contentCss.match(
@@ -70,14 +73,25 @@ describe("Landing causal scene motion", () => {
     const resultTiming = contentCss.match(
       /\.mv-lesson-scene-layer\.is-active \.mv-scene-vector-branch--result\s*\{[^}]*mvLandingLineGrow\s+(\d+)ms\s+(\d+)ms/s,
     );
-    const annotationTiming = contentCss.match(
-      /\.mv-lesson-scene-layer\.is-active \.mv-scene-vector-arrows,[\s\S]*?animation:\s*mvLandingLabelReveal\s+(\d+)ms\s+(\d+)ms/s,
+    const resultAnnotationTiming = contentCss.match(
+      /\.mv-lesson-scene-layer\.is-active \.mv-scene-vector-annotation--result\s*\{[^}]*mvLandingLabelReveal\s+(\d+)ms\s+(\d+)ms/s,
     );
-    const componentEnd = Number(componentTiming?.[1]) + Number(componentTiming?.[2]);
+    const componentAnnotationTiming = contentCss.match(
+      /\.mv-lesson-scene-layer\.is-active \.mv-scene-vector-annotation--component\s*\{[^}]*mvLandingLabelReveal\s+(\d+)ms\s+(\d+)ms/s,
+    );
+    const projectionTiming = contentCss.match(
+      /\.mv-lesson-scene-layer\.is-active \.mv-scene-vector-projections\s*\{[^}]*mvLandingLabelReveal\s+(\d+)ms\s+(\d+)ms/s,
+    );
     const resultEnd = Number(resultTiming?.[1]) + Number(resultTiming?.[2]);
+    const componentEnd = Number(componentTiming?.[1]) + Number(componentTiming?.[2]);
 
-    expect(Number(resultTiming?.[2])).toBeGreaterThanOrEqual(componentEnd);
-    expect(Number(annotationTiming?.[2])).toBeGreaterThanOrEqual(resultEnd);
+    const resultAnnotationEnd =
+      Number(resultAnnotationTiming?.[1]) + Number(resultAnnotationTiming?.[2]);
+    const projectionEnd = Number(projectionTiming?.[1]) + Number(projectionTiming?.[2]);
+    expect(Number(resultAnnotationTiming?.[2])).toBeGreaterThanOrEqual(resultEnd);
+    expect(Number(componentTiming?.[2])).toBeGreaterThanOrEqual(resultAnnotationEnd);
+    expect(Number(projectionTiming?.[2])).toBeGreaterThanOrEqual(componentEnd);
+    expect(Number(componentAnnotationTiming?.[2])).toBeGreaterThanOrEqual(projectionEnd);
   });
 
   it("pins every causal physics layer in reduced-motion mode", () => {
@@ -87,7 +101,10 @@ describe("Landing causal scene motion", () => {
       /prefers-reduced-motion:[\s\S]*\.mv-scene-vector-branch[\s\S]*stroke-dashoffset:\s*0/,
     );
     expect(compatCss).toMatch(
-      /prefers-reduced-motion:[\s\S]*\.mv-scene-vector-labels[\s\S]*opacity:\s*1/,
+      /prefers-reduced-motion:[\s\S]*\.mv-scene-vector-annotation[\s\S]*opacity:\s*1/,
+    );
+    expect(compatCss).toMatch(
+      /prefers-reduced-motion:[\s\S]*\.mv-scene-vector-projections[\s\S]*opacity:\s*1/,
     );
   });
 });
