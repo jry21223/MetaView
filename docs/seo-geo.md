@@ -19,6 +19,11 @@ history, settings, payment, admin, asset-showcase, unknown, and legacy redirect
 shells do not publish canonical URLs or structured data and use `noindex`
 policies.
 
+The standard Nginx image serves the generated `/__spa__/index.html` noindex
+shell when no concrete static route exists. Dynamic workbench URLs such as
+`/run/:runId` and unknown URLs therefore cannot inherit the home page canonical
+metadata before the client router starts.
+
 `PlaybookScript` remains the only rendering contract. The HTML fallback is a
 semantic loading/indexing surface for existing public pages, not an alternate
 lesson renderer or video path.
@@ -47,6 +52,11 @@ With an absolute HTTP(S) value, the build emits absolute canonical/social URLs,
 application still builds and route metadata resolves against the browser
 origin, but no sitemap is generated; do not treat that mode as release-ready
 SEO evidence.
+
+The web Dockerfile accepts the same value as a build argument, and
+`docker-compose.yml` forwards it from the operator environment. It is a build
+time value; changing a running container environment does not rewrite static
+metadata.
 
 ## Verification
 

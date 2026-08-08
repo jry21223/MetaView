@@ -1,0 +1,136 @@
+.mv-boot-fallback {
+  --mv-fallback-bg: #f4f1ea;
+  --mv-fallback-surface: rgb(255 255 255 / 62%);
+  --mv-fallback-ink: #161a18;
+  --mv-fallback-ink-2: #4f5b54;
+  --mv-fallback-ink-3: #6d766f;
+  --mv-fallback-line: rgb(22 26 24 / 14%);
+  --mv-fallback-line-strong: rgb(22 26 24 / 18%);
+  --mv-fallback-accent: #47634f;
+  --mv-fallback-accent-ink: #173a24;
+  --mv-fallback-accent-soft: rgb(71 99 79 / 8%);
+  --mv-fallback-shadow: 0 24px 80px rgb(22 26 24 / 8%);
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background:
+    radial-gradient(circle at 15% 10%, rgb(104 145 118 / 12%), transparent 34%),
+    var(--mv-fallback-bg);
+  color: var(--mv-fallback-ink);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.mv-boot-fallback__content {
+  width: min(760px, 100%);
+  display: grid;
+  gap: 18px;
+  padding: clamp(26px, 5vw, 52px);
+  border: 1px solid var(--mv-fallback-line);
+  border-radius: 16px;
+  background: var(--mv-fallback-surface);
+  box-shadow: var(--mv-fallback-shadow);
+}
+
+.mv-boot-fallback__content--catalog { width: min(960px, 100%); }
+
+.mv-boot-fallback__eyebrow {
+  margin: 0;
+  color: var(--mv-fallback-accent);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+}
+
+.mv-boot-fallback h1 {
+  max-width: 760px;
+  margin: 0;
+  font-family: "Space Grotesk", Inter, sans-serif;
+  font-size: clamp(32px, 7vw, 64px);
+  line-height: 1.02;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+
+.mv-boot-fallback p {
+  max-width: 720px;
+  margin: 0;
+  color: var(--mv-fallback-ink-2);
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.mv-boot-fallback__prompt {
+  padding: 14px 16px;
+  border-left: 3px solid var(--mv-fallback-accent);
+  background: var(--mv-fallback-accent-soft);
+}
+
+.mv-boot-fallback nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.mv-boot-fallback a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--mv-fallback-line-strong);
+  border-radius: 999px;
+  color: var(--mv-fallback-accent-ink);
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.mv-boot-fallback a:hover {
+  border-color: var(--mv-fallback-accent);
+  background: var(--mv-fallback-accent-soft);
+}
+
+.mv-boot-fallback a:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--mv-fallback-accent) 46%, transparent);
+  outline-offset: 2px;
+}
+
+.mv-boot-fallback small,
+.mv-boot-fallback__links span {
+  color: var(--mv-fallback-ink-3);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.mv-boot-fallback__links {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin: 4px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mv-boot-fallback__links li {
+  display: grid;
+  gap: 7px;
+  padding: 14px;
+  border: 1px solid var(--mv-fallback-line);
+  border-radius: 16px;
+}
+
+.mv-boot-fallback__links a {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.mv-boot-fallback__back { justify-self: start; }
+
+@media (max-width: 390px) {
+  .mv-boot-fallback { padding: 14px; }
+  .mv-boot-fallback__content { gap: 14px; padding: 24px 18px; }
+}

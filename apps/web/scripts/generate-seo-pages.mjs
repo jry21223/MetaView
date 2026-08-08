@@ -20,6 +20,7 @@ const siteBase = process.env.VITE_PUBLIC_SITE_URL?.trim() ?? "";
 
 const SEO_BLOCK = /<!-- metaview:seo:start -->[\s\S]*?<!-- metaview:seo:end -->/;
 const FALLBACK_BLOCK = /<!-- metaview:fallback:start -->[\s\S]*?<!-- metaview:fallback:end -->/;
+const FALLBACK_STYLESHEET = /href="\/boot-fallback\.css"/;
 
 const privateShellPaths = [
   "/admin",
@@ -37,6 +38,7 @@ const privateShellPaths = [
 
 const routePaths = [
   "/",
+  "/__spa__",
   "/templates",
   ...TEMPLATES.map((template) => `/templates/${template.id}`),
   ...privateShellPaths,
@@ -45,11 +47,16 @@ const routePaths = [
 const baseHtml = await readFile(indexPath, "utf8");
 assertMarker(baseHtml, SEO_BLOCK, "SEO head block");
 assertMarker(baseHtml, FALLBACK_BLOCK, "fallback content block");
+assertMarker(baseHtml, FALLBACK_STYLESHEET, "fallback stylesheet");
 
 for (const routePath of routePaths) {
   const html = baseHtml
     .replace(SEO_BLOCK, renderSeoBlock(routePath))
-    .replace(FALLBACK_BLOCK, renderFallbackBlock(routePath));
+    .replace(FALLBACK_BLOCK, renderFallbackBlock(routePath))
+    .replace(
+      FALLBACK_STYLESHEET,
+      `href="${publicHref("/boot-fallback.css")}"`,
+    );
   const outputPath = routePath === "/"
     ? indexPath
     : path.join(distDirectory, routePath.replace(/^\/+/, ""), "index.html");
