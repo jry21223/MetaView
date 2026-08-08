@@ -209,6 +209,31 @@ describe("LandingPage", () => {
     }
   });
 
+  it("builds physics vectors outward from the moving point", () => {
+    const { container } = renderLanding();
+    const physicsLayer = container.querySelector<HTMLElement>("[data-scene-domain='physics']");
+    const focus = physicsLayer?.querySelector<SVGCircleElement>(".mv-scene-focus");
+    const componentVectors = Array.from(
+      physicsLayer?.querySelectorAll<SVGPathElement>(".mv-scene-vector-branch--component") ?? [],
+    );
+    const resultVector = physicsLayer?.querySelector<SVGPathElement>(
+      ".mv-scene-vector-branch--result",
+    );
+    const arrows = physicsLayer?.querySelector<SVGGElement>(".mv-scene-vector-arrows");
+    const labels = physicsLayer?.querySelector<SVGGElement>(".mv-scene-vector-labels");
+    const focusX = Number(focus?.getAttribute("cx"));
+    const focusY = Number(focus?.getAttribute("cy"));
+
+    expect(componentVectors).toHaveLength(2);
+    expect(resultVector).toBeTruthy();
+    for (const vector of [...componentVectors, resultVector as SVGPathElement]) {
+      expect(vector.getAttribute("d")).toMatch(new RegExp(`^M${focusX} ${focusY}`));
+      expect(vector.getAttribute("pathLength")).toBe("1");
+    }
+    expect(arrows?.querySelectorAll("path")).toHaveLength(3);
+    expect(labels?.textContent).toBe("vₓvᵧv");
+  });
+
   it("encodes binary-search values by bar height while keeping range state explicit", () => {
     const { container, getByRole } = renderLanding();
 

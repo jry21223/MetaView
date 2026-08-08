@@ -517,10 +517,6 @@ function PhysicsScene() {
           d="M84 278C166 116 294 76 438 130C500 153 545 202 579 278"
         />
         <g className="mv-scene-analysis">
-          <path className="mv-scene-vector" d="M356 105H457" />
-          <path className="mv-scene-vector" d="M356 105V206" />
-          <path className="mv-scene-vector mv-scene-vector--result" d="M356 105L457 206" />
-          <path className="mv-scene-arrow" d="m448 97 9 8-9 8M348 197l8 9 8-9M445 205l12 1-1-12" />
           <circle
             className="mv-scene-focus-ring"
             cx="356"
@@ -528,9 +524,21 @@ function PhysicsScene() {
             r="24"
           />
           <circle className="mv-scene-focus" cx="356" cy="105" r="9" />
-          <text className="mv-scene-label" x="401" y="92">vₓ</text>
-          <text className="mv-scene-label" x="370" y="163">vᵧ</text>
-          <text className="mv-scene-label mv-scene-label--muted" x="455" y="190">v</text>
+          <g className="mv-scene-vectors">
+            <path pathLength="1" className="mv-scene-vector mv-scene-vector-branch mv-scene-vector-branch--component" d="M356 105L457 105" />
+            <path pathLength="1" className="mv-scene-vector mv-scene-vector-branch mv-scene-vector-branch--component" d="M356 105L356 206" />
+            <path pathLength="1" className="mv-scene-vector mv-scene-vector-branch mv-scene-vector-branch--result" d="M356 105L457 206" />
+          </g>
+          <g className="mv-scene-vector-arrows">
+            <path className="mv-scene-arrow" d="m448 97 9 8-9 8" />
+            <path className="mv-scene-arrow" d="m348 197 8 9 8-9" />
+            <path className="mv-scene-arrow mv-scene-arrow--result" d="m445 205 12 1-1-12" />
+          </g>
+          <g className="mv-scene-vector-labels">
+            <text className="mv-scene-label" x="401" y="92">vₓ</text>
+            <text className="mv-scene-label" x="370" y="163">vᵧ</text>
+            <text className="mv-scene-label mv-scene-label--muted" x="455" y="190">v</text>
+          </g>
         </g>
       </svg>
     </div>

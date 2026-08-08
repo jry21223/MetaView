@@ -291,15 +291,6 @@
   animation: mvLandingPathDraw 1.7s 420ms ease forwards;
 }
 
-/* 物理场景尚沿用整组分析淡入；数学场景在下方按焦点、关系、标签依次展开。 */
-.mv-lesson-scene-layer.is-active .mv-lesson-scene--physics .mv-scene-analysis {
-  animation: mvLandingAnalysisIn 480ms 2250ms ease both;
-}
-
-.mv-lesson-scene-layer.is-active .mv-lesson-scene--physics .mv-scene-focus-ring {
-  animation: mvLandingFocus 3.4s 2250ms ease-in-out infinite;
-}
-
 .mv-scene-tangent,
 .mv-scene-vector {
   fill: none;
@@ -310,7 +301,6 @@
 
 .mv-scene-vector--result {
   stroke: var(--ink-2);
-  stroke-dasharray: 5 5;
 }
 
 .mv-scene-arrow {
@@ -344,23 +334,30 @@
 }
 
 .mv-lesson-scene--math .mv-scene-focus,
-.mv-lesson-scene--math .mv-scene-analysis-labels {
+.mv-lesson-scene--math .mv-scene-analysis-labels,
+.mv-lesson-scene--physics .mv-scene-focus,
+.mv-scene-vector-arrows,
+.mv-scene-vector-labels {
   opacity: 0;
   transform-box: fill-box;
   transform-origin: center;
 }
 
-.mv-lesson-scene--math .mv-scene-focus {
+.mv-lesson-scene--math .mv-scene-focus,
+.mv-lesson-scene--physics .mv-scene-focus {
   transform: scale(0.72);
 }
 
 .mv-scene-tangent-branch,
-.mv-scene-guide-branch {
+.mv-scene-guide-branch,
+.mv-scene-vector-branch {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
 }
 
-.mv-scene-analysis-labels {
+.mv-scene-analysis-labels,
+.mv-scene-vector-arrows,
+.mv-scene-vector-labels {
   transform: translateY(3px);
 }
 
@@ -381,6 +378,27 @@
 }
 
 .mv-lesson-scene-layer.is-active .mv-lesson-scene--math .mv-scene-focus-ring {
+  animation: mvLandingFocus 3.4s 2980ms ease-in-out infinite;
+}
+
+.mv-lesson-scene-layer.is-active .mv-lesson-scene--physics .mv-scene-focus {
+  animation: mvLandingPointReveal 180ms 2120ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.mv-lesson-scene-layer.is-active .mv-scene-vector-branch--component {
+  animation: mvLandingLineGrow 560ms 2260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.mv-lesson-scene-layer.is-active .mv-scene-vector-branch--result {
+  animation: mvLandingLineGrow 560ms 2520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.mv-lesson-scene-layer.is-active .mv-scene-vector-arrows,
+.mv-lesson-scene-layer.is-active .mv-scene-vector-labels {
+  animation: mvLandingLabelReveal 240ms 2840ms ease-out both;
+}
+
+.mv-lesson-scene-layer.is-active .mv-lesson-scene--physics .mv-scene-focus-ring {
   animation: mvLandingFocus 3.4s 2980ms ease-in-out infinite;
 }
 
@@ -492,14 +510,17 @@
 }
 
 .mv-lesson-scene-layer.has-played .mv-scene-focus,
-.mv-lesson-scene-layer.has-played .mv-scene-analysis-labels {
+.mv-lesson-scene-layer.has-played .mv-scene-analysis-labels,
+.mv-lesson-scene-layer.has-played .mv-scene-vector-arrows,
+.mv-lesson-scene-layer.has-played .mv-scene-vector-labels {
   animation: none;
   opacity: 1;
   transform: none;
 }
 
 .mv-lesson-scene-layer.has-played .mv-scene-tangent-branch,
-.mv-lesson-scene-layer.has-played .mv-scene-guide-branch {
+.mv-lesson-scene-layer.has-played .mv-scene-guide-branch,
+.mv-lesson-scene-layer.has-played .mv-scene-vector-branch {
   animation: none;
   stroke-dashoffset: 0;
 }

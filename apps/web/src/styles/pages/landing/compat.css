@@ -18,11 +18,6 @@
   to { stroke-dashoffset: 0; }
 }
 
-@keyframes mvLandingAnalysisIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
 @keyframes mvLandingPointReveal {
   from { opacity: 0; transform: scale(0.72); }
   to { opacity: 1; transform: scale(1); }
@@ -77,11 +72,6 @@
     stroke-dashoffset: 0;
   }
 
-  .mv-lesson-scene-layer.is-active .mv-lesson-scene--physics .mv-scene-analysis {
-    animation: none;
-    opacity: 1;
-  }
-
   /* 焦点环不做脉冲，停在自然状态（opacity 1）；与 .has-played 选择器形状一致 */
   .mv-lesson-scene-layer.is-active .mv-scene-analysis .mv-scene-focus-ring,
   .mv-lesson-scene-layer.is-active .mv-scene-focus-ring {
@@ -91,14 +81,17 @@
   }
 
   .mv-lesson-scene-layer.is-active .mv-scene-focus,
-  .mv-lesson-scene-layer.is-active .mv-scene-analysis-labels {
+  .mv-lesson-scene-layer.is-active .mv-scene-analysis-labels,
+  .mv-lesson-scene-layer.is-active .mv-scene-vector-arrows,
+  .mv-lesson-scene-layer.is-active .mv-scene-vector-labels {
     animation: none;
     opacity: 1;
     transform: none;
   }
 
   .mv-lesson-scene-layer.is-active .mv-scene-tangent-branch,
-  .mv-lesson-scene-layer.is-active .mv-scene-guide-branch {
+  .mv-lesson-scene-layer.is-active .mv-scene-guide-branch,
+  .mv-lesson-scene-layer.is-active .mv-scene-vector-branch {
     animation: none;
     stroke-dashoffset: 0;
   }

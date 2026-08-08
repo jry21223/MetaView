@@ -44,4 +44,35 @@ describe("Landing causal scene motion", () => {
       /prefers-reduced-motion:[\s\S]*\.mv-scene-analysis-labels[\s\S]*opacity:\s*1/,
     );
   });
+
+  it("reveals physics vectors from the moving point instead of fading the whole group", () => {
+    const contentCss = landingStyles("content.css");
+
+    expect(contentCss).not.toMatch(
+      /\.mv-lesson-scene-layer\.is-active \.mv-lesson-scene--physics \.mv-scene-analysis\s*\{[^}]*mvLandingAnalysisIn/s,
+    );
+    expect(contentCss).toMatch(
+      /\.mv-lesson-scene-layer\.is-active \.mv-lesson-scene--physics \.mv-scene-focus\s*\{[^}]*mvLandingPointReveal/s,
+    );
+    expect(contentCss).toMatch(
+      /\.mv-lesson-scene-layer\.is-active \.mv-scene-vector-branch--component\s*\{[^}]*mvLandingLineGrow/s,
+    );
+    expect(contentCss).toMatch(
+      /\.mv-lesson-scene-layer\.is-active \.mv-scene-vector-branch--result\s*\{[^}]*mvLandingLineGrow/s,
+    );
+    expect(contentCss).toMatch(
+      /\.mv-lesson-scene-layer\.is-active \.mv-scene-vector-(?:arrows|labels)[\s\S]*mvLandingLabelReveal/s,
+    );
+  });
+
+  it("pins every causal physics layer in reduced-motion mode", () => {
+    const compatCss = landingStyles("compat.css");
+
+    expect(compatCss).toMatch(
+      /prefers-reduced-motion:[\s\S]*\.mv-scene-vector-branch[\s\S]*stroke-dashoffset:\s*0/,
+    );
+    expect(compatCss).toMatch(
+      /prefers-reduced-motion:[\s\S]*\.mv-scene-vector-labels[\s\S]*opacity:\s*1/,
+    );
+  });
 });
