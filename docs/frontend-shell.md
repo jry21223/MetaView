@@ -18,6 +18,8 @@
 
 `LandingRoute` 负责加载与应用内一致的主题变量，并把“开始创建”导航到 `/create`。公共首页不复用应用内 `GlobalTopbar`，避免把营销叙事和工具导航塞进同一个 Shell。
 
+Landing 的 Director 演示区（`.mv-landing-director`）使用“反色色带”明度逻辑：浅色主题下为深色带、深色主题下为浅色带，与正文区形成明度反转对比，而不是跟随当前主题。色值镜像 `THEME_PALETTE` 的 dark / light 两套品牌色（见 `content.css` 中 `.mv-landing-director` 与 `.mv-dark .mv-landing-director`），修改调色板时需同步这两处。
+
 ## Stage 路由
 
 `SelfAppShell` / `OpsAppShell` 使用当前路径派生五个应用 Stage：

@@ -433,6 +433,28 @@
 .mv-algorithm-bar:nth-child(7) rect { animation-delay: 210ms; }
 .mv-algorithm-bar:nth-child(8) rect { animation-delay: 245ms; }
 
+/* 已播放过的 domain 冻结在最终绘制状态：滚动回退再次激活时不重播轨迹描边 /
+   分析淡入动画。LandingPage 在 domain 首次离开舞台后给对应 scene layer
+   打上 has-played。规则必须排在 .is-active 动画规则之后（同特异性靠源序取胜）。 */
+.mv-lesson-scene-layer.has-played .mv-scene-curve--animated {
+  animation: none;
+  stroke-dashoffset: 0;
+}
+
+.mv-lesson-scene-layer.has-played .mv-scene-analysis {
+  animation: none;
+  opacity: 1;
+}
+
+.mv-lesson-scene-layer.has-played .mv-scene-analysis .mv-scene-focus-ring,
+.mv-lesson-scene-layer.has-played .mv-scene-focus-ring {
+  animation: none;
+}
+
+.mv-lesson-scene-layer.has-played .mv-algorithm-bar rect {
+  animation: none;
+}
+
 .mv-algorithm-bar text {
   fill: var(--ink);
   font-family: "IBM Plex Mono", ui-monospace, monospace;
@@ -897,18 +919,32 @@
   color: var(--accent-strong);
 }
 
+/* Director 演示带是 Landing 专属的“反色色带”motif（见 docs/frontend-shell.md）：
+   浅色页面用暗色品牌色、深色页面用浅色品牌色，与正文区形成明度反转对比，
+   而不是跟随当前主题。色值镜像 THEME_PALETTE 的 dark / light 两套品牌色
+   （themePalette.ts），修改调色板时需同步此处。 */
 .mv-landing-director {
-  --director-bg: var(--bg);
-  --director-surface: var(--surface);
-  --director-ink: var(--ink);
-  --director-ink-2: var(--ink-2);
-  --director-ink-3: var(--ink-3);
-  --director-line: var(--line-2);
-  --director-accent: var(--accent);
+  --director-bg: #0e1412;
+  --director-surface: #0e1412;
+  --director-ink: #e8efe9;
+  --director-ink-2: #9ba8a0;
+  --director-ink-3: #5b6862;
+  --director-line: #27332c;
+  --director-accent: #9fb48d;
   overflow: hidden;
   border: 0;
   background: var(--director-bg);
   color: var(--director-ink);
+}
+
+.mv-dark .mv-landing-director {
+  --director-bg: #faf8f3;
+  --director-surface: #faf8f3;
+  --director-ink: #161a18;
+  --director-ink-2: #5d655f;
+  --director-ink-3: #9aa39d;
+  --director-line: #d6d1c2;
+  --director-accent: #82976f;
 }
 
 .mv-landing-director .mv-landing-kicker {
