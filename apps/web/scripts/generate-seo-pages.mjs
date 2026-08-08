@@ -8,6 +8,7 @@ import {
   PUBLISHED_TEMPLATES,
   PUBLIC_INDEXABLE_PATHS,
   buildStructuredData,
+  isAbsoluteHttpUrl,
   resolvePublicUrl,
   resolveSeoRoute,
 } from "../src/app/seoConfig.ts";
@@ -17,6 +18,7 @@ const appDirectory = path.resolve(scriptDirectory, "..");
 const distDirectory = path.join(appDirectory, "dist");
 const indexPath = path.join(distDirectory, "index.html");
 const siteBase = process.env.VITE_PUBLIC_SITE_URL?.trim() ?? "";
+assertSiteOrigin(siteBase);
 
 const SEO_BLOCK = /<!-- metaview:seo:start -->[\s\S]*?<!-- metaview:seo:end -->/;
 const FALLBACK_BLOCK = /<!-- metaview:fallback:start -->[\s\S]*?<!-- metaview:fallback:end -->/;
@@ -254,11 +256,24 @@ function assertMarker(html, pattern, label) {
   }
 }
 
-function isAbsoluteHttpUrl(value) {
+function assertSiteOrigin(value) {
+  if (!value) return;
+
   try {
     const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
+    const isOriginOnly =
+      isAbsoluteHttpUrl(value)
+      && !url.username
+      && !url.password
+      && url.pathname === "/"
+      && !url.search
+      && !url.hash;
+    if (isOriginOnly) return;
   } catch {
-    return false;
+    // Fall through to the actionable build error below.
   }
+
+  throw new Error(
+    "VITE_PUBLIC_SITE_URL must be an absolute HTTP(S) origin without a path, query, hash, or credentials.",
+  );
 }

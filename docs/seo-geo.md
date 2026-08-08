@@ -41,11 +41,16 @@ headings, descriptions, prompts, and links when JavaScript has not loaded.
 ## Required public URL configuration
 
 Set `VITE_PUBLIC_SITE_URL` to the public HTTPS origin before a production-like
-build. An optional deployment base path is supported, for example:
+build:
 
 ```text
-VITE_PUBLIC_SITE_URL=https://learn.example/metaview/
+VITE_PUBLIC_SITE_URL=https://learn.example
 ```
+
+The value must be an origin only. Deployment base paths are not supported by
+the current Vite asset and `BrowserRouter` contracts, so the build rejects a
+value such as `https://learn.example/metaview/` instead of emitting broken
+asset and route URLs.
 
 With an absolute HTTP(S) value, the build emits absolute canonical/social URLs,
 `dist/sitemap.xml`, and a `Sitemap:` entry in `dist/robots.txt`. Without it, the

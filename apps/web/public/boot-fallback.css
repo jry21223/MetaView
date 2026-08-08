@@ -1,22 +1,21 @@
 .mv-boot-fallback {
   --mv-fallback-bg: #f4f1ea;
-  --mv-fallback-surface: rgb(255 255 255 / 62%);
+  --mv-fallback-surface: #fff;
   --mv-fallback-ink: #161a18;
-  --mv-fallback-ink-2: #4f5b54;
-  --mv-fallback-ink-3: #6d766f;
-  --mv-fallback-line: rgb(22 26 24 / 14%);
-  --mv-fallback-line-strong: rgb(22 26 24 / 18%);
-  --mv-fallback-accent: #47634f;
-  --mv-fallback-accent-ink: #173a24;
-  --mv-fallback-accent-soft: rgb(71 99 79 / 8%);
-  --mv-fallback-shadow: 0 24px 80px rgb(22 26 24 / 8%);
+  --mv-fallback-ink-2: #5d655f;
+  --mv-fallback-ink-3: #9aa39d;
+  --mv-fallback-line: #e6e2d5;
+  --mv-fallback-line-strong: #d6d1c2;
+  --mv-fallback-accent: #82976f;
+  --mv-fallback-accent-ink: #394533;
+  --mv-fallback-accent-soft: rgb(130 151 111 / 15%);
   min-height: 100vh;
   min-height: 100dvh;
   display: grid;
   place-items: center;
   padding: 28px;
   background:
-    radial-gradient(circle at 15% 10%, rgb(104 145 118 / 12%), transparent 34%),
+    radial-gradient(circle at 15% 10%, var(--mv-fallback-accent-soft), transparent 34%),
     var(--mv-fallback-bg);
   color: var(--mv-fallback-ink);
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -30,7 +29,6 @@
   border: 1px solid var(--mv-fallback-line);
   border-radius: 16px;
   background: var(--mv-fallback-surface);
-  box-shadow: var(--mv-fallback-shadow);
 }
 
 .mv-boot-fallback__content--catalog { width: min(960px, 100%); }

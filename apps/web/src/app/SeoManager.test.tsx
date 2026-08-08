@@ -89,13 +89,13 @@ describe("SeoManager", () => {
     }
   });
 
-  it("preserves an explicitly configured deployment base path", () => {
+  it("resolves a public route from the configured site origin", () => {
     expect(
       resolvePublicUrl(
         "/templates/binary-search",
-        "https://learn.example/metaview/",
+        "https://learn.example/",
       ),
-    ).toBe("https://learn.example/metaview/templates/binary-search");
+    ).toBe("https://learn.example/templates/binary-search");
   });
 });
 
