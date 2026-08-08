@@ -1,4 +1,25 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
+
+import {
+  type FollowupAnimationState,
+  type FollowupCameraShot,
+  EMPTY_FOLLOWUP_ANIMATION,
+  followupCompleteState,
+  followupStateAt,
+} from "./followupTimeline";
+import { clampPanOffset, followupDesiredCenter } from "./cameraMath";
+import {
+  railActivatedIndex,
+  railOffsetPercent,
+  railProgressFromScroll,
+  railTargetPosition,
+} from "./railMath";
 
 interface LandingPageProps {
   appEdition: "self" | "ops";
@@ -47,7 +68,7 @@ const DEMO_STORIES: DemoStory[] = [
     title: "把受力、速度与轨迹放进同一个因果画面。",
     description:
       "矢量、轨迹和时间同步推进，学生看到的不只是答案，而是每一步如何影响下一步。",
-    subtitle: "水平速度保持不变，竖直速度持续受到重力改变。",
+    subtitle: "速度先沿轨迹切线方向，再分解为水平 vₓ 与竖直 vᵧ。",
   },
   {
     id: "algorithm",
@@ -102,29 +123,6 @@ const FOLLOWUP_DEMOS = [
 }>;
 
 type FollowupDemo = (typeof FOLLOWUP_DEMOS)[number];
-type FollowupCameraShot = "wide" | "prompt" | "response";
-
-interface FollowupAnimationState {
-  prompt: string;
-  response: string;
-  cameraShot: FollowupCameraShot;
-  promptVisible: boolean;
-  promptTyping: boolean;
-  responseVisible: boolean;
-  responseTyping: boolean;
-  complete: boolean;
-}
-
-const EMPTY_FOLLOWUP_ANIMATION: FollowupAnimationState = {
-  prompt: "",
-  response: "",
-  cameraShot: "wide",
-  promptVisible: false,
-  promptTyping: false,
-  responseVisible: false,
-  responseTyping: false,
-  complete: false,
-};
 
 function shouldSkipFollowupMotion() {
   return (
@@ -133,6 +131,46 @@ function shouldSkipFollowupMotion() {
     typeof window.matchMedia !== "function" ||
     window.matchMedia("(prefers-reduced-motion: reduce)").matches
   );
+}
+
+/** WAI-ARIA APG tabs keyboard pattern: arrows move focus and activate the
+ *  adjacent tab (wrap-around), Home/End jump to the first/last tab. */
+function handleTablistKeyDown<T extends string>(
+  event: KeyboardEvent<HTMLDivElement>,
+  options: {
+    ids: readonly T[];
+    activeId: T;
+    tabId: (id: T) => string;
+    onSelect: (id: T) => void;
+  },
+) {
+  const index = options.ids.indexOf(options.activeId);
+  if (index < 0) return;
+  let nextIndex: number | null = null;
+  switch (event.key) {
+    case "ArrowRight":
+    case "ArrowDown":
+      nextIndex = (index + 1) % options.ids.length;
+      break;
+    case "ArrowLeft":
+    case "ArrowUp":
+      nextIndex = (index - 1 + options.ids.length) % options.ids.length;
+      break;
+    case "Home":
+      nextIndex = 0;
+      break;
+    case "End":
+      nextIndex = options.ids.length - 1;
+      break;
+    default:
+      return;
+  }
+  event.preventDefault();
+  const nextId = options.ids[nextIndex];
+  options.onSelect(nextId);
+  event.currentTarget
+    .querySelector<HTMLElement>(`#${options.tabId(nextId)}`)
+    ?.focus();
 }
 
 function numberFromCssVariable(
@@ -196,10 +234,13 @@ function setFollowupCameraShot(
     1.075,
   );
   const maxPan = numberFromCssVariable(viewport, "--mv-followup-closeup-pan", 24);
-  const desiredX = viewport.clientWidth * (shot === "prompt" ? 0.6 : 0.5);
-  const desiredY = viewport.clientHeight * 0.52;
-  const panX = Math.max(-maxPan, Math.min(maxPan, desiredX - targetCenterX));
-  const panY = Math.max(-maxPan, Math.min(maxPan, desiredY - targetCenterY));
+  const desired = followupDesiredCenter(
+    viewport.clientWidth,
+    viewport.clientHeight,
+    shot,
+  );
+  const panX = clampPanOffset(desired.x, targetCenterX, maxPan);
+  const panY = clampPanOffset(desired.y, targetCenterY, maxPan);
 
   camera.style.setProperty("--mv-followup-camera-x", `${panX}px`);
   camera.style.setProperty("--mv-followup-camera-y", `${panY}px`);
@@ -217,74 +258,49 @@ function AnimatedFollowupThread({
   isSelected: boolean;
   isPlaying: boolean;
 }) {
-  const skipMotion = shouldSkipFollowupMotion();
+  const [skipMotion, setSkipMotion] = useState(shouldSkipFollowupMotion);
   const [animation, setAnimation] = useState<FollowupAnimationState>(() =>
-    skipMotion
-      ? {
-          prompt: demo.prompt,
-          response: demo.response,
-          cameraShot: "wide",
-          promptVisible: true,
-          promptTyping: false,
-          responseVisible: true,
-          responseTyping: false,
-          complete: true,
-        }
-      : EMPTY_FOLLOWUP_ANIMATION,
+    skipMotion ? followupCompleteState(demo) : EMPTY_FOLLOWUP_ANIMATION,
   );
   const threadRef = useRef<HTMLDivElement | null>(null);
+
+  // React live to OS reduced-motion changes mid-session: the rail effect
+  // subscribes to the same query, so flipping the preference stops/resumes
+  // the follow-up typing animation as well.
+  useEffect(() => {
+    if (
+      typeof window === "undefined" ||
+      typeof window.matchMedia !== "function"
+    ) {
+      return;
+    }
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = (event: MediaQueryListEvent) => setSkipMotion(event.matches);
+    query.addEventListener?.("change", onChange);
+    return () => query.removeEventListener?.("change", onChange);
+  }, []);
+
+  // When the preference flips mid-animation: reduce → jump straight to the
+  // complete state (the rAF loop below cancels itself via its skipMotion
+  // dependency); back off → restart the animation from the beginning.
+  // Guarded state adjustment during render (React's documented pattern for
+  // syncing state to a prop) instead of a setState-in-effect.
+  const [prevSkipMotion, setPrevSkipMotion] = useState(skipMotion);
+  if (prevSkipMotion !== skipMotion) {
+    setPrevSkipMotion(skipMotion);
+    setAnimation(
+      skipMotion ? followupCompleteState(demo) : EMPTY_FOLLOWUP_ANIMATION,
+    );
+  }
 
   useEffect(() => {
     if (!isSelected || !isPlaying || skipMotion) return;
 
-    const introDelayMs = 420;
-    const cameraTravelMs = 760;
-    const promptCharacterMs = 44;
-    const promptHoldMs = 320;
-    const responseCharacterMs = 32;
-    const responseHoldMs = 620;
-    const promptFocusAt = introDelayMs;
-    const promptTypingAt = promptFocusAt + cameraTravelMs;
-    const promptTypedAt = promptTypingAt + demo.prompt.length * promptCharacterMs;
-    const responseFocusAt = promptTypedAt + promptHoldMs;
-    const responseTypingAt = responseFocusAt + cameraTravelMs;
-    const responseTypedAt =
-      responseTypingAt + demo.response.length * responseCharacterMs;
-    const returnWideAt = responseTypedAt + responseHoldMs;
-    const completeAt = returnWideAt + cameraTravelMs;
     const startedAt = window.performance.now();
     let animationFrame: number | null = null;
 
     const animate = (timestamp: number) => {
-      const elapsed = timestamp - startedAt;
-      const promptElapsed = Math.max(0, elapsed - promptTypingAt);
-      const promptCount = Math.min(
-        demo.prompt.length,
-        Math.floor(promptElapsed / promptCharacterMs),
-      );
-      const responseElapsed = Math.max(0, elapsed - responseTypingAt);
-      const responseCount = Math.min(
-        demo.response.length,
-        Math.floor(responseElapsed / responseCharacterMs),
-      );
-      const cameraShot: FollowupCameraShot =
-        elapsed >= returnWideAt
-          ? "wide"
-          : elapsed >= responseFocusAt
-            ? "response"
-            : elapsed >= promptFocusAt
-              ? "prompt"
-              : "wide";
-      const nextState: FollowupAnimationState = {
-        prompt: demo.prompt.slice(0, promptCount),
-        response: demo.response.slice(0, responseCount),
-        cameraShot,
-        promptVisible: elapsed >= promptFocusAt,
-        promptTyping: elapsed >= promptTypingAt,
-        responseVisible: elapsed >= responseFocusAt,
-        responseTyping: elapsed >= responseTypingAt,
-        complete: elapsed >= completeAt,
-      };
+      const nextState = followupStateAt(timestamp - startedAt, demo);
 
       setAnimation((current) =>
         current.prompt === nextState.prompt &&
@@ -330,25 +346,16 @@ function AnimatedFollowupThread({
     return () => observer.disconnect();
   }, [animation.cameraShot, isSelected]);
 
-  const animationPhase = animation.complete
-    ? "complete"
-    : animation.cameraShot === "wide" && animation.responseVisible
-      ? "return"
-      : animation.responseTyping
-        ? "response"
-        : animation.responseVisible
-          ? "response-focus"
-          : animation.promptTyping
-            ? "prompt"
-            : animation.promptVisible
-              ? "prompt-focus"
-              : "focus";
+  // Live announcement for assistive tech: the visible typing text is
+  // aria-hidden, so a dedicated visually-hidden status region announces the
+  // completed reply (matching what the status line reveals visually).
+  const liveAnnouncement =
+    isSelected && animation.complete ? `${demo.status} · ${demo.summary}` : "";
 
   return (
     <div
       ref={threadRef}
       className={`mv-landing-followup-demo__thread${isSelected ? " is-active" : ""}`}
-      data-animation-phase={animationPhase}
       data-camera-shot={animation.cameraShot}
       aria-hidden={!isSelected}
     >
@@ -394,12 +401,17 @@ function AnimatedFollowupThread({
 
       <div
         className={`mv-landing-followup-demo__versions${demo.id === "revise" ? " is-revised" : ""}${animation.complete ? " is-visible" : ""}`}
+        role="group"
         aria-label={demo.id === "revise" ? "已从版本 v1 更新到 v2" : "当前保持版本 v1"}
       >
         <span><code>v1</code><small>{demo.id === "revise" ? "可恢复" : "HEAD"}</small></span>
         <i />
         <span><code>{demo.id === "revise" ? "v2" : "—"}</code><small>{demo.id === "revise" ? "HEAD" : "未创建新版本"}</small></span>
       </div>
+
+      <span className="mv-landing-visually-hidden" role="status">
+        {liveAnnouncement || "\u00A0"}
+      </span>
     </div>
   );
 }
@@ -458,12 +470,27 @@ function MathScene() {
           className="mv-scene-curve mv-scene-curve--animated"
           d="M74 264C155 258 211 242 260 216C316 186 361 139 400 84C427 46 450 34 476 52C508 74 535 129 572 230"
         />
-        <path className="mv-scene-tangent" d="M245 264.9L443 40.68" />
-        <circle className="mv-scene-focus-ring" cx="361" cy="133.54" r="24" />
-        <circle className="mv-scene-focus" cx="361" cy="133.54" r="8" />
-        <path className="mv-scene-guide" d="M361 133.54V278M136 133.54H361" />
-        <text className="mv-scene-label" x="374" y="151">P(1, B(1))</text>
-        <text className="mv-scene-label mv-scene-label--muted" x="420" y="78">切线</text>
+        <g className="mv-scene-analysis">
+          <circle
+            className="mv-scene-focus-ring"
+            cx="361"
+            cy="133.54"
+            r="24"
+          />
+          <circle className="mv-scene-focus" cx="361" cy="133.54" r="8" />
+          <g className="mv-scene-tangent">
+            <path pathLength="1" className="mv-scene-tangent-branch" d="M361 133.54L245 264.9" />
+            <path pathLength="1" className="mv-scene-tangent-branch" d="M361 133.54L443 40.68" />
+          </g>
+          <g className="mv-scene-guide">
+            <path pathLength="1" className="mv-scene-guide-branch" d="M361 133.54L361 278" />
+            <path pathLength="1" className="mv-scene-guide-branch" d="M361 133.54L136 133.54" />
+          </g>
+          <g className="mv-scene-analysis-labels">
+            <text className="mv-scene-label" x="374" y="151">P(1, B(1))</text>
+            <text className="mv-scene-label mv-scene-label--muted" x="420" y="78">切线</text>
+          </g>
+        </g>
       </svg>
     </div>
   );
@@ -476,7 +503,7 @@ function PhysicsScene() {
         <span>v = vₓ + vᵧ</span>
         <strong>g = 9.8 m/s²</strong>
       </div>
-      <svg viewBox="0 0 640 360" role="img" aria-label="抛体运动速度分解示意图">
+      <svg viewBox="0 0 640 360" role="img" aria-label="抛体运动切向速度及分解示意图">
         <g className="mv-scene-grid">
           <path d="M72 54V310M136 54V310M200 54V310M264 54V310M328 54V310M392 54V310M456 54V310M520 54V310M584 54V310" />
           <path d="M72 54H584M72 118H584M72 182H584M72 246H584M72 310H584" />
@@ -489,15 +516,34 @@ function PhysicsScene() {
           className="mv-scene-curve mv-scene-curve--animated"
           d="M84 278C166 116 294 76 438 130C500 153 545 202 579 278"
         />
-        <path className="mv-scene-vector" d="M356 105H457" />
-        <path className="mv-scene-vector" d="M356 105V206" />
-        <path className="mv-scene-vector mv-scene-vector--result" d="M356 105L457 206" />
-        <path className="mv-scene-arrow" d="m448 97 9 8-9 8M348 197l8 9 8-9M445 205l12 1-1-12" />
-        <circle className="mv-scene-focus-ring" cx="356" cy="105" r="24" />
-        <circle className="mv-scene-focus" cx="356" cy="105" r="9" />
-        <text className="mv-scene-label" x="401" y="92">vₓ</text>
-        <text className="mv-scene-label" x="370" y="163">vᵧ</text>
-        <text className="mv-scene-label mv-scene-label--muted" x="455" y="190">v</text>
+        <g className="mv-scene-analysis">
+          <circle
+            className="mv-scene-focus-ring"
+            cx="438"
+            cy="130"
+            r="24"
+          />
+          <circle className="mv-scene-focus" cx="438" cy="130" r="9" />
+          <g className="mv-scene-vectors">
+            <path pathLength="1" className="mv-scene-vector mv-scene-vector--result mv-scene-vector-branch mv-scene-vector-branch--result" d="M438 130L534 165.61" />
+            <path pathLength="1" className="mv-scene-vector mv-scene-vector-branch mv-scene-vector-branch--component" d="M438 130L534 130" />
+            <path pathLength="1" className="mv-scene-vector mv-scene-vector-branch mv-scene-vector-branch--component" d="M438 130L438 165.61" />
+          </g>
+          <g className="mv-scene-vector-projections">
+            <path className="mv-scene-vector-projection" d="M534 130L534 165.61" />
+            <path className="mv-scene-vector-projection" d="M438 165.61L534 165.61" />
+          </g>
+          <g className="mv-scene-vector-arrows">
+            <path className="mv-scene-arrow mv-scene-arrow--result mv-scene-vector-annotation mv-scene-vector-annotation--result" d="M522.4 168.65 534 165.61 527.18 155.72" />
+            <path className="mv-scene-arrow mv-scene-vector-annotation mv-scene-vector-annotation--component" d="m525 122 9 8-9 8" />
+            <path className="mv-scene-arrow mv-scene-vector-annotation mv-scene-vector-annotation--component" d="m430 156.61 8 9 8-9" />
+          </g>
+          <g className="mv-scene-vector-labels">
+            <text className="mv-scene-label mv-scene-vector-annotation mv-scene-vector-annotation--result" x="510" y="153">v</text>
+            <text className="mv-scene-label mv-scene-vector-annotation mv-scene-vector-annotation--component" x="482" y="118">vₓ</text>
+            <text className="mv-scene-label mv-scene-vector-annotation mv-scene-vector-annotation--component" x="448" y="157">vᵧ</text>
+          </g>
+        </g>
       </svg>
     </div>
   );
@@ -569,9 +615,19 @@ function AlgorithmScene() {
   );
 }
 
-function LessonCanvas({ domain, hero = false }: { domain: DemoDomain; hero?: boolean }) {
+function LessonCanvas({
+  domain,
+  hero = false,
+  hasPlayed = false,
+}: {
+  domain: DemoDomain;
+  hero?: boolean;
+  hasPlayed?: boolean;
+}) {
   const story = DEMO_STORIES.find((item) => item.id === domain) ?? DEMO_STORIES[0];
   const canvasStories = hero ? [story] : DEMO_STORIES;
+
+  const layerHasPlayed = (item: DemoStory) => hasPlayed && domain === item.id;
 
   return (
     <div className={`mv-lesson-canvas${hero ? " mv-lesson-canvas--hero" : ""}`}>
@@ -614,12 +670,15 @@ function LessonCanvas({ domain, hero = false }: { domain: DemoDomain; hero?: boo
         <div
           className="mv-lesson-stage"
           data-active-domain={domain}
-          aria-label={`${story.label}画面：${story.scene}`}
+          role={hero ? undefined : "tabpanel"}
+          id={hero ? undefined : "landing-demo-panel"}
+          aria-labelledby={hero ? undefined : `landing-demo-tab-${domain}`}
+          aria-label={hero ? `${story.label}画面：${story.scene}` : undefined}
         >
           {canvasStories.map((item) => (
             <div
               key={item.id}
-              className={`mv-lesson-scene-layer${domain === item.id ? " is-active" : ""}`}
+              className={`mv-lesson-scene-layer${domain === item.id ? " is-active" : ""}${layerHasPlayed(item) ? " has-played" : ""}`}
               data-scene-domain={item.id}
               aria-hidden={domain !== item.id}
             >
@@ -665,6 +724,28 @@ export function LandingPage({
   const followupRef = useRef<HTMLElement | null>(null);
   const visualRef = useRef<HTMLDivElement | null>(null);
   const storyTrackRef = useRef<HTMLDivElement | null>(null);
+  // Domains whose scene animation has already played once. Re-activating a
+  // played domain freezes its scene at the final drawn state (the layer gets a
+  // has-played class, see the .has-played rules in the landing stylesheet)
+  // instead of replaying the ~2.3s path-draw + analysis fade on every scroll
+  // reversal.
+  const [playedDomains, setPlayedDomains] = useState<ReadonlySet<DemoDomain>>(
+    () => new Set(),
+  );
+  const previousDomainRef = useRef<DemoDomain | null>(null);
+
+  // Mark a domain as played only once it leaves the stage. The first
+  // activation — including the hero and the initial load — always animates
+  // because the marking happens in an effect after that commit, and the
+  // re-render it triggers never touches the layer that is currently playing.
+  useEffect(() => {
+    const previous = previousDomainRef.current;
+    previousDomainRef.current = activeDomain;
+    if (previous === null || previous === activeDomain) return;
+    setPlayedDomains((prev) =>
+      prev.has(previous) ? prev : new Set(prev).add(previous),
+    );
+  }, [activeDomain]);
 
   useEffect(() => {
     const visual = visualRef.current;
@@ -720,7 +801,6 @@ export function LandingPage({
 
     const desktopQuery = window.matchMedia("(min-width: 901px)");
     const reduceMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const lastPanelIndex = DEMO_RAIL_PANELS.length - 1;
     let targetPosition = 0;
     let renderedPosition = 0;
     let animationFrame: number | null = null;
@@ -730,13 +810,15 @@ export function LandingPage({
       const track = storyTrackRef.current;
       if (!track) return;
 
-      const panelOffset = 100 / DEMO_RAIL_PANELS.length;
       track.style.setProperty(
         "--mv-landing-story-offset",
-        `${-position * panelOffset}%`,
+        `${railOffsetPercent(position, DEMO_RAIL_PANELS.length)}%`,
       );
 
-      const panel = DEMO_RAIL_PANELS[Math.min(lastPanelIndex, Math.round(position))];
+      const panel =
+        DEMO_RAIL_PANELS[
+          railActivatedIndex(position, DEMO_RAIL_PANELS.length)
+        ];
       setActiveRailPanel((current) => (current === panel ? current : panel));
       if (panel !== "intro") {
         setActiveDomain((current) => (current === panel ? current : panel));
@@ -774,19 +856,18 @@ export function LandingPage({
     };
 
     const syncRailTarget = () => {
-      const section = capabilityRef.current;
       const track = storyTrackRef.current;
-      if (!section || !track) return;
+      if (!track) return;
 
       if (!desktopQuery.matches) {
         track.style.removeProperty("--mv-landing-story-offset");
         return;
       }
 
-      const sectionTop = window.scrollY + section.getBoundingClientRect().top;
-      const travel = Math.max(section.offsetHeight - window.innerHeight, 1);
-      const progress = Math.min(1, Math.max(0, (window.scrollY - sectionTop) / travel));
-      targetPosition = progress * lastPanelIndex;
+      targetPosition = railTargetPosition(
+        railProgressFromScroll(window.scrollY, sectionTop, travel),
+        DEMO_RAIL_PANELS.length,
+      );
 
       if (reduceMotionQuery.matches) {
         renderedPosition = targetPosition;
@@ -797,9 +878,27 @@ export function LandingPage({
       scheduleRailAnimation();
     };
 
+    // The section's document position is stable while scrolling, so measure
+    // it once (mount + resize) and let the scroll handler read only
+    // window.scrollY instead of touching layout on every scroll event.
+    let sectionTop = 0;
+    let travel = 1;
+    const measure = () => {
+      const section = capabilityRef.current;
+      if (!section) return;
+      sectionTop = window.scrollY + section.getBoundingClientRect().top;
+      travel = Math.max(section.offsetHeight - window.innerHeight, 1);
+    };
+
+    const handleResize = () => {
+      measure();
+      syncRailTarget();
+    };
+
+    measure();
     syncRailTarget();
     window.addEventListener("scroll", syncRailTarget, { passive: true });
-    window.addEventListener("resize", syncRailTarget);
+    window.addEventListener("resize", handleResize);
     desktopQuery.addEventListener?.("change", syncRailTarget);
     reduceMotionQuery.addEventListener?.("change", syncRailTarget);
 
@@ -808,7 +907,7 @@ export function LandingPage({
         window.cancelAnimationFrame(animationFrame);
       }
       window.removeEventListener("scroll", syncRailTarget);
-      window.removeEventListener("resize", syncRailTarget);
+      window.removeEventListener("resize", handleResize);
       desktopQuery.removeEventListener?.("change", syncRailTarget);
       reduceMotionQuery.removeEventListener?.("change", syncRailTarget);
     };
@@ -943,13 +1042,24 @@ export function LandingPage({
                 role="tablist"
                 aria-label="学科画面示例"
                 data-active-domain={activeDomain}
+                onKeyDown={(event) =>
+                  handleTablistKeyDown(event, {
+                    ids: DEMO_STORIES.map((story) => story.id),
+                    activeId: activeDomain,
+                    tabId: (id) => `landing-demo-tab-${id}`,
+                    onSelect: (id) => activateDomain(id, true),
+                  })
+                }
               >
                 {DEMO_STORIES.map((story) => (
                   <button
                     key={story.id}
                     type="button"
                     role="tab"
+                    id={`landing-demo-tab-${story.id}`}
                     aria-selected={activeDomain === story.id}
+                    aria-controls="landing-demo-panel"
+                    tabIndex={activeDomain === story.id ? 0 : -1}
                     className={activeDomain === story.id ? "is-active" : ""}
                     onClick={() => activateDomain(story.id, true)}
                   >
@@ -958,14 +1068,16 @@ export function LandingPage({
                   </button>
                 ))}
               </div>
-              <LessonCanvas domain={activeDomain} />
+              <LessonCanvas
+                domain={activeDomain}
+                hasPlayed={playedDomains.has(activeDomain)}
+              />
             </div>
 
             <div className="mv-landing-story">
               <div
                 className="mv-landing-story__track"
                 ref={storyTrackRef}
-                data-active-panel={activeRailPanel}
               >
                 <div
                   className="mv-landing-section-head mv-landing-section-head--story"
@@ -989,10 +1101,7 @@ export function LandingPage({
                     <button
                       type="button"
                       onClick={() => activateDomain(story.id)}
-                      onFocus={() => {
-                        setActiveDomain(story.id);
-                        setActiveRailPanel(story.id);
-                      }}
+                      onFocus={() => activateDomain(story.id, true)}
                     >
                       <span>{story.index} / {story.label}</span>
                       <h3>{story.title}</h3>
@@ -1050,13 +1159,24 @@ export function LandingPage({
                 role="tablist"
                 aria-label="追问方式"
                 data-active-mode={followupMode}
+                onKeyDown={(event) =>
+                  handleTablistKeyDown(event, {
+                    ids: FOLLOWUP_DEMOS.map((demo) => demo.id),
+                    activeId: followupMode,
+                    tabId: (id) => `landing-followup-tab-${id}`,
+                    onSelect: (id) => setFollowupMode(id),
+                  })
+                }
               >
                 {FOLLOWUP_DEMOS.map((demo) => (
                   <button
                     key={demo.id}
                     type="button"
                     role="tab"
+                    id={`landing-followup-tab-${demo.id}`}
                     aria-selected={followupMode === demo.id}
+                    aria-controls="landing-followup-panel"
+                    tabIndex={followupMode === demo.id ? 0 : -1}
                     className={followupMode === demo.id ? "is-active" : ""}
                     onClick={() => setFollowupMode(demo.id)}
                   >
@@ -1067,7 +1187,12 @@ export function LandingPage({
 
               <div className="mv-landing-followup-demo__viewport">
                 <div className="mv-landing-followup-demo__camera">
-                  <div className="mv-landing-followup-demo__thread-stack" aria-live="polite">
+                  <div
+                    className="mv-landing-followup-demo__thread-stack"
+                    role="tabpanel"
+                    id="landing-followup-panel"
+                    aria-labelledby={`landing-followup-tab-${followupMode}`}
+                  >
                     {FOLLOWUP_DEMOS.map((demo) => (
                       <AnimatedFollowupThread
                         key={`${demo.id}-${followupMode === demo.id ? "active" : "inactive"}-${followupInView ? "playing" : "idle"}`}

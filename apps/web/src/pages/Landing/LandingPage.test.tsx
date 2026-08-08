@@ -1,7 +1,76 @@
-import { cleanup, fireEvent, render, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { LandingPage } from "./LandingPage";
+
+/** Controllable matchMedia stub: queries remember their listeners and can be
+ *  flipped by the test, which fires the same "change" events the browser
+ *  would. Defaults mirror happy-dom's real viewport (desktop, no reduce). */
+function installMatchMediaMock() {
+  const states = new Map<
+    string,
+    { matches: boolean; listeners: Set<(event: MediaQueryListEvent) => void> }
+  >();
+  const getState = (query: string) => {
+    let state = states.get(query);
+    if (!state) {
+      state = {
+        matches:
+          query === "(prefers-reduced-motion: reduce)"
+            ? false
+            : query === "(min-width: 901px)"
+              ? true
+              : false,
+        listeners: new Set(),
+      };
+      states.set(query, state);
+    }
+    return state;
+  };
+
+  vi.stubGlobal(
+    "matchMedia",
+    (query: string): MediaQueryList => {
+      const state = getState(query);
+      return {
+        get matches() {
+          return state.matches;
+        },
+        media: query,
+        onchange: null,
+        addEventListener: (
+          type: string,
+          listener: (event: MediaQueryListEvent) => void,
+        ) => {
+          if (type === "change") state.listeners.add(listener);
+        },
+        removeEventListener: (
+          type: string,
+          listener: (event: MediaQueryListEvent) => void,
+        ) => {
+          if (type === "change") state.listeners.delete(listener);
+        },
+        addListener: (listener: (event: MediaQueryListEvent) => void) => {
+          state.listeners.add(listener);
+        },
+        removeListener: (listener: (event: MediaQueryListEvent) => void) => {
+          state.listeners.delete(listener);
+        },
+        dispatchEvent: () => true,
+      } as unknown as MediaQueryList;
+    },
+  );
+
+  return {
+    setMatches(query: string, matches: boolean) {
+      const state = getState(query);
+      state.matches = matches;
+      for (const listener of state.listeners) {
+        listener({ matches, media: query } as MediaQueryListEvent);
+      }
+    },
+  };
+}
 
 function renderLanding() {
   const props = {
@@ -16,7 +85,10 @@ function renderLanding() {
 }
 
 describe("LandingPage", () => {
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
 
   it("presents the real product workflow and routes primary actions to creation", () => {
     const { getByRole, getByText, props } = renderLanding();
@@ -86,7 +158,7 @@ describe("LandingPage", () => {
       "physics",
     );
     expect(getByText("抛体运动分解")).toBeTruthy();
-    expect(getByText("水平速度保持不变，竖直速度持续受到重力改变。")).toBeTruthy();
+    expect(getByText("速度先沿轨迹切线方向，再分解为水平 vₓ 与竖直 vᵧ。")).toBeTruthy();
     expect(stage?.getAttribute("data-active-domain")).toBe("physics");
     expect(physicsLayer?.classList.contains("is-active")).toBe(true);
     expect(mathLayer?.classList.contains("is-active")).toBe(false);
@@ -97,8 +169,14 @@ describe("LandingPage", () => {
     const { container } = renderLanding();
     const mathLayer = container.querySelector<HTMLElement>("[data-scene-domain='math']");
     const mathSvg = mathLayer?.querySelector("svg");
-    const tangent = mathLayer?.querySelector<SVGPathElement>(".mv-scene-tangent");
+    const tangentBranches = Array.from(
+      mathLayer?.querySelectorAll<SVGPathElement>(".mv-scene-tangent-branch") ?? [],
+    );
+    const guideBranches = Array.from(
+      mathLayer?.querySelectorAll<SVGPathElement>(".mv-scene-guide-branch") ?? [],
+    );
     const focus = mathLayer?.querySelector<SVGCircleElement>(".mv-scene-focus");
+    const labels = mathLayer?.querySelector<SVGGElement>(".mv-scene-analysis-labels");
 
     expect(within(mathLayer as HTMLElement).getByText("f(x) = B(x)")).toBeTruthy();
     expect(within(mathLayer as HTMLElement).getByText("f′(1) ≈ 1.83")).toBeTruthy();
@@ -106,21 +184,95 @@ describe("LandingPage", () => {
     expect(mathLayer?.textContent).not.toContain("f(x) = x²");
     expect(mathSvg?.getAttribute("aria-label")).toBe("自定义 Bézier 曲线与切线示意图");
 
-    const tangentCoordinates = tangent
+    const focusX = Number(focus?.getAttribute("cx"));
+    const focusY = Number(focus?.getAttribute("cy"));
+
+    expect(tangentBranches).toHaveLength(2);
+    expect(guideBranches).toHaveLength(2);
+    expect(labels?.textContent).toContain("P(1, B(1))");
+    expect(labels?.textContent).toContain("切线");
+
+    for (const branch of [...tangentBranches, ...guideBranches]) {
+      expect(branch.getAttribute("d")).toMatch(
+        new RegExp(`^M${focusX} ${focusY}L`),
+      );
+    }
+
+    for (const branch of tangentBranches) {
+      const coordinates = branch
+        .getAttribute("d")
+        ?.match(/^M([\d.]+) ([\d.]+)L([\d.]+) ([\d.]+)$/)
+        ?.slice(1)
+        .map(Number) as [number, number, number, number];
+      const [x1, y1, x2, y2] = coordinates;
+      expect((y2 - y1) / (x2 - x1)).toBeCloseTo(-1.1324, 3);
+    }
+  });
+
+  it("builds physics vectors outward from the moving point", () => {
+    const { container } = renderLanding();
+    const physicsLayer = container.querySelector<HTMLElement>("[data-scene-domain='physics']");
+    expect(physicsLayer?.querySelector("svg")?.getAttribute("aria-label")).toBe(
+      "抛体运动切向速度及分解示意图",
+    );
+    const focus = physicsLayer?.querySelector<SVGCircleElement>(".mv-scene-focus");
+    const componentVectors = Array.from(
+      physicsLayer?.querySelectorAll<SVGPathElement>(".mv-scene-vector-branch--component") ?? [],
+    );
+    const resultVector = physicsLayer?.querySelector<SVGPathElement>(
+      ".mv-scene-vector-branch--result",
+    );
+    const arrows = physicsLayer?.querySelector<SVGGElement>(".mv-scene-vector-arrows");
+    const labels = physicsLayer?.querySelector<SVGGElement>(".mv-scene-vector-labels");
+    const projections = Array.from(
+      physicsLayer?.querySelectorAll<SVGPathElement>(".mv-scene-vector-projection") ?? [],
+    );
+    const focusX = Number(focus?.getAttribute("cx"));
+    const focusY = Number(focus?.getAttribute("cy"));
+
+    expect(componentVectors).toHaveLength(2);
+    expect(resultVector).toBeTruthy();
+    expect(resultVector?.classList.contains("mv-scene-vector--result")).toBe(true);
+    for (const vector of [...componentVectors, resultVector as SVGPathElement]) {
+      expect(vector.getAttribute("d")).toMatch(new RegExp(`^M${focusX} ${focusY}`));
+      expect(vector.getAttribute("pathLength")).toBe("1");
+    }
+    expect(arrows?.querySelectorAll("path")).toHaveLength(3);
+    expect(labels?.textContent).toContain("v");
+    expect(labels?.textContent).toContain("vₓ");
+    expect(labels?.textContent).toContain("vᵧ");
+
+    const trajectory = physicsLayer?.querySelector<SVGPathElement>(".mv-scene-curve");
+    const trajectoryJoin = trajectory
+      ?.getAttribute("d")
+      ?.match(/C[\d.]+ [\d.]+ [\d.]+ [\d.]+ ([\d.]+) ([\d.]+)C/)
+      ?.slice(1)
+      .map(Number) as [number, number];
+    expect([focusX, focusY]).toEqual(trajectoryJoin);
+
+    const resultCoordinates = resultVector
       ?.getAttribute("d")
       ?.match(/^M([\d.]+) ([\d.]+)L([\d.]+) ([\d.]+)$/)
       ?.slice(1)
-      .map(Number);
-    expect(tangentCoordinates).toHaveLength(4);
+      .map(Number) as [number, number, number, number];
+    const [, , resultX, resultY] = resultCoordinates;
+    const resultSlope = (resultY - focusY) / (resultX - focusX);
+    const trajectoryTangentSlope = (153 - 130) / (500 - 438);
+    expect(resultSlope).toBeCloseTo(trajectoryTangentSlope, 2);
 
-    const [x1, y1, x2, y2] = tangentCoordinates as [number, number, number, number];
-    const focusX = Number(focus?.getAttribute("cx"));
-    const focusY = Number(focus?.getAttribute("cy"));
-    const slope = (y2 - y1) / (x2 - x1);
-    const tangentYAtFocus = y1 + slope * (focusX - x1);
-
-    expect(slope).toBeCloseTo(-1.1324, 3);
-    expect(tangentYAtFocus).toBeCloseTo(focusY, 2);
+    const componentEnds = componentVectors.map((vector) =>
+      vector
+        .getAttribute("d")
+        ?.match(/^M[\d.]+ [\d.]+L([\d.]+) ([\d.]+)$/)
+        ?.slice(1)
+        .map(Number),
+    );
+    expect(componentEnds).toContainEqual([resultX, focusY]);
+    expect(componentEnds).toContainEqual([focusX, resultY]);
+    expect(projections.map((projection) => projection.getAttribute("d"))).toEqual([
+      `M${resultX} ${focusY}L${resultX} ${resultY}`,
+      `M${focusX} ${resultY}L${resultX} ${resultY}`,
+    ]);
   });
 
   it("encodes binary-search values by bar height while keeping range state explicit", () => {
@@ -142,6 +294,178 @@ describe("LandingPage", () => {
     expect(container.querySelector(".mv-lesson-code strong")?.textContent).toContain(
       "left = mid + 1",
     );
+  });
+
+  it("freezes a scene at its final state when its domain is re-activated", () => {
+    const { container, getByRole } = renderLanding();
+
+    const layer = () =>
+      container.querySelector<HTMLElement>(
+        ".mv-landing-capability [data-scene-domain='math']",
+      );
+
+    // First activation animates: the layer carries no freeze class.
+    expect(layer()?.classList.contains("has-played")).toBe(false);
+
+    fireEvent.click(getByRole("tab", { name: /物理/ }));
+    fireEvent.click(getByRole("tab", { name: /数学/ }));
+
+    // Re-activation after the domain already played: the layer carries
+    // has-played so the stylesheet pins the scene at its drawn state and
+    // the CSS animation cannot replay.
+    expect(layer()?.classList.contains("has-played")).toBe(true);
+  });
+
+  it("announces follow-up completion via a dedicated live region", () => {
+    const { setMatches } = installMatchMediaMock();
+    const { container } = renderLanding();
+
+    // The thread stack itself is no longer a live region: the visible typing
+    // text is aria-hidden, so a dedicated visually-hidden status element
+    // carries the announcement for the active thread instead.
+    const threadStack = container.querySelector<HTMLElement>(
+      ".mv-landing-followup-demo__thread-stack",
+    );
+    expect(threadStack?.hasAttribute("aria-live")).toBe(false);
+
+    const status = container.querySelector<HTMLElement>(
+      ".mv-landing-followup-demo__thread.is-active [role='status']",
+    );
+    expect(status?.classList.contains("mv-landing-visually-hidden")).toBe(
+      true,
+    );
+    expect(status?.textContent?.trim()).toBe("");
+
+    // The versions row is a labelled group, not an unnamed div.
+    expect(
+      container
+        .querySelector(".mv-landing-followup-demo__versions")
+        ?.getAttribute("role"),
+    ).toBe("group");
+
+    // When the reply completes, the status region carries the announcement.
+    act(() => setMatches("(prefers-reduced-motion: reduce)", true));
+    expect(status?.textContent).toContain("TEXT REPLY");
+  });
+
+  it("aligns the story rail when an article button receives focus", () => {
+    const scrollTo = vi.fn();
+    vi.stubGlobal("scrollTo", scrollTo);
+    const { container } = renderLanding();
+
+    const physicsButton = container.querySelector<HTMLElement>(
+      "[data-demo-domain='physics'] button",
+    );
+    fireEvent.focus(physicsButton as HTMLElement);
+
+    // Focus activates the panel and scrolls the page to the rail position
+    // where it is fully visible.
+    expect(
+      container
+        .querySelector("[data-demo-domain='physics']")
+        ?.classList.contains("is-active"),
+    ).toBe(true);
+    expect(scrollTo).toHaveBeenCalledWith(
+      expect.objectContaining({ behavior: "smooth", top: expect.any(Number) }),
+    );
+  });
+
+  it("supports the ARIA tabs keyboard pattern on both tablists", () => {
+    const { container, getByRole } = renderLanding();
+    const demoTablist = getByRole("tablist", { name: "学科画面示例" });
+    const followupTablist = getByRole("tablist", { name: "追问方式" });
+    const demoStage = container.querySelector<HTMLElement>(
+      ".mv-landing-capability .mv-lesson-stage",
+    );
+    const threadStack = container.querySelector<HTMLElement>(
+      ".mv-landing-followup-demo__thread-stack",
+    );
+
+    // Panels are wired to their tablists via id / aria-controls pairs.
+    expect(demoStage?.getAttribute("role")).toBe("tabpanel");
+    expect(demoStage?.getAttribute("aria-labelledby")).toBe(
+      "landing-demo-tab-math",
+    );
+    expect(threadStack?.getAttribute("role")).toBe("tabpanel");
+    expect(threadStack?.getAttribute("aria-labelledby")).toBe(
+      "landing-followup-tab-explain",
+    );
+
+    const mathTab = getByRole("tab", { name: /数学/ });
+    const physicsTab = getByRole("tab", { name: /物理/ });
+    const algorithmTab = getByRole("tab", { name: /算法/ });
+    expect(mathTab.getAttribute("aria-controls")).toBe("landing-demo-panel");
+    expect(physicsTab.getAttribute("aria-controls")).toBe("landing-demo-panel");
+
+    // Roving tabindex: only the active tab is in the tab order.
+    expect(mathTab.tabIndex).toBe(0);
+    expect(physicsTab.tabIndex).toBe(-1);
+    expect(algorithmTab.tabIndex).toBe(-1);
+
+    // ArrowRight moves focus and activates the next tab.
+    fireEvent.keyDown(demoTablist, { key: "ArrowRight" });
+    expect(physicsTab.getAttribute("aria-selected")).toBe("true");
+    expect(physicsTab.tabIndex).toBe(0);
+    expect(mathTab.tabIndex).toBe(-1);
+    expect(document.activeElement).toBe(physicsTab);
+    expect(demoStage?.getAttribute("aria-labelledby")).toBe(
+      "landing-demo-tab-physics",
+    );
+
+    // ArrowLeft moves back; Home / End jump to the first / last tab.
+    fireEvent.keyDown(demoTablist, { key: "ArrowLeft" });
+    expect(mathTab.getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(mathTab);
+
+    fireEvent.keyDown(demoTablist, { key: "End" });
+    expect(algorithmTab.getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(algorithmTab);
+    fireEvent.keyDown(demoTablist, { key: "Home" });
+    expect(mathTab.getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(mathTab);
+
+    // The follow-up tablist uses the same pattern, with wrap-around.
+    const explainTab = getByRole("tab", { name: "解释这一步" });
+    const reviseTab = getByRole("tab", { name: "调整讲解" });
+    expect(explainTab.getAttribute("aria-controls")).toBe(
+      "landing-followup-panel",
+    );
+    expect(explainTab.tabIndex).toBe(0);
+    expect(reviseTab.tabIndex).toBe(-1);
+
+    fireEvent.keyDown(followupTablist, { key: "ArrowRight" });
+    expect(reviseTab.getAttribute("aria-selected")).toBe("true");
+    expect(reviseTab.tabIndex).toBe(0);
+    expect(document.activeElement).toBe(reviseTab);
+    expect(threadStack?.getAttribute("aria-labelledby")).toBe(
+      "landing-followup-tab-revise",
+    );
+
+    fireEvent.keyDown(followupTablist, { key: "ArrowRight" });
+    expect(explainTab.getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(explainTab);
+  });
+
+  it("reacts live to prefers-reduced-motion changes in the follow-up demo", () => {
+    const { setMatches } = installMatchMediaMock();
+    const { container } = renderLanding();
+
+    const activeSummary = () =>
+      container.querySelector<HTMLElement>(
+        ".mv-landing-followup-demo__thread.is-active .mv-landing-followup-demo__message.is-ai small",
+      );
+
+    // Motion enabled: the reply has not finished typing yet.
+    expect(activeSummary()?.classList.contains("is-visible")).toBe(false);
+
+    // Flip to reduced motion mid-session: the thread jumps to the complete
+    // state (full reply) and the animation loop stops.
+    act(() => setMatches("(prefers-reduced-motion: reduce)", true));
+    expect(activeSummary()?.classList.contains("is-visible")).toBe(true);
+
+    // Flip back: the animation restarts from the beginning.
+    act(() => setMatches("(prefers-reduced-motion: reduce)", false));
+    expect(activeSummary()?.classList.contains("is-visible")).toBe(false);
   });
 
   it("shows follow-up as contextual replies and reversible lesson revisions", () => {

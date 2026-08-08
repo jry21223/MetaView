@@ -1,0 +1,493 @@
+/* MetaView public landing page */
+
+/* Sticky storytelling needs every ancestor to follow the document scroll.
+   The app shell normally clips x-overflow, which computes y-overflow to auto
+   and turns that shell into a non-scrolling sticky container. */
+html:has(.mv-landing),
+body:has(.mv-landing),
+#root:has(.mv-landing),
+.mv-root:has(> .mv-landing) {
+  overflow: visible;
+}
+
+.mv-landing {
+  --accent-strong: color-mix(in srgb, var(--accent) 78%, var(--ink));
+  --landing-shadow: 0 28px 72px rgba(48, 50, 42, 0.12);
+  --landing-content: min(1200px, calc(100vw - 48px));
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow: visible;
+  background: var(--bg);
+  color: var(--ink);
+  font-family:
+    "Inter",
+    -apple-system,
+    system-ui,
+    "PingFang SC",
+    "Noto Sans SC",
+    sans-serif;
+}
+
+.mv-dark .mv-landing {
+  --landing-shadow: 0 28px 72px rgba(0, 0, 0, 0.28);
+}
+
+.mv-landing a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.mv-landing button,
+.mv-landing a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mv-landing button,
+.mv-landing input,
+.mv-landing textarea {
+  font: inherit;
+}
+
+.mv-landing-skip {
+  position: fixed;
+  z-index: 100;
+  top: 10px;
+  left: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  transform: translateY(-160%);
+  transition: transform 160ms ease;
+}
+
+.mv-landing-skip:focus {
+  transform: translateY(0);
+}
+
+.mv-landing-header {
+  position: absolute;
+  z-index: 20;
+  top: 0;
+  left: 50%;
+  width: var(--landing-content);
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto minmax(220px, 1fr);
+  align-items: center;
+  gap: 24px;
+  padding-top: max(8px, var(--mv-safe-top));
+  animation: mvLandingHeaderIn 520ms ease both;
+}
+
+.mv-landing-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  width: max-content;
+}
+
+.mv-landing-brand img {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+}
+
+.mv-landing-brand > span {
+  display: grid;
+  gap: 1px;
+}
+
+.mv-landing-brand strong {
+  font-family: var(--font-headline, "Space Grotesk", sans-serif);
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.mv-landing-brand small {
+  color: var(--ink-3);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 8.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+}
+
+.mv-landing-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.mv-landing-nav a {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  border-radius: 8px;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 500;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.mv-landing-nav a:hover {
+  background: color-mix(in srgb, var(--surface) 56%, transparent);
+  color: var(--ink);
+}
+
+.mv-landing-header-cta {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 13px;
+  border: 1px solid var(--line-2);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 550;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.mv-landing-header__actions {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mv-landing-theme {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  color: var(--ink-2);
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.mv-landing-theme:hover {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.mv-landing-theme svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 1.8;
+}
+
+.mv-landing-header-cta:hover {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.mv-landing-header-cta svg,
+.mv-landing-button svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 1.8;
+}
+
+.mv-landing-hero {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: grid;
+  align-items: center;
+  padding: 108px 24px 58px;
+  border-bottom: 1px solid var(--line);
+  background:
+    linear-gradient(color-mix(in srgb, var(--line) 42%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--line) 42%, transparent) 1px, transparent 1px),
+    var(--bg);
+  background-size: 48px 48px;
+}
+
+.mv-landing-hero::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: radial-gradient(
+    circle at 66% 44%,
+    color-mix(in srgb, var(--accent) 11%, transparent),
+    transparent 38%
+  );
+  pointer-events: none;
+}
+
+.mv-landing-hero::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: 72px;
+  bottom: 0;
+  left: calc(50% - min(600px, 42vw));
+  width: 1px;
+  background: linear-gradient(transparent, var(--line), transparent);
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.mv-landing-hero__inner {
+  position: relative;
+  z-index: 1;
+  width: var(--landing-content);
+  margin-inline: auto;
+  display: grid;
+  grid-template-columns: minmax(360px, 0.83fr) minmax(520px, 1.17fr);
+  align-items: center;
+  gap: clamp(36px, 5vw, 76px);
+}
+
+.mv-landing-hero__copy {
+  max-width: 500px;
+}
+
+.mv-landing-kicker {
+  margin: 0;
+  color: color-mix(in srgb, var(--accent) 72%, var(--ink-2));
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  line-height: 1.4;
+}
+
+.mv-landing-hero__copy .mv-landing-kicker {
+  animation: mvLandingCopyIn 560ms 70ms ease both;
+}
+
+.mv-landing-hero h1 {
+  display: grid;
+  gap: 18px;
+  margin: 20px 0 0;
+  text-wrap: balance;
+}
+
+.mv-landing-hero h1 strong {
+  font-family: var(--font-headline, "Space Grotesk", sans-serif);
+  font-size: clamp(48px, 5.5vw, 72px);
+  font-weight: 620;
+  letter-spacing: -0.065em;
+  line-height: 0.88;
+  animation: mvLandingCopyIn 600ms 120ms ease both;
+}
+
+.mv-landing-hero h1 span {
+  max-width: 11em;
+  font-size: clamp(38px, 3.7vw, 44px);
+  font-weight: 620;
+  letter-spacing: -0.045em;
+  line-height: 1.08;
+  animation: mvLandingCopyIn 620ms 170ms ease both;
+}
+
+.mv-landing-lead {
+  max-width: 430px;
+  margin: 24px 0 0;
+  color: var(--ink-2);
+  font-size: clamp(15px, 1.3vw, 17px);
+  line-height: 1.65;
+  animation: mvLandingCopyIn 620ms 220ms ease both;
+}
+
+.mv-landing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 30px;
+  animation: mvLandingCopyIn 620ms 270ms ease both;
+}
+
+.mv-landing-button {
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 18px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  font-size: 13.5px;
+  font-weight: 600;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.mv-landing-button--primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast, #ffffff);
+  cursor: pointer;
+}
+
+.mv-landing-button--primary:hover {
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
+}
+
+.mv-landing-button--ghost {
+  border-color: var(--line-2);
+  background: color-mix(in srgb, var(--surface) 52%, transparent);
+  color: var(--ink-2);
+}
+
+.mv-landing-button--ghost:hover {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--line-2));
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.mv-landing-domain-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 32px 0 0;
+  color: var(--ink-2);
+  font-size: 11.5px;
+  line-height: 1.6;
+  animation: mvLandingCopyIn 620ms 320ms ease both;
+}
+
+.mv-landing-domain-line span {
+  color: var(--ink-2);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+}
+
+.mv-landing-hero__visual {
+  position: relative;
+  width: min(100%, 680px);
+  margin: 0;
+  justify-self: end;
+  animation: mvLandingCanvasIn 760ms 180ms cubic-bezier(0.2, 0.75, 0.24, 1) both;
+}
+
+.mv-landing-question {
+  position: relative;
+  z-index: 2;
+  width: 78%;
+  margin: 0 0 -12px 7%;
+  padding: 13px 16px 20px;
+  border: 1px solid var(--line-2);
+  border-radius: 10px 10px 0 0;
+  background: color-mix(in srgb, var(--surface) 92%, var(--bg));
+  box-shadow: 0 10px 28px rgba(49, 51, 42, 0.07);
+}
+
+.mv-dark .mv-landing-question {
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.26);
+}
+
+.mv-landing-question p {
+  margin: 6px 0 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 560;
+}
+
+.mv-landing-hero__visual figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+  color: var(--ink-2);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.04em;
+}
+
+.mv-landing-hero__visual figcaption i {
+  width: 28px;
+  height: 1px;
+  background: var(--line-2);
+}
+
+.mv-landing-hero__visual figcaption strong {
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
+.mv-landing-footer {
+  width: var(--landing-content);
+  min-height: 126px;
+  margin-inline: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 40px;
+  background: var(--bg);
+}
+
+.mv-landing-footer > div {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+
+.mv-landing-footer > div span {
+  font-family: var(--font-headline, "Space Grotesk", sans-serif);
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.mv-landing-footer p {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 11.5px;
+}
+
+.mv-landing-footer nav {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.mv-landing-footer nav :is(a, button) {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.mv-landing-footer nav :is(a, button):hover {
+  color: var(--ink);
+}
+
+.mv-landing :is(a, button):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 46%, transparent);
+  outline-offset: 2px;
+}

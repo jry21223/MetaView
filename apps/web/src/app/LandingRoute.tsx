@@ -28,13 +28,31 @@ export function LandingRoute({ appEdition }: { appEdition: AppEdition }) {
     const path = consumePostLoginPath();
     if (path) navigate(path, { replace: true });
   }, [appEdition, navigate]);
-  const css = useMemo(
-    () =>
-      themeVars({
+  const css = useMemo<Record<string, string>>(
+    () => {
+      const pageVars = themeVars({
         ...t,
         theme: landingTheme,
         accent: THEME_PALETTE[landingTheme].accent,
-      }),
+      });
+      const directorTheme = landingTheme === "light" ? "dark" : "light";
+      const directorVars = themeVars({
+        ...t,
+        theme: directorTheme,
+        accent: THEME_PALETTE[directorTheme].accent,
+      });
+
+      return {
+        ...pageVars,
+        "--landing-director-bg": directorVars["--surface-2"],
+        "--landing-director-surface": directorVars["--surface-2"],
+        "--landing-director-ink": directorVars["--ink"],
+        "--landing-director-ink-2": directorVars["--ink-2"],
+        "--landing-director-ink-3": directorVars["--ink-3"],
+        "--landing-director-line": directorVars["--line-2"],
+        "--landing-director-accent": directorVars["--accent"],
+      };
+    },
     [landingTheme, t],
   );
 

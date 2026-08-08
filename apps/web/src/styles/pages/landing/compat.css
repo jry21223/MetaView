@@ -1,0 +1,98 @@
+
+@keyframes mvLandingHeaderIn {
+  from { opacity: 0; transform: translate(-50%, -5px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@keyframes mvLandingCopyIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes mvLandingCanvasIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes mvLandingPathDraw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes mvLandingPointReveal {
+  from { opacity: 0; transform: scale(0.72); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes mvLandingLineGrow {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes mvLandingLabelReveal {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes mvLandingBarRise {
+  from { transform: scaleY(0.12); }
+  to { transform: scaleY(1); }
+}
+
+@keyframes mvLandingFocus {
+  0%, 100% { opacity: 0.42; transform: scale(0.94); }
+  50% { opacity: 0.72; transform: scale(1.04); }
+}
+
+@keyframes mvLandingPipelineTravel {
+  0%, 8% { transform: translateX(0); }
+  92%, 100% { transform: translateX(calc(100% - 8px)); }
+}
+
+@keyframes mvLandingVersionLine {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes mvLandingTypeCursor {
+  0%, 48% { opacity: 1; }
+  49%, 100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mv-landing *,
+  .mv-landing *::before,
+  .mv-landing *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .mv-scene-curve--animated {
+    stroke-dashoffset: 0;
+  }
+
+  /* 焦点环不做脉冲，停在自然状态（opacity 1）；与 .has-played 选择器形状一致 */
+  .mv-lesson-scene-layer.is-active .mv-scene-analysis .mv-scene-focus-ring,
+  .mv-lesson-scene-layer.is-active .mv-scene-focus-ring {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .mv-lesson-scene-layer.is-active .mv-scene-focus,
+  .mv-lesson-scene-layer.is-active .mv-scene-analysis-labels,
+  .mv-lesson-scene-layer.is-active .mv-scene-vector-annotation,
+  .mv-lesson-scene-layer.is-active .mv-scene-vector-projections {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .mv-lesson-scene-layer.is-active .mv-scene-tangent-branch,
+  .mv-lesson-scene-layer.is-active .mv-scene-guide-branch,
+  .mv-lesson-scene-layer.is-active .mv-scene-vector-branch {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}

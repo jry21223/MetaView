@@ -1,7 +1,10 @@
 @import './styles/tokens.css';
 @import './styles/global.css';
 @import './styles/layout.css';
-@import './styles/pages/landing.css';
+@import './styles/pages/landing/shell.css';
+@import './styles/pages/landing/content.css';
+@import './styles/pages/landing/responsive.css';
+@import './styles/pages/landing/compat.css';
 @import './styles/pages/studio.css';
 @import './styles/pages/playbook.css';
 @import './styles/pages/history.css';

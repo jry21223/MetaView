@@ -18,6 +18,8 @@
 
 `LandingRoute` 负责加载与应用内一致的主题变量，并把“开始创建”导航到 `/create`。公共首页不复用应用内 `GlobalTopbar`，避免把营销叙事和工具导航塞进同一个 Shell。
 
+Landing 的 Director 演示区（`.mv-landing-director`）使用“反色色带”明度逻辑：浅色主题下为深色带、深色主题下为浅色带，与正文区形成明度反转对比，而不是跟随当前主题。`LandingRoute` 使用相反主题调用 `themeVars()`，把结果映射为 `--landing-director-*` 语义变量；Director CSS 只消费这些变量，因此色值始终来自 `THEME_PALETTE` 的单一来源。
+
 ## Stage 路由
 
 `SelfAppShell` / `OpsAppShell` 使用当前路径派生五个应用 Stage：
@@ -161,7 +163,7 @@ mainStyle = {
 - 公共 Landing 路由与主题装配 → `apps/web/src/app/LandingRoute.tsx`
 - 跨 Stage 共享 UI → `apps/web/src/shared/ui/`
 - 单 Stage 专用 → `apps/web/src/pages/<Stage>/` 或 `apps/web/src/features/<feature>/ui/`
-- Landing 样式 → `apps/web/src/styles/pages/landing.css`
+- Landing 样式 → `apps/web/src/styles/pages/landing/`（shell / content / responsive / compat 四份）
 - Public template 页面样式 → `apps/web/src/styles/pages/templates.css`
 
 `shared/` 不得反向导入 `features/` 或 `pages/`。

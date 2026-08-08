@@ -1,409 +1,3 @@
-/* MetaView public landing page */
-
-/* Sticky storytelling needs every ancestor to follow the document scroll.
-   The app shell normally clips x-overflow, which computes y-overflow to auto
-   and turns that shell into a non-scrolling sticky container. */
-html:has(.mv-landing),
-body:has(.mv-landing),
-#root:has(.mv-landing),
-.mv-root:has(> .mv-landing) {
-  overflow: visible;
-}
-
-.mv-landing {
-  --accent-strong: color-mix(in srgb, var(--accent) 78%, var(--ink));
-  --landing-shadow: 0 28px 72px rgba(48, 50, 42, 0.12);
-  --landing-content: min(1200px, calc(100vw - 48px));
-  min-height: 100vh;
-  min-height: 100dvh;
-  overflow: visible;
-  background: var(--bg);
-  color: var(--ink);
-  font-family:
-    "Inter",
-    -apple-system,
-    system-ui,
-    "PingFang SC",
-    "Noto Sans SC",
-    sans-serif;
-}
-
-.mv-dark .mv-landing {
-  --landing-shadow: 0 28px 72px rgba(0, 0, 0, 0.28);
-}
-
-.mv-landing a {
-  color: inherit;
-  text-decoration: none;
-}
-
-.mv-landing button,
-.mv-landing a {
-  -webkit-tap-highlight-color: transparent;
-}
-
-.mv-landing button,
-.mv-landing input,
-.mv-landing textarea {
-  font: inherit;
-}
-
-.mv-landing-skip {
-  position: fixed;
-  z-index: 100;
-  top: 10px;
-  left: 12px;
-  padding: 10px 14px;
-  border: 1px solid var(--line-2);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--ink);
-  font-size: 13px;
-  transform: translateY(-160%);
-  transition: transform 160ms ease;
-}
-
-.mv-landing-skip:focus {
-  transform: translateY(0);
-}
-
-.mv-landing-header {
-  position: absolute;
-  z-index: 20;
-  top: 0;
-  left: 50%;
-  width: var(--landing-content);
-  min-height: 72px;
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto minmax(220px, 1fr);
-  align-items: center;
-  gap: 24px;
-  padding-top: max(8px, var(--mv-safe-top));
-  animation: mvLandingHeaderIn 520ms ease both;
-}
-
-.mv-landing-brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 11px;
-  width: max-content;
-}
-
-.mv-landing-brand img {
-  width: 38px;
-  height: 38px;
-  border-radius: 9px;
-}
-
-.mv-landing-brand > span {
-  display: grid;
-  gap: 1px;
-}
-
-.mv-landing-brand strong {
-  font-family: var(--font-headline, "Space Grotesk", sans-serif);
-  font-size: 15px;
-  font-weight: 650;
-  letter-spacing: -0.02em;
-}
-
-.mv-landing-brand small {
-  color: var(--ink-3);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 8.5px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-}
-
-.mv-landing-nav {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-}
-
-.mv-landing-nav a {
-  min-height: 38px;
-  display: inline-flex;
-  align-items: center;
-  padding: 0 12px;
-  border-radius: 8px;
-  color: var(--ink-2);
-  font-size: 12.5px;
-  font-weight: 500;
-  transition:
-    background-color 150ms ease,
-    color 150ms ease;
-}
-
-.mv-landing-nav a:hover {
-  background: color-mix(in srgb, var(--surface) 56%, transparent);
-  color: var(--ink);
-}
-
-.mv-landing-header-cta {
-  min-height: 40px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 13px;
-  border: 1px solid var(--line-2);
-  border-radius: 9px;
-  background: color-mix(in srgb, var(--surface) 72%, transparent);
-  color: var(--ink-2);
-  font-size: 12.5px;
-  font-weight: 550;
-  cursor: pointer;
-  backdrop-filter: blur(12px);
-  transition:
-    border-color 150ms ease,
-    background-color 150ms ease,
-    color 150ms ease;
-}
-
-.mv-landing-header__actions {
-  justify-self: end;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.mv-landing-theme {
-  width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 1px solid var(--line-2);
-  border-radius: 9px;
-  background: color-mix(in srgb, var(--surface) 72%, transparent);
-  color: var(--ink-2);
-  cursor: pointer;
-  backdrop-filter: blur(12px);
-  transition:
-    border-color 150ms ease,
-    background-color 150ms ease,
-    color 150ms ease;
-}
-
-.mv-landing-theme:hover {
-  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
-  background: var(--surface);
-  color: var(--ink);
-}
-
-.mv-landing-theme svg {
-  width: 16px;
-  height: 16px;
-  stroke-width: 1.8;
-}
-
-.mv-landing-header-cta:hover {
-  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
-  background: var(--surface);
-  color: var(--ink);
-}
-
-.mv-landing-header-cta svg,
-.mv-landing-button svg {
-  width: 16px;
-  height: 16px;
-  stroke-width: 1.8;
-}
-
-.mv-landing-hero {
-  position: relative;
-  isolation: isolate;
-  min-height: 100vh;
-  min-height: 100svh;
-  display: grid;
-  align-items: center;
-  padding: 108px 24px 58px;
-  border-bottom: 1px solid var(--line);
-  background:
-    linear-gradient(color-mix(in srgb, var(--line) 42%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--line) 42%, transparent) 1px, transparent 1px),
-    var(--bg);
-  background-size: 48px 48px;
-}
-
-.mv-landing-hero::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  background: radial-gradient(
-    circle at 66% 44%,
-    color-mix(in srgb, var(--accent) 11%, transparent),
-    transparent 38%
-  );
-  pointer-events: none;
-}
-
-.mv-landing-hero::after {
-  content: "";
-  position: absolute;
-  z-index: 0;
-  top: 72px;
-  bottom: 0;
-  left: calc(50% - min(600px, 42vw));
-  width: 1px;
-  background: linear-gradient(transparent, var(--line), transparent);
-  opacity: 0.72;
-  pointer-events: none;
-}
-
-.mv-landing-hero__inner {
-  position: relative;
-  z-index: 1;
-  width: var(--landing-content);
-  margin-inline: auto;
-  display: grid;
-  grid-template-columns: minmax(360px, 0.83fr) minmax(520px, 1.17fr);
-  align-items: center;
-  gap: clamp(36px, 5vw, 76px);
-}
-
-.mv-landing-hero__copy {
-  max-width: 500px;
-}
-
-.mv-landing-kicker {
-  margin: 0;
-  color: color-mix(in srgb, var(--accent) 72%, var(--ink-2));
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  line-height: 1.4;
-}
-
-.mv-landing-hero__copy .mv-landing-kicker {
-  animation: mvLandingCopyIn 560ms 70ms ease both;
-}
-
-.mv-landing-hero h1 {
-  display: grid;
-  gap: 18px;
-  margin: 20px 0 0;
-  text-wrap: balance;
-}
-
-.mv-landing-hero h1 strong {
-  font-family: var(--font-headline, "Space Grotesk", sans-serif);
-  font-size: clamp(64px, 6.4vw, 92px);
-  font-weight: 620;
-  letter-spacing: -0.065em;
-  line-height: 0.88;
-  animation: mvLandingCopyIn 600ms 120ms ease both;
-}
-
-.mv-landing-hero h1 span {
-  max-width: 11em;
-  font-size: clamp(38px, 3.7vw, 54px);
-  font-weight: 620;
-  letter-spacing: -0.045em;
-  line-height: 1.08;
-  animation: mvLandingCopyIn 620ms 170ms ease both;
-}
-
-.mv-landing-lead {
-  max-width: 430px;
-  margin: 24px 0 0;
-  color: var(--ink-2);
-  font-size: clamp(16px, 1.45vw, 19px);
-  line-height: 1.65;
-  animation: mvLandingCopyIn 620ms 220ms ease both;
-}
-
-.mv-landing-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  margin-top: 30px;
-  animation: mvLandingCopyIn 620ms 270ms ease both;
-}
-
-.mv-landing-button {
-  min-height: 46px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 0 18px;
-  border: 1px solid transparent;
-  border-radius: 9px;
-  font-size: 13.5px;
-  font-weight: 600;
-  transition:
-    background-color 150ms ease,
-    border-color 150ms ease,
-    color 150ms ease;
-}
-
-.mv-landing-button--primary {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--accent-contrast, #ffffff) !important;
-  cursor: pointer;
-}
-
-.mv-landing-button--primary:hover {
-  border-color: var(--accent-strong);
-  background: var(--accent-strong);
-}
-
-.mv-landing-button--ghost {
-  border-color: var(--line-2);
-  background: color-mix(in srgb, var(--surface) 52%, transparent);
-  color: var(--ink-2);
-}
-
-.mv-landing-button--ghost:hover {
-  border-color: color-mix(in srgb, var(--accent) 34%, var(--line-2));
-  background: var(--surface);
-  color: var(--ink);
-}
-
-.mv-landing-domain-line {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin: 32px 0 0;
-  color: var(--ink-3);
-  font-size: 11.5px;
-  line-height: 1.6;
-  animation: mvLandingCopyIn 620ms 320ms ease both;
-}
-
-.mv-landing-domain-line span {
-  color: var(--ink-2);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 9.5px;
-  font-weight: 600;
-  letter-spacing: 0.11em;
-}
-
-.mv-landing-hero__visual {
-  position: relative;
-  width: min(100%, 680px);
-  margin: 0;
-  justify-self: end;
-  animation: mvLandingCanvasIn 760ms 180ms cubic-bezier(0.2, 0.75, 0.24, 1) both;
-}
-
-.mv-landing-question {
-  position: relative;
-  z-index: 2;
-  width: 78%;
-  margin: 0 0 -12px 7%;
-  padding: 13px 16px 20px;
-  border: 1px solid var(--line-2);
-  border-radius: 10px 10px 0 0;
-  background: color-mix(in srgb, var(--surface) 92%, var(--bg));
-  box-shadow: 0 10px 28px rgba(49, 51, 42, 0.07);
-}
 
 .mv-landing-question span,
 .mv-lesson-toolbar span,
@@ -415,34 +9,8 @@ body:has(.mv-landing),
   letter-spacing: 0.12em;
 }
 
-.mv-landing-question p {
-  margin: 6px 0 0;
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 560;
-}
-
-.mv-landing-hero__visual figcaption {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 16px;
-  color: var(--ink-3);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 8.5px;
-  letter-spacing: 0.04em;
-}
-
-.mv-landing-hero__visual figcaption i {
-  width: 28px;
-  height: 1px;
-  background: var(--line-2);
-}
-
-.mv-landing-hero__visual figcaption strong {
-  color: var(--accent-strong);
-  font-weight: 600;
+.mv-lesson-focus-note span {
+  color: var(--ink-2);
 }
 
 .mv-lesson-canvas {
@@ -541,7 +109,7 @@ body:has(.mv-landing),
 
 .mv-lesson-toolbar code,
 .mv-lesson-time {
-  color: var(--ink-3);
+  color: var(--ink-2);
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 8.5px;
 }
@@ -637,28 +205,24 @@ body:has(.mv-landing),
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  filter: blur(2.5px);
   transform: translate3d(0, 11px, 0) scale(0.992);
   transform-origin: center;
   transition:
     opacity 240ms ease,
-    filter 260ms ease,
     transform 340ms cubic-bezier(0.3, 0, 0.7, 0.2),
     visibility 0s linear 360ms;
-  will-change: opacity, filter, transform;
 }
 
 .mv-lesson-scene-layer.is-active {
   z-index: 1;
   opacity: 1;
   visibility: visible;
-  filter: blur(0);
   transform: translate3d(0, 0, 0) scale(1);
   transition:
     opacity 340ms 55ms ease,
-    filter 340ms 25ms ease,
     transform 440ms 25ms cubic-bezier(0.2, 0.75, 0.24, 1),
     visibility 0s;
+  will-change: opacity, transform;
 }
 
 .mv-lesson-scene {
@@ -684,7 +248,6 @@ body:has(.mv-landing),
   border: 1px solid var(--line);
   border-radius: 8px;
   background: color-mix(in srgb, var(--surface) 86%, transparent);
-  backdrop-filter: blur(8px);
 }
 
 .mv-lesson-formula span {
@@ -729,8 +292,7 @@ body:has(.mv-landing),
 }
 
 .mv-scene-tangent,
-.mv-scene-vector,
-.mv-algorithm-shift {
+.mv-scene-vector {
   fill: none;
   stroke: var(--accent);
   stroke-width: 3;
@@ -738,8 +300,13 @@ body:has(.mv-landing),
 }
 
 .mv-scene-vector--result {
+  stroke: var(--accent);
+  stroke-width: 3.4;
+}
+
+.mv-scene-vector-branch--component,
+.mv-scene-vector-annotation--component.mv-scene-arrow {
   stroke: var(--ink-2);
-  stroke-dasharray: 5 5;
 }
 
 .mv-scene-arrow {
@@ -758,6 +325,7 @@ body:has(.mv-landing),
 }
 
 .mv-scene-focus-ring {
+  opacity: 0;
   fill: var(--accent-soft);
   stroke: color-mix(in srgb, var(--accent) 48%, transparent);
   stroke-width: 1.5;
@@ -765,14 +333,100 @@ body:has(.mv-landing),
   transform-origin: center;
 }
 
-.mv-lesson-scene-layer.is-active .mv-scene-focus-ring {
-  animation: mvLandingFocus 3.4s ease-in-out infinite;
-}
-
 .mv-scene-focus {
   fill: var(--accent);
   stroke: var(--surface);
   stroke-width: 3;
+}
+
+.mv-lesson-scene--math .mv-scene-focus,
+.mv-lesson-scene--math .mv-scene-analysis-labels,
+.mv-lesson-scene--physics .mv-scene-focus,
+.mv-scene-vector-annotation {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.mv-lesson-scene--math .mv-scene-focus,
+.mv-lesson-scene--physics .mv-scene-focus {
+  transform: scale(0.72);
+}
+
+.mv-scene-tangent-branch,
+.mv-scene-guide-branch,
+.mv-scene-vector-branch {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+
+.mv-scene-analysis-labels,
+.mv-scene-vector-annotation {
+  transform: translateY(3px);
+}
+
+.mv-scene-vector-annotation--result.mv-scene-label {
+  fill: var(--accent-strong);
+}
+
+.mv-scene-vector-projections {
+  opacity: 0;
+  transform: translateY(3px);
+}
+
+.mv-scene-vector-projection {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ink-3) 64%, transparent);
+  stroke-width: 1.2;
+  stroke-dasharray: 4 5;
+}
+
+.mv-lesson-scene-layer.is-active .mv-lesson-scene--math .mv-scene-focus {
+  animation: mvLandingPointReveal 180ms 2120ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.mv-lesson-scene-layer.is-active .mv-scene-tangent-branch {
+  animation: mvLandingLineGrow 620ms 2260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.mv-lesson-scene-layer.is-active .mv-scene-guide-branch {
+  animation: mvLandingLineGrow 520ms 2380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.mv-lesson-scene-layer.is-active .mv-scene-analysis-labels {
+  animation: mvLandingLabelReveal 240ms 2840ms ease-out both;
+}
+
+.mv-lesson-scene-layer.is-active .mv-lesson-scene--math .mv-scene-focus-ring {
+  animation: mvLandingFocus 3.4s 2980ms ease-in-out infinite;
+}
+
+.mv-lesson-scene-layer.is-active .mv-lesson-scene--physics .mv-scene-focus {
+  animation: mvLandingPointReveal 180ms 2120ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.mv-lesson-scene-layer.is-active .mv-scene-vector-branch--result {
+  animation: mvLandingLineGrow 560ms 2300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.mv-lesson-scene-layer.is-active .mv-scene-vector-annotation--result {
+  animation: mvLandingLabelReveal 200ms 2860ms ease-out both;
+}
+
+.mv-lesson-scene-layer.is-active .mv-scene-vector-branch--component {
+  animation: mvLandingLineGrow 520ms 3060ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.mv-lesson-scene-layer.is-active .mv-scene-vector-projections {
+  animation: mvLandingLabelReveal 240ms 3580ms ease-out both;
+}
+
+.mv-lesson-scene-layer.is-active .mv-scene-vector-annotation--component {
+  animation: mvLandingLabelReveal 220ms 3820ms ease-out both;
+}
+
+.mv-lesson-scene-layer.is-active .mv-lesson-scene--physics .mv-scene-focus-ring {
+  animation: mvLandingFocus 3.4s 4040ms ease-in-out infinite;
 }
 
 .mv-scene-label,
@@ -804,7 +458,6 @@ body:has(.mv-landing),
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 8px;
   line-height: 1.4;
-  backdrop-filter: blur(8px);
 }
 
 .mv-lesson-code span,
@@ -863,6 +516,46 @@ body:has(.mv-landing),
 .mv-algorithm-bar:nth-child(7) rect { animation-delay: 210ms; }
 .mv-algorithm-bar:nth-child(8) rect { animation-delay: 245ms; }
 
+/* 已播放过的 domain 冻结在最终绘制状态：滚动回退再次激活时不重播轨迹描边 /
+   分析淡入动画。LandingPage 在 domain 首次离开舞台后给对应 scene layer
+   打上 has-played。规则必须排在 .is-active 动画规则之后（同特异性靠源序取胜）。 */
+.mv-lesson-scene-layer.has-played .mv-scene-curve--animated {
+  animation: none;
+  stroke-dashoffset: 0;
+}
+
+.mv-lesson-scene-layer.has-played .mv-scene-analysis {
+  animation: none;
+  opacity: 1;
+}
+
+.mv-lesson-scene-layer.has-played .mv-scene-analysis .mv-scene-focus-ring,
+.mv-lesson-scene-layer.has-played .mv-scene-focus-ring {
+  animation: none;
+  opacity: 1;
+  transform: none;
+}
+
+.mv-lesson-scene-layer.has-played .mv-scene-focus,
+.mv-lesson-scene-layer.has-played .mv-scene-analysis-labels,
+.mv-lesson-scene-layer.has-played .mv-scene-vector-annotation,
+.mv-lesson-scene-layer.has-played .mv-scene-vector-projections {
+  animation: none;
+  opacity: 1;
+  transform: none;
+}
+
+.mv-lesson-scene-layer.has-played .mv-scene-tangent-branch,
+.mv-lesson-scene-layer.has-played .mv-scene-guide-branch,
+.mv-lesson-scene-layer.has-played .mv-scene-vector-branch {
+  animation: none;
+  stroke-dashoffset: 0;
+}
+
+.mv-lesson-scene-layer.has-played .mv-algorithm-bar rect {
+  animation: none;
+}
+
 .mv-algorithm-bar text {
   fill: var(--ink);
   font-family: "IBM Plex Mono", ui-monospace, monospace;
@@ -915,7 +608,6 @@ body:has(.mv-landing),
   border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--line));
   border-radius: 7px;
   background: color-mix(in srgb, var(--surface) 86%, transparent);
-  backdrop-filter: blur(8px);
 }
 
 .mv-lesson-focus-note strong {
@@ -939,7 +631,6 @@ body:has(.mv-landing),
   font-size: 10.5px;
   line-height: 1.45;
   text-align: center;
-  backdrop-filter: blur(8px);
 }
 
 .mv-lesson-timeline {
@@ -988,7 +679,7 @@ body:has(.mv-landing),
 
 .mv-landing-section {
   position: relative;
-  padding: 112px 24px;
+  padding: clamp(78px, 9vw, 116px) 24px;
 }
 
 .mv-landing-section__inner {
@@ -1081,13 +772,25 @@ body:has(.mv-landing),
   z-index: 3;
   top: -4px;
   left: 0;
+  width: 100%;
+  height: 8px;
+  pointer-events: none;
+  animation: mvLandingPipelineTravel 8s ease-in-out infinite;
+}
+
+/* The visual dot rides the full-width traveler so translateX percentages
+   (element-relative) resolve against the li width, not the 8px dot. */
+.mv-landing-pipeline__progress::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 8px;
   height: 8px;
   border: 2px solid var(--surface-2);
   border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
-  animation: mvLandingPipelineTravel 8s ease-in-out infinite;
 }
 
 .mv-landing-proof-line {
@@ -1164,6 +867,8 @@ body:has(.mv-landing),
   transition: transform 320ms cubic-bezier(0.2, 0.75, 0.24, 1);
 }
 
+/* Pills are track-sized and tracks are gapless (gap: 0), so sliding one
+   column means moving 100% of the pill's own width. */
 .mv-landing-demo-toolbar[data-active-domain="physics"]::before {
   transform: translateX(100%);
 }
@@ -1209,7 +914,7 @@ body:has(.mv-landing),
 }
 
 .mv-landing-capability .mv-lesson-canvas {
-  box-shadow: 0 24px 64px rgba(45, 48, 40, 0.1);
+  box-shadow: var(--landing-shadow);
 }
 
 .mv-landing-story {
@@ -1315,14 +1020,17 @@ body:has(.mv-landing),
   color: var(--accent-strong);
 }
 
+/* Director 演示带是 Landing 专属的“反色色带”motif（见 docs/frontend-shell.md）：
+   浅色页面用暗色品牌色、深色页面用浅色品牌色，与正文区形成明度反转对比，
+   而不是跟随当前主题。反色语义变量由 LandingRoute 通过 themeVars() 注入。 */
 .mv-landing-director {
-  --director-bg: #101410;
-  --director-surface: #151b17;
-  --director-ink: #e8efe9;
-  --director-ink-2: #9ba8a0;
-  --director-ink-3: #657169;
-  --director-line: #27332c;
-  --director-accent: #9fb48d;
+  --director-bg: var(--landing-director-bg);
+  --director-surface: var(--landing-director-surface);
+  --director-ink: var(--landing-director-ink);
+  --director-ink-2: var(--landing-director-ink-2);
+  --director-ink-3: var(--landing-director-ink-3);
+  --director-line: var(--landing-director-line);
+  --director-accent: var(--landing-director-accent);
   overflow: hidden;
   border: 0;
   background: var(--director-bg);
@@ -1676,7 +1384,7 @@ body:has(.mv-landing),
 }
 
 .mv-landing-followup-demo__modes[data-active-mode="revise"]::before {
-  transform: translateX(calc(100% + 6px));
+  transform: translateX(100%);
 }
 
 .mv-landing-followup-demo__modes button {
@@ -1947,7 +1655,7 @@ body:has(.mv-landing),
 }
 
 .mv-landing-final {
-  padding: 118px 24px;
+  padding: clamp(78px, 9vw, 116px) 24px;
   border-bottom: 1px solid var(--line);
   background:
     linear-gradient(color-mix(in srgb, var(--line) 42%, transparent) 1px, transparent 1px),
@@ -1983,686 +1691,4 @@ body:has(.mv-landing),
 
 .mv-landing-final .mv-landing-button {
   flex: 0 0 auto;
-}
-
-.mv-landing-footer {
-  width: var(--landing-content);
-  min-height: 126px;
-  margin-inline: auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 40px;
-  background: var(--bg);
-}
-
-.mv-landing-footer > div {
-  display: flex;
-  align-items: baseline;
-  gap: 14px;
-}
-
-.mv-landing-footer > div span {
-  font-family: var(--font-headline, "Space Grotesk", sans-serif);
-  font-size: 16px;
-  font-weight: 650;
-}
-
-.mv-landing-footer p {
-  margin: 0;
-  color: var(--ink-3);
-  font-size: 11.5px;
-}
-
-.mv-landing-footer nav {
-  display: flex;
-  align-items: center;
-  gap: 22px;
-}
-
-.mv-landing-footer nav :is(a, button) {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--ink-2);
-  font-size: 11.5px;
-  cursor: pointer;
-}
-
-.mv-landing-footer nav :is(a, button):hover {
-  color: var(--ink);
-}
-
-.mv-landing :is(a, button):focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent) 46%, transparent);
-  outline-offset: 2px;
-}
-
-@keyframes mvLandingHeaderIn {
-  from { opacity: 0; transform: translate(-50%, -5px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
-}
-
-@keyframes mvLandingCopyIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes mvLandingCanvasIn {
-  from { opacity: 0; transform: translateY(8px) scale(0.985); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes mvLandingPathDraw {
-  to { stroke-dashoffset: 0; }
-}
-
-@keyframes mvLandingBarRise {
-  from { transform: scaleY(0.12); }
-  to { transform: scaleY(1); }
-}
-
-@keyframes mvLandingFocus {
-  0%, 100% { opacity: 0.42; transform: scale(0.94); }
-  50% { opacity: 0.72; transform: scale(1.04); }
-}
-
-@keyframes mvLandingPipelineTravel {
-  0%, 8% { left: 0; }
-  92%, 100% { left: calc(100% - 8px); }
-}
-
-@keyframes mvLandingVersionLine {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
-}
-
-@keyframes mvLandingTypeCursor {
-  0%, 48% { opacity: 1; }
-  49%, 100% { opacity: 0; }
-}
-
-@media (max-width: 1080px) {
-  .mv-landing-header {
-    grid-template-columns: minmax(190px, 1fr) auto minmax(190px, 1fr);
-  }
-
-  .mv-landing-hero__inner {
-    grid-template-columns: minmax(330px, 0.84fr) minmax(480px, 1.16fr);
-    gap: 36px;
-  }
-
-  .mv-landing-hero h1 strong {
-    font-size: clamp(58px, 6.2vw, 76px);
-  }
-
-  .mv-landing-hero h1 span {
-    font-size: clamp(34px, 3.7vw, 44px);
-  }
-
-  .mv-lesson-workspace {
-    min-height: 340px;
-  }
-
-  .mv-landing-section-head,
-  .mv-landing-director__intro {
-    grid-template-columns: 0.42fr 1.25fr 0.7fr;
-    gap: 28px;
-  }
-
-  .mv-landing-capability__inner {
-    grid-template-columns: minmax(0, 1fr) minmax(300px, 0.72fr);
-    gap: 48px;
-  }
-}
-
-@media (max-width: 900px) {
-  .mv-landing-followup-demo__viewport {
-    --mv-followup-closeup-scale: 1.06;
-    --mv-followup-closeup-pan: 18;
-  }
-
-  .mv-landing {
-    --landing-content: min(100%, calc(100vw - 40px));
-  }
-
-  .mv-landing-header {
-    grid-template-columns: 1fr auto;
-  }
-
-  .mv-landing-nav {
-    display: none;
-  }
-
-  .mv-landing-hero {
-    min-height: auto;
-    padding-top: 118px;
-    padding-bottom: 82px;
-  }
-
-  .mv-landing-hero::after {
-    display: none;
-  }
-
-  .mv-landing-hero__inner {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 68px;
-  }
-
-  .mv-landing-hero__copy {
-    max-width: 680px;
-  }
-
-  .mv-landing-hero h1 span {
-    max-width: 12em;
-    font-size: clamp(38px, 6vw, 52px);
-  }
-
-  .mv-landing-hero__visual {
-    width: min(100%, 720px);
-    justify-self: center;
-  }
-
-  .mv-landing-section,
-  .mv-landing-final {
-    padding-block: 88px;
-  }
-
-  .mv-landing-section-head,
-  .mv-landing-director__intro {
-    grid-template-columns: 1fr;
-    align-items: start;
-    gap: 20px;
-  }
-
-  .mv-landing-section-head > p:last-child,
-  .mv-landing-director__intro > p:last-child {
-    max-width: 560px;
-  }
-
-  .mv-landing-pipeline {
-    grid-template-columns: 1fr;
-    margin-top: 56px;
-  }
-
-  .mv-landing-pipeline li {
-    min-height: 84px;
-    display: grid;
-    grid-template-columns: 44px 1fr;
-    align-items: center;
-    padding: 14px 16px;
-    border-top: 1px solid var(--line);
-    border-left: 0;
-  }
-
-  .mv-landing-pipeline li:first-child {
-    border-top: 0;
-  }
-
-  .mv-landing-pipeline__progress {
-    display: none;
-  }
-
-  .mv-landing-capability__inner {
-    position: relative;
-    top: auto;
-    grid-template-columns: 1fr;
-    gap: 76px;
-  }
-
-  .mv-landing-followup__inner {
-    grid-template-columns: 1fr;
-    gap: 68px;
-  }
-
-  .mv-landing-followup__copy {
-    max-width: 680px;
-  }
-
-  .mv-landing-followup-demo {
-    width: min(100%, 720px);
-    justify-self: center;
-  }
-
-  .mv-landing-capability__visual {
-    position: relative;
-    top: auto;
-    transform: none;
-  }
-
-  .mv-landing-capability {
-    min-height: 0;
-  }
-
-  .mv-landing-story {
-    height: auto;
-    overflow: visible;
-    -webkit-mask-image: none;
-    mask-image: none;
-  }
-
-  .mv-landing-story__track {
-    height: auto;
-    transform: none !important;
-  }
-
-  .mv-landing-section-head--story {
-    height: auto;
-    min-height: auto;
-    padding-bottom: 28px;
-  }
-
-  .mv-landing-story article {
-    height: auto;
-    display: none;
-    min-height: 0;
-  }
-
-  .mv-landing-story article.is-active {
-    display: flex;
-    min-height: 260px;
-  }
-
-  .mv-landing-final__inner {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-}
-
-@media (max-width: 640px) {
-  .mv-landing {
-    --landing-content: calc(100vw - 28px);
-  }
-
-  .mv-landing-header {
-    min-height: 66px;
-  }
-
-  .mv-landing-brand img {
-    width: 34px;
-    height: 34px;
-  }
-
-  .mv-landing-brand small {
-    display: none;
-  }
-
-  .mv-landing-header-cta {
-    min-height: 44px;
-    padding-inline: 12px;
-    font-size: 12px;
-  }
-
-  .mv-landing-theme {
-    width: 44px;
-    height: 44px;
-  }
-
-  .mv-landing-header-cta svg {
-    display: none;
-  }
-
-  .mv-landing-hero {
-    padding: 104px 14px 64px;
-    background-size: 36px 36px;
-  }
-
-  .mv-landing-hero__inner {
-    gap: 52px;
-  }
-
-  .mv-landing-hero h1 {
-    gap: 14px;
-    margin-top: 16px;
-  }
-
-  .mv-landing-hero h1 strong {
-    font-size: clamp(54px, 18vw, 68px);
-  }
-
-  .mv-landing-hero h1 span {
-    max-width: 10.5em;
-    font-size: clamp(32px, 10vw, 42px);
-    line-height: 1.1;
-  }
-
-  .mv-landing-lead {
-    margin-top: 20px;
-    font-size: 15px;
-    line-height: 1.62;
-  }
-
-  .mv-landing-actions {
-    align-items: stretch;
-    margin-top: 24px;
-  }
-
-  .mv-landing-button {
-    min-height: 48px;
-  }
-
-  .mv-landing-actions .mv-landing-button--primary {
-    flex: 1 1 100%;
-  }
-
-  .mv-landing-domain-line {
-    margin-top: 24px;
-    font-size: 10.5px;
-  }
-
-  .mv-landing-question {
-    width: 88%;
-    margin-left: 4%;
-  }
-
-  .mv-landing-question p {
-    font-size: 11.5px;
-  }
-
-  .mv-landing-hero__visual figcaption {
-    justify-content: flex-start;
-    gap: 5px;
-    overflow: hidden;
-    font-size: 7px;
-    white-space: nowrap;
-  }
-
-  .mv-landing-hero__visual figcaption i {
-    width: 12px;
-  }
-
-  .mv-lesson-toolbar {
-    min-height: 44px;
-    padding-inline: 11px;
-  }
-
-  .mv-lesson-toolbar > div:first-child {
-    gap: 6px;
-  }
-
-  .mv-lesson-toolbar strong {
-    max-width: 120px;
-    overflow: hidden;
-    font-size: 10px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .mv-lesson-workspace {
-    grid-template-columns: 42px minmax(0, 1fr);
-    min-height: 260px;
-  }
-
-  .mv-lesson-steps {
-    gap: 22px;
-  }
-
-  .mv-lesson-steps b {
-    display: none;
-  }
-
-  .mv-lesson-steps li:not(:last-child)::after {
-    height: 20px;
-  }
-
-  .mv-lesson-formula {
-    top: 10px;
-    left: 10px;
-    padding: 7px 8px;
-  }
-
-  .mv-lesson-formula span {
-    font-size: 13px;
-  }
-
-  .mv-lesson-focus-note {
-    top: 9px;
-    right: 8px;
-    padding: 6px 7px;
-  }
-
-  .mv-lesson-subtitle {
-    right: 8px;
-    bottom: 7px;
-    left: 8px;
-    padding: 6px 8px;
-    font-size: 8.5px;
-  }
-
-  .mv-lesson-code {
-    top: 10px;
-    left: 10px;
-    width: 48%;
-    padding: 7px;
-    font-size: 6px;
-  }
-
-  .mv-lesson-timeline {
-    min-height: 38px;
-    gap: 7px;
-    padding-inline: 9px;
-  }
-
-  .mv-landing-section,
-  .mv-landing-final {
-    padding: 76px 14px;
-  }
-
-  .mv-landing-section-head h2,
-  .mv-landing-director__intro h2,
-  .mv-landing-section-head--story h2,
-  .mv-landing-followup__copy h2 {
-    font-size: 36px;
-    line-height: 1.1;
-  }
-
-  .mv-landing-pipeline {
-    margin-top: 42px;
-  }
-
-  .mv-landing-proof-line {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .mv-landing-capability__inner {
-    gap: 58px;
-  }
-
-  .mv-landing-demo-toolbar {
-    width: 100%;
-  }
-
-  .mv-landing-demo-toolbar button {
-    flex: 1;
-    min-height: 42px;
-    justify-content: center;
-  }
-
-  .mv-landing-story article {
-    min-height: 260px;
-  }
-
-  .mv-landing-story article > button {
-    min-height: 44px;
-    padding-block: 34px;
-  }
-
-  .mv-landing-story article h3 {
-    font-size: 26px;
-  }
-
-  .mv-landing-director-track {
-    margin-top: 48px;
-    padding: 18px 14px;
-  }
-
-  .mv-landing-director-track__line {
-    margin-block: 38px 30px;
-  }
-
-  .mv-landing-director-track__line > span {
-    font-size: 7px;
-  }
-
-  .mv-landing-director-track__focus {
-    grid-template-columns: 1fr;
-    gap: 6px;
-  }
-
-  .mv-landing-director-track__focus p {
-    grid-column: auto;
-  }
-
-  .mv-landing-followup__inner {
-    gap: 52px;
-  }
-
-  .mv-landing-followup__copy > p:nth-of-type(2) {
-    margin-top: 22px;
-    font-size: 13.5px;
-  }
-
-  .mv-landing-followup-demo__head {
-    min-height: 62px;
-    padding-inline: 14px;
-  }
-
-  .mv-landing-followup-demo__head code {
-    display: none;
-  }
-
-  .mv-landing-followup-demo__modes {
-    width: calc(100% - 28px);
-    margin: 14px 14px 0;
-  }
-
-  .mv-landing-followup-demo__modes button {
-    min-height: 42px;
-  }
-
-  .mv-landing-followup-demo__thread {
-    gap: 15px;
-    padding: 16px 14px 18px;
-  }
-
-  .mv-landing-followup-demo__context {
-    grid-template-columns: 1fr;
-    gap: 7px;
-  }
-
-  .mv-landing-followup-demo__context p {
-    justify-self: start;
-  }
-
-  .mv-landing-followup-demo__context small {
-    grid-column: auto;
-  }
-
-  .mv-landing-followup-demo__message {
-    max-width: 94%;
-  }
-
-  .mv-landing-followup-demo__viewport {
-    --mv-followup-closeup-scale: 1.045;
-    --mv-followup-closeup-pan: 12;
-  }
-
-  .mv-landing-followup-demo__versions {
-    gap: 8px;
-  }
-
-  .mv-landing-followup-demo__versions > span {
-    display: grid;
-    gap: 2px;
-  }
-
-  .mv-landing-director-facts {
-    grid-template-columns: 1fr;
-    margin-top: 42px;
-  }
-
-  .mv-landing-director-facts > div {
-    min-height: 104px;
-    padding: 20px 0;
-    border-top: 1px solid var(--director-line);
-    border-left: 0;
-  }
-
-  .mv-landing-director-facts > div:first-child {
-    border-top: 0;
-  }
-
-  .mv-landing-final {
-    background-size: 36px 36px;
-  }
-
-  .mv-landing-final h2 {
-    font-size: 40px;
-  }
-
-  .mv-landing-final .mv-landing-button {
-    width: 100%;
-  }
-
-  .mv-landing-footer {
-    min-height: 168px;
-    align-items: flex-start;
-    flex-direction: column;
-    justify-content: center;
-    gap: 28px;
-  }
-
-  .mv-landing-footer > div {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .mv-landing-footer nav {
-    width: 100%;
-    justify-content: space-between;
-  }
-}
-
-@media (max-width: 380px) {
-  .mv-landing-header-cta {
-    padding-inline: 10px;
-  }
-
-  .mv-landing-hero h1 span,
-  .mv-landing-section-head h2,
-  .mv-landing-director__intro h2,
-  .mv-landing-section-head--story h2,
-  .mv-landing-followup__copy h2 {
-    overflow-wrap: anywhere;
-  }
-
-  .mv-lesson-toolbar__status code {
-    display: none;
-  }
-
-  .mv-lesson-focus-note span {
-    display: none;
-  }
-
-  .mv-landing-footer nav {
-    gap: 14px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .mv-landing *,
-  .mv-landing *::before,
-  .mv-landing *::after {
-    scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-
-  .mv-scene-curve--animated {
-    stroke-dashoffset: 0;
-  }
 }

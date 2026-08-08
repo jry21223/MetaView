@@ -5,8 +5,8 @@ import {
   THEME_TYPE,
   type ThemeName,
   type ThemePalette,
-} from "./themePalette";
-import { themeVars, themeMode, TWEAK_DEFAULTS } from "../../features/studio-editor/hooks/useTweaks";
+} from "../../../shared/config/themePalette";
+import { themeVars, themeMode, TWEAK_DEFAULTS } from "./useTweaks";
 
 const THEME_NAMES = Object.keys(THEME_PALETTE) as ThemeName[];
 

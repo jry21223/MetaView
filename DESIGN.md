@@ -259,8 +259,9 @@ font-family: "IBM Plex Mono", ui-monospace, monospace;
 
 | Role | Size | Weight | Line Height |
 |---|---:|---:|---:|
-| Landing Display | `clamp(44px, 5.4vw, 72px)`; mobile `clamp(39px, 12vw, 52px)` | `600–650` | `1.03–1.12` |
-| Landing Lead | `clamp(15px, 1.3vw, 17px)`; mobile `14px` | `400–500` | `1.68–1.75` |
+| Landing Display | `clamp(48px, 5.5vw, 72px)`; mobile `clamp(54px, 18vw, 68px)` | `600–650` | `0.88–1.08` |
+| Landing Tagline | `clamp(38px, 3.7vw, 44px)`; ≤900px `clamp(38px, 6vw, 52px)`; mobile `clamp(32px, 10vw, 42px)` | `620` | `1.08` |
+| Landing Lead | `clamp(15px, 1.3vw, 17px)`; mobile `15px` | `400–500` | `1.62–1.65` |
 | App Hero | `clamp(24px, 2.4vw, 32px)` | `600–650` | `1.25–1.3` |
 | Page Title | `26px` | `600` | `1.25` |
 | Section Title | `15–18px` | `600` | `1.3` |
@@ -598,7 +599,7 @@ comet
 
 | Surface | Current breakpoints |
 |---|---|
-| Landing | `1080px`, `820px`, `640px`, `390px` |
+| Landing | `1080px`, `900px`, `640px`, `380px` |
 | App shell / Studio | `900px`, `720px`, `680px`, `640px`, `380px` |
 | Player | `1180px`, `920px`, `680px` |
 | Tools / Ops | `1024px`, `640px` |
@@ -611,7 +612,7 @@ comet
 控制台不挤压主画面、Follow-up 内容从顶部开始，以及页面没有无理由的底部空白。
 
 网站级响应式检查不能只判断页面是否出现横向滚动。全局 `overflow-x: hidden` 可能掩盖子元素
-被裁切的问题，因此还要在 `820px`、`390px` 与 `320px` 宽度检查元素边界。主导航不得因单个
+被裁切的问题，因此还要在 `900px`、`380px` 与 `320px` 宽度检查元素边界。主导航不得因单个
 标签换行而高度错位；移动端分区导航应完整重排，或提供明确可见的横向滚动提示，不得隐藏
 滚动条后让末项看似消失。
 
@@ -710,7 +711,6 @@ styles/
   global.css
   layout.css
   pages/
-    landing.css
     landing/
       shell.css
       content.css
