@@ -995,30 +995,19 @@
 
 /* Director 演示带是 Landing 专属的“反色色带”motif（见 docs/frontend-shell.md）：
    浅色页面用暗色品牌色、深色页面用浅色品牌色，与正文区形成明度反转对比，
-   而不是跟随当前主题。色值镜像 THEME_PALETTE 的 dark / light 两套品牌色
-   （themePalette.ts），修改调色板时需同步此处。 */
+   而不是跟随当前主题。反色语义变量由 LandingRoute 通过 themeVars() 注入。 */
 .mv-landing-director {
-  --director-bg: #0e1412;
-  --director-surface: #0e1412;
-  --director-ink: #e8efe9;
-  --director-ink-2: #9ba8a0;
-  --director-ink-3: #5b6862;
-  --director-line: #27332c;
-  --director-accent: #9fb48d;
+  --director-bg: var(--landing-director-bg);
+  --director-surface: var(--landing-director-surface);
+  --director-ink: var(--landing-director-ink);
+  --director-ink-2: var(--landing-director-ink-2);
+  --director-ink-3: var(--landing-director-ink-3);
+  --director-line: var(--landing-director-line);
+  --director-accent: var(--landing-director-accent);
   overflow: hidden;
   border: 0;
   background: var(--director-bg);
   color: var(--director-ink);
-}
-
-.mv-dark .mv-landing-director {
-  --director-bg: #faf8f3;
-  --director-surface: #faf8f3;
-  --director-ink: #161a18;
-  --director-ink-2: #5d655f;
-  --director-ink-3: #9aa39d;
-  --director-line: #d6d1c2;
-  --director-accent: #82976f;
 }
 
 .mv-landing-director .mv-landing-kicker {

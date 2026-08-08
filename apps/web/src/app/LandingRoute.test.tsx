@@ -33,11 +33,36 @@ describe("LandingRoute", () => {
     expect(container.querySelector(".mv-root")?.getAttribute("data-theme")).toBe(
       "dark",
     );
+    const root = container.querySelector<HTMLElement>(".mv-root");
+    expect(root?.style.getPropertyValue("--landing-director-bg")).toBe(
+      THEME_PALETTE.light.surface2,
+    );
+    expect(root?.style.getPropertyValue("--landing-director-ink")).toBe(
+      THEME_PALETTE.light.ink,
+    );
+    expect(root?.style.getPropertyValue("--landing-director-line")).toBe(
+      THEME_PALETTE.light.line2,
+    );
+    expect(root?.style.getPropertyValue("--landing-director-accent")).toBe(
+      THEME_PALETTE.light.accent,
+    );
 
     fireEvent.click(getByRole("button", { name: "切换主题" }));
 
     expect(container.querySelector(".mv-root")?.getAttribute("data-theme")).toBe(
       "light",
+    );
+    expect(root?.style.getPropertyValue("--landing-director-bg")).toBe(
+      THEME_PALETTE.dark.surface2,
+    );
+    expect(root?.style.getPropertyValue("--landing-director-ink")).toBe(
+      THEME_PALETTE.dark.ink,
+    );
+    expect(root?.style.getPropertyValue("--landing-director-line")).toBe(
+      THEME_PALETTE.dark.line2,
+    );
+    expect(root?.style.getPropertyValue("--landing-director-accent")).toBe(
+      THEME_PALETTE.dark.accent,
     );
     expect(JSON.parse(localStorage.getItem("mv_tweaks") ?? "{}").theme).toBe(
       "monokai",
