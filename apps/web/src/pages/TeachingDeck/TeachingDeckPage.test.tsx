@@ -26,7 +26,7 @@ describe("TeachingDeckPage MVP", () => {
     expect(
       view.getAllByRole("button", { name: /第 \d+ 页：/ }),
     ).toHaveLength(11);
-    expect(view.getByText("2 个动态页 · 0 个已生成")).toBeTruthy();
+    expect(view.getByText("11 页 · 2 个动态页 · 0 个已生成")).toBeTruthy();
   });
 
   it("submits only the selected dynamic slide and keeps the returned run", async () => {
