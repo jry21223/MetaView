@@ -29,7 +29,8 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<LandingRoute appEdition={appEdition} />} />
-      <Route path="/teaching-deck" element={<TeachingDeckRoute />} />
+      <Route path="/teaching-deck" element={<Navigate to="/create/teaching-deck" replace />} />
+      <Route path="/create/teaching-deck" element={<TeachingDeckRoute />} />
       <Route path="/payment/result" element={<PaymentResultPage />} />
       <Route
         path="/admin"
