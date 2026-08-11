@@ -4,7 +4,7 @@ This MVP validates the seam between PPTMaster-style slide authoring and MetaView
 
 ## Scope
 
-- Route: `/teaching-deck`
+- Route: `/create/teaching-deck` (`/teaching-deck` redirects here)
 - Reference lesson: 高中数学《椭圆及其标准方程》
 - Default output: 11 editable slide intents
 - Default dynamic pages: 2
@@ -39,7 +39,7 @@ The exported PPTX currently represents dynamic pages with editable teaching cont
 
 ## Persistence and privacy
 
-The draft project is saved in browser `localStorage`. Pasted source material is removed before persistence because it may contain unpublished teaching content; it remains only in the current React session.
+Projects without pasted source material are saved in browser `localStorage`. If source material is present, the entire project remains session-only and any previously persisted draft is removed. This prevents generated excerpts derived from unpublished teaching material from being persisted indirectly through slide content.
 
 ## Acceptance criteria
 
@@ -50,7 +50,7 @@ The draft project is saved in browser `localStorage`. Pasted source material is 
 - Generate one dynamic slide without regenerating the whole lesson.
 - Reopen the returned MetaView Run.
 - Export a real 16:9 `.pptx` package with editable ordinary text/shapes.
-- Keep source material out of automatic local persistence.
+- Keep source-backed projects out of automatic local persistence.
 
 ## Deliberate exclusions
 
