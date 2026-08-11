@@ -1,0 +1,302 @@
+/* Teaching Deck MVP: lesson outline + PPTMaster native pages + MetaView dynamic pages. */
+
+.mv-teaching-body {
+  flex: 1;
+  width: 100%;
+  padding: 32px clamp(18px, 3vw, 36px) 56px;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.mv-teaching-intake,
+.mv-teaching-header,
+.mv-teaching-editor,
+.mv-teaching-warning {
+  width: min(1280px, 100%);
+  margin-inline: auto;
+}
+
+.mv-teaching-intake {
+  display: grid;
+  gap: 18px;
+  padding-top: 28px;
+}
+
+.mv-teaching-intake h1,
+.mv-teaching-header h1 {
+  margin: 0;
+  font-family: var(--font-headline, "Space Grotesk", sans-serif);
+  color: var(--ink);
+  font-weight: 620;
+}
+
+.mv-teaching-intake h1 { font-size: clamp(30px, 4vw, 46px); line-height: 1.08; }
+.mv-teaching-header h1 { font-size: 26px; line-height: 1.25; }
+.mv-teaching-intake > p,
+.mv-teaching-header p { margin: 0; color: var(--ink-2); line-height: 1.65; }
+
+.mv-teaching-intake__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  padding-top: 10px;
+}
+
+.mv-teaching-field--wide { grid-column: 1 / -1; }
+
+.mv-teaching-intake label,
+.mv-teaching-inspector label,
+.mv-teaching-dynamic-settings label {
+  display: grid;
+  gap: 7px;
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mv-teaching-intake input,
+.mv-teaching-intake textarea,
+.mv-teaching-inspector input,
+.mv-teaching-inspector textarea,
+.mv-teaching-inspector select,
+.mv-teaching-dynamic-settings input {
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  resize: vertical;
+}
+
+.mv-teaching-intake input:focus-visible,
+.mv-teaching-intake textarea:focus-visible,
+.mv-teaching-inspector input:focus-visible,
+.mv-teaching-inspector textarea:focus-visible,
+.mv-teaching-inspector select:focus-visible,
+.mv-teaching-dynamic-settings input:focus-visible,
+.mv-teaching-body button:focus-visible,
+.mv-teaching-body a:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 46%, transparent);
+  outline-offset: 2px;
+}
+
+.mv-teaching-intake__actions,
+.mv-teaching-header__actions,
+.mv-teaching-sequence-actions,
+.mv-teaching-run {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.mv-teaching-primary,
+.mv-teaching-secondary,
+.mv-teaching-sequence-actions button,
+.mv-teaching-run button {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.mv-teaching-primary {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: transparent;
+}
+
+.mv-teaching-secondary,
+.mv-teaching-sequence-actions button,
+.mv-teaching-run button {
+  background: var(--surface);
+  color: var(--ink-2);
+}
+
+.mv-teaching-body button:disabled { opacity: .55; cursor: default; }
+
+.mv-teaching-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.mv-teaching-header > div:first-child { display: grid; gap: 7px; }
+
+.mv-teaching-warning {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--warn) 34%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--warn) 8%, var(--surface));
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.mv-teaching-editor {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 320px;
+  gap: 18px;
+  padding-top: 18px;
+  align-items: start;
+}
+
+.mv-teaching-slides {
+  min-width: 0;
+  display: grid;
+  border-top: 1px solid var(--line);
+}
+
+.mv-teaching-slides button {
+  appearance: none;
+  width: 100%;
+  min-height: 64px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 8px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-2);
+  text-align: left;
+  cursor: pointer;
+}
+
+.mv-teaching-slides button:hover,
+.mv-teaching-slides button.is-active {
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface));
+}
+
+.mv-teaching-slides button.is-active { color: var(--ink); }
+.mv-teaching-slides span,
+.mv-teaching-slides small { color: var(--ink-3); font: 500 9px/1.3 "IBM Plex Mono", ui-monospace, monospace; }
+.mv-teaching-slides strong { overflow: hidden; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+
+.mv-teaching-preview-column { min-width: 0; display: grid; gap: 10px; }
+
+.mv-teaching-preview {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: clamp(22px, 4vw, 46px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.mv-teaching-preview__accent {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 6px;
+  background: var(--accent);
+}
+
+.mv-teaching-preview__meta {
+  margin: 0;
+  color: var(--accent);
+  font: 600 9px/1.3 "IBM Plex Mono", ui-monospace, monospace;
+  letter-spacing: .1em;
+}
+
+.mv-teaching-preview h2 {
+  margin: 14px 0 0;
+  color: var(--ink);
+  font-family: var(--font-headline, "Space Grotesk", sans-serif);
+  font-size: clamp(24px, 3vw, 38px);
+  font-weight: 620;
+  line-height: 1.1;
+}
+
+.mv-teaching-preview__goal {
+  max-width: 86%;
+  margin: 10px 0 0;
+  color: var(--ink-2);
+  font-size: clamp(11px, 1.2vw, 14px);
+  line-height: 1.55;
+}
+
+.mv-teaching-preview ul {
+  display: grid;
+  gap: 9px;
+  margin: 22px 0 0;
+  padding-left: 20px;
+  color: var(--ink);
+  font-size: clamp(12px, 1.35vw, 16px);
+  line-height: 1.5;
+}
+
+.mv-teaching-preview__dynamic {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-3);
+  font-size: 10px;
+}
+
+.mv-teaching-sequence-actions { justify-content: flex-end; }
+
+.mv-teaching-inspector {
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.mv-teaching-inspector h2 { margin: 0; color: var(--ink); font-size: 16px; }
+.mv-teaching-dynamic-settings { display: grid; gap: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.mv-teaching-run { min-width: 0; justify-content: space-between; }
+.mv-teaching-run code { min-width: 0; overflow: hidden; color: var(--ink-3); font-size: 10px; text-overflow: ellipsis; }
+
+@media (max-width: 1024px) {
+  .mv-teaching-editor { grid-template-columns: 190px minmax(0, 1fr); }
+  .mv-teaching-inspector { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mv-teaching-inspector h2,
+  .mv-teaching-dynamic-settings { grid-column: 1 / -1; }
+}
+
+@media (max-width: 720px) {
+  .mv-teaching-body { padding-inline: 14px; }
+  .mv-teaching-intake__grid { grid-template-columns: 1fr; }
+  .mv-teaching-field--wide { grid-column: auto; }
+  .mv-teaching-header { align-items: stretch; flex-direction: column; }
+  .mv-teaching-header__actions { justify-content: flex-start; }
+  .mv-teaching-editor { grid-template-columns: 1fr; }
+  .mv-teaching-slides { display: flex; overflow-x: auto; border-top: 0; gap: 6px; padding-bottom: 4px; }
+  .mv-teaching-slides button { flex: 0 0 180px; min-height: 54px; border: 1px solid var(--line); border-radius: 8px; }
+  .mv-teaching-inspector { grid-column: auto; grid-template-columns: 1fr; }
+  .mv-teaching-inspector h2,
+  .mv-teaching-dynamic-settings { grid-column: auto; }
+  .mv-teaching-primary,
+  .mv-teaching-secondary,
+  .mv-teaching-sequence-actions button,
+  .mv-teaching-run button { min-height: 44px; }
+}
+
+@media (max-width: 390px) {
+  .mv-teaching-preview { padding: 18px; }
+  .mv-teaching-preview__goal { max-width: 100%; }
+  .mv-teaching-preview ul { margin-top: 14px; gap: 5px; font-size: 11px; }
+  .mv-teaching-sequence-actions { justify-content: flex-start; }
+}

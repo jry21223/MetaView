@@ -3,6 +3,7 @@ import type { AppEdition } from "../shared/config/constants";
 import { PaymentResultPage } from "../pages/PaymentResultPage";
 import { OpsDashboardPage } from "../pages/OpsDashboard/OpsDashboardPage";
 import { AssetShowcasePage } from "../pages/AssetShowcase/AssetShowcasePage";
+import { TeachingDeckRoute } from "../pages/TeachingDeck/TeachingDeckRoute";
 import { LandingRoute } from "./LandingRoute";
 import { OpsAppShell } from "./OpsAppShell";
 import { SelfAppShell } from "./SelfAppShell";
@@ -28,6 +29,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<LandingRoute appEdition={appEdition} />} />
+      <Route path="/teaching-deck" element={<TeachingDeckRoute />} />
       <Route path="/payment/result" element={<PaymentResultPage />} />
       <Route
         path="/admin"
