@@ -76,16 +76,15 @@ export function loadTeachingDeckProject(): TeachingDeckProject | null {
 export function saveTeachingDeckProject(project: TeachingDeckProject): void {
   if (typeof window === "undefined") return;
   try {
-    const browserSafeProject: TeachingDeckProject = {
-      ...project,
-      input: {
-        ...project.input,
-        // Source material can contain unpublished teaching content. Keep it in
-        // the current React session, but do not persist it automatically.
-        sourceMaterial: "",
-      },
-    };
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(browserSafeProject));
+    // Pasted source material may be unpublished or sensitive, and the planner
+    // can derive visible slide text from it. When source material is present,
+    // keep the whole project session-only instead of persisting an indirect
+    // excerpt through the generated slides.
+    if (project.input.sourceMaterial.trim()) {
+      window.localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
   } catch {
     // Storage is optional. Quota and privacy-mode failures must not block editing.
   }
