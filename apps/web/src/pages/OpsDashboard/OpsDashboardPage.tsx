@@ -56,6 +56,8 @@ interface OpsDashboardPageProps {
   accountAvatarUrl?: string | null;
   onNavigate: (stage: Stage) => void;
   onOpenProviderSettings?: () => void;
+  /** When provided, the permission panel renders a primary WeChat login CTA that invokes it. */
+  onRequireLogin?: () => void;
 }
 
 type TableTab = "runs" | "orders";
@@ -83,6 +85,7 @@ export function OpsDashboardPage({
   accountAvatarUrl,
   onNavigate,
   onOpenProviderSettings,
+  onRequireLogin,
 }: OpsDashboardPageProps) {
   const [windowDays, setWindowDays] = useState<OpsDashboardWindowDays>(30);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -154,7 +157,7 @@ export function OpsDashboardPage({
             {error && !isPermissionError && !dashboard && (
               <ErrorPanel error={error} onRefresh={refresh} />
             )}
-            {isPermissionError && <PermissionPanel />}
+            {isPermissionError && <PermissionPanel onRequireLogin={onRequireLogin} />}
             {dashboard && !isPermissionError && (
               <DashboardContent
                 dashboard={dashboard}
@@ -785,7 +788,7 @@ function LoadingPanel() {
   );
 }
 
-function PermissionPanel() {
+function PermissionPanel({ onRequireLogin }: { onRequireLogin?: () => void }) {
   return (
     <Paper component="section" variant="outlined" className="mv-ops-state-panel">
       <div className="mv-ops-state-panel__content">
@@ -794,6 +797,11 @@ function PermissionPanel() {
         <p className="mv-ops-state-panel__body">
           当前会话不是启用状态的 admin 账户，无法查看全站运营数据。
         </p>
+        {onRequireLogin && (
+          <Button variant="contained" onClick={onRequireLogin}>
+            微信登录
+          </Button>
+        )}
       </div>
     </Paper>
   );

@@ -11,7 +11,8 @@ export function isSafeOpsReturnPath(value: string | null | undefined): value is 
         /^\/templates\/[^/]+$/.test(value) ||
         value === "/settings" ||
         value === "/history" ||
-        /^\/run\/[^/]+$/.test(value)),
+        /^\/run\/[^/]+$/.test(value) ||
+        value === "/admin"),
   );
 }
 

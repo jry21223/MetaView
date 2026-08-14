@@ -1,14 +1,22 @@
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import React from "react";
 import { http, HttpResponse } from "msw";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { server } from "../../mocks/server";
 import { API_BASE_URL } from "../../shared/config/constants";
+import { AdminShell } from "../../app/AdminShell";
 import { sampleDashboard } from "./testFixtures";
 import { OpsDashboardPage } from "./OpsDashboardPage";
 
-function renderPage({ onNavigate = vi.fn() }: { onNavigate?: ReturnType<typeof vi.fn> } = {}) {
+function renderPage({
+  onNavigate = vi.fn(),
+  onRequireLogin,
+}: {
+  onNavigate?: ReturnType<typeof vi.fn>;
+  onRequireLogin?: ReturnType<typeof vi.fn>;
+} = {}) {
   return render(
     <OpsDashboardPage
       accountName="管理员"
@@ -16,6 +24,7 @@ function renderPage({ onNavigate = vi.fn() }: { onNavigate?: ReturnType<typeof v
       accountAvatarUrl={null}
       onNavigate={onNavigate}
       onOpenProviderSettings={vi.fn()}
+      onRequireLogin={onRequireLogin}
     />,
   );
 }
@@ -114,7 +123,38 @@ describe("OpsDashboardPage", () => {
     expect(queryByText("最近任务")).toBeNull();
   });
 
-  it("does not show dashboard nav item while already on dashboard", async () => {
+  it("renders a WeChat login CTA in the permission panel when onRequireLogin is provided", async () => {
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>
+        HttpResponse.json({ detail: "需要管理员权限" }, { status: 403 }),
+      ),
+    );
+
+    const onRequireLogin = vi.fn();
+    const { findByText, getByRole } = renderPage({ onRequireLogin });
+
+    expect(await findByText("需要管理员权限")).toBeTruthy();
+    const cta = getByRole("button", { name: "微信登录" });
+    expect(cta).toBeTruthy();
+
+    fireEvent.click(cta);
+    expect(onRequireLogin).toHaveBeenCalledOnce();
+  });
+
+  it("does not render a login CTA when onRequireLogin is absent", async () => {
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>
+        HttpResponse.json({ detail: "需要管理员权限" }, { status: 403 }),
+      ),
+    );
+
+    const { findByText, queryByRole } = renderPage();
+
+    expect(await findByText("需要管理员权限")).toBeTruthy();
+    expect(queryByRole("button", { name: "微信登录" })).toBeNull();
+  });
+
+  it("does not render dashboard nav item while already on dashboard", async () => {
     server.use(
       http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>
         HttpResponse.json(sampleDashboard()),
@@ -176,5 +216,48 @@ describe("OpsDashboardPage", () => {
 
     fireEvent.click(getAllByRole("button", { name: "工作台" })[0]);
     expect(onNavigate).toHaveBeenCalledWith("intake");
+  });
+});
+
+describe("AdminShell login CTA from /admin permission panel", () => {
+  beforeEach(() => {
+    if (!("ResizeObserver" in window)) {
+      Object.defineProperty(window, "ResizeObserver", {
+        configurable: true,
+        value: class {
+          observe() {}
+          unobserve() {}
+          disconnect() {}
+        },
+      });
+    }
+  });
+
+  afterEach(() => {
+    cleanup();
+    sessionStorage.clear();
+  });
+
+  it("persists the post-login return path and opens the WeChat login dialog when the CTA is clicked", async () => {
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>
+        HttpResponse.json({ detail: "需要管理员权限" }, { status: 403 }),
+      ),
+    );
+
+    const { findByText, findByRole, queryByText } = render(
+      <MemoryRouter initialEntries={["/admin"]}>
+        <AdminShell />
+      </MemoryRouter>,
+    );
+
+    expect(await findByText("需要管理员权限")).toBeTruthy();
+    expect(queryByText("微信登录后继续")).toBeNull();
+    expect(sessionStorage.getItem("metaview:post-login-path")).toBeNull();
+
+    fireEvent.click(await findByRole("button", { name: "微信登录" }));
+
+    expect(await findByText("微信登录后继续")).toBeTruthy();
+    expect(sessionStorage.getItem("metaview:post-login-path")).toBe("/admin");
   });
 });
