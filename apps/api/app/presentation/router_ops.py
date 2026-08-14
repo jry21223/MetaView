@@ -14,7 +14,7 @@ from app.application.use_cases.ops_dashboard import (
 from app.config import Settings, get_settings
 from app.domain.models.account import SessionAccount
 from app.presentation.dependencies import get_account_use_case, get_ops_dashboard_use_case
-from app.presentation.edition_policy import require_wechat_session
+from app.presentation.edition_policy import require_bound_admin_session
 from app.presentation.rate_limit import read_limit
 
 router = APIRouter(prefix="/ops", tags=["ops"])
@@ -50,6 +50,4 @@ async def _session(
     settings: Settings,
     account_use_case: AccountUseCase,
 ) -> SessionAccount:
-    if settings.app_edition != "ops":
-        raise HTTPException(status_code=403, detail="需要管理员权限")
-    return await require_wechat_session(request, settings, account_use_case)
+    return await require_bound_admin_session(request, settings, account_use_case)

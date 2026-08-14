@@ -8,8 +8,9 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
-from app.config import get_settings
+from app.config import Settings, get_settings
 from app.infrastructure.persistence.db_init import init_db
 from app.infrastructure.persistence.sqlite_account_repository import SqliteAccountRepository
 from app.main import create_app
@@ -87,7 +88,7 @@ def test_ops_dashboard_aggregates_global_metrics_and_recent_rows(
     _set_login_provider(db, guest.account.user_id, "guest")
     _seed_dashboard_data(db, user.account.user_id)
 
-    with _client(monkeypatch, db) as client:
+    with _client(monkeypatch, db, ops_admin_user_id=admin.account.user_id) as client:
         resp = client.get(
             "/api/v1/ops/dashboard?window_days=7&limit=2",
             headers={"Cookie": f"mv_session={admin.token}"},
@@ -136,7 +137,7 @@ def test_ops_dashboard_redacts_recent_row_user_identity(
     user = _session(db, role="user", display_name="敏感用户")
     _seed_dashboard_data(db, user.account.user_id)
 
-    with _client(monkeypatch, db) as client:
+    with _client(monkeypatch, db, ops_admin_user_id=admin.account.user_id) as client:
         resp = client.get(
             "/api/v1/ops/dashboard?window_days=7&limit=2",
             headers={"Cookie": f"mv_session={admin.token}"},
@@ -162,7 +163,7 @@ def test_ops_dashboard_validates_query_shape(
     db = _db(tmp_path, "query.db")
     admin = _session(db, role="admin")
 
-    with _client(monkeypatch, db) as client:
+    with _client(monkeypatch, db, ops_admin_user_id=admin.account.user_id) as client:
         bad_window = client.get(
             "/api/v1/ops/dashboard?window_days=14",
             headers={"Cookie": f"mv_session={admin.token}"},
@@ -176,6 +177,60 @@ def test_ops_dashboard_validates_query_shape(
     assert bad_limit.status_code == 422
 
 
+def test_ops_dashboard_allows_bound_admin(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    db = _db(tmp_path, "bound-admin.db")
+    admin = _session(db, role="admin")
+
+    with _client(monkeypatch, db, ops_admin_user_id=admin.account.user_id) as client:
+        resp = client.get(
+            "/api/v1/ops/dashboard",
+            headers={"Cookie": f"mv_session={admin.token}"},
+        )
+
+    assert resp.status_code == 200
+
+
+def test_ops_dashboard_rejects_unbound_admin(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    db = _db(tmp_path, "unbound-admin.db")
+    bound = _session(db, role="admin")
+    intruder = _session(db, role="admin")
+    assert intruder.account.user_id != bound.account.user_id
+
+    with _client(monkeypatch, db, ops_admin_user_id=bound.account.user_id) as client:
+        resp = client.get(
+            "/api/v1/ops/dashboard",
+            headers={"Cookie": f"mv_session={intruder.token}"},
+        )
+
+    assert resp.status_code == 403
+    assert "管理员权限" in resp.json()["detail"]
+
+
+def test_settings_ops_edition_requires_bound_admin_user_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("METAVIEW_OPS_ADMIN_USER_ID", raising=False)
+    monkeypatch.delenv("METAVIEW_APP_EDITION", raising=False)
+    with pytest.raises(ValidationError):
+        Settings(app_edition="ops")
+
+
+def test_settings_self_edition_allows_missing_bound_admin_user_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("METAVIEW_OPS_ADMIN_USER_ID", raising=False)
+    monkeypatch.delenv("METAVIEW_APP_EDITION", raising=False)
+    settings = Settings(app_edition="self")
+    assert settings.app_edition == "self"
+    assert settings.ops_admin_user_id is None
+
+
 def _db(tmp_path: Path, name: str) -> str:
     db = str(tmp_path / name)
     init_db(db)
@@ -187,11 +242,13 @@ def _client(
     db: str,
     *,
     app_edition: str = "ops",
+    ops_admin_user_id: str = "ops-admin",
 ):
     get_settings.cache_clear()
     monkeypatch.setenv("METAVIEW_APP_EDITION", app_edition)
     monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", db)
     monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    monkeypatch.setenv("METAVIEW_OPS_ADMIN_USER_ID", ops_admin_user_id)
     app = create_app()
     return TestClient(app)
 

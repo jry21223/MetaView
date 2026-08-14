@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import AliasChoices, Field, field_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _ALL_DOMAINS = "algorithm,math,code,physics,chemistry,biology,geography"
@@ -124,6 +124,12 @@ class Settings(BaseSettings):
     account_session_secure: bool = False
     recharge_min_cents: int = 500
     generation_cost_cents: int = 10
+
+    # Ops edition trust boundary (issue #226): the single ``user_id`` that is
+    # permitted to reach ops routes. Optional for ``self`` edition; mandatory
+    # when ``app_edition == "ops"`` — the model validator below refuses to
+    # serve an ops deployment that has not bound its admin identity.
+    ops_admin_user_id: str | None = None
 
     # WeChat OAuth login (Website App / Open Platform)
     wechat_login_appid: str | None = None
@@ -348,6 +354,15 @@ class Settings(BaseSettings):
         if normalized not in _APP_EDITIONS:
             return "self"
         return normalized  # type: ignore[return-value]
+
+    @model_validator(mode="after")
+    def _require_ops_admin_user_id_when_ops(self) -> "Settings":
+        if self.app_edition == "ops" and not self.ops_admin_user_id:
+            raise ValueError(
+                "METAVIEW_OPS_ADMIN_USER_ID is required when app_edition='ops'; "
+                "set it to the user_id of the bound ops admin account"
+            )
+        return self
 
     @property
     def enabled_topic_domains(self) -> tuple[str, ...]:
