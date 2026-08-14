@@ -364,6 +364,24 @@ class Settings(BaseSettings):
             )
         return self
 
+    @model_validator(mode="after")
+    def _reject_loopback_wechat_login_success_url_when_ops(self) -> "Settings":
+        # Issue #225: an ops deployment that forgets to set
+        # METAVIEW_WECHAT_LOGIN_SUCCESS_URL keeps the localhost default, which
+        # silently breaks the WeChat OAuth callback by redirecting users back
+        # to 127.0.0.1 in production. Refuse to boot rather than ship a broken
+        # redirect target. Declared after the #226 validator so a missing
+        # ops_admin_user_id still raises first.
+        if self.app_edition == "ops" and self.wechat_login_success_url.startswith(
+            ("http://localhost", "http://127.0.0.1")
+        ):
+            raise ValueError(
+                "wechat_login_success_url must not target http://localhost or "
+                "http://127.0.0.1 in ops edition; set METAVIEW_WECHAT_LOGIN_SUCCESS_URL "
+                "to the public HTTPS URL the WeChat OAuth callback should redirect to"
+            )
+        return self
+
     @property
     def enabled_topic_domains(self) -> tuple[str, ...]:
         return tuple(

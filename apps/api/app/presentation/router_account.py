@@ -73,13 +73,24 @@ class RechargeOrderResponse(BaseModel):
 
 
 def _set_session_cookie(response: Response, settings: Settings, session: SessionAccount) -> None:
+    # Issue #225: in ops edition the admin session cookie must always be
+    # Secure + SameSite=strict regardless of account_session_secure, so a
+    # deployment that forgets METAVIEW_ACCOUNT_SESSION_SECURE never ships the
+    # admin cookie in cleartext or cross-site. The loose secure/default pair
+    # stays for local self-edition dev where browsers reject Secure on http.
+    if settings.app_edition == "ops":
+        secure = True
+        samesite = "strict"
+    else:
+        secure = settings.account_session_secure
+        samesite = "lax"
     response.set_cookie(
         settings.account_session_cookie,
         session.token,
         max_age=settings.account_session_days * 24 * 60 * 60,
         httponly=True,
-        secure=settings.account_session_secure,
-        samesite="lax",
+        secure=secure,
+        samesite=samesite,
     )
 
 
