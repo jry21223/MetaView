@@ -169,4 +169,78 @@ describe("GlobalTopbar account avatar", () => {
     expect(trigger.querySelector("svg")).toBeTruthy();
     expect(trigger.textContent?.trim()).toBe("");
   });
+
+  it("opens the WeChat login flow when a guest clicks the top-right avatar", () => {
+    const onOpenAccountPanel = vi.fn();
+    const { container } = render(
+      <GlobalTopbar
+        {...baseProps}
+        accountState="guest"
+        accountBalanceYuan={null}
+        accountName={null}
+        onOpenAccountPanel={onOpenAccountPanel}
+      />,
+    );
+
+    const avatar = container.querySelector(".mv-avatar");
+    expect(avatar).not.toBeNull();
+    expect(avatar.tagName).toBe("BUTTON");
+    expect(avatar.getAttribute("aria-label")).toBe("微信登录");
+    fireEvent.click(avatar);
+    expect(onOpenAccountPanel).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens the account and recharge panel when an authenticated user clicks the avatar", () => {
+    const onOpenAccountPanel = vi.fn();
+    const { container } = render(
+      <GlobalTopbar
+        {...baseProps}
+        accountState="authenticated"
+        onOpenAccountPanel={onOpenAccountPanel}
+      />,
+    );
+
+    const avatar = container.querySelector(".mv-avatar");
+    expect(avatar).not.toBeNull();
+    expect(avatar.tagName).toBe("BUTTON");
+    expect(avatar.getAttribute("aria-label")).toBe("账户与充值");
+    fireEvent.click(avatar);
+    expect(onOpenAccountPanel).toHaveBeenCalledTimes(1);
+  });
+
+  it("makes the avatar keyboard reachable as a native focusable button", () => {
+    const onOpenAccountPanel = vi.fn();
+    const { container } = render(
+      <GlobalTopbar {...baseProps} onOpenAccountPanel={onOpenAccountPanel} />,
+    );
+
+    const avatar = container.querySelector(".mv-avatar");
+    expect(avatar).not.toBeNull();
+    // Native <button> ⇒ role=button, in tab order, activates on Enter / Space.
+    expect(avatar.tagName).toBe("BUTTON");
+    expect(avatar.tabIndex).toBe(0);
+
+    avatar.focus();
+    expect(document.activeElement).toBe(avatar);
+
+    // Firing the click mirrors the UA Enter / Space activation path and proves
+    // the account/login handler is wired to the avatar.
+    fireEvent.click(avatar);
+    expect(onOpenAccountPanel).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the avatar out of self edition so the account/login entry stays ops-only", () => {
+    const { container, queryByText } = render(
+      <GlobalTopbar
+        {...baseProps}
+        appEdition="self"
+        accountBalanceYuan={null}
+        accountName={null}
+        onOpenProviderSettings={vi.fn()}
+      />,
+    );
+
+    expect(container.querySelector(".mv-avatar")).toBeNull();
+    expect(queryByText("MV")).toBeNull();
+  });
 });

@@ -144,14 +144,14 @@ export function GlobalTopbar({
       )}
 
       <div className="mv-top-right">
-        {accountOrProviderHandler && (
+        {appEdition === "self" && accountOrProviderHandler && (
           <button
             className="mv-icon-btn"
             onClick={accountOrProviderHandler}
             title={accountOrProviderLabel}
             aria-label={accountOrProviderLabel}
           >
-            {appEdition === "ops" ? "¥" : <ProviderSettingsIcon />}
+            <ProviderSettingsIcon />
           </button>
         )}
         {(appEdition === "ops" ||
@@ -215,18 +215,27 @@ export function GlobalTopbar({
             </svg>
           )}
         </button>
-        {appEdition === "ops" &&
-          (avatarUrl ? (
-            <img
-              className="mv-avatar mv-avatar-img"
-              src={avatarUrl}
-              alt={`${accountName ?? "微信用户"}头像`}
-              referrerPolicy="no-referrer"
-              onError={() => setFailedAvatarUrl(avatarUrl)}
-            />
-          ) : (
-            <div className="mv-avatar">MV</div>
-          ))}
+        {appEdition === "ops" && (
+          <button
+            type="button"
+            className="mv-avatar"
+            onClick={accountOrProviderHandler}
+            title={accountOrProviderLabel}
+            aria-label={accountOrProviderLabel}
+          >
+            {avatarUrl ? (
+              <img
+                className="mv-avatar-img"
+                src={avatarUrl}
+                alt={`${accountName ?? "微信用户"}头像`}
+                referrerPolicy="no-referrer"
+                onError={() => setFailedAvatarUrl(avatarUrl)}
+              />
+            ) : (
+              "MV"
+            )}
+          </button>
+        )}
       </div>
     </header>
   );
