@@ -1,12 +1,11 @@
 import { BrowserRouter, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import type { AppEdition } from "../shared/config/constants";
 import { PaymentResultPage } from "../pages/PaymentResultPage";
-import { OpsDashboardPage } from "../pages/OpsDashboard/OpsDashboardPage";
 import { AssetShowcasePage } from "../pages/AssetShowcase/AssetShowcasePage";
+import { AdminShell } from "./AdminShell";
 import { LandingRoute } from "./LandingRoute";
 import { OpsAppShell } from "./OpsAppShell";
 import { SelfAppShell } from "./SelfAppShell";
-import { stageToPath } from "./routes";
 
 function resolveAppEdition(): AppEdition {
   return import.meta.env.VITE_APP_EDITION === "ops" ? "ops" : "self";
@@ -31,7 +30,7 @@ function AppRoutes() {
         path="/admin"
         element={
           appEdition === "ops" ? (
-            <OpsDashboardRoute />
+            <AdminShell />
           ) : (
             <AdminUnavailable />
           )
@@ -57,15 +56,6 @@ const LEGACY_CASE_ROUTES: Record<string, string> = {
 function LegacyCaseRedirect() {
   const { slug = "" } = useParams<{ slug: string }>();
   return <Navigate to={LEGACY_CASE_ROUTES[slug] ?? "/templates"} replace />;
-}
-
-function OpsDashboardRoute() {
-  const navigate = useNavigate();
-  return (
-    <OpsDashboardPage
-      onNavigate={(stage) => navigate(stageToPath(stage))}
-    />
-  );
 }
 
 function AdminUnavailable() {
