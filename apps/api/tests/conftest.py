@@ -30,6 +30,10 @@ _TEST_ENV_DEFAULTS = {
     # it. Tests that opt into ops edition would otherwise fail at Settings
     # construction; keep the same inert-for-routes default.
     "METAVIEW_OPS_HOST": "ops.metaview.top",
+    # Ops transport boundary: production must explicitly name trusted source
+    # networks. Loopback is inert for tests but keeps any ops-shaped app
+    # construction fail-closed rather than relying on an empty allowlist.
+    "METAVIEW_OPS_ALLOW_IPS": "127.0.0.1/32",
 }
 
 
