@@ -9,6 +9,7 @@ import { API_BASE_URL } from "../../shared/config/constants";
 import { AdminShell } from "../../app/AdminShell";
 import { sampleDashboard } from "./testFixtures";
 import { OpsDashboardPage } from "./OpsDashboardPage";
+import type { OpsAccountsResponse } from "../../features/ops-dashboard";
 
 function renderPage({
   accountName = "管理员",
@@ -30,6 +31,21 @@ function renderPage({
       onRequireLogin={onRequireLogin}
     />,
   );
+}
+
+function sampleAccounts(): OpsAccountsResponse {
+  const items = Array.from({ length: 25 }, (_, index) => ({
+    user_id: `user_${String(index + 1).padStart(3, "0")}`,
+    display_name: index === 0 ? "王小甲" : `账户 ${index + 1}`,
+    avatar_url: null,
+    login_provider: "wechat",
+    status: index === 24 ? "disabled" : "enabled",
+    role: index === 1 ? "admin" : "user",
+    balance_yuan: (index * 1.5).toFixed(2),
+    created_at: `2026-06-${String(8 - (index % 7)).padStart(2, "0")}T03:00:00+00:00`,
+    last_active_at: null,
+  }));
+  return { items, total: items.length, page: 1, page_size: 20 };
 }
 
 describe("OpsDashboardPage", () => {
@@ -225,10 +241,13 @@ describe("OpsDashboardPage", () => {
     }
   });
 
-  it("switches between admin sections and renders placeholder content", async () => {
+  it("switches between admin sections and renders section content", async () => {
     server.use(
       http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>
         HttpResponse.json(sampleDashboard()),
+      ),
+      http.get(`${API_BASE_URL}/api/v1/ops/accounts`, () =>
+        HttpResponse.json(sampleAccounts()),
       ),
     );
 
@@ -236,7 +255,7 @@ describe("OpsDashboardPage", () => {
     await findByText("用户数");
 
     fireEvent.click(getAllByRole("button", { name: "账户" })[0]);
-    expect(await findByText("账户与充值视图将在 #232 落地。")).toBeTruthy();
+    expect(await findByText("王小甲")).toBeTruthy();
     expect(queryByText("用户数")).toBeNull();
 
     fireEvent.click(getAllByRole("button", { name: "任务审计" })[0]);
@@ -247,7 +266,132 @@ describe("OpsDashboardPage", () => {
 
     fireEvent.click(getAllByRole("button", { name: "运营总览" })[0]);
     expect(await findByText("用户数")).toBeTruthy();
-  });
+  }, 20_000);
+
+  it("defers the accounts request until the 账户 section opens", async () => {
+    const seenUrls: string[] = [];
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>
+        HttpResponse.json(sampleDashboard()),
+      ),
+      http.get(`${API_BASE_URL}/api/v1/ops/accounts`, ({ request }) => {
+        seenUrls.push(request.url);
+        return HttpResponse.json(sampleAccounts());
+      }),
+    );
+
+    const { findByText, getAllByRole, findAllByText } = renderPage();
+    await findByText("用户数");
+    expect(seenUrls).toHaveLength(0);
+
+    fireEvent.click(getAllByRole("button", { name: "账户" })[0]);
+    await findAllByText("王小甲");
+
+    expect(seenUrls).toHaveLength(1);
+    expect(seenUrls[0]).toContain("page=1");
+    expect(seenUrls[0]).toContain("page_size=20");
+  }, 20_000);
+
+  it("searches accounts by display name or user ID on Enter", async () => {
+    const requestedSearches: Array<string | null> = [];
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>
+        HttpResponse.json(sampleDashboard()),
+      ),
+      http.get(`${API_BASE_URL}/api/v1/ops/accounts`, ({ request }) => {
+        const url = new URL(request.url);
+        const search = url.searchParams.get("search");
+        requestedSearches.push(search);
+        const items = search
+          ? sampleAccounts().items.filter(
+              (account) =>
+                account.display_name.includes(search) ||
+                account.user_id.includes(search),
+            )
+          : sampleAccounts().items;
+        return HttpResponse.json({
+          items: items.slice(0, 20),
+          total: items.length,
+          page: 1,
+          page_size: 20,
+        });
+      }),
+    );
+
+    const { findByText, getAllByRole, getByRole, queryByText } = renderPage();
+    await findByText("用户数");
+    fireEvent.click(getAllByRole("button", { name: "账户" })[0]);
+    await findByText("账户 2");
+
+    const input = getByRole("textbox", { name: "搜索账户" });
+    fireEvent.change(input, { target: { value: "王小" } });
+    fireEvent.keyDown(input, { key: "Enter", code: "Enter" });
+
+    await waitFor(() => expect(requestedSearches.at(-1)).toBe("王小"), {
+      timeout: 10_000,
+    });
+    expect(await findByText("王小甲")).toBeTruthy();
+    await waitFor(() => expect(queryByText("账户 2")).toBeNull(), { timeout: 10_000 });
+  }, 20_000);
+
+  it("requests the next accounts page from the grid pagination", async () => {
+    const requestedPages: string[] = [];
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>
+        HttpResponse.json(sampleDashboard()),
+      ),
+      http.get(`${API_BASE_URL}/api/v1/ops/accounts`, ({ request }) => {
+        const url = new URL(request.url);
+        requestedPages.push(url.searchParams.get("page") ?? "1");
+        return HttpResponse.json(sampleAccounts());
+      }),
+    );
+
+    const { findByText, getAllByRole, getByRole } = renderPage();
+    await findByText("用户数");
+    fireEvent.click(getAllByRole("button", { name: "账户" })[0]);
+    await findByText("王小甲");
+
+    fireEvent.click(getByRole("button", { name: "下一页" }));
+    await waitFor(() => expect(requestedPages).toContain("2"), { timeout: 10_000 });
+  }, 20_000);
+
+  it("shows the empty state when the accounts API returns no accounts", async () => {
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>
+        HttpResponse.json(sampleDashboard()),
+      ),
+      http.get(`${API_BASE_URL}/api/v1/ops/accounts`, () =>
+        HttpResponse.json({ items: [], total: 0, page: 1, page_size: 20 }),
+      ),
+    );
+
+    const { findByText, getAllByRole } = renderPage();
+    await findByText("用户数");
+    fireEvent.click(getAllByRole("button", { name: "账户" })[0]);
+
+    expect(await findByText("暂无账户记录")).toBeTruthy();
+  }, 20_000);
+
+  it("shows an error state when the accounts API fails", async () => {
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>
+        HttpResponse.json(sampleDashboard()),
+      ),
+      http.get(`${API_BASE_URL}/api/v1/ops/accounts`, () =>
+        HttpResponse.json({ detail: "database unavailable" }, { status: 500 }),
+      ),
+    );
+
+    const { findByText, getAllByRole, getByText } = renderPage();
+    await findByText("用户数");
+    fireEvent.click(getAllByRole("button", { name: "账户" })[0]);
+
+    expect(await findByText("加载失败")).toBeTruthy();
+    await waitFor(() => expect(getByText("database unavailable")).toBeTruthy(), {
+      timeout: 10_000,
+    });
+  }, 20_000);
 
   it("renders the admin account identity and balance in the sidebar", async () => {
     server.use(

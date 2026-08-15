@@ -13,6 +13,7 @@ from app.application.ports.director_repository import IRunDirectorRepository
 from app.application.ports.export_repository import IExportJobRepository
 from app.application.ports.llm_provider import ILLMProvider
 from app.application.ports.oauth_client import IOAuthClient
+from app.application.ports.ops_accounts_repository import IOpsAccountsRepository
 from app.application.ports.ops_dashboard_repository import IOpsDashboardRepository
 from app.application.ports.payment_gateway import IPaymentGateway
 from app.application.ports.router_provider import IRouterProvider
@@ -20,6 +21,7 @@ from app.application.ports.run_repository import IRunRepository
 from app.application.services.coverage_resolver import DefaultCoverageResolver
 from app.application.use_cases.account import AccountUseCase
 from app.application.use_cases.newapi_topup import NewApiTopupUseCase
+from app.application.use_cases.ops_accounts import OpsAccountsUseCase
 from app.application.use_cases.ops_dashboard import OpsDashboardUseCase
 from app.config import Settings, get_settings
 from app.infrastructure.agent.codex_agent_provider import CodexAgentProvider
@@ -37,6 +39,9 @@ from app.infrastructure.persistence.sqlite_director_repository import (
 )
 from app.infrastructure.persistence.sqlite_newapi_topup_repository import (
     SqliteNewApiTopupRepository,
+)
+from app.infrastructure.persistence.sqlite_ops_accounts_repository import (
+    SqliteOpsAccountsRepository,
 )
 from app.infrastructure.persistence.sqlite_ops_dashboard_repository import (
     SqliteOpsDashboardRepository,
@@ -70,6 +75,11 @@ def _get_newapi_topup_repo(db_path: str) -> SqliteNewApiTopupRepository:
 @lru_cache(maxsize=4)
 def _get_ops_dashboard_repo(db_path: str) -> SqliteOpsDashboardRepository:
     return SqliteOpsDashboardRepository(db_path)
+
+
+@lru_cache(maxsize=4)
+def _get_ops_accounts_repo(db_path: str) -> SqliteOpsAccountsRepository:
+    return SqliteOpsAccountsRepository(db_path)
 
 
 @lru_cache
@@ -121,6 +131,12 @@ def get_ops_dashboard_repo(
     return _get_ops_dashboard_repo(settings.history_db_path)
 
 
+def get_ops_accounts_repo(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> IOpsAccountsRepository:
+    return _get_ops_accounts_repo(settings.history_db_path)
+
+
 def get_payment_gateway(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> IPaymentGateway:
@@ -157,6 +173,13 @@ def get_ops_dashboard_use_case(
     repo: Annotated[IOpsDashboardRepository, Depends(get_ops_dashboard_repo)],
 ) -> OpsDashboardUseCase:
     return OpsDashboardUseCase(settings=settings, repo=repo)
+
+
+def get_ops_accounts_use_case(
+    settings: Annotated[Settings, Depends(get_settings)],
+    repo: Annotated[IOpsAccountsRepository, Depends(get_ops_accounts_repo)],
+) -> OpsAccountsUseCase:
+    return OpsAccountsUseCase(settings=settings, repo=repo)
 
 
 @lru_cache

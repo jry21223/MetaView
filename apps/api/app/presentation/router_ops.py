@@ -5,15 +5,24 @@ from typing import Annotated, Literal, cast
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from starlette.requests import Request
 
+from app.application.dto.ops_accounts_dto import OpsAccountsResponse
 from app.application.dto.ops_dashboard_dto import OpsDashboardResponse
 from app.application.use_cases.account import AccountUseCase
+from app.application.use_cases.ops_accounts import (
+    OpsAccountsPermissionError,
+    OpsAccountsUseCase,
+)
 from app.application.use_cases.ops_dashboard import (
     OpsDashboardPermissionError,
     OpsDashboardUseCase,
 )
 from app.config import Settings, get_settings
 from app.domain.models.account import SessionAccount
-from app.presentation.dependencies import get_account_use_case, get_ops_dashboard_use_case
+from app.presentation.dependencies import (
+    get_account_use_case,
+    get_ops_accounts_use_case,
+    get_ops_dashboard_use_case,
+)
 from app.presentation.edition_policy import require_bound_admin_session
 from app.presentation.rate_limit import read_limit
 
@@ -41,6 +50,31 @@ async def get_ops_dashboard(
             limit=limit,
         )
     except OpsDashboardPermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
+@router.get("/accounts", response_model=OpsAccountsResponse)
+@read_limit()
+async def get_ops_accounts(
+    request: Request,
+    response: Response,
+    settings: Annotated[Settings, Depends(get_settings)],
+    account_use_case: Annotated[AccountUseCase, Depends(get_account_use_case)],
+    use_case: Annotated[OpsAccountsUseCase, Depends(get_ops_accounts_use_case)],
+    search: Annotated[str | None, Query(max_length=100)] = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> OpsAccountsResponse:
+    normalized_search = search.strip() if search else None
+    session = await _session(request, response, settings, account_use_case)
+    try:
+        return await use_case.list_accounts(
+            session=session,
+            search=normalized_search,
+            page=page,
+            page_size=page_size,
+        )
+    except OpsAccountsPermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 

@@ -22,6 +22,7 @@ import ListItemText from "@mui/material/ListItemText";
 import Paper from "@mui/material/Paper";
 import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
+import TextField from "@mui/material/TextField";
 import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import { ThemeProvider } from "@mui/material/styles";
@@ -34,7 +35,9 @@ import {
 } from "@mui/x-charts";
 
 import {
+  useOpsAccounts,
   useOpsDashboard,
+  type OpsAccountRow,
   type OpsDashboardResponse,
   type OpsDashboardWindowDays,
   type OpsHealthStatus,
@@ -81,6 +84,17 @@ interface OrderTableRow {
   order: string;
   amount: string;
   status: string;
+  createdAt: string;
+}
+
+interface AccountTableRow {
+  id: string;
+  userId: string;
+  displayName: string;
+  loginProvider: string;
+  status: string;
+  role: string;
+  balanceYuan: string;
   createdAt: string;
 }
 
@@ -172,6 +186,8 @@ export function OpsDashboardPage({
                   />
                 )}
               </>
+            ) : activeSection === "accounts" ? (
+              <AccountsSection />
             ) : (
               <SectionPlaceholder section={activeSection} />
             )}
@@ -793,13 +809,9 @@ function SideMenu({
 }
 
 const PLACEHOLDER_SECTIONS: Record<
-  Exclude<AdminSection, "overview">,
+  Exclude<AdminSection, "overview" | "accounts">,
   { title: string; description: string }
 > = {
-  accounts: {
-    title: "账户",
-    description: "账户与充值视图将在 #232 落地。",
-  },
   runs: {
     title: "任务审计",
     description: "全站任务审计视图尚未落地。",
@@ -812,10 +824,10 @@ const PLACEHOLDER_SECTIONS: Record<
 
 /**
  * Minimal placeholder for admin sections whose real views ship in later
- * tickets. The account view is #232's job — nothing more than this belongs
+ * tickets. The account view landed in #232 — nothing more than this belongs
  * in the admin shell yet.
  */
-function SectionPlaceholder({ section }: { section: Exclude<AdminSection, "overview"> }) {
+function SectionPlaceholder({ section }: { section: Exclude<AdminSection, "overview" | "accounts"> }) {
   const content = PLACEHOLDER_SECTIONS[section];
   return (
     <Paper component="section" variant="outlined" className="mv-ops-state-panel">
@@ -824,6 +836,85 @@ function SectionPlaceholder({ section }: { section: Exclude<AdminSection, "overv
         <p className="mv-ops-state-panel__body">{content.description}</p>
       </div>
     </Paper>
+  );
+}
+
+const ACCOUNTS_PAGE_SIZES = [10, 20, 50];
+
+function AccountsSection() {
+  const [searchDraft, setSearchDraft] = useState("");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const { accounts, isLoading, error, refresh } = useOpsAccounts({
+    search,
+    page,
+    pageSize,
+  });
+  const rows = useMemo(
+    () => (accounts?.items ?? []).map(accountTableRow),
+    [accounts],
+  );
+
+  const commitSearch = () => {
+    const term = searchDraft.trim();
+    if (term !== search) {
+      setSearch(term);
+      setPage(1);
+    }
+  };
+
+  return (
+    <Panel
+      title="账户列表"
+      subtitle={
+        accounts
+          ? `全站账户，共 ${accounts.total} 个，按注册时间倒序`
+          : "全站账户，按注册时间倒序"
+      }
+      action={
+        <TextField
+          size="small"
+          placeholder="搜索昵称 / 用户 ID，回车确认"
+          value={searchDraft}
+          onChange={(event) => setSearchDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") commitSearch();
+          }}
+          onBlur={commitSearch}
+          slotProps={{ htmlInput: { "aria-label": "搜索账户" } }}
+          sx={{ width: { xs: 180, sm: 240 } }}
+        />
+      }
+      flush
+    >
+      {error && accounts && <ErrorBanner error={error} onRefresh={refresh} />}
+      {error && !accounts ? (
+        <ErrorPanel error={error} onRefresh={refresh} />
+      ) : (
+        <div className="mv-ops-table">
+          <DataGrid
+            rows={rows}
+            columns={accountColumns}
+            loading={isLoading}
+            rowCount={accounts?.total ?? 0}
+            paginationMode="server"
+            paginationModel={{ page: page - 1, pageSize }}
+            onPaginationModelChange={({ page: nextPage, pageSize: nextSize }) => {
+              setPage(nextSize === pageSize ? nextPage + 1 : 1);
+              setPageSize(nextSize);
+            }}
+            density="compact"
+            pageSizeOptions={ACCOUNTS_PAGE_SIZES}
+            disableColumnMenu
+            disableRowSelectionOnClick
+            rowHeight={42}
+            columnHeaderHeight={42}
+            localeText={{ ...dataGridLocaleText, noRowsLabel: "暂无账户记录" }}
+          />
+        </div>
+      )}
+    </Panel>
   );
 }
 
@@ -919,12 +1010,39 @@ const orderColumns: GridColDef<OrderTableRow>[] = [
   { field: "createdAt", headerName: "创建时间", width: 142 },
 ];
 
-function StatusChip({ status, kind }: { status: string; kind: "run" | "order" }) {
+const accountColumns: GridColDef<AccountTableRow>[] = [
+  {
+    field: "userId",
+    headerName: "用户 ID",
+    flex: 1.1,
+    minWidth: 170,
+    cellClassName: "mv-ops-id-cell",
+  },
+  { field: "displayName", headerName: "昵称", flex: 1, minWidth: 120 },
+  { field: "loginProvider", headerName: "登录方式", width: 92 },
+  {
+    field: "status",
+    headerName: "状态",
+    width: 88,
+    renderCell: ({ value }) => <StatusChip status={String(value)} kind="account" />,
+  },
+  { field: "role", headerName: "角色", width: 88 },
+  { field: "balanceYuan", headerName: "余额", width: 96 },
+  { field: "createdAt", headerName: "注册时间", width: 142 },
+];
+
+function StatusChip({ status, kind }: { status: string; kind: "run" | "order" | "account" }) {
   return (
     <Chip
       className="mv-ops-status"
       size="small"
-      label={kind === "run" ? statusLabel(status) : orderStatusLabel(status)}
+      label={
+        kind === "run"
+          ? statusLabel(status)
+          : kind === "order"
+            ? orderStatusLabel(status)
+            : accountStatusLabel(status)
+      }
       data-tone={statusTone(status)}
     />
   );
@@ -950,9 +1068,29 @@ function orderTableRow(row: OpsOrderRow): OrderTableRow {
   };
 }
 
+function accountTableRow(row: OpsAccountRow): AccountTableRow {
+  return {
+    id: row.user_id,
+    userId: row.user_id,
+    displayName: row.display_name,
+    loginProvider:
+      row.login_provider === "wechat"
+        ? "微信"
+        : row.login_provider === "guest"
+          ? "游客"
+          : row.login_provider,
+    status: row.status,
+    role: row.role === "admin" ? "管理员" : row.role === "user" ? "用户" : row.role,
+    balanceYuan: `¥ ${row.balance_yuan}`,
+    createdAt: formatDateTime(row.created_at),
+  };
+}
+
 function statusTone(status: string): StatusTone {
-  if (status === "succeeded" || status === "paid") return "positive";
-  if (status === "failed") return "negative";
+  if (status === "succeeded" || status === "paid" || status === "enabled") {
+    return "positive";
+  }
+  if (status === "failed" || status === "disabled") return "negative";
   if (
     status === "queued" ||
     status === "running" ||
@@ -1001,6 +1139,13 @@ function orderStatusLabel(status: string): string {
     pending: "待支付",
     paid: "已支付",
     closed: "已关闭",
+  }[status] ?? status;
+}
+
+function accountStatusLabel(status: string): string {
+  return {
+    enabled: "启用",
+    disabled: "禁用",
   }[status] ?? status;
 }
 
