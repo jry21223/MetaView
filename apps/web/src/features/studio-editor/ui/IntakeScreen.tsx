@@ -9,7 +9,7 @@ const TEXTAREA_MIN_HEIGHT = 168;
 const TEXTAREA_MAX_HEIGHT = 320;
 
 /** Kill switch for new-run generation while output quality is under active tuning. */
-const GENERATION_DISABLED = true;
+const GENERATION_DISABLED = false;
 const GENERATION_DISABLED_MESSAGE =
   "MetaView 目前处于测试阶段，生成效果仍在优化中，新建生成功能暂时关闭，感谢理解。";
 

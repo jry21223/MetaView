@@ -81,22 +81,23 @@ describe("IntakeScreen smart-routed intake", () => {
     );
   });
 
-  it("shows a testing-in-progress announcement and keeps generation disabled", async () => {
-    const { getByRole, getByPlaceholderText, getByText, props } = renderIntake();
+  it("keeps generation enabled and submits the prompt", async () => {
+    const { getByPlaceholderText, getByRole, queryByText, props } = renderIntake();
     const textarea = getByPlaceholderText(/例如：用动画解释导数/);
 
     expect(
-      getByText("MetaView 目前处于测试阶段，生成效果仍在优化中，新建生成功能暂时关闭，感谢理解。"),
-    ).toBeTruthy();
+      queryByText("MetaView 目前处于测试阶段，生成效果仍在优化中，新建生成功能暂时关闭，感谢理解。"),
+    ).toBeNull();
 
     fireEvent.change(textarea, { target: { value: "求函数 f(x)=x² 在 x=1 处的导数" } });
     const submitButton = getByRole("button", { name: "生成讲解" }) as HTMLButtonElement;
-    expect(submitButton.disabled).toBe(true);
+    expect(submitButton.disabled).toBe(false);
 
     fireEvent.click(submitButton);
-    fireEvent.keyDown(textarea, { key: "Enter", metaKey: true });
 
-    expect(props.onSubmit).not.toHaveBeenCalled();
+    await vi.waitFor(() =>
+      expect(props.onSubmit).toHaveBeenCalledWith({ prompt: "求函数 f(x)=x² 在 x=1 处的导数" }),
+    );
   });
 
   it("seeds initialPrompt and caps textarea growth at 320px", () => {
@@ -171,7 +172,7 @@ describe("IntakeScreen smart-routed intake", () => {
     expect(queryByText("large.py")).toBeNull();
   });
 
-  it("keeps generation disabled even with a valid code file attached", () => {
+  it("submits a code-file attachment once it is attached", async () => {
     const { container, getByRole, getByText, props } = renderIntake();
     const file = pythonFile();
 
@@ -179,10 +180,18 @@ describe("IntakeScreen smart-routed intake", () => {
     expect(getByText("solution.py")).toBeTruthy();
 
     const submitButton = getByRole("button", { name: "生成讲解" }) as HTMLButtonElement;
-    expect(submitButton.disabled).toBe(true);
+    expect(submitButton.disabled).toBe(false);
     fireEvent.click(submitButton);
 
-    expect(props.onSubmit).not.toHaveBeenCalled();
+    await vi.waitFor(() =>
+      expect(props.onSubmit).toHaveBeenCalledWith({
+        prompt: "讲解 solution.py 中的代码。",
+        sourceCode: "def solve():\n    return 42\n",
+        language: "python",
+        sourceFilename: "solution.py",
+        sourceSizeBytes: file.size,
+      }),
+    );
   });
 
   it("exposes pending and submit errors accessibly", () => {
