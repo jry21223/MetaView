@@ -417,6 +417,10 @@
     background-size: 36px 36px;
   }
 
+  .mv-landing-followup {
+    background-size: auto, 36px 36px, 36px 36px;
+  }
+
   .mv-landing-demo-toolbar {
     width: 100%;
   }

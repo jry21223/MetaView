@@ -1208,9 +1208,16 @@
 .mv-landing-followup {
   overflow: hidden;
   border-bottom: 1px solid var(--line);
+  /* 与 Hero / capability / 最终 CTA 统一的“条纹纸”纸面：暖白底 + 48px 网格。
+     原先基底是纯白 --surface，light 主题下整段无纹理，与 capability 段的
+     白屏问题同源。radial 层保持整段尺寸（auto），网格层 48px ——
+     background-size 需按层提供，否则会压扁渐变层。 */
   background:
     radial-gradient(circle at 78% 38%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 32%),
-    var(--surface);
+    linear-gradient(color-mix(in srgb, var(--line) 42%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--line) 42%, transparent) 1px, transparent 1px),
+    var(--bg);
+  background-size: auto, 48px 48px, 48px 48px;
 }
 
 .mv-landing-followup__inner {
