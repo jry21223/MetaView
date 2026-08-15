@@ -24,6 +24,7 @@
 | [quality-gate.md](./quality-gate.md) | 后端 Canonical QualityReport、修复、持久化、Director 与导出阻断语义 |
 | [frontend-shell.md](./frontend-shell.md) | Stage 路由、GlobalTopbar、Studio 布局、Provider 配置、snapshot support levels |
 | [template-previews.md](./template-previews.md) | `/templates` 正式案例、统一 PlaybookPlayer、确定性参数与零请求边界 |
+| [seo-geo.md](./seo-geo.md) | 公共路由的索引边界、canonical / social metadata、JSON-LD、sitemap 与构建验证 |
 | [gold-template-system.md](./gold-template-system.md) | Public Gold Template、Hidden Variant、Manifest 与防泄漏边界 |
 | [conic-sections-capability.md](./conic-sections-capability.md) | 圆锥曲线题型母版、领域内核、Skill 路由与 V1 能力边界 |
 | [animation-tool-registry.md](./animation-tool-registry.md) | 后端 animation tool registry 的扩展流程、当前工具和新增规则 |
@@ -31,6 +32,7 @@
 | [remotion-skills.md](./remotion-skills.md) | Remotion 组件、渲染器、注册表和音频同步约定 |
 | [skill-pack-architecture.md](./skill-pack-architecture.md) | SkillPack 核心契约、registry、routing 和首个实现边界 |
 | [skill-pack-authoring.md](./skill-pack-authoring.md) | SkillPack 包结构、manifest、执行契约和 renderer contract |
+| [physics-renderer-style.md](./physics-renderer-style.md) | 物理渲染器配色契约：颜色承载物理含义、与 Director/RenderPlan 的职责边界 |
 
 ## Planning
 
@@ -63,6 +65,9 @@
 | [skill-sources.md](./skill-sources.md) | 学科 skill 来源、版权边界和 fixture 选取规则 |
 | [math-scene-object-identity.md](./math-scene-object-identity.md) | Math scene 对象标识优先级、fallback 和重复 warning |
 | [brand-logo.md](./brand-logo.md) | MetaView logo 资源、颜色和使用禁忌 |
+| [assets.md](./assets.md) | Subject visual kit 的 manifest 契约、语义角色寻址与素材包规范 |
+| [research/teacher-student-learning-workflow.md](./research/teacher-student-learning-workflow.md) | MetaView 融入教师备课与学生自学闭环的证据、产品定位、边界、指标与阶段路线 |
+| [research/high-school-math-p0-textbook-scope.md](./research/high-school-math-p0-textbook-scope.md) | 高中数学 P0 的人教 A 版椭圆章节范围、现有案例归属与教材覆盖风险 |
 
 ## Archive
 
@@ -79,3 +84,11 @@
 | [../CONTRIBUTING.md](../CONTRIBUTING.md) | 分支策略、Conventional Commits、提交流程和本地 hook |
 | [../AGENTS.md](../AGENTS.md) | coding agent 工作规则、worktree 保护、ignore 纪律和验证要求 |
 | [../apps/api/app/domain/skills/solid_geometry/README.md](../apps/api/app/domain/skills/solid_geometry/README.md) | `solid_geometry` skill-local 范围、文件结构、ProblemSpec 和 kernel 规则 |
+
+## Agent Skills
+
+| 文档 | 内容 |
+|------|------|
+| [agents/issue-tracker.md](./agents/issue-tracker.md) | Issue tracker 约定：GitHub + `gh` CLI 操作、wayfinding 依赖图 |
+| [agents/triage-labels.md](./agents/triage-labels.md) | 五个标准 triage 角色到实际 label 字符串的映射 |
+| [agents/domain.md](./agents/domain.md) | 领域文档消费规则：CONTEXT.md、ADR 与词汇表 |

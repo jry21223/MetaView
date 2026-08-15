@@ -6,6 +6,7 @@ import { AssetShowcasePage } from "../pages/AssetShowcase/AssetShowcasePage";
 import { LandingRoute } from "./LandingRoute";
 import { OpsAppShell } from "./OpsAppShell";
 import { SelfAppShell } from "./SelfAppShell";
+import { SeoManager } from "./SeoManager";
 
 // The ops admin shell (MUI dashboard) is a separate chunk, loaded only in the
 // ops edition. The conditional keeps the lazy definition itself inside the
@@ -25,6 +26,7 @@ function resolveAppEdition(): AppEdition {
 export function App() {
   return (
     <BrowserRouter>
+      <SeoManager />
       <AppRoutes />
     </BrowserRouter>
   );

@@ -3,52 +3,76 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>演算视界 MetaView · 让理解过程被看见</title>
+    <meta name="theme-color" content="#f4f1ea" />
+    <!-- metaview:seo:start -->
+    <title>MetaView 教育可视化平台｜让理解过程被看见</title>
     <meta
       name="description"
-      content="MetaView 把题目和代码转化为可播放、可追问、可调整并可导出的分步可视化讲解。"
+      content="MetaView 将数学、算法、物理等知识转化为可分步播放、可调参数、可追问并可导出的交互式可视化讲解。"
     />
+    <meta
+      name="robots"
+      content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
+    />
+    <meta
+      name="googlebot"
+      content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
+    />
+    <meta
+      name="bingbot"
+      content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
+    />
+    <!-- Build-safe placeholder; seo:generate and SeoManager replace it per route. -->
+    <link rel="canonical" href="https://metaview.invalid/" />
+    <meta property="og:site_name" content="演算视界 MetaView" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="MetaView 教育可视化平台｜让理解过程被看见" />
+    <meta
+      property="og:description"
+      content="将数学、算法、物理等知识转化为可分步播放、可调参数、可追问的交互式可视化讲解。"
+    />
+    <meta property="og:url" content="/" />
+    <meta property="og:image" content="/brand/metaview-og-image.png" />
+    <meta property="og:image:alt" content="MetaView 教育可视化平台" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="MetaView 教育可视化平台｜让理解过程被看见" />
+    <meta
+      name="twitter:description"
+      content="将抽象知识转化为可播放、可调整、可追问的交互式理解过程。"
+    />
+    <meta name="twitter:image" content="/brand/metaview-og-image.png" />
+    <script id="metaview-structured-data" type="application/ld+json">
+      {"@context":"https://schema.org","@graph":[{"@type":"WebSite","name":"MetaView 教育可视化平台","alternateName":"演算视界 MetaView","url":"/","description":"MetaView 将数学、算法、物理等知识转化为可分步播放、可调参数、可追问并可导出的交互式可视化讲解。","inLanguage":"zh-CN"},{"@type":"SoftwareApplication","name":"演算视界 MetaView","applicationCategory":"EducationalApplication","operatingSystem":"Web","url":"/","description":"MetaView 将数学、算法、物理等知识转化为可分步播放、可调参数、可追问并可导出的交互式可视化讲解。","image":"/brand/metaview-og-image.png","isAccessibleForFree":true,"inLanguage":"zh-CN"}]}
+    </script>
+    <!-- metaview:seo:end -->
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <meta name="og:image" content="/brand/metaview-og-image.png" />
-    <meta name="og:title" content="演算视界 MetaView" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap"
     />
-    <style>
-      .mv-boot-fallback {
-        min-height: 100vh;
-        min-height: 100dvh;
-        display: grid;
-        place-items: center;
-        gap: 10px;
-        align-content: center;
-        background: #f4f1ea;
-        color: #161a18;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        text-align: center;
-      }
-      .mv-boot-fallback strong {
-        font-size: 18px;
-        font-weight: 650;
-      }
-      .mv-boot-fallback span {
-        max-width: 360px;
-        color: #5d655f;
-        font-size: 13px;
-        line-height: 1.6;
-      }
-    </style>
+    <link rel="stylesheet" href="/boot-fallback.css" />
   </head>
   <body>
     <div id="root">
-      <div class="mv-boot-fallback" role="status">
-        <strong>MetaView 正在启动</strong>
-        <span>如果页面长时间停留在这里，请刷新并确认浏览器允许 JavaScript。</span>
+      <div class="mv-boot-fallback" role="status" aria-live="polite">
+        <!-- metaview:fallback:start -->
+        <main class="mv-boot-fallback__content">
+          <p class="mv-boot-fallback__eyebrow">METAVIEW EDUCATION</p>
+          <h1>把一道题，变成一段看得见的理解过程。</h1>
+          <p>MetaView 将数学、算法、物理等知识转化为可分步播放、可调参数、可追问并可导出的交互式可视化讲解。</p>
+          <nav aria-label="MetaView 公开入口">
+            <a href="/templates">浏览交互式案例</a>
+            <a href="/templates/binary-search">二分查找可视化</a>
+            <a href="/templates/derivative-tangent">导数与切线可视化</a>
+          </nav>
+          <small>应用正在加载；即使 JavaScript 暂不可用，公开内容仍可被浏览与索引。</small>
+        </main>
+        <!-- metaview:fallback:end -->
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>

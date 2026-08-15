@@ -51,6 +51,10 @@ Agent mode is an active verification path, not the default production claim. To 
 - `/templates` is the only template catalogue. Published templates expand a static poster and then open `/templates/:templateId` in the shared `PlaybookPlayer`; pending templates stay visible but disabled.
 - `/admin` is the hidden operations dashboard, restricted to the single ops admin account bound by `METAVIEW_OPS_ADMIN_USER_ID` (role=admin alone is no longer sufficient).
 
+Public indexing, canonical metadata, structured data, and generated HTML shell
+rules are defined in `docs/seo-geo.md`. Do not make workbench or unpublished
+template routes indexable while changing the route map.
+
 The move from `/` to `/create` for direct creation is an intentional route behavior change. Do not assume the root path opens the generator.
 
 ## What to read next
@@ -78,7 +82,7 @@ The move from `/` to `/create` for direct creation is an intentional route behav
 
 ## Current next milestones
 
-1. Keep the four published `/templates` cases correct, deterministic, and visually reviewed while the remaining templates stay explicitly marked as pending.
+1. Keep published `/templates` cases correct, deterministic, and visually reviewed while the remaining templates stay explicitly marked as pending.
 2. Keep template playback, parameter changes, and preset follow-ups free of run, quota, LLM, and pipeline requests.
 3. Compile SceneIntent into shared SceneBlueprint/Playbook assembly without removing legacy CIR in one step.
 4. Add SkillRecipe validation/execution for `composable` decisions without registering a universal SkillPack.
