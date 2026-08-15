@@ -1,17 +1,19 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useAccount } from "../features/account";
 import { WeChatLoginDialog } from "../features/account/ui/WeChatLoginDialog";
 import { OpsDashboardPage } from "../pages/OpsDashboard/OpsDashboardPage";
 import { savePostLoginPath } from "./opsGuestAccess";
-import { stageToPath } from "./routes";
 
 /**
  * AdminShell owns the `/admin` surface as a slim seam over OpsDashboardPage.
- * It also owns the WeChat login-dialog state (issue #228) so the ops-edition
- * permission panel can trigger login directly from `/admin` instead of forcing
- * the visitor to find a login entry elsewhere. Self edition never reaches this
- * shell — App renders AdminUnavailable there, which intentionally has no login
- * CTA (self edition has no account/login at all).
+ * It wires the logged-in admin's account identity and balance into the
+ * sidebar (issue #230) and owns the WeChat login-dialog state (issue #228) so
+ * the ops-edition permission panel can trigger login directly from `/admin`
+ * instead of forcing the visitor to find a login entry elsewhere. Self
+ * edition never reaches this shell — App renders AdminUnavailable there,
+ * which intentionally has no login CTA (self edition has no account/login
+ * at all).
  */
 export function AdminShell() {
   const navigate = useNavigate();
@@ -22,6 +24,7 @@ export function AdminShell() {
   // WeChat OAuth redirect the SPA already remounts; this covers the in-SPA
   // close path (dismissal, or a cookie that arrived via another tab/popup).
   const [dashboardKey, setDashboardKey] = useState(0);
+  const { account, refresh: refreshAccount } = useAccount();
 
   // WeChat login is a full redirect (window.location.assign → WeChat → OAuth
   // callback → landing route). Persist /admin as the post-login return path so
@@ -35,13 +38,19 @@ export function AdminShell() {
   const handleLoginClose = () => {
     setLoginOpen(false);
     setDashboardKey((n) => n + 1);
+    // The dashboard remount covers ops data; refresh the account too so a
+    // cookie that arrived via another tab/popup surfaces the real identity.
+    void refreshAccount();
   };
 
   return (
     <>
       <OpsDashboardPage
         key={dashboardKey}
-        onNavigate={(stage) => navigate(stageToPath(stage))}
+        accountName={account?.display_name ?? null}
+        accountBalanceYuan={account?.balance_yuan ?? null}
+        accountAvatarUrl={account?.avatar_url ?? null}
+        onOpenProviderSettings={() => navigate("/settings")}
         onRequireLogin={requireLogin}
       />
       {loginOpen && <WeChatLoginDialog onClose={handleLoginClose} />}

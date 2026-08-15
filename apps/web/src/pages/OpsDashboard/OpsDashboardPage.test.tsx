@@ -11,18 +11,21 @@ import { sampleDashboard } from "./testFixtures";
 import { OpsDashboardPage } from "./OpsDashboardPage";
 
 function renderPage({
-  onNavigate = vi.fn(),
+  accountName = "管理员",
+  accountBalanceYuan = "9.00",
+  accountAvatarUrl = null,
   onRequireLogin,
 }: {
-  onNavigate?: ReturnType<typeof vi.fn>;
+  accountName?: string | null;
+  accountBalanceYuan?: string | null;
+  accountAvatarUrl?: string | null;
   onRequireLogin?: ReturnType<typeof vi.fn>;
 } = {}) {
   return render(
     <OpsDashboardPage
-      accountName="管理员"
-      accountBalanceYuan="9.00"
-      accountAvatarUrl={null}
-      onNavigate={onNavigate}
+      accountName={accountName}
+      accountBalanceYuan={accountBalanceYuan}
+      accountAvatarUrl={accountAvatarUrl}
       onOpenProviderSettings={vi.fn()}
       onRequireLogin={onRequireLogin}
     />,
@@ -57,8 +60,7 @@ describe("OpsDashboardPage", () => {
 
     const { findByText, getAllByText, getByText } = renderPage();
 
-    expect(await findByText("运营总览")).toBeTruthy();
-    expect(getByText("用户数")).toBeTruthy();
+    expect(await findByText("用户数")).toBeTruthy();
     expect(getAllByText("¥ 15.00")).toHaveLength(2);
     expect(getByText("任务趋势")).toBeTruthy();
     expect(getByText("收入趋势")).toBeTruthy();
@@ -161,8 +163,8 @@ describe("OpsDashboardPage", () => {
       ),
     );
 
-    const { findByText, queryByText } = renderPage();
-    await findByText("运营总览");
+    const { findAllByText, queryByText } = renderPage();
+    await findAllByText("运营总览");
 
     expect(queryByText("运营面板")).toBeNull();
   });
@@ -203,19 +205,86 @@ describe("OpsDashboardPage", () => {
     );
   }, 15_000);
 
-  it("passes workspace navigation through to the app shell", async () => {
-    const onNavigate = vi.fn();
+  it("renders admin-only nav destinations without user shell navigation", async () => {
     server.use(
       http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>
         HttpResponse.json(sampleDashboard()),
       ),
     );
 
-    const { findByText, getAllByRole } = renderPage({ onNavigate });
-    await findByText("运营总览");
+    const { findAllByText, getAllByText, queryByText } = renderPage();
 
-    fireEvent.click(getAllByRole("button", { name: "工作台" })[0]);
-    expect(onNavigate).toHaveBeenCalledWith("intake");
+    // Page title plus both drawer copies of the nav item.
+    await findAllByText("运营总览");
+    expect(getAllByText("运营总览").length).toBeGreaterThanOrEqual(3);
+    for (const label of ["账户", "任务审计", "平台状态"]) {
+      expect(getAllByText(label).length).toBeGreaterThanOrEqual(2);
+    }
+    for (const label of ["工作台", "任务历史", "模板", "设置"]) {
+      expect(queryByText(label)).toBeNull();
+    }
+  });
+
+  it("switches between admin sections and renders placeholder content", async () => {
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>
+        HttpResponse.json(sampleDashboard()),
+      ),
+    );
+
+    const { findByText, getAllByRole, queryByText } = renderPage();
+    await findByText("用户数");
+
+    fireEvent.click(getAllByRole("button", { name: "账户" })[0]);
+    expect(await findByText("账户与充值视图将在 #232 落地。")).toBeTruthy();
+    expect(queryByText("用户数")).toBeNull();
+
+    fireEvent.click(getAllByRole("button", { name: "任务审计" })[0]);
+    expect(await findByText("全站任务审计视图尚未落地。")).toBeTruthy();
+
+    fireEvent.click(getAllByRole("button", { name: "平台状态" })[0]);
+    expect(await findByText("平台服务与依赖健康状态视图尚未落地。")).toBeTruthy();
+
+    fireEvent.click(getAllByRole("button", { name: "运营总览" })[0]);
+    expect(await findByText("用户数")).toBeTruthy();
+  });
+
+  it("renders the admin account identity and balance in the sidebar", async () => {
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>
+        HttpResponse.json(sampleDashboard()),
+      ),
+    );
+
+    const { findByText, getAllByText, queryByText } = renderPage({
+      accountName: "运营管理员",
+      accountBalanceYuan: "3.50",
+      accountAvatarUrl: null,
+    });
+
+    await findByText("用户数");
+    expect(getAllByText("运营管理员")[0]).toBeTruthy();
+    expect(getAllByText("余额 ¥ 3.50")[0]).toBeTruthy();
+    expect(queryByText("ADMIN ACCESS")).toBeNull();
+    expect(queryByText("管理员")).toBeNull();
+  });
+
+  it("keeps the neutral admin fallback when no account data is provided", async () => {
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>
+        HttpResponse.json(sampleDashboard()),
+      ),
+    );
+
+    const { findByText, getAllByText } = renderPage({
+      accountName: null,
+      accountBalanceYuan: null,
+      accountAvatarUrl: null,
+    });
+
+    await findByText("用户数");
+    expect(getAllByText("管理员")[0]).toBeTruthy();
+    expect(getAllByText("ADMIN ACCESS")[0]).toBeTruthy();
   });
 });
 
@@ -243,6 +312,9 @@ describe("AdminShell login CTA from /admin permission panel", () => {
       http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>
         HttpResponse.json({ detail: "需要管理员权限" }, { status: 403 }),
       ),
+      http.get(`${API_BASE_URL}/api/v1/account/me`, () =>
+        HttpResponse.json({ detail: "请先使用微信登录" }, { status: 401 }),
+      ),
     );
 
     const { findByText, findByRole, queryByText } = render(
@@ -259,5 +331,37 @@ describe("AdminShell login CTA from /admin permission panel", () => {
 
     expect(await findByText("微信登录后继续")).toBeTruthy();
     expect(sessionStorage.getItem("metaview:post-login-path")).toBe("/admin");
+  });
+
+  it("passes the logged-in account identity and balance into the admin sidebar", async () => {
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>
+        HttpResponse.json(sampleDashboard()),
+      ),
+      http.get(`${API_BASE_URL}/api/v1/account/me`, () =>
+        HttpResponse.json({
+          user_id: "admin_1",
+          display_name: "运营管理员",
+          avatar_url: null,
+          login_provider: "wechat",
+          status: "enabled",
+          role: "admin",
+          balance_cents: 350,
+          balance_yuan: "3.50",
+          recharge_min_cents: 500,
+          payment_enabled: false,
+          wechat_login_enabled: true,
+        }),
+      ),
+    );
+
+    const { findAllByText } = render(
+      <MemoryRouter initialEntries={["/admin"]}>
+        <AdminShell />
+      </MemoryRouter>,
+    );
+
+    expect((await findAllByText("运营管理员")).length).toBeGreaterThanOrEqual(1);
+    expect((await findAllByText("余额 ¥ 3.50")).length).toBeGreaterThanOrEqual(1);
   });
 });

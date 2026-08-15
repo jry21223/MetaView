@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from "react";
-import HistoryIcon from "@mui/icons-material/History";
+import AccountCircleIcon from "@mui/icons-material/AccountCircle";
+import DashboardIcon from "@mui/icons-material/Dashboard";
+import FactCheckIcon from "@mui/icons-material/FactCheck";
 import MenuIcon from "@mui/icons-material/Menu";
-import PlayCircleIcon from "@mui/icons-material/PlayCircle";
+import MonitorHeartIcon from "@mui/icons-material/MonitorHeart";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import SettingsIcon from "@mui/icons-material/Settings";
-import ViewModuleIcon from "@mui/icons-material/ViewModule";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import Avatar from "@mui/material/Avatar";
 import Box from "@mui/material/Box";
@@ -44,17 +44,22 @@ import {
   type OpsRunRow,
 } from "../../features/ops-dashboard";
 import { usePrefersReducedMotion } from "../../shared/hooks/usePrefersReducedMotion";
-import type { Stage } from "../../shared/ui/GlobalTopbar";
 import { OPS_THEME_VARS, opsDashboardTheme } from "./opsDashboardTheme";
 
 const windowOptions: OpsDashboardWindowDays[] = [7, 30, 90];
 const dataGridLocaleText = dataGridZhCN.components.MuiDataGrid.defaultProps.localeText;
 
+/**
+ * Admin destinations of the `/admin` surface. Kept local to the admin shell
+ * area on purpose: these are NOT user shell stages and must not join the
+ * shared Stage type used by the public GlobalTopbar navigation.
+ */
+export type AdminSection = "overview" | "accounts" | "runs" | "health";
+
 interface OpsDashboardPageProps {
   accountName?: string | null;
   accountBalanceYuan?: string | null;
   accountAvatarUrl?: string | null;
-  onNavigate: (stage: Stage) => void;
   onOpenProviderSettings?: () => void;
   /** When provided, the permission panel renders a primary WeChat login CTA that invokes it. */
   onRequireLogin?: () => void;
@@ -83,26 +88,29 @@ export function OpsDashboardPage({
   accountName,
   accountBalanceYuan,
   accountAvatarUrl,
-  onNavigate,
   onOpenProviderSettings,
   onRequireLogin,
 }: OpsDashboardPageProps) {
   const [windowDays, setWindowDays] = useState<OpsDashboardWindowDays>(30);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [tableTab, setTableTab] = useState<TableTab>("runs");
+  const [activeSection, setActiveSection] = useState<AdminSection>("overview");
   const { dashboard, isLoading, error, errorStatus, refresh } =
     useOpsDashboard(windowDays);
   const isPermissionError = errorStatus === 403;
+
+  const handleSelectSection = (section: AdminSection) => {
+    setActiveSection(section);
+    setMobileOpen(false);
+  };
 
   const drawer = (
     <SideMenu
       accountName={accountName}
       accountBalanceYuan={accountBalanceYuan}
       accountAvatarUrl={accountAvatarUrl}
-      onNavigate={(stage) => {
-        setMobileOpen(false);
-        onNavigate(stage);
-      }}
+      activeSection={activeSection}
+      onSelectSection={handleSelectSection}
       onOpenProviderSettings={onOpenProviderSettings}
     />
   );
@@ -140,30 +148,32 @@ export function OpsDashboardPage({
         <Box component="main" className="mv-ops-main">
           <MobileHeader onOpenMenu={() => setMobileOpen(true)} />
           <div className="mv-ops-content" aria-busy={isLoading}>
-            <Header
-              windowDays={windowDays}
-              generatedAt={dashboard?.generated_at ?? null}
-              onWindowChange={(_, value) => {
-                if (value !== null) setWindowDays(value);
-              }}
-              onRefresh={refresh}
-              isLoading={isLoading}
-            />
-
-            {isLoading && !dashboard && <LoadingPanel />}
-            {error && !isPermissionError && dashboard && (
-              <ErrorBanner error={error} onRefresh={refresh} />
-            )}
-            {error && !isPermissionError && !dashboard && (
-              <ErrorPanel error={error} onRefresh={refresh} />
-            )}
-            {isPermissionError && <PermissionPanel onRequireLogin={onRequireLogin} />}
-            {dashboard && !isPermissionError && (
-              <DashboardContent
-                dashboard={dashboard}
-                tableTab={tableTab}
-                onTableTabChange={setTableTab}
-              />
+            {isPermissionError ? (
+              <PermissionPanel onRequireLogin={onRequireLogin} />
+            ) : activeSection === "overview" ? (
+              <>
+                <Header
+                  windowDays={windowDays}
+                  generatedAt={dashboard?.generated_at ?? null}
+                  onWindowChange={(_, value) => {
+                    if (value !== null) setWindowDays(value);
+                  }}
+                  onRefresh={refresh}
+                  isLoading={isLoading}
+                />
+                {isLoading && !dashboard && <LoadingPanel />}
+                {error && dashboard && <ErrorBanner error={error} onRefresh={refresh} />}
+                {error && !dashboard && <ErrorPanel error={error} onRefresh={refresh} />}
+                {dashboard && (
+                  <DashboardContent
+                    dashboard={dashboard}
+                    tableTab={tableTab}
+                    onTableTabChange={setTableTab}
+                  />
+                )}
+              </>
+            ) : (
+              <SectionPlaceholder section={activeSection} />
             )}
           </div>
         </Box>
@@ -703,18 +713,28 @@ function HealthRow({ item, group = false }: { item: OpsHealthTreeItem; group?: b
   );
 }
 
+interface SideMenuProps {
+  accountName?: string | null;
+  accountBalanceYuan?: string | null;
+  accountAvatarUrl?: string | null;
+  activeSection: AdminSection;
+  onSelectSection: (section: AdminSection) => void;
+  onOpenProviderSettings?: () => void;
+}
+
 function SideMenu({
   accountName,
   accountBalanceYuan,
   accountAvatarUrl,
-  onNavigate,
+  activeSection,
+  onSelectSection,
   onOpenProviderSettings,
-}: OpsDashboardPageProps) {
-  const navItems: Array<{ stage: Stage; label: string; icon: React.ReactNode }> = [
-    { stage: "intake", label: "工作台", icon: <PlayCircleIcon /> },
-    { stage: "history", label: "任务历史", icon: <HistoryIcon /> },
-    { stage: "templates", label: "模板", icon: <ViewModuleIcon /> },
-    { stage: "settings", label: "设置", icon: <SettingsIcon /> },
+}: SideMenuProps) {
+  const navItems: Array<{ section: AdminSection; label: string; icon: React.ReactNode }> = [
+    { section: "overview", label: "运营总览", icon: <DashboardIcon /> },
+    { section: "accounts", label: "账户", icon: <AccountCircleIcon /> },
+    { section: "runs", label: "任务审计", icon: <FactCheckIcon /> },
+    { section: "health", label: "平台状态", icon: <MonitorHeartIcon /> },
   ];
 
   return (
@@ -727,13 +747,15 @@ function SideMenu({
         </div>
       </div>
       <Divider />
-      <span className="mv-ops-nav-label">Workspace</span>
+      <span className="mv-ops-nav-label">Admin</span>
       <List className="mv-ops-nav-list">
         {navItems.map((item) => (
           <ListItemButton
-            key={item.stage}
+            key={item.section}
             className="mv-ops-nav-item"
-            onClick={() => onNavigate(item.stage)}
+            selected={item.section === activeSection}
+            aria-current={item.section === activeSection ? "page" : undefined}
+            onClick={() => onSelectSection(item.section)}
           >
             <ListItemIcon>{item.icon}</ListItemIcon>
             <ListItemText primary={item.label} />
@@ -747,7 +769,7 @@ function SideMenu({
           alt={accountAvatarUrl ? `${accountName ?? "管理员"}头像` : ""}
           slotProps={{ img: { referrerPolicy: "no-referrer" } }}
         >
-          管
+          {(accountName ?? "管理员").slice(0, 1)}
         </Avatar>
         <div>
           <div className="mv-ops-account__name">{accountName ?? "管理员"}</div>
@@ -767,6 +789,41 @@ function SideMenu({
         )}
       </div>
     </div>
+  );
+}
+
+const PLACEHOLDER_SECTIONS: Record<
+  Exclude<AdminSection, "overview">,
+  { title: string; description: string }
+> = {
+  accounts: {
+    title: "账户",
+    description: "账户与充值视图将在 #232 落地。",
+  },
+  runs: {
+    title: "任务审计",
+    description: "全站任务审计视图尚未落地。",
+  },
+  health: {
+    title: "平台状态",
+    description: "平台服务与依赖健康状态视图尚未落地。",
+  },
+};
+
+/**
+ * Minimal placeholder for admin sections whose real views ship in later
+ * tickets. The account view is #232's job — nothing more than this belongs
+ * in the admin shell yet.
+ */
+function SectionPlaceholder({ section }: { section: Exclude<AdminSection, "overview"> }) {
+  const content = PLACEHOLDER_SECTIONS[section];
+  return (
+    <Paper component="section" variant="outlined" className="mv-ops-state-panel">
+      <div className="mv-ops-state-panel__content">
+        <h2 className="mv-ops-state-panel__title">{content.title}</h2>
+        <p className="mv-ops-state-panel__body">{content.description}</p>
+      </div>
+    </Paper>
   );
 }
 

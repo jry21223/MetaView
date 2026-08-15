@@ -105,6 +105,17 @@
   color: var(--ink);
 }
 
+.mv-ops-nav-item.Mui-selected {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--line-2));
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+.mv-ops-nav-item.Mui-selected:hover {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line-2));
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
 .mv-ops-nav-item .MuiListItemIcon-root {
   min-width: 34px;
   color: currentColor;
