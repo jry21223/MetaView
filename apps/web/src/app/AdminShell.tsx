@@ -4,6 +4,10 @@ import { useAccount } from "../features/account";
 import { WeChatLoginDialog } from "../features/account/ui/WeChatLoginDialog";
 import { OpsDashboardPage } from "../pages/OpsDashboard/OpsDashboardPage";
 import { savePostLoginPath } from "./opsGuestAccess";
+// Issue #234: the ops dashboard stylesheet is loaded with this lazy admin
+// chunk instead of the global index.css, so the apex (self) bundle no longer
+// ships the admin styles at all.
+import "../styles/pages/ops-dashboard.css";
 
 /**
  * AdminShell owns the `/admin` surface as a slim seam over OpsDashboardPage.
