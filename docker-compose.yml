@@ -118,3 +118,18 @@ services:
       - api
     ports:
       - "5173:80"
+
+  # Issue #233: dedicated ops-edition build served ONLY on the ops subdomain
+  # (deploy.sh's second nginx server block proxies ops.metaview.top → 5174).
+  web-ops:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+        VITE_APP_EDITION: ops
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
+    depends_on:
+      - api
+    ports:
+      - "5174:80"

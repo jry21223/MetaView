@@ -25,6 +25,11 @@ _TEST_ENV_DEFAULTS = {
     # construction; pick a non-local default so they pass the new validator
     # without each setting their own success URL.
     "METAVIEW_WECHAT_LOGIN_SUCCESS_URL": "https://ops.metaview.top/",
+    # Issue #233: ops edition also requires METAVIEW_OPS_HOST (the admin
+    # subdomain the ops build is served on) and scopes credentialed CORS to
+    # it. Tests that opt into ops edition would otherwise fail at Settings
+    # construction; keep the same inert-for-routes default.
+    "METAVIEW_OPS_HOST": "ops.metaview.top",
 }
 
 

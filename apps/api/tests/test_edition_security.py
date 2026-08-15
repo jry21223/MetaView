@@ -45,6 +45,9 @@ def test_set_session_cookie_ops_edition_forces_secure_and_strict_samesite() -> N
     assert "secure" in cookie.lower()
     assert "samesite=strict" in cookie.lower()
     assert "samesite=lax" not in cookie.lower()
+    # Issue #233: no Domain attribute means the cookie is host-only on the ops
+    # subdomain — the apex host can never receive mv_session.
+    assert "domain=" not in cookie.lower()
 
 
 def test_set_session_cookie_self_edition_honors_loose_defaults() -> None:
@@ -67,6 +70,9 @@ def test_set_session_cookie_self_edition_honors_loose_defaults() -> None:
     cookie_secure = _cookie_header(settings_secure)
     assert "samesite=lax" in cookie_secure.lower()
     assert "secure" in cookie_secure.lower()
+    # Issue #233: self edition is also host-only; no Domain attribute ever
+    # leaks mv_session to sibling subdomains.
+    assert "domain=" not in cookie_secure.lower()
 
 
 def test_ops_settings_reject_localhost_wechat_login_success_url(
@@ -124,3 +130,48 @@ def test_self_settings_accept_loopback_wechat_login_success_url(
     )
     assert settings.app_edition == "self"
     assert settings.wechat_login_success_url == "http://127.0.0.1:5173/"
+
+
+def test_ops_settings_require_ops_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Issue #233: an ops deployment must name the admin subdomain it is served
+    # on; otherwise the API cannot scope CORS / the session cookie to it and
+    # the ops build would be reachable from arbitrary origins.
+    monkeypatch.delenv("METAVIEW_OPS_HOST", raising=False)
+    with pytest.raises(ValidationError, match="METAVIEW_OPS_HOST"):
+        Settings(
+            app_edition="ops",
+            ops_admin_user_id="ops-admin",
+            wechat_login_success_url="https://ops.metaview.top/",
+            _env_file=None,
+        )
+
+
+def test_ops_settings_ops_host_scopes_cors_origins(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Issue #233: in ops edition credentialed CORS collapses to the ops origin
+    # only; the apex self bundle never talks to the ops API with credentials.
+    monkeypatch.setenv("METAVIEW_OPS_HOST", "ops.metaview.top")
+    settings = Settings(
+        app_edition="ops",
+        ops_admin_user_id="ops-admin",
+        wechat_login_success_url="https://ops.metaview.top/",
+        _env_file=None,
+    )
+    assert settings.ops_host == "ops.metaview.top"
+    assert settings.cors_origins == ["https://ops.metaview.top"]
+
+
+def test_self_settings_keep_default_cors_origins(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Issue #233: self-edition CORS keeps its loopback dev defaults; nothing
+    # about the apex build changes.
+    monkeypatch.delenv("METAVIEW_OPS_HOST", raising=False)
+    settings = Settings(
+        app_edition="self",
+        wechat_login_success_url="http://127.0.0.1:5173/",
+        _env_file=None,
+    )
+    assert settings.ops_host is None
+    assert settings.cors_origins == ["http://127.0.0.1:5173", "http://localhost:5173"]

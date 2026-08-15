@@ -18,7 +18,7 @@ from app.infrastructure.payment.easy_pay import EasyPayClient
 from app.infrastructure.persistence.db_init import init_db
 from app.infrastructure.persistence.sqlite_account_repository import SqliteAccountRepository
 from app.main import create_app
-from app.presentation.dependencies import get_payment_gateway
+from app.presentation.dependencies import get_oauth_client, get_payment_gateway
 
 
 def test_app_edition_defaults_and_normalizes(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -393,6 +393,43 @@ class _DisabledOAuthClient:
 
     async def fetch_identity(self, code: str) -> OAuthIdentity:
         raise AssertionError("OAuth is disabled in this test")
+
+
+class _ConfiguredOAuthClient:
+    configured = True
+
+    def build_login_url(self, state: str) -> str:
+        return f"https://open.weixin.qq.com/connect/qrconnect?state={state}"
+
+    async def fetch_identity(self, code: str) -> OAuthIdentity:
+        raise AssertionError("login-url flow must not fetch identity")
+
+
+def test_ops_login_url_sets_host_only_session_cookie(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    # Issue #233: the ops session cookie is host-only (no Domain attribute),
+    # so a browser on the ops subdomain never sends mv_session to the apex
+    # host. An explicit Domain= would widen the cookie to sibling subdomains;
+    # assert the Set-Cookie header stays scoped to the ops host.
+    db = str(tmp_path / "ops-login-url.db")
+    init_db(db)
+    get_settings.cache_clear()
+    monkeypatch.setenv("METAVIEW_APP_EDITION", "ops")
+    monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", db)
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    app = create_app()
+    app.dependency_overrides[get_oauth_client] = lambda: _ConfiguredOAuthClient()
+
+    with TestClient(app) as client:
+        response = client.get("/api/v1/auth/wechat/login-url")
+
+    get_settings.cache_clear()
+    assert response.status_code == 200
+    set_cookie = response.headers.get("set-cookie", "")
+    assert "mv_session=" in set_cookie
+    assert "domain=" not in set_cookie.lower()
 
 
 def _wechat_session(

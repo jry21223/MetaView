@@ -131,6 +131,13 @@ class Settings(BaseSettings):
     # serve an ops deployment that has not bound its admin identity.
     ops_admin_user_id: str | None = None
 
+    # Ops admin subdomain (issue #233): the host the dedicated ops build is
+    # served on (e.g. ``ops.metaview.top``). Optional for ``self`` edition;
+    # mandatory when ``app_edition == "ops"`` — the validator below refuses to
+    # boot an ops deployment without it and collapses credentialed CORS to
+    # ``https://<ops_host>`` so the apex origin can never talk to the ops API.
+    ops_host: str | None = None
+
     # WeChat OAuth login (Website App / Open Platform)
     wechat_login_appid: str | None = None
     wechat_login_secret: str | None = None
@@ -356,12 +363,25 @@ class Settings(BaseSettings):
         return normalized  # type: ignore[return-value]
 
     @model_validator(mode="after")
-    def _require_ops_admin_user_id_when_ops(self) -> "Settings":
-        if self.app_edition == "ops" and not self.ops_admin_user_id:
+    def _require_ops_mandatory_settings_when_ops(self) -> "Settings":
+        # Ops edition trust boundary (issue #227): the bound admin identity is
+        # mandatory for an ops deployment. Issue #233 extends the mandatory
+        # set with the ops host and restricts credentialed CORS to the ops
+        # origin — the apex self bundle never carries credentials.
+        if self.app_edition != "ops":
+            return self
+        if not self.ops_admin_user_id:
             raise ValueError(
                 "METAVIEW_OPS_ADMIN_USER_ID is required when app_edition='ops'; "
                 "set it to the user_id of the bound ops admin account"
             )
+        if not self.ops_host:
+            raise ValueError(
+                "METAVIEW_OPS_HOST is required when app_edition='ops'; "
+                "set it to the ops admin subdomain the ops build is served on "
+                "(e.g. ops.metaview.top)"
+            )
+        self.cors_origins = [f"https://{self.ops_host}"]
         return self
 
     @model_validator(mode="after")

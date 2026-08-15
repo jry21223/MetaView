@@ -11,9 +11,9 @@ import { savePostLoginPath } from "./opsGuestAccess";
  * sidebar (issue #230) and owns the WeChat login-dialog state (issue #228) so
  * the ops-edition permission panel can trigger login directly from `/admin`
  * instead of forcing the visitor to find a login entry elsewhere. Self
- * edition never reaches this shell — App renders AdminUnavailable there,
- * which intentionally has no login CTA (self edition has no account/login
- * at all).
+ * edition never reaches this shell — in self edition the /admin route is
+ * not registered at all (the apex build drops it, see App.tsx), so there is
+ * no login CTA or admin surface on the public site.
  */
 export function AdminShell() {
   const navigate = useNavigate();
