@@ -817,7 +817,14 @@
   min-height: 328svh;
   padding-top: 128px;
   padding-bottom: 128px;
-  background: var(--surface);
+  /* 与 Hero / 最终 CTA 统一的“条纹纸”纸面：暖白底 + 48px 低对比细网格。
+     此前只铺一层纯白 --surface，light 主题下整屏无纹理，视觉上与背景
+     未加载的白屏无法区分。 */
+  background:
+    linear-gradient(color-mix(in srgb, var(--line) 42%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--line) 42%, transparent) 1px, transparent 1px),
+    var(--bg);
+  background-size: 48px 48px;
 }
 
 .mv-landing-capability__inner {
