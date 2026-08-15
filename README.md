@@ -216,6 +216,7 @@ make stop
 | `METAVIEW_ROUTER_MODE` | `off` / `heuristic` / `llm` / `hybrid` |
 | `METAVIEW_HISTORY_DB_PATH` | 本地 SQLite 路径 |
 | `METAVIEW_OPS_ADMIN_USER_ID` | ops edition 唯一绑定的管理员 user_id（ops 必填） |
+| `METAVIEW_OPS_HOST` | ops 管理台子域名（可选，留空 = 单域名模式；仅 deploy.sh 的 nginx 配置使用） |
 | `METAVIEW_PLAYBOOK_DEFAULT_FPS` | 默认帧率 |
 
 </details>
