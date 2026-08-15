@@ -8,6 +8,7 @@ from app.config import get_settings
 from app.infrastructure.persistence.db_init import init_db
 from app.presentation.error_handlers import register_error_handlers
 from app.presentation.middleware import BodySizeLimitMiddleware
+from app.presentation.ops_transport_policy import validate_ops_transport_allowlist
 from app.presentation.rate_limit import install_rate_limiter
 from app.presentation.router_account import router as account_router
 from app.presentation.router_agent import router as agent_router
@@ -29,6 +30,7 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    validate_ops_transport_allowlist(settings)
 
     app = FastAPI(
         title=settings.app_name,
