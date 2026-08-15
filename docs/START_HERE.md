@@ -49,7 +49,7 @@ Agent mode is an active verification path, not the default production claim. To 
 - `/` is the public Landing page.
 - `/create` is the lesson creation entrypoint; use this path for bookmarks, external CTAs, and E2E flows that should open the workbench directly.
 - `/templates` is the only template catalogue. Published templates expand a static poster and then open `/templates/:templateId` in the shared `PlaybookPlayer`; pending templates stay visible but disabled.
-- `/admin` is the hidden operations dashboard and remains restricted to `ops` edition administrators.
+- `/admin` is the hidden operations dashboard, restricted to the single ops admin account bound by `METAVIEW_OPS_ADMIN_USER_ID` (role=admin alone is no longer sufficient).
 
 The move from `/` to `/create` for direct creation is an intentional route behavior change. Do not assume the root path opens the generator.
 

@@ -13,7 +13,7 @@ _TEST_ENV_DEFAULTS = {
     "METAVIEW_OPENAI_API_KEY": "",
     "METAVIEW_TTS_API_KEY": "",
     "METAVIEW_RATE_LIMIT_ENABLED": "false",
-    # Issue #226: an ops deployment must bind one admin identity. Tests that
+    # Issue #227: an ops deployment must bind one admin identity. Tests that
     # opt into ops edition (``METAVIEW_APP_EDITION=ops``) without setting
     # this would otherwise fail at Settings construction. The value is
     # inert for account routes, which still gate via require_wechat_session,

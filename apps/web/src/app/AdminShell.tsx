@@ -7,7 +7,7 @@ import { stageToPath } from "./routes";
 
 /**
  * AdminShell owns the `/admin` surface as a slim seam over OpsDashboardPage.
- * It also owns the WeChat login-dialog state (issue #229) so the ops-edition
+ * It also owns the WeChat login-dialog state (issue #228) so the ops-edition
  * permission panel can trigger login directly from `/admin` instead of forcing
  * the visitor to find a login entry elsewhere. Self edition never reaches this
  * shell — App renders AdminUnavailable there, which intentionally has no login

@@ -197,7 +197,7 @@ make stop
 | 客户端 Provider override | 允许 | 允许 |
 | 余额、充值与账户 | 不显示 | 登录后启用 |
 | 运行历史 | 本地 SQLite | 按微信账户隔离 |
-| 管理后台 | 不可用 | `/admin`，仍需 `role=admin` |
+| 管理后台 | 不可用 | `/admin`，仅绑定 `METAVIEW_OPS_ADMIN_USER_ID` 的 admin 账户（ops 未配置该项则启动失败） |
 
 完整变量见 [`.env.example`](./.env.example)。生产环境必须为登录、支付回调和下载地址配置公网 HTTPS，并关闭不适合生产的 mock 与开发选项。
 
@@ -215,6 +215,7 @@ make stop
 | `METAVIEW_AGENT_BASE_URL` / `METAVIEW_AGENT_SHARED_TOKEN` | Agent sidecar 地址与共享鉴权 token |
 | `METAVIEW_ROUTER_MODE` | `off` / `heuristic` / `llm` / `hybrid` |
 | `METAVIEW_HISTORY_DB_PATH` | 本地 SQLite 路径 |
+| `METAVIEW_OPS_ADMIN_USER_ID` | ops edition 唯一绑定的管理员 user_id（ops 必填） |
 | `METAVIEW_PLAYBOOK_DEFAULT_FPS` | 默认帧率 |
 
 </details>

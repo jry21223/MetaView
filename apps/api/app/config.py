@@ -125,7 +125,7 @@ class Settings(BaseSettings):
     recharge_min_cents: int = 500
     generation_cost_cents: int = 10
 
-    # Ops edition trust boundary (issue #226): the single ``user_id`` that is
+    # Ops edition trust boundary (issue #227): the single ``user_id`` that is
     # permitted to reach ops routes. Optional for ``self`` edition; mandatory
     # when ``app_edition == "ops"`` — the model validator below refuses to
     # serve an ops deployment that has not bound its admin identity.
@@ -366,11 +366,11 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _reject_loopback_wechat_login_success_url_when_ops(self) -> "Settings":
-        # Issue #225: an ops deployment that forgets to set
+        # Issue #226: an ops deployment that forgets to set
         # METAVIEW_WECHAT_LOGIN_SUCCESS_URL keeps the localhost default, which
         # silently breaks the WeChat OAuth callback by redirecting users back
         # to 127.0.0.1 in production. Refuse to boot rather than ship a broken
-        # redirect target. Declared after the #226 validator so a missing
+        # redirect target. Declared after the #227 validator so a missing
         # ops_admin_user_id still raises first.
         if self.app_edition == "ops" and self.wechat_login_success_url.startswith(
             ("http://localhost", "http://127.0.0.1")

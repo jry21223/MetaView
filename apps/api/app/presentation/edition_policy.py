@@ -40,7 +40,7 @@ async def require_bound_admin_session(
     """Guards every ops route behind the single bound ops-admin identity.
 
     Runs the existing WeChat session + enabled-status gate, then enforces the
-    issue #226 trust boundary: ``role == admin`` AND ``user_id ==
+    issue #227 trust boundary: ``role == admin`` AND ``user_id ==
     settings.ops_admin_user_id``. The bound-admin check lives here once so ops
     routes never duplicate it. ``require_wechat_session`` stays available for
     non-admin account routes that should not bind to the ops admin.

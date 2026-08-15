@@ -200,6 +200,15 @@
   letter-spacing: 0.04em;
   cursor: pointer;
   transition: all 0.15s;
+  position: relative;
+}
+/* DESIGN.md touch-target floor: keep the 31px visual circle but extend the
+ * clickable area to 44px via an invisible pseudo-element hit ring. */
+.mv-avatar::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border-radius: 50%;
 }
 .mv-avatar:hover {
   color: var(--ink);
