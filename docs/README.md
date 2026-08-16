@@ -22,6 +22,7 @@
 | [coverage-and-fallback.md](./coverage-and-fallback.md) | CoverageDecision 四种能力模式、受控组合、阻断与持久化边界 |
 | [skill-recipe.md](./skill-recipe.md) | composable 请求的临时执行契约、确定性验证和安全边界 |
 | [quality-gate.md](./quality-gate.md) | 后端 Canonical QualityReport、修复、持久化、Director 与导出阻断语义 |
+| [pipeline-observability.md](./pipeline-observability.md) | #241 运行观测：脚本用法、指标定义（修复/warning 码/provider 路径/上修成功率）与数据来源 |
 | [frontend-shell.md](./frontend-shell.md) | Stage 路由、GlobalTopbar、Studio 布局、Provider 配置、snapshot support levels |
 | [template-previews.md](./template-previews.md) | `/templates` 正式案例、统一 PlaybookPlayer、确定性参数与零请求边界 |
 | [seo-geo.md](./seo-geo.md) | 公共路由的索引边界、canonical / social metadata、JSON-LD、sitemap 与构建验证 |
