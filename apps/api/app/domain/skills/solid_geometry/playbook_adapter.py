@@ -14,6 +14,7 @@ from app.domain.models.playbook import (
     SolidGeometryVector,
 )
 from app.domain.models.topic import TopicDomain
+from app.domain.services.playbook_quality import estimate_step_frames
 from app.domain.skills.solid_geometry.geometry_kernel import (
     SolidGeometrySolution,
     SolidGeometrySolutionStep,
@@ -35,7 +36,8 @@ def build_solid_geometry_playbook(
     cumulative = 0
     for index, solution_step in enumerate(solution.steps):
         is_final = index == len(solution.steps) - 1
-        cumulative += _STEP_FRAMES
+        voiceover_text = _voiceover(solution, solution_step, is_final=is_final)
+        cumulative += max(_STEP_FRAMES, estimate_step_frames(voiceover_text, _FPS))
         snapshot = _build_snapshot(
             solution,
             solution_step,
@@ -46,7 +48,7 @@ def build_solid_geometry_playbook(
                 step_id=f"solid_geometry_{index + 1:02d}",
                 end_frame=cumulative,
                 title=solution_step.title,
-                voiceover_text=_voiceover(solution, solution_step, is_final=is_final),
+                voiceover_text=voiceover_text,
                 animation_hint="solid_geometry_scene",
                 snapshot=snapshot,
                 layers=[

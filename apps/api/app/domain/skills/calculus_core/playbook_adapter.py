@@ -14,6 +14,7 @@ from app.domain.models.playbook import (
     PlaybookScript,
 )
 from app.domain.models.topic import TopicDomain
+from app.domain.services.playbook_quality import estimate_step_frames
 from app.domain.skills.algebra_core import expression_to_source, parse_expression
 from app.domain.skills.calculus_core.problem_spec import CalculusCoreProblemSpec
 
@@ -204,13 +205,16 @@ def _script(
     snapshots: list[MathFormulaSnapshot | MathPlotSnapshot | IterationTraceSceneSnapshot],
 ) -> PlaybookScript:
     steps: list[MetaStep] = []
+    frame_cursor = 0
     for index, snapshot in enumerate(snapshots[:6]):
+        voiceover_text = getattr(snapshot, "caption", None) or "执行微积分步骤。"
+        frame_cursor += max(_STEP_FRAMES, estimate_step_frames(voiceover_text, _FPS))
         steps.append(
             MetaStep(
                 step_id=f"calculus_core_{index + 1:02d}",
-                end_frame=(index + 1) * _STEP_FRAMES,
+                end_frame=frame_cursor,
                 title=["建立函数", "视觉解释", "符号计算", "数值观察", "总结"][min(index, 4)],
-                voiceover_text=getattr(snapshot, "caption", None) or "执行微积分步骤。",
+                voiceover_text=voiceover_text,
                 animation_hint=snapshot.kind,
                 snapshot=snapshot,
                 layers=[Layer(timing=LayerTiming(), body=snapshot)],
@@ -219,7 +223,7 @@ def _script(
         )
     return PlaybookScript(
         fps=_FPS,
-        total_frames=len(steps) * _STEP_FRAMES,
+        total_frames=frame_cursor,
         domain=TopicDomain.MATH,
         title=title,
         summary="使用共享 algebra_core 解析表达式，再由 SymPy kernel 完成微积分计算。",

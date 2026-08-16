@@ -11,6 +11,7 @@ from app.domain.models.playbook import (
     TableSceneSnapshot,
 )
 from app.domain.models.topic import TopicDomain
+from app.domain.services.playbook_quality import estimate_step_frames
 from app.domain.skills.algebra_core import (
     parse_equation,
     parse_expression,
@@ -122,14 +123,17 @@ def _script(
     ]
     while len(snapshots) < 5:
         snapshots.append(snapshots[-1])
+    frame_cursor = 0
     for index, snapshot in enumerate(snapshots[:6]):
         label = captions[index] if index < len(captions) else "补充说明"
+        voiceover_text = _voiceover(label, snapshot)
+        frame_cursor += max(_STEP_FRAMES, estimate_step_frames(voiceover_text, _FPS))
         steps.append(
             MetaStep(
                 step_id=f"elementary_algebra_{index + 1:02d}",
-                end_frame=(index + 1) * _STEP_FRAMES,
+                end_frame=frame_cursor,
                 title=label,
-                voiceover_text=_voiceover(label, snapshot),
+                voiceover_text=voiceover_text,
                 animation_hint=snapshot.kind,
                 snapshot=snapshot,
                 layers=[Layer(timing=LayerTiming(), body=snapshot)],
@@ -138,7 +142,7 @@ def _script(
         )
     return PlaybookScript(
         fps=_FPS,
-        total_frames=len(steps) * _STEP_FRAMES,
+        total_frames=frame_cursor,
         domain=TopicDomain.MATH,
         title=title,
         summary="使用共享 algebra_core 完成确定性解析、求解和步骤化解释。",

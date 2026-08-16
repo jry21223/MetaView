@@ -12,6 +12,7 @@ from app.domain.models.playbook import (
     TableSceneSnapshot,
 )
 from app.domain.models.topic import TopicDomain
+from app.domain.services.playbook_quality import estimate_step_frames
 from app.domain.skills.linear_algebra.problem_spec import LinearAlgebraProblemSpec
 
 _FPS = 30
@@ -174,16 +175,19 @@ def _script(
     title: str,
     snapshots: list[MatrixSceneSnapshot | MathFormulaSnapshot | TableSceneSnapshot],
 ) -> PlaybookScript:
+    steps: list[MetaStep] = []
     while len(snapshots) < 5:
         snapshots.append(snapshots[-1])
-    steps: list[MetaStep] = []
+    frame_cursor = 0
     for index, snapshot in enumerate(snapshots[:6]):
+        voiceover_text = getattr(snapshot, "caption", None) or "执行线性代数步骤。"
+        frame_cursor += max(_STEP_FRAMES, estimate_step_frames(voiceover_text, _FPS))
         steps.append(
             MetaStep(
                 step_id=f"linear_algebra_{index + 1:02d}",
-                end_frame=(index + 1) * _STEP_FRAMES,
+                end_frame=frame_cursor,
                 title=_step_title(index, snapshot),
-                voiceover_text=getattr(snapshot, "caption", None) or "执行线性代数步骤。",
+                voiceover_text=voiceover_text,
                 animation_hint=snapshot.kind,
                 snapshot=snapshot,
                 layers=[Layer(timing=LayerTiming(), body=snapshot)],
@@ -192,7 +196,7 @@ def _script(
         )
     return PlaybookScript(
         fps=_FPS,
-        total_frames=len(steps) * _STEP_FRAMES,
+        total_frames=frame_cursor,
         domain=TopicDomain.MATH,
         title=title,
         summary="使用确定性矩阵 kernel 构建可渲染的线性代数步骤。",

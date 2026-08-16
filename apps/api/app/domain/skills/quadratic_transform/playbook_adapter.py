@@ -9,6 +9,7 @@ from app.domain.models.playbook import (
     PlaybookScript,
 )
 from app.domain.models.topic import TopicDomain
+from app.domain.services.playbook_quality import estimate_step_frames
 from app.domain.skills.quadratic_transform.problem_spec import (
     QuadraticTransformProblemSpec,
     build_quadratic_expression,
@@ -30,6 +31,7 @@ def build_quadratic_transform_playbook(
     scaled_expression = build_quadratic_expression(spec.a, spec.h, 0.0)
 
     steps: list[MetaStep] = []
+    frame_cursor = 0
 
     def add_step(
         title: str,
@@ -38,6 +40,7 @@ def build_quadratic_transform_playbook(
         formula_latex: str,
         marker_x: float | None = None,
     ) -> None:
+        nonlocal frame_cursor
         snapshot = MathPlotSnapshot(
             curves=curves,
             x_min=spec.x_min,
@@ -45,10 +48,11 @@ def build_quadratic_transform_playbook(
             marker_x=marker_x,
             formula_latex=formula_latex,
         )
+        frame_cursor += max(_STEP_FRAMES, estimate_step_frames(voiceover_text, _FPS))
         steps.append(
             MetaStep(
                 step_id=f"quadratic_transform_{len(steps) + 1:02d}",
-                end_frame=(len(steps) + 1) * _STEP_FRAMES,
+                end_frame=frame_cursor,
                 title=title,
                 voiceover_text=voiceover_text,
                 animation_hint="math_plot_transform",
@@ -127,7 +131,7 @@ def build_quadratic_transform_playbook(
 
     return PlaybookScript(
         fps=_FPS,
-        total_frames=len(steps) * _STEP_FRAMES,
+        total_frames=frame_cursor,
         domain=TopicDomain.MATH,
         title="二次函数图像变换",
         summary="用确定性的函数图像步骤解释顶点式二次函数的平移、伸缩和开口变化。",

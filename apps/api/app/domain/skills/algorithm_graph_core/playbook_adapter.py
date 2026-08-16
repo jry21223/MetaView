@@ -17,6 +17,7 @@ from app.domain.models.playbook import (
 )
 from app.domain.models.topic import TopicDomain
 from app.domain.services.algorithm_code_library import get_by_id
+from app.domain.services.playbook_quality import estimate_step_frames
 from app.domain.skills.algorithm_graph_core.graph_kernel import GraphAlgorithmSolution
 
 _FPS = 30
@@ -36,23 +37,27 @@ def build_algorithm_graph_playbook(
     solution: GraphAlgorithmSolution,
 ) -> PlaybookScript:
     snapshots = _snapshots(solution)
-    steps = [
-        MetaStep(
-            step_id=f"algorithm_graph_core_{index + 1:02d}",
-            end_frame=(index + 1) * _STEP_FRAMES,
-            title=_title(index, snapshot.kind),
-            voiceover_text=_voiceover_text(index, snapshot.kind, solution),
-            animation_hint=snapshot.kind,
-            snapshot=snapshot,
-            layers=[Layer(timing=LayerTiming(), body=snapshot)],
-            code_highlight=_code_highlight_for_snapshot(solution, snapshot),
-            tokens=[],
+    steps: list[MetaStep] = []
+    frame_cursor = 0
+    for index, snapshot in enumerate(snapshots):
+        voiceover_text = _voiceover_text(index, snapshot.kind, solution)
+        frame_cursor += max(_STEP_FRAMES, estimate_step_frames(voiceover_text, _FPS))
+        steps.append(
+            MetaStep(
+                step_id=f"algorithm_graph_core_{index + 1:02d}",
+                end_frame=frame_cursor,
+                title=_title(index, snapshot.kind),
+                voiceover_text=voiceover_text,
+                animation_hint=snapshot.kind,
+                snapshot=snapshot,
+                layers=[Layer(timing=LayerTiming(), body=snapshot)],
+                code_highlight=_code_highlight_for_snapshot(solution, snapshot),
+                tokens=[],
+            )
         )
-        for index, snapshot in enumerate(snapshots)
-    ]
     return PlaybookScript(
         fps=_FPS,
-        total_frames=len(steps) * _STEP_FRAMES,
+        total_frames=frame_cursor,
         domain=TopicDomain.ALGORITHM,
         title=_playbook_title(solution.kind),
         summary="使用确定性图算法 kernel 生成可渲染步骤。",

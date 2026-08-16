@@ -11,6 +11,7 @@ from app.domain.models.playbook import (
     TableSceneSnapshot,
 )
 from app.domain.models.topic import TopicDomain
+from app.domain.services.playbook_quality import estimate_step_frames
 from app.domain.skills.chemistry_stoichiometry.stoichiometry_kernel import (
     ChemistryStoichiometrySolution,
 )
@@ -24,22 +25,26 @@ def build_chemistry_stoichiometry_playbook(
     solution: ChemistryStoichiometrySolution,
 ) -> PlaybookScript:
     snapshots = _snapshots(solution)
-    steps = [
-        MetaStep(
-            step_id=f"chemistry_stoichiometry_{index + 1:02d}",
-            end_frame=(index + 1) * _STEP_FRAMES,
-            title=_title(index, snapshot),
-            voiceover_text=getattr(snapshot, "caption", None) or solution.answer_text,
-            animation_hint=snapshot.kind,
-            snapshot=snapshot,
-            layers=[Layer(timing=LayerTiming(), body=snapshot)],
-            tokens=[],
+    steps: list[MetaStep] = []
+    frame_cursor = 0
+    for index, snapshot in enumerate(snapshots):
+        voiceover_text = getattr(snapshot, "caption", None) or solution.answer_text
+        frame_cursor += max(_STEP_FRAMES, estimate_step_frames(voiceover_text, _FPS))
+        steps.append(
+            MetaStep(
+                step_id=f"chemistry_stoichiometry_{index + 1:02d}",
+                end_frame=frame_cursor,
+                title=_title(index, snapshot),
+                voiceover_text=voiceover_text,
+                animation_hint=snapshot.kind,
+                snapshot=snapshot,
+                layers=[Layer(timing=LayerTiming(), body=snapshot)],
+                tokens=[],
+            )
         )
-        for index, snapshot in enumerate(snapshots)
-    ]
     return PlaybookScript(
         fps=_FPS,
-        total_frames=len(steps) * _STEP_FRAMES,
+        total_frames=frame_cursor,
         domain=TopicDomain.CHEMISTRY,
         title=_playbook_title(solution.kind),
         summary="使用确定性化学计量 kernel 构建可渲染的步骤。",
