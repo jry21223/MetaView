@@ -39,7 +39,11 @@ def _moving_line_playbook(
     playbook["title"] = "Fixed-point line family"
     playbook["summary"] = "Prove a moving line passes through a fixed point."
     playbook["parameter_controls"] = controls or []
-    for step in playbook["steps"]:
+    for index, step in enumerate(playbook["steps"]):
+        # The narration needs ~8.5s; give every step enough frames so the
+        # fixture does not trip the allowlisted timeline.voiceover_too_short
+        # warning, keeping this file focused on the math parameter contract.
+        step["end_frame"] = (index + 1) * 300
         snapshot = {
             "kind": "math_plot",
             "curves": [{"expression": expression, "label": "moving line"}],
@@ -57,6 +61,7 @@ def _moving_line_playbook(
         step["snapshot"] = snapshot
         step["layers"] = [{"body": json.loads(json.dumps(snapshot))}]
         step["code_highlight"] = None
+    playbook["total_frames"] = 300 * len(playbook["steps"])
     return playbook
 
 

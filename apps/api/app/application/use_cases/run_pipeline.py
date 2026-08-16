@@ -71,6 +71,10 @@ AGENT_SELF_REPAIR_ATTEMPTS = 2
 AGENT_REVIEWER_REPAIR_ATTEMPTS = 1
 CANONICAL_QUALITY_REPAIR_ATTEMPTS = 1
 
+# Warning codes that auto-trigger a single repair regeneration in agent mode
+# (decision #236: auto-repair; expanded based on repair-success observability).
+_WARNING_REPAIR_ALLOWLIST = frozenset({"timeline.voiceover_too_short"})
+
 
 @dataclass(frozen=True)
 class ParseResult:
@@ -740,10 +744,12 @@ class RunPipelineUseCase:
                 coverage_decision=route_context.coverage_decision,
                 lesson_plan=lesson_plan,
             )
-            if quality_report.status == "repairable":
+            for attempt in range(CANONICAL_QUALITY_REPAIR_ATTEMPTS):
+                if quality_report.status != "repairable":
+                    break
                 review_report = _with_playbook_review_actions(
                     review_report,
-                    [*review_report.actions, "quality:repair_attempt:1"],
+                    [*review_report.actions, f"quality:repair_attempt:{attempt + 1}"],
                 )
                 await self._persist_quality_report(run_id, quality_report)
                 await self._repo.update(
@@ -769,6 +775,49 @@ class RunPipelineUseCase:
                     run_id,
                     request,
                     playbook,
+                    provider_config=provider_config,
+                    route_context=route_context,
+                    review_report=review_report,
+                    lesson_plan=lesson_plan,
+                )
+                quality_report = _quality_report_with_review(
+                    playbook,
+                    request.prompt,
+                    review_report,
+                    generator_path="agent",
+                    coverage_decision=route_context.coverage_decision,
+                    lesson_plan=lesson_plan,
+                )
+            if (
+                quality_report.status == "warnings"
+                and any(
+                    issue.code in _WARNING_REPAIR_ALLOWLIST
+                    for issue in quality_report.issues
+                )
+            ):
+                # One-shot auto-repair for allowlisted warnings (#242). Kept
+                # outside the repairable loop: warnings never enter that loop,
+                # and this must stay a single attempt per run. No reviewer LLM
+                # round-trip here; the canonical gate rerun is the only check.
+                review_report = _with_playbook_review_actions(
+                    review_report,
+                    [*review_report.actions, "quality:warning_repair_attempt:1"],
+                )
+                await self._persist_quality_report(run_id, quality_report)
+                await self._repo.update(
+                    run_id,
+                    status=PipelineRunStatus.REVIEWING,
+                    review_json=review_report.model_dump_json(),
+                )
+                playbook, review_report = await self._repair_agent_playbook_from_reviewer(
+                    run_id,
+                    request,
+                    playbook,
+                    [
+                        issue
+                        for issue in quality_report.issues
+                        if issue.code in _WARNING_REPAIR_ALLOWLIST
+                    ],
                     provider_config=provider_config,
                     route_context=route_context,
                     review_report=review_report,
@@ -1310,10 +1359,10 @@ class RunPipelineUseCase:
             logger.warning("Failed to persist default director for run %s", run_id, exc_info=True)
             return PlaybookReviewIssue(
                 code="director.persistence_failed",
-                severity=PlaybookIssueSeverity.ERROR,
+                severity=PlaybookIssueSeverity.WARNING,
                 path="director",
                 message=f"Default DirectorScript could not be persisted: {exc}",
-                suggestion="Retry Director persistence before declaring the run complete.",
+                suggestion="The run still completes; export rebuilds the default DirectorScript.",
                 requires_repair=False,
             )
         return None
@@ -1351,14 +1400,6 @@ class RunPipelineUseCase:
                 director_issue,
                 action="director:persistence_failed",
             )
-            await self._persist_quality_report(run_id, quality_report)
-            await self._repo.update(
-                run_id,
-                status=PipelineRunStatus.FAILED,
-                error=director_issue.message,
-                review_json=review_json,
-            )
-            return False
 
         await self._persist_quality_report(run_id, quality_report)
         await self._repo.update(

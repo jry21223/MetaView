@@ -141,7 +141,7 @@ async def test_successful_pipeline_run_persists_active_director(repos) -> None:
 
 
 @pytest.mark.asyncio
-async def test_director_persistence_failure_blocks_run_completion(repo) -> None:
+async def test_director_persistence_failure_degrades_run_gracefully(repo) -> None:
     use_case = RunPipelineUseCase(
         repo,
         MockLLMSuccess(),
@@ -155,12 +155,13 @@ async def test_director_persistence_failure_blocks_run_completion(repo) -> None:
 
     result = await repo.get("run-director-fail")
     assert result is not None
-    assert result.status == PipelineRunStatus.FAILED
+    assert result.status == PipelineRunStatus.SUCCEEDED
+    assert result.playbook is not None
+    assert result.error is None
     assert result.quality_report is not None
-    assert result.quality_report.status == "blocked"
-    assert {issue.code for issue in result.quality_report.issues} >= {
-        "director.persistence_failed"
-    }
+    assert result.quality_report.status == "warnings"
+    issues = {issue.code: issue.severity for issue in result.quality_report.issues}
+    assert issues["director.persistence_failed"] == "warning"
 
 
 @pytest.mark.asyncio

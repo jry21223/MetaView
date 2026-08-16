@@ -18,7 +18,16 @@ import pytest
 from app.application.agent.types import AgentRequest, AgentResult
 from app.application.dto.pipeline_dto import PipelineRequest
 from app.application.ports.agent_provider import AgentProviderError
+from app.application.use_cases import run_pipeline as run_pipeline_module
 from app.application.use_cases.run_pipeline import RunPipelineUseCase as _RunPipelineUseCase
+from app.domain.models.pipeline_run import PipelineRunStatus
+from app.domain.models.quality_report import QualityReport
+from app.domain.models.review import (
+    PlaybookIssueSeverity,
+    PlaybookReviewIssue,
+    PlaybookReviewStatus,
+    PlaybookReviewVerdict,
+)
 from app.domain.skills.registry import SkillRegistry
 from tests.coverage_test_utils import ComposableCoverageResolver
 
@@ -847,3 +856,310 @@ async def test_single_mode_does_not_call_agent() -> None:
 
     # Agent must never be invoked.
     assert agent.calls == []
+
+
+def _repairable_gate_report(generator_path: str, coverage_mode: str) -> QualityReport:
+    """A canonical gate verdict flagging exactly one repairable error."""
+    return QualityReport.from_review_verdict(
+        PlaybookReviewVerdict(
+            status=PlaybookReviewStatus.BLOCKED,
+            summary="Canonical gate flagged a repairable issue.",
+            issues=[
+                PlaybookReviewIssue(
+                    code="step.empty_voiceover",
+                    severity=PlaybookIssueSeverity.ERROR,
+                    path="steps[0].voiceover_text",
+                    message="Every step must have non-empty voiceover_text.",
+                    suggestion="Write narration.",
+                    requires_repair=True,
+                )
+            ],
+        ),
+        generator_path=generator_path,
+        coverage_mode=coverage_mode,
+    )
+
+
+def _clean_gate_report(generator_path: str, coverage_mode: str) -> QualityReport:
+    """A canonical gate verdict with no issues."""
+    return QualityReport.from_review_verdict(
+        PlaybookReviewVerdict(
+            status=PlaybookReviewStatus.CLEAN,
+            summary="Playbook passed the canonical backend quality gate.",
+            issues=[],
+        ),
+        generator_path=generator_path,
+        coverage_mode=coverage_mode,
+    )
+
+
+def _warnings_gate_report(
+    generator_path: str,
+    coverage_mode: str,
+    code: str = "timeline.voiceover_too_short",
+) -> QualityReport:
+    """A canonical gate verdict flagging exactly one non-repairable warning."""
+    return QualityReport.from_review_verdict(
+        PlaybookReviewVerdict(
+            status=PlaybookReviewStatus.WARNINGS,
+            summary="Canonical gate flagged a warning.",
+            issues=[
+                PlaybookReviewIssue(
+                    code=code,
+                    severity=PlaybookIssueSeverity.WARNING,
+                    path="steps[0].end_frame",
+                    message=(
+                        "Step duration appears shorter than the estimated "
+                        "narration requirement."
+                    ),
+                    suggestion="Increase this step duration or shorten the narration text.",
+                    requires_repair=False,
+                )
+            ],
+        ),
+        generator_path=generator_path,
+        coverage_mode=coverage_mode,
+    )
+
+
+def _sequence_quality_gate(reports: list[QualityReport]):
+    """Stand-in for ``quality_gate_playbook`` returning scripted reports.
+
+    The agent self-check and the canonical gate currently run the same checks,
+    so a genuinely ``repairable`` gate result is not reachable end-to-end; this
+    seam exercises the repair-count wiring driven by
+    ``CANONICAL_QUALITY_REPAIR_ATTEMPTS`` instead.
+    """
+    calls = 0
+
+    def gate(
+        playbook: Any,
+        prompt: str,
+        *,
+        generator_path: str,
+        coverage_mode: str,
+        coverage_decision: Any = None,
+        lesson_plan: Any = None,
+    ) -> QualityReport:
+        nonlocal calls
+        report = reports[min(calls, len(reports) - 1)]
+        calls += 1
+        return report
+
+    return gate
+
+
+@pytest.mark.asyncio
+async def test_agent_mode_canonical_quality_repair_runs_once_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _RecordingRepo()
+    agent = _SequenceAgent([_playbook_copy(), _playbook_copy()])
+    reviewer = _SequenceReviewer([
+        _reviewer_response("clean"),
+        _reviewer_response("clean"),
+    ])
+    monkeypatch.setattr(
+        run_pipeline_module,
+        "quality_gate_playbook",
+        _sequence_quality_gate([
+            _repairable_gate_report("agent", "composable"),
+            _clean_gate_report("agent", "composable"),
+        ]),
+    )
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        reviewer_llm=reviewer,
+        agent_provider=agent,
+        generation_mode="agent",
+    )
+
+    await use_case.execute(
+        "run-canonical-repair",
+        PipelineRequest(prompt="Show the array", domain="algorithm"),
+    )
+
+    assert len(agent.calls) == 2  # initial generation + one canonical repair
+    assert len(reviewer.calls) == 2  # initial review + post-repair review
+    last = repo.updates[-1]
+    assert last["status"].value == "succeeded"
+    review = json.loads(last["review_json"])
+    assert "quality:repair_attempt:1" in review["actions"]
+    assert not any(
+        action.startswith("quality:repair_attempt:2") for action in review["actions"]
+    )
+    assert repo.quality_reports[-1]["report"]["status"] == "clean"
+
+
+@pytest.mark.asyncio
+async def test_agent_mode_canonical_quality_repair_count_follows_constant(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _RecordingRepo()
+    agent = _SequenceAgent([_playbook_copy(), _playbook_copy(), _playbook_copy()])
+    reviewer = _SequenceReviewer([
+        _reviewer_response("clean"),
+        _reviewer_response("clean"),
+        _reviewer_response("clean"),
+    ])
+    monkeypatch.setattr(run_pipeline_module, "CANONICAL_QUALITY_REPAIR_ATTEMPTS", 2)
+    monkeypatch.setattr(
+        run_pipeline_module,
+        "quality_gate_playbook",
+        _sequence_quality_gate([
+            _repairable_gate_report("agent", "composable"),
+            _repairable_gate_report("agent", "composable"),
+            _clean_gate_report("agent", "composable"),
+        ]),
+    )
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        reviewer_llm=reviewer,
+        agent_provider=agent,
+        generation_mode="agent",
+    )
+
+    await use_case.execute(
+        "run-canonical-repair-twice",
+        PipelineRequest(prompt="Show the array", domain="algorithm"),
+    )
+
+    assert len(agent.calls) == 3  # initial generation + two canonical repairs
+    assert len(reviewer.calls) == 3  # one review per generation
+    last = repo.updates[-1]
+    assert last["status"].value == "succeeded"
+    review = json.loads(last["review_json"])
+    assert "quality:repair_attempt:1" in review["actions"]
+    assert "quality:repair_attempt:2" in review["actions"]
+
+
+@pytest.mark.asyncio
+async def test_agent_mode_allowlisted_warning_repairs_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _RecordingRepo()
+    agent = _SequenceAgent([_playbook_copy(), _playbook_copy()])
+    reviewer = _SequenceReviewer([_reviewer_response("clean")])
+    monkeypatch.setattr(
+        run_pipeline_module,
+        "quality_gate_playbook",
+        _sequence_quality_gate([
+            _warnings_gate_report("agent", "composable"),
+            _clean_gate_report("agent", "composable"),
+        ]),
+    )
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        reviewer_llm=reviewer,
+        agent_provider=agent,
+        generation_mode="agent",
+    )
+
+    await use_case.execute(
+        "run-warning-repair",
+        PipelineRequest(prompt="Show the array", domain="algorithm"),
+    )
+
+    assert len(agent.calls) == 2  # initial generation + one warning repair
+    assert len(reviewer.calls) == 1  # no extra reviewer round-trip after repair
+    assert any(
+        update.get("status") == PipelineRunStatus.REVIEWING
+        and "quality:warning_repair_attempt:1"
+        in json.loads(update["review_json"])["actions"]
+        for update in repo.updates
+    )
+    last = repo.updates[-1]
+    assert last["status"].value == "succeeded"
+    review = json.loads(last["review_json"])
+    assert "quality:warning_repair_attempt:1" in review["actions"]
+    assert not any(
+        action.startswith("quality:warning_repair_attempt:2")
+        for action in review["actions"]
+    )
+    assert not any(
+        action.startswith("quality:repair_attempt:") for action in review["actions"]
+    )
+    assert repo.quality_reports[-1]["report"]["status"] == "clean"
+
+
+@pytest.mark.asyncio
+async def test_agent_mode_allowlisted_warning_still_warns_after_repair_succeeds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _RecordingRepo()
+    agent = _SequenceAgent([_playbook_copy(), _playbook_copy()])
+    reviewer = _SequenceReviewer([_reviewer_response("clean")])
+    monkeypatch.setattr(
+        run_pipeline_module,
+        "quality_gate_playbook",
+        _sequence_quality_gate([
+            _warnings_gate_report("agent", "composable"),
+            _warnings_gate_report("agent", "composable"),
+        ]),
+    )
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        reviewer_llm=reviewer,
+        agent_provider=agent,
+        generation_mode="agent",
+    )
+
+    await use_case.execute(
+        "run-warning-persists",
+        PipelineRequest(prompt="Show the array", domain="algorithm"),
+    )
+
+    assert len(agent.calls) == 2
+    assert len(reviewer.calls) == 1
+    last = repo.updates[-1]
+    assert last["status"].value == "succeeded"
+    review = json.loads(last["review_json"])
+    assert "quality:warning_repair_attempt:1" in review["actions"]
+    assert repo.quality_reports[-1]["report"]["status"] == "warnings"
+
+
+@pytest.mark.asyncio
+async def test_agent_mode_non_allowlisted_warning_does_not_repair(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _RecordingRepo()
+    agent = _SequenceAgent([_playbook_copy()])
+    reviewer = _SequenceReviewer([_reviewer_response("clean")])
+    monkeypatch.setattr(
+        run_pipeline_module,
+        "quality_gate_playbook",
+        _sequence_quality_gate([
+            _warnings_gate_report(
+                "agent",
+                "composable",
+                code="snapshot.narration_mismatch",
+            ),
+        ]),
+    )
+    use_case = RunPipelineUseCase(
+        repo,
+        _RaisingLLM(),
+        reviewer_llm=reviewer,
+        agent_provider=agent,
+        generation_mode="agent",
+    )
+
+    await use_case.execute(
+        "run-warning-skipped",
+        PipelineRequest(prompt="Show the array", domain="algorithm"),
+    )
+
+    assert len(agent.calls) == 1  # initial generation only
+    assert len(reviewer.calls) == 1
+    last = repo.updates[-1]
+    assert last["status"].value == "succeeded"
+    review = json.loads(last["review_json"])
+    assert not any(
+        action.startswith("quality:warning_repair_attempt:")
+        for action in review["actions"]
+    )
+    assert repo.quality_reports[-1]["report"]["status"] == "warnings"
