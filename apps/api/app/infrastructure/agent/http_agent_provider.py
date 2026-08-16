@@ -60,6 +60,11 @@ class HttpAgentProvider:
         return result
 
     async def _post_generate(self, body: dict[str, Any]) -> AgentResult:
+        # Forward our httpx timeout as the sidecar's per-request budget
+        # (issue #238). The sidecar clamps it to its own env ceiling, so it
+        # gives up at or before the API's HTTP client does — a deployment that
+        # lowers ``agent_timeout_s`` tightens both sides, not just the API.
+        body = {**body, "timeout_ms": int(self._timeout_s * 1000)}
         url = f"{self._base_url}/generate"
         headers = (
             {"X-MetaView-Agent-Token": self._shared_token}

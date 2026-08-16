@@ -77,6 +77,9 @@ async def test_generate_returns_playbook_dict() -> None:
         assert request.url.path == "/generate"
         body = json.loads(request.content)
         assert body["prompt"] == "hello"
+        # Issue #238: the provider forwards its own httpx timeout as the
+        # sidecar's per-request budget (timeout_s=5.0 -> 5000ms).
+        assert body["timeout_ms"] == 5000
         return httpx.Response(200, json={"playbook": fake_playbook})
 
     provider = _make_provider_with_handler(handler)
@@ -177,6 +180,9 @@ async def test_run_posts_wide_agent_request_and_returns_agent_result() -> None:
     assert seen["lesson_plan"] == lesson_plan.model_dump(mode="json")
     assert seen["playbook_schema"] == {"type": "object"}
     assert seen["available_tools"][0]["name"] == "playbook.schema.validate"
+    # Issue #238: the sidecar's per-request budget mirrors the provider's
+    # httpx timeout (timeout_s=5.0 -> 5000ms).
+    assert seen["timeout_ms"] == 5000
     assert result.provider == "pi"
     assert result.playbook == fake_playbook
     assert result.tool_events[0]["tool"] == "runtime_tool_list"

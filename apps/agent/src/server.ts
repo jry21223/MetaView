@@ -29,7 +29,29 @@ const DEFAULT_BASE_URL =
   process.env.AGENT_DEFAULT_BASE_URL ?? process.env.METAVIEW_OPENAI_BASE_URL;
 const SHARED_TOKEN = process.env.AGENT_SHARED_TOKEN ?? process.env.METAVIEW_AGENT_SHARED_TOKEN;
 // Hard ceiling so a hung agent loop can't block the worker indefinitely.
+// The API forwards its own agent timeout via the request body (``timeout_ms``,
+// issue #238); the effective per-request timeout is the lower of that value
+// and this ceiling, so the sidecar gives up at or before the API's HTTP
+// client does. A deployment that lowers ``METAVIEW_AGENT_TIMEOUT_S`` on the
+// API therefore tightens the sidecar too, instead of leaving it running to
+// this ceiling in the background.
 const GENERATE_TIMEOUT_MS = Number(process.env.AGENT_TIMEOUT_MS ?? 540_000);
+
+/**
+ * Effective per-request timeout: the API-provided ``timeout_ms`` (forwarded
+ * from ``agent_timeout_s``) when present and positive, clamped to the env
+ * ceiling ``ceilingMs``. Absent/invalid values fall back to the ceiling.
+ */
+export function resolveGenerateTimeoutMs(
+  requestedMs: unknown,
+  ceilingMs: number,
+): number {
+  const requested = Number(requestedMs);
+  if (!Number.isFinite(requested) || requested <= 0) {
+    return ceilingMs;
+  }
+  return Math.min(requested, ceilingMs);
+}
 
 const app = express();
 app.use(express.json({ limit: "2mb" }));
@@ -61,6 +83,7 @@ app.post("/generate", async (req: Request, res: Response) => {
     playbook_schema,
     constraints,
     available_tools,
+    timeout_ms,
   } = (req.body ?? {}) as {
     run_id?: string;
     prompt?: string;
@@ -74,15 +97,17 @@ app.post("/generate", async (req: Request, res: Response) => {
     playbook_schema?: Record<string, unknown>;
     constraints?: Record<string, unknown>;
     available_tools?: Array<Record<string, unknown>>;
+    timeout_ms?: number;
   };
   if (!prompt || typeof prompt !== "string") {
     res.status(400).json({ detail: "missing or invalid 'prompt' field" });
     return;
   }
+  const timeoutMs = resolveGenerateTimeoutMs(timeout_ms, GENERATE_TIMEOUT_MS);
   const timeout = new Promise<never>((_, reject) =>
     setTimeout(
-      () => reject(new Error(`agent timed out after ${GENERATE_TIMEOUT_MS}ms`)),
-      GENERATE_TIMEOUT_MS,
+      () => reject(new Error(`agent timed out after ${timeoutMs}ms`)),
+      timeoutMs,
     ),
   );
   try {
