@@ -9,9 +9,14 @@ export type PlaybookExportProps = {
   theme: "dark" | "light";
   showSubtitles: boolean;
   /**
-   * Optional per-step audio file URLs (file:// or http://) aligned with script.steps.
-   * Empty entries skip audio for that step. When provided, backend should have
-   * already stretched script.steps[i].end_frame to match audio durations.
+   * Optional per-step audio file URLs (http:// or https://) aligned with
+   * script.steps. Empty entries skip audio for that step. When provided,
+   * backend should have already stretched script.steps[i].end_frame to match
+   * audio durations.
+   *
+   * Only http(s) URLs work: Remotion's renderer downloads every media asset
+   * over HTTP (file paths and file:// URLs fail during render). The backend
+   * serves TTS audio from a loopback HTTP server for the render (#244).
    */
   audioFiles?: string[];
   [key: string]: unknown;

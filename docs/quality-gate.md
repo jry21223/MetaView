@@ -18,7 +18,10 @@ SkillPack / Agent / legacy single
 ```
 
 - `clean`: no issues; the run may continue.
-- `warnings`: non-blocking issues are persisted and visible in History.
+- `warnings`: non-blocking issues are persisted and visible in History. In
+  agent mode, an allowlisted warning (initially only
+  `timeline.voiceover_too_short`) triggers one auto-repair regeneration before
+  the report is accepted (#242); remaining warnings never fail the run.
 - `repairable`: every error has a supported repair target. Agent and legacy
   single get one canonical repair attempt; deterministic SkillPack output fails
   closed because runtime code generation is not allowed.
@@ -66,9 +69,13 @@ current version rather than a stale candidate.
 
 ## Export boundary
 
-Export requires an already-succeeded run and reruns the gate against the active
-Playbook. Fresh errors replace stale export errors while prior non-blocking
-review warnings remain visible. A Director repository read failure blocks the
+Export requires an already-succeeded run and reruns the gate against the final
+export timeline — after audio-based end-frame stretching when `with_audio` is
+set — so frame-dependent conclusions (for example
+`timeline.voiceover_too_short`) match what will actually render (#240). Fresh
+errors replace stale export errors while prior non-blocking review warnings
+remain visible — except frame-dependent codes (e.g. `timeline.voiceover_too_short`),
+which are decided by the stretched-timeline recheck alone (#245). A Director repository read failure blocks the
 job. Export receives the current light/dark theme and always renders with
 `showDiagnostics=false` and `showInlineCode=false`. Code Sync stays in the
 learning console beside the player and never enters preview/export pixels.
@@ -92,5 +99,6 @@ Run focused verification with:
 ```bash
 uv run pytest apps/api/tests/test_snapshot_contract_consistency.py \
   apps/api/tests/test_playbook_review_self_check.py \
-  apps/api/tests/test_quality_report.py
+  apps/api/tests/test_quality_report.py \
+  apps/api/tests/test_skill_pack_timing_gate.py
 ```

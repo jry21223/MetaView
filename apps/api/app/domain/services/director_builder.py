@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from typing import Any
 
 from app.domain.models.director import (
     DirectorBeat,
@@ -65,6 +66,76 @@ def build_default_director(playbook: PlaybookScript, run_id: str) -> DirectorScr
         previous_end = end_frame
 
     return DirectorScript(run_id=run_id, source="rule", beats=beats)
+
+
+def remap_director_beats_to_playbook(
+    director: DirectorScript,
+    original_playbook: PlaybookScript,
+    stretched_playbook: dict[str, Any],
+) -> DirectorScript:
+    """Align director beat frames to a (possibly audio-stretched) playbook timeline.
+
+    Audio export stretches each step's ``end_frame`` so the step lasts at
+    least as long as its narration (see ``export_video._stretch_end_frames``).
+    Beats built against the original timeline then drift away from the
+    rendered step boundaries, so re-map every beat onto the stretched boundary
+    of its step, preserving its relative position *within* the original step
+    (so a hand-edited director with several short beats per step keeps its
+    pacing instead of stretching every beat to the full step). Semantics fields
+    (intent, shot type, camera motion, pacing, emphasis terms, ...) are
+    preserved. Beats whose ``step_id`` is absent from the playbook keep their
+    original frames.
+    """
+
+    def _bounds_from_objects(
+        steps: list[Any],
+    ) -> dict[str, tuple[int, int]]:
+        bounds: dict[str, tuple[int, int]] = {}
+        cumulative = 0
+        for step in steps:
+            end_frame = int(step.end_frame)
+            bounds[step.step_id] = (cumulative, end_frame)
+            cumulative = end_frame
+        return bounds
+
+    def _bounds_from_dicts(
+        steps: list[dict[str, Any]],
+    ) -> dict[str, tuple[int, int]]:
+        bounds: dict[str, tuple[int, int]] = {}
+        cumulative = 0
+        for step in steps:
+            end_frame = int(step["end_frame"])
+            bounds[str(step["step_id"])] = (cumulative, end_frame)
+            cumulative = end_frame
+        return bounds
+
+    original_bounds = _bounds_from_objects(original_playbook.steps)
+    stretched_bounds = _bounds_from_dicts(stretched_playbook.get("steps", []))
+
+    remapped: list[DirectorBeat] = []
+    for beat in director.beats:
+        stretched = stretched_bounds.get(beat.step_id)
+        if stretched is None:
+            remapped.append(beat)
+            continue
+        original = original_bounds.get(beat.step_id)
+        if original is None or original[1] <= original[0]:
+            remapped.append(
+                beat.model_copy(update={"start_frame": stretched[0], "end_frame": stretched[1]})
+            )
+            continue
+        old_duration = original[1] - original[0]
+        rel_start = min(1.0, max(0.0, (beat.start_frame - original[0]) / old_duration))
+        rel_end = min(1.0, max(0.0, (beat.end_frame - original[0]) / old_duration))
+        new_duration = stretched[1] - stretched[0]
+        new_start = stretched[0] + round(rel_start * new_duration)
+        new_end = stretched[0] + round(rel_end * new_duration)
+        if new_end <= new_start:
+            new_end = new_start + 1
+        remapped.append(
+            beat.model_copy(update={"start_frame": new_start, "end_frame": new_end})
+        )
+    return director.model_copy(update={"beats": remapped})
 
 
 def _beat_style(

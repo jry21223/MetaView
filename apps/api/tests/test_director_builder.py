@@ -5,7 +5,10 @@ from pydantic import ValidationError
 
 from app.domain.models.director import DirectorBeat, DirectorScript
 from app.domain.models.playbook import PlaybookScript
-from app.domain.services.director_builder import build_default_director
+from app.domain.services.director_builder import (
+    build_default_director,
+    remap_director_beats_to_playbook,
+)
 
 
 def test_director_script_validates_beat_frame_ranges() -> None:
@@ -127,6 +130,145 @@ def test_build_default_director_infers_middle_formula_focus() -> None:
     assert middle.shot_type == "close"
     assert middle.camera_motion == "hold"
     assert any("frac" in term or "dx" in term for term in middle.emphasis_terms)
+
+
+def test_remap_director_beats_aligns_to_stretched_step_boundaries() -> None:
+    playbook_model = _playbook(
+        [
+            _array_step("s1", 30),
+            _math_formula_step("s2", 60, "导数公式", "\\frac{d}{dx}x^2=2x"),
+            _narration_step("s3", 90),
+        ]
+    )
+    director = build_default_director(playbook_model, "run-stretch")
+    assert [(beat.start_frame, beat.end_frame) for beat in director.beats] == [
+        (0, 30),
+        (30, 60),
+        (60, 90),
+    ]
+
+    # Simulate audio stretching: s2 grows to 150 frames, s3 to 210 frames.
+    stretched = playbook_model.model_dump()
+    stretched["steps"][1]["end_frame"] = 150
+    stretched["steps"][2]["end_frame"] = 210
+    stretched["total_frames"] = 210
+
+    remapped = remap_director_beats_to_playbook(director, playbook_model, stretched)
+
+    assert [(beat.start_frame, beat.end_frame) for beat in remapped.beats] == [
+        (0, 30),
+        (30, 150),
+        (150, 210),
+    ]
+    # Boundaries are monotonic and exactly match the stretched step ends.
+    stretched_ends = [step["end_frame"] for step in stretched["steps"]]
+    assert [beat.end_frame for beat in remapped.beats] == stretched_ends
+    assert [beat.start_frame for beat in remapped.beats] == [0, *stretched_ends[:-1]]
+    # Semantic fields are preserved while only frames change.
+    assert [beat.step_id for beat in remapped.beats] == ["s1", "s2", "s3"]
+    assert [beat.intent for beat in remapped.beats] == ["hook", "focus", "summary"]
+    assert [beat.camera_motion for beat in remapped.beats] == [
+        "push_in",
+        "hold",
+        "pull_out",
+    ]
+    assert "导数公式" in remapped.beats[1].emphasis_terms
+
+
+def test_remap_director_beats_keeps_frames_for_unknown_step_id() -> None:
+    original = _playbook([_array_step("s1", 30)])
+    playbook = original.model_dump()
+    # Audio stretch moves s1 out to 120 frames.
+    playbook["steps"][0]["end_frame"] = 120
+    playbook["total_frames"] = 120
+    director = DirectorScript(
+        run_id="run-hand",
+        source="manual",
+        beats=[
+            DirectorBeat(
+                beat_id="beat_01",
+                step_id="s1",
+                start_frame=0,
+                end_frame=30,
+                intent="hook",
+                shot_type="medium",
+                camera_motion="push_in",
+                pacing="normal",
+            ),
+            DirectorBeat(
+                beat_id="beat_ghost",
+                step_id="ghost-step",
+                start_frame=40,
+                end_frame=70,
+                intent="explain",
+                shot_type="wide",
+                camera_motion="hold",
+                pacing="slow",
+            ),
+        ],
+    )
+
+    remapped = remap_director_beats_to_playbook(director, original, playbook)
+
+    assert remapped.source == "manual"
+    assert remapped.beats[0].start_frame == 0
+    assert remapped.beats[0].end_frame == 120
+    # Unknown step_id: original frames untouched.
+    assert remapped.beats[1].start_frame == 40
+    assert remapped.beats[1].end_frame == 70
+    assert remapped.beats[1].intent == "explain"
+
+
+def test_remap_director_beats_is_noop_without_playbook_steps() -> None:
+    director = build_default_director(_playbook([]), "run-empty")
+
+    remapped = remap_director_beats_to_playbook(director, _playbook([]), {"steps": []})
+
+    assert remapped.beats == []
+
+
+def test_remap_director_beats_preserves_relative_position_within_step() -> None:
+    """Hand-edited directors with several beats per step keep their intra-step
+    pacing instead of stretching every beat to the full step (#237 review)."""
+    original = _playbook([_array_step("s1", 120)])
+    director = DirectorScript(
+        run_id="run-hand",
+        source="manual",
+        beats=[
+            DirectorBeat(
+                beat_id="beat_01",
+                step_id="s1",
+                start_frame=0,
+                end_frame=30,
+                intent="hook",
+                shot_type="medium",
+                camera_motion="push_in",
+                pacing="fast",
+            ),
+            DirectorBeat(
+                beat_id="beat_02",
+                step_id="s1",
+                start_frame=60,
+                end_frame=90,
+                intent="explain",
+                shot_type="close",
+                camera_motion="hold",
+                pacing="normal",
+            ),
+        ],
+    )
+    stretched = original.model_dump()
+    # Audio stretch doubles s1 (120 -> 240 frames).
+    stretched["steps"][0]["end_frame"] = 240
+    stretched["total_frames"] = 240
+
+    remapped = remap_director_beats_to_playbook(director, original, stretched)
+
+    assert [(beat.start_frame, beat.end_frame) for beat in remapped.beats] == [
+        (0, 60),
+        (120, 180),
+    ]
+    assert [beat.intent for beat in remapped.beats] == ["hook", "explain"]
 
 
 def _playbook(steps: list[dict]) -> PlaybookScript:

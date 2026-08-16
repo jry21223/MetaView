@@ -52,8 +52,10 @@ candidate PlaybookScript
 `QualityReport` 独立持久化在 `pipeline_runs.quality_report_json`，运行历史只读展示后端
 结果，前端 `visualQualityGate` 不再决定 pipeline 是否成功。空步骤、无效 timeline、空
 narration/payload、renderer contract、missing asset、学科 fallback、数学视觉不足、算法
-状态不足、递归/平抛最低语义场景、final answer 等规则由后端裁决。Director 持久化失败
-同样会形成 blocking issue，不能继续宣称完整成功。
+状态不足、递归/平抛最低语义场景、final answer 等规则由后端裁决。Director 持久化失败降级为
+warning 记入质量报告，不阻塞 run 完成；导出时自动重建默认 DirectorScript。agent 模式下
+allowlist 内的 warning（初始仅 `timeline.voiceover_too_short`）会在接受前触发一次自动上修
+重生成，修复后直接重跑 gate 且不额外调用 reviewer；修后仍为 warning 则照常接受（#242）。
 
 snapshot kind 的 canonical source 是 API `SnapshotKind` 判别联合。合同测试同时核对
 Pydantic `AnySnapshot` discriminator、Agent self-check allow-list、Web `SnapshotKind` union
@@ -247,12 +249,14 @@ end_frame_i = (i+1) * 60                               # 无 execution_map（兼
 - 无音轨导出是稳定路径；当音频时序无法保证时，保持 silent export。
 
 1. 从 `IRunRepository` 取该 run 的 `PlaybookScript`，序列化为 `inputProps.json`。
-   开始渲染前会重新执行 canonical export-readiness gate；Director 读取失败、资产失效或
-   其他 blocking issue 会让 export job 失败。导出主题由当前 preview 的 light/dark
+   Director 读取失败、资产失效或其他 blocking issue 会让 export job 失败。
+   导出主题由当前 preview 的 light/dark
    选项随请求传入，`showDiagnostics` 在 export composition 中始终为 `false`。
 2. （可选 `with_audio`）调 TTS 代理 `POST {tts_base_url}/audio/speech` 逐步合成 mp3，
    再用 `ffprobe`（缺失时回退到 wave / 动画时长）测每段时长，按 `fps` 重新拉伸
-   `step.end_frame` 让动画 ≥ 配音长度。
+   `step.end_frame` 让动画 ≥ 配音长度。拉伸完成后（无音轨时直接基于原始时间线）、
+   组装 `inputProps.json` 前重新执行 canonical export-readiness gate，保证帧数相关结论
+   （如 `timeline.voiceover_too_short`）基于实际渲染时间线（#240）。
 3. spawn 子进程：
 
    ```
@@ -340,6 +344,15 @@ METAVIEW_AGENT_PROVIDER=http
 METAVIEW_AGENT_BASE_URL=http://agent:8001   # docker-compose service name
 METAVIEW_AGENT_TIMEOUT_S=600
 ```
+
+`METAVIEW_AGENT_TIMEOUT_S`（默认 600s）是 API 侧 HTTP 客户端等待 sidecar
+的预算。API 会把该值以毫秒随 `POST /generate` 请求体里的 `timeout_ms` 下发；
+sidecar 的有效超时取 `min(timeout_ms, AGENT_TIMEOUT_MS)`，其中
+`AGENT_TIMEOUT_MS`（sidecar 环境变量，默认 540000）是硬上限。因此 sidecar
+的超时不会晚于 API（issue #238）：把 `METAVIEW_AGENT_TIMEOUT_S` 调低会同步
+收紧 sidecar，不会出现 API 已判超时、sidecar 仍在后台跑满 540s 的情况。
+sidecar 超时后立即返回 500，但已在进行中的单次 LLM 调用无法被中断（取决于
+provider 是否支持 abort），其后台收尾不阻塞 API 侧的超时语义。
 
 `docker-compose up` 会同时启 `api` / `web` / `agent` 三个 service。本地 `make
 dev` 同样并行起三个进程。

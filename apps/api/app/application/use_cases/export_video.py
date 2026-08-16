@@ -12,16 +12,21 @@ Pipeline:
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import functools
 import json
 import logging
 import math
 import os
 import shutil
 import subprocess
+import threading
 import wave
 from collections import deque
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
+from urllib.parse import quote
 
 import httpx
 
@@ -39,13 +44,60 @@ from app.domain.models.pipeline_run import PipelineRunStatus
 from app.domain.models.playbook import PlaybookScript
 from app.domain.models.quality_report import QualityReport
 from app.domain.models.review import PlaybookIssueSeverity, PlaybookReviewIssue
-from app.domain.services.director_builder import build_default_director
+from app.domain.services.director_builder import (
+    build_default_director,
+    remap_director_beats_to_playbook,
+)
 from app.domain.services.playbook_quality import (
     playbook_review_verdict_from_issues,
     quality_gate_playbook,
 )
 
 _RENDER_TAIL_LINES = 40
+
+
+class _ExportAudioRequestHandler(SimpleHTTPRequestHandler):
+    """Serve TTS audio over loopback HTTP for the Remotion renderer.
+
+    Remotion downloads every media asset over HTTP during render (its
+    ``readFile`` only accepts http:// / https://), so file paths or file://
+    URLs in ``audioFiles`` cannot work (#244). The use case therefore runs a
+    short-lived server on 127.0.0.1 for the duration of the render.
+    """
+
+    def log_message(self, fmt: str, *args: Any) -> None:
+        # Keep render logs readable: route per-request access lines to debug.
+        logger.debug("audio-serve: " + fmt, *args)
+
+
+@contextlib.contextmanager
+def _serve_audio_files(audio_files: list[str]) -> Iterator[list[str]]:
+    """Yield ``audioFiles`` entries as http://127.0.0.1:<port>/<name> URLs.
+
+    The server lives exactly as long as the ``with`` block (i.e. the Remotion
+    subprocess render), is bound to a random loopback port, and is shut down
+    on every exit path. Entries without audio ("") pass through unchanged.
+    """
+
+    non_empty = [p for p in audio_files if p]
+    if not non_empty:
+        yield audio_files
+        return
+    audio_dir = Path(non_empty[0]).parent
+    handler = functools.partial(_ExportAudioRequestHandler, directory=str(audio_dir))
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    httpd.daemon_threads = True
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    host, port = httpd.server_address
+    base_url = f"http://{host}:{port}"
+    logger.info("serving export audio to remotion at %s", base_url)
+    try:
+        yield [f"{base_url}/{quote(Path(p).name)}" if p else "" for p in audio_files]
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        logger.info("export audio server stopped")
 
 _QUALITY_TO_DIMENSIONS: dict[str, tuple[int, int]] = {
     "720p": (1280, 720),
@@ -119,34 +171,21 @@ class ExportVideoUseCase:
                 playbook_model = PlaybookScript.model_validate_json(playbook_json)
             else:
                 playbook_model = run.playbook
-            export_quality = self._build_export_quality_report(playbook_model, run)
-            if export_quality.status == "repairable":
-                export_quality = export_quality.with_issue(
-                    PlaybookReviewIssue(
-                        code="export.not_ready",
-                        severity=PlaybookIssueSeverity.ERROR,
-                        path="playbook",
-                        message="Export readiness recheck found unresolved quality errors.",
-                        suggestion="Repair the PlaybookScript before starting export.",
-                        requires_repair=False,
-                    ),
-                    action="export:blocked",
-                )
             update_quality_report = getattr(self._runs, "update_quality_report", None)
-            if callable(update_quality_report):
-                await update_quality_report(run_id, export_quality.model_dump_json())
-            if export_quality.status in {"repairable", "blocked"}:
-                codes = ", ".join(issue.code for issue in export_quality.issues[:5])
-                raise ValueError(f"Run {run_id!r} is not export-ready: {codes}")
             job = await self._exports.get(job_id)
 
             playbook = playbook_model.model_dump()
             try:
                 director = await self._get_export_director(
-                    run_id, version_id=version_id, playbook=playbook_model
+                    run_id,
+                    version_id=version_id,
+                    playbook=playbook_model,
+                    rebuild_if_missing=_quality_has_director_persistence_failure(run),
                 )
             except Exception as exc:  # noqa: BLE001 - export must fail closed on Director I/O.
-                director_quality = export_quality.with_issue(
+                director_quality = self._build_export_quality_report(
+                    playbook_model, run
+                ).with_issue(
                     PlaybookReviewIssue(
                         code="director.persistence_failed",
                         severity=PlaybookIssueSeverity.ERROR,
@@ -182,31 +221,66 @@ class ExportVideoUseCase:
                 audio_files = await self._generate_step_audio(playbook, tts, audio_dir)
                 # Re-stretch end_frames so each step lasts ≥ its audio
                 playbook = _stretch_end_frames(playbook, audio_files)
+                if director is not None:
+                    # Stretching moves step boundaries; re-align beat frames to
+                    # the stretched timeline so camera beats stay in sync (#237).
+                    director = remap_director_beats_to_playbook(
+                        director, playbook_model, playbook
+                    )
 
-            input_props = {
-                "script": playbook,
-                "theme": opts.theme,
-                "showSubtitles": True,
-                "audioFiles": audio_files,
-            }
-            if director is not None:
-                input_props["director"] = director.model_dump()
-            props_path = job_dir / "inputProps.json"
-            props_path.write_text(json.dumps(input_props), encoding="utf-8")
-
-            # Resolve render options (issue #14). Defaults preserve historical
-            # 1080p/30fps/mp4 behavior so existing callers keep working.
-            extension = _FORMAT_TO_EXTENSION.get(opts.format, "mp4")
-            output_path = job_dir / f"video.{extension}"
-
-            await self._exports.update(
-                job_id,
-                status=ExportJobStatus.RENDERING,
-                progress=0.15,
-                message=f"渲染中…（{opts.quality} {opts.fps}fps {opts.format.upper()}）",
+            # Recheck export readiness against the final timeline: after audio
+            # stretch, step durations are driven by measured audio lengths, not
+            # char-rate estimates, so frame-dependent conclusions (e.g.
+            # timeline.voiceover_too_short) must reflect what will actually
+            # render (#240).
+            export_quality = self._build_export_quality_report(
+                PlaybookScript.model_validate(playbook), run
             )
+            if export_quality.status == "repairable":
+                export_quality = export_quality.with_issue(
+                    PlaybookReviewIssue(
+                        code="export.not_ready",
+                        severity=PlaybookIssueSeverity.ERROR,
+                        path="playbook",
+                        message="Export readiness recheck found unresolved quality errors.",
+                        suggestion="Repair the PlaybookScript before starting export.",
+                        requires_repair=False,
+                    ),
+                    action="export:blocked",
+                )
+            if callable(update_quality_report):
+                await update_quality_report(run_id, export_quality.model_dump_json())
+            if export_quality.status in {"repairable", "blocked"}:
+                codes = ", ".join(issue.code for issue in export_quality.issues[:5])
+                raise ValueError(f"Run {run_id!r} is not export-ready: {codes}")
 
-            await self._run_remotion_render(job_id, props_path, output_path, opts)
+            # Remotion downloads media assets over HTTP, so audio must be
+            # reachable as http:// URLs for the whole render (#244).
+            with _serve_audio_files(audio_files) as served_audio:
+                input_props = {
+                    "script": playbook,
+                    "theme": opts.theme,
+                    "showSubtitles": True,
+                    "audioFiles": served_audio,
+                }
+                if director is not None:
+                    input_props["director"] = director.model_dump()
+                props_path = job_dir / "inputProps.json"
+                props_path.write_text(json.dumps(input_props), encoding="utf-8")
+
+                # Resolve render options (issue #14). Defaults preserve historical
+                # 1080p/30fps/mp4 behavior so existing callers keep working.
+                extension = _FORMAT_TO_EXTENSION.get(opts.format, "mp4")
+                output_path = job_dir / f"video.{extension}"
+
+                await self._exports.update(
+                    job_id,
+                    status=ExportJobStatus.RENDERING,
+                    progress=0.15,
+                    message=f"渲染中…（{opts.quality} {opts.fps}fps {opts.format.upper()}）",
+                )
+
+                await self._run_remotion_render(job_id, props_path, output_path, opts)
 
             asset_report_path = None
             if job is not None and job.asset_report is not None:
@@ -239,13 +313,20 @@ class ExportVideoUseCase:
         *,
         version_id: str | None,
         playbook: PlaybookScript,
+        rebuild_if_missing: bool = False,
     ) -> DirectorScript | None:
         if version_id is not None:
             director_json = await self._runs.get_version_director(run_id, version_id)
             if director_json is None:
                 return build_default_director(playbook, run_id)
             return DirectorScript.model_validate_json(director_json)
-        return await self._directors.get(run_id)
+        director = await self._directors.get(run_id)
+        if director is None and rebuild_if_missing:
+            # Only rebuild when the run reported a persistence failure (#235);
+            # runs that never had a director keep the historical no-director
+            # behaviour instead of silently changing camera motion.
+            return build_default_director(playbook, run_id)
+        return director
 
     async def _generate_step_audio(
         self,
@@ -441,6 +522,31 @@ def _stretch_end_frames(playbook: dict[str, Any], audio_files: list[str]) -> dic
     return playbook
 
 
+# Warnings whose verdict depends on frame counts that audio stretching can
+# change (currently only timeline.voiceover_too_short). The export recheck runs
+# on the final stretched timeline, so its instances are authoritative for these
+# codes; re-merging the pre-stretch ones would resurrect stale frame numbers in
+# the export report (#245). Intentionally narrow: stretch-independent warnings
+# (snapshot.narration_mismatch, step.too_shallow, ...) keep their
+# preserve-on-merge semantics.
+_FRAME_DEPENDENT_WARNING_CODES: frozenset[str] = frozenset(
+    {"timeline.voiceover_too_short"}
+)
+
+
+def _quality_has_director_persistence_failure(run: Any) -> bool:
+    """True when the run's persisted quality report recorded a director
+    persistence failure (#235), so export knows it may rebuild the default
+    director instead of treating a missing one as the historical no-director
+    state.
+    """
+    quality = getattr(run, "quality_report", None)
+    return bool(
+        quality
+        and any(issue.code == "director.persistence_failed" for issue in quality.issues)
+    )
+
+
 def _merge_export_quality(
     previous: QualityReport | None,
     current: QualityReport,
@@ -454,6 +560,7 @@ def _merge_export_quality(
         issue
         for issue in previous.issues
         if issue.severity == PlaybookIssueSeverity.WARNING
+        and issue.code not in _FRAME_DEPENDENT_WARNING_CODES
     ]
     for issue in [*previous_warnings, *current.issues]:
         unique[(issue.code, issue.path, issue.message)] = issue

@@ -48,6 +48,41 @@ const SCRIPT: PlaybookScript = {
   ],
 };
 
+const AUDIO_SCRIPT: PlaybookScript = {
+  fps: 30,
+  total_frames: 180,
+  domain: "math",
+  title: "Audio export contract",
+  summary: "Per-step audio files must reach <Audio> unchanged.",
+  parameter_controls: [],
+  steps: [
+    {
+      step_id: "s1",
+      end_frame: 60,
+      title: "First",
+      voiceover_text: "One.",
+      tokens: [],
+      snapshot: { kind: "math_formula", formula_latex: "y=x" },
+    },
+    {
+      step_id: "s2",
+      end_frame: 120,
+      title: "Second",
+      voiceover_text: "Two.",
+      tokens: [],
+      snapshot: { kind: "math_formula", formula_latex: "y=x" },
+    },
+    {
+      step_id: "s3",
+      end_frame: 180,
+      title: "Silent",
+      voiceover_text: "Three.",
+      tokens: [],
+      snapshot: { kind: "math_formula", formula_latex: "y=x" },
+    },
+  ],
+};
+
 describe("PlaybookExportComposition diagnostics", () => {
   it("forces renderer diagnostics off", () => {
     const markup = renderToStaticMarkup(
@@ -56,5 +91,28 @@ describe("PlaybookExportComposition diagnostics", () => {
 
     expect(markup).toContain('data-show-diagnostics="false"');
     expect(markup).toContain('data-show-inline-code="false"');
+  });
+});
+
+describe("PlaybookExportComposition audio", () => {
+  it("passes http(s) audio URLs through to <Audio> and skips empty entries", () => {
+    const audioFiles = [
+      "http://127.0.0.1:43123/step_000.wav",
+      "https://cdn.example.com/voice/step_001.mp3",
+      "",
+    ];
+    const markup = renderToStaticMarkup(
+      <PlaybookExportComposition
+        script={AUDIO_SCRIPT}
+        theme="light"
+        showSubtitles
+        audioFiles={audioFiles}
+      />,
+    );
+
+    expect(markup).toContain('<audio src="http://127.0.0.1:43123/step_000.wav"></audio>');
+    expect(markup).toContain('<audio src="https://cdn.example.com/voice/step_001.mp3"></audio>');
+    // The empty entry must not render an <audio> tag for step 3.
+    expect(markup.match(/<audio/g)).toHaveLength(2);
   });
 });
