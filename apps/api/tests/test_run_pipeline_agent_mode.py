@@ -1163,3 +1163,56 @@ async def test_agent_mode_non_allowlisted_warning_does_not_repair(
         for action in review["actions"]
     )
     assert repo.quality_reports[-1]["report"]["status"] == "warnings"
+
+
+def _issue(
+    code: str,
+    path: str,
+    severity: PlaybookIssueSeverity = PlaybookIssueSeverity.ERROR,
+    message: str = "blocking issue",
+) -> PlaybookReviewIssue:
+    return PlaybookReviewIssue(
+        code=code,
+        severity=severity,
+        path=path,
+        message=message,
+    )
+
+
+def test_humanize_issues_counts_repair_attempts_from_verdict_actions() -> None:
+    verdict = PlaybookReviewVerdict(
+        status=PlaybookReviewStatus.BLOCKED,
+        summary="blocked",
+        issues=[_issue("lesson_plan.visual_role_missing", "lesson_plan.required_visual_roles.target_point")],
+        actions=[
+            "agent:self_check",
+            "agent:self_check:blocked",
+            "agent:self_repair_attempt:1",
+            "agent:self_repair_attempt:2",
+        ],
+    )
+    rendered = run_pipeline_module.humanize_issues(verdict)
+    assert rendered.startswith("Pipeline output failed review after 2 repair attempt(s): ")
+
+
+def test_agent_repair_prompt_includes_lesson_plan_visual_role_guidance() -> None:
+    prompt = run_pipeline_module._build_agent_self_repair_prompt(
+        "用动画解释导数与切线斜率。",
+        {"title": "旧稿", "summary": "", "steps": []},
+        [
+            _issue(
+                "lesson_plan.visual_role_missing",
+                "lesson_plan.required_visual_roles.target_point",
+            ),
+            _issue(
+                "step.too_shallow",
+                "summary",
+                severity=PlaybookIssueSeverity.WARNING,
+                message="Playbook summary is empty.",
+            ),
+        ],
+    )
+    assert "marker_x" in prompt
+    assert "scene_blueprint.compile" in prompt
+    assert "non-empty one-sentence playbook summary" in prompt
+    assert "blocking_issues" in prompt

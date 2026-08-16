@@ -286,7 +286,7 @@ _LESSON_FACT_ALIASES: dict[str, tuple[str, ...]] = {
 
 _LESSON_VISUAL_ROLE_ALIASES: dict[str, tuple[str, ...]] = {
     "curve": ("curves", "curve", "expression"),
-    "target_point": ("target_point", "marker_x", "point"),
+    "target_point": ("target_point", "marker_x", "point", "points"),
     "secant": ("secant", "割线"),
     "tangent": ("tangent", "切线"),
     "slope": ("slope", "斜率"),

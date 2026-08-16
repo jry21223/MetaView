@@ -1746,6 +1746,7 @@ def _build_agent_repair_prompt(
             "Keep PlaybookScript as the only rendering exit.",
             "Do not introduce raw HTML, iframe, Manim, or server video rendering.",
             "Use only renderer-supported snapshot kinds.",
+            *_agent_repair_issue_guidance(issues),
         ],
     }
     return (
@@ -1754,6 +1755,58 @@ def _build_agent_repair_prompt(
         "PlaybookScript through the normal agent generation path:\n"
         f"{json.dumps(repair_payload, ensure_ascii=False, indent=2)}"
     )
+
+
+# Canonical-gate issue codes the repair loop has seen fail repeatedly in
+# production; each hint tells the generator exactly which snapshot fields the
+# deterministic gate accepts so a repair is not a blind re-roll.
+_AGENT_REPAIR_ISSUE_GUIDANCE: dict[str, str] = {
+    "lesson_plan.visual_role_missing": (
+        "Render each missing visual role with snapshot fields the canonical gate accepts: "
+        "target_point → math_plot `marker_x` (x of the marked point on the lead curve), "
+        "or a `points`/`point` field; "
+        "curve → a `curves` field; "
+        "secant/tangent → a curve or segment whose label (or semantic_role) contains "
+        "'secant'/'割线' / 'tangent'/'切线'; "
+        "slope → `formula_latex` containing m or f′/f', or a '斜率'/'slope' label. "
+        "When scene_blueprint.compile is available, compile the scene (e.g. "
+        "sceneType derivative_tangent) and rebuild its snapshot shape through the "
+        "Drawing CLI tools."
+    ),
+    "lesson_plan.scene_type_missing": (
+        "Use a renderer-backed snapshot kind accepted by the preferred scene type "
+        "(derivative_tangent → math_plot or math_scene)."
+    ),
+    "lesson_plan.fact_missing": (
+        "Cover the missing fact in step titles, narration, or snapshot fields "
+        "(formula_latex / labels / captions) so the canonical gate finds its evidence."
+    ),
+    "lesson_plan.conclusion_missing": (
+        "End the final step by stating the expected conclusion numerically "
+        "(e.g. 导数/切线斜率等于 2) in narration and formula_latex."
+    ),
+    "lesson_plan.conclusion_conflict": (
+        "Remove every conflicting numeric claim; only the expected conclusion may "
+        "appear as a numeric result in the final step."
+    ),
+}
+
+_AGENT_REPAIR_SUMMARY_GUIDANCE = (
+    "Set a non-empty one-sentence playbook summary (plan_outline summary) that "
+    "names the lesson; an empty summary is reported as step.too_shallow."
+)
+
+
+def _agent_repair_issue_guidance(issues: list[PlaybookReviewIssue]) -> list[str]:
+    hints: list[str] = []
+    for issue in issues:
+        if issue.code == "step.too_shallow" and issue.path == "summary":
+            hint = _AGENT_REPAIR_SUMMARY_GUIDANCE
+        else:
+            hint = _AGENT_REPAIR_ISSUE_GUIDANCE.get(issue.code)
+        if hint is not None and hint not in hints:
+            hints.append(hint)
+    return hints
 
 
 def _quality_report_with_review(
@@ -2034,7 +2087,9 @@ def humanize_issues(report: CirReviewReport | PlaybookReviewVerdict) -> str:
         if len(report.issues) <= len(shown)
         else f" (+{len(report.issues) - len(shown)} more)"
     )
-    attempts = getattr(report, "attempts", 0)
+    attempts = getattr(report, "attempts", None)
+    if attempts is None:
+        attempts = _playbook_repair_attempts(getattr(report, "actions", None) or [])
     prefix = f"Pipeline output failed review after {attempts} repair attempt(s): "
     return prefix + "; ".join(parts) + suffix
 

@@ -147,6 +147,27 @@ describe("PlaybookEmitter — finalize", () => {
     expect((snap.segments as unknown[]).length).toBe(1);
   });
 
+  it("surfaces an added point as marker_x on a math_plot snapshot", () => {
+    const e = new PlaybookEmitter();
+    e.beginStep(1, "tangent at a point");
+    e.addCurve1D("x^2", "f(x)", "primary");
+    e.addPoint(1, 1, "P", "primary");
+    e.commitStep();
+    const snap = e.finalize().steps[0].snapshot as Record<string, unknown>;
+    expect(snap.kind).toBe("math_plot");
+    expect(snap.marker_x).toBe(1);
+  });
+
+  it("keeps math_plot free of marker_x when no point is added", () => {
+    const e = new PlaybookEmitter();
+    e.beginStep(1, "plain plot");
+    e.addCurve1D("x^2", "f(x)", "primary");
+    e.commitStep();
+    const snap = e.finalize().steps[0].snapshot as Record<string, unknown>;
+    expect(snap.kind).toBe("math_plot");
+    expect(snap).not.toHaveProperty("marker_x");
+  });
+
   it("falls back to math_formula when only formula is set", () => {
     const e = new PlaybookEmitter();
     e.beginStep(1, "pure formula");

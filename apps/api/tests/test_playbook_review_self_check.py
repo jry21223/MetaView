@@ -842,6 +842,61 @@ def test_lesson_plan_visual_role_cannot_be_satisfied_by_narration_only() -> None
     assert "lesson_plan.required_visual_roles.secant" in missing_paths
 
 
+def test_lesson_plan_target_point_role_accepts_math_scene_points_field() -> None:
+    prompt = "用图像解释曲线 y=x^2 在点 (1,1) 处的导数，从割线过渡到切线。"
+    lesson_plan = build_rule_based_lesson_plan(prompt=prompt, domain="math")
+    payload = _derivative_playbook().model_dump(mode="json")
+    for step in payload["steps"]:
+        snapshot = deepcopy(step["snapshot"])
+        snapshot["kind"] = "math_scene"
+        for key, fallback in (("y_min", -5.0), ("y_max", 5.0)):
+            if not isinstance(snapshot.get(key), (int, float)):
+                snapshot[key] = fallback
+        snapshot["points"] = [
+            {"x": 1, "y": 1, "label": "目标点", "emphasis": "primary"}
+        ]
+        snapshot["curves"] = [
+            {
+                "expression_y": curve["expression"],
+                "label": curve["label"],
+                "semantic_role": curve["semantic_role"],
+            }
+            for curve in snapshot["curves"]
+        ]
+        snapshot.pop("marker_x", None)
+        snapshot.pop("params", None)
+        step["snapshot"] = snapshot
+        step["layers"] = [{"body": deepcopy(snapshot)}]
+    report = quality_gate_playbook(
+        PlaybookScript.model_validate(payload),
+        prompt,
+        generator_path="test",
+        lesson_plan=lesson_plan,
+    )
+
+    assert not any(
+        issue.code == "lesson_plan.visual_role_missing"
+        and issue.path == "lesson_plan.required_visual_roles.target_point"
+        for issue in report.issues
+    )
+
+    for step in payload["steps"]:
+        step["snapshot"]["points"] = []
+        step["layers"] = [{"body": deepcopy(step["snapshot"])}]
+    missing_report = quality_gate_playbook(
+        PlaybookScript.model_validate(payload),
+        prompt,
+        generator_path="test",
+        lesson_plan=lesson_plan,
+    )
+
+    assert any(
+        issue.code == "lesson_plan.visual_role_missing"
+        and issue.path == "lesson_plan.required_visual_roles.target_point"
+        for issue in missing_report.issues
+    )
+
+
 def test_lesson_plan_conclusion_does_not_match_numeric_prefix() -> None:
     prompt = "用图像解释曲线 y=x^2 在点 (1,1) 处的导数，从割线过渡到切线。"
     report = quality_gate_playbook(

@@ -454,6 +454,11 @@ function serializeSnapshot(step: StepBuilder): Record<string, unknown> {
   }
   if (kind === "function") {
     const primary = step.curves[0];
+    // The renderer's math_plot point marker rides the lead curve at marker_x.
+    // Surface an added point (primary first) so lesson-plan target-point
+    // roles survive serialization instead of being dropped.
+    const markedPoint =
+      step.points.find((p) => p.emphasis === "primary") ?? step.points[0];
     return {
       kind: "math_plot",
       curves: step.curves.map((c) => ({
@@ -465,6 +470,7 @@ function serializeSnapshot(step: StepBuilder): Record<string, unknown> {
       x_max: primary?.x_max ?? step.axes?.x_max ?? 6,
       x_label: step.axes?.x_label,
       y_label: step.axes?.y_label,
+      ...(markedPoint ? { marker_x: markedPoint.x } : {}),
       formula_latex: step.formula_latex,
     };
   }
