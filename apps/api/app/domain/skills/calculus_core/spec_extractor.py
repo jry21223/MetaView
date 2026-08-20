@@ -14,6 +14,15 @@ _LIMIT_RE = re.compile(
     r"(?:lim|limit)(?:_\{?)?(?P<var>[A-Za-z])(?:->|to)(?P<point>[-+]?\d+(?:\.\d+)?)(?:\}?)?(?P<expr>.+)"
 )
 _SERIES_RE = re.compile(r"(?:series|泰勒|taylor).*?(?P<expr>[A-Za-z0-9_+\-*/().^]+)")
+_POINT_COORD_RE = re.compile(
+    r"(?:点|point)?\s*\(\s*(?P<x>[-+]?\d+(?:\.\d+)?)\s*,\s*"
+    r"(?P<y>[-+]?\d+(?:\.\d+)?)\s*\)",
+    flags=re.IGNORECASE,
+)
+_AT_X_RE = re.compile(
+    r"(?:在|at)?\s*x\s*=\s*(?P<x>[-+]?\d+(?:\.\d+)?)",
+    flags=re.IGNORECASE,
+)
 
 
 def try_extract_calculus_core(prompt: str) -> CalculusCoreProblemSpec | None:
@@ -38,6 +47,7 @@ def try_extract_calculus_core(prompt: str) -> CalculusCoreProblemSpec | None:
             task="derivative",
             expression=_clean_expr(derivative.group("expr")),
             variable=derivative.group("var"),
+            point=_derivative_point(normalized),
         )
     if "求导" in normalized or "导数" in normalized or "derivative" in normalized.lower():
         expression = extract_expression_after(normalized, ("求导", "导数", "derivative"))
@@ -47,6 +57,7 @@ def try_extract_calculus_core(prompt: str) -> CalculusCoreProblemSpec | None:
                 task="derivative",
                 expression=expression,
                 variable="x",
+                point=_derivative_point(normalized),
             )
 
     limit = _LIMIT_RE.search(compact)
@@ -78,3 +89,11 @@ def _clean_expr(expr: str) -> str:
         out = out[1:-1].strip()
     out = re.sub(r"(sin|cos|tan|log|ln|exp|sqrt)([A-Za-z])", r"\1(\2)", out)
     return out
+
+
+def _derivative_point(prompt: str) -> str | None:
+    coordinate = _POINT_COORD_RE.search(prompt)
+    if coordinate is not None:
+        return coordinate.group("x")
+    at_x = _AT_X_RE.search(prompt)
+    return at_x.group("x") if at_x is not None else None

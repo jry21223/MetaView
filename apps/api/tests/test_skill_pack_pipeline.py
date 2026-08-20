@@ -320,6 +320,43 @@ async def test_agent_mode_routes_registered_skill_before_agent() -> None:
 
 
 @pytest.mark.asyncio
+async def test_derivative_tangent_prompt_produces_required_visual_evidence() -> None:
+    prompt = "用动画解释导数的几何意义：曲线 y=x² 在点 (1,1) 处切线的斜率为什么是 2。"
+    agent = _FailingAgentProvider()
+    repo = _RecordingRepo()
+    use_case = RunPipelineUseCase(
+        repo,
+        _FailingLLM(),
+        generation_mode="agent",
+        agent_provider=agent,
+    )
+
+    await use_case.execute(
+        "run-derivative-tangent",
+        PipelineRequest(prompt=prompt),
+    )
+
+    assert agent.called is False
+    assert repo.final_status == PipelineRunStatus.SUCCEEDED
+    assert repo.quality_reports[-1]["report"]["status"] == "clean"
+
+    playbook = json.loads(repo.updates[-1]["playbook_json"])
+    math_plots = [
+        step["snapshot"]
+        for step in playbook["steps"]
+        if step["snapshot"]["kind"] == "math_plot"
+    ]
+    curve_roles = {
+        curve.get("semantic_role")
+        for snapshot in math_plots
+        for curve in snapshot["curves"]
+    }
+    assert {"curve", "secant", "tangent"} <= curve_roles
+    assert any(snapshot.get("marker_x") == 1 for snapshot in math_plots)
+    assert "切线斜率也等于 2" in playbook["steps"][-1]["voiceover_text"]
+
+
+@pytest.mark.asyncio
 async def test_geography_earth_scene_blueprint_runs_through_default_registry() -> None:
     repo = _RecordingRepo()
     use_case = RunPipelineUseCase(

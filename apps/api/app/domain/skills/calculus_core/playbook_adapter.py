@@ -39,6 +39,8 @@ def _build_derivative(spec: CalculusCoreProblemSpec) -> PlaybookScript:
     expr, parsed = parse_expression(spec.expression)
     symbol = sp.Symbol(spec.variable)
     derivative = sp.simplify(sp.diff(expr, symbol))
+    if spec.point is not None:
+        return _build_derivative_tangent(spec, expr, parsed.latex, symbol, derivative)
     snapshots = [
         MathFormulaSnapshot(
             formula_latex=rf"f({spec.variable})={parsed.latex}", caption="把输入解析为单变量函数。"
@@ -73,6 +75,139 @@ def _build_derivative(spec: CalculusCoreProblemSpec) -> PlaybookScript:
         ),
     ]
     return _script(spec, "单变量导数", snapshots)
+
+
+def _build_derivative_tangent(
+    spec: CalculusCoreProblemSpec,
+    expr: sp.Expr,
+    expression_latex: str,
+    symbol: sp.Symbol,
+    derivative: sp.Expr,
+) -> PlaybookScript:
+    point = sp.sympify(spec.point)
+    point_value = sp.simplify(expr.subs(symbol, point))
+    tangent_slope = sp.simplify(derivative.subs(symbol, point))
+    tangent_line = sp.expand(tangent_slope * (symbol - point) + point_value)
+    curve = MathPlotCurve(
+        expression=expression_to_source(expr),
+        label=f"f({spec.variable})",
+        emphasis="primary",
+        semantic_role="curve",
+    )
+
+    def plot(
+        *extra_curves: MathPlotCurve,
+        formula_latex: str,
+        caption: str,
+    ) -> MathPlotSnapshot:
+        point_float = float(point)
+        return MathPlotSnapshot(
+            pack_id="math-basic",
+            asset_id="derivative-tangent-preset",
+            curves=[curve, *extra_curves],
+            x_min=point_float - 2,
+            x_max=point_float + 2,
+            marker_x=point_float,
+            formula_latex=formula_latex,
+            caption=caption,
+        )
+
+    secant_far, secant_far_slope = _secant_line(expr, symbol, point, point_value, sp.Integer(1))
+    secant_near, secant_near_slope = _secant_line(
+        expr,
+        symbol,
+        point,
+        point_value,
+        sp.Rational(1, 4),
+    )
+    tangent_curve = MathPlotCurve(
+        expression=expression_to_source(tangent_line),
+        label="切线 tangent",
+        emphasis="accent",
+        semantic_role="tangent",
+    )
+    snapshots = [
+        plot(
+            formula_latex=rf"f({spec.variable})={expression_latex}",
+            caption=(
+                f"先观察曲线，并标出目标点 "
+                f"({_display(point)},{_display(point_value)})。"
+            ),
+        ),
+        plot(
+            MathPlotCurve(
+                expression=expression_to_source(secant_far),
+                label="割线 secant",
+                emphasis="secondary",
+                semantic_role="secant",
+            ),
+            formula_latex=rf"m_{{\mathrm{{sec}}}}={sp.latex(secant_far_slope)}",
+            caption=(
+                "连接目标点和第二个曲线点得到割线，"
+                f"此时割线斜率为 {_display(secant_far_slope)}。"
+            ),
+        ),
+        plot(
+            MathPlotCurve(
+                expression=expression_to_source(secant_near),
+                label="割线 secant",
+                emphasis="secondary",
+                semantic_role="secant",
+            ),
+            formula_latex=(
+                rf"h\to 0,\quad m_{{\mathrm{{sec}}}}\to {sp.latex(tangent_slope)}"
+            ),
+            caption=(
+                "让第二个点沿曲线靠近目标点，割线斜率趋近 "
+                f"{_display(tangent_slope)}。"
+            ),
+        ),
+        plot(
+            tangent_curve,
+            formula_latex=(
+                rf"f'({_display(point)})={sp.latex(tangent_slope)}"
+            ),
+            caption=(
+                "当第二个点趋近目标点时，割线趋近切线；"
+                f"这个极限就是导数 {_display(tangent_slope)}。"
+            ),
+        ),
+        plot(
+            MathPlotCurve(
+                expression=expression_to_source(secant_near),
+                label="割线 secant",
+                emphasis="secondary",
+                semantic_role="secant",
+            ),
+            tangent_curve,
+            formula_latex=(
+                rf"f'({_display(point)})={sp.latex(tangent_slope)}="
+                rf"m_{{\mathrm{{tangent}}}}"
+            ),
+            caption=(
+                f"曲线在目标点处的导数等于 {_display(tangent_slope)}，"
+                f"因此该点的切线斜率也等于 {_display(tangent_slope)}。"
+            ),
+        ),
+    ]
+    return _script(spec, "导数的几何意义", snapshots)
+
+
+def _secant_line(
+    expr: sp.Expr,
+    symbol: sp.Symbol,
+    point: sp.Expr,
+    point_value: sp.Expr,
+    offset: sp.Expr,
+) -> tuple[sp.Expr, sp.Expr]:
+    other_point = point + offset
+    other_value = sp.simplify(expr.subs(symbol, other_point))
+    slope = sp.simplify((other_value - point_value) / offset)
+    return sp.expand(slope * (symbol - point) + point_value), slope
+
+
+def _display(value: sp.Expr) -> str:
+    return sp.sstr(sp.simplify(value))
 
 
 def _build_integral(spec: CalculusCoreProblemSpec) -> PlaybookScript:

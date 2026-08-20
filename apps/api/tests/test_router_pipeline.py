@@ -9,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.application.dto.pipeline_dto import PipelineRequest
+from app.application.services.coverage_resolver import DefaultCoverageResolver
 from app.config import get_settings
 from app.domain.models.pipeline_run import PipelineRunStatus
 from app.infrastructure.persistence.db_init import init_db
@@ -172,6 +173,34 @@ def test_get_run_returns_run_after_creation(client) -> None:
     assert data["run_id"] == run_id
     assert data["quality_report"]["status"] in {"clean", "warnings"}
     assert data["quality_report"]["generator_path"] == "generic_cir"
+
+
+def test_derivative_tangent_pipeline_returns_renderable_playbook(client) -> None:
+    prompt = "用动画解释导数的几何意义：曲线 y=x² 在点 (1,1) 处切线的斜率为什么是 2。"
+    client.app.dependency_overrides[get_coverage_resolver] = lambda: DefaultCoverageResolver()
+
+    submit = client.post("/api/v1/pipeline", json={"prompt": prompt})
+    run = client.get(f"/api/v1/runs/{submit.json()['run_id']}")
+
+    assert submit.status_code == 202
+    assert run.status_code == 200
+    payload = run.json()
+    assert payload["status"] == "succeeded", payload.get("error")
+    assert payload["quality_report"]["status"] == "clean"
+
+    playbook = payload["playbook"]
+    math_plots = [
+        step["snapshot"]
+        for step in playbook["steps"]
+        if step["snapshot"]["kind"] == "math_plot"
+    ]
+    curve_roles = {
+        curve.get("semantic_role")
+        for snapshot in math_plots
+        for curve in snapshot["curves"]
+    }
+    assert {"curve", "secant", "tangent"} <= curve_roles
+    assert any(snapshot.get("marker_x") == 1 for snapshot in math_plots)
 
 
 def test_list_runs_returns_array(client) -> None:
