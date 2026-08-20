@@ -24,6 +24,8 @@ class BinarySearchCoreSkillPack:
     manifest = BINARY_SEARCH_CORE_MANIFEST
 
     def heuristic_match(self, request: SkillRouteInput) -> SkillRouteMatch | None:
+        if request.source_code and request.source_code.strip():
+            return None
         spec = try_extract_binary_search(request.prompt)
         if spec is None:
             return None

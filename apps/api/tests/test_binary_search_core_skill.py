@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from app.domain.skills.base import SkillRouteInput
 from app.domain.skills.binary_search_core.manifest import BINARY_SEARCH_CORE_MANIFEST
 from app.domain.skills.binary_search_core.skill_pack import BinarySearchCoreSkillPack
@@ -79,15 +81,39 @@ def test_binary_search_core_does_not_overflow_on_very_large_integer() -> None:
     assert match.problem_spec["target"] == int(value)
 
 
-def test_binary_search_core_rejects_custom_comparators() -> None:
+@pytest.mark.parametrize(
+    "customization",
+    [
+        "使用传入的 compare(a,b) 函数作为比较逻辑",
+        "using compare (a,b)",
+        "按照自定义排序规则",
+        "with a custom comparator",
+        "用 cmp 回调",
+    ],
+)
+def test_binary_search_core_rejects_custom_comparators(customization: str) -> None:
     skill = BinarySearchCoreSkillPack()
 
     match = skill.heuristic_match(
         SkillRouteInput(
             prompt=(
-                "在有序数组 [1,3,5,7] 中使用自定义比较函数 compare "
+                f"在有序数组 [1,3,5,7] 中{customization}，"
                 "二分查找 7"
             )
+        )
+    )
+
+    assert match is None
+
+
+def test_binary_search_core_rejects_uploaded_source_code() -> None:
+    skill = BinarySearchCoreSkillPack()
+
+    match = skill.heuristic_match(
+        SkillRouteInput(
+            prompt="在有序数组 [1,3,5,7] 中二分查找 7",
+            source_code="const compare = (a, b) => a.rank - b.rank;",
+            language="typescript",
         )
     )
 

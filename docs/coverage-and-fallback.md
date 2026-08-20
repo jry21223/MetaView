@@ -135,5 +135,6 @@ uv run pytest \
   apps/api/tests/test_coverage_decision_contract.py \
   apps/api/tests/test_coverage_resolver.py \
   apps/api/tests/test_coverage_decision_persistence.py \
-  apps/api/tests/test_coverage_pipeline_integration.py
+  apps/api/tests/test_coverage_pipeline_integration.py \
+  apps/api/tests/test_run_pipeline_routed.py
 ```

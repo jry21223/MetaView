@@ -10,12 +10,82 @@ _TARGET_RE = re.compile(
     rf"(?:查找|寻找|找出|目标(?:值)?(?:为|是|=)?|target\s*=?)\s*(?P<target>{_NUMBER})",
     flags=re.IGNORECASE,
 )
-_UNSUPPORTED_MARKERS = (
-    "自定义比较",
-    "比较函数",
-    "custom comparator",
-    "custom comparison",
-    "comparator",
+_SUPPORTED_REQUEST_TERMS = tuple(sorted(
+    (
+        "binary_search",
+        "binary search",
+        "二分查找",
+        "二分搜索",
+        "有序数组",
+        "升序数组",
+        "已排序数组",
+        "目标值",
+        "的过程",
+        "demonstrate",
+        "ascending",
+        "pointers",
+        "sorted",
+        "process",
+        "indices",
+        "pointer",
+        "search",
+        "target",
+        "array",
+        "trace",
+        "show",
+        "find",
+        "mark",
+        "index",
+        "使用",
+        "演示",
+        "展示",
+        "说明",
+        "解释",
+        "数组",
+        "有序",
+        "升序",
+        "查找",
+        "寻找",
+        "找出",
+        "找到",
+        "目标",
+        "过程",
+        "标出",
+        "标记",
+        "显示",
+        "追踪",
+        "跟踪",
+        "变化",
+        "指针",
+        "下标",
+        "比较",
+        "中点",
+        "当前",
+        "区间",
+        "缩小",
+        "low",
+        "mid",
+        "high",
+        "请",
+        "用",
+        "在",
+        "里",
+        "中",
+        "从",
+        "对",
+        "如何",
+        "the",
+        "to",
+        "in",
+        "for",
+        "with",
+        "and",
+    ),
+    key=len,
+    reverse=True,
+))
+_REQUEST_PUNCTUATION_RE = re.compile(
+    rf"(?:{_NUMBER}|[\s,+\-*/=._:;!?，。；：！？()\[\]{{}}])"
 )
 
 
@@ -23,7 +93,7 @@ def try_extract_binary_search(prompt: str) -> BinarySearchProblemSpec | None:
     text = _normalize(prompt)
     if not _is_binary_search(text):
         return None
-    if any(marker in text.lower() for marker in _UNSUPPORTED_MARKERS):
+    if not _has_only_supported_request_language(text):
         return None
     values = _extract_values(text)
     target_match = _TARGET_RE.search(text)
@@ -54,6 +124,14 @@ def _is_binary_search(text: str) -> bool:
         marker in lowered
         for marker in ("二分查找", "二分搜索", "binary search", "binary_search")
     )
+
+
+def _has_only_supported_request_language(text: str) -> bool:
+    lowered = text.lower()
+    remainder = re.sub(r"\[[^\]]+\]", " ", lowered)
+    for term in _SUPPORTED_REQUEST_TERMS:
+        remainder = remainder.replace(term, " ")
+    return not _REQUEST_PUNCTUATION_RE.sub("", remainder)
 
 
 def _extract_values(text: str) -> list[int | float] | None:

@@ -46,8 +46,9 @@ and guardrail before any renderer-heavy expansion.
 
 1. Keep each manifest's supported and unsupported notes aligned with its parser
    and kernel tests.
-2. Preserve deterministic fallback behavior: unsafe parsing or solving returns
-   `handled=False` with a clear `fallback_reason`.
+2. Preserve deterministic failure behavior: unsafe parsing returns no heuristic
+   match; unsafe solving after a specialized match returns `handled=False` with
+   a clear `fallback_reason` and the pipeline fails closed.
 3. Expand handwritten fixtures before broadening capability descriptions.
 4. Add renderer-heavy work only after the skill's `ProblemSpec`, kernel output,
    and existing-renderer adapter tests are stable.
