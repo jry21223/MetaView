@@ -6,7 +6,7 @@ validation, solving, and playbook composition behind a shared interface.
 Each skill must provide:
 
 1. Manifest
-2. `heuristic_match()` that either returns a deterministic candidate or `None`
+2. Optional `heuristic_match()`
 3. `ProblemSpec` validator
 4. `execute()` returning `PlaybookScript` JSON
 5. Tests

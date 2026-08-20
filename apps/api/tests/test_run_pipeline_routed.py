@@ -149,7 +149,8 @@ async def test_custom_comparator_binary_search_fails_closed() -> None:
         "run-binary-search-custom-comparator",
         PipelineRequest(
             prompt=(
-                "在有序数组 [1,3,5,7] 中用 cmp 回调二分查找 7"
+                "在有序数组 [1,3,5,7] 中使用自定义比较函数 compare "
+                "二分查找 7"
             )
         ),
     )

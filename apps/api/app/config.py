@@ -91,9 +91,9 @@ class Settings(BaseSettings):
     # field (DeepSeek, local vLLM, etc.). Allowed: minimal/low/medium/high.
     openai_reasoning_effort: str | None = None
 
-    # Router policy. Hybrid mode accepts a high-confidence deterministic
-    # heuristic first, then uses the small router for ambiguous or unmatched
-    # requests and retains heuristic evidence as its fallback.
+    # Model router. Hybrid mode uses the small router first and falls back to
+    # deterministic parsers / legacy topic routing when the model is unavailable
+    # or too uncertain.
     router_mode: RouterMode = "hybrid"
     router_model: str | None = None
     router_timeout_s: float = 12.0

@@ -48,10 +48,9 @@ skill-specific import or branch.
 
 ## Routing
 
-In `hybrid` mode, the registry first accepts a high-confidence,
-non-refining deterministic heuristic match. If there is no such match, the
-small model router receives all current manifests and returns either a
-`SkillRouteMatch` JSON object or `null`. The router prompt is intentionally dynamic:
+The small model router receives all current manifests and returns either a
+`SkillRouteMatch` JSON object or `null`. The router prompt is intentionally
+dynamic:
 
 ```text
 Do not assume the only skill is solid_geometry. The skill list is dynamic.
@@ -61,8 +60,8 @@ The router must not solve final answers. It can only choose a skill and
 optionally draft a `problem_spec` for that skill to validate.
 
 If the model router is unavailable, low confidence, or returns `null`, the
-pipeline reuses the best lower-confidence heuristic evidence. `llm` mode does
-not preempt the model; `heuristic` mode never calls it.
+registry asks each skill for a heuristic match and chooses the highest
+confidence match.
 
 ## First Implementation
 
