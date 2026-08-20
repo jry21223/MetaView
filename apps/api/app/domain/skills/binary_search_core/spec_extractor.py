@@ -10,11 +10,20 @@ _TARGET_RE = re.compile(
     rf"(?:查找|寻找|找出|目标(?:值)?(?:为|是|=)?|target\s*=?)\s*(?P<target>{_NUMBER})",
     flags=re.IGNORECASE,
 )
+_UNSUPPORTED_MARKERS = (
+    "自定义比较",
+    "比较函数",
+    "custom comparator",
+    "custom comparison",
+    "comparator",
+)
 
 
 def try_extract_binary_search(prompt: str) -> BinarySearchProblemSpec | None:
     text = _normalize(prompt)
     if not _is_binary_search(text):
+        return None
+    if any(marker in text.lower() for marker in _UNSUPPORTED_MARKERS):
         return None
     values = _extract_values(text)
     target_match = _TARGET_RE.search(text)
@@ -63,5 +72,6 @@ def _extract_values(text: str) -> list[int | float] | None:
 
 
 def _parse_number(value: str) -> int | float:
-    parsed = float(value)
-    return int(parsed) if parsed.is_integer() else parsed
+    if "." not in value:
+        return int(value)
+    return float(value)

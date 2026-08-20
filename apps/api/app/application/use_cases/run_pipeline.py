@@ -282,14 +282,25 @@ class RunPipelineUseCase:
             return None
 
         mode = self._router_mode
+        route_input = SkillRouteInput(
+            prompt=request.prompt,
+            source_code=request.source_code,
+            language=request.language,
+        )
+        heuristic_match = (
+            self._skill_registry.heuristic_match(route_input)
+            if mode in {"heuristic", "hybrid"}
+            else None
+        )
+        if (
+            heuristic_match is not None
+            and heuristic_match.confidence >= self._router_min_confidence
+            and not heuristic_match.needs_refinement
+        ):
+            return heuristic_match
 
         if mode in {"llm", "hybrid"} and self._router_provider is not None:
             try:
-                route_input = SkillRouteInput(
-                    prompt=request.prompt,
-                    source_code=request.source_code,
-                    language=request.language,
-                )
                 model_match = await self._router_provider.route(
                     request=route_input,
                     manifests=self._skill_registry.manifests(),
@@ -311,13 +322,7 @@ class RunPipelineUseCase:
                 logger.warning("Skill router failed; falling back to registry heuristic: %s", exc)
 
         if mode in {"heuristic", "hybrid"}:
-            return self._skill_registry.heuristic_match(
-                SkillRouteInput(
-                    prompt=request.prompt,
-                    source_code=request.source_code,
-                    language=request.language,
-                )
-            )
+            return heuristic_match
 
         return None
 

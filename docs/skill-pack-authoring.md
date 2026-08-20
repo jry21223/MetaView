@@ -72,8 +72,10 @@ return SkillExecutionResult(
 ```
 
 If the route is relevant but cannot be handled safely, return `handled=False`
-with a `fallback_reason`; the pipeline will continue to the generic or agent
-path.
+with a `fallback_reason`. Once CoverageDecision has classified the request as
+`specialized`, the pipeline records `skill.execution_unhandled` and fails
+closed; it does not continue to the generic or agent path under a specialized
+quality label.
 
 ## Renderer Contract
 

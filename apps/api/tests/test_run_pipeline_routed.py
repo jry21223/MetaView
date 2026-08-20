@@ -89,12 +89,74 @@ async def test_text_request_does_not_send_a_false_python_signal_to_router() -> N
 
     await use_case.execute(
         "run-null-language",
-        PipelineRequest(prompt="用动画解释导数的几何意义"),
+        PipelineRequest(prompt="请解释这个数学概念"),
     )
 
     assert router.last_request is not None
     assert router.last_request.source_code is None
     assert router.last_request.language is None
+
+
+@pytest.mark.asyncio
+async def test_high_confidence_binary_search_heuristic_skips_model_router() -> None:
+    wrong_route = SkillRouteMatch(
+        skill_id="probability_statistics_core",
+        domain="math",
+        confidence=0.99,
+        capability_id="probability_statistics_core.descriptive_statistics",
+        problem_spec={
+            "kind": "descriptive_statistics",
+            "data": ["1", "3", "5", "7", "9", "11"],
+        },
+    )
+    router = _StaticRouter(wrong_route)
+    agent = _Agent()
+    repo = _RecordingRepo()
+    use_case = RunPipelineUseCase(
+        repo,
+        _FailingLLM(),
+        generation_mode="agent",
+        agent_provider=agent,
+        router_provider=router,
+        router_mode="hybrid",
+    )
+
+    await use_case.execute(
+        "run-binary-search-router",
+        PipelineRequest(
+            prompt="演示在有序数组 [1,3,5,7,9,11] 里二分查找 7，标出 low/mid/high"
+        ),
+    )
+
+    assert router.calls == 0
+    assert agent.calls == []
+    assert repo.updates[-1]["status"] == PipelineRunStatus.SUCCEEDED
+
+
+@pytest.mark.asyncio
+async def test_custom_comparator_binary_search_fails_closed() -> None:
+    agent = _Agent()
+    repo = _RecordingRepo()
+    use_case = RunPipelineUseCase(
+        repo,
+        _FailingLLM(),
+        generation_mode="agent",
+        agent_provider=agent,
+        router_mode="heuristic",
+    )
+
+    await use_case.execute(
+        "run-binary-search-custom-comparator",
+        PipelineRequest(
+            prompt=(
+                "在有序数组 [1,3,5,7] 中使用自定义比较函数 compare "
+                "二分查找 7"
+            )
+        ),
+    )
+
+    assert agent.calls == []
+    assert repo.updates[-1]["status"] == PipelineRunStatus.FAILED
 
 
 class _Agent:

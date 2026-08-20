@@ -13,13 +13,18 @@ class BinarySearchProblemSpec(BaseModel):
 
     @model_validator(mode="after")
     def validate_search_input(self) -> "BinarySearchProblemSpec":
-        numbers = [float(value) for value in self.values]
-        if not all(math.isfinite(value) for value in numbers):
+        if not all(
+            not isinstance(value, float) or math.isfinite(value)
+            for value in self.values
+        ):
             raise ValueError("binary-search values must be finite")
-        if not math.isfinite(float(self.target)):
+        if isinstance(self.target, float) and not math.isfinite(self.target):
             raise ValueError("binary-search target must be finite")
-        if any(left > right for left, right in zip(numbers, numbers[1:], strict=False)):
+        if any(
+            left > right
+            for left, right in zip(self.values, self.values[1:], strict=False)
+        ):
             raise ValueError("binary-search values must be sorted in ascending order")
-        if float(self.target) not in numbers:
+        if self.target not in self.values:
             raise ValueError("binary-search target must appear in the input values")
         return self
