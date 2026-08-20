@@ -68,8 +68,12 @@ declines at runtime or returns no Playbook candidate, the run is blocked with
 `skill.execution_unhandled`; it never falls through to Agent/CIR while retaining a specialized
 quality label.
 
-This second validation prevents false matches such as a binary-search array being classified
-as descriptive statistics merely because it contains many numbers.
+The registered `binary_search_core` heuristic takes precedence over descriptive statistics for
+an explicit binary-search request. Its V1 `ProblemSpec` accepts an ascending finite numeric array
+of at most 64 values and a target present in that array, then emits deterministic `low` / `mid` /
+`high` states. Independently re-deriving that spec during specialized verification prevents a
+numeric search array from being treated as descriptive statistics merely because it contains
+many numbers.
 
 ## Controlled composition profiles
 

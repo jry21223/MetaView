@@ -33,6 +33,7 @@ and guardrail before any renderer-heavy expansion.
 - `calculus_core`
 - `physics_mechanics`
 - `chemistry_stoichiometry`
+- `binary_search_core`
 - `algorithm_graph_core`
 - `biology_genetics`
 - `probability_statistics_core`

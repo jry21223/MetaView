@@ -206,6 +206,7 @@ def test_default_registry_contains_subject_skills_and_routes_prompts() -> None:
     assert {
         "physics_mechanics",
         "chemistry_stoichiometry",
+        "binary_search_core",
         "algorithm_graph_core",
         "biology_genetics",
         "probability_statistics_core",
@@ -354,6 +355,43 @@ async def test_derivative_tangent_prompt_produces_required_visual_evidence() -> 
     assert {"curve", "secant", "tangent"} <= curve_roles
     assert any(snapshot.get("marker_x") == 1 for snapshot in math_plots)
     assert "切线斜率也等于 2" in playbook["steps"][-1]["voiceover_text"]
+
+
+@pytest.mark.asyncio
+async def test_binary_search_prompt_produces_deterministic_search_states() -> None:
+    prompt = "演示在有序数组 [1,3,5,7,9,11] 里二分查找 7 的过程，标出 low/mid/high。"
+    agent = _FailingAgentProvider()
+    repo = _RecordingRepo()
+    use_case = RunPipelineUseCase(
+        repo,
+        _FailingLLM(),
+        generation_mode="agent",
+        agent_provider=agent,
+    )
+
+    await use_case.execute(
+        "run-binary-search",
+        PipelineRequest(prompt=prompt),
+    )
+
+    assert agent.called is False
+    assert repo.final_status == PipelineRunStatus.SUCCEEDED
+    assert repo.quality_reports[-1]["report"]["status"] == "clean"
+    assert repo.quality_reports[-1]["report"]["generator_path"] == "skill_pack"
+
+    playbook = json.loads(repo.updates[-1]["playbook_json"])
+    assert playbook["algorithm_id"] == "binary_search"
+    assert [step["snapshot"]["search_range"] for step in playbook["steps"]] == [
+        [0, 5],
+        [3, 5],
+        [3, 3],
+    ]
+    assert all(
+        [pointer["id"] for pointer in step["snapshot"]["pointers"]]
+        == ["low", "mid", "high"]
+        for step in playbook["steps"]
+    )
+    assert "下标 3" in playbook["steps"][-1]["voiceover_text"]
 
 
 @pytest.mark.asyncio

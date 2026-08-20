@@ -203,6 +203,29 @@ def test_derivative_tangent_pipeline_returns_renderable_playbook(client) -> None
     assert any(snapshot.get("marker_x") == 1 for snapshot in math_plots)
 
 
+def test_binary_search_pipeline_returns_renderable_search_trace(client) -> None:
+    prompt = "演示在有序数组 [1,3,5,7,9,11] 里二分查找 7 的过程，标出 low/mid/high。"
+    client.app.dependency_overrides[get_coverage_resolver] = lambda: DefaultCoverageResolver()
+
+    submit = client.post("/api/v1/pipeline", json={"prompt": prompt})
+    run = client.get(f"/api/v1/runs/{submit.json()['run_id']}")
+
+    assert submit.status_code == 202
+    assert run.status_code == 200
+    payload = run.json()
+    assert payload["status"] == "succeeded", payload.get("error")
+    assert payload["quality_report"]["status"] == "clean"
+    assert payload["quality_report"]["generator_path"] == "skill_pack"
+
+    playbook = payload["playbook"]
+    assert playbook["algorithm_id"] == "binary_search"
+    assert [step["snapshot"]["search_range"] for step in playbook["steps"]] == [
+        [0, 5],
+        [3, 5],
+        [3, 3],
+    ]
+
+
 def test_list_runs_returns_array(client) -> None:
     client.post("/api/v1/pipeline", json={"prompt": "test 1"})
     client.post("/api/v1/pipeline", json={"prompt": "test 2"})

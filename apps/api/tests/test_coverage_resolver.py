@@ -285,7 +285,7 @@ def test_unregistered_route_domain_does_not_resolve_an_unknown_prompt() -> None:
 def test_default_registry_does_not_register_a_generalist_composer() -> None:
     skill_ids = {skill.manifest.skill_id for skill in build_default_skill_registry().all()}
 
-    assert len(skill_ids) == 13
+    assert len(skill_ids) == 14
     assert not any("generalist" in skill_id or "composer" in skill_id for skill_id in skill_ids)
 
 
@@ -307,24 +307,23 @@ def test_generic_override_never_forces_a_registered_skill() -> None:
     assert "skill:physics_mechanics:blocked_by_generic_override" in (decision.missing_capabilities)
 
 
-def test_binary_search_dataset_cannot_become_statistics_specialized() -> None:
+def test_binary_search_dataset_routes_to_matching_algorithm_skill() -> None:
     registry = build_default_skill_registry()
     prompt = "用二分查找在 [2,4,7,11,18,25,31] 中查找 18"
-    false_match = registry.heuristic_match(SkillRouteInput(prompt=prompt))
-    assert false_match is not None
-    assert false_match.skill_id == "probability_statistics_core"
+    match = registry.heuristic_match(SkillRouteInput(prompt=prompt))
+    assert match is not None
+    assert match.skill_id == "binary_search_core"
 
     decision = DefaultCoverageResolver(registry).resolve(
         prompt=prompt,
-        route_match=false_match,
+        route_match=match,
     )
 
-    assert decision.mode == "experimental"
+    assert decision.mode == "specialized"
     assert decision.domain == "algorithm"
-    assert decision.matched_skill_ids == ["probability_statistics_core"]
-    assert "skill:probability_statistics_core:topic_domain_mismatch" in (
-        decision.missing_capabilities
-    )
+    assert decision.matched_skill_ids == ["binary_search_core"]
+    assert decision.missing_capabilities == []
+    assert decision.fallback_policy == "use_skill"
 
 
 def test_manifest_declared_unsupported_capability_is_rejected() -> None:

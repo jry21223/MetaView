@@ -32,6 +32,7 @@ class SkillRegistry:
 
 def build_default_skill_registry() -> SkillRegistry:
     from app.domain.skills.algorithm_graph_core.skill_pack import AlgorithmGraphCoreSkillPack
+    from app.domain.skills.binary_search_core.skill_pack import BinarySearchCoreSkillPack
     from app.domain.skills.biology_genetics.skill_pack import BiologyGeneticsSkillPack
     from app.domain.skills.calculus_core.skill_pack import CalculusCoreSkillPack
     from app.domain.skills.chemistry_stoichiometry.skill_pack import ChemistryStoichiometrySkillPack
@@ -57,6 +58,7 @@ def build_default_skill_registry() -> SkillRegistry:
             ConicSectionsSkillPack(),
             PhysicsMechanicsSkillPack(),
             ChemistryStoichiometrySkillPack(),
+            BinarySearchCoreSkillPack(),
             AlgorithmGraphCoreSkillPack(),
             BiologyGeneticsSkillPack(),
             ProbabilityStatisticsCoreSkillPack(),
