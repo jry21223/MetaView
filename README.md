@@ -258,7 +258,8 @@ Benchmark V2 的基础 Gold Case 包括导数与切线、BFS、递归阶乘和�
 | `apps/web` | React 19 + Vite + Remotion：Landing、工作台、播放器、Code Sync、参数面板与 Follow-up |
 | `apps/agent` | Agent sidecar：Drawing CLI、runtime / animation tools 和 Agent self-check |
 | `apps/mcp-server` | MetaView MCP 服务与 `createVisualLesson` prompt |
-| `skills` | 学科 SkillPack 与 agent prompt reference |
+| `apps/api/app/domain/skills` | 后端 deterministic SkillPack：ProblemSpec、kernel、Playbook adapter 与 registry |
+| `skills` | Agent prompt reference 与运行时技能说明 |
 | `docs` | 架构、契约、质量门、Benchmark、资产和验收文档 |
 | `eval` | Benchmark 配置、Gold Case 与本地评测入口 |
 | `data` | 本地 SQLite、导出文件与调试数据，不进入 Git |

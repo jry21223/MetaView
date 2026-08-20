@@ -13,8 +13,9 @@ and guardrail before any renderer-heavy expansion.
   explainable step labels.
 - Build the parser, `ProblemSpec`, deterministic kernel, and fallback behavior
   before investing in custom visualization.
-- If parsing or solving is unsafe, return `handled=False` with a clear
-  `fallback_reason` and let the generic or agent path continue.
+- If parsing is unsafe, return no heuristic match. If an already-specialized Skill execution
+  returns `handled=False`, include a clear `fallback_reason`; the pipeline records
+  `skill.execution_unhandled` and fails closed instead of continuing through generic or agent.
 - Use handwritten fixtures for supported, edge, and fallback cases.
 - Runtime and tests must not use the network. Source-derived data must be
   reviewed, minimal, and checked in before use.
@@ -31,19 +32,22 @@ and guardrail before any renderer-heavy expansion.
 - `elementary_algebra`
 - `linear_algebra`
 - `calculus_core`
+- `conic_sections`
 - `physics_mechanics`
 - `chemistry_stoichiometry`
 - `algorithm_graph_core`
 - `biology_genetics`
 - `probability_statistics_core`
+- `geography_earth`
 - `geography_climate`
 
 ## Maintenance Priorities
 
 1. Keep each manifest's supported and unsupported notes aligned with its parser
    and kernel tests.
-2. Preserve deterministic fallback behavior: unsafe parsing or solving returns
-   `handled=False` with a clear `fallback_reason`.
+2. Preserve deterministic failure behavior: unsafe parsing returns no heuristic
+   match; unsafe solving after a specialized match returns `handled=False` with
+   a clear `fallback_reason` and the pipeline fails closed.
 3. Expand handwritten fixtures before broadening capability descriptions.
 4. Add renderer-heavy work only after the skill's `ProblemSpec`, kernel output,
    and existing-renderer adapter tests are stable.
