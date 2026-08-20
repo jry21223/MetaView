@@ -44,7 +44,6 @@ Status: Active
 | `line-ellipse-position` | 相交、相切、相离、竖直直线与判别式 | 直线类型及参数 |
 | `ellipse-chord-midpoint-locus` | 动弦、中点尾迹、理论轨迹与韦达关系 | 定点、斜率 |
 | `pole-polar` | 圆外点、两条切线、接触弦与极线方程 | 外点坐标 `k` |
-| `projectile` | 速度分解、最高点、落点、时间、高度和射程 | 初速度、角度 |
 | `two-sum` | 逐项扫描、补数查询、哈希状态与命中下标 | 固定教学输入 |
 | `redox-electron` | 氧化还原反应、电子流、反应物与生成物 | 固定教学反应 |
 | `dna-replication` | 模板链、复制叉、互补配对与新链生成 | 固定教学过程 |

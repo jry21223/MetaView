@@ -36,7 +36,7 @@ MetaView 是一个面向教育场景的 AI 可视化讲解系统。输入一道�
 
 当前节点、队列、访问集合、活动边和代码行保持同步，让“先进先出”从一句定义变成可以逐步检查的执行过程。
 
-当前正式模板还包括二分查找、平抛运动和六个高中圆锥曲线 Gold Template。Gold Case 同时是 `/templates` 中经过人工校验的公开教师案例；对应的 Hidden Benchmark Variant 只保存 eval-only 题目与事实要求，必须经过真实 Pipeline 生成，不能读取公开冻结 Playbook 获得通过。仓库中的其他 fixture 主要用于渲染回归与视觉验收，不等同于已经发布给学习者的成品案例。
+当前正式模板共 16 个，包括滑动窗口、归并排序、快速排序、二分查找、二叉树 BFS、导数与切线，六个高中圆锥曲线 Gold Template，以及两数之和、氧化还原、DNA 复制和东亚季风。Gold Case 同时是 `/templates` 中经过人工校验的公开教师案例；对应的 Hidden Benchmark Variant 只保存 eval-only 题目与事实要求，必须经过真实 Pipeline 生成，不能读取公开冻结 Playbook 获得通过。仓库中的其他 fixture 主要用于渲染回归与视觉验收，不等同于已经发布给学习者的成品案例。
 
 ## 它不只生成一段视频
 
@@ -160,7 +160,7 @@ make dev
 | API | `http://localhost:8000` |
 | Agent sidecar | `http://localhost:8001` |
 
-打开 `/templates` 可以先体验四个静态正式案例；打开 `/create` 进入讲解创建工作台。根路径 `/` 是产品 Landing，不是生成器入口。
+打开 `/templates` 可以体验 16 个静态正式案例；打开 `/create` 进入讲解创建工作台，其中“二分查找”快捷项会直接进入对应静态模板，不创建生成任务。根路径 `/` 是产品 Landing，不是生成器入口。
 
 也可以拆开启动：
 

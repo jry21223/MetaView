@@ -58,8 +58,12 @@ settings              -> /settings
 
 `/create` 只呈现一个单列输入面，不在前端显示或推断学科、Coverage、Skill、
 LessonPlan 或 Director。教师可以输入题目/知识点、粘贴代码，或附加一个代码文件；
-“导数与切线 / 二分查找 / 抛体运动”三个按钮只填入自然语言 prompt，不提交、
-不选择模板，也不写入 domain。`/templates` 是模板和正式案例的唯一规范地址：二分查找、二叉树 BFS、导数与切线、抛体运动可以先展开真实封面，再进入共享 `PlaybookPlayer`；其余模板保持“制作中”并禁用。模板播放、调参和预设 Follow-up 全部使用本地确定性数据，不创建 run、不提交 pipeline，也不读取账户或额度。
+“导数与切线 / 抛体运动”两个按钮只填入自然语言 prompt，不提交、也不写入
+domain。“二分查找”是指向 `/templates/binary-search` 的静态模板链接，不填 prompt、
+不提交 pipeline。`/templates` 是模板和正式案例的权威目录：已登记案例可先展开真实
+封面，再进入共享 `PlaybookPlayer`；其余模板保持“制作中”并禁用。模板快捷入口、
+播放、调参和预设 Follow-up 全部使用本地确定性数据，不创建 run、不提交 pipeline，
+也不读取或扣减账户额度。
 
 正常 Web 提交统一经过 `usePipelineSubmit`，始终发送 `domain: null`：
 
