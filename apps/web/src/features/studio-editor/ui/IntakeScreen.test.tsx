@@ -57,15 +57,12 @@ describe("IntakeScreen smart-routed intake", () => {
     expect(queryByText("可导出")).toBeNull();
   });
 
-  it("offers exactly three prompt-only examples and a stable templates link", () => {
-    const { container, getByRole, getAllByRole, props } = renderIntake();
+  it("offers two prompt examples, one template shortcut, and the template index", () => {
+    const { container, getByRole, props } = renderIntake();
 
-    const examples = getAllByRole("button").filter((button) =>
-      button.classList.contains("mv-intake-example"),
-    );
-    expect(examples).toHaveLength(3);
+    expect(container.querySelectorAll(".mv-intake-example")).toHaveLength(3);
     expect(getByRole("button", { name: "导数与切线" })).toBeTruthy();
-    expect(getByRole("button", { name: "二分查找" })).toBeTruthy();
+    expect(getByRole("link", { name: "二分查找" })).toBeTruthy();
     expect(getByRole("button", { name: "抛体运动" })).toBeTruthy();
 
     fireEvent.click(getByRole("button", { name: "导数与切线" }));
@@ -79,6 +76,22 @@ describe("IntakeScreen smart-routed intake", () => {
     expect(getByRole("link", { name: "查看模板案例" }).getAttribute("href")).toBe(
       "/templates",
     );
+  });
+
+  it("opens the released binary-search template without creating a pipeline draft", () => {
+    const { container, getByRole, props } = renderIntake();
+
+    const binarySearchLink = getByRole("link", { name: "二分查找" });
+    expect(binarySearchLink.getAttribute("href")).toBe(
+      "/templates/binary-search",
+    );
+
+    fireEvent.click(binarySearchLink);
+
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    expect(
+      (container.querySelector("textarea") as HTMLTextAreaElement).value,
+    ).toBe("");
   });
 
   it("keeps generation enabled and submits the prompt", async () => {

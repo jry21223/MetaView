@@ -21,8 +21,7 @@ const EXAMPLE_PROMPTS = [
   },
   {
     label: "二分查找",
-    prompt:
-      "演示在有序数组 [1,3,5,7,9,11] 里二分查找 7 的过程，标出 low/mid/high。",
+    templateHref: "/templates/binary-search",
   },
   {
     label: "抛体运动",
@@ -356,17 +355,32 @@ export function IntakeScreen({
               <h2 id="mv-intake-examples-title">试试：</h2>
             </div>
             <div className="mv-intake-example-list">
-              {EXAMPLE_PROMPTS.map((example) => (
-                <button
-                  key={example.label}
-                  className="mv-intake-example"
-                  type="button"
-                  disabled={pending}
-                  onClick={() => pickExample(example.prompt)}
-                >
-                  {example.label}
-                </button>
-              ))}
+              {EXAMPLE_PROMPTS.map((example) =>
+                "templateHref" in example ? (
+                  <a
+                    key={example.label}
+                    className="mv-intake-example"
+                    href={example.templateHref}
+                    aria-disabled={pending}
+                    tabIndex={pending ? -1 : undefined}
+                    onClick={(event) => {
+                      if (pending) event.preventDefault();
+                    }}
+                  >
+                    {example.label}
+                  </a>
+                ) : (
+                  <button
+                    key={example.label}
+                    className="mv-intake-example"
+                    type="button"
+                    disabled={pending}
+                    onClick={() => pickExample(example.prompt)}
+                  >
+                    {example.label}
+                  </button>
+                ),
+              )}
             </div>
             <a className="mv-intake-cases-link" href="/templates">
               查看模板案例

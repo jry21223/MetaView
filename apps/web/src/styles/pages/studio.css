@@ -33,6 +33,7 @@
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--ink-2);
+  text-decoration: none;
 }
 .mv-eyebrow {
   font-size: 9.5px;
@@ -2541,7 +2542,8 @@
   color: var(--ink);
 }
 
-.mv-intake-example:disabled {
+.mv-intake-example:disabled,
+.mv-intake-example[aria-disabled="true"] {
   cursor: not-allowed;
   opacity: 0.52;
 }
