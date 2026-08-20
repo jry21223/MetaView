@@ -15,8 +15,9 @@ tests.
   chapters or worked examples.
 - Build deterministic parser plus kernel first. Add rendering only after the
   spec, solve path, and adapter contract are stable.
-- Return `handled=False` with a `fallback_reason` when parse, validation, or
-  solve safety is uncertain.
+- Return no heuristic match when parse or validation safety is uncertain. If
+  solving becomes unsafe after specialized selection, return `handled=False`
+  with a `fallback_reason`; the pipeline fails closed.
 - Use handwritten fixtures that cover supported cases, unsafe cases, and
   fallback cases. Do not scrape textbook examples into test data.
 - Runtime and test paths must not access the network. Any source tables needed
