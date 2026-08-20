@@ -13,9 +13,8 @@ and guardrail before any renderer-heavy expansion.
   explainable step labels.
 - Build the parser, `ProblemSpec`, deterministic kernel, and fallback behavior
   before investing in custom visualization.
-- If parsing is unsafe, return no heuristic match. If an already-specialized Skill execution
-  returns `handled=False`, include a clear `fallback_reason`; the pipeline records
-  `skill.execution_unhandled` and fails closed instead of continuing through generic or agent.
+- If parsing or solving is unsafe, return `handled=False` with a clear
+  `fallback_reason` and let the generic or agent path continue.
 - Use handwritten fixtures for supported, edge, and fallback cases.
 - Runtime and tests must not use the network. Source-derived data must be
   reviewed, minimal, and checked in before use.
@@ -32,14 +31,12 @@ and guardrail before any renderer-heavy expansion.
 - `elementary_algebra`
 - `linear_algebra`
 - `calculus_core`
-- `conic_sections`
 - `physics_mechanics`
 - `chemistry_stoichiometry`
 - `binary_search_core`
 - `algorithm_graph_core`
 - `biology_genetics`
 - `probability_statistics_core`
-- `geography_earth`
 - `geography_climate`
 
 ## Maintenance Priorities

@@ -140,6 +140,5 @@ def _operation_label(state: BinarySearchState) -> str:
 
 
 def _display(value: Number) -> str:
-    if isinstance(value, int):
-        return str(value)
-    return str(int(value)) if value.is_integer() else str(value)
+    number = float(value)
+    return str(int(number)) if number.is_integer() else str(number)

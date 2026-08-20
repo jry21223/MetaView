@@ -31,11 +31,6 @@ heuristics and coverage validation. The request DTO keeps an explicit domain for
 internal compatibility clients, but a Web-provided label cannot bypass the resolver's manifest,
 ProblemSpec, confidence or tool checks because the Web path does not provide one.
 
-In `hybrid` router mode, a high-confidence, non-refining deterministic heuristic match wins
-before the model router. Ambiguous or unmatched requests may still use the model router, but a
-validated SkillPack input does not spend a model call or risk being replaced by an unrelated
-model-selected skill.
-
 ## Modes
 
 | Mode | Meaning | Fallback |
