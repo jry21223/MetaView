@@ -216,7 +216,7 @@ export async function runAgentGenerationWithTrace(
       if (report.status !== "blocked") {
         trace.runtime("sidecar.completed", {
           attempt_count: attemptNumber,
-          tool_call_count: trace.toolEvents.length,
+          tool_call_count: trace.toolCallCount,
         });
         attachTraceSummary(playbook, trace);
         return {

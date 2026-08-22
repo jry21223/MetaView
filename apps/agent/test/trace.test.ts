@@ -128,6 +128,7 @@ describe("AgentTraceCollector", () => {
     await wrapped.execute("call-3", { index: 3 } as never);
 
     expect(collector.toolEvents).toHaveLength(2);
+    expect(collector.toolCallCount).toBe(3);
     expect(collector.runtimeEvents).toContainEqual(
       expect.objectContaining({
         event: "trace.tool_events_truncated",

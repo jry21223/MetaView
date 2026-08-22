@@ -17,6 +17,7 @@ export class AgentTraceCollector {
   private sequence = 0;
   private readonly toolEventBuffer: ToolTraceEvent[] = [];
   private readonly runtimeEventBuffer: RuntimeTraceEvent[] = [];
+  private totalToolCalls = 0;
   private droppedToolEvents = 0;
   private droppedRuntimeEvents = 0;
   private runtimeTruncationTimestamp: string | null = null;
@@ -35,6 +36,10 @@ export class AgentTraceCollector {
 
   get toolEvents(): ToolTraceEvent[] {
     return [...this.toolEventBuffer];
+  }
+
+  get toolCallCount(): number {
+    return this.totalToolCalls;
   }
 
   get runtimeEvents(): RuntimeTraceEvent[] {
@@ -109,6 +114,7 @@ export class AgentTraceCollector {
   }
 
   private appendTool(event: ToolTraceEvent): void {
+    this.totalToolCalls += 1;
     if (this.toolEventBuffer.length >= this.maxToolEvents) {
       this.toolEventBuffer.shift();
       this.droppedToolEvents += 1;
