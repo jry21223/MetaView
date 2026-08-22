@@ -6,6 +6,7 @@
  */
 
 export type Emphasis = "primary" | "secondary" | "accent";
+export type DraftState = "empty" | "outlined" | "draft_open" | "finalized";
 
 export interface CurveBuilder {
   curve_id: number;
@@ -18,6 +19,7 @@ export interface CurveBuilder {
   label: string;
   emphasis: Emphasis;
   is_parametric: boolean;
+  semantic_role?: string;
 }
 
 export interface PointBuilder {
@@ -26,6 +28,7 @@ export interface PointBuilder {
   y: number;
   label: string;
   emphasis: Emphasis;
+  semantic_role?: string;
 }
 
 export interface SegmentBuilder {
@@ -36,12 +39,14 @@ export interface SegmentBuilder {
   y1: number;
   arrow: boolean;
   label: string;
+  semantic_role?: string;
 }
 
 export interface RegionBuilder {
   vertices: Array<[number, number]>;
   label: string;
   emphasis: Emphasis;
+  semantic_role?: string;
 }
 
 export interface ArrayTokenBuilder {
@@ -145,6 +150,15 @@ export interface LayerOutput {
   body: Record<string, unknown>;
 }
 
+export interface CodeHighlightOutput {
+  language: string;
+  lines: string[];
+  active_lines: number[];
+  active_line: number;
+  variables: Record<string, string>;
+  operation_label?: string;
+}
+
 export interface MetaStepOutput {
   step_id: string;
   title: string;
@@ -157,7 +171,7 @@ export interface MetaStepOutput {
     value: string | null;
     emphasis: Emphasis;
   }>;
-  code_highlight: null;
+  code_highlight: CodeHighlightOutput | null;
   snapshot: Record<string, unknown>;
   layers: LayerOutput[];
 }
@@ -171,4 +185,31 @@ export interface PlaybookOutput {
   summary: string;
   steps: MetaStepOutput[];
   parameter_controls: ParameterControl[];
+  initial_data?: Record<string, string[]>;
+}
+
+export interface ToolTraceEvent {
+  sequence: number;
+  timestamp: string;
+  tool: string;
+  attempt_id: string;
+  ok: boolean;
+  duration_ms: number;
+  args: unknown;
+  error?: string;
+  state_before?: DraftState;
+  state_after?: DraftState;
+}
+
+export interface RuntimeTraceEvent {
+  sequence: number;
+  timestamp: string;
+  event: string;
+  detail?: Record<string, unknown>;
+}
+
+export interface AgentGenerationResult {
+  playbook: PlaybookOutput;
+  toolEvents: ToolTraceEvent[];
+  runtimeEvents: RuntimeTraceEvent[];
 }

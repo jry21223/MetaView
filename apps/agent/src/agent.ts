@@ -7,13 +7,20 @@
 import { Agent, type AgentTool } from "@earendil-works/pi-agent-core";
 import { getModel, type Api, type KnownProvider, type Model } from "@earendil-works/pi-ai";
 
+import { resolveOptionalEnv } from "./env.js";
 import { PlaybookEmitter } from "./state/playbookEmitter.js";
 import {
   AgentSelfCheckError,
   selfCheckPlaybook,
   type SelfCheckReport,
 } from "./state/playbookSelfCheck.js";
-import type { PlaybookOutput } from "./state/types.js";
+import { AgentTraceCollector } from "./state/trace.js";
+import type {
+  AgentGenerationResult,
+  PlaybookOutput,
+  RuntimeTraceEvent,
+  ToolTraceEvent,
+} from "./state/types.js";
 import { makeAssertTools } from "./tools/asserts.js";
 import { makeAnimationToolTools } from "./tools/animationTools.js";
 import { makeDrawingTools } from "./tools/drawing.js";
@@ -45,6 +52,8 @@ export interface GenerateOptions {
   defaultModel: string;
   defaultApiKey?: string;
   defaultBaseUrl?: string;
+  /** Optional live collector so the HTTP boundary can retain timeout traces. */
+  traceCollector?: AgentTraceCollector;
 }
 
 export const SYSTEM_PROMPT =
@@ -135,10 +144,48 @@ Output discipline:
 `.trim();
 
 const MAX_SELF_REPAIR_ATTEMPTS = 2;
+const DEFAULT_MAX_TOOL_EVENTS = 512;
+const MAX_RUNTIME_EVENTS = 256;
+
+export class AgentGenerationTraceError extends Error {
+  readonly originalError: unknown;
+  readonly toolEvents: ToolTraceEvent[];
+  readonly runtimeEvents: RuntimeTraceEvent[];
+
+  constructor(
+    originalError: unknown,
+    toolEvents: ToolTraceEvent[],
+    runtimeEvents: RuntimeTraceEvent[],
+  ) {
+    super(
+      originalError instanceof Error
+        ? originalError.message
+        : String(originalError),
+    );
+    this.name = "AgentGenerationTraceError";
+    this.originalError = originalError;
+    this.toolEvents = toolEvents;
+    this.runtimeEvents = runtimeEvents;
+  }
+}
 
 export async function runAgentGeneration(
   opts: GenerateOptions,
 ): Promise<PlaybookOutput> {
+  try {
+    return (await runAgentGenerationWithTrace(opts)).playbook;
+  } catch (error) {
+    if (error instanceof AgentGenerationTraceError) {
+      throw error.originalError;
+    }
+    throw error;
+  }
+}
+
+export async function runAgentGenerationWithTrace(
+  opts: GenerateOptions,
+): Promise<AgentGenerationResult> {
+  const trace = opts.traceCollector ?? createAgentTraceCollector(opts.constraints);
   let userPrompt = buildAgentPrompt(
     opts.prompt,
     opts.routeDecision,
@@ -147,41 +194,82 @@ export async function runAgentGeneration(
   );
   let lastReport: SelfCheckReport | null = null;
 
-  for (let attempt = 0; attempt <= MAX_SELF_REPAIR_ATTEMPTS; attempt++) {
-    const playbook = await runAgentAttempt(opts, userPrompt);
-    const report = selfCheckPlaybook(playbook, opts.prompt);
-    if (report.status !== "blocked") {
-      return playbook;
+  try {
+    for (let attempt = 0; attempt <= MAX_SELF_REPAIR_ATTEMPTS; attempt++) {
+      const attemptNumber = attempt + 1;
+      trace.runtime("sidecar.attempt.started", {
+        attempt: attemptNumber,
+        run_id: opts.runId ?? null,
+      });
+      const playbook = await runAgentAttempt(
+        opts,
+        userPrompt,
+        trace,
+        attemptNumber,
+      );
+      const report = selfCheckPlaybook(playbook, opts.prompt);
+      trace.runtime("sidecar.self_check.completed", {
+        attempt: attemptNumber,
+        status: report.status,
+        issue_count: report.issues.length,
+      });
+      if (report.status !== "blocked") {
+        trace.runtime("sidecar.completed", {
+          attempt_count: attemptNumber,
+          tool_call_count: trace.toolEvents.length,
+        });
+        attachTraceSummary(playbook, trace);
+        return {
+          playbook,
+          toolEvents: trace.toolEvents,
+          runtimeEvents: trace.runtimeEvents,
+        };
+      }
+      lastReport = report;
+      if (attempt >= MAX_SELF_REPAIR_ATTEMPTS) {
+        throw new AgentSelfCheckError(report);
+      }
+      userPrompt = buildAgentSelfRepairPrompt({
+        originalPrompt: opts.prompt,
+        routeDecision: opts.routeDecision,
+        coverageDecision: opts.coverageDecision,
+        lessonPlan: opts.lessonPlan,
+        previousPlaybook: playbook,
+        report,
+        repairAttempt: attempt + 1,
+      });
     }
-    lastReport = report;
-    if (attempt >= MAX_SELF_REPAIR_ATTEMPTS) {
-      throw new AgentSelfCheckError(report);
-    }
-    userPrompt = buildAgentSelfRepairPrompt({
-      originalPrompt: opts.prompt,
-      routeDecision: opts.routeDecision,
-      coverageDecision: opts.coverageDecision,
-      lessonPlan: opts.lessonPlan,
-      previousPlaybook: playbook,
-      report,
-      repairAttempt: attempt + 1,
-    });
-  }
 
-  throw new AgentSelfCheckError(
-    lastReport ?? { status: "blocked", issues: [] },
-  );
+    throw new AgentSelfCheckError(
+      lastReport ?? { status: "blocked", issues: [] },
+    );
+  } catch (error) {
+    trace.runtime("sidecar.failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw new AgentGenerationTraceError(
+      error,
+      trace.toolEvents,
+      trace.runtimeEvents,
+    );
+  }
 }
 
 async function runAgentAttempt(
   opts: GenerateOptions,
   userPrompt: string,
+  trace: AgentTraceCollector,
+  attemptNumber: number,
 ): Promise<PlaybookOutput> {
   const emitter = new PlaybookEmitter();
   let runtimePlaybook: PlaybookOutput | null = null;
 
   const drawingTools = makeDrawingTools({ emitter });
-  const assertTools = makeAssertTools({ emitter, apiBaseUrl: opts.apiBaseUrl });
+  const assertTools = makeAssertTools({
+    emitter,
+    apiBaseUrl: opts.apiBaseUrl,
+    sharedToken: opts.agentSharedToken,
+  });
   const runtimeTools = makeRuntimeToolTools({
     apiBaseUrl: opts.apiBaseUrl,
     sharedToken: opts.agentSharedToken,
@@ -191,19 +279,21 @@ async function runAgentAttempt(
     sharedToken: opts.agentSharedToken,
   });
   const templateTools = makeTemplateTools({ emitter });
-  const tools: AgentTool[] = [
+  const rawTools: AgentTool[] = [
     ...drawingTools,
     ...runtimeTools,
     ...animationToolBridge,
     ...templateTools,
     ...assertTools,
   ];
+  const attemptId = `${opts.runId ?? "run"}:attempt:${attemptNumber}`;
+  const tools = trace.wrapTools(rawTools, attemptId, () => emitter.state());
 
   const providerName =
     (opts.provider?.provider as string | undefined) ?? opts.defaultProvider;
   const modelName = opts.provider?.model ?? opts.defaultModel;
-  const apiKey = opts.provider?.api_key ?? opts.defaultApiKey;
-  const baseUrl = opts.provider?.base_url ?? opts.defaultBaseUrl;
+  const apiKey = resolveOptionalEnv(opts.provider?.api_key, opts.defaultApiKey);
+  const baseUrl = resolveOptionalEnv(opts.provider?.base_url, opts.defaultBaseUrl);
 
   const model = resolveModel(providerName, modelName, baseUrl);
 
@@ -220,6 +310,11 @@ async function runAgentAttempt(
         return undefined;
       }
       runtimePlaybook = playbook;
+      trace.runtime("sidecar.runtime_playbook.accepted", {
+        attempt: attemptNumber,
+        step_count: playbook.steps.length,
+        domain: playbook.domain,
+      });
       return { terminate: true };
     },
   });
@@ -232,6 +327,40 @@ async function runAgentAttempt(
   // The emitter has all committed steps by now even if finalize_playbook
   // wasn't explicitly called — its idempotent ``finalize`` covers the case.
   return emitter.finalize();
+}
+
+export function createAgentTraceCollector(
+  constraints?: Record<string, unknown>,
+): AgentTraceCollector {
+  return new AgentTraceCollector(
+    resolveMaxToolEvents(constraints),
+    MAX_RUNTIME_EVENTS,
+  );
+}
+
+function resolveMaxToolEvents(constraints?: Record<string, unknown>): number {
+  const configured = Number(constraints?.max_tool_events);
+  if (!Number.isFinite(configured)) return DEFAULT_MAX_TOOL_EVENTS;
+  return Math.max(32, Math.min(2048, Math.trunc(configured)));
+}
+
+function attachTraceSummary(
+  playbook: PlaybookOutput,
+  trace: AgentTraceCollector,
+): void {
+  playbook.initial_data = {
+    ...(playbook.initial_data ?? {}),
+    agent_tool_trace: trace.toolEvents.slice(-64).map((event) => {
+      const transition = event.state_before && event.state_after
+        ? `:${event.state_before}->${event.state_after}`
+        : "";
+      const outcome = event.ok ? "ok" : "error";
+      return `${event.sequence}:${event.attempt_id}:${event.tool}:${outcome}${transition}`;
+    }),
+    agent_runtime_trace: trace.runtimeEvents.slice(-32).map(
+      (event) => `${event.sequence}:${event.event}`,
+    ),
+  };
 }
 
 function resolveModel(

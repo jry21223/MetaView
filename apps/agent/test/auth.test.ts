@@ -15,4 +15,9 @@ describe("agent shared-token auth", () => {
     expect(hasValidSharedToken("secret", undefined)).toBe(false);
     expect(hasValidSharedToken("secret", "wrong")).toBe(false);
   });
+
+  it("rejects length-mismatched tokens without throwing", () => {
+    expect(hasValidSharedToken("secret", "sec")).toBe(false);
+    expect(hasValidSharedToken("sec", "secret")).toBe(false);
+  });
 });

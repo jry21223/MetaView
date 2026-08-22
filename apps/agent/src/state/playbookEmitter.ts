@@ -10,6 +10,7 @@ import type {
   AlgorithmRangeBuilder,
   ArrayTokenBuilder,
   CurveBuilder,
+  DraftState,
   Emphasis,
   MetaStepOutput,
   ParameterControl,
@@ -51,6 +52,14 @@ export class PlaybookEmitter {
       fps: DEFAULT_FPS,
       step_frames: DEFAULT_STEP_FRAMES,
     };
+  }
+
+  /** Coarse lifecycle state used by bounded tool traces. */
+  state(): DraftState {
+    if (this.finalized) return "finalized";
+    if (this.currentStep) return "draft_open";
+    if (this.skeleton.step_titles.length > 0) return "outlined";
+    return "empty";
   }
 
   // ── Plan / outline ────────────────────────────────────────────────────
