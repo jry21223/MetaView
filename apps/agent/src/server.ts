@@ -12,8 +12,13 @@
 import express, { type Request, type Response } from "express";
 import pino from "pino";
 
-import { runAgentGeneration } from "./agent.js";
+import {
+  AgentGenerationTraceError,
+  createAgentTraceCollector,
+  runAgentGenerationWithTrace,
+} from "./agent.js";
 import { hasValidSharedToken } from "./auth.js";
+import { resolveOptionalEnv } from "./env.js";
 import { AgentSelfCheckError } from "./state/playbookSelfCheck.js";
 
 const log = pino({ level: process.env.LOG_LEVEL ?? "info" });
@@ -21,13 +26,19 @@ const PORT = Number(process.env.PORT ?? 8001);
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://api:8000";
 const DEFAULT_PROVIDER = process.env.AGENT_DEFAULT_PROVIDER ?? "openai";
 const DEFAULT_MODEL = process.env.AGENT_DEFAULT_MODEL ?? "gpt-4o-mini";
-const DEFAULT_API_KEY =
-  process.env.AGENT_DEFAULT_API_KEY ??
-  process.env.METAVIEW_OPENAI_API_KEY ??
-  process.env.OPENAI_API_KEY;
-const DEFAULT_BASE_URL =
-  process.env.AGENT_DEFAULT_BASE_URL ?? process.env.METAVIEW_OPENAI_BASE_URL;
-const SHARED_TOKEN = process.env.AGENT_SHARED_TOKEN ?? process.env.METAVIEW_AGENT_SHARED_TOKEN;
+const DEFAULT_API_KEY = resolveOptionalEnv(
+  process.env.AGENT_DEFAULT_API_KEY,
+  process.env.METAVIEW_OPENAI_API_KEY,
+  process.env.OPENAI_API_KEY,
+);
+const DEFAULT_BASE_URL = resolveOptionalEnv(
+  process.env.AGENT_DEFAULT_BASE_URL,
+  process.env.METAVIEW_OPENAI_BASE_URL,
+);
+const SHARED_TOKEN = resolveOptionalEnv(
+  process.env.AGENT_SHARED_TOKEN,
+  process.env.METAVIEW_AGENT_SHARED_TOKEN,
+);
 // Hard ceiling so a hung agent loop can't block the worker indefinitely.
 // The API forwards its own agent timeout via the request body (``timeout_ms``,
 // issue #238); the effective per-request timeout is the lower of that value
@@ -104,15 +115,18 @@ app.post("/generate", async (req: Request, res: Response) => {
     return;
   }
   const timeoutMs = resolveGenerateTimeoutMs(timeout_ms, GENERATE_TIMEOUT_MS);
-  const timeout = new Promise<never>((_, reject) =>
-    setTimeout(
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutHandle = setTimeout(
       () => reject(new Error(`agent timed out after ${timeoutMs}ms`)),
       timeoutMs,
-    ),
-  );
+    );
+    timeoutHandle.unref?.();
+  });
+  const trace = createAgentTraceCollector(constraints);
   try {
-    const playbook = await Promise.race([
-      runAgentGeneration({
+    const result = await Promise.race([
+      runAgentGenerationWithTrace({
         prompt,
         runId: run_id,
         sourceCode: source_code,
@@ -130,28 +144,59 @@ app.post("/generate", async (req: Request, res: Response) => {
         defaultModel: DEFAULT_MODEL,
         defaultApiKey: DEFAULT_API_KEY,
         defaultBaseUrl: DEFAULT_BASE_URL,
+        traceCollector: trace,
       }),
       timeout,
     ]);
     res.json({
-      playbook,
+      playbook: result.playbook,
       provider: "pi",
-      tool_events: [],
-      runtime_events: [{ event: "sidecar.completed" }],
+      tool_events: result.toolEvents,
+      runtime_events: result.runtimeEvents,
       review: null,
       artifacts: {},
     });
   } catch (err) {
-    log.error({ err }, "generate failed");
-    if (err instanceof AgentSelfCheckError) {
+    const originalError = err instanceof AgentGenerationTraceError
+      ? err.originalError
+      : err;
+    if (!(err instanceof AgentGenerationTraceError)) {
+      const message = originalError instanceof Error
+        ? originalError.message
+        : String(originalError);
+      if (message.includes("timed out")) {
+        trace.runtime("sidecar.timeout", { timeout_ms: timeoutMs });
+      }
+    }
+    const toolEvents = err instanceof AgentGenerationTraceError
+      ? err.toolEvents
+      : trace.toolEvents;
+    const runtimeEvents = err instanceof AgentGenerationTraceError
+      ? err.runtimeEvents
+      : trace.runtimeEvents;
+    log.error(
+      { err: originalError, tool_events: toolEvents, runtime_events: runtimeEvents },
+      "generate failed",
+    );
+    if (originalError instanceof AgentSelfCheckError) {
       res.status(500).json({
-        detail: err.message,
-        self_check: err.report,
+        detail: originalError.message,
+        self_check: originalError.report,
+        tool_events: toolEvents,
+        runtime_events: runtimeEvents,
       });
       return;
     }
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ detail: message });
+    const message = originalError instanceof Error
+      ? originalError.message
+      : String(originalError);
+    res.status(500).json({
+      detail: message,
+      tool_events: toolEvents,
+      runtime_events: runtimeEvents,
+    });
+  } finally {
+    if (timeoutHandle) clearTimeout(timeoutHandle);
   }
 });
 

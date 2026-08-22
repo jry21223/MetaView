@@ -181,6 +181,15 @@ describe("agent runtime SceneBlueprint adoption", () => {
     );
     expect(result).toEqual(playbook);
     expect(result.steps[0].snapshot.kind).toBe("geo_map_scene");
+    expect(result.initial_data?.agent_tool_trace?.[0]).toContain(
+      "runtime_tool_execute:ok",
+    );
+    expect(result.initial_data?.agent_runtime_trace).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("sidecar.runtime_playbook.accepted"),
+        expect.stringContaining("sidecar.completed"),
+      ]),
+    );
     expect(agentMock.prompts[0]).toContain("LESSON_PLAN_ONLY_MARKER");
     expect(JSON.stringify(result)).not.toContain("LESSON_PLAN_ONLY_MARKER");
     expect(JSON.stringify(result)).not.toContain("algorithm_array");

@@ -15,6 +15,8 @@ export interface AssertToolDeps {
   emitter: PlaybookEmitter;
   /** FastAPI base URL (e.g. ``http://api:8000``). */
   apiBaseUrl: string;
+  /** Shared token pre-wired for the assert routes' coordinated fail-closed rollout. */
+  sharedToken?: string;
 }
 
 interface OrientationResult {
@@ -35,13 +37,19 @@ interface MonotonicResult {
 }
 
 export function makeAssertTools(deps: AssertToolDeps): AgentTool[] {
-  const { emitter, apiBaseUrl } = deps;
+  const { emitter, apiBaseUrl, sharedToken } = deps;
   const base = apiBaseUrl.replace(/\/$/, "");
 
   async function post<T>(path: string, body: unknown): Promise<T> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (sharedToken) {
+      headers["X-MetaView-Agent-Token"] = sharedToken;
+    }
     const resp = await fetch(`${base}${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(body),
     });
     if (!resp.ok) {

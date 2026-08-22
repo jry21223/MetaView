@@ -13,6 +13,7 @@ class AgentConstraints(BaseModel):
     max_reviewer_repair_attempts: int = 1
     legacy_single_enabled: bool = True
     executable_tools_available: bool = True
+    max_tool_events: int = Field(default=512, ge=32, le=2048)
 
 
 class ToolManifest(BaseModel):
@@ -27,11 +28,21 @@ class ToolEvent(BaseModel):
     tool: str
     ok: bool
     detail: dict[str, Any] | None = None
+    sequence: int | None = None
+    timestamp: str | None = None
+    attempt_id: str | None = None
+    duration_ms: int = 0
+    args: Any = None
+    error: str | None = None
+    state_before: str | None = None
+    state_after: str | None = None
 
 
 class RuntimeEvent(BaseModel):
     event: str
     detail: dict[str, Any] | None = None
+    sequence: int | None = None
+    timestamp: str | None = None
 
 
 class ToolExecutionResult(BaseModel):
