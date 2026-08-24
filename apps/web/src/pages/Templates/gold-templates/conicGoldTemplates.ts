@@ -58,12 +58,24 @@ function playbook(title: string, summary: string, algorithmId: string, steps: Me
   };
 }
 
-function followups(script: PlaybookScript, why: string, parameter: string): TemplatePreviewFollowups {
-  return Object.fromEntries(script.steps.map((step) => [step.step_id, [
-    { id: `${step.step_id}-q1`, question: "这一幕应该观察什么？", answer: step.voiceover_text },
-    { id: `${step.step_id}-q2`, question: "为什么这个结论成立？", answer: why },
-    { id: `${step.step_id}-q3`, question: "修改参数会怎样？", answer: parameter },
-  ] satisfies TemplatePreviewQuestion[]]));
+interface FollowupStepOverride {
+  why?: string;
+  parameter?: string;
+}
+
+function followups(
+  script: PlaybookScript,
+  fallback: { why: string; parameter: string },
+  byStep?: Record<string, FollowupStepOverride>,
+): TemplatePreviewFollowups {
+  return Object.fromEntries(script.steps.map((step) => {
+    const override = byStep?.[step.step_id] ?? {};
+    return [step.step_id, [
+      { id: `${step.step_id}-q1`, question: "这一幕应该观察什么？", answer: step.voiceover_text },
+      { id: `${step.step_id}-q2`, question: "为什么这个结论成立？", answer: override.why ?? fallback.why },
+      { id: `${step.step_id}-q3`, question: "修改参数会怎样？", answer: override.parameter ?? fallback.parameter },
+    ] satisfies TemplatePreviewQuestion[]];
+  }));
 }
 
 function ellipseCurve(a: number, b: number): NonNullable<MathSceneSnapshot["curves"]> {
@@ -460,8 +472,9 @@ function manifest(args: {
   defaults: TemplatePreviewParams;
   controls: NonNullable<GoldTemplateManifest["parameterSchema"]>["controls"];
   builder: (params: TemplatePreviewParams) => PlaybookScript;
-  why?: string;
-  parameterNote?: string;
+  why: string;
+  parameterNote: string;
+  followupsByStep?: (params: TemplatePreviewParams) => Record<string, FollowupStepOverride>;
 }): GoldTemplateManifest {
   const archetype = resolveConicArchetype(args.archetypeId);
   return attachPublicGoldTemplate({
@@ -472,8 +485,8 @@ function manifest(args: {
     buildPublicPlaybook: args.builder,
     buildFollowups: (params, script) => followups(
       script,
-      args.why ?? "所有数值由同一个圆锥曲线纯函数内核验证，画面只呈现已通过约束的结果。",
-      args.parameterNote ?? `当前参数会重新构建完整 Playbook；例如 ${Object.entries(params).map(([key, value]) => `${key}=${value}`).join("，")}。`,
+      { why: args.why, parameter: args.parameterNote },
+      args.followupsByStep?.(params),
     ),
   });
 }
@@ -533,24 +546,89 @@ export const CONIC_PUBLIC_GOLD_TEMPLATES: readonly GoldTemplateManifest[] = Obje
     { id: "a", kind: "range", label: "长半轴 a", description: "3 到 7", min: 3, max: 7, step: 0.25, resetPlayback: false },
     { id: "b", kind: "range", label: "短半轴 b", description: "自动满足 b<a", min: 1, max: 6.5, step: 0.25, resetPlayback: false },
     { id: "t", kind: "range", label: "动点参数 t", description: "沿椭圆移动", min: 0, max: 6.28, step: 0.05, resetPlayback: false },
-  ], builder: buildEllipseFocus }),
+  ], builder: buildEllipseFocus,
+  why: "椭圆上任意一点到两焦点的距离之和恒等于 2a，这是由 b²=a²−c² 保证的代数恒等式。",
+  parameterNote: "a 控制椭圆大小，b 控制扁平程度（须 b<a），t 只移动动点；焦距 c=√(a²−b²) 随 a、b 联动。",
+  followupsByStep: (params) => {
+    const a = clamp(numberParam(params, "a", 5), 3, 7);
+    const b = clamp(numberParam(params, "b", 3), 1, a - 0.5);
+    const t = clamp(numberParam(params, "t", 1), 0, 2 * Math.PI);
+    const sum = ellipseFocalDistanceSum({ a, b }, ellipsePoint({ a, b }, t));
+    return {
+      "ellipse-foci": { why: `焦点由 c=√(a²−b²)=${fixed(Math.sqrt(a * a - b * b))} 唯一确定：椭圆越扁（b 越小），c 越大，两个焦点越靠近顶点。` },
+      "ellipse-moving-point": { why: "P=(a·cos t, b·sin t) 代入 x²/a²+y²/b² 恒等于 1，所以无论 t 取多少，P 都不会离开这条椭圆。" },
+      "ellipse-two-distances": { why: "P 靠近哪个焦点，那段焦半径就变短；由椭圆的对称结构，另一段恰好变长相应的量。" },
+      "ellipse-distance-sum": { why: `当前 PF₁+PF₂=${fixed(sum)}，恰好等于 2a=${fixed(2 * a)}；多试几个 t 结果都相同，这不是巧合，下一步给出代数原因。` },
+      "ellipse-shape-parameters": { why: "由 b²=a²−c² 化简得 PF₁=a+c·cos t、PF₂=a−c·cos t，两式相加时 ±c·cos t 两项正好抵消，只剩常数 2a。" },
+      "ellipse-definition": { why: "距离和与 t 无关，说明「到两定点距离之和为 2a」刻画的正是这条椭圆上的全部点——这就是椭圆的定义。" },
+    };
+  } }),
   manifest({ caseId: "parabola-focus-directrix", archetypeId: "conic.parabola.focus-directrix", topic: "抛物线", title: "抛物线的焦点—准线定义", description: "同步比较动点到焦点和准线的距离", prompt: "用动点、焦点、准线和垂足解释抛物线 y²=2px 的定义。", defaults: { p: 2, t: 1.2 }, controls: [
     { id: "p", kind: "range", label: "焦准距 p", description: "焦点到准线的距离（y²=2px）", min: 1, max: 4, step: 0.25, resetPlayback: false },
     { id: "t", kind: "range", label: "动点参数 t", description: "控制 P", min: -2.2, max: 2.2, step: 0.05, resetPlayback: false },
-  ], builder: buildParabola }),
+  ], builder: buildParabola,
+  why: "抛物线上任意一点到焦点的距离恒等于它到准线的距离，这由 y²=2px 直接化简可得。",
+  parameterNote: "p 是焦点到准线的距离：p 越大，抛物线开口越阔，焦点与准线同时远离顶点；t 只移动动点。",
+  followupsByStep: () => ({
+    "parabola-focus-directrix": { why: "焦点与准线分别位于顶点两侧、各距 p/2；它们的间距 p 叫焦准距，定义只依赖这两个参照物。" },
+    "parabola-moving-point": { why: "P=(pt²/2, pt) 满足 y²=2px，所以 P 始终在抛物线上；t 的符号决定 P 在 x 轴上方还是下方。" },
+    "parabola-project": { why: "点到直线的距离是垂线段的长，所以必须作 PH⊥l；H 与 P 同高，PH 就是水平距离 x_P+p/2。" },
+    "parabola-distance": { why: "PF=√((x−p/2)²+y²)，用 y²=2px 替换 y² 后根号内恰好配成 (x+p/2)²，开方即得 PH=x+p/2。" },
+    "parabola-definition": { why: "无论 t 取多少，PF 与 PH 都化简为同一个式子 (p/2)(t²+1)，所以等距是恒成立的性质而不是当前参数下的巧合。" },
+  }) }),
   manifest({ caseId: "hyperbola-asymptotes", archetypeId: "conic.hyperbola.asymptotes", topic: "双曲线", title: "双曲线与渐近线", description: "理解两支结构、渐近趋势和焦点距离差", prompt: "展示双曲线两支、渐近线、焦点与动点的距离差。", defaults: { a: 3, b: 2, u: 1 }, controls: [
     { id: "a", kind: "range", label: "实半轴 a", description: "保持正值", min: 1.5, max: 5, step: 0.25, resetPlayback: false },
     { id: "b", kind: "range", label: "虚半轴 b", description: "改变渐近线", min: 1, max: 4, step: 0.25, resetPlayback: false },
     { id: "u", kind: "range", label: "动点参数 u", description: "沿右支移动", min: -1.7, max: 1.7, step: 0.05, resetPlayback: false },
-  ], builder: buildHyperbola }),
+  ], builder: buildHyperbola,
+  why: "双曲线的两支无限贴近渐近线 y=±(b/a)x，而两条焦半径之差恒等于 2a。",
+  parameterNote: "a 决定两支间距与焦距差 2a，b 决定渐近线斜率 ±b/a；u 只沿右支移动动点。",
+  followupsByStep: () => ({
+    "hyperbola-branches": { why: "方程中 x²/a²=1+y²/b²≥1 迫使 |x|≥a，所以平面被分成互不相连、关于原点对称的左右两支。" },
+    "hyperbola-asymptotes": { why: "把方程右边的 1 换成 0 就得到 y=±(b/a)x，它们是曲线的「极限方向」，本身不属于双曲线。" },
+    "hyperbola-moving-point": { why: "远离中心时 y 与 x 同时增大，比值 y/x 逐渐稳定；下一步用代数证明它稳定到 ±b/a。" },
+    "hyperbola-focal-difference": { why: "x−√(x²−a²)=a²/(x+√(x²−a²)) 随 x 增大趋于 0，所以曲线与直线 y=±(b/a)x 无限接近但永不相交。" },
+    "hyperbola-eccentricity": { why: "右支上的点到较远焦点的距离总比到较近焦点多出固定的 2a——与椭圆的「和不变」形成对照。" },
+    "hyperbola-summary": { why: "焦半径 PF₁=ex+a、PF₂=ex−a 都随 x 变化，但相减时 ex 项抵消，只剩常数 2a。" },
+  }) }),
   manifest({ caseId: "line-ellipse-position", archetypeId: "conic.line-ellipse.position", topic: "直线与椭圆", title: "直线与椭圆的位置关系", description: "对应相交、相切、相离与判别式状态", prompt: "联立直线与椭圆，展示 Δ>0、Δ=0、Δ<0 和竖直直线。", defaults: { lineType: "slope", slope: 0.35, intercept: 0, verticalX: 4 }, controls: [
     { id: "lineType", kind: "select", label: "直线类型", description: "覆盖斜率不存在", resetPlayback: false, options: [{ label: "斜率式", value: "slope" }, { label: "竖直线", value: "vertical" }] },
     { id: "slope", kind: "range", label: "斜率 m", description: "斜率式", min: -1.2, max: 1.2, step: 0.05, resetPlayback: false },
     { id: "intercept", kind: "range", label: "截距 q", description: "斜率式", min: -4, max: 4, step: 0.05, resetPlayback: false },
     { id: "verticalX", kind: "range", label: "竖直线 x", description: "竖直式", min: -6, max: 6, step: 0.05, resetPlayback: false },
-  ], builder: buildLineEllipse }),
+  ], builder: buildLineEllipse,
+  why: "直线与椭圆的交点个数等于联立后一元二次方程实根的个数，由判别式 Δ 的符号唯一决定。",
+  parameterNote: "调斜率或截距会连续改变 Δ 的符号；把截距推向 ±3 附近，可以亲眼看到相交→相切→相离的转变。",
+  followupsByStep: (params) => {
+    const lineType = params.lineType === "vertical" ? "vertical" : "slope";
+    const line: LineSpec = lineType === "vertical"
+      ? { kind: "vertical", x: clamp(numberParam(params, "verticalX", 4), -6, 6) }
+      : { kind: "slope", slope: clamp(numberParam(params, "slope", 0.35), -1.2, 1.2), intercept: clamp(numberParam(params, "intercept", 0), -4, 4) };
+    const result = intersectLineConic(ellipseImplicit({ a: 5, b: 3 }), line, 1e-8);
+    return {
+      "line-ellipse-setup": { why: "交点坐标必须同时满足直线与椭圆两个方程，联立消元后交点个数就等于一元二次方程实根的个数。" },
+      "line-ellipse-secant": { why: "Δ>0 时方程有两个不同实根，对应两个不同交点；取 y=0 时两根 x=±5 正是长轴端点。" },
+      "line-ellipse-tangent": { why: "Δ=0 表示两个实根重合成一个：几何上两个交点合并为唯一切点，直线恰好「擦过」椭圆。" },
+      "line-ellipse-disjoint": { why: "Δ<0 时方程没有实根，代数上无解等价于几何上直线与椭圆没有公共点。" },
+      "line-ellipse-vertical": { why: "竖直直线没有斜率，不能写成 y=mx+q；把 x=c 直接代入椭圆方程同样能数出交点个数，不需要伪造「无穷大斜率」。" },
+      "line-ellipse-current": { why: `当前 Δ=${fixed(result.discriminant, 4)}，它的符号唯一决定实根个数，从而唯一决定交点个数。` },
+    };
+  } }),
   manifest({ caseId: "ellipse-chord-midpoint-locus", archetypeId: "conic.ellipse.chord-midpoint-locus", topic: "动弦与轨迹", title: "椭圆动弦与中点轨迹", description: "连接动弦、中点尾迹与韦达消元", prompt: "展示过椭圆内定点的动弦与中点轨迹，并用韦达关系验证。", defaults: { fixedX: 2, slope: 0.6 }, controls: [
     { id: "fixedX", kind: "range", label: "定点横坐标 q", description: "限制在椭圆内部", min: 0.8, max: 3.8, step: 0.1, resetPlayback: false },
     { id: "slope", kind: "range", label: "斜率 m", description: "控制动弦", min: -2.5, max: 2.5, step: 0.05, resetPlayback: false },
-  ], builder: buildChordLocus }),
+  ], builder: buildChordLocus,
+  why: "过椭圆内定点的动弦中点满足由韦达定理导出的轨迹方程，轨迹是一个内含于原椭圆的小椭圆。",
+  parameterNote: "q 移动定点：轨迹小椭圆的中心 (q/2,0) 与半轴随之变化，但始终内含于原椭圆；m 只选择当前这条动弦。",
+  followupsByStep: (params) => {
+    const q = clamp(numberParam(params, "fixedX", 2), 0.8, 3.8);
+    return {
+      "chord-family": { why: `所有动直线都写成 y=m(x−${fixed(q)})，无论 m 取多少都经过定点 Q(${fixed(q)},0)——这是「过定点的直线族」。` },
+      "chord-endpoints": { why: "A、B 的横坐标是联立后一元二次方程的两个实根；Q 在椭圆内部保证 Δ>0，动弦总是存在。" },
+      "chord-midpoint": { why: "中点坐标是两根的平均值，因此可以用韦达定理直接表达，而不必真的解出 A、B。" },
+      "chord-trail": { why: "每个斜率 m 给出一个中点，m 连续变化时中点连续移动，尾迹就是这条轨迹的采样点。" },
+      "chord-vieta": { why: `由 x_M=(x_A+x_B)/2 与 y_M=m(x_M−${fixed(q)}) 消去 m，得到只含 x_M、y_M 的方程——这就是轨迹方程。` },
+      "chord-locus-result": { why: `轨迹方程可配方为中心 (${fixed(q / 2)},0) 的小椭圆；当前 M 代入后残差为 0，与尾迹重合。` },
+    };
+  } }),
 ]);

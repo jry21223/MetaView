@@ -342,6 +342,30 @@ describe("public gold template manifest", () => {
     expect(base.parameter_controls[0].value).toBe("5");
   });
 
+  it("answers conic why-questions with step-specific mathematics, not engine wording", () => {
+    const conicManifests = PUBLIC_GOLD_TEMPLATES.filter(
+      (manifest) => manifest.domain === "conic_sections",
+    );
+    const whyByCaseStep = new Map<string, string>();
+    for (const manifest of conicManifests) {
+      const params = manifest.parameterSchema?.defaults ?? {};
+      const script = manifest.buildPublicPlaybook(params);
+      const followupMap = manifest.buildFollowups(params, script);
+      for (const step of script.steps) {
+        for (const preset of followupMap[step.step_id]) {
+          expect(preset.answer).not.toContain("纯函数内核");
+          expect(preset.answer).not.toContain("重新构建完整 Playbook");
+        }
+        whyByCaseStep.set(`${manifest.caseId}:${step.step_id}`, followupMap[step.step_id][2].answer);
+      }
+    }
+    expect(whyByCaseStep.get("ellipse-focus-definition:ellipse-shape-parameters")).toContain("正好抵消");
+    expect(whyByCaseStep.get("parabola-focus-directrix:parabola-distance")).toContain("配成 (x+p/2)²");
+    expect(whyByCaseStep.get("hyperbola-asymptotes:hyperbola-summary")).toContain("ex 项抵消");
+    expect(whyByCaseStep.get("line-ellipse-position:line-ellipse-tangent")).toContain("重合成一个");
+    expect(whyByCaseStep.get("ellipse-chord-midpoint-locus:chord-vieta")).toContain("消去 m");
+  });
+
   it("publishes all five semantic Follow-up intents for every active conic step", () => {
     const expectedActions = [
       "slow-current-segment",
