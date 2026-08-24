@@ -73,6 +73,57 @@ function ellipseCurve(a: number, b: number): NonNullable<MathSceneSnapshot["curv
   }];
 }
 
+function buildStringConstruction(params: TemplatePreviewParams): PlaybookScript {
+  const ropeLength = clamp(numberParam(params, "rope", 10), 7, 13);
+  const a = ropeLength / 2;
+  const pinDistance = clamp(numberParam(params, "pins", 6), 2, 6.5);
+  const c = Math.min(pinDistance / 2, a - 0.25);
+  const t = clamp(numberParam(params, "t", 0.9), 0, 2 * Math.PI);
+  const b = Math.sqrt(a * a - c * c);
+  const spec = { a, b };
+  const f1 = { x: -c, y: 0 };
+  const f2 = { x: c, y: 0 };
+  const p = ellipsePoint(spec, t);
+  const d1 = Math.hypot(p.x - f1.x, p.y - f1.y);
+  const d2 = Math.hypot(p.x - f2.x, p.y - f2.y);
+  const residual = p.x * p.x / (a * a) + p.y * p.y / (b * b);
+  const trail = Array.from({ length: 24 }, (_, index) => ellipsePoint(spec, (index / 24) * 2 * Math.PI));
+  const base = (stage: number, caption: string, formula: string): MathSceneSnapshot => ({
+    kind: "math_scene", camera_mode: "fixed", x_min: -a - 1.5, x_max: a + 1.5, y_min: -b - 1.5, y_max: b + 1.5,
+    x_label: "x", y_label: "y",
+    curves: stage >= 5 ? ellipseCurve(a, b) : [],
+    points: [
+      { ...f1, label: "$F_1$", emphasis: stage === 1 ? "accent" : "secondary", semantic_role: "focus" },
+      { ...f2, label: "$F_2$", emphasis: stage === 1 ? "accent" : "secondary", semantic_role: "focus" },
+      ...(stage >= 2 ? [{ ...p, label: "P", emphasis: "accent", semantic_role: "moving_point" }] : []),
+      ...(stage >= 4 ? trail.map((point) => ({ ...point, emphasis: "secondary", semantic_role: "locus_trail" })) : []),
+    ],
+    segments: stage >= 2 ? [
+      { x0: p.x, y0: p.y, x1: f1.x, y1: f1.y, label: `PF₁=${fixed(d1)}`, emphasis: stage === 3 ? "accent" : "secondary", semantic_role: "focal_distance" },
+      { x0: p.x, y0: p.y, x1: f2.x, y1: f2.y, label: `PF₂=${fixed(d2)}`, emphasis: stage === 3 ? "accent" : "secondary", semantic_role: "focal_distance" },
+    ] : [],
+    annotations: stage === 1
+      ? [{ x: -a - 1, y: b + 0.9, text: `$F_1F_2=2c=${fixed(2 * c)},\\ \\text{绳长}=2a=${fixed(2 * a)}$`, align: "nw", semantic_role: "setup_panel" }]
+      : stage >= 4
+        ? [{ x: -a - 1, y: b + 0.9, text: `$PF_1+PF_2=${fixed(d1 + d2)}=2a$`, align: "nw", semantic_role: "derivation_panel" }]
+        : [],
+    formula_latex: formula, caption,
+  });
+  const steps = [
+    sceneStep(0, "string-setup", "观察目标：图钉、细绳与一个问题", `把两枚图钉钉在 F₁=(${fixed(-c)},0) 和 F₂=(${fixed(c)},0)，取一段长为 2a=${fixed(2 * a)} 的细绳，把两端分别系在图钉上。绳长 ${fixed(2 * a)} 大于图钉距离 ${fixed(2 * c)}，接下来的构造才能成立。`, base(1, "先检查构造条件：绳长必须大于两枚图钉的距离。", String.raw`\text{绳长}\ 2a=${fixed(2 * a)}>2c=${fixed(2 * c)}`)),
+    sceneStep(1, "string-taut", "拉紧绳子：笔尖定在 P", `用笔尖把绳拉直，笔尖此时位于 P=(${fixed(p.x)},${fixed(p.y)})。绳被分成两段：PF₁=${fixed(d1)}，PF₂=${fixed(d2)}，两段之和就是绳长本身。`, base(2, "绳一旦绷直，就变成 PF₁、PF₂ 两条线段。", String.raw`PF_1+PF_2=${fixed(d1)}+${fixed(d2)}=${fixed(d1 + d2)}`)),
+    sceneStep(2, "string-invariant", "改变 t：两段此消彼长，和不变", `拖动 t 移动笔尖：靠近 F₁ 时 PF₁ 变短、PF₂ 变长。只要绳保持绷直，两段之和始终等于绳长 2a=${fixed(2 * a)}，这就是实验里的不变量。`, base(3, "单段长度随笔尖移动改变，但两段之和被绳长锁定。", String.raw`PF_1+PF_2=${fixed(d1 + d2)}=2a`)),
+    sceneStep(3, "string-trail", "积累尾迹：轨迹逐渐显形", "把笔尖到过的位置全部保留下来，这些点排成一条光滑的封闭曲线。它左右对称、上下对称，我们猜想：笔尖的轨迹是一个椭圆。", base(4, "尾迹是实验证据；它是什么曲线还需要下一步验证。", String.raw`\{P \mid PF_1+PF_2=2a\}`)),
+    sceneStep(4, "string-verify", "验证轨迹：尾迹与椭圆重合", `令 b²=a²−c²=${fixed(b * b)}，画出椭圆 x²/a²+y²/b²=1。它与尾迹完全重合；把当前 P 代入方程，左边算得 ${fixed(residual, 4)}，恰好等于 1。`, base(5, "理论曲线此刻才出现，用来核对实验尾迹。", String.raw`\frac{x^2}{${fixed(a * a)}}+\frac{y^2}{${fixed(b * b)}}=1,\quad b^2=a^2-c^2`)),
+    sceneStep(5, "string-definition", "总结定义与退化情形", `平面内到两个定点 F₁、F₂ 距离之和等于常数 2a 的点的轨迹，在 2a>2c 时就是椭圆。若 2a=2c，笔尖只能在线段 F₁F₂ 上移动，轨迹退化为线段；若 2a<2c，绳子够不着两枚图钉，无轨迹。`, base(5, "定义里的条件 2a>2c 正是实验能画出椭圆的原因。", String.raw`\boxed{PF_1+PF_2=2a\ (2a>2c)}`)),
+  ];
+  return playbook("椭圆的绳长实验", "两枚图钉一段细绳，画出椭圆并归纳定义。", "conic_ellipse_string_construction", steps, [
+    { id: "rope", label: "绳长 2a", value: fixed(2 * a), description: "保持大于图钉距离" },
+    { id: "pins", label: "图钉距离 2c", value: fixed(2 * c), description: "自动限制在绳长以内" },
+    { id: "t", label: "笔尖位置 t", value: fixed(t), description: "0 到 2π" },
+  ]);
+}
+
 function buildEllipseFocus(params: TemplatePreviewParams): PlaybookScript {
   const a = clamp(numberParam(params, "a", 5), 3, 7);
   const b = clamp(numberParam(params, "b", 3), 1, a - 0.5);
@@ -305,6 +356,8 @@ function manifest(args: {
   defaults: TemplatePreviewParams;
   controls: NonNullable<GoldTemplateManifest["parameterSchema"]>["controls"];
   builder: (params: TemplatePreviewParams) => PlaybookScript;
+  why?: string;
+  parameterNote?: string;
 }): GoldTemplateManifest {
   const archetype = resolveConicArchetype(args.archetypeId);
   return attachPublicGoldTemplate({
@@ -313,11 +366,32 @@ function manifest(args: {
     parameterSchema: { defaults: args.defaults, controls: args.controls },
     poster: { url: `/template-previews/${args.caseId}/poster.webp`, alt: `${args.title}的 Playbook 代表画面`, frame: archetype.pedagogicalRubric.minimumSteps * STEP_FRAMES - 40 },
     buildPublicPlaybook: args.builder,
-    buildFollowups: (params, script) => followups(script, "所有数值由同一个圆锥曲线纯函数内核验证，画面只呈现已通过约束的结果。", `当前参数会重新构建完整 Playbook；例如 ${Object.entries(params).map(([key, value]) => `${key}=${value}`).join("，")}。`),
+    buildFollowups: (params, script) => followups(
+      script,
+      args.why ?? "所有数值由同一个圆锥曲线纯函数内核验证，画面只呈现已通过约束的结果。",
+      args.parameterNote ?? `当前参数会重新构建完整 Playbook；例如 ${Object.entries(params).map(([key, value]) => `${key}=${value}`).join("，")}。`,
+    ),
   });
 }
 
 export const CONIC_PUBLIC_GOLD_TEMPLATES: readonly GoldTemplateManifest[] = Object.freeze([
+  manifest({
+    caseId: "ellipse-string-construction",
+    archetypeId: "conic.ellipse.string-construction",
+    topic: "椭圆",
+    title: "椭圆的绳长实验",
+    description: "两枚图钉一段细绳，画出椭圆并归纳定义",
+    prompt: "用绳长实验演示椭圆的定义：固定两枚图钉与一段细绳，展示 PF₁+PF₂=2a 恒成立并画出轨迹。",
+    defaults: { rope: 10, pins: 6, t: 0.9 },
+    controls: [
+      { id: "rope", kind: "range", label: "绳长 2a", description: "7 到 13", min: 7, max: 13, step: 0.5, resetPlayback: false },
+      { id: "pins", kind: "range", label: "图钉距离 2c", description: "自动保持小于绳长", min: 2, max: 6.5, step: 0.5, resetPlayback: false },
+      { id: "t", kind: "range", label: "笔尖位置 t", description: "沿轨迹移动", min: 0, max: 6.28, step: 0.05, resetPlayback: false },
+    ],
+    builder: buildStringConstruction,
+    why: "绳被拉直后就是 PF₁、PF₂ 两条线段，它们的和被绳长 2a 锁定；这个不变量正是椭圆定义的核心。",
+    parameterNote: "增大绳长 2a 椭圆整体变大；图钉距离 2c 越接近 2a，椭圆越扁；一旦 2a 不大于 2c，轨迹退化为线段或不存在。",
+  }),
   manifest({ caseId: "ellipse-focus-definition", archetypeId: "conic.ellipse.focus-definition", topic: "椭圆", title: "椭圆的焦点定义", description: "观察动点到两焦点距离之和恒定", prompt: "用动点解释椭圆的焦点定义，并验证 PF₁+PF₂=2a。", defaults: { a: 5, b: 3, t: 1 }, controls: [
     { id: "a", kind: "range", label: "长半轴 a", description: "3 到 7", min: 3, max: 7, step: 0.25, resetPlayback: false },
     { id: "b", kind: "range", label: "短半轴 b", description: "自动满足 b<a", min: 1, max: 6.5, step: 0.25, resetPlayback: false },

@@ -314,6 +314,50 @@
         "requiredPhases": ["观察", "构造", "推导", "验证", "总结"],
         "minimumSteps": 6
       }
+    },
+    {
+      "archetypeId": "conic.ellipse.string-construction",
+      "publicCaseId": "ellipse-string-construction",
+      "requiredCapabilities": ["conic.ellipse.string-construction", "math_scene.parametric_curve", "conic.deterministic_kernel"],
+      "expectedFacts": [
+        {
+          "id": "string-foci-pins",
+          "description": "两枚图钉即两个焦点，间距为 2c",
+          "anyOf": ["图钉", "焦点", "F1", "F2"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "string-sum-invariant",
+          "description": "绳保持绷直时 PF1+PF2 恒等于绳长 2a",
+          "anyOf": ["PF1+PF2", "PF_1+PF_2", "距离之和", "绳长"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "string-trace-ellipse",
+          "description": "笔尖轨迹是椭圆",
+          "anyOf": ["椭圆", "ellipse"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "string-validity-constraint",
+          "description": "构造成立要求 2a>2c，否则退化为线段或无轨迹",
+          "anyOf": ["2a>2c", "2a > 2c", "绳长大于", "退化"],
+          "tolerance": 1e-8
+        }
+      ],
+      "visualInvariants": [
+        {
+          "id": "string-construction-visual",
+          "description": "图钉焦点、绷直的两段绳、笔尖动点、尾迹与最终椭圆均可辨认",
+          "requiredSemanticRoles": ["focus", "moving_point", "focal_distance", "locus_trail", "conic_curve"],
+          "requiredStateFields": ["curves", "points", "segments"]
+        }
+      ],
+      "pedagogicalRubric": {
+        "objective": "用绳长实验从轨迹生成椭圆，并归纳含 2a>2c 条件的椭圆定义",
+        "requiredPhases": ["观察", "构造", "验证", "总结"],
+        "minimumSteps": 6
+      }
     }
   ]
 }

@@ -76,6 +76,15 @@ const LINE_PREVIEWS: Record<TemplatePreviewCaseId, ReactNode> = {
       <circle className="is-accent" cx="83" cy="28" r="3.5" />
     </svg>
   ),
+  "ellipse-string-construction": (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="ellipse-string-construction">
+      <ellipse className="is-guide" cx="80" cy="30" rx="52" ry="18" data-object="conic" />
+      <circle cx="31" cy="30" r="3" data-object="focus" />
+      <circle cx="129" cy="30" r="3" data-object="focus" />
+      <path className="is-accent" d="M31 30 106 14l23 16" data-object="rope" />
+      <circle className="is-accent" cx="106" cy="14" r="3" data-object="moving-point" />
+    </svg>
+  ),
   "ellipse-focus-definition": (
     <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="ellipse-focal-sum">
       <path className="is-guide is-dashed" d="M22 28h116" data-object="focal-axis" />

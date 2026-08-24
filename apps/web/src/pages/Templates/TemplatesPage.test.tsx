@@ -50,11 +50,11 @@ describe("TemplatesPage lesson atlas", () => {
     expect(view.getByLabelText("current-path").textContent).toBe("/templates/binary-search");
   });
 
-  it("publishes sixteen line-drawn previews and keeps the other templates disabled", () => {
+  it("publishes seventeen line-drawn previews and keeps the other templates disabled", () => {
     const { container, getByRole } = renderPage();
 
-    expect(TEMPLATES).toHaveLength(27);
-    expect(container.querySelectorAll("[data-preview]")).toHaveLength(16);
+    expect(TEMPLATES).toHaveLength(28);
+    expect(container.querySelectorAll("[data-preview]")).toHaveLength(17);
     expect((getByRole("button", { name: "斐波那契 · 记忆化，制作中" }) as HTMLButtonElement).disabled).toBe(true);
   });
 

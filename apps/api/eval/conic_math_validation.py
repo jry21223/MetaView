@@ -41,6 +41,23 @@ class _EllipseParameters(BaseModel):
         return self
 
 
+class _StringConstructionParameters(BaseModel):
+    """Rope-length ellipse construction: rope 2a between pins at (+/-c, 0)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    a: float = Field(gt=0)
+    c: float = Field(ge=0)
+
+    @model_validator(mode="after")
+    def validate_rope(self) -> "_StringConstructionParameters":
+        if self.a <= self.c:
+            raise ValueError(
+                "string construction requires 2a > 2c (rope longer than pin distance)"
+            )
+        return self
+
+
 class _ParabolaParameters(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -127,6 +144,7 @@ class _PolePolarParameters(BaseModel):
 
 
 _PARAMETER_MODELS: dict[str, type[BaseModel]] = {
+    "conic.ellipse.string-construction": _StringConstructionParameters,
     "conic.ellipse.focus-definition": _EllipseParameters,
     "conic.parabola.focus-directrix": _ParabolaParameters,
     "conic.hyperbola.asymptotes": _HyperbolaParameters,
@@ -163,6 +181,8 @@ def validate_conic_playbook(
     scenes = [item for item in snapshots if item.get("kind") == "math_scene"]
     if not scenes:
         return [ConicMathDiagnostic("$.steps[*].snapshot", "math_scene evidence is absent")]
+    if archetype_id == "conic.ellipse.string-construction":
+        return _validate_string_construction(validated, scenes, tolerance)
     if archetype_id == "conic.ellipse.focus-definition":
         return _validate_ellipse(validated, scenes, tolerance)
     if archetype_id == "conic.parabola.focus-directrix":
@@ -176,6 +196,20 @@ def validate_conic_playbook(
     if archetype_id == "conic.pole-polar.circle":
         return _validate_pole_polar(validated, scenes, tolerance)
     return [ConicMathDiagnostic("$.expectation.validator", "unsupported conic validator")]
+
+
+def _validate_string_construction(
+    parameters: dict[str, Any],
+    scenes: list[dict[str, Any]],
+    tolerance: float,
+) -> list[ConicMathDiagnostic]:
+    """The rope construction traces exactly the ellipse with b^2 = a^2 - c^2,
+    so all curve/foci/focal-distance evidence is checked by the shared
+    ellipse validator on the derived semi-axes."""
+    a = float(parameters["a"])
+    c = float(parameters["c"])
+    b = math.sqrt(a * a - c * c)
+    return _validate_ellipse({"a": a, "b": b, "majorAxis": "x"}, scenes, tolerance)
 
 
 def _validate_ellipse(

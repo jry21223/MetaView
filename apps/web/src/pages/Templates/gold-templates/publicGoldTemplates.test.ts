@@ -78,7 +78,7 @@ describe("public gold template manifest", () => {
   });
 
   it("keeps public identifiers and archetypes unique", () => {
-    expect(PUBLIC_GOLD_TEMPLATES).toHaveLength(10);
+    expect(PUBLIC_GOLD_TEMPLATES).toHaveLength(11);
     expect(new Set(PUBLIC_GOLD_TEMPLATES.map((item) => item.caseId)).size)
       .toBe(PUBLIC_GOLD_TEMPLATES.length);
     expect(new Set(PUBLIC_GOLD_TEMPLATES.map((item) => item.archetypeId)).size)
@@ -92,11 +92,11 @@ describe("public gold template manifest", () => {
     }
   });
 
-  it("publishes exactly six conic teacher cases with complete deterministic contracts", () => {
+  it("publishes exactly seven conic teacher cases with complete deterministic contracts", () => {
     const conicTemplates = PUBLIC_GOLD_TEMPLATES.filter(
       (item) => item.domain === "conic_sections",
     );
-    expect(conicTemplates).toHaveLength(6);
+    expect(conicTemplates).toHaveLength(7);
     for (const item of conicTemplates) {
       const defaults = item.parameterSchema?.defaults ?? {};
       const script = item.buildPublicPlaybook(defaults);
@@ -116,6 +116,7 @@ describe("public gold template manifest", () => {
 
   it("orders every public conic case as an explicit teacher-grade reasoning chain", () => {
     const expectedTitleCues: Record<string, readonly string[]> = {
+      "ellipse-string-construction": ["观察目标", "拉紧绳子", "改变 t", "积累尾迹", "验证轨迹", "总结"],
       "ellipse-focus-definition": ["观察目标", "改变 t", "测量", "提出猜想", "代数解释", "验证"],
       "parabola-focus-directrix": ["观察目标", "改变 t", "构造", "代数解释", "验证"],
       "hyperbola-asymptotes": ["观察目标", "提出猜想", "改变 u", "代数验证", "焦距差", "总结"],
@@ -127,7 +128,7 @@ describe("public gold template manifest", () => {
     const conicManifests = PUBLIC_GOLD_TEMPLATES.filter(
       (manifest) => manifest.archetypeId.startsWith("conic."),
     );
-    expect(conicManifests).toHaveLength(6);
+    expect(conicManifests).toHaveLength(7);
     for (const manifest of conicManifests) {
       const script = manifest.buildPublicPlaybook(manifest.parameterSchema?.defaults ?? {});
       expect(script.steps.map((step, index) => step.title.includes(
@@ -153,6 +154,20 @@ describe("public gold template manifest", () => {
       manifest.caseId,
       manifest.buildPublicPlaybook(manifest.parameterSchema?.defaults ?? {}),
     ]));
+
+    const stringConstruction = byCase.get("ellipse-string-construction")!;
+    const trailScene = stringConstruction.steps[3].snapshot;
+    const verifyScene = stringConstruction.steps[4].snapshot;
+    expect(trailScene.kind).toBe("math_scene");
+    expect(verifyScene.kind).toBe("math_scene");
+    if (trailScene.kind === "math_scene" && verifyScene.kind === "math_scene") {
+      expect(trailScene.curves ?? []).toHaveLength(0);
+      expect(trailScene.points?.some((point) => point.semantic_role === "locus_trail")).toBe(true);
+      expect(verifyScene.curves?.some((curve) => curve.semantic_role === "conic_curve")).toBe(true);
+    }
+    expect(stringConstruction.steps[4].voiceover_text).toContain("恰好等于 1");
+    expect(stringConstruction.steps.at(-1)?.voiceover_text).toContain("退化为线段");
+    expect(stringConstruction.steps.at(-1)?.voiceover_text).toContain("2a>2c");
 
     const ellipse = byCase.get("ellipse-focus-definition")!;
     expect(ellipse.steps[4].snapshot.kind).toBe("math_scene");

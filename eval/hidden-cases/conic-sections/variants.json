@@ -173,6 +173,34 @@
       },
       "conclusionAliases": [["极线"], ["kx+2y=9", "kx + 2y = 9"], ["圆外", "合法区域"]],
       "forbiddenAliases": ["圆内仍有两条实切线"]
+    },
+    {
+      "caseId": "conic-hidden-string-construction-01",
+      "archetypeId": "conic.ellipse.string-construction",
+      "prompt": "请用绳长实验为高中生讲解椭圆的定义：两枚图钉相距 8（即 2c=8），绳长为 12（即 2a=12）。展示笔尖移动时到两图钉距离之和为何始终是 12，说明轨迹为什么是椭圆，并解释为什么必须 2a>2c。",
+      "parameters": {"a": 6, "c": 4},
+      "factEvidence": {
+        "string-foci-pins": ["图钉", "焦点", "2c=8", "2c = 8"],
+        "string-sum-invariant": ["PF1+PF2=12", "PF_1+PF_2=12", "距离之和为 12", "绳长 12"],
+        "string-trace-ellipse": ["椭圆", "ellipse"],
+        "string-validity-constraint": ["2a>2c", "2a > 2c", "12>8", "退化"]
+      },
+      "conclusionAliases": [["椭圆", "ellipse"], ["PF1+PF2", "PF_1+PF_2", "距离之和"], ["12", "2a"]],
+      "forbiddenAliases": ["PF1+PF2=8", "PF_1+PF_2=8", "距离之和为 8"]
+    },
+    {
+      "caseId": "conic-hidden-string-construction-02",
+      "archetypeId": "conic.ellipse.string-construction",
+      "prompt": "两个定点 F1、F2 相距 6（2c=6），一段长度为 10 的细绳两端固定在 F1、F2，笔尖拉紧细绳滑动。请为高中生讲解笔尖轨迹：验证 PF1+PF2 恒等于 10，写出轨迹的椭圆特征，并讨论绳长恰好等于 6 或小于 6 时会发生什么。",
+      "parameters": {"a": 5, "c": 3},
+      "factEvidence": {
+        "string-foci-pins": ["定点", "焦点", "2c=6", "2c = 6"],
+        "string-sum-invariant": ["PF1+PF2=10", "PF_1+PF_2=10", "距离之和为 10", "绳长 10"],
+        "string-trace-ellipse": ["椭圆", "ellipse"],
+        "string-validity-constraint": ["2a>2c", "2a > 2c", "线段", "退化", "无轨迹"]
+      },
+      "conclusionAliases": [["椭圆", "ellipse"], ["PF1+PF2", "PF_1+PF_2", "距离之和"], ["10", "2a"]],
+      "forbiddenAliases": ["PF1+PF2=6", "PF_1+PF_2=6", "距离之和为 6"]
     }
   ]
 }
