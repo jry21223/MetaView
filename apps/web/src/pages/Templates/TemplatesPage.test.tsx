@@ -60,8 +60,8 @@ describe("TemplatesPage lesson atlas", () => {
 
   it("opens the pole-polar template as a real case route", () => {
     const view = renderPage();
-    fireEvent.click(view.getByRole("button", { name: "极点与极线，展开预览" }));
-    fireEvent.click(view.getByRole("button", { name: "极点与极线，进入完整案例" }));
+    fireEvent.click(view.getByRole("button", { name: "极点与极线（拓展），展开预览" }));
+    fireEvent.click(view.getByRole("button", { name: "极点与极线（拓展），进入完整案例" }));
     expect(view.getByLabelText("current-path").textContent).toBe("/templates/pole-polar");
   });
 

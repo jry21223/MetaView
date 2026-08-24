@@ -179,13 +179,24 @@ describe("public gold template manifest", () => {
     const parabola = byCase.get("parabola-focus-directrix")!;
     expect(parabola.steps[3].snapshot.kind).toBe("math_scene");
     if (parabola.steps[3].snapshot.kind === "math_scene") {
-      expect(parabola.steps[3].snapshot.formula_latex).toContain("p(t^2+1)=PH");
+      expect(parabola.steps[3].snapshot.formula_latex).toContain("(t^2+1)=PH");
+      expect(parabola.steps[0].snapshot.formula_latex).toContain("y^2=2px");
     }
     expect(parabola.steps.at(-1)?.voiceover_text).toMatch(/PF=\d+(?:\.\d+)?、PH=\d+(?:\.\d+)?/);
 
     const hyperbola = byCase.get("hyperbola-asymptotes")!;
-    expect(hyperbola.steps[3].voiceover_text).toContain("tanh u");
+    expect(hyperbola.steps[3].voiceover_text).toContain("x²−a²");
     expect(hyperbola.steps.at(-1)?.voiceover_text).toContain("当前数值 6 与推导一致");
+    // 双曲函数超出高中范围：允许其留在机器侧曲线表达式里，但任何学生可见
+    // 文本（旁白/公式/说明）都不得出现。
+    for (const step of hyperbola.steps) {
+      const visible = [
+        step.voiceover_text,
+        step.snapshot.kind === "math_scene" ? step.snapshot.formula_latex ?? "" : "",
+        step.snapshot.kind === "math_scene" ? step.snapshot.caption ?? "" : "",
+      ].join(" ");
+      expect(visible).not.toMatch(/cosh|sinh|tanh/);
+    }
 
     const lineEllipse = byCase.get("line-ellipse-position")!;
     expect(lineEllipse.steps.slice(1, 4).map((step) => step.voiceover_text)).toEqual([

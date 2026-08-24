@@ -267,27 +267,29 @@ function buildEllipseFocus(params: TemplatePreviewParams): PlaybookScript {
 }
 
 function buildParabola(params: TemplatePreviewParams): PlaybookScript {
-  const p = clamp(numberParam(params, "p", 1.5), 0.5, 3);
+  // 人教 A 版约定：y²=2px，p 是焦点到准线的距离（焦准距），焦点 (p/2,0)、
+  // 准线 x=−p/2。内核 spec 的 p 表示顶点到焦点的距离，因此传入 p/2。
+  const p = clamp(numberParam(params, "p", 2), 1, 4);
   const t = clamp(numberParam(params, "t", 1.2), -2.2, 2.2);
-  const spec = { p };
+  const spec = { p: p / 2 };
+  const half = p / 2;
   const focus = parabolaFocus(spec);
   const point = parabolaPoint(spec, t);
-  const foot = { x: -p, y: point.y };
+  const foot = { x: -half, y: point.y };
   const distances = parabolaDefinitionDistances(spec, point);
   const snapshot = (stage: number, caption: string, formula: string): MathSceneSnapshot => ({
     // Viewport hugs the drawn content (vertex, focus, directrix, P up to
-    // t=±2.2): the previous x_max of 5.5p left the right half of the frame
-    // almost empty while the action crowded the left edge.
-    kind: "math_scene", camera_mode: "fixed", x_min: -p - 1.2, x_max: p * 5, y_min: -p * 4.6, y_max: p * 4.6,
+    // t=±2.2) so the action fills the frame instead of crowding one edge.
+    kind: "math_scene", camera_mode: "fixed", x_min: -half - 1.2, x_max: p * 2.6, y_min: -p * 2.4, y_max: p * 2.4,
     x_label: "x", y_label: "y",
-    curves: [{ expression_x: `${p}*t^2`, expression_y: `${2 * p}*t`, t_min: -2.2, t_max: 2.2, label: "抛物线", emphasis: "primary", semantic_role: "conic_curve" }],
+    curves: [{ expression_x: `${half}*t^2`, expression_y: `${p}*t`, t_min: -2.2, t_max: 2.2, label: "抛物线", emphasis: "primary", semantic_role: "conic_curve" }],
     points: [
       { ...focus, label: "F", emphasis: stage === 1 ? "accent" : "secondary", semantic_role: "focus" },
       ...(stage >= 2 ? [{ ...point, label: "P", emphasis: "accent", semantic_role: "moving_point" }] : []),
       ...(stage >= 3 ? [{ ...foot, label: "H", emphasis: "secondary", semantic_role: "projection_foot" }] : []),
     ],
     segments: [
-      { x0: -p, y0: -p * 4.6, x1: -p, y1: p * 4.6, label: "准线", emphasis: stage === 1 ? "accent" : "secondary", semantic_role: "directrix" },
+      { x0: -half, y0: -p * 2.4, x1: -half, y1: p * 2.4, label: "准线", emphasis: stage === 1 ? "accent" : "secondary", semantic_role: "directrix" },
       ...(stage >= 3 ? [
         { x0: point.x, y0: point.y, x1: focus.x, y1: focus.y, label: `PF=${fixed(distances.focus)}`, emphasis: "accent", semantic_role: "focal_distance" },
         { x0: point.x, y0: point.y, x1: foot.x, y1: foot.y, label: `PH=${fixed(distances.directrix)}`, emphasis: "secondary", semantic_role: "directrix_distance" },
@@ -297,14 +299,14 @@ function buildParabola(params: TemplatePreviewParams): PlaybookScript {
     formula_latex: formula, caption,
   });
   const steps = [
-    sceneStep(0, "parabola-focus-directrix", "观察目标：寻找等距规则", `固定焦点 F=(${p},0) 与准线 l:x=${-p}，接下来只比较动点到它们的距离。`, snapshot(1, "一个定点、一条定直线，是整个定义的两个参照物。", String.raw`F(${p},0),\quad l:x=${-p}`)),
-    sceneStep(1, "parabola-moving-point", "改变 t：追踪曲线上的 P", `当 t=${fixed(t)} 时，P=(${fixed(point.x)},${fixed(point.y)})。拖动 t 会改变 P，但焦点和准线不动。`, snapshot(2, "这一幕只确定要测量的点 P。", String.raw`P(t)=(${p}t^2,${2 * p}t)`)),
-    sceneStep(2, "parabola-project", "构造可比的两段距离", `连接 PF，再作 PH⊥l。H=(${-p},${fixed(point.y)}) 是垂足，因此 PH 才是 P 到准线的最短距离。`, snapshot(3, "现在 PF 与 PH 表示同一个点 P 到两个参照物的距离。", String.raw`PH\perp l,\quad H(-p,2pt)`)),
-    sceneStep(3, "parabola-distance", "代数解释：为什么 PF=PH", `代入 P=(pt²,2pt) 后，PF 化简为 p(t²+1)；而 PH=x_P+p，也是 p(t²+1)。相等由参数式直接导出。`, snapshot(4, "两段距离随 t 同步改变，因为它们化简后是同一个式子。", String.raw`PF=\sqrt{p^2(t^2-1)^2+4p^2t^2}=p(t^2+1)=PH`)),
+    sceneStep(0, "parabola-focus-directrix", "观察目标：寻找等距规则", `抛物线 y²=2px 中，p=${fixed(p)} 是焦点到准线的距离。固定焦点 F=(${fixed(half)},0) 与准线 l:x=${fixed(-half)}，接下来只比较动点到它们的距离。`, snapshot(1, "一个定点、一条定直线，是整个定义的两个参照物。", String.raw`y^2=2px\ (p=${fixed(p)}),\quad F(\tfrac p2,0),\ l:x=-\tfrac p2`)),
+    sceneStep(1, "parabola-moving-point", "改变 t：追踪曲线上的 P", `当 t=${fixed(t)} 时，P=(${fixed(point.x)},${fixed(point.y)})。拖动 t 会改变 P，但焦点和准线不动。`, snapshot(2, "这一幕只确定要测量的点 P。", String.raw`P(t)=\left(\tfrac p2 t^2,\ pt\right)`)),
+    sceneStep(2, "parabola-project", "构造可比的两段距离", `连接 PF，再作 PH⊥l。H=(${fixed(-half)},${fixed(point.y)}) 是垂足，因此 PH 才是 P 到准线的最短距离。`, snapshot(3, "现在 PF 与 PH 表示同一个点 P 到两个参照物的距离。", String.raw`PH\perp l,\quad H\left(-\tfrac p2,\ pt\right)`)),
+    sceneStep(3, "parabola-distance", "代数解释：为什么 PF=PH", `代入 P=(pt²/2, pt) 后，PF 化简为 (p/2)(t²+1)；而 PH=x_P+p/2，同样是 (p/2)(t²+1)。相等由参数式直接导出。`, snapshot(4, "两段距离随 t 同步改变，因为它们化简后是同一个式子。", String.raw`PF=\sqrt{\tfrac{p^2}{4}(t^2-1)^2+p^2t^2}=\tfrac p2(t^2+1)=PH`)),
     sceneStep(4, "parabola-definition", "数值验证并总结定义", `当前 PF=${fixed(distances.focus)}、PH=${fixed(distances.directrix)}，计算值一致。到定点 F 与定直线 l 距离相等的点的轨迹，就是抛物线。`, snapshot(4, "几何构造、代数化简和当前数值在这里共同验证定义。", String.raw`\boxed{PF=d(P,l)=${fixed(distances.focus)}}`)),
   ];
   return playbook("抛物线的焦点—准线定义", "比较动点到焦点和准线的距离。", "conic_parabola_focus_directrix", steps, [
-    { id: "p", label: "焦参数 p", value: fixed(p), description: "保持 p>0" },
+    { id: "p", label: "焦准距 p", value: fixed(p), description: "焦点到准线的距离，y²=2px" },
     { id: "t", label: "动点参数 t", value: fixed(t), description: "控制 P 的位置" },
   ]);
 }
@@ -345,10 +347,10 @@ function buildHyperbola(params: TemplatePreviewParams): PlaybookScript {
   const steps = [
     sceneStep(0, "hyperbola-branches", "观察目标：两支向哪里延伸", "先只看双曲线本身：它有互不相连的左、右两支，并关于坐标轴和原点对称。", snapshot(1, "先识别两支结构，下一幕再给出它们的参照方向。", String.raw`\frac{x^2}{${a * a}}-\frac{y^2}{${b * b}}=1`)),
     sceneStep(1, "hyperbola-asymptotes", "提出猜想：两条参照线", `画出 y=±(b/a)x，当前斜率为 ±${fixed(b / a)}。从图上猜想：曲线越远离中心，越靠近这两条线。`, snapshot(2, "渐近线是待验证的方向，不是双曲线的一部分。", String.raw`y=\pm\frac ba x=\pm${fixed(b / a)}x`)),
-    sceneStep(2, "hyperbola-moving-point", "改变 u：比较 P 的方向", `当 u=${fixed(u)} 时，P=(${fixed(p.x)},${fixed(p.y)})，y/x=${fixed(p.y / p.x, 3)}。增大 |u| 时，这个比值会靠近 ±b/a。`, snapshot(3, "这一幕只跟踪动点方向 y/x 如何靠近渐近线斜率。", String.raw`P(u)=(${a}\cosh u,${b}\sinh u)`)),
-    sceneStep(3, "hyperbola-focal-difference", "代数验证渐近趋势", `由 y/x=(b/a)tanh u，当 u 趋向正、负无穷时，tanh u 趋向±1，因此 y/x 趋向±b/a。`, snapshot(4, "渐近线斜率来自参数式的极限，不只是目测结果。", String.raw`\frac yx=\frac ba\tanh u\longrightarrow\pm\frac ba`)),
+    sceneStep(2, "hyperbola-moving-point", "改变 u：比较 P 的方向", `当前 P=(${fixed(p.x)},${fixed(p.y)})，比值 y/x=${fixed(p.y / p.x, 3)}。让 P 沿右支远离中心，这个比值会越来越接近 ±b/a=±${fixed(b / a, 3)}。`, snapshot(3, "这一幕只跟踪动点方向 y/x 如何靠近渐近线斜率。", String.raw`P(${fixed(p.x)},${fixed(p.y)}),\quad \frac yx=${fixed(p.y / p.x, 3)}`)),
+    sceneStep(3, "hyperbola-focal-difference", "代数验证渐近趋势", `由方程解出 y=±(b/a)·√(x²−a²)。x 越大，√(x²−a²) 与 x 的差距越小，所以曲线与直线 y=±(b/a)x 无限接近但永不相交——这正是渐近线的含义。`, snapshot(4, "渐近线斜率来自代数化简，不只是目测结果。", String.raw`y=\pm\frac ba\sqrt{x^2-a^2}\longrightarrow\pm\frac ba x`)),
     sceneStep(4, "hyperbola-eccentricity", "建立第二个关系：焦距差", `现在引入 F₁、F₂。当前 PF₁=${fixed(d1)}、PF₂=${fixed(d2)}，两者不相等，但差的绝对值是 ${fixed(difference)}。`, snapshot(5, "分别测量两段焦距，关注它们的差而不是和。", String.raw`|PF_1-PF_2|=${fixed(difference)}`)),
-    sceneStep(5, "hyperbola-summary", "推导、验证并总结", `令 c=√(a²+b²)=${fixed(c)}，右支上 PF₁=c cosh u+a，PF₂=c cosh u−a，相减恒得 2a=${fixed(2 * a)}。当前数值 ${fixed(difference)} 与推导一致。`, snapshot(6, "双曲线同时具有渐近方向与焦距差不变两层结构。", String.raw`\boxed{|PF_1-PF_2|=2a=${fixed(difference)}}`)),
+    sceneStep(5, "hyperbola-summary", "推导、验证并总结", `令 c=√(a²+b²)=${fixed(c)}，离心率 e=c/a=${fixed(c / a, 3)}。右支上 PF₁=e·x+a、PF₂=e·x−a，相减后与 x 无关，恒得 2a=${fixed(2 * a)}。当前数值 ${fixed(difference)} 与推导一致。`, snapshot(6, "双曲线同时具有渐近方向与焦距差不变两层结构。", String.raw`PF_1-PF_2=(ex+a)-(ex-a)=\boxed{2a=${fixed(difference)}}`)),
   ];
   return playbook("双曲线与渐近线", "理解双曲线两支、渐近趋势与焦点距离差。", "conic_hyperbola_asymptotes", steps, [
     { id: "a", label: "实半轴 a", value: fixed(a), description: "保持 a>0" },
@@ -532,8 +534,8 @@ export const CONIC_PUBLIC_GOLD_TEMPLATES: readonly GoldTemplateManifest[] = Obje
     { id: "b", kind: "range", label: "短半轴 b", description: "自动满足 b<a", min: 1, max: 6.5, step: 0.25, resetPlayback: false },
     { id: "t", kind: "range", label: "动点参数 t", description: "沿椭圆移动", min: 0, max: 6.28, step: 0.05, resetPlayback: false },
   ], builder: buildEllipseFocus }),
-  manifest({ caseId: "parabola-focus-directrix", archetypeId: "conic.parabola.focus-directrix", topic: "抛物线", title: "抛物线的焦点—准线定义", description: "同步比较动点到焦点和准线的距离", prompt: "用动点、焦点、准线和垂足解释抛物线定义。", defaults: { p: 1.5, t: 1.2 }, controls: [
-    { id: "p", kind: "range", label: "焦参数 p", description: "保持 p>0", min: 0.5, max: 3, step: 0.1, resetPlayback: false },
+  manifest({ caseId: "parabola-focus-directrix", archetypeId: "conic.parabola.focus-directrix", topic: "抛物线", title: "抛物线的焦点—准线定义", description: "同步比较动点到焦点和准线的距离", prompt: "用动点、焦点、准线和垂足解释抛物线 y²=2px 的定义。", defaults: { p: 2, t: 1.2 }, controls: [
+    { id: "p", kind: "range", label: "焦准距 p", description: "焦点到准线的距离（y²=2px）", min: 1, max: 4, step: 0.25, resetPlayback: false },
     { id: "t", kind: "range", label: "动点参数 t", description: "控制 P", min: -2.2, max: 2.2, step: 0.05, resetPlayback: false },
   ], builder: buildParabola }),
   manifest({ caseId: "hyperbola-asymptotes", archetypeId: "conic.hyperbola.asymptotes", topic: "双曲线", title: "双曲线与渐近线", description: "理解两支结构、渐近趋势和焦点距离差", prompt: "展示双曲线两支、渐近线、焦点与动点的距离差。", defaults: { a: 3, b: 2, u: 1 }, controls: [

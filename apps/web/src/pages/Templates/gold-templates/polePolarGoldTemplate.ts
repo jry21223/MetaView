@@ -230,8 +230,8 @@ export const POLE_POLAR_GOLD_TEMPLATE: GoldTemplateManifest = attachPublicGoldTe
   domain: "conic_sections",
   topic: "极点与极线",
   visibility: "public",
-  title: "极点与极线",
-  description: "从圆外点的两条切线推导接触弦与极线方程",
+  title: "极点与极线（拓展）",
+  description: "拓展（强基方向）：从圆外点的两条切线推导接触弦与极线方程，不属于常规课标序列",
   canonicalPrompt: "已知圆 x²+y²=25 和圆外点 P=(k,k)，推导接触弦及极线方程。",
   parameterSchema: {
     defaults: { k: 5 },

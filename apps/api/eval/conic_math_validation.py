@@ -360,12 +360,14 @@ def _ellipse_residual(x: float, y: float, a: float, b: float, major_axis: str) -
 def _validate_parabola(
     parameters: dict[str, Any], scenes: list[dict[str, Any]], tolerance: float
 ) -> list[ConicMathDiagnostic]:
+    # 人教 A 版 convention: y^2 = 2px with p as the focus-directrix distance,
+    # so the focus sits at p/2 from the vertex and the directrix at -p/2.
     p = float(parameters["p"])
     axis = str(parameters["axis"])
-    expected_focus = (p, 0.0) if axis == "right" else (0.0, p)
+    expected_focus = (p / 2, 0.0) if axis == "right" else (0.0, p / 2)
     diagnostics = _validate_curves(
         scenes,
-        lambda x, y: y * y - 4 * p * x if axis == "right" else x * x - 4 * p * y,
+        lambda x, y: y * y - 2 * p * x if axis == "right" else x * x - 2 * p * y,
         tolerance,
         "parabola",
     )
@@ -385,7 +387,7 @@ def _validate_parabola(
             )
     for point in _objects(scenes, "points", "moving_point"):
         x, y = _xy(point)
-        residual = y * y - 4 * p * x if axis == "right" else x * x - 4 * p * y
+        residual = y * y - 2 * p * x if axis == "right" else x * x - 2 * p * y
         if abs(residual) > tolerance:
             diagnostics.append(
                 ConicMathDiagnostic(
@@ -401,13 +403,13 @@ def _validate_parabola(
     for segment in directrices:
         if axis == "right":
             valid = (
-                abs(float(segment["x0"]) + p) <= tolerance
-                and abs(float(segment["x1"]) + p) <= tolerance
+                abs(float(segment["x0"]) + p / 2) <= tolerance
+                and abs(float(segment["x1"]) + p / 2) <= tolerance
             )
         else:
             valid = (
-                abs(float(segment["y0"]) + p) <= tolerance
-                and abs(float(segment["y1"]) + p) <= tolerance
+                abs(float(segment["y0"]) + p / 2) <= tolerance
+                and abs(float(segment["y1"]) + p / 2) <= tolerance
             )
         if not valid:
             diagnostics.append(
@@ -419,8 +421,8 @@ def _validate_parabola(
     feet = _objects(scenes, "points", "projection_foot")
     for foot in feet:
         x, y = _xy(foot)
-        if (axis == "right" and abs(x + p) > tolerance) or (
-            axis == "up" and abs(y + p) > tolerance
+        if (axis == "right" and abs(x + p / 2) > tolerance) or (
+            axis == "up" and abs(y + p / 2) > tolerance
         ):
             diagnostics.append(
                 ConicMathDiagnostic(

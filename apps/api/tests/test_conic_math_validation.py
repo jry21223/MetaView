@@ -49,7 +49,8 @@ def test_ellipse_requires_both_distinct_expected_foci() -> None:
 
 
 def test_parabola_geometry_checks_focus_directrix_and_equal_distances() -> None:
-    params = {"p": 2, "axis": "right"}
+    # 人教 A 版约定：p 为焦准距，曲线 y²=8x 对应 p=4（焦点 (2,0)、准线 x=-2）。
+    params = {"p": 4, "axis": "right"}
     scene = _scene(
         curves=[_curve("2*t^2", "4*t")],
         points=[

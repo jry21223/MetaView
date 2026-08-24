@@ -33,7 +33,7 @@
       "caseId": "conic-hidden-parabola-focus-01",
       "archetypeId": "conic.parabola.focus-directrix",
       "prompt": "抛物线 y²=8x。用焦点、准线、动点 P 和垂足 H 解释焦点—准线定义，动态比较 PF 与 PH。",
-      "parameters": {"p": 2, "axis": "right"},
+      "parameters": {"p": 4, "axis": "right"},
       "factEvidence": {
         "parabola-focus": ["F(2,0)", "F(2, 0)"],
         "parabola-directrix": ["x=-2", "x = -2"],
@@ -46,7 +46,7 @@
       "caseId": "conic-hidden-parabola-focus-02",
       "archetypeId": "conic.parabola.focus-directrix",
       "prompt": "对上开口抛物线 x²=12y，比较曲线上动点到焦点和准线的距离，并明确焦点、准线与垂足。",
-      "parameters": {"p": 3, "axis": "up"},
+      "parameters": {"p": 6, "axis": "up"},
       "factEvidence": {
         "parabola-focus": ["F(0,3)", "F(0, 3)"],
         "parabola-directrix": ["y=-3", "y = -3"],
