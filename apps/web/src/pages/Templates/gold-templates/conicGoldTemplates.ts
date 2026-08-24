@@ -124,6 +124,58 @@ function buildStringConstruction(params: TemplatePreviewParams): PlaybookScript 
   ]);
 }
 
+function buildStandardEquation(params: TemplatePreviewParams): PlaybookScript {
+  const a = clamp(numberParam(params, "a", 5), 3, 7);
+  const c = Math.min(clamp(numberParam(params, "c", 4), 1, 6), a - 0.25);
+  const t = clamp(numberParam(params, "t", 0.7), 0, 2 * Math.PI);
+  const b = Math.sqrt(a * a - c * c);
+  const p = ellipsePoint({ a, b }, t);
+  const d1 = Math.hypot(p.x + c, p.y);
+  const d2 = Math.hypot(p.x - c, p.y);
+  // Each derivation line is backed by both sides evaluated at the current P.
+  const lhs3 = a * a - c * p.x;
+  const rhs3 = a * d2;
+  const lhs4 = (a * a - c * c) * p.x * p.x + a * a * p.y * p.y;
+  const rhs4 = a * a * (a * a - c * c);
+  const residual = p.x * p.x / (a * a) + p.y * p.y / (b * b);
+  const triangle = (emphasis: "accent" | "secondary"): NonNullable<MathSceneSnapshot["segments"]> => [
+    { x0: 0, y0: 0, x1: c, y1: 0, label: "c", emphasis, semantic_role: "semi_focal_distance" },
+    { x0: 0, y0: 0, x1: 0, y1: b, label: `b=${fixed(b)}`, emphasis, semantic_role: "semi_minor_axis" },
+    { x0: c, y0: 0, x1: 0, y1: b, label: `a=${fixed(a)}`, emphasis, semantic_role: "characteristic_triangle" },
+  ];
+  const base = (stage: number, caption: string, formula: string, check?: string): MathSceneSnapshot => ({
+    kind: "math_scene", camera_mode: "fixed", x_min: -a - 1.5, x_max: a + 1.5, y_min: -b - 1.5, y_max: b + 1.5,
+    x_label: "x", y_label: "y", curves: ellipseCurve(a, b),
+    points: [
+      { ...{ x: -c, y: 0 }, label: "$F_1$", emphasis: stage === 1 ? "accent" : "secondary", semantic_role: "focus" },
+      { ...{ x: c, y: 0 }, label: "$F_2$", emphasis: stage === 1 ? "accent" : "secondary", semantic_role: "focus" },
+      { ...p, label: "P", emphasis: "accent", semantic_role: "moving_point" },
+    ],
+    segments: [
+      { x0: p.x, y0: p.y, x1: -c, y1: 0, label: `PF₁=${fixed(d1)}`, emphasis: stage <= 3 ? "accent" : "secondary", semantic_role: "focal_distance" },
+      { x0: p.x, y0: p.y, x1: c, y1: 0, label: `PF₂=${fixed(d2)}`, emphasis: stage <= 3 ? "accent" : "secondary", semantic_role: "focal_distance" },
+      ...(stage >= 6 ? triangle("accent") : []),
+    ],
+    annotations: check
+      ? [{ x: -a - 1, y: b + 0.9, text: check, align: "nw", semantic_role: "derivation_panel" }]
+      : [],
+    formula_latex: formula, caption,
+  });
+  const steps = [
+    sceneStep(0, "equation-setup", "观察目标：把定义翻译成方程", `建立坐标系，把焦点放在 x 轴上：F₁(−${fixed(c)},0)、F₂(${fixed(c)},0)。设 P(x,y)，定义"距离之和等于 2a"就写成一个含两个根号的方程。`, base(1, "先选好坐标系，定义才有最简单的代数形式。", String.raw`\sqrt{(x+c)^2+y^2}+\sqrt{(x-c)^2+y^2}=2a`, `$${fixed(d1)}+${fixed(d2)}=${fixed(d1 + d2)}=2a$`)),
+    sceneStep(1, "equation-isolate", "移项：每次只处理一个根号", `直接平方会让两个根号纠缠在一起。先把一个根号移到右边：√((x+c)²+y²)=2a−√((x−c)²+y²)。当前点代入检验：左边 ${fixed(d1)}，右边 ${fixed(2 * a - d2)}，相等。`, base(2, "移项的目的只有一个：让下一次平方恰好消掉一个根号。", String.raw`\sqrt{(x+c)^2+y^2}=2a-\sqrt{(x-c)^2+y^2}`, `$${fixed(d1)}=2a-${fixed(d2)}$`)),
+    sceneStep(2, "equation-first-square", "第一次平方：整理出线性关系", `两边平方后，x²、y² 与 c² 全部抵消，只剩 4cx−4a² 与根号项，整理得 a²−cx=a·√((x−c)²+y²)。当前点检验：左边 ${fixed(lhs3)}，右边 ${fixed(rhs3)}。`, base(3, "平方不是蛮力：抵消之后式子反而更短了。", String.raw`a^2-cx=a\sqrt{(x-c)^2+y^2}`, `$${fixed(lhs3)}=${fixed(rhs3)}$`)),
+    sceneStep(3, "equation-second-square", "第二次平方：得到整式方程", `再平方一次消掉最后的根号：(a²−cx)²=a²[(x−c)²+y²]，展开整理得 (a²−c²)x²+a²y²=a²(a²−c²)。当前点检验：左边 ${fixed(lhs4)}，右边 ${fixed(rhs4)}。`, base(4, "两次平方后，方程里再也没有根号。", String.raw`(a^2-c^2)x^2+a^2y^2=a^2(a^2-c^2)`, `$${fixed(lhs4)}=${fixed(rhs4)}$`)),
+    sceneStep(4, "equation-b-substitution", "引入 b²：写出标准方程", `因为 a>c>0，a²−c²=${fixed(a * a - c * c)} 是正数，把它记作 b²。两边除以 a²b²，得到标准方程 x²/a²+y²/b²=1。当前 P 代入，左边算得 ${fixed(residual, 4)}。`, base(5, "b² 不是硬凑记号：它就是那个反复出现的正数 a²−c²。", String.raw`\frac{x^2}{${fixed(a * a)}}+\frac{y^2}{${fixed(b * b)}}=1`, `$\\frac{x^2}{a^2}+\\frac{y^2}{b^2}=${fixed(residual, 4)}$`)),
+    sceneStep(5, "equation-geometry", "总结：b 在图上是什么", `令 x=0 得 y=±b，所以 b=${fixed(b)} 是半短轴长。图中 O、(c,0)、(0,b) 构成直角三角形，斜边恰好为 a：这就是 b²=a²−c² 的几何身份。`, base(6, "推导中引入的 b，最终落在图形的短轴端点上。", String.raw`\boxed{\frac{x^2}{a^2}+\frac{y^2}{b^2}=1,\quad b^2=a^2-c^2}`)),
+  ];
+  return playbook("椭圆的标准方程推导", "从距离定义两次平方推出标准方程，每一步都有数值验证。", "conic_ellipse_standard_equation", steps, [
+    { id: "a", label: "半长轴 a", value: fixed(a), description: "距离之和为 2a" },
+    { id: "c", label: "半焦距 c", value: fixed(c), description: "自动保持 c<a" },
+    { id: "t", label: "验证点 t", value: fixed(t), description: "选择代入检验的点" },
+  ]);
+}
+
 function buildEllipseFocus(params: TemplatePreviewParams): PlaybookScript {
   const a = clamp(numberParam(params, "a", 5), 3, 7);
   const b = clamp(numberParam(params, "b", 3), 1, a - 0.5);
@@ -391,6 +443,23 @@ export const CONIC_PUBLIC_GOLD_TEMPLATES: readonly GoldTemplateManifest[] = Obje
     builder: buildStringConstruction,
     why: "绳被拉直后就是 PF₁、PF₂ 两条线段，它们的和被绳长 2a 锁定；这个不变量正是椭圆定义的核心。",
     parameterNote: "增大绳长 2a 椭圆整体变大；图钉距离 2c 越接近 2a，椭圆越扁；一旦 2a 不大于 2c，轨迹退化为线段或不存在。",
+  }),
+  manifest({
+    caseId: "ellipse-standard-equation",
+    archetypeId: "conic.ellipse.standard-equation",
+    topic: "椭圆",
+    title: "椭圆的标准方程推导",
+    description: "移项、两次平方到 b²=a²−c²，每步带数值验证",
+    prompt: "从椭圆定义 PF₁+PF₂=2a 出发，通过移项与两次平方推导标准方程，并解释 b² 的引入。",
+    defaults: { a: 5, c: 4, t: 0.7 },
+    controls: [
+      { id: "a", kind: "range", label: "半长轴 a", description: "3 到 7", min: 3, max: 7, step: 0.25, resetPlayback: false },
+      { id: "c", kind: "range", label: "半焦距 c", description: "自动保持 c<a", min: 1, max: 6, step: 0.25, resetPlayback: false },
+      { id: "t", kind: "range", label: "验证点 t", description: "选择代入检验的点", min: 0, max: 6.28, step: 0.05, resetPlayback: false },
+    ],
+    builder: buildStandardEquation,
+    why: "每一步变形的合法性都能在当前验证点上核对：移项与平方不改变等式两边的数值相等，最终的 1 就是定义成立的代数化身。",
+    parameterNote: "改变 a、c 会重算整条推导链的所有数值；拖动验证点 t 可以换一个点重新核对每一行等式。",
   }),
   manifest({ caseId: "ellipse-focus-definition", archetypeId: "conic.ellipse.focus-definition", topic: "椭圆", title: "椭圆的焦点定义", description: "观察动点到两焦点距离之和恒定", prompt: "用动点解释椭圆的焦点定义，并验证 PF₁+PF₂=2a。", defaults: { a: 5, b: 3, t: 1 }, controls: [
     { id: "a", kind: "range", label: "长半轴 a", description: "3 到 7", min: 3, max: 7, step: 0.25, resetPlayback: false },

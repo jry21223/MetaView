@@ -201,6 +201,34 @@
       },
       "conclusionAliases": [["椭圆", "ellipse"], ["PF1+PF2", "PF_1+PF_2", "距离之和"], ["10", "2a"]],
       "forbiddenAliases": ["PF1+PF2=6", "PF_1+PF_2=6", "距离之和为 6"]
+    },
+    {
+      "caseId": "conic-hidden-standard-equation-01",
+      "archetypeId": "conic.ellipse.standard-equation",
+      "prompt": "已知椭圆的焦点为 F1(-4,0)、F2(4,0)，椭圆上任意一点到两焦点距离之和为 10。请为高中生从这个定义出发，通过移项和两次平方推导出椭圆的标准方程，说明每一步根号如何消去，并解释为什么要引入 b²=a²−c²。",
+      "parameters": {"a": 5, "c": 4},
+      "factEvidence": {
+        "equation-from-definition": ["根号", "√", "距离之和为 10", "2a=10"],
+        "squaring-strategy": ["移项", "平方"],
+        "b-substitution": ["b²=a²−c²", "b^2=a^2-c^2", "b²=9", "b^2=9"],
+        "standard-equation": ["x²/25+y²/9=1", "x^2/25+y^2/9=1", "\\frac{x^2}{25}+\\frac{y^2}{9}=1"]
+      },
+      "conclusionAliases": [["标准方程", "x²/25+y²/9=1", "x^2/25+y^2/9=1"], ["b²=a²−c²", "b^2=a^2-c^2", "b²=9"], ["椭圆", "ellipse"]],
+      "forbiddenAliases": ["b²=41", "b^2=41", "x²/25+y²/41=1"]
+    },
+    {
+      "caseId": "conic-hidden-standard-equation-02",
+      "archetypeId": "conic.ellipse.standard-equation",
+      "prompt": "焦点在 x 轴上的椭圆，半焦距 c=12，椭圆上的点到两焦点距离之和为 26。请为高中生完整推导它的标准方程：写出含根号的定义方程，演示移项与两次平方的化简过程，并给出 b² 的数值与最终方程。",
+      "parameters": {"a": 13, "c": 12},
+      "factEvidence": {
+        "equation-from-definition": ["根号", "√", "距离之和为 26", "2a=26"],
+        "squaring-strategy": ["移项", "平方"],
+        "b-substitution": ["b²=a²−c²", "b^2=a^2-c^2", "b²=25", "b^2=25"],
+        "standard-equation": ["x²/169+y²/25=1", "x^2/169+y^2/25=1", "\\frac{x^2}{169}+\\frac{y^2}{25}=1"]
+      },
+      "conclusionAliases": [["标准方程", "x²/169+y²/25=1", "x^2/169+y^2/25=1"], ["b²=a²−c²", "b^2=a^2-c^2", "b²=25"], ["椭圆", "ellipse"]],
+      "forbiddenAliases": ["b²=313", "b^2=313", "x²/169+y²/313=1"]
     }
   ]
 }

@@ -15,6 +15,11 @@ const CONIC_PREVIEWS: ReadonlyArray<{
     objects: { conic: 1, focus: 2, rope: 1, "moving-point": 1 },
   },
   {
+    caseId: "ellipse-standard-equation",
+    geometry: "ellipse-standard-equation",
+    objects: { conic: 1, focus: 2, "characteristic-triangle": 1, "moving-point": 1 },
+  },
+  {
     caseId: "ellipse-focus-definition",
     geometry: "ellipse-focal-sum",
     objects: { conic: 1, focus: 2, "focal-distance": 2, "moving-point": 1 },

@@ -358,6 +358,50 @@
         "requiredPhases": ["观察", "构造", "验证", "总结"],
         "minimumSteps": 6
       }
+    },
+    {
+      "archetypeId": "conic.ellipse.standard-equation",
+      "publicCaseId": "ellipse-standard-equation",
+      "requiredCapabilities": ["conic.ellipse.standard-equation", "math_scene.parametric_curve", "conic.deterministic_kernel"],
+      "expectedFacts": [
+        {
+          "id": "equation-from-definition",
+          "description": "定义翻译为含两个根号的距离方程",
+          "anyOf": ["根号", "√", "距离之和"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "squaring-strategy",
+          "description": "先移项再两次平方逐个消去根号",
+          "anyOf": ["移项", "平方"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "b-substitution",
+          "description": "引入 b²=a²−c² 使方程取得标准形式",
+          "anyOf": ["b²=a²−c²", "b^2=a^2-c^2", "b²=a²-c²"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "standard-equation",
+          "description": "得到椭圆的标准方程",
+          "anyOf": ["标准方程", "x²/a²+y²/b²=1", "\\frac{x^2}{a^2}+\\frac{y^2}{b^2}=1"],
+          "tolerance": 1e-8
+        }
+      ],
+      "visualInvariants": [
+        {
+          "id": "standard-equation-visual",
+          "description": "椭圆、焦点、验证动点、两段焦距与特征三角形均可辨认",
+          "requiredSemanticRoles": ["conic_curve", "focus", "moving_point", "focal_distance", "characteristic_triangle"],
+          "requiredStateFields": ["curves", "points", "segments"]
+        }
+      ],
+      "pedagogicalRubric": {
+        "objective": "从距离定义出发两次平方推导标准方程，并解释 b²=a²−c² 的引入",
+        "requiredPhases": ["观察", "推导", "验证", "总结"],
+        "minimumSteps": 6
+      }
     }
   ]
 }

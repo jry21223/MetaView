@@ -58,6 +58,10 @@ class _StringConstructionParameters(BaseModel):
         return self
 
 
+class _EllipseDerivationParameters(_StringConstructionParameters):
+    """Standard-equation derivation: same a/c contract as the rope build."""
+
+
 class _ParabolaParameters(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -145,6 +149,7 @@ class _PolePolarParameters(BaseModel):
 
 _PARAMETER_MODELS: dict[str, type[BaseModel]] = {
     "conic.ellipse.string-construction": _StringConstructionParameters,
+    "conic.ellipse.standard-equation": _EllipseDerivationParameters,
     "conic.ellipse.focus-definition": _EllipseParameters,
     "conic.parabola.focus-directrix": _ParabolaParameters,
     "conic.hyperbola.asymptotes": _HyperbolaParameters,
@@ -181,7 +186,10 @@ def validate_conic_playbook(
     scenes = [item for item in snapshots if item.get("kind") == "math_scene"]
     if not scenes:
         return [ConicMathDiagnostic("$.steps[*].snapshot", "math_scene evidence is absent")]
-    if archetype_id == "conic.ellipse.string-construction":
+    if archetype_id in {
+        "conic.ellipse.string-construction",
+        "conic.ellipse.standard-equation",
+    }:
         return _validate_string_construction(validated, scenes, tolerance)
     if archetype_id == "conic.ellipse.focus-definition":
         return _validate_ellipse(validated, scenes, tolerance)
