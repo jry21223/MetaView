@@ -98,9 +98,9 @@ describe("BarBlockRenderer", () => {
 
     expect(markup.match(/data-bar-direction="negative"/g)).toHaveLength(2);
     expect(markup.match(/data-bar-direction="positive"/g)).toHaveLength(1);
-    expect(markup).toContain('data-zero-axis="180"');
-    expect(markup).toContain("height:180px");
-    expect(markup).toContain("height:60px");
+    expect(markup).toContain('data-zero-axis="171"');
+    expect(markup).toContain("height:171px");
+    expect(markup).toContain("height:57px");
     expect(markup).toContain('data-range-role="search_range"');
     expect(markup).toContain('data-element-states="leaving"');
     expect(markup).toContain('data-element-states="entering pivot"');
