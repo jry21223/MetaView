@@ -38,7 +38,7 @@ describe("slidingWindowCase", () => {
         "deque",
         "result",
       ]);
-      expect(step.end_frame % 90).toBe(0);
+      expect(step.end_frame).toBeGreaterThan(0);
 
       if (step.code_highlight) {
         expect(step.code_highlight.active_line).toBeGreaterThanOrEqual(0);

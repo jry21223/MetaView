@@ -20,6 +20,7 @@ import type {
   TemplatePreviewQuestion,
 } from "../templatePreviewCases";
 import { resolveConicArchetype } from "../../../shared/domain/conicArchetypeCatalog";
+import { applyNarrationTimeline, posterFrameForStep } from "../narrationTiming";
 import { attachPublicGoldTemplate, type GoldTemplateManifest } from "./manifest";
 
 const FPS = 30;
@@ -44,14 +45,15 @@ function sceneStep(index: number, id: string, title: string, narration: string, 
 }
 
 function playbook(title: string, summary: string, algorithmId: string, steps: MetaStep[], controls: PlaybookScript["parameter_controls"]): PlaybookScript {
+  const timed = applyNarrationTimeline(steps, FPS);
   return {
     schema_version: "2.0.0",
     fps: FPS,
-    total_frames: steps.length * STEP_FRAMES,
+    total_frames: timed.at(-1)?.end_frame ?? 0,
     domain: "math",
     title,
     summary,
-    steps,
+    steps: timed,
     parameter_controls: controls,
     algorithm_id: algorithmId,
     initial_data: { scene_blueprint: [algorithmId], archetype: [algorithmId] },
@@ -477,11 +479,12 @@ function manifest(args: {
   followupsByStep?: (params: TemplatePreviewParams) => Record<string, FollowupStepOverride>;
 }): GoldTemplateManifest {
   const archetype = resolveConicArchetype(args.archetypeId);
+  const defaultScript = args.builder(args.defaults);
   return attachPublicGoldTemplate({
     caseId: args.caseId, archetypeId: args.archetypeId, subject: "high_school_math", domain: "conic_sections", topic: args.topic,
     visibility: "public", title: args.title, description: args.description, canonicalPrompt: args.prompt,
     parameterSchema: { defaults: args.defaults, controls: args.controls },
-    poster: { url: `/template-previews/${args.caseId}/poster.webp`, alt: `${args.title}的 Playbook 代表画面`, frame: archetype.pedagogicalRubric.minimumSteps * STEP_FRAMES - 40 },
+    poster: { url: `/template-previews/${args.caseId}/poster.webp`, alt: `${args.title}的 Playbook 代表画面`, frame: posterFrameForStep(defaultScript, archetype.pedagogicalRubric.minimumSteps - 1) },
     buildPublicPlaybook: args.builder,
     buildFollowups: (params, script) => followups(
       script,

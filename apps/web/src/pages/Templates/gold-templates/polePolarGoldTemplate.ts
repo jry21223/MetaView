@@ -8,6 +8,7 @@ import type {
   TemplatePreviewParams,
   TemplatePreviewQuestion,
 } from "../templatePreviewCases";
+import { applyNarrationTimeline, posterFrameForStep } from "../narrationTiming";
 import { attachPublicGoldTemplate, type GoldTemplateManifest } from "./manifest";
 
 const FPS = 30;
@@ -177,14 +178,15 @@ function buildPlaybook(params: TemplatePreviewParams): PlaybookScript {
     step(4, { step_id: "pole-polar-substitute-pole", title: "代入 P：验证 A、B 共线", voiceover_text: `P=(${k},${k}) 同时在 A、B 处的两条切线上。对当前切点计算，k(a+b)=${fixed(valueAtA)}，k(x_B+y_B)=${fixed(valueAtB)}，都等于 R²=25，因此 A、B 共同满足 kx+ky=25。`, snapshot: snapshot(values, 5, `两个切点分别代入同一方程，数值均为 25。`, `A,B:\\quad kx+ky=R^2=25\\Rightarrow x+y=${sum}`) }),
     step(5, { step_id: "pole-polar-result", title: "写出极线并总结联动关系", voiceover_text: `所以 P=(${k},${k}) 的极线是 kx+ky=25，即 x+y=${sum}。增大 k 时，25/k 变小，极线便向原点平移；构造、推导与参数变化由同一方程统一。`, snapshot: snapshot(values, 6, `当前画面只突出整条极线 x+y=${sum}，而不再突出单个切点。`, `\\boxed{kx+ky=R^2}\\iff\\boxed{x+y=${sum}}`) }),
   ];
+  const timed = applyNarrationTimeline(steps, FPS);
   return {
     schema_version: "2.0.0",
     fps: FPS,
-    total_frames: steps.length * STEP_FRAMES,
+    total_frames: timed.at(-1)?.end_frame ?? 0,
     domain: "math",
     title: "极点与极线：从两条切线到接触弦",
     summary: "用圆外点的两条切线推导接触弦方程，并观察极点移动时极线如何联动。",
-    steps,
+    steps: timed,
     parameter_controls: [{ id: "k", label: "外点坐标 k", value: k, description: "外点固定为 P=(k,k)，圆半径 R=5。" }],
     algorithm_id: "circle_pole_polar",
     initial_data: { radius: [String(values.radius)], pole: [k, k], polar_sum: [sum] },
@@ -249,7 +251,7 @@ export const POLE_POLAR_GOLD_TEMPLATE: GoldTemplateManifest = attachPublicGoldTe
   poster: {
     url: "/template-previews/pole-polar/poster.webp",
     alt: "圆外点、两条切线与接触弦极线的 Playbook 画面",
-    frame: 500,
+    frame: posterFrameForStep(buildPlaybook({ k: 5 }), 5),
   },
   buildPublicPlaybook: buildPlaybook,
   buildFollowups,

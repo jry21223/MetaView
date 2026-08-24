@@ -572,7 +572,7 @@ export function buildMergeSortFollowups(
 export const MERGE_SORT_PREVIEW_CASE = defineAlgorithmPreviewCase({
   id: "merge-sort",
   posterAlt: "归并排序分治与合并过程示意",
-  posterFrame: 495,
+  posterStepIndex: 5,
   defaultParams: {},
   controls: [],
   buildScript: buildMergeSortScript,

@@ -416,16 +416,10 @@ export function buildSlidingWindowFollowups(
   return followups;
 }
 
-const DEFAULT_SCRIPT = buildSlidingWindowScript({ windowSize: DEFAULT_WINDOW_SIZE });
-const POSTER_FRAME = Math.min(
-  4 * 90 + 45,
-  Math.max(0, (DEFAULT_SCRIPT.total_frames ?? 1) - 1),
-);
-
 export const SLIDING_WINDOW_PREVIEW_CASE = defineAlgorithmPreviewCase({
   id: "sliding-window",
   posterAlt: "滑动窗口最大值：固定窗口在数组上右移并维护当前最大值",
-  posterFrame: POSTER_FRAME,
+  posterStepIndex: 4,
   defaultParams: { windowSize: DEFAULT_WINDOW_SIZE },
   controls: [
     {

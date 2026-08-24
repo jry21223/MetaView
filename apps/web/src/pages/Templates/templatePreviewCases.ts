@@ -13,6 +13,7 @@ import { PUBLIC_GOLD_TEMPLATES } from "./gold-templates/publicGoldTemplates";
 import { manifestToPreviewCase } from "./gold-templates/manifest";
 import type { ConicFollowupCommand } from "../../features/playbook/interaction/types";
 import type { InteractionAdapter } from "../../features/playbook/interaction/types";
+import { applyNarrationTimeline, posterFrameForStep } from "./narrationTiming";
 
 export type TemplatePreviewCaseId = string;
 
@@ -252,14 +253,15 @@ function buildBinarySearchScript(params: TemplatePreviewParams): PlaybookScript 
     },
   }));
 
+  const timed = applyNarrationTimeline(steps, FPS);
   return {
     schema_version: "2.0.0",
     fps: FPS,
-    total_frames: steps.length * STEP_FRAMES,
+    total_frames: timed.at(-1)?.end_frame ?? 0,
     domain: "algorithm",
     title: "二分查找：区间如何收敛",
     summary: "用 low、mid、high 的连续变化解释二分查找为何每轮排除一半候选。",
-    steps,
+    steps: timed,
     parameter_controls: [{
       id: "target",
       label: "目标值",
@@ -480,14 +482,15 @@ function buildBfsScript(params: TemplatePreviewParams): PlaybookScript {
     },
   }));
 
+  const timed = applyNarrationTimeline(steps, FPS);
   return {
     schema_version: "2.0.0",
     fps: FPS,
-    total_frames: steps.length * STEP_FRAMES,
+    total_frames: timed.at(-1)?.end_frame ?? 0,
     domain: "algorithm",
     title: "二叉树 BFS：队列驱动的层序遍历",
     summary: "逐步展示出队、发现邻接节点、入队和访问集合的同步变化。",
-    steps,
+    steps: timed,
     parameter_controls: [{
       id: "startNode",
       label: "起始节点",
@@ -634,14 +637,15 @@ function buildDerivativeScript(params: TemplatePreviewParams): PlaybookScript {
     ),
   }));
 
+  const timed = applyNarrationTimeline(steps, FPS);
   return {
     schema_version: "2.0.0",
     fps: FPS,
-    total_frames: steps.length * STEP_FRAMES,
+    total_frames: timed.at(-1)?.end_frame ?? 0,
     domain: "math",
     title: "导数与切线：从割线到瞬时斜率",
     summary: "让割线间隔逐步趋近零，直观看见导数如何成为切线斜率。",
-    steps,
+    steps: timed,
     parameter_controls: [{
       id: "markerX",
       label: "切点 a",
@@ -682,7 +686,7 @@ const TEMPLATE_PREVIEW_CASES: Record<TemplatePreviewCaseId, TemplatePreviewCase>
     templateId: "binary-search",
     posterUrl: "/template-previews/binary-search/poster.webp",
     posterAlt: "二分查找区间逐步收敛的 Playbook 画面",
-    posterFrame: 410,
+    posterFrame: posterFrameForStep(buildBinarySearchScript({ target: 22 }), 4),
     defaultParams: { target: 22 },
     controls: [{
       id: "target",
@@ -702,7 +706,7 @@ const TEMPLATE_PREVIEW_CASES: Record<TemplatePreviewCaseId, TemplatePreviewCase>
     templateId: "bfs-tree",
     posterUrl: "/template-previews/bfs-tree/poster.webp",
     posterAlt: "二叉树 BFS 队列与访问顺序的 Playbook 画面",
-    posterFrame: 430,
+    posterFrame: posterFrameForStep(buildBfsScript({ startNode: "1" }), 4),
     defaultParams: { startNode: "1" },
     controls: [{
       id: "startNode",
@@ -720,7 +724,7 @@ const TEMPLATE_PREVIEW_CASES: Record<TemplatePreviewCaseId, TemplatePreviewCase>
     templateId: "derivative-tangent",
     posterUrl: "/template-previews/derivative-tangent/poster.webp",
     posterAlt: "抛物线切点与切线斜率的 Playbook 画面",
-    posterFrame: 420,
+    posterFrame: posterFrameForStep(buildDerivativeScript({ markerX: 1 }), 4),
     defaultParams: { markerX: 1 },
     controls: [{
       id: "markerX",

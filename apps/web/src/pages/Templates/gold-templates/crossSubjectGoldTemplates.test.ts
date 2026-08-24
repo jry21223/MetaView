@@ -5,6 +5,7 @@ import {
   monsoonState,
   traceTwoSum,
 } from "./crossSubjectGoldTemplates";
+import { narrationStepFrames } from "../narrationTiming";
 
 describe("cross-subject public Gold Templates", () => {
   it("publishes one deterministic teacher case for each requested subject", () => {
@@ -31,9 +32,11 @@ describe("cross-subject public Gold Templates", () => {
       expect(script.steps.length).toBeGreaterThanOrEqual(6);
       expect(script.steps.length).toBeGreaterThanOrEqual(item.pedagogicalRubric.minimumSteps);
       expect(script.total_frames).toBe(script.steps.at(-1)?.end_frame);
-      expect(script.steps.map((step) => step.end_frame)).toEqual(
-        script.steps.map((_, index) => (index + 1) * 90),
-      );
+      let previousEnd = 0;
+      for (const step of script.steps) {
+        expect(step.end_frame - previousEnd).toBe(narrationStepFrames(step.voiceover_text, 30));
+        previousEnd = step.end_frame;
+      }
       expect(new Set(script.steps.map((step) => step.step_id)).size).toBe(script.steps.length);
       expect(Object.keys(prompts)).toEqual(script.steps.map((step) => step.step_id));
       expect(script.steps.every((step) => prompts[step.step_id]?.length === 3)).toBe(true);

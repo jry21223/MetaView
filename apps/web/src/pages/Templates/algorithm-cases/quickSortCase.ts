@@ -697,7 +697,7 @@ export function buildQuickSortFollowups(
 export const QUICK_SORT_PREVIEW_CASE = defineAlgorithmPreviewCase({
   id: "quick-sort",
   posterAlt: "快速排序 Lomuto 分区演示：pivot、扫描指针与归位",
-  posterFrame: 225,
+  posterStepIndex: 2,
   defaultParams: {},
   controls: [],
   buildScript: buildQuickSortScript,

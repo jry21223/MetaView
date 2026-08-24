@@ -9,6 +9,7 @@ import type {
   TemplatePreviewParams,
   TemplatePreviewQuestion,
 } from "../templatePreviewCases";
+import { applyNarrationTimeline, posterFrameForStep } from "../narrationTiming";
 
 export const ALGORITHM_CASE_FPS = 30;
 export const ALGORITHM_CASE_STEP_FRAMES = 90;
@@ -65,14 +66,15 @@ export function buildAlgorithmPlaybook(args: {
   controls?: PlaybookScript["parameter_controls"];
   initialData?: PlaybookScript["initial_data"];
 }): PlaybookScript {
+  const timed = applyNarrationTimeline(args.steps, ALGORITHM_CASE_FPS);
   return {
     schema_version: "2.0.0",
     fps: ALGORITHM_CASE_FPS,
-    total_frames: args.steps.at(-1)?.end_frame ?? 0,
+    total_frames: timed.at(-1)?.end_frame ?? 0,
     domain: args.domain ?? "algorithm",
     title: args.title,
     summary: args.summary,
-    steps: args.steps,
+    steps: timed,
     parameter_controls: args.controls ?? [],
     algorithm_id: args.algorithmId,
     initial_data: args.initialData ?? {
@@ -85,7 +87,7 @@ export function buildAlgorithmPlaybook(args: {
 export function defineAlgorithmPreviewCase(args: {
   id: string;
   posterAlt: string;
-  posterFrame: number;
+  posterStepIndex: number;
   defaultParams: TemplatePreviewParams;
   controls: TemplatePreviewControl[];
   buildScript: (params: TemplatePreviewParams) => PlaybookScript;
@@ -99,7 +101,7 @@ export function defineAlgorithmPreviewCase(args: {
     templateId: args.id,
     posterUrl: `/template-previews/${args.id}/poster.webp`,
     posterAlt: args.posterAlt,
-    posterFrame: args.posterFrame,
+    posterFrame: posterFrameForStep(args.buildScript(args.defaultParams), args.posterStepIndex),
     defaultParams: args.defaultParams,
     controls: args.controls,
     buildScript: args.buildScript,

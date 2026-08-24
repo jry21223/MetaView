@@ -14,6 +14,7 @@ import type {
   TemplatePreviewParams,
   TemplatePreviewQuestion,
 } from "../templatePreviewCases";
+import { applyNarrationTimeline, posterFrameForStep } from "../narrationTiming";
 import {
   defineStandaloneGoldTemplate,
   type GoldTemplateManifest,
@@ -47,14 +48,15 @@ function playbook(
   steps: MetaStep[],
   controls: PlaybookScript["parameter_controls"] = [],
 ): PlaybookScript {
+  const timed = applyNarrationTimeline(steps, FPS);
   return {
     schema_version: "2.0.0",
     fps: FPS,
-    total_frames: steps.at(-1)?.end_frame ?? 0,
+    total_frames: timed.at(-1)?.end_frame ?? 0,
     domain,
     title,
     summary,
-    steps,
+    steps: timed,
     parameter_controls: controls,
     algorithm_id: algorithmId,
     initial_data: {
@@ -500,8 +502,9 @@ function standalone(args: {
   builder: (params: TemplatePreviewParams) => PlaybookScript;
   mechanism: string;
   transfer: string;
-  posterFrame?: number;
+  posterStepIndex?: number;
 }): GoldTemplateManifest {
+  const defaultScript = args.builder(args.defaults);
   return defineStandaloneGoldTemplate({
     caseId: args.caseId,
     archetypeId: args.archetypeId,
@@ -515,7 +518,7 @@ function standalone(args: {
     poster: {
       url: `/template-previews/${args.caseId}/poster.webp`,
       alt: `${args.title}的 Playbook 代表画面`,
-      frame: args.posterFrame ?? 450,
+      frame: posterFrameForStep(defaultScript, args.posterStepIndex ?? defaultScript.steps.length - 1),
     },
     requiredCapabilities: args.requiredCapabilities,
     expectedFacts: args.expectedFacts,
@@ -561,7 +564,7 @@ export const CROSS_SUBJECT_PUBLIC_GOLD_TEMPLATES: readonly GoldTemplateManifest[
     builder: buildTwoSumGoldPlaybook,
     mechanism: "先查 complement，未命中后才写入当前值；seen 因而只包含更早的元素。",
     transfer: "代回 nums 检查两个下标不同且两数之和等于 target。",
-    posterFrame: 405,
+    posterStepIndex: 4,
   }),
   standalone({
     caseId: "redox-electron",
@@ -612,7 +615,7 @@ export const CROSS_SUBJECT_PUBLIC_GOLD_TEMPLATES: readonly GoldTemplateManifest[
     builder: buildDnaReplicationGoldPlaybook,
     mechanism: "互补配对复制模板信息，而 DNA 聚合酶的 5′→3′ 限制导致一条连续、一条分段合成。",
     transfer: "检查两个子代 DNA 是否都包含一条旧链和一条新链，并核对 A-T、G-C 配对。",
-    posterFrame: 495,
+    posterStepIndex: 5,
   }),
   standalone({
     caseId: "monsoon",
@@ -639,6 +642,6 @@ export const CROSS_SUBJECT_PUBLIC_GOLD_TEMPLATES: readonly GoldTemplateManifest[
     builder: buildMonsoonGoldPlaybook,
     mechanism: "海陆热容量差异造成季节性气压差，近地面气流受气压梯度与地转偏向共同组织。",
     transfer: "先判大陆与海洋谁是高压，再检查箭头是否由高压指向低压，并核对水汽来源。",
-    posterFrame: 495,
+    posterStepIndex: 5,
   }),
 ]);

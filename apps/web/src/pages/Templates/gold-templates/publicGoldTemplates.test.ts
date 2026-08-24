@@ -252,7 +252,8 @@ describe("public gold template manifest", () => {
 
     const slowed = result.script.steps[2];
     expect(slowed.end_frame - previousEnd).toBe(Math.ceil(originalDuration * 1.5));
-    expect(result.script.steps[3].end_frame - slowed.end_frame).toBe(90);
+    expect(result.script.steps[3].end_frame - slowed.end_frame)
+      .toBe(base.steps[3].end_frame - base.steps[2].end_frame);
     expect(result.script.total_frames).toBe(result.script.steps.at(-1)?.end_frame);
     expect(new Set(result.script.steps.map((step) => step.step_id)).size)
       .toBe(result.script.steps.length);
