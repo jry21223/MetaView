@@ -155,7 +155,7 @@ function slidingSnapshot(args: {
       {
         id: "monotonic-deque",
         role: "deque",
-        label: "MONOTONIC DEQUE · indices",
+        label: "单调队列 · 下标",
         items: deque.map((index, position) => ({
           id: `deque-${position}-${index}`,
           label: `i=${index}`,

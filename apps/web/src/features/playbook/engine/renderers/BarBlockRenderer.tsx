@@ -70,8 +70,11 @@ const VAR = {
 
 const ENTER_BEZIER = Easing.bezier(0.16, 1, 0.3, 1);
 const MOVE_FRAMES = 22;
-const MAX_BAR_HEIGHT = 360;
+const MAX_BAR_HEIGHT = 342;
 const MIN_BAR_HEIGHT = 6;
+// Headroom above the tallest bar so its value label (top: -22) never rides
+// into the step title when the centered column overflows a short scene.
+const BAR_FIELD_TOP_PAD = 42;
 const POINTER_LABEL_ORDER = ["low", "mid", "high"];
 
 function pointerLabelRank(name: string): number {
@@ -189,7 +192,7 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
           gap: barGap,
           position: "relative",
           height: MAX_BAR_HEIGHT + 8,
-          paddingTop: 24,
+          paddingTop: BAR_FIELD_TOP_PAD,
         }}
       >
         <div
@@ -198,7 +201,7 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
             position: "absolute",
             left: 0,
             right: 0,
-            top: 24 + zeroAxisY,
+            top: BAR_FIELD_TOP_PAD + zeroAxisY,
             borderTop: `1px solid ${c.floor(theme)}`,
             zIndex: 0,
           }}
@@ -488,7 +491,7 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
                 }}
               >
                 ▲
-                <span>
+                <span style={{ whiteSpace: "nowrap" }}>
                   {[...names]
                     .sort((left, right) => pointerLabelRank(left) - pointerLabelRank(right))
                     .join(" · ")}

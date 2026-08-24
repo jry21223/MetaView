@@ -62,7 +62,10 @@ export const CodeTraceSceneRenderer: React.FC<RendererProps> = ({ step, theme })
   const codeX = 56;
   const codeY = 88;
   const codeW = 500;
-  const lineH = 34;
+  // 30px per line keeps an 8-line listing inside the 290px-tall code panel;
+  // at 34px the last line rendered below the panel and collided with the
+  // array strip underneath.
+  const lineH = 30;
   const arrayX = 102;
   const arrayY = 390;
   const cellW = arrayValues.length > 0 ? Math.min(74, 560 / arrayValues.length) : 70;
@@ -105,9 +108,9 @@ export const CodeTraceSceneRenderer: React.FC<RendererProps> = ({ step, theme })
               {active ? (
                 <rect
                   x={codeX - 10}
-                  y={y - 23}
+                  y={y - 21}
                   width={codeW}
-                  height={30}
+                  height={27}
                   rx="5"
                   fill={soft(colors.accent, 9)}
                   stroke={colors.accent}

@@ -62,8 +62,8 @@ describe("BarBlockRenderer", () => {
     const markup = renderToStaticMarkup(BarBlockRenderer(props(barsStep(makeBars([9, 3])))));
     const hs = heightsOf(markup);
     // tallest bar reaches the max bar height; the value-3 bar is one third of it
-    expect(hs).toContain(360);
-    expect(hs).toContain(120);
+    expect(hs).toContain(342);
+    expect(hs).toContain(114);
   });
 
   it("keeps unchanged bars visible at the exact start of a later step", () => {
@@ -76,7 +76,7 @@ describe("BarBlockRenderer", () => {
     })));
 
     expect(markup).toMatch(/data-bar-index="0"[^>]*opacity:1/);
-    expect(markup).toContain("height:360px");
+    expect(markup).toContain("height:342px");
   });
 
   it("uses a signed zero axis for negative values and still supports range overlays", () => {

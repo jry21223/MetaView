@@ -203,10 +203,6 @@ export const GeoMapSceneRenderer: React.FC<RendererProps> = ({ step, progress, t
         <text x="8" y="14" fontSize="5.2" fontWeight="760" fill="#182235">
           {step.title}
         </text>
-        <text x="92" y="14" textAnchor="end" fontSize="3.6" fontWeight="700" fill="#466172">
-          {snap.map_region ?? "world"}
-        </text>
-
         {mapAssets.map(renderMapAsset)}
 
         {pressureCenters.map((center, index) => {

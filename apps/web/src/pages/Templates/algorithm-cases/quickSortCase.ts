@@ -651,14 +651,9 @@ export function buildQuickSortScript(params: TemplatePreviewParams = {}): Playbo
       "用 last-element pivot 的 Lomuto 分区演示 [3,6,1,8,2,5,4,7]：选 pivot、扫描交换、pivot 归位，再递归左右区间。平均 O(n log n)，最坏 O(n²)。",
     algorithmId: "quick_sort",
     steps,
-    controls: [
-      {
-        id: "pivotStrategy",
-        label: "pivot 策略",
-        value: pivotStrategy,
-        description: "v1 仅支持 last（Lomuto：取区间最后一个元素为 pivot）。",
-      },
-    ],
+    // v1 has a single deterministic pivot strategy (Lomuto, last element),
+    // so no user-facing control is exposed until a second real option exists.
+    controls: [],
     initialData: {
       array: values.map(String),
       pivotStrategy: [pivotStrategy],
@@ -703,19 +698,8 @@ export const QUICK_SORT_PREVIEW_CASE = defineAlgorithmPreviewCase({
   id: "quick-sort",
   posterAlt: "快速排序 Lomuto 分区演示：pivot、扫描指针与归位",
   posterFrame: 225,
-  defaultParams: {
-    pivotStrategy: "last",
-  },
-  controls: [
-    {
-      id: "pivotStrategy",
-      kind: "select",
-      label: "pivot 策略",
-      description: "v1 仅开放 last（Lomuto 取末元素）。",
-      resetPlayback: true,
-      options: [{ label: "末元素 (Lomuto)", value: "last" }],
-    },
-  ],
+  defaultParams: {},
+  controls: [],
   buildScript: buildQuickSortScript,
   buildFollowups: buildQuickSortFollowups,
 });

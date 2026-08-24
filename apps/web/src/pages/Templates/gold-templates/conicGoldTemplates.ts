@@ -122,16 +122,19 @@ function buildParabola(params: TemplatePreviewParams): PlaybookScript {
   const foot = { x: -p, y: point.y };
   const distances = parabolaDefinitionDistances(spec, point);
   const snapshot = (stage: number, caption: string, formula: string): MathSceneSnapshot => ({
-    kind: "math_scene", camera_mode: "fixed", x_min: -p - 1.5, x_max: p * 5.5, y_min: -p * 5, y_max: p * 5,
+    // Viewport hugs the drawn content (vertex, focus, directrix, P up to
+    // t=±2.2): the previous x_max of 5.5p left the right half of the frame
+    // almost empty while the action crowded the left edge.
+    kind: "math_scene", camera_mode: "fixed", x_min: -p - 1.2, x_max: p * 5, y_min: -p * 4.6, y_max: p * 4.6,
     x_label: "x", y_label: "y",
-    curves: [{ expression_x: `${p}*t^2`, expression_y: `${2 * p}*t`, t_min: -2.4, t_max: 2.4, label: "抛物线", emphasis: "primary", semantic_role: "conic_curve" }],
+    curves: [{ expression_x: `${p}*t^2`, expression_y: `${2 * p}*t`, t_min: -2.2, t_max: 2.2, label: "抛物线", emphasis: "primary", semantic_role: "conic_curve" }],
     points: [
       { ...focus, label: "F", emphasis: stage === 1 ? "accent" : "secondary", semantic_role: "focus" },
       ...(stage >= 2 ? [{ ...point, label: "P", emphasis: "accent", semantic_role: "moving_point" }] : []),
       ...(stage >= 3 ? [{ ...foot, label: "H", emphasis: "secondary", semantic_role: "projection_foot" }] : []),
     ],
     segments: [
-      { x0: -p, y0: -p * 5, x1: -p, y1: p * 5, label: "准线", emphasis: stage === 1 ? "accent" : "secondary", semantic_role: "directrix" },
+      { x0: -p, y0: -p * 4.6, x1: -p, y1: p * 4.6, label: "准线", emphasis: stage === 1 ? "accent" : "secondary", semantic_role: "directrix" },
       ...(stage >= 3 ? [
         { x0: point.x, y0: point.y, x1: focus.x, y1: focus.y, label: `PF=${fixed(distances.focus)}`, emphasis: "accent", semantic_role: "focal_distance" },
         { x0: point.x, y0: point.y, x1: foot.x, y1: foot.y, label: `PH=${fixed(distances.directrix)}`, emphasis: "secondary", semantic_role: "directrix_distance" },

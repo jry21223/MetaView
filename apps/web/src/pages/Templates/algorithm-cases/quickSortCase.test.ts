@@ -72,7 +72,10 @@ describe("quickSortCase playbook", () => {
   it("exports the catalog case id quick-sort", () => {
     expect(QUICK_SORT_PREVIEW_CASE.id).toBe("quick-sort");
     expect(QUICK_SORT_PREVIEW_CASE.templateId).toBe("quick-sort");
-    expect(QUICK_SORT_PREVIEW_CASE.defaultParams.pivotStrategy).toBe("last");
+    // v1 exposes no pivot-strategy control: a single-option select is not a
+    // real parameter, so the case ships without user-facing controls.
+    expect(QUICK_SORT_PREVIEW_CASE.defaultParams).toEqual({});
+    expect(QUICK_SORT_PREVIEW_CASE.controls).toEqual([]);
   });
 
   it("builds a deterministic multi-step playbook with bars and code highlight", () => {
@@ -140,7 +143,8 @@ describe("quickSortCase playbook", () => {
 
   it("falls back to last when pivotStrategy is unsupported", () => {
     const script = buildQuickSortScript({ pivotStrategy: "median" });
-    expect(script.parameter_controls?.[0]?.value).toBe("last");
+    expect(script.parameter_controls).toEqual([]);
+    expect(script.initial_data?.pivotStrategy).toEqual(["last"]);
     const again = buildQuickSortScript({ pivotStrategy: "last" });
     expect(script.steps.map((step) => step.step_id)).toEqual(
       again.steps.map((step) => step.step_id),

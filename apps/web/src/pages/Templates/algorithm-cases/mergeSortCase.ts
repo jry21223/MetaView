@@ -445,14 +445,9 @@ export function buildMergeSortScript(params: TemplatePreviewParams): PlaybookScr
       "用固定数组展示划分、两两合并、半区合并与最终归并，强调合并后子区间保持有序。",
     algorithmId: "merge_sort",
     steps,
-    controls: [
-      {
-        id: "order",
-        label: "排序方向",
-        value: order,
-        description: "当前示例固定为升序归并，后续可扩展降序对照。",
-      },
-    ],
+    // v1 only demonstrates the ascending merge, so no user-facing control is
+    // exposed until a real descending variant exists.
+    controls: [],
     initialData: {
       array: MERGE_SORT_VALUES.map(String),
       order: [order],
@@ -578,17 +573,8 @@ export const MERGE_SORT_PREVIEW_CASE = defineAlgorithmPreviewCase({
   id: "merge-sort",
   posterAlt: "归并排序分治与合并过程示意",
   posterFrame: 495,
-  defaultParams: { order: "ascending" },
-  controls: [
-    {
-      id: "order",
-      kind: "select",
-      label: "排序方向",
-      description: "v1 仅提供升序演示，参数用于对齐控件协议。",
-      resetPlayback: true,
-      options: [{ label: "升序", value: "ascending" }],
-    },
-  ],
+  defaultParams: {},
+  controls: [],
   buildScript: buildMergeSortScript,
   buildFollowups: buildMergeSortFollowups,
 });

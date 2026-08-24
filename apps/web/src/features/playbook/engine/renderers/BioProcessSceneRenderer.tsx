@@ -144,10 +144,6 @@ export const BioProcessSceneRenderer: React.FC<RendererProps> = ({ step, progres
         <text x="8" y="12" fontSize="5.6" fontWeight="780" fill={theme === "dark" ? "#f8fafc" : "#182235"}>
           {step.title}
         </text>
-        <text x="92" y="12" textAnchor="end" fontSize="3.5" fontWeight="760" fill="#5b8c6a">
-          {snap.process_id.replace(/_/g, " ")}
-        </text>
-
         {(snap.connections ?? []).map((connection) => renderConnection(connection, snap.steps, p))}
 
         {snap.steps.map((processStep, index) => {
