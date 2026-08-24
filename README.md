@@ -36,7 +36,7 @@ MetaView 是一个面向教育场景的 AI 可视化讲解系统。输入一道�
 
 当前节点、队列、访问集合、活动边和代码行保持同步，让“先进先出”从一句定义变成可以逐步检查的执行过程。
 
-当前正式模板共 18 个，包括滑动窗口、归并排序、快速排序、二分查找、二叉树 BFS、导数与切线，八个高中圆锥曲线 Gold Template（含椭圆绳长实验与标准方程推导），以及两数之和、氧化还原、DNA 复制和东亚季风。Gold Case 同时是 `/templates` 中经过人工校验的公开教师案例；对应的 Hidden Benchmark Variant 只保存 eval-only 题目与事实要求，必须经过真实 Pipeline 生成，不能读取公开冻结 Playbook 获得通过。仓库中的其他 fixture 主要用于渲染回归与视觉验收，不等同于已经发布给学习者的成品案例。
+当前正式模板共 19 个，包括滑动窗口、归并排序、快速排序、二分查找、二叉树 BFS、导数与切线，九个高中圆锥曲线 Gold Template（含椭圆第一课三件套：绳长实验、标准方程推导、a/b/c 与离心率），以及两数之和、氧化还原、DNA 复制和东亚季风。Gold Case 同时是 `/templates` 中经过人工校验的公开教师案例；对应的 Hidden Benchmark Variant 只保存 eval-only 题目与事实要求，必须经过真实 Pipeline 生成，不能读取公开冻结 Playbook 获得通过。仓库中的其他 fixture 主要用于渲染回归与视觉验收，不等同于已经发布给学习者的成品案例。
 
 ## 它不只生成一段视频
 
@@ -235,7 +235,7 @@ candidate PlaybookScript
 
 质量检查覆盖时间线、旁白与 payload、renderer contract、缺失资产、学科错误降级、最低语义状态、Code Sync 一致性、LessonPlan 事实与最终结论。Follow-up 修改、版本恢复和导出也会重新检查当前 Playbook。
 
-Benchmark V2 的基础 Gold Case 包括导数与切线、BFS、递归阶乘和平抛运动；圆锥曲线包另有 16 个 eval-only Hidden Variant。总分达到 90 仍不够：任一 hard-fail 都会让该次尝试失败。公开 Gold Template 的冻结 Playbook 只用于展示，不进入隐藏评测。Checked-in fixtures 只用于回归和迁移验证；发布验收应来自真实生成的独立重复运行与本地 `eval/reports/` 证据。
+Benchmark V2 的基础 Gold Case 包括导数与切线、BFS、递归阶乘和平抛运动；圆锥曲线包另有 18 个 eval-only Hidden Variant。总分达到 90 仍不够：任一 hard-fail 都会让该次尝试失败。公开 Gold Template 的冻结 Playbook 只用于展示，不进入隐藏评测。Checked-in fixtures 只用于回归和迁移验证；发布验收应来自真实生成的独立重复运行与本地 `eval/reports/` 证据。
 
 | 命令 | 内容 |
 |---|---|

@@ -20,6 +20,11 @@ const CONIC_PREVIEWS: ReadonlyArray<{
     objects: { conic: 1, focus: 2, "characteristic-triangle": 1, "moving-point": 1 },
   },
   {
+    caseId: "ellipse-parameters-eccentricity",
+    geometry: "ellipse-parameters-eccentricity",
+    objects: { conic: 1, "flat-variant": 1, focus: 2 },
+  },
+  {
     caseId: "ellipse-focus-definition",
     geometry: "ellipse-focal-sum",
     objects: { conic: 1, focus: 2, "focal-distance": 2, "moving-point": 1 },

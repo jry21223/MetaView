@@ -2,7 +2,7 @@
 
 Status: Active
 
-`/templates` 是模板和正式案例的权威目录。它保留完整的 29 个模板目录，但只有已登记的正式案例可交互；尚未完成的模板必须显示“制作中”并保持禁用，不能退回旧的生成入口。
+`/templates` 是模板和正式案例的权威目录。它保留完整的 30 个模板目录，但只有已登记的正式案例可交互；尚未完成的模板必须显示“制作中”并保持禁用，不能退回旧的生成入口。
 
 ## 路由与交互
 
@@ -40,6 +40,7 @@ Status: Active
 | `derivative-tangent` | 割线逼近、切点、切线和 `f'(a)=2a` | 切点 `a` |
 | `ellipse-string-construction` | 图钉、细绳、笔尖尾迹与椭圆定义（含 2a>2c 退化讨论） | 绳长 `2a`、图钉距离 `2c`、笔尖位置 |
 | `ellipse-standard-equation` | 移项、两次平方、`b²=a²−c²` 与标准方程，每步数值验证 | `a`、`c`、验证点 |
+| `ellipse-parameters-eccentricity` | 特征三角形、`e=c/a`，从接近圆到接近线段的对照 | `a`、`c` |
 | `ellipse-focus-definition` | 两焦点、动点与焦点距离和 | `a`、`b`、动点参数 |
 | `parabola-focus-directrix` | 焦点、准线、垂足与等距性质 | `p`、动点参数 |
 | `hyperbola-asymptotes` | 两支、渐近线、焦点距离差 | `a`、`b`、动点参数 |
@@ -51,7 +52,7 @@ Status: Active
 | `dna-replication` | 模板链、复制叉、互补配对与新链生成 | 固定教学过程 |
 | `monsoon` | 东亚海陆热力差异、气压中心、季风与降水 | 季节状态 |
 
-每个默认案例至少有五个实际状态不同的步骤。普通正式案例每一步保留 3 个固定问题；八个 Gold 圆锥曲线案例每一步提供上述 5 个可执行且与当前步骤绑定的语义操作。案例数据必须继续符合 `PlaybookScript`；不要为公开模板引入第二套播放器或渲染协议。
+每个默认案例至少有五个实际状态不同的步骤。普通正式案例每一步保留 3 个固定问题；九个 Gold 圆锥曲线案例每一步提供上述 5 个可执行且与当前步骤绑定的语义操作。案例数据必须继续符合 `PlaybookScript`；不要为公开模板引入第二套播放器或渲染协议。
 
 Gold 的公开冻结 Playbook 只用于展示和视觉基线，不能作为真实生成 Benchmark 的输入。隐藏变体及隔离规则见 [gold-template-system.md](./gold-template-system.md)。
 

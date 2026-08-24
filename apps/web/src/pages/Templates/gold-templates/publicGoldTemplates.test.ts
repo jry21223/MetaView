@@ -78,7 +78,7 @@ describe("public gold template manifest", () => {
   });
 
   it("keeps public identifiers and archetypes unique", () => {
-    expect(PUBLIC_GOLD_TEMPLATES).toHaveLength(12);
+    expect(PUBLIC_GOLD_TEMPLATES).toHaveLength(13);
     expect(new Set(PUBLIC_GOLD_TEMPLATES.map((item) => item.caseId)).size)
       .toBe(PUBLIC_GOLD_TEMPLATES.length);
     expect(new Set(PUBLIC_GOLD_TEMPLATES.map((item) => item.archetypeId)).size)
@@ -92,11 +92,11 @@ describe("public gold template manifest", () => {
     }
   });
 
-  it("publishes exactly eight conic teacher cases with complete deterministic contracts", () => {
+  it("publishes exactly nine conic teacher cases with complete deterministic contracts", () => {
     const conicTemplates = PUBLIC_GOLD_TEMPLATES.filter(
       (item) => item.domain === "conic_sections",
     );
-    expect(conicTemplates).toHaveLength(8);
+    expect(conicTemplates).toHaveLength(9);
     for (const item of conicTemplates) {
       const defaults = item.parameterSchema?.defaults ?? {};
       const script = item.buildPublicPlaybook(defaults);
@@ -118,6 +118,7 @@ describe("public gold template manifest", () => {
     const expectedTitleCues: Record<string, readonly string[]> = {
       "ellipse-string-construction": ["观察目标", "拉紧绳子", "改变 t", "积累尾迹", "验证轨迹", "总结"],
       "ellipse-standard-equation": ["观察目标", "移项", "第一次平方", "第二次平方", "引入 b²", "总结"],
+      "ellipse-parameters-eccentricity": ["观察目标", "改变 c", "定义离心率", "验证一", "验证二", "总结"],
       "ellipse-focus-definition": ["观察目标", "改变 t", "测量", "提出猜想", "代数解释", "验证"],
       "parabola-focus-directrix": ["观察目标", "改变 t", "构造", "代数解释", "验证"],
       "hyperbola-asymptotes": ["观察目标", "提出猜想", "改变 u", "代数验证", "焦距差", "总结"],
@@ -129,7 +130,7 @@ describe("public gold template manifest", () => {
     const conicManifests = PUBLIC_GOLD_TEMPLATES.filter(
       (manifest) => manifest.archetypeId.startsWith("conic."),
     );
-    expect(conicManifests).toHaveLength(8);
+    expect(conicManifests).toHaveLength(9);
     for (const manifest of conicManifests) {
       const script = manifest.buildPublicPlaybook(manifest.parameterSchema?.defaults ?? {});
       expect(script.steps.map((step, index) => step.title.includes(

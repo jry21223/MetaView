@@ -402,6 +402,50 @@
         "requiredPhases": ["观察", "推导", "验证", "总结"],
         "minimumSteps": 6
       }
+    },
+    {
+      "archetypeId": "conic.ellipse.parameters-eccentricity",
+      "publicCaseId": "ellipse-parameters-eccentricity",
+      "requiredCapabilities": ["conic.ellipse.parameters-eccentricity", "math_scene.parametric_curve", "conic.deterministic_kernel"],
+      "expectedFacts": [
+        {
+          "id": "axes-meaning",
+          "description": "a、b、c 分别是半长轴、半短轴与半焦距",
+          "anyOf": ["半长轴", "半短轴", "半焦距", "长轴", "短轴"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "b-relation",
+          "description": "三个量满足 b²=a²−c²",
+          "anyOf": ["b²=a²−c²", "b^2=a^2-c^2", "b²=a²-c²", "直角三角形"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "eccentricity-definition",
+          "description": "离心率定义为 e=c/a",
+          "anyOf": ["e=c/a", "e = c/a", "离心率"],
+          "tolerance": 1e-8
+        },
+        {
+          "id": "eccentricity-shape",
+          "description": "0<e<1，e 越小越接近圆、越大越扁",
+          "anyOf": ["0<e<1", "接近圆", "越扁"],
+          "tolerance": 1e-8
+        }
+      ],
+      "visualInvariants": [
+        {
+          "id": "parameters-eccentricity-visual",
+          "description": "椭圆、焦点、半长轴、半短轴与特征三角形均可辨认",
+          "requiredSemanticRoles": ["conic_curve", "focus", "semi_major_axis", "semi_minor_axis", "characteristic_triangle"],
+          "requiredStateFields": ["curves", "points", "segments"]
+        }
+      ],
+      "pedagogicalRubric": {
+        "objective": "认识 a、b、c 的几何身份，并用 e=c/a 解释椭圆形状从圆到扁的变化",
+        "requiredPhases": ["观察", "推理", "验证", "总结"],
+        "minimumSteps": 6
+      }
     }
   ]
 }

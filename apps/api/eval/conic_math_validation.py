@@ -62,6 +62,10 @@ class _EllipseDerivationParameters(_StringConstructionParameters):
     """Standard-equation derivation: same a/c contract as the rope build."""
 
 
+class _EllipseShapeParameters(_StringConstructionParameters):
+    """Axes/eccentricity lesson: same a/c contract as the rope build."""
+
+
 class _ParabolaParameters(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -150,6 +154,7 @@ class _PolePolarParameters(BaseModel):
 _PARAMETER_MODELS: dict[str, type[BaseModel]] = {
     "conic.ellipse.string-construction": _StringConstructionParameters,
     "conic.ellipse.standard-equation": _EllipseDerivationParameters,
+    "conic.ellipse.parameters-eccentricity": _EllipseShapeParameters,
     "conic.ellipse.focus-definition": _EllipseParameters,
     "conic.parabola.focus-directrix": _ParabolaParameters,
     "conic.hyperbola.asymptotes": _HyperbolaParameters,
@@ -189,6 +194,7 @@ def validate_conic_playbook(
     if archetype_id in {
         "conic.ellipse.string-construction",
         "conic.ellipse.standard-equation",
+        "conic.ellipse.parameters-eccentricity",
     }:
         return _validate_string_construction(validated, scenes, tolerance)
     if archetype_id == "conic.ellipse.focus-definition":

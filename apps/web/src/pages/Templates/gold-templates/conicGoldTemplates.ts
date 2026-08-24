@@ -176,6 +176,56 @@ function buildStandardEquation(params: TemplatePreviewParams): PlaybookScript {
   ]);
 }
 
+function buildParametersEccentricity(params: TemplatePreviewParams): PlaybookScript {
+  const a = clamp(numberParam(params, "a", 5), 3, 7);
+  const c = Math.min(clamp(numberParam(params, "c", 3), 0.5, 6), a - 0.25);
+  const b = Math.sqrt(a * a - c * c);
+  const e = c / a;
+  const cLow = 0.5;
+  const bLow = Math.sqrt(a * a - cLow * cLow);
+  const cHigh = a - 0.3;
+  const bHigh = Math.sqrt(a * a - cHigh * cHigh);
+  const comparison = (cx: number, bx: number): NonNullable<MathSceneSnapshot["curves"]>[number] => ({
+    expression_x: `${a}*cos(t)`, expression_y: `${bx}*sin(t)`, t_min: 0, t_max: 2 * Math.PI,
+    label: `e=${fixed(cx / a, 2)}`, emphasis: "accent", semantic_role: "comparison_curve",
+  });
+  const axes = (emphasis: "accent" | "secondary"): NonNullable<MathSceneSnapshot["segments"]> => [
+    { x0: 0, y0: 0, x1: a, y1: 0, label: `a=${fixed(a)}`, emphasis, semantic_role: "semi_major_axis" },
+    { x0: 0, y0: 0, x1: 0, y1: b, label: `b=${fixed(b)}`, emphasis, semantic_role: "semi_minor_axis" },
+    { x0: 0, y0: 0, x1: c, y1: 0, label: `c=${fixed(c)}`, emphasis: "secondary", semantic_role: "semi_focal_distance" },
+    { x0: c, y0: 0, x1: 0, y1: b, emphasis, semantic_role: "characteristic_triangle" },
+  ];
+  const base = (stage: number, caption: string, formula: string, extraCurve?: NonNullable<MathSceneSnapshot["curves"]>[number]): MathSceneSnapshot => ({
+    kind: "math_scene", camera_mode: "fixed", x_min: -a - 1.5, x_max: a + 1.5, y_min: -a - 0.8, y_max: a + 0.8,
+    x_label: "x", y_label: "y",
+    curves: [
+      { expression_x: `${a}*cos(t)`, expression_y: `${b}*sin(t)`, t_min: 0, t_max: 2 * Math.PI, label: "椭圆", emphasis: extraCurve ? "secondary" : "primary", semantic_role: "conic_curve" },
+      ...(extraCurve ? [extraCurve] : []),
+    ],
+    points: [
+      { x: -c, y: 0, label: "$F_1$", emphasis: stage === 2 ? "accent" : "secondary", semantic_role: "focus" },
+      { x: c, y: 0, label: "$F_2$", emphasis: stage === 2 ? "accent" : "secondary", semantic_role: "focus" },
+    ],
+    segments: stage === 1 || stage === 6 ? axes(stage === 1 ? "accent" : "secondary") : stage === 2 ? axes("secondary") : [],
+    annotations: stage >= 3
+      ? [{ x: -a - 1, y: a + 0.4, text: `$e=\\dfrac{c}{a}=${fixed(e, 2)}$`, align: "nw", semantic_role: "derivation_panel" }]
+      : [],
+    formula_latex: formula, caption,
+  });
+  const steps = [
+    sceneStep(0, "shape-setup", "观察目标：三个量与一个三角形", `在这个椭圆里，a=${fixed(a)} 是半长轴，b=${fixed(b)} 是半短轴，c=${fixed(c)} 是半焦距。O、(c,0)、(0,b) 组成直角三角形，斜边长度恰好是 a。`, base(1, "先认清 a、b、c 各自落在图上的哪条线段。", String.raw`b^2=a^2-c^2=${fixed(b * b)}`)),
+    sceneStep(1, "shape-change-c", "改变 c：形状随焦点移动", `保持半长轴 a=${fixed(a)} 不变，调大 c：两个焦点向端点靠近，b=√(a²−c²) 随之变小，椭圆被压扁。当前 c=${fixed(c)}，b=${fixed(b)}。`, base(2, "焦点离中心越远，椭圆就越扁。", String.raw`b=\sqrt{a^2-c^2}=${fixed(b)}`)),
+    sceneStep(2, "shape-eccentricity", "定义离心率：e=c/a", `把整幅图放大一倍，a 和 c 同时翻倍，椭圆的胖瘦却不变。所以度量形状要用比值：定义离心率 e=c/a，当前 e=${fixed(c)}/${fixed(a)}=${fixed(e, 2)}。`, base(3, "用比值度量形状，大小的影响就被除掉了。", String.raw`e=\frac{c}{a}=${fixed(e, 2)}`)),
+    sceneStep(3, "shape-near-circle", "验证一：e 接近 0，椭圆接近圆", `作对照：同样的 a=${fixed(a)}，取 c=${fixed(cLow)}，此时 e=${fixed(cLow / a, 2)}，b=${fixed(bLow)} 几乎与 a 相等，对照曲线的轮廓接近圆。`, base(4, "对照曲线的 e 很小，长短轴几乎一样长。", String.raw`e=\frac{${fixed(cLow)}}{${fixed(a)}}=${fixed(cLow / a, 2)}`, comparison(cLow, bLow))),
+    sceneStep(4, "shape-flat", "验证二：e 接近 1，椭圆越来越扁", `再作对照：取 c=${fixed(cHigh)}（非常接近 a），此时 e=${fixed(cHigh / a, 2)}，b 只剩 ${fixed(bHigh)}，对照曲线被压得很扁，越来越接近一条线段。`, base(5, "e 逼近 1 时，短轴迅速消失。", String.raw`e=\frac{${fixed(cHigh)}}{${fixed(a)}}=${fixed(cHigh / a, 2)}`, comparison(cHigh, bHigh))),
+    sceneStep(5, "shape-summary", "总结：a 管大小，e 管形状", `因为 0<c<a，所以 0<e<1：e 靠近 0 时接近圆，靠近 1 时越来越扁。a 决定椭圆有多大，e 决定它有多圆或多扁，两个数合起来就确定了这个椭圆的样子。`, base(6, "大小与形状由 a 与 e 分工描述。", String.raw`\boxed{e=\frac{c}{a}\in(0,1)}`)),
+  ];
+  return playbook("椭圆的 a、b、c 与离心率", "认清三个量的几何身份，用 e=c/a 解释从圆到扁的变化。", "conic_ellipse_parameters_eccentricity", steps, [
+    { id: "a", label: "半长轴 a", value: fixed(a), description: "决定椭圆大小" },
+    { id: "c", label: "半焦距 c", value: fixed(c), description: "自动保持 c<a" },
+  ]);
+}
+
 function buildEllipseFocus(params: TemplatePreviewParams): PlaybookScript {
   const a = clamp(numberParam(params, "a", 5), 3, 7);
   const b = clamp(numberParam(params, "b", 3), 1, a - 0.5);
@@ -460,6 +510,22 @@ export const CONIC_PUBLIC_GOLD_TEMPLATES: readonly GoldTemplateManifest[] = Obje
     builder: buildStandardEquation,
     why: "每一步变形的合法性都能在当前验证点上核对：移项与平方不改变等式两边的数值相等，最终的 1 就是定义成立的代数化身。",
     parameterNote: "改变 a、c 会重算整条推导链的所有数值；拖动验证点 t 可以换一个点重新核对每一行等式。",
+  }),
+  manifest({
+    caseId: "ellipse-parameters-eccentricity",
+    archetypeId: "conic.ellipse.parameters-eccentricity",
+    topic: "椭圆",
+    title: "椭圆的 a、b、c 与离心率",
+    description: "特征三角形、e=c/a，与从圆到扁的两极对照",
+    prompt: "讲解椭圆中 a、b、c 的几何含义与关系 b²=a²−c²，并用离心率 e=c/a 解释形状变化。",
+    defaults: { a: 5, c: 3 },
+    controls: [
+      { id: "a", kind: "range", label: "半长轴 a", description: "3 到 7", min: 3, max: 7, step: 0.25, resetPlayback: false },
+      { id: "c", kind: "range", label: "半焦距 c", description: "自动保持 c<a", min: 0.5, max: 6, step: 0.25, resetPlayback: false },
+    ],
+    builder: buildParametersEccentricity,
+    why: "b²=a²−c² 来自 O、(c,0)、(0,b) 的直角三角形；而形状只由比值 e=c/a 决定，因为同时缩放 a、c 不改变胖瘦。",
+    parameterNote: "增大 a 椭圆整体变大但 e 不变形状不变；增大 c 则 e 上升、b 变小，椭圆变扁，直到 c 逼近 a 时接近线段。",
   }),
   manifest({ caseId: "ellipse-focus-definition", archetypeId: "conic.ellipse.focus-definition", topic: "椭圆", title: "椭圆的焦点定义", description: "观察动点到两焦点距离之和恒定", prompt: "用动点解释椭圆的焦点定义，并验证 PF₁+PF₂=2a。", defaults: { a: 5, b: 3, t: 1 }, controls: [
     { id: "a", kind: "range", label: "长半轴 a", description: "3 到 7", min: 3, max: 7, step: 0.25, resetPlayback: false },

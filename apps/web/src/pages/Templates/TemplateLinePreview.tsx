@@ -94,6 +94,14 @@ const LINE_PREVIEWS: Record<TemplatePreviewCaseId, ReactNode> = {
       <circle className="is-accent" cx="106" cy="14" r="3" data-object="moving-point" />
     </svg>
   ),
+  "ellipse-parameters-eccentricity": (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="ellipse-parameters-eccentricity">
+      <ellipse className="is-guide" cx="80" cy="28" rx="52" ry="20" data-object="conic" />
+      <ellipse className="is-accent is-dashed" cx="80" cy="28" rx="52" ry="7" data-object="flat-variant" />
+      <circle cx="38" cy="28" r="3" data-object="focus" />
+      <circle cx="122" cy="28" r="3" data-object="focus" />
+    </svg>
+  ),
   "ellipse-focus-definition": (
     <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="ellipse-focal-sum">
       <path className="is-guide is-dashed" d="M22 28h116" data-object="focal-axis" />

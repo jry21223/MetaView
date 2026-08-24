@@ -229,6 +229,34 @@
       },
       "conclusionAliases": [["标准方程", "x²/169+y²/25=1", "x^2/169+y^2/25=1"], ["b²=a²−c²", "b^2=a^2-c^2", "b²=25"], ["椭圆", "ellipse"]],
       "forbiddenAliases": ["b²=313", "b^2=313", "x²/169+y²/313=1"]
+    },
+    {
+      "caseId": "conic-hidden-eccentricity-01",
+      "archetypeId": "conic.ellipse.parameters-eccentricity",
+      "prompt": "以椭圆 x²/25+y²/9=1 为主体，为高中生讲解 a、b、c 三个量的几何含义：指出半长轴、半短轴与半焦距，计算离心率 e，并说明这个 e 值对应的椭圆是偏圆还是偏扁。",
+      "parameters": {"a": 5, "c": 4},
+      "factEvidence": {
+        "axes-meaning": ["半长轴", "半短轴", "半焦距"],
+        "b-relation": ["b²=a²−c²", "b^2=a^2-c^2", "b²=9", "b^2=9"],
+        "eccentricity-definition": ["e=c/a", "e=4/5", "e=0.8"],
+        "eccentricity-shape": ["0<e<1", "越扁", "较扁"]
+      },
+      "conclusionAliases": [["离心率"], ["e=4/5", "e=0.8", "0.8"], ["扁"]],
+      "forbiddenAliases": ["e=1.25", "e=5/4", "e>1"]
+    },
+    {
+      "caseId": "conic-hidden-eccentricity-02",
+      "archetypeId": "conic.ellipse.parameters-eccentricity",
+      "prompt": "以焦点在 x 轴、a=10、c=6 的椭圆为主体，为高中生推出 b 的值并讲解离心率：写出 b²=a²−c² 的计算过程，求 e=c/a，并说明当 c 减小到接近 0 或增大到接近 a 时椭圆形状分别如何变化。",
+      "parameters": {"a": 10, "c": 6},
+      "factEvidence": {
+        "axes-meaning": ["半长轴", "半短轴", "半焦距"],
+        "b-relation": ["b²=a²−c²", "b^2=a^2-c^2", "b²=64", "b^2=64", "b=8"],
+        "eccentricity-definition": ["e=c/a", "e=6/10", "e=3/5", "e=0.6"],
+        "eccentricity-shape": ["0<e<1", "接近圆", "越扁"]
+      },
+      "conclusionAliases": [["离心率"], ["e=0.6", "e=3/5", "0.6"], ["b=8", "b²=64", "b^2=64"]],
+      "forbiddenAliases": ["e=5/3", "e=1.67", "e>1"]
     }
   ]
 }

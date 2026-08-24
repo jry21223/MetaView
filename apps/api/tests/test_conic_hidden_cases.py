@@ -105,7 +105,7 @@ def test_hidden_manifest_rejects_unknown_catalog_fact_ids(tmp_path: Path) -> Non
 def test_hidden_manifest_has_two_variants_per_archetype_and_never_enters_web_source() -> None:
     catalog = load_conic_archetype_catalog()
     manifest = load_hidden_conic_manifest()
-    assert len(manifest.variants) == 16
+    assert len(manifest.variants) == 18
     assert Counter(item.archetype_id for item in manifest.variants) == Counter(
         {item.archetype_id: 2 for item in catalog.archetypes}
     )
