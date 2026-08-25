@@ -146,12 +146,22 @@ class MathPlotPoint(BaseModel):
     semantic_role: str | None = None
 
 
+class MathPlotPolyline(BaseModel):
+    """A precomputed trajectory drawn as one polyline (iterated maps, ODE solutions)."""
+
+    points: list[tuple[float, float]] = Field(default_factory=list)
+    label: str | None = None
+    emphasis: str = "primary"  # primary | secondary | accent
+    semantic_role: str | None = None
+
+
 class MathPlotSnapshot(BaseModel):
     """Cartesian function / curve plot (math domain).
 
     Curves carry formula strings — not sampled points — so the renderer controls
     resolution and can animate the curve being drawn from the step ``progress``.
-    ``points`` overlays discrete observations (experiment records) on top.
+    ``points`` overlays discrete observations (experiment records) and
+    ``polylines`` overlays precomputed trajectories on top.
     """
 
     kind: Literal["math_plot"] = "math_plot"
@@ -159,6 +169,7 @@ class MathPlotSnapshot(BaseModel):
     asset_id: str | None = None
     curves: list[MathPlotCurve] = Field(default_factory=list)
     points: list[MathPlotPoint] = Field(default_factory=list)
+    polylines: list[MathPlotPolyline] = Field(default_factory=list)
     params: dict[str, float] = Field(default_factory=dict)
     x_min: float = -10.0
     x_max: float = 10.0

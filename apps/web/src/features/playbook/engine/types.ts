@@ -125,6 +125,16 @@ export interface MathPlotPoint {
   semantic_role?: string;
 }
 
+/** A precomputed trajectory drawn as one polyline (iterated maps, ODE solutions). */
+export interface MathPlotPolyline {
+  /** Ordered [x, y] vertices in plot coordinates. */
+  points: Array<[number, number]>;
+  label?: string | null;
+  /** `primary` = trajectory in focus, `secondary` = context (dashed), `accent` = highlighted twin. */
+  emphasis?: string;
+  semantic_role?: string;
+}
+
 /** Cartesian function / curve plot (math domain). */
 export interface MathPlotSnapshot {
   kind: "math_plot";
@@ -133,6 +143,8 @@ export interface MathPlotSnapshot {
   curves: MathPlotCurve[];
   /** Discrete data points drawn over the curves (observations, experiment records). */
   points?: MathPlotPoint[];
+  /** Precomputed trajectories (iterated maps, numerical solutions) drawn as polylines. */
+  polylines?: MathPlotPolyline[];
   /** Runtime numeric parameter scope used by curve expressions, e.g. `{ a: 2 }` for `a*x`. */
   params?: Record<string, number>;
   x_min: number;

@@ -228,6 +228,9 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
     const ys: number[] = [];
     for (const c of drawable) for (const p of c.points) if (Number.isFinite(p.y)) ys.push(p.y);
     for (const p of snap.points ?? []) if (Number.isFinite(p.y)) ys.push(p.y);
+    for (const line of snap.polylines ?? []) {
+      for (const [, y] of line.points) if (Number.isFinite(y)) ys.push(y);
+    }
     const [lo, hi] = padRange(...autoYBounds(ys));
     if (yMin == null) yMin = lo;
     if (yMax == null) yMax = hi;
@@ -244,6 +247,23 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
 
   const pointsToPath = (pts: SamplePoint[]): string =>
     pts.map((p) => `${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(" ");
+
+  // A dense scatter (e.g. a bifurcation diagram) renders as one batched path
+  // node instead of thousands of circle groups; a sweep clip reveals it left
+  // to right. Below the threshold, points keep per-dot labels and fades.
+  const DENSE_POINTS_THRESHOLD = 220;
+  const densePointsPath = React.useMemo(() => {
+    const pts = snap.points;
+    if (!pts || pts.length <= DENSE_POINTS_THRESHOLD) return null;
+    const r = 1.6;
+    let d = "";
+    for (const p of pts) {
+      const cx = MARGIN.left + ((p.x - xMin) / (xMax - xMin || 1)) * PLOT_W;
+      const cy = MARGIN.top + ((yHi - p.y) / (yHi - yLo || 1)) * PLOT_H;
+      d += `M${(cx - r).toFixed(1)},${cy.toFixed(1)}a${r},${r} 0 1,0 ${r * 2},0a${r},${r} 0 1,0 ${-r * 2},0`;
+    }
+    return d;
+  }, [snap.points, xMin, xMax, yLo, yHi]);
 
   const xTicks = niceTicks(xMin, xMax, 8);
   const yTicks = niceTicks(yLo, yHi, 7);
@@ -313,7 +333,10 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
     return html || null;
   }, [snap.formula_latex]);
 
-  const empty = drawable.length === 0 && (snap.points ?? []).length === 0;
+  const empty =
+    drawable.length === 0 &&
+    (snap.points ?? []).length === 0 &&
+    (snap.polylines ?? []).length === 0;
 
   return (
     <div
@@ -571,40 +594,95 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
                 );
               })}
 
-              {(snap.points ?? []).map((p, pi) => {
-                // Observed data appears in x-order as the step's reveal sweeps
-                // left to right, matching the curve draw-on direction.
-                const xFrac = (p.x - xMin) / (xMax - xMin || 1);
-                const opacity = clamp01((reveal * 1.15 - xFrac) * 8);
-                const fill = curveColor(colors, p.emphasis, 0);
+              {(snap.polylines ?? []).map((line, li) => {
+                if (line.points.length < 2) return null;
+                const stroke = curveColor(colors, line.emphasis, li);
+                const tip = line.points[line.points.length - 1];
+                const tipX = sx(tip[0]);
                 return (
-                  <g
-                    key={`pt-${pi}`}
-                    opacity={opacity}
-                    data-semantic-role={p.semantic_role ?? "data_point"}
-                  >
-                    <circle
-                      cx={sx(p.x)}
-                      cy={sy(p.y)}
-                      r={4.5}
-                      fill={fill}
-                      stroke={colors.bg}
-                      strokeWidth={1.4}
+                  <g key={`traj-${li}`} data-semantic-role={line.semantic_role ?? "trajectory"}>
+                    <polyline
+                      points={line.points
+                        .map(([px, py]) => `${sx(px).toFixed(1)},${sy(py).toFixed(1)}`)
+                        .join(" ")}
+                      fill="none"
+                      stroke={stroke}
+                      strokeWidth={line.emphasis === "accent" ? 2.6 : 2.2}
+                      strokeLinejoin="round"
+                      opacity={line.emphasis === "secondary" ? 0.55 : 0.92}
+                      pathLength={1}
+                      strokeDasharray={1}
+                      strokeDashoffset={1 - clamp01(reveal * 1.05)}
                     />
-                    {p.label && p.label.trim() && (
+                    {line.label && (
                       <text
-                        x={sx(p.x) + 9}
-                        y={sy(p.y) - 9}
+                        x={Math.min(tipX + 8, MARGIN.left + PLOT_W - 6)}
+                        y={Math.max(MARGIN.top + 12, sy(tip[1]) - 6)}
+                        textAnchor={tipX > MARGIN.left + PLOT_W - 90 ? "end" : "start"}
                         fontSize={12.5}
                         fontWeight={600}
-                        fill={fill}
+                        fill={stroke}
+                        opacity={clamp01((reveal - 0.8) * 6)}
                       >
-                        {p.label}
+                        {line.label}
                       </text>
                     )}
                   </g>
                 );
               })}
+
+              {densePointsPath ? (
+                <g data-semantic-role={snap.points?.[0]?.semantic_role ?? "data_point"}>
+                  <clipPath id="mv-plot-dense-sweep">
+                    <rect
+                      x={MARGIN.left}
+                      y={MARGIN.top}
+                      width={Math.max(0, PLOT_W * clamp01(reveal * 1.05))}
+                      height={PLOT_H}
+                    />
+                  </clipPath>
+                  <path
+                    d={densePointsPath}
+                    fill={curveColor(colors, snap.points?.[0]?.emphasis, 0)}
+                    clipPath="url(#mv-plot-dense-sweep)"
+                  />
+                </g>
+              ) : (
+                (snap.points ?? []).map((p, pi) => {
+                  // Observed data appears in x-order as the step's reveal sweeps
+                  // left to right, matching the curve draw-on direction.
+                  const xFrac = (p.x - xMin) / (xMax - xMin || 1);
+                  const opacity = clamp01((reveal * 1.15 - xFrac) * 8);
+                  const fill = curveColor(colors, p.emphasis, 0);
+                  return (
+                    <g
+                      key={`pt-${pi}`}
+                      opacity={opacity}
+                      data-semantic-role={p.semantic_role ?? "data_point"}
+                    >
+                      <circle
+                        cx={sx(p.x)}
+                        cy={sy(p.y)}
+                        r={4.5}
+                        fill={fill}
+                        stroke={colors.bg}
+                        strokeWidth={1.4}
+                      />
+                      {p.label && p.label.trim() && (
+                        <text
+                          x={sx(p.x) + 9}
+                          y={sy(p.y) - 9}
+                          fontSize={12.5}
+                          fontWeight={600}
+                          fill={fill}
+                        >
+                          {p.label}
+                        </text>
+                      )}
+                    </g>
+                  );
+                })
+              )}
 
               {marker && (
                 <g

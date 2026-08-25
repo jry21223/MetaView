@@ -84,6 +84,20 @@ const LINE_PREVIEWS: Record<TemplatePreviewCaseId, ReactNode> = {
       <circle className="is-accent" cx="76" cy="29" r="3" data-object="inflection" />
     </svg>
   ),
+  "rabbit-chaos": (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="rabbit-chaos">
+      <path className="is-guide" d="M14 46h132M14 46V8" />
+      <path d="M14 28h44" data-object="stable-branch" />
+      <path d="M58 28c10-6 14-9 22-10M58 28c10 6 14 9 22 10" data-object="first-fork" />
+      <path className="is-accent" d="M80 18c7-3 10-4 16-5M80 18c7 3 10 3 16 4M80 38c7 3 10 4 16 5M80 38c7-3 10-3 16-4" data-object="second-fork" />
+      <g className="is-accent" data-object="chaos-band">
+        <circle cx="104" cy="13" r="1.4" /><circle cx="109" cy="30" r="1.4" /><circle cx="113" cy="20" r="1.4" />
+        <circle cx="118" cy="41" r="1.4" /><circle cx="122" cy="15" r="1.4" /><circle cx="126" cy="33" r="1.4" />
+        <circle cx="131" cy="24" r="1.4" /><circle cx="135" cy="43" r="1.4" /><circle cx="139" cy="12" r="1.4" />
+        <circle cx="143" cy="28" r="1.4" />
+      </g>
+    </svg>
+  ),
   "ellipse-string-construction": (
     <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="ellipse-string-construction">
       <ellipse className="is-guide" cx="80" cy="30" rx="52" ry="18" data-object="conic" />

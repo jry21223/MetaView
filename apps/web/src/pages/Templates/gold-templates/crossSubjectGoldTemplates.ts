@@ -4,6 +4,7 @@ import type {
   GeoMapSceneSnapshot,
   MathPlotSnapshot,
   MetaStep,
+  PhasePortraitSceneSnapshot,
   PlaybookScript,
   ReactionSceneSnapshot,
 } from "../../../features/playbook/engine/types";
@@ -727,6 +728,255 @@ export function buildLogisticGrowthGoldPlaybook(params: TemplatePreviewParams): 
   );
 }
 
+// ── 兔群与混沌：离散 logistic 映射 → 分岔图 → 洛伦兹 ─────────────────────────
+
+const CHAOS_CAPACITY = 1000;
+const CHAOS_YEARS_SHORT = 30;
+const CHAOS_YEARS_MID = 40;
+const CHAOS_YEARS_LONG = 60;
+const RABBIT_MAP_FORMULA = String.raw`N_{t+1}=N_t+rN_t\left(1-\frac{N_t}{K}\right)`;
+
+/** Discrete logistic map N_{t+1} = N + rN(1 − N/K), floored at zero. */
+function iterateLogisticMap(r: number, n0: number, years: number): Array<[number, number]> {
+  const path: Array<[number, number]> = [[0, n0]];
+  let n = n0;
+  for (let t = 1; t <= years; t += 1) {
+    n = Math.max(0, n + r * n * (1 - n / CHAOS_CAPACITY));
+    path.push([t, n]);
+  }
+  return path;
+}
+
+/**
+ * Bifurcation diagram of the map above: long-run attractor samples per growth
+ * rate, quantized and deduplicated per column so the scatter stays a few
+ * thousand points. Parameter-independent, so cached after the first build.
+ */
+let bifurcationCache: NonNullable<MathPlotSnapshot["points"]> | null = null;
+function bifurcationScatter(): NonNullable<MathPlotSnapshot["points"]> {
+  if (bifurcationCache) return bifurcationCache;
+  const samples: NonNullable<MathPlotSnapshot["points"]> = [];
+  const columns = 320;
+  for (let column = 0; column <= columns; column += 1) {
+    const r = 0.5 + (2.5 * column) / columns;
+    let n = 10;
+    for (let i = 0; i < 300; i += 1) n = Math.max(0, n + r * n * (1 - n / CHAOS_CAPACITY));
+    const seen = new Set<number>();
+    for (let i = 0; i < 100; i += 1) {
+      n = Math.max(0, n + r * n * (1 - n / CHAOS_CAPACITY));
+      const bin = Math.round(n / 2.5);
+      if (seen.has(bin)) continue;
+      seen.add(bin);
+      samples.push({ x: r, y: bin * 2.5, semantic_role: "attractor_sample" });
+    }
+  }
+  bifurcationCache = samples;
+  return samples;
+}
+
+/** Lorenz system (σ=10, ρ=28, β=8/3) integrated with RK4 from (x0, 1, 1). */
+function lorenzRun(x0: number): { xz: Array<[number, number]>; tx: Array<[number, number]> } {
+  const sigma = 10;
+  const rho = 28;
+  const beta = 8 / 3;
+  const dt = 0.004;
+  const steps = 10000;
+  const deriv = (s: readonly [number, number, number]): [number, number, number] => [
+    sigma * (s[1] - s[0]),
+    s[0] * (rho - s[2]) - s[1],
+    s[0] * s[1] - beta * s[2],
+  ];
+  let state: [number, number, number] = [x0, 1, 1];
+  const xz: Array<[number, number]> = [];
+  const tx: Array<[number, number]> = [];
+  for (let i = 0; i <= steps; i += 1) {
+    if (i % 2 === 0) xz.push([state[0], state[2]]);
+    if (i % 5 === 0) tx.push([i * dt, state[0]]);
+    const k1 = deriv(state);
+    const k2 = deriv([
+      state[0] + (dt / 2) * k1[0],
+      state[1] + (dt / 2) * k1[1],
+      state[2] + (dt / 2) * k1[2],
+    ]);
+    const k3 = deriv([
+      state[0] + (dt / 2) * k2[0],
+      state[1] + (dt / 2) * k2[1],
+      state[2] + (dt / 2) * k2[2],
+    ]);
+    const k4 = deriv([state[0] + dt * k3[0], state[1] + dt * k3[1], state[2] + dt * k3[2]]);
+    state = [
+      state[0] + (dt / 6) * (k1[0] + 2 * k2[0] + 2 * k3[0] + k4[0]),
+      state[1] + (dt / 6) * (k1[1] + 2 * k2[1] + 2 * k3[1] + k4[1]),
+      state[2] + (dt / 6) * (k1[2] + 2 * k2[2] + 2 * k3[2] + k4[2]),
+    ];
+  }
+  return { xz, tx };
+}
+
+let lorenzCache: { a: ReturnType<typeof lorenzRun>; b: ReturnType<typeof lorenzRun> } | null = null;
+function lorenzPair(): { a: ReturnType<typeof lorenzRun>; b: ReturnType<typeof lorenzRun> } {
+  if (!lorenzCache) lorenzCache = { a: lorenzRun(1), b: lorenzRun(1.000001) };
+  return lorenzCache;
+}
+
+export function buildRabbitChaosGoldPlaybook(params: TemplatePreviewParams): PlaybookScript {
+  const r = boundedNumber(params, "r", 2.95, 0.5, 3);
+  const n0 = boundedNumber(params, "N0", 10, 1, 100);
+  const yTop = 1400;
+  const capacityLine = {
+    expression: `${CHAOS_CAPACITY}`,
+    label: `K=${CHAOS_CAPACITY}`,
+    emphasis: "secondary" as const,
+    semantic_role: "carrying_capacity",
+  };
+  const mapPlot = (args: {
+    lines: MathPlotSnapshot["polylines"];
+    points?: MathPlotSnapshot["points"];
+    curves?: MathPlotSnapshot["curves"];
+    caption: string;
+    formula: string;
+    window?: { xMin?: number; xMax?: number; yMin?: number; yMax?: number; xLabel?: string; yLabel?: string };
+  }): MathPlotSnapshot => ({
+    kind: "math_plot",
+    pack_id: "math-basic",
+    curves: args.curves ?? [capacityLine],
+    points: args.points,
+    polylines: args.lines,
+    x_min: args.window?.xMin ?? 0,
+    x_max: args.window?.xMax ?? CHAOS_YEARS_SHORT,
+    y_min: args.window?.yMin ?? 0,
+    y_max: args.window?.yMax ?? yTop,
+    x_label: args.window?.xLabel ?? "时间（年）",
+    y_label: args.window?.yLabel ?? "兔群数量 N",
+    formula_latex: args.formula,
+    caption: args.caption,
+  });
+  const trajectory = (rate: number, start: number, years: number) => ({
+    points: iterateLogisticMap(rate, start, years),
+    label: `r=${fixed(rate, 2)}`,
+    emphasis: "primary" as const,
+    semantic_role: "rabbit_trajectory",
+  });
+  const yearDots = (line: { points: Array<[number, number]> }) =>
+    line.points.map(([x, y]) => ({ x, y, semantic_role: "yearly_count" }));
+  const converge = trajectory(0.8, 10, CHAOS_YEARS_SHORT);
+  const overshoot = trajectory(1.8, 10, CHAOS_YEARS_SHORT);
+  const periodTwo = trajectory(2.2, 10, CHAOS_YEARS_MID);
+  const periodFour = trajectory(2.5, 10, CHAOS_YEARS_MID);
+  const deepChaos = trajectory(2.95, 10, CHAOS_YEARS_LONG);
+  const butterflyA = { ...trajectory(2.95, 10, CHAOS_YEARS_LONG), label: "N₀=10" };
+  const butterflyB = {
+    ...trajectory(2.95, 10.000001, CHAOS_YEARS_LONG),
+    label: "N₀=10.000001",
+    emphasis: "accent" as const,
+    semantic_role: "rabbit_trajectory_twin",
+  };
+  const lorenz = lorenzPair();
+  const steps = [
+    sceneStep(0, "chaos-one-generation", "把时间切成一年一代", "换一种时间观：兔群一年繁殖一代，方程从微分变成迭代——明年的数量由今年一步算出。r=0.8 时它跟连续模型走同一条路，只慢半拍，最后同样贴向 K=1000。这半拍就是时滞的种子——现在看无伤大雅，对吧？", mapPlot({
+      lines: [converge],
+      points: yearDots(converge),
+      curves: [
+        {
+          expression: `${CHAOS_CAPACITY}/(1+${fixed((CHAOS_CAPACITY - 10) / 10, 0)}*exp(-0.8*x))`,
+          label: "连续模型",
+          emphasis: "secondary",
+          semantic_role: "continuous_reference",
+        },
+        capacityLine,
+      ],
+      caption: "同一个 logistic，只是把时间切成了离散的一代一代。",
+      formula: RABBIT_MAP_FORMULA,
+    })),
+    sceneStep(1, "chaos-overshoot", "r=1.8：刹不住车", "把 r 提到 1.8：兔群冲过 K 再跌回来，振荡几年才安定。原因是时滞——今年的过剩要到明年才显形，方向盘打晚了一年。连续模型永远不会这样，它的反馈是即时的。", mapPlot({
+      lines: [overshoot],
+      points: yearDots(overshoot),
+      caption: "一年的反馈延迟：过冲、回摆、逐渐安定。",
+      formula: RABBIT_MAP_FORMULA,
+    })),
+    sceneStep(2, "chaos-period-two", "r=2.2：永不安定的秩序", "r=2.2：振荡不再衰减，兔群锁进高一年、低一年的两年循环。它永远到不了 K，却完全可预测——这是第一次分岔。", mapPlot({
+      lines: [periodTwo],
+      points: yearDots(periodTwo),
+      window: { xMax: CHAOS_YEARS_MID },
+      caption: "周期 2：平衡点失稳后出现的新秩序。",
+      formula: RABBIT_MAP_FORMULA,
+    })),
+    sceneStep(3, "chaos-period-four", "r=2.5：周期加倍", "r=2.5：两年循环裂成四年循环。继续加大 r，周期以越来越快的速度翻倍：8、16、32……到 r≈2.57，翻倍塞满，秩序耗尽。", mapPlot({
+      lines: [periodFour],
+      points: yearDots(periodFour),
+      window: { xMax: CHAOS_YEARS_MID },
+      caption: "倍周期级联：通往混沌最经典的一条路。",
+      formula: RABBIT_MAP_FORMULA,
+    })),
+    sceneStep(4, "chaos-deep", "r=2.95：混沌", "r=2.95：轨迹再也不重复自己。注意，方程里没有一个随机数——每一步都是确定的，但整体永不循环。这就是混沌：确定性系统生出的不可预测。", mapPlot({
+      lines: [deepChaos],
+      window: { xMax: CHAOS_YEARS_LONG },
+      caption: "确定性方程，非周期轨道。",
+      formula: RABBIT_MAP_FORMULA,
+    })),
+    sceneStep(5, "chaos-butterfly", "蝴蝶效应：0.000001 的分量", "两群兔子，初始只差百万分之一只：前三十多年两条轨迹完全重合，然后彻底分道扬镳。初值的微小误差按指数放大——超过一个期限，预测就失效了。这不是测量不够准，是系统本性。", mapPlot({
+      lines: [butterflyA, butterflyB],
+      window: { xMax: CHAOS_YEARS_LONG },
+      caption: "初值差 10⁻⁶：重合三十多年，然后各奔东西。",
+      formula: String.raw`\Delta_0=10^{-6}`,
+    })),
+    sceneStep(6, "chaos-bifurcation", "分岔图：整个故事的地图", `把每个 r 的长期归宿都画出来：左边一条线是安定，r=2 劈成两枝，再裂成四枝，然后是混沌的噪点带——带里还嵌着突然安静的白色窗口。你刚才走过的五步，是这张图上的五条竖线；此刻的竖线停在 r=${fixed(r, 2)}。`, mapPlot({
+      lines: [{
+        points: [[r, 0], [r, yTop]],
+        label: `r=${fixed(r, 2)}`,
+        emphasis: "accent",
+        semantic_role: "current_rate_marker",
+      }],
+      points: bifurcationScatter(),
+      curves: [],
+      window: { xMin: 0.5, xMax: 3, xLabel: "年增长率 r", yLabel: "长期兔群数量" },
+      caption: "横轴 r，纵轴长期归宿；白色窗口里秩序短暂回归。",
+      formula: String.raw`r_\infty\approx2.57`,
+    })),
+    sceneStep(7, "chaos-lorenz-shape", "蝴蝶的本体：洛伦兹吸引子", "混沌不只住在兔群里。1963 年，气象学家洛伦兹在三条大气对流方程里看到同样的东西——轨迹永远绕着两翼盘旋，永不重复。你看到的交叉是三维轨迹拍进平面的投影假象，这恰好说明它活在三维里。", {
+      kind: "phase_portrait_scene",
+      trajectories: [{ points: lorenz.a.xz, emphasis: "primary" }],
+      equilibria: [
+        { x: Math.sqrt(72), y: 27, label: "C₊", stable: false },
+        { x: -Math.sqrt(72), y: 27, label: "C₋", stable: false },
+      ],
+      x_min: -25,
+      x_max: 25,
+      y_min: 0,
+      y_max: 52,
+      formula_latex: String.raw`\sigma=10,\ \rho=28,\ \beta=\tfrac83`,
+      caption: "洛伦兹三条对流方程的 x–z 投影；“交叉”是三维轨迹拍扁后的假象。",
+    } satisfies PhasePortraitSceneSnapshot),
+    sceneStep(8, "chaos-lorenz-divergence", "同一只蝴蝶，两条命运", "还是那个 0.000001：两条洛伦兹轨迹的 x 分量，前二十多秒完全重合，之后各自绕向不同的翼。天气预报的两周上限，就是这条曲线定的——不是仪器不行，是大气本身在放大误差。", mapPlot({
+      lines: [
+        { points: lorenz.a.tx, label: "x₀=1", emphasis: "primary", semantic_role: "lorenz_x" },
+        { points: lorenz.b.tx, label: "x₀=1.000001", emphasis: "accent", semantic_role: "lorenz_x_twin" },
+      ],
+      curves: [],
+      window: { xMax: 40, yMin: -25, yMax: 25, xLabel: "时间", yLabel: "x 分量" },
+      caption: "初值差 10⁻⁶ 的两条洛伦兹轨迹：重合，然后分道。",
+      formula: String.raw`\Delta(t)\approx\Delta_0e^{\lambda t}`,
+    })),
+    sceneStep(9, "chaos-sandbox", "沙盘：r 交给你", "旁白到此为止。右侧的 r 和 N₀ 现在归你：把 r 从 0.5 慢慢推到 3，找一找周期 8；进了混沌带再把 N₀ 挪一格，数一数轨迹几年后面目全非。这张图你已经会读了。", mapPlot({
+      lines: [trajectory(r, n0, CHAOS_YEARS_LONG)],
+      window: { xMax: CHAOS_YEARS_LONG },
+      caption: "自由沙盘：参数归你，图你已经会读了。",
+      formula: RABBIT_MAP_FORMULA,
+    })),
+  ];
+  return playbook(
+    "biology",
+    "兔群与混沌 · 从秩序到蝴蝶效应",
+    "离散 logistic 映射：倍周期、分岔图、洛伦兹吸引子与蝴蝶效应。",
+    "ecology_rabbit_chaos",
+    steps,
+    [
+      { id: "r", label: "年增长率 r", value: fixed(r, 2), description: "0.5 安定 → 3 深混沌" },
+      { id: "N0", label: "初始兔群 N₀", value: fixed(n0, 1), description: "混沌区里挪一格即分道" },
+    ],
+  );
+}
+
 function standalone(args: {
   caseId: string;
   archetypeId: string;
@@ -935,5 +1185,51 @@ export const CROSS_SUBJECT_PUBLIC_GOLD_TEMPLATES: readonly GoldTemplateManifest[
     },
     transfer: "先把 E 拖到 r/2 看产量到顶、拖过 r 看崩溃；再回第 3 步把 r、K 拖离拟合值，检查曲线怎样离开数据点。",
     posterStepIndex: 2,
+  }),
+  standalone({
+    caseId: "rabbit-chaos",
+    archetypeId: "ecology.population.rabbit-chaos",
+    subject: "university_ecology",
+    domain: "biology",
+    topic: "种群生态学 · 动力系统",
+    title: "兔群与混沌 · 从秩序到蝴蝶效应",
+    description: "离散 logistic 映射：倍周期分岔、混沌、分岔图与洛伦兹蝴蝶效应",
+    prompt: "用一年一代的离散 logistic 映射讲解兔群动力学：r 从 0.5 推到 3 经历收敛、过冲、周期 2、周期 4 与混沌，用初值差 0.000001 的双轨迹演示蝴蝶效应，再用分岔图给出全景，最后以洛伦兹吸引子说明连续系统同样的可预测性上限。",
+    defaults: { r: 2.95, N0: 10 },
+    controls: [
+      { id: "r", kind: "range", label: "年增长率 r", description: "0.5 安定 → 3 深混沌", min: 0.5, max: 3, step: 0.01, resetPlayback: false },
+      { id: "N0", kind: "range", label: "初始兔群 N₀", description: "混沌区里挪一格即分道", min: 1, max: 100, step: 0.5, resetPlayback: false },
+    ],
+    requiredCapabilities: ["math_plot", "trajectory_polyline", "data_points", "phase_portrait_scene"],
+    expectedFacts: [
+      { id: "chaos-map", description: "一年一代的离散 logistic 映射", anyOf: ["N_{t+1}", "一年一代", "迭代"] },
+      { id: "chaos-doubling", description: "倍周期级联在 r≈2.57 通向混沌", anyOf: ["倍周期", "2.57", "分岔"] },
+      { id: "chaos-butterfly", description: "初值差 0.000001 被指数放大", anyOf: ["0.000001", "蝴蝶", "初值"] },
+      { id: "chaos-bifurcation-map", description: "分岔图与周期窗口", anyOf: ["分岔图", "窗口", "地图"] },
+      { id: "chaos-lorenz", description: "洛伦兹吸引子与可预测性上限", anyOf: ["洛伦兹", "两周", "吸引子"] },
+    ],
+    visualInvariants: [{
+      id: "chaos-visual",
+      description: "兔群轨迹、承载线与分岔图在同一模板内可辨认",
+      requiredSemanticRoles: ["rabbit_trajectory", "carrying_capacity", "attractor_sample"],
+      requiredStateFields: ["polylines", "points", "curves", "x_min", "x_max"],
+    }],
+    objective: "从离散化的时滞效应出发经历倍周期分岔到混沌，理解初值敏感性、分岔图全景与确定性系统的可预测性上限。",
+    builder: buildRabbitChaosGoldPlaybook,
+    mechanism: "离散反馈晚一代到账：r<2 时误差衰减，r>2 后平衡点失稳、周期翻倍，r≈2.57 之后进入混沌。",
+    mechanismByStep: {
+      "chaos-one-generation": "把 dN/dt 换成一年一步的差分 ΔN=rN(1−N/K)。r 远小于 2 时步长足够小，离散轨迹贴着连续解走，两种时间观看不出差别。",
+      "chaos-overshoot": "反馈延迟一代：N 超过 K 的代价要下一年才兑现，于是过冲、回摆。在 K 处线性化得特征乘子 1−r，|1−r|<1（即 r<2）时振荡衰减、仍然稳定。",
+      "chaos-period-two": "r>2 时 |1−r|>1，K 失稳；轨迹落进二阶迭代 f(f(N)) 的两个新不动点——高低两年交替，这是第一次倍周期分岔。",
+      "chaos-period-four": "每个循环又在更高的 r 失稳再翻倍，分岔间隔按费根鲍姆常数 δ≈4.669 收缩，所以 8、16、32 全挤在 r≈2.57 前的极窄区间里。",
+      "chaos-deep": "混沌区里轨道有界、确定、永不重复，且相邻轨道以正的李雅普诺夫指数分离——三个条件同时成立才叫混沌，缺一不可。",
+      "chaos-butterfly": "两条轨迹的间距近似按 Δ₀e^{λt} 放大。重合期只取决于初始误差的对数：误差再缩小十倍，也只多争取 ln10/λ 那几年。",
+      "chaos-bifurcation": "横轴 r、纵轴长期归宿：倍周期级联在 r≈2.57 完结进入混沌带；带内白色窗口是周期轨道短暂回归，窗口内部又是一套微缩的倍周期——自相似即分形。",
+      "chaos-lorenz-shape": "洛伦兹方程是大气对流的三模截断，ρ=28 时平衡点 C± 失稳，轨迹被拉进奇怪吸引子；三维解曲线由唯一性定理保证永不相交，交叉只是投影假象。",
+      "chaos-lorenz-divergence": "吸引子上误差按最大李雅普诺夫指数放大 Δ(t)≈Δ₀e^{λt}；对大气这对应约两周的可预测上限——是动力学性质，不是观测短板。",
+      "chaos-sandbox": "读图口诀：r<2 安定，2 到 2.57 数周期，之后看混沌带与白窗口；改 N₀ 不改变吸引子本身，只改变你落在它上面的那条路径。",
+    },
+    transfer: "把 r 停在 2.45 与 2.55 之间找周期 4 和周期 8；进混沌带后把 N₀ 挪一格，数一数轨迹几年后面目全非。",
+    posterStepIndex: 6,
   }),
 ]);

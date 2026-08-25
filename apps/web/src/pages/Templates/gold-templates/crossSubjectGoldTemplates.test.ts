@@ -15,6 +15,7 @@ describe("cross-subject public Gold Templates", () => {
       "dna-replication",
       "monsoon",
       "logistic-growth",
+      "rabbit-chaos",
     ]);
     expect(new Set(CROSS_SUBJECT_PUBLIC_GOLD_TEMPLATES.map((item) => item.subject))).toEqual(new Set([
       "computer_science",
@@ -83,6 +84,54 @@ describe("cross-subject public Gold Templates", () => {
     expect(collapsed.steps[4].voiceover_text).toContain("滑向 0");
     if (collapsed.steps[4].snapshot.kind === "math_plot") {
       expect(collapsed.steps[4].snapshot.curves[0].semantic_role).toBe("population_collapse");
+    }
+  });
+
+  it("walks the rabbit map from order to chaos and keeps the butterfly honest", () => {
+    const manifest = CROSS_SUBJECT_PUBLIC_GOLD_TEMPLATES.find(
+      (item) => item.caseId === "rabbit-chaos",
+    )!;
+    const script = manifest.buildPublicPlaybook(manifest.parameterSchema!.defaults);
+    expect(script.steps).toHaveLength(10);
+
+    // r=2.2 locks into a stable period-2 cycle: equal two years apart, far apart adjacent years.
+    const periodTwo = script.steps[2].snapshot;
+    expect(periodTwo.kind).toBe("math_plot");
+    if (periodTwo.kind === "math_plot") {
+      const tail = periodTwo.polylines![0].points.slice(-6).map(([, n]) => n);
+      expect(Math.abs(tail[5] - tail[3])).toBeLessThan(1e-6);
+      expect(Math.abs(tail[5] - tail[4])).toBeGreaterThan(100);
+    }
+
+    // Butterfly: the 1e-6 twin stays glued at year 10, then diverges to macroscopic gaps.
+    const butterfly = script.steps[5].snapshot;
+    if (butterfly.kind === "math_plot") {
+      const a = butterfly.polylines![0].points;
+      const b = butterfly.polylines![1].points;
+      expect(Math.abs(a[10][1] - b[10][1])).toBeLessThan(0.01);
+      const maxGap = Math.max(...a.map(([, n], i) => Math.abs(n - b[i][1])));
+      expect(maxGap).toBeGreaterThan(300);
+    }
+
+    // Bifurcation scatter stays inside the renderer's batched budget and the marker sits at r.
+    const bifurcation = script.steps[6].snapshot;
+    if (bifurcation.kind === "math_plot") {
+      expect(bifurcation.points!.length).toBeGreaterThan(1500);
+      expect(bifurcation.points!.length).toBeLessThan(12000);
+      expect(bifurcation.polylines![0].points[0][0]).toBeCloseTo(2.95, 9);
+    }
+
+    expect(script.steps[7].snapshot.kind).toBe("phase_portrait_scene");
+
+    // Lorenz twins: x components overlap early, then take different wings.
+    const lorenz = script.steps[8].snapshot;
+    if (lorenz.kind === "math_plot") {
+      const a = lorenz.polylines![0].points;
+      const b = lorenz.polylines![1].points;
+      const at = (line: Array<[number, number]>, t: number) => line.find(([tt]) => tt >= t)![1];
+      expect(Math.abs(at(a, 5) - at(b, 5))).toBeLessThan(0.01);
+      const maxGap = Math.max(...a.map(([, x], i) => Math.abs(x - b[i][1])));
+      expect(maxGap).toBeGreaterThan(20);
     }
   });
 

@@ -754,19 +754,33 @@ function projectGraphPoint(
   };
 }
 
-export const PhasePortraitSceneRenderer: React.FC<RendererProps> = ({ step, theme }) => {
+export const PhasePortraitSceneRenderer: React.FC<RendererProps> = ({ step, theme, progress }) => {
   const snap = step.snapshot as PhasePortraitSceneSnapshot;
   const colors = PALETTE[theme];
   const xMin = snap.x_min ?? -5;
   const xMax = snap.x_max ?? 5;
   const yMin = snap.y_min ?? -5;
   const yMax = snap.y_max ?? 5;
+  // Long precomputed trajectories (ODE solutions) draw themselves on with the
+  // step progress and use a thinner stroke so dense attractors stay legible.
+  const reveal = Math.max(0, Math.min(1, progress * 1.05));
   return (
     <Shell title={step.title} caption={snap.caption} formula={snap.formula_latex} theme={theme}>
       <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} width="100%" height="100%">
         <AxisFrame theme={theme} xMin={xMin} xMax={xMax} yMin={yMin} yMax={yMax} />
         {(snap.trajectories ?? []).map((trajectory, index) => (
-          <polyline key={index} points={pointsPath(trajectory.points, xMin, xMax, yMin, yMax)} fill="none" stroke={trajectory.emphasis === "accent" ? colors.accent : colors.primary} strokeWidth={4} />
+          <polyline
+            key={index}
+            points={pointsPath(trajectory.points, xMin, xMax, yMin, yMax)}
+            fill="none"
+            stroke={trajectory.emphasis === "accent" ? colors.accent : colors.primary}
+            strokeWidth={trajectory.points.length > 500 ? 2 : 4}
+            strokeLinejoin="round"
+            opacity={trajectory.emphasis === "secondary" ? 0.55 : 0.92}
+            pathLength={1}
+            strokeDasharray={1}
+            strokeDashoffset={1 - reveal}
+          />
         ))}
         {(snap.equilibria ?? []).map((eq, index) => (
           <g key={index}>

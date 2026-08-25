@@ -696,6 +696,7 @@ def test_scene_blueprint_compiler_builds_math_plot_from_structured_layout_input(
             {"expression": "3*x - 2", "label": "tangent slope = 3", "emphasis": "accent", "semantic_role": "tangent"},
         ],
         "points": [],
+        "polylines": [],
         "params": {"a": 3.0},
         "x_min": -2.0,
         "x_max": 2.0,
