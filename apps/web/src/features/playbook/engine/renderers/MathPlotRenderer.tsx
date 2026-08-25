@@ -521,7 +521,24 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
                 const isSecondary = c.emphasis === "secondary";
                 const shown = c.points.slice(0, Math.max(2, Math.ceil(c.points.length * reveal)));
                 const segments = toSegments(shown);
-                const lastFinite = [...shown].reverse().find((p) => Number.isFinite(p.y));
+                // Anchor the label on the visible run (a curve can exit the
+                // window), backed off from the right edge and staggered per
+                // curve so stacked labels do not collide.
+                const visible = shown.filter(
+                  (p) => Number.isFinite(p.y) && p.y >= yLo && p.y <= yHi,
+                );
+                const anchor = visible.length
+                  ? visible[Math.min(
+                      visible.length - 1,
+                      Math.floor(visible.length * (0.88 - 0.14 * (ci % 3))),
+                    )]
+                  : null;
+                const labelX = anchor
+                  ? Math.min(sx(anchor.x) + 8, MARGIN.left + PLOT_W - 6)
+                  : 0;
+                const labelY = anchor
+                  ? Math.min(Math.max(sy(anchor.y) - 8, MARGIN.top + 14), MARGIN.top + PLOT_H - 8)
+                  : 0;
                 return (
                   <g key={`curve-${ci}`} data-semantic-role={c.semanticRole ?? "curve"}>
                     {segments.map((seg, si) => (
@@ -538,10 +555,11 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
                         opacity={isSecondary ? 0.85 : 1}
                       />
                     ))}
-                    {c.label && lastFinite && (
+                    {c.label && anchor && (
                       <text
-                        x={sx(lastFinite.x) + 8}
-                        y={sy(lastFinite.y) - 6}
+                        x={labelX}
+                        y={labelY}
+                        textAnchor={labelX > MARGIN.left + PLOT_W - 90 ? "end" : "start"}
                         fontSize={13}
                         fontWeight={600}
                         fill={stroke}

@@ -505,101 +505,224 @@ function fixed(value: number, digits = 2): string {
   return Object.is(rounded, -0) ? "0" : String(rounded);
 }
 
+/**
+ * Carlson (1913) hourly yeast-culture measurements, t = 0..18 h — the classic
+ * dataset Pearl (1927) fitted with the logistic curve. The public case keeps
+ * the observations fixed; r/K/N0 are the teacher's fitting knobs.
+ */
+const CARLSON_YEAST: readonly number[] = [
+  9.6, 18.3, 29.0, 47.2, 71.1, 119.1, 174.6, 257.3, 350.7, 441.0,
+  513.3, 559.7, 594.8, 629.4, 640.8, 651.1, 655.9, 659.6, 661.8,
+];
+
+/** Least-squares exponential fit `a·e^{b·t}` over the first `count` observations. */
+function fitExponentialHead(data: readonly number[], count: number): { a: number; b: number } {
+  const head = data.slice(0, count).map((value, hour) => [hour, Math.log(value)] as const);
+  const tMean = head.reduce((sum, [t]) => sum + t, 0) / head.length;
+  const lnMean = head.reduce((sum, [, ln]) => sum + ln, 0) / head.length;
+  const b = head.reduce((sum, [t, ln]) => sum + (t - tMean) * (ln - lnMean), 0) /
+    head.reduce((sum, [t]) => sum + (t - tMean) ** 2, 0);
+  return { a: Math.exp(lnMean - b * tMean), b };
+}
+
+const CARLSON_EXP_FIT = fitExponentialHead(CARLSON_YEAST, 5);
+
+/**
+ * St. Matthew Island reindeer (Klein 1968, J. Wildl. Manage. 32:350-367),
+ * thousands of animals over years since the 1944 introduction.
+ */
+const ST_MATTHEW_REINDEER = [
+  { x: 0, y: 0.029, label: "29" },
+  { x: 13, y: 1.35, label: "1350" },
+  { x: 19, y: 6, label: "6000" },
+  { x: 22, y: 0.042, label: "42" },
+] as const;
+
+/** Retrospective logistic "prediction" through the 1944/1957 counts with K guessed at 3,000. */
+const ST_MATTHEW_GUESS_K = 3;
+const ST_MATTHEW_GUESS_G = (ST_MATTHEW_GUESS_K - 0.029) / 0.029;
+const ST_MATTHEW_GUESS_R =
+  Math.log((ST_MATTHEW_GUESS_G * 1.35) / (ST_MATTHEW_GUESS_K - 1.35)) / 13;
+
 export function buildLogisticGrowthGoldPlaybook(params: TemplatePreviewParams): PlaybookScript {
-  const r = boundedNumber(params, "r", 0.6, 0.2, 1.2);
-  const capacity = boundedNumber(params, "K", 60, 40, 100);
-  const n0 = boundedNumber(params, "N0", 6, 2, 20);
-  // N0 <= 20 < K/2 keeps G >= 1, so the inflection stays at t >= 0.
+  const r = boundedNumber(params, "r", 0.55, 0.3, 0.9);
+  const capacity = boundedNumber(params, "K", 663, 400, 900);
+  const n0 = boundedNumber(params, "N0", 9.6, 4, 30);
+  const effort = boundedNumber(params, "E", 0, 0, 0.9);
+  // N0 <= 30 << K/2 keeps G > 1, so the inflection stays at t >= 0.
   const growthGap = (capacity - n0) / n0;
   const tInflection = Math.log(growthGap) / r;
-  const t90 = Math.log(9 * growthGap) / r;
-  const xMax = Math.min(34, Math.max(8, t90 * 1.3));
+  const maxRate = (r * capacity) / 4;
+  // The observation window is fixed by the data; harvest steps get a longer run-out.
+  const dataXMax = 19;
+  const harvestXMax = 30;
+  const yTop = Math.max(capacity * 1.15, 720);
+  const observations = CARLSON_YEAST.map((value, hour) => ({
+    x: hour,
+    y: value,
+    label: hour === 0 || hour === CARLSON_YEAST.length - 1 ? fixed(value, 1) : null,
+    emphasis: "primary",
+    semantic_role: "observed_population",
+  }));
   const logisticCurve = {
-    expression: `${capacity}/(1+${fixed(growthGap, 4)}*exp(-${fixed(r, 4)}*x))`,
+    expression: `${fixed(capacity, 2)}/(1+${fixed(growthGap, 4)}*exp(-${fixed(r, 4)}*x))`,
     label: "Logistic",
     emphasis: "primary" as const,
     semantic_role: "population_curve",
   };
   const capacityLine = {
-    expression: `${capacity}`,
-    label: `K=${capacity}`,
+    expression: `${fixed(capacity, 2)}`,
+    label: `K=${fixed(capacity)}`,
     emphasis: "secondary" as const,
     semantic_role: "carrying_capacity",
   };
   const exponentialCurve = {
-    expression: `${n0}*exp(${fixed(r, 4)}*x)`,
-    label: "指数模型",
+    expression: `${fixed(CARLSON_EXP_FIT.a, 2)}*exp(${fixed(CARLSON_EXP_FIT.b, 4)}*x)`,
+    label: "指数外推",
     emphasis: "secondary" as const,
     semantic_role: "exponential_reference",
   };
+  // Constant-effort harvest keeps the model analytic: dN/dt = rN(1-N/K) - EN
+  // folds into a logistic with r_eff = r-E and K_eff = K(1-E/r); past E = r the
+  // exact solution still has closed form and decays to zero.
+  const effectiveRate = r - effort;
+  const effectiveCapacity = capacity * (1 - effort / r);
+  const harvestedCurve = (() => {
+    if (effort < 1e-9) return { ...logisticCurve, label: "无捕捞" };
+    if (effectiveRate > 1e-9) {
+      const gap = (effectiveCapacity - n0) / n0;
+      return {
+        expression: `${fixed(effectiveCapacity, 3)}/(1+${fixed(gap, 4)}*exp(-${fixed(effectiveRate, 4)}*x))`,
+        label: `捕捞 E=${fixed(effort, 3)}`,
+        emphasis: "primary" as const,
+        semantic_role: "harvested_population",
+      };
+    }
+    if (Math.abs(effectiveRate) <= 1e-9) {
+      return {
+        expression: `${fixed(n0, 3)}/(1+${fixed((r * n0) / capacity, 5)}*x)`,
+        label: `捕捞 E=${fixed(effort, 3)}`,
+        emphasis: "primary" as const,
+        semantic_role: "harvested_population",
+      };
+    }
+    const decay = effort - r;
+    const crowd = r / capacity;
+    return {
+      expression: `${fixed(decay * n0, 4)}*exp(-${fixed(decay, 4)}*x)/(${fixed(decay, 4)}+${fixed(crowd * n0, 5)}*(1-exp(-${fixed(decay, 4)}*x)))`,
+      label: `捕捞 E=${fixed(effort, 3)}`,
+      emphasis: "primary" as const,
+      semantic_role: "population_collapse",
+    };
+  })();
+  const yieldCurve = {
+    expression: `${fixed(capacity, 2)}*x*(1-x/${fixed(r, 4)})`,
+    label: "Y(E)",
+    emphasis: "primary" as const,
+    semantic_role: "sustainable_yield",
+  };
+  const stMatthewPrediction = {
+    expression: `${ST_MATTHEW_GUESS_K}/(1+${fixed(ST_MATTHEW_GUESS_G, 3)}*exp(-${fixed(ST_MATTHEW_GUESS_R, 4)}*x))`,
+    label: "logistic 预测",
+    emphasis: "secondary" as const,
+    semantic_role: "model_prediction",
+  };
   const plot = (args: {
     curves: MathPlotSnapshot["curves"];
+    points?: MathPlotSnapshot["points"];
     marker?: number;
     shade?: readonly [number, number];
     caption: string;
     formula: string;
+    window?: { xMax: number; yMax: number; xLabel: string; yLabel: string };
   }): MathPlotSnapshot => ({
     kind: "math_plot",
     pack_id: "math-basic",
     curves: args.curves,
+    points: args.points,
     x_min: 0,
-    x_max: xMax,
+    x_max: args.window?.xMax ?? dataXMax,
     y_min: 0,
-    y_max: capacity * 1.15,
+    y_max: args.window?.yMax ?? yTop,
     marker_x: args.marker ?? null,
     shade_from: args.shade?.[0] ?? null,
     shade_to: args.shade?.[1] ?? null,
-    x_label: "时间 t",
-    y_label: "种群数量 N",
+    x_label: args.window?.xLabel ?? "时间 t（小时）",
+    y_label: args.window?.yLabel ?? "酵母量 N",
     formula_latex: args.formula,
     caption: args.caption,
   });
   const steps = [
-    sceneStep(0, "logistic-exponential-question", "观察目标：种群会一直翻倍下去吗", `先做最理想的假设：资源无限，人均增长率恒为 r=${fixed(r)}。方程 dN/dt=rN 解出指数曲线，一路上冲——但任何真实环境都养不下无限的种群。`, plot({
-      curves: [{ ...exponentialCurve, emphasis: "primary" }],
-      caption: "理想条件下的指数模型：没有任何东西限制增长。",
-      formula: String.raw`\frac{dN}{dt}=rN\ \Rightarrow\ N(t)=N_0e^{rt}`,
+    sceneStep(0, "logistic-data-puzzle", "先看数据：增长为什么停了", "1913 年，生物学家 Carlson 每小时测一次培养瓶里的酵母量。前 5 个小时它每小时都涨六成以上——照这个势头外推，第 18 小时应该超过七万。可真实的记录在 663 附近停住了。是什么按住了它？", plot({
+      curves: [exponentialCurve],
+      points: observations,
+      caption: "1913 年，Carlson 每小时记录一次培养瓶里的酵母量。",
+      formula: String.raw`N(t)\overset{?}{=}${fixed(CARLSON_EXP_FIT.a, 1)}\,e^{${fixed(CARLSON_EXP_FIT.b, 3)}t}`,
     })),
-    sceneStep(1, "logistic-carrying-capacity", "引入环境容量：把有限资源写进方程", `引入环境容量 K=${capacity}：在增长率上乘一个 (1−N/K)。种群离 K 越近，这个因子越接近 0，增长就被资源拉住。`, plot({
-      curves: [exponentialCurve, { ...capacityLine, emphasis: "primary" }],
-      caption: "K 是这片环境能长期承载的最大数量。",
-      formula: String.raw`\frac{dN}{dt}=rN\left(1-\frac NK\right),\quad K=${capacity}`,
+    sceneStep(1, "logistic-density-dependence", "刹车项：密度制约", "是拥挤本身。瓶里的糖被越来越多的细胞分食，人均资源随 N 下降——写成最简单的形式：人均增长率从 r 线性降到 0，即给 rN 乘上刹车项 (1−N/K)。K 就是这瓶环境长期养得起的上限。", plot({
+      curves: [exponentialCurve, capacityLine],
+      points: observations,
+      caption: "K：这瓶培养液长期养得起的最大数量。",
+      formula: String.raw`\frac{dN}{dt}=rN\left(1-\frac NK\right)`,
     })),
-    sceneStep(2, "logistic-s-curve", "S 形曲线：慢、快、慢", `解出的曲线是 S 形：开始几乎与指数模型重合，中段增长最快，最后水平逼近 K=${capacity}。它与指数曲线拉开的差距，正是资源限制的代价。`, plot({
+    sceneStep(2, "logistic-s-curve", "S 曲线穿过数据", `方程解出的 S 形曲线，用三个数就穿过全部 19 个观测：r=${fixed(r, 2)}、K=${fixed(capacity)}、N₀=${fixed(n0, 1)}。前段贴着指数走，后段贴着 K 放平。把右侧参数拖离这组值，曲线会当着你的面离开数据点——拟合就是这种感觉。`, plot({
       curves: [logisticCurve, capacityLine, exponentialCurve],
-      marker: tInflection,
-      caption: "前段贴着指数走，后段贴着 K 放平。",
-      formula: String.raw`N(t)=\dfrac{K}{1+${fixed(growthGap, 2)}\,e^{-${fixed(r)}t}}`,
+      points: observations,
+      caption: "数据点固定不动；r、K、N₀ 是你手里的拟合旋钮。",
+      formula: String.raw`N(t)=\dfrac{K}{1+${fixed(growthGap, 1)}\,e^{-${fixed(r, 2)}t}}`,
     })),
-    sceneStep(3, "logistic-inflection", "拐点：增长最快的时刻", `拐点出现在 t≈${fixed(tInflection, 1)}：此时种群恰好是容量的一半（N=${fixed(capacity / 2)}），瞬时增长率达到最大 rK/4=${fixed((r * capacity) / 4, 1)}。这解释了为什么种群管理常盯住"半容量"阶段。`, plot({
+    sceneStep(3, "logistic-inflection", "拐点：半满时最快", `增长最快的时刻不在种群最多的时候，而在恰好半满：N=K/2=${fixed(capacity / 2)} 时瞬时增长率到达最大值 rK/4=${fixed(maxRate, 1)}，对应 t≈${fixed(tInflection, 1)}。记住 rK/4 这个数——两步之后它会换一个身份出场。`, plot({
       curves: [logisticCurve, capacityLine],
+      points: observations,
       marker: tInflection,
       shade: [Math.max(0, tInflection - 0.8), tInflection + 0.8],
-      caption: "最大瞬时增长出现在种群到达一半容量时。",
-      formula: String.raw`N=\frac K2=${fixed(capacity / 2)}\ \text{时}\ \frac{dN}{dt}\Big|_{max}=\frac{rK}{4}=${fixed((r * capacity) / 4, 1)}`,
+      caption: "拐点：种群到达一半容量的时刻。",
+      formula: String.raw`N=\frac K2\ \text{时}\ \frac{dN}{dt}\Big|_{\max}=\frac{rK}{4}=${fixed(maxRate, 1)}`,
     })),
-    sceneStep(4, "logistic-parameters", "改变 r 与 N₀：改变过程，不改变终点", `当前参数下到达 90% 容量约需 t≈${fixed(t90, 1)}。把 r 调大，曲线更陡、更早放平；改 N₀ 只是挪动起跑线——只要 r>0，终点始终是 K。`, plot({
-      curves: [logisticCurve, capacityLine],
-      marker: t90,
-      caption: "r 决定多快贴上 K；N₀ 只平移起点。",
-      formula: String.raw`t_{90\%K}\approx${fixed(t90, 1)}`,
+    sceneStep(4, "logistic-harvest", "决策实验：开始捕捞", effort < 1e-9
+      ? "现在把模型变成决策工具：以恒定努力捕捞，每小时捞走 E·N。方程只多一项 −EN，合并后仍是 logistic——增长率降为 r−E，平衡点从 K 降到 K(1−E/r)。把右侧的捕捞强度 E 拖起来，看看种群把新家安在哪里。"
+      : effectiveRate > 1e-9
+        ? `捕捞强度 E=${fixed(effort, 3)}：有效增长率降到 r−E=${fixed(effectiveRate, 3)}，种群不再回到 K=${fixed(capacity)}，而是停在更低的新平衡 K(1−E/r)≈${fixed(effectiveCapacity, 0)}。捞得越狠，家搬得越低——但只要 E<r，它仍能停住。`
+        : `捕捞强度 E=${fixed(effort, 3)} 已不低于 r=${fixed(r, 2)}：增长追不上捕捞，方程失去正平衡点，任何起点都单调滑向 0。这不是运气差，是参数的必然。`, plot({
+      curves: effort < 1e-9
+        ? [harvestedCurve, capacityLine]
+        : [harvestedCurve, { ...logisticCurve, emphasis: "secondary" as const, label: "无捕捞对照" }, capacityLine],
+      window: { xMax: harvestXMax, yMax: yTop, xLabel: "时间 t", yLabel: "种群数量 N" },
+      caption: "恒定努力捕捞：−EN 并入方程后仍可解析求解。",
+      formula: String.raw`\frac{dN}{dt}=rN\left(1-\frac NK\right)-EN`,
     })),
-    sceneStep(5, "logistic-boundary", "总结与边界：模型是骨架", "Logistic 模型抓住了增长受密度制约这一核心机制。真实种群还会有波动、时滞和随机干扰——它们都是在这条 S 形骨架上生长出来的偏离，所以先把骨架本身看清楚。", plot({
+    sceneStep(5, "logistic-msy", "最大可持续产量：rK/4 的第二次出场", `换个问题：长期每小时最多能捞走多少？平衡时的产量 Y=E·K(1−E/r) 是一条开口向下的抛物线，在 E=r/2=${fixed(r / 2, 3)} 处到顶，最大值恰好是 rK/4=${fixed(maxRate, 1)}——拐点处那个最大再生产速度，就是渔场的天花板。站在顶点还意味着：E 再大一点点，产量和种群就一起下坡。`, plot({
+      curves: [yieldCurve, { expression: `${fixed(maxRate, 2)}`, label: `rK/4=${fixed(maxRate, 1)}`, emphasis: "secondary" as const, semantic_role: "yield_ceiling" }],
+      marker: effort > 1e-9 && effort < r ? effort : r / 2,
+      window: { xMax: r * 1.08, yMax: maxRate * 1.25, xLabel: "捕捞强度 E", yLabel: "可持续产量 Y" },
+      caption: "第 4 步的 rK/4 在这里换了身份：可持续捕捞的上限。",
+      formula: String.raw`Y_{\max}=\frac{rK}{4}=${fixed(maxRate, 1)}\ \text{在}\ E=\frac r2`,
+    })),
+    sceneStep(6, "logistic-st-matthew", "圣马修岛：模型的边界", "1944 年，29 只驯鹿被引入白令海的圣马修岛。按前 13 年的增长拟合 logistic、把 K 猜成 3000，模型预言种群平滑贴向天花板。现实是：1963 年夏数到 6000 只，随后一个严冬几乎全数饿死，1966 年只剩 42 只。不是方程算错了，是它的前提塌了——驯鹿吃光了再生要几十年的地衣，K 本身崩了，而模型假设 K 永远不变。", plot({
+      curves: [stMatthewPrediction, { expression: `${ST_MATTHEW_GUESS_K}`, label: "K 的猜测", emphasis: "secondary" as const, semantic_role: "carrying_capacity" }],
+      points: ST_MATTHEW_REINDEER.map((point) => ({ ...point, emphasis: "accent", semantic_role: "observed_population" })),
+      window: { xMax: 28, yMax: 7, xLabel: "1944 年起算的年数", yLabel: "驯鹿数量（千只）" },
+      caption: "数据：Klein (1968)。纵轴单位：千只。",
+      formula: String.raw`K\neq\text{常数}`,
+    })),
+    sceneStep(7, "logistic-skeleton", "模型是骨架", "回到酵母。Logistic 抓住的是密度制约这一根骨架：数据里长出的波动、时滞，圣马修岛那样的过冲崩溃，都是骨架上的偏离项。会用模型的意思，是同时知道它何时成立、何时失效。下一课把时间切成一年一代——同一个方程，会自己长出混沌。", plot({
       curves: [logisticCurve, capacityLine],
-      caption: "真实种群的波动与时滞，都长在这条骨架上。",
+      points: observations,
+      caption: "骨架看清了，偏离才有处安放。下一课：离散时间与混沌。",
       formula: String.raw`\boxed{\dfrac{dN}{dt}=rN\left(1-\dfrac NK\right)}`,
     })),
   ];
   return playbook(
     "biology",
     "种群增长 · Logistic 模型",
-    "从指数假设到环境容量：S 形曲线、K/2 拐点与参数的作用。",
+    "从 Carlson 的酵母数据到捕捞决策：拟合、拐点、rK/4 与模型的边界。",
     "ecology_logistic_growth",
     steps,
     [
-      { id: "r", label: "内禀增长率 r", value: fixed(r), description: "0.2 到 1.2" },
-      { id: "K", label: "环境容量 K", value: fixed(capacity), description: "40 到 100" },
-      { id: "N0", label: "初始种群 N₀", value: fixed(n0), description: "2 到 20" },
+      { id: "r", label: "内禀增长率 r", value: fixed(r, 2), description: "0.3 到 0.9；拟合值 0.55" },
+      { id: "K", label: "环境容量 K", value: fixed(capacity), description: "400 到 900；拟合值 663" },
+      { id: "N0", label: "初始种群 N₀", value: fixed(n0, 1), description: "4 到 30；观测值 9.6" },
+      { id: "E", label: "捕捞强度 E", value: fixed(effort, 3), description: "0 到 0.9；E≥r 时种群崩溃" },
     ],
   );
 }
@@ -772,39 +895,45 @@ export const CROSS_SUBJECT_PUBLIC_GOLD_TEMPLATES: readonly GoldTemplateManifest[
     domain: "biology",
     topic: "种群生态学",
     title: "种群增长 · Logistic 模型",
-    description: "从指数假设到环境容量：S 形曲线、K/2 拐点与参数的作用",
-    prompt: "用 Logistic 模型讲解种群增长：从指数假设出发引入环境容量 K，解释 S 形曲线、K/2 拐点与 r、N₀ 的作用。",
-    defaults: { r: 0.6, K: 60, N0: 6 },
+    description: "Carlson 酵母数据、S 形拟合、捕捞决策与圣马修岛：从数据到模型边界",
+    prompt: "从 Carlson 1913 年酵母数据出发讲解 Logistic 模型：检验指数假设、拟合 S 形曲线、定位 K/2 拐点，引入恒定努力捕捞推导最大可持续产量 rK/4，并用圣马修岛驯鹿说明模型失效的边界。",
+    defaults: { r: 0.55, K: 663, N0: 9.6, E: 0 },
     controls: [
-      { id: "r", kind: "range", label: "内禀增长率 r", description: "决定逼近 K 的快慢", min: 0.2, max: 1.2, step: 0.05, resetPlayback: false },
-      { id: "K", kind: "range", label: "环境容量 K", description: "长期可承载的最大数量", min: 40, max: 100, step: 5, resetPlayback: false },
-      { id: "N0", kind: "range", label: "初始种群 N₀", description: "起始数量", min: 2, max: 20, step: 1, resetPlayback: false },
+      { id: "r", kind: "range", label: "内禀增长率 r", description: "拟合值 0.55；决定坡度", min: 0.3, max: 0.9, step: 0.01, resetPlayback: false },
+      { id: "K", kind: "range", label: "环境容量 K", description: "拟合值 663；数据的天花板", min: 400, max: 900, step: 1, resetPlayback: false },
+      { id: "N0", kind: "range", label: "初始种群 N₀", description: "观测值 9.6；只挪起点", min: 4, max: 30, step: 0.1, resetPlayback: false },
+      { id: "E", kind: "range", label: "捕捞强度 E", description: "E=r/2 产量最大；E≥r 崩溃", min: 0, max: 0.9, step: 0.005, resetPlayback: false },
     ],
-    requiredCapabilities: ["math_plot", "expression_curve", "curve_marker"],
+    requiredCapabilities: ["math_plot", "expression_curve", "curve_marker", "data_points"],
     expectedFacts: [
       { id: "logistic-equation", description: "密度制约的增长方程", anyOf: ["rN(1−N/K)", "rN(1-N/K)", "dN/dt=rN"] },
+      { id: "logistic-data-first", description: "以 Carlson 1913 酵母数据开场并检验指数假设", anyOf: ["Carlson", "1913", "酵母"] },
       { id: "logistic-capacity", description: "环境容量 K 的含义", anyOf: ["环境容量", "承载", "K"] },
       { id: "logistic-inflection", description: "拐点在 K/2，最大增长率 rK/4", anyOf: ["K 的一半", "K/2", "rK/4"] },
+      { id: "logistic-msy", description: "最大可持续产量 rK/4 出现在 E=r/2", anyOf: ["rK/4", "E=r/2", "可持续产量"] },
+      { id: "logistic-model-limits", description: "圣马修岛：K 非常数导致过冲—崩溃", anyOf: ["圣马修", "K 本身", "42"] },
       { id: "logistic-shape", description: "解曲线为 S 形", anyOf: ["S 形", "logistic", "Logistic"] },
     ],
     visualInvariants: [{
       id: "logistic-visual",
-      description: "Logistic 曲线、环境容量线与拐点标记同屏可辨认",
-      requiredSemanticRoles: ["population_curve", "carrying_capacity"],
-      requiredStateFields: ["curves", "x_min", "x_max", "marker_x"],
+      description: "观测数据点、Logistic 曲线与环境容量线同屏可辨认",
+      requiredSemanticRoles: ["population_curve", "carrying_capacity", "observed_population"],
+      requiredStateFields: ["curves", "points", "x_min", "x_max", "marker_x"],
     }],
-    objective: "由密度制约机制推导 S 形增长曲线，并定位 K/2 拐点与参数的作用。",
+    objective: "从真实数据出发拟合 logistic，定位 K/2 拐点，推导最大可持续产量 rK/4，并识别模型失效的边界。",
     builder: buildLogisticGrowthGoldPlaybook,
     mechanism: "S 形来自两股力的接力：前期 rN 主导（加速），越过 K/2 后 (1−N/K) 主导（减速）。",
     mechanismByStep: {
-      "logistic-exponential-question": "在 dN/dt=rN 里增长率与 N 成正比，解就是指数函数；它只在资源不设限的理想假设下成立。",
-      "logistic-carrying-capacity": "乘上 (1−N/K) 后，N 很小时方程近似 rN，N 接近 K 时增长率趋于 0——一个因子同时保住两端的行为。",
-      "logistic-s-curve": "S 形来自两股力的接力：前期 rN 主导（加速），越过 K/2 后 (1−N/K) 主导（减速）。",
-      "logistic-inflection": "把 dN/dt=rN(1−N/K) 看成 N 的二次函数，它在 N=K/2 处取最大值 rK/4——求导即可验证的极值。",
-      "logistic-parameters": "r 只出现在指数项里，决定逼近 K 的速率；平衡点由 dN/dt=0 给出 N=K，与 r、N₀ 无关。",
-      "logistic-boundary": "波动、时滞、Allee 效应等真实偏离，都是在这套方程骨架上修改某一项得到的，所以先掌握骨架。",
+      "logistic-data-puzzle": "对前 5 个点做 ln N 对 t 的最小二乘回归得 N≈10.4e^{0.495t}；它对前 6 小时误差很小，从第 7 小时起系统性高估——偏差单调放大，说明缺的不是精度，是机制。",
+      "logistic-density-dependence": "资源人均份额随 N 下降，人均增长率 (1/N)dN/dt 近似线性递减为 r(1−N/K)——这是对数据最简的机制假设，也是仍能解析求解的形式。",
+      "logistic-s-curve": "把 dN/dt=rN(1−N/K) 分离变量积分，得 N(t)=K/(1+Ge^{−rt})，G=(K−N₀)/N₀。三个参数各管一件事：N₀ 定起点，r 定坡度，K 定天花板。",
+      "logistic-inflection": "dN/dt 是 N 的二次函数 rN−rN²/K，在 N=K/2 取极大 rK/4；换到时间轴上就是 t=ln G/r 处曲线最陡。",
+      "logistic-harvest": "恒定努力收获项 −EN 与 rN 同形，合并后方程仍是 logistic：r_eff=r−E、K_eff=K(1−E/r)。E≥r 时增长项被吞掉，任何初值都单调衰减到 0，且仍有闭式解。",
+      "logistic-msy": "平衡点 N*=K(1−E/r) 处产量 Y=EN*=KE(1−E/r)，对 E 求导得极值 E=r/2，代回得 Y_max=rK/4——与拐点最大增速同值并非巧合：可持续捕捞的上限就是种群的最大再生产速度。",
+      "logistic-st-matthew": "logistic 假设 K 恒定且响应即时；驯鹿的食物（地衣）再生以十年计，种群冲过真实承载力时把 K 不可逆地压低，再叠加 1963-64 的极端积雪，于是出现过冲—崩溃而非渐近。数据出处 Klein (1968)。",
+      "logistic-skeleton": "时滞（延迟方程）、随机扰动、Allee 效应、K(t) 动态，都是往骨架上加一项得到的扩展；判断模型的适用边界与会解方程同等重要。",
     },
-    transfer: "把 r、K、N₀ 各拖一遍：检查终点是否始终贴住 K，拐点是否始终出现在 K/2。",
+    transfer: "先把 E 拖到 r/2 看产量到顶、拖过 r 看崩溃；再回第 3 步把 r、K 拖离拟合值，检查曲线怎样离开数据点。",
     posterStepIndex: 2,
   }),
 ]);

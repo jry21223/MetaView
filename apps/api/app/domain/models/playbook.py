@@ -136,17 +136,29 @@ class MathPlotCurve(BaseModel):
     semantic_role: str | None = None
 
 
+class MathPlotPoint(BaseModel):
+    """A fixed data point overlaid on a math function plot (measured observations)."""
+
+    x: float
+    y: float
+    label: str | None = None
+    emphasis: str = "primary"  # primary | secondary | accent
+    semantic_role: str | None = None
+
+
 class MathPlotSnapshot(BaseModel):
     """Cartesian function / curve plot (math domain).
 
-    Carries formula strings — not sampled points — so the renderer controls
+    Curves carry formula strings — not sampled points — so the renderer controls
     resolution and can animate the curve being drawn from the step ``progress``.
+    ``points`` overlays discrete observations (experiment records) on top.
     """
 
     kind: Literal["math_plot"] = "math_plot"
     pack_id: str | None = None
     asset_id: str | None = None
     curves: list[MathPlotCurve] = Field(default_factory=list)
+    points: list[MathPlotPoint] = Field(default_factory=list)
     params: dict[str, float] = Field(default_factory=dict)
     x_min: float = -10.0
     x_max: float = 10.0

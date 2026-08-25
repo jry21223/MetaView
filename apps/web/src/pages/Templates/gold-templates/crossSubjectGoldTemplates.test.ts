@@ -25,26 +25,65 @@ describe("cross-subject public Gold Templates", () => {
     ]));
   });
 
-  it("teaches logistic growth with the inflection at half capacity", () => {
+  it("teaches logistic growth from Carlson's data to harvest decisions", () => {
     const manifest = CROSS_SUBJECT_PUBLIC_GOLD_TEMPLATES.find(
       (item) => item.caseId === "logistic-growth",
     )!;
-    const script = manifest.buildPublicPlaybook({ r: 0.6, K: 60, N0: 6 });
-    const followups = manifest.buildFollowups({ r: 0.6, K: 60, N0: 6 }, script);
+    const defaults = manifest.parameterSchema!.defaults;
+    const script = manifest.buildPublicPlaybook(defaults);
+    const followups = manifest.buildFollowups(defaults, script);
 
-    const inflection = script.steps[3];
-    expect(inflection.voiceover_text).toContain("rK/4=9");
-    expect(inflection.voiceover_text).toContain("N=30");
-    // G=(60-6)/6=9, tInf=ln9/0.6≈3.66, t90=ln81/0.6≈7.32
-    expect(script.steps[3].snapshot.kind).toBe("math_plot");
-    if (script.steps[3].snapshot.kind === "math_plot") {
-      expect(script.steps[3].snapshot.marker_x).toBeCloseTo(Math.log(9) / 0.6, 6);
-      expect(script.steps[3].snapshot.curves[0].semantic_role).toBe("population_curve");
+    expect(script.steps).toHaveLength(8);
+    const puzzle = script.steps[0].snapshot;
+    expect(puzzle.kind).toBe("math_plot");
+    if (puzzle.kind === "math_plot") {
+      expect(puzzle.points).toHaveLength(19);
+      expect(puzzle.points?.[0]).toMatchObject({ x: 0, y: 9.6 });
+      expect(puzzle.points?.at(-1)).toMatchObject({ x: 18, y: 661.8 });
+      expect(puzzle.curves[0].semantic_role).toBe("exponential_reference");
     }
-    expect(script.steps[4].voiceover_text).toContain("t≈7.3");
+
+    // G=(663-9.6)/9.6≈68.06, tInf=ln(G)/r≈7.67, rK/4=91.1625
+    const inflection = script.steps[3];
+    expect(inflection.voiceover_text).toContain("rK/4=91.2");
+    if (inflection.snapshot.kind === "math_plot") {
+      expect(inflection.snapshot.marker_x).toBeCloseTo(Math.log((663 - 9.6) / 9.6) / 0.55, 6);
+      expect(inflection.snapshot.curves[0].semantic_role).toBe("population_curve");
+    }
+
+    const msy = script.steps[5];
+    expect(msy.voiceover_text).toContain("E=r/2=0.275");
+    if (msy.snapshot.kind === "math_plot") {
+      expect(msy.snapshot.marker_x).toBeCloseTo(0.275, 9);
+      expect(msy.snapshot.x_label).toBe("捕捞强度 E");
+    }
+
+    const stMatthew = script.steps[6];
+    expect(stMatthew.voiceover_text).toContain("6000");
+    expect(stMatthew.voiceover_text).toContain("42");
+    if (stMatthew.snapshot.kind === "math_plot") {
+      expect(stMatthew.snapshot.points).toHaveLength(4);
+      expect(stMatthew.snapshot.points?.at(-1)).toMatchObject({ x: 22, y: 0.042 });
+      expect(stMatthew.snapshot.y_max).toBe(7);
+    }
+
     expect(script.steps.at(-1)?.voiceover_text).toContain("骨架");
-    expect(followups["logistic-inflection"][1].answer).toContain("rK/4");
-    expect(followups["logistic-parameters"][1].answer).toContain("N=K");
+    expect(followups["logistic-msy"][1].answer).toContain("rK/4");
+    expect(followups["logistic-st-matthew"][1].answer).toContain("Klein");
+
+    const harvested = manifest.buildPublicPlaybook({ ...defaults, E: 0.2 });
+    const harvestStep = harvested.steps[4];
+    // K_eff = 663·(1−0.2/0.55) ≈ 422
+    expect(harvestStep.voiceover_text).toContain("422");
+    if (harvestStep.snapshot.kind === "math_plot") {
+      expect(harvestStep.snapshot.curves[0].semantic_role).toBe("harvested_population");
+    }
+
+    const collapsed = manifest.buildPublicPlaybook({ ...defaults, E: 0.7 });
+    expect(collapsed.steps[4].voiceover_text).toContain("滑向 0");
+    if (collapsed.steps[4].snapshot.kind === "math_plot") {
+      expect(collapsed.steps[4].snapshot.curves[0].semantic_role).toBe("population_collapse");
+    }
   });
 
   it("keeps every case structurally complete and every follow-up local to a step", () => {
