@@ -22,7 +22,8 @@ export type GoldTemplateSubject =
   | "computer_science"
   | "high_school_chemistry"
   | "high_school_biology"
-  | "high_school_geography";
+  | "high_school_geography"
+  | "university_ecology";
 
 export interface ExpectedFact {
   readonly id: string;

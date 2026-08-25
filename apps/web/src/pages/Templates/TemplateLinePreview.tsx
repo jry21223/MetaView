@@ -76,6 +76,14 @@ const LINE_PREVIEWS: Record<TemplatePreviewCaseId, ReactNode> = {
       <circle className="is-accent" cx="83" cy="28" r="3.5" />
     </svg>
   ),
+  "logistic-growth": (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="logistic-growth">
+      <path className="is-guide" d="M14 46h132M14 46V8" />
+      <path className="is-guide is-dashed" d="M14 14h132" data-object="carrying-capacity" />
+      <path className="is-accent" d="M14 44c28 0 30-26 62-28 26-1.6 40-1.9 70-2" data-object="population-curve" />
+      <circle className="is-accent" cx="76" cy="29" r="3" data-object="inflection" />
+    </svg>
+  ),
   "ellipse-string-construction": (
     <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="ellipse-string-construction">
       <ellipse className="is-guide" cx="80" cy="30" rx="52" ry="18" data-object="conic" />

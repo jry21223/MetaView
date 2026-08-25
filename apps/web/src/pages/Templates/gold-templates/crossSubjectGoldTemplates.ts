@@ -2,6 +2,7 @@ import type {
   BioProcessSceneSnapshot,
   CodeTraceSceneSnapshot,
   GeoMapSceneSnapshot,
+  MathPlotSnapshot,
   MetaStep,
   PlaybookScript,
   ReactionSceneSnapshot,
@@ -484,10 +485,129 @@ export function buildMonsoonGoldPlaybook(params: TemplatePreviewParams): Playboo
   );
 }
 
+// ---------------------------------------------------------------------------
+// Ecology · Logistic population growth (university pilot)
+
+function boundedNumber(
+  params: TemplatePreviewParams,
+  key: string,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  const value = Number(params[key]);
+  const finite = Number.isFinite(value) ? value : fallback;
+  return Math.min(max, Math.max(min, finite));
+}
+
+function fixed(value: number, digits = 2): string {
+  const rounded = Number(value.toFixed(digits));
+  return Object.is(rounded, -0) ? "0" : String(rounded);
+}
+
+export function buildLogisticGrowthGoldPlaybook(params: TemplatePreviewParams): PlaybookScript {
+  const r = boundedNumber(params, "r", 0.6, 0.2, 1.2);
+  const capacity = boundedNumber(params, "K", 60, 40, 100);
+  const n0 = boundedNumber(params, "N0", 6, 2, 20);
+  // N0 <= 20 < K/2 keeps G >= 1, so the inflection stays at t >= 0.
+  const growthGap = (capacity - n0) / n0;
+  const tInflection = Math.log(growthGap) / r;
+  const t90 = Math.log(9 * growthGap) / r;
+  const xMax = Math.min(34, Math.max(8, t90 * 1.3));
+  const logisticCurve = {
+    expression: `${capacity}/(1+${fixed(growthGap, 4)}*exp(-${fixed(r, 4)}*x))`,
+    label: "Logistic",
+    emphasis: "primary" as const,
+    semantic_role: "population_curve",
+  };
+  const capacityLine = {
+    expression: `${capacity}`,
+    label: `K=${capacity}`,
+    emphasis: "secondary" as const,
+    semantic_role: "carrying_capacity",
+  };
+  const exponentialCurve = {
+    expression: `${n0}*exp(${fixed(r, 4)}*x)`,
+    label: "指数模型",
+    emphasis: "secondary" as const,
+    semantic_role: "exponential_reference",
+  };
+  const plot = (args: {
+    curves: MathPlotSnapshot["curves"];
+    marker?: number;
+    shade?: readonly [number, number];
+    caption: string;
+    formula: string;
+  }): MathPlotSnapshot => ({
+    kind: "math_plot",
+    pack_id: "math-basic",
+    curves: args.curves,
+    x_min: 0,
+    x_max: xMax,
+    y_min: 0,
+    y_max: capacity * 1.15,
+    marker_x: args.marker ?? null,
+    shade_from: args.shade?.[0] ?? null,
+    shade_to: args.shade?.[1] ?? null,
+    x_label: "时间 t",
+    y_label: "种群数量 N",
+    formula_latex: args.formula,
+    caption: args.caption,
+  });
+  const steps = [
+    sceneStep(0, "logistic-exponential-question", "观察目标：种群会一直翻倍下去吗", `先做最理想的假设：资源无限，人均增长率恒为 r=${fixed(r)}。方程 dN/dt=rN 解出指数曲线，一路上冲——但任何真实环境都养不下无限的种群。`, plot({
+      curves: [{ ...exponentialCurve, emphasis: "primary" }],
+      caption: "理想条件下的指数模型：没有任何东西限制增长。",
+      formula: String.raw`\frac{dN}{dt}=rN\ \Rightarrow\ N(t)=N_0e^{rt}`,
+    })),
+    sceneStep(1, "logistic-carrying-capacity", "引入环境容量：把有限资源写进方程", `引入环境容量 K=${capacity}：在增长率上乘一个 (1−N/K)。种群离 K 越近，这个因子越接近 0，增长就被资源拉住。`, plot({
+      curves: [exponentialCurve, { ...capacityLine, emphasis: "primary" }],
+      caption: "K 是这片环境能长期承载的最大数量。",
+      formula: String.raw`\frac{dN}{dt}=rN\left(1-\frac NK\right),\quad K=${capacity}`,
+    })),
+    sceneStep(2, "logistic-s-curve", "S 形曲线：慢、快、慢", `解出的曲线是 S 形：开始几乎与指数模型重合，中段增长最快，最后水平逼近 K=${capacity}。它与指数曲线拉开的差距，正是资源限制的代价。`, plot({
+      curves: [logisticCurve, capacityLine, exponentialCurve],
+      marker: tInflection,
+      caption: "前段贴着指数走，后段贴着 K 放平。",
+      formula: String.raw`N(t)=\dfrac{K}{1+${fixed(growthGap, 2)}\,e^{-${fixed(r)}t}}`,
+    })),
+    sceneStep(3, "logistic-inflection", "拐点：增长最快的时刻", `拐点出现在 t≈${fixed(tInflection, 1)}：此时种群恰好是容量的一半（N=${fixed(capacity / 2)}），瞬时增长率达到最大 rK/4=${fixed((r * capacity) / 4, 1)}。这解释了为什么种群管理常盯住"半容量"阶段。`, plot({
+      curves: [logisticCurve, capacityLine],
+      marker: tInflection,
+      shade: [Math.max(0, tInflection - 0.8), tInflection + 0.8],
+      caption: "最大瞬时增长出现在种群到达一半容量时。",
+      formula: String.raw`N=\frac K2=${fixed(capacity / 2)}\ \text{时}\ \frac{dN}{dt}\Big|_{max}=\frac{rK}{4}=${fixed((r * capacity) / 4, 1)}`,
+    })),
+    sceneStep(4, "logistic-parameters", "改变 r 与 N₀：改变过程，不改变终点", `当前参数下到达 90% 容量约需 t≈${fixed(t90, 1)}。把 r 调大，曲线更陡、更早放平；改 N₀ 只是挪动起跑线——只要 r>0，终点始终是 K。`, plot({
+      curves: [logisticCurve, capacityLine],
+      marker: t90,
+      caption: "r 决定多快贴上 K；N₀ 只平移起点。",
+      formula: String.raw`t_{90\%K}\approx${fixed(t90, 1)}`,
+    })),
+    sceneStep(5, "logistic-boundary", "总结与边界：模型是骨架", "Logistic 模型抓住了增长受密度制约这一核心机制。真实种群还会有波动、时滞和随机干扰——它们都是在这条 S 形骨架上生长出来的偏离，所以先把骨架本身看清楚。", plot({
+      curves: [logisticCurve, capacityLine],
+      caption: "真实种群的波动与时滞，都长在这条骨架上。",
+      formula: String.raw`\boxed{\dfrac{dN}{dt}=rN\left(1-\dfrac NK\right)}`,
+    })),
+  ];
+  return playbook(
+    "biology",
+    "种群增长 · Logistic 模型",
+    "从指数假设到环境容量：S 形曲线、K/2 拐点与参数的作用。",
+    "ecology_logistic_growth",
+    steps,
+    [
+      { id: "r", label: "内禀增长率 r", value: fixed(r), description: "0.2 到 1.2" },
+      { id: "K", label: "环境容量 K", value: fixed(capacity), description: "40 到 100" },
+      { id: "N0", label: "初始种群 N₀", value: fixed(n0), description: "2 到 20" },
+    ],
+  );
+}
+
 function standalone(args: {
   caseId: string;
   archetypeId: string;
-  subject: "computer_science" | "high_school_chemistry" | "high_school_biology" | "high_school_geography";
+  subject: "computer_science" | "high_school_chemistry" | "high_school_biology" | "high_school_geography" | "university_ecology";
   domain: string;
   topic: string;
   title: string;
@@ -501,6 +621,7 @@ function standalone(args: {
   objective: string;
   builder: (params: TemplatePreviewParams) => PlaybookScript;
   mechanism: string;
+  mechanismByStep?: Record<string, string>;
   transfer: string;
   posterStepIndex?: number;
 }): GoldTemplateManifest {
@@ -531,7 +652,7 @@ function standalone(args: {
     buildPublicPlaybook: args.builder,
     buildFollowups: (_params, script) => followups(
       script,
-      () => args.mechanism,
+      (step) => args.mechanismByStep?.[step.step_id] ?? args.mechanism,
       args.transfer,
     ),
   });
@@ -643,5 +764,47 @@ export const CROSS_SUBJECT_PUBLIC_GOLD_TEMPLATES: readonly GoldTemplateManifest[
     mechanism: "海陆热容量差异造成季节性气压差，近地面气流受气压梯度与地转偏向共同组织。",
     transfer: "先判大陆与海洋谁是高压，再检查箭头是否由高压指向低压，并核对水汽来源。",
     posterStepIndex: 5,
+  }),
+  standalone({
+    caseId: "logistic-growth",
+    archetypeId: "ecology.population.logistic-growth",
+    subject: "university_ecology",
+    domain: "biology",
+    topic: "种群生态学",
+    title: "种群增长 · Logistic 模型",
+    description: "从指数假设到环境容量：S 形曲线、K/2 拐点与参数的作用",
+    prompt: "用 Logistic 模型讲解种群增长：从指数假设出发引入环境容量 K，解释 S 形曲线、K/2 拐点与 r、N₀ 的作用。",
+    defaults: { r: 0.6, K: 60, N0: 6 },
+    controls: [
+      { id: "r", kind: "range", label: "内禀增长率 r", description: "决定逼近 K 的快慢", min: 0.2, max: 1.2, step: 0.05, resetPlayback: false },
+      { id: "K", kind: "range", label: "环境容量 K", description: "长期可承载的最大数量", min: 40, max: 100, step: 5, resetPlayback: false },
+      { id: "N0", kind: "range", label: "初始种群 N₀", description: "起始数量", min: 2, max: 20, step: 1, resetPlayback: false },
+    ],
+    requiredCapabilities: ["math_plot", "expression_curve", "curve_marker"],
+    expectedFacts: [
+      { id: "logistic-equation", description: "密度制约的增长方程", anyOf: ["rN(1−N/K)", "rN(1-N/K)", "dN/dt=rN"] },
+      { id: "logistic-capacity", description: "环境容量 K 的含义", anyOf: ["环境容量", "承载", "K"] },
+      { id: "logistic-inflection", description: "拐点在 K/2，最大增长率 rK/4", anyOf: ["K 的一半", "K/2", "rK/4"] },
+      { id: "logistic-shape", description: "解曲线为 S 形", anyOf: ["S 形", "logistic", "Logistic"] },
+    ],
+    visualInvariants: [{
+      id: "logistic-visual",
+      description: "Logistic 曲线、环境容量线与拐点标记同屏可辨认",
+      requiredSemanticRoles: ["population_curve", "carrying_capacity"],
+      requiredStateFields: ["curves", "x_min", "x_max", "marker_x"],
+    }],
+    objective: "由密度制约机制推导 S 形增长曲线，并定位 K/2 拐点与参数的作用。",
+    builder: buildLogisticGrowthGoldPlaybook,
+    mechanism: "S 形来自两股力的接力：前期 rN 主导（加速），越过 K/2 后 (1−N/K) 主导（减速）。",
+    mechanismByStep: {
+      "logistic-exponential-question": "在 dN/dt=rN 里增长率与 N 成正比，解就是指数函数；它只在资源不设限的理想假设下成立。",
+      "logistic-carrying-capacity": "乘上 (1−N/K) 后，N 很小时方程近似 rN，N 接近 K 时增长率趋于 0——一个因子同时保住两端的行为。",
+      "logistic-s-curve": "S 形来自两股力的接力：前期 rN 主导（加速），越过 K/2 后 (1−N/K) 主导（减速）。",
+      "logistic-inflection": "把 dN/dt=rN(1−N/K) 看成 N 的二次函数，它在 N=K/2 处取最大值 rK/4——求导即可验证的极值。",
+      "logistic-parameters": "r 只出现在指数项里，决定逼近 K 的速率；平衡点由 dN/dt=0 给出 N=K，与 r、N₀ 无关。",
+      "logistic-boundary": "波动、时滞、Allee 效应等真实偏离，都是在这套方程骨架上修改某一项得到的，所以先掌握骨架。",
+    },
+    transfer: "把 r、K、N₀ 各拖一遍：检查终点是否始终贴住 K，拐点是否始终出现在 K/2。",
+    posterStepIndex: 2,
   }),
 ]);

@@ -182,6 +182,7 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
   },
 
   // ---- biology ----
+  publicGoldEntry("logistic-growth", "biology"),
   {
     id: "atp-synthesis",
     domain: "biology",

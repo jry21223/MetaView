@@ -14,13 +14,37 @@ describe("cross-subject public Gold Templates", () => {
       "redox-electron",
       "dna-replication",
       "monsoon",
+      "logistic-growth",
     ]);
     expect(new Set(CROSS_SUBJECT_PUBLIC_GOLD_TEMPLATES.map((item) => item.subject))).toEqual(new Set([
       "computer_science",
       "high_school_chemistry",
       "high_school_biology",
       "high_school_geography",
+      "university_ecology",
     ]));
+  });
+
+  it("teaches logistic growth with the inflection at half capacity", () => {
+    const manifest = CROSS_SUBJECT_PUBLIC_GOLD_TEMPLATES.find(
+      (item) => item.caseId === "logistic-growth",
+    )!;
+    const script = manifest.buildPublicPlaybook({ r: 0.6, K: 60, N0: 6 });
+    const followups = manifest.buildFollowups({ r: 0.6, K: 60, N0: 6 }, script);
+
+    const inflection = script.steps[3];
+    expect(inflection.voiceover_text).toContain("rK/4=9");
+    expect(inflection.voiceover_text).toContain("N=30");
+    // G=(60-6)/6=9, tInf=ln9/0.6≈3.66, t90=ln81/0.6≈7.32
+    expect(script.steps[3].snapshot.kind).toBe("math_plot");
+    if (script.steps[3].snapshot.kind === "math_plot") {
+      expect(script.steps[3].snapshot.marker_x).toBeCloseTo(Math.log(9) / 0.6, 6);
+      expect(script.steps[3].snapshot.curves[0].semantic_role).toBe("population_curve");
+    }
+    expect(script.steps[4].voiceover_text).toContain("t≈7.3");
+    expect(script.steps.at(-1)?.voiceover_text).toContain("骨架");
+    expect(followups["logistic-inflection"][1].answer).toContain("rK/4");
+    expect(followups["logistic-parameters"][1].answer).toContain("N=K");
   });
 
   it("keeps every case structurally complete and every follow-up local to a step", () => {
