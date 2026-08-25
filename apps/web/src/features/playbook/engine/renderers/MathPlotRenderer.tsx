@@ -227,6 +227,7 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
   if (yMin == null || yMax == null) {
     const ys: number[] = [];
     for (const c of drawable) for (const p of c.points) if (Number.isFinite(p.y)) ys.push(p.y);
+    for (const p of snap.points ?? []) if (Number.isFinite(p.y)) ys.push(p.y);
     const [lo, hi] = padRange(...autoYBounds(ys));
     if (yMin == null) yMin = lo;
     if (yMax == null) yMax = hi;
@@ -312,7 +313,7 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
     return html || null;
   }, [snap.formula_latex]);
 
-  const empty = drawable.length === 0;
+  const empty = drawable.length === 0 && (snap.points ?? []).length === 0;
 
   return (
     <div
@@ -546,6 +547,41 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
                         fill={stroke}
                       >
                         {c.label}
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
+
+              {(snap.points ?? []).map((p, pi) => {
+                // Observed data appears in x-order as the step's reveal sweeps
+                // left to right, matching the curve draw-on direction.
+                const xFrac = (p.x - xMin) / (xMax - xMin || 1);
+                const opacity = clamp01((reveal * 1.15 - xFrac) * 8);
+                const fill = curveColor(colors, p.emphasis, 0);
+                return (
+                  <g
+                    key={`pt-${pi}`}
+                    opacity={opacity}
+                    data-semantic-role={p.semantic_role ?? "data_point"}
+                  >
+                    <circle
+                      cx={sx(p.x)}
+                      cy={sy(p.y)}
+                      r={4.5}
+                      fill={fill}
+                      stroke={colors.bg}
+                      strokeWidth={1.4}
+                    />
+                    {p.label && p.label.trim() && (
+                      <text
+                        x={sx(p.x) + 9}
+                        y={sy(p.y) - 9}
+                        fontSize={12.5}
+                        fontWeight={600}
+                        fill={fill}
+                      >
+                        {p.label}
                       </text>
                     )}
                   </g>

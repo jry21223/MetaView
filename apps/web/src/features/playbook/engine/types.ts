@@ -114,12 +114,25 @@ export interface MathPlotCurve {
   semantic_role?: "curve" | "tangent" | "normal" | "slope" | string;
 }
 
+/** A fixed data point overlaid on a math function plot (e.g. measured observations). */
+export interface MathPlotPoint {
+  x: number;
+  y: number;
+  /** Short label drawn beside the dot; keep to a few characters. */
+  label?: string | null;
+  /** `primary` = data in focus, `secondary` = context, `accent` = highlighted result. */
+  emphasis?: string;
+  semantic_role?: string;
+}
+
 /** Cartesian function / curve plot (math domain). */
 export interface MathPlotSnapshot {
   kind: "math_plot";
   pack_id?: string | null;
   asset_id?: string | null;
   curves: MathPlotCurve[];
+  /** Discrete data points drawn over the curves (observations, experiment records). */
+  points?: MathPlotPoint[];
   /** Runtime numeric parameter scope used by curve expressions, e.g. `{ a: 2 }` for `a*x`. */
   params?: Record<string, number>;
   x_min: number;
