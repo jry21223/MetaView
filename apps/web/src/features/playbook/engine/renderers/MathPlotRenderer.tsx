@@ -149,6 +149,27 @@ interface CompiledCurve {
   primaryIndex: number;
 }
 
+/** Dots beyond this count batch into a single path with a sweep-clip reveal. */
+const DENSE_POINTS_THRESHOLD = 220;
+
+function buildDensePointsPath(
+  points: MathPlotSnapshot["points"],
+  xMin: number,
+  xMax: number,
+  yLo: number,
+  yHi: number,
+): string | null {
+  if (!points || points.length <= DENSE_POINTS_THRESHOLD) return null;
+  const r = 1.6;
+  let d = "";
+  for (const p of points) {
+    const cx = MARGIN.left + ((p.x - xMin) / (xMax - xMin || 1)) * PLOT_W;
+    const cy = MARGIN.top + ((yHi - p.y) / (yHi - yLo || 1)) * PLOT_H;
+    d += `M${(cx - r).toFixed(1)},${cy.toFixed(1)}a${r},${r} 0 1,0 ${r * 2},0a${r},${r} 0 1,0 ${-r * 2},0`;
+  }
+  return d;
+}
+
 // ── Component ──────────────────────────────────────────────────────────────
 
 export const MathPlotRenderer: React.FC<RendererProps> = ({
@@ -251,19 +272,8 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
   // A dense scatter (e.g. a bifurcation diagram) renders as one batched path
   // node instead of thousands of circle groups; a sweep clip reveals it left
   // to right. Below the threshold, points keep per-dot labels and fades.
-  const DENSE_POINTS_THRESHOLD = 220;
-  const densePointsPath = React.useMemo(() => {
-    const pts = snap.points;
-    if (!pts || pts.length <= DENSE_POINTS_THRESHOLD) return null;
-    const r = 1.6;
-    let d = "";
-    for (const p of pts) {
-      const cx = MARGIN.left + ((p.x - xMin) / (xMax - xMin || 1)) * PLOT_W;
-      const cy = MARGIN.top + ((yHi - p.y) / (yHi - yLo || 1)) * PLOT_H;
-      d += `M${(cx - r).toFixed(1)},${cy.toFixed(1)}a${r},${r} 0 1,0 ${r * 2},0a${r},${r} 0 1,0 ${-r * 2},0`;
-    }
-    return d;
-  }, [snap.points, xMin, xMax, yLo, yHi]);
+  // Plain computation — the React Compiler memoizes it from its inputs.
+  const densePointsPath = buildDensePointsPath(snap.points, xMin, xMax, yLo, yHi);
 
   const xTicks = niceTicks(xMin, xMax, 8);
   const yTicks = niceTicks(yLo, yHi, 7);
