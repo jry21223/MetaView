@@ -313,9 +313,18 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
   const subtitleHeight = PLAYBOOK_LAYOUT.SUBTITLE_HEIGHT;
   const vizRatio = PLAYBOOK_LAYOUT.VIZ_SPLIT_RATIO;
 
-  // Subtitle fade: 0→1 over first SUBTITLE_FADE_FRAMES frames of the step
+  // Subtitle fade: 0→1 over first SUBTITLE_FADE_FRAMES frames of the step.
+  // Keep the bar fully opaque when the visible text is unchanged across the
+  // boundary — micro-stepped scripts repeat one narration line for many steps
+  // and re-fading it every step reads as a strobe.
   const localFrame = frame - stepStartFrame;
-  const fadeProgress = Math.min(1, localFrame / PLAYBOOK_LAYOUT.SUBTITLE_FADE_FRAMES);
+  const subtitleTextContinues =
+    prevStep != null &&
+    !shouldShowDirectorVoiceover &&
+    subtitleText === prevStep.voiceover_text;
+  const fadeProgress = subtitleTextContinues
+    ? 1
+    : Math.min(1, localFrame / PLAYBOOK_LAYOUT.SUBTITLE_FADE_FRAMES);
 
   const isDark = theme === "dark";
   const visualBackground = stageBackground(theme);

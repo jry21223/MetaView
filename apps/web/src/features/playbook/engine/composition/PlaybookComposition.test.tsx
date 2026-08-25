@@ -610,6 +610,85 @@ describe("PlaybookComposition", () => {
     expect(markup).toContain('data-visual-continuation="true"');
   });
 
+  it("keeps a continued math_scene step fully opaque right after a micro-step boundary", () => {
+    const sweepSnapshot = (px: number, py: number, pf1: string, pf2: string): MathSceneSnapshot =>
+      sceneSnapshot({
+        points: [
+          { x: -3, y: 0, semantic_role: "focus" },
+          { x: 3, y: 0, semantic_role: "focus" },
+          { x: px, y: py, semantic_role: "moving_point" },
+        ],
+        segments: [
+          { x0: px, y0: py, x1: -3, y1: 0, label: `PF₁=${pf1}`, semantic_role: "focal_distance" },
+          { x0: px, y0: py, x1: 3, y1: 0, label: `PF₂=${pf2}`, semantic_role: "focal_distance" },
+        ],
+      });
+    const script = twoStepScript(
+      {
+        step_id: "sweep-1",
+        end_frame: 60,
+        title: "拉紧绳子滑动笔尖",
+        voiceover_text: "绳保持绷直。",
+        tokens: [],
+        snapshot: sweepSnapshot(4.94, 0.6, "3.42", "6.58"),
+      },
+      {
+        step_id: "sweep-2",
+        end_frame: 120,
+        title: "拉紧绳子滑动笔尖",
+        voiceover_text: "绳保持绷直。",
+        tokens: [],
+        snapshot: sweepSnapshot(4.78, 1.18, "3.57", "6.43"),
+      },
+    );
+
+    for (const frame of [61, 62]) {
+      remotionState.frame = frame;
+      const markup = renderToStaticMarkup(<PlaybookComposition script={script} />);
+      const layerTag = layerOpenTag(markup, "math_scene");
+
+      expect(markup).toContain('data-visual-continuation="true"');
+      expect(layerTag).toContain("opacity:1");
+      expect(layerTag).not.toMatch(/opacity:0/);
+      // The unchanged step title must not re-run its fade at the boundary…
+      expect(markup).toContain('math-scene-renderer__title" style="opacity:1"');
+      // …and neither must the subtitle bar for the unchanged narration line.
+      expect(markup).toContain("flex-shrink:0;opacity:1");
+    }
+  });
+
+  it("still fades in a changed math_scene title at the step boundary", () => {
+    const snapshot = sceneSnapshot({
+      points: [{ x: 0, y: 0, semantic_role: "focus" }],
+    });
+    const script = twoStepScript(
+      {
+        step_id: "s1",
+        end_frame: 60,
+        title: "第一步",
+        voiceover_text: "第一段说明",
+        tokens: [],
+        snapshot,
+      },
+      {
+        step_id: "s2",
+        end_frame: 120,
+        title: "第二步",
+        voiceover_text: "第二段说明",
+        tokens: [],
+        snapshot,
+      },
+    );
+
+    remotionState.frame = 62;
+    const markup = renderToStaticMarkup(
+      <PlaybookComposition script={script} showSubtitles={false} />,
+    );
+
+    expect(markup).toContain('data-visual-continuation="true"');
+    expect(markup).toContain('math-scene-renderer__title" style="opacity:0.25"');
+  });
+
   it("keeps the semantic stage layer mounted when the visual snapshot changes", () => {
     const script = twoStepScript(
       step({

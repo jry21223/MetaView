@@ -382,6 +382,8 @@ export const MathSceneRenderer: React.FC<RendererProps> = ({
   theme,
   renderMode = "standalone",
   directorFrame,
+  visualStartFrame,
+  isVisualContinuation,
 }) => {
   const snap = step.snapshot as MathSceneSnapshot;
   const isOverlayMode = renderMode === "stage-overlay";
@@ -407,8 +409,14 @@ export const MathSceneRenderer: React.FC<RendererProps> = ({
   const plan = snap.camera_mode === "fixed"
     ? { ...directedPlan, camera: viewBoxFromSnapshot(snap) }
     : directedPlan;
-  const elapsed = Math.max(0, frame - stepStartFrame);
-  const titleOpacity = clamp01(elapsed / 8);
+  // An unchanged title on a visual continuation must not re-fade at every
+  // narration step (micro-stepped sweeps strobe otherwise); anchor its fade
+  // to the visual window instead of the step.
+  const titleAnchorFrame =
+    isVisualContinuation && prevStep?.title === step.title
+      ? Math.min(visualStartFrame ?? stepStartFrame, stepStartFrame)
+      : stepStartFrame;
+  const titleOpacity = clamp01(Math.max(0, frame - titleAnchorFrame) / 8);
 
   const xMin = snap.x_min;
   const xMax = snap.x_max;

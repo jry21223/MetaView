@@ -23,9 +23,33 @@ export interface MathSceneObjectRef {
 
 export type MathSceneIdentitySets = Record<MathSceneObjectKind, Set<string>>;
 
+/**
+ * Continuity identity of one object. `key` is the exact content key used for
+ * React keys and diff sets; `roleKey` and `geometryKey` are label-independent
+ * fallbacks so the diff can keep matching an object whose label text or exact
+ * coordinates changed between steps.
+ */
+export interface MathSceneObjectIdentity extends MathSceneObjectRef {
+  /** semantic_role plus per-role ordinal, or null when the object has no role. */
+  roleKey: string | null;
+  /** Label/text-free content key: geometry, expressions, or sampling only. */
+  geometryKey: string;
+}
+
 type ObjectWithExplicitId = {
   id?: unknown;
 };
+
+type ObjectWithSemanticRole = {
+  semantic_role?: unknown;
+};
+
+function semanticRoleOf(object: ObjectWithSemanticRole): string | null {
+  const role = object.semantic_role;
+  if (typeof role !== "string") return null;
+  const trimmed = role.trim();
+  return trimmed ? trimmed : null;
+}
 
 function emptyIdentitySets(): MathSceneIdentitySets {
   return {
@@ -131,37 +155,56 @@ export function vectorFieldKey(field: MathSceneVectorField): string {
   ].join(":");
 }
 
-export function collectObjectRefs(snapshot: MathSceneSnapshot): MathSceneObjectRef[] {
+/**
+ * Collect every object's continuity identity in stable declaration order.
+ * `geometryKey` reuses each exact key function with the label/text blanked,
+ * and role ordinals count per (kind, semantic_role) so two same-role objects
+ * in one snapshot (e.g. both focal-distance segments) stay distinguishable.
+ */
+export function collectObjectIdentities(snapshot: MathSceneSnapshot): MathSceneObjectIdentity[] {
+  const roleOrdinals = new Map<string, number>();
+  const identify = (
+    kind: MathSceneObjectKind,
+    object: ObjectWithSemanticRole,
+    key: string,
+    geometryKey: string,
+  ): MathSceneObjectIdentity => {
+    const role = semanticRoleOf(object);
+    let roleKey: string | null = null;
+    if (role) {
+      const bucket = `${kind} ${role}`;
+      const ordinal = roleOrdinals.get(bucket) ?? 0;
+      roleOrdinals.set(bucket, ordinal + 1);
+      roleKey = [kind, "role", role, ordinal].join(":");
+    }
+    return { kind, key, roleKey, geometryKey };
+  };
+  const field = snapshot.vector_field;
+
   return [
-    ...(snapshot.points ?? []).map((point) => ({
-      kind: "point" as const,
-      key: pointKey(point),
-    })),
-    ...(snapshot.segments ?? []).map((segment) => ({
-      kind: "segment" as const,
-      key: segmentKey(segment),
-    })),
-    ...(snapshot.regions ?? []).map((region) => ({
-      kind: "region" as const,
-      key: regionKey(region),
-    })),
-    ...(snapshot.curves ?? []).map((curve) => ({
-      kind: "curve" as const,
-      key: curveKey(curve),
-    })),
-    ...(snapshot.annotations ?? []).map((annotation) => ({
-      kind: "annotation" as const,
-      key: annotationKey(annotation),
-    })),
-    ...(snapshot.vector_field
-      ? [
-          {
-            kind: "vector_field" as const,
-            key: vectorFieldKey(snapshot.vector_field),
-          },
-        ]
+    ...(snapshot.points ?? []).map((point) =>
+      identify("point", point, pointKey(point), pointKey({ ...point, label: null })),
+    ),
+    ...(snapshot.segments ?? []).map((segment) =>
+      identify("segment", segment, segmentKey(segment), segmentKey({ ...segment, label: null })),
+    ),
+    ...(snapshot.regions ?? []).map((region) =>
+      identify("region", region, regionKey(region), regionKey({ ...region, label: null })),
+    ),
+    ...(snapshot.curves ?? []).map((curve) =>
+      identify("curve", curve, curveKey(curve), curveKey({ ...curve, label: null })),
+    ),
+    ...(snapshot.annotations ?? []).map((annotation) =>
+      identify("annotation", annotation, annotationKey(annotation), annotationKey({ ...annotation, text: "" })),
+    ),
+    ...(field
+      ? [identify("vector_field", field, vectorFieldKey(field), vectorFieldKey({ ...field, label: null }))]
       : []),
   ];
+}
+
+export function collectObjectRefs(snapshot: MathSceneSnapshot): MathSceneObjectRef[] {
+  return collectObjectIdentities(snapshot).map(({ kind, key }) => ({ kind, key }));
 }
 
 export function collectIdentitySets(snapshot: MathSceneSnapshot): MathSceneIdentitySets {

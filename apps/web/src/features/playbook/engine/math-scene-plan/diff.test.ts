@@ -8,6 +8,7 @@ import {
 import {
   annotationKey,
   collectObjectKeySet,
+  pointKey,
   segmentKey,
   vectorFieldKey,
 } from "./identity";
@@ -86,6 +87,30 @@ describe("math-scene-plan diff", () => {
 
     expect(diff.persisted).toEqual(collectObjectKeySet(trianglePlusSquareScene));
     expect(diff.added).toEqual(new Set([annotationKey(annotation)]));
+    expect(diff.removed.size).toBe(0);
+    expectDisjoint(diff);
+  });
+
+  it("still adds an object whose semantic role had no previous member", () => {
+    const previous = {
+      ...triangleScene,
+      points: [{ x: 1, y: 1, label: "P", semantic_role: "moving_point" }],
+      segments: [],
+    };
+    const current = {
+      ...previous,
+      points: [
+        { x: 2, y: 2, label: "P", semantic_role: "moving_point" },
+        { x: 1, y: 1, semantic_role: "locus_trail" },
+      ],
+    };
+    const diff = diffMathSceneObjects(previous, current);
+    const [movingPoint, trailPoint] = current.points;
+
+    expect(isPersisted(pointKey(movingPoint), diff)).toBe(true);
+    // The moving point consumed the only previous point; the trail dot must
+    // not steal it through the geometry pass and stays a true entrance.
+    expect(isAdded(pointKey(trailPoint), diff)).toBe(true);
     expect(diff.removed.size).toBe(0);
     expectDisjoint(diff);
   });

@@ -175,6 +175,79 @@ describe("math-scene-plan plan", () => {
     );
   });
 
+  it("keeps same-role objects persisted when only label values and geometry drift", () => {
+    const previous: MathSceneSnapshot = {
+      ...triangleScene,
+      points: [
+        { x: -3, y: 0, label: "$F_1$", semantic_role: "focus" },
+        { x: 3, y: 0, label: "$F_2$", semantic_role: "focus" },
+        { x: 4.94, y: 0.6, label: "P", semantic_role: "moving_point" },
+      ],
+      segments: [
+        { x0: 4.94, y0: 0.6, x1: -3, y1: 0, label: "PF₁=3.42", semantic_role: "focal_distance" },
+        { x0: 4.94, y0: 0.6, x1: 3, y1: 0, label: "PF₂=6.58", semantic_role: "focal_distance" },
+      ],
+    };
+    const current: MathSceneSnapshot = {
+      ...previous,
+      points: [
+        { x: -3, y: 0, label: "$F_1$", semantic_role: "focus" },
+        { x: 3, y: 0, label: "$F_2$", semantic_role: "focus" },
+        { x: 4.78, y: 1.18, label: "P", semantic_role: "moving_point" },
+        { x: 4.94, y: 0.6, semantic_role: "locus_trail" },
+      ],
+      segments: [
+        { x0: 4.78, y0: 1.18, x1: -3, y1: 0, label: "PF₁=3.57", semantic_role: "focal_distance" },
+        { x0: 4.78, y0: 1.18, x1: 3, y1: 0, label: "PF₂=6.43", semantic_role: "focal_distance" },
+      ],
+    };
+    const plan = buildMathSceneRenderPlan({
+      previousStep: makeMathSceneStep(previous, { step_id: "sweep-1" }),
+      currentSnapshot: current,
+      stepProgress: 0.1,
+    });
+
+    for (const segment of plan.segments) {
+      expect(segment.persisted).toBe(true);
+      expect(segment.added).toBe(false);
+      expect(segment.progress).toBe(1);
+    }
+    const movingPoint = required(
+      plan.points.find((object) => object.object.semantic_role === "moving_point"),
+    );
+    expect(movingPoint.persisted).toBe(true);
+    expect(movingPoint.progress).toBe(1);
+    // The freshly dropped trail dot is genuinely new and keeps its draw-in.
+    const trailPoint = required(
+      plan.points.find((object) => object.object.semantic_role === "locus_trail"),
+    );
+    expect(trailPoint.added).toBe(true);
+    expect(trailPoint.progress).toBe(0.1);
+  });
+
+  it("matches unchanged geometry whose label text changed without a semantic role", () => {
+    const previous: MathSceneSnapshot = {
+      ...triangleScene,
+      points: [{ x: 2, y: 1, label: "t=0.10" }],
+      segments: [{ x0: 0, y0: 0, x1: 2, y1: 1, label: "d=2.24" }],
+    };
+    const current: MathSceneSnapshot = {
+      ...previous,
+      points: [{ x: 2, y: 1, label: "t=0.20" }],
+      segments: [{ x0: 0, y0: 0, x1: 2, y1: 1, label: "d=2.24 (不变)" }],
+    };
+    const plan = buildMathSceneRenderPlan({
+      previousStep: makeMathSceneStep(previous, { step_id: "tick" }),
+      currentSnapshot: current,
+      stepProgress: 0.3,
+    });
+
+    expect(plan.points[0]?.persisted).toBe(true);
+    expect(plan.points[0]?.progress).toBe(1);
+    expect(plan.segments[0]?.persisted).toBe(true);
+    expect(plan.segments[0]?.progress).toBe(1);
+  });
+
   it("plans annotations and vector fields with object-level progress", () => {
     const previous = {
       ...trianglePlusSquarePlusAnnotationScene,
