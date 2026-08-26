@@ -26,16 +26,20 @@ def test_wechat_notification_rejects_stale_and_future_timestamps(tmp_path: Path)
     client, key = _client(tmp_path)
     body = b'{"resource":{"ciphertext":"x","nonce":"n"}}'
     now = int(time.time())
+    # Stay far from the 300s boundary: the client reads its own clock, and a
+    # runner NTP step between the two readings once flipped a now-301 sample
+    # back inside the window (CI-only DID NOT RAISE flake).
+    an_hour = 3600
 
     with pytest.raises(WeChatPayGatewayError, match="timestamp"):
         client._verify_notification(
-            _headers(key, body, timestamp=now - 301, nonce="stale"),
+            _headers(key, body, timestamp=now - an_hour, nonce="stale"),
             body,
         )
 
     with pytest.raises(WeChatPayGatewayError, match="timestamp"):
         client._verify_notification(
-            _headers(key, body, timestamp=now + 301, nonce="future"),
+            _headers(key, body, timestamp=now + an_hour, nonce="future"),
             body,
         )
 
