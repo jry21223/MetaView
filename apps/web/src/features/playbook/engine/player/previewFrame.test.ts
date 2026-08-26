@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { PLAYBOOK_DEFAULTS } from "../../../../shared/config/constants";
 import type { PlaybookScript } from "../types";
-import { resolveInitialPreviewFrame, resolvePlayerTimelineKey } from "./previewFrame";
+import {
+  resolveCarriedStepFrame,
+  resolveInitialPreviewFrame,
+  resolvePlayerTimelineKey,
+} from "./previewFrame";
 
 function script(overrides: Partial<PlaybookScript> = {}): PlaybookScript {
   return {
@@ -38,6 +42,30 @@ function script(overrides: Partial<PlaybookScript> = {}): PlaybookScript {
     ...overrides,
   };
 }
+
+describe("resolveCarriedStepFrame", () => {
+  it("keeps the viewer on the same step's settled frame after a timeline reshape", () => {
+    // A parameter edit lengthened step 1's narration: 60 → 90 frames.
+    const reshaped = script({
+      total_frames: 150,
+      steps: [
+        { ...script().steps[0], end_frame: 90 },
+        { ...script().steps[1], end_frame: 150 },
+      ],
+    });
+    expect(resolveCarriedStepFrame(reshaped, 1, 0)).toBe(149);
+    expect(resolveCarriedStepFrame(reshaped, 0, 0)).toBe(89);
+  });
+
+  it("clamps to the step start and falls back on out-of-range indexes", () => {
+    const single = script({
+      total_frames: 60,
+      steps: [{ ...script().steps[0], end_frame: 60 }],
+    });
+    expect(resolveCarriedStepFrame(single, 0, 0)).toBe(59);
+    expect(resolveCarriedStepFrame(single, 5, 17)).toBe(17);
+  });
+});
 
 describe("resolveInitialPreviewFrame", () => {
   it("starts the player on a visible early frame instead of frame zero", () => {

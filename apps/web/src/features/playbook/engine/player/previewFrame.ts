@@ -13,6 +13,24 @@ export function resolveInitialPreviewFrame(
   return Math.min(preferred, firstStepLastFrame, lastFrame);
 }
 
+/**
+ * Settled frame of one step — used to keep the viewer's place when a reshaped
+ * timeline (parameter edits change narration lengths, so end frames shift and
+ * the keyed Player remounts) would otherwise reset playback to the opening
+ * poster. The step's last own frame shows its fully revealed visuals.
+ */
+export function resolveCarriedStepFrame(
+  script: PlaybookScript,
+  stepIndex: number,
+  fallback: number,
+): number {
+  const step = script.steps[stepIndex];
+  if (!step) return fallback;
+  const start = stepIndex > 0 ? script.steps[stepIndex - 1]?.end_frame ?? 0 : 0;
+  const lastFrame = Math.max(0, script.total_frames - 1);
+  return Math.min(Math.max(start, step.end_frame - 1), lastFrame);
+}
+
 export function resolvePlayerTimelineKey(script: PlaybookScript): string {
   const fingerprint = JSON.stringify({
     fps: script.fps,

@@ -10,7 +10,11 @@ import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { resolveNarrationTemplate } from "./resolveNarrationTemplate";
 import { useResolvedScript, type ScriptOverrides } from "./useResolvedScript";
 import { resolveCodePanelOverlay } from "./resolveCodePanelOverlay";
-import { resolveInitialPreviewFrame, resolvePlayerTimelineKey } from "./previewFrame";
+import {
+  resolveCarriedStepFrame,
+  resolveInitialPreviewFrame,
+  resolvePlayerTimelineKey,
+} from "./previewFrame";
 import { CodeHighlightRenderer } from "../renderers/CodeHighlightRenderer";
 import { domainCapability } from "../domainCapabilities";
 import { getParamPanel } from "../param-panels/registry";
@@ -212,6 +216,23 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   const safeStepIndex = script.steps.length
     ? Math.min(currentStepIndex, script.steps.length - 1)
     : 0;
+  // A reshaped timeline (parameter edits change narration lengths, shifting
+  // end frames) remounts the keyed Player below. Carry the viewer to the
+  // current step's settled frame instead of resetting to the opening poster.
+  const [timelineCarry, setTimelineCarry] = useState<{ key: string; frame: number | null }>({
+    key: playerTimelineKey,
+    frame: null,
+  });
+  if (timelineCarry.key !== playerTimelineKey) {
+    setTimelineCarry({
+      key: playerTimelineKey,
+      frame: resolveCarriedStepFrame(script, safeStepIndex, initialPreviewFrame),
+    });
+  }
+  const playerMountFrame =
+    timelineCarry.key === playerTimelineKey && timelineCarry.frame != null
+      ? timelineCarry.frame
+      : initialPreviewFrame;
   const codeOverlay = useMemo(
     () => resolveCodePanelOverlay(displayScript, safeStepIndex),
     [displayScript, safeStepIndex],
@@ -531,7 +552,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
           fps={script.fps}
           compositionWidth={PLAYBOOK_DEFAULTS.COMPOSITION_WIDTH}
           compositionHeight={PLAYBOOK_DEFAULTS.COMPOSITION_HEIGHT}
-          initialFrame={initialPreviewFrame}
+          initialFrame={playerMountFrame}
           style={{ width: "100%", height: "100%" }}
           playbackRate={playbackRate}
           clickToPlay={false}
