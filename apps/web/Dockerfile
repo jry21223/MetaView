@@ -8,9 +8,13 @@ ARG VITE_API_BASE_URL=
 ARG VITE_APP_EDITION=self
 ARG VITE_PUBLIC_SITE_URL=
 ARG NPM_REGISTRY=https://registry.npmmirror.com
+# The build context has no .git, so the deploy passes the commit in for the
+# mv-build fingerprint (vite.config.ts resolveBuildStamp).
+ARG GIT_SHA=
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 ENV VITE_APP_EDITION=${VITE_APP_EDITION}
 ENV VITE_PUBLIC_SITE_URL=${VITE_PUBLIC_SITE_URL}
+ENV GIT_SHA=${GIT_SHA}
 
 COPY package.json package-lock.json ./
 COPY apps/web/package.json ./apps/web/package.json

@@ -1,4 +1,5 @@
 /// <reference types="vitest" />
+import { execSync } from "node:child_process";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 
@@ -21,8 +22,50 @@ function katexFontDisplaySwap(): Plugin {
   };
 }
 
+/**
+ * Stamp every build with an identity readable straight off the deployed page
+ * (view-source → <meta name="mv-build">, or the "[MetaView] build" console
+ * line), so "is the live site running the latest bundle?" never needs
+ * guesswork. The commit comes from $GIT_SHA when the builder exports it (the
+ * Docker build context carries no .git), falling back to git itself, then to
+ * "unknown" — the timestamp always identifies the build either way.
+ */
+function resolveBuildStamp(): string {
+  let commit = process.env.GIT_SHA?.trim() ?? "";
+  if (!commit) {
+    try {
+      commit = execSync("git rev-parse --short HEAD", {
+        stdio: ["ignore", "pipe", "ignore"],
+      }).toString().trim();
+    } catch {
+      commit = "unknown";
+    }
+  }
+  return `${commit} ${new Date().toISOString()}`;
+}
+
+const buildStamp = resolveBuildStamp();
+
+function buildFingerprint(): Plugin {
+  return {
+    name: "mv-build-fingerprint",
+    transformIndexHtml() {
+      return [
+        {
+          tag: "meta",
+          attrs: { name: "mv-build", content: buildStamp },
+          injectTo: "head",
+        },
+      ];
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [katexFontDisplaySwap(), react()],
+  plugins: [katexFontDisplaySwap(), buildFingerprint(), react()],
+  define: {
+    __MV_BUILD__: JSON.stringify(buildStamp),
+  },
   // Mafs declares a `react >= 18` peer; npm hoisted a stray React 18 alongside
   // it at the workspace root while apps/web pins React 19. Force a single
   // React (and react-dom) instance so hooks share one dispatcher.
