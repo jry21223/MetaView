@@ -9,7 +9,7 @@ interface TemplatePreviewControlsProps {
   params: TemplatePreviewParams;
   onChange: (id: string, value: TemplatePreviewParamValue, resetPlayback: boolean) => void;
   onReset: () => void;
-  /** Current step id from the player; enables per-step effect badges. */
+  /** Current step id from the player; scoped cases only render that step's controls. */
   currentStepId?: string;
 }
 
@@ -20,46 +20,31 @@ export function TemplatePreviewControls({
   onReset,
   currentStepId,
 }: TemplatePreviewControlsProps) {
-  // A control without a declared step scope applies everywhere and stays
-  // badge-free (existing templates keep their current look).
-  const controlActive = (steps?: readonly string[]) =>
-    !steps || (currentStepId != null && steps.includes(currentStepId));
-  const scopedControls = previewCase.controls.filter((control) => control.steps);
-  const frozenStep =
-    currentStepId != null &&
-    scopedControls.length === previewCase.controls.length &&
+  // A case where every control declares its step scope filters the panel down
+  // to the controls that act on the current step; anything else (legacy cases
+  // with unscoped controls) keeps showing the full list.
+  const scoped =
     previewCase.controls.length > 0 &&
-    previewCase.controls.every((control) => !controlActive(control.steps));
+    previewCase.controls.every((control) => control.steps) &&
+    currentStepId != null;
+  const visibleControls = scoped
+    ? previewCase.controls.filter((control) => control.steps?.includes(currentStepId))
+    : previewCase.controls;
 
   return (
     <div className="mv-template-params" aria-label="案例参数">
-      {frozenStep && (
+      {scoped && visibleControls.length === 0 && (
         <p className="mv-template-params__frozen" role="status">
-          当前步骤不可调参——本步是固定画面（真实数据或结论场景），参数会在标出的步骤生效。
+          本步暂不支持调整参数。
         </p>
       )}
-      {previewCase.controls.map((control) => {
+      {visibleControls.map((control) => {
         const inputId = `template-param-${previewCase.id}-${control.id}`;
         const value = params[control.id] ?? previewCase.defaultParams[control.id];
-        const scoped = Boolean(control.steps);
-        const active = controlActive(control.steps);
-        const stateClass = scoped
-          ? active
-            ? " mv-template-param--step-active"
-            : " mv-template-param--step-inactive"
-          : "";
         return (
-          <label className={`mv-template-param${stateClass}`} htmlFor={inputId} key={control.id}>
+          <label className="mv-template-param" htmlFor={inputId} key={control.id}>
             <span className="mv-template-param__head">
               <strong>{control.label}</strong>
-              {scoped && (
-                <em
-                  className={`mv-template-param__badge${active ? " is-active" : ""}`}
-                  aria-label={active ? "此参数在当前步骤生效" : "此参数在当前步骤不生效"}
-                >
-                  {active ? "本步可调" : "本步不生效"}
-                </em>
-              )}
               <output htmlFor={inputId}>{String(value)}</output>
             </span>
             {control.kind === "select" ? (

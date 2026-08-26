@@ -20,27 +20,27 @@ function renderControls(caseId: string, currentStepId: string) {
   );
 }
 
-describe("TemplatePreviewControls step badges", () => {
+describe("TemplatePreviewControls per-step filtering", () => {
   afterEach(cleanup);
 
-  it("marks which controls act on the current step", () => {
+  it("renders only the controls that act on the current step", () => {
     const view = renderControls("rabbit-chaos", "chaos-butterfly");
-    expect(view.getAllByText("本步可调")).toHaveLength(1);
-    expect(view.getAllByText("本步不生效")).toHaveLength(1);
-    expect(view.queryByText(/当前步骤不可调参/)).toBeNull();
+    expect(view.getByText("初始兔群 N₀")).toBeTruthy();
+    expect(view.queryByText("年增长率 r")).toBeNull();
+    expect(view.queryByText(/本步暂不支持调整参数/)).toBeNull();
   });
 
-  it("announces frozen steps where no parameter applies", () => {
+  it("announces frozen steps instead of showing inert sliders", () => {
     const view = renderControls("rabbit-chaos", "chaos-lorenz-shape");
-    expect(view.getByText(/当前步骤不可调参/)).toBeTruthy();
-    expect(view.getAllByText("本步不生效")).toHaveLength(2);
-    expect(view.queryByText("本步可调")).toBeNull();
+    expect(view.getByText("本步暂不支持调整参数。")).toBeTruthy();
+    expect(view.queryByText("年增长率 r")).toBeNull();
+    expect(view.queryByText("初始兔群 N₀")).toBeNull();
+    expect(view.getByRole("button", { name: "恢复默认参数" })).toBeTruthy();
   });
 
-  it("keeps unscoped controls badge-free", () => {
+  it("keeps legacy unscoped cases showing every control", () => {
     const view = renderControls("binary-search", "any-step");
-    expect(view.queryByText("本步可调")).toBeNull();
-    expect(view.queryByText("本步不生效")).toBeNull();
-    expect(view.queryByText(/当前步骤不可调参/)).toBeNull();
+    expect(view.getByText("目标值")).toBeTruthy();
+    expect(view.queryByText(/本步暂不支持调整参数/)).toBeNull();
   });
 });
