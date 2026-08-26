@@ -53,6 +53,9 @@ export type PlaybookFollowupSlot =
 
 const PORTRAIT_QUERY = "(max-width: 680px) and (orientation: portrait)";
 
+/** Quiet time after the last live script edit before playback resumes. */
+const SCRUB_RESUME_DELAY_MS = 800;
+
 function resolveAutoLayoutMode(): PlaybookLayoutMode {
   if (typeof window === "undefined" || !window.matchMedia) return "desktop";
   return window.matchMedia(PORTRAIT_QUERY).matches ? "portrait" : "desktop";
@@ -285,12 +288,49 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     };
   });
 
+  // A parameter drag rebuilds the script on every tick while the playhead
+  // keeps advancing, so the stage would animate against the in-place remap.
+  // Live edits hold playback instead — a hold, not the pause state — and once
+  // the sliders go quiet the lesson resumes on its own.
+  const scrubHoldRef = useRef<{
+    timer: ReturnType<typeof setTimeout> | null;
+    wasPlaying: boolean;
+  }>({ timer: null, wasPlaying: false });
+  const previousScriptRef = useRef(script);
+  const cancelScrubHold = useCallback(() => {
+    const hold = scrubHoldRef.current;
+    if (hold.timer != null) {
+      clearTimeout(hold.timer);
+      hold.timer = null;
+    }
+    hold.wasPlaying = false;
+  }, []);
+  useLayoutEffect(() => {
+    if (previousScriptRef.current === script) return;
+    previousScriptRef.current = script;
+    const hold = scrubHoldRef.current;
+    if (isPlaying) {
+      playerRef.current?.pause();
+      hold.wasPlaying = true;
+    }
+    if (!hold.wasPlaying) return;
+    if (hold.timer != null) clearTimeout(hold.timer);
+    hold.timer = setTimeout(() => {
+      hold.timer = null;
+      if (!hold.wasPlaying) return;
+      hold.wasPlaying = false;
+      playerRef.current?.play();
+    }, SCRUB_RESUME_DELAY_MS);
+  }, [script, isPlaying]);
+  useEffect(() => cancelScrubHold, [cancelScrubHold]);
+
   // The page lands on the opening step's settled poster frame (a fully drawn
   // picture, not frame zero), so the very first play press must rewind to the
   // current step's start — otherwise playback crosses into the next step
   // almost immediately and the opening narration is skipped.
   const hasEverPlayedRef = useRef(false);
   const handlePlayPause = useCallback(() => {
+    cancelScrubHold();
     const player = playerRef.current;
     if (!player) return;
     if (isPlaying) {
@@ -303,13 +343,31 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
       player.seekTo(stepStart);
     }
     player.play();
-  }, [isPlaying, safeStepIndex, script.steps]);
+  }, [cancelScrubHold, isPlaying, safeStepIndex, script.steps]);
+
+  // Manual navigation is a deliberate pause — it must also drop any pending
+  // scrub auto-resume so the lesson does not restart under the user.
+  const goToStepManual = useCallback(
+    (index: number) => {
+      cancelScrubHold();
+      goToStep(index);
+    },
+    [cancelScrubHold, goToStep],
+  );
+  const prevStepManual = useCallback(() => {
+    cancelScrubHold();
+    prev();
+  }, [cancelScrubHold, prev]);
+  const nextStepManual = useCallback(() => {
+    cancelScrubHold();
+    next();
+  }, [cancelScrubHold, next]);
 
   const handleReset = useCallback(() => {
     playerRef.current?.seekTo(0);
-    goToStep(0);
+    goToStepManual(0);
     setIsPlaying(false);
-  }, [goToStep]);
+  }, [goToStepManual]);
 
   const handleSpeedUp = useCallback(() => {
     setPlaybackRate((r) => {
@@ -326,8 +384,8 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
 
   useKeyboardShortcuts({
     onPlayPause: handlePlayPause,
-    onPrev: prev,
-    onNext: next,
+    onPrev: prevStepManual,
+    onNext: nextStepManual,
     onReset: handleReset,
     onToggleTTS: enableTTS ? tts.toggle : undefined,
     onSpeedUp: handleSpeedUp,
@@ -611,7 +669,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
               key={step.step_id}
               type="button"
               className={dotClasses}
-              onClick={() => goToStep(i)}
+              onClick={() => goToStepManual(i)}
               title={parametric ? `${step.title}（本步可调参）` : step.title}
               aria-label={`第 ${i + 1} 步：${step.title}${parametric ? "（可调参）" : ""}`}
             />
@@ -651,7 +709,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
 
         <button
           className="playbook-ctrl-btn"
-          onClick={prev}
+          onClick={prevStepManual}
           disabled={!canGoPrev}
           aria-label="上一步"
           type="button"
@@ -661,7 +719,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
 
         <button
           className="playbook-ctrl-btn"
-          onClick={next}
+          onClick={nextStepManual}
           disabled={!canGoNext}
           aria-label="下一步"
           type="button"
@@ -741,7 +799,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
                 key={step.step_id}
                 type="button"
                 className={`playbook-player__rail-step${i === safeStepIndex ? " is-active" : ""}`}
-                onClick={() => goToStep(i)}
+                onClick={() => goToStepManual(i)}
               >
                 <span>{String(i + 1).padStart(2, "0")}</span>
                 <strong>{step.title}</strong>

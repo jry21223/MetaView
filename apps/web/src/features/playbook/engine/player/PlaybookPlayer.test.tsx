@@ -1230,4 +1230,82 @@ describe("PlaybookPlayer", () => {
     expect(playerMockState.seekTo).toHaveBeenCalledTimes(1);
     expect(playerMockState.play).toHaveBeenCalledTimes(2);
   });
+
+  /** The latest handler the player registered for the given transport event. */
+  function latestPlayerListener(event: "play" | "pause"): () => void {
+    const call = playerMockState.addEventListener.mock.calls
+      .filter((registered) => registered[0] === event)
+      .at(-1);
+    if (!call) throw new Error(`no ${event} listener registered`);
+    return call[1] as () => void;
+  }
+
+  it("holds playback during live script edits and resumes on its own", () => {
+    vi.useFakeTimers();
+    try {
+      playerMockState.pause.mockClear();
+      playerMockState.play.mockClear();
+      const first = baseScript();
+      const view = render(<PlaybookPlayer script={first} enableTTS={false} />);
+      act(() => latestPlayerListener("play")());
+
+      // A slider tick hands the player a rebuilt script object.
+      view.rerender(<PlaybookPlayer script={{ ...first }} enableTTS={false} />);
+      expect(playerMockState.pause).toHaveBeenCalledTimes(1);
+      expect(playerMockState.play).not.toHaveBeenCalled();
+
+      // Once the edits go quiet the lesson resumes without a manual press.
+      act(() => {
+        vi.advanceTimersByTime(800);
+      });
+      expect(playerMockState.play).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("leaves a paused lesson paused through script edits", () => {
+    vi.useFakeTimers();
+    try {
+      playerMockState.pause.mockClear();
+      playerMockState.play.mockClear();
+      const first = baseScript();
+      const view = render(<PlaybookPlayer script={first} enableTTS={false} />);
+
+      view.rerender(<PlaybookPlayer script={{ ...first }} enableTTS={false} />);
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      expect(playerMockState.pause).not.toHaveBeenCalled();
+      expect(playerMockState.play).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("drops the pending auto-resume when the user takes the transport", () => {
+    vi.useFakeTimers();
+    try {
+      playerMockState.pause.mockClear();
+      playerMockState.play.mockClear();
+      const first = baseScript();
+      const view = render(<PlaybookPlayer script={first} enableTTS={false} />);
+      act(() => latestPlayerListener("play")());
+
+      view.rerender(<PlaybookPlayer script={{ ...first }} enableTTS={false} />);
+      expect(playerMockState.pause).toHaveBeenCalledTimes(1);
+
+      // The player reports the hold as a pause; the user then presses play
+      // themselves — the stale auto-resume must not fire a second play.
+      act(() => latestPlayerListener("pause")());
+      fireEvent.click(view.getByRole("button", { name: "播放" }));
+      expect(playerMockState.play).toHaveBeenCalledTimes(1);
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      expect(playerMockState.play).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
