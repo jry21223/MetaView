@@ -416,6 +416,41 @@
 .mv-template-params { display: grid; gap: 15px; padding: 12px 14px 14px; }
 .mv-template-param { display: grid; gap: 7px; }
 
+.mv-template-param--step-active {
+  border-left: 2px solid var(--accent);
+  padding-left: 10px;
+  margin-left: -12px;
+}
+
+.mv-template-param--step-inactive { opacity: 0.45; }
+
+.mv-template-param__badge {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 999px;
+  color: var(--ink-3);
+  background: color-mix(in srgb, var(--line-2) 60%, transparent);
+  white-space: nowrap;
+}
+
+.mv-template-param__badge.is-active {
+  color: var(--accent-contrast);
+  background: var(--accent);
+}
+
+.mv-template-params__frozen {
+  margin: 0 0 4px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--line-2);
+  color: var(--ink-2);
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
 .mv-template-param__head {
   display: flex;
   align-items: baseline;

@@ -91,7 +91,7 @@ interface PlaybookPlayerProps {
   swapDurationFrames?: number;
   onOpenExport?: () => void;
   /** Custom deterministic parameter controls rendered in the existing Params panel. */
-  parameterSlot?: React.ReactNode;
+  parameterSlot?: React.ReactNode | ((context: PlaybookSlotContext) => React.ReactNode);
   /** A static node for Studio or a step-aware renderer for deterministic previews. */
   followupSlot?: PlaybookFollowupSlot;
   /** Keep false for surfaces that must never inherit persisted remote TTS settings. */
@@ -217,22 +217,16 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     ? Math.min(currentStepIndex, script.steps.length - 1)
     : 0;
   // A reshaped timeline (parameter edits change narration lengths, shifting
-  // end frames) remounts the keyed Player below. Carry the viewer to the
-  // current step's settled frame instead of resetting to the opening poster.
-  const [timelineCarry, setTimelineCarry] = useState<{ key: string; frame: number | null }>({
-    key: playerTimelineKey,
-    frame: null,
-  });
-  if (timelineCarry.key !== playerTimelineKey) {
-    setTimelineCarry({
-      key: playerTimelineKey,
-      frame: resolveCarriedStepFrame(script, safeStepIndex, initialPreviewFrame),
-    });
-  }
-  const playerMountFrame =
-    timelineCarry.key === playerTimelineKey && timelineCarry.frame != null
-      ? timelineCarry.frame
-      : initialPreviewFrame;
+  // end frames) used to remount a keyed Player, which blinked on every
+  // slider tick. The Player now stays mounted through reshapes; before the
+  // browser paints, playback is re-seated on the current step's settled
+  // frame so dragging a parameter re-solves the picture in place.
+  const timelineSignatureRef = useRef(playerTimelineKey);
+  useLayoutEffect(() => {
+    if (timelineSignatureRef.current === playerTimelineKey) return;
+    timelineSignatureRef.current = playerTimelineKey;
+    playerRef.current?.seekTo(resolveCarriedStepFrame(script, safeStepIndex, initialPreviewFrame));
+  }, [playerTimelineKey, script, safeStepIndex, initialPreviewFrame]);
   const codeOverlay = useMemo(
     () => resolveCodePanelOverlay(displayScript, safeStepIndex),
     [displayScript, safeStepIndex],
@@ -438,15 +432,19 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     currentStep,
     currentNarrationFallback,
   );
+  const slotContext = {
+    currentStepId: currentStep.step_id,
+    currentStepIndex: safeStepIndex,
+    script: displayScript,
+  };
   const resolvedFollowupSlot = typeof followupSlot === "function"
-    ? followupSlot({
-        currentStepId: currentStep.step_id,
-        currentStepIndex: safeStepIndex,
-        script: displayScript,
-      })
+    ? followupSlot(slotContext)
     : followupSlot;
+  const resolvedParameterSlot = typeof parameterSlot === "function"
+    ? parameterSlot(slotContext)
+    : parameterSlot;
   const showMobileConsole = isPortraitLayout && showLearningConsole;
-  const hasControlPanel = Boolean(parameterSlot) || showDomainPanel || showInteractionPanel;
+  const hasControlPanel = Boolean(resolvedParameterSlot) || showDomainPanel || showInteractionPanel;
   const effectiveMobileTab =
     mobileTab === "params" && !hasControlPanel ? "narration" : mobileTab;
   const effectiveMobileSheet =
@@ -470,7 +468,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   };
   const mobileParamsContent = (
     <>
-      {parameterSlot}
+      {resolvedParameterSlot}
       {interactionSlot}
       {showDomainPanel && (
         <ParamPanelSlot
@@ -532,7 +530,6 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
           </div>
         )}
         <Player
-          key={playerTimelineKey}
           ref={playerRef}
           component={PlaybookComposition}
           inputProps={{
@@ -552,7 +549,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
           fps={script.fps}
           compositionWidth={PLAYBOOK_DEFAULTS.COMPOSITION_WIDTH}
           compositionHeight={PLAYBOOK_DEFAULTS.COMPOSITION_HEIGHT}
-          initialFrame={playerMountFrame}
+          initialFrame={initialPreviewFrame}
           style={{ width: "100%", height: "100%" }}
           playbackRate={playbackRate}
           clickToPlay={false}
@@ -747,7 +744,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
           baseScript={baseScript}
           overrides={overrides}
           onOverridesChange={setOverrides}
-          parameterSlot={parameterSlot}
+          parameterSlot={resolvedParameterSlot}
           interactionSlot={interactionSlot}
           followupSlot={resolvedFollowupSlot}
           relatedSlot={relatedSlot}

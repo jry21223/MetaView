@@ -34,6 +34,11 @@ interface BaseTemplatePreviewControl {
   label: string;
   description: string;
   resetPlayback: boolean;
+  /**
+   * Step ids where dragging this control visibly changes the picture.
+   * Omitted = the control applies on every step (no per-step badges shown).
+   */
+  steps?: readonly string[];
 }
 
 export interface NumberTemplatePreviewControl extends BaseTemplatePreviewControl {

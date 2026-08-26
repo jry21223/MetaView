@@ -1151,10 +1151,10 @@ export const CROSS_SUBJECT_PUBLIC_GOLD_TEMPLATES: readonly GoldTemplateManifest[
     prompt: "从 Carlson 1913 年酵母数据出发讲解 Logistic 模型：检验指数假设、拟合 S 形曲线、定位 K/2 拐点，引入恒定努力捕捞推导最大可持续产量 rK/4，并用圣马修岛驯鹿说明模型失效的边界。",
     defaults: { r: 0.55, K: 663, N0: 9.6, E: 0 },
     controls: [
-      { id: "r", kind: "range", label: "内禀增长率 r", description: "拟合值 0.55；决定坡度", min: 0.3, max: 0.9, step: 0.01, resetPlayback: false },
-      { id: "K", kind: "range", label: "环境容量 K", description: "拟合值 663；数据的天花板", min: 400, max: 900, step: 1, resetPlayback: false },
-      { id: "N0", kind: "range", label: "初始种群 N₀", description: "观测值 9.6；只挪起点", min: 4, max: 30, step: 0.1, resetPlayback: false },
-      { id: "E", kind: "range", label: "捕捞强度 E", description: "E=r/2 产量最大；E≥r 崩溃", min: 0, max: 0.9, step: 0.005, resetPlayback: false },
+      { id: "r", kind: "range", label: "内禀增长率 r", description: "拟合值 0.55；决定坡度", min: 0.3, max: 0.9, step: 0.01, resetPlayback: false, steps: ["logistic-s-curve", "logistic-inflection", "logistic-harvest", "logistic-msy", "logistic-skeleton"] },
+      { id: "K", kind: "range", label: "环境容量 K", description: "拟合值 663；数据的天花板", min: 400, max: 900, step: 1, resetPlayback: false, steps: ["logistic-density-dependence", "logistic-s-curve", "logistic-inflection", "logistic-harvest", "logistic-msy", "logistic-skeleton"] },
+      { id: "N0", kind: "range", label: "初始种群 N₀", description: "观测值 9.6；只挪起点", min: 4, max: 30, step: 0.1, resetPlayback: false, steps: ["logistic-s-curve", "logistic-inflection", "logistic-harvest", "logistic-skeleton"] },
+      { id: "E", kind: "range", label: "捕捞强度 E", description: "E=r/2 产量最大；E≥r 崩溃", min: 0, max: 0.9, step: 0.005, resetPlayback: false, steps: ["logistic-harvest", "logistic-msy"] },
     ],
     requiredCapabilities: ["math_plot", "expression_curve", "curve_marker", "data_points"],
     expectedFacts: [
@@ -1199,8 +1199,8 @@ export const CROSS_SUBJECT_PUBLIC_GOLD_TEMPLATES: readonly GoldTemplateManifest[
     prompt: "用一年一代的离散 logistic 映射讲解兔群动力学：r 从 0.5 推到 3 经历收敛、过冲、周期 2、周期 4 与混沌，用初值差 0.000001 的双轨迹演示蝴蝶效应，再用分岔图给出全景，最后以洛伦兹吸引子说明连续系统同样的可预测性上限。",
     defaults: { r: 2.95, N0: 10 },
     controls: [
-      { id: "r", kind: "range", label: "年增长率 r", description: "0.5 安定 → 3 深混沌", min: 0.5, max: 3, step: 0.01, resetPlayback: false },
-      { id: "N0", kind: "range", label: "初始兔群 N₀", description: "混沌区里挪一格即分道", min: 1, max: 100, step: 0.5, resetPlayback: false },
+      { id: "r", kind: "range", label: "年增长率 r", description: "0.5 安定 → 3 深混沌", min: 0.5, max: 3, step: 0.01, resetPlayback: false, steps: ["chaos-bifurcation", "chaos-sandbox"] },
+      { id: "N0", kind: "range", label: "初始兔群 N₀", description: "混沌区里挪一格即分道", min: 1, max: 100, step: 0.5, resetPlayback: false, steps: ["chaos-one-generation", "chaos-overshoot", "chaos-period-two", "chaos-period-four", "chaos-deep", "chaos-butterfly", "chaos-sandbox"] },
     ],
     requiredCapabilities: ["math_plot", "trajectory_polyline", "data_points", "phase_portrait_scene"],
     expectedFacts: [

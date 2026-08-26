@@ -164,6 +164,14 @@ describe("cross-subject public Gold Templates", () => {
         previousEnd = step.end_frame;
       }
       expect(new Set(script.steps.map((step) => step.step_id)).size).toBe(script.steps.length);
+      const stepIds = new Set(script.steps.map((step) => step.step_id));
+      for (const control of item.parameterSchema?.controls ?? []) {
+        if (!control.steps) continue;
+        expect(control.steps.length).toBeGreaterThan(0);
+        for (const stepId of control.steps) {
+          expect(stepIds.has(stepId)).toBe(true);
+        }
+      }
       expect(Object.keys(prompts)).toEqual(script.steps.map((step) => step.step_id));
       expect(script.steps.every((step) => prompts[step.step_id]?.length === 3)).toBe(true);
       expect(item.expectedFacts.length).toBeGreaterThanOrEqual(3);

@@ -94,12 +94,13 @@ function TemplatePreviewContent({
           script={script}
           initialFrame={settledOpeningFrame}
           theme={theme}
-          parameterSlot={(
+          parameterSlot={({ currentStepId }) => (
             <TemplatePreviewControls
               previewCase={previewCase}
               params={renderedParams}
               onChange={updateParam}
               onReset={resetParams}
+              currentStepId={currentStepId}
             />
           )}
           followupSlot={({ currentStepId }) => (
