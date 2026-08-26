@@ -999,6 +999,7 @@ function standalone(args: {
   mechanismByStep?: Record<string, string>;
   transfer: string;
   posterStepIndex?: number;
+  handsOn?: readonly string[];
 }): GoldTemplateManifest {
   const defaultScript = args.builder(args.defaults);
   return defineStandaloneGoldTemplate({
@@ -1017,6 +1018,7 @@ function standalone(args: {
       frame: posterFrameForStep(defaultScript, args.posterStepIndex ?? defaultScript.steps.length - 1),
     },
     requiredCapabilities: args.requiredCapabilities,
+    handsOnStepIds: args.handsOn,
     expectedFacts: args.expectedFacts,
     visualInvariants: args.visualInvariants,
     pedagogicalRubric: {
@@ -1157,6 +1159,7 @@ export const CROSS_SUBJECT_PUBLIC_GOLD_TEMPLATES: readonly GoldTemplateManifest[
       { id: "E", kind: "range", label: "捕捞强度 E", description: "E=r/2 产量最大；E≥r 崩溃", min: 0, max: 0.9, step: 0.005, resetPlayback: false, steps: ["logistic-harvest", "logistic-msy"] },
     ],
     requiredCapabilities: ["math_plot", "expression_curve", "curve_marker", "data_points"],
+    handsOn: ["logistic-s-curve", "logistic-harvest"],
     expectedFacts: [
       { id: "logistic-equation", description: "密度制约的增长方程", anyOf: ["rN(1−N/K)", "rN(1-N/K)", "dN/dt=rN"] },
       { id: "logistic-data-first", description: "以 Carlson 1913 酵母数据开场并检验指数假设", anyOf: ["Carlson", "1913", "酵母"] },
@@ -1203,6 +1206,7 @@ export const CROSS_SUBJECT_PUBLIC_GOLD_TEMPLATES: readonly GoldTemplateManifest[
       { id: "N0", kind: "range", label: "初始兔群 N₀", description: "混沌区里挪一格即分道", min: 1, max: 100, step: 0.5, resetPlayback: false, steps: ["chaos-one-generation", "chaos-overshoot", "chaos-period-two", "chaos-period-four", "chaos-deep", "chaos-butterfly", "chaos-sandbox"] },
     ],
     requiredCapabilities: ["math_plot", "trajectory_polyline", "data_points", "phase_portrait_scene"],
+    handsOn: ["chaos-bifurcation", "chaos-sandbox"],
     expectedFacts: [
       { id: "chaos-map", description: "一年一代的离散 logistic 映射", anyOf: ["N_{t+1}", "一年一代", "迭代"] },
       { id: "chaos-doubling", description: "倍周期级联在 r≈2.57 通向混沌", anyOf: ["倍周期", "2.57", "分岔"] },

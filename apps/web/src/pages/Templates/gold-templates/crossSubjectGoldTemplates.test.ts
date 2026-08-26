@@ -172,6 +172,14 @@ describe("cross-subject public Gold Templates", () => {
           expect(stepIds.has(stepId)).toBe(true);
         }
       }
+      if (item.handsOnStepIds) {
+        // The ring is an invitation, not a capability map — keep it scarce.
+        expect(item.handsOnStepIds.length).toBeGreaterThanOrEqual(1);
+        expect(item.handsOnStepIds.length).toBeLessThanOrEqual(3);
+        for (const stepId of item.handsOnStepIds) {
+          expect(stepIds.has(stepId)).toBe(true);
+        }
+      }
       expect(Object.keys(prompts)).toEqual(script.steps.map((step) => step.step_id));
       expect(script.steps.every((step) => prompts[step.step_id]?.length === 3)).toBe(true);
       expect(item.expectedFacts.length).toBeGreaterThanOrEqual(3);

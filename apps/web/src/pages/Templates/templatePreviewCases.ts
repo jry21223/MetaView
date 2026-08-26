@@ -58,6 +58,8 @@ export type TemplatePreviewControl =
   | SelectTemplatePreviewControl;
 
 export interface TemplatePreviewCase {
+  /** Curated hands-on moments whose timeline dots get the ring (1–3 ids). */
+  handsOnStepIds?: readonly string[];
   id: TemplatePreviewCaseId;
   templateId: TemplatePreviewCaseId;
   posterUrl: string;

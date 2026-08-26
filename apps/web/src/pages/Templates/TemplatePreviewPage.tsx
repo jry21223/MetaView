@@ -75,15 +75,9 @@ function TemplatePreviewContent({
     [renderedParams, previewCase, script],
   );
   const settledOpeningFrame = Math.max(0, (script.steps[0]?.end_frame ?? 1) - 1);
-  // Only cases whose controls all declare step scopes get hands-on dot rings;
-  // an unscoped control means "applies everywhere", where rings say nothing.
-  const parametricStepIds = useMemo(() => {
-    const controls = previewCase.controls;
-    if (!controls.length || controls.some((control) => !control.steps)) return undefined;
-    const ids = new Set<string>();
-    for (const control of controls) for (const stepId of control.steps ?? []) ids.add(stepId);
-    return [...ids];
-  }, [previewCase]);
+  // Rings mark the case's curated hands-on moments (1–3 per template), not
+  // every step a parameter merely touches — scarcity keeps the cue readable.
+  const parametricStepIds = previewCase.handsOnStepIds;
 
   const updateParam = (id: string, value: TemplatePreviewParamValue, resetPlayback: boolean) => {
     setParams({ ...renderedParams, [id]: value });

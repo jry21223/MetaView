@@ -63,6 +63,12 @@ export interface GoldTemplateManifest {
     controls: TemplatePreviewControl[];
     defaults: TemplatePreviewParams;
   };
+  /**
+   * Curated hands-on moments (one to three step ids) that earn the timeline
+   * ring. Deliberately scarcer than the controls' per-step effect scopes:
+   * the ring is an invitation, not a capability map.
+   */
+  handsOnStepIds?: readonly string[];
   poster: {
     url: string;
     alt: string;
@@ -165,6 +171,7 @@ export function manifestToPreviewCase(
     posterUrl: manifest.poster.url,
     posterAlt: manifest.poster.alt,
     posterFrame: manifest.poster.frame,
+    handsOnStepIds: manifest.handsOnStepIds,
     defaultParams: { ...(manifest.parameterSchema?.defaults ?? {}) },
     controls: [...(manifest.parameterSchema?.controls ?? [])],
     buildScript: manifest.buildPublicPlaybook,
