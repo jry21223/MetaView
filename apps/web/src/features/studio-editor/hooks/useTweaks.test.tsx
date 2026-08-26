@@ -47,6 +47,32 @@ describe("useTweaks", () => {
     ).toBe("#ffffff");
   });
 
+  it("follows the OS color scheme on first visit and keeps a saved choice afterwards", () => {
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes("prefers-color-scheme: dark"),
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+    try {
+      const fresh = renderHook(() => useTweaks(TWEAK_DEFAULTS));
+      expect(fresh.result.current[0].theme).toBe("dark");
+      expect(fresh.result.current[0].accent).toBe(THEME_PALETTE.dark.accent);
+      cleanup();
+
+      localStorage.setItem("mv_tweaks", JSON.stringify({ theme: "light" }));
+      const saved = renderHook(() => useTweaks(TWEAK_DEFAULTS));
+      expect(saved.result.current[0].theme).toBe("light");
+    } finally {
+      window.matchMedia = originalMatchMedia;
+    }
+  });
+
   it("migrates the legacy bright-green default to the current theme accent", () => {
     localStorage.setItem(
       "mv_tweaks",

@@ -150,24 +150,42 @@ export function themeVars(t: TweakValues): Record<string, string> {
   };
 }
 
+/**
+ * First visit only: with no saved tweak set the theme follows the OS color
+ * scheme; any persisted choice (including the snapshot saved right after that
+ * first visit) wins on later loads, and the topbar toggle stays authoritative.
+ */
+function systemPreferredTheme(fallback: ThemeName): ThemeName {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return fallback;
+  }
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : fallback;
+}
+
 function loadFromStorage(defaults: TweakValues): TweakValues {
   if (typeof window === "undefined") return defaults;
+  const systemTheme = systemPreferredTheme(defaults.theme);
+  const systemDefaults: TweakValues = {
+    ...defaults,
+    theme: systemTheme,
+    accent: THEME_PALETTE[systemTheme]?.accent ?? defaults.accent,
+  };
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaults;
+    if (!raw) return systemDefaults;
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
-      return defaults;
+      return systemDefaults;
     const persisted = parsed as Partial<TweakValues>;
-    const theme = isThemeName(persisted.theme) ? persisted.theme : defaults.theme;
+    const theme = isThemeName(persisted.theme) ? persisted.theme : systemDefaults.theme;
     const migrated =
       typeof persisted.accent === "string" &&
       LEGACY_DEFAULT_ACCENTS.has(persisted.accent.toLowerCase())
         ? { ...persisted, accent: THEME_PALETTE[theme].accent }
         : persisted;
-    return sanitizeTweaks({ ...defaults, ...migrated }, defaults);
+    return sanitizeTweaks({ ...systemDefaults, ...migrated }, systemDefaults);
   } catch {
-    return defaults;
+    return systemDefaults;
   }
 }
 
