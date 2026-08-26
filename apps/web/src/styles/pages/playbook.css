@@ -528,6 +528,30 @@
   box-shadow: 0 0 0 4px var(--player-accent-soft);
 }
 
+/* Steps where template parameters take effect: a hands-on ring in the same
+   focus orange as draggable canvas markers — color plus shape, so the cue
+   survives color-blindness and pairs with the params panel badges. */
+.playbook-player__progress button.is-parametric::before {
+  width: 8px;
+  height: 8px;
+  background: transparent;
+  border: 1.5px solid var(--canvas-focus, #e8833a);
+}
+
+.playbook-player__progress button.is-parametric:hover::before {
+  background: color-mix(in srgb, var(--canvas-focus, #e8833a) 30%, transparent);
+}
+
+.playbook-player__progress button.is-active.is-parametric::before {
+  width: 10px;
+  height: 10px;
+  background: var(--player-accent);
+  border: 0;
+  box-shadow:
+    0 0 0 4px var(--player-accent-soft),
+    0 0 0 5.5px var(--canvas-focus, #e8833a);
+}
+
 .playbook-player__caption {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);

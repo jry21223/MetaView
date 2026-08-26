@@ -1198,4 +1198,20 @@ describe("PlaybookPlayer", () => {
     expect(view.queryByText("沙盒预览")).toBeNull();
   });
 
+  it("rings the timeline dots of parameter-effective steps", () => {
+    const { getByRole } = render(
+      <PlaybookPlayer
+        script={baseScript()}
+        enableTTS={false}
+        parametricStepIds={["s2"]}
+      />,
+    );
+
+    const ringed = getByRole("button", { name: "第 2 步：调整参数（可调参）" });
+    expect(ringed.className).toContain("is-parametric");
+    expect(ringed.title).toBe("调整参数（本步可调参）");
+
+    const plain = getByRole("button", { name: "第 1 步：建立函数" });
+    expect(plain.className).not.toContain("is-parametric");
+  });
 });

@@ -100,6 +100,8 @@ interface PlaybookPlayerProps {
   showLearningConsole?: boolean;
   /** Hide the generation-coverage chip on curated surfaces such as template pages. */
   showCapabilityNotice?: boolean;
+  /** Step ids where template parameters take effect; their timeline dots get the hands-on ring. */
+  parametricStepIds?: readonly string[];
   /** Opt-in browser-only sandbox controls. Read-only player surfaces leave this disabled. */
   enableInteractionSandbox?: boolean;
   /** Explicit user-triggered handoff of normalized semantic events to follow-up AI. */
@@ -129,6 +131,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   relatedSlot,
   showLearningConsole = true,
   showCapabilityNotice = true,
+  parametricStepIds,
   enableInteractionSandbox = false,
   onExplainInteraction,
   onApplyInteractionVersion,
@@ -219,6 +222,10 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   const safeStepIndex = script.steps.length
     ? Math.min(currentStepIndex, script.steps.length - 1)
     : 0;
+  const parametricStepSet = useMemo(
+    () => (parametricStepIds ? new Set(parametricStepIds) : null),
+    [parametricStepIds],
+  );
   // A reshaped timeline (parameter edits change narration lengths, shifting
   // end frames) used to remount a keyed Player, which blinked on every
   // slider tick. The Player now stays mounted through reshapes; before the
@@ -570,17 +577,24 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
         {isPlaying ? "⏸" : "▶"}
       </button>
 
-      <div className="playbook-player__progress" role="group" aria-label="Lesson steps">
-        {script.steps.map((step, i) => (
-          <button
-            key={step.step_id}
-            type="button"
-            className={i === safeStepIndex ? "is-active" : ""}
-            onClick={() => goToStep(i)}
-            title={step.title}
-            aria-label={`Step ${i + 1}: ${step.title}`}
-          />
-        ))}
+      <div className="playbook-player__progress" role="group" aria-label="步骤导航">
+        {script.steps.map((step, i) => {
+          const parametric = parametricStepSet?.has(step.step_id) ?? false;
+          const dotClasses = [
+            i === safeStepIndex ? "is-active" : "",
+            parametric ? "is-parametric" : "",
+          ].filter(Boolean).join(" ");
+          return (
+            <button
+              key={step.step_id}
+              type="button"
+              className={dotClasses}
+              onClick={() => goToStep(i)}
+              title={parametric ? `${step.title}（本步可调参）` : step.title}
+              aria-label={`第 ${i + 1} 步：${step.title}${parametric ? "（可调参）" : ""}`}
+            />
+          );
+        })}
       </div>
 
       <div className="playbook-player__control-actions">
