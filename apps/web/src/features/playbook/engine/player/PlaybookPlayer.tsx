@@ -98,6 +98,8 @@ interface PlaybookPlayerProps {
   enableTTS?: boolean;
   relatedSlot?: React.ReactNode;
   showLearningConsole?: boolean;
+  /** Hide the generation-coverage chip on curated surfaces such as template pages. */
+  showCapabilityNotice?: boolean;
   /** Opt-in browser-only sandbox controls. Read-only player surfaces leave this disabled. */
   enableInteractionSandbox?: boolean;
   /** Explicit user-triggered handoff of normalized semantic events to follow-up AI. */
@@ -126,6 +128,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   enableTTS = true,
   relatedSlot,
   showLearningConsole = true,
+  showCapabilityNotice = true,
   enableInteractionSandbox = false,
   onExplainInteraction,
   onApplyInteractionVersion,
@@ -518,9 +521,9 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
       </button>
     ) : null;
   const stageSlot = (
-    <section className="playbook-player__stage-shell" aria-label="Lesson animation">
+    <section className="playbook-player__stage-shell" aria-label="课程动画">
       <div className="playbook-player__stage">
-        {capability.message && capability.support !== "full" && (
+        {showCapabilityNotice && capability.message && capability.support !== "full" && (
           <div
             className="playbook-player__capability"
             title={capability.message}
@@ -748,7 +751,6 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
           interactionSlot={interactionSlot}
           followupSlot={resolvedFollowupSlot}
           relatedSlot={relatedSlot}
-          relatedAlgorithmId={script.algorithm_id}
         />
       )}
 

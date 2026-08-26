@@ -17,7 +17,6 @@ interface PlaybookLearningConsoleProps {
   interactionSlot?: React.ReactNode;
   followupSlot?: React.ReactNode;
   relatedSlot?: React.ReactNode;
-  relatedAlgorithmId?: string | null;
 }
 
 export function PlaybookLearningConsole({
@@ -32,15 +31,14 @@ export function PlaybookLearningConsole({
   interactionSlot,
   followupSlot,
   relatedSlot,
-  relatedAlgorithmId,
 }: PlaybookLearningConsoleProps) {
   return (
-    <aside className="playbook-player__console" aria-label="Learning console">
+    <aside className="playbook-player__console" aria-label="学习台">
       {showCodePanelSlot && (
         <section className="playbook-player__console-card playbook-player__code-card">
           <div className="playbook-player__console-head">
-            <span>Code Sync</span>
-            <small>{codeOverlay?.language ?? "source"}</small>
+            <span>代码同步</span>
+            <small>{codeOverlay?.language ?? "源码"}</small>
           </div>
           <div className="playbook-player__code-body">
             {codeOverlay ? (
@@ -52,7 +50,7 @@ export function PlaybookLearningConsole({
             ) : (
               <div className="playbook-player__code-empty">
                 <span>{"</>"}</span>
-                <p>Code highlights will sync here.</p>
+                <p>代码高亮会在这里同步。</p>
               </div>
             )}
           </div>
@@ -62,8 +60,8 @@ export function PlaybookLearningConsole({
       {(parameterSlot || interactionSlot || hasDomainPanel) && (
         <section className="playbook-player__console-card playbook-player__params-card">
           <div className="playbook-player__console-head">
-            <span>{interactionSlot && !parameterSlot ? "Explore" : "Params"}</span>
-            {interactionSlot && !parameterSlot && <small>Experimental</small>}
+            <span>{interactionSlot && !parameterSlot ? "探索" : "参数"}</span>
+            {interactionSlot && !parameterSlot && <small>实验</small>}
           </div>
           <div className="playbook-player__param-body">
             {parameterSlot}
@@ -84,22 +82,16 @@ export function PlaybookLearningConsole({
       {followupSlot && (
         <section className="playbook-player__console-card playbook-player__follow-card">
           <div className="playbook-player__console-head">
-            <span>Follow-up</span>
-            <small>current step</small>
+            <span>追问</span>
+            <small>当前步骤</small>
           </div>
           <div className="playbook-player__follow-body">{followupSlot}</div>
         </section>
       )}
 
-      {relatedSlot ? (
-        <section className="playbook-player__related-card" aria-label="Related study context">
+      {relatedSlot && (
+        <section className="playbook-player__related-card" aria-label="相关内容">
           {relatedSlot}
-        </section>
-      ) : (
-        <section className="playbook-player__related-row" aria-label="Related study context">
-          <span>Related</span>
-          <strong>{relatedAlgorithmId ?? "Study variants"}</strong>
-          <small>›</small>
         </section>
       )}
     </aside>

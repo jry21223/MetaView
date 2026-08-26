@@ -256,17 +256,17 @@ describe("PlaybookPlayer", () => {
       />,
     );
 
-    expect(getByText("Code Sync")).toBeTruthy();
-    expect(getByText("Params")).toBeTruthy();
-    expect(getByText("Follow-up")).toBeTruthy();
+    expect(getByText("代码同步")).toBeTruthy();
+    expect(getByText("参数")).toBeTruthy();
+    expect(getByText("追问")).toBeTruthy();
     expect(getByText("Related lesson")).toBeTruthy();
     expect(queryByText("Director")).toBeNull();
     expect(getByTestId("followup-slot")).toBeTruthy();
     expect(getByText("Ask this step")).toBeTruthy();
-    const consoleText = getByRole("complementary", { name: "Learning console" }).textContent ?? "";
-    expect(consoleText.indexOf("Code Sync")).toBeLessThan(consoleText.indexOf("Params"));
-    expect(consoleText.indexOf("Params")).toBeLessThan(consoleText.indexOf("Follow-up"));
-    expect(consoleText.indexOf("Follow-up")).toBeLessThan(consoleText.indexOf("Related lesson"));
+    const consoleText = getByRole("complementary", { name: "学习台" }).textContent ?? "";
+    expect(consoleText.indexOf("代码同步")).toBeLessThan(consoleText.indexOf("参数"));
+    expect(consoleText.indexOf("参数")).toBeLessThan(consoleText.indexOf("追问"));
+    expect(consoleText.indexOf("追问")).toBeLessThan(consoleText.indexOf("Related lesson"));
     expect(consoleText.match(/python/g)).toHaveLength(1);
     expect(consoleText).not.toContain("algorithm");
   });
@@ -303,9 +303,9 @@ describe("PlaybookPlayer", () => {
     });
 
     const { getByRole, getByText } = render(<PlaybookPlayer script={script} theme="light" />);
-    const learningConsole = getByRole("complementary", { name: "Learning console" });
+    const learningConsole = getByRole("complementary", { name: "学习台" });
 
-    expect(getByText("Code Sync")).toBeTruthy();
+    expect(getByText("代码同步")).toBeTruthy();
     expect(learningConsole.textContent).toContain("def factorial(n):");
     expect(learningConsole.textContent).toContain("n = 3");
   });
@@ -319,8 +319,8 @@ describe("PlaybookPlayer", () => {
       />,
     );
 
-    expect(queryByText("Code Sync")).toBeNull();
-    expect(queryByText("Params")).toBeNull();
+    expect(queryByText("代码同步")).toBeNull();
+    expect(queryByText("参数")).toBeNull();
     expect(container.querySelector(".playbook-player__params-card")).toBeNull();
     expect(container.querySelector(".playbook-player__follow-card")).toBeTruthy();
     expect(getByTestId("followup-slot")).toBeTruthy();
@@ -335,7 +335,7 @@ describe("PlaybookPlayer", () => {
       <PlaybookPlayer script={script} theme="light" />,
     );
 
-    expect(getByText("Params")).toBeTruthy();
+    expect(getByText("参数")).toBeTruthy();
     expect(getByLabelText("斜率 a")).toBeTruthy();
   });
 
@@ -352,7 +352,7 @@ describe("PlaybookPlayer", () => {
       />,
     );
 
-    expect(getByText("Params")).toBeTruthy();
+    expect(getByText("参数")).toBeTruthy();
     expect(getByTestId("static-params")).toBeTruthy();
     expect(getByTestId("static-followup").textContent).toContain(script.steps[0].step_id);
   });
@@ -635,7 +635,7 @@ describe("PlaybookPlayer", () => {
     expect(followBody?.textContent).toContain("Ask this step");
     expect(followBody?.textContent).not.toContain("版本记录");
 
-    const relatedPanel = getByLabelText("Related study context");
+    const relatedPanel = getByLabelText("相关内容");
     expect(within(relatedPanel).getByTestId("version-history")).toBeTruthy();
     expect(getByTestId("followup-slot")).toBeTruthy();
     expect(queryByText("Study variants")).toBeNull();
@@ -679,10 +679,10 @@ describe("PlaybookPlayer", () => {
     );
 
     expect(container.querySelector(".playbook-player--no-console")).toBeTruthy();
-    expect(queryByLabelText("Learning console")).toBeNull();
-    expect(queryByText("Code Sync")).toBeNull();
-    expect(queryByText("Params")).toBeNull();
-    expect(queryByText("Follow-up")).toBeNull();
+    expect(queryByLabelText("学习台")).toBeNull();
+    expect(queryByText("代码同步")).toBeNull();
+    expect(queryByText("参数")).toBeNull();
+    expect(queryByText("追问")).toBeNull();
     expect(queryByText("Related")).toBeNull();
     expect(queryByText("Ask a follow-up")).toBeNull();
     expect(queryByText("版本记录")).toBeNull();
@@ -693,7 +693,7 @@ describe("PlaybookPlayer", () => {
       <PlaybookPlayer script={derivativeScript()} theme="light" />,
     );
 
-    expect(queryByText("Explore")).toBeNull();
+    expect(queryByText("探索")).toBeNull();
     expect(queryByRole("slider", { name: "切点 x" })).toBeNull();
     expect(getByTestId("mock-remotion-player").getAttribute("data-marker-x")).toBe("1");
   });
@@ -707,7 +707,7 @@ describe("PlaybookPlayer", () => {
       />,
     );
 
-    expect(getByText("Explore")).toBeTruthy();
+    expect(getByText("探索")).toBeTruthy();
     const slider = getByRole("slider", { name: "切点 x" });
     fireEvent.change(slider, { target: { value: "3" } });
     fireEvent.pointerUp(slider);
@@ -727,7 +727,7 @@ describe("PlaybookPlayer", () => {
       />,
     );
 
-    expect(queryByText("Explore")).toBeNull();
+    expect(queryByText("探索")).toBeNull();
     expect(queryByRole("slider", { name: "切点 x" })).toBeNull();
     expect(getByTestId("mock-remotion-player").getAttribute("data-marker-x")).toBe("1");
   });
@@ -751,7 +751,7 @@ describe("PlaybookPlayer", () => {
     });
     fireEvent.click(getByRole("button", { name: "重置" }));
     await waitFor(() => {
-      expect(queryByText("Explore")).toBeNull();
+      expect(queryByText("探索")).toBeNull();
     });
   });
 
@@ -780,7 +780,7 @@ describe("PlaybookPlayer", () => {
       <PlaybookPlayer script={script} theme="light" />,
     );
 
-    expect(getByText("Params")).toBeTruthy();
+    expect(getByText("参数")).toBeTruthy();
     expect(getByDisplayValue("3")).toBeTruthy();
     expect(getByDisplayValue("1")).toBeTruthy();
   });
@@ -872,7 +872,7 @@ describe("PlaybookPlayer", () => {
 
     const { queryByText } = render(<PlaybookPlayer script={script} theme="light" />);
 
-    expect(queryByText("Params")).toBeNull();
+    expect(queryByText("参数")).toBeNull();
     expect(queryByText(/不可用|不支持/)).toBeNull();
   });
 
@@ -905,7 +905,7 @@ describe("PlaybookPlayer", () => {
   it("keeps the interaction sandbox disabled unless a player surface opts in", () => {
     const view = render(<PlaybookPlayer script={derivativeScript()} theme="light" />);
 
-    expect(view.queryByText("Explore")).toBeNull();
+    expect(view.queryByText("探索")).toBeNull();
     expect(view.queryByText("沙盒预览")).toBeNull();
     expect(view.getByTestId("mock-remotion-player").getAttribute("data-has-interaction"))
       .toBe("false");
@@ -935,7 +935,7 @@ describe("PlaybookPlayer", () => {
       />,
     );
 
-    expect(view.getByText("Explore")).toBeTruthy();
+    expect(view.getByText("探索")).toBeTruthy();
     expect(view.queryByText("此步骤无可调参数。")).toBeNull();
     expect(view.getByTestId("mock-remotion-player").getAttribute("data-has-interaction"))
       .toBe("true");
@@ -1088,7 +1088,7 @@ describe("PlaybookPlayer", () => {
     expect(reset.disabled).toBe(false);
     fireEvent.click(reset);
     await waitFor(() => {
-      expect(view.queryByText("Explore")).toBeNull();
+      expect(view.queryByText("探索")).toBeNull();
     });
   });
 

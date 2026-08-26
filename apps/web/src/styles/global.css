@@ -39,9 +39,18 @@ body {
     sans-serif;
   font-feature-settings: "cv11", "ss01";
   -webkit-font-smoothing: antialiased;
-  background: var(--bg);
+  /* --bg lives on .mv-root's inline theme vars and never reaches body, so
+     resolve a themed fallback here — any app-shell shortfall (visual-viewport
+     rounding, overscroll) shows page-colored ground instead of bare white. */
+  background: var(--bg, #f4f1ea);
   color: var(--ink);
   min-width: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background: var(--bg, #0b0f0d);
+  }
 }
 
 body.mv-modal-open {

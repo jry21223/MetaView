@@ -111,6 +111,7 @@ function TemplatePreviewContent({
             />
           )}
           enableTTS={false}
+          showCapabilityNotice={false}
           showLearningConsole
           topbarCollapsed={topbarCollapsed}
           onToggleTopbar={onToggleTopbar}
