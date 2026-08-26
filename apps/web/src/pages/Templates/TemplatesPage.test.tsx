@@ -50,11 +50,11 @@ describe("TemplatesPage lesson atlas", () => {
     expect(view.getByLabelText("current-path").textContent).toBe("/templates/binary-search");
   });
 
-  it("publishes twenty-one line-drawn previews and keeps the other templates disabled", () => {
+  it("publishes eighteen line-drawn previews and keeps the other templates disabled", () => {
     const { container, getByRole } = renderPage();
 
-    expect(TEMPLATES).toHaveLength(32);
-    expect(container.querySelectorAll("[data-preview]")).toHaveLength(21);
+    expect(TEMPLATES).toHaveLength(28);
+    expect(container.querySelectorAll("[data-preview]")).toHaveLength(18);
     expect((getByRole("button", { name: "斐波那契 · 记忆化，制作中" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -84,7 +84,7 @@ describe("TemplatesPage lesson atlas", () => {
     expect(algorithmSection).not.toBeNull();
     expect(view.queryByRole("button", { name: "代码" })).toBeNull();
     expect(view.queryByRole("heading", { name: "代码" })).toBeNull();
-    expect(within(algorithmSection as HTMLElement).getByText("两数之和 · 哈希表")).toBeTruthy();
+    expect(view.queryByText("两数之和 · 哈希表")).toBeNull();
     expect(within(algorithmSection as HTMLElement).getByText("斐波那契 · 记忆化")).toBeTruthy();
   });
 

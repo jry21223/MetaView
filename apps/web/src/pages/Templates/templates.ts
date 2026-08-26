@@ -15,6 +15,7 @@ export type TemplateDomain =
   | "math"
   | "physics"
   | "chemistry"
+  | "ecology"
   | "biology"
   | "geography";
 
@@ -32,6 +33,7 @@ export const TEMPLATE_DOMAIN_LABEL: Record<TemplateDomain, string> = {
   math: "数学",
   physics: "物理",
   chemistry: "化学",
+  ecology: "生态学",
   biology: "生物",
   geography: "地理",
 };
@@ -139,7 +141,8 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
   },
 
   // ---- code-driven algorithms ----
-  publicGoldEntry("two-sum", "algorithm"),
+  // two-sum is hidden from the catalog while the coursepack focus narrows to
+  // math conics + the ecology pilot; its manifest and hidden variants remain.
   {
     id: "fib-memo",
     domain: "algorithm",
@@ -172,18 +175,14 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
   },
 
   // ---- chemistry ----
-  publicGoldEntry("redox-electron", "chemistry"),
-  {
-    id: "neutralization",
-    domain: "chemistry",
-    title: "强酸强碱中和",
-    desc: "HCl + NaOH 的滴定与 pH 变化",
-    prompt: "讲解 HCl 与 NaOH 的中和反应：写出化学方程式，分别在反应前/中/后展示离子分布和 pH",
-  },
+  // Hidden while the catalog narrows to the coursepack focus (redox-electron
+  // and the neutralization placeholder); manifests stay registered.
+
+  // ---- ecology (university pilot) ----
+  publicGoldEntry("logistic-growth", "ecology"),
+  publicGoldEntry("rabbit-chaos", "ecology"),
 
   // ---- biology ----
-  publicGoldEntry("logistic-growth", "biology"),
-  publicGoldEntry("rabbit-chaos", "biology"),
   {
     id: "atp-synthesis",
     domain: "biology",
@@ -194,7 +193,7 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
   publicGoldEntry("dna-replication", "biology"),
 
   // ---- geography ----
-  publicGoldEntry("monsoon", "geography"),
+  // monsoon is hidden with the same catalog narrowing; manifest remains.
   {
     id: "plate-tectonics",
     domain: "geography",
