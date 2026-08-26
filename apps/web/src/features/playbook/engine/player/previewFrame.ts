@@ -14,21 +14,29 @@ export function resolveInitialPreviewFrame(
 }
 
 /**
- * Settled frame of one step — used to keep the viewer's place when a reshaped
- * timeline (parameter edits change narration lengths, so end frames shift and
- * the keyed Player remounts) would otherwise reset playback to the opening
- * poster. The step's last own frame shows its fully revealed visuals.
+ * Map a frame from one timeline onto a reshaped one (parameter edits change
+ * narration lengths, shifting every end frame): same step — matched by id,
+ * falling back to index — at the same fractional position, so neither the
+ * picture nor any progress indicator visibly jumps.
  */
-export function resolveCarriedStepFrame(
-  script: PlaybookScript,
-  stepIndex: number,
-  fallback: number,
+export function mapFrameAcrossTimelines(
+  previousSteps: PlaybookScript["steps"],
+  nextSteps: PlaybookScript["steps"],
+  frame: number,
 ): number {
-  const step = script.steps[stepIndex];
-  if (!step) return fallback;
-  const start = stepIndex > 0 ? script.steps[stepIndex - 1]?.end_frame ?? 0 : 0;
-  const lastFrame = Math.max(0, script.total_frames - 1);
-  return Math.min(Math.max(start, step.end_frame - 1), lastFrame);
+  if (!previousSteps.length || !nextSteps.length) return 0;
+  let index = previousSteps.findIndex((step) => frame < step.end_frame);
+  if (index === -1) index = previousSteps.length - 1;
+  const prevStart = index > 0 ? previousSteps[index - 1].end_frame : 0;
+  const prevLength = Math.max(1, previousSteps[index].end_frame - prevStart);
+  const fraction = Math.min(1, Math.max(0, (frame - prevStart) / prevLength));
+  const previousId = previousSteps[index].step_id;
+  let nextIndex = nextSteps.findIndex((step) => step.step_id === previousId);
+  if (nextIndex === -1) nextIndex = Math.min(index, nextSteps.length - 1);
+  const nextStart = nextIndex > 0 ? nextSteps[nextIndex - 1].end_frame : 0;
+  const nextEnd = nextSteps[nextIndex].end_frame;
+  const mapped = Math.round(nextStart + fraction * (nextEnd - nextStart));
+  return Math.min(Math.max(nextStart, mapped), Math.max(nextStart, nextEnd - 1));
 }
 
 export function resolvePlayerTimelineKey(script: PlaybookScript): string {

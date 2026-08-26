@@ -11,7 +11,7 @@ import { resolveNarrationTemplate } from "./resolveNarrationTemplate";
 import { useResolvedScript, type ScriptOverrides } from "./useResolvedScript";
 import { resolveCodePanelOverlay } from "./resolveCodePanelOverlay";
 import {
-  resolveCarriedStepFrame,
+  mapFrameAcrossTimelines,
   resolveInitialPreviewFrame,
   resolvePlayerTimelineKey,
 } from "./previewFrame";
@@ -229,14 +229,24 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   // A reshaped timeline (parameter edits change narration lengths, shifting
   // end frames) used to remount a keyed Player, which blinked on every
   // slider tick. The Player now stays mounted through reshapes; before the
-  // browser paints, playback is re-seated on the current step's settled
-  // frame so dragging a parameter re-solves the picture in place.
-  const timelineSignatureRef = useRef(playerTimelineKey);
+  // browser paints, the playhead is remapped onto the new timeline at the
+  // same step and fractional position, so neither the picture nor the
+  // progress indicators visibly move while a slider is dragged.
+  const timelineCarryRef = useRef<{ signature: string; steps: PlaybookScript["steps"] }>({
+    signature: playerTimelineKey,
+    steps: script.steps,
+  });
   useLayoutEffect(() => {
-    if (timelineSignatureRef.current === playerTimelineKey) return;
-    timelineSignatureRef.current = playerTimelineKey;
-    playerRef.current?.seekTo(resolveCarriedStepFrame(script, safeStepIndex, initialPreviewFrame));
-  }, [playerTimelineKey, script, safeStepIndex, initialPreviewFrame]);
+    const previous = timelineCarryRef.current;
+    if (previous.signature !== playerTimelineKey) {
+      const player = playerRef.current;
+      if (player) {
+        const frame = player.getCurrentFrame?.() ?? 0;
+        player.seekTo(mapFrameAcrossTimelines(previous.steps, script.steps, frame));
+      }
+    }
+    timelineCarryRef.current = { signature: playerTimelineKey, steps: script.steps };
+  }, [playerTimelineKey, script.steps]);
   const codeOverlay = useMemo(
     () => resolveCodePanelOverlay(displayScript, safeStepIndex),
     [displayScript, safeStepIndex],
@@ -275,13 +285,25 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     };
   });
 
+  // The page lands on the opening step's settled poster frame (a fully drawn
+  // picture, not frame zero), so the very first play press must rewind to the
+  // current step's start — otherwise playback crosses into the next step
+  // almost immediately and the opening narration is skipped.
+  const hasEverPlayedRef = useRef(false);
   const handlePlayPause = useCallback(() => {
+    const player = playerRef.current;
+    if (!player) return;
     if (isPlaying) {
-      playerRef.current?.pause();
-    } else {
-      playerRef.current?.play();
+      player.pause();
+      return;
     }
-  }, [isPlaying]);
+    if (!hasEverPlayedRef.current) {
+      hasEverPlayedRef.current = true;
+      const stepStart = safeStepIndex > 0 ? script.steps[safeStepIndex - 1]?.end_frame ?? 0 : 0;
+      player.seekTo(stepStart);
+    }
+    player.play();
+  }, [isPlaying, safeStepIndex, script.steps]);
 
   const handleReset = useCallback(() => {
     playerRef.current?.seekTo(0);

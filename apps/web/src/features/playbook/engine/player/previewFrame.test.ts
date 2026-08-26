@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { PLAYBOOK_DEFAULTS } from "../../../../shared/config/constants";
 import type { PlaybookScript } from "../types";
 import {
-  resolveCarriedStepFrame,
+  mapFrameAcrossTimelines,
   resolveInitialPreviewFrame,
   resolvePlayerTimelineKey,
 } from "./previewFrame";
@@ -43,27 +43,37 @@ function script(overrides: Partial<PlaybookScript> = {}): PlaybookScript {
   };
 }
 
-describe("resolveCarriedStepFrame", () => {
-  it("keeps the viewer on the same step's settled frame after a timeline reshape", () => {
-    // A parameter edit lengthened step 1's narration: 60 → 90 frames.
-    const reshaped = script({
+describe("mapFrameAcrossTimelines", () => {
+  it("preserves the fractional position inside the matching step", () => {
+    const before = script().steps;
+    // Step 1 lengthened 60 → 90 frames, step 2 shifted accordingly.
+    const after = script({
       total_frames: 150,
       steps: [
         { ...script().steps[0], end_frame: 90 },
         { ...script().steps[1], end_frame: 150 },
       ],
-    });
-    expect(resolveCarriedStepFrame(reshaped, 1, 0)).toBe(149);
-    expect(resolveCarriedStepFrame(reshaped, 0, 0)).toBe(89);
+    }).steps;
+    // Halfway through step 1 (frame 30 of 60) maps to halfway of 90.
+    expect(mapFrameAcrossTimelines(before, after, 30)).toBe(45);
+    // Halfway through step 2 (frame 90 of 60..120) maps to 90..150.
+    expect(mapFrameAcrossTimelines(before, after, 90)).toBe(120);
   });
 
-  it("clamps to the step start and falls back on out-of-range indexes", () => {
-    const single = script({
-      total_frames: 60,
-      steps: [{ ...script().steps[0], end_frame: 60 }],
-    });
-    expect(resolveCarriedStepFrame(single, 0, 0)).toBe(59);
-    expect(resolveCarriedStepFrame(single, 5, 17)).toBe(17);
+  it("matches steps by id and clamps inside the target step", () => {
+    const before = script().steps;
+    const reordered = script({
+      total_frames: 120,
+      steps: [
+        { ...script().steps[1], end_frame: 60 },
+        { ...script().steps[0], end_frame: 120 },
+      ],
+    }).steps;
+    // Frame 59 sits at the end of s1; s1 now occupies 60..120.
+    const mapped = mapFrameAcrossTimelines(before, reordered, 59);
+    expect(mapped).toBeGreaterThanOrEqual(60);
+    expect(mapped).toBeLessThan(120);
+    expect(mapFrameAcrossTimelines([], reordered, 30)).toBe(0);
   });
 });
 

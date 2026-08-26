@@ -1214,4 +1214,20 @@ describe("PlaybookPlayer", () => {
     const plain = getByRole("button", { name: "第 1 步：建立函数" });
     expect(plain.className).not.toContain("is-parametric");
   });
+  it("rewinds the first play press to the current step's start", () => {
+    playerMockState.seekTo.mockClear();
+    playerMockState.play.mockClear();
+    const { getByRole } = render(
+      <PlaybookPlayer script={baseScript()} enableTTS={false} initialFrame={44} />,
+    );
+
+    fireEvent.click(getByRole("button", { name: "播放" }));
+    expect(playerMockState.seekTo).toHaveBeenCalledWith(0);
+    expect(playerMockState.play).toHaveBeenCalledTimes(1);
+
+    // Later presses resume without rewinding again.
+    fireEvent.click(getByRole("button", { name: "播放" }));
+    expect(playerMockState.seekTo).toHaveBeenCalledTimes(1);
+    expect(playerMockState.play).toHaveBeenCalledTimes(2);
+  });
 });
