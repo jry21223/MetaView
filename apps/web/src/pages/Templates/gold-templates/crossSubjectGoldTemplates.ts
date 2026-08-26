@@ -859,15 +859,17 @@ export function buildRabbitChaosGoldPlaybook(params: TemplatePreviewParams): Pla
   });
   const yearDots = (line: { points: Array<[number, number]> }) =>
     line.points.map(([x, y]) => ({ x, y, semantic_role: "yearly_count" }));
-  const converge = trajectory(0.8, 10, CHAOS_YEARS_SHORT);
-  const overshoot = trajectory(1.8, 10, CHAOS_YEARS_SHORT);
-  const periodTwo = trajectory(2.2, 10, CHAOS_YEARS_MID);
-  const periodFour = trajectory(2.5, 10, CHAOS_YEARS_MID);
-  const deepChaos = trajectory(2.95, 10, CHAOS_YEARS_LONG);
-  const butterflyA = { ...trajectory(2.95, 10, CHAOS_YEARS_LONG), label: "N₀=10" };
+  // Each teaching step pins its own r (that IS the lesson's axis); N0 follows
+  // the slider everywhere so the transient responds while the attractor holds.
+  const converge = trajectory(0.8, n0, CHAOS_YEARS_SHORT);
+  const overshoot = trajectory(1.8, n0, CHAOS_YEARS_SHORT);
+  const periodTwo = trajectory(2.2, n0, CHAOS_YEARS_MID);
+  const periodFour = trajectory(2.5, n0, CHAOS_YEARS_MID);
+  const deepChaos = trajectory(2.95, n0, CHAOS_YEARS_LONG);
+  const butterflyA = { ...trajectory(2.95, n0, CHAOS_YEARS_LONG), label: `N₀=${fixed(n0, 1)}` };
   const butterflyB = {
-    ...trajectory(2.95, 10.000001, CHAOS_YEARS_LONG),
-    label: "N₀=10.000001",
+    ...trajectory(2.95, n0 + 0.000001, CHAOS_YEARS_LONG),
+    label: `N₀=${fixed(n0, 1)}+0.000001`,
     emphasis: "accent" as const,
     semantic_role: "rabbit_trajectory_twin",
   };
@@ -878,7 +880,7 @@ export function buildRabbitChaosGoldPlaybook(params: TemplatePreviewParams): Pla
       points: yearDots(converge),
       curves: [
         {
-          expression: `${CHAOS_CAPACITY}/(1+${fixed((CHAOS_CAPACITY - 10) / 10, 0)}*exp(-0.8*x))`,
+          expression: `${CHAOS_CAPACITY}/(1+${fixed((CHAOS_CAPACITY - n0) / n0, 4)}*exp(-0.8*x))`,
           label: "连续模型",
           emphasis: "secondary",
           semantic_role: "continuous_reference",

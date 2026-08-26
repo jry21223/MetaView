@@ -123,6 +123,20 @@ describe("cross-subject public Gold Templates", () => {
 
     expect(script.steps[7].snapshot.kind).toBe("phase_portrait_scene");
 
+    // N0 must flow into every trajectory step, not just the sandbox.
+    const moved = manifest.buildPublicPlaybook({ r: 2.95, N0: 40 });
+    for (const stepIndex of [0, 1, 2, 3, 4, 5, 9]) {
+      const snapshot = moved.steps[stepIndex].snapshot;
+      if (snapshot.kind === "math_plot") {
+        expect(snapshot.polylines?.[0]?.points[0]).toEqual([0, 40]);
+      }
+    }
+    const movedButterfly = moved.steps[5].snapshot;
+    if (movedButterfly.kind === "math_plot") {
+      expect(movedButterfly.polylines?.[1]?.points[0][1]).toBeCloseTo(40.000001, 9);
+      expect(movedButterfly.polylines?.[0]?.label).toBe("N₀=40");
+    }
+
     // Lorenz twins: x components overlap early, then take different wings.
     const lorenz = script.steps[8].snapshot;
     if (lorenz.kind === "math_plot") {
