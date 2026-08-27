@@ -144,11 +144,15 @@ describe("App routing", () => {
 
     expect(queryByText("Director")).toBeNull();
     fireEvent.click(getByRole("button", { name: "播放" }));
-    fireEvent.change(getByRole("slider", { name: /切点 a/ }), { target: { value: "1.4" } });
-    fireEvent.click(getByRole("button", { name: "当前切点和斜率是多少？" }));
+    // The remade case scopes its controls per step: the Galileo data opening
+    // has no knobs, the secant step exposes both a and h.
+    fireEvent.click(getByRole("button", { name: /第 3 步：平均速度就是割线/ }));
+    const slider = await waitFor(() => getByRole("slider", { name: /切点 a/ }));
+    fireEvent.change(slider, { target: { value: "1.4" } });
+    fireEvent.click(getByRole("button", { name: "这一幕先观察什么？" }));
     fireEvent.click(getByRole("button", { name: "播放器设置" }));
 
-    expect(getByText("切点 a=1.4，对应导数与切线斜率都是 2.8。")).toBeTruthy();
+    await waitFor(() => expect(getByText(/2a\+h=3\.8/)).toBeTruthy());
     expect(queryByText("语音后端")).toBeNull();
     expect(queryByText("Director")).toBeNull();
     expect(accountHits).toBe(0);

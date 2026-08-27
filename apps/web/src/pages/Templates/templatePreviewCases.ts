@@ -2,7 +2,6 @@ import type {
   GraphSceneEdge,
   GraphSceneNode,
   GraphSceneSnapshot,
-  MathPlotSnapshot,
   MetaStep,
   PlaybookScript,
 } from "../../features/playbook/engine/types";
@@ -105,11 +104,6 @@ function questions(
 function finiteNumber(params: TemplatePreviewParams, key: string, fallback: number): number {
   const value = Number(params[key]);
   return Number.isFinite(value) ? value : fallback;
-}
-
-function fixed(value: number, digits = 2): string {
-  const rounded = Number(value.toFixed(digits));
-  return Object.is(rounded, -0) ? "0" : String(rounded);
 }
 
 // ── Binary search ──────────────────────────────────────────────────────────
@@ -538,148 +532,6 @@ function buildBfsFollowups(params: TemplatePreviewParams): TemplatePreviewFollow
   return followups;
 }
 
-// ── Derivative and tangent ────────────────────────────────────────────────
-
-function lineExpression(slope: number, intercept: number): string {
-  const m = fixed(slope, 3);
-  const b = Number(fixed(intercept, 3));
-  if (b === 0) return `${m}*x`;
-  return `${m}*x${b > 0 ? "+" : "-"}${fixed(Math.abs(b), 3)}`;
-}
-
-function derivativeSnapshot(
-  markerX: number,
-  h: number | null | undefined,
-  caption: string,
-  formulaLatex: string,
-): MathPlotSnapshot {
-  const curves: MathPlotSnapshot["curves"] = [
-    { expression: "x^2", label: "f(x)=x²", emphasis: "primary", semantic_role: "curve" },
-  ];
-  if (typeof h === "number") {
-    const slope = 2 * markerX + h;
-    const intercept = -markerX * (markerX + h);
-    curves.push({
-      expression: lineExpression(slope, intercept),
-      label: `割线斜率 ${fixed(slope)}`,
-      emphasis: "secondary",
-      semantic_role: "slope",
-    });
-  } else if (h === null) {
-    const slope = 2 * markerX;
-    const intercept = -(markerX ** 2);
-    curves.push({
-      expression: lineExpression(slope, intercept),
-      label: `切线斜率 ${fixed(slope)}`,
-      emphasis: "accent",
-      semantic_role: "tangent",
-    });
-  }
-  return {
-    kind: "math_plot",
-    pack_id: "math-basic",
-    asset_id: "derivative-tangent-preset",
-    curves,
-    params: { a: markerX },
-    x_min: -3,
-    x_max: 3,
-    y_min: -2,
-    y_max: 9,
-    marker_x: markerX,
-    shade_from: h === undefined ? null : h === null ? markerX - 0.08 : markerX,
-    shade_to: h === undefined ? null : h === null ? markerX + 0.08 : markerX + h,
-    x_label: "x",
-    y_label: "f(x)",
-    formula_latex: formulaLatex,
-    caption,
-  };
-}
-
-function buildDerivativeScript(params: TemplatePreviewParams): PlaybookScript {
-  const markerX = Math.max(-2, Math.min(2, finiteNumber(params, "markerX", 1)));
-  const slope = 2 * markerX;
-  const secants = [1, 0.5, 0.1];
-  const steps: MetaStep[] = [
-    step(0, {
-      step_id: "derivative-curve",
-      title: "观察函数曲线",
-      voiceover_text: `先观察 f(x)=x²，并把切点放在 a=${fixed(markerX)}。`,
-      snapshot: derivativeSnapshot(markerX, undefined, "先确认函数形状和切点位置，再引入割线。", "f(x)=x^2"),
-    }),
-  ];
-  secants.forEach((h, index) => {
-    const secantSlope = 2 * markerX + h;
-    steps.push(step(steps.length, {
-      step_id: `derivative-secant-${index + 1}`,
-      title: `缩小间隔 h=${h}`,
-      voiceover_text: `当 h=${h} 时，割线斜率是 ${fixed(secantSlope)}。h 越小，割线越接近切线。`,
-      snapshot: derivativeSnapshot(
-        markerX,
-        h,
-        `割线斜率 ${fixed(secantSlope)} 正在逼近 ${fixed(slope)}。`,
-        `\\frac{f(a+h)-f(a)}{h}=${fixed(secantSlope)}`,
-      ),
-    }));
-  });
-  steps.push(step(steps.length, {
-    step_id: "derivative-tangent",
-    title: "割线收敛为切线",
-    voiceover_text: `当 h 趋近于零，割线斜率趋近 ${fixed(slope)}，这就是切点处的导数。`,
-    snapshot: derivativeSnapshot(
-      markerX,
-      null,
-      `切线斜率等于 f'(${fixed(markerX)})=${fixed(slope)}。`,
-      `f'(${fixed(markerX)})=${fixed(slope)}`,
-    ),
-  }));
-  steps.push(step(steps.length, {
-    step_id: "derivative-result",
-    title: "得到导数公式",
-    voiceover_text: `对任意切点 a，f(x)=x² 的导数都是 f'(a)=2a。当前切点的斜率是 ${fixed(slope)}。`,
-    snapshot: derivativeSnapshot(
-      markerX,
-      null,
-      `切点移动时，切线仍满足 y=${fixed(slope)}x${-(markerX ** 2) >= 0 ? "+" : "-"}${fixed(Math.abs(markerX ** 2))}。`,
-      "f'(a)=2a",
-    ),
-  }));
-
-  const timed = applyNarrationTimeline(steps, FPS);
-  return {
-    schema_version: "2.0.0",
-    fps: FPS,
-    total_frames: timed.at(-1)?.end_frame ?? 0,
-    domain: "math",
-    title: "导数与切线：从割线到瞬时斜率",
-    summary: "让割线间隔逐步趋近零，直观看见导数如何成为切线斜率。",
-    steps: timed,
-    parameter_controls: [{
-      id: "markerX",
-      label: "切点 a",
-      value: fixed(markerX),
-      description: "拖动后同步更新割线、切线和导数值。",
-    }],
-    algorithm_id: "derivative_tangent",
-    initial_data: { function: ["x^2"], marker_x: [fixed(markerX)] },
-  };
-}
-
-function buildDerivativeFollowups(params: TemplatePreviewParams, script: PlaybookScript): TemplatePreviewFollowups {
-  const markerX = Math.max(-2, Math.min(2, finiteNumber(params, "markerX", 1)));
-  const slope = 2 * markerX;
-  return Object.fromEntries(script.steps.map((item) => [
-    item.step_id,
-    questions(
-      item.step_id,
-      ["这一幕的核心变化是什么？", item.voiceover_text],
-      ["当前切点和斜率是多少？", `切点 a=${fixed(markerX)}，对应导数与切线斜率都是 ${fixed(slope)}。`],
-      item.step_id.includes("secant")
-        ? ["为什么还不是切线？", "当前仍连接两个不同的函数点；只有当 h 趋近零时，割线才收敛为切线。"]
-        : ["导数在图像上表示什么？", "导数表示当前切点处切线的斜率，也就是函数在这一点的瞬时变化率。"],
-    ),
-  ]));
-}
-
 const TEMPLATE_PREVIEW_CASES: Record<TemplatePreviewCaseId, TemplatePreviewCase> = {
   ...Object.fromEntries(PUBLIC_GOLD_TEMPLATES.map((item) => [
     item.caseId,
@@ -725,26 +577,6 @@ const TEMPLATE_PREVIEW_CASES: Record<TemplatePreviewCaseId, TemplatePreviewCase>
     }],
     buildScript: buildBfsScript,
     buildFollowups: (params) => buildBfsFollowups(params),
-  },
-  "derivative-tangent": {
-    id: "derivative-tangent",
-    templateId: "derivative-tangent",
-    posterUrl: "/template-previews/derivative-tangent/poster.webp",
-    posterAlt: "抛物线切点与切线斜率的 Playbook 画面",
-    posterFrame: posterFrameForStep(buildDerivativeScript({ markerX: 1 }), 4),
-    defaultParams: { markerX: 1 },
-    controls: [{
-      id: "markerX",
-      kind: "range",
-      label: "切点 a",
-      description: "切线与导数同步变化",
-      min: -2,
-      max: 2,
-      step: 0.1,
-      resetPlayback: false,
-    }],
-    buildScript: buildDerivativeScript,
-    buildFollowups: buildDerivativeFollowups,
   },
 };
 

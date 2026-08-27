@@ -95,22 +95,9 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
   },
 
   // ---- math ----
-  {
-    id: "integral-area",
-    domain: "math",
-    title: "定积分的几何意义",
-    desc: "黎曼和逐步逼近曲线下面积",
-    prompt: "讲解定积分 ∫₀² x² dx 的几何意义：用黎曼和逐步逼近曲线下面积，最终给出 8/3",
-  },
-  {
-    id: "derivative-tangent",
-    previewCaseId: "derivative-tangent",
-    domain: "math",
-    title: "导数与切线",
-    desc: "可拖动 marker_x 看切线如何变化",
-    prompt: "画出 f(x) = x² 在不同点的切线，导数 f'(x) = 2x，用滑杆控制切点 x 的位置",
-  },
-  ...PUBLIC_GOLD_TEMPLATES.filter((item) => item.subject === "high_school_math").map((item) => ({
+  publicGoldEntry("derivative-tangent", "math"),
+  publicGoldEntry("integral-area", "math"),
+  ...PUBLIC_GOLD_TEMPLATES.filter((item) => item.domain === "conic_sections").map((item) => ({
     id: item.caseId,
     previewCaseId: item.caseId,
     domain: "math" as const,
@@ -152,26 +139,14 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
   },
 
   // ---- physics ----
+  publicGoldEntry("projectile", "physics"),
+  publicGoldEntry("spring-shm", "physics"),
   {
     id: "incline-friction",
     domain: "physics",
     title: "斜面摩擦受力分析",
     desc: "重力分解、摩擦力、加速度",
     prompt: "质量 2kg 物体在 30° 斜面上，摩擦系数 0.2，重力加速度 10m/s²，分析受力并求沿斜面方向的加速度",
-  },
-  {
-    id: "projectile",
-    domain: "physics",
-    title: "抛体运动",
-    desc: "初速度分解 + 轨迹绘制",
-    prompt: "一个物体以 20 m/s 初速度、45° 仰角抛出，画出轨迹并求最大高度和落地距离",
-  },
-  {
-    id: "spring-shm",
-    domain: "physics",
-    title: "弹簧简谐振动",
-    desc: "x(t) = A·cos(ωt) 的能量交换",
-    prompt: "讲解质量为 1kg、劲度系数 k=4 N/m 的弹簧振子简谐运动，画出位移、速度、动能随时间的变化",
   },
 
   // ---- chemistry ----

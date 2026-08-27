@@ -15,7 +15,6 @@ describe("template preview cases", () => {
       ...PUBLIC_GOLD_TEMPLATES.map((item) => item.caseId),
       "binary-search",
       "bfs-tree",
-      "derivative-tangent",
       "sliding-window",
       "merge-sort",
       "quick-sort",
@@ -97,18 +96,6 @@ describe("template preview cases", () => {
 
     expect(result).toContain("3、1、6、7、2、4、5");
     expect(firstVisit?.code_highlight?.lines[firstVisit.code_highlight.active_line]).toContain("visited.add");
-  });
-
-  it("keeps derivative slope and tangent equation synchronized", () => {
-    const item = getTemplatePreviewCase("derivative-tangent")!;
-    const script = item.buildScript({ markerX: 2 });
-    const tangent = script.steps.find((step) => step.step_id === "derivative-tangent");
-
-    expect(tangent?.voiceover_text).toContain("4");
-    expect(tangent?.snapshot.kind).toBe("math_plot");
-    if (tangent?.snapshot.kind === "math_plot") {
-      expect(tangent.snapshot.curves[1]?.expression).toBe("4*x-4");
-    }
   });
 
   it.each([4, 5, 8])("keeps pole-polar geometry valid at k=%s", (k) => {

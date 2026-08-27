@@ -1,23 +1,18 @@
 import type {
-  AnySnapshot,
   MathFormulaSnapshot,
   MathPlotSnapshot,
   MetaStep,
   PhysicsForceSceneSnapshot,
   PlaybookScript,
 } from "../../../../features/playbook/engine/types";
-import type {
-  TemplatePreviewFollowups,
-  TemplatePreviewParams,
-  TemplatePreviewQuestion,
-} from "../../templatePreviewCases";
+import type { TemplatePreviewParams } from "../../templatePreviewCases";
+import type { GoldTemplateManifest } from "../manifest";
 import {
-  defineStandaloneGoldTemplate,
-  type ExpectedFact,
-  type GoldTemplateManifest,
-  type PedagogicalRubric,
-  type VisualInvariant,
-} from "../manifest";
+  fixed,
+  playbook,
+  sceneStep,
+  standaloneCase,
+} from "../standaloneCaseHelpers";
 import {
   PROJECTILE_DEFAULTS,
   PROJECTILE_LIMITS,
@@ -28,39 +23,18 @@ import {
   type ProjectileState,
 } from "./projectileMotionDomain";
 
-const FPS = 30;
-const STEP_FRAMES = 90;
-
-function fixed(value: number, digits = 2): string {
-  const rounded = Number(value.toFixed(digits));
-  return Object.is(rounded, -0) ? "0" : String(rounded);
-}
+/**
+ * 抛体运动 · 两颗子弹与一条抛物线。
+ *
+ * The MythBusters "fired vs. dropped bullet" episode (2009) provides the
+ * data-first opening: both bullets hit the ground within 39 ms of each other.
+ * The lesson decomposes the flight into two independent one-dimensional
+ * motions, reassembles the trajectory through the shared clock, and closes on
+ * Galileo's 1638 parabola proof and the Apollo 14 moon boundary.
+ */
 
 function expressionNumber(value: number): string {
   return Number(value.toPrecision(12)).toString();
-}
-
-function teachingStep<T extends AnySnapshot>(
-  index: number,
-  id: string,
-  title: string,
-  narration: string,
-  snapshot: T,
-): MetaStep<T> {
-  return {
-    step_id: id,
-    end_frame: (index + 1) * STEP_FRAMES,
-    title,
-    voiceover_text: narration,
-    animation_hint: "draw teaching objects in causal order",
-    snapshot,
-    layers: [{
-      id: `${id}-teaching-layer`,
-      timing: { enter_at: 0, exit_at: 1, appear_anim: "draw", z_order: 0 },
-      body: snapshot,
-    }],
-    tokens: [],
-  };
 }
 
 function safePlotSpan(value: number): number {
@@ -90,8 +64,8 @@ function horizontalPositionPlot(state: ProjectileState): MathPlotSnapshot {
     y_label: "x / m",
     formula_latex: String.raw`x(t)=v_0\cos\theta\,t=${fixed(state.vx)}t`,
     caption: state.vx === 0
-      ? "竖直发射时 vₓ=0，所以水平位置始终不变。"
-      : `图像斜率恒为 vₓ=${fixed(state.vx)} m/s。`,
+      ? "竖直发射时 vₓ=0，水平位置始终不变。"
+      : `直线斜率恒为 vₓ=${fixed(state.vx)} m/s；g 不在这条方程里。`,
   };
 }
 
@@ -121,8 +95,8 @@ function verticalVelocityPlot(state: ProjectileState): MathPlotSnapshot {
     y_label: "vᵧ / (m·s⁻¹)",
     formula_latex: String.raw`v_y(t)=v_0\sin\theta-gt`,
     caption: state.flightTime === 0
-      ? "地面切向边界没有正的腾空时间；公式仍给出随后向下的速度趋势。"
-      : `直线斜率为 −g；在 t=${fixed(state.apexTime)} s 穿过 vᵧ=0。`,
+      ? "当前边界没有正的腾空时间；公式仍给出随后向下的速度趋势。"
+      : `斜率恒为 −g；在 t=${fixed(state.apexTime)} s 穿过 vᵧ=0。`,
   };
 }
 
@@ -150,7 +124,7 @@ function verticalPositionPlot(state: ProjectileState): MathPlotSnapshot {
     formula_latex: String.raw`y(t)=v_0\sin\theta\,t-\frac12gt^2`,
     caption: state.flightTime === 0
       ? "此边界下 y(t) 没有位于地面上方的正时间区间。"
-      : `开口向下；顶点高度 H=${fixed(state.maxHeight)} m，两个零点是 0 与 ${fixed(state.flightTime)} s。`,
+      : `开口向下；顶点 H=${fixed(state.maxHeight)} m，两个零点是 0 与 ${fixed(state.flightTime)} s。`,
   };
 }
 
@@ -243,8 +217,8 @@ function summaryFormula(state: ProjectileState): MathFormulaSnapshot {
   return {
     kind: "math_formula",
     formula_latex: formula,
-    caption: "同一个时间 t 连接两条分运动；消去 t 后得到抛物线轨迹。",
-    highlights: ["x(t)", "y(t)", "y(x)"],
+    caption: "同一个时间 t 连接两条分运动；消去 t 后，轨迹显形为抛物线。",
+    highlights: ["y(x)"],
     annotations: [
       `飞行时间 T=${fixed(state.flightTime)} s`,
       `最高点 H=${fixed(state.maxHeight)} m`,
@@ -253,25 +227,12 @@ function summaryFormula(state: ProjectileState): MathFormulaSnapshot {
   };
 }
 
-function boundaryFormula(state: ProjectileState): MathFormulaSnapshot {
-  const boundaryExplanation = {
-    regular: "当前参数是常规斜抛：T、H、R 都由同一组分量计算。",
-    stationary: "v₀=0 时质点不离开原点，T=H=R=0。",
-    "ground-tangent": "θ=0° 且从地面发射时，理想模型没有正的腾空时间，T=H=R=0。",
-    "vertical-launch": "θ=90° 时 vₓ=0，因此 R=0；竖直上抛过程仍完整存在。",
-  }[state.boundaryCase];
-  return {
-    kind: "math_formula",
-    formula_latex: String.raw`y(0)=0,\quad y(T)=0,\quad v_y(T)=-v_{y0}`,
-    caption: boundaryExplanation,
-    highlights: ["y(0)=0", "y(T)=0"],
-    annotations: [
-      "模型边界：同一水平面起落、重力恒定、忽略空气阻力。",
-      `当前输入已规范为 v₀=${fixed(state.speed)} m/s，θ=${fixed(state.angle)}°，g=${fixed(state.gravity)} m/s²。`,
-      "非法数值使用默认值；超范围数值限制在模板公开的安全区间。",
-    ],
-  };
-}
+const BOUNDARY_EXPLANATION: Record<ProjectileState["boundaryCase"], string> = {
+  regular: "当前参数是常规斜抛：T、H、R 都由同一组分量算出。",
+  stationary: "v₀=0 时质点不离开原点，T=H=R=0。",
+  "ground-tangent": "θ=0° 且从地面发射时，理想模型没有正的腾空时间，T=H=R=0。",
+  "vertical-launch": "θ=90° 时 vₓ=0，因此 R=0；竖直上抛过程仍完整存在。",
+};
 
 export function buildProjectileMotionPlaybook(params: TemplatePreviewParams): PlaybookScript {
   const state = solveProjectile({
@@ -279,199 +240,183 @@ export function buildProjectileMotionPlaybook(params: TemplatePreviewParams): Pl
     angle: params.angle,
     gravity: params.gravity,
   });
-  const launchPrompt = state.boundaryCase === "regular"
-    ? `以 ${fixed(state.speed)} m/s、${fixed(state.angle)}° 发射后，为什么轨迹会弯曲，又如何预测最高点和落点？`
-    : `当前参数触发“${state.boundaryCase}”边界；先判断物体是否真正形成空中轨迹。`;
+  const grounded = state.flightTime === 0;
+  const moonScale = state.gravity / 1.62;
+  const midPoint = projectileAtFraction(state, 0.35);
+  const boundaryNote = state.boundaryCase === "regular" ? "" : `注意：${BOUNDARY_EXPLANATION[state.boundaryCase]}`;
   const steps: MetaStep[] = [
-    teachingStep(0, "projectile-observe", "先提出观察问题", launchPrompt, physicsSnapshot(
+    sceneStep(0, "projectile-two-bullets", "两颗子弹：一个反直觉的实验", `2009 年，《流言终结者》搭起一间长棚：同一高度上，一颗子弹水平射出，另一颗同时松手自由落下。几百米每秒的水平速度听上去足以让子弹“多飞一会儿”——实测两者落地只差 0.039 秒，在测量误差内同时着地。为什么水平速度帮不上“留在空中”的忙？这门课把一次飞行拆成两件互不打扰的事。当前发射设定：v₀=${fixed(state.speed)} m/s，θ=${fixed(state.angle)}°。${boundaryNote}`, physicsSnapshot(
       state,
       0,
-      "先区分初速度方向与始终竖直向下的重力加速度。",
+      "先分清两个方向：初速度沿发射方向，重力永远竖直向下。",
       `v₀=${fixed(state.speed)} m/s · θ=${fixed(state.angle)}°`,
       { showResultant: true, showGravity: true },
     )),
-    teachingStep(1, "projectile-decompose", "把初速度分解到两轴", `同一个初速度分解为 vₓ=${fixed(state.vx)} m/s 与 vᵧ₀=${fixed(state.vy0)} m/s。忽略空气阻力后，重力只改变竖直分量。`, physicsSnapshot(
+    sceneStep(1, "projectile-decompose", "分解：重力只碰竖直方向", `把初速度按两个方向拆开：vₓ=v₀cosθ=${fixed(state.vx)} m/s，vᵧ₀=v₀sinθ=${fixed(state.vy0)} m/s。忽略空气阻力后，唯一的力是竖直向下的重力——水平方向没有任何力来改变 vₓ；竖直方向独自做匀变速。两个方向唯一共享的东西，是同一只时钟 t。子弹之谜的机关就在这里：水平速度再大，也进不了竖直方向的方程。`, physicsSnapshot(
       state,
       0,
-      "水平与竖直运动共享时间，但遵循不同的运动规律。",
+      "水平与竖直各自守各自的规律，只共享时间。",
       "vₓ=v₀cosθ  vᵧ₀=v₀sinθ",
       { showComponents: true, showGravity: true },
     )),
-    teachingStep(2, "projectile-horizontal", "建立水平位移—时间关系", state.vx === 0
-      ? "竖直发射使水平分量为零，所以 x(t) 始终等于零。"
-      : `水平方向没有加速度，vₓ=${fixed(state.vx)} m/s 保持不变，因此 x(t) 是一条过原点的直线。`, horizontalPositionPlot(state)),
-    teachingStep(3, "projectile-vertical-velocity", "追踪竖直速度如何变化", state.flightTime === 0
-      ? "当前边界没有正的腾空区间；但 vᵧ(t)=vᵧ₀−gt 仍说明重力使竖直速度持续减小。"
-      : `vᵧ(t) 以每秒 ${fixed(state.gravity)} m/s 的速率减小，在 t=${fixed(state.apexTime)} s 变为零，随后转向下。`, verticalVelocityPlot(state)),
-    teachingStep(4, "projectile-vertical-position", "建立竖直位移—时间关系", state.flightTime === 0
-      ? "从地面水平擦出或静止时，模型没有位于地面上方的正时间区间。"
-      : `对 vᵧ(t) 累积得到 y(t)。开口向下的二次函数在 t=${fixed(state.apexTime)} s 达到 ${fixed(state.maxHeight)} m。`, verticalPositionPlot(state)),
-    teachingStep(5, "projectile-compose-trajectory", "用同一个时间生成轨迹", "对每个相同的 t，把 x(t) 与 y(t) 配成平面上的一个点；这些点连续连接，才得到真实轨迹，而不是先假定它是抛物线。", physicsSnapshot(
+    sceneStep(2, "projectile-horizontal", "水平方向：一条不弯的直线", state.vx === 0
+      ? "竖直发射使水平分量为零，x(t) 恒等于零：直线退化成横轴，这正是 θ=90° 的边界情形。"
+      : `水平方向没有加速度，vₓ=${fixed(state.vx)} m/s 从头到尾不变，位移 x(t)=${fixed(state.vx)}t 是一条过原点的直线，斜率就是 vₓ。注意方程里没有 g——把重力加速度拖大拖小，这条线纹丝不动，“独立”二字的直接证据。`, horizontalPositionPlot(state)),
+    sceneStep(3, "projectile-vertical-velocity", "竖直方向：速度匀速流失", grounded
+      ? "当前边界没有正的腾空区间；但 vᵧ(t)=vᵧ₀−gt 仍然成立：重力让竖直速度以恒定速率减小。"
+      : `竖直速度 vᵧ(t)=vᵧ₀−gt：每过一秒减少 ${fixed(state.gravity)} m/s，在 t=${fixed(state.apexTime)} s 穿过零，随后转为向下。子弹之谜在这里解开一半：这条方程里只有 vᵧ₀ 和 g，水平速度从未出场。`, verticalVelocityPlot(state)),
+    sceneStep(4, "projectile-vertical-position", "竖直位移：开口向下的抛物线", grounded
+      ? "从地面水平擦出或静止时，y(t) 没有位于地面上方的正时间区间；模型如实给出 T=H=0。"
+      : `对 vᵧ(t) 累积——上一门数学课刚讲过：速度曲线下的面积就是位移——得 y(t)=vᵧ₀t−gt²/2，开口向下的二次曲线，在 t=${fixed(state.apexTime)} s 到达最高点 H=${fixed(state.maxHeight)} m。谜底揭晓：两颗子弹的 y(t) 是同一条方程，里面没有水平速度，它们必然同时落地。`, verticalPositionPlot(state)),
+    sceneStep(5, "projectile-compose", "合成：同一只时钟配出轨迹", grounded
+      ? "常规情形下，把同一时刻的 x(t) 与 y(t) 配成平面上的点，点的连线才是真实轨迹；当前边界没有空中段可合成。"
+      : `把同一个 t 的 x(t) 与 y(t) 配成平面上的一个点，让 t 流动，这串点连成的才是真实轨迹。此刻 t=${fixed(state.flightTime * 0.35)} s，质点在 (${fixed(midPoint.x)}, ${fixed(midPoint.y)}) m 处；速度方向恰沿轨迹的切线——位置对时间求导就是速度，导数的几何意义在空中重演。`, physicsSnapshot(
       state,
       0.35,
-      `当前时刻 t=${fixed(state.flightTime * 0.35)} s 的横、纵坐标来自同一个时间参数。`,
-      `P(t)=(x(t),y(t))`,
+      "横、纵坐标来自同一个时间参数；速度沿轨迹切线。",
+      String.raw`P(t)=(x(t),\,y(t))`,
       { showResultant: true, showComponents: true, showGravity: true },
     )),
-    teachingStep(6, "projectile-apex", "检查最高点", state.flightTime === 0
+    sceneStep(6, "projectile-apex", "最高点：速度并不为零", grounded
       ? "当前边界没有离地后的最高点；最大高度为零。"
-      : `最高点只表示 vᵧ=0，并不表示速度为零；质点仍以 vₓ=${fixed(state.vx)} m/s 水平运动。`, physicsSnapshot(
+      : `t=${fixed(state.apexTime)} s 到达最高点。这里 vᵧ=0，但速度不为零——vₓ=${fixed(state.vx)} m/s 还在。“最高点速度为零”是抛体最常见的误区：真正归零的只是竖直分量，总速度此刻取全程最小值 |vₓ|。`, physicsSnapshot(
       state,
       0.5,
-      `tₕ=${fixed(state.apexTime)} s，H=${fixed(state.maxHeight)} m；此刻仍保留水平速度。`,
+      `最高点只是竖直方向的转折：H=${fixed(state.maxHeight)} m，水平速度仍在。`,
       `vᵧ=0 · H=${fixed(state.maxHeight)} m`,
       { showComponents: true, showGravity: true },
     )),
-    teachingStep(7, "projectile-landing", "检查落地时刻", state.flightTime === 0
-      ? "T=0 表示这组同高起落参数没有形成空中飞行段。"
-      : `令 y(T)=0 并取非零根，得到 T=${fixed(state.flightTime)} s；再代入 x(T)，射程为 ${fixed(state.range)} m。`, physicsSnapshot(
+    sceneStep(7, "projectile-landing", "落地与射程：sin2θ 说了算", grounded
+      ? "T=0 表示这组同高起落参数没有形成空中飞行段；把 θ 或 v₀ 拖离边界即可恢复常规斜抛。"
+      : `令 y(T)=0 取非零根：T=2vᵧ₀/g=${fixed(state.flightTime)} s；代回 x(T) 得射程 R=vₓT=v₀²sin2θ/g=${fixed(state.range)} m。sin2θ 一次说出两件事：θ=45° 时 sin2θ=1，同一 v₀ 的射程封顶；θ 与 90°−θ 的 sin2θ 相同，30° 与 60° 打到同一个落点。把 θ 拖过 45°，看 R 先涨后跌。落地时 vᵧ=−vᵧ₀=${fixed(-state.vy0)} m/s，与出发时大小相等、方向相反。`, physicsSnapshot(
       state,
       1,
-      `落地时 vᵧ=${fixed(-state.vy0)} m/s；在理想同高模型中，它与初始竖直速度大小相等、方向相反。`,
+      "同高起落的对称性：落地竖直速度与初始竖直速度互为镜像。",
       `T=${fixed(state.flightTime)} s · R=${fixed(state.range)} m`,
       { showResultant: true, showComponents: true, showGravity: true },
     )),
-    teachingStep(8, "projectile-eliminate-time", "消去时间得到轨迹方程", state.vx === 0
-      ? "vₓ=0 时不能用 x/vₓ 消去时间；轨迹退化为竖直线，必须单独讨论。"
-      : "由 t=x/vₓ 代入 y(t)，得到关于 x 的二次函数。这一步把时间规律与空间轨迹严格连接起来。", summaryFormula(state)),
-    teachingStep(9, "projectile-verify-boundaries", "总结结论并验证边界", `回代检查 y(0)=0、y(T)=0，并核对落地竖直速度。${boundaryFormula(state).caption}`, boundaryFormula(state)),
+    sceneStep(8, "projectile-parabola", "消去时钟：轨迹是抛物线", state.vx === 0
+      ? "vₓ=0 时不能用 t=x/vₓ 消元——除数为零；轨迹退化为一条竖直线，必须单独讨论。这正是代数边界与物理边界互相印证的地方。"
+      : `时间是两条分运动方程的暗线。用 t=x/vₓ 把它抹掉：y=x·tanθ−g·x²/(2vₓ²)——关于 x 的二次函数，系数 −g/(2vₓ²) 为负，开口向下。1638 年，伽利略在《两门新科学》“第四天”里第一次证明了这一点：匀速与匀加速两条各自平凡的定律，拼在一起生成了炮弹的曲线。`, summaryFormula(state)),
+    sceneStep(9, "projectile-moon", "边界与月球：模型的适用范围", `以上全部依赖三个前提：同一水平面起落、g 恒定、忽略空气阻力。羽毛球杀球的下落段明显更陡——空气阻力让真实轨迹偏离抛物线；而在没有大气的月球上，模型反而更准。${moonScale > 1.05
+      ? `月球 g=1.62 m/s²，约为当前 g 的 1/${fixed(moonScale, 1)}：T、H、R 同倍放大 ${fixed(moonScale, 1)} 倍。1971 年阿波罗 14 号的谢泼德在月面打出的那颗高尔夫球，就是这条公式的实景演示。把 g 拖到 1.62 亲自试试；`
+      : `当前 g=${fixed(state.gravity)} m/s²——你已经站在月球弹道附近：同一组 v₀、θ 下，T、H、R 都是地球值的约 6 倍。1971 年阿波罗 14 号的谢泼德在月面打出的那颗高尔夫球，就是这条公式的实景演示。`}沙盘里 v₀、θ、g 都归你。${boundaryNote}`, physicsSnapshot(
+      state,
+      grounded ? 0 : 0.65,
+      `${BOUNDARY_EXPLANATION[state.boundaryCase]}模型前提：同高起落、g 恒定、无空气阻力。`,
+      `T=${fixed(state.flightTime)} s · H=${fixed(state.maxHeight)} m · R=${fixed(state.range)} m`,
+      { showResultant: true, showGravity: true },
+    )),
   ];
 
-  return {
-    schema_version: "2.0.0",
-    fps: FPS,
-    total_frames: steps.length * STEP_FRAMES,
-    domain: "physics",
-    title: "抛体运动：从分运动到轨迹",
-    summary: "从观察问题出发，分别建立水平与竖直时间关系，再合成轨迹并验证最高点、落地与退化边界。",
+  return playbook(
+    "physics",
+    "抛体运动 · 两颗子弹与一条抛物线",
+    "从同落实验出发拆解两条独立分运动，用同一只时钟合成轨迹，验证最高点、射程与模型边界。",
+    "projectile_motion_teacher_case",
     steps,
-    parameter_controls: [
-      { id: "speed", label: "初速度 v₀", value: fixed(state.speed), description: "单位 m/s；允许 0 以检查静止边界。" },
-      { id: "angle", label: "抛射角 θ", value: fixed(state.angle), description: "0° 到 90°，覆盖水平与竖直退化。" },
-      { id: "gravity", label: "重力加速度 g", value: fixed(state.gravity), description: "单位 m/s²；改变后完整重算时间、高度与射程。" },
+    [
+      { id: "speed", label: "初速度 v₀", value: fixed(state.speed), description: "单位 m/s；允许 0 检查静止边界" },
+      { id: "angle", label: "抛射角 θ", value: fixed(state.angle), description: "45° 射程封顶；互补角同射程" },
+      { id: "gravity", label: "重力加速度 g", value: fixed(state.gravity), description: "拖到 1.62 进入月球弹道" },
     ],
-    algorithm_id: "projectile_motion_teacher_case",
-    initial_data: {
+    {
       speed: [fixed(state.speed)],
       angle: [fixed(state.angle)],
       gravity: [fixed(state.gravity)],
       boundary_case: [state.boundaryCase],
     },
-  };
+  );
 }
 
-function questionsForStep(
-  step: MetaStep,
-  state: ProjectileState,
-): TemplatePreviewQuestion[] {
-  const common = {
-    horizontal: state.vx === 0
-      ? "当前 vₓ=0，水平位置不变。"
-      : `当前 vₓ=${fixed(state.vx)} m/s 恒定，所以 x(t)=${fixed(state.vx)}t。`,
-    vertical: `当前 vᵧ₀=${fixed(state.vy0)} m/s，重力使 vᵧ 每秒减少 ${fixed(state.gravity)} m/s。`,
-    result: `T=${fixed(state.flightTime)} s，H=${fixed(state.maxHeight)} m，R=${fixed(state.range)} m。`,
-    boundary: boundaryFormula(state).caption ?? "",
-  };
-  const local: Record<string, Array<[string, string]>> = {
-    "projectile-observe": [
-      ["这一幕先不要急着算什么？", "先辨认初速度与重力的方向，并提出轨迹为什么弯曲的问题。"],
-      ["重力会直接改变水平速度吗？", "不会。忽略空气阻力时，重力只有竖直分量。"],
-    ],
-    "projectile-decompose": [
-      ["为什么可以分别研究两个方向？", "水平与竖直方程共享同一个时间，但加速度分量彼此独立。"],
-      ["当前两个初速度分量是多少？", `vₓ=${fixed(state.vx)} m/s，vᵧ₀=${fixed(state.vy0)} m/s。`],
-    ],
-    "projectile-horizontal": [
-      ["直线图像的斜率表示什么？", common.horizontal],
-      ["改变 g 会改变这条直线吗？", "不会；g 只进入竖直方向方程。"],
-    ],
-    "projectile-vertical-velocity": [
-      ["vᵧ=0 是否表示物体静止？", `不一定；此时仍可能有 vₓ=${fixed(state.vx)} m/s。`],
-      ["图像为什么是一条下降直线？", common.vertical],
-    ],
-    "projectile-vertical-position": [
-      ["为什么 y(t) 是二次函数？", "因为竖直速度随时间线性变化，对速度累积后得到二次位移。"],
-      ["最高点对应图像哪里？", `对应抛物线顶点，t=${fixed(state.apexTime)} s，y=${fixed(state.maxHeight)} m。`],
-    ],
-    "projectile-compose-trajectory": [
-      ["轨迹点如何生成？", "选定同一个 t，分别算 x(t) 和 y(t)，再组成点 P(t)。"],
-      ["为什么不能给 x、y 使用不同时间？", "真实质点在每个时刻只有一个位置，两个方向必须同步。"],
-    ],
-    "projectile-apex": [
-      ["最高点的速度一定为零吗？", `只有 vᵧ=0；总速度大小是 |vₓ|=${fixed(Math.abs(state.vx))} m/s。`],
-      ["最高点之后发生什么？", "vᵧ 变为负值，物体进入下降阶段；vₓ 仍保持不变。"],
-    ],
-    "projectile-landing": [
-      ["y(T)=0 为什么有两个根？", "t=0 是发射时刻；另一个非负根才是同高落地时刻。"],
-      ["怎样从 T 得到射程？", `代入 x(T)=vₓT，当前得到 R=${fixed(state.range)} m。`],
-    ],
-    "projectile-eliminate-time": [
-      ["抛物线是如何推出来的？", "当 vₓ≠0 时，用 t=x/vₓ 消去时间，y 就成为 x 的二次函数。"],
-      ["什么时候不能这样消元？", "竖直发射时 vₓ=0，不能除以零；轨迹退化为竖直线。"],
-    ],
-    "projectile-verify-boundaries": [
-      ["最终数值结论是什么？", common.result],
-      ["这些公式依赖哪些前提？", "同一水平面起落、匀强重力场、质点模型，并忽略空气阻力。"],
-    ],
-  };
-  const firstTwo = local[step.step_id] ?? [["这一幕在说明什么？", step.voiceover_text]];
-  return [
-    ...firstTwo,
-    ["调整初速度会怎样？", "在角度与 g 不变时，T 与 v₀ 成正比，H 与 R 与 v₀² 成正比。"],
-    ["调整重力加速度会怎样？", "在 v₀ 与 θ 不变时，T、H、R 都与 g 成反比。"],
-    ["当前参数是否触发边界？", common.boundary],
-  ].slice(0, 5).map(([question, answer], index) => ({
-    id: `${step.step_id}-q${index + 1}`,
-    question,
-    answer,
-  }));
-}
-
-export function buildProjectileMotionFollowups(
-  params: TemplatePreviewParams,
-  script: PlaybookScript,
-): TemplatePreviewFollowups {
-  const state = solveProjectile({
-    speed: params.speed,
-    angle: params.angle,
-    gravity: params.gravity,
-  });
-  return Object.fromEntries(script.steps.map((step) => [
-    step.step_id,
-    questionsForStep(step, state),
-  ]));
-}
-
-export const PROJECTILE_EXPECTED_FACTS: readonly ExpectedFact[] = Object.freeze([
-  {
-    id: "projectile.horizontal-constant",
-    description: "Horizontal velocity is constant and horizontal displacement is linear in time.",
-    anyOf: ["v_x=v_0 cos(theta)", "x(t)=v_x t"],
-    tolerance: 0.01,
-  },
-  {
-    id: "projectile.vertical-kinematics",
-    description: "Vertical velocity and displacement use the same downward gravity.",
-    anyOf: ["v_y(t)=v_y0-g t", "y(t)=v_y0 t-1/2 g t^2"],
-    tolerance: 0.01,
-  },
-  {
-    id: "projectile.key-moments",
-    description: "The apex and same-height landing are derived from the vertical equations.",
-    anyOf: ["v_y(t_apex)=0", "y(T)=0", "R=v_x T"],
-    tolerance: 0.01,
-  },
-  {
-    id: "projectile.boundaries",
-    description: "Stationary, ground-tangent, and vertical launches avoid division by zero and false airborne motion.",
-    anyOf: ["v0=0 => T=H=R=0", "theta=90deg => R=0", "v_x=0 is not eliminated"],
-  },
-]);
-
-export const PROJECTILE_VISUAL_INVARIANTS: readonly VisualInvariant[] = Object.freeze([
-  {
+export const PROJECTILE_MOTION_GOLD_TEMPLATE: GoldTemplateManifest = standaloneCase({
+  caseId: "projectile",
+  archetypeId: "physics.projectile.motion-decomposition",
+  subject: "high_school_physics",
+  domain: "projectile_motion",
+  topic: "抛体运动",
+  title: "抛体运动 · 两颗子弹与一条抛物线",
+  description: "同落实验、分运动独立性、sin2θ 射程、伽利略 1638 与月球弹道边界",
+  prompt: "从“水平射出与自由落下的子弹同时落地”的实验出发讲解抛体运动：分解初速度并说明独立性，分别建立 x(t)、vᵧ(t)、y(t)，用同一时钟合成轨迹，检查最高点误区、T 与 R=v₀²sin2θ/g、θ=45° 最大射程与互补角，消去时间得到抛物线，并讨论空气阻力与月球 g=1.62 的模型边界。",
+  defaults: { ...PROJECTILE_DEFAULTS },
+  controls: [
+    {
+      id: "speed",
+      kind: "range",
+      label: "初速度 v₀",
+      description: "m/s；含 v₀=0 边界",
+      min: PROJECTILE_LIMITS.speed.min,
+      max: PROJECTILE_LIMITS.speed.max,
+      step: 1,
+      resetPlayback: false,
+    },
+    {
+      id: "angle",
+      kind: "range",
+      label: "抛射角 θ",
+      description: "拖过 45° 看射程先涨后跌",
+      min: PROJECTILE_LIMITS.angle.min,
+      max: PROJECTILE_LIMITS.angle.max,
+      step: 1,
+      resetPlayback: false,
+    },
+    {
+      id: "gravity",
+      kind: "range",
+      label: "重力加速度 g",
+      description: "m/s²；1.62 即月球",
+      min: PROJECTILE_LIMITS.gravity.min,
+      max: PROJECTILE_LIMITS.gravity.max,
+      step: 0.1,
+      resetPlayback: false,
+    },
+  ],
+  requiredCapabilities: [
+    "physics_force_scene",
+    "velocity_decomposition",
+    "math_plot",
+    "trajectory_composition",
+    "boundary_verification",
+  ],
+  handsOn: ["projectile-landing", "projectile-moon"],
+  expectedFacts: [
+    {
+      id: "projectile.horizontal-constant",
+      description: "水平速度恒定，水平位移随时间线性增长",
+      anyOf: ["v_x=v_0 cos(theta)", "x(t)=v_x t", "vₓ 从头到尾不变"],
+      tolerance: 0.01,
+    },
+    {
+      id: "projectile.vertical-kinematics",
+      description: "竖直速度与位移由同一个向下的 g 决定",
+      anyOf: ["v_y(t)=v_y0-g t", "y(t)=v_y0 t-1/2 g t^2", "vᵧ(t)=vᵧ₀−gt"],
+      tolerance: 0.01,
+    },
+    {
+      id: "projectile.key-moments",
+      description: "最高点与同高落地由竖直方程推出",
+      anyOf: ["v_y(t_apex)=0", "y(T)=0", "R=v_x T"],
+      tolerance: 0.01,
+    },
+    {
+      id: "projectile.range-angle",
+      description: "R=v₀²sin2θ/g 在 45° 封顶，互补角射程相同",
+      anyOf: ["sin2θ", "45°", "90°−θ"],
+    },
+    {
+      id: "projectile.independence",
+      description: "水平速度不进入竖直方程，两颗子弹同时落地",
+      anyOf: ["同时着地", "0.039", "互不打扰"],
+    },
+    {
+      id: "projectile.boundaries",
+      description: "静止、贴地、竖直发射的退化边界得到显式处理",
+      anyOf: ["v0=0 => T=H=R=0", "θ=90° 时 vₓ=0", "T=H=R=0"],
+    },
+  ],
+  visualInvariants: [{
     id: "projectile.causal-visual-chain",
-    description: "Velocity components, gravity, time plots, and the trajectory preserve their semantic identity across the lesson.",
+    description: "速度分量、重力、时间图线与轨迹在整节课中保持语义身份",
     requiredSemanticRoles: [
       "velocity",
       "acceleration",
@@ -479,89 +424,24 @@ export const PROJECTILE_VISUAL_INVARIANTS: readonly VisualInvariant[] = Object.f
       "vertical_velocity",
       "vertical_position",
     ],
-    requiredStateFields: [
-      "snapshot.objects",
-      "snapshot.vectors",
-      "snapshot.trajectory",
-      "snapshot.curves",
-      "snapshot.formula_latex",
-    ],
-  },
-]);
-
-export const PROJECTILE_PEDAGOGICAL_RUBRIC: PedagogicalRubric = Object.freeze({
-  objective: "Students can derive a projectile path from two synchronized one-dimensional motions and verify key moments and model boundaries.",
-  requiredPhases: [
-    "observation-question",
-    "velocity-decomposition",
-    "horizontal-time-relation",
-    "vertical-time-relations",
-    "trajectory-composition",
-    "apex-and-landing",
-    "conclusion-and-boundary-check",
-  ],
+    requiredStateFields: ["objects", "vectors", "trajectory", "curves", "formula_latex"],
+  }],
+  objective: "把一次飞行分解为共享时钟的两条一维运动，合成轨迹并验证最高点、射程规律与模型边界。",
   minimumSteps: 10,
-});
-
-export const PROJECTILE_MOTION_GOLD_TEMPLATE: GoldTemplateManifest = defineStandaloneGoldTemplate({
-  caseId: "projectile",
-  archetypeId: "physics.projectile.motion-decomposition",
-  subject: "high_school_physics",
-  domain: "projectile_motion",
-  topic: "抛体运动",
-  title: "抛体运动：从分运动到轨迹",
-  description: "从水平、竖直时间关系推导轨迹，并验证最高点、落地与退化边界",
-  canonicalPrompt: "一个物体从地面以初速度 v₀、仰角 θ 抛出。在忽略空气阻力、重力恒定的条件下，从速度分解开始推导 x(t)、vᵧ(t)、y(t) 和轨迹方程，并说明最高点、落地时刻、射程以及 v₀=0、θ=0°、θ=90° 的边界。",
-  requiredCapabilities: [
-    "physics.projectile.solve",
-    "physics.velocity.decompose",
-    "math.time-series.plot",
-    "physics.trajectory.compose",
-    "education.boundary.verify",
-  ],
-  expectedFacts: PROJECTILE_EXPECTED_FACTS,
-  visualInvariants: PROJECTILE_VISUAL_INVARIANTS,
-  pedagogicalRubric: PROJECTILE_PEDAGOGICAL_RUBRIC,
-  parameterSchema: {
-    defaults: PROJECTILE_DEFAULTS,
-    controls: [
-      {
-        id: "speed",
-        kind: "range",
-        label: "初速度 v₀",
-        description: "m/s；含 v₀=0 边界",
-        min: PROJECTILE_LIMITS.speed.min,
-        max: PROJECTILE_LIMITS.speed.max,
-        step: 1,
-        resetPlayback: false,
-      },
-      {
-        id: "angle",
-        kind: "range",
-        label: "抛射角 θ",
-        description: "0° 到 90°",
-        min: PROJECTILE_LIMITS.angle.min,
-        max: PROJECTILE_LIMITS.angle.max,
-        step: 1,
-        resetPlayback: false,
-      },
-      {
-        id: "gravity",
-        kind: "range",
-        label: "重力加速度 g",
-        description: "m/s²；完整重算运动",
-        min: PROJECTILE_LIMITS.gravity.min,
-        max: PROJECTILE_LIMITS.gravity.max,
-        step: 0.1,
-        resetPlayback: false,
-      },
-    ],
+  builder: buildProjectileMotionPlaybook,
+  mechanism: "牛顿第二定律按分量独立成立：水平方向无力故匀速，竖直方向恒受 g 故匀变速；两个方向只共享时间。",
+  mechanismByStep: {
+    "projectile-two-bullets": "竖直方程 y(t)=vᵧ₀t−gt²/2 里没有 vₓ 的位置：水平速度改不了竖直命运。实测的 0.039 s 差来自枪管微小上仰与空气阻力，不是原理偏差。",
+    "projectile-decompose": "矢量方程 F=ma 逐分量读：Fₓ=0 ⇒ aₓ=0；Fᵧ=−mg ⇒ aᵧ=−g。分解不是技巧，是分量语言的直译。",
+    "projectile-horizontal": "aₓ=0 使 vₓ 成为常数，x(t)=vₓt 因而线性；图线斜率里没有 g，所以改 g 不动它。",
+    "projectile-vertical-velocity": "aᵧ=−g 恒定 ⇒ vᵧ 线性递减；令 vᵧ=0 得 t=vᵧ₀/g，这是上升与下降的分水岭。",
+    "projectile-vertical-position": "位移是速度的累积：对线性的 vᵧ(t) 积分得到二次的 y(t)；顶点出现在导数为零处。",
+    "projectile-compose": "运动的本体是位置矢量 r(t)=(x(t), y(t))；轨迹是把 t 隐藏后的影子，而速度 v=r′(t) 天然指向轨迹切线。",
+    "projectile-apex": "vᵧ=0 只是竖直分量的转折；|v|=√(vₓ²+vᵧ²) 在此取最小值 |vₓ|，只有 θ=90° 时才真正为零。",
+    "projectile-landing": "y(T)=0 的两根中 t=0 是出发时刻，非零根 T=2vᵧ₀/g；R=vₓT=2v₀²sinθcosθ/g=v₀²sin2θ/g，二倍角公式把“45° 封顶”与“互补角同程”一次说完。",
+    "projectile-parabola": "把 t=x/vₓ 代入 y(t)：一次代入、二次落地；系数 −g/(2vₓ²)<0 保证开口向下。vₓ=0 时消元除零，边界必须单列。",
+    "projectile-moon": "T=2vᵧ₀/g、H=vᵧ₀²/(2g)、R=v₀²sin2θ/g 都反比于 g：g 缩小到约 1/6，三者同倍放大。月球没有大气，反而消掉了模型最大的误差源。",
   },
-  poster: {
-    url: "/template-previews/projectile/poster.webp",
-    alt: "抛体运动最高点画面，同时显示水平速度、向下重力与完整轨迹",
-    frame: 600,
-  },
-  buildPublicPlaybook: buildProjectileMotionPlaybook,
-  buildFollowups: buildProjectileMotionFollowups,
+  transfer: "把 θ 分别停在 30° 与 60°，验证两次射程相同；把 g 拖到 1.62 看月球弹道同倍放大；最后把 θ 拖到 90°，检查 R=0 的退化边界。",
+  posterStepIndex: 7,
 });

@@ -76,6 +76,35 @@ const LINE_PREVIEWS: Record<TemplatePreviewCaseId, ReactNode> = {
       <circle className="is-accent" cx="83" cy="28" r="3.5" />
     </svg>
   ),
+  "integral-area": (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="integral-riemann-area">
+      <path className="is-guide" d="M18 48h124M26 53V6" data-object="axes" />
+      <rect x="42" y="43" width="15" height="5" rx="1" data-object="riemann-rect" />
+      <rect x="59" y="38" width="15" height="10" rx="1" data-object="riemann-rect" />
+      <rect className="is-accent" x="76" y="30" width="15" height="18" rx="1" data-object="riemann-rect" />
+      <rect x="93" y="21" width="15" height="27" rx="1" data-object="riemann-rect" />
+      <rect x="110" y="10" width="15" height="38" rx="1" data-object="riemann-rect" />
+      <path d="M34 47c28-2 62-14 94-40" data-object="area-curve" />
+    </svg>
+  ),
+  projectile: (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="projectile-trajectory">
+      <path className="is-guide" d="M14 48h132" data-object="ground" />
+      <path d="M24 48C48 10 112 10 136 48" data-object="trajectory" />
+      <path className="is-accent" d="m24 48 20-22m-8 1 8-1 1 8" data-object="launch-velocity" />
+      <path className="is-guide is-dashed" d="M80 20v28" data-object="max-height" />
+      <circle className="is-accent" cx="80" cy="19" r="3.2" data-object="apex" />
+    </svg>
+  ),
+  "spring-shm": (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="spring-shm-cosine">
+      <path className="is-guide" d="M14 28h132" data-object="axis" />
+      <path className="is-guide is-dashed" d="M14 9h132M14 47h132" data-object="amplitude-bound" />
+      <path d="M14 9c9 0 15 38 26 38s17-38 28-38 17 38 28 38 17-38 28-38 12 19 22 28" data-object="displacement-wave" />
+      <circle className="is-accent" cx="14" cy="9" r="3" data-object="release-point" />
+      <circle className="is-accent" cx="68" cy="9" r="3" data-object="period-mark" />
+    </svg>
+  ),
   "logistic-growth": (
     <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="logistic-growth">
       <path className="is-guide" d="M14 46h132M14 46V8" />
