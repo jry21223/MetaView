@@ -306,7 +306,7 @@ export function buildSpringShmGoldPlaybook(params: TemplatePreviewParams): Playb
     sceneStep(1, "shm-restoring", "恢复力：总想回家，回家又刹不住", `胡克定律的负号是全部剧情：无论砝码在哪一侧，力都指回平衡点，偏得越远拉得越狠——当前在 x=A=${fixed(amplitude)} m 处 |F|=kA=${fixed(stiffness * amplitude)} N。回到中点力归零，速度却在那一刻最大，于是冲过头，再被反向拉回。振动的引擎就是这对矛盾：总想回家，回家又刹不住。`, oscillatorScene(
       state,
       "力随位移线性增长、方向始终相反：负号驱动整场往返。",
-      String.raw`|F|=kA=${fixed(stiffness * amplitude)}\ \text{N}`,
+      `|F| = kA = ${fixed(stiffness * amplitude)} N`,
     )),
     sceneStep(2, "shm-newton", "牛顿翻译：a=−(k/m)x", `把胡克定律交给牛顿第二定律：ma=−kx，即 a=−(k/m)x=−${fixed(stiffness / mass)}x。注意——这不是匀加速：加速度每一刻都跟着位置变，位置由速度积累，速度又被加速度改写。这种“变化率由自身状态决定”的循环，正是导数语言的主场。当前 k/m=${fixed(stiffness / mass)} s⁻²，这个数马上会有自己的名字。`, newtonFormula(state)),
     sceneStep(3, "shm-cosine", "猜一条曲线来验：余弦严丝合缝", `物理的老办法——猜解并验证。试 x(t)=A·cos(ωt)：求导得 v(t)=−Aω·sin(ωt)，再求导得 a(t)=−Aω²·cos(ωt)=−ω²x。只要 ω²=k/m，方程严丝合缝——当前 ω=√(${fixed(stiffness)}/${fixed(mass)})=${fixed(omega)} rad/s。初始条件同样吻合：从静止释放，x(0)=A=${fixed(amplitude)} m、v(0)=0。微积分问世不过几十年，弹簧就成了它最早的战利品之一。`, displacementPlot(state, {

@@ -67,6 +67,17 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+// Draw-ins run on their own short clock, not the narration's: a 40-second
+// voiceover must not stretch the trajectory reveal to 40 seconds.
+const TRAJECTORY_DRAW_FRAMES = 42;
+const VECTOR_DRAW_DELAY_FRAMES = 6;
+const VECTOR_DRAW_FRAMES = 26;
+
+function easeOutCubic(t: number): number {
+  const clamped = clamp(t, 0, 1);
+  return 1 - (1 - clamped) ** 3;
+}
+
 /** Zig-zag coil path with short straight leads at both anchors. */
 function springPath(spring: PhysicsSceneSpring): string {
   const coils = Math.max(3, Math.round(spring.coils ?? 8));
@@ -142,6 +153,8 @@ function compactFormula(formula: string | null | undefined): string {
     .replace(/\\quad/g, "  ")
     .replace(/\\frac12/g, "1/2")
     .replace(/\\frac\{1\}\{2\}/g, "1/2")
+    .replace(/\\text/g, "")
+    .replace(/\\[,;! ]/g, " ")
     .replace(/[{}]/g, "");
 }
 
@@ -187,7 +200,7 @@ function renderVector(
         x2={endX}
         y2={endY}
         stroke={color}
-        strokeWidth={vector.semantic_role === "velocity" ? "0.52" : "0.7"}
+        strokeWidth={vector.semantic_role === "velocity" ? "0.36" : "0.46"}
         strokeLinecap="round"
         markerEnd={`url(#physics-arrow-${vector.semantic_role})`}
       />
@@ -226,8 +239,8 @@ function renderExtraTrajectory(
         d={trajectoryPath(item.points, progress)}
         fill="none"
         stroke={color}
-        strokeWidth={item.emphasis === "secondary" ? 0.7 : item.emphasis === "accent" ? 1.3 : 1.5}
-        strokeDasharray={item.emphasis === "secondary" ? "2.1 1.6" : undefined}
+        strokeWidth={item.emphasis === "secondary" ? 0.4 : item.emphasis === "accent" ? 0.62 : 0.7}
+        strokeDasharray={item.emphasis === "secondary" ? "1.5 1.2" : undefined}
         opacity={item.emphasis === "secondary" ? 0.7 : 0.88}
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -279,7 +292,7 @@ function renderGround(groundY: number, colors: PhysicsColors) {
   const hatches = Array.from({ length: 22 }, (_, index) => 7 + index * 4);
   return (
     <g data-semantic-role="ground" opacity="0.75">
-      <line x1="6" y1={groundY} x2="94" y2={groundY} stroke={colors.axis} strokeWidth="0.55" />
+      <line x1="6" y1={groundY} x2="94" y2={groundY} stroke={colors.axis} strokeWidth="0.4" />
       {hatches.map((x) => (
         <line
           key={x}
@@ -288,7 +301,7 @@ function renderGround(groundY: number, colors: PhysicsColors) {
           x2={x - 1.9}
           y2={groundY + 2.1}
           stroke={colors.axis}
-          strokeWidth="0.35"
+          strokeWidth="0.26"
           opacity="0.5"
         />
       ))}
@@ -296,11 +309,21 @@ function renderGround(groundY: number, colors: PhysicsColors) {
   );
 }
 
-export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({ step, progress, theme }) => {
+export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({
+  step,
+  frame,
+  stepStartFrame,
+  visualStartFrame,
+  theme,
+}) => {
   const snap = step.snapshot as PhysicsForceSceneSnapshot;
   const colors = physicsPalette(theme);
   const formulaText = compactFormula(snap.formula_latex);
   const hasGround = snap.ground_y != null && Number.isFinite(snap.ground_y);
+  // Anchor to the visual slot so a continued scene never re-draws mid-lesson.
+  const slotFrame = frame - (visualStartFrame ?? stepStartFrame);
+  const drawProgress = easeOutCubic(slotFrame / TRAJECTORY_DRAW_FRAMES);
+  const vectorProgress = easeOutCubic((slotFrame - VECTOR_DRAW_DELAY_FRAMES) / VECTOR_DRAW_FRAMES);
 
   return (
     <div
@@ -322,14 +345,14 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({ step, progr
             <marker
               key={role}
               id={`physics-arrow-${role}`}
-              markerWidth="2.5"
-              markerHeight="2.5"
-              refX="2.2"
-              refY="1.25"
+              markerWidth="1.9"
+              markerHeight="1.9"
+              refX="1.66"
+              refY="0.95"
               orient="auto"
               markerUnits="userSpaceOnUse"
             >
-              <path d="M0,0 L2.2,1.25 L0,2.5 Z" fill={vectorColor(role, colors)} />
+              <path d="M0,0 L1.66,0.95 L0,1.9 Z" fill={vectorColor(role, colors)} />
             </marker>
           ))}
         </defs>
@@ -365,17 +388,17 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({ step, progr
           <g data-semantic-role="motion_trail" data-render-mode="native-trajectory">
             {!hasGround ? (
               <g data-semantic-role="motion_axes" opacity="0.6">
-                <line x1="12" y1="84" x2="91" y2="84" stroke={colors.axis} strokeWidth="0.55" />
-                <line x1="12" y1="17" x2="12" y2="84" stroke={colors.axis} strokeWidth="0.55" />
+                <line x1="12" y1="84" x2="91" y2="84" stroke={colors.axis} strokeWidth="0.4" />
+                <line x1="12" y1="17" x2="12" y2="84" stroke={colors.axis} strokeWidth="0.4" />
                 <text x="92" y="85.4" fontSize="2.8" fill={colors.muted}>x</text>
                 <text x="10.6" y="16" fontSize="2.8" fill={colors.muted}>y</text>
               </g>
             ) : null}
             <path
-              d={trajectoryPath(snap.trajectory, progress)}
+              d={trajectoryPath(snap.trajectory, drawProgress)}
               fill="none"
               stroke={colors.trajectory}
-              strokeWidth="1.5"
+              strokeWidth="0.7"
               opacity="0.85"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -384,7 +407,7 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({ step, progr
           </g>
         ) : null}
 
-        {snap.trajectories?.map((item, index) => renderExtraTrajectory(item, index, progress, colors))}
+        {snap.trajectories?.map((item, index) => renderExtraTrajectory(item, index, drawProgress, colors))}
 
         {snap.springs?.map((spring) => (
           <g key={spring.id} data-semantic-role={spring.semantic_role ?? "spring_coil"}>
@@ -392,7 +415,7 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({ step, progr
               d={springPath(spring)}
               fill="none"
               stroke={colors.ink}
-              strokeWidth="0.62"
+              strokeWidth="0.42"
               strokeLinejoin="round"
               strokeLinecap="round"
             />
@@ -420,7 +443,7 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({ step, progr
                 r={radius}
                 fill={colors.surface}
                 stroke={colors.ink}
-                strokeWidth="0.65"
+                strokeWidth="0.45"
               />
               {object.label ? (
                 <HaloText
@@ -440,7 +463,7 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({ step, progr
 
         {snap.points?.map((point, index) => renderPoint(point, index, colors))}
 
-        {snap.vectors.map((vector) => renderVector(vector, objectById(snap.objects, vector.target), progress, colors))}
+        {snap.vectors.map((vector) => renderVector(vector, objectById(snap.objects, vector.target), vectorProgress, colors))}
 
         {snap.annotations?.map((annotation, index) => (
           <g key={`annotation-${index}`} data-semantic-role={annotation.semantic_role ?? "scene_annotation"}>

@@ -73,7 +73,7 @@ describe("PhysicsForceSceneRenderer", () => {
     expect(markup).not.toContain("var(--warn");
     expect(markup).not.toContain("var(--canvas-primary");
     expect(markup).toContain('data-semantic-role="trajectory"');
-    expect(markup).toContain('stroke-width="1.5"');
+    expect(markup).toContain('stroke-width="0.7"');
     expect(markup).not.toContain("#1f8abd");
     expect(markup).not.toContain("#8e44ad");
     expect(markup).not.toContain("projectile-body-dot");
@@ -108,7 +108,32 @@ describe("PhysicsForceSceneRenderer", () => {
     const markup = renderToStaticMarkup(<PhysicsForceSceneRenderer {...props(snapshot)} />);
 
     expect(markup).toContain('data-vector-component="horizontal"');
-    expect(markup).toContain('stroke-width="0.52"');
+    expect(markup).toContain('stroke-width="0.36"');
+  });
+
+  it("finishes the trajectory draw-in on its own clock, not the narration's", () => {
+    const snapshot = projectileMotionSnapshot();
+    const longStep = {
+      ...step(snapshot),
+      end_frame: 1200,
+    };
+    const at = (frame: number) => renderToStaticMarkup(
+      <PhysicsForceSceneRenderer
+        {...props(snapshot)}
+        step={longStep}
+        frame={frame}
+        stepEndFrame={1200}
+      />,
+    );
+
+    // 60 frames (2s) into a 40-second narration the path is already complete…
+    const settled = at(60).match(/data-semantic-role="trajectory"[^>]*d="([^"]*)"|d="([^"]*)"[^>]*data-semantic-role="trajectory"/);
+    const settledPath = settled?.[1] ?? settled?.[2] ?? "";
+    expect(settledPath.split("L")).toHaveLength(snapshot.trajectory!.length);
+    // …while a frame early in the draw window still shows a partial path.
+    const early = at(8).match(/data-semantic-role="trajectory"[^>]*d="([^"]*)"|d="([^"]*)"[^>]*data-semantic-role="trajectory"/);
+    const earlyPath = early?.[1] ?? early?.[2] ?? "";
+    expect(earlyPath.split("L").length).toBeLessThan(snapshot.trajectory!.length);
   });
 
   it("replaces the abstract axes with a hatched ground when ground_y is declared", () => {
@@ -144,7 +169,7 @@ describe("PhysicsForceSceneRenderer", () => {
     expect(markup).toContain('data-semantic-role="drop_line"');
     expect(markup).toContain('data-semantic-role="complementary_trajectory"');
     expect(markup).toContain("自由落下");
-    expect(markup).toContain('stroke-dasharray="2.1 1.6"');
+    expect(markup).toContain('stroke-dasharray="1.5 1.2"');
   });
 
   it("marks scene points, annotations, and a zig-zag spring coil", () => {
