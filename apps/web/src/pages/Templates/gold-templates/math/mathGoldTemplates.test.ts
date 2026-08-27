@@ -143,17 +143,39 @@ describe("calculus public Gold Templates", () => {
       expect(lower.snapshot.regions?.every(
         (region) => region.semantic_role === "riemann_rectangle",
       )).toBe(true);
+      // Dots mark where each rectangle's height touches the curve.
+      expect(lower.snapshot.points).toHaveLength(4);
+      expect(lower.snapshot.points?.every((point) => point.y === point.x ** 2)).toBe(true);
     }
 
     const upper = script.steps[2];
     expect(upper.voiceover_text).toContain("1.75 < S < 3.75");
     if (upper.snapshot.kind === "math_scene") {
+      // Staircase (3) plus one orange cap per column (4).
       expect(upper.snapshot.regions).toHaveLength(7);
+      expect(upper.snapshot.regions?.filter(
+        (region) => region.semantic_role === "gap_strip",
+      )).toHaveLength(4);
     }
 
     const refine = script.steps[3];
     expect(refine.voiceover_text).toContain("n=8，2.19 与 3.19");
     expect(refine.voiceover_text).toContain("n=64，2.6 与 2.73");
+    if (refine.snapshot.kind === "math_scene") {
+      // The caps slide right into one contiguous stack: strip k's top edge is
+      // strip k+1's bottom edge, and the pile spans 0..f(b) — that IS b³/n.
+      const stack = refine.snapshot.regions!.filter(
+        (region) => region.semantic_role === "gap_stack",
+      );
+      expect(stack).toHaveLength(4);
+      const tops = stack.map((region) => region.vertices[2][1]);
+      const bottoms = stack.map((region) => region.vertices[0][1]);
+      expect(bottoms[0]).toBe(0);
+      expect(tops.at(-1)).toBeCloseTo(4, 12);
+      for (let k = 1; k < stack.length; k += 1) {
+        expect(bottoms[k]).toBeCloseTo(tops[k - 1], 12);
+      }
+    }
 
     expect(script.steps[4].voiceover_text).toContain("n(n+1)(2n+1)/6");
     expect(script.steps[5].voiceover_text).toContain("2.67");
@@ -165,10 +187,10 @@ describe("calculus public Gold Templates", () => {
     const dense = buildIntegralAreaGoldPlaybook({ n: 64, b: 2 });
     const refine = dense.steps[3];
     if (refine.snapshot.kind === "math_scene") {
-      // 64 upper + 63 lower rectangles (left-endpoint k=0 skipped).
-      expect(refine.snapshot.regions).toHaveLength(127);
+      // 63 staircase slabs + 64 caps + 64 stacked strips.
+      expect(refine.snapshot.regions).toHaveLength(191);
     }
-    expect(refine.voiceover_text).toContain(`n=64`);
+    expect(refine.voiceover_text).toContain(`Δx=0.031`);
 
     const widened = buildIntegralAreaGoldPlaybook({ n: 4, b: 3 });
     expect(widened.steps[5].voiceover_text).toContain("S=lim Σf(xₖ)Δx=9");
