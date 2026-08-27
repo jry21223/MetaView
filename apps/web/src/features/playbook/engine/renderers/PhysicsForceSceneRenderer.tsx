@@ -29,6 +29,8 @@ function physicsPalette(theme: "dark" | "light") {
     line: `var(--line-2, ${palette.line2})`,
     axis: `var(--canvas-axis, ${palette.canvasAxis})`,
     accent: `var(--accent, ${palette.accent})`,
+    // The "live" element color math scenes use for the current point.
+    focus: `var(--canvas-focus, ${palette.canvasFocus})`,
     trajectory: physicsVisualColor("trajectory", theme),
     velocity: physicsVisualColor("velocity", theme),
     acceleration: physicsVisualColor("acceleration", theme),
@@ -73,9 +75,50 @@ const TRAJECTORY_DRAW_FRAMES = 42;
 const VECTOR_DRAW_DELAY_FRAMES = 6;
 const VECTOR_DRAW_FRAMES = 26;
 
+// Flow tracers cruise once the draw has settled, then replay: one full pass
+// uniform in sample index (= uniform in time for time-sampled paths), a rest
+// at the endpoint, and a restart. Every tracer shares this clock, so paths
+// spanning the same time interval stay synchronized on screen.
+const CRUISE_START_FRAMES = TRAJECTORY_DRAW_FRAMES + 8;
+const CRUISE_TRAVEL_FRAMES = 96;
+const CRUISE_HOLD_FRAMES = 27;
+
 function easeOutCubic(t: number): number {
   const clamped = clamp(t, 0, 1);
   return 1 - (1 - clamped) ** 3;
+}
+
+function cruiseFraction(slotFrame: number): number | null {
+  const elapsed = slotFrame - CRUISE_START_FRAMES;
+  if (elapsed < 0) return null;
+  const phase = elapsed % (CRUISE_TRAVEL_FRAMES + CRUISE_HOLD_FRAMES);
+  return Math.min(1, phase / CRUISE_TRAVEL_FRAMES);
+}
+
+function pointAlong(points: Array<[number, number]>, fraction: number): [number, number] | null {
+  if (points.length < 2) return null;
+  const position = clamp(fraction, 0, 1) * (points.length - 1);
+  const index = Math.min(points.length - 2, Math.floor(position));
+  const t = position - index;
+  const [x0, y0] = points[index];
+  const [x1, y1] = points[index + 1];
+  return [x0 + (x1 - x0) * t, y0 + (y1 - y0) * t];
+}
+
+function renderFlowTracer(
+  points: Array<[number, number]>,
+  fraction: number | null,
+  colors: PhysicsColors,
+  key: string,
+) {
+  if (fraction == null) return null;
+  const at = pointAlong(points, fraction);
+  if (!at) return null;
+  return (
+    <g key={key} data-semantic-role="flow_tracer">
+      <circle cx={at[0]} cy={at[1]} r={1.5} fill={colors.focus} stroke={colors.surface} strokeWidth={0.4} />
+    </g>
+  );
 }
 
 /** Zig-zag coil path with short straight leads at both anchors. */
@@ -324,6 +367,7 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({
   const slotFrame = frame - (visualStartFrame ?? stepStartFrame);
   const drawProgress = easeOutCubic(slotFrame / TRAJECTORY_DRAW_FRAMES);
   const vectorProgress = easeOutCubic((slotFrame - VECTOR_DRAW_DELAY_FRAMES) / VECTOR_DRAW_FRAMES);
+  const flowFraction = cruiseFraction(slotFrame);
 
   return (
     <div
@@ -408,6 +452,14 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({
         ) : null}
 
         {snap.trajectories?.map((item, index) => renderExtraTrajectory(item, index, drawProgress, colors))}
+
+        {snap.flow_tracer && snap.trajectory?.length
+          ? renderFlowTracer(snap.trajectory, flowFraction, colors, "tracer-main")
+          : null}
+        {snap.trajectories?.map((item, index) =>
+          item.flow
+            ? renderFlowTracer(item.points, flowFraction, colors, `tracer-${item.id ?? index}`)
+            : null)}
 
         {snap.springs?.map((spring) => (
           <g key={spring.id} data-semantic-role={spring.semantic_role ?? "spring_coil"}>

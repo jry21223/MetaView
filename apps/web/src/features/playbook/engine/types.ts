@@ -773,6 +773,13 @@ export interface PhysicsSceneTrajectory {
   /** `primary` = motion in focus, `secondary` = dashed contrast, `accent` = highlighted twin. */
   emphasis?: "primary" | "secondary" | "accent" | string;
   semantic_role?: string;
+  /**
+   * Ride a looping tracer dot along this path once it has drawn in. All
+   * tracers in a scene share one clock, so paths sampled over the same time
+   * span stay physically synchronized (the two-bullet experiment). Only flag
+   * paths whose vertices are uniform in time.
+   */
+  flow?: boolean;
 }
 
 /** A marked point in scene space (equal-time samples, apex, landing marks). */
@@ -819,6 +826,8 @@ export interface PhysicsForceSceneSnapshot {
   springs?: PhysicsSceneSpring[];
   /** Scene-space y of the ground; draws a hatched ground line replacing the abstract axes. */
   ground_y?: number | null;
+  /** Ride a looping tracer dot along the primary `trajectory` (see PhysicsSceneTrajectory.flow). */
+  flow_tracer?: boolean;
   formula_latex?: string | null;
   caption?: string | null;
 }

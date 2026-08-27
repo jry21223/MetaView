@@ -249,6 +249,10 @@ function physicsSnapshot(
     }],
     vectors,
     trajectory: projectileSceneTrajectory(state),
+    // The scene trajectory is sampled uniformly in time, so the cruising
+    // tracer replays the real motion: constant horizontal pace, accelerating
+    // vertical drop.
+    flow_tracer: true,
     points: [
       ...(options.showTimeSamples ? timeSamplePoints(state) : []),
       ...(options.showKeyMarks ? keyMarkPoints(state) : []),
@@ -276,7 +280,12 @@ function twinBulletScene(): PhysicsForceSceneSnapshot {
     const f = index / 24;
     return [startX + horizontalReach * f, topY + drop * f * f];
   });
-  const dropPoints: Array<[number, number]> = [[startX, topY], [startX, SCENE_GROUND_Y]];
+  // Same time sampling as the shot so the shared-clock tracers fall in sync:
+  // equal index = equal t, and both dots sit at the same height every frame.
+  const dropPoints: Array<[number, number]> = Array.from({ length: 25 }, (_, index) => {
+    const f = index / 24;
+    return [startX, topY + drop * f * f];
+  });
   const strobe: NonNullable<PhysicsForceSceneSnapshot["points"]> = [];
   for (let index = 1; index <= 5; index += 1) {
     const f = fraction(index);
@@ -303,8 +312,8 @@ function twinBulletScene(): PhysicsForceSceneSnapshot {
       { id: "shared-gravity", target: "dropped-bullet", semantic_role: "acceleration", dx: 0, dy: 9, label: "g" },
     ],
     trajectories: [
-      { id: "fired-path", points: shotPoints, emphasis: "primary", semantic_role: "fired_trajectory" },
-      { id: "dropped-path", points: dropPoints, emphasis: "secondary", semantic_role: "drop_line" },
+      { id: "fired-path", points: shotPoints, emphasis: "primary", semantic_role: "fired_trajectory", flow: true },
+      { id: "dropped-path", points: dropPoints, emphasis: "secondary", semantic_role: "drop_line", flow: true },
       {
         id: "equal-height-link",
         points: [[startX, linkedY], [startX + horizontalReach * fraction(4), linkedY]],

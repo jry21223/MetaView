@@ -172,6 +172,40 @@ describe("PhysicsForceSceneRenderer", () => {
     expect(markup).toContain('stroke-dasharray="1.5 1.2"');
   });
 
+  it("cruises a flow tracer along the trajectory after the draw settles", () => {
+    const snapshot = projectileMotionSnapshot({ flow_tracer: true });
+    const at = (frame: number) => renderToStaticMarkup(
+      <PhysicsForceSceneRenderer {...props(snapshot)} frame={frame} />,
+    );
+
+    // Inside the draw window there is no tracer yet.
+    expect(at(30)).not.toContain('data-semantic-role="flow_tracer"');
+    // 48 frames past cruise start = half of the 96-frame pass: the tracer sits
+    // at the path's midpoint by index, interpolated between vertices 1 and 2.
+    const midCruise = at(50 + 48);
+    expect(midCruise).toContain('data-semantic-role="flow_tracer"');
+    expect(midCruise).toMatch(/data-semantic-role="flow_tracer"><circle cx="41" cy="49.5"/);
+  });
+
+  it("keeps every flow tracer on one shared clock so twin paths stay in sync", () => {
+    const snapshot = projectileMotionSnapshot({
+      trajectory: [],
+      trajectories: [
+        { id: "fired", points: [[20, 30], [40, 34], [60, 46], [80, 66]], flow: true, semantic_role: "fired_trajectory" },
+        { id: "dropped", points: [[20, 30], [20, 34], [20, 46], [20, 66]], flow: true, semantic_role: "drop_line" },
+      ],
+    });
+    const markup = renderToStaticMarkup(
+      <PhysicsForceSceneRenderer {...props(snapshot)} frame={50 + 24} />,
+    );
+
+    const heights = [...markup.matchAll(/data-semantic-role="flow_tracer"><circle cx="[^"]+" cy="([^"]+)"/g)]
+      .map((match) => Number(match[1]));
+    expect(heights).toHaveLength(2);
+    // Same time sampling + shared clock = the two bullets agree on height.
+    expect(heights[0]).toBeCloseTo(heights[1], 9);
+  });
+
   it("marks scene points, annotations, and a zig-zag spring coil", () => {
     const markup = renderToStaticMarkup(<PhysicsForceSceneRenderer {...props(projectileMotionSnapshot({
       points: [{ x: 40, y: 50, label: "t=1 s", semantic_role: "time_sample" }],

@@ -787,6 +787,10 @@ class PhysicsSceneTrajectory(BaseModel):
     label: str | None = None
     emphasis: str | None = None
     semantic_role: str | None = None
+    # Ride a looping tracer dot along this path after it draws in. All tracers
+    # share one clock, so paths spanning the same time interval stay physically
+    # synchronized; only flag paths whose vertices are uniform in time.
+    flow: bool | None = None
 
 
 class PhysicsScenePoint(BaseModel):
@@ -833,6 +837,8 @@ class PhysicsForceSceneSnapshot(BaseModel):
     annotations: list[PhysicsSceneAnnotation] = Field(default_factory=list)
     springs: list[PhysicsSceneSpring] = Field(default_factory=list)
     ground_y: float | None = None
+    # Ride a looping tracer dot along the primary `trajectory` (see PhysicsSceneTrajectory.flow).
+    flow_tracer: bool | None = None
     formula_latex: str | None = None
     caption: str | None = None
 

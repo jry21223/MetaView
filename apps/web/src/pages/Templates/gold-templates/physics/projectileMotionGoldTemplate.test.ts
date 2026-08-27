@@ -82,6 +82,16 @@ describe("projectile motion public Gold Template", () => {
     const dropLine = opening.trajectories!.find((item) => item.semantic_role === "drop_line")!;
     expect(new Set(dropLine.points.map(([x]) => x)).size).toBe(1);
 
+    // Both bullet paths carry live tracers on the shared clock, and the drop
+    // line is sampled in time (y ∝ f²) so equal index means equal height.
+    const firedPath = opening.trajectories!.find((item) => item.semantic_role === "fired_trajectory")!;
+    expect(firedPath.flow).toBe(true);
+    expect(dropLine.flow).toBe(true);
+    expect(dropLine.points).toHaveLength(firedPath.points.length);
+    dropLine.points.forEach(([, y], index) => {
+      expect(y).toBeCloseTo(firedPath.points[index][1], 9);
+    });
+
     // Strobe pairs: at every sampled instant both bullets sit at the same height.
     const twins = opening.points!.filter((point) => point.semantic_role === "time_sample_twin");
     const fired = opening.points!.filter((point) => point.semantic_role === "time_sample");
@@ -92,6 +102,17 @@ describe("projectile motion public Gold Template", () => {
       expect(fired[index].x).toBeGreaterThan(twin.x);
     });
     expect(opening.annotations?.[0]?.text).toContain("同一时刻");
+
+    // The single-trajectory teaching steps cruise a P(t) tracer; the
+    // complementary overlay must not (its two arcs span different times).
+    const compose = script.steps[5].snapshot;
+    if (compose.kind === "physics_force_scene") {
+      expect(compose.flow_tracer).toBe(true);
+    }
+    const overlay = script.steps[8].snapshot;
+    if (overlay.kind === "physics_force_scene") {
+      expect(overlay.trajectories?.some((item) => item.flow)).toBeFalsy();
+    }
   });
 
   it("overlays the complementary angle onto one shared scale with a common landing point", () => {
