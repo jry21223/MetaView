@@ -50,7 +50,7 @@ describe("projectile motion public Gold Template", () => {
       "physics_force_scene",
       "physics_force_scene",
       "physics_force_scene",
-      "math_formula",
+      "physics_force_scene",
       "physics_force_scene",
     ]);
     expect(script.total_frames).toBe(script.steps.at(-1)?.end_frame);
@@ -67,6 +67,76 @@ describe("projectile motion public Gold Template", () => {
     expect(script.steps[7].voiceover_text).toContain("90°−θ");
     expect(script.steps[8].voiceover_text).toContain("两门新科学");
     expect(script.steps[9].voiceover_text).toContain("阿波罗 14");
+  });
+
+  it("shows the two-bullet strobe instead of merely narrating it", () => {
+    const script = buildProjectileMotionPlaybook({ speed: 20, angle: 45, gravity: 9.8 });
+    const opening = script.steps[0].snapshot;
+    expect(opening.kind).toBe("physics_force_scene");
+    if (opening.kind !== "physics_force_scene") return;
+
+    expect(opening.ground_y).toBe(78);
+    const roles = (opening.trajectories ?? []).map((item) => item.semantic_role);
+    expect(roles).toEqual(["fired_trajectory", "drop_line", "equal_height_link"]);
+
+    const dropLine = opening.trajectories!.find((item) => item.semantic_role === "drop_line")!;
+    expect(new Set(dropLine.points.map(([x]) => x)).size).toBe(1);
+
+    // Strobe pairs: at every sampled instant both bullets sit at the same height.
+    const twins = opening.points!.filter((point) => point.semantic_role === "time_sample_twin");
+    const fired = opening.points!.filter((point) => point.semantic_role === "time_sample");
+    expect(twins).toHaveLength(5);
+    expect(fired).toHaveLength(5);
+    twins.forEach((twin, index) => {
+      expect(fired[index].y).toBeCloseTo(twin.y, 9);
+      expect(fired[index].x).toBeGreaterThan(twin.x);
+    });
+    expect(opening.annotations?.[0]?.text).toContain("同一时刻");
+  });
+
+  it("overlays the complementary angle onto one shared scale with a common landing point", () => {
+    const tilted = buildProjectileMotionPlaybook({ speed: 20, angle: 30, gravity: 9.8 });
+    const parabola = tilted.steps[8];
+    expect(parabola.voiceover_text).toContain("同一个点");
+    expect(parabola.snapshot.kind).toBe("physics_force_scene");
+    if (parabola.snapshot.kind === "physics_force_scene") {
+      const [current, complementary] = parabola.snapshot.trajectories!;
+      expect(current.semantic_role).toBe("current_trajectory");
+      expect(complementary.semantic_role).toBe("complementary_trajectory");
+      const currentEnd = current.points.at(-1)!;
+      const complementaryEnd = complementary.points.at(-1)!;
+      expect(currentEnd[0]).toBeCloseTo(complementaryEnd[0], 6);
+      expect(currentEnd[1]).toBeCloseTo(complementaryEnd[1], 6);
+      // 60° flies higher than 30° on the same scale.
+      const peak = (points: Array<[number, number]>) => Math.min(...points.map(([, y]) => y));
+      expect(peak(complementary.points)).toBeLessThan(peak(current.points));
+      expect(parabola.snapshot.points?.[0]).toMatchObject({ semantic_role: "landing_mark" });
+      expect(parabola.snapshot.annotations?.[0]?.text).toBe("同一落点");
+    }
+
+    const symmetric = buildProjectileMotionPlaybook({ speed: 20, angle: 45, gravity: 9.8 });
+    const symmetricParabola = symmetric.steps[8];
+    expect(symmetricParabola.voiceover_text).toContain("互补对称轴");
+    if (symmetricParabola.snapshot.kind === "physics_force_scene") {
+      expect(symmetricParabola.snapshot.trajectories).toHaveLength(1);
+    }
+  });
+
+  it("strobes the composed trajectory and marks apex and range at landing", () => {
+    const script = buildProjectileMotionPlaybook({ speed: 20, angle: 45, gravity: 9.8 });
+    const compose = script.steps[5].snapshot;
+    if (compose.kind === "physics_force_scene") {
+      expect(compose.points?.filter((point) => point.semantic_role === "time_sample")).toHaveLength(7);
+    }
+    const landing = script.steps[7].snapshot;
+    if (landing.kind === "physics_force_scene") {
+      const roles = landing.points?.map((point) => point.semantic_role);
+      expect(roles).toEqual(["apex_mark", "landing_mark"]);
+      expect(landing.points?.[0].label).toBe("H=10.2 m");
+      // The range number sits below the ground line, clear of the vectors.
+      expect(landing.annotations?.[0]).toMatchObject({ text: "R=40.82 m", semantic_role: "range_note" });
+      expect(landing.annotations![0].y).toBeGreaterThan(landing.ground_y!);
+    }
   });
 
   it("keeps the semantic teaching objects and equations in the Playbook contract", () => {

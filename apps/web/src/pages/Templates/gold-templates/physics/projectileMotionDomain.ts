@@ -146,27 +146,51 @@ export function sampleProjectile(
   );
 }
 
+/** Vertical band of the 0-100 canvas left free by the title and caption chrome. */
+const SCENE_TOP = 26;
+const SCENE_BOTTOM_MAX = 80;
+const SCENE_WIDTH = 84;
+
+interface ProjectileSceneLayout {
+  scale: number;
+  baseline: number;
+  startX: number;
+}
+
 /**
- * Converts real metre coordinates into the renderer's 0-100 teaching canvas.
- * One metre has one common scale on both axes, so steep and shallow launches
- * remain visually honest instead of being stretched independently.
+ * Shared scene layout: one common metre scale on both axes (so steep and
+ * shallow launches stay visually honest), sized to the full usable band and
+ * vertically centred in it — a flat 45° arc no longer hugs the bottom edge.
  */
+function projectileSceneLayout(state: ProjectileState): ProjectileSceneLayout {
+  const horizontalExtent = state.range;
+  const verticalExtent = state.maxHeight;
+  const band = SCENE_BOTTOM_MAX - SCENE_TOP;
+  const extentScale = Math.min(
+    horizontalExtent > EPSILON ? SCENE_WIDTH / horizontalExtent : Number.POSITIVE_INFINITY,
+    verticalExtent > EPSILON ? band / verticalExtent : Number.POSITIVE_INFINITY,
+  );
+  const scale = Number.isFinite(extentScale) ? extentScale : 1;
+  const usedHeight = verticalExtent * scale;
+  const baseline = SCENE_BOTTOM_MAX - (band - usedHeight) / 2;
+  const startX = 50 - (horizontalExtent * scale) / 2;
+  return { scale, baseline, startX };
+}
+
+/** Scene-space y of the ground for this launch (the trajectory's baseline). */
+export function projectileSceneBaseline(state: ProjectileState): number {
+  return Number(projectileSceneLayout(state).baseline.toFixed(4));
+}
+
+/** Converts real metre coordinates into the renderer's 0-100 teaching canvas. */
 export function projectileSceneTrajectory(
   state: ProjectileState,
   sampleCount = 49,
 ): Array<[number, number]> {
-  const horizontalExtent = state.range;
-  const verticalExtent = state.maxHeight;
-  const extentScale = Math.min(
-    horizontalExtent > EPSILON ? 72 / horizontalExtent : Number.POSITIVE_INFINITY,
-    verticalExtent > EPSILON ? 48 / verticalExtent : Number.POSITIVE_INFINITY,
-  );
-  const scale = Number.isFinite(extentScale) ? extentScale : 1;
-  const width = horizontalExtent * scale;
-  const startX = 50 - width / 2;
+  const { scale, baseline, startX } = projectileSceneLayout(state);
   return sampleProjectile(state, sampleCount).map((point) => [
     Number((startX + point.x * scale).toFixed(4)),
-    Number((78 - point.y * scale).toFixed(4)),
+    Number((baseline - point.y * scale).toFixed(4)),
   ]);
 }
 

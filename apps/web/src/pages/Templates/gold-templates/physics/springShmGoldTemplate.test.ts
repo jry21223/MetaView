@@ -72,6 +72,32 @@ describe("spring SHM public Gold Template", () => {
     expect(payload).toContain("ceiiinosssttuv");
   });
 
+  it("draws an actual spring: wall, coil to the mass edge, equilibrium and range marks", () => {
+    const script = buildSpringShmGoldPlaybook({ A: 0.5, k: 4, m: 1 });
+    const scene = script.steps[0].snapshot;
+    expect(scene.kind).toBe("physics_force_scene");
+    if (scene.kind !== "physics_force_scene") return;
+
+    const coil = scene.springs![0];
+    expect(coil.semantic_role).toBe("spring_coil");
+    expect(coil.x0).toBe(13);
+    // Mass center 50 + 0.5·25 = 62.5; the coil stops at the mass edge (radius 4).
+    expect(coil.x1).toBeCloseTo(58.5, 9);
+    expect(coil.label).toBe("k=4 N/m");
+
+    const roles = scene.trajectories!.map((item) => item.semantic_role);
+    expect(roles).toEqual(["wall", "amplitude_range"]);
+    expect(scene.points?.[0]).toMatchObject({ x: 50, semantic_role: "equilibrium_mark" });
+
+    const wide = buildSpringShmGoldPlaybook({ A: 1.2, k: 4, m: 1 });
+    const wideScene = wide.steps[0].snapshot;
+    if (wideScene.kind === "physics_force_scene") {
+      expect(wideScene.springs![0].x1).toBeCloseTo(50 + 1.2 * 25 - 4, 9);
+      const range = wideScene.trajectories!.find((item) => item.semantic_role === "amplitude_range")!;
+      expect(range.points[1][0] - range.points[0][0]).toBeCloseTo(2 * 1.2 * 25, 9);
+    }
+  });
+
   it("tells the isochronism story with numbers that follow the parameters", () => {
     const base = buildSpringShmGoldPlaybook({ A: 0.5, k: 4, m: 1 });
     expect(base.steps[3].voiceover_text).toContain("ω=√(4/1)=2 rad/s");

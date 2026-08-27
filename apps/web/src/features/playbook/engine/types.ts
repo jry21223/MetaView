@@ -764,12 +764,61 @@ export interface PhysicsSceneVector {
   magnitude?: string | null;
 }
 
+/** A path drawn in scene space (a second body, a reference trajectory, a wall). */
+export interface PhysicsSceneTrajectory {
+  id?: string;
+  /** Ordered [x, y] vertices in 0–100 scene coordinates. */
+  points: Array<[number, number]>;
+  label?: string | null;
+  /** `primary` = motion in focus, `secondary` = dashed contrast, `accent` = highlighted twin. */
+  emphasis?: "primary" | "secondary" | "accent" | string;
+  semantic_role?: string;
+}
+
+/** A marked point in scene space (equal-time samples, apex, landing marks). */
+export interface PhysicsScenePoint {
+  x: number;
+  y: number;
+  label?: string | null;
+  emphasis?: "primary" | "secondary" | "accent" | string;
+  semantic_role?: string;
+}
+
+/** Free-floating text label anchored in scene space. */
+export interface PhysicsSceneAnnotation {
+  x: number;
+  y: number;
+  text: string;
+  align?: "start" | "middle" | "end";
+  semantic_role?: string;
+}
+
+/** Zig-zag coil drawn between two anchors (spring diagrams). */
+export interface PhysicsSceneSpring {
+  id: string;
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  /** Number of zig-zag half-waves; renderer default when omitted. */
+  coils?: number | null;
+  label?: string | null;
+  semantic_role?: string;
+}
+
 export interface PhysicsForceSceneSnapshot {
   kind: "physics_force_scene";
   pack_id?: string | null;
   objects: PhysicsSceneObject[];
   vectors: PhysicsSceneVector[];
   trajectory?: Array<[number, number]>;
+  /** Additional paths beyond the legacy primary trajectory. */
+  trajectories?: PhysicsSceneTrajectory[];
+  points?: PhysicsScenePoint[];
+  annotations?: PhysicsSceneAnnotation[];
+  springs?: PhysicsSceneSpring[];
+  /** Scene-space y of the ground; draws a hatched ground line replacing the abstract axes. */
+  ground_y?: number | null;
   formula_latex?: string | null;
   caption?: string | null;
 }

@@ -779,12 +779,60 @@ class PhysicsSceneVector(BaseModel):
     magnitude: str | None = None
 
 
+class PhysicsSceneTrajectory(BaseModel):
+    """A path drawn in scene space (a second body, a reference trajectory, a wall)."""
+
+    id: str | None = None
+    points: list[tuple[float, float]] = Field(default_factory=list)
+    label: str | None = None
+    emphasis: str | None = None
+    semantic_role: str | None = None
+
+
+class PhysicsScenePoint(BaseModel):
+    """A marked point in scene space (equal-time samples, apex, landing marks)."""
+
+    x: float
+    y: float
+    label: str | None = None
+    emphasis: str | None = None
+    semantic_role: str | None = None
+
+
+class PhysicsSceneAnnotation(BaseModel):
+    """Free-floating text label anchored in scene space."""
+
+    x: float
+    y: float
+    text: str
+    align: str | None = None
+    semantic_role: str | None = None
+
+
+class PhysicsSceneSpring(BaseModel):
+    """Zig-zag coil drawn between two anchors (spring diagrams)."""
+
+    id: str
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+    coils: int | None = None
+    label: str | None = None
+    semantic_role: str | None = None
+
+
 class PhysicsForceSceneSnapshot(BaseModel):
     kind: Literal["physics_force_scene"] = "physics_force_scene"
     pack_id: str = "physics-basic"
     objects: list[PhysicsSceneObject] = Field(default_factory=list)
     vectors: list[PhysicsSceneVector] = Field(default_factory=list)
     trajectory: list[tuple[float, float]] = Field(default_factory=list)
+    trajectories: list[PhysicsSceneTrajectory] = Field(default_factory=list)
+    points: list[PhysicsScenePoint] = Field(default_factory=list)
+    annotations: list[PhysicsSceneAnnotation] = Field(default_factory=list)
+    springs: list[PhysicsSceneSpring] = Field(default_factory=list)
+    ground_y: float | None = None
     formula_latex: str | None = None
     caption: str | None = None
 

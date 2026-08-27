@@ -58,19 +58,22 @@ function num(value: number): string {
   return Number(value.toPrecision(12)).toString();
 }
 
-/** Scene-space (0–100) oscillator: anchor, equilibrium, displaced mass. */
+/**
+ * Scene-space (0–100) oscillator: wall, zig-zag spring coil, equilibrium mark,
+ * amplitude range, and the displaced mass — a spring you can actually see.
+ */
 function oscillatorScene(state: ShmState, caption: string, formulaLatex: string): PhysicsForceSceneSnapshot {
   const metersToScene = 25;
   const equilibriumX = 50;
+  const wallX = 13;
+  const massRadius = 4;
   const massX = equilibriumX + state.amplitude * metersToScene;
   const forceScale = 18 / Math.max(1, state.stiffness * state.amplitude);
   return {
     kind: "physics_force_scene",
     pack_id: "physics-basic",
     objects: [
-      { id: "shm-anchor", label: "固定端", x: 12, y: 55, radius: 2 },
-      { id: "shm-equilibrium", label: "平衡点 O", x: equilibriumX, y: 55, radius: 1.4 },
-      { id: "shm-mass", label: `m=${fixed(state.mass)} kg`, x: massX, y: 55, radius: 4 },
+      { id: "shm-mass", label: `m=${fixed(state.mass)} kg`, x: massX, y: 55, radius: massRadius },
     ],
     vectors: [{
       id: "restoring-force",
@@ -79,12 +82,50 @@ function oscillatorScene(state: ShmState, caption: string, formulaLatex: string)
       dx: -state.stiffness * state.amplitude * forceScale,
       dy: 0,
       label: "F=−kx",
-      magnitude: `${fixed(state.stiffness * state.amplitude)} N`,
+      // The narration carries |F|=kA; a number at the arrow tip would sit on
+      // the equilibrium mark in this tight layout.
+      magnitude: null,
     }],
-    trajectory: [
-      [equilibriumX - state.amplitude * metersToScene, 55],
-      [equilibriumX + state.amplitude * metersToScene, 55],
+    trajectories: [
+      {
+        id: "shm-wall",
+        points: [[wallX, 43], [wallX, 67]],
+        emphasis: "primary",
+        semantic_role: "wall",
+      },
+      {
+        id: "shm-amplitude-range",
+        points: [
+          [equilibriumX - state.amplitude * metersToScene, 64],
+          [equilibriumX + state.amplitude * metersToScene, 64],
+        ],
+        label: `±A=${fixed(state.amplitude)} m`,
+        emphasis: "secondary",
+        semantic_role: "amplitude_range",
+      },
     ],
+    springs: [{
+      id: "shm-spring",
+      x0: wallX,
+      y0: 55,
+      x1: massX - massRadius,
+      y1: 55,
+      coils: 9,
+      label: `k=${fixed(state.stiffness)} N/m`,
+      semantic_role: "spring_coil",
+    }],
+    points: [{
+      x: equilibriumX,
+      y: 55,
+      emphasis: "accent",
+      semantic_role: "equilibrium_mark",
+    }],
+    annotations: [{
+      x: equilibriumX,
+      y: 68.6,
+      text: "平衡点 O",
+      semantic_role: "equilibrium_label",
+    }],
     formula_latex: formulaLatex,
     caption,
   };
@@ -338,9 +379,9 @@ export const SPRING_SHM_GOLD_TEMPLATE: GoldTemplateManifest = standaloneCase({
   ],
   visualInvariants: [{
     id: "shm-visual",
-    description: "恢复力向量、位移曲线、两条能量曲线与相图椭圆保持语义身份",
-    requiredSemanticRoles: ["force", "displacement_curve", "potential_energy", "kinetic_energy", "amplitude_bound"],
-    requiredStateFields: ["objects", "vectors", "curves", "trajectories", "equilibria"],
+    description: "弹簧线圈、恢复力向量、位移曲线、两条能量曲线与相图椭圆保持语义身份",
+    requiredSemanticRoles: ["spring_coil", "force", "displacement_curve", "potential_energy", "kinetic_energy", "amplitude_bound"],
+    requiredStateFields: ["objects", "vectors", "springs", "curves", "trajectories", "equilibria"],
   }],
   objective: "由 F=−kx 与牛顿第二定律验证余弦解，理解与振幅无关的周期、能量交换与相图椭圆，并识别简谐近似的适用边界。",
   minimumSteps: 9,

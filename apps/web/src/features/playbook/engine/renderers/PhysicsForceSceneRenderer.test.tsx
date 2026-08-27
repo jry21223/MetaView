@@ -73,7 +73,7 @@ describe("PhysicsForceSceneRenderer", () => {
     expect(markup).not.toContain("var(--warn");
     expect(markup).not.toContain("var(--canvas-primary");
     expect(markup).toContain('data-semantic-role="trajectory"');
-    expect(markup).toContain('stroke-width="1.1"');
+    expect(markup).toContain('stroke-width="1.5"');
     expect(markup).not.toContain("#1f8abd");
     expect(markup).not.toContain("#8e44ad");
     expect(markup).not.toContain("projectile-body-dot");
@@ -109,5 +109,59 @@ describe("PhysicsForceSceneRenderer", () => {
 
     expect(markup).toContain('data-vector-component="horizontal"');
     expect(markup).toContain('stroke-width="0.52"');
+  });
+
+  it("replaces the abstract axes with a hatched ground when ground_y is declared", () => {
+    const markup = renderToStaticMarkup(
+      <PhysicsForceSceneRenderer {...props(projectileMotionSnapshot({ ground_y: 78 }))} />,
+    );
+
+    expect(markup).toContain('data-semantic-role="ground"');
+    expect(markup).not.toContain('data-semantic-role="motion_axes"');
+    expect(markup).toContain('data-semantic-role="motion_trail"');
+  });
+
+  it("draws labelled extra trajectories with emphasis styling", () => {
+    const markup = renderToStaticMarkup(<PhysicsForceSceneRenderer {...props(projectileMotionSnapshot({
+      trajectories: [
+        {
+          id: "twin",
+          points: [[20, 26], [20, 78]],
+          label: "自由落下",
+          emphasis: "secondary",
+          semantic_role: "drop_line",
+        },
+        {
+          id: "mirror",
+          points: [[20, 78], [50, 30], [80, 78]],
+          label: "90°−θ",
+          emphasis: "accent",
+          semantic_role: "complementary_trajectory",
+        },
+      ],
+    }))} />);
+
+    expect(markup).toContain('data-semantic-role="drop_line"');
+    expect(markup).toContain('data-semantic-role="complementary_trajectory"');
+    expect(markup).toContain("自由落下");
+    expect(markup).toContain('stroke-dasharray="2.1 1.6"');
+  });
+
+  it("marks scene points, annotations, and a zig-zag spring coil", () => {
+    const markup = renderToStaticMarkup(<PhysicsForceSceneRenderer {...props(projectileMotionSnapshot({
+      points: [{ x: 40, y: 50, label: "t=1 s", semantic_role: "time_sample" }],
+      annotations: [{ x: 50, y: 30, text: "同一时刻，同一高度", semantic_role: "equal_height_note" }],
+      springs: [{ id: "coil", x0: 14, y0: 55, x1: 46, y1: 55, coils: 8, semantic_role: "spring_coil" }],
+    }))} />);
+
+    expect(markup).toContain('data-semantic-role="time_sample"');
+    expect(markup).toContain("t=1 s");
+    expect(markup).toContain('data-semantic-role="equal_height_note"');
+    expect(markup).toContain("同一时刻，同一高度");
+    expect(markup).toContain('data-semantic-role="spring_coil"');
+    // The coil path zig-zags: it needs many more segments than a straight line.
+    const coilPath = markup.match(/data-semantic-role="spring_coil"><path d="([^"]+)"/)?.[1] ?? "";
+    expect(coilPath.split("L").length).toBeGreaterThan(8);
+    expect(markup).toContain('paint-order="stroke"');
   });
 });
