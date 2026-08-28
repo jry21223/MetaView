@@ -89,12 +89,27 @@ describe("spring SHM public Gold Template", () => {
     expect(roles).toEqual(["wall", "amplitude_range"]);
     expect(scene.points?.[0]).toMatchObject({ x: 50, semantic_role: "equilibrium_mark" });
 
+    // The ±A ruler doubles as the flow tracer's rail: one full period of
+    // x(t)=A·cos(ωt) sampled uniformly in time, so the shared-clock tracer
+    // performs real simple harmonic motion along a visually unchanged line.
+    const rail = scene.trajectories!.find((item) => item.semantic_role === "amplitude_range")!;
+    expect(rail.flow).toBe(true);
+    expect(rail.points).toHaveLength(49);
+    expect(rail.points.every(([, y]) => y === 64)).toBe(true);
+    expect(rail.points[0][0]).toBeCloseTo(50 + 0.5 * 25, 9);
+    expect(rail.points[24][0]).toBeCloseTo(50 - 0.5 * 25, 9);
+    expect(rail.points[48][0]).toBeCloseTo(rail.points[0][0], 9);
+    rail.points.forEach(([x], index) => {
+      expect(x).toBeCloseTo(50 + 0.5 * 25 * Math.cos((2 * Math.PI * index) / 48), 9);
+    });
+
     const wide = buildSpringShmGoldPlaybook({ A: 1.2, k: 4, m: 1 });
     const wideScene = wide.steps[0].snapshot;
     if (wideScene.kind === "physics_force_scene") {
       expect(wideScene.springs![0].x1).toBeCloseTo(50 + 1.2 * 25 - 4, 9);
       const range = wideScene.trajectories!.find((item) => item.semantic_role === "amplitude_range")!;
-      expect(range.points[1][0] - range.points[0][0]).toBeCloseTo(2 * 1.2 * 25, 9);
+      const xs = range.points.map(([x]) => x);
+      expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(2 * 1.2 * 25, 9);
     }
   });
 

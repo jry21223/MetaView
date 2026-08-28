@@ -95,13 +95,18 @@ function oscillatorScene(state: ShmState, caption: string, formulaLatex: string)
       },
       {
         id: "shm-amplitude-range",
-        points: [
-          [equilibriumX - state.amplitude * metersToScene, 64],
-          [equilibriumX + state.amplitude * metersToScene, 64],
-        ],
+        // One full period sampled uniformly in time, x(t)=A·cos(ωt): the drawn
+        // dashed line is unchanged (all points collinear on the ±A ruler), but
+        // the flow tracer riding it performs real simple harmonic motion —
+        // slowest at the turning points, fastest through the equilibrium mark.
+        points: Array.from({ length: 49 }, (_, index): [number, number] => [
+          equilibriumX + state.amplitude * metersToScene * Math.cos((2 * Math.PI * index) / 48),
+          64,
+        ]),
         label: `±A=${fixed(state.amplitude)} m`,
         emphasis: "secondary",
         semantic_role: "amplitude_range",
+        flow: true,
       },
     ],
     springs: [{
