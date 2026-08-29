@@ -145,15 +145,44 @@ export function buildIntegralAreaGoldPlaybook(params: TemplatePreviewParams): Pl
   const bText = fixed(b);
   // Parametric so the parabola stays clipped to the teaching range instead of
   // sprouting its x<0 branch across the value panel.
-  const curve = {
+  // The Mafs stage does not clip overflow, so each frame's curve must top out
+  // inside its own window (tight y_max 1.03b², wide 1.14b²).
+  const areaCurve = (frame: "tight" | "wide") => ({
     expression_x: "t",
     expression_y: "t^2",
-    t_min: -0.1 * b,
-    t_max: 1.06 * b,
+    t_min: -0.06 * b,
+    t_max: (frame === "tight" ? 1.005 : 1.03) * b,
     label: "y=x²",
     emphasis: "primary" as const,
     semantic_role: "area_curve",
-  };
+  });
+  // Mafs' background grid washes out on the paper theme, so the number line
+  // the narration leans on ("从 0 到 b") is drawn explicitly: an x-axis with
+  // ticks and labels at 0 and b, extended under the cap stack in wide frames.
+  const axisFurniture = (frame: "tight" | "wide") => ({
+    segments: [
+      {
+        x0: -0.28 * b,
+        y0: 0,
+        x1: (frame === "tight" ? 1.28 : 1.7) * b,
+        y1: 0,
+        emphasis: "secondary",
+        semantic_role: "x_axis",
+      },
+      ...[0, b].map((x) => ({
+        x0: x,
+        y0: 0,
+        x1: x,
+        y1: -0.045 * b * b,
+        emphasis: "secondary",
+        semantic_role: "axis_tick",
+      })),
+    ] satisfies MathSceneSnapshot["segments"],
+    annotations: [
+      { x: 0, y: -0.09 * b * b, text: "$0$", semantic_role: "axis_label" },
+      { x: b, y: -0.09 * b * b, text: `$${bText}$`, semantic_role: "axis_label" },
+    ],
+  });
   const scene = (args: {
     regions?: Region[];
     points?: ScenePoint[];
@@ -162,40 +191,64 @@ export function buildIntegralAreaGoldPlaybook(params: TemplatePreviewParams): Pl
     valuePanel?: string;
     caption: string;
     formula: string;
-  }): MathSceneSnapshot => ({
-    kind: "math_scene",
-    camera_mode: "fixed",
-    // Square units make [0,b]×[0,b²] a tall 1:2 block; both flanks carry
-    // content (value panel left, cap stack right) instead of dead margin.
-    x_min: -0.66 * b,
-    x_max: 1.74 * b,
-    y_min: -0.14 * b * b,
-    y_max: 1.14 * b * b,
-    x_label: "x",
-    y_label: "y",
-    curves: [curve],
-    regions: args.regions ?? [],
-    points: args.points ?? [],
-    segments: args.segments ?? [],
-    annotations: [
-      ...(args.valuePanel
-        ? [{ x: -0.4 * b, y: 0.86 * b * b, text: args.valuePanel, semantic_role: "value_panel" }]
-        : []),
-      ...(args.annotations ?? []),
-    ],
-    formula_latex: args.formula,
-    caption: args.caption,
-  });
+    /**
+     * "tight" frames the opening acts on the figure itself; "wide" reserves
+     * the flanks the later acts fill (value panel left, cap stack right).
+     * The reframe lands on the slide-caps step, where pulling back to make
+     * room on the right is the story.
+     */
+    frame?: "tight" | "wide";
+  }): MathSceneSnapshot => {
+    const frame = args.frame ?? "wide";
+    const axis = axisFurniture(frame);
+    return {
+      kind: "math_scene",
+      camera_mode: "fixed",
+      ...(frame === "tight"
+        // The stage's height is the binding constraint under square units, so
+        // the tight frame trims the vertical span instead of the flanks: the
+        // curve pierces the top edge and the figure gains real size.
+        ? { x_min: -0.35 * b, x_max: 1.35 * b, y_min: -0.17 * b * b, y_max: 1.06 * b * b }
+        : { x_min: -0.66 * b, x_max: 1.74 * b, y_min: -0.19 * b * b, y_max: 1.14 * b * b }),
+      x_label: "x",
+      y_label: "y",
+      curves: [areaCurve(frame)],
+      regions: args.regions ?? [],
+      points: args.points ?? [],
+      segments: [...axis.segments, ...(args.segments ?? [])],
+      annotations: [
+        ...axis.annotations,
+        ...(args.valuePanel
+          ? [{
+              // Tight frames have no left flank; the panel sits in the empty
+              // upper-left corner above the staircase's shallow end instead.
+              x: frame === "tight" ? 0.1 * b : -0.4 * b,
+              y: 0.86 * b * b,
+              text: args.valuePanel,
+              semantic_role: "value_panel",
+            }]
+          : []),
+        ...(args.annotations ?? []),
+      ],
+      formula_latex: args.formula,
+      caption: args.caption,
+    };
+  };
   const refineLadder = [8, 16, 64]
     .map((count) => `n=${count}，${fixed(lowerRiemannSum(b, count))} 与 ${fixed(upperRiemannSum(b, count))}`)
     .join("；");
   const steps: MetaStep[] = [
     sceneStep(0, "integral-puzzle", "曲边图形：公式失效的地方", `三角形、长方形、圆——古典几何给每种规则图形都配了面积公式。可抛物线 y=x² 下方、从 0 到 ${bText} 的这块图形，有一条边是弯的，任何现成公式都套不上。公元前 3 世纪，阿基米德用穷竭法第一个算出了这类面积；两千年后，黎曼把那套办法炼成了定义。目标只有一个数：这块面积 S 究竟是多少。`, scene({
+      frame: "tight",
       regions: [targetAreaRegion(b, "secondary")],
+      annotations: [
+        { x: 0.58 * b, y: 0.22 * b * b, text: "$S=\\,?$", semantic_role: "area_question" },
+      ],
       caption: "曲边梯形：三条直边，加一条抛物线弧。",
       formula: String.raw`S=\,?`,
     })),
     sceneStep(1, "integral-lower-sum", "地板：藏在曲线下面的矩形", `用手里有的东西——矩形——去逼近。把 [0, ${bText}] 均分成 n=${n} 段，每段以左端点的曲线高度立一个矩形——圆点标出每块矩形的高度从曲线上哪里来。因为 y=x² 递增，它们全部藏在曲线下方，总面积是 ${fixed(lower)}。无论真值 S 是多少，它一定大于 ${fixed(lower)}——我们拿到了一块地板。`, scene({
+      frame: "tight",
       regions: lowerRectangles(b, n),
       points: endpointDots(b, n, "left"),
       valuePanel: `$s_{${n}}=${fixed(lower)}$`,
@@ -203,6 +256,7 @@ export function buildIntegralAreaGoldPlaybook(params: TemplatePreviewParams): Pl
       formula: String.raw`s_{n}=\sum_{k=0}^{n-1}f(x_k)\,\Delta x=${fixed(lower)}`,
     })),
     sceneStep(2, "integral-upper-sum", "天花板：每列加一顶帽子", `把每列矩形加高到右端点的曲线高度——图中橙色的帽子。绿色阶梯加上橙色帽子就是上和 ${fixed(upper)}，它盖住了整块曲边图形。于是真值被夹住了：${fixed(lower)} < S < ${fixed(upper)}。而夹缝——上和多出来的部分——恰恰就是那些橙色帽子本身，总面积 ${fixed(gap)}。`, scene({
+      frame: "tight",
       regions: [...lowerRectangles(b, n), ...gapCaps(b, n)],
       points: endpointDots(b, n, "right"),
       valuePanel: `$s_{${n}}=${fixed(lower)},\\ S_{${n}}=${fixed(upper)}$`,
@@ -310,7 +364,7 @@ export const INTEGRAL_AREA_GOLD_TEMPLATE: GoldTemplateManifest = standaloneCase(
   visualInvariants: [{
     id: "integral-visual",
     description: "抛物线、下和阶梯、橙色夹缝帽与目标曲边区域同屏可辨认",
-    requiredSemanticRoles: ["area_curve", "riemann_rectangle", "gap_strip", "gap_stack", "target_area"],
+    requiredSemanticRoles: ["area_curve", "riemann_rectangle", "gap_strip", "gap_stack", "target_area", "x_axis"],
     requiredStateFields: ["curves", "regions", "points", "annotations", "x_min"],
   }],
   objective: "把曲边面积识别为上下矩形和的公共极限，用帽子滑移看见夹缝 b³/n，用平方和闭式算出 b³/3，并以微积分基本定理做独立的第二路验证。",

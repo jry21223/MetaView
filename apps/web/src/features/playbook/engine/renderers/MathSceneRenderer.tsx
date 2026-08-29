@@ -15,6 +15,7 @@ import { compileExpr, type CompiledExpr } from "../../../../shared/lib/mathExpr"
 import { sanitizeKatex } from "../../../../shared/lib/sanitizeKatex";
 import { clamp01 } from "../foundation";
 import { planCameraViewBox } from "../math-scene-plan/cameraPlanner";
+import { MATH_SCENE_ENTRANCE_FRAMES } from "../math-scene-plan/progress";
 import { viewBoxFromSnapshot } from "../math-scene-plan/camera";
 import {
   buildMathSceneRenderPlan,
@@ -387,12 +388,18 @@ export const MathSceneRenderer: React.FC<RendererProps> = ({
 }) => {
   const snap = step.snapshot as MathSceneSnapshot;
   const isOverlayMode = renderMode === "stage-overlay";
+  // Newly added objects draw on a short fixed clock: a 30-second narration
+  // must not stretch an axis or a rectangle's entrance across 30 seconds.
+  // Camera moves keep the narration-paced glide via the raw progress below.
+  const entranceProgress = clamp01(
+    Math.max(0, frame - stepStartFrame) / MATH_SCENE_ENTRANCE_FRAMES,
+  );
   const fallbackPlan = React.useMemo(
     () => {
       const basePlan = buildMathSceneRenderPlan({
         previousStep: prevStep,
         currentSnapshot: snap,
-        stepProgress: progress,
+        stepProgress: entranceProgress,
       });
       return {
         ...basePlan,
@@ -403,7 +410,7 @@ export const MathSceneRenderer: React.FC<RendererProps> = ({
         }),
       };
     },
-    [prevStep, snap, progress],
+    [prevStep, snap, entranceProgress, progress],
   );
   const directedPlan = directorFrame?.mathScene?.renderPlan ?? fallbackPlan;
   const plan = snap.camera_mode === "fixed"

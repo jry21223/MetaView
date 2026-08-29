@@ -5,12 +5,14 @@ import type { DirectorAdapter } from "./types";
 
 export const MathSceneDirectorAdapter: DirectorAdapter = {
   supports: (step) => step.snapshot.kind === "math_scene",
-  build: ({ beat, step, prevStep, stepProgress }) => {
+  build: ({ beat, step, prevStep, stepProgress, entranceProgress }) => {
     const snap = step.snapshot as MathSceneSnapshot;
     const basePlan = buildMathSceneRenderPlan({
       previousStep: prevStep,
       currentSnapshot: snap,
-      stepProgress,
+      // Object draw-ins ride the fixed entrance clock; the camera below keeps
+      // the narration-paced glide.
+      stepProgress: entranceProgress ?? stepProgress,
     });
     const camera = planCameraViewBox({
       plan: basePlan,

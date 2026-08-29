@@ -8,6 +8,12 @@ export interface DirectorAdapterContext {
   step: MetaStep;
   prevStep: MetaStep | null;
   stepProgress: number;
+  /**
+   * Fixed-clock draw-in progress for newly added objects (complete ~2.2s into
+   * the step), independent of narration length. Falls back to stepProgress
+   * where a caller cannot supply it.
+   */
+  entranceProgress?: number;
 }
 
 export interface DirectorAdapterResult {

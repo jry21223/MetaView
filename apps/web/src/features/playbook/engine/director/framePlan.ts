@@ -1,4 +1,5 @@
 import type { MathSceneRenderPlan } from "../math-scene-plan/plan";
+import { MATH_SCENE_ENTRANCE_FRAMES } from "../math-scene-plan/progress";
 import type { MetaStep, PlaybookScript } from "../types";
 import { selectDirectorAdapter } from "./adapters/registry";
 import { directorBeatLocalProgress, findActiveDirectorBeat } from "./resolveDirectorFrame";
@@ -45,12 +46,20 @@ export function buildDirectorFramePlan(context: DirectorFrameContext): DirectorF
   const beat = findActiveDirectorBeat(context.director, context.frame);
   const localProgress = directorBeatLocalProgress(beat, context.frame);
   const adapter = selectDirectorAdapter(context.step);
+  // Draw-ins finish on a short fixed clock however long the narration runs;
+  // the step starts where the previous step ended.
+  const stepStartFrame = context.prevStep?.end_frame ?? 0;
+  const entranceProgress = Math.min(
+    1,
+    Math.max(0, context.frame - stepStartFrame) / MATH_SCENE_ENTRANCE_FRAMES,
+  );
   const result = adapter.build({
     beat,
     localProgress,
     step: context.step,
     prevStep: context.prevStep,
     stepProgress: context.stepProgress,
+    entranceProgress,
   });
 
   return {

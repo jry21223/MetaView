@@ -281,6 +281,9 @@ describe("MathSceneRenderer", () => {
         {...props(currentStep, {
           prevStep: previousStep,
           progress: 0.2,
+          // Added objects draw on the fixed entrance clock (66 frames), not
+          // the narration progress: frame 33 of the step = half drawn.
+          frame: 33,
         })}
       />,
     );
@@ -313,10 +316,10 @@ describe("MathSceneRenderer", () => {
     expect(persistedPoint.getAttribute("data-math-scene-progress")).toBe("1.000");
     expect(Number(persistedPoint.getAttribute("opacity"))).toBeCloseTo(1);
     expect(persistedSegment.getAttribute("data-math-scene-progress")).toBe("1.000");
-    expect(addedPoint.getAttribute("data-math-scene-progress")).toBe("0.200");
-    expect(Number(addedPoint.getAttribute("opacity"))).toBeCloseTo(0.3);
-    expect(addedSegment.getAttribute("data-math-scene-progress")).toBe("0.200");
-    expect(addedVectorField.getAttribute("data-math-scene-progress")).toBe("0.200");
+    expect(addedPoint.getAttribute("data-math-scene-progress")).toBe("0.500");
+    expect(Number(addedPoint.getAttribute("opacity"))).toBeCloseTo(0.75);
+    expect(addedSegment.getAttribute("data-math-scene-progress")).toBe("0.500");
+    expect(addedVectorField.getAttribute("data-math-scene-progress")).toBe("0.500");
   });
 
   it("does not render the math scene plan debug overlay without the query flag", () => {

@@ -135,6 +135,24 @@ describe("calculus public Gold Templates", () => {
     const script = buildIntegralAreaGoldPlaybook({ n: 4, b: 2 });
     expect(script.steps).toHaveLength(8);
 
+    // The opening acts frame the figure itself: a tight window with an
+    // explicit x-axis (ticks and labels at 0 and b) and the S=? anchor.
+    // The wide flanked window only arrives with the slide-caps step.
+    const puzzle = script.steps[0];
+    if (puzzle.snapshot.kind === "math_scene") {
+      expect(puzzle.snapshot.x_max).toBeCloseTo(1.35 * 2, 9);
+      const roles = (puzzle.snapshot.segments ?? []).map((item) => item.semantic_role);
+      expect(roles).toEqual(["x_axis", "axis_tick", "axis_tick"]);
+      const labels = (puzzle.snapshot.annotations ?? []).filter(
+        (item) => item.semantic_role === "axis_label",
+      );
+      expect(labels.map((item) => item.text)).toEqual(["$0$", "$2$"]);
+      expect(labels.map((item) => item.x)).toEqual([0, 2]);
+      expect(puzzle.snapshot.annotations?.some(
+        (item) => item.semantic_role === "area_question",
+      )).toBe(true);
+    }
+
     const lower = script.steps[1];
     expect(lower.snapshot.kind).toBe("math_scene");
     if (lower.snapshot.kind === "math_scene") {
@@ -162,6 +180,8 @@ describe("calculus public Gold Templates", () => {
     expect(refine.voiceover_text).toContain("n=8，2.19 与 3.19");
     expect(refine.voiceover_text).toContain("n=64，2.6 与 2.73");
     if (refine.snapshot.kind === "math_scene") {
+      // The reframe to the flanked window lands exactly here.
+      expect(refine.snapshot.x_max).toBeCloseTo(1.74 * 2, 9);
       // The caps slide right into one contiguous stack: strip k's top edge is
       // strip k+1's bottom edge, and the pile spans 0..f(b) — that IS b³/n.
       const stack = refine.snapshot.regions!.filter(
