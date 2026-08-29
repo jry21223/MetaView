@@ -14,11 +14,10 @@ import type { RendererProps } from "./types";
 import { compileExpr, type CompiledExpr } from "../../../../shared/lib/mathExpr";
 import { sanitizeKatex } from "../../../../shared/lib/sanitizeKatex";
 import { clamp01 } from "../foundation";
-import { planCameraViewBox } from "../math-scene-plan/cameraPlanner";
+import { composeMathScenePlan } from "../director/adapters/mathSceneAdapter";
 import { MATH_SCENE_ENTRANCE_FRAMES } from "../math-scene-plan/progress";
 import { viewBoxFromSnapshot } from "../math-scene-plan/camera";
 import {
-  buildMathSceneRenderPlan,
   type MathSceneRenderPlan,
   type PlannedObject,
 } from "../math-scene-plan/plan";
@@ -388,28 +387,21 @@ export const MathSceneRenderer: React.FC<RendererProps> = ({
 }) => {
   const snap = step.snapshot as MathSceneSnapshot;
   const isOverlayMode = renderMode === "stage-overlay";
-  // Newly added objects draw on a short fixed clock: a 30-second narration
-  // must not stretch an axis or a rectangle's entrance across 30 seconds.
-  // Camera moves keep the narration-paced glide via the raw progress below.
+  // Inside the composition the plan always arrives via directorFrame — the
+  // null-director path still synthesizes one through the math-scene adapter,
+  // so this fallback only serves standalone mounts (unit tests, isolated
+  // previews). It goes through the same composeMathScenePlan as the adapter
+  // so the two paths cannot drift apart.
   const entranceProgress = clamp01(
     Math.max(0, frame - stepStartFrame) / MATH_SCENE_ENTRANCE_FRAMES,
   );
   const fallbackPlan = React.useMemo(
-    () => {
-      const basePlan = buildMathSceneRenderPlan({
-        previousStep: prevStep,
-        currentSnapshot: snap,
-        stepProgress: entranceProgress,
-      });
-      return {
-        ...basePlan,
-        camera: planCameraViewBox({
-          plan: basePlan,
-          fallback: basePlan.camera,
-          progress,
-        }),
-      };
-    },
+    () => composeMathScenePlan({
+      prevStep,
+      snapshot: snap,
+      entranceProgress,
+      cameraProgress: progress,
+    }),
     [prevStep, snap, entranceProgress, progress],
   );
   const directedPlan = directorFrame?.mathScene?.renderPlan ?? fallbackPlan;
