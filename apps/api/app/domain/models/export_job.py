@@ -31,6 +31,11 @@ class ExportOptions(BaseModel):
     fps: int = Field(default=30, ge=15, le=60)
     format: ExportFormat = "mp4"
     theme: ExportTheme = "light"
+    # Playback tempo for silent exports: 2.0 renders the lesson at double
+    # speed (promo cuts), 1.0 keeps the narration pacing. Audio exports
+    # reject any other value — the generated narration defines its own
+    # pacing there.
+    tempo: float = Field(default=1.0, ge=0.25, le=4.0)
 
 
 class ExportAssetReportEntry(BaseModel):

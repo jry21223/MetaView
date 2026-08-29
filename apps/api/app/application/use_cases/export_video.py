@@ -202,6 +202,19 @@ class ExportVideoUseCase:
                     f"Run {run_id!r} cannot export without its persisted DirectorScript"
                 ) from exc
             opts = options or ExportOptions()
+            if opts.tempo != 1.0:
+                if with_audio:
+                    raise ValueError(
+                        "tempo requires with_audio=False: generated narration "
+                        "defines its own pacing"
+                    )
+                playbook = _apply_tempo(playbook, opts.tempo)
+                if director is not None:
+                    # Scaling moves step boundaries exactly like the audio
+                    # stretch does; re-align beat frames the same way.
+                    director = remap_director_beats_to_playbook(
+                        director, playbook_model, playbook
+                    )
 
             job_dir = self._artifacts / job_id
             job_dir.mkdir(parents=True, exist_ok=True)
@@ -496,6 +509,27 @@ def _write_asset_report_sidecar(
     }
     report_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     return report_path
+
+
+def _apply_tempo(playbook: dict[str, Any], tempo: float) -> dict[str, Any]:
+    """Scale the timeline for silent exports: tempo 2.0 = double speed.
+
+    End frames divide by tempo with a strictly monotonic floor of one frame
+    per step, so extreme tempos cannot collapse steps into zero length;
+    total_frames follows the last step.
+    """
+
+    scaled = dict(playbook)
+    steps = [dict(step) for step in playbook.get("steps", [])]
+    previous_end = 0
+    for step in steps:
+        target = round(step["end_frame"] / tempo)
+        step["end_frame"] = max(previous_end + 1, target)
+        previous_end = step["end_frame"]
+    scaled["steps"] = steps
+    if steps:
+        scaled["total_frames"] = steps[-1]["end_frame"]
+    return scaled
 
 
 def _stretch_end_frames(playbook: dict[str, Any], audio_files: list[str]) -> dict[str, Any]:

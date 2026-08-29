@@ -1084,3 +1084,85 @@ def _stretch_playbook() -> dict:
         "parameter_controls": [],
         "initial_data": {},
     }
+
+
+@pytest.mark.asyncio
+async def test_tempo_scales_silent_timeline_and_remaps_director(tmp_path) -> None:
+    db = str(tmp_path / "export.db")
+    init_db(db)
+    run_repo = SqliteRunRepository(db)
+    director_repo = SqliteRunDirectorRepository(db)
+    export_repo = InMemoryExportJobRepository()
+    await _seed_run(
+        run_repo,
+        "run-tempo",
+        playbook_json=json.dumps(_stretch_playbook(), ensure_ascii=False),
+    )
+    await director_repo.upsert(_stretch_director("run-tempo"), "2026-06-05T00:00:00+00:00")
+    await export_repo.create(_job("job-tempo", "run-tempo"))
+    use_case = RecordingExportVideoUseCase(
+        export_repo,
+        run_repo,
+        director_repo,
+        web_app_dir=tmp_path,
+        artifacts_dir=tmp_path / "artifacts",
+    )
+
+    await use_case.execute(
+        "job-tempo",
+        "run-tempo",
+        with_audio=False,
+        tts=None,
+        options=ExportOptions(tempo=2.0),
+    )
+
+    assert use_case.input_props is not None
+    steps = use_case.input_props["script"]["steps"]
+    beats = use_case.input_props["director"]["beats"]
+    # 30/60/90 at double speed: 15/30/45, and total_frames follows.
+    assert [step["end_frame"] for step in steps] == [15, 30, 45]
+    assert use_case.input_props["script"]["total_frames"] == 45
+    # Director beats snap to the scaled step boundaries, like audio stretch.
+    assert [beat["start_frame"] for beat in beats] == [0, 15, 30]
+    assert [beat["end_frame"] for beat in beats] == [15, 30, 45]
+
+
+@pytest.mark.asyncio
+async def test_tempo_with_audio_fails_the_job(tmp_path) -> None:
+    db = str(tmp_path / "export.db")
+    init_db(db)
+    run_repo = SqliteRunRepository(db)
+    director_repo = SqliteRunDirectorRepository(db)
+    export_repo = InMemoryExportJobRepository()
+    await _seed_run(
+        run_repo,
+        "run-tempo-audio",
+        playbook_json=json.dumps(_stretch_playbook(), ensure_ascii=False),
+    )
+    await director_repo.upsert(
+        _stretch_director("run-tempo-audio"), "2026-06-05T00:00:00+00:00"
+    )
+    await export_repo.create(_job("job-tempo-audio", "run-tempo-audio"))
+    use_case = StubAudioExportVideoUseCase(
+        export_repo,
+        run_repo,
+        director_repo,
+        web_app_dir=tmp_path,
+        artifacts_dir=tmp_path / "artifacts",
+    )
+
+    await use_case.execute(
+        "job-tempo-audio",
+        "run-tempo-audio",
+        with_audio=True,
+        tts=TtsConfig(api_key="test"),
+        options=ExportOptions(tempo=2.0),
+    )
+
+    # The narration defines its own pacing; the job fails instead of
+    # rendering a video whose audio and timeline disagree.
+    assert use_case.input_props is None
+    job = await export_repo.get("job-tempo-audio")
+    assert job is not None
+    assert job.status.value == "failed"
+    assert "tempo" in (job.error or "")
