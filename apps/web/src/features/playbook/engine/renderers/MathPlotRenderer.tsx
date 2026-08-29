@@ -178,7 +178,6 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
   frame,
   stepStartFrame,
   visualStartFrame,
-  progress,
   theme,
   onInteraction,
 }) => {
