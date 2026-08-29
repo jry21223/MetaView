@@ -135,19 +135,13 @@ describe("calculus public Gold Templates", () => {
     const script = buildIntegralAreaGoldPlaybook({ n: 4, b: 2 });
     expect(script.steps).toHaveLength(8);
 
-    // The opening acts frame the figure itself: a tight window with an
-    // explicit x-axis (ticks and labels at 0 and b) and the S=? anchor.
-    // The wide flanked window only arrives with the slide-caps step.
+    // The opening acts frame the figure itself in a tight window with the
+    // S=? anchor; the coordinate system itself comes from the renderer's
+    // (now visible) Mafs axes. The wide flanked window only arrives with
+    // the slide-caps step.
     const puzzle = script.steps[0];
     if (puzzle.snapshot.kind === "math_scene") {
       expect(puzzle.snapshot.x_max).toBeCloseTo(1.35 * 2, 9);
-      const roles = (puzzle.snapshot.segments ?? []).map((item) => item.semantic_role);
-      expect(roles).toEqual(["x_axis", "axis_tick", "axis_tick"]);
-      const labels = (puzzle.snapshot.annotations ?? []).filter(
-        (item) => item.semantic_role === "axis_label",
-      );
-      expect(labels.map((item) => item.text)).toEqual(["$0$", "$2$"]);
-      expect(labels.map((item) => item.x)).toEqual([0, 2]);
       expect(puzzle.snapshot.annotations?.some(
         (item) => item.semantic_role === "area_question",
       )).toBe(true);

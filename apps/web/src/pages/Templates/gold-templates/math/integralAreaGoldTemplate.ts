@@ -156,33 +156,6 @@ export function buildIntegralAreaGoldPlaybook(params: TemplatePreviewParams): Pl
     emphasis: "primary" as const,
     semantic_role: "area_curve",
   });
-  // Mafs' background grid washes out on the paper theme, so the number line
-  // the narration leans on ("从 0 到 b") is drawn explicitly: an x-axis with
-  // ticks and labels at 0 and b, extended under the cap stack in wide frames.
-  const axisFurniture = (frame: "tight" | "wide") => ({
-    segments: [
-      {
-        x0: -0.28 * b,
-        y0: 0,
-        x1: (frame === "tight" ? 1.28 : 1.7) * b,
-        y1: 0,
-        emphasis: "secondary",
-        semantic_role: "x_axis",
-      },
-      ...[0, b].map((x) => ({
-        x0: x,
-        y0: 0,
-        x1: x,
-        y1: -0.045 * b * b,
-        emphasis: "secondary",
-        semantic_role: "axis_tick",
-      })),
-    ] satisfies MathSceneSnapshot["segments"],
-    annotations: [
-      { x: 0, y: -0.09 * b * b, text: "$0$", semantic_role: "axis_label" },
-      { x: b, y: -0.09 * b * b, text: `$${bText}$`, semantic_role: "axis_label" },
-    ],
-  });
   const scene = (args: {
     regions?: Region[];
     points?: ScenePoint[];
@@ -200,7 +173,6 @@ export function buildIntegralAreaGoldPlaybook(params: TemplatePreviewParams): Pl
     frame?: "tight" | "wide";
   }): MathSceneSnapshot => {
     const frame = args.frame ?? "wide";
-    const axis = axisFurniture(frame);
     return {
       kind: "math_scene",
       camera_mode: "fixed",
@@ -215,9 +187,8 @@ export function buildIntegralAreaGoldPlaybook(params: TemplatePreviewParams): Pl
       curves: [areaCurve(frame)],
       regions: args.regions ?? [],
       points: args.points ?? [],
-      segments: [...axis.segments, ...(args.segments ?? [])],
+      segments: args.segments ?? [],
       annotations: [
-        ...axis.annotations,
         ...(args.valuePanel
           ? [{
               // Tight frames have no left flank; the panel sits in the empty
@@ -364,7 +335,7 @@ export const INTEGRAL_AREA_GOLD_TEMPLATE: GoldTemplateManifest = standaloneCase(
   visualInvariants: [{
     id: "integral-visual",
     description: "抛物线、下和阶梯、橙色夹缝帽与目标曲边区域同屏可辨认",
-    requiredSemanticRoles: ["area_curve", "riemann_rectangle", "gap_strip", "gap_stack", "target_area", "x_axis"],
+    requiredSemanticRoles: ["area_curve", "riemann_rectangle", "gap_strip", "gap_stack", "target_area"],
     requiredStateFields: ["curves", "regions", "points", "annotations", "x_min"],
   }],
   objective: "把曲边面积识别为上下矩形和的公共极限，用帽子滑移看见夹缝 b³/n，用平方和闭式算出 b³/3，并以微积分基本定理做独立的第二路验证。",

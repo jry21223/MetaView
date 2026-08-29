@@ -2216,6 +2216,23 @@
   --grid-line-subdivision-color: var(--canvas-grid);
 }
 
+/* Server-side renders (Remotion exports, posters) have no app root applying
+   the runtime theme variables, so var(--canvas-axis) collapses and Mafs falls
+   back to its own dark defaults — invisible axes on the paper theme. Scope
+   literal fallbacks by the renderer's data-theme so exported video shows the
+   same axes the app does. */
+.math-scene-renderer[data-theme="light"] .MafsView {
+  --mafs-origin-color: var(--canvas-axis, rgba(22, 26, 24, 0.55));
+  --mafs-line-color: var(--canvas-grid, rgba(22, 26, 24, 0.07));
+  --grid-line-subdivision-color: var(--canvas-grid, rgba(22, 26, 24, 0.07));
+}
+
+.math-scene-renderer[data-theme="dark"] .MafsView {
+  --mafs-origin-color: var(--canvas-axis, rgba(232, 239, 233, 0.5));
+  --mafs-line-color: var(--canvas-grid, rgba(232, 239, 233, 0.07));
+  --grid-line-subdivision-color: var(--canvas-grid, rgba(232, 239, 233, 0.07));
+}
+
 .math-scene-renderer__caption {
   text-align: center;
   font-size: 14px;
