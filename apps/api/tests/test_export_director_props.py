@@ -1166,3 +1166,81 @@ async def test_tempo_with_audio_fails_the_job(tmp_path) -> None:
     assert job is not None
     assert job.status.value == "failed"
     assert "tempo" in (job.error or "")
+
+
+@pytest.mark.asyncio
+async def test_template_case_exports_without_a_run(tmp_path) -> None:
+    db = str(tmp_path / "export.db")
+    init_db(db)
+    run_repo = SqliteRunRepository(db)
+    director_repo = SqliteRunDirectorRepository(db)
+    export_repo = InMemoryExportJobRepository()
+    templates = tmp_path / "template-previews"
+    templates.mkdir()
+    (templates / "integral-area.playbook.json").write_text(
+        json.dumps(_stretch_playbook(), ensure_ascii=False), encoding="utf-8"
+    )
+    await export_repo.create(_job("job-tpl", "integral-area"))
+    use_case = RecordingExportVideoUseCase(
+        export_repo,
+        run_repo,
+        director_repo,
+        web_app_dir=tmp_path,
+        artifacts_dir=tmp_path / "artifacts",
+        template_playbooks_dir=templates,
+    )
+
+    await use_case.execute(
+        "job-tpl",
+        "",
+        with_audio=False,
+        tts=None,
+        template_case_id="integral-area",
+    )
+
+    assert use_case.input_props is not None
+    # The frozen script renders as-is; curated cases carry no DirectorScript
+    # (omitted entirely, as for a run without one) and skip the run-level
+    # quality gate.
+    assert "director" not in use_case.input_props
+    assert [s["end_frame"] for s in use_case.input_props["script"]["steps"]] == [30, 60, 90]
+    job = await export_repo.get("job-tpl")
+    assert job is not None
+    assert job.status.value == "completed"
+
+
+@pytest.mark.asyncio
+async def test_template_export_refuses_unknown_and_traversing_ids(tmp_path) -> None:
+    db = str(tmp_path / "export.db")
+    init_db(db)
+    export_repo = InMemoryExportJobRepository()
+    templates = tmp_path / "template-previews"
+    templates.mkdir()
+    # A playbook that exists but outside the curated directory must stay
+    # unreachable however the id is spelled.
+    (tmp_path / "secret.playbook.json").write_text(
+        json.dumps(_stretch_playbook(), ensure_ascii=False), encoding="utf-8"
+    )
+    use_case = RecordingExportVideoUseCase(
+        export_repo,
+        SqliteRunRepository(db),
+        SqliteRunDirectorRepository(db),
+        web_app_dir=tmp_path,
+        artifacts_dir=tmp_path / "artifacts",
+        template_playbooks_dir=templates,
+    )
+
+    for case_id in ["missing-case", "../secret", "..%2Fsecret"]:
+        await export_repo.create(_job(f"job-{case_id}", case_id))
+        await use_case.execute(
+            f"job-{case_id}",
+            "",
+            with_audio=False,
+            tts=None,
+            template_case_id=case_id,
+        )
+        job = await export_repo.get(f"job-{case_id}")
+        assert job is not None
+        assert job.status.value == "failed", case_id
+
+    assert use_case.input_props is None

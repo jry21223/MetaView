@@ -126,3 +126,65 @@ def test_apply_tempo_one_is_identity() -> None:
     scaled = _apply_tempo(playbook, 1.0)
     assert [s["end_frame"] for s in scaled["steps"]] == [50, 120]
     assert scaled["total_frames"] == 120
+
+
+def test_export_request_accepts_a_template_case() -> None:
+    req = ExportRequest.model_validate(
+        {"template_case_id": "integral-area", "with_audio": False}
+    )
+    assert req.template_case_id == "integral-area"
+    assert req.run_id is None
+
+
+def _client_and_templates(tmp_path):
+    from app.presentation import router_exports
+
+    app = create_app()
+    settings = get_settings()
+    original = settings.export_template_playbooks_dir
+    templates = tmp_path / "template-previews"
+    templates.mkdir()
+    settings.export_template_playbooks_dir = str(templates)
+    return TestClient(app), templates, settings, original, router_exports
+
+
+def test_submit_export_rejects_ambiguous_and_unknown_sources(tmp_path) -> None:
+    client, templates, settings, original, _ = _client_and_templates(tmp_path)
+    prefix = settings.api_prefix
+    try:
+        # Neither source, and both sources, are equally invalid.
+        for payload in (
+            {"with_audio": False},
+            {"run_id": "r1", "template_case_id": "integral-area", "with_audio": False},
+        ):
+            resp = client.post(f"{prefix}/exports", json=payload)
+            assert resp.status_code == 400, resp.text
+            assert "exactly one" in resp.json()["detail"]
+
+        # A case this deployment does not ship is a 404, not a queued job.
+        resp = client.post(
+            f"{prefix}/exports",
+            json={"template_case_id": "not-a-case", "with_audio": False},
+        )
+        assert resp.status_code == 404
+
+        # Path traversal never resolves outside the curated directory.
+        resp = client.post(
+            f"{prefix}/exports",
+            json={"template_case_id": "../secret", "with_audio": False},
+        )
+        assert resp.status_code == 400
+
+        # version_id is a run-only concept.
+        (templates / "integral-area.playbook.json").write_text("{}", encoding="utf-8")
+        resp = client.post(
+            f"{prefix}/exports",
+            json={
+                "template_case_id": "integral-area",
+                "version_id": "v1",
+                "with_audio": False,
+            },
+        )
+        assert resp.status_code == 400
+    finally:
+        settings.export_template_playbooks_dir = original

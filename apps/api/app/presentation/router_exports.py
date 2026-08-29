@@ -73,24 +73,48 @@ async def submit_export(
 ) -> ExportJobResponse:
     if payload.with_audio and payload.tts is None:
         raise HTTPException(status_code=400, detail="with_audio=true requires a tts config")
-    run = await run_repo.get(payload.run_id)
-    if run is None or run.playbook is None:
-        raise HTTPException(status_code=404, detail=f"Run {payload.run_id!r} has no playbook")
-    if payload.version_id is not None:
-        version_playbook = await run_repo.get_version_playbook(
-            payload.run_id,
-            payload.version_id,
+    if (payload.run_id is None) == (payload.template_case_id is None):
+        raise HTTPException(
+            status_code=400,
+            detail="exactly one of run_id / template_case_id is required",
         )
-        if version_playbook is None:
+
+    template_dir = _resolve_path(settings.export_template_playbooks_dir)
+    if payload.template_case_id is not None:
+        # A frozen public case: no run, no versions. Validate up front so the
+        # caller gets 404 instead of a background job that fails later.
+        if payload.version_id is not None:
+            raise HTTPException(
+                status_code=400,
+                detail="version_id does not apply to template exports",
+            )
+        case_id = payload.template_case_id
+        if not case_id or not all(ch.isalnum() or ch in "-_" for ch in case_id):
+            raise HTTPException(status_code=400, detail=f"Invalid case id {case_id!r}")
+        if not (template_dir / f"{case_id}.playbook.json").is_file():
             raise HTTPException(
                 status_code=404,
-                detail=f"Version {payload.version_id!r} not found",
+                detail=f"Template case {case_id!r} is not available for export",
             )
+    else:
+        run = await run_repo.get(payload.run_id)
+        if run is None or run.playbook is None:
+            raise HTTPException(status_code=404, detail=f"Run {payload.run_id!r} has no playbook")
+        if payload.version_id is not None:
+            version_playbook = await run_repo.get_version_playbook(
+                payload.run_id,
+                payload.version_id,
+            )
+            if version_playbook is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Version {payload.version_id!r} not found",
+                )
 
     job_id = str(uuid.uuid4())
     job = ExportJob(
         job_id=job_id,
-        run_id=payload.run_id,
+        run_id=payload.run_id or payload.template_case_id or "",
         with_audio=payload.with_audio,
         asset_report=payload.asset_report,
         asset_report_warning=(
@@ -106,15 +130,17 @@ async def submit_export(
         director_repo,
         web_app_dir=_resolve_path(settings.export_web_app_dir),
         artifacts_dir=_resolve_path(settings.export_artifacts_dir),
+        template_playbooks_dir=template_dir,
     )
     background_tasks.add_task(
         use_case.execute,
         job_id,
-        payload.run_id,
+        payload.run_id or "",
         payload.with_audio,
         payload.tts,
         payload.options,
         payload.version_id,
+        payload.template_case_id,
     )
 
     return _to_response(job, request, settings.api_prefix)

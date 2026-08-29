@@ -117,13 +117,32 @@ class ExportVideoUseCase:
         director_repo: IRunDirectorRepository,
         web_app_dir: Path,
         artifacts_dir: Path,
+        template_playbooks_dir: Path | None = None,
     ) -> None:
         self._exports = export_repo
         self._runs = run_repo
         self._directors = director_repo
         self._web_dir = web_app_dir
         self._artifacts = artifacts_dir
+        self._templates = template_playbooks_dir
         self._artifacts.mkdir(parents=True, exist_ok=True)
+
+    def _load_template_playbook(self, case_id: str) -> PlaybookScript:
+        """Resolve a frozen public template case to its playbook.
+
+        The id is matched against the curated directory's file names, so a
+        caller can only render lessons this deployment actually ships — path
+        traversal and arbitrary client payloads are both impossible.
+        """
+
+        if self._templates is None:
+            raise ValueError("template exports are not configured for this deployment")
+        if not case_id or not all(ch.isalnum() or ch in "-_" for ch in case_id):
+            raise ValueError(f"Template case id {case_id!r} is not a valid case id")
+        path = self._templates / f"{case_id}.playbook.json"
+        if not path.is_file():
+            raise ValueError(f"Template case {case_id!r} has no frozen playbook to export")
+        return PlaybookScript.model_validate_json(path.read_text(encoding="utf-8"))
 
     def _build_export_quality_report(
         self,
@@ -155,32 +174,47 @@ class ExportVideoUseCase:
         tts: TtsConfig | None,
         options: ExportOptions | None = None,
         version_id: str | None = None,
+        template_case_id: str | None = None,
     ) -> None:
         try:
-            run = await self._runs.get(run_id)
-            if run is None or run.playbook is None:
-                raise ValueError(f"Run {run_id!r} has no playbook to export")
-            if run.status != PipelineRunStatus.SUCCEEDED:
-                raise ValueError(f"Run {run_id!r} is not in succeeded state")
-            if version_id is not None:
+            run = None
+            director = None
+            update_quality_report = None
+            if template_case_id is not None:
+                # Frozen public template: a curated, already-reviewed script
+                # with no run, no versions and no DirectorScript. The quality
+                # gate is a run-level concept, so it does not apply here.
+                playbook_model = self._load_template_playbook(template_case_id)
+            else:
+                run = await self._runs.get(run_id)
+                if run is None or run.playbook is None:
+                    raise ValueError(f"Run {run_id!r} has no playbook to export")
+                if run.status != PipelineRunStatus.SUCCEEDED:
+                    raise ValueError(f"Run {run_id!r} is not in succeeded state")
+            if template_case_id is None and version_id is not None:
                 playbook_json = await self._runs.get_version_playbook(run_id, version_id)
                 if playbook_json is None:
                     raise ValueError(
                         f"Version {version_id!r} not found for run {run_id!r}"
                     )
                 playbook_model = PlaybookScript.model_validate_json(playbook_json)
-            else:
+            elif template_case_id is None:
                 playbook_model = run.playbook
-            update_quality_report = getattr(self._runs, "update_quality_report", None)
+            if run is not None:
+                update_quality_report = getattr(self._runs, "update_quality_report", None)
             job = await self._exports.get(job_id)
 
             playbook = playbook_model.model_dump()
             try:
-                director = await self._get_export_director(
-                    run_id,
-                    version_id=version_id,
-                    playbook=playbook_model,
-                    rebuild_if_missing=_quality_has_director_persistence_failure(run),
+                director = (
+                    None
+                    if template_case_id is not None
+                    else await self._get_export_director(
+                        run_id,
+                        version_id=version_id,
+                        playbook=playbook_model,
+                        rebuild_if_missing=_quality_has_director_persistence_failure(run),
+                    )
                 )
             except Exception as exc:  # noqa: BLE001 - export must fail closed on Director I/O.
                 director_quality = self._build_export_quality_report(
@@ -246,26 +280,31 @@ class ExportVideoUseCase:
             # char-rate estimates, so frame-dependent conclusions (e.g.
             # timeline.voiceover_too_short) must reflect what will actually
             # render (#240).
-            export_quality = self._build_export_quality_report(
-                PlaybookScript.model_validate(playbook), run
-            )
-            if export_quality.status == "repairable":
-                export_quality = export_quality.with_issue(
-                    PlaybookReviewIssue(
-                        code="export.not_ready",
-                        severity=PlaybookIssueSeverity.ERROR,
-                        path="playbook",
-                        message="Export readiness recheck found unresolved quality errors.",
-                        suggestion="Repair the PlaybookScript before starting export.",
-                        requires_repair=False,
-                    ),
-                    action="export:blocked",
+            export_quality = (
+                None
+                if run is None
+                else self._build_export_quality_report(
+                    PlaybookScript.model_validate(playbook), run
                 )
-            if callable(update_quality_report):
-                await update_quality_report(run_id, export_quality.model_dump_json())
-            if export_quality.status in {"repairable", "blocked"}:
-                codes = ", ".join(issue.code for issue in export_quality.issues[:5])
-                raise ValueError(f"Run {run_id!r} is not export-ready: {codes}")
+            )
+            if export_quality is not None:
+                if export_quality.status == "repairable":
+                    export_quality = export_quality.with_issue(
+                        PlaybookReviewIssue(
+                            code="export.not_ready",
+                            severity=PlaybookIssueSeverity.ERROR,
+                            path="playbook",
+                            message="Export readiness recheck found unresolved quality errors.",
+                            suggestion="Repair the PlaybookScript before starting export.",
+                            requires_repair=False,
+                        ),
+                        action="export:blocked",
+                    )
+                if callable(update_quality_report):
+                    await update_quality_report(run_id, export_quality.model_dump_json())
+                if export_quality.status in {"repairable", "blocked"}:
+                    codes = ", ".join(issue.code for issue in export_quality.issues[:5])
+                    raise ValueError(f"Run {run_id!r} is not export-ready: {codes}")
 
             # Remotion downloads media assets over HTTP, so audio must be
             # reachable as http:// URLs for the whole render (#244).

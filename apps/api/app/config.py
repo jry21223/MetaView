@@ -60,6 +60,11 @@ class Settings(BaseSettings):
     # Export (Remotion render) — relative to repo root unless absolute
     export_web_app_dir: str = "apps/web"
     export_artifacts_dir: str = "data/exports"
+    # Frozen public Gold-template playbooks (written by
+    # `npm --workspace apps/web run template-previews:export`). Exporting a
+    # template case resolves its script here, so only curated lessons render —
+    # a client never posts arbitrary playbook content.
+    export_template_playbooks_dir: str = "data/template-previews"
 
     # TTS proxy (issue #40) — the player no longer stores an OpenAI key in
     # localStorage. ``tts_api_key`` falls back to ``openai_api_key`` so a

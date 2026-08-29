@@ -11,7 +11,16 @@ from app.domain.models.export_job import (
 
 
 class ExportRequest(BaseModel):
-    run_id: str
+    """Export a generated run, or a frozen public template case.
+
+    Exactly one of ``run_id`` / ``template_case_id`` is required; the router
+    rejects requests that set both or neither.
+    """
+
+    run_id: str | None = None
+    #: Public Gold-template case id (e.g. "integral-area"). Resolved against
+    #: the frozen playbook directory, never against client-supplied content.
+    template_case_id: str | None = None
     version_id: str | None = None
     with_audio: bool = False
     tts: TtsConfig | None = None
