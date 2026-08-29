@@ -78,16 +78,19 @@ describe("spring SHM public Gold Template", () => {
     expect(scene.kind).toBe("physics_force_scene");
     if (scene.kind !== "physics_force_scene") return;
 
+    // The oscillator declares the wide (16:9) scene space: wall at 22,
+    // equilibrium at its centre 84, one metre = 42 scene units.
+    expect(scene.scene_width).toBe(168);
     const coil = scene.springs![0];
     expect(coil.semantic_role).toBe("spring_coil");
-    expect(coil.x0).toBe(13);
-    // Mass center 50 + 0.5·25 = 62.5; the coil stops at the mass edge (radius 4).
-    expect(coil.x1).toBeCloseTo(58.5, 9);
+    expect(coil.x0).toBe(22);
+    // Mass center 84 + 0.5·42 = 105; the coil stops at the mass edge (radius 4).
+    expect(coil.x1).toBeCloseTo(101, 9);
     expect(coil.label).toBe("k=4 N/m");
 
     const roles = scene.trajectories!.map((item) => item.semantic_role);
     expect(roles).toEqual(["wall", "amplitude_range"]);
-    expect(scene.points?.[0]).toMatchObject({ x: 50, semantic_role: "equilibrium_mark" });
+    expect(scene.points?.[0]).toMatchObject({ x: 84, semantic_role: "equilibrium_mark" });
 
     // The ±A ruler doubles as the flow tracer's rail: one full period of
     // x(t)=A·cos(ωt) sampled uniformly in time, so the shared-clock tracer
@@ -96,20 +99,20 @@ describe("spring SHM public Gold Template", () => {
     expect(rail.flow).toBe(true);
     expect(rail.points).toHaveLength(49);
     expect(rail.points.every(([, y]) => y === 64)).toBe(true);
-    expect(rail.points[0][0]).toBeCloseTo(50 + 0.5 * 25, 9);
-    expect(rail.points[24][0]).toBeCloseTo(50 - 0.5 * 25, 9);
+    expect(rail.points[0][0]).toBeCloseTo(84 + 0.5 * 42, 9);
+    expect(rail.points[24][0]).toBeCloseTo(84 - 0.5 * 42, 9);
     expect(rail.points[48][0]).toBeCloseTo(rail.points[0][0], 9);
     rail.points.forEach(([x], index) => {
-      expect(x).toBeCloseTo(50 + 0.5 * 25 * Math.cos((2 * Math.PI * index) / 48), 9);
+      expect(x).toBeCloseTo(84 + 0.5 * 42 * Math.cos((2 * Math.PI * index) / 48), 9);
     });
 
     const wide = buildSpringShmGoldPlaybook({ A: 1.2, k: 4, m: 1 });
     const wideScene = wide.steps[0].snapshot;
     if (wideScene.kind === "physics_force_scene") {
-      expect(wideScene.springs![0].x1).toBeCloseTo(50 + 1.2 * 25 - 4, 9);
+      expect(wideScene.springs![0].x1).toBeCloseTo(84 + 1.2 * 42 - 4, 9);
       const range = wideScene.trajectories!.find((item) => item.semantic_role === "amplitude_range")!;
       const xs = range.points.map(([x]) => x);
-      expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(2 * 1.2 * 25, 9);
+      expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(2 * 1.2 * 42, 9);
     }
   });
 

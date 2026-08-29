@@ -63,15 +63,19 @@ function num(value: number): string {
  * amplitude range, and the displaced mass — a spring you can actually see.
  */
 function oscillatorScene(state: ShmState, caption: string, formulaLatex: string): PhysicsForceSceneSnapshot {
-  const metersToScene = 25;
-  const equilibriumX = 50;
-  const wallX = 13;
+  // The oscillator is a horizontal apparatus, so it declares the same wide
+  // (16:9) scene space the projectile uses instead of the central square.
+  const sceneWidth = 168;
+  const metersToScene = 42;
+  const equilibriumX = sceneWidth / 2;
+  const wallX = 22;
   const massRadius = 4;
   const massX = equilibriumX + state.amplitude * metersToScene;
   const forceScale = 18 / Math.max(1, state.stiffness * state.amplitude);
   return {
     kind: "physics_force_scene",
     pack_id: "physics-basic",
+    scene_width: sceneWidth,
     objects: [
       { id: "shm-mass", label: `m=${fixed(state.mass)} kg`, x: massX, y: 55, radius: massRadius },
     ],

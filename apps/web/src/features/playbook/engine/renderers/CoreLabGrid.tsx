@@ -6,6 +6,8 @@ interface CoreLabGridProps {
   theme: "light" | "dark";
   lightFill?: string;
   darkFill?: string;
+  /** Scene-space width of the canvas (height is always 100). */
+  width?: number;
 }
 
 export function CoreLabGrid({
@@ -13,6 +15,7 @@ export function CoreLabGrid({
   theme,
   lightFill,
   darkFill,
+  width = 100,
 }: CoreLabGridProps) {
   const isDark = theme === "dark";
   const palette = THEME_PALETTE[theme];
@@ -29,8 +32,8 @@ export function CoreLabGrid({
           <path d="M 5 0 L 0 0 0 5" fill="none" stroke={gridStroke} strokeWidth="0.22" />
         </pattern>
       </defs>
-      <rect x="0" y="0" width="100" height="100" rx="3" fill={canvasFill} />
-      <rect x="0" y="0" width="100" height="100" rx="3" fill={`url(#${patternId})`} />
+      <rect x="0" y="0" width={width} height="100" rx="3" fill={canvasFill} />
+      <rect x="0" y="0" width={width} height="100" rx="3" fill={`url(#${patternId})`} />
     </g>
   );
 }

@@ -20,6 +20,7 @@ import {
   projectileSceneBaseline,
   projectileScenePoint,
   projectileSceneTrajectory,
+  PROJECTILE_SCENE_WIDTH,
   solveProjectile,
   type ProjectileState,
 } from "./projectileMotionDomain";
@@ -169,7 +170,7 @@ function keyMarkAnnotations(state: ProjectileState): NonNullable<PhysicsForceSce
   // Nudged left of the landing point so the descending velocity arrows
   // don't run through the number.
   return [{
-    x: Math.min(landX - 6.5, 84),
+    x: Math.min(landX - 6.5, PROJECTILE_SCENE_WIDTH - 16),
     y: projectileSceneBaseline(state) + 5.4,
     text: `R=${fixed(state.range)} m`,
     semantic_role: "range_note",
@@ -248,6 +249,7 @@ function physicsSnapshot(
       radius: 2.8,
     }],
     vectors,
+    scene_width: PROJECTILE_SCENE_WIDTH,
     trajectory: projectileSceneTrajectory(state),
     // The scene trajectory is sampled uniformly in time, so the cruising
     // tracer replays the real motion: constant horizontal pace, accelerating
@@ -271,10 +273,10 @@ function physicsSnapshot(
  * launch; heights agree pairwise because y(t) never sees the horizontal speed.
  */
 function twinBulletScene(): PhysicsForceSceneSnapshot {
-  const startX = 20;
+  const startX = 34;
   const topY = 30;
   const drop = SCENE_GROUND_Y - topY;
-  const horizontalReach = 66;
+  const horizontalReach = 112;
   const fraction = (index: number) => index / 6;
   const shotPoints: Array<[number, number]> = Array.from({ length: 25 }, (_, index) => {
     const f = index / 24;
@@ -323,9 +325,10 @@ function twinBulletScene(): PhysicsForceSceneSnapshot {
     ],
     points: strobe,
     annotations: [
-      { x: startX + 24, y: linkedY - 2.8, text: "同一时刻 · 同一高度", semantic_role: "equal_height_note" },
+      { x: startX + 40, y: linkedY - 2.8, text: "同一时刻 · 同一高度", semantic_role: "equal_height_note" },
     ],
     ground_y: SCENE_GROUND_Y,
+    scene_width: PROJECTILE_SCENE_WIDTH,
     // The physics formula card renders plain text, not KaTeX — keep it unicode.
     formula_latex: "t落 = √(2h/g)",
     caption: "等时刻频闪：两条轨迹的下落进度每一刻都相同——落地时间里没有水平速度的位置。",
@@ -345,9 +348,12 @@ function complementaryScene(state: ProjectileState): PhysicsForceSceneSnapshot {
   const sameAngle = Math.abs(state.angle - 45) < 0.5;
   const maxHeight = Math.max(state.maxHeight, complementary.maxHeight);
   // Same usable band as the single-launch layout, sized to the taller twin.
-  const scale = Math.min(84 / Math.max(1e-9, state.range), 54 / Math.max(1e-9, maxHeight));
+  const scale = Math.min(
+    (PROJECTILE_SCENE_WIDTH - 20) / Math.max(1e-9, state.range),
+    54 / Math.max(1e-9, maxHeight),
+  );
   const groundY = 80 - (54 - maxHeight * scale) / 2;
-  const startX = 50 - (state.range * scale) / 2;
+  const startX = PROJECTILE_SCENE_WIDTH / 2 - (state.range * scale) / 2;
   const mapTrajectory = (which: ProjectileState): Array<[number, number]> =>
     Array.from({ length: 33 }, (_, index) => {
       const t = which.flightTime * (index / 32);
@@ -379,6 +385,7 @@ function complementaryScene(state: ProjectileState): PhysicsForceSceneSnapshot {
     objects: [],
     vectors: [],
     trajectories,
+    scene_width: PROJECTILE_SCENE_WIDTH,
     points: [{
       x: startX + state.range * scale,
       y: groundY,
@@ -386,7 +393,7 @@ function complementaryScene(state: ProjectileState): PhysicsForceSceneSnapshot {
       semantic_role: "landing_mark",
     }],
     annotations: [{
-      x: Math.min(startX + state.range * scale, 88),
+      x: Math.min(startX + state.range * scale, PROJECTILE_SCENE_WIDTH - 12),
       y: groundY + 5.4,
       text: sameAngle ? `R=${fixed(state.range)} m` : "同一落点",
       semantic_role: "range_note",

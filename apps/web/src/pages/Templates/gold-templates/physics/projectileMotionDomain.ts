@@ -146,10 +146,16 @@ export function sampleProjectile(
   );
 }
 
-/** Vertical band of the 0-100 canvas left free by the title and caption chrome. */
+/**
+ * The physics stage is 16:9, so the scene declares a matching 168-wide space
+ * (see PhysicsForceSceneSnapshot.scene_width) instead of the legacy square:
+ * a flat trajectory now uses the whole frame rather than its middle third.
+ */
+export const PROJECTILE_SCENE_WIDTH = 168;
+/** Vertical band left free by the title and caption chrome. */
 const SCENE_TOP = 26;
 const SCENE_BOTTOM_MAX = 80;
-const SCENE_WIDTH = 84;
+const SCENE_WIDTH = PROJECTILE_SCENE_WIDTH - 20;
 
 interface ProjectileSceneLayout {
   scale: number;
@@ -173,7 +179,7 @@ function projectileSceneLayout(state: ProjectileState): ProjectileSceneLayout {
   const scale = Number.isFinite(extentScale) ? extentScale : 1;
   const usedHeight = verticalExtent * scale;
   const baseline = SCENE_BOTTOM_MAX - (band - usedHeight) / 2;
-  const startX = 50 - (horizontalExtent * scale) / 2;
+  const startX = PROJECTILE_SCENE_WIDTH / 2 - (horizontalExtent * scale) / 2;
   return { scale, baseline, startX };
 }
 

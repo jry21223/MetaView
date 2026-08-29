@@ -826,6 +826,12 @@ export interface PhysicsForceSceneSnapshot {
   springs?: PhysicsSceneSpring[];
   /** Scene-space y of the ground; draws a hatched ground line replacing the abstract axes. */
   ground_y?: number | null;
+  /**
+   * Horizontal extent of the scene coordinate space (height stays 100).
+   * Default 100 keeps the legacy square canvas; wide scenes (e.g. 168) let a
+   * trajectory use the 16:9 stage instead of its central square.
+   */
+  scene_width?: number | null;
   /** Ride a looping tracer dot along the primary `trajectory` (see PhysicsSceneTrajectory.flow). */
   flow_tracer?: boolean;
   formula_latex?: string | null;

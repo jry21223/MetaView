@@ -206,6 +206,7 @@ function renderVector(
   target: PhysicsSceneObject | undefined,
   progress: number,
   colors: PhysicsColors,
+  sceneWidth: number,
 ) {
   if (!target) return null;
   const p = Math.max(0, Math.min(1, progress));
@@ -223,7 +224,7 @@ function renderVector(
   const labelX = clamp(
     component === "vertical" ? midX - 2.6 : component === "horizontal" ? midX : midX - uy * 3.2,
     4,
-    96,
+    sceneWidth - 4,
   );
   const labelY = clamp(
     component === "horizontal" ? midY - 2.8 : component === "vertical" ? midY + 1 : midY + ux * 3.2 + 1,
@@ -232,7 +233,7 @@ function renderVector(
   );
   const labelAnchor = component === "vertical" ? "end" : "middle";
   // Magnitude continues past the arrow tip along the vector's own direction.
-  const magnitudeX = clamp(endX + ux * 3, 4, 96);
+  const magnitudeX = clamp(endX + ux * 3, 4, sceneWidth - 4);
   const magnitudeY = clamp(endY + uy * 3 + 1, 8, 92);
   const magnitudeAnchor = Math.abs(ux) < 0.3 ? "middle" : ux > 0 ? "start" : "end";
   return (
@@ -273,6 +274,7 @@ function renderExtraTrajectory(
   index: number,
   progress: number,
   colors: PhysicsColors,
+  sceneWidth: number,
 ) {
   const color = emphasisColor(item.emphasis, colors);
   const lastPoint = item.points.at(-1);
@@ -290,7 +292,7 @@ function renderExtraTrajectory(
       />
       {item.label && lastPoint ? (
         <HaloText
-          x={clamp(lastPoint[0], 7, 93)}
+          x={clamp(lastPoint[0], 7, sceneWidth - 7)}
           y={clamp(lastPoint[1] - 2.2, 8, 92)}
           size={2.7}
           weight={620}
@@ -304,7 +306,12 @@ function renderExtraTrajectory(
   );
 }
 
-function renderPoint(point: PhysicsScenePoint, index: number, colors: PhysicsColors) {
+function renderPoint(
+  point: PhysicsScenePoint,
+  index: number,
+  colors: PhysicsColors,
+  sceneWidth: number,
+) {
   const color = point.emphasis === "secondary"
     ? colors.muted
     : point.emphasis === "accent"
@@ -315,7 +322,7 @@ function renderPoint(point: PhysicsScenePoint, index: number, colors: PhysicsCol
       <circle cx={point.x} cy={point.y} r={point.emphasis === "secondary" ? 0.85 : 1.1} fill={color} />
       {point.label ? (
         <HaloText
-          x={clamp(point.x, 6, 94)}
+          x={clamp(point.x, 6, sceneWidth - 6)}
           y={clamp(point.y - 2.1, 8, 92)}
           size={2.6}
           weight={620}
@@ -331,11 +338,15 @@ function renderPoint(point: PhysicsScenePoint, index: number, colors: PhysicsCol
 
 // The ground is context, not content: keep it visibly lighter than any
 // trajectory so the motion owns the visual hierarchy.
-function renderGround(groundY: number, colors: PhysicsColors) {
-  const hatches = Array.from({ length: 22 }, (_, index) => 7 + index * 4);
+function renderGround(groundY: number, colors: PhysicsColors, sceneWidth: number) {
+  const right = sceneWidth - 6;
+  const hatches = Array.from(
+    { length: Math.max(2, Math.round((right - 7) / 4)) },
+    (_, index) => 7 + index * 4,
+  );
   return (
     <g data-semantic-role="ground" opacity="0.75">
-      <line x1="6" y1={groundY} x2="94" y2={groundY} stroke={colors.axis} strokeWidth="0.4" />
+      <line x1="6" y1={groundY} x2={right} y2={groundY} stroke={colors.axis} strokeWidth="0.4" />
       {hatches.map((x) => (
         <line
           key={x}
@@ -363,6 +374,11 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({
   const colors = physicsPalette(theme);
   const formulaText = compactFormula(snap.formula_latex);
   const hasGround = snap.ground_y != null && Number.isFinite(snap.ground_y);
+  // Wide scenes let a trajectory use the 16:9 stage instead of its central
+  // square; 100 keeps the legacy canvas for every snapshot that omits it.
+  const sceneWidth = Number.isFinite(snap.scene_width) && (snap.scene_width as number) > 0
+    ? (snap.scene_width as number)
+    : 100;
   // Anchor to the visual slot so a continued scene never re-draws mid-lesson.
   const slotFrame = frame - (visualStartFrame ?? stepStartFrame);
   const drawProgress = easeOutCubic(slotFrame / TRAJECTORY_DRAW_FRAMES);
@@ -383,7 +399,7 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({
         fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
       }}
     >
-      <svg width="100%" height="100%" viewBox="0 0 100 100" role="img" aria-label={step.title}>
+      <svg width="100%" height="100%" viewBox={`0 0 ${sceneWidth} 100`} role="img" aria-label={step.title}>
         <defs>
           {["force", "velocity", "acceleration"].map((role) => (
             <marker
@@ -401,7 +417,7 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({
           ))}
         </defs>
 
-        <CoreLabGrid rendererKind="physics_force_scene" theme={theme} />
+        <CoreLabGrid rendererKind="physics_force_scene" theme={theme} width={sceneWidth} />
 
         <text x="8" y="11" fontSize="5.6" fontWeight="760" fill={colors.ink}>
           {step.title}
@@ -411,12 +427,12 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({
             id="physics-formula"
             text={formulaText}
             rendererKind="physics_force_scene"
-            x={57}
+            x={sceneWidth - 43}
             y={14.5}
             width={37}
             height={9}
             textAnchor="end"
-            textX={92}
+            textX={sceneWidth - 8}
             textY={20.6}
             fontSize={4.2}
             textFill={colors.ink}
@@ -426,7 +442,7 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({
           />
         ) : null}
 
-        {hasGround ? renderGround(snap.ground_y as number, colors) : null}
+        {hasGround ? renderGround(snap.ground_y as number, colors, sceneWidth) : null}
 
         {snap.trajectory?.length ? (
           <g data-semantic-role="motion_trail" data-render-mode="native-trajectory">
@@ -451,7 +467,7 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({
           </g>
         ) : null}
 
-        {snap.trajectories?.map((item, index) => renderExtraTrajectory(item, index, drawProgress, colors))}
+        {snap.trajectories?.map((item, index) => renderExtraTrajectory(item, index, drawProgress, colors, sceneWidth))}
 
         {snap.flow_tracer && snap.trajectory?.length
           ? renderFlowTracer(snap.trajectory, flowFraction, colors, "tracer-main")
@@ -473,7 +489,7 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({
             />
             {spring.label ? (
               <HaloText
-                x={clamp((spring.x0 + spring.x1) / 2, 6, 94)}
+                x={clamp((spring.x0 + spring.x1) / 2, 6, sceneWidth - 6)}
                 y={clamp(Math.min(spring.y0, spring.y1) - 4.4, 8, 92)}
                 size={2.7}
                 fill={colors.muted}
@@ -513,14 +529,14 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({
           );
         })}
 
-        {snap.points?.map((point, index) => renderPoint(point, index, colors))}
+        {snap.points?.map((point, index) => renderPoint(point, index, colors, sceneWidth))}
 
-        {snap.vectors.map((vector) => renderVector(vector, objectById(snap.objects, vector.target), vectorProgress, colors))}
+        {snap.vectors.map((vector) => renderVector(vector, objectById(snap.objects, vector.target), vectorProgress, colors, sceneWidth))}
 
         {snap.annotations?.map((annotation, index) => (
           <g key={`annotation-${index}`} data-semantic-role={annotation.semantic_role ?? "scene_annotation"}>
             <HaloText
-              x={clamp(annotation.x, 4, 96)}
+              x={clamp(annotation.x, 4, sceneWidth - 4)}
               y={clamp(annotation.y, 8, 92)}
               size={2.9}
               fill={colors.muted}
@@ -533,7 +549,7 @@ export const PhysicsForceSceneRenderer: React.FC<RendererProps> = ({
         ))}
 
         {snap.caption ? (
-          <text x="50" y="94" textAnchor="middle" fontSize="3.8" fill={colors.muted}>
+          <text x={sceneWidth / 2} y="94" textAnchor="middle" fontSize="3.8" fill={colors.muted}>
             {snap.caption}
           </text>
         ) : null}

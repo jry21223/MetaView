@@ -5,6 +5,7 @@ import {
   normalizeProjectileInput,
   projectileAtTime,
   projectileSceneTrajectory,
+  PROJECTILE_SCENE_WIDTH,
   sampleProjectile,
   solveProjectile,
 } from "./projectileMotionDomain";
@@ -79,6 +80,10 @@ describe("projectile motion deterministic domain", () => {
     expect(vertical.vx).toBe(0);
     expect(vertical.range).toBe(0);
     expect(vertical.flightTime).toBeGreaterThan(0);
-    expect(new Set(projectileSceneTrajectory(vertical).map(([x]) => x))).toEqual(new Set([50]));
+    // A vertical launch has zero range, so every sample sits on the centre
+    // line of the wide (16:9) scene space.
+    expect(new Set(projectileSceneTrajectory(vertical).map(([x]) => x))).toEqual(
+      new Set([PROJECTILE_SCENE_WIDTH / 2]),
+    );
   });
 });

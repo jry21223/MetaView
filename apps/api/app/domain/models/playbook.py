@@ -837,6 +837,9 @@ class PhysicsForceSceneSnapshot(BaseModel):
     annotations: list[PhysicsSceneAnnotation] = Field(default_factory=list)
     springs: list[PhysicsSceneSpring] = Field(default_factory=list)
     ground_y: float | None = None
+    # Horizontal extent of the scene space (height stays 100). Default 100 is
+    # the legacy square canvas; wide scenes (e.g. 168) fill the 16:9 stage.
+    scene_width: float | None = None
     # Ride a looping tracer dot along the primary `trajectory` (see PhysicsSceneTrajectory.flow).
     flow_tracer: bool | None = None
     formula_latex: str | None = None
