@@ -145,6 +145,8 @@ Agent 自检只是前置检查。无论内容来自 SkillPack、Agent 还是 sin
 
 需要 Node.js、Python 和 `make`。第一次运行推荐使用 `self + single + mock`，先确认不依赖真实模型凭据的完整管线。
 
+`package-lock.json` 固定使用官方 `registry.npmjs.org`，保证代理/白名单环境下 `npm ci` 可用；需要镜像加速请在本机 `~/.npmrc` 里覆盖 registry，不要改回 lockfile。
+
 ```bash
 make bootstrap
 make setup-hooks
