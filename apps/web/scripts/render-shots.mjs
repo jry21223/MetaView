@@ -32,6 +32,9 @@ if (!playbookPath) {
 const theme = process.env.SHOT_THEME ?? "dark";
 const entry = process.env.REMOTION_ENTRY ?? path.resolve("apps/web/src/remotion/index.ts");
 const publicDir = process.env.REMOTION_PUBLIC_DIR ?? path.resolve("apps/web/public");
+// Sandboxed environments often cannot download Remotion's own headless shell;
+// point REMOTION_BROWSER_EXECUTABLE at a preinstalled Chromium to skip it.
+const browserExecutable = process.env.REMOTION_BROWSER_EXECUTABLE || undefined;
 
 const script = JSON.parse(fs.readFileSync(playbookPath, "utf8"));
 const director = process.env.SHOT_DIRECTOR_PATH
@@ -43,7 +46,7 @@ console.log(`[render-shots] bundling ${entry} ...`);
 const serveUrl = await bundle({ entryPoint: entry, publicDir });
 
 const inputProps = { script, director, theme, showSubtitles: true, audioFiles: [] };
-const composition = await selectComposition({ serveUrl, id: "playbook", inputProps });
+const composition = await selectComposition({ serveUrl, id: "playbook", inputProps, browserExecutable });
 
 const requestedFrame = process.env.SHOT_FRAME;
 const steps = Array.isArray(script.steps) ? script.steps : [];
@@ -75,7 +78,7 @@ if (requestedFrame !== undefined) {
 
 for (const { label, frame, title } of shots) {
   const output = path.join(outDir, `${label}.png`);
-  await renderStill({ composition, serveUrl, output, frame, inputProps });
+  await renderStill({ composition, serveUrl, output, frame, inputProps, browserExecutable });
   console.log(`[render-shots] ${label} @frame ${frame}  ${title} -> ${output}`);
 }
 console.log(`[render-shots] done: ${shots.length} stills in ${outDir}`);
