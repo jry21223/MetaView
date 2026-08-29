@@ -54,5 +54,6 @@ jobs:
           path: |
             eval/reports/
             eval/shots/
+            data/visual-regression/
           if-no-files-found: ignore
           retention-days: 14

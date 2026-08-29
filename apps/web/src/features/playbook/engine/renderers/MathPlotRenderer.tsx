@@ -13,6 +13,7 @@ import { sanitizeKatex } from "../../../../shared/lib/sanitizeKatex";
 import { THEME_PALETTE } from "../../../../shared/config/themePalette";
 import { MATH_PLOT } from "../../../../shared/config/constants";
 import { clamp01 } from "../foundation";
+import { ENTRANCE_FRAMES } from "../math-scene-plan/progress";
 import {
   MATH_PLOT_MARGIN as MARGIN,
   MATH_PLOT_SVG_HEIGHT as SVG_H,
@@ -176,6 +177,7 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
   step,
   frame,
   stepStartFrame,
+  visualStartFrame,
   progress,
   theme,
   onInteraction,
@@ -212,7 +214,13 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
   // Spring-driven `progress` can briefly overshoot; for time-fades use raw elapsed.
   const elapsed = Math.max(0, frame - stepStartFrame);
   const titleOpacity = clamp01(elapsed / 8);
-  const reveal = clamp01(progress);
+  // Curves, shading and observed-data marks sweep in on the fixed entrance
+  // clock, not the narration: a 36-second step must not leave the Galileo
+  // data points half-drawn 30 seconds in. The clock is anchored to the visual
+  // slot, so geometry carried across a narration boundary stays drawn instead
+  // of re-sweeping at every step.
+  const revealAnchor = Math.min(visualStartFrame ?? stepStartFrame, stepStartFrame);
+  const reveal = clamp01(Math.max(0, frame - revealAnchor) / ENTRANCE_FRAMES);
 
   const xMin = snap.x_min;
   const xMax = snap.x_max;

@@ -75,9 +75,12 @@ describe("MathPlotRenderer", () => {
     expect(markup).toContain("katex");
   });
 
-  it("reveals the curve progressively with step progress", () => {
-    const full = firstPolylinePointCount(render(makeSnap(), { progress: 1 }));
-    const partial = firstPolylinePointCount(render(makeSnap(), { progress: 0.25 }));
+  it("reveals the curve on the fixed entrance clock, not narration length", () => {
+    // Frame 240 is past the 66-frame entrance window: fully drawn. Frame 16
+    // is a quarter into it: partial — and both hold whatever the narration
+    // progress claims, so a long voiceover cannot stretch the sweep.
+    const full = firstPolylinePointCount(render(makeSnap(), { frame: 240, progress: 0.05 }));
+    const partial = firstPolylinePointCount(render(makeSnap(), { frame: 16, progress: 1 }));
     expect(partial).toBeGreaterThan(1);
     expect(partial).toBeLessThan(full);
   });

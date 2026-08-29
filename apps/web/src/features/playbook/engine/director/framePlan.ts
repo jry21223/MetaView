@@ -1,5 +1,5 @@
 import type { MathSceneRenderPlan } from "../math-scene-plan/plan";
-import { MATH_SCENE_ENTRANCE_FRAMES } from "../math-scene-plan/progress";
+import { ENTRANCE_FRAMES } from "../math-scene-plan/progress";
 import type { MetaStep, PlaybookScript } from "../types";
 import { selectDirectorAdapter } from "./adapters/registry";
 import { directorBeatLocalProgress, findActiveDirectorBeat } from "./resolveDirectorFrame";
@@ -51,7 +51,7 @@ export function buildDirectorFramePlan(context: DirectorFrameContext): DirectorF
   const stepStartFrame = context.prevStep?.end_frame ?? 0;
   const entranceProgress = Math.min(
     1,
-    Math.max(0, context.frame - stepStartFrame) / MATH_SCENE_ENTRANCE_FRAMES,
+    Math.max(0, context.frame - stepStartFrame) / ENTRANCE_FRAMES,
   );
   const result = adapter.build({
     beat,

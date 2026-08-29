@@ -2,11 +2,12 @@ import type { MathSceneObjectDiff } from "./diff";
 import { isAdded, isPersisted } from "./diff";
 
 /**
- * Frames a newly added object takes to finish its draw-in (2.2s at 30fps).
- * Entrances run on this fixed clock, not the narration's: a 30-second
- * voiceover must not stretch an axis or a rectangle across 30 seconds.
+ * Frames a draw-in takes to finish (2.2s at 30fps). Every teaching renderer
+ * paces entrances on this fixed clock rather than the narration's progress:
+ * a 30-second voiceover must not stretch an axis, a rectangle or a row of
+ * data points across 30 seconds.
  */
-export const MATH_SCENE_ENTRANCE_FRAMES = 66;
+export const ENTRANCE_FRAMES = 66;
 
 function clamp01(value: number): number {
   if (!Number.isFinite(value)) return 0;

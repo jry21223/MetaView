@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 
-.PHONY: bootstrap bootstrap-manim setup-hooks dev-web dev-api dev-agent dev review-real-generation start stop lint test test-coverage build asset-audit asset-showcase asset-showcase-release check visual-check docker-build docker-up docker-down eval eval-gold eval-conic-gold eval-shots eval-generate
+.PHONY: bootstrap bootstrap-manim setup-hooks dev-web dev-api dev-agent dev review-real-generation start stop lint test test-coverage build asset-audit asset-showcase asset-showcase-release check visual-check visual-gold docker-build docker-up docker-down eval eval-gold eval-conic-gold eval-shots eval-generate
 
 DOCKER_COMPOSE_CMD := $(shell sh -lc 'if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then printf "%s" "docker compose"; elif command -v docker-compose >/dev/null 2>&1; then printf "%s" "docker-compose"; fi')
 
@@ -81,7 +81,14 @@ check: lint test build
 
 # Existing renderer/asset visual checks remain independent from the fast
 # contract/unit gate so CI and local development can opt into the heavier path.
-visual-check: asset-audit asset-showcase
+visual-check: asset-audit asset-showcase visual-gold
+
+# Renders every step of the flagship Gold cases and asserts stage blankness
+# and annotation-collision invariants (#270). Pass CASES="integral-area" via
+# the script directly for a single-case run.
+visual-gold:
+	npm --workspace apps/web run template-previews:export
+	cd apps/web && node scripts/visual-regression.mjs
 
 docker-check:
 	@if [ -z "$(DOCKER_COMPOSE_CMD)" ]; then \

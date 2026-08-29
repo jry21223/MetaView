@@ -36,7 +36,7 @@ export type RendererInteractionEvent =
  *    also spring-eased. Restarts every step; for labels/text meant to re-run.
  * 3. Entrance clocks — draw-ins of newly added objects run on short FIXED
  *    frame budgets derived from `frame - stepStartFrame` (math scenes:
- *    MATH_SCENE_ENTRANCE_FRAMES via the director adapter; physics scenes:
+ *    ENTRANCE_FRAMES via the director adapter; physics scenes:
  *    their own trajectory/vector clocks). Narration length must never
  *    stretch a draw-in.
  * 4. Director beat progress — lives inside `directorFrame` (per-beat local

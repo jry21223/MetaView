@@ -15,7 +15,7 @@ import { compileExpr, type CompiledExpr } from "../../../../shared/lib/mathExpr"
 import { sanitizeKatex } from "../../../../shared/lib/sanitizeKatex";
 import { clamp01 } from "../foundation";
 import { composeMathScenePlan } from "../director/adapters/mathSceneAdapter";
-import { MATH_SCENE_ENTRANCE_FRAMES } from "../math-scene-plan/progress";
+import { ENTRANCE_FRAMES } from "../math-scene-plan/progress";
 import { viewBoxFromSnapshot } from "../math-scene-plan/camera";
 import {
   type MathSceneRenderPlan,
@@ -393,7 +393,7 @@ export const MathSceneRenderer: React.FC<RendererProps> = ({
   // previews). It goes through the same composeMathScenePlan as the adapter
   // so the two paths cannot drift apart.
   const entranceProgress = clamp01(
-    Math.max(0, frame - stepStartFrame) / MATH_SCENE_ENTRANCE_FRAMES,
+    Math.max(0, frame - stepStartFrame) / ENTRANCE_FRAMES,
   );
   const fallbackPlan = React.useMemo(
     () => composeMathScenePlan({
