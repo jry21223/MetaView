@@ -854,7 +854,7 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
                 opacity={marker.opacity}
                 textAnchor={marker.px > MARGIN.left + PLOT_W - 80 ? "end" : "start"}
               >
-                ({fmtNum(marker.mx)}, {fmtNum(marker.my)})
+                ({fmtNum(marker.mx, xMax - xMin)}, {fmtNum(marker.my, yMax - yMin)})
               </text>
             )}
           </svg>

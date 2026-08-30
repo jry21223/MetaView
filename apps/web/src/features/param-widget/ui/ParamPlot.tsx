@@ -267,7 +267,7 @@ export function ParamPlot({
           fill={marker.color}
           textAnchor={sx(marker.x) > M.left + PW - 70 ? "end" : "start"}
         >
-          {marker.label ?? `(${fmtNum(marker.x)}, ${fmtNum(marker.y)})`}
+          {marker.label ?? `(${fmtNum(marker.x, xMax - xMin)}, ${fmtNum(marker.y, yHi - yLo)})`}
         </text>
       )}
     </svg>
