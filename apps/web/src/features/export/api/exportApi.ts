@@ -15,7 +15,9 @@ export interface ExportTtsConfig {
   api_key?: string;
   base_url?: string;
   model?: string;
-  voice: string;
+  // Optional: voice IDs are vendor-specific, so an unchosen voice falls back
+  // to the server's METAVIEW_TTS_DEFAULT_VOICE rather than an OpenAI name.
+  voice?: string;
 }
 
 export type ExportQuality = "720p" | "1080p" | "2k";

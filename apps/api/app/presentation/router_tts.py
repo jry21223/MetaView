@@ -1,8 +1,12 @@
 """TTS proxy router — issue #40.
 
-Routes ``POST /tts/speech`` through the server-side OpenAI key so the player
-never stores secrets in ``localStorage`` and the front-end never makes a
+Routes ``POST /tts/speech`` through the server-side key so the player never
+stores secrets in ``localStorage`` and the front-end never makes a
 cross-origin request to the upstream TTS provider.
+
+Which vendor dialect goes on the wire is decided by ``METAVIEW_TTS_PROVIDER``
+and composed in ``app.infrastructure.tts`` — the same module the export
+pipeline uses, so playback and export never drift apart.
 """
 
 from __future__ import annotations
@@ -18,6 +22,11 @@ from starlette.requests import Request
 
 from app.application.use_cases.account import AccountUseCase
 from app.config import Settings, get_settings
+from app.infrastructure.tts import (
+    build_tts_request,
+    resolve_base_url,
+    response_audio,
+)
 from app.presentation.dependencies import get_account_use_case
 from app.presentation.edition_policy import require_wechat_session
 from app.presentation.rate_limit import write_limit
@@ -26,6 +35,14 @@ router = APIRouter(prefix="/tts", tags=["tts"])
 
 _BEARER_TOKEN_RE: Final = re.compile(r"Bearer\s+[A-Za-z0-9._~+/=-]+", re.IGNORECASE)
 _OPENAI_KEY_RE: Final = re.compile(r"sk-[A-Za-z0-9._-]{8,}", re.IGNORECASE)
+_MEDIA_TYPES: Final[dict[str, str]] = {
+    "mp3": "audio/mpeg",
+    "wav": "audio/wav",
+    "opus": "audio/opus",
+    "aac": "audio/aac",
+    "flac": "audio/flac",
+    "pcm": "audio/pcm",
+}
 _SECRET_FIELD_RE: Final = re.compile(
     r'(?P<quote>"?)(?P<key>api[_-]?key|authorization|token)'
     r'(?P=quote)(?P<sep>\s*[:=]\s*")(?P<value>[^"]+)(?P<end>")',
@@ -61,9 +78,7 @@ def _resolve_api_key(settings: Settings, payload: TtsSpeechRequest) -> str:
 
 
 def _resolve_base_url(settings: Settings, payload: TtsSpeechRequest) -> str:
-    if payload.base_url:
-        return payload.base_url
-    return settings.tts_base_url
+    return resolve_base_url(settings.tts_provider, payload.base_url or settings.tts_base_url)
 
 
 def _resolve_model(settings: Settings, payload: TtsSpeechRequest) -> str:
@@ -112,38 +127,72 @@ async def synthesize_speech(
     model = _resolve_model(settings, payload)
     base_url = _resolve_base_url(settings, payload)
 
-    body = {
-        "model": model,
-        "input": payload.text,
-        "voice": voice,
-        "speed": payload.rate,
-        "response_format": payload.response_format,
-    }
+    try:
+        call = build_tts_request(
+            provider=settings.tts_provider,
+            base_url=base_url,
+            api_key=api_key,
+            model=model,
+            voice=voice,
+            text=payload.text,
+            speed=payload.rate,
+            audio_format=payload.response_format,
+            app_id=settings.tts_app_id,
+            cluster=settings.tts_cluster,
+        )
+    except ValueError as exc:
+        # A dialect is missing a credential the operator never set.
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     timeout = httpx.Timeout(settings.tts_timeout_s)
     async with httpx.AsyncClient(timeout=timeout) as client:
         try:
-            upstream = await client.post(
-                f"{base_url.rstrip('/')}/audio/speech",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
-                json=body,
-            )
+            upstream = await client.post(call.url, headers=call.headers, json=call.body)
         except httpx.HTTPError as exc:
             raise HTTPException(
                 status_code=502, detail=f"TTS upstream unreachable: {exc}"
             ) from exc
 
-    if upstream.status_code >= 400:
-        content_type = upstream.headers.get("content-type", "")
-        detail = (
-            _sanitize_upstream_error(upstream.text, upstream.status_code)
-            if content_type.startswith("application/json")
-            else f"upstream returned {upstream.status_code}"
-        )
-        raise HTTPException(status_code=upstream.status_code, detail=detail)
+        if upstream.status_code >= 400:
+            content_type = upstream.headers.get("content-type", "")
+            detail = (
+                _sanitize_upstream_error(upstream.text, upstream.status_code)
+                if content_type.startswith("application/json")
+                else f"upstream returned {upstream.status_code}"
+            )
+            raise HTTPException(status_code=upstream.status_code, detail=detail)
 
-    media_type = upstream.headers.get("content-type", "audio/mpeg")
-    return Response(content=upstream.content, media_type=media_type)
+        # Some vendors answer 200 with the audio base64'd inside JSON, or with
+        # a link to fetch. Normalize both to bytes so the browser always gets
+        # something its AudioContext can decode. Unlike the export path there
+        # is no magic-byte check on bytes the upstream already labelled audio:
+        # the browser decodes them immediately and reports its own error,
+        # whereas a bad step_000.mp3 only surfaces at render time.
+        try:
+            audio, audio_url = response_audio(upstream, "playback")
+        except RuntimeError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        if audio is None and audio_url is not None:
+            try:
+                fetched = await client.get(audio_url)
+            except httpx.HTTPError as exc:
+                raise HTTPException(
+                    status_code=502, detail=f"TTS audio unreachable: {exc}"
+                ) from exc
+            if fetched.status_code >= 400:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"TTS audio download returned {fetched.status_code}",
+                )
+            audio = fetched.content
+
+    if not audio:
+        raise HTTPException(status_code=502, detail="TTS returned an empty body")
+
+    upstream_type = upstream.headers.get("content-type", "").split(";")[0].strip()
+    media_type = (
+        upstream_type
+        if upstream_type.startswith("audio/")
+        else _MEDIA_TYPES.get(payload.response_format.lower(), "audio/mpeg")
+    )
+    return Response(content=audio, media_type=media_type)

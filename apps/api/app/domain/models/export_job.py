@@ -81,7 +81,15 @@ class TtsConfig(BaseModel):
     api_key: str | None = None
     base_url: str | None = None
     model: str | None = None
-    voice: str = "alloy"
+    # Unset means "use METAVIEW_TTS_DEFAULT_VOICE" — voice IDs are
+    # vendor-specific (OpenAI's ``alloy`` is not a 火山 音色 ID), so a client
+    # default must never override the operator's configured voice.
+    voice: str | None = None
+    # Request dialect and its Volcano-only extras; all fall back to the
+    # server-side ``METAVIEW_TTS_*`` settings when omitted.
+    provider: str | None = None
+    app_id: str | None = None
+    cluster: str | None = None
 
 
 class ExportJob(BaseModel):

@@ -257,7 +257,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         ...(withAudio &&
           ttsConfig && {
             tts: {
-              voice: ttsConfig.voice || "alloy",
+              // Voice IDs are vendor-specific, so an unchosen voice is left
+              // out and the server's METAVIEW_TTS_DEFAULT_VOICE applies.
+              voice: ttsConfig.voice || undefined,
               api_key: ttsConfig.apiKey || undefined,
               base_url: ttsConfig.baseUrl || undefined,
               model: ttsConfig.model || undefined,

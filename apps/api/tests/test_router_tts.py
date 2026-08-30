@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import json as json_module
 import sqlite3
 from collections.abc import Iterator
 from typing import Any
@@ -26,6 +28,9 @@ class _FakeResponse:
     @property
     def text(self) -> str:
         return self.content.decode("utf-8", errors="replace")
+
+    def json(self) -> Any:
+        return json_module.loads(self.content)
 
 
 class _FakeAsyncClient:
@@ -291,3 +296,62 @@ def _run(coro):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
     return loop.run_until_complete(coro)
+
+
+def test_volcano_provider_speaks_openspeech_end_to_end(monkeypatch) -> None:
+    """A player request must reach 火山 in its own dialect and come back as bytes.
+
+    Export and playback share one dialect module, so this is the proof that
+    flipping METAVIEW_TTS_PROVIDER also fixes in-browser narration — not just
+    the rendered video.
+    """
+    get_settings.cache_clear()
+    monkeypatch.setenv("METAVIEW_TTS_PROVIDER", "volcano")
+    monkeypatch.setenv("METAVIEW_TTS_API_KEY", "volc-access-token")
+    monkeypatch.setenv("METAVIEW_TTS_APP_ID", "1234567890")
+    monkeypatch.setenv("METAVIEW_TTS_DEFAULT_VOICE", "BV700_streaming")
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    monkeypatch.setattr("app.presentation.router_tts.httpx.AsyncClient", _FakeAsyncClient)
+    mp3 = b"\xff\xfb\x90\x00" + b"\x00" * 64
+    _FakeAsyncClient.response = _FakeResponse(
+        status_code=200,
+        content=b'{"code": 3000, "data": "%s"}' % base64.b64encode(mp3),
+        headers={"content-type": "application/json"},
+    )
+    try:
+        with TestClient(create_app()) as client:
+            r = client.post("/api/v1/tts/speech", json={"text": "抛体运动"})
+        assert r.status_code == 200
+        # The JSON envelope is unwrapped: the browser gets decodable audio and
+        # an audio content-type, never application/json.
+        assert r.content == mp3
+        assert r.headers["content-type"] == "audio/mpeg"
+
+        req = _FakeAsyncClient.last_request
+        assert req is not None
+        # Base URL was left at its OpenAI default; the dialect overrides it.
+        assert req["url"] == "https://openspeech.bytedance.com/api/v1/tts"
+        assert req["headers"]["Authorization"] == "Bearer;volc-access-token"
+        assert req["json"]["app"]["appid"] == "1234567890"
+        assert req["json"]["audio"]["voice_type"] == "BV700_streaming"
+        assert req["json"]["request"]["text"] == "抛体运动"
+    finally:
+        get_settings.cache_clear()
+
+
+def test_volcano_without_an_app_id_is_a_configuration_error(monkeypatch) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("METAVIEW_TTS_PROVIDER", "volcano")
+    monkeypatch.setenv("METAVIEW_TTS_API_KEY", "volc-access-token")
+    monkeypatch.setenv("METAVIEW_TTS_APP_ID", "")
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    monkeypatch.setattr("app.presentation.router_tts.httpx.AsyncClient", _FakeAsyncClient)
+    try:
+        with TestClient(create_app()) as client:
+            r = client.post("/api/v1/tts/speech", json={"text": "x"})
+        assert r.status_code == 503
+        assert "METAVIEW_TTS_APP_ID" in r.json()["detail"]
+        # It failed before any network call — no half-formed request went out.
+        assert _FakeAsyncClient.last_request is None
+    finally:
+        get_settings.cache_clear()
