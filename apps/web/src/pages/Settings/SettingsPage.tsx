@@ -177,7 +177,9 @@ export function SettingsPage({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text: "朗读后端测试。",
-          voice: tts.config.voice === "auto" ? "alloy" : tts.config.voice,
+          // Voice IDs are vendor-specific ("alloy" is meaningless to
+          // 火山), so "auto" defers to METAVIEW_TTS_DEFAULT_VOICE.
+          voice: tts.config.voice === "auto" ? undefined : tts.config.voice,
           rate: 1.0,
           ...(showLocalTtsSettings && {
             api_key: tts.config.apiKey || null,

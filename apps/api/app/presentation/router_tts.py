@@ -26,6 +26,7 @@ from app.infrastructure.tts import (
     build_tts_request,
     resolve_base_url,
     response_audio,
+    to_spoken,
 )
 from app.presentation.dependencies import get_account_use_case
 from app.presentation.edition_policy import require_wechat_session
@@ -134,7 +135,11 @@ async def synthesize_speech(
             api_key=api_key,
             model=model,
             voice=voice,
-            text=payload.text,
+            # Same rewrite the export pipeline applies, for the same reason:
+            # narration is typeset for the screen and engines drop √ and
+            # misread ². Playback and export must not read the text
+            # differently, so both go through to_spoken.
+            text=to_spoken(payload.text),
             speed=payload.rate,
             audio_format=payload.response_format,
             app_id=settings.tts_app_id,

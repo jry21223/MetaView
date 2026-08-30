@@ -14,6 +14,7 @@ from app.infrastructure.tts.dialects import (
     resolve_base_url,
     response_audio,
 )
+from app.infrastructure.tts.narration import to_spoken
 
 __all__ = [
     "TtsRequest",
@@ -23,4 +24,5 @@ __all__ = [
     "looks_like_audio",
     "resolve_base_url",
     "response_audio",
+    "to_spoken",
 ]

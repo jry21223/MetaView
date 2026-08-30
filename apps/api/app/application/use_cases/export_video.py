@@ -58,6 +58,7 @@ from app.infrastructure.tts import (
     looks_like_audio,
     resolve_base_url,
     response_audio,
+    to_spoken,
 )
 
 _RENDER_TAIL_LINES = 40
@@ -419,13 +420,18 @@ class ExportVideoUseCase:
                     files.append("")
                     continue
                 audio_path = audio_dir / f"step_{i:03d}.mp3"
+                # Narration is typeset for the screen (b²=a²−c², √, F₁, θ=30°)
+                # and speech engines do not share that lexicon — they drop √
+                # outright and read ² as a bare "二". Only the synthesizer gets
+                # the spoken rewrite; the playbook keeps its typographic text
+                # for subtitles and the canvas.
                 call = build_tts_request(
                     provider=provider,
                     base_url=base_url,
                     api_key=api_key,
                     model=model,
                     voice=voice,
-                    text=text,
+                    text=to_spoken(text),
                     app_id=app_id,
                     cluster=cluster,
                 )
