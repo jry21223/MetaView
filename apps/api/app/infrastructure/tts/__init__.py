@@ -6,9 +6,12 @@ agreement and adding a vendor stays a config change.
 """
 
 from app.infrastructure.tts.dialects import (
+    VOLCANO_V3_DIALECT,
     TtsRequest,
+    audio_from_chunked_json,
     audio_from_json,
     build_tts_request,
+    build_v3_req_params,
     decode_audio_field,
     looks_like_audio,
     resolve_base_url,
@@ -26,6 +29,9 @@ from app.infrastructure.tts.volcano_ws import synthesize as synthesize_over_webs
 
 __all__ = [
     "TtsRequest",
+    "VOLCANO_V3_DIALECT",
+    "audio_from_chunked_json",
+    "build_v3_req_params",
     "audio_from_json",
     "build_tts_request",
     "decode_audio_field",

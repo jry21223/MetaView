@@ -25,6 +25,8 @@ from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Any, Final
 
+from app.infrastructure.tts.dialects import build_v3_req_params, v3_headers
+
 DEFAULT_ENDPOINT: Final = "wss://openspeech.bytedance.com/api/v3/tts/unidirectional/stream"
 DEFAULT_RESOURCE_ID: Final = "seed-tts-2.0"
 # The provider value that selects this transport.
@@ -195,51 +197,18 @@ class Message:
         return f"{self.type.name}/{event} payload={body!r}"
 
 
-def build_session_payload(
-    *,
-    text: str,
-    speaker: str,
-    audio_format: str = "mp3",
-    sample_rate: int = 24000,
-    speech_rate: int = 0,
-    loudness_rate: int = 0,
-    extra_additions: dict[str, Any] | None = None,
-) -> bytes:
-    """The StartSession body: one text in, one voice, one container out.
+def build_session_payload(**kwargs: Any) -> bytes:
+    """The StartSession body — the same req_params the HTTP transport sends."""
 
-    Deliberately minimal. The corpus carries no LaTeX and no Markdown, so the
-    vendor's parsers for those would only add latency; and its
-    ``max_length_to_filter_parenthesis`` must stay off because our parentheses
-    hold coordinates like ``(-1,2.4)``, not asides.
-    """
-
-    additions: dict[str, Any] = {"explicit_language": "zh-cn"}
-    if extra_additions:
-        additions.update(extra_additions)
-    return json.dumps(
-        {
-            "req_params": {
-                "text": text,
-                "speaker": speaker,
-                "audio_params": {
-                    "format": audio_format,
-                    "sample_rate": sample_rate,
-                    "speech_rate": speech_rate,
-                    "loudness_rate": loudness_rate,
-                },
-                "additions": json.dumps(additions, ensure_ascii=False),
-            }
-        },
-        ensure_ascii=False,
-    ).encode("utf-8")
+    return json.dumps(build_v3_req_params(**kwargs), ensure_ascii=False).encode("utf-8")
 
 
 def connect_headers(*, api_key: str, resource_id: str) -> dict[str, str]:
-    return {
-        "X-Api-Key": api_key,
-        "X-Api-Resource-Id": resource_id,
-        "X-Api-Request-Id": str(uuid.uuid4()),
-    }
+    """The v3 headers, minus the Content-Type an upgrade request has no use for."""
+
+    headers = v3_headers(api_key=api_key, resource_id=resource_id)
+    headers.pop("Content-Type", None)
+    return headers
 
 
 def _event_message(event: Event, *, session_id: str = "", payload: bytes = b"{}") -> Message:

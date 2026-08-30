@@ -447,6 +447,7 @@ class ExportVideoUseCase:
                         text=to_spoken(text),
                         app_id=app_id,
                         cluster=cluster,
+                        resource_id=settings.tts_resource_id,
                     )
                     resp = await client.post(call.url, headers=call.headers, json=call.body)
                     if resp.status_code >= 400:

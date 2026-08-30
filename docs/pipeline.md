@@ -255,8 +255,10 @@ end_frame_i = (i+1) * 60                               # 无 execution_map（兼
 2. （可选 `with_audio`）按 `METAVIEW_TTS_PROVIDER` 选定的厂商方言逐步合成 mp3：
    `openai` 走 `POST {base}/audio/speech`；`volcano` 走火山 openspeech v1
    `POST {base}/api/v1/tts`（`Bearer;<token>`，音频以 base64 装在 JSON 里）；
-   `volcano_ws` 走火山 v3 语音合成大模型的 WebSocket（`X-Api-Key` +
-   `X-Api-Resource-Id`，二进制分帧，音频分块流回后拼接）。送给合成器的文本先经
+   `volcano_v3` 走火山 v3 语音合成大模型的 HTTP chunked（`X-Api-Key` +
+   `X-Api-Resource-Id`，请求体是 `req_params`，响应是一串 JSON chunk、每块
+   `data` 里装一段 base64，逐块解码后拼接）；`volcano_ws` 是同一个模型的
+   WebSocket 版（二进制分帧）。送给合成器的文本先经
    `to_spoken()` 口语化——排版体的 `√`、`²`、`F₁` 引擎念不出来，字幕仍用原文。
    再用 `ffprobe`（缺失时回退到 wave / 动画时长）测每段时长，按 `fps` 重新拉伸
    `step.end_frame` 让动画 ≥ 配音长度。拉伸完成后（无音轨时直接基于原始时间线）、

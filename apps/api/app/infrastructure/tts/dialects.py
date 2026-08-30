@@ -20,6 +20,7 @@ from __future__ import annotations
 import base64
 import binascii
 import contextlib
+import json
 import uuid
 from typing import Any, Final, NamedTuple
 
@@ -27,12 +28,18 @@ import httpx
 
 OPENAI_DIALECT: Final = "openai"
 VOLCANO_DIALECT: Final = "volcano"
+# 火山 v3 (current console): one X-Api-Key, HTTP chunked, JSON chunks each
+# carrying base64 audio. Same req_params as the WebSocket variant.
+VOLCANO_V3_DIALECT: Final = "volcano_v3"
+VOLCANO_V3_PATH: Final = "/api/v3/tts/unidirectional"
+VOLCANO_V3_RESOURCE_ID: Final = "seed-tts-2.0"
 
 # Default host per dialect. A base URL that still names *another* dialect's
 # default is treated as unset — see ``resolve_base_url``.
 BASE_URL_DEFAULTS: Final[dict[str, str]] = {
     OPENAI_DIALECT: "https://api.openai.com/v1",
     VOLCANO_DIALECT: "https://openspeech.bytedance.com",
+    VOLCANO_V3_DIALECT: "https://openspeech.bytedance.com",
 }
 
 _AUDIO_MAGIC: Final = (b"ID3", b"RIFF", b"OggS", b"fLaC")
@@ -40,6 +47,56 @@ _AUDIO_MAGIC: Final = (b"ID3", b"RIFF", b"OggS", b"fLaC")
 _AUDIO_PAYLOAD_KEYS: Final = ("audio", "audio_base64", "audio_content", "data")
 _AUDIO_URL_KEYS: Final = ("url", "audio_url", "audio_file", "file_url")
 _JSON_ENVELOPE_KEYS: Final = ("data", "output", "result", "response")
+
+
+def build_v3_req_params(
+    *,
+    text: str,
+    speaker: str,
+    audio_format: str = "mp3",
+    sample_rate: int = 24000,
+    speech_rate: int = 0,
+    loudness_rate: int = 0,
+    extra_additions: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """The 火山 v3 request body — identical over HTTP and over WebSocket.
+
+    Deliberately minimal, and the corpus is what decided that: there is no
+    LaTeX and no Markdown in any lesson, so the vendor's parsers for those
+    would only add latency; and ``max_length_to_filter_parenthesis`` must stay
+    off because our parentheses hold coordinates like ``(-1,2.4)``, never
+    asides — switching it on would silently swallow them.
+
+    ``additions`` is a JSON-serialized *string*, per the vendor's field type.
+    """
+
+    additions: dict[str, Any] = {"explicit_language": "zh-cn"}
+    if extra_additions:
+        additions.update(extra_additions)
+    return {
+        "req_params": {
+            "text": text,
+            "speaker": speaker,
+            "audio_params": {
+                "format": audio_format,
+                "sample_rate": sample_rate,
+                "speech_rate": speech_rate,
+                "loudness_rate": loudness_rate,
+            },
+            "additions": json.dumps(additions, ensure_ascii=False),
+        }
+    }
+
+
+def v3_headers(*, api_key: str, resource_id: str) -> dict[str, str]:
+    """Headers every 火山 v3 call carries, whichever transport it uses."""
+
+    return {
+        "X-Api-Key": api_key,
+        "X-Api-Resource-Id": resource_id,
+        "X-Api-Request-Id": str(uuid.uuid4()),
+        "Content-Type": "application/json",
+    }
 
 
 def normalize_dialect(provider: str | None) -> str:
@@ -89,11 +146,30 @@ def build_tts_request(
     audio_format: str = "mp3",
     app_id: str | None = None,
     cluster: str = "volcano_tts",
+    resource_id: str = VOLCANO_V3_RESOURCE_ID,
 ) -> TtsRequest:
     """Compose one synthesis request in the dialect the provider speaks."""
 
     dialect = normalize_dialect(provider)
     root = base_url.rstrip("/")
+
+    if dialect == VOLCANO_V3_DIALECT:
+        # 火山 v3 over HTTP chunked: the whole request is req_params, the
+        # credentials are headers, and the audio comes back as a stream of
+        # JSON chunks each holding base64 (see ``audio_from_chunked_json``).
+        return TtsRequest(
+            url=f"{root}{VOLCANO_V3_PATH}",
+            headers=v3_headers(api_key=api_key, resource_id=resource_id),
+            body=build_v3_req_params(
+                text=text,
+                speaker=voice,
+                audio_format=audio_format,
+                # v3 counts in steps, not multiples: 0 is normal, 100 is
+                # double speed, -50 is half. Clamped to the documented range
+                # so a caller's rate can never make the request invalid.
+                speech_rate=max(-50, min(100, round((speed - 1.0) * 100))),
+            ),
+        )
 
     if dialect == VOLCANO_DIALECT:
         # openspeech: the app triple travels in the body, the access token in a
@@ -204,6 +280,60 @@ def audio_from_json(body: Any) -> tuple[bytes | None, str | None]:
     return None, None
 
 
+def audio_from_chunked_json(body: bytes) -> tuple[bytes | None, str | None]:
+    """Join the audio out of an HTTP-chunked stream of JSON objects.
+
+    火山 v3 answers with one JSON object per chunk, each carrying a slice of
+    base64 audio under ``data``. httpx de-chunks transparently, so what
+    arrives here is those objects back to back — possibly newline separated,
+    possibly not. Scanning with ``raw_decode`` accepts either without having
+    to guess which the vendor emits.
+
+    Each chunk's payload is decoded on its own and the *bytes* concatenated:
+    joining the base64 strings first would corrupt every chunk whose length
+    is not a multiple of four.
+    """
+
+    text = body.decode("utf-8", "replace").strip()
+    if not text:
+        return None, None
+
+    decoder = json.JSONDecoder()
+    chunks: list[bytes] = []
+    error: str | None = None
+    index = 0
+    while index < len(text):
+        if text[index] in " \r\n\t,":
+            index += 1
+            continue
+        try:
+            obj, end = decoder.raw_decode(text, index)
+        except ValueError:
+            break
+        index = end
+        if not isinstance(obj, dict):
+            continue
+        code = obj.get("code")
+        if isinstance(code, int) and code != 0 and error is None:
+            error = f"code {code}: {obj.get('message') or 'no message'}"
+        payload = obj.get("data")
+        if isinstance(payload, str) and payload:
+            decoded = decode_audio_field(payload)
+            if decoded is None:
+                # Mid-stream slices are raw base64 without a container header,
+                # so the magic-byte check in decode_audio_field rejects them.
+                with contextlib.suppress(binascii.Error, ValueError):
+                    decoded = base64.b64decode(payload, validate=True)
+            if decoded:
+                chunks.append(decoded)
+
+    if chunks:
+        return b"".join(chunks), None
+    if error:
+        raise RuntimeError(f"volcano v3 TTS refused the request: {error}")
+    return None, None
+
+
 def response_audio(resp: httpx.Response, label: str) -> tuple[bytes | None, str | None]:
     """Normalize one provider response into audio bytes or a URL to fetch.
 
@@ -221,6 +351,11 @@ def response_audio(resp: httpx.Response, label: str) -> tuple[bytes | None, str 
             audio, url = audio_from_json(resp.json())
             if audio is not None or url is not None:
                 return audio, url
+        # Not a single object: a chunked stream of them, joined here. This
+        # also raises with the vendor's own code/message when it refused.
+        audio, url = audio_from_chunked_json(resp.content)
+        if audio is not None or url is not None:
+            return audio, url
     raise RuntimeError(
         f"TTS returned no audio for {label} "
         f"(content-type {content_type or 'unset'}): {resp.text[:200]}"

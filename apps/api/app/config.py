@@ -77,9 +77,11 @@ class Settings(BaseSettings):
     tts_timeout_s: float = 60.0
     # Request dialect:
     #   ``openai``     — OpenAI and every provider mirroring /audio/speech
+    #   ``volcano_v3`` — 火山 v3 语音合成大模型 over HTTP chunked (current
+    #                    console: one X-Api-Key). The one to use.
+    #   ``volcano_ws`` — the same v3 model over its binary WebSocket, for
+    #                    when first-audio latency matters more than simplicity
     #   ``volcano``    — ByteDance openspeech v1 (old console: appid + token)
-    #   ``volcano_ws`` — 火山 v3 语音合成大模型 over WebSocket (new console:
-    #                    one X-Api-Key), the seed-tts-2.0 family
     # Response decoding is dialect-independent for the HTTP ones.
     tts_provider: str = "openai"
     # Volcano-only credentials. The access token reuses ``tts_api_key``;
@@ -87,8 +89,9 @@ class Settings(BaseSettings):
     # the vendor console — confirm yours there rather than trusting a default.
     tts_app_id: str | None = None
     tts_cluster: str = "volcano_tts"
-    # volcano_ws only: which model family the connection requests, and the
-    # 音色 ID it speaks with. Both come from the new console.
+    # Both v3 dialects: which model family to request. seed-tts-2.0 for a
+    # catalogue 音色, seed-icl-2.0 for one cloned via 声音复刻. The 音色 ID
+    # itself travels in ``tts_default_voice``.
     tts_resource_id: str = "seed-tts-2.0"
 
     # OpenAI-compatible provider

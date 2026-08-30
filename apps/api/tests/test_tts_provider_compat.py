@@ -10,12 +10,14 @@ change, and so export and playback keep speaking the same dialect.
 from __future__ import annotations
 
 import base64
+import json
 import uuid
 
 import httpx
 import pytest
 
 from app.infrastructure.tts import (
+    audio_from_chunked_json,
     build_tts_request,
     looks_like_audio,
     resolve_base_url,
@@ -209,3 +211,97 @@ def test_an_explicitly_chosen_host_is_always_honoured() -> None:
     assert resolve_base_url("volcano", "https://proxy.internal/openspeech/") == (
         "https://proxy.internal/openspeech"
     )
+
+
+# ── 火山 v3 over HTTP chunked ────────────────────────────────────────────────
+
+
+def _v3(**overrides: object):
+    kwargs: dict[str, object] = {
+        "provider": "volcano_v3",
+        "base_url": resolve_base_url("volcano_v3", None),
+        "api_key": "my-api-key",
+        "model": "tts-1",
+        "voice": "zh_male_m191_uranus_bigtts",
+        "text": "两个物体同时落地。",
+        "resource_id": "seed-tts-2.0",
+    }
+    kwargs.update(overrides)
+    return build_tts_request(**kwargs)  # type: ignore[arg-type]
+
+
+def test_v3_posts_req_params_with_the_key_in_a_header() -> None:
+    call = _v3()
+    assert call.url == "https://openspeech.bytedance.com/api/v3/tts/unidirectional"
+    assert call.headers["X-Api-Key"] == "my-api-key"
+    assert call.headers["X-Api-Resource-Id"] == "seed-tts-2.0"
+    assert call.headers["X-Api-Request-Id"]
+    # v1's app triple and OpenAI's keys must not leak into a v3 body.
+    assert set(call.body) == {"req_params"}
+    params = call.body["req_params"]
+    assert params["text"] == "两个物体同时落地。"
+    assert params["speaker"] == "zh_male_m191_uranus_bigtts"
+    assert params["audio_params"]["format"] == "mp3"
+
+
+def test_v3_request_ids_are_unique_per_call() -> None:
+    assert _v3().headers["X-Api-Request-Id"] != _v3().headers["X-Api-Request-Id"]
+
+
+def test_v3_additions_travel_as_a_json_string_not_an_object() -> None:
+    additions = _v3().body["req_params"]["additions"]
+    assert isinstance(additions, str), "the vendor types this field as a string"
+    assert json.loads(additions)["explicit_language"] == "zh-cn"
+    # Our parentheses hold coordinates like (-1,2.4), so the filter stays off.
+    assert "max_length_to_filter_parenthesis" not in json.loads(additions)
+
+
+@pytest.mark.parametrize(
+    ("speed", "expected"),
+    [(0.25, -50), (0.5, -50), (1.0, 0), (1.5, 50), (2.0, 100), (4.0, 100)],
+)
+def test_v3_speech_rate_is_steps_not_a_multiplier(speed: float, expected: int) -> None:
+    # 0 is normal, 100 double, -50 half — and out-of-range rates are clamped
+    # rather than sent as an invalid request.
+    assert _v3(speed=speed).body["req_params"]["audio_params"]["speech_rate"] == expected
+
+
+def _chunk(audio: bytes, code: int = 0) -> str:
+    return json.dumps({"code": code, "message": "", "data": base64.b64encode(audio).decode()})
+
+
+def test_v3_joins_the_audio_across_chunks() -> None:
+    head, middle, tail = b"\xff\xfb\x90\x00HEAD", b"MIDDLE", b"TAIL"
+    body = "\n".join(_chunk(part) for part in (head, middle, tail)).encode()
+    audio, url = audio_from_chunked_json(body)
+    assert audio == head + middle + tail
+    assert url is None
+
+
+def test_v3_chunks_that_arrive_back_to_back_are_read_too() -> None:
+    """The vendor does not document a separator, so neither shape may break it."""
+    head, tail = b"\xff\xfb\x90\x00HEAD", b"TAIL"
+    assert audio_from_chunked_json((_chunk(head) + _chunk(tail)).encode())[0] == head + tail
+
+
+def test_v3_decodes_each_chunk_separately() -> None:
+    # A slice whose base64 length is not a multiple of four would corrupt the
+    # stream if the strings were concatenated before decoding.
+    parts = [b"\xff\xfb\x90\x00A", b"BB", b"CCCCC", b"D"]
+    body = "\n".join(_chunk(p) for p in parts).encode()
+    assert audio_from_chunked_json(body)[0] == b"".join(parts)
+
+
+def test_v3_surfaces_the_vendors_code_and_message_when_it_refuses() -> None:
+    body = b'{"code":45000001,"message":"invalid speaker","data":""}'
+    with pytest.raises(RuntimeError, match="45000001.*invalid speaker"):
+        audio_from_chunked_json(body)
+
+
+def test_v3_chunked_bodies_reach_the_shared_response_reader() -> None:
+    """response_audio must handle a v3 stream without the caller branching."""
+    audio = b"\xff\xfb\x90\x00STREAMED"
+    body = "\n".join(_chunk(part) for part in (audio, b"MORE")).encode()
+    got, url = response_audio(_resp(body, "application/json"), "step 0")
+    assert got == audio + b"MORE"
+    assert url is None

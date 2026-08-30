@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.config import get_settings  # noqa: E402
 from app.infrastructure.tts import (  # noqa: E402
     DEFAULT_WS_ENDPOINT,
+    VOLCANO_V3_DIALECT,
     WEBSOCKET_DIALECT,
     build_tts_request,
     looks_like_audio,
@@ -88,6 +89,7 @@ def main() -> int:
             text=args.text,
             app_id=settings.tts_app_id,
             cluster=settings.tts_cluster,
+            resource_id=settings.tts_resource_id,
         )
     except ValueError as exc:
         print(f"✗ {exc}", file=sys.stderr)
@@ -98,6 +100,9 @@ def main() -> int:
     print(f"voice    : {voice}")
     if provider.strip().lower() == "volcano":
         print(f"appid    : {settings.tts_app_id}   cluster: {settings.tts_cluster}")
+    elif provider.strip().lower() == VOLCANO_V3_DIALECT:
+        print(f"model    : {settings.tts_resource_id}")
+    print(f"朗读文本 : {args.text}")
 
     with httpx.Client(timeout=settings.tts_timeout_s) as client:
         try:

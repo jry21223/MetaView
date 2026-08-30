@@ -417,3 +417,49 @@ def test_a_websocket_failure_surfaces_as_502_with_the_vendors_words(monkeypatch)
         assert "invalid speaker" in r.json()["detail"]
     finally:
         get_settings.cache_clear()
+
+
+def test_volcano_v3_streams_chunked_json_through_the_ordinary_http_path(monkeypatch) -> None:
+    """火山 v3 needs no special casing at the call site — only a dialect.
+
+    Request shape, chunked-JSON response and the spoken rewrite all have to
+    line up through the real proxy, not just in isolation.
+    """
+    get_settings.cache_clear()
+    monkeypatch.setenv("METAVIEW_TTS_PROVIDER", "volcano_v3")
+    monkeypatch.setenv("METAVIEW_TTS_API_KEY", "volc-api-key")
+    monkeypatch.setenv("METAVIEW_TTS_RESOURCE_ID", "seed-tts-2.0")
+    monkeypatch.setenv("METAVIEW_TTS_DEFAULT_VOICE", "zh_male_m191_uranus_bigtts")
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    monkeypatch.setattr("app.presentation.router_tts.httpx.AsyncClient", _FakeAsyncClient)
+
+    head, tail = b"\xff\xfb\x90\x00HEAD", b"TAIL"
+    chunks = "\n".join(
+        json_module.dumps({"code": 0, "message": "", "data": base64.b64encode(p).decode()})
+        for p in (head, tail)
+    )
+    _FakeAsyncClient.response = _FakeResponse(
+        status_code=200,
+        content=chunks.encode(),
+        headers={"content-type": "application/json"},
+    )
+    try:
+        with TestClient(create_app()) as client:
+            r = client.post("/api/v1/tts/speech", json={"text": "√((x+c)²+y²)", "rate": 1.5})
+        assert r.status_code == 200
+        # Chunks joined, and handed over as audio rather than JSON.
+        assert r.content == head + tail
+        assert r.headers["content-type"] == "audio/mpeg"
+
+        req = _FakeAsyncClient.last_request
+        assert req is not None
+        assert req["url"] == "https://openspeech.bytedance.com/api/v3/tts/unidirectional"
+        assert req["headers"]["X-Api-Key"] == "volc-api-key"
+        assert req["headers"]["X-Api-Resource-Id"] == "seed-tts-2.0"
+        params = req["json"]["req_params"]
+        assert params["speaker"] == "zh_male_m191_uranus_bigtts"
+        # The root reaches the vendor as a word, never as a glyph it drops.
+        assert params["text"] == "根号 ((x+c)的平方+y的平方)"
+        assert params["audio_params"]["speech_rate"] == 50  # 1.5x in v3's steps
+    finally:
+        get_settings.cache_clear()

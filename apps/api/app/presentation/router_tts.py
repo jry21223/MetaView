@@ -171,6 +171,7 @@ async def synthesize_speech(
             audio_format=payload.response_format,
             app_id=settings.tts_app_id,
             cluster=settings.tts_cluster,
+            resource_id=settings.tts_resource_id,
         )
     except ValueError as exc:
         # A dialect is missing a credential the operator never set.
