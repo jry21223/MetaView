@@ -127,6 +127,32 @@ const LINE_PREVIEWS: Record<TemplatePreviewCaseId, ReactNode> = {
       </g>
     </svg>
   ),
+  "predator-prey": (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="predator-prey-cycles">
+      <path className="is-guide" d="M14 46h132M14 46V8" />
+      <path d="M14 40c6-18 10-26 17-26s11 26 18 26 11-26 18-26 11 26 18 26 11-26 18-26 11 26 18 26 8-14 13-20" data-object="hare-wave" />
+      <path className="is-accent" d="M14 44c8-2 12-20 19-20s11 20 18 20 11-20 18-20 11 20 18 20 11-20 18-20 11 20 18 20" data-object="lynx-wave" />
+      <circle className="is-accent" cx="49" cy="24" r="2.6" data-object="lag-mark" />
+    </svg>
+  ),
+  "competition-exclusion": (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="competition-isoclines">
+      <path className="is-guide" d="M14 46h132M14 46V8" />
+      <path d="M20 10 90 46" data-object="isocline-1" />
+      <path d="M14 28 134 46" data-object="isocline-2" />
+      <path className="is-accent is-dashed" d="M24 40c18-2 32-2 46-4" data-object="trajectory" />
+      <circle className="is-accent" cx="72" cy="36" r="3.2" data-object="equilibrium" />
+    </svg>
+  ),
+  "island-biogeography": (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="island-crossing-rates">
+      <path className="is-guide" d="M14 46h132M14 46V8" />
+      <path d="M14 12c34 8 70 20 118 30" data-object="immigration-curve" />
+      <path className="is-accent" d="M14 45c40-4 78-16 116-30" data-object="extinction-curve" />
+      <path className="is-guide is-dashed" d="M74 29v17" data-object="equilibrium-drop" />
+      <circle className="is-accent" cx="74" cy="29" r="3.2" data-object="equilibrium" />
+    </svg>
+  ),
   "ellipse-string-construction": (
     <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="ellipse-string-construction">
       <ellipse className="is-guide" cx="80" cy="30" rx="52" ry="18" data-object="conic" />

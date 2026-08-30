@@ -156,6 +156,9 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
   // ---- ecology (university pilot) ----
   publicGoldEntry("logistic-growth", "ecology"),
   publicGoldEntry("rabbit-chaos", "ecology"),
+  publicGoldEntry("predator-prey", "ecology"),
+  publicGoldEntry("competition-exclusion", "ecology"),
+  publicGoldEntry("island-biogeography", "ecology"),
 
   // ---- biology ----
   {
