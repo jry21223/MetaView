@@ -268,7 +268,7 @@ export function buildPredatorPreyGoldPlaybook(params: TemplatePreviewParams): Pl
       caption: "Volterra 原理：捕捞把均衡点沿「猎物多、捕食者少」的方向平移。",
       formula: String.raw`N^*_q=\frac{m+q}{ea},\quad P^*_q=\frac{r-q}{a}`,
     })),
-    sceneStep(7, "lv-boundary", "模型的边界：环为什么不散？", `给雪兔补上它自己的 K：增长项换成 rN(1−N/150)。只加这一项，中性环立刻变成向内的螺旋，收进焦点 (${fixed(nStar, 0)}, ${fixed(dampedFocusP, 0)})——环是靠「猎物无自限」这个假设撑着的。可账本里的循环持续了两百年不衰减，谜题反转：真实世界靠什么维持振荡？时滞、雪兔与食物的另一层耦合、行为反应——都在候选名单上。没有猞猁的安蒂科斯蒂岛上，雪兔照样十年一轮。`, plot({
+    sceneStep(7, "lv-boundary", "模型的边界：环为什么不散？", `给雪兔补上它自己的 K：增长项换成 rN(1−N/150)。只加这一项，中性环立刻变成向内的螺旋，收进焦点 (${fixed(nStar, 0)}, ${fixed(dampedFocusP, 0)})——环是靠“猎物无自限”这个假设撑着的。可账本里的循环持续了两百年不衰减，谜题反转：真实世界靠什么维持振荡？时滞、雪兔与食物的另一层耦合、行为反应——都在候选名单上。没有猞猁的安蒂科斯蒂岛上，雪兔照样十年一轮。`, plot({
       lines: [
         { points: phaseLine(dampedPath), emphasis: "primary", semantic_role: "damped_spiral" },
         { points: phaseLine(orbitPath), label: "纯 L-V", emphasis: "secondary", semantic_role: "model_orbit" },
@@ -680,7 +680,7 @@ export function buildIslandBiogeographyGoldPlaybook(
       caption: "拉卡塔岛留鸟普查（Dammerman 整理；MacArthur & Wilson 1967 引用）。",
       formula: String.raw`1908:13\quad 1919\text{–}21:28\quad 1932\text{–}34:29`,
     })),
-    sceneStep(1, "ibg-flows", "不是终点，是两股流", "MacArthur 和 Wilson 换了一种看法：岛上的物种数不是爬向某个「装满」的容量，而是两股流的拔河。从大陆物种池不断有新物种渡海迁入；岛上已有的物种也在不断地局部灭绝。数量停住，只说明两股流打平了——像一个进水口和出水口同时开着的水池。", ratePlot({
+    sceneStep(1, "ibg-flows", "不是终点，是两股流", "MacArthur 和 Wilson 换了一种看法：岛上的物种数不是爬向某个“装满”的容量，而是两股流的拔河。从大陆物种池不断有新物种渡海迁入；岛上已有的物种也在不断地局部灭绝。数量停住，只说明两股流打平了——像一个进水口和出水口同时开着的水池。", ratePlot({
       curves: [sCurve],
       points: krakatauPoints,
       window: recoveryWindow,
@@ -726,7 +726,7 @@ export function buildIslandBiogeographyGoldPlaybook(
       caption: "同一条灭绝线，两条迁入线：岛越远，线越低，客越稀。",
       formula: String.raw`\lambda\propto 2^{-D/${fixed(IBG_DHALF, 0)}}`,
     })),
-    sceneStep(6, "ibg-species-area", "验证：理论长出经验律", `理论必须交出可检验的预言。把不同面积的岛的均衡值连成曲线：A=1 时约 ${fixed(sAt(1), 0)} 种，A=10 约 ${fixed(sAt(10), 0)}，A=100 约 ${fixed(sAt(100), 0)}——面积每扩大十倍，物种数大约翻一番。这正是生物地理学家在群岛上数出来的种-面积规律 S=cA^z：实测的 z 多在 0.2 到 0.35 之间，这条曲线给出 0.28 到 0.40。机制模型自己长出了经验直线。`, ratePlot({
+    sceneStep(6, "ibg-species-area", "验证：理论长出经验律", `理论必须交出可检验的预言。把不同面积的岛的均衡值连成曲线：A=1 时约 ${fixed(sAt(1), 0)} 种，A=10 约 ${fixed(sAt(10), 0)}，A=100 约 ${fixed(sAt(100), 0)}——面积每扩大十倍，物种数大约翻一番。这正是生物地理学家在群岛上数出来的种-面积规律，S 随面积的 z 次幂增长：实测的 z 多在 0.2 到 0.35 之间，这条曲线给出 0.28 到 0.40。机制模型自己长出了经验直线。`, ratePlot({
       curves: [speciesAreaCurve],
       points: [
         { x: 1, y: sAt(1), label: fixed(sAt(1), 0), semantic_role: "species_area_sample" },
@@ -737,7 +737,7 @@ export function buildIslandBiogeographyGoldPlaybook(
       caption: "十倍面积 ≈ 两倍物种：Darlington 的经验口诀从方程里长出来。",
       formula: String.raw`S=cA^{z},\quad z\approx 0.25`,
     })),
-    sceneStep(7, "ibg-reserves", "从岛屿到保护区", `理论出圈了：被农田与公路切碎的森林，就是一片人造群岛。种-面积曲线立刻给出严厉的提醒——保护区缩小十倍，长期物种数减半，哪怕一棵树都没再砍。「一大还是几小」（SLOSS）因此争论了半个世纪：四个 A=25 的碎片各养约 ${fixed(sAt(25), 0)} 种，一块 A=100 养约 ${fixed(sAt(100), 0)} 种，孰优取决于碎片间的物种是否重复。模型不判决，但它把该问的问题亮了出来：廊道抬高迁入 λ，连片扩大压低灭绝 μ。`, ratePlot({
+    sceneStep(7, "ibg-reserves", "从岛屿到保护区", `理论出圈了：被农田与公路切碎的森林，就是一片人造群岛。种-面积曲线立刻给出严厉的提醒——保护区缩小十倍，长期物种数减半，哪怕一棵树都没再砍。“一大还是几小”（SLOSS）因此争论了半个世纪：四个 A=25 的碎片各养约 ${fixed(sAt(25), 0)} 种，一块 A=100 养约 ${fixed(sAt(100), 0)} 种，孰优取决于碎片间的物种是否重复。模型不判决，但它把该问的问题亮了出来：廊道抬高迁入 λ，连片扩大压低灭绝 μ。`, ratePlot({
       curves: [speciesAreaCurve],
       points: [
         { x: 25, y: sAt(25), label: `四小：各约${fixed(sAt(25), 0)}`, semantic_role: "species_area_sample" },
