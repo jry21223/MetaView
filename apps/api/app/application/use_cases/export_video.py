@@ -54,10 +54,12 @@ from app.domain.services.playbook_quality import (
     quality_gate_playbook,
 )
 from app.infrastructure.tts import (
+    WEBSOCKET_DIALECT,
     build_tts_request,
     looks_like_audio,
     resolve_base_url,
     response_audio,
+    synthesize_over_websocket,
     to_spoken,
 )
 
@@ -425,31 +427,42 @@ class ExportVideoUseCase:
                 # outright and read ² as a bare "二". Only the synthesizer gets
                 # the spoken rewrite; the playbook keeps its typographic text
                 # for subtitles and the canvas.
-                call = build_tts_request(
-                    provider=provider,
-                    base_url=base_url,
-                    api_key=api_key,
-                    model=model,
-                    voice=voice,
-                    text=to_spoken(text),
-                    app_id=app_id,
-                    cluster=cluster,
-                )
-                resp = await client.post(call.url, headers=call.headers, json=call.body)
-                if resp.status_code >= 400:
-                    raise RuntimeError(
-                        f"TTS HTTP {resp.status_code} for step {i}: {resp.text[:200]}"
+                if provider.strip().lower() == WEBSOCKET_DIALECT:
+                    # 火山 v3 speaks WebSocket, not HTTP: one framed session
+                    # per line, audio streamed back in chunks and joined.
+                    audio = await synthesize_over_websocket(
+                        text=to_spoken(text),
+                        api_key=api_key,
+                        speaker=voice,
+                        resource_id=settings.tts_resource_id,
+                        timeout_s=settings.tts_timeout_s,
                     )
-                audio, audio_url = response_audio(resp, f"step {i}")
-                if audio is None and audio_url is not None:
-                    # Provider handed back a link instead of the bytes; it is
-                    # the operator's own configured vendor, so fetch it.
-                    fetched = await client.get(audio_url)
-                    if fetched.status_code >= 400:
+                else:
+                    call = build_tts_request(
+                        provider=provider,
+                        base_url=base_url,
+                        api_key=api_key,
+                        model=model,
+                        voice=voice,
+                        text=to_spoken(text),
+                        app_id=app_id,
+                        cluster=cluster,
+                    )
+                    resp = await client.post(call.url, headers=call.headers, json=call.body)
+                    if resp.status_code >= 400:
                         raise RuntimeError(
-                            f"TTS audio download HTTP {fetched.status_code} for step {i}"
+                            f"TTS HTTP {resp.status_code} for step {i}: {resp.text[:200]}"
                         )
-                    audio = fetched.content
+                    audio, audio_url = response_audio(resp, f"step {i}")
+                    if audio is None and audio_url is not None:
+                        # Provider handed back a link instead of the bytes; it
+                        # is the operator's own configured vendor, so fetch it.
+                        fetched = await client.get(audio_url)
+                        if fetched.status_code >= 400:
+                            raise RuntimeError(
+                                f"TTS audio download HTTP {fetched.status_code} for step {i}"
+                            )
+                        audio = fetched.content
                 if not audio or not looks_like_audio(audio):
                     raise RuntimeError(
                         f"TTS payload for step {i} is not a recognizable audio container"

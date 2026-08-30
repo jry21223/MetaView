@@ -33,8 +33,10 @@ services:
       # Narration TTS. Without these the container never sees the operator's
       # .env and silently falls back to the LLM key against OpenAI's host —
       # i.e. exports come out mute with no error anywhere.
-      # PROVIDER picks the request dialect: openai (default) or volcano
-      # (火山引擎 openspeech, which also needs APP_ID + CLUSTER).
+      # PROVIDER picks the request dialect: openai (default), volcano
+      # (openspeech v1, old console: APP_ID + CLUSTER), or volcano_ws
+      # (火山 v3 语音合成大模型 over WebSocket, new console: one API key
+      # plus RESOURCE_ID and a 音色 ID in DEFAULT_VOICE).
       METAVIEW_TTS_PROVIDER: ${METAVIEW_TTS_PROVIDER:-openai}
       METAVIEW_TTS_API_KEY: ${METAVIEW_TTS_API_KEY:-}
       METAVIEW_TTS_BASE_URL: ${METAVIEW_TTS_BASE_URL:-https://api.openai.com/v1}
@@ -43,6 +45,7 @@ services:
       METAVIEW_TTS_TIMEOUT_S: ${METAVIEW_TTS_TIMEOUT_S:-60}
       METAVIEW_TTS_APP_ID: ${METAVIEW_TTS_APP_ID:-}
       METAVIEW_TTS_CLUSTER: ${METAVIEW_TTS_CLUSTER:-volcano_tts}
+      METAVIEW_TTS_RESOURCE_ID: ${METAVIEW_TTS_RESOURCE_ID:-seed-tts-2.0}
       # Agent sidecar wiring — only used when generation_mode=agent.
       METAVIEW_GENERATION_MODE: ${METAVIEW_GENERATION_MODE:-single}
       METAVIEW_AGENT_PROVIDER: ${METAVIEW_AGENT_PROVIDER:-http}

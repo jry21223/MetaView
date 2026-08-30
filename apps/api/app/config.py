@@ -75,16 +75,21 @@ class Settings(BaseSettings):
     tts_model: str = "tts-1"
     tts_default_voice: str = "alloy"
     tts_timeout_s: float = 60.0
-    # Request dialect. ``openai`` covers OpenAI and every provider that
-    # mirrors its /audio/speech shape; ``volcano`` speaks ByteDance's
-    # openspeech protocol, which differs in path, auth header and body.
-    # Response decoding is dialect-independent (see export_video).
+    # Request dialect:
+    #   ``openai``     — OpenAI and every provider mirroring /audio/speech
+    #   ``volcano``    — ByteDance openspeech v1 (old console: appid + token)
+    #   ``volcano_ws`` — 火山 v3 语音合成大模型 over WebSocket (new console:
+    #                    one X-Api-Key), the seed-tts-2.0 family
+    # Response decoding is dialect-independent for the HTTP ones.
     tts_provider: str = "openai"
     # Volcano-only credentials. The access token reuses ``tts_api_key``;
     # these two carry the rest of the app triple. Cluster is per-product on
     # the vendor console — confirm yours there rather than trusting a default.
     tts_app_id: str | None = None
     tts_cluster: str = "volcano_tts"
+    # volcano_ws only: which model family the connection requests, and the
+    # 音色 ID it speaks with. Both come from the new console.
+    tts_resource_id: str = "seed-tts-2.0"
 
     # OpenAI-compatible provider
     openai_api_key: str | None = None

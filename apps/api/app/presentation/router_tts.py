@@ -23,9 +23,11 @@ from starlette.requests import Request
 from app.application.use_cases.account import AccountUseCase
 from app.config import Settings, get_settings
 from app.infrastructure.tts import (
+    WEBSOCKET_DIALECT,
     build_tts_request,
     resolve_base_url,
     response_audio,
+    synthesize_over_websocket,
     to_spoken,
 )
 from app.presentation.dependencies import get_account_use_case
@@ -127,6 +129,31 @@ async def synthesize_speech(
     voice = payload.voice or settings.tts_default_voice
     model = _resolve_model(settings, payload)
     base_url = _resolve_base_url(settings, payload)
+
+    if settings.tts_provider.strip().lower() == WEBSOCKET_DIALECT:
+        # 火山 v3 is a framed WebSocket session, not an HTTP post. Playback
+        # takes the same path as the export so the two never diverge.
+        try:
+            audio = await synthesize_over_websocket(
+                text=to_spoken(payload.text),
+                api_key=api_key,
+                speaker=voice,
+                resource_id=settings.tts_resource_id,
+                audio_format=payload.response_format,
+                timeout_s=settings.tts_timeout_s,
+            )
+        except RuntimeError as exc:
+            raise HTTPException(
+                status_code=502, detail=_sanitize_upstream_error(str(exc), 502)
+            ) from exc
+        except Exception as exc:  # noqa: BLE001 — transport errors are 502s too
+            raise HTTPException(
+                status_code=502, detail=f"TTS upstream unreachable: {exc}"
+            ) from exc
+        return Response(
+            content=audio,
+            media_type=_MEDIA_TYPES.get(payload.response_format.lower(), "audio/mpeg"),
+        )
 
     try:
         call = build_tts_request(

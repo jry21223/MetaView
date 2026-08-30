@@ -13,6 +13,7 @@ Exits non-zero with the provider's own words when synthesis fails.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import sys
 from pathlib import Path
 
@@ -23,10 +24,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.config import get_settings  # noqa: E402
 from app.infrastructure.tts import (  # noqa: E402
+    DEFAULT_WS_ENDPOINT,
+    WEBSOCKET_DIALECT,
     build_tts_request,
     looks_like_audio,
     resolve_base_url,
     response_audio,
+    synthesize_over_websocket,
+    to_spoken,
 )
 
 DEFAULT_TEXT = "同一高度水平抛出和自由落下的两个小球，会同时落地。"
@@ -41,12 +46,37 @@ def main() -> int:
 
     settings = get_settings()
     provider = settings.tts_provider
+    # Probe with the spoken form, the same rewrite the pipeline applies —
+    # otherwise the probe passes on text the real narration never sends.
+    args.text = to_spoken(args.text)
     api_key = (settings.tts_api_key or settings.openai_api_key or "").strip()
     if not api_key:
         print("✗ METAVIEW_TTS_API_KEY is empty", file=sys.stderr)
         return 2
     voice = args.voice or settings.tts_default_voice
     base_url = resolve_base_url(provider, settings.tts_base_url)
+
+    if provider.strip().lower() == WEBSOCKET_DIALECT:
+        print(f"provider : {provider}")
+        # This dialect ignores tts_base_url; say where it actually connects.
+        print(f"WSS      : {DEFAULT_WS_ENDPOINT}")
+        print(f"model    : {settings.tts_resource_id}")
+        print(f"音色     : {voice}")
+        print(f"朗读文本 : {args.text}")
+        try:
+            audio = asyncio.run(
+                synthesize_over_websocket(
+                    text=args.text,
+                    api_key=api_key,
+                    speaker=voice,
+                    resource_id=settings.tts_resource_id,
+                    timeout_s=settings.tts_timeout_s,
+                )
+            )
+        except Exception as exc:  # noqa: BLE001 — the operator wants the raw reason
+            print(f"✗ {type(exc).__name__}: {exc}", file=sys.stderr)
+            return 1
+        return _write(audio, Path(args.out))
 
     try:
         call = build_tts_request(
@@ -87,11 +117,13 @@ def main() -> int:
             print(f"fetching : {audio_url}")
             audio = client.get(audio_url).content
 
+    return _write(audio, Path(args.out))
+
+
+def _write(audio: bytes, out: Path) -> int:
     if not audio or not looks_like_audio(audio):
         print("✗ response carried no recognizable audio container", file=sys.stderr)
         return 1
-
-    out = Path(args.out)
     out.write_bytes(audio)
     print(f"✓ wrote {len(audio):,} bytes to {out.resolve()} — play it to confirm the voice.")
     return 0

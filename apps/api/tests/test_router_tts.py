@@ -355,3 +355,65 @@ def test_volcano_without_an_app_id_is_a_configuration_error(monkeypatch) -> None
         assert _FakeAsyncClient.last_request is None
     finally:
         get_settings.cache_clear()
+
+
+def test_volcano_ws_provider_streams_through_the_websocket_dialect(monkeypatch) -> None:
+    """火山 v3 is a framed WebSocket session, not an HTTP post.
+
+    Playback must take the same path as the export, or the browser and the
+    rendered video would read the same lesson through different vendors.
+    """
+    get_settings.cache_clear()
+    monkeypatch.setenv("METAVIEW_TTS_PROVIDER", "volcano_ws")
+    monkeypatch.setenv("METAVIEW_TTS_API_KEY", "volc-api-key")
+    monkeypatch.setenv("METAVIEW_TTS_RESOURCE_ID", "seed-tts-2.0")
+    monkeypatch.setenv("METAVIEW_TTS_DEFAULT_VOICE", "zh_female_shuangkuaisisi")
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+
+    mp3 = b"\xff\xfb\x90\x00" + b"\x00" * 64
+    seen: dict[str, Any] = {}
+
+    async def fake_ws(**kwargs: Any) -> bytes:
+        seen.update(kwargs)
+        return mp3
+
+    monkeypatch.setattr(
+        "app.presentation.router_tts.synthesize_over_websocket", fake_ws
+    )
+    # No HTTP client may be touched on this path.
+    monkeypatch.setattr("app.presentation.router_tts.httpx.AsyncClient", _FakeAsyncClient)
+
+    try:
+        with TestClient(create_app()) as client:
+            r = client.post("/api/v1/tts/speech", json={"text": "b²=a²−c²"})
+        assert r.status_code == 200
+        assert r.content == mp3
+        assert r.headers["content-type"] == "audio/mpeg"
+        assert _FakeAsyncClient.last_request is None, "must not fall through to HTTP"
+
+        assert seen["api_key"] == "volc-api-key"
+        assert seen["speaker"] == "zh_female_shuangkuaisisi"
+        assert seen["resource_id"] == "seed-tts-2.0"
+        # The spoken rewrite applies here too: √ and ² never reach the vendor.
+        assert seen["text"] == "b的平方=a的平方 减 c的平方"
+    finally:
+        get_settings.cache_clear()
+
+
+def test_a_websocket_failure_surfaces_as_502_with_the_vendors_words(monkeypatch) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("METAVIEW_TTS_PROVIDER", "volcano_ws")
+    monkeypatch.setenv("METAVIEW_TTS_API_KEY", "volc-api-key")
+    monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+
+    async def fake_ws(**_kwargs: Any) -> bytes:
+        raise RuntimeError("volcano TTS refused the request: ERROR/None invalid speaker")
+
+    monkeypatch.setattr("app.presentation.router_tts.synthesize_over_websocket", fake_ws)
+    try:
+        with TestClient(create_app()) as client:
+            r = client.post("/api/v1/tts/speech", json={"text": "hi"})
+        assert r.status_code == 502
+        assert "invalid speaker" in r.json()["detail"]
+    finally:
+        get_settings.cache_clear()
