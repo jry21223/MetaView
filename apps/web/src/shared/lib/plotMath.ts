@@ -4,10 +4,15 @@
  */
 
 /** Format a tick / coordinate value compactly (≤ 3 decimals, exp for extremes). */
-export function fmtNum(v: number): string {
+export function fmtNum(v: number, scale?: number): string {
   if (!Number.isFinite(v)) return "";
   if (v === 0) return "0";
   const a = Math.abs(v);
+  // Evaluating a curve at its own zero leaves float residue — vᵧ(t)=v₀sinθ−gt
+  // at the apex came out as -3.09e-11 and the marker label proudly showed
+  // "-3.1e-11" in a lesson video. Against the axis it is drawn on, anything
+  // that many orders of magnitude below the span is zero, not a small number.
+  if (scale != null && Number.isFinite(scale) && a < Math.abs(scale) * 1e-9) return "0";
   if (a >= 1e4 || a < 1e-3) return v.toExponential(1);
   return String(Math.round(v * 1000) / 1000);
 }
