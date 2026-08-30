@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import json
 import sqlite3
 from datetime import datetime, timezone
@@ -1244,3 +1246,57 @@ async def test_template_export_refuses_unknown_and_traversing_ids(tmp_path) -> N
         assert job.status.value == "failed", case_id
 
     assert use_case.input_props is None
+
+
+def _captured_remotion_argv(monkeypatch, tmp_path) -> list[str]:
+    """Run the real _run_remotion_render far enough to see the argv it builds."""
+    captured: dict[str, list[str]] = {}
+
+    async def fake_exec(*cmd: str, **_kwargs: Any):
+        captured["cmd"] = list(cmd)
+        raise RuntimeError("stop after capturing argv")
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
+    # The CLI is resolved from the web workspace before argv is built, so give
+    # the stub web dir a binary to find.
+    remotion_bin = tmp_path / "node_modules" / ".bin" / "remotion"
+    remotion_bin.parent.mkdir(parents=True, exist_ok=True)
+    remotion_bin.touch()
+    use_case = ExportVideoUseCase(
+        InMemoryExportJobRepository(),
+        None,
+        None,
+        web_app_dir=tmp_path,
+        artifacts_dir=tmp_path / "artifacts",
+    )
+    with contextlib.suppress(Exception):
+        asyncio.run(
+            use_case._run_remotion_render(
+                "job", tmp_path / "props.json", tmp_path / "out.mp4", ExportOptions()
+            )
+        )
+    return captured["cmd"]
+
+
+def test_remotion_cli_gets_the_preinstalled_browser_when_one_is_configured(
+    monkeypatch, tmp_path
+) -> None:
+    """REMOTION_BROWSER_EXECUTABLE must reach the CLI as a flag.
+
+    It is a Node-API option, so the CLI ignores the env var and insists on
+    downloading its own Chromium from remotion.media — which fails outright
+    wherever that host is slow, blocked or firewalled, leaving such a
+    deployment unable to export at all.
+    """
+    monkeypatch.setenv("REMOTION_BROWSER_EXECUTABLE", "/opt/chromium/headless_shell")
+    cmd = _captured_remotion_argv(monkeypatch, tmp_path)
+    assert "--browser-executable" in cmd
+    assert cmd[cmd.index("--browser-executable") + 1] == "/opt/chromium/headless_shell"
+
+
+@pytest.mark.parametrize("value", ["", "   "])
+def test_remotion_cli_omits_the_flag_when_no_browser_is_configured(
+    monkeypatch, tmp_path, value: str
+) -> None:
+    monkeypatch.setenv("REMOTION_BROWSER_EXECUTABLE", value)
+    assert "--browser-executable" not in _captured_remotion_argv(monkeypatch, tmp_path)

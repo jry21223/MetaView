@@ -482,6 +482,14 @@ class ExportVideoUseCase:
             "--frames-per-second",
             str(options.fps),
         ]
+        # REMOTION_BROWSER_EXECUTABLE is a Node-API option; the CLI only reads
+        # the flag. Without it Remotion insists on downloading its own Chromium
+        # from remotion.media, which fails wherever that host is slow, blocked
+        # or firewalled — so an air-gapped or GFW-side deployment could never
+        # export at all.
+        browser = os.environ.get("REMOTION_BROWSER_EXECUTABLE", "").strip()
+        if browser:
+            cmd += ["--browser-executable", browser]
         env = os.environ.copy()
         env.setdefault("NODE_ENV", "production")
 
