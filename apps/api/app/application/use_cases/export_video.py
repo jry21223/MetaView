@@ -12,6 +12,8 @@ Pipeline:
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 import contextlib
 import functools
 import json
@@ -98,6 +100,101 @@ def _serve_audio_files(audio_files: list[str]) -> Iterator[list[str]]:
         httpd.shutdown()
         httpd.server_close()
         logger.info("export audio server stopped")
+
+# ── TTS provider compatibility ──────────────────────────────────────────────
+# Providers agree on "POST /audio/speech with a Bearer key" and disagree on
+# nearly everything else: OpenAI names the container ``response_format`` while
+# others read ``format``; some answer with raw audio bytes, others wrap it in
+# JSON as base64/hex or hand back a URL to fetch. These helpers absorb that
+# spread so a new provider is a config change, not a code change.
+
+_AUDIO_MAGIC = (b"ID3", b"RIFF", b"OggS", b"fLaC")
+# Where providers put the payload inside a JSON envelope, most specific first.
+_AUDIO_PAYLOAD_KEYS = ("audio", "audio_base64", "audio_content", "data")
+_AUDIO_URL_KEYS = ("url", "audio_url", "audio_file", "file_url")
+_JSON_ENVELOPE_KEYS = ("data", "output", "result", "response")
+
+
+def _looks_like_audio(payload: bytes) -> bool:
+    """Cheap magic-byte check: is this actually an audio container?
+
+    Guards the failure mode where a provider answers HTTP 200 with a JSON
+    error body — writing that to step_000.mp3 produces a render that fails
+    much later with nothing pointing back at the real cause.
+    """
+
+    if len(payload) < 8:
+        return False
+    if payload.startswith(_AUDIO_MAGIC):
+        return True
+    # Bare MPEG frame sync (mp3 without an ID3 header): 11 set bits.
+    if payload[0] == 0xFF and (payload[1] & 0xE0) == 0xE0:
+        return True
+    # ISO base media (m4a/aac): a size-prefixed "ftyp" box.
+    return payload[4:8] == b"ftyp"
+
+
+def _decode_audio_field(value: str) -> bytes | None:
+    """Decode a base64 or hex audio payload; None when it is neither."""
+
+    text = value.strip()
+    if not text:
+        return None
+    with contextlib.suppress(binascii.Error, ValueError):
+        decoded = base64.b64decode(text, validate=True)
+        if _looks_like_audio(decoded):
+            return decoded
+    with contextlib.suppress(ValueError):
+        decoded = bytes.fromhex(text)
+        if _looks_like_audio(decoded):
+            return decoded
+    return None
+
+
+def _tts_audio_from_json(body: Any) -> tuple[bytes | None, str | None]:
+    """Pull audio bytes — or a URL to fetch them — out of a JSON envelope."""
+
+    scopes = [body]
+    if isinstance(body, dict):
+        scopes.extend(
+            body[key] for key in _JSON_ENVELOPE_KEYS if isinstance(body.get(key), dict)
+        )
+    for scope in scopes:
+        if not isinstance(scope, dict):
+            continue
+        for key in _AUDIO_PAYLOAD_KEYS:
+            value = scope.get(key)
+            if isinstance(value, str):
+                decoded = _decode_audio_field(value)
+                if decoded is not None:
+                    return decoded, None
+        for key in _AUDIO_URL_KEYS:
+            value = scope.get(key)
+            if isinstance(value, str) and value.startswith(("http://", "https://")):
+                return None, value
+    return None, None
+
+
+def _tts_response_audio(resp: httpx.Response, step: int) -> tuple[bytes | None, str | None]:
+    """Normalize one provider response into audio bytes or a URL to fetch.
+
+    Raises with the provider's own words when the response carries no audio at
+    all, so a misconfigured model or voice name is obvious at the first step.
+    """
+
+    content_type = resp.headers.get("content-type", "").split(";")[0].strip().lower()
+    if content_type.startswith("audio/") or _looks_like_audio(resp.content):
+        return resp.content, None
+    if "json" in content_type or resp.content[:1] in (b"{", b"["):
+        with contextlib.suppress(ValueError):
+            audio, url = _tts_audio_from_json(resp.json())
+            if audio is not None or url is not None:
+                return audio, url
+    raise RuntimeError(
+        f"TTS returned no audio for step {step} "
+        f"(content-type {content_type or 'unset'}): {resp.text[:200]}"
+    )
+
 
 _QUALITY_TO_DIMENSIONS: dict[str, tuple[int, int]] = {
     "720p": (1280, 720),
@@ -418,6 +515,11 @@ class ExportVideoUseCase:
                         "model": model,
                         "voice": tts.voice,
                         "input": text,
+                        # OpenAI spells the container ``response_format``;
+                        # several compatible providers only read ``format``.
+                        # Sending both keeps one request shape working across
+                        # the spread — each side ignores the key it does not know.
+                        "response_format": "mp3",
                         "format": "mp3",
                     },
                 )
@@ -425,7 +527,21 @@ class ExportVideoUseCase:
                     raise RuntimeError(
                         f"TTS HTTP {resp.status_code} for step {i}: {resp.text[:200]}"
                     )
-                audio_path.write_bytes(resp.content)
+                audio, audio_url = _tts_response_audio(resp, i)
+                if audio is None and audio_url is not None:
+                    # Provider handed back a link instead of the bytes; it is
+                    # the operator's own configured vendor, so fetch it.
+                    fetched = await client.get(audio_url)
+                    if fetched.status_code >= 400:
+                        raise RuntimeError(
+                            f"TTS audio download HTTP {fetched.status_code} for step {i}"
+                        )
+                    audio = fetched.content
+                if not audio or not _looks_like_audio(audio):
+                    raise RuntimeError(
+                        f"TTS payload for step {i} is not a recognizable audio container"
+                    )
+                audio_path.write_bytes(audio)
                 files.append(str(audio_path))
         return files
 
