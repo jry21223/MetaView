@@ -14,6 +14,7 @@ from app.infrastructure.tts.dialects import (
     build_v3_req_params,
     decode_audio_field,
     looks_like_audio,
+    post_with_retry,
     resolve_base_url,
     response_audio,
 )
@@ -36,6 +37,7 @@ __all__ = [
     "build_tts_request",
     "decode_audio_field",
     "looks_like_audio",
+    "post_with_retry",
     "resolve_base_url",
     "response_audio",
     "to_spoken",

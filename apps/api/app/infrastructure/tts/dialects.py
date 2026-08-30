@@ -17,14 +17,18 @@ playback proxy behave identically for the same ``METAVIEW_TTS_PROVIDER``.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import binascii
 import contextlib
 import json
+import logging
 import uuid
 from typing import Any, Final, NamedTuple
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 OPENAI_DIALECT: Final = "openai"
 VOLCANO_DIALECT: Final = "volcano"
@@ -370,3 +374,43 @@ def response_audio(resp: httpx.Response, label: str) -> tuple[bytes | None, str 
         f"TTS returned no audio for {label} "
         f"(content-type {content_type or 'unset'}): {resp.text[:200]}"
     )
+
+
+# Observed against the live 火山 endpoint: the first request on a cold or
+# long-idle connection is reset mid-handshake, and the immediate retry
+# succeeds. One narrated lesson is ~8 synthesis calls and the whole catalogue
+# is ~190, so without this a batch reliably dies partway through on a fault
+# that costs one second to absorb.
+_TRANSPORT_RETRIES: Final = 3
+_RETRY_BACKOFF_S: Final = (0.5, 2.0)
+
+
+async def post_with_retry(
+    client: httpx.AsyncClient,
+    call: TtsRequest,
+    *,
+    label: str,
+    attempts: int = _TRANSPORT_RETRIES,
+) -> httpx.Response:
+    """POST one synthesis request, retrying only transport-level faults.
+
+    A 4xx is the vendor's answer and is returned to the caller untouched — a
+    bad key or an unknown 音色 must fail on the first step, not three times
+    more slowly.
+    """
+
+    last: Exception | None = None
+    for attempt in range(attempts):
+        try:
+            return await client.post(call.url, headers=call.headers, json=call.body)
+        except httpx.HTTPError as exc:
+            last = exc
+            if attempt == attempts - 1:
+                break
+            delay = _RETRY_BACKOFF_S[min(attempt, len(_RETRY_BACKOFF_S) - 1)]
+            logger.warning(
+                "TTS transport fault on %s (%s), retrying in %.1fs",
+                label, type(exc).__name__, delay,
+            )
+            await asyncio.sleep(delay)
+    raise RuntimeError(f"TTS unreachable for {label} after {attempts} attempts: {last}") from last

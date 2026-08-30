@@ -57,6 +57,7 @@ from app.infrastructure.tts import (
     WEBSOCKET_DIALECT,
     build_tts_request,
     looks_like_audio,
+    post_with_retry,
     resolve_base_url,
     response_audio,
     synthesize_over_websocket,
@@ -449,7 +450,7 @@ class ExportVideoUseCase:
                         cluster=cluster,
                         resource_id=settings.tts_resource_id,
                     )
-                    resp = await client.post(call.url, headers=call.headers, json=call.body)
+                    resp = await post_with_retry(client, call, label=f"step {i}")
                     if resp.status_code >= 400:
                         raise RuntimeError(
                             f"TTS HTTP {resp.status_code} for step {i}: {resp.text[:200]}"

@@ -20,6 +20,7 @@ from app.infrastructure.tts import (
     audio_from_chunked_json,
     build_tts_request,
     looks_like_audio,
+    post_with_retry,
     resolve_base_url,
     response_audio,
 )
@@ -330,3 +331,55 @@ def test_v3_finds_audio_whichever_level_the_service_puts_it_at() -> None:
     wholly_nested = json.dumps({"header": {"code": 0, "data": encoded}}).encode()
     for body in (flat, nested, wholly_nested):
         assert audio_from_chunked_json(body)[0] == audio
+
+
+# ── transport resilience ────────────────────────────────────────────────────
+
+
+class _FlakyClient:
+    """Fails with a transport error N times, then answers."""
+
+    def __init__(self, failures: int, response: httpx.Response | None = None) -> None:
+        self.failures = failures
+        self.calls = 0
+        self._response = response or _resp(MP3, "audio/mpeg")
+
+    async def post(self, url, *, headers, json):  # noqa: A002 - mirrors httpx
+        self.calls += 1
+        if self.calls <= self.failures:
+            raise httpx.ConnectError("Connection reset by peer")
+        return self._response
+
+
+@pytest.mark.asyncio
+async def test_a_cold_connection_reset_is_retried_not_fatal() -> None:
+    """The live endpoint resets the first request on an idle connection.
+
+    One lesson is ~8 synthesis calls and the catalogue is ~190, so a batch
+    would reliably die partway through without this.
+    """
+    client = _FlakyClient(failures=1)
+    call = _v3()
+    resp = await post_with_retry(client, call, label="step 0")  # type: ignore[arg-type]
+    assert resp.content == MP3
+    assert client.calls == 2
+
+
+@pytest.mark.asyncio
+async def test_retries_give_up_and_name_the_fault() -> None:
+    client = _FlakyClient(failures=99)
+    with pytest.raises(RuntimeError, match="after 3 attempts.*Connection reset"):
+        await post_with_retry(client, _v3(), label="step 7")  # type: ignore[arg-type]
+    assert client.calls == 3
+
+
+@pytest.mark.asyncio
+async def test_a_rejected_key_fails_at_once_rather_than_retrying() -> None:
+    """A 4xx is the vendor's answer, not a fault — retrying only slows the
+    report that the key or the 音色 is wrong."""
+    refused = _resp(b'{"header":{"code":45000010,"message":"Invalid X-Api-Key"}}', "application/json")
+    refused.status_code = 401
+    client = _FlakyClient(failures=0, response=refused)
+    resp = await post_with_retry(client, _v3(), label="step 0")  # type: ignore[arg-type]
+    assert resp.status_code == 401
+    assert client.calls == 1
