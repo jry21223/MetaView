@@ -10,6 +10,7 @@ import type {
 } from "../types";
 import { CoreFormulaTag } from "./CoreFormulaTag";
 import { CoreLabGrid } from "./CoreLabGrid";
+import { cruiseFraction } from "./physicsFlowTracer";
 import { physicsVisualColor } from "./physicsVisualPalette";
 import type { RendererProps } from "./types";
 import { THEME_PALETTE } from "../../../../shared/config/themePalette";
@@ -75,24 +76,9 @@ const TRAJECTORY_DRAW_FRAMES = 42;
 const VECTOR_DRAW_DELAY_FRAMES = 6;
 const VECTOR_DRAW_FRAMES = 26;
 
-// Flow tracers cruise once the draw has settled, then replay: one full pass
-// uniform in sample index (= uniform in time for time-sampled paths), a rest
-// at the endpoint, and a restart. Every tracer shares this clock, so paths
-// spanning the same time interval stay synchronized on screen.
-const CRUISE_START_FRAMES = TRAJECTORY_DRAW_FRAMES + 8;
-const CRUISE_TRAVEL_FRAMES = 96;
-const CRUISE_HOLD_FRAMES = 27;
-
 function easeOutCubic(t: number): number {
   const clamped = clamp(t, 0, 1);
   return 1 - (1 - clamped) ** 3;
-}
-
-function cruiseFraction(slotFrame: number): number | null {
-  const elapsed = slotFrame - CRUISE_START_FRAMES;
-  if (elapsed < 0) return null;
-  const phase = elapsed % (CRUISE_TRAVEL_FRAMES + CRUISE_HOLD_FRAMES);
-  return Math.min(1, phase / CRUISE_TRAVEL_FRAMES);
 }
 
 function pointAlong(points: Array<[number, number]>, fraction: number): [number, number] | null {
