@@ -252,7 +252,9 @@ end_frame_i = (i+1) * 60                               # 无 execution_map（兼
    Director 读取失败、资产失效或其他 blocking issue 会让 export job 失败。
    导出主题由当前 preview 的 light/dark
    选项随请求传入，`showDiagnostics` 在 export composition 中始终为 `false`。
-2. （可选 `with_audio`）调 TTS 代理 `POST {tts_base_url}/audio/speech` 逐步合成 mp3，
+2. （可选 `with_audio`）按 `METAVIEW_TTS_PROVIDER` 选定的厂商方言逐步合成 mp3
+   （`openai` 走 `POST {base}/audio/speech`；`volcano` 走火山 openspeech
+   `POST {base}/api/v1/tts`，鉴权头是 `Bearer;<token>`，音频以 base64 装在 JSON 里），
    再用 `ffprobe`（缺失时回退到 wave / 动画时长）测每段时长，按 `fps` 重新拉伸
    `step.end_frame` 让动画 ≥ 配音长度。拉伸完成后（无音轨时直接基于原始时间线）、
    组装 `inputProps.json` 前重新执行 canonical export-readiness gate，保证帧数相关结论
@@ -300,6 +302,7 @@ end_frame_i = (i+1) * 60                               # 无 execution_map（兼
 | `apps/web/src/features/playbook/engine/player/PlaybookPlayer.tsx` | Remotion 入口 |
 | `apps/api/app/infrastructure/llm/openai_provider.py` | OpenAI 兼容 HTTP 客户端（`max_tokens` / `reasoning_effort`） |
 | `apps/api/app/application/use_cases/export_video.py` | Remotion CLI subprocess + TTS 配音对齐 + stderr 回传 |
+| `apps/api/app/infrastructure/tts/dialects.py` | TTS 厂商方言：请求怎么拼（openai / volcano）+ 响应怎么拆（裸字节 / base64 / hex / 链接）；导出与网页朗读共用 |
 | `apps/api/app/presentation/router_exports.py` | `/exports` 路由（提交 / 状态 / 下载） |
 | `apps/web/src/remotion/Root.tsx` & `PlaybookExportComposition.tsx` | Remotion `Composition`，导出时与播放器共用 `renderers/registry` |
 
