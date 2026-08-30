@@ -305,3 +305,28 @@ def test_v3_chunked_bodies_reach_the_shared_response_reader() -> None:
     got, url = response_audio(_resp(body, "application/json"), "step 0")
     assert got == audio + b"MORE"
     assert url is None
+
+
+def test_v3_reads_the_envelope_the_live_service_actually_returns() -> None:
+    """Captured verbatim from openspeech.bytedance.com on a bad key.
+
+    The published reference puts code/message/data at the top level; the
+    service nests them under "header". Reading only the documented shape
+    would have let a chunk-level refusal pass as "no audio".
+    """
+    live = (
+        b'{"header":{"reqid":"6ceae867-8292-41f6-b638-7807119276ab",'
+        b'"code":45000010,"message":"Invalid X-Api-Key"}}'
+    )
+    with pytest.raises(RuntimeError, match="45000010.*Invalid X-Api-Key"):
+        audio_from_chunked_json(live)
+
+
+def test_v3_finds_audio_whichever_level_the_service_puts_it_at() -> None:
+    audio = b"\xff\xfb\x90\x00AUDIO"
+    encoded = base64.b64encode(audio).decode()
+    flat = json.dumps({"code": 0, "data": encoded}).encode()
+    nested = json.dumps({"header": {"code": 0}, "data": encoded}).encode()
+    wholly_nested = json.dumps({"header": {"code": 0, "data": encoded}}).encode()
+    for body in (flat, nested, wholly_nested):
+        assert audio_from_chunked_json(body)[0] == audio

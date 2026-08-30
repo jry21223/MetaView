@@ -46,7 +46,9 @@ _AUDIO_MAGIC: Final = (b"ID3", b"RIFF", b"OggS", b"fLaC")
 # Where providers put the payload inside a JSON envelope, most specific first.
 _AUDIO_PAYLOAD_KEYS: Final = ("audio", "audio_base64", "audio_content", "data")
 _AUDIO_URL_KEYS: Final = ("url", "audio_url", "audio_file", "file_url")
-_JSON_ENVELOPE_KEYS: Final = ("data", "output", "result", "response")
+# ``header`` is 火山 v3: its live responses nest code/message/data there,
+# though the published reference shows them at the top level.
+_JSON_ENVELOPE_KEYS: Final = ("data", "output", "result", "response", "header")
 
 
 def build_v3_req_params(
@@ -313,10 +315,18 @@ def audio_from_chunked_json(body: bytes) -> tuple[bytes | None, str | None]:
         index = end
         if not isinstance(obj, dict):
             continue
-        code = obj.get("code")
+        # 火山 v3 answers with code/message/data nested under "header", not at
+        # the top level as its reference shows — confirmed against the live
+        # endpoint, which returned {"header":{"code":45000010,...}} for a bad
+        # key. Read both so a documentation drift either way stays handled.
+        scope = obj.get("header") if isinstance(obj.get("header"), dict) else obj
+        code = scope.get("code", obj.get("code"))
         if isinstance(code, int) and code != 0 and error is None:
-            error = f"code {code}: {obj.get('message') or 'no message'}"
+            message = scope.get("message") or obj.get("message") or "no message"
+            error = f"code {code}: {message}"
         payload = obj.get("data")
+        if not isinstance(payload, str):
+            payload = scope.get("data")
         if isinstance(payload, str) and payload:
             decoded = decode_audio_field(payload)
             if decoded is None:
