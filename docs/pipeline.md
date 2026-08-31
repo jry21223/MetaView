@@ -270,7 +270,8 @@ end_frame_i = (i+1) * 60                               # 无 execution_map（兼
    npx --yes remotion render \
        src/remotion/index.ts playbook <output> \
        --props <inputProps.json> --codec h264|vp8|gif \
-       --width <W> --height <H> --frames-per-second <FPS>
+       --scale <S> --frames-per-second <FPS> \
+       [--browser-executable <path>]
    ```
 
    工作目录是 `apps/web/`（由 `METAVIEW_EXPORT_WEB_APP_DIR` 控制，默认相对仓库根）。
@@ -284,12 +285,38 @@ end_frame_i = (i+1) * 60                               # 无 execution_map（兼
 | `GET`  | `/exports/{job_id}` | 进度 + 状态 + `error` |
 | `GET`  | `/exports/{job_id}/download` | 下载 mp4 / webm / gif |
 
+### 导出画面约定
+
+这三条决定导出画面长什么样，改导出路径前先读。
+
+**尺寸靠 `--scale`，不要用 `--width` / `--height`。** composition 是 960×540
+（`playbook_composition_width` / `_height`），布局里全是绝对像素——字幕 14px、
+步骤标题 18px、线宽也都是写死的数。`--width/--height` 会让 Remotion 按新尺寸重新
+排版，而绝对像素原样不动：导 1920×1080 时 14px 字幕仍然是物理 14px，只有版面意图
+的一半，手机上根本读不清。`--scale` 是整体放大，字号、线宽、间距按同一比例走。
+1080p 对应 `--scale 2`，720p 对应 `--scale 1.333`。比例由
+`_render_scale(width, composition_width)` 算，改 composition 尺寸不需要动调用方。
+
+**CLI 只认 `--browser-executable`。** `REMOTION_BROWSER_EXECUTABLE` 是
+`@remotion/renderer` Node API 的选项（`browserExecutable`），`remotion render`
+CLI 不读环境变量。不传这个 flag，Remotion 会坚持从 remotion.media 下载自带
+Chromium，那个域名慢、被墙或机器离线时导出直接不可用。`apps/web/scripts/*.mjs`
+走 Node API，本身就传 `browserExecutable`；只有 `ExportVideoUseCase` spawn 的是
+CLI，所以那里必须显式补 flag。
+
+**字幕条取主题色，不要手写颜色。** 背景用 `SUBTITLE_TINT`（相对 `surface2` 提亮或
+压暗几个百分点），文字用 `palette.ink2`，分隔线用 `palette.line`，都来自
+`THEME_PALETTE`。此前手写的冷色条压在暖色纸面上，色相不属于这张画，整条字幕读起来
+像钉在画面底部的另一块板。字幕是画的一部分，配色必须跟着当前主题走。
+
 ### 失败诊断
 渲染失败时 `ExportJob.error` 会带最后 ~40 行 Remotion 子进程输出（包含 stack trace）。
 常见雷：
 - `apps/web/node_modules` 缺包或 `@remotion/cli`/`renderer` 版本错位 → 重装：
   `rm -rf node_modules apps/web/node_modules && npm install`（仓库走 npm workspaces）。
-- 首次跑会拉 Chrome Headless Shell（约 80–150 MB），国内网络可能超时——重跑通常自愈。
+- 首次跑会拉 Chrome Headless Shell（约 80–150 MB），国内网络可能超时——重跑通常自愈；
+  离线或被墙的环境改用本地 Chromium：设 `REMOTION_BROWSER_EXECUTABLE`，导出会把它
+  转成 CLI 的 `--browser-executable`（见上方「导出画面约定」）。
 - `ffprobe` 缺失只影响 `with_audio` 的时长对齐，单纯导出无音轨不受影响。
 
 ## 9. 关键文件
