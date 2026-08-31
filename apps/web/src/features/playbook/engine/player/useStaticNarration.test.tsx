@@ -68,6 +68,40 @@ describe("useStaticNarration", () => {
     expect(result.current.speaking).toBe(false);
   });
 
+  it("lets a line finish when a parameter edit rebuilds the script under it", () => {
+    const { result } = renderHook(() => useStaticNarration(CASE));
+    act(() => result.current.playStep(FIRST.step_id, FIRST.text));
+    expect(window.HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(1);
+    const pausesWhileStarting = vi.mocked(window.HTMLMediaElement.prototype.pause).mock
+      .calls.length;
+
+    // Every slider tick rebuilds the whole script and re-fires the narration
+    // effect. Same step: neither restart the sentence nor cut it off — the
+    // drag used to clip the line mid-word and leave the step silent.
+    act(() => result.current.playStep(FIRST.step_id, `${FIRST.text}（参数已改）`));
+    act(() => result.current.playStep(FIRST.step_id, FIRST.text));
+    expect(window.HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(1);
+    expect(window.HTMLMediaElement.prototype.pause).toHaveBeenCalledTimes(
+      pausesWhileStarting,
+    );
+    expect(result.current.speaking).toBe(true);
+  });
+
+  it("still hands the next step its own line, or silence when that one drifted", () => {
+    const { result } = renderHook(() => useStaticNarration(CASE));
+    act(() => result.current.playStep(FIRST.step_id, FIRST.text));
+    expect(window.HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(1);
+
+    // Moving on is a real step change: the previous line stops, and this one
+    // only speaks if the recording still matches what is on screen.
+    act(() => result.current.playStep(SECOND.step_id, `${SECOND.text}（参数已改）`));
+    expect(window.HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(1);
+    expect(result.current.speaking).toBe(false);
+
+    act(() => result.current.playStep(SECOND.step_id, SECOND.text));
+    expect(window.HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(2);
+  });
+
   it("mutes on request and remembers the choice", () => {
     const first = renderHook(() => useStaticNarration(CASE));
     act(() => first.result.current.toggle());
