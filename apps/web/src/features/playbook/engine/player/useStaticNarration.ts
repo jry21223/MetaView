@@ -76,6 +76,8 @@ export function useStaticNarration(caseId?: string): StaticNarrationChannel {
   );
   const [speaking, setSpeaking] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  /** Which step's line the element is currently carrying, playing or done. */
+  const playingStepRef = useRef<string | null>(null);
   const enabledRef = useRef(enabled);
   useLayoutEffect(() => {
     enabledRef.current = enabled;
@@ -108,6 +110,7 @@ export function useStaticNarration(caseId?: string): StaticNarrationChannel {
   }, [caseId]);
 
   const stop = useCallback(() => {
+    playingStepRef.current = null;
     const audio = audioRef.current;
     if (!audio) return;
     audio.pause();
@@ -119,6 +122,15 @@ export function useStaticNarration(caseId?: string): StaticNarrationChannel {
       if (!caseId || !enabledRef.current) return;
       const audio = audioRef.current;
       if (!audio) return;
+      if (playingStepRef.current === stepId) {
+        // A parameter edit rebuilds the whole script on every slider tick, and
+        // the narration effect re-fires with it. That is not a step change:
+        // restarting the line would stutter it, and cutting it off would clip
+        // a sentence mid-word — which is what dragging a slider used to do.
+        // The line the viewer is already hearing plays out; only the *next*
+        // step consults the recording again.
+        return;
+      }
       const entry = byStep.get(stepId);
       if (!entry || entry.text !== text.trim()) {
         // Either nothing was recorded for this step, or its line has been
@@ -129,6 +141,7 @@ export function useStaticNarration(caseId?: string): StaticNarrationChannel {
       audio.pause();
       audio.src = `${PUBLIC_DIR}/${caseId}/${entry.file}`;
       audio.currentTime = 0;
+      playingStepRef.current = stepId;
       setSpeaking(true);
       void audio.play().catch(() => {
         // Autoplay policies reject sound before the first gesture; the next
