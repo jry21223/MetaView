@@ -17,9 +17,12 @@ import {
  * without costing anything per view.
  *
  * Narration is parameter-dependent: dragging a slider rewrites the wording of
- * the steps it affects. Each entry therefore carries the exact text it was
- * recorded from, and a step whose live text has drifted stays silent — a
- * sentence quoting numbers that are no longer on screen is worse than none.
+ * the steps it affects, and a fixed recording cannot follow it. The lesson
+ * keeps speaking anyway — a voice that stops the moment a student touches a
+ * slider reads as broken, and the recomputed numbers stay right there in the
+ * subtitle and on the canvas. The cost is that those few steps narrate the
+ * values they were recorded at; recordedNarration.test.ts keeps the recordings
+ * honest for the defaults, which is the state every visitor arrives in.
  */
 
 export interface StaticNarrationChannel {
@@ -29,8 +32,8 @@ export interface StaticNarrationChannel {
   enabled: boolean;
   speaking: boolean;
   toggle: () => void;
-  /** Play a step's recorded line, or stay silent if its text has drifted. */
-  playStep: (stepId: string, text: string) => void;
+  /** Play this step's recorded line, if one was recorded for it. */
+  playStep: (stepId: string) => void;
   stop: () => void;
 }
 
@@ -118,7 +121,7 @@ export function useStaticNarration(caseId?: string): StaticNarrationChannel {
   }, []);
 
   const playStep = useCallback(
-    (stepId: string, text: string) => {
+    (stepId: string) => {
       if (!caseId || !enabledRef.current) return;
       const audio = audioRef.current;
       if (!audio) return;
@@ -132,9 +135,7 @@ export function useStaticNarration(caseId?: string): StaticNarrationChannel {
         return;
       }
       const entry = byStep.get(stepId);
-      if (!entry || entry.text !== text.trim()) {
-        // Either nothing was recorded for this step, or its line has been
-        // rewritten since. Silence beats a stale reading.
+      if (!entry) {
         stop();
         return;
       }

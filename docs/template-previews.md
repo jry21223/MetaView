@@ -28,9 +28,11 @@ Status: Active
 
 静态模板播放器不接 TTS 代理入口，避免继承浏览器里曾保存的远程 TTS 配置并意外请求服务端；Studio 和运营版 BYOK 的既有语音/模型配置不受影响。
 
-旁白改为**预先录好、随前端发布的静态音频**：`apps/api/scripts/generate_template_narration.py` 用与导出视频同一套 `METAVIEW_TTS_*` 配置，把每一步旁白合成到 `apps/web/public/template-narration/<caseId>/<stepId>.mp3`（32 kbps 单声道，按步懒加载），同目录 `manifest.json` 记录每段录制时的原文。播放器侧由 `useStaticNarration` 播放，并与既有「等旁白说完再翻页」的闸门共用同一契约。访客打开模板页即可听到讲解：无需登录、不发 API 请求、不扣减额度——静态运行边界不变（音频与海报一样是静态资源）。
+旁白改为**预先录好、随前端发布的静态音频**：`apps/api/scripts/generate_template_narration.py` 用与导出视频同一套 `METAVIEW_TTS_*` 配置，把每一步旁白合成到 `apps/web/public/template-narration/<caseId>/<stepId>.mp3`（32 kbps 单声道，按步懒加载），并把录音清单生成为 TS 源码 `src/pages/Templates/narration/recordedNarration.ts`——随包发布而非线上拉取，模板页因此仍是零 fetch。播放器侧由 `useStaticNarration` 播放，并与既有「等旁白说完再翻页」的闸门共用同一契约。访客打开模板页即可听到讲解：无需登录、不发 API 请求、不扣减额度——静态运行边界不变（音频与海报一样是静态资源）。
 
-旁白文案随参数实时重算，所以每段录音只对录制时的文案成立：某一步的当前文案与 manifest 记录不一致时（例如拖动了影响该步的滑杆），该步静音，其余步骤照常朗读。改动旁白后需重新运行上述脚本；未生成音频的案例自动保持无声。
+旁白文案随参数实时重算，而录音是固定的，两者只在默认参数下完全一致。取舍是**声音优先**：任何一步都照常播放它的录音，学生拖动滑杆后那一两步会念着录制时的数字（重算后的数字仍显示在字幕和画面上）——旁白一碰滑杆就消失，用起来像坏了。同一步内重入既不重播也不打断，只有真正切换步骤才停旧句、播新句。
+
+录音与默认文案是否一致由 `recordedNarration.test.ts` 在开发期守住：改了旁白却没重新运行生成脚本，测试会直接失败并指出是哪一步。未生成音频的案例自动保持无声。
 
 ## 正式案例
 
