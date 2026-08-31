@@ -706,7 +706,7 @@ export function buildLogisticGrowthGoldPlaybook(params: TemplatePreviewParams): 
       caption: "数据：Klein (1968)。纵轴单位：千只。",
       formula: String.raw`K\neq\text{常数}`,
     })),
-    sceneStep(7, "logistic-skeleton", "模型是骨架", "回到酵母。Logistic 抓住的是密度制约这一根骨架：数据里长出的波动、时滞，圣马修岛那样的过冲崩溃，都是骨架上的偏离项。会用模型的意思，是同时知道它何时成立、何时失效。下一课把时间切成一年一代——同一个方程，会自己长出混沌。", plot({
+    sceneStep(7, "logistic-skeleton", "模型是骨架", "回到酵母。Logistic 抓住的是密度制约这一根骨架：数据里的波动、时滞，圣马修岛那样的过冲崩溃，都是骨架上的偏离项。会用模型的意思，是同时知道它何时成立、何时失效。下一课把时间切成一年一代——同一个方程，将一路通向混沌。", plot({
       curves: [logisticCurve, capacityLine],
       points: observations,
       caption: "骨架看清了，偏离才有处安放。下一课：离散时间与混沌。",

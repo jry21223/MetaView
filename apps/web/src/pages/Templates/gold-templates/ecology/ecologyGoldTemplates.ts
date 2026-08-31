@@ -726,7 +726,7 @@ export function buildIslandBiogeographyGoldPlaybook(
       caption: "同一条灭绝线，两条迁入线：岛越远，线越低，客越稀。",
       formula: String.raw`\lambda\propto 2^{-D/${fixed(IBG_DHALF, 0)}}`,
     })),
-    sceneStep(6, "ibg-species-area", "验证：理论长出经验律", `理论必须交出可检验的预言。把不同面积的岛的均衡值连成曲线：A=1 时约 ${fixed(sAt(1), 0)} 种，A=10 约 ${fixed(sAt(10), 0)}，A=100 约 ${fixed(sAt(100), 0)}——面积每扩大十倍，物种数大约翻一番。这正是生物地理学家在群岛上数出来的种-面积规律，S 随面积的 z 次幂增长：实测的 z 多在 0.2 到 0.35 之间，这条曲线给出 0.28 到 0.40。机制模型自己长出了经验直线。`, ratePlot({
+    sceneStep(6, "ibg-species-area", "验证：从机制推出经验律", `理论必须交出可检验的预言。把不同面积的岛的均衡值连成曲线：A=1 时约 ${fixed(sAt(1), 0)} 种，A=10 约 ${fixed(sAt(10), 0)}，A=100 约 ${fixed(sAt(100), 0)}——面积每扩大十倍，物种数大约翻一番。这正是生物地理学家在群岛上数出来的种-面积规律，S 随面积的 z 次幂增长：实测的 z 多在 0.2 到 0.35 之间，这条曲线给出 0.28 到 0.40。经验规律，就这样从迁入与灭绝的机制里被推导了出来。`, ratePlot({
       curves: [speciesAreaCurve],
       points: [
         { x: 1, y: sAt(1), label: fixed(sAt(1), 0), semantic_role: "species_area_sample" },
@@ -734,7 +734,7 @@ export function buildIslandBiogeographyGoldPlaybook(
         { x: 100, y: sAt(100), label: fixed(sAt(100), 0), semantic_role: "species_area_sample" },
       ],
       window: { xMax: 105, yMax: 75, xLabel: "岛面积 A（相对值）", yLabel: "均衡物种数 S*" },
-      caption: "十倍面积 ≈ 两倍物种：Darlington 的经验口诀从方程里长出来。",
+      caption: "十倍面积 ≈ 两倍物种：与 Darlington 的经验口诀一致。",
       formula: String.raw`S=cA^{z},\quad z\approx 0.25`,
     })),
     sceneStep(7, "ibg-reserves", "从岛屿到保护区", `理论出圈了：被农田与公路切碎的森林，就是一片人造群岛。种-面积曲线立刻给出严厉的提醒——保护区缩小十倍，长期物种数减半，哪怕一棵树都没再砍。“一大还是几小”（SLOSS）因此争论了半个世纪：四个 A=25 的碎片各养约 ${fixed(sAt(25), 0)} 种，一块 A=100 养约 ${fixed(sAt(100), 0)} 种，孰优取决于碎片间的物种是否重复。模型不判决，但它把该问的问题亮了出来：廊道抬高迁入 λ，连片扩大压低灭绝 μ。`, ratePlot({
