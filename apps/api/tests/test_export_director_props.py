@@ -1248,7 +1248,9 @@ async def test_template_export_refuses_unknown_and_traversing_ids(tmp_path) -> N
     assert use_case.input_props is None
 
 
-def _captured_remotion_argv(monkeypatch, tmp_path) -> list[str]:
+def _captured_remotion_argv(
+    monkeypatch, tmp_path, options: ExportOptions | None = None
+) -> list[str]:
     """Run the real _run_remotion_render far enough to see the argv it builds."""
     captured: dict[str, list[str]] = {}
 
@@ -1272,7 +1274,10 @@ def _captured_remotion_argv(monkeypatch, tmp_path) -> list[str]:
     with contextlib.suppress(Exception):
         asyncio.run(
             use_case._run_remotion_render(
-                "job", tmp_path / "props.json", tmp_path / "out.mp4", ExportOptions()
+                "job",
+                tmp_path / "props.json",
+                tmp_path / "out.mp4",
+                options or ExportOptions(),
             )
         )
     return captured["cmd"]
@@ -1300,3 +1305,28 @@ def test_remotion_cli_omits_the_flag_when_no_browser_is_configured(
 ) -> None:
     monkeypatch.setenv("REMOTION_BROWSER_EXECUTABLE", value)
     assert "--browser-executable" not in _captured_remotion_argv(monkeypatch, tmp_path)
+
+
+def test_remotion_renders_at_scale_instead_of_overriding_the_composition_size(
+    monkeypatch, tmp_path
+) -> None:
+    """1080p must mean "the authored layout, rasterised at 1080p".
+
+    --width/--height replace the composition's dimensions, so the layout's
+    fixed-px chrome (a 14px subtitle on a 960px-wide canvas) was laid out on a
+    1920px canvas and rendered at half its intended relative size. --scale
+    keeps the layout and raises the resolution.
+    """
+    cmd = _captured_remotion_argv(monkeypatch, tmp_path)
+    assert "--width" not in cmd and "--height" not in cmd
+    assert float(cmd[cmd.index("--scale") + 1]) == pytest.approx(2.0)
+
+
+@pytest.mark.parametrize(
+    ("quality", "expected"), [("720p", 4 / 3), ("1080p", 2.0), ("2k", 8 / 3)]
+)
+def test_every_quality_maps_to_its_composition_scale(
+    monkeypatch, tmp_path, quality: str, expected: float
+) -> None:
+    cmd = _captured_remotion_argv(monkeypatch, tmp_path, ExportOptions(quality=quality))
+    assert float(cmd[cmd.index("--scale") + 1]) == pytest.approx(expected, abs=1e-5)

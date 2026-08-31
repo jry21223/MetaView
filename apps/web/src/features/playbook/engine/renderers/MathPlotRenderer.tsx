@@ -499,7 +499,7 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
               x={MARGIN.left + PLOT_W - 4}
               y={axisYPx - 8}
               textAnchor="end"
-              fontSize={14}
+              fontSize={15}
               fill={colors.axisLabel}
               fontStyle="italic"
             >
@@ -508,7 +508,7 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
             <text
               x={axisXPx + 10}
               y={MARGIN.top + 14}
-              fontSize={14}
+              fontSize={15}
               fill={colors.axisLabel}
               fontStyle="italic"
             >
@@ -523,7 +523,7 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
                   x={sx(t)}
                   y={axisYPx + 16}
                   textAnchor="middle"
-                  fontSize={12}
+                  fontSize={13}
                   fill={colors.tick}
                 >
                   {fmtNum(t)}
@@ -537,7 +537,7 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
                   x={axisXPx - 8}
                   y={sy(t) + 4}
                   textAnchor="end"
-                  fontSize={12}
+                  fontSize={13}
                   fill={colors.tick}
                 >
                   {fmtNum(t)}
@@ -600,7 +600,7 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
                         x={labelX}
                         y={labelY}
                         textAnchor={labelX > MARGIN.left + PLOT_W - 90 ? "end" : "start"}
-                        fontSize={13}
+                        fontSize={14}
                         fontWeight={600}
                         fill={stroke}
                       >
@@ -636,7 +636,7 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
                         x={Math.min(tipX + 8, MARGIN.left + PLOT_W - 6)}
                         y={Math.max(MARGIN.top + 12, sy(tip[1]) - 6)}
                         textAnchor={tipX > MARGIN.left + PLOT_W - 90 ? "end" : "start"}
-                        fontSize={12.5}
+                        fontSize={14}
                         fontWeight={600}
                         fill={stroke}
                         opacity={clamp01((reveal - 0.8) * 6)}
@@ -689,7 +689,7 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
                         <text
                           x={sx(p.x) + 9}
                           y={sy(p.y) - 9}
-                          fontSize={12.5}
+                          fontSize={13.5}
                           fontWeight={600}
                           fill={fill}
                         >
@@ -848,7 +848,7 @@ export const MathPlotRenderer: React.FC<RendererProps> = ({
               <text
                 x={Math.min(marker.px + 12, MARGIN.left + PLOT_W - 4)}
                 y={Math.max(marker.py - 12, MARGIN.top + 12)}
-                fontSize={13}
+                fontSize={14}
                 fontWeight={600}
                 fill={colors.marker}
                 opacity={marker.opacity}

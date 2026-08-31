@@ -115,6 +115,16 @@ _QUALITY_TO_DIMENSIONS: dict[str, tuple[int, int]] = {
     "1080p": (1920, 1080),
     "2k": (2560, 1440),
 }
+
+# The playbook composition is authored at 960×540 CSS pixels (PLAYBOOK_DEFAULTS
+# in apps/web/src/shared/config/constants.ts) and sizes its chrome in fixed px:
+# a 14px subtitle, a 19px step title. Remotion's --width/--height *replace* the
+# composition's dimensions rather than scaling its layout, so asking for 1080p
+# used to lay that same 14px subtitle out on a canvas twice as wide — every
+# piece of text came out at half the size the design intends, which is exactly
+# how a lecture ends up unreadable on screen. --scale keeps the authored layout
+# and rasterises it at the higher resolution, which is what "1080p" should mean.
+_COMPOSITION_BASE_WIDTH = 960
 _FORMAT_TO_EXTENSION: dict[str, str] = {"mp4": "mp4", "webm": "webm", "gif": "gif"}
 
 logger = logging.getLogger(__name__)
@@ -482,7 +492,8 @@ class ExportVideoUseCase:
     ) -> None:
         # Codec is picked from the desired container; Remotion ships h264/vp8/gif.
         codec = {"mp4": "h264", "webm": "vp8", "gif": "gif"}.get(options.format, "h264")
-        width, height = _QUALITY_TO_DIMENSIONS.get(options.quality, (1920, 1080))
+        width, _height = _QUALITY_TO_DIMENSIONS.get(options.quality, (1920, 1080))
+        scale = width / _COMPOSITION_BASE_WIDTH
         remotion_bin = _resolve_remotion_bin(self._web_dir)
         cmd = [
             str(remotion_bin),
@@ -496,10 +507,8 @@ class ExportVideoUseCase:
             "info",
             "--codec",
             codec,
-            "--width",
-            str(width),
-            "--height",
-            str(height),
+            "--scale",
+            f"{scale:.6f}",
             "--frames-per-second",
             str(options.fps),
         ]
