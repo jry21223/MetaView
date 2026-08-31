@@ -6,6 +6,7 @@ import { usePlaybookController } from "./usePlaybookController";
 import { PlaybookComposition } from "../composition/PlaybookComposition";
 import { PLAYBOOK_DEFAULTS } from "../../../../shared/config/constants";
 import { useTTS, resolveVoice } from "./useTTS";
+import { useStaticNarration } from "./useStaticNarration";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { resolveNarrationTemplate } from "./resolveNarrationTemplate";
 import { useResolvedScript, type ScriptOverrides } from "./useResolvedScript";
@@ -99,6 +100,12 @@ interface PlaybookPlayerProps {
   followupSlot?: PlaybookFollowupSlot;
   /** Keep false for surfaces that must never inherit persisted remote TTS settings. */
   enableTTS?: boolean;
+  /**
+   * Template case whose pre-recorded narration should play, e.g.
+   * ``predator-prey``. Lets the static template pages speak without calling
+   * the TTS proxy — see useStaticNarration.
+   */
+  narrationCaseId?: string;
   relatedSlot?: React.ReactNode;
   showLearningConsole?: boolean;
   /** Hide the generation-coverage chip on curated surfaces such as template pages. */
@@ -131,6 +138,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   parameterSlot,
   followupSlot,
   enableTTS = true,
+  narrationCaseId,
   relatedSlot,
   showLearningConsole = true,
   showCapabilityNotice = true,
@@ -208,6 +216,15 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     tts.setDomain(script.domain);
   }, [tts, script.domain]);
 
+  // Studio speaks through the TTS proxy; the static template pages play
+  // recordings made ahead of time. Exactly one channel is live at a time and
+  // both report through the same gate, so the timeline waits for whichever is
+  // talking before it turns the page.
+  const recorded = useStaticNarration(enableTTS ? undefined : narrationCaseId);
+  const narration = enableTTS
+    ? { enabled: tts.enabled, supported: tts.supported, speaking: tts.speaking, toggle: tts.toggle }
+    : recorded;
+
   const {
     currentStepIndex,
     canGoPrev,
@@ -218,8 +235,8 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     prev,
     next,
   } = usePlaybookController(script, playerRef, {
-    isSpeaking: enableTTS && tts.speaking,
-    ttsEnabled: enableTTS && tts.enabled,
+    isSpeaking: narration.speaking,
+    ttsEnabled: narration.enabled,
   });
 
   const safeStepIndex = script.steps.length
@@ -273,6 +290,12 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   // Ref so auto-narrate effect always calls the latest speak function without re-registering.
   const ttsRef = useRef(tts);
   useLayoutEffect(() => { ttsRef.current = tts; });
+  const recordedRef = useRef(recorded);
+  useLayoutEffect(() => { recordedRef.current = recorded; });
+  // Re-runs the narration effect once the recordings finish loading (and when
+  // the viewer mutes or unmutes), so the current step still gets its line
+  // instead of waiting for the next step boundary.
+  const recordedNarrationKey = `${recorded.available}:${recorded.enabled}`;
 
   // Keep isPlaying in sync with actual player state (controller may pause mid-step).
   useEffect(() => {
@@ -387,7 +410,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     onPrev: prevStepManual,
     onNext: nextStepManual,
     onReset: handleReset,
-    onToggleTTS: enableTTS ? tts.toggle : undefined,
+    onToggleTTS: narration.supported ? narration.toggle : undefined,
     onSpeedUp: handleSpeedUp,
     onSpeedDown: handleSpeedDown,
     onOpenExport: onOpenExport,
@@ -399,9 +422,13 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   // Auto-narrate on step change.
   // ttsRef always holds the latest tts object, so no stale-closure risk on speak/backend changes.
   useEffect(() => {
-    if (!enableTTS || !ttsRef.current.enabled) return;
     const step = script.steps[safeStepIndex];
     if (!step) return;
+    if (!enableTTS) {
+      recordedRef.current.playStep(step.step_id, step.voiceover_text);
+      return;
+    }
+    if (!ttsRef.current.enabled) return;
     const fallback =
       step.narration_template && step.tokens.length > 0
         ? resolveNarrationTemplate(step.narration_template, step.tokens)
@@ -411,7 +438,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     const voice = resolveVoice(ttsRef.current.config.voice, script.domain);
     const rate = step.tts_rate ?? ttsRef.current.config.rate;
     ttsRef.current.speak(text, { voice, rate });
-  }, [safeStepIndex, director, enableTTS, script]); // script included so step data is never stale
+  }, [safeStepIndex, director, enableTTS, script, recordedNarrationKey]); // script included so step data is never stale
 
   const handleVoicePreview = useCallback(
     (voice: string, sampleText: string) => {
@@ -694,15 +721,16 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
               onPlaybackRateChange={setPlaybackRate}
               stepThrough={stepThrough}
               onStepThroughChange={setStepThrough}
-              ttsEnabled={tts.enabled}
-              ttsSupported={tts.supported}
-              onToggleTTS={tts.toggle}
+              ttsEnabled={narration.enabled}
+              ttsSupported={narration.supported}
+              onToggleTTS={narration.toggle}
               config={tts.config}
               onUpdate={tts.updateConfig}
               onClose={() => setShowPlayerSettings(false)}
               isDark={isDark}
               onPreview={handleVoicePreview}
               showTTS={enableTTS}
+              showNarrationRow={narration.supported}
             />
           )}
         </div>

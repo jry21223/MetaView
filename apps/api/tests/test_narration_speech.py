@@ -102,6 +102,14 @@ def test_no_shipped_narration_still_carries_an_unreadable_symbol() -> None:
         for step in json.loads(path.read_text(encoding="utf-8")).get("steps", [])
         if (text := (step.get("voiceover_text") or "").strip())
     ]
+    if not steps:
+        # data/ is a build artifact, not a fixture: a fresh clone has nothing
+        # to scan until the playbooks are exported. CI exports them first, so
+        # this only spares a local run that has not.
+        pytest.skip(
+            "no exported narration corpus — run "
+            "`npm --workspace apps/web run template-previews:export` first"
+        )
     assert len(steps) > 150, "corpus should not have shrunk"
 
     residual: dict[str, int] = {}

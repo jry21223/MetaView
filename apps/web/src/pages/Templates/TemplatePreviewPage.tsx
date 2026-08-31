@@ -114,6 +114,7 @@ function TemplatePreviewContent({
             />
           )}
           enableTTS={false}
+          narrationCaseId={previewCase.id}
           showCapabilityNotice={false}
           parametricStepIds={parametricStepIds}
           showLearningConsole

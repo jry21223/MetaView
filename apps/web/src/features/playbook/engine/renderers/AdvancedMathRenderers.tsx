@@ -23,8 +23,15 @@ import { THEME_PALETTE } from "../../../../shared/config/themePalette";
 type ThemeName = "dark" | "light";
 
 const SVG_W = 900;
-const SVG_H = 520;
-const PLOT = { left: 78, right: 34, top: 50, bottom: 58 };
+/**
+ * Same fitting arithmetic as the math plot: the Shell's middle row is roughly
+ * 904×336 CSS px (2.7:1), so a 520-tall canvas was height-fitted and handed a
+ * third of the width back as blank paper. 440 keeps the drawn figure close to
+ * its established proportions — a phase portrait reads badly once flattened —
+ * while spending most of that margin on the figure.
+ */
+const SVG_H = 440;
+const PLOT = { left: 78, right: 34, top: 42, bottom: 50 };
 
 interface Palette {
   bg: string;
@@ -95,13 +102,13 @@ function Shell({
       style={{
         width: "100%",
         height: "100%",
-        padding: 28,
+        padding: 20,
         boxSizing: "border-box",
         background: colors.bg,
         color: colors.ink,
         display: "grid",
         gridTemplateRows: "auto 1fr auto",
-        gap: 14,
+        gap: 10,
         fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
       }}
     >
@@ -785,7 +792,7 @@ export const PhasePortraitSceneRenderer: React.FC<RendererProps> = ({ step, them
         {(snap.equilibria ?? []).map((eq, index) => (
           <g key={index}>
             <circle cx={sx(eq.x, xMin, xMax)} cy={sy(eq.y, yMin, yMax)} r={10} fill={eq.stable ? colors.primary : colors.warn} />
-            <text x={sx(eq.x, xMin, xMax) + 14} y={sy(eq.y, yMin, yMax) - 10} fill={colors.ink} fontSize={14}>{eq.label}</text>
+            <text x={sx(eq.x, xMin, xMax) + 14} y={sy(eq.y, yMin, yMax) - 10} fill={colors.ink} fontSize={16}>{eq.label}</text>
           </g>
         ))}
       </svg>

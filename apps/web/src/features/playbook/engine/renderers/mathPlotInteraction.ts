@@ -1,5 +1,14 @@
 export const MATH_PLOT_SVG_WIDTH = 1000;
-export const MATH_PLOT_SVG_HEIGHT = 560;
+/**
+ * The canvas is fitted with `xMidYMid meet`, so whichever axis runs out first
+ * decides the scale and the other axis keeps the leftover as dead margin. The
+ * stage this SVG lands in — the composition minus the step header and the
+ * subtitle bar — is about 936×428 CSS px, i.e. roughly 2.19:1, so a 1000×560
+ * canvas (1.79:1) was always height-fitted and gave back a quarter of the
+ * width as blank paper, shrinking the plot and every label with it. Matching
+ * the stage's own ratio spends that width on the figure instead.
+ */
+export const MATH_PLOT_SVG_HEIGHT = 456;
 export const MATH_PLOT_MARGIN = { top: 20, right: 28, bottom: 40, left: 56 } as const;
 export const MATH_PLOT_WIDTH =
   MATH_PLOT_SVG_WIDTH - MATH_PLOT_MARGIN.left - MATH_PLOT_MARGIN.right;

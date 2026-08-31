@@ -19,6 +19,12 @@ interface PlayerSettingsPopoverProps {
   isDark: boolean;
   onPreview: (voice: string, sampleText: string) => void;
   showTTS?: boolean;
+  /**
+   * Show the on/off row on its own. The static template pages play recorded
+   * narration, so muting applies there too — but the backend and voice
+   * sections below it are Studio's and would be meaningless.
+   */
+  showNarrationRow?: boolean;
 }
 
 const SAMPLE_TEXT_DEFAULT = "你好，这是一段试听文字。Hello, this is a preview.";
@@ -46,6 +52,7 @@ export const PlayerSettingsPopover: React.FC<PlayerSettingsPopoverProps> = ({
   isDark,
   onPreview,
   showTTS = true,
+  showNarrationRow,
 }) => {
   const popoverRef = useRef<HTMLDivElement>(null);
   const [sampleText, setSampleText] = useState(SAMPLE_TEXT_DEFAULT);
@@ -155,7 +162,7 @@ export const PlayerSettingsPopover: React.FC<PlayerSettingsPopoverProps> = ({
             {stepThrough ? "步进" : "连播"}
           </button>
         </div>
-        {showTTS && (
+        {(showNarrationRow ?? showTTS) && (
           <div className="playbook-player__settings-row">
             <span>语音朗读</span>
             <button
