@@ -425,7 +425,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     const step = script.steps[safeStepIndex];
     if (!step) return;
     if (!enableTTS) {
-      recordedRef.current.playStep(step.step_id, step.voiceover_text);
+      recordedRef.current.playStep(step.step_id);
       return;
     }
     if (!ttsRef.current.enabled) return;
