@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 
 from app.application.dto.pipeline_dto import PipelineRequest
-from app.application.use_cases.export_video import ExportVideoUseCase
+from app.application.use_cases.export_video import ExportVideoUseCase, _render_scale
 from app.application.use_cases.run_pipeline import RunPipelineUseCase
 from app.domain.models.coverage import CoverageDecision
 from app.domain.models.director import DirectorBeat, DirectorScript
@@ -1248,7 +1248,9 @@ async def test_template_export_refuses_unknown_and_traversing_ids(tmp_path) -> N
     assert use_case.input_props is None
 
 
-def _captured_remotion_argv(monkeypatch, tmp_path) -> list[str]:
+def _captured_remotion_argv(
+    monkeypatch, tmp_path, options: ExportOptions | None = None
+) -> list[str]:
     """Run the real _run_remotion_render far enough to see the argv it builds."""
     captured: dict[str, list[str]] = {}
 
@@ -1272,7 +1274,10 @@ def _captured_remotion_argv(monkeypatch, tmp_path) -> list[str]:
     with contextlib.suppress(Exception):
         asyncio.run(
             use_case._run_remotion_render(
-                "job", tmp_path / "props.json", tmp_path / "out.mp4", ExportOptions()
+                "job",
+                tmp_path / "props.json",
+                tmp_path / "out.mp4",
+                options or ExportOptions(),
             )
         )
     return captured["cmd"]
@@ -1300,3 +1305,33 @@ def test_remotion_cli_omits_the_flag_when_no_browser_is_configured(
 ) -> None:
     monkeypatch.setenv("REMOTION_BROWSER_EXECUTABLE", value)
     assert "--browser-executable" not in _captured_remotion_argv(monkeypatch, tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("quality", "expected"),
+    [("720p", "1.33333"), ("1080p", "2"), ("2k", "2.66667")],
+)
+def test_render_magnifies_the_composition_for_each_quality(
+    monkeypatch, tmp_path, quality: str, expected: str
+) -> None:
+    """--width/--height re-lays the design out; --scale magnifies it.
+
+    The shipped defect: a composition authored at 960×540 kept its absolute
+    pixel sizes when rendered at 1920×1080, so a 14px subtitle stayed 14
+    physical pixels — half the intended size, measured on the exported frames
+    — and every lesson went out with text too small to read on a phone.
+    """
+    monkeypatch.delenv("REMOTION_BROWSER_EXECUTABLE", raising=False)
+    cmd = _captured_remotion_argv(
+        monkeypatch, tmp_path, options=ExportOptions(quality=quality)
+    )
+    assert "--width" not in cmd and "--height" not in cmd
+    assert "--scale" in cmd
+    assert cmd[cmd.index("--scale") + 1].startswith(expected[:4])
+
+
+def test_scale_is_derived_from_the_configured_composition_width() -> None:
+    assert _render_scale(1920, 960) == 2.0
+    assert _render_scale(1280, 960) == pytest.approx(4 / 3)
+    # A composition width of zero must not divide by zero.
+    assert _render_scale(1920, 0) == 1.0

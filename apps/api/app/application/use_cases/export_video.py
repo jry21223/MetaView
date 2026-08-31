@@ -115,6 +115,22 @@ _QUALITY_TO_DIMENSIONS: dict[str, tuple[int, int]] = {
     "1080p": (1920, 1080),
     "2k": (2560, 1440),
 }
+
+
+def _render_scale(width: int, composition_width: int) -> float:
+    """How much to magnify the composition to reach the requested width.
+
+    Remotion's ``--width``/``--height`` *re-lay out* the composition at the new
+    size rather than magnifying it, so a design authored at 960×540 kept its
+    absolute pixel sizes when asked for 1920×1080: a 14px subtitle stayed 14
+    physical pixels, half the size the layout intends, and every lesson
+    exported with text too small to read on a phone. ``--scale`` magnifies
+    instead, so type, strokes and spacing all keep their proportions.
+    """
+
+    if composition_width <= 0:
+        return 1.0
+    return width / composition_width
 _FORMAT_TO_EXTENSION: dict[str, str] = {"mp4": "mp4", "webm": "webm", "gif": "gif"}
 
 logger = logging.getLogger(__name__)
@@ -482,7 +498,10 @@ class ExportVideoUseCase:
     ) -> None:
         # Codec is picked from the desired container; Remotion ships h264/vp8/gif.
         codec = {"mp4": "h264", "webm": "vp8", "gif": "gif"}.get(options.format, "h264")
-        width, height = _QUALITY_TO_DIMENSIONS.get(options.quality, (1920, 1080))
+        width, _height = _QUALITY_TO_DIMENSIONS.get(options.quality, (1920, 1080))
+        from app.config import get_settings
+
+        scale = _render_scale(width, get_settings().playbook_composition_width)
         remotion_bin = _resolve_remotion_bin(self._web_dir)
         cmd = [
             str(remotion_bin),
@@ -496,10 +515,10 @@ class ExportVideoUseCase:
             "info",
             "--codec",
             codec,
-            "--width",
-            str(width),
-            "--height",
-            str(height),
+            # Magnify the composition rather than re-laying it out; see
+            # _render_scale for why --width/--height halved every font.
+            "--scale",
+            f"{scale:g}",
             "--frames-per-second",
             str(options.fps),
         ]
