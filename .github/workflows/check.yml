@@ -44,6 +44,12 @@ jobs:
       - name: Lint
         run: make lint
 
+      # The narration speakability guard scans the frozen template playbooks,
+      # which live in gitignored data/ as a build artifact. Without this the
+      # corpus is empty on CI and the guard silently protects nothing.
+      - name: Export template playbooks
+        run: npm --workspace apps/web run template-previews:export
+
       - name: Test API
         run: .venv/bin/pytest apps/api/tests -q
 
