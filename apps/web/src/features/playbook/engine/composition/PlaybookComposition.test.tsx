@@ -28,6 +28,7 @@ vi.mock("remotion", async () => {
 });
 
 import { PlaybookComposition } from "./PlaybookComposition";
+import { THEME_PALETTE } from "../../../../shared/config/themePalette";
 
 function plotSnapshot(expression = "x^2"): MathPlotSnapshot {
   return {
@@ -751,7 +752,9 @@ describe("PlaybookComposition", () => {
     const baseLayer = layerOpenTag(markup, "math_plot");
 
     expect(markup).toContain("scene-compositor");
-    expect(markup).toContain("background:#0f1117");
+    // The stage takes its ground from the palette, not a literal: this used to
+    // pin GitHub's #0f1117, a cool grey in an otherwise warm picture.
+    expect(markup).toContain(`background:${THEME_PALETTE.dark.surface2}`);
     expect(baseLayer).not.toBe("");
     expect(baseLayer).toContain("opacity:1");
     expect(baseLayer).not.toContain("opacity:0");

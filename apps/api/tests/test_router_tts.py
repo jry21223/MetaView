@@ -62,6 +62,20 @@ class _FakeAsyncClient:
         return _FakeAsyncClient.response
 
 
+def _pin_openai_dialect(monkeypatch) -> None:
+    """Keep these tests hermetic against the operator's own environment.
+
+    Settings read METAVIEW_TTS_* straight from the process environment, so a
+    developer who has exported a real provider — say while driving a live
+    render — would otherwise watch four unrelated tests fail with a KeyError
+    on a request body that is a perfectly correct body for *their* dialect.
+    """
+
+    monkeypatch.setenv("METAVIEW_TTS_PROVIDER", "openai")
+    for leaked in ("METAVIEW_TTS_RESOURCE_ID", "METAVIEW_TTS_APP_ID",
+                   "METAVIEW_TTS_DEFAULT_VOICE", "METAVIEW_TTS_BASE_URL"):
+        monkeypatch.delenv(leaked, raising=False)
+
 @pytest.fixture(autouse=True)
 def _reset_fake_client() -> Iterator[None]:
     _FakeAsyncClient.response = None
@@ -75,6 +89,7 @@ def client(monkeypatch) -> TestClient:
     get_settings.cache_clear()
     monkeypatch.setenv("METAVIEW_TTS_API_KEY", "sk-test-secret")
     monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    _pin_openai_dialect(monkeypatch)
     monkeypatch.setattr(
         "app.presentation.router_tts.httpx.AsyncClient", _FakeAsyncClient
     )
@@ -89,6 +104,7 @@ def client_without_key(monkeypatch) -> TestClient:
     monkeypatch.setenv("METAVIEW_TTS_API_KEY", "")
     monkeypatch.setenv("METAVIEW_OPENAI_API_KEY", "")
     monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    _pin_openai_dialect(monkeypatch)
     monkeypatch.setattr(
         "app.presentation.router_tts.httpx.AsyncClient", _FakeAsyncClient
     )
@@ -107,6 +123,7 @@ def ops_client(monkeypatch, tmp_path) -> tuple[TestClient, object]:
     monkeypatch.setenv("METAVIEW_HISTORY_DB_PATH", db)
     monkeypatch.setenv("METAVIEW_TTS_API_KEY", "sk-server-secret")
     monkeypatch.setenv("METAVIEW_RATE_LIMIT_ENABLED", "false")
+    _pin_openai_dialect(monkeypatch)
     monkeypatch.setattr(
         "app.presentation.router_tts.httpx.AsyncClient", _FakeAsyncClient
     )

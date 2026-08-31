@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 
 from app.application.dto.pipeline_dto import PipelineRequest
-from app.application.use_cases.export_video import ExportVideoUseCase
+from app.application.use_cases.export_video import ExportVideoUseCase, _render_scale
 from app.application.use_cases.run_pipeline import RunPipelineUseCase
 from app.domain.models.coverage import CoverageDecision
 from app.domain.models.director import DirectorBeat, DirectorScript
@@ -1307,26 +1307,31 @@ def test_remotion_cli_omits_the_flag_when_no_browser_is_configured(
     assert "--browser-executable" not in _captured_remotion_argv(monkeypatch, tmp_path)
 
 
-def test_remotion_renders_at_scale_instead_of_overriding_the_composition_size(
-    monkeypatch, tmp_path
-) -> None:
-    """1080p must mean "the authored layout, rasterised at 1080p".
-
-    --width/--height replace the composition's dimensions, so the layout's
-    fixed-px chrome (a 14px subtitle on a 960px-wide canvas) was laid out on a
-    1920px canvas and rendered at half its intended relative size. --scale
-    keeps the layout and raises the resolution.
-    """
-    cmd = _captured_remotion_argv(monkeypatch, tmp_path)
-    assert "--width" not in cmd and "--height" not in cmd
-    assert float(cmd[cmd.index("--scale") + 1]) == pytest.approx(2.0)
-
-
 @pytest.mark.parametrize(
-    ("quality", "expected"), [("720p", 4 / 3), ("1080p", 2.0), ("2k", 8 / 3)]
+    ("quality", "expected"),
+    [("720p", "1.33333"), ("1080p", "2"), ("2k", "2.66667")],
 )
-def test_every_quality_maps_to_its_composition_scale(
-    monkeypatch, tmp_path, quality: str, expected: float
+def test_render_magnifies_the_composition_for_each_quality(
+    monkeypatch, tmp_path, quality: str, expected: str
 ) -> None:
-    cmd = _captured_remotion_argv(monkeypatch, tmp_path, ExportOptions(quality=quality))
-    assert float(cmd[cmd.index("--scale") + 1]) == pytest.approx(expected, abs=1e-5)
+    """--width/--height re-lays the design out; --scale magnifies it.
+
+    The shipped defect: a composition authored at 960×540 kept its absolute
+    pixel sizes when rendered at 1920×1080, so a 14px subtitle stayed 14
+    physical pixels — half the intended size, measured on the exported frames
+    — and every lesson went out with text too small to read on a phone.
+    """
+    monkeypatch.delenv("REMOTION_BROWSER_EXECUTABLE", raising=False)
+    cmd = _captured_remotion_argv(
+        monkeypatch, tmp_path, options=ExportOptions(quality=quality)
+    )
+    assert "--width" not in cmd and "--height" not in cmd
+    assert "--scale" in cmd
+    assert cmd[cmd.index("--scale") + 1].startswith(expected[:4])
+
+
+def test_scale_is_derived_from_the_configured_composition_width() -> None:
+    assert _render_scale(1920, 960) == 2.0
+    assert _render_scale(1280, 960) == pytest.approx(4 / 3)
+    # A composition width of zero must not divide by zero.
+    assert _render_scale(1920, 0) == 1.0

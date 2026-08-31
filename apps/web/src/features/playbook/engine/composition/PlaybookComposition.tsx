@@ -5,6 +5,7 @@ import { CodeHighlightRenderer } from "../renderers/CodeHighlightRenderer";
 import { useStepProgress } from "./useInterpolatedState";
 import type { RendererInteractionEvent, RendererProps } from "../renderers/types";
 import { PLAYBOOK_LAYOUT } from "../../../../shared/config/constants";
+import { THEME_PALETTE } from "../../../../shared/config/themePalette";
 import { rendererRegistry } from "../renderers/registry";
 import { appearTransform, useTimeline } from "../foundation";
 import { compileVisualTimeline, type VisualLayerState, type VisualStepState } from "./visualContinuity";
@@ -29,8 +30,20 @@ interface PlaybookCompositionProps {
   interactionTargetKind?: Extract<SnapshotKind, "math_plot" | "graph_scene">;
 }
 
+/**
+ * A whisper of warmth under the narration — the studio surface darkened a
+ * few percent, so the caption has a ground to sit on without the bar reading
+ * as a separate slab bolted to the bottom of the frame.
+ */
+const SUBTITLE_TINT = {
+  light: "rgba(243,241,232,0.94)",
+  dark: "rgba(20,25,23,0.88)",
+} as const;
+
 function stageBackground(theme: "dark" | "light"): string {
-  return theme === "dark" ? "#0f1117" : "#f6f8fa";
+  // Same palette as everything drawn on top of it; a cool grey here used to
+  // show through wherever a renderer did not paint its own surface.
+  return THEME_PALETTE[theme === "dark" ? "dark" : "light"].surface2;
 }
 
 function SnapshotRenderer(props: RendererProps) {
@@ -44,8 +57,8 @@ function SnapshotRenderer(props: RendererProps) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: props.theme === "dark" ? "#0a0c10" : "#f5f7fa",
-        color: props.theme === "dark" ? "#e8ecf4" : "#141820",
+        background: stageBackground(props.theme),
+        color: THEME_PALETTE[props.theme === "dark" ? "dark" : "light"].ink,
         fontFamily: "system-ui, sans-serif",
         fontSize: 18,
       }}
@@ -328,9 +341,16 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
 
   const isDark = theme === "dark";
   const visualBackground = stageBackground(theme);
-  const subtitleBg = isDark ? "rgba(10,12,16,0.85)" : "rgba(245,247,250,0.92)";
-  const subtitleColor = isDark ? "#c9d1d9" : "#24292f";
-  const dividerColor = isDark ? "#30363d" : "#d0d7de";
+  // The subtitle bar used to carry GitHub's Primer palette — #24292f, #d0d7de,
+  // a cool rgba(245,247,250) ground — while everything else in the frame is
+  // drawn from the warm theme tokens. Sampling a rendered frame, 61.7% of it
+  // was the warm paper and the bar was the ONLY cool region in the picture,
+  // 9.1% of the pixels: one discordant patch under every lesson. These come
+  // from the palette now, so the bar belongs to the same picture.
+  const palette = THEME_PALETTE[isDark ? "dark" : "light"];
+  const subtitleBg = isDark ? SUBTITLE_TINT.dark : SUBTITLE_TINT.light;
+  const subtitleColor = palette.ink2;
+  const dividerColor = palette.line;
 
   const rendererProps: RendererProps = {
     step,

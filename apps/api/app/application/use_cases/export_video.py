@@ -116,15 +116,21 @@ _QUALITY_TO_DIMENSIONS: dict[str, tuple[int, int]] = {
     "2k": (2560, 1440),
 }
 
-# The playbook composition is authored at 960×540 CSS pixels (PLAYBOOK_DEFAULTS
-# in apps/web/src/shared/config/constants.ts) and sizes its chrome in fixed px:
-# a 14px subtitle, a 19px step title. Remotion's --width/--height *replace* the
-# composition's dimensions rather than scaling its layout, so asking for 1080p
-# used to lay that same 14px subtitle out on a canvas twice as wide — every
-# piece of text came out at half the size the design intends, which is exactly
-# how a lecture ends up unreadable on screen. --scale keeps the authored layout
-# and rasterises it at the higher resolution, which is what "1080p" should mean.
-_COMPOSITION_BASE_WIDTH = 960
+
+def _render_scale(width: int, composition_width: int) -> float:
+    """How much to magnify the composition to reach the requested width.
+
+    Remotion's ``--width``/``--height`` *re-lay out* the composition at the new
+    size rather than magnifying it, so a design authored at 960×540 kept its
+    absolute pixel sizes when asked for 1920×1080: a 14px subtitle stayed 14
+    physical pixels, half the size the layout intends, and every lesson
+    exported with text too small to read on a phone. ``--scale`` magnifies
+    instead, so type, strokes and spacing all keep their proportions.
+    """
+
+    if composition_width <= 0:
+        return 1.0
+    return width / composition_width
 _FORMAT_TO_EXTENSION: dict[str, str] = {"mp4": "mp4", "webm": "webm", "gif": "gif"}
 
 logger = logging.getLogger(__name__)
@@ -493,7 +499,9 @@ class ExportVideoUseCase:
         # Codec is picked from the desired container; Remotion ships h264/vp8/gif.
         codec = {"mp4": "h264", "webm": "vp8", "gif": "gif"}.get(options.format, "h264")
         width, _height = _QUALITY_TO_DIMENSIONS.get(options.quality, (1920, 1080))
-        scale = width / _COMPOSITION_BASE_WIDTH
+        from app.config import get_settings
+
+        scale = _render_scale(width, get_settings().playbook_composition_width)
         remotion_bin = _resolve_remotion_bin(self._web_dir)
         cmd = [
             str(remotion_bin),
@@ -507,8 +515,10 @@ class ExportVideoUseCase:
             "info",
             "--codec",
             codec,
+            # Magnify the composition rather than re-laying it out; see
+            # _render_scale for why --width/--height halved every font.
             "--scale",
-            f"{scale:.6f}",
+            f"{scale:g}",
             "--frames-per-second",
             str(options.fps),
         ]
