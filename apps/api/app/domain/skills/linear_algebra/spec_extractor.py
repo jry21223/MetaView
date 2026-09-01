@@ -26,6 +26,12 @@ def try_extract_linear_algebra(prompt: str) -> LinearAlgebraProblemSpec | None:
             matrix=matrix,
         )
 
+    # Graph-edge notation like "A->B=2" is not a linear equation; without this
+    # guard a Dijkstra prompt reads as a solvable system and outranks the
+    # algorithm skill pack. See issue #282.
+    if "->" in normalized:
+        return None
+
     if any(keyword in normalized.lower() for keyword in _SYSTEM_KEYWORDS) or _looks_like_system(
         normalized
     ):

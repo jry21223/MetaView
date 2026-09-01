@@ -20,8 +20,13 @@ def try_extract_ellipse_focus_definition(prompt: str) -> ConicEllipseFocusProble
         return None
     a_match = _A_RE.search(text)
     b_match = _B_RE.search(text)
-    if a_match is None or b_match is None:
+    if (a_match is None) != (b_match is None):
+        # Half-specified axes are ambiguous; let another skill or path claim it.
         return None
+    if a_match is None and b_match is None:
+        # A pure focus-definition demo names no axes (the manifest's own second
+        # example); use a classic demonstration ellipse. See issue #282.
+        return ConicEllipseFocusProblemSpec(original_prompt=prompt, a=5.0, b=3.0)
     try:
         return ConicEllipseFocusProblemSpec(
             original_prompt=prompt,
