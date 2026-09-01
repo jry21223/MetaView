@@ -74,7 +74,7 @@ def test_algebra_core_solves_equation_and_system_matrix() -> None:
     [
         (ElementaryAlgebraSkillPack(), "解方程 2x+3=11", "elementary_algebra", "table_scene"),
         (LinearAlgebraSkillPack(), "求 A=[[1,2],[3,4]] 的特征值", "linear_algebra", "matrix_scene"),
-        (CalculusCoreSkillPack(), "求 d/dx (x^2 sin x)", "calculus_core", "iteration_trace_scene"),
+        (CalculusCoreSkillPack(), "求 d/dx (x^2 sin x)", "calculus_core", "math_plot"),
     ],
 )
 @pytest.mark.asyncio

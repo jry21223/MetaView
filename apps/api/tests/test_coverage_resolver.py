@@ -310,13 +310,26 @@ def test_generic_override_never_forces_a_registered_skill() -> None:
 def test_binary_search_dataset_cannot_become_statistics_specialized() -> None:
     registry = build_default_skill_registry()
     prompt = "用二分查找在 [2,4,7,11,18,25,31] 中查找 18"
-    false_match = registry.heuristic_match(SkillRouteInput(prompt=prompt))
-    assert false_match is not None
-    assert false_match.skill_id == "probability_statistics_core"
 
+    # Since issue #282 the statistics extractor no longer claims a bare number
+    # list, so the false match is gone at the source.
+    false_match = registry.heuristic_match(SkillRouteInput(prompt=prompt))
+    assert false_match is None or false_match.skill_id != "probability_statistics_core"
+
+    # The resolver's downstream defense must still hold if a mis-route ever
+    # reappears: a statistics claim on an algorithm prompt degrades to
+    # experimental with an explicit domain mismatch.
+    forged_match = SkillRouteMatch(
+        skill_id="probability_statistics_core",
+        domain="math",
+        confidence=0.9,
+        capability_id="probability_statistics_core.descriptive_statistics",
+        reason="forged false positive for downstream-defense coverage",
+        problem_spec=None,
+    )
     decision = DefaultCoverageResolver(registry).resolve(
         prompt=prompt,
-        route_match=false_match,
+        route_match=forged_match,
     )
 
     assert decision.mode == "experimental"

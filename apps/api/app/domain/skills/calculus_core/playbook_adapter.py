@@ -39,42 +39,28 @@ def _build_derivative(spec: CalculusCoreProblemSpec) -> PlaybookScript:
     expr, parsed = parse_expression(spec.expression)
     symbol = sp.Symbol(spec.variable)
     derivative = sp.simplify(sp.diff(expr, symbol))
-    if spec.point is not None:
-        return _build_derivative_tangent(spec, expr, parsed.latex, symbol, derivative)
-    snapshots = [
-        MathFormulaSnapshot(
-            formula_latex=rf"f({spec.variable})={parsed.latex}", caption="把输入解析为单变量函数。"
-        ),
-        MathFormulaSnapshot(
-            formula_latex=rf"f'({spec.variable})=\frac{{d}}{{d{spec.variable}}}\left({parsed.latex}\right)",
-            caption="导数表示瞬时变化率。",
-        ),
-        MathFormulaSnapshot(
-            formula_latex=rf"f'({spec.variable})={sp.latex(derivative)}",
-            caption="使用确定性符号求导。",
-        ),
-        MathPlotSnapshot(
-            curves=[
-                MathPlotCurve(
-                    expression=expression_to_source(expr), label="f(x)", emphasis="secondary"
-                ),
-                MathPlotCurve(
-                    expression=expression_to_source(derivative), label="f'(x)", emphasis="accent"
-                ),
-            ],
-            x_min=-5,
-            x_max=5,
-            formula_latex=rf"f'({spec.variable})={sp.latex(derivative)}",
-        ),
-        IterationTraceSceneSnapshot(
-            iterations=_sample_derivative(expr, derivative, symbol),
-            metric_name="slope",
-            current_index=2,
-            formula_latex=rf"f'({spec.variable})={sp.latex(derivative)}",
-            caption="用几个采样点对比函数值和导数斜率。",
-        ),
-    ]
-    return _script(spec, "单变量导数", snapshots)
+    # A derivative lesson always teaches through the secant→tangent arc (the
+    # LessonPlan demands tangent/secant/target_point visuals even without an
+    # explicit point); without one we pick a well-defined demonstration point.
+    if spec.point is None:
+        spec = spec.model_copy(update={"point": _default_tangent_point(expr, derivative, symbol)})
+    return _build_derivative_tangent(spec, expr, parsed.latex, symbol, derivative)
+
+
+def _default_tangent_point(
+    expr: sp.Expr,
+    derivative: sp.Expr,
+    symbol: sp.Symbol,
+) -> float | int:
+    for candidate in (1, sp.Rational(1, 2), 2, -1, 0):
+        try:
+            value = expr.subs(symbol, candidate)
+            slope = derivative.subs(symbol, candidate)
+        except Exception:  # noqa: BLE001
+            continue
+        if value.is_real and slope.is_real and value.is_finite and slope.is_finite:
+            return int(candidate) if candidate == int(candidate) else float(candidate)
+    return 1
 
 
 def _build_derivative_tangent(
@@ -189,8 +175,17 @@ def _build_derivative_tangent(
                 f"因此该点的切线斜率也等于 {_display(tangent_slope)}。"
             ),
         ),
+        MathFormulaSnapshot(
+            formula_latex=rf"f'({spec.variable})={sp.latex(derivative)}",
+            caption="切线斜率随目标点移动，就得到整条导函数。",
+        ),
     ]
-    return _script(spec, "导数的几何意义", snapshots)
+    answer_text = (
+        f"所以 d/d{spec.variable} ({expression_to_source(expr)}) = "
+        f"{expression_to_source(derivative)}；在 {spec.variable}={_display(point)} 处，"
+        f"切线斜率为 {_display(tangent_slope)}。"
+    )
+    return _script(spec, "导数的几何意义", snapshots, answer_text=answer_text)
 
 
 def _secant_line(
@@ -207,7 +202,10 @@ def _secant_line(
 
 
 def _display(value: sp.Expr) -> str:
-    return sp.sstr(sp.simplify(value))
+    simplified = sp.simplify(value)
+    if getattr(simplified, "is_Float", False):
+        return str(round(float(simplified), 4))
+    return sp.sstr(simplified)
 
 
 def _build_integral(spec: CalculusCoreProblemSpec) -> PlaybookScript:
@@ -248,9 +246,16 @@ def _build_integral(spec: CalculusCoreProblemSpec) -> PlaybookScript:
             formula_latex=rf"面积={sp.latex(value)}",
             caption="用分割采样展示面积累积直觉。",
         ),
-        MathFormulaSnapshot(formula_latex=rf"\boxed{{{sp.latex(value)}}}", caption="最终结果。"),
+        MathFormulaSnapshot(
+            formula_latex=rf"{integral_latex}=\boxed{{{sp.latex(value)}}}",
+            caption="阴影区域的面积就是这个定积分的值。",
+        ),
     ]
-    return _script(spec, "定积分面积", snapshots)
+    answer_text = (
+        f"所以 int_{_display(lower)}^{_display(upper)} {expression_to_source(expr)} "
+        f"d{spec.variable} = {_display(value)}，曲线下这块面积等于 {_display(value)}。"
+    )
+    return _script(spec, "定积分面积", snapshots, answer_text=answer_text)
 
 
 def _build_limit(spec: CalculusCoreProblemSpec) -> PlaybookScript:
@@ -286,9 +291,16 @@ def _build_limit(spec: CalculusCoreProblemSpec) -> PlaybookScript:
             formula_latex=rf"{limit_latex}={sp.latex(value)}",
             caption="符号极限给出最终值。",
         ),
-        MathFormulaSnapshot(formula_latex=rf"\boxed{{{sp.latex(value)}}}", caption="整理答案。"),
+        MathFormulaSnapshot(
+            formula_latex=rf"{limit_latex}=\boxed{{{sp.latex(value)}}}",
+            caption="两侧取样与符号计算给出同一个极限值。",
+        ),
     ]
-    return _script(spec, "单变量极限", snapshots)
+    answer_text = (
+        f"所以 lim {spec.variable}->{_display(point)} {expression_to_source(expr)} "
+        f"= {_display(value)}，极限等于 {_display(value)}。"
+    )
+    return _script(spec, "单变量极限", snapshots, answer_text=answer_text)
 
 
 def _build_series(spec: CalculusCoreProblemSpec) -> PlaybookScript:
@@ -331,18 +343,29 @@ def _build_series(spec: CalculusCoreProblemSpec) -> PlaybookScript:
         ),
         MathFormulaSnapshot(formula_latex=sp.latex(series), caption="最终近似多项式。"),
     ]
-    return _script(spec, "泰勒展开", snapshots)
+    answer_text = (
+        f"所以 {expression_to_source(expr)} 在该点的泰勒多项式为 "
+        f"{expression_to_source(series)}。"
+    )
+    return _script(spec, "泰勒展开", snapshots, answer_text=answer_text)
 
 
 def _script(
     spec: CalculusCoreProblemSpec,
     title: str,
     snapshots: list[MathFormulaSnapshot | MathPlotSnapshot | IterationTraceSceneSnapshot],
+    *,
+    answer_text: str | None = None,
 ) -> PlaybookScript:
     steps: list[MetaStep] = []
     frame_cursor = 0
-    for index, snapshot in enumerate(snapshots[:6]):
+    kept = snapshots[:6]
+    for index, snapshot in enumerate(kept):
         voiceover_text = getattr(snapshot, "caption", None) or "执行微积分步骤。"
+        if answer_text and index == len(kept) - 1:
+            # The final step must state the requested conclusion in narration —
+            # a \boxed{} formula alone never answers the prompt (issue #283).
+            voiceover_text = f"{voiceover_text} {answer_text}".strip()
         frame_cursor += max(_STEP_FRAMES, estimate_step_frames(voiceover_text, _FPS))
         steps.append(
             MetaStep(
@@ -368,19 +391,6 @@ def _script(
         initial_data={},
     )
 
-
-def _sample_derivative(
-    expr: sp.Expr, derivative: sp.Expr, symbol: sp.Symbol
-) -> list[IterationTraceItem]:
-    items: list[IterationTraceItem] = []
-    for index, x_value in enumerate([-2, -1, 0, 1, 2]):
-        slope = sp.N(derivative.subs(symbol, x_value), 5)
-        items.append(
-            IterationTraceItem(
-                index=index, value=f"x={x_value}", error=float(slope), label=f"斜率 {slope}"
-            )
-        )
-    return items
 
 
 def _riemann_samples(

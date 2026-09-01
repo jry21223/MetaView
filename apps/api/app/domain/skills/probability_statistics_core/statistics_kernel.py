@@ -23,6 +23,16 @@ class ProbabilityStatisticsSolution:
     assumptions: list[str] = field(default_factory=list)
 
 
+_DESCRIPTIVE_LABELS = {
+    "mean": "均值",
+    "median": "中位数",
+    "mode": "众数",
+    "range": "极差",
+    "variance": "方差",
+    "std": "标准差",
+}
+
+
 def solve_probability_statistics(
     spec: ProbabilityStatisticsProblemSpec,
 ) -> ProbabilityStatisticsSolution:
@@ -74,7 +84,12 @@ def _solve_descriptive(spec: ProbabilityStatisticsProblemSpec) -> ProbabilitySta
         table_rows=rows,
         chart_values=[(str(index + 1), float(value)) for index, value in enumerate(spec.data)],
         formula_latex=r"\bar{x}=\frac{\sum x_i}{n}",
-        answer_text="；".join(f"{key}={_display(value)}" for key, value in results.items()),
+        # Bilingual labels so the final narration shares tokens with the
+        # (usually Chinese) prompt — "mean=5" alone never answers 「求均值」.
+        answer_text="；".join(
+            f"{_DESCRIPTIVE_LABELS.get(key, key)} {key}={_display(value)}"
+            for key, value in results.items()
+        ),
         data=spec.data,
         assumptions=spec.assumptions,
     )
