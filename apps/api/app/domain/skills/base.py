@@ -71,6 +71,9 @@ class SkillExecutionResult(BaseModel):
 
 class SkillPack(Protocol):
     manifest: SkillManifest
+    # ProblemSpec model advertised to agents (runtime tool args_schema); the
+    # same model validate_problem_spec accepts.
+    problem_spec_model: type[BaseModel]
 
     def heuristic_match(self, request: SkillRouteInput) -> SkillRouteMatch | None:
         ...

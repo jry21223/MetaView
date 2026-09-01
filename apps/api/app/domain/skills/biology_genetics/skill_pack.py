@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 class BiologyGeneticsSkillPack:
     manifest = BIOLOGY_GENETICS_MANIFEST
+    problem_spec_model = BiologyGeneticsProblemSpec
 
     def heuristic_match(self, request: SkillRouteInput) -> SkillRouteMatch | None:
         spec = try_extract_biology_genetics(request.prompt)

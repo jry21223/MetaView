@@ -81,6 +81,7 @@ def _snapshots(
             ],
             x_label="反应物",
             y_label="n/系数",
+            categories=[label for label, _value in solution.chart_values],
             formula_latex=r"\min(n_i/\nu_i)",
             caption="柱子越短，越先耗尽，是限量反应物。",
         )

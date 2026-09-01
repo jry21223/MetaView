@@ -112,6 +112,11 @@ def _projectile_force_snapshot(solution: PhysicsMechanicsSolution) -> PhysicsFor
 
 
 def _motion_snapshot(solution: PhysicsMechanicsSolution) -> MotionSceneSnapshot:
+    if solution.kind == "incline_force":
+        return _incline_motion_snapshot(solution)
+    # The direction label lives at the arrow tip, not on the segment itself:
+    # a segment label sits at the midpoint, exactly where the animated body's
+    # own label passes, and the two collide mid-step (issue #286).
     objects = [
         MotionSegmentObject(
             id="axis",
@@ -120,9 +125,9 @@ def _motion_snapshot(solution: PhysicsMechanicsSolution) -> MotionSceneSnapshot:
             x2=4,
             y2=0,
             arrow=True,
-            label="运动方向",
             style="muted",
         ),
+        MotionTextObject(id="axis-label", x=3.4, y=0.55, text="运动方向", style="label"),
         MotionPointObject(id="body", x=-3.2, y=0, r=0.16, label="物体", style="primary"),
         MotionSegmentObject(
             id="velocity",
@@ -210,6 +215,109 @@ def _motion_snapshot(solution: PhysicsMechanicsSolution) -> MotionSceneSnapshot:
                 easing="easeInOut",
             ),
         ]
+    return MotionSceneSnapshot(
+        viewport=MotionSceneViewport(
+            width=960,
+            height=540,
+            world=MotionSceneWorld(xMin=-4.5, xMax=4.5, yMin=-3.0, yMax=3.0),
+        ),
+        objects=objects,
+        tracks=tracks,
+        camera=MotionCameraTrack(
+            keyframes=[
+                MotionCameraKeyframe(t=0, x=0, y=0, zoom=1),
+                MotionCameraKeyframe(t=1, x=0, y=0, zoom=1),
+            ],
+            easing="linear",
+        ),
+    )
+
+
+def _incline_motion_snapshot(solution: PhysicsMechanicsSolution) -> MotionSceneSnapshot:
+    """Draw the ramp at the real incline angle with the body sliding down it.
+
+    The generic horizontal scene used to be reused verbatim here, so the
+    narration said 沿斜面下滑 while the picture showed level motion (#286).
+    """
+    import math
+
+    angle_value = solution.values.get("angle_deg")
+    angle_deg = angle_value.numeric if angle_value is not None else 30.0
+    angle = math.radians(max(5.0, min(80.0, angle_deg)))
+    base = (3.8, -2.2)
+    ramp_length = min(6.5, 7.6 / math.cos(angle), 4.6 / math.sin(angle))
+    top = (base[0] - ramp_length * math.cos(angle), base[1] + ramp_length * math.sin(angle))
+    # Down-slope unit direction, and the outward normal used to float the
+    # velocity arrow above the surface, clear of the body's path.
+    down = (math.cos(angle), -math.sin(angle))
+    normal = (math.sin(angle), math.cos(angle))
+    start = (top[0] + 0.4 * down[0], top[1] + 0.4 * down[1])
+    end = (base[0] - 0.6 * down[0], base[1] - 0.6 * down[1])
+    velocity_start = (start[0] + 0.35 * normal[0], start[1] + 0.35 * normal[1])
+    velocity_end = (velocity_start[0] + 1.8 * down[0], velocity_start[1] + 1.8 * down[1])
+    objects = [
+        MotionSegmentObject(id="ground", x1=-4.2, y1=base[1], x2=4.2, y2=base[1], style="muted"),
+        MotionSegmentObject(
+            id="ramp",
+            x1=round(top[0], 3),
+            y1=round(top[1], 3),
+            x2=base[0],
+            y2=base[1],
+            style="secondary",
+        ),
+        MotionTextObject(
+            id="angle-label",
+            x=base[0] - 1.5,
+            y=base[1] + 0.3,
+            text=f"θ={angle_deg:g}°",
+            style="label",
+        ),
+        MotionPointObject(
+            id="body",
+            x=round(start[0], 3),
+            y=round(start[1], 3),
+            r=0.16,
+            label="物体",
+            style="primary",
+        ),
+        MotionSegmentObject(
+            id="velocity",
+            x1=round(velocity_start[0], 3),
+            y1=round(velocity_start[1], 3),
+            x2=round(velocity_end[0], 3),
+            y2=round(velocity_end[1], 3),
+            arrow=True,
+            label="v",
+            style="accent",
+        ),
+        MotionTextObject(id="summary", x=-3.7, y=2.2, text=solution.answer_text, style="caption"),
+    ]
+    tracks = [
+        MotionTrack(
+            target="body",
+            property="x",
+            keyframes=[
+                MotionKeyframe(t=0, value=round(start[0], 3)),
+                MotionKeyframe(t=1, value=round(end[0], 3)),
+            ],
+            easing="easeInOut",
+        ),
+        MotionTrack(
+            target="body",
+            property="y",
+            keyframes=[
+                MotionKeyframe(t=0, value=round(start[1], 3)),
+                MotionKeyframe(t=1, value=round(end[1], 3)),
+            ],
+            easing="easeInOut",
+        ),
+        MotionTrack(
+            target="velocity",
+            property="drawProgress",
+            keyframes=[MotionKeyframe(t=0, value=0), MotionKeyframe(t=1, value=1)],
+            easing="linear",
+        ),
+    ]
     return MotionSceneSnapshot(
         viewport=MotionSceneViewport(
             width=960,

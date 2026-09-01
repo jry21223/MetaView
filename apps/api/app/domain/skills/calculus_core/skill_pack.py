@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 class CalculusCoreSkillPack:
     manifest = CALCULUS_CORE_MANIFEST
+    problem_spec_model = CalculusCoreProblemSpec
 
     def heuristic_match(self, request: SkillRouteInput) -> SkillRouteMatch | None:
         spec = try_extract_calculus_core(request.prompt)

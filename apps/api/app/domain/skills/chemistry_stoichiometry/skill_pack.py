@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 
 class ChemistryStoichiometrySkillPack:
     manifest = CHEMISTRY_STOICHIOMETRY_MANIFEST
+    problem_spec_model = ChemistryStoichiometryProblemSpec
 
     def heuristic_match(self, request: SkillRouteInput) -> SkillRouteMatch | None:
         spec = try_extract_chemistry_stoichiometry(request.prompt)

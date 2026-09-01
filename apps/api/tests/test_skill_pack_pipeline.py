@@ -353,7 +353,10 @@ async def test_derivative_tangent_prompt_produces_required_visual_evidence() -> 
     }
     assert {"curve", "secant", "tangent"} <= curve_roles
     assert any(snapshot.get("marker_x") == 1 for snapshot in math_plots)
-    assert "切线斜率也等于 2" in playbook["steps"][-1]["voiceover_text"]
+    final_voiceover = playbook["steps"][-1]["voiceover_text"]
+    # Since #283 the final step states the full requested conclusion.
+    assert "切线斜率为 2" in final_voiceover
+    assert "d/dx" in final_voiceover
 
 
 @pytest.mark.asyncio

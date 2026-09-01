@@ -162,7 +162,11 @@ def _solve_incline(spec: PhysicsMechanicsProblemSpec) -> PhysicsMechanicsSolutio
             PhysicsMechanicsStep("重力分解", r"mg\sin\theta", "沿斜面分力提供下滑加速度。"),
             PhysicsMechanicsStep("忽略摩擦", r"a=g\sin\theta", "质量约掉，结果只由角度和 g 决定。"),
         ],
-        values={"acceleration": value},
+        values={
+            "acceleration": value,
+            # The motion-scene adapter draws the ramp at the real angle.
+            "angle_deg": _mechanics_value(Decimal(str(angle)), "°"),
+        },
         answer_latex=rf"a=g\sin\theta={_fmt(acceleration)}\,\text{{m/s}}^2",
         answer_text=f"沿斜面下滑加速度 {value.display}。",
         checks={"frictionless": True},

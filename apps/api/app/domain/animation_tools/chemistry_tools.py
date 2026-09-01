@@ -16,17 +16,32 @@ from app.domain.models.playbook import TableSceneSnapshot
 
 
 class StoichiometryRowArgs(BaseModel):
-    species: str = Field(min_length=1)
-    coefficient: int = Field(ge=1)
-    mol: float | None = Field(default=None, ge=0)
-    mass: float | None = Field(default=None, ge=0)
-    role: str = Field(min_length=1)
+    species: str = Field(min_length=1, description="Chemical formula of the species, e.g. 'Fe2O3'.")
+    coefficient: int = Field(ge=1, description="Balanced-equation coefficient for this species.")
+    mol: float | None = Field(
+        default=None, ge=0, description="Optional amount of substance in mol."
+    )
+    mass: float | None = Field(default=None, ge=0, description="Optional mass in grams.")
+    role: str = Field(
+        min_length=1,
+        description=(
+            "Free-text role shown in the table, e.g. 'reactant', 'product', "
+            "or 'limiting reactant'."
+        ),
+    )
 
 
 class ChemistryStoichiometryTableArgs(BaseModel):
-    rows: list[StoichiometryRowArgs] = Field(min_length=1)
-    equation_latex: str = Field(min_length=1)
-    caption: str | None = None
+    rows: list[StoichiometryRowArgs] = Field(
+        min_length=1, description="One row per species in the balanced reaction."
+    )
+    equation_latex: str = Field(
+        min_length=1,
+        description="Balanced equation as KaTeX, e.g. '4Fe + 3O_2 \\\\rightarrow 2Fe_2O_3'.",
+    )
+    caption: str | None = Field(
+        default=None, description="Optional one-sentence caption rendered as a narration card."
+    )
 
 
 @register("chemistry.stoichiometry_table", ChemistryStoichiometryTableArgs)

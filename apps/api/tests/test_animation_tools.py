@@ -454,3 +454,123 @@ class TestRegistry:
                 _REGISTRY.pop("test.raise_base_exception", None)
             else:
                 _REGISTRY["test.raise_base_exception"] = original
+
+
+class TestErrorEchoAndFailFast:
+    """Issues #279/#280: field paths in errors and fail-fast expression checks."""
+
+    def test_unknown_tool_lists_available_tools(self):
+        result = safe_expand_animation_call("math.show_tangent_line", {})
+
+        assert result.issues[0].code == "animation_tool.unknown_tool"
+        assert "math.show_tangent" in result.issues[0].message
+
+    def test_invalid_args_message_names_every_missing_field(self):
+        result = safe_expand_animation_call("math.show_parametric_curve", {})
+
+        assert result.issues[0].code == "animation_tool.invalid_args"
+        message = result.issues[0].message
+        for field in ("expression_x", "expression_y", "t_min", "t_max"):
+            assert field in message
+
+    def test_invalid_args_message_names_nested_field_path(self):
+        result = safe_expand_animation_call(
+            "physics.force_diagram",
+            {"forces": [{"name": "重力", "magnitude": "9.8牛", "angle_deg": -90}]},
+        )
+
+        assert result.issues[0].code == "animation_tool.invalid_args"
+        assert "forces.0.magnitude" in result.issues[0].message
+
+    @pytest.mark.parametrize("bad_expression", ["x**2", "\\sin(x)"])
+    def test_python_or_latex_expression_fails_fast(self, bad_expression):
+        result = safe_expand_animation_call(
+            "math.show_function", {"expression": bad_expression}
+        )
+
+        assert result.layers == []
+        assert result.issues[0].code == "animation_tool.invalid_expression"
+        assert "expression" in result.issues[0].message
+        assert "'^'" in result.issues[0].message
+
+    def test_caret_grammar_still_expands(self):
+        result = safe_expand_animation_call(
+            "math.show_function", {"expression": "x^2*sin(x)"}
+        )
+
+        assert result.issues == []
+        assert result.layers[0].kind == LayerKind.MATH_PLOT
+
+    def test_formula_latex_is_not_expression_checked(self):
+        result = safe_expand_animation_call(
+            "math.show_function",
+            {"expression": "x^2", "formula_latex": "\\int_0^1 x^2 dx"},
+        )
+
+        assert result.issues == []
+
+
+class TestDerivedTangentAndDerivative:
+    """Issue #281: omit tangent/derivative expressions and get the true ones."""
+
+    def test_show_tangent_derives_true_tangent_when_omitted(self):
+        layers = expand_animation_call(
+            "math.show_tangent", {"expression": "x^2", "x0": 2}
+        )
+
+        tangent = layers[0].plot.curves[1].expression
+        from app.domain.services.safe_math_expr import compile_safe_math_expression
+
+        fn = compile_safe_math_expression(tangent)
+        # Tangent of x^2 at x0=2 is 4x - 4.
+        for x in (-1.0, 0.0, 2.0, 3.5):
+            assert fn({"x": x}) == pytest.approx(4 * x - 4)
+
+    def test_show_tangent_keeps_explicit_tangent_expression(self):
+        layers = expand_animation_call(
+            "math.show_tangent",
+            {"expression": "x^2", "x0": 2, "tangent_expression": "4*x - 4"},
+        )
+
+        assert layers[0].plot.curves[1].expression == "4*x - 4"
+
+    def test_show_derivative_compare_derives_derivative_when_omitted(self):
+        layers = expand_animation_call(
+            "math.show_derivative_compare", {"expression": "x^3"}
+        )
+
+        derivative = layers[0].plot.curves[1].expression
+        from app.domain.services.safe_math_expr import compile_safe_math_expression
+
+        fn = compile_safe_math_expression(derivative)
+        for x in (-2.0, 0.5, 3.0):
+            assert fn({"x": x}) == pytest.approx(3 * x * x)
+
+    def test_every_tool_documents_every_arg_field(self):
+        for tool in list_animation_tools():
+            properties = tool.args_schema.get("properties", {})
+            defs = tool.args_schema.get("$defs", {})
+            for name, prop in properties.items():
+                assert _schema_field_documented(prop, defs), (
+                    f"{tool.name}.{name} has no description"
+                )
+            for def_name, definition in defs.items():
+                for name, prop in definition.get("properties", {}).items():
+                    assert _schema_field_documented(prop, defs), (
+                        f"{tool.name} ${def_name}.{name} has no description"
+                    )
+
+
+def _schema_field_documented(prop: dict, defs: dict) -> bool:
+    if prop.get("description"):
+        return True
+    ref = prop.get("$ref", "")
+    if ref.startswith("#/$defs/"):
+        return True  # nested model documented via its own properties
+    items = prop.get("items")
+    if isinstance(items, dict) and items.get("$ref", "").startswith("#/$defs/"):
+        return True
+    for variant in prop.get("anyOf", []) or []:
+        if isinstance(variant, dict) and variant.get("description"):
+            return True
+    return False

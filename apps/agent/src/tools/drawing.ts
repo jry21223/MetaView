@@ -117,8 +117,9 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
       "add_curve_parametric",
       "Add parametric curve",
       "Add a parametric curve ``(x(t), y(t))`` over ``[t_min, t_max]``. " +
-        "Expressions use the same character set MathPlotRenderer accepts " +
-        "(sin/cos/exp/log + parameters).",
+        "Expression grammar: '^' for powers (never '**'), plain function " +
+        "names like sin(t), cos(t), sqrt(t) (no LaTeX backslashes), explicit " +
+        "multiplication (2*t), constants pi and e.",
       Type.Object({
         expression_x: Type.String({ minLength: 1 }),
         expression_y: Type.String({ minLength: 1 }),
@@ -147,7 +148,9 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
       "Add 1D curve",
       "Add a 1-D function y=f(x). Use this for typical math function plots, " +
         "tangent lines, derivative comparisons, integrals (with shade_from/to " +
-        "set elsewhere).",
+        "set elsewhere). Expression grammar: '^' for powers (never '**'), " +
+        "plain function names like sin(x) (no LaTeX backslashes), explicit " +
+        "multiplication (2*x).",
       Type.Object({
         expression: Type.String({ minLength: 1 }),
         label: Type.String(),

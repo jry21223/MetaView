@@ -48,3 +48,12 @@ math explanations that were not fully handled by deterministic SkillPacks.
   transforms, frame counts, arbitrary JSON Patch operations, or unverified
   discriminant/intersection results. Do not copy public template scripts or
   embed hidden benchmark answers.
+
+## Expression Grammar
+
+All curve and validator expressions use the renderer grammar: `^` for powers
+(never `**`), plain function names (`sin(x)`, not `\sin(x)`), explicit
+multiplication (`2*x`), constants `pi` and `e`. LaTeX is only valid inside
+`formula_latex` / `add_formula`. Prefer omitting `tangent_expression` /
+`derivative_expression` in `math.show_tangent` / `math.show_derivative_compare`
+— the backend derives the true tangent/derivative symbolically.

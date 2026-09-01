@@ -393,9 +393,9 @@ class CodeTraceSceneSnapshot(BaseModel):
 
 
 class ChartPoint(BaseModel):
-    x: float
-    y: float
-    label: str | None = None
+    x: float = Field(description="Horizontal position of the point in chart coordinates.")
+    y: float = Field(description="Vertical position of the point in chart coordinates.")
+    label: str | None = Field(default=None, description="Optional label for this point.")
 
 
 class ChartSeries(BaseModel):
@@ -411,6 +411,10 @@ class StatsChartSceneSnapshot(BaseModel):
     series: list[ChartSeries] = Field(default_factory=list)
     x_label: str = "x"
     y_label: str = "y"
+    # Category names for bar/histogram charts, one per series value; when set
+    # the renderer lays bars out categorically and labels each bar instead of
+    # showing a meaningless numeric index axis (issue #285).
+    categories: list[str] = Field(default_factory=list)
     current_index: int | None = None
     formula_latex: str | None = None
     caption: str | None = None

@@ -106,6 +106,38 @@ describe("advanced math renderers", () => {
     }
   });
 
+  it("labels categorical bars with category names and axis titles (issue #285)", () => {
+    const markup = render({
+      kind: "stats_chart_scene",
+      chart_type: "bar",
+      series: [{ label: "表现型概率", values: [0.75, 0.25], emphasis: "accent" }],
+      x_label: "表现型",
+      y_label: "概率",
+      categories: ["显性", "隐性"],
+    });
+
+    expect(markup).toContain("显性");
+    expect(markup).toContain("隐性");
+    expect(markup).toContain("表现型");
+    expect(markup).toContain("概率");
+    // Categorical mode replaces the numeric index axis under the bars.
+    expect(markup).not.toContain(">0.5<");
+  });
+
+  it("keeps numeric-axis bar charts working without categories", () => {
+    const markup = render({
+      kind: "stats_chart_scene",
+      chart_type: "bar",
+      series: [{ label: "counts", values: [3, 5, 2] }],
+      x_label: "index",
+      y_label: "count",
+    });
+
+    expect(markup).toContain("advanced-math-renderer");
+    expect(markup).toContain("index");
+    expect(markup).toContain("count");
+  });
+
   it("projects compact graph coordinates into the viewport", () => {
     const markup = render({
       kind: "graph_scene",

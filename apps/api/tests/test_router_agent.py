@@ -134,7 +134,7 @@ def test_animation_tool_list_requires_shared_token(monkeypatch: pytest.MonkeyPat
     assert ok.status_code == 200
     tools = ok.json()["tools"]
     tangent = next(tool for tool in tools if tool["name"] == "math.show_tangent")
-    assert tangent["description"] == "Show a function and tangent line at a selected x value."
+    assert tangent["description"].startswith("Show a function and its tangent line at x0")
     assert tangent["args_schema"]["properties"]["expression"]["minLength"] == 1
 
 
@@ -172,7 +172,7 @@ def test_animation_tool_expand_returns_layers_with_issues_empty(
         headers={"X-MetaView-Agent-Token": "secret"},
         json={
             "tool": "math.show_function",
-            "args": {"expression": "x**2", "x_min": -2, "x_max": 2},
+            "args": {"expression": "x^2", "x_min": -2, "x_max": 2},
         },
     )
 
@@ -232,7 +232,7 @@ def test_runtime_tool_execute_returns_structured_result(
         headers={"X-MetaView-Agent-Token": "secret"},
         json={
             "tool": "geometry.assert_monotonic",
-            "args": {"expression": "x**2", "x_min": 0.1, "x_max": 2.0},
+            "args": {"expression": "x^2", "x_min": 0.1, "x_max": 2.0},
         },
     )
 

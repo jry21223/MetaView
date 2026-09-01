@@ -397,6 +397,9 @@ export interface StatsChartSceneSnapshot {
   series: ChartSeries[];
   x_label?: string;
   y_label?: string;
+  /** Category names for bar/histogram charts, one per series value; enables
+   *  categorical layout with per-bar labels instead of a numeric index axis. */
+  categories?: string[];
   current_index?: number | null;
   formula_latex?: string | null;
   caption?: string | null;

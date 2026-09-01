@@ -14,8 +14,23 @@ from pydantic import BaseModel, Field, ValidationError
 
 from app.domain.animation_tools.types import AnimationTool
 from app.domain.models.cir import CirDocument, LayerSpec
+from app.domain.services.safe_math_expr import (
+    SafeMathExpressionError,
+    compile_safe_math_expression,
+)
 
 logger = logging.getLogger(__name__)
+
+# Renderer expression grammar, restated wherever an agent can get it wrong.
+EXPRESSION_GRAMMAR_HINT = (
+    "MetaView expressions use '^' for powers (not Python '**'), plain function "
+    "names such as sin(x), cos(x), sqrt(x), abs(x) (no LaTeX backslashes), "
+    "explicit multiplication like 2*x, and the constants pi and e."
+)
+
+# Args-model field names that must parse under the renderer expression grammar.
+_EXPRESSION_FIELD_PREFIX = "expression"
+_EXPRESSION_FIELD_SUFFIX = "_expression"
 
 _REGISTRY: dict[str, AnimationTool] = {}
 _TOOL_ARGS_MODELS: dict[str, type[BaseModel]] = {}
@@ -25,7 +40,11 @@ _TOOL_DESCRIPTIONS: dict[str, str] = {
     "chemistry.stoichiometry_table": (
         "Build stoichiometry table layers for balanced reaction quantities."
     ),
-    "math.show_derivative_compare": "Compare a function and its derivative on shared plot layers.",
+    "math.show_derivative_compare": (
+        "Compare a function and its derivative on shared plot layers. Pass only "
+        "`expression` and the backend differentiates it symbolically; "
+        "`derivative_expression` overrides that at the caller's own risk."
+    ),
     "math.show_function": (
         "Build function plot layers with optional comparison, marker, or shaded interval."
     ),
@@ -33,7 +52,12 @@ _TOOL_DESCRIPTIONS: dict[str, str] = {
     "math.show_integral_area": "Show area under a function between two bounds.",
     "math.show_parametric_curve": "Show a parametric curve in a math scene.",
     "math.show_region_boundary": "Show a polygonal region boundary in a math scene.",
-    "math.show_tangent": "Show a function and tangent line at a selected x value.",
+    "math.show_tangent": (
+        "Show a function and its tangent line at x0 with a marker at the tangent "
+        "point. Pass only `expression` and `x0` and the backend derives the true "
+        "tangent symbolically; `tangent_expression` overrides that at the "
+        "caller's own risk."
+    ),
     "physics.force_diagram": "Build force-vector scene layers for a body.",
     "physics.projectile_motion": (
         "Build projectile trajectory layers from initial velocity and angle."
@@ -46,6 +70,7 @@ _TOOL_DESCRIPTIONS: dict[str, str] = {
 AnimationToolIssueCode = Literal[
     "animation_tool.unknown_tool",
     "animation_tool.invalid_args",
+    "animation_tool.invalid_expression",
     "animation_tool.exception",
 ]
 
@@ -122,6 +147,52 @@ def _description_from_name(name: str) -> str:
     return f"{domain.title()} animation tool for {phrase}."
 
 
+def _format_validation_error(exc: ValidationError) -> str:
+    """Render every error with its field path so callers can self-correct."""
+    parts = []
+    for error in exc.errors():
+        loc = ".".join(str(item) for item in error.get("loc", ())) or "args"
+        parts.append(f"{loc}: {error.get('msg')}")
+    return "; ".join(parts)
+
+
+def _expression_issues(
+    tool: str,
+    args: dict,
+    path: str,
+) -> list[AnimationToolIssue]:
+    """Fail fast on expression fields the renderer grammar cannot parse.
+
+    The canonical quality gate would reject these anyway, but only after the
+    whole Playbook is assembled — far from the tool call that caused it.
+    """
+    issues: list[AnimationToolIssue] = []
+    for field, value in args.items():
+        if not isinstance(value, str) or not value.strip():
+            continue
+        if not (
+            field == _EXPRESSION_FIELD_PREFIX
+            or field.startswith(f"{_EXPRESSION_FIELD_PREFIX}_")
+            or field.endswith(_EXPRESSION_FIELD_SUFFIX)
+        ):
+            continue
+        try:
+            compile_safe_math_expression(value)
+        except SafeMathExpressionError as exc:
+            issues.append(
+                AnimationToolIssue(
+                    code="animation_tool.invalid_expression",
+                    tool=tool,
+                    path=path,
+                    message=(
+                        f"Invalid expression for animation tool {tool} at {field}: "
+                        f"{exc}. {EXPRESSION_GRAMMAR_HINT}"
+                    ),
+                )
+            )
+    return issues
+
+
 def safe_expand_animation_call(
     tool: str,
     args: dict,
@@ -139,10 +210,17 @@ def safe_expand_animation_call(
             code="animation_tool.unknown_tool",
             tool=tool,
             path=path,
-            message=f"Unknown animation tool: {tool}",
+            message=(
+                f"Unknown animation tool: {tool}. Available tools: {', '.join(sorted(_REGISTRY))}"
+            ),
         )
         logger.warning("%s at %s", issue.message, path)
         return AnimationToolExpansionResult(issues=[issue])
+    expression_issues = _expression_issues(tool, args, path)
+    if expression_issues:
+        for issue in expression_issues:
+            logger.warning("%s", issue.message)
+        return AnimationToolExpansionResult(issues=expression_issues)
     try:
         return AnimationToolExpansionResult(layers=fn(args))
     except ValidationError as exc:
@@ -150,7 +228,7 @@ def safe_expand_animation_call(
             code="animation_tool.invalid_args",
             tool=tool,
             path=path,
-            message=f"Invalid args for animation tool {tool}: {exc.errors()[0].get('msg')}",
+            message=f"Invalid args for animation tool {tool}: {_format_validation_error(exc)}",
         )
         logger.warning("%s", issue.message)
         return AnimationToolExpansionResult(issues=[issue])

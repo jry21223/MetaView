@@ -23,6 +23,7 @@ _EAST_ASIA_TERMS = ("东亚", "中国", "西太平洋", "western pacific", "east
 
 class GeographyEarthSkillPack:
     manifest = GEOGRAPHY_EARTH_MANIFEST
+    problem_spec_model = GeographyEarthProblemSpec
 
     def heuristic_match(self, request: SkillRouteInput) -> SkillRouteMatch | None:
         spec = try_extract_geography_earth(request.prompt)

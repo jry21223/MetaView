@@ -59,19 +59,28 @@ def _extract_descriptive(text: str) -> ProbabilityStatisticsProblemSpec | None:
     if not data:
         return None
     query: list[str] = []
+    lower = text.lower()
     for needle, key in (
         ("均值", "mean"),
         ("平均", "mean"),
+        ("mean", "mean"),
         ("中位数", "median"),
+        ("median", "median"),
         ("众数", "mode"),
+        ("mode", "mode"),
         ("极差", "range"),
         ("方差", "variance"),
+        ("variance", "variance"),
         ("标准差", "std"),
     ):
-        if needle in text and key not in query:
+        if (needle in text or needle in lower) and key not in query:
             query.append(key)
+    # A bare number list is not a statistics request: without at least one
+    # descriptive-statistics keyword this extractor must not claim the prompt
+    # (an eigenvalue prompt like "求 A=[[1,2],[3,4]] 的特征值" also contains a
+    # bracketed number list). See issue #282.
     if not query:
-        query = ["mean", "median", "mode", "range"]
+        return None
     scope = "population" if "总体" in text else "sample" if "样本" in text else None
     assumptions: list[str] = []
     if scope is None and {"variance", "std"} & set(query):

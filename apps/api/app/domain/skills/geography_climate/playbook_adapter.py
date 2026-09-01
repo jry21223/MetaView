@@ -99,6 +99,7 @@ def _snapshots(
         ],
         x_label="月份/站点",
         y_label="温度或降水",
+        categories=[label for label, _value in solution.chart_values],
         formula_latex=solution.formula_latex,
         caption="用月序列或站点柱形图显示气候常年值。",
     )

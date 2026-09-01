@@ -28,6 +28,7 @@ _SUPPORTED_QUERY_KINDS = frozenset({"line_plane_angle", "volume"})
 
 class SolidGeometrySkillPack:
     manifest = SOLID_GEOMETRY_MANIFEST
+    problem_spec_model = SolidGeometryProblemSpec
 
     def heuristic_match(self, request: SkillRouteInput) -> SkillRouteMatch | None:
         spec = extract_solid_geometry_spec(request.prompt)

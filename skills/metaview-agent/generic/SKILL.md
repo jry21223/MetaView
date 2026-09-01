@@ -35,3 +35,12 @@ Use this skill for every Codex agent generation in MetaView.
   current reasoning step.
 - Do not invent unsupported renderers, HTML, SVG-only scenes, Manim, iframe
   rendering, or server-side video output.
+
+## Expression Grammar
+
+Every `expression*` argument across drawing, animation, and assert tools uses
+one grammar: `^` for powers (never Python's `**`), plain function names such as
+`sin(x)`, `cos(t)`, `exp(x)`, `log(x)`, `sqrt(x)`, `abs(x)` (no LaTeX
+backslashes), explicit multiplication like `2*x`, and the constants `pi` and
+`e`. LaTeX belongs only in `formula_latex` arguments. An expression that
+violates this grammar renders as a blank curve, so fix it at authoring time.

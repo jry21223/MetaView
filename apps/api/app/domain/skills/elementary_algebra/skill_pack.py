@@ -30,6 +30,7 @@ _TASK_CAPABILITY_IDS = {
 
 class ElementaryAlgebraSkillPack:
     manifest = ELEMENTARY_ALGEBRA_MANIFEST
+    problem_spec_model = ElementaryAlgebraProblemSpec
 
     def heuristic_match(self, request: SkillRouteInput) -> SkillRouteMatch | None:
         spec = try_extract_elementary_algebra(request.prompt)
