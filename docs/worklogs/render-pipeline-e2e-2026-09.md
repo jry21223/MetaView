@@ -102,3 +102,88 @@ annotation-collision 不变量，但它出现在新生成的内容上，而不�
 - `code` 学科：没有确定性 SkillPack，需要真实 LLM 凭据，本次未验证。
 - `agent` 模式、Follow-up 与版本恢复、带音轨导出（beta）未验证。
 - 真实生产部署不可达（沙箱网络策略拒绝 `metaview.top`），本次验证对象是 `main` 分支代码。
+
+## 追加诊断：为什么生成质量和 Gold Template 差这么远
+
+上面五条是症状。把「模板」和「生成内容」放在同一把尺子下量，根因是**编排短路**，
+不是 renderer。
+
+### 快照词汇表对比
+
+| snapshot kind | Gold Template（人工编写） | Pipeline 生成（69 步） |
+|---|---|---|
+| `math_plot` | 12 | **0** |
+| `math_scene` | 11 | **0** |
+| `physics_force_scene` | 4 | **0** |
+| `algorithm_bars` / `algorithm_array` | 5 | **0** |
+| `phase_portrait_scene` | 2 | 0 |
+| `code_trace_scene` | 1 | 0 |
+| `math_formula` | 2（5%） | **32（46%）** |
+| `table_scene` | 0 | **18（26%）** |
+| 交互控件 | 56 | **0** |
+
+renderer registry 注册了 28 个 renderer，生成内容只用到 6 个，其中 72% 是
+公式卡加表格。chemistry 有 `reaction_scene` / `molecule_2d_scene` 却在画表格，
+biology 有 `bio_cell_scene` / `bio_process_scene` 却在画表格，geography 有
+`geo_map_scene` 却在画表格。
+
+### 不是 renderer 的问题
+
+模板和生成内容走的是同一套 renderer、同一条 Remotion 出口。模板好看是因为喂给
+renderer 的是富数据（`math_scene` 的几何对象、`math_plot` 的多曲线与 marker）。
+28 个 renderer 本身工作正常——本次 18 条成功用例全部渲染出静帧，MP4 导出也通过。
+
+### 工具是「暴露了但够不着」
+
+`GET /api/v1/agent/animation-tools` 暴露了 13 个动画工具，其中
+`math.show_tangent` / `math.show_derivative_compare` / `math.show_integral_area`
+正是导数模板需要的能力。实测调用：
+
+```
+POST /api/v1/agent/animation-tools/expand
+{"tool":"math.show_tangent","args":{"expression":"x^2*sin(x)","x0":1.0,
+ "tangent_expression":"2.22*(x-1)+0.841","x_min":-6,"x_max":6}}
+```
+
+返回一个 `math_plot` layer：原函数曲线（primary）+ 切线（secondary，标注「切线 (x=1.0)」）
++ `marker_x=1.0`，外加一个 `narration_card`。`issues` 为空。
+这正好满足 calculus LessonPlan 要求的 `secant` / `tangent` / `target_point` 三个
+visual role——也就是发现 2 里被判定「缺失」的那三个。
+
+工具能用，但它只挂在 agent 路径上，而 agent 路径在这些提示词上根本不会执行。
+
+### 短路点
+
+[`run_pipeline.py:243`](../../apps/api/app/application/use_cases/run_pipeline.py)（single 模式）：
+
+```python
+if route_match is not None and route_context.coverage_decision.mode == "specialized":
+    handled = await self._try_execute_skill(...)
+    if handled:
+        return          # ← LLM / 动画工具永远到不了
+await self._execute_single(...)
+```
+
+agent 模式同样受限，`can_execute_skill` 的判据一模一样：
+
+```python
+can_execute_skill=lambda ctx: (... and ctx.coverage_decision.mode == "specialized")
+```
+
+于是对这 13 个 SkillPack 覆盖的学科，**两种生成模式下 agent 与 13 个动画工具都被绕过**，
+输出质量的上限就是确定性 adapter 的快照词汇表：34 个 `MathFormulaSnapshot` +
+13 个 `TableSceneSnapshot`，13 个包加起来只有 1 个 `MathSceneSnapshot`。
+
+确定性 SkillPack 保证了「算得对」（本次化学配平、遗传比例、高斯消元结果都正确），
+但同时封死了「讲得好」的通道。发现 2 的「末步不陈述答案」正是这个上限的直接表现：
+adapter 只会把答案塞进 `\boxed{}` 公式卡。
+
+### 修的方向
+
+问题在优先级，不在缺工具。三条路，代价递增：
+
+1. SkillPack 保留 solve（算得对），把 render 交给动画工具——adapter 输出
+   `math_plot` / `math_scene` 而不是公式卡。改动集中在各 `playbook_adapter.py`。
+2. 让 `specialized` 覆盖走「skill 出数据 + agent 出画面」，而不是 skill 独占并 return。
+3. 给 adapter 补 `parameter_controls`，否则 README 承诺的参数互动轨道在生成内容上
+   始终是空的。
