@@ -187,3 +187,93 @@ adapter 只会把答案塞进 `\boxed{}` 公式卡。
 2. 让 `specialized` 覆盖走「skill 出数据 + agent 出画面」，而不是 skill 独占并 return。
 3. 给 adapter 补 `parameter_controls`，否则 README 承诺的参数互动轨道在生成内容上
    始终是空的。
+
+## 追加审计：agent 工具面（描述、schema、报错回显）
+
+用「一个只能看到工具名 + description + args_schema 的 LLM」的标准，把
+`/api/v1/agent/animation-tools`、`/api/v1/agent/runtime-tools`、geometry asserts
+和 sidecar Drawing 工具过了一遍，全部为实测结果。
+
+### T1. 参数字段描述覆盖率为 0
+
+13 个动画工具 101 个参数字段、22 个 runtime 工具 98 个参数字段，
+**199 个字段没有一个带 `description`**。单位、表达式语法、枚举含义、
+`alleles` 与 `cells` 的布局关系、`role` 的合法取值，agent 全靠猜。
+Pydantic 的 `Field(description=...)` 会自动进 json schema，属于纯增量修复。
+
+### T2. 描述不准确 / 埋雷
+
+- `math.show_tangent` 的描述是 "Show a function and tangent line at a selected
+  x value"，但 required 里有 `tangent_expression`——**切线要调用方自己算**，
+  描述只字未提；且服务端不校验它是不是真切线：给 `x^2` 在 `x0=1` 配上
+  `100*x-500`，返回 `issues: []`。`show_derivative_compare` 的
+  `derivative_expression` 同理。错误画面就是这样带着「成功」标记流下去的。
+- `skill.*.solve` 的 description 直接复用 manifest 一句话（"Deterministic
+  single-variable calculus explanations."），`problem_spec` 在 schema 里是
+  `{"type": "object"}` 黑箱——真实的 `CalculusCoreProblemSpec` 有 9 个字段和
+  `task` Literal 枚举，agent 无从得知。
+- sidecar `add_curve_parametric` 的语法说明是循环引用："Expressions use the
+  same character set MathPlotRenderer accepts"——模型读不到 MathPlotRenderer。
+
+### T3. 报错回显丢关键信息
+
+- [`animation_tools/registry.py:153`](../../apps/api/app/domain/animation_tools/registry.py)
+  只取 `exc.errors()[0].get("msg")`：**丢字段路径、丢其余所有错误**。实测缺
+  `tangent_expression` 时回显是 `Invalid args ...: Field required`——不说缺哪个；
+  `forces[0].magnitude` 传字符串时回显 `Input should be a valid number`——不说哪个字段。
+- `skill.calculus_core.solve` 传错 args 形状时返回
+  `{"ok": true, "handled": false, "fallback_reason": "unsupported_calculus_core"}`：
+  成功标志位为 true，理由撒谎（不是能力不支持，是 args 不对），没有任何
+  「期望的 spec 长这样」提示。schema 广告的 `required: ["run_id","prompt"]`
+  实际也不执行——不传照样跑。
+- `animation_tool.unknown_tool` 不回可用工具列表或最近似名。
+- 对照组：geometry assert 走 FastAPI 原生 422，带全部 `loc`，反而是可用的。
+
+### T4. 校验时机太晚（fail-late 而非 fail-fast）
+
+表达式语法后端前端是一致的（都收 `x^2`/`sin(x)`，都拒 `x**2`/`\sin(x)`，
+`safe_math_expr.py` 与 `mathExpr.ts` 实测无漂移）——但这套校验**不在工具边界上跑**：
+
+- `animation-tools/expand` 对 `\sin(x)`、`x**2` 一律 `issues: []` 放行；
+  错误要等整份 Playbook 进 canonical gate 才爆（`math.expression_invalid`），
+  报错已经和当初那次工具调用脱钩，agent 只能整轮重来。
+- Drawing 路径同样只在 `finalize_playbook` 后的 self-check 里验表达式：
+  第 3 步埋的雷，画完 14 步才响。
+
+而 LLM 默认吐 Python（`**`）或 LaTeX（`\sin`）语法；`^` 才是本仓库的方言，
+这条方言在 SYSTEM_PROMPT、8 份 SKILL.md、35 个工具描述里**一处都没写**
+（唯一一处是 T2 那句循环引用）。
+
+### T5. 命名不一致
+
+list 返回 `name` 字段，`expand`/`execute` 请求体却要 `tool`（我第一次就猜成
+`tool_id`）；动画工具用 `expression`，geometry assert 用
+`expression_x/expression_y/t_min`；`math.show_integral_area` 的 `from_`
+（Python 关键字规避 + alias "from"）直接泄漏进 schema；`skill.*.solve` 要求
+agent 提供 `run_id` 这种 harness 内部字段。
+
+### T6. 暴露形态：两跳 + free-form JSON
+
+sidecar 只给 LLM 两个动画工具：`animation_tool_list` 和
+`animation_tool_expand(tool, args: Record<string, unknown>)`。13 个工具不是
+一等 function-calling 工具，args 在模型侧没有 schema 约束——每个参数错误都
+变成一次运行时往返，而往返的报错又丢路径（T3）。模型必须先 list、再从返回
+文本里自行解析 json schema、再盲填 free-form args。
+
+### 好的一面
+
+SYSTEM_PROMPT 的工作流纪律本身写得不错（LessonPlan 绑定、断言前置、
+参数控件规则、禁止发明字段）；表达式语法前后端无漂移；geometry assert 的
+422 回显完整。问题集中在工具边界的描述与回显，不在工作流设计。
+
+### 修复优先级
+
+1. `registry.py:153`：拼接全部 `exc.errors()` 的 `loc + msg`（一行级改动，收益最大）。
+2. `expand` 边界上对所有表达式字段跑 `compile_safe_math_expression`，
+   报错附语法提示（「用 `^` 表示幂，不支持 `**` 与 LaTeX 反斜杠」）。
+3. 给 199 个参数字段补 `Field(description=...)`；`show_tangent` 要么在描述里
+   写明「切线表达式需调用方计算」，要么后端用 sympy 自己算（能力现成）。
+4. `skill.*.solve` 用 `model_json_schema()` 导出真实 ProblemSpec；
+   `handled: false` 时回显期望 spec 与失败原因，`ok` 不再恒为 true。
+5. 表达式语法契约写进 SYSTEM_PROMPT 与各 SKILL.md。
+6. 统一 `tool`/`name` 与 `expression*` 命名，schema 里去掉 `run_id`、`from_` 泄漏。
