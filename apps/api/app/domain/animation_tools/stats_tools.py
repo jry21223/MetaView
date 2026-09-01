@@ -38,6 +38,13 @@ class StatsDistributionChartArgs(BaseModel):
     )
     x_label: str = Field(default="x", description="x-axis title.")
     y_label: str = Field(default="y", description="y-axis title.")
+    categories: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Category names for bar/histogram charts, one per series value; "
+            "when set the renderer labels each bar instead of a numeric axis."
+        ),
+    )
     formula_latex: str | None = Field(
         default=None, description="Optional KaTeX formula overlay (LaTeX allowed here only)."
     )
@@ -62,6 +69,7 @@ def distribution_chart(args: dict) -> list[LayerSpec]:
         ],
         x_label=parsed.x_label,
         y_label=parsed.y_label,
+        categories=parsed.categories,
         formula_latex=parsed.formula_latex,
         caption=parsed.caption,
     )

@@ -75,6 +75,11 @@ def _snapshots(
         ],
         x_label="项目",
         y_label="数值/概率",
+        categories=(
+            [label for label, _value in solution.chart_values]
+            if solution.kind != "z_score_normal_cdf"
+            else []
+        ),
         formula_latex=solution.formula_latex,
         caption="用图形比较关键数值的大小。",
     )

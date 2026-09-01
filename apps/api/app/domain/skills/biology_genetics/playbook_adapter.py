@@ -95,6 +95,7 @@ def _snapshots(
         ],
         x_label="表现型",
         y_label="概率",
+        categories=[label for label, _value in solution.chart_values],
         formula_latex=solution.formula_latex,
         caption="柱高表示每类表现型的精确概率。",
     )

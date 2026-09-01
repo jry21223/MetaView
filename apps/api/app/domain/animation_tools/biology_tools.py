@@ -64,6 +64,7 @@ def punnett_square(args: dict) -> list[LayerSpec]:
         ],
         x_label="phenotype",
         y_label="count",
+        categories=list(parsed.phenotype_counts.keys()),
         caption="Phenotype count distribution",
     )
     return [

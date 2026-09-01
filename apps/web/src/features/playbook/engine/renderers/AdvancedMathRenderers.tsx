@@ -329,45 +329,149 @@ function chartBounds(series: ChartSeries[]): { xMin: number; xMax: number; yMin:
   };
 }
 
+function AxisTitles({ theme, xLabel, yLabel }: { theme: ThemeName; xLabel?: string; yLabel?: string }) {
+  const colors = PALETTE[theme];
+  return (
+    <>
+      {xLabel ? (
+        <text x={(PLOT.left + SVG_W - PLOT.right) / 2} y={SVG_H - 6} fill={colors.muted} fontSize={13} textAnchor="middle">
+          {xLabel}
+        </text>
+      ) : null}
+      {yLabel ? (
+        <text
+          x={8}
+          y={(PLOT.top + SVG_H - PLOT.bottom) / 2}
+          fill={colors.muted}
+          fontSize={13}
+          textAnchor="middle"
+          transform={`rotate(-90 8 ${(PLOT.top + SVG_H - PLOT.bottom) / 2})`}
+        >
+          {yLabel}
+        </text>
+      ) : null}
+    </>
+  );
+}
+
+function CategoricalBars({
+  series,
+  categories,
+  reveal,
+  theme,
+}: {
+  series: ChartSeries[];
+  categories: string[];
+  reveal: number;
+  theme: ThemeName;
+}) {
+  const colors = PALETTE[theme];
+  const slotCount = Math.max(categories.length, ...series.map((s) => chartPoints(s).length), 1);
+  const plotW = SVG_W - PLOT.left - PLOT.right;
+  const slotW = plotW / slotCount;
+  const values = series.flatMap((s) => chartPoints(s).map((p) => p.y));
+  const yMin = Math.min(0, ...values);
+  // Headroom so the tallest bar never touches the plot ceiling.
+  const yMax = Math.max(1, ...values) * 1.12;
+  const yTicks = [yMin, (yMin + yMax) / 2, yMax];
+  const groupW = Math.min(slotW * 0.6, 96);
+  const barW = Math.max(8, groupW / series.length);
+  return (
+    <>
+      <rect x={PLOT.left} y={PLOT.top} width={plotW} height={SVG_H - PLOT.top - PLOT.bottom} fill="transparent" stroke={colors.line} />
+      {yTicks.map((tick) => (
+        <g key={`y-${tick}`}>
+          <line x1={PLOT.left} x2={SVG_W - PLOT.right} y1={sy(tick, yMin, yMax)} y2={sy(tick, yMin, yMax)} stroke={colors.grid} />
+          <text x={44} y={sy(tick, yMin, yMax) + 4} fill={colors.muted} fontSize={12} textAnchor="end">{tick.toFixed(1)}</text>
+        </g>
+      ))}
+      {series.map((oneSeries, seriesIndex) => {
+        const color = oneSeries.emphasis === "accent" ? colors.accent : oneSeries.emphasis === "secondary" ? colors.secondary : colors.primary;
+        return chartPoints(oneSeries).map((point, index) => {
+          const slotCenter = PLOT.left + (index + 0.5) * slotW;
+          const x = slotCenter - groupW / 2 + seriesIndex * barW;
+          return (
+            <rect
+              key={`${oneSeries.label}-${index}`}
+              x={x}
+              y={sy(point.y * reveal, yMin, yMax)}
+              width={barW}
+              height={Math.max(0, sy(0, yMin, yMax) - sy(point.y * reveal, yMin, yMax))}
+              fill={color}
+              opacity={0.78}
+              rx={4}
+            />
+          );
+        });
+      })}
+      {categories.map((category, index) => (
+        <text
+          key={`cat-${index}`}
+          x={PLOT.left + (index + 0.5) * slotW}
+          y={SVG_H - 25}
+          fill={colors.ink}
+          fontSize={13}
+          textAnchor="middle"
+        >
+          {category}
+        </text>
+      ))}
+    </>
+  );
+}
+
 export const StatsChartSceneRenderer: React.FC<RendererProps> = ({ step, frame, stepStartFrame, theme }) => {
   const snap = step.snapshot as StatsChartSceneSnapshot;
   const colors = PALETTE[theme];
   const bounds = chartBounds(snap.series ?? []);
   const reveal = progressOpacity(frame, stepStartFrame, 4);
+  const chartType = snap.chart_type ?? "line";
+  const barLike = chartType === "bar" || chartType === "histogram";
+  const categories = snap.categories ?? [];
+  const categorical = barLike && categories.length > 0;
+  const plotLeft = PLOT.left;
+  const plotRight = SVG_W - PLOT.right;
   return (
     <Shell title={step.title} caption={snap.caption} formula={snap.formula_latex} theme={theme}>
       <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} width="100%" height="100%">
-        <AxisFrame theme={theme} {...bounds} />
-        {(snap.series ?? []).map((series, seriesIndex) => {
-          const pts = chartPoints(series);
-          const color = series.emphasis === "accent" ? colors.accent : series.emphasis === "secondary" ? colors.secondary : colors.primary;
-          if ((snap.chart_type ?? "line") === "bar" || (snap.chart_type ?? "line") === "histogram") {
-            const barW = Math.max(8, (SVG_W - PLOT.left - PLOT.right) / Math.max(pts.length * 1.8, 1));
-            return pts.map((point, index) => (
-              <rect
-                key={`${series.label}-${index}`}
-                x={sx(point.x, bounds.xMin, bounds.xMax) - barW / 2}
-                y={sy(point.y * reveal, bounds.yMin, bounds.yMax)}
-                width={barW}
-                height={Math.max(0, sy(0, bounds.yMin, bounds.yMax) - sy(point.y * reveal, bounds.yMin, bounds.yMax))}
-                fill={color}
-                opacity={0.78}
-                rx={4}
-              />
-            ));
-          }
-          return (
-            <polyline
-              key={series.label || seriesIndex}
-              points={pointsPath(pts.slice(0, Math.max(1, Math.ceil(pts.length * reveal))).map((p) => [p.x, p.y]), bounds.xMin, bounds.xMax, bounds.yMin, bounds.yMax)}
-              fill="none"
-              stroke={color}
-              strokeWidth={4}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          );
-        })}
+        {categorical ? (
+          <CategoricalBars series={snap.series ?? []} categories={categories} reveal={reveal} theme={theme} />
+        ) : (
+          <>
+            <AxisFrame theme={theme} {...bounds} />
+            {(snap.series ?? []).map((series, seriesIndex) => {
+              const pts = chartPoints(series);
+              const color = series.emphasis === "accent" ? colors.accent : series.emphasis === "secondary" ? colors.secondary : colors.primary;
+              if (barLike) {
+                const barW = Math.max(8, (SVG_W - PLOT.left - PLOT.right) / Math.max(pts.length * 1.8, 1));
+                return pts.map((point, index) => (
+                  <rect
+                    key={`${series.label}-${index}`}
+                    x={Math.min(Math.max(sx(point.x, bounds.xMin, bounds.xMax) - barW / 2, plotLeft), plotRight - barW)}
+                    y={sy(point.y * reveal, bounds.yMin, bounds.yMax)}
+                    width={barW}
+                    height={Math.max(0, sy(0, bounds.yMin, bounds.yMax) - sy(point.y * reveal, bounds.yMin, bounds.yMax))}
+                    fill={color}
+                    opacity={0.78}
+                    rx={4}
+                  />
+                ));
+              }
+              return (
+                <polyline
+                  key={series.label || seriesIndex}
+                  points={pointsPath(pts.slice(0, Math.max(1, Math.ceil(pts.length * reveal))).map((p) => [p.x, p.y]), bounds.xMin, bounds.xMax, bounds.yMin, bounds.yMax)}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth={4}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              );
+            })}
+          </>
+        )}
+        <AxisTitles theme={theme} xLabel={snap.x_label} yLabel={snap.y_label} />
       </svg>
     </Shell>
   );

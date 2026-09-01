@@ -411,6 +411,10 @@ class StatsChartSceneSnapshot(BaseModel):
     series: list[ChartSeries] = Field(default_factory=list)
     x_label: str = "x"
     y_label: str = "y"
+    # Category names for bar/histogram charts, one per series value; when set
+    # the renderer lays bars out categorically and labels each bar instead of
+    # showing a meaningless numeric index axis (issue #285).
+    categories: list[str] = Field(default_factory=list)
     current_index: int | None = None
     formula_latex: str | None = None
     caption: str | None = None
