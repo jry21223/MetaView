@@ -277,3 +277,24 @@ SYSTEM_PROMPT 的工作流纪律本身写得不错（LessonPlan 绑定、断言�
    `handled: false` 时回显期望 spec 与失败原因，`ok` 不再恒为 true。
 5. 表达式语法契约写进 SYSTEM_PROMPT 与各 SKILL.md。
 6. 统一 `tool`/`name` 与 `expression*` 命名，schema 里去掉 `run_id`、`from_` 泄漏。
+
+## 修复落地（2026-09-01）
+
+以上发现已拆为 issue #279–#287 并在同一分支实现（#287 为需要产品决策的
+编排 epic，未实现）：
+
+| Issue | 内容 | 验证 |
+|---|---|---|
+| #279 | 工具报错拼全字段路径；solve 失败区分 invalid_problem_spec | pytest 回显断言 |
+| #280 | expand 边界表达式 fail-fast；语法契约进 SYSTEM_PROMPT/SKILL.md | `x**2`/`\sin` 立即报错 |
+| #281 | 199 个参数字段补描述；show_tangent 缺省自动求切线；solve 导出真 spec schema | schema 全量断言 |
+| #282 | 统计包不再认领裸数字列表；`->` 不再当方程；conic 焦点定义兜底 | manifest 57 例全量路由回归 |
+| #283 | calculus 末步陈述答案；导数默认进切线弧；统计答案加中文标签 | 真实 pipeline 4 例 succeeded |
+| #284 | dfs/dijkstra/topo 从过程表填遍历状态 | DFS/Dijkstra E2E succeeded |
+| #285 | stats_chart_scene 增 categories，渲染分类名与轴标题，末柱不溢出 | 渲染截图核对 |
+| #286 | 斜面按真实倾角作画；方向标签移出运动路径 | 渲染截图核对 |
+
+复验：第一轮 E2E 的 7 条失败用例（3 条 calculus、DFS、Dijkstra、特征值、
+描述统计）全部经真实 pipeline 转为 succeeded；biology/geography 柱状图与
+两条物理场景重渲染确认视觉修复。`code` 学科与 agent 模式仍未覆盖（无 LLM
+凭据），#287 待决策。
