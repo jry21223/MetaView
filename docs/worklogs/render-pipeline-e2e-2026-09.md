@@ -318,6 +318,10 @@ x=2，x=3`、`正方体中直线 A1B 与平面 ABCD 的夹角…为 θ=π/4`、`
 各列合计 50、50`），物理 kernel 的步骤与结论明确说出「竖直方向由重力加速」
 「两个分运动合成抛物线轨迹」。复验：55/55 经真实 pipeline succeeded。
 
+顺手修了一处既有错误：斜抛分支的公式卡此前借用平抛的 `y=h-½gt²`，现在两条分支
+各写自己的运动方程（平抛 `y=h-½gt²`、`x=v_xt`；斜抛 `y=v₀sinθ·t-½gt²`、
+`x=v₀cosθ·t`），`test_physics_mechanics_skill.py` 按抛出方式各锁一条。
+
 这个指标现在由 `tests/test_skill_pack_manifest_examples_gate.py` 长期守住：
 每条 manifest 示例都经本包 `execute` 后过 canonical gate（带 rule-based
 LessonPlan、`specialized` 覆盖），任何 ERROR 即失败。

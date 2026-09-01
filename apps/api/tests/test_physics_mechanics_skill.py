@@ -171,3 +171,33 @@ async def test_physics_mechanics_pipeline_path_does_not_call_llm() -> None:
     playbook = json.loads(repo.updates[-1]["playbook_json"])
     assert playbook["domain"] == "physics"
     assert any(step["snapshot"]["kind"] == "math_formula" for step in playbook["steps"])
+
+
+@pytest.mark.parametrize(
+    ("prompt", "vertical_marker", "horizontal_marker"),
+    [
+        ("一个物体以 10m/s 水平抛出，高度 20m，求落地时间和水平位移", r"y=h-\frac{1}{2}gt^2", "x=v_xt"),
+        ("以 20m/s、30° 斜向上抛出，求最大高度和射程", r"y=v_0\sin\theta\,t-\frac{1}{2}gt^2", r"x=v_0\cos\theta\,t"),
+    ],
+)
+def test_projectile_step_formulas_follow_the_launch_kind(
+    prompt: str, vertical_marker: str, horizontal_marker: str
+) -> None:
+    # The angled launch used to reuse the horizontal-launch formula y=h-½gt²
+    # on its formula card; each branch now states its own equations of motion,
+    # and both narrate the gravity / parabola facts the LessonPlan requires.
+    skill = PhysicsMechanicsSkillPack()
+    match = skill.heuristic_match(SkillRouteInput(prompt=prompt))
+    assert match is not None
+    spec = skill.validate_problem_spec(match.problem_spec or {})
+    assert spec is not None
+
+    solution = solve_mechanics(spec)
+    titles = [step.title for step in solution.steps]
+    vertical = solution.steps[titles.index("竖直方向")]
+    horizontal = solution.steps[titles.index("水平方向")]
+    assert vertical.formula_latex == vertical_marker
+    assert horizontal.formula_latex == horizontal_marker
+    assert "重力" in vertical.caption
+    assert "抛物线" in horizontal.caption
+    assert "重力" in solution.answer_text and "抛物线" in solution.answer_text

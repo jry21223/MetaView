@@ -101,6 +101,9 @@ def _solve_projectile(spec: PhysicsMechanicsProblemSpec) -> PhysicsMechanicsSolu
             f"落地时间 {values['time'].display}，"
             f"水平位移 {values['horizontal_range'].display}。{_PROJECTILE_MECHANISM}"
         )
+        vertical_latex = r"y=h-\frac{1}{2}gt^2"
+        vertical_caption = "竖直方向由重力产生加速度 g，从高度 h 落到地面的时间由它决定。"
+        horizontal_latex = "x=v_xt"
     else:
         speed = float(_value(spec, "initial_speed"))
         angle = math.radians(float(_value(spec, "angle_deg")))
@@ -119,6 +122,13 @@ def _solve_projectile(spec: PhysicsMechanicsProblemSpec) -> PhysicsMechanicsSolu
             f"最大高度 {values['max_height'].display}，"
             f"射程 {values['range'].display}。{_PROJECTILE_MECHANISM}"
         )
+        # An angled launch starts from the ground with an upward velocity
+        # component; the horizontal-launch formula y=h-½gt² does not apply.
+        vertical_latex = r"y=v_0\sin\theta\,t-\frac{1}{2}gt^2"
+        vertical_caption = (
+            "竖直方向先减速上升再加速下落，由重力产生加速度 g，决定最大高度与飞行时间。"
+        )
+        horizontal_latex = r"x=v_0\cos\theta\,t"
     return PhysicsMechanicsSolution(
         kind=spec.kind,
         steps=[
@@ -127,14 +137,10 @@ def _solve_projectile(spec: PhysicsMechanicsProblemSpec) -> PhysicsMechanicsSolu
                 "x,y",
                 "水平与竖直方向独立处理：水平方向不受力、保持匀速，竖直方向只受重力、匀加速。",
             ),
-            PhysicsMechanicsStep(
-                "竖直方向",
-                r"y=h-\frac{1}{2}gt^2",
-                "竖直方向由重力产生加速度 g，决定飞行时间。",
-            ),
+            PhysicsMechanicsStep("竖直方向", vertical_latex, vertical_caption),
             PhysicsMechanicsStep(
                 "水平方向",
-                "x=v_xt",
+                horizontal_latex,
                 "水平方向匀速运动给出位移，两个分运动合成抛物线轨迹。",
             ),
         ],
