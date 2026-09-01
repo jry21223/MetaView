@@ -169,13 +169,29 @@ def _solve_contingency(spec: ProbabilityStatisticsProblemSpec) -> ProbabilitySta
         for index, row in enumerate(spec.table)
     ]
     rows.append(["column_total", *[_display(value) for value in column_totals], _display(total)])
+    row_text = "、".join(_display(value) for value in row_totals)
+    column_text = "、".join(_display(value) for value in column_totals)
     return ProbabilityStatisticsSolution(
         kind=spec.kind,
-        results={"total": _clean_decimal(total)},
+        results={
+            **{
+                f"row_{index + 1}_total": _clean_decimal(value)
+                for index, value in enumerate(row_totals)
+            },
+            **{
+                f"column_{index + 1}_total": _clean_decimal(value)
+                for index, value in enumerate(column_totals)
+            },
+            "total": _clean_decimal(total),
+        },
         table_rows=rows,
         chart_values=[(f"row {index + 1}", float(value)) for index, value in enumerate(row_totals)],
         formula_latex=r"\text{total}=\sum_i\sum_j n_{ij}",
-        answer_text=f"总数={_display(total)}",
+        # The prompt asks for 行列合计; the narration has to say those words
+        # (and the totals), not just the grand total (issue #283 class).
+        answer_text=(
+            f"各行合计 {row_text}；各列合计 {column_text}；总数 total={_display(total)}"
+        ),
         assumptions=spec.assumptions,
     )
 

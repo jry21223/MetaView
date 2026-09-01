@@ -298,3 +298,30 @@ SYSTEM_PROMPT 的工作流纪律本身写得不错（LessonPlan 绑定、断言�
 描述统计）全部经真实 pipeline 转为 succeeded；biology/geography 柱状图与
 两条物理场景重渲染确认视觉修复。`code` 学科与 agent 模式仍未覆盖（无 LLM
 凭据），#287 待决策。
+
+## 追加修复：manifest 示例 55/55（2026-09-01）
+
+#288 合并后，用同一把尺子把 13 个 SkillPack manifest 的**全部 55 条**
+capability 示例走了一遍真实管线（self / single / heuristic，无 LLM），50/55
+succeeded。剩下 5 条是 #283 那类缺陷在另外三个包里的复制品，加上物理平抛的
+两个 required fact 没接上：
+
+| 包 / capability | 示例 | 拦截原因 |
+|---|---|---|
+| `elementary_algebra` equation_1var | 求 x²−5x+6=0 的解 | `step.does_not_answer_prompt` |
+| `solid_geometry` cube.line_plane_angle | 正方体棱长 2，求 A₁B 与平面 ABCD 的夹角 | `step.does_not_answer_prompt` |
+| `probability_statistics_core` contingency_table | 列联表求行列合计 | `step.does_not_answer_prompt` |
+| `physics_mechanics` projectile_motion（两条示例） | 10 m/s 水平抛出 / 20 m/s 30° 斜抛 | `lesson_plan.fact_missing`：`gravity`、`parabolic` |
+
+修法照 #283：末步旁白用题目自己的词把答案说出来（`所以方程 x^2-5x+6=0 的解为
+x=2，x=3`、`正方体中直线 A1B 与平面 ABCD 的夹角…为 θ=π/4`、`各行合计 40、60；
+各列合计 50、50`），物理 kernel 的步骤与结论明确说出「竖直方向由重力加速」
+「两个分运动合成抛物线轨迹」。复验：55/55 经真实 pipeline succeeded。
+
+这个指标现在由 `tests/test_skill_pack_manifest_examples_gate.py` 长期守住：
+每条 manifest 示例都经本包 `execute` 后过 canonical gate（带 rule-based
+LessonPlan、`specialized` 覆盖），任何 ERROR 即失败。
+
+```bash
+cd apps/api && ../../.venv/bin/pytest tests/test_skill_pack_manifest_examples_gate.py -q
+```

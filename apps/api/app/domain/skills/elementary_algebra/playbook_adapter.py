@@ -18,6 +18,7 @@ from app.domain.skills.algebra_core import (
     solve_equation,
     solve_inequality,
 )
+from app.domain.skills.algebra_core.models import AlgebraEquation
 from app.domain.skills.elementary_algebra.problem_spec import ElementaryAlgebraProblemSpec
 
 _FPS = 30
@@ -47,7 +48,8 @@ def build_elementary_algebra_playbook(
                 caption="不等式的解用区间或逻辑条件表示。",
             )
         )
-        return _script(spec, "一元不等式", snapshots)
+        answer_text = f"所以不等式 {_relation_source(equation)} 的解集为 {_plain(result)}。"
+        return _script(spec, "一元不等式", snapshots, answer_text=answer_text)
 
     solutions, core_steps = solve_equation(equation, spec.variable)
     snapshots: list[MathFormulaSnapshot | TableSceneSnapshot] = [
@@ -72,7 +74,11 @@ def build_elementary_algebra_playbook(
         )
     )
     title = "一元一次方程" if spec.task == "linear_equation" else "一元二次方程"
-    return _script(spec, title, snapshots)
+    answer_text = (
+        f"所以方程 {_relation_source(equation)} 的解为 "
+        f"{_solutions_spoken(spec.variable, solutions)}。"
+    )
+    return _script(spec, title, snapshots, answer_text=answer_text)
 
 
 def _build_factor_playbook(spec: ElementaryAlgebraProblemSpec) -> PlaybookScript:
@@ -105,13 +111,16 @@ def _build_factor_playbook(spec: ElementaryAlgebraProblemSpec) -> PlaybookScript
             caption="最终输出保持为规范化因式乘积。",
         ),
     ]
-    return _script(spec, "多项式因式分解", snapshots)
+    answer_text = f"所以 {parsed.source} 因式分解的结果为 {_plain(factored)}。"
+    return _script(spec, "多项式因式分解", snapshots, answer_text=answer_text)
 
 
 def _script(
     spec: ElementaryAlgebraProblemSpec,
     title: str,
     snapshots: list[MathFormulaSnapshot | TableSceneSnapshot],
+    *,
+    answer_text: str | None = None,
 ) -> PlaybookScript:
     steps: list[MetaStep] = []
     captions = [
@@ -124,9 +133,15 @@ def _script(
     while len(snapshots) < 5:
         snapshots.append(snapshots[-1])
     frame_cursor = 0
-    for index, snapshot in enumerate(snapshots[:6]):
+    kept = snapshots[:6]
+    for index, snapshot in enumerate(kept):
         label = captions[index] if index < len(captions) else "补充说明"
         voiceover_text = _voiceover(label, snapshot)
+        if answer_text and index == len(kept) - 1:
+            # The final step must state the requested result in the prompt's
+            # own terms — a solution that only lives in the table never answers
+            # the question (same defect class as issue #283).
+            voiceover_text = f"{voiceover_text} {answer_text}".strip()
         frame_cursor += max(_STEP_FRAMES, estimate_step_frames(voiceover_text, _FPS))
         steps.append(
             MetaStep(
@@ -162,6 +177,21 @@ def _solutions_text(solutions: list[sp.Expr]) -> str:
     if not solutions:
         return "无解"
     return ", ".join(sp.latex(solution) for solution in solutions)
+
+
+def _solutions_spoken(variable: str, solutions: list[sp.Expr]) -> str:
+    if not solutions:
+        return "无解"
+    return "，".join(f"{variable}={_plain(solution)}" for solution in solutions)
+
+
+def _relation_source(equation: AlgebraEquation) -> str:
+    return f"{equation.lhs_source}{equation.relation}{equation.rhs_source}"
+
+
+def _plain(expr: sp.Basic) -> str:
+    # Narration reads the renderer dialect (``x^2``), not Python's ``**``.
+    return sp.sstr(expr).replace("**", "^")
 
 
 def _roots_latex(variable: str, roots: list[sp.Expr]) -> str:

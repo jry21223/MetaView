@@ -77,6 +77,11 @@ def _solve_uniform(spec: PhysicsMechanicsProblemSpec) -> PhysicsMechanicsSolutio
     )
 
 
+# The projectile LessonPlan requires evidence for the gravity and parabolic
+# facts; the narration has to say them, a number table never does.
+_PROJECTILE_MECHANISM = "水平速度保持不变，竖直方向由重力加速，两个分运动合成抛物线轨迹。"
+
+
 def _solve_projectile(spec: PhysicsMechanicsProblemSpec) -> PhysicsMechanicsSolution:
     g = _value(spec, "g")
     if "height" in spec.values:
@@ -94,7 +99,7 @@ def _solve_projectile(spec: PhysicsMechanicsProblemSpec) -> PhysicsMechanicsSolu
         )
         text = (
             f"落地时间 {values['time'].display}，"
-            f"水平位移 {values['horizontal_range'].display}。"
+            f"水平位移 {values['horizontal_range'].display}。{_PROJECTILE_MECHANISM}"
         )
     else:
         speed = float(_value(spec, "initial_speed"))
@@ -110,13 +115,28 @@ def _solve_projectile(spec: PhysicsMechanicsProblemSpec) -> PhysicsMechanicsSolu
             rf"H=\frac{{v_0^2\sin^2\theta}}{{2g}}={_fmt(max_height)}\,\text{{m}},\quad "
             rf"R=\frac{{v_0^2\sin 2\theta}}{{g}}={_fmt(horizontal_range)}\,\text{{m}}"
         )
-        text = f"最大高度 {values['max_height'].display}，射程 {values['range'].display}。"
+        text = (
+            f"最大高度 {values['max_height'].display}，"
+            f"射程 {values['range'].display}。{_PROJECTILE_MECHANISM}"
+        )
     return PhysicsMechanicsSolution(
         kind=spec.kind,
         steps=[
-            PhysicsMechanicsStep("分解运动", "x,y", "水平与竖直方向独立处理。"),
-            PhysicsMechanicsStep("竖直方向", r"y=h-\frac{1}{2}gt^2", "竖直运动决定飞行时间。"),
-            PhysicsMechanicsStep("水平方向", "x=v_xt", "水平方向匀速运动给出位移。"),
+            PhysicsMechanicsStep(
+                "分解运动",
+                "x,y",
+                "水平与竖直方向独立处理：水平方向不受力、保持匀速，竖直方向只受重力、匀加速。",
+            ),
+            PhysicsMechanicsStep(
+                "竖直方向",
+                r"y=h-\frac{1}{2}gt^2",
+                "竖直方向由重力产生加速度 g，决定飞行时间。",
+            ),
+            PhysicsMechanicsStep(
+                "水平方向",
+                "x=v_xt",
+                "水平方向匀速运动给出位移，两个分运动合成抛物线轨迹。",
+            ),
         ],
         values=values,
         answer_latex=answer_latex,
