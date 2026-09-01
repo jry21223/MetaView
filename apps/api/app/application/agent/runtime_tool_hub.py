@@ -30,36 +30,53 @@ from app.domain.skills.registry import SkillRegistry, build_default_skill_regist
 ArgModelT = TypeVar("ArgModelT", bound=BaseModel)
 
 ASSET_MANIFEST_ROOT = (
-    Path(__file__).resolve().parents[5]
-    / "apps"
-    / "web"
-    / "public"
-    / "assets"
-    / "metaview-kits"
+    Path(__file__).resolve().parents[5] / "apps" / "web" / "public" / "assets" / "metaview-kits"
+)
+
+
+_PARAM_EXPR_DOC = (
+    "Renderer-grammar expression in t: '^' for powers (not '**'), plain "
+    "function names like sin(t), no LaTeX backslashes."
 )
 
 
 class _OrientationArgs(BaseModel):
-    expression_x: StrictStr = Field(min_length=1)
-    expression_y: StrictStr = Field(min_length=1)
-    t_min: FiniteFloat
-    t_max: FiniteFloat
+    expression_x: StrictStr = Field(
+        min_length=1, description=f"x(t) of the parametric curve. {_PARAM_EXPR_DOC}"
+    )
+    expression_y: StrictStr = Field(
+        min_length=1, description="y(t) of the parametric curve, same grammar."
+    )
+    t_min: FiniteFloat = Field(description="Start of the parameter interval.")
+    t_max: FiniteFloat = Field(description="End of the parameter interval.")
 
 
 class _PassesThroughArgs(BaseModel):
-    expression_x: StrictStr = Field(min_length=1)
-    expression_y: StrictStr = Field(min_length=1)
-    t_min: FiniteFloat
-    t_max: FiniteFloat
-    target_x: FiniteFloat
-    target_y: FiniteFloat
-    tol: FiniteFloat = 1e-2
+    expression_x: StrictStr = Field(
+        min_length=1, description=f"x(t) of the parametric curve. {_PARAM_EXPR_DOC}"
+    )
+    expression_y: StrictStr = Field(
+        min_length=1, description="y(t) of the parametric curve, same grammar."
+    )
+    t_min: FiniteFloat = Field(description="Start of the parameter interval.")
+    t_max: FiniteFloat = Field(description="End of the parameter interval.")
+    target_x: FiniteFloat = Field(description="x coordinate the curve should pass through.")
+    target_y: FiniteFloat = Field(description="y coordinate the curve should pass through.")
+    tol: FiniteFloat = Field(
+        default=1e-2, description="Distance tolerance for the pass-through check."
+    )
 
 
 class _MonotonicArgs(BaseModel):
-    expression: StrictStr = Field(min_length=1)
-    x_min: FiniteFloat
-    x_max: FiniteFloat
+    expression: StrictStr = Field(
+        min_length=1,
+        description=(
+            "Function of x in renderer grammar: '^' for powers (not '**'), "
+            "no LaTeX backslashes."
+        ),
+    )
+    x_min: FiniteFloat = Field(description="Left end of the interval to check.")
+    x_max: FiniteFloat = Field(description="Right end of the interval to check.")
 
 
 class RuntimeToolHub:
@@ -103,8 +120,7 @@ class RuntimeToolHub:
             ToolManifest(
                 name="scene_blueprint.compile",
                 description=(
-                    "Compile a controlled SceneBlueprint into a renderer-ready "
-                    "PlaybookScript."
+                    "Compile a controlled SceneBlueprint into a renderer-ready PlaybookScript."
                 ),
                 args_schema={
                     "type": "object",
@@ -171,7 +187,7 @@ class RuntimeToolHub:
                         "source_code": {"type": ["string", "null"]},
                         "language": {"type": ["string", "null"]},
                         "route_match": {"type": "object"},
-                        "problem_spec": {"type": "object"},
+                        "problem_spec": self._problem_spec_schema(manifest.skill_id),
                     },
                     "required": ["run_id", "prompt"],
                 },
@@ -188,14 +204,25 @@ class RuntimeToolHub:
     def get_tool(self, name: str) -> ToolManifest | None:
         return next((tool for tool in self.list_tools() if tool.name == name), None)
 
+    def _problem_spec_schema(self, skill_id: str) -> dict[str, Any]:
+        """Advertise the pack's real ProblemSpec schema instead of a bare object."""
+        skill = self._skill_registry.get(skill_id)
+        model = getattr(skill, "problem_spec_model", None)
+        if model is None or not (isinstance(model, type) and issubclass(model, BaseModel)):
+            return {"type": "object"}
+        return model.model_json_schema()
+
     async def execute_tool(self, name: str, args: dict[str, Any]) -> ToolExecutionResult:
         if name == "skill.registry.list":
-            return self._ok(name, {
-                "skills": [
-                    manifest.model_dump(mode="json")
-                    for manifest in self._skill_registry.manifests()
-                ]
-            })
+            return self._ok(
+                name,
+                {
+                    "skills": [
+                        manifest.model_dump(mode="json")
+                        for manifest in self._skill_registry.manifests()
+                    ]
+                },
+            )
         if name.startswith("skill.") and name.endswith(".solve"):
             return await self._execute_skill_tool(name, args)
         if name == "playbook.schema.validate":
@@ -205,9 +232,9 @@ class RuntimeToolHub:
         if name == "scene_blueprint.compile":
             return self._compile_scene_blueprint(name, args)
         if name == "animation_tool.list":
-            return self._ok(name, {
-                "tools": [tool.model_dump(mode="json") for tool in list_animation_tools()]
-            })
+            return self._ok(
+                name, {"tools": [tool.model_dump(mode="json") for tool in list_animation_tools()]}
+            )
         if name == "animation_tool.expand":
             result = safe_expand_animation_call(
                 str(args.get("tool", "")),
@@ -253,7 +280,10 @@ class RuntimeToolHub:
         return self._error(
             name,
             "runtime_tool.unknown_tool",
-            f"Unknown runtime tool: {name}",
+            (
+                f"Unknown runtime tool: {name}. Available tools: "
+                f"{', '.join(tool.name for tool in self.list_tools())}"
+            ),
         )
 
     async def _execute_skill_tool(
@@ -264,16 +294,22 @@ class RuntimeToolHub:
         skill_id = name.removeprefix("skill.").removesuffix(".solve")
         skill = self._skill_registry.get(skill_id)
         if skill is None:
+            available = ", ".join(
+                f"skill.{manifest.skill_id}.solve"
+                for manifest in self._skill_registry.manifests()
+            )
             return self._error(
                 name,
                 "runtime_tool.unknown_tool",
-                f"Unknown SkillPack runtime tool: {name}",
+                f"Unknown SkillPack runtime tool: {name}. Available: {available}",
             )
         prompt = str(args.get("prompt", ""))
         route_match = self._coerce_route_match(skill_id, args)
         problem_spec = None
+        provided_spec_invalid = False
         if isinstance(args.get("problem_spec"), dict):
             problem_spec = skill.validate_problem_spec(args["problem_spec"])
+            provided_spec_invalid = problem_spec is None
         if problem_spec is None and route_match.problem_spec:
             problem_spec = skill.validate_problem_spec(route_match.problem_spec)
         if problem_spec is None:
@@ -297,6 +333,22 @@ class RuntimeToolHub:
             problem_spec,
         )
         payload = result.model_dump(mode="json")
+        if not result.handled:
+            if provided_spec_invalid and problem_spec is None:
+                spec_model = getattr(skill, "problem_spec_model", None)
+                expected = spec_model.__name__ if isinstance(spec_model, type) else "problem_spec"
+                payload["fallback_reason"] = "invalid_problem_spec"
+                payload["message"] = (
+                    f"The provided problem_spec did not validate against {expected}; "
+                    f"check the {name} args_schema for the expected fields, or omit "
+                    "problem_spec and pass a prompt the skill can extract from."
+                )
+            else:
+                payload["message"] = (
+                    f"{name} declined this request "
+                    f"(fallback_reason={payload.get('fallback_reason')}): the prompt or "
+                    "problem_spec did not match a supported capability of this skill."
+                )
         if result.playbook_json:
             try:
                 payload["playbook"] = PlaybookScript.model_validate_json(

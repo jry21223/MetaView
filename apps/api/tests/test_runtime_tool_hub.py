@@ -483,3 +483,71 @@ async def test_runtime_tool_hub_executes_skill_pack_tool() -> None:
     assert result.result["handled"] is True
     assert result.result["playbook"]["title"] == "Fake Skill"
     assert result.result["review_actions"] == ["skill:fake_skill"]
+
+
+@pytest.mark.anyio
+async def test_skill_solve_reports_invalid_problem_spec_instead_of_unsupported() -> None:
+    """Issue #279: a mis-shaped problem_spec must not read as 'capability unsupported'."""
+    hub = RuntimeToolHub()
+
+    result = await hub.execute_tool(
+        "skill.calculus_core.solve",
+        {
+            "run_id": "run-echo",
+            "prompt": "",
+            "problem_spec": {"task": "derivative", "expression": "x**2"},
+        },
+    )
+
+    assert result.ok is True
+    assert result.result["handled"] is False
+    assert result.result["fallback_reason"] == "invalid_problem_spec"
+    assert "CalculusCoreProblemSpec" in result.result["message"]
+
+
+@pytest.mark.anyio
+async def test_skill_solve_declined_prompt_carries_message() -> None:
+    hub = RuntimeToolHub()
+
+    result = await hub.execute_tool(
+        "skill.calculus_core.solve",
+        {"run_id": "run-echo", "prompt": "写一首关于秋天的诗"},
+    )
+
+    assert result.ok is True
+    assert result.result["handled"] is False
+    assert "declined" in result.result["message"]
+
+
+@pytest.mark.anyio
+async def test_unknown_runtime_tool_error_lists_available_tools() -> None:
+    hub = RuntimeToolHub()
+
+    result = await hub.execute_tool("skill.calculus.solve", {})
+
+    assert result.ok is False
+    assert "skill.calculus_core.solve" in result.error["message"]
+
+
+def test_skill_solve_args_schema_exports_real_problem_spec() -> None:
+    """Issue #281: problem_spec must not be advertised as an opaque object."""
+    hub = RuntimeToolHub()
+
+    tool = hub.get_tool("skill.calculus_core.solve")
+    spec_schema = tool.args_schema["properties"]["problem_spec"]
+
+    assert spec_schema.get("title") == "CalculusCoreProblemSpec"
+    task = spec_schema["properties"]["task"]
+    assert "derivative" in task.get("enum", [])
+
+
+def test_geometry_assert_args_document_every_field() -> None:
+    hub = RuntimeToolHub()
+    for name in (
+        "geometry.assert_orientation",
+        "geometry.assert_passes_through",
+        "geometry.assert_monotonic",
+    ):
+        schema = hub.get_tool(name).args_schema
+        for field, prop in schema["properties"].items():
+            assert prop.get("description"), f"{name}.{field} has no description"

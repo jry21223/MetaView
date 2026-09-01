@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 class GeographyClimateSkillPack:
     manifest = GEOGRAPHY_CLIMATE_MANIFEST
+    problem_spec_model = GeographyClimateProblemSpec
 
     def heuristic_match(self, request: SkillRouteInput) -> SkillRouteMatch | None:
         spec = try_extract_geography_climate(request.prompt)

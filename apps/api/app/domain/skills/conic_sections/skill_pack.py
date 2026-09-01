@@ -18,6 +18,7 @@ from app.domain.skills.conic_sections.spec_extractor import try_extract_ellipse_
 
 class ConicSectionsSkillPack:
     manifest = CONIC_SECTIONS_MANIFEST
+    problem_spec_model = ConicEllipseFocusProblemSpec
 
     def heuristic_match(self, request: SkillRouteInput) -> SkillRouteMatch | None:
         spec = try_extract_ellipse_focus_definition(request.prompt)

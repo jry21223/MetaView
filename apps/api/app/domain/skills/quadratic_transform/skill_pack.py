@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 class QuadraticTransformSkillPack:
     manifest = QUADRATIC_TRANSFORM_MANIFEST
+    problem_spec_model = QuadraticTransformProblemSpec
 
     def heuristic_match(self, request: SkillRouteInput) -> SkillRouteMatch | None:
         spec = try_extract_quadratic_transform(request.prompt)

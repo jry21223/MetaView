@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 
 class ProbabilityStatisticsCoreSkillPack:
     manifest = PROBABILITY_STATISTICS_CORE_MANIFEST
+    problem_spec_model = ProbabilityStatisticsProblemSpec
 
     def heuristic_match(self, request: SkillRouteInput) -> SkillRouteMatch | None:
         spec = try_extract_probability_statistics(request.prompt)

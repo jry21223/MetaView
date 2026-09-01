@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import AliasChoices, BaseModel, Field
 
-from app.domain.animation_tools.registry import register
+from app.domain.animation_tools.registry import EXPRESSION_GRAMMAR_HINT, register
 from app.domain.models.cir import (
     KaTeXOverlaySpec,
     LayerKind,
@@ -18,82 +18,175 @@ from app.domain.models.cir import (
     SceneSegment,
     SceneSpec,
 )
+from app.domain.skills.algebra_core import parse_expression
+from app.domain.skills.algebra_core.parser import expression_to_source
+
+_EXPR_DOC = f"Function of x in renderer grammar. {EXPRESSION_GRAMMAR_HINT}"
+_LATEX_DOC = "Optional KaTeX string shown as a formula overlay (LaTeX allowed here only)."
+_CAPTION_DOC = "Optional one-sentence caption rendered as a narration card."
 
 
 class _PlotBounds(BaseModel):
-    x_min: float = -6.0
-    x_max: float = 6.0
-    y_min: float | None = None
-    y_max: float | None = None
+    x_min: float = Field(default=-6.0, description="Left edge of the visible x range.")
+    x_max: float = Field(default=6.0, description="Right edge of the visible x range.")
+    y_min: float | None = Field(
+        default=None, description="Optional fixed lower y bound (auto when null)."
+    )
+    y_max: float | None = Field(
+        default=None, description="Optional fixed upper y bound (auto when null)."
+    )
 
 
 class MathShowTangentArgs(_PlotBounds):
-    expression: str = Field(min_length=1)
-    x0: float
-    tangent_expression: str = Field(min_length=1)
-    formula_latex: str | None = None
-    caption: str | None = None
+    expression: str = Field(min_length=1, description=_EXPR_DOC)
+    x0: float = Field(description="x value of the tangent point; also drawn as marker_x.")
+    tangent_expression: str | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "Optional explicit tangent line as a function of x. Omit it and the "
+            "backend derives the true tangent of `expression` at `x0` symbolically; "
+            "if you do pass it, you are responsible for its correctness."
+        ),
+    )
+    formula_latex: str | None = Field(default=None, description=_LATEX_DOC)
+    caption: str | None = Field(default=None, description=_CAPTION_DOC)
 
 
 class MathShowFunctionArgs(_PlotBounds):
-    expression: str = Field(min_length=1)
-    expression_2: str | None = None
-    formula_latex: str | None = None
-    marker_x: float | None = None
-    shade_from: float | None = None
-    shade_to: float | None = None
+    expression: str = Field(min_length=1, description=_EXPR_DOC)
+    expression_2: str | None = Field(
+        default=None,
+        description=f"Optional second curve g(x) for comparison. {EXPRESSION_GRAMMAR_HINT}",
+    )
+    formula_latex: str | None = Field(default=None, description=_LATEX_DOC)
+    marker_x: float | None = Field(
+        default=None, description="Optional x position highlighted with a marker dot."
+    )
+    shade_from: float | None = Field(
+        default=None, description="Optional left x bound of a shaded interval under the curve."
+    )
+    shade_to: float | None = Field(
+        default=None, description="Optional right x bound of the shaded interval."
+    )
 
 
 class MathShowIntegralAreaArgs(_PlotBounds):
-    expression: str = Field(min_length=1)
-    from_: float = Field(validation_alias=AliasChoices("from_", "from"))
-    to: float
-    formula_latex: str | None = None
+    expression: str = Field(min_length=1, description=_EXPR_DOC)
+    from_: float = Field(
+        validation_alias=AliasChoices("from_", "from"),
+        description="Lower integration bound (JSON key: `from` or `from_`).",
+    )
+    to: float = Field(description="Upper integration bound.")
+    formula_latex: str | None = Field(default=None, description=_LATEX_DOC)
 
 
 class MathShowDerivativeCompareArgs(_PlotBounds):
-    expression: str = Field(min_length=1)
-    derivative_expression: str = Field(min_length=1)
-    formula_latex: str | None = None
-    caption: str | None = None
+    expression: str = Field(min_length=1, description=_EXPR_DOC)
+    derivative_expression: str | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "Optional explicit derivative f'(x). Omit it and the backend "
+            "differentiates `expression` symbolically; if you do pass it, you "
+            "are responsible for its correctness."
+        ),
+    )
+    formula_latex: str | None = Field(default=None, description=_LATEX_DOC)
+    caption: str | None = Field(default=None, description=_CAPTION_DOC)
 
 
 class MathShowFunctionTransformArgs(_PlotBounds):
-    base_expression: str = Field(min_length=1)
-    transformed_expression: str = Field(min_length=1)
-    base_label: str = "f(x)"
-    transformed_label: str = "g(x)"
-    formula_latex: str | None = None
-    caption: str | None = None
+    base_expression: str = Field(
+        min_length=1, description=f"Base curve before the transform. {EXPRESSION_GRAMMAR_HINT}"
+    )
+    transformed_expression: str = Field(
+        min_length=1, description="Transformed curve, same grammar as base_expression."
+    )
+    base_label: str = Field(default="f(x)", description="Legend label for the base curve.")
+    transformed_label: str = Field(
+        default="g(x)", description="Legend label for the transformed curve."
+    )
+    formula_latex: str | None = Field(default=None, description=_LATEX_DOC)
+    caption: str | None = Field(default=None, description=_CAPTION_DOC)
 
 
 class MathShowParametricCurveArgs(BaseModel):
-    expression_x: str = Field(min_length=1)
-    expression_y: str = Field(min_length=1)
-    t_min: float
-    t_max: float
-    x_min: float = -5.0
-    x_max: float = 5.0
-    y_min: float = -5.0
-    y_max: float = 5.0
-    formula_latex: str | None = None
-    caption: str | None = None
+    expression_x: str = Field(
+        min_length=1, description=f"x(t) of the parametric curve. {EXPRESSION_GRAMMAR_HINT}"
+    )
+    expression_y: str = Field(
+        min_length=1, description="y(t) of the parametric curve, same grammar as expression_x."
+    )
+    t_min: float = Field(description="Start of the parameter interval (radians for trig curves).")
+    t_max: float = Field(description="End of the parameter interval.")
+    x_min: float = Field(default=-5.0, description="Left edge of the visible x range.")
+    x_max: float = Field(default=5.0, description="Right edge of the visible x range.")
+    y_min: float = Field(default=-5.0, description="Bottom edge of the visible y range.")
+    y_max: float = Field(default=5.0, description="Top edge of the visible y range.")
+    formula_latex: str | None = Field(default=None, description=_LATEX_DOC)
+    caption: str | None = Field(default=None, description=_CAPTION_DOC)
 
 
 class MathShowRegionBoundaryArgs(BaseModel):
-    vertices: list[tuple[float, float]] = Field(min_length=3)
-    label: str | None = None
-    x_min: float = -5.0
-    x_max: float = 5.0
-    y_min: float = -5.0
-    y_max: float = 5.0
-    formula_latex: str | None = None
-    caption: str | None = None
+    vertices: list[tuple[float, float]] = Field(
+        min_length=3,
+        description=(
+            "Polygon vertices as [x, y] pairs in scene coordinates, "
+            "in drawing order (auto-closed)."
+        ),
+    )
+    label: str | None = Field(
+        default=None, description="Optional label for the region and its boundary."
+    )
+    x_min: float = Field(default=-5.0, description="Left edge of the visible x range.")
+    x_max: float = Field(default=5.0, description="Right edge of the visible x range.")
+    y_min: float = Field(default=-5.0, description="Bottom edge of the visible y range.")
+    y_max: float = Field(default=5.0, description="Top edge of the visible y range.")
+    formula_latex: str | None = Field(default=None, description=_LATEX_DOC)
+    caption: str | None = Field(default=None, description=_CAPTION_DOC)
+
+
+def _plot_symbol(parsed_variables: list[str]):
+    import sympy as sp
+
+    # Plot curves are functions of x; fall back to the single parsed variable
+    # so e.g. "t^2" still differentiates, but always emit in terms of x.
+    name = "x" if "x" in parsed_variables or not parsed_variables else parsed_variables[0]
+    return sp.Symbol(name)
+
+
+def _derived_tangent_expression(expression: str, x0: float) -> str:
+    """Compute the tangent line of ``expression`` at ``x0`` in renderer grammar."""
+    import sympy as sp
+
+    expr, parsed = parse_expression(expression)
+    symbol = _plot_symbol(parsed.variables)
+    slope = sp.diff(expr, symbol).subs(symbol, x0)
+    value = expr.subs(symbol, x0)
+    if not (slope.is_number and value.is_number):
+        raise ValueError(
+            f"cannot derive a tangent for {expression!r} at x0={x0}: "
+            "the expression must evaluate to a number there"
+        )
+    tangent = sp.nsimplify(value) + sp.nsimplify(slope) * (sp.Symbol("x") - sp.nsimplify(x0))
+    return expression_to_source(sp.expand(tangent))
+
+
+def _derived_derivative_expression(expression: str) -> str:
+    """Differentiate ``expression`` symbolically, returned in renderer grammar."""
+    import sympy as sp
+
+    expr, parsed = parse_expression(expression)
+    return expression_to_source(sp.diff(expr, _plot_symbol(parsed.variables)))
 
 
 @register("math.show_tangent", MathShowTangentArgs)
 def show_tangent(args: dict) -> list[LayerSpec]:
     parsed = MathShowTangentArgs.model_validate(args)
+    tangent_expression = parsed.tangent_expression or _derived_tangent_expression(
+        parsed.expression, parsed.x0
+    )
     layers = _plot_layers(
         PlotSpec(
             curves=[
@@ -103,7 +196,7 @@ def show_tangent(args: dict) -> list[LayerSpec]:
                     emphasis="primary",
                 ),
                 PlotCurveSpec(
-                    expression=parsed.tangent_expression,
+                    expression=tangent_expression,
                     label=f"切线 (x={parsed.x0})",
                     emphasis="secondary",
                 ),
@@ -124,9 +217,7 @@ def show_tangent(args: dict) -> list[LayerSpec]:
 @register("math.show_function", MathShowFunctionArgs)
 def show_function(args: dict) -> list[LayerSpec]:
     parsed = MathShowFunctionArgs.model_validate(args)
-    curves = [
-        PlotCurveSpec(expression=parsed.expression, label="f(x)", emphasis="primary")
-    ]
+    curves = [PlotCurveSpec(expression=parsed.expression, label="f(x)", emphasis="primary")]
     if parsed.expression_2:
         curves.append(
             PlotCurveSpec(
@@ -178,6 +269,9 @@ def show_integral_area(args: dict) -> list[LayerSpec]:
 @register("math.show_derivative_compare", MathShowDerivativeCompareArgs)
 def show_derivative_compare(args: dict) -> list[LayerSpec]:
     parsed = MathShowDerivativeCompareArgs.model_validate(args)
+    derivative_expression = parsed.derivative_expression or _derived_derivative_expression(
+        parsed.expression
+    )
     return _plot_layers(
         PlotSpec(
             curves=[
@@ -187,7 +281,7 @@ def show_derivative_compare(args: dict) -> list[LayerSpec]:
                     emphasis="primary",
                 ),
                 PlotCurveSpec(
-                    expression=parsed.derivative_expression,
+                    expression=derivative_expression,
                     label="f'(x)",
                     emphasis="accent",
                 ),

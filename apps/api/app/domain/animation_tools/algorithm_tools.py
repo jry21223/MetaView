@@ -10,20 +10,40 @@ from app.domain.models.playbook import GraphSceneEdge, GraphSceneNode, GraphScen
 
 
 class GraphTraversalEdgeArgs(BaseModel):
-    source: str = Field(min_length=1)
-    target: str = Field(min_length=1)
-    label: str | None = None
-    weight: float | None = None
+    source: str = Field(
+        min_length=1, description="Node id the edge starts from; must appear in `nodes`."
+    )
+    target: str = Field(
+        min_length=1, description="Node id the edge points to; must appear in `nodes`."
+    )
+    label: str | None = Field(
+        default=None, description="Optional edge label drawn at the midpoint."
+    )
+    weight: float | None = Field(
+        default=None, description="Optional edge weight, shown when `weighted` is true."
+    )
 
 
 class AlgorithmGraphTraversalArgs(BaseModel):
-    nodes: list[str] = Field(min_length=1)
-    edges: list[GraphTraversalEdgeArgs] = Field(default_factory=list)
-    active_node_ids: list[str] = Field(default_factory=list)
-    active_edge_ids: list[str] = Field(default_factory=list)
-    directed: bool = False
-    weighted: bool = False
-    caption: str | None = None
+    nodes: list[str] = Field(
+        min_length=1, description="Node ids; each is also used as its display label."
+    )
+    edges: list[GraphTraversalEdgeArgs] = Field(
+        default_factory=list, description="Edges between the declared nodes."
+    )
+    active_node_ids: list[str] = Field(
+        default_factory=list,
+        description="Node ids highlighted as the traversal's current frontier for this step.",
+    )
+    active_edge_ids: list[str] = Field(
+        default_factory=list,
+        description='Edge ids highlighted this step, written as "source->target".',
+    )
+    directed: bool = Field(default=False, description="Draw arrowheads and treat edges as one-way.")
+    weighted: bool = Field(default=False, description="Show edge weights next to edges.")
+    caption: str | None = Field(
+        default=None, description="Optional one-sentence caption rendered as a narration card."
+    )
 
 
 @register("algorithm.graph_traversal", AlgorithmGraphTraversalArgs)

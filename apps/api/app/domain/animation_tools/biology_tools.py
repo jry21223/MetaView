@@ -10,11 +10,35 @@ from app.domain.models.playbook import ChartSeries, StatsChartSceneSnapshot, Tab
 
 
 class BiologyPunnettSquareArgs(BaseModel):
-    parent_a: str = Field(min_length=1)
-    parent_b: str = Field(min_length=1)
-    alleles: list[str] = Field(min_length=1)
-    cells: list[list[str]] = Field(min_length=1)
-    phenotype_counts: dict[str, float] = Field(default_factory=dict)
+    parent_a: str = Field(
+        min_length=1,
+        description="Genotype of the first parent, e.g. 'Aa'; shown as the column-side parent.",
+    )
+    parent_b: str = Field(
+        min_length=1,
+        description="Genotype of the second parent, e.g. 'Aa'; shown as the row-side parent.",
+    )
+    alleles: list[str] = Field(
+        min_length=1,
+        description=(
+            "Gamete labels, e.g. ['A', 'a']. They become the column headers "
+            "and, in order, the row headers."
+        ),
+    )
+    cells: list[list[str]] = Field(
+        min_length=1,
+        description=(
+            "Offspring genotypes as a grid: cells[i][j] is row-gamete i crossed "
+            "with column-gamete j, so the grid is len(alleles) x len(alleles)."
+        ),
+    )
+    phenotype_counts: dict[str, float] = Field(
+        default_factory=dict,
+        description=(
+            "Optional phenotype -> count (or probability) mapping charted "
+            "next to the square."
+        ),
+    )
 
 
 @register("biology.punnett_square", BiologyPunnettSquareArgs)

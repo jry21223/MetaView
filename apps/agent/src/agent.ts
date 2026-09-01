@@ -130,6 +130,15 @@ Workflow you MUST follow:
    学到了什么". Finish with \`finalize_playbook\`; after that, do not call any
    more tools.
 
+Expression grammar (every \`expression*\` argument, in drawing, animation, and
+assert tools alike):
+- Powers use \`^\`, NEVER Python's \`**\` (write \`x^2\`, not \`x**2\`).
+- Function names are plain, with no LaTeX backslashes: \`sin(x)\`, \`cos(t)\`,
+  \`exp(x)\`, \`log(x)\`, \`sqrt(x)\`, \`abs(x)\` — never \`\\sin(x)\`.
+- Multiplication is explicit (\`2*x\`, \`a*sin(x)\`); constants \`pi\` and \`e\`
+  are available. LaTeX belongs ONLY in \`formula_latex\` / \`add_formula\`
+  arguments, never in an expression.
+
 Output discipline:
 - Use the most specific tool available; do not try to write CIR JSON directly.
 - For subject visual scenes, use SceneBlueprint/SkillPack-backed renderer

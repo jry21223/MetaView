@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 class PhysicsMechanicsSkillPack:
     manifest = PHYSICS_MECHANICS_MANIFEST
+    problem_spec_model = PhysicsMechanicsProblemSpec
 
     def heuristic_match(self, request: SkillRouteInput) -> SkillRouteMatch | None:
         spec = try_extract_physics_mechanics(request.prompt)

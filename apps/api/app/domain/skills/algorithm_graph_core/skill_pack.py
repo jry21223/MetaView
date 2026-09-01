@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 class AlgorithmGraphCoreSkillPack:
     manifest = ALGORITHM_GRAPH_CORE_MANIFEST
+    problem_spec_model = AlgorithmGraphProblemSpec
 
     def heuristic_match(self, request: SkillRouteInput) -> SkillRouteMatch | None:
         spec = try_extract_algorithm_graph(request.prompt)

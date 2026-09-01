@@ -29,32 +29,62 @@ from app.domain.models.playbook import (
 
 
 class ForceVectorArgs(BaseModel):
-    name: str = Field(min_length=1)
-    magnitude: float = Field(gt=0)
-    angle_deg: float
+    name: str = Field(
+        min_length=1, description="Force label drawn next to the arrow, e.g. 'F', 'mg', 'N'."
+    )
+    magnitude: float = Field(
+        gt=0,
+        description="Force magnitude in newtons; arrows are scaled relative to the largest force.",
+    )
+    angle_deg: float = Field(
+        description="Direction in degrees, counterclockwise from the +x axis (0 = right, 90 = up)."
+    )
 
 
 class PhysicsForceDiagramArgs(BaseModel):
-    forces: list[ForceVectorArgs] = Field(min_length=1)
-    x_min: float = -5.0
-    x_max: float = 5.0
-    y_min: float = -5.0
-    y_max: float = 5.0
-    formula_latex: str | None = None
-    caption: str | None = None
+    forces: list[ForceVectorArgs] = Field(
+        min_length=1, description="Forces acting on one body, all drawn from the origin."
+    )
+    x_min: float = Field(default=-5.0, description="Left edge of the scene coordinate range.")
+    x_max: float = Field(default=5.0, description="Right edge of the scene coordinate range.")
+    y_min: float = Field(default=-5.0, description="Bottom edge of the scene coordinate range.")
+    y_max: float = Field(default=5.0, description="Top edge of the scene coordinate range.")
+    formula_latex: str | None = Field(
+        default=None, description="Optional KaTeX formula overlay (LaTeX allowed here only)."
+    )
+    caption: str | None = Field(
+        default=None, description="Optional one-sentence caption rendered as a narration card."
+    )
 
 
 class PhysicsProjectileMotionArgs(BaseModel):
-    v0: float = Field(gt=0)
-    angle_deg: float
-    g: float = Field(default=9.8, gt=0)
-    duration: float | None = Field(default=None, gt=0)
-    x_min: float = 0.0
-    x_max: float | None = None
-    y_min: float = 0.0
-    y_max: float | None = None
-    formula_latex: str | None = None
-    caption: str | None = None
+    v0: float = Field(gt=0, description="Initial speed in m/s.")
+    angle_deg: float = Field(
+        description="Launch angle in degrees above the horizontal (90 = straight up)."
+    )
+    g: float = Field(default=9.8, gt=0, description="Gravitational acceleration in m/s^2.")
+    duration: float | None = Field(
+        default=None,
+        gt=0,
+        description="Optional flight time in seconds; defaults to the full time until landing.",
+    )
+    x_min: float = Field(default=0.0, description="Left edge of the world x range in meters.")
+    x_max: float | None = Field(
+        default=None,
+        description="Optional right edge in meters; auto-fit to the trajectory when null.",
+    )
+    y_min: float = Field(
+        default=0.0, description="Bottom edge of the world y range in meters (ground level)."
+    )
+    y_max: float | None = Field(
+        default=None, description="Optional top edge in meters; auto-fit to the peak when null."
+    )
+    formula_latex: str | None = Field(
+        default=None, description="Optional KaTeX formula overlay (LaTeX allowed here only)."
+    )
+    caption: str | None = Field(
+        default=None, description="Optional one-sentence caption rendered as a narration card."
+    )
 
 
 @register("physics.force_diagram", PhysicsForceDiagramArgs)

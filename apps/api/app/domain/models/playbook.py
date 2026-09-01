@@ -393,9 +393,9 @@ class CodeTraceSceneSnapshot(BaseModel):
 
 
 class ChartPoint(BaseModel):
-    x: float
-    y: float
-    label: str | None = None
+    x: float = Field(description="Horizontal position of the point in chart coordinates.")
+    y: float = Field(description="Vertical position of the point in chart coordinates.")
+    label: str | None = Field(default=None, description="Optional label for this point.")
 
 
 class ChartSeries(BaseModel):

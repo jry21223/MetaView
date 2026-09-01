@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 class LinearAlgebraSkillPack:
     manifest = LINEAR_ALGEBRA_MANIFEST
+    problem_spec_model = LinearAlgebraProblemSpec
 
     def heuristic_match(self, request: SkillRouteInput) -> SkillRouteMatch | None:
         spec = try_extract_linear_algebra(request.prompt)
