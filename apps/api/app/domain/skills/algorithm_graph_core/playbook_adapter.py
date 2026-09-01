@@ -168,16 +168,35 @@ def _graph_asset_id(kind: str) -> str | None:
 
 
 def _graph_visual_state(solution: GraphAlgorithmSolution) -> GraphVisualState:
-    if solution.kind == "bfs" and solution.table_rows:
+    # Every kind's process table keeps cumulative state per row, so the first
+    # row always yields a non-empty visited/frontier state. Leaving these
+    # lists empty for non-BFS kinds used to trip the quality gate's
+    # algorithm.state_missing check on DFS (issue #284).
+    if solution.table_rows:
         row = solution.table_rows[0]
         current = row[0]
-        visited = _split_state_cell(row[1] if len(row) > 1 else "")
-        enqueued = _split_state_cell(row[2] if len(row) > 2 else "")
-        queue = _split_state_cell(row[3] if len(row) > 3 else "")
+        if solution.kind == "bfs":
+            visited = _split_state_cell(row[1] if len(row) > 1 else "")
+            enqueued = _split_state_cell(row[2] if len(row) > 2 else "")
+            queue = _split_state_cell(row[3] if len(row) > 3 else "")
+        elif solution.kind == "dfs":
+            # columns: 当前节点 / 深度 / 已访问顺序
+            visited = _split_state_cell(row[2] if len(row) > 2 else "")
+            enqueued = visited
+            queue = []
+        elif solution.kind == "dijkstra":
+            # columns: 确定节点 / 最短距离 / 候选堆
+            visited = [current]
+            queue = _split_state_cell(row[2] if len(row) > 2 else "")
+            enqueued = queue
+        else:  # topological_sort — columns: 取出节点 / 拓扑序 / 释放节点
+            visited = _split_state_cell(row[1] if len(row) > 1 else "")
+            queue = _split_state_cell(row[2] if len(row) > 2 else "")
+            enqueued = queue
         return {
             "current_node_id": current,
             "active_node_ids": [current],
-            "visited_node_ids": visited,
+            "visited_node_ids": visited or [current],
             "queue_node_ids": queue,
             "active_edge_ids": _edge_ids_from_current(solution, current, enqueued),
         }
@@ -186,7 +205,7 @@ def _graph_visual_state(solution: GraphAlgorithmSolution) -> GraphVisualState:
     return {
         "current_node_id": active_nodes[0] if active_nodes else None,
         "active_node_ids": active_nodes,
-        "visited_node_ids": [],
+        "visited_node_ids": list(active_nodes[:1]),
         "queue_node_ids": [],
         "active_edge_ids": _active_edge_ids(solution, active_nodes),
     }
