@@ -13,6 +13,7 @@ from app.domain.models.playbook import (
 )
 from app.domain.models.topic import TopicDomain
 from app.domain.services.playbook_quality import estimate_step_frames
+from app.domain.skills.algebra_core import parse_number
 from app.domain.skills.linear_algebra.problem_spec import LinearAlgebraProblemSpec
 
 _FPS = 30
@@ -23,7 +24,9 @@ def build_linear_algebra_playbook(
     run_id: str,  # noqa: ARG001
     spec: LinearAlgebraProblemSpec,
 ) -> PlaybookScript:
-    matrix = sp.Matrix(spec.matrix)
+    # ``sp.Matrix`` sympifies string entries (that is ``eval``); a spec that
+    # arrives from an agent tool call may carry strings, so parse literals only.
+    matrix = sp.Matrix([[parse_number(value) for value in row] for row in spec.matrix])
     if spec.task == "solve_system":
         return _build_solve_system(spec, matrix)
     if spec.task == "eigen_basic":
@@ -34,7 +37,7 @@ def build_linear_algebra_playbook(
 
 
 def _build_solve_system(spec: LinearAlgebraProblemSpec, matrix: sp.Matrix) -> PlaybookScript:
-    rhs = sp.Matrix(spec.rhs or [])
+    rhs = sp.Matrix([parse_number(value) for value in (spec.rhs or [])])
     augmented = matrix.row_join(rhs) if rhs.rows == matrix.rows else matrix
     rref, pivots = augmented.rref()
     variables = spec.variable_names or [f"x_{i + 1}" for i in range(matrix.cols)]

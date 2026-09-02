@@ -15,7 +15,7 @@ from app.domain.models.playbook import (
 )
 from app.domain.models.topic import TopicDomain
 from app.domain.services.playbook_quality import estimate_step_frames
-from app.domain.skills.algebra_core import expression_to_source, parse_expression
+from app.domain.skills.algebra_core import expression_to_source, parse_expression, parse_number
 from app.domain.skills.calculus_core.problem_spec import CalculusCoreProblemSpec
 
 _FPS = 30
@@ -70,7 +70,7 @@ def _build_derivative_tangent(
     symbol: sp.Symbol,
     derivative: sp.Expr,
 ) -> PlaybookScript:
-    point = sp.sympify(spec.point)
+    point = parse_number(spec.point)
     point_value = sp.simplify(expr.subs(symbol, point))
     tangent_slope = sp.simplify(derivative.subs(symbol, point))
     tangent_line = sp.expand(tangent_slope * (symbol - point) + point_value)
@@ -211,8 +211,8 @@ def _display(value: sp.Expr) -> str:
 def _build_integral(spec: CalculusCoreProblemSpec) -> PlaybookScript:
     expr, parsed = parse_expression(spec.expression)
     symbol = sp.Symbol(spec.variable)
-    lower = sp.sympify(spec.lower)
-    upper = sp.sympify(spec.upper)
+    lower = parse_number(spec.lower)
+    upper = parse_number(spec.upper)
     value = sp.simplify(sp.integrate(expr, (symbol, lower, upper)))
     integral_latex = (
         rf"\int_{{{sp.latex(lower)}}}^{{{sp.latex(upper)}}} "
@@ -261,7 +261,7 @@ def _build_integral(spec: CalculusCoreProblemSpec) -> PlaybookScript:
 def _build_limit(spec: CalculusCoreProblemSpec) -> PlaybookScript:
     expr, parsed = parse_expression(spec.expression)
     symbol = sp.Symbol(spec.variable)
-    point = sp.sympify(spec.point)
+    point = parse_number(spec.point)
     value = sp.simplify(sp.limit(expr, symbol, point))
     limit_latex = rf"\lim_{{{spec.variable}\to {sp.latex(point)}}} {parsed.latex}"
     snapshots = [
@@ -306,7 +306,7 @@ def _build_limit(spec: CalculusCoreProblemSpec) -> PlaybookScript:
 def _build_series(spec: CalculusCoreProblemSpec) -> PlaybookScript:
     expr, parsed = parse_expression(spec.expression)
     symbol = sp.Symbol(spec.variable)
-    point = sp.sympify(spec.point or 0)
+    point = parse_number(spec.point if spec.point is not None else 0)
     series = sp.series(expr, symbol, point, spec.order).removeO()
     snapshots = [
         MathFormulaSnapshot(
