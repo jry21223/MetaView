@@ -205,10 +205,26 @@ def _voiceover(
     if not is_final:
         return narration
     if solution.query_kind == "line_plane_angle":
-        return f"{narration} 因此目标直线与底面所成的角（线面角）为 {solution.answer_latex}。"
+        # Restate the question in the prompt's own words (body, line, plane,
+        # 夹角) so the final step visibly answers it; the earlier generic
+        # "目标直线与底面" wording shared no token with the prompt (#283 class).
+        line = "".join(solution.target_line or ())
+        plane = "".join(solution.target_face or solution.target_plane or ())
+        body = _BODY_NAMES.get(solution.body, "几何体")
+        return (
+            f"{narration} 所以{body}中直线 {line} 与平面 {plane} 的夹角，"
+            f"也就是线面角，为 {solution.answer_latex}。"
+        )
     if solution.query_kind == "volume":
         return f"{narration} 因此立体的体积为 {solution.answer_latex}。"
     return narration
+
+
+_BODY_NAMES = {
+    "cube": "正方体",
+    "cuboid": "长方体",
+    "regular_quad_pyramid": "正四棱锥",
+}
 
 
 def _title_for(solution: SolidGeometrySolution, prompt: str) -> str:

@@ -298,3 +298,61 @@ SYSTEM_PROMPT 的工作流纪律本身写得不错（LessonPlan 绑定、断言�
 描述统计）全部经真实 pipeline 转为 succeeded；biology/geography 柱状图与
 两条物理场景重渲染确认视觉修复。`code` 学科与 agent 模式仍未覆盖（无 LLM
 凭据），#287 待决策。
+
+## 追加修复：manifest 示例 55/55（2026-09-01）
+
+#288 合并后，用同一把尺子把 13 个 SkillPack manifest 的**全部 55 条**
+capability 示例走了一遍真实管线（self / single / heuristic，无 LLM），50/55
+succeeded。剩下 5 条是 #283 那类缺陷在另外三个包里的复制品，加上物理平抛的
+两个 required fact 没接上：
+
+| 包 / capability | 示例 | 拦截原因 |
+|---|---|---|
+| `elementary_algebra` equation_1var | 求 x²−5x+6=0 的解 | `step.does_not_answer_prompt` |
+| `solid_geometry` cube.line_plane_angle | 正方体棱长 2，求 A₁B 与平面 ABCD 的夹角 | `step.does_not_answer_prompt` |
+| `probability_statistics_core` contingency_table | 列联表求行列合计 | `step.does_not_answer_prompt` |
+| `physics_mechanics` projectile_motion（两条示例） | 10 m/s 水平抛出 / 20 m/s 30° 斜抛 | `lesson_plan.fact_missing`：`gravity`、`parabolic` |
+
+修法照 #283：末步旁白用题目自己的词把答案说出来（`所以方程 x^2-5x+6=0 的解为
+x=2，x=3`、`正方体中直线 A1B 与平面 ABCD 的夹角…为 θ=π/4`、`各行合计 40、60；
+各列合计 50、50`），物理 kernel 的步骤与结论明确说出「竖直方向由重力加速」
+「两个分运动合成抛物线轨迹」。复验：55/55 经真实 pipeline succeeded。
+
+顺手修了一处既有错误：斜抛分支的公式卡此前借用平抛的 `y=h-½gt²`，现在两条分支
+各写自己的运动方程（平抛 `y=h-½gt²`、`x=v_xt`；斜抛 `y=v₀sinθ·t-½gt²`、
+`x=v₀cosθ·t`），`test_physics_mechanics_skill.py` 按抛出方式各锁一条。
+
+这个指标现在由 `tests/test_skill_pack_manifest_examples_gate.py` 长期守住：
+每条 manifest 示例都经本包 `execute` 后过 canonical gate（带 rule-based
+LessonPlan、`specialized` 覆盖），任何 ERROR 即失败。
+
+```bash
+cd apps/api && ../../.venv/bin/pytest tests/test_skill_pack_manifest_examples_gate.py -q
+```
+
+## 加固：题面文本不再进 Python `eval`（2026-09-02）
+
+`algebra_core/parser.py` 此前把题面里抽出的表达式直接交给 sympy `parse_expr`，
+而 `parse_expr` 就是对转换后源码做 `eval`：白盒探针确认
+`解方程 x.__class__.__init__.__globals__=1` 这样的提示词会让
+`Symbol('x').__class__.__init__.__globals__` 真的被求值；用旧解析器解析
+`preview(x)` 会直接去调 LaTeX（报 `latex program is not installed`）。这条路径
+在 self 版无需登录即可触达（路由阶段就解析），agent 侧
+`skill.<id>.solve` 又接受自由格式的 `problem_spec`，同一段文本也能从工具面进来。
+`geometry_validators.py` 早就有 AST 白名单守卫（`test_rejects_attribute_access`），
+但没有覆盖 algebra_core 这条。
+
+现在与 geometry 同一套姿势：`stringify_expr` 得到转换后源码 → AST 白名单
+（数字字面量、`Symbol('name')`、四则与幂、`pi` / `E`、白名单数学函数的直接调用）
+→ 通过才 `eval_expr`，且命名空间只含这些名字并把 `__builtins__` 置空。属性访问、
+下标、lambda、条件表达式、字符串、其余任何 sympy 全局名（`S`、`N`、`Lambda`、
+`preview`…）一律在 `eval` 之前以 `UnsafeExpressionError`（`ValueError` 子类）拒绝。
+副作用：`oo`、`I`、`S` 这类名字不再是无穷 / 虚数单位 / 单例注册表，而是普通符号。
+
+同类入口一并收口：`calculus_core` 的 `point` / `lower` / `upper` 与
+`linear_algebra` 的矩阵元素以前走 `sp.sympify` / `sp.Matrix` 的字符串 sympify，
+现在统一经 `parse_number`（只认十进制、科学计数与 `p/q`）。
+
+守卫测试 `tests/test_algebra_core_parser_guard.py`：13 类敌意输入必须在 `eval`
+之前被拒（对 `eval_expr` 打桩计数为 0），12 类常规代数写法照常解析且只 `eval` 一次，
+另覆盖方程路径、初等代数抽取器、calculus 数值字段与线性代数矩阵字段。
