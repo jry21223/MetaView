@@ -4,6 +4,7 @@ import type {
   GraphSceneSnapshot,
   MetaStep,
 } from "../../../features/playbook/engine/types";
+import { graphSceneSnapshot } from "../../../features/playbook/engine/kits/algorithm/graphScene";
 import type { TemplatePreviewParams } from "../templatePreviewCases";
 import {
   defineAlgorithmCase,
@@ -105,22 +106,19 @@ function graphSnapshot(
   activeEdges: string[],
   caption: string,
 ): GraphSceneSnapshot {
-  return {
-    kind: "graph_scene",
-    pack_id: "algorithm-code-basic",
-    asset_id: "bfs-graph-preset",
+  return graphSceneSnapshot({
+    packId: "algorithm-code-basic",
+    assetId: "bfs-graph-preset",
     nodes: BFS_NODES,
     edges: BFS_EDGES,
-    directed: false,
-    weighted: false,
-    current_node_id: current,
-    active_node_ids: current ? [current] : [],
-    active_edge_ids: activeEdges,
-    visited_node_ids: visited,
-    queue_node_ids: queue,
-    frontier_node_ids: frontier,
+    currentNodeId: current,
+    activeNodeIds: current ? [current] : [],
+    activeEdgeIds: activeEdges,
+    visitedNodeIds: visited,
+    queueNodeIds: queue,
+    frontierNodeIds: frontier,
     caption,
-  };
+  });
 }
 
 function codeHighlight(

@@ -4,6 +4,7 @@ import type {
   GraphSceneSnapshot,
   MetaStep,
 } from "../../../features/playbook/engine/types";
+import { graphSceneSnapshot } from "../../../features/playbook/engine/kits/algorithm/graphScene";
 import type { TemplatePreviewParams } from "../templatePreviewCases";
 import {
   defineAlgorithmCase,
@@ -170,20 +171,16 @@ function dijkstraSnapshot(args: {
   activeEdges: readonly string[];
   caption: string;
 }): GraphSceneSnapshot {
-  return {
-    kind: "graph_scene",
+  return graphSceneSnapshot({
     nodes: graphNodes(args.dist),
     edges: GRAPH_EDGES,
-    directed: false,
     weighted: true,
-    current_node_id: args.current,
-    active_node_ids: [],
-    active_edge_ids: [...args.activeEdges],
-    visited_node_ids: [...args.settled],
-    queue_node_ids: [...args.frontier],
-    frontier_node_ids: [],
+    currentNodeId: args.current,
+    activeEdgeIds: args.activeEdges,
+    visitedNodeIds: args.settled,
+    queueNodeIds: args.frontier,
     caption: args.caption,
-  };
+  });
 }
 
 function codeHighlight(

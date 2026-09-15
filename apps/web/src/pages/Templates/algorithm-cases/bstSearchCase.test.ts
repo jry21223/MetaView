@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { visualQualityGate } from "../../../features/playbook/engine/assets/visualQualityGate";
+import { graphStageBounds, isOnStage } from "../../../features/playbook/engine/kits/algorithm/graphScene";
 import type { GraphSceneSnapshot } from "../../../features/playbook/engine/types";
 import {
   BST_INSERT_ORDER,
@@ -35,15 +36,17 @@ describe("bstSearchCase", () => {
     }
   });
 
-  it("keeps every inserted leaf inside the 900px stage for every target", () => {
-    // Compact graph coords project to 450 + x * 120 with a 32px accent radius.
-    const maxX = (450 - 32) / 120;
+  it("keeps every inserted leaf inside the stage for every target", () => {
+    // The bound comes from the same projection the renderer uses, so a change
+    // to `GRAPH_SCENE_PROJECTION` moves this assertion with it.
+    const { maxX } = graphStageBounds();
     for (let target = 0; target <= 15; target += 1) {
       const script = buildBstSearchScript({ target });
       for (const step of script.steps) {
         const snapshot = asGraph(step.snapshot);
         for (const node of snapshot.nodes) {
           expect(Math.abs(node.x as number), `target ${target} node ${node.id}`).toBeLessThanOrEqual(maxX);
+          expect(isOnStage(node), `target ${target} node ${node.id}`).toBe(true);
         }
       }
     }

@@ -20,18 +20,31 @@ import { clamp01 } from "../foundation";
 import { sanitizeKatex } from "../../../../shared/lib/sanitizeKatex";
 import type { RendererProps } from "./types";
 import { THEME_PALETTE } from "../../../../shared/config/themePalette";
+import {
+  GRAPH_FALLBACK_RING,
+  GRAPH_NODE_RADIUS,
+  GRAPH_NODE_RADIUS_ACTIVE,
+  GRAPH_SCENE_PROJECTION,
+  GRAPH_SCENE_VIEWBOX,
+  GRAPH_STATE_PANEL_PROJECTION,
+  projectGraphPoint,
+  shouldProjectCompactGraphCoords,
+} from "../kits/algorithm/graphScene";
 
 type ThemeName = "dark" | "light";
 
-const SVG_W = 900;
 /**
  * Same fitting arithmetic as the math plot: the Shell's middle row is roughly
  * 904×336 CSS px (2.7:1), so a 520-tall canvas was height-fitted and handed a
  * third of the width back as blank paper. 440 keeps the drawn figure close to
  * its established proportions — a phase portrait reads badly once flattened —
  * while spending most of that margin on the figure.
+ *
+ * The graph kit projects compact case coordinates against this same stage, so
+ * both read it from `GRAPH_SCENE_VIEWBOX` instead of keeping two copies.
  */
-const SVG_H = 440;
+const SVG_W = GRAPH_SCENE_VIEWBOX.width;
+const SVG_H = GRAPH_SCENE_VIEWBOX.height;
 const PLOT = { left: 78, right: 34, top: 42, bottom: 50 };
 
 interface Palette {
@@ -563,8 +576,8 @@ function GraphSvg({
   const positioned = nodes.map((node, index) => {
     const angle = (index / Math.max(nodes.length, 1)) * Math.PI * 2 - Math.PI / 2;
     const fallback = {
-      x: 450 + Math.cos(angle) * 260,
-      y: 245 + Math.sin(angle) * 170,
+      x: GRAPH_FALLBACK_RING.centerX + Math.cos(angle) * GRAPH_FALLBACK_RING.radiusX,
+      y: GRAPH_FALLBACK_RING.centerY + Math.sin(angle) * GRAPH_FALLBACK_RING.radiusY,
     };
     const hasExplicitPosition = typeof node.x === "number" && typeof node.y === "number";
     const projected = hasExplicitPosition
@@ -588,9 +601,7 @@ function GraphSvg({
   ]);
   const activeEdges = new Set(graph.active_edge_ids ?? []);
   const showStatePanel = shouldRenderGraphAlgorithmStatePanel(graph, currentNodes, visitedNodes, queueNodes);
-  const projection = showStatePanel
-    ? { centerX: 312, centerY: 258, xScale: 78, yScale: 66 }
-    : { centerX: SVG_W / 2, centerY: SVG_H / 2, xScale: 120, yScale: 82 };
+  const projection = showStatePanel ? GRAPH_STATE_PANEL_PROJECTION : GRAPH_SCENE_PROJECTION;
   const layoutPositioned = positioned.map((node) => {
     if (!projectCompactCoords || !showStatePanel || typeof node.x !== "number" || typeof node.y !== "number") {
       return node;
@@ -864,9 +875,6 @@ function GraphAlgorithmStatePanel({
 
 type GraphNodeVisualState = "current" | "queue" | "visited" | "default";
 
-const GRAPH_NODE_RADIUS = 29;
-const GRAPH_NODE_RADIUS_ACTIVE = 32;
-
 function graphNodeRadius(
   node: { id: string; emphasis?: SceneEmphasis },
   currentNodes: Set<string>,
@@ -967,13 +975,6 @@ function trimEdgeToNodeRims(
   };
 }
 
-interface GraphProjection {
-  centerX: number;
-  centerY: number;
-  xScale: number;
-  yScale: number;
-}
-
 function graphNodeState(
   nodeId: string,
   currentNodes: Set<string>,
@@ -984,25 +985,6 @@ function graphNodeState(
   if (queueNodes.has(nodeId)) return "queue";
   if (visitedNodes.has(nodeId)) return "visited";
   return "default";
-}
-
-function shouldProjectCompactGraphCoords(nodes: GraphSceneSnapshot["nodes"]): boolean {
-  const positioned = nodes.filter((node) => typeof node.x === "number" && typeof node.y === "number");
-  if (!positioned.length) return false;
-  return positioned.every((node) => Math.abs(node.x as number) <= 12 && Math.abs(node.y as number) <= 12);
-}
-
-function projectGraphPoint(
-  x: number,
-  y: number,
-  compact: boolean,
-  projection: GraphProjection = { centerX: SVG_W / 2, centerY: SVG_H / 2, xScale: 120, yScale: 82 },
-): { x: number; y: number } {
-  if (!compact) return { x, y };
-  return {
-    x: projection.centerX + x * projection.xScale,
-    y: projection.centerY + y * projection.yScale,
-  };
 }
 
 export const PhasePortraitSceneRenderer: React.FC<RendererProps> = ({ step, theme, progress }) => {

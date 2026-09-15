@@ -4,6 +4,12 @@ import type {
   GraphSceneSnapshot,
   MetaStep,
 } from "../../../features/playbook/engine/types";
+import {
+  graphSceneSnapshot,
+  pointerMarkers,
+  pointerMarkerId,
+  rowLayout,
+} from "../../../features/playbook/engine/kits/algorithm/graphScene";
 import type { TemplatePreviewParams } from "../templatePreviewCases";
 import {
   defineAlgorithmCase,
@@ -88,17 +94,18 @@ function nodeLabel(value: number): string {
   return value === 0 ? "∅" : String(value);
 }
 
+/** The row is `∅ → 1 → … → n → ∅`, so both null sentinels get a slot of their own. */
+const LIST_ROW_Y = -0.2;
+
 function listNodes(length: number): GraphSceneNode[] {
-  const total = length + 2;
-  const pitch = 6.4 / (total - 1);
-  const nodes: GraphSceneNode[] = [];
-  for (let slot = 0; slot < total; slot += 1) {
-    const x = Number((-3.2 + slot * pitch).toFixed(3));
-    if (slot === 0) nodes.push({ id: HEAD_NULL_ID, label: "∅", x, y: -0.2 });
-    else if (slot === total - 1) nodes.push({ id: TAIL_NULL_ID, label: "∅", x, y: -0.2 });
-    else nodes.push({ id: `n${slot}`, label: String(slot), x, y: -0.2 });
-  }
-  return nodes;
+  return rowLayout(
+    Array.from({ length: length + 2 }, (_, slot) => {
+      if (slot === 0) return { id: HEAD_NULL_ID, label: "∅" };
+      if (slot === length + 1) return { id: TAIL_NULL_ID, label: "∅" };
+      return { id: `n${slot}`, label: String(slot) };
+    }),
+    { y: LIST_ROW_Y },
+  );
 }
 
 export function flippedEdgeId(value: number): string {
@@ -128,38 +135,10 @@ export function listEdges(length: number, reversedCount: number): GraphSceneEdge
 
 export type PointerName = "prev" | "curr" | "next";
 
-export function pointerMarkerId(name: PointerName): string {
-  return `ptr-${name}`;
-}
+export { pointerMarkerId };
 
+/** The prev / curr / next markers sit on their own row above the list. */
 const POINTER_ROW_Y = -1.75;
-
-/**
- * The three pointers drawn as labelled markers above the row, each with an
- * arrow down to the node it references — so prev / curr / next are visible
- * on stage, not only in the caption.
- */
-function pointerMarkers(
-  nodes: readonly GraphSceneNode[],
-  pointers: Partial<Record<PointerName, string>>,
-): { nodes: GraphSceneNode[]; edges: GraphSceneEdge[] } {
-  const markerNodes: GraphSceneNode[] = [];
-  const markerEdges: GraphSceneEdge[] = [];
-  for (const name of ["prev", "curr", "next"] as const) {
-    const targetId = pointers[name];
-    if (!targetId) continue;
-    const target = nodes.find((node) => node.id === targetId);
-    if (!target) continue;
-    markerNodes.push({ id: pointerMarkerId(name), label: name, x: target.x, y: POINTER_ROW_Y });
-    markerEdges.push({
-      id: `${pointerMarkerId(name)}-edge`,
-      source: pointerMarkerId(name),
-      target: targetId,
-      emphasis: name === "curr" ? "accent" : undefined,
-    });
-  }
-  return { nodes: markerNodes, edges: markerEdges };
-}
 
 function listSnapshot(args: {
   length: number;
@@ -173,21 +152,27 @@ function listSnapshot(args: {
   caption: string;
 }): GraphSceneSnapshot {
   const nodes = listNodes(args.length);
-  const markers = pointerMarkers(nodes, args.pointers);
-  return {
-    kind: "graph_scene",
+  const markers = pointerMarkers(
+    nodes,
+    // `curr` is the pointer the step is actually moving, so only it is accented.
+    (["prev", "curr", "next"] as const).map((name) => ({
+      name,
+      target: args.pointers[name],
+      accent: name === "curr",
+    })),
+    POINTER_ROW_Y,
+  );
+  return graphSceneSnapshot({
     nodes: [...nodes, ...markers.nodes],
     edges: [...listEdges(args.length, args.reversedCount), ...markers.edges],
     directed: true,
-    weighted: false,
-    current_node_id: args.current == null ? null : `n${args.current}`,
-    active_node_ids: (args.active ?? []).map((value) => `n${value}`),
-    active_edge_ids: [...(args.activeEdges ?? [])],
-    visited_node_ids: (args.visited ?? []).map((value) => `n${value}`),
-    queue_node_ids: [],
-    frontier_node_ids: args.next ? [`n${args.next}`] : [],
+    currentNodeId: args.current == null ? null : `n${args.current}`,
+    activeNodeIds: (args.active ?? []).map((value) => `n${value}`),
+    activeEdgeIds: args.activeEdges,
+    visitedNodeIds: (args.visited ?? []).map((value) => `n${value}`),
+    frontierNodeIds: args.next ? [`n${args.next}`] : [],
     caption: args.caption,
-  };
+  });
 }
 
 function codeHighlight(

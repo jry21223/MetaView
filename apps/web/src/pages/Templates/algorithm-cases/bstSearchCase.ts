@@ -4,6 +4,11 @@ import type {
   GraphSceneSnapshot,
   MetaStep,
 } from "../../../features/playbook/engine/types";
+import {
+  graphCoord,
+  graphSceneSnapshot,
+  inorderTreeLayout,
+} from "../../../features/playbook/engine/kits/algorithm/graphScene";
 import type { TemplatePreviewParams } from "../templatePreviewCases";
 import {
   defineAlgorithmCase,
@@ -119,20 +124,21 @@ function subtreeValues(tree: BstTree, root: number | null): number[] {
 }
 
 // 0.7 keeps an inserted leaf beside node 1 or 14 (targets 0 / 15) inside the
-// 900px viewBox: |x| ≤ 2.8 + 0.45 → cx within 60..840 with a 32px radius.
+// stage: |x| ≤ 2.8 + 0.45, still under `graphStageBounds().maxX` ≈ 3.48.
+// `bstSearchCase.test.ts` checks that against the shared projection.
 const X_PITCH = 0.7;
 const Y_TOP = -2.05;
 const Y_PITCH = 0.95;
+/** Horizontal offset of an inserted leaf from the parent it hangs under. */
+const INSERT_X_OFFSET = 0.45;
 
 function layoutNodes(tree: BstTree): GraphSceneNode[] {
-  const ordered = [...tree.keys()].sort((left, right) => left - right);
-  const center = (ordered.length - 1) / 2;
-  return ordered.map((value, rank) => ({
-    id: String(value),
-    label: String(value),
-    x: Number(((rank - center) * X_PITCH).toFixed(3)),
-    y: Number((Y_TOP + tree.get(value)!.depth * Y_PITCH).toFixed(3)),
-  }));
+  return inorderTreeLayout(
+    [...tree.keys()]
+      .sort((left, right) => left - right)
+      .map((value) => ({ id: String(value), label: String(value), depth: tree.get(value)!.depth })),
+    { xPitch: X_PITCH, yTop: Y_TOP, yPitch: Y_PITCH },
+  );
 }
 
 function edgeId(parent: number, child: number): string {
@@ -180,8 +186,8 @@ function bstSnapshot(args: {
     nodes.push({
       id: newId,
       label: String(args.insert.target),
-      x: Number(((parent.x ?? 0) + (args.insert.side === "left" ? -0.45 : 0.45)).toFixed(3)),
-      y: Number(((parent.y ?? 0) + Y_PITCH).toFixed(3)),
+      x: graphCoord((parent.x ?? 0) + (args.insert.side === "left" ? -INSERT_X_OFFSET : INSERT_X_OFFSET)),
+      y: graphCoord((parent.y ?? 0) + Y_PITCH),
       emphasis: "accent",
     });
     const newEdgeId = `${args.insert.parent}-${newId}`;
@@ -189,20 +195,17 @@ function bstSnapshot(args: {
     frontier.push(newId);
     activeEdges.push(newEdgeId);
   }
-  return {
-    kind: "graph_scene",
+  return graphSceneSnapshot({
     nodes,
     edges,
     directed: true,
-    weighted: false,
-    current_node_id: args.current == null ? null : String(args.current),
-    active_node_ids: [...(args.active ?? [])].map(String),
-    active_edge_ids: activeEdges,
-    visited_node_ids: [...(args.visited ?? [])].map(String),
-    queue_node_ids: [],
-    frontier_node_ids: frontier,
+    currentNodeId: args.current == null ? null : String(args.current),
+    activeNodeIds: [...(args.active ?? [])].map(String),
+    activeEdgeIds: activeEdges,
+    visitedNodeIds: [...(args.visited ?? [])].map(String),
+    frontierNodeIds: frontier,
     caption: args.caption,
-  };
+  });
 }
 
 function codeHighlight(
