@@ -1,15 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { visualQualityGate } from "../../../features/playbook/engine/assets/visualQualityGate";
 import type { AlgorithmArraySnapshot } from "../../../features/playbook/engine/types";
 import {
   STACK_BRACKETS_PREVIEW_CASE,
   STACK_BRACKET_PRESETS,
-  buildStackBracketsFollowups,
   buildStackBracketsScript,
   resolveBracketPreset,
   stackBracketTrace,
 } from "./stackBracketsCase";
+import { expectDeterministicCase } from "./testing/expectDeterministicCase";
+
+const PARAM_MATRIX = STACK_BRACKET_PRESETS.map((preset) => ({ expression: preset.id }));
 
 function asArray(snapshot: unknown): AlgorithmArraySnapshot {
   expect(snapshot).toMatchObject({ kind: "algorithm_array" });
@@ -17,6 +18,10 @@ function asArray(snapshot: unknown): AlgorithmArraySnapshot {
 }
 
 describe("stackBracketsCase", () => {
+  it("holds the shared preview-case invariants for every preset", () => {
+    expectDeterministicCase(STACK_BRACKETS_PREVIEW_CASE, PARAM_MATRIX);
+  });
+
   it("traces every preset to the verdict the code would return", () => {
     expect(stackBracketTrace("{[()]}").verdict).toBe("valid");
     expect(stackBracketTrace("()[]{}").verdict).toBe("valid");
@@ -36,12 +41,8 @@ describe("stackBracketsCase", () => {
   it("builds a default script with a scan cursor, a stack lane and a matched-pair lane", () => {
     const script = buildStackBracketsScript(STACK_BRACKETS_PREVIEW_CASE.defaultParams);
 
-    expect(script.schema_version).toBe("2.0.0");
     expect(script.algorithm_id).toBe("stack_bracket_matching");
     expect(script.steps).toHaveLength(8);
-    expect(script.total_frames).toBe(script.steps.at(-1)?.end_frame);
-    expect(new Set(script.steps.map((step) => step.step_id)).size).toBe(script.steps.length);
-    expect(new Set(script.steps.map((step) => JSON.stringify(step.snapshot))).size).toBe(script.steps.length);
 
     for (const step of script.steps) {
       const snapshot = asArray(step.snapshot);
@@ -49,7 +50,6 @@ describe("stackBracketsCase", () => {
       expect(snapshot.sorted_indices).toEqual([]);
       expect(snapshot.swap_indices).toEqual([]);
       expect(snapshot.auxiliary_lanes?.map((lane) => lane.role)).toEqual(["stack", "result"]);
-      expect(step.code_highlight?.active_line).toBeLessThan(step.code_highlight!.lines.length);
     }
 
     const deepest = asArray(script.steps.find((step) => step.step_id === "bracket-read-2")?.snapshot);
@@ -77,12 +77,6 @@ describe("stackBracketsCase", () => {
     expect(script.steps.at(-1)?.title).toBe("栈为空，表达式合法");
   });
 
-  it("keeps every step visually focused", () => {
-    for (const preset of STACK_BRACKET_PRESETS) {
-      expect(visualQualityGate(buildStackBracketsScript({ expression: preset.id }))).toEqual([]);
-    }
-  });
-
   it("stops early on a mismatch and reports leftovers when unclosed", () => {
     const crossed = buildStackBracketsScript({ expression: "crossed" });
     expect(crossed.steps.map((step) => step.step_id)).toEqual([
@@ -106,18 +100,6 @@ describe("stackBracketsCase", () => {
     expect(extra.steps).toHaveLength(5);
   });
 
-  it("covers every step with at least three follow-up questions for every preset", () => {
-    for (const preset of STACK_BRACKET_PRESETS) {
-      const params = { expression: preset.id };
-      const script = buildStackBracketsScript(params);
-      const followups = buildStackBracketsFollowups(params);
-      expect(script.steps.length).toBeGreaterThanOrEqual(5);
-      for (const step of script.steps) {
-        expect(followups[step.step_id]?.length).toBeGreaterThanOrEqual(3);
-      }
-    }
-  });
-
   it("clamps unknown presets to the nested default", () => {
     expect(resolveBracketPreset({})).toBe("nested");
     expect(resolveBracketPreset({ expression: "nope" })).toBe("nested");
@@ -128,7 +110,5 @@ describe("stackBracketsCase", () => {
   it("exposes a preview case wired to the pure builders", () => {
     expect(STACK_BRACKETS_PREVIEW_CASE.id).toBe("stack-brackets");
     expect(STACK_BRACKETS_PREVIEW_CASE.controls[0]?.id).toBe("expression");
-    const script = STACK_BRACKETS_PREVIEW_CASE.buildScript(STACK_BRACKETS_PREVIEW_CASE.defaultParams);
-    expect(STACK_BRACKETS_PREVIEW_CASE.posterFrame).toBeLessThan(script.total_frames);
   });
 });

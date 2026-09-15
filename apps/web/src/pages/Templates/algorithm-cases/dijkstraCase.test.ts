@@ -1,16 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { visualQualityGate } from "../../../features/playbook/engine/assets/visualQualityGate";
+import { isOnStage } from "../../../features/playbook/engine/kits/algorithm/graphScene";
 import type { GraphSceneSnapshot } from "../../../features/playbook/engine/types";
 import {
   DIJKSTRA_NODE_IDS,
   DIJKSTRA_PREVIEW_CASE,
-  buildDijkstraFollowups,
   buildDijkstraScript,
   dijkstraTrace,
   resolveDijkstraSource,
   shortestPath,
 } from "./dijkstraCase";
+import { expectDeterministicCase } from "./testing/expectDeterministicCase";
+
+const PARAM_MATRIX = DIJKSTRA_NODE_IDS.map((source) => ({ source }));
 
 function asGraph(snapshot: unknown): GraphSceneSnapshot {
   expect(snapshot).toMatchObject({ kind: "graph_scene" });
@@ -18,6 +20,10 @@ function asGraph(snapshot: unknown): GraphSceneSnapshot {
 }
 
 describe("dijkstraCase", () => {
+  it("holds the shared preview-case invariants for every source", () => {
+    expectDeterministicCase(DIJKSTRA_PREVIEW_CASE, PARAM_MATRIX);
+  });
+
   it("settles nodes in nondecreasing distance order from A", () => {
     const trace = dijkstraTrace("A");
     expect(trace.map((step) => step.current)).toEqual(["A", "C", "B", "D", "E", "F"]);
@@ -52,9 +58,6 @@ describe("dijkstraCase", () => {
       "dijkstra-settle-F",
       "dijkstra-result",
     ]);
-    expect(script.total_frames).toBe(script.steps.at(-1)?.end_frame);
-    expect(new Set(script.steps.map((step) => JSON.stringify(step.snapshot))).size).toBe(script.steps.length);
-
     const intro = asGraph(script.steps[0]?.snapshot);
     expect(intro.weighted).toBe(true);
     expect(intro.nodes.map((node) => node.label)).toEqual(["A 0", "B ∞", "C ∞", "D ∞", "E ∞", "F ∞"]);
@@ -74,14 +77,14 @@ describe("dijkstraCase", () => {
     expect(script.steps.at(-1)?.voiceover_text).toContain("A、C、B、D、E、F");
   });
 
-  it("keeps every step visually focused for every source", () => {
+  it("settles all six nodes on stage whatever the source", () => {
     for (const source of DIJKSTRA_NODE_IDS) {
       const script = buildDijkstraScript({ source });
       expect(script.steps).toHaveLength(8);
-      expect(visualQualityGate(script)).toEqual([]);
-      const followups = buildDijkstraFollowups({ source });
       for (const step of script.steps) {
-        expect(followups[step.step_id]?.length).toBeGreaterThanOrEqual(3);
+        for (const node of asGraph(step.snapshot).nodes) {
+          expect(isOnStage(node), `source ${source} node ${node.id}`).toBe(true);
+        }
       }
     }
   });
@@ -96,7 +99,5 @@ describe("dijkstraCase", () => {
   it("exposes a preview case wired to the pure builders", () => {
     expect(DIJKSTRA_PREVIEW_CASE.id).toBe("dijkstra");
     expect(DIJKSTRA_PREVIEW_CASE.controls[0]).toMatchObject({ id: "source", kind: "select" });
-    const script = DIJKSTRA_PREVIEW_CASE.buildScript(DIJKSTRA_PREVIEW_CASE.defaultParams);
-    expect(DIJKSTRA_PREVIEW_CASE.posterFrame).toBeLessThan(script.total_frames);
   });
 });

@@ -18,6 +18,7 @@
     "showcase:approve-reference": "vite-node scripts/approve-showcase-reference.mjs",
     "template-previews:export": "vite-node --script scripts/export-template-preview-cases.mjs",
     "template-previews:posters": "node scripts/render-template-preview-posters.mjs",
+    "template-shots": "vite-node --script scripts/render-template-shots.mjs --",
     "test:visual:conics": "playwright test --config playwright.conics.config.ts",
     "test": "vitest run",
     "test:watch": "vitest",

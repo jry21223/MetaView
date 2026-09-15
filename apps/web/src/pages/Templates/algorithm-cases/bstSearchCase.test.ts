@@ -1,19 +1,26 @@
 import { describe, expect, it } from "vitest";
 
-import { visualQualityGate } from "../../../features/playbook/engine/assets/visualQualityGate";
 import { graphStageBounds, isOnStage } from "../../../features/playbook/engine/kits/algorithm/graphScene";
 import type { GraphSceneSnapshot } from "../../../features/playbook/engine/types";
 import {
   BST_INSERT_ORDER,
   BST_NODES,
   BST_SEARCH_PREVIEW_CASE,
+  BST_TARGET_MAX,
+  BST_TARGET_MIN,
   BST_TREE,
   bstSearchTrace,
   buildBst,
-  buildBstSearchFollowups,
   buildBstSearchScript,
   resolveBstTarget,
 } from "./bstSearchCase";
+import { expectDeterministicCase } from "./testing/expectDeterministicCase";
+
+/** Every reachable target, including the ones that fall off the tree. */
+const PARAM_MATRIX = Array.from(
+  { length: BST_TARGET_MAX - BST_TARGET_MIN + 1 },
+  (_, offset) => ({ target: BST_TARGET_MIN + offset }),
+);
 
 function asGraph(snapshot: unknown): GraphSceneSnapshot {
   expect(snapshot).toMatchObject({ kind: "graph_scene" });
@@ -21,6 +28,10 @@ function asGraph(snapshot: unknown): GraphSceneSnapshot {
 }
 
 describe("bstSearchCase", () => {
+  it("holds the shared preview-case invariants for every target", () => {
+    expectDeterministicCase(BST_SEARCH_PREVIEW_CASE, PARAM_MATRIX);
+  });
+
   it("builds the fixed tree from the insertion order and lays it out in-order", () => {
     const tree = buildBst(BST_INSERT_ORDER);
     expect(tree.get(8)).toMatchObject({ left: 3, right: 10, depth: 0, parent: null });
@@ -80,8 +91,6 @@ describe("bstSearchCase", () => {
       "bst-result",
       "bst-complexity",
     ]);
-    expect(script.total_frames).toBe(script.steps.at(-1)?.end_frame);
-    expect(new Set(script.steps.map((step) => JSON.stringify(step.snapshot))).size).toBe(script.steps.length);
 
     for (const step of script.steps) {
       const snapshot = asGraph(step.snapshot);
@@ -121,18 +130,6 @@ describe("bstSearchCase", () => {
     expect(Math.abs(deepNode?.y as number)).toBeLessThanOrEqual(2.2);
   });
 
-  it("keeps every step visually focused across the target range", () => {
-    for (const target of [0, 1, 5, 7, 8, 12, 15]) {
-      const script = buildBstSearchScript({ target });
-      expect(script.steps.length).toBeGreaterThanOrEqual(5);
-      expect(visualQualityGate(script)).toEqual([]);
-      const followups = buildBstSearchFollowups({ target });
-      for (const step of script.steps) {
-        expect(followups[step.step_id]?.length).toBeGreaterThanOrEqual(3);
-      }
-    }
-  });
-
   it("clamps the target to the supported interval", () => {
     expect(resolveBstTarget({})).toBe(7);
     expect(resolveBstTarget({ target: -3 })).toBe(0);
@@ -144,7 +141,5 @@ describe("bstSearchCase", () => {
   it("exposes a preview case wired to the pure builders", () => {
     expect(BST_SEARCH_PREVIEW_CASE.id).toBe("bst-search");
     expect(BST_SEARCH_PREVIEW_CASE.controls[0]).toMatchObject({ id: "target", kind: "number", min: 0, max: 15 });
-    const script = BST_SEARCH_PREVIEW_CASE.buildScript(BST_SEARCH_PREVIEW_CASE.defaultParams);
-    expect(BST_SEARCH_PREVIEW_CASE.posterFrame).toBeLessThan(script.total_frames);
   });
 });

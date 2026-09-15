@@ -1,18 +1,20 @@
 import { describe, expect, it } from "vitest";
 
-import { visualQualityGate } from "../../../features/playbook/engine/assets/visualQualityGate";
+import { isOnStage } from "../../../features/playbook/engine/kits/algorithm/graphScene";
 import type { GraphSceneSnapshot } from "../../../features/playbook/engine/types";
 import {
   HEAD_NULL_ID,
   LINKED_LIST_LENGTHS,
   LINKED_LIST_REVERSE_PREVIEW_CASE,
   TAIL_NULL_ID,
-  buildLinkedListReverseFollowups,
   buildLinkedListReverseScript,
   linkedListReverseTrace,
   listEdges,
   resolveLinkedListLength,
 } from "./linkedListReverseCase";
+import { expectDeterministicCase } from "./testing/expectDeterministicCase";
+
+const PARAM_MATRIX = LINKED_LIST_LENGTHS.map((length) => ({ length }));
 
 function asGraph(snapshot: unknown): GraphSceneSnapshot {
   expect(snapshot).toMatchObject({ kind: "graph_scene" });
@@ -20,6 +22,10 @@ function asGraph(snapshot: unknown): GraphSceneSnapshot {
 }
 
 describe("linkedListReverseCase", () => {
+  it("holds the shared preview-case invariants for every supported length", () => {
+    expectDeterministicCase(LINKED_LIST_REVERSE_PREVIEW_CASE, PARAM_MATRIX);
+  });
+
   it("traces prev / curr / next for every iteration", () => {
     const frames = linkedListReverseTrace(4);
     expect(frames.map((frame) => [frame.curr, frame.prevBefore, frame.next])).toEqual([
@@ -58,8 +64,6 @@ describe("linkedListReverseCase", () => {
       "list-flip-4",
       "list-result",
     ]);
-    expect(script.total_frames).toBe(script.steps.at(-1)?.end_frame);
-    expect(new Set(script.steps.map((step) => JSON.stringify(step.snapshot))).size).toBe(script.steps.length);
 
     const listNodes = (snapshot: GraphSceneSnapshot) => snapshot.nodes.filter((node) => !node.id.startsWith("ptr-"));
     const markerTargets = (snapshot: GraphSceneSnapshot) =>
@@ -104,14 +108,14 @@ describe("linkedListReverseCase", () => {
     expect(script.steps.at(-1)?.snapshot.caption).toContain("4 → 3 → 2 → 1 → ∅");
   });
 
-  it("keeps every step visually focused for every supported length", () => {
+  it("keeps the whole row on stage at every supported length", () => {
     for (const length of LINKED_LIST_LENGTHS) {
       const script = buildLinkedListReverseScript({ length });
       expect(script.steps).toHaveLength(Number(length) + 2);
-      expect(visualQualityGate(script)).toEqual([]);
-      const followups = buildLinkedListReverseFollowups({ length });
       for (const step of script.steps) {
-        expect(followups[step.step_id]?.length).toBeGreaterThanOrEqual(3);
+        for (const node of asGraph(step.snapshot).nodes) {
+          expect(isOnStage(node), `length ${length} node ${node.id}`).toBe(true);
+        }
       }
     }
   });
@@ -126,7 +130,5 @@ describe("linkedListReverseCase", () => {
   it("exposes a preview case wired to the pure builders", () => {
     expect(LINKED_LIST_REVERSE_PREVIEW_CASE.id).toBe("linked-list-reverse");
     expect(LINKED_LIST_REVERSE_PREVIEW_CASE.controls[0]).toMatchObject({ id: "length", kind: "select" });
-    const script = LINKED_LIST_REVERSE_PREVIEW_CASE.buildScript(LINKED_LIST_REVERSE_PREVIEW_CASE.defaultParams);
-    expect(LINKED_LIST_REVERSE_PREVIEW_CASE.posterFrame).toBeLessThan(script.total_frames);
   });
 });

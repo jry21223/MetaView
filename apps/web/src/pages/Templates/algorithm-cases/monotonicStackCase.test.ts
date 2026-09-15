@@ -1,15 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { visualQualityGate } from "../../../features/playbook/engine/assets/visualQualityGate";
 import type { AlgorithmBarsSnapshot } from "../../../features/playbook/engine/types";
 import {
   MONOTONIC_STACK_PRESETS,
   MONOTONIC_STACK_PREVIEW_CASE,
-  buildMonotonicStackFollowups,
   buildMonotonicStackScript,
   monotonicStackTrace,
   resolveMonotonicPreset,
 } from "./monotonicStackCase";
+import { expectDeterministicCase } from "./testing/expectDeterministicCase";
+
+const PARAM_MATRIX = MONOTONIC_STACK_PRESETS.map((preset) => ({ preset: preset.id }));
 
 function asBars(snapshot: unknown): AlgorithmBarsSnapshot {
   expect(snapshot).toMatchObject({ kind: "algorithm_bars" });
@@ -17,6 +18,10 @@ function asBars(snapshot: unknown): AlgorithmBarsSnapshot {
 }
 
 describe("monotonicStackCase", () => {
+  it("holds the shared preview-case invariants for every preset", () => {
+    expectDeterministicCase(MONOTONIC_STACK_PREVIEW_CASE, PARAM_MATRIX);
+  });
+
   it("computes next-greater answers with a decreasing index stack", () => {
     const mixed = monotonicStackTrace([4, 2, 5, 1, 3, 6]);
     expect(mixed.at(-1)?.answer).toEqual([5, 5, 6, 3, 6, -1]);
@@ -37,8 +42,6 @@ describe("monotonicStackCase", () => {
 
     expect(script.algorithm_id).toBe("monotonic_stack_next_greater");
     expect(script.steps).toHaveLength(8);
-    expect(script.total_frames).toBe(script.steps.at(-1)?.end_frame);
-    expect(new Set(script.steps.map((step) => JSON.stringify(step.snapshot))).size).toBe(script.steps.length);
 
     for (const step of script.steps) {
       const snapshot = asBars(step.snapshot);
@@ -65,12 +68,6 @@ describe("monotonicStackCase", () => {
     expect(script.steps.at(-1)?.voiceover_text).toContain("[5, 5, 6, 3, 6, -1]");
   });
 
-  it("keeps every step visually focused for every preset", () => {
-    for (const preset of MONOTONIC_STACK_PRESETS) {
-      expect(visualQualityGate(buildMonotonicStackScript({ preset: preset.id }))).toEqual([]);
-    }
-  });
-
   it("distinguishes the stack-only-grows and pop-every-step presets", () => {
     const descending = buildMonotonicStackScript({ preset: "descending" });
     expect(descending.steps.slice(1, -1).every((step) => step.title.includes("直接入栈"))).toBe(true);
@@ -81,15 +78,7 @@ describe("monotonicStackCase", () => {
     expect(asBars(ascending.steps.at(-1)?.snapshot).auxiliary_lanes?.[0]?.items).toHaveLength(1);
   });
 
-  it("covers every step with follow-ups and clamps unknown presets", () => {
-    for (const preset of MONOTONIC_STACK_PRESETS) {
-      const params = { preset: preset.id };
-      const script = buildMonotonicStackScript(params);
-      const followups = buildMonotonicStackFollowups(params);
-      for (const step of script.steps) {
-        expect(followups[step.step_id]?.length).toBeGreaterThanOrEqual(3);
-      }
-    }
+  it("clamps unknown presets to the mixed default", () => {
     expect(resolveMonotonicPreset({})).toBe("mixed");
     expect(resolveMonotonicPreset({ preset: "zigzag" })).toBe("mixed");
     expect(buildMonotonicStackScript({ preset: "zigzag" }).parameter_controls[0]?.value).toBe("mixed");
@@ -98,7 +87,5 @@ describe("monotonicStackCase", () => {
   it("exposes a preview case wired to the pure builders", () => {
     expect(MONOTONIC_STACK_PREVIEW_CASE.id).toBe("monotonic-stack");
     expect(MONOTONIC_STACK_PREVIEW_CASE.controls[0]?.id).toBe("preset");
-    const script = MONOTONIC_STACK_PREVIEW_CASE.buildScript(MONOTONIC_STACK_PREVIEW_CASE.defaultParams);
-    expect(MONOTONIC_STACK_PREVIEW_CASE.posterFrame).toBeLessThan(script.total_frames);
   });
 });
