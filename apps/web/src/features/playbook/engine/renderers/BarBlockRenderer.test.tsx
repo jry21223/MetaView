@@ -98,6 +98,26 @@ describe("BarBlockRenderer", () => {
     expect(markup).toContain('data-auxiliary-role="result"');
   });
 
+  it("keeps the full bar field when the only extra lane is a stack column", () => {
+    const snap = makeBars([9, 3], {
+      pointers: { i: 1 },
+      auxiliary_lanes: [
+        { id: "stack", role: "stack", label: "STACK", items: [{ id: "s0", label: "i=0", value: "nums[i]=9", index: 0 }] },
+        { id: "answer", role: "result", label: "ANSWER", items: [{ id: "a0", label: "?", index: 0 }] },
+      ],
+    });
+    const markup = renderToStaticMarkup(BarBlockRenderer(props(barsStep(snap))));
+    const hs = heightsOf(markup);
+
+    // Only the result row borrows height: 342 - 1 * 56 = 286.
+    expect(hs).toContain(286);
+    expect(markup).toContain('data-stack-lane="stack"');
+    expect(markup).toContain('data-stack-capacity="2"');
+    expect(markup).toContain('data-stack-top="0"');
+    expect(markup).not.toContain('data-auxiliary-role="stack"');
+    expect(markup).toContain('data-auxiliary-role="result"');
+  });
+
   it("uses a signed zero axis for negative values and still supports range overlays", () => {
     const snap = makeBars([-3, -1, 3], {
       element_states: {

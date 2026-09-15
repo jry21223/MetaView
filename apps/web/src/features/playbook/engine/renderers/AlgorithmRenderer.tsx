@@ -6,7 +6,9 @@ import { THEME_PALETTE } from "../../../../shared/config/themePalette";
 import {
   AlgorithmAuxiliaryLanes,
   AlgorithmRangeOverlay,
+  AlgorithmStackColumn,
 } from "./AlgorithmSequenceOverlays";
+import { STACK_COLUMN_RESERVE, stackColumnCapacity } from "./stackColumnLayout";
 
 function soft(color: string, strength: number): string {
   return `color-mix(in srgb, ${color} ${strength}%, transparent)`;
@@ -123,7 +125,9 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
     );
   }
 
-  const cellW = Math.min(80, Math.floor(880 / snap.array_values.length));
+  const stackLanes = (snap.auxiliary_lanes ?? []).filter((lane) => lane.role === "stack");
+  const stackReserve = stackLanes.length * STACK_COLUMN_RESERVE;
+  const cellW = Math.min(80, Math.floor((880 - stackReserve) / snap.array_values.length));
   const cellH = 64;
   const cellGap = 4;
   const cellPitch = cellW + cellGap;
@@ -178,6 +182,8 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
         {step.title}
       </h2>
 
+      <div style={{ display: "flex", alignItems: "center", gap: 40 }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 32 }}>
       {/* Array cells */}
       <div style={{ display: "flex", gap: cellGap, position: "relative" }}>
         {snap.array_values.map((val, i) => {
@@ -445,6 +451,19 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
         width={snap.array_values.length * cellW + (snap.array_values.length - 1) * cellGap}
         theme={theme}
       />
+      </div>
+
+      {stackLanes.map((lane) => (
+        <AlgorithmStackColumn
+          key={lane.id}
+          lane={lane}
+          previousLane={prevSnap?.auxiliary_lanes?.find((candidate) => candidate.id === lane.id) ?? null}
+          capacity={stackColumnCapacity(lane, snap.array_values.length)}
+          elapsed={elapsed}
+          theme={theme}
+        />
+      ))}
+      </div>
 
     </div>
   );

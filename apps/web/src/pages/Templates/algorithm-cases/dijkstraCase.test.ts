@@ -71,7 +71,7 @@ describe("dijkstraCase", () => {
     const result = asGraph(script.steps.at(-1)?.snapshot);
     expect(result.visited_node_ids).toEqual(["A", "C", "B", "D", "E", "F"]);
     expect([...result.active_edge_ids ?? []].sort()).toEqual(["A-C", "B-C", "B-D", "D-E", "E-F"]);
-    expect(script.steps.at(-1)?.voiceover_text).toContain("A → C → B → D → E → F");
+    expect(script.steps.at(-1)?.voiceover_text).toContain("A、C、B、D、E、F");
   });
 
   it("keeps every step visually focused for every source", () => {

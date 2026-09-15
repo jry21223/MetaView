@@ -14,8 +14,8 @@ import {
 /**
  * 单调栈 · 下一个更大元素。
  *
- * 柱状数组表达数值大小，栈轨道保存“还没找到答案”的下标（对应值单调递减），
- * 结果轨道逐格填入答案。三种预设数组分别展示典型混合、全递减（栈只涨不落）
+ * 柱状数组表达数值大小，右侧的竖直栈列保存“还没找到答案”的下标（自底向上
+ * 对应值单调递减），下方的结果轨道逐格填入答案。三种预设数组分别展示典型混合、全递减（栈只涨不落）
  * 与全递增（每步都弹出）三种行为。
  */
 export const MONOTONIC_STACK_PRESETS = [
@@ -113,8 +113,8 @@ function monotonicSnapshot(args: {
     auxiliary_lanes: [
       {
         id: "monotonic-stack",
-        role: "deque",
-        label: "STACK · 值递减",
+        role: "stack",
+        label: "STACK · 自底向上递减",
         items: args.stack.map((index) => ({
           id: `stack-${index}`,
           label: `i=${index}`,
@@ -157,6 +157,16 @@ function codeHighlight(
 
 function answerText(answer: readonly number[]): string {
   return `[${answer.map((value) => (value === -1 ? "?" : String(value))).join(", ")}]`;
+}
+
+/** Resolved answers in spoken form: no placeholder glyphs reach the narration. */
+function answerSpoken(answer: readonly number[]): string {
+  const resolved = answer
+    .map((value, index) => ({ value, index }))
+    .filter((item) => item.value !== -1);
+  const pending = answer.length - resolved.length;
+  const known = resolved.map((item) => `下标 ${item.index} 是 ${item.value}`).join("、");
+  return pending > 0 ? `${known}，其余 ${pending} 个还在等待` : known;
 }
 
 function stackText(stack: readonly number[], values: readonly number[]): string {
@@ -225,7 +235,7 @@ export function buildMonotonicStackScript(params: TemplatePreviewParams): Playbo
     steps.push(algorithmStep(steps.length, {
       step_id: stepId,
       title: `读入 ${frame.value}，弹出 ${frame.popped.length} 个更小的元素`,
-      voiceover_text: `下标 ${frame.index} 的值是 ${frame.value}，比栈顶的 ${poppedValues[0]} 大。栈顶等的“右侧第一个更大值”就是它：弹出并写下答案。${frame.popped.length > 1 ? `新的栈顶 ${poppedValues.slice(1).join("、")} 也比 ${frame.value} 小，同样依次弹出记答案。` : ""}直到栈顶不再小于 ${frame.value}，再把下标 ${frame.index} 压入。答案已更新为 ${answerText(frame.answer)}。`,
+      voiceover_text: `下标 ${frame.index} 的值是 ${frame.value}，比栈顶的 ${poppedValues[0]} 大。栈顶等的“右侧第一个更大值”就是它：弹出并写下答案。${frame.popped.length > 1 ? `新的栈顶 ${poppedValues.slice(1).join("、")} 也比 ${frame.value} 小，同样依次弹出记答案。` : ""}直到栈顶不再小于 ${frame.value}，再把下标 ${frame.index} 压入。目前已确定的答案：${answerSpoken(frame.answer)}。`,
       snapshot: monotonicSnapshot({
         values,
         cursor: frame.index,

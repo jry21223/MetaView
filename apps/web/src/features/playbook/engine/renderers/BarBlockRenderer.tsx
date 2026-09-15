@@ -14,7 +14,9 @@ import { THEME_PALETTE } from "../../../../shared/config/themePalette";
 import {
   AlgorithmAuxiliaryLanes,
   AlgorithmRangeOverlay,
+  AlgorithmStackColumn,
 } from "./AlgorithmSequenceOverlays";
+import { STACK_COLUMN_RESERVE, stackColumnCapacity } from "./stackColumnLayout";
 
 /**
  * Theme-reactive palette built on the app's CSS variables (see
@@ -138,13 +140,15 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
   const domainMin = Math.min(0, ...snap.numeric_values);
   const domainMax = Math.max(0, ...snap.numeric_values);
   const domainSpan = Math.max(domainMax - domainMin, 1);
-  const laneCount = snap.auxiliary_lanes?.length ?? 0;
+  const stackLanes = (snap.auxiliary_lanes ?? []).filter((lane) => lane.role === "stack");
+  const laneCount = (snap.auxiliary_lanes?.length ?? 0) - stackLanes.length;
   const maxBarHeight = laneCount > 0
     ? Math.max(MIN_BAR_FIELD_HEIGHT, MAX_BAR_HEIGHT - laneCount * LANE_FIELD_RESERVE)
     : MAX_BAR_HEIGHT;
   const pixelsPerUnit = maxBarHeight / domainSpan;
   const zeroAxisY = domainMax * pixelsPerUnit;
-  const barW = Math.max(10, Math.min(72, Math.floor(960 / n) - 8));
+  const stackReserve = stackLanes.length * STACK_COLUMN_RESERVE;
+  const barW = Math.max(10, Math.min(72, Math.floor((960 - stackReserve) / n) - 8));
   const barGap = Math.max(4, Math.min(14, Math.floor(barW * 0.18)));
   const pitch = barW + barGap;
 
@@ -193,6 +197,8 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
         {step.title}
       </h2>
 
+      <div style={{ display: "flex", alignItems: "center", gap: 40 }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 18 }}>
       {/* Bar field — signed values share a real zero axis. */}
       <div
         data-zero-axis={zeroAxisY}
@@ -516,6 +522,19 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
         width={n * barW + (n - 1) * barGap}
         theme={theme}
       />
+      </div>
+
+      {stackLanes.map((lane) => (
+        <AlgorithmStackColumn
+          key={lane.id}
+          lane={lane}
+          previousLane={prevSnap?.auxiliary_lanes?.find((candidate) => candidate.id === lane.id) ?? null}
+          capacity={stackColumnCapacity(lane, n)}
+          elapsed={elapsed}
+          theme={theme}
+        />
+      ))}
+      </div>
 
     </div>
   );

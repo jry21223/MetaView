@@ -82,7 +82,8 @@ describe("linkedListReverseCase", () => {
     expect(result.current_node_id).toBeNull();
     expect(result.visited_node_ids).toEqual(["n1", "n2", "n3", "n4"]);
     expect(result.active_edge_ids).toEqual(["n1-back", "n2-back", "n3-back", "n4-back"]);
-    expect(script.steps.at(-1)?.voiceover_text).toContain("4 → 3 → 2 → 1 → ∅");
+    expect(script.steps.at(-1)?.voiceover_text).toContain("4、3、2、1，末尾指向空");
+    expect(script.steps.at(-1)?.snapshot.caption).toContain("4 → 3 → 2 → 1 → ∅");
   });
 
   it("keeps every step visually focused for every supported length", () => {

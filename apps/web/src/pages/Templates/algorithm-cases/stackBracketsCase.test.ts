@@ -48,7 +48,7 @@ describe("stackBracketsCase", () => {
       expect(snapshot.array_values).toEqual([..."{[()]}"]);
       expect(snapshot.sorted_indices).toEqual([]);
       expect(snapshot.swap_indices).toEqual([]);
-      expect(snapshot.auxiliary_lanes?.map((lane) => lane.role)).toEqual(["auxiliary_array", "result"]);
+      expect(snapshot.auxiliary_lanes?.map((lane) => lane.role)).toEqual(["stack", "result"]);
       expect(step.code_highlight?.active_line).toBeLessThan(step.code_highlight!.lines.length);
     }
 

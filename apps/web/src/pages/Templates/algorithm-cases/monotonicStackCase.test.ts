@@ -44,7 +44,7 @@ describe("monotonicStackCase", () => {
       const snapshot = asBars(step.snapshot);
       expect(snapshot.numeric_values).toEqual([4, 2, 5, 1, 3, 6]);
       expect(snapshot.sorted_indices).toEqual([]);
-      expect(snapshot.auxiliary_lanes?.map((lane) => lane.role)).toEqual(["deque", "result"]);
+      expect(snapshot.auxiliary_lanes?.map((lane) => lane.role)).toEqual(["stack", "result"]);
       expect(snapshot.auxiliary_lanes?.[1]?.items).toHaveLength(6);
     }
 

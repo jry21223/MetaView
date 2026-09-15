@@ -220,7 +220,7 @@ _COMBINED_SCHEMA = """{
         "auxiliary_lanes": [
           {
             "id": "string",
-            "role": "deque | result | auxiliary_array",
+            "role": "deque | result | auxiliary_array | stack",
             "label": "short lane label",
             "items": [
               {

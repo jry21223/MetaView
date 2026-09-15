@@ -91,7 +91,7 @@ export interface AlgorithmAuxiliaryItemBuilder {
 
 export interface AlgorithmAuxiliaryLaneBuilder {
   id: string;
-  role: "deque" | "result" | "auxiliary_array";
+  role: "deque" | "result" | "auxiliary_array" | "stack";
   label: string;
   items: AlgorithmAuxiliaryItemBuilder[];
 }

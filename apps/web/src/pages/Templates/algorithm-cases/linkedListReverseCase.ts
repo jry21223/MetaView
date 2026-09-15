@@ -176,6 +176,15 @@ function chain(values: readonly number[]): string {
   return [...values.map(String), "∅"].join(" → ");
 }
 
+/** The same chain for narration: TTS cannot read arrows or the null glyph. */
+function chainSpoken(values: readonly number[]): string {
+  return values.length ? `${values.join("、")}，末尾指向空` : "空";
+}
+
+function spokenNode(value: number): string {
+  return value === 0 ? "空" : String(value);
+}
+
 export function buildLinkedListReverseScript(params: TemplatePreviewParams): PlaybookScript {
   const length = resolveLinkedListLength(params);
   const frames = linkedListReverseTrace(length);
@@ -185,7 +194,7 @@ export function buildLinkedListReverseScript(params: TemplatePreviewParams): Pla
     algorithmStep(0, {
       step_id: "list-intro",
       title: "三个指针：prev、curr、next",
-      voiceover_text: `链表是 ${chain(original)}，每个节点只知道自己的后继。反转的目标是让每个 next 指针掉头。迭代法用三个指针：prev 指向已经反转好的部分（开始时为空），curr 指向正在处理的节点，next 提前保存后继，否则指针一掉头就找不到后面的节点了。`,
+      voiceover_text: `链表依次是 ${chainSpoken(original)}，每个节点只知道自己的后继。反转的目标是让每个 next 指针掉头。迭代法用三个指针：prev 指向已经反转好的部分（开始时为空），curr 指向正在处理的节点，next 提前保存后继，否则指针一掉头就找不到后面的节点了。`,
       snapshot: listSnapshot({
         length,
         reversedCount: 0,
@@ -205,10 +214,12 @@ export function buildLinkedListReverseScript(params: TemplatePreviewParams): Pla
   frames.forEach((frame) => {
     const prevLabel = nodeLabel(frame.prevBefore);
     const nextLabel = nodeLabel(frame.next);
+    const prevSpoken = spokenNode(frame.prevBefore);
+    const nextSpoken = spokenNode(frame.next);
     steps.push(algorithmStep(steps.length, {
       step_id: `list-flip-${frame.curr}`,
       title: `翻转节点 ${frame.curr} 的指针：${frame.curr} → ${prevLabel}`,
-      voiceover_text: `curr 在节点 ${frame.curr}。先把后继保存进 next（${nextLabel}），再让 ${frame.curr}.next 指向 prev，也就是 ${prevLabel}。指针掉头之后，prev 前进到 ${frame.curr}，curr 前进到保存好的 ${nextLabel}。${frame.next === 0 ? "next 为空，循环即将结束。" : `此刻已反转的前缀是 ${chain([...frame.reversed].reverse())}。`}`,
+      voiceover_text: `curr 在节点 ${frame.curr}。先把后继保存进 next，也就是 ${nextSpoken}；再让节点 ${frame.curr} 的 next 指向 prev，也就是 ${prevSpoken}。指针掉头之后，prev 前进到 ${frame.curr}，curr 前进到保存好的 ${nextSpoken}。${frame.next === 0 ? "next 为空，循环即将结束。" : `此刻已反转的前缀依次是 ${chainSpoken([...frame.reversed].reverse())}。`}`,
       snapshot: listSnapshot({
         length,
         reversedCount: frame.reversed.length,
@@ -236,7 +247,7 @@ export function buildLinkedListReverseScript(params: TemplatePreviewParams): Pla
   steps.push(algorithmStep(steps.length, {
     step_id: "list-result",
     title: `curr 为空，新头结点是 ${last.curr}`,
-    voiceover_text: `curr 走到 ∅，循环结束。prev 停在原来的尾节点 ${last.curr}，它就是新的头结点，返回 prev。现在链表是 ${chain(last.order)}。每个节点恰好被访问一次、翻转一条指针，时间 O(n)，只用了三个指针的额外空间。`,
+    voiceover_text: `curr 走到空，循环结束。prev 停在原来的尾节点 ${last.curr}，它就是新的头结点，返回 prev。现在链表依次是 ${chainSpoken(last.order)}。每个节点恰好被访问一次、翻转一条指针，时间 O(n)，只用了三个指针的额外空间。`,
     snapshot: listSnapshot({
       length,
       reversedCount: length,

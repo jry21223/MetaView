@@ -19,16 +19,30 @@ import {
  * 栈 · 括号匹配。
  *
  * 数据结构可视化里最经典的栈案例：逐字符扫描表达式，左括号入栈、右括号
- * 与栈顶配对出栈。主序列是表达式本身（位置与扫描指针），辅助轨道是栈和
- * 已匹配的括号对——栈不藏在旁白里，而是一条真实的轨道。
+ * 与栈顶配对出栈。主序列是表达式本身（位置与扫描指针）；栈画成主序列右侧
+ * 的竖直槽位列（栈底在下、栈顶在上、空槽可见），已匹配的括号对是下方的结果轨道。
  */
 export const STACK_BRACKET_PRESETS = [
-  { id: "nested", expression: "{[()]}", label: "{[()]}  嵌套" },
-  { id: "sequence", expression: "()[]{}", label: "()[]{}  并列" },
-  { id: "crossed", expression: "([)]", label: "([)]  交叉错配" },
-  { id: "unclosed", expression: "(()", label: "(()  少一个右括号" },
-  { id: "extra-close", expression: "())", label: "())  多一个右括号" },
+  { id: "nested", expression: "{[()]}", label: "{[()]}  嵌套", spoken: "花括号里套着方括号，方括号里再套着圆括号" },
+  { id: "sequence", expression: "()[]{}", label: "()[]{}  并列", spoken: "圆括号、方括号、花括号三对依次并列" },
+  { id: "crossed", expression: "([)]", label: "([)]  交叉错配", spoken: "圆括号还没闭合就先闭合了方括号，两对交叉" },
+  { id: "unclosed", expression: "(()", label: "(()  少一个右括号", spoken: "两个左圆括号，却只有一个右圆括号" },
+  { id: "extra-close", expression: "())", label: "())  多一个右括号", spoken: "一对圆括号后面又多了一个右圆括号" },
 ] as const;
+
+/** Spoken names for the six bracket glyphs: narration must stay readable by TTS. */
+const CHAR_NAMES: Record<string, string> = {
+  "(": "左圆括号",
+  ")": "右圆括号",
+  "[": "左方括号",
+  "]": "右方括号",
+  "{": "左花括号",
+  "}": "右花括号",
+};
+
+export function bracketName(char: string): string {
+  return CHAR_NAMES[char] ?? char;
+}
 
 export type StackBracketPresetId = (typeof STACK_BRACKET_PRESETS)[number]["id"];
 
@@ -84,6 +98,10 @@ export function resolveBracketPreset(params: TemplatePreviewParams): StackBracke
 
 export function bracketExpression(presetId: StackBracketPresetId): string {
   return STACK_BRACKET_PRESETS.find((preset) => preset.id === presetId)!.expression;
+}
+
+function bracketSpoken(presetId: StackBracketPresetId): string {
+  return STACK_BRACKET_PRESETS.find((preset) => preset.id === presetId)!.spoken;
 }
 
 /** Pure single-pass stack scan; stops at the first failure like the code does. */
@@ -176,8 +194,8 @@ function bracketSnapshot(args: {
     auxiliary_lanes: [
       {
         id: "bracket-stack",
-        role: "auxiliary_array",
-        label: "STACK · 栈顶在右",
+        role: "stack",
+        label: "STACK · 栈顶在上",
         items: args.stack.map((index) => ({
           id: `stack-${index}`,
           label: args.chars[index]!,
@@ -221,6 +239,13 @@ function stackText(chars: readonly string[], stack: readonly number[]): string {
   return stack.length ? `[${stack.map((index) => chars[index]).join(", ")}]` : "[]";
 }
 
+/** Bottom-to-top stack contents in spoken form for narration. */
+function stackSpoken(chars: readonly string[], stack: readonly number[]): string {
+  return stack.length
+    ? `从底到顶依次是${stack.map((index) => bracketName(chars[index]!)).join("、")}`
+    : "已经空了";
+}
+
 function verdictTitle(verdict: StackBracketVerdict): string {
   if (verdict === "valid") return "栈为空，表达式合法";
   if (verdict === "unclosed") return "扫描结束但栈非空";
@@ -233,7 +258,7 @@ function verdictNarration(trace: StackBracketTrace, chars: readonly string[]): s
     return `扫描完 ${chars.length} 个字符，栈恰好为空：每个右括号都找到了最近的、类型相同的左括号。返回 true。整个过程每个字符只入栈、出栈各最多一次，时间复杂度 O(n)，栈的额外空间最坏也是 O(n)。`;
   }
   if (verdict === "unclosed") {
-    return `所有字符都读完了，但栈里还剩 ${stackText(chars, trace.leftover)}：这些左括号没有等到自己的右括号。栈非空就返回 false——合法性不只看每一次配对，也看扫描结束时是否清空。`;
+    return `所有字符都读完了，但栈里还剩 ${trace.leftover.length} 个左括号，${stackSpoken(chars, trace.leftover)}：它们没有等到自己的右括号。栈非空就返回 false——合法性不只看每一次配对，也看扫描结束时是否清空。`;
   }
   if (verdict === "underflow") {
     return "遇到右括号时栈已经为空，没有任何左括号可以与它配对，函数在这里直接返回 false，后面的字符不再需要读取。";
@@ -252,7 +277,7 @@ export function buildStackBracketsScript(params: TemplatePreviewParams): Playboo
     algorithmStep(0, {
       step_id: "bracket-intro",
       title: "准备一个空栈",
-      voiceover_text: `要判断 ${expression} 的括号是否匹配。规则只有一条：每个右括号必须与最近一个尚未闭合的左括号类型相同。“最近的尚未闭合”正是后进先出，所以用栈来记录还没配对的左括号，从左到右逐字符扫描。`,
+      voiceover_text: `要判断这个表达式的括号是否匹配：${bracketSpoken(presetId)}。规则只有一条：每个右括号必须与最近一个尚未闭合的左括号类型相同。“最近的尚未闭合”正是后进先出，所以用栈来记录还没配对的左括号，从左到右逐字符扫描。`,
       snapshot: bracketSnapshot({
         chars,
         cursor: 0,
@@ -276,7 +301,7 @@ export function buildStackBracketsScript(params: TemplatePreviewParams): Playboo
       steps.push(algorithmStep(steps.length, {
         step_id: `bracket-read-${event.index}`,
         title: `读入 ${event.char}，入栈`,
-        voiceover_text: `第 ${event.index} 个字符是左括号 ${event.char}。它还没有配对对象，先压入栈顶等待。此时栈是 ${stackAfter}，栈顶总是最近一个尚未闭合的左括号。`,
+        voiceover_text: `第 ${event.index} 个字符是${bracketName(event.char)}。它还没有配对对象，先压入栈顶等待。此时栈里${stackSpoken(chars, event.stack)}，栈顶总是最近一个尚未闭合的左括号。`,
         snapshot: bracketSnapshot({
           chars,
           cursor: event.index,
@@ -299,7 +324,7 @@ export function buildStackBracketsScript(params: TemplatePreviewParams): Playboo
       steps.push(algorithmStep(steps.length, {
         step_id: `bracket-read-${event.index}`,
         title: `读入 ${event.char}，与栈顶 ${chars[partner]} 配对`,
-        voiceover_text: `第 ${event.index} 个字符是右括号 ${event.char}。栈顶是第 ${partner} 个字符 ${chars[partner]}，类型正好相同，于是弹出栈顶，两者完成配对。弹出后栈是 ${stackAfter}。`,
+        voiceover_text: `第 ${event.index} 个字符是${bracketName(event.char)}。栈顶是第 ${partner} 个字符${bracketName(chars[partner]!)}，类型正好相同，于是弹出栈顶，两者完成配对。弹出后栈${event.stack.length ? `里${stackSpoken(chars, event.stack)}` : "已经空了"}。`,
         snapshot: bracketSnapshot({
           chars,
           cursor: event.index,
@@ -329,7 +354,7 @@ export function buildStackBracketsScript(params: TemplatePreviewParams): Playboo
       steps.push(algorithmStep(steps.length, {
         step_id: `bracket-read-${event.index}`,
         title: `读入 ${event.char}，栈顶是 ${chars[partner]}：不匹配`,
-        voiceover_text: `第 ${event.index} 个字符是右括号 ${event.char}，需要的左括号是 ${PAIR[event.char]}，可栈顶却是第 ${partner} 个字符 ${chars[partner]}。栈只能和最近一个尚未闭合的左括号配对，类型不同就说明括号交叉了，立即返回 false。`,
+        voiceover_text: `第 ${event.index} 个字符是${bracketName(event.char)}，需要配对的是${bracketName(PAIR[event.char]!)}，可栈顶却是第 ${partner} 个字符${bracketName(chars[partner]!)}。栈只能和最近一个尚未闭合的左括号配对，类型不同就说明括号交叉了，立即返回 false。`,
         snapshot: bracketSnapshot({
           chars,
           cursor: event.index,
@@ -355,7 +380,7 @@ export function buildStackBracketsScript(params: TemplatePreviewParams): Playboo
     steps.push(algorithmStep(steps.length, {
       step_id: `bracket-read-${event.index}`,
       title: `读入 ${event.char}，栈已空`,
-      voiceover_text: `第 ${event.index} 个字符是右括号 ${event.char}，但栈里已经没有任何左括号。没有可配对的对象，函数立即返回 false。`,
+      voiceover_text: `第 ${event.index} 个字符是${bracketName(event.char)}，但栈里已经没有任何左括号。没有可配对的对象，函数立即返回 false。`,
       snapshot: bracketSnapshot({
         chars,
         cursor: event.index,
@@ -434,7 +459,7 @@ export function buildStackBracketsFollowups(params: TemplatePreviewParams): Temp
       followups[stepId] = algorithmQuestions(
         stepId,
         ["为什么左括号直接入栈？", "左括号此刻还看不到自己的右括号，只能先记下来等待，栈就是这份等待名单。"],
-        ["现在栈里有几个元素？", `${event.stack.length} 个：${stackText(chars, event.stack)}，最右边是栈顶。`],
+        ["现在栈里有几个元素？", `${event.stack.length} 个：${stackText(chars, event.stack)}，最后压入的在最上面，是栈顶。`],
         ["下一个字符若是右括号会怎样？", `它会和栈顶 ${event.char} 比较类型：相同就弹出配对，不同就直接返回 false。`],
       );
       return;

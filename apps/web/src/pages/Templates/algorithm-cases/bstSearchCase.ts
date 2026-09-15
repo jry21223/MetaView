@@ -228,6 +228,11 @@ function pathText(path: readonly BstComparison[]): string {
   return path.map((item) => item.node).join(" → ");
 }
 
+/** The same path for narration, without arrow glyphs. */
+function pathSpoken(path: readonly BstComparison[]): string {
+  return path.map((item) => item.node).join("、");
+}
+
 export function buildBstSearchScript(params: TemplatePreviewParams): PlaybookScript {
   const target = resolveBstTarget(params);
   const root = BST_INSERT_ORDER[0];
@@ -256,7 +261,7 @@ export function buildBstSearchScript(params: TemplatePreviewParams): PlaybookScr
     algorithmStep(1, {
       step_id: "bst-property",
       title: "左子树都更小，右子树都更大",
-      voiceover_text: `二叉搜索树的性质：任意节点的左子树所有值都小于它，右子树所有值都大于它。以根 ${root} 为例，左子树是 {${leftValues.join(", ")}}，右子树是 {${rightValues.join(", ")}}。画面里节点的横坐标就是中序位置，所以性质在左右方向上直接可见。`,
+      voiceover_text: `二叉搜索树的性质：任意节点的左子树所有值都小于它，右子树所有值都大于它。以根 ${root} 为例，左子树是 ${leftValues.join("、")}，右子树是 ${rightValues.join("、")}。画面里节点的横坐标就是中序位置，所以性质在左右方向上直接可见。`,
       snapshot: bstSnapshot({
         current: root,
         visited: leftValues,
@@ -280,7 +285,7 @@ export function buildBstSearchScript(params: TemplatePreviewParams): PlaybookScr
       ? `在 ${comparison.node} 处比较：${target} = ${comparison.node}，命中`
       : `在 ${comparison.node} 处比较：${target} ${relation} ${comparison.node}，向${comparison.direction === "left" ? "左" : "右"}走`;
     const narration = comparison.direction === "found"
-      ? `来到节点 ${comparison.node}，目标 ${target} 正好等于它，查找结束。这是第 ${index + 1} 次比较，走过的路径是 ${pathText(trace.path)}。`
+      ? `来到节点 ${comparison.node}，目标 ${target} 正好等于它，查找结束。这是第 ${index + 1} 次比较，走过的路径依次是 ${pathSpoken(trace.path)}。`
       : nextValue == null
         ? `来到节点 ${comparison.node}，目标 ${target} ${relation} ${comparison.node}，应该往${comparison.direction === "left" ? "左" : "右"}走，但那一侧是空的。第 ${index + 1} 次比较后可以确定：${target} 不在树中。`
         : `来到节点 ${comparison.node}，目标 ${target} ${relation} ${comparison.node}，所以整棵${comparison.direction === "left" ? "右" : "左"}子树都不用看，沿${comparison.direction === "left" ? "左" : "右"}孩子进入 ${nextValue}。这是第 ${index + 1} 次比较。`;
@@ -315,7 +320,7 @@ export function buildBstSearchScript(params: TemplatePreviewParams): PlaybookScr
     steps.push(algorithmStep(steps.length, {
       step_id: "bst-result",
       title: `找到 ${target}，共比较 ${trace.path.length} 次`,
-      voiceover_text: `目标 ${target} 就在路径末端。整条路径 ${pathText(trace.path)} 只经过 ${trace.path.length} 个节点，其余 ${BST_TREE.size - trace.path.length} 个节点一次都没有访问。`,
+      voiceover_text: `目标 ${target} 就在路径末端。整条路径依次经过 ${pathSpoken(trace.path)}，只有 ${trace.path.length} 个节点，其余 ${BST_TREE.size - trace.path.length} 个节点一次都没有访问。`,
       snapshot: bstSnapshot({
         current: lastNode,
         active: [lastNode],
@@ -334,7 +339,7 @@ export function buildBstSearchScript(params: TemplatePreviewParams): PlaybookScr
     steps.push(algorithmStep(steps.length, {
       step_id: "bst-result",
       title: `${target} 不在树中，可作为 ${insert.parent} 的${insert.side === "left" ? "左" : "右"}孩子插入`,
-      voiceover_text: `查找落空的位置恰好就是插入位置：把 ${target} 挂到 ${insert.parent} 的${insert.side === "left" ? "左" : "右"}侧空位上，树仍然满足左小右大。插入和查找走的是同一条路径 ${pathText(trace.path)}，代价相同。`,
+      voiceover_text: `查找落空的位置恰好就是插入位置：把 ${target} 挂到 ${insert.parent} 的${insert.side === "left" ? "左" : "右"}侧空位上，树仍然满足左小右大。插入和查找走的是同一条路径，依次经过 ${pathSpoken(trace.path)}，代价相同。`,
       snapshot: bstSnapshot({
         current: insert.parent,
         visited: pathNodes.slice(0, -1),
