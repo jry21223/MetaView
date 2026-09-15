@@ -2,7 +2,6 @@ import type {
   GraphSceneEdge,
   GraphSceneNode,
   GraphSceneSnapshot,
-  MetaStep,
 } from "../../../features/playbook/engine/types";
 import {
   graphCoord,
@@ -12,6 +11,7 @@ import {
 import { spokenPath } from "../../../shared/lib/spokenText";
 import type { TemplatePreviewParams } from "../templatePreviewCases";
 import {
+  codeHighlightFor,
   defineAlgorithmCase,
   finiteNumber,
   type AlgorithmCaseFrame,
@@ -209,21 +209,7 @@ function bstSnapshot(args: {
   });
 }
 
-function codeHighlight(
-  activeLine: number,
-  variables: Record<string, string>,
-  operationLabel: string,
-  activeLines: number[] = [activeLine],
-): NonNullable<MetaStep["code_highlight"]> {
-  return {
-    language: "typescript",
-    lines: [...BST_SEARCH_CODE],
-    active_lines: activeLines,
-    active_line: activeLine,
-    variables,
-    operation_label: operationLabel,
-  };
-}
+const codeHighlight = codeHighlightFor(BST_SEARCH_CODE);
 
 function pathText(path: readonly BstComparison[]): string {
   return path.map((item) => item.node).join(" → ");

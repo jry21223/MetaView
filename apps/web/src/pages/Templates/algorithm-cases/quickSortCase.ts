@@ -1,9 +1,7 @@
-import type {
-  AlgorithmBarsSnapshot,
-  MetaStep,
-} from "../../../features/playbook/engine/types";
+import type { AlgorithmBarsSnapshot } from "../../../features/playbook/engine/types";
 import type { TemplatePreviewParams } from "../templatePreviewCases";
 import {
+  codeHighlightFor,
   defineAlgorithmCase,
   stringParam,
   type AlgorithmCaseFrame,
@@ -312,22 +310,7 @@ function barsSnapshot(args: {
   };
 }
 
-function codeOverlay(args: {
-  activeLine: number;
-  activeLines?: number[];
-  variables: Record<string, string>;
-  operation: string;
-}): NonNullable<MetaStep["code_highlight"]> {
-  const activeLines = args.activeLines ?? [args.activeLine];
-  return {
-    language: "typescript",
-    lines: QUICK_SORT_CODE,
-    active_lines: activeLines,
-    active_line: args.activeLine,
-    variables: args.variables,
-    operation_label: args.operation,
-  };
-}
+const codeHighlight = codeHighlightFor(QUICK_SORT_CODE);
 
 function pickTeachingEvents(trace: readonly QuickSortTraceEvent[]): QuickSortTraceEvent[] {
   const firstPartition = trace.filter((event) => event.partitionId === 0);
@@ -392,15 +375,15 @@ function draftFromEvent(
           hi: event.hi,
         },
       }),
-      code_highlight: codeOverlay({
-        activeLine: 0,
-        variables: {
+      code_highlight: codeHighlight(
+        0,
+        {
           array: `[${event.array.join(",")}]`,
           strategy: "last (Lomuto)",
           n: String(event.array.length),
         },
-        operation: "introduce array",
-      }),
+        "introduce array",
+      ),
       questions: [
         ["快速排序的核心思想是什么？", "选 pivot 分区，使左侧都不大于 pivot、右侧都大于 pivot，再递归处理两侧。"],
         ["本模板用哪种分区？", "Lomuto 分区，pivot 取当前区间最后一个元素（pivotStrategy=last）。"],
@@ -426,18 +409,18 @@ function draftFromEvent(
           i: event.i ?? event.lo - 1,
         },
       }),
-      code_highlight: codeOverlay({
-        activeLine: 7,
-        activeLines: [6, 7, 8],
-        variables: {
+      code_highlight: codeHighlight(
+        7,
+        {
           lo: String(event.lo),
           hi: String(event.hi),
           pivotIndex: String(event.pivotIndex),
           pivot: String(event.pivotValue),
           i: String(event.i ?? event.lo - 1),
         },
-        operation: "choose pivot",
-      }),
+        "choose pivot",
+        [6, 7, 8],
+      ),
       questions: [
         ["pivot 现在在哪？", `索引 ${event.pivotIndex}，值 ${event.pivotValue}，即区间右端 a[hi]。`],
         ["i 初始为什么是 lo-1？", "i 指向“已确认 ≤ pivot 区域”的右边界；尚未确认任何元素时，右边界在 lo 左侧。"],
@@ -467,10 +450,9 @@ function draftFromEvent(
           j: event.j!,
         },
       }),
-      code_highlight: codeOverlay({
-        activeLine: 10,
-        activeLines: [9, 10],
-        variables: {
+      code_highlight: codeHighlight(
+        10,
+        {
           lo: String(event.lo),
           hi: String(event.hi),
           i: String(event.i ?? event.lo - 1),
@@ -479,8 +461,9 @@ function draftFromEvent(
           a_j: value,
           decision: event.comparedLe ? "<=" : ">",
         },
-        operation: event.comparedLe ? "expand left side" : "skip greater element",
-      }),
+        event.comparedLe ? "expand left side" : "skip greater element",
+        [9, 10],
+      ),
       questions: [
         ["这一步比较的是谁？", `扫描下标 j=${event.j} 的值 ${value}，与 pivot ${event.pivotValue} 比较。`],
         ["为什么用 ≤ 而不是 <？", "Lomuto 经典写法把等于 pivot 的元素也收进左侧，最终不变式是左侧 ≤ pivot、右侧 > pivot。"],
@@ -509,18 +492,18 @@ function draftFromEvent(
           j: event.j ?? right,
         },
       }),
-      code_highlight: codeOverlay({
-        activeLine: 10,
-        activeLines: [10],
-        variables: {
+      code_highlight: codeHighlight(
+        10,
+        {
           i: String(event.i),
           j: String(event.j),
           pivot: String(event.pivotValue),
           swapped: `${left}<->${right}`,
           array: `[${event.array.join(",")}]`,
         },
-        operation: "swap into left partition",
-      }),
+        "swap into left partition",
+        [10],
+      ),
       questions: [
         ["这次交换保证了什么？", `下标 ${left} 进入 ≤ pivot 前缀，较大元素被推到更右侧等待后续处理。`],
         ["如果 i 已经等于 j 还要交换吗？", "不需要。元素已在前缀边界上，原地即可。"],
@@ -557,18 +540,18 @@ function draftFromEvent(
           i: event.i ?? event.lo - 1,
         },
       }),
-      code_highlight: codeOverlay({
-        activeLine: 12,
-        activeLines: [12, 13],
-        variables: {
+      code_highlight: codeHighlight(
+        12,
+        {
           lo: String(event.lo),
           hi: String(event.hi),
           pivotIndex: String(event.pivotIndex),
           pivot: String(event.pivotValue),
           invariant: "left<=pivot < right",
         },
-        operation: "place pivot",
-      }),
+        "place pivot",
+        [12, 13],
+      ),
       questions: [
         ["pivot 的最终下标是多少？", `p = ${event.pivotIndex}，值 ${event.pivotValue} 已在最终有序位置上。`],
         ["分区不变式如何表述？", "对 Lomuto（比较用 ≤）：左侧 ≤ pivot，右侧 > pivot，pivot 位于 p。"],
@@ -589,17 +572,17 @@ function draftFromEvent(
       sorted: event.array.map((_, idx) => idx),
       pointers: {},
     }),
-    code_highlight: codeOverlay({
-      activeLine: 1,
-      activeLines: [0, 1, 2, 3, 4],
-      variables: {
+    code_highlight: codeHighlight(
+      1,
+      {
         result: `[${event.array.join(",")}]`,
         average: "O(n log n)",
         worst: "O(n^2)",
         strategy: "Lomuto / last",
       },
-      operation: "sorted summary",
-    }),
+      "sorted summary",
+      [0, 1, 2, 3, 4],
+    ),
     questions: [
       ["最终结果是什么？", `升序结果为 [${event.array.join(", ")}]。`],
       ["为什么平均是 O(n log n)？", "若 pivot 大致均匀切开，递归树高度约 log n，每层分区扫描合计 O(n)。"],

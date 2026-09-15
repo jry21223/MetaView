@@ -2,7 +2,6 @@ import type {
   GraphSceneEdge,
   GraphSceneNode,
   GraphSceneSnapshot,
-  MetaStep,
 } from "../../../features/playbook/engine/types";
 import {
   graphSceneSnapshot,
@@ -13,8 +12,9 @@ import {
 import { SPOKEN_NULL, spokenList } from "../../../shared/lib/spokenText";
 import type { TemplatePreviewParams } from "../templatePreviewCases";
 import {
+  codeHighlightFor,
   defineAlgorithmCase,
-  stringParam,
+  definePresetParam,
   type AlgorithmCaseFrame,
   type AlgorithmStepDraft,
 } from "./helpers";
@@ -30,6 +30,15 @@ export const LINKED_LIST_LENGTHS = ["3", "4", "5"] as const;
 export type LinkedListLength = (typeof LINKED_LIST_LENGTHS)[number];
 
 const DEFAULT_LENGTH: LinkedListLength = "4";
+
+const LENGTH_PARAM = definePresetParam<LinkedListLength>({
+  id: "length",
+  label: "链表长度",
+  description: "调整节点数后重新演示反转。",
+  playbookDescription: "调整节点数后重新演示反转过程。",
+  options: LINKED_LIST_LENGTHS.map((value) => ({ value, label: `${value} 个节点` })),
+  defaultValue: DEFAULT_LENGTH,
+});
 
 export const LINKED_LIST_CODE = [
   "function reverseList(head: ListNode | null): ListNode | null {",
@@ -49,7 +58,7 @@ export const HEAD_NULL_ID = "null-head";
 export const TAIL_NULL_ID = "null-tail";
 
 export function resolveLinkedListLength(params: TemplatePreviewParams): number {
-  return Number(stringParam(params, "length", LINKED_LIST_LENGTHS, DEFAULT_LENGTH));
+  return Number(LENGTH_PARAM.resolve(params));
 }
 
 export interface LinkedListFrame {
@@ -176,21 +185,7 @@ function listSnapshot(args: {
   });
 }
 
-function codeHighlight(
-  activeLine: number,
-  variables: Record<string, string>,
-  operationLabel: string,
-  activeLines: number[] = [activeLine],
-): NonNullable<MetaStep["code_highlight"]> {
-  return {
-    language: "typescript",
-    lines: [...LINKED_LIST_CODE],
-    active_lines: activeLines,
-    active_line: activeLine,
-    variables,
-    operation_label: operationLabel,
-  };
-}
+const codeHighlight = codeHighlightFor(LINKED_LIST_CODE);
 
 function chain(values: readonly number[]): string {
   return [...values.map(String), "∅"].join(" → ");
@@ -310,12 +305,7 @@ function buildLinkedListReverseSteps(
 
   return {
     steps,
-    controls: [{
-      id: "length",
-      label: "链表长度",
-      value: String(length),
-      description: "调整节点数后重新演示反转过程。",
-    }],
+    controls: [LENGTH_PARAM.playbookControl(String(length) as LinkedListLength)],
     initialData: {
       list: original.map(String),
       length: [String(length)],
@@ -329,16 +319,7 @@ export const LINKED_LIST_REVERSE_PREVIEW_CASE = defineAlgorithmCase({
   posterAlt: "链表反转：带箭头的节点排、已翻转的前缀与正在掉头的指针",
   posterStepIndex: 2,
   defaultParams: { length: DEFAULT_LENGTH },
-  controls: [
-    {
-      id: "length",
-      kind: "select",
-      label: "链表长度",
-      description: "调整节点数后重新演示反转。",
-      resetPlayback: true,
-      options: LINKED_LIST_LENGTHS.map((value) => ({ label: `${value} 个节点`, value })),
-    },
-  ],
+  controls: [LENGTH_PARAM.control],
   title: "链表反转：一次只翻一条指针",
   summary: "用 prev、curr、next 三个指针迭代反转单链表，每一步只让一条 next 指针掉头，箭头方向就是全部状态。",
   algorithmId: "linked_list_reverse",

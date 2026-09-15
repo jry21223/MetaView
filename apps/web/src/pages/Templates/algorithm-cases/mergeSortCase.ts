@@ -1,6 +1,7 @@
 import type { AlgorithmBarsSnapshot } from "../../../features/playbook/engine/types";
 import type { TemplatePreviewParams } from "../templatePreviewCases";
 import {
+  codeHighlightFor,
   defineAlgorithmCase,
   stringParam,
   type AlgorithmCaseFrame,
@@ -482,6 +483,8 @@ export function buildMergeSortBeats(): ScriptBeat[] {
   return beats;
 }
 
+const codeHighlight = codeHighlightFor(MERGE_SORT_CODE);
+
 function beatToDraft(beat: ScriptBeat): AlgorithmStepDraft<AlgorithmBarsSnapshot> {
   return {
     step_id: beat.step_id,
@@ -492,14 +495,12 @@ function beatToDraft(beat: ScriptBeat): AlgorithmStepDraft<AlgorithmBarsSnapshot
       sorted: beat.sorted,
       pointers: beat.pointers,
     }),
-    code_highlight: {
-      language: "typescript",
-      lines: [...MERGE_SORT_CODE],
-      active_line: beat.active_line,
-      active_lines: beat.active_lines,
-      variables: beat.variables,
-      operation_label: beat.operation_label,
-    },
+    code_highlight: codeHighlight(
+      beat.active_line,
+      beat.variables,
+      beat.operation_label,
+      beat.active_lines,
+    ),
     questions: beat.questions,
   };
 }

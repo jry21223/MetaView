@@ -3,6 +3,7 @@ import type {
   PlaybookScript,
 } from "../../../features/playbook/engine/types";
 import type {
+  SelectTemplatePreviewControl,
   TemplatePreviewCase,
   TemplatePreviewControl,
   TemplatePreviewFollowups,
@@ -81,6 +82,83 @@ export function buildAlgorithmPlaybook(args: {
       scene_blueprint: [args.algorithmId],
       teaching_phases: ["观察", "机制或推理", "验证", "总结"],
     },
+  };
+}
+
+/**
+ * The `code_highlight` builder for one listing. Every case used to declare its
+ * own four-argument `codeHighlight` around the same object literal; this
+ * binds the listing once and leaves the per-step arguments.
+ */
+export function codeHighlightFor(
+  lines: readonly string[],
+  language = "typescript",
+): (
+  activeLine: number,
+  variables: Record<string, string>,
+  operationLabel: string,
+  activeLines?: number[],
+) => NonNullable<MetaStep["code_highlight"]> {
+  const source = [...lines];
+  return (activeLine, variables, operationLabel, activeLines = [activeLine]) => ({
+    language,
+    lines: source,
+    active_lines: activeLines,
+    active_line: activeLine,
+    variables,
+    operation_label: operationLabel,
+  });
+}
+
+export interface PresetParamOption<Id extends string> {
+  value: Id;
+  label: string;
+}
+
+export interface PresetParam<Id extends string> {
+  /** Clamp a raw param value to one of the presets. */
+  resolve: (params: TemplatePreviewParams) => Id;
+  /** The `/templates` select shown beside the player. */
+  control: SelectTemplatePreviewControl;
+  /** The matching `PlaybookScript.parameter_controls` entry for a resolved value. */
+  playbookControl: (value: Id) => PlaybookScript["parameter_controls"][number];
+}
+
+/**
+ * A "pick one of these" parameter declared once.
+ *
+ * The preset list, the clamp, the select options and the two control
+ * declarations (one for the page, one inside the script) used to be written
+ * out separately in every case, so a new preset meant four edits and a
+ * forgotten one silently fell back to the default.
+ */
+export function definePresetParam<Id extends string>(args: {
+  id: string;
+  label: string;
+  /** Shown under the select on the template page. */
+  description: string;
+  /** Shown in `PlaybookScript.parameter_controls`; defaults to `description`. */
+  playbookDescription?: string;
+  options: ReadonlyArray<PresetParamOption<Id>>;
+  defaultValue: Id;
+}): PresetParam<Id> {
+  const allowed = args.options.map((option) => option.value);
+  return {
+    resolve: (params) => stringParam(params, args.id, allowed, args.defaultValue) as Id,
+    control: {
+      id: args.id,
+      kind: "select",
+      label: args.label,
+      description: args.description,
+      resetPlayback: true,
+      options: args.options.map((option) => ({ label: option.label, value: option.value })),
+    },
+    playbookControl: (value) => ({
+      id: args.id,
+      label: args.label,
+      value,
+      description: args.playbookDescription ?? args.description,
+    }),
   };
 }
 

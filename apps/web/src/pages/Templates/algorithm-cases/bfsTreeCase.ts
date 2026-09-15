@@ -2,12 +2,13 @@ import type {
   GraphSceneEdge,
   GraphSceneNode,
   GraphSceneSnapshot,
-  MetaStep,
 } from "../../../features/playbook/engine/types";
 import { graphSceneSnapshot } from "../../../features/playbook/engine/kits/algorithm/graphScene";
 import type { TemplatePreviewParams } from "../templatePreviewCases";
 import {
+  codeHighlightFor,
   defineAlgorithmCase,
+  definePresetParam,
   type AlgorithmCaseFrame,
   type AlgorithmStepDraft,
 } from "./helpers";
@@ -40,6 +41,15 @@ export const BFS_EDGES: GraphSceneEdge[] = BFS_EDGE_PAIRS.map(([source, target])
 
 const DEFAULT_START_NODE = "1";
 
+const START_NODE_PARAM = definePresetParam({
+  id: "startNode",
+  label: "起始节点",
+  description: "更换起点后重新遍历",
+  playbookDescription: "选择后在固定树结构上重新执行 BFS。",
+  options: BFS_NODES.map((node) => ({ value: node.id, label: `节点 ${node.id}` })),
+  defaultValue: DEFAULT_START_NODE,
+});
+
 export const BFS_CODE = [
   "const queue = [start];",
   "const visited = new Set([start]);",
@@ -66,10 +76,7 @@ export interface BfsState {
   activeEdges: string[];
 }
 
-export function resolveBfsStartNode(params: TemplatePreviewParams): string {
-  const requested = String(params.startNode ?? DEFAULT_START_NODE);
-  return BFS_NODES.some((node) => node.id === requested) ? requested : DEFAULT_START_NODE;
-}
+export const resolveBfsStartNode = START_NODE_PARAM.resolve;
 
 /** Pure BFS trace: one entry per dequeued node. */
 export function bfsTrace(startNode: string): BfsState[] {
@@ -121,21 +128,7 @@ function graphSnapshot(
   });
 }
 
-function codeHighlight(
-  activeLine: number,
-  variables: Record<string, string>,
-  operationLabel: string,
-  activeLines: number[] = [activeLine],
-): NonNullable<MetaStep["code_highlight"]> {
-  return {
-    language: "typescript",
-    lines: BFS_CODE,
-    active_lines: activeLines,
-    active_line: activeLine,
-    variables,
-    operation_label: operationLabel,
-  };
-}
+const codeHighlight = codeHighlightFor(BFS_CODE);
 
 function buildBfsSteps(params: TemplatePreviewParams): AlgorithmCaseFrame<GraphSceneSnapshot> {
   const startNode = resolveBfsStartNode(params);
@@ -222,12 +215,7 @@ function buildBfsSteps(params: TemplatePreviewParams): AlgorithmCaseFrame<GraphS
 
   return {
     steps,
-    controls: [{
-      id: "startNode",
-      label: "起始节点",
-      value: startNode,
-      description: "选择后在固定树结构上重新执行 BFS。",
-    }],
+    controls: [START_NODE_PARAM.playbookControl(startNode)],
     initialData: { start_node: [startNode], nodes: BFS_NODES.map((node) => node.id) },
   };
 }
@@ -237,14 +225,7 @@ export const BFS_TREE_PREVIEW_CASE = defineAlgorithmCase({
   posterAlt: "二叉树 BFS 队列与访问顺序的 Playbook 画面",
   posterStepIndex: 4,
   defaultParams: { startNode: DEFAULT_START_NODE },
-  controls: [{
-    id: "startNode",
-    kind: "select",
-    label: "起始节点",
-    description: "更换起点后重新遍历",
-    options: BFS_NODES.map((node) => ({ label: `节点 ${node.id}`, value: node.id })),
-    resetPlayback: true,
-  }],
+  controls: [START_NODE_PARAM.control],
   title: "二叉树 BFS：队列驱动的层序遍历",
   summary: "逐步展示出队、发现邻接节点、入队和访问集合的同步变化。",
   algorithmId: "bfs_graph",

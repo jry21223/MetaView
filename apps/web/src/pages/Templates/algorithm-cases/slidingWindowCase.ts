@@ -1,9 +1,7 @@
-import type {
-  AlgorithmArraySnapshot,
-  MetaStep,
-} from "../../../features/playbook/engine/types";
+import type { AlgorithmArraySnapshot } from "../../../features/playbook/engine/types";
 import type { TemplatePreviewParams } from "../templatePreviewCases";
 import {
+  codeHighlightFor,
   defineAlgorithmCase,
   finiteNumber,
   type AlgorithmCaseFrame,
@@ -177,21 +175,7 @@ function slidingSnapshot(args: {
   };
 }
 
-function codeHighlight(
-  activeLine: number,
-  variables: Record<string, string>,
-  operationLabel: string,
-  activeLines: number[] = [activeLine],
-): NonNullable<MetaStep["code_highlight"]> {
-  return {
-    language: "typescript",
-    lines: SLIDING_WINDOW_CODE,
-    active_lines: activeLines,
-    active_line: activeLine,
-    variables,
-    operation_label: operationLabel,
-  };
-}
+const codeHighlight = codeHighlightFor(SLIDING_WINDOW_CODE);
 
 function buildSlidingWindowSteps(
   params: TemplatePreviewParams,

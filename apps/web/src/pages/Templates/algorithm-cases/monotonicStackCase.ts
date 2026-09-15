@@ -1,12 +1,10 @@
-import type {
-  AlgorithmBarsSnapshot,
-  MetaStep,
-} from "../../../features/playbook/engine/types";
+import type { AlgorithmBarsSnapshot } from "../../../features/playbook/engine/types";
 import { spokenList } from "../../../shared/lib/spokenText";
 import type { TemplatePreviewParams } from "../templatePreviewCases";
 import {
+  codeHighlightFor,
   defineAlgorithmCase,
-  stringParam,
+  definePresetParam,
   type AlgorithmCaseFrame,
   type AlgorithmStepDraft,
 } from "./helpers";
@@ -26,8 +24,16 @@ export const MONOTONIC_STACK_PRESETS = [
 
 export type MonotonicStackPresetId = (typeof MONOTONIC_STACK_PRESETS)[number]["id"];
 
-const PRESET_IDS = MONOTONIC_STACK_PRESETS.map((preset) => preset.id);
 const DEFAULT_PRESET: MonotonicStackPresetId = "mixed";
+
+const PRESET_PARAM = definePresetParam<MonotonicStackPresetId>({
+  id: "preset",
+  label: "输入数组",
+  description: "切换输入数组，对比栈只涨不落与每步都弹出两种极端。",
+  playbookDescription: "切换数组后重新执行单调栈扫描。",
+  options: MONOTONIC_STACK_PRESETS.map((preset) => ({ value: preset.id, label: preset.label })),
+  defaultValue: DEFAULT_PRESET,
+});
 
 export const MONOTONIC_STACK_CODE = [
   "function nextGreater(nums: number[]): number[] {",
@@ -55,9 +61,7 @@ export interface MonotonicStackFrame {
   answer: number[];
 }
 
-export function resolveMonotonicPreset(params: TemplatePreviewParams): MonotonicStackPresetId {
-  return stringParam(params, "preset", PRESET_IDS, DEFAULT_PRESET) as MonotonicStackPresetId;
-}
+export const resolveMonotonicPreset = PRESET_PARAM.resolve;
 
 export function monotonicValues(presetId: MonotonicStackPresetId): number[] {
   return [...MONOTONIC_STACK_PRESETS.find((preset) => preset.id === presetId)!.values];
@@ -142,21 +146,7 @@ function monotonicSnapshot(args: {
   };
 }
 
-function codeHighlight(
-  activeLine: number,
-  variables: Record<string, string>,
-  operationLabel: string,
-  activeLines: number[] = [activeLine],
-): NonNullable<MetaStep["code_highlight"]> {
-  return {
-    language: "typescript",
-    lines: [...MONOTONIC_STACK_CODE],
-    active_lines: activeLines,
-    active_line: activeLine,
-    variables,
-    operation_label: operationLabel,
-  };
-}
+const codeHighlight = codeHighlightFor(MONOTONIC_STACK_CODE);
 
 function answerText(answer: readonly number[]): string {
   return `[${answer.map((value) => (value === -1 ? "?" : String(value))).join(", ")}]`;
@@ -312,12 +302,7 @@ function buildMonotonicStackSteps(
 
   return {
     steps,
-    controls: [{
-      id: "preset",
-      label: "输入数组",
-      value: presetId,
-      description: "切换数组后重新执行单调栈扫描。",
-    }],
+    controls: [PRESET_PARAM.playbookControl(presetId)],
     initialData: {
       array: values.map(String),
       preset: [presetId],
@@ -331,19 +316,7 @@ export const MONOTONIC_STACK_PREVIEW_CASE = defineAlgorithmCase({
   posterAlt: "单调栈求下一个更大元素：柱状数组、递减栈轨道与逐格填入的答案",
   posterStepIndex: 3,
   defaultParams: { preset: DEFAULT_PRESET },
-  controls: [
-    {
-      id: "preset",
-      kind: "select",
-      label: "输入数组",
-      description: "切换输入数组，对比栈只涨不落与每步都弹出两种极端。",
-      resetPlayback: true,
-      options: MONOTONIC_STACK_PRESETS.map((preset) => ({
-        label: preset.label,
-        value: preset.id,
-      })),
-    },
-  ],
+  controls: [PRESET_PARAM.control],
   title: "单调栈：下一个更大元素",
   summary: "用一条值递减的下标栈保存“还在等答案”的元素，解释为什么每个元素只需入栈出栈各一次就能在 O(n) 内找到右侧第一个更大值。",
   algorithmId: "monotonic_stack_next_greater",

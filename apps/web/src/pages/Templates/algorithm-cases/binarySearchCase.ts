@@ -1,9 +1,7 @@
-import type {
-  AlgorithmBarsSnapshot,
-  MetaStep,
-} from "../../../features/playbook/engine/types";
+import type { AlgorithmBarsSnapshot } from "../../../features/playbook/engine/types";
 import type { TemplatePreviewParams } from "../templatePreviewCases";
 import {
+  codeHighlightFor,
   defineAlgorithmCase,
   finiteNumber,
   type AlgorithmCaseFrame,
@@ -97,21 +95,7 @@ function binarySnapshot(
   };
 }
 
-function codeHighlight(
-  activeLine: number,
-  variables: Record<string, string>,
-  operationLabel: string,
-  activeLines: number[] = [activeLine],
-): NonNullable<MetaStep["code_highlight"]> {
-  return {
-    language: "typescript",
-    lines: BINARY_CODE,
-    active_lines: activeLines,
-    active_line: activeLine,
-    variables,
-    operation_label: operationLabel,
-  };
-}
+const codeHighlight = codeHighlightFor(BINARY_CODE);
 
 function buildBinarySearchSteps(
   params: TemplatePreviewParams,

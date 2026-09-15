@@ -1,13 +1,13 @@
 import type {
   AlgorithmArraySnapshot,
   AlgorithmRange,
-  MetaStep,
 } from "../../../features/playbook/engine/types";
 import { bracketSpokenName, spokenList } from "../../../shared/lib/spokenText";
 import type { TemplatePreviewParams } from "../templatePreviewCases";
 import {
+  codeHighlightFor,
   defineAlgorithmCase,
-  stringParam,
+  definePresetParam,
   type AlgorithmCaseFrame,
   type AlgorithmStepDraft,
 } from "./helpers";
@@ -32,8 +32,16 @@ export { bracketSpokenName as bracketName };
 
 export type StackBracketPresetId = (typeof STACK_BRACKET_PRESETS)[number]["id"];
 
-const PRESET_IDS = STACK_BRACKET_PRESETS.map((preset) => preset.id);
 const DEFAULT_PRESET: StackBracketPresetId = "nested";
+
+const EXPRESSION_PARAM = definePresetParam<StackBracketPresetId>({
+  id: "expression",
+  label: "表达式",
+  description: "切换表达式，重新逐字符扫描并观察栈的变化。",
+  playbookDescription: "切换表达式后重新逐字符扫描并重建栈的变化。",
+  options: STACK_BRACKET_PRESETS.map((preset) => ({ value: preset.id, label: preset.label })),
+  defaultValue: DEFAULT_PRESET,
+});
 
 export const STACK_BRACKET_CODE = [
   "function isValid(s: string): boolean {",
@@ -78,9 +86,7 @@ export interface StackBracketTrace {
   leftover: number[];
 }
 
-export function resolveBracketPreset(params: TemplatePreviewParams): StackBracketPresetId {
-  return stringParam(params, "expression", PRESET_IDS, DEFAULT_PRESET) as StackBracketPresetId;
-}
+export const resolveBracketPreset = EXPRESSION_PARAM.resolve;
 
 export function bracketExpression(presetId: StackBracketPresetId): string {
   return STACK_BRACKET_PRESETS.find((preset) => preset.id === presetId)!.expression;
@@ -218,21 +224,7 @@ function bracketSnapshot(args: {
   };
 }
 
-function codeHighlight(
-  activeLine: number,
-  variables: Record<string, string>,
-  operationLabel: string,
-  activeLines: number[] = [activeLine],
-): NonNullable<MetaStep["code_highlight"]> {
-  return {
-    language: "typescript",
-    lines: [...STACK_BRACKET_CODE],
-    active_lines: activeLines,
-    active_line: activeLine,
-    variables,
-    operation_label: operationLabel,
-  };
-}
+const codeHighlight = codeHighlightFor(STACK_BRACKET_CODE);
 
 function stackText(chars: readonly string[], stack: readonly number[]): string {
   return stack.length ? `[${stack.map((index) => chars[index]).join(", ")}]` : "[]";
@@ -453,12 +445,7 @@ function buildStackBracketSteps(params: TemplatePreviewParams): AlgorithmCaseFra
 
   return {
     steps,
-    controls: [{
-      id: "expression",
-      label: "表达式",
-      value: presetId,
-      description: "切换表达式后重新逐字符扫描并重建栈的变化。",
-    }],
+    controls: [EXPRESSION_PARAM.playbookControl(presetId)],
     initialData: {
       expression: chars,
       preset: [presetId],
@@ -472,19 +459,7 @@ export const STACK_BRACKETS_PREVIEW_CASE = defineAlgorithmCase({
   posterAlt: "栈与括号匹配：表达式扫描指针、栈轨道与已配对的括号",
   posterStepIndex: 4,
   defaultParams: { expression: DEFAULT_PRESET },
-  controls: [
-    {
-      id: "expression",
-      kind: "select",
-      label: "表达式",
-      description: "切换表达式，重新逐字符扫描并观察栈的变化。",
-      resetPlayback: true,
-      options: STACK_BRACKET_PRESETS.map((preset) => ({
-        label: preset.label,
-        value: preset.id,
-      })),
-    },
-  ],
+  controls: [EXPRESSION_PARAM.control],
   title: "栈与括号匹配：后进先出如何配对",
   summary: "逐字符扫描表达式，左括号入栈、右括号与栈顶配对出栈，用一条真实的栈轨道解释为什么后进先出恰好对应“最近的尚未闭合”。",
   algorithmId: "stack_bracket_matching",

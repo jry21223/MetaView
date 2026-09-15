@@ -2,13 +2,13 @@ import type {
   GraphSceneEdge,
   GraphSceneNode,
   GraphSceneSnapshot,
-  MetaStep,
 } from "../../../features/playbook/engine/types";
 import { graphSceneSnapshot } from "../../../features/playbook/engine/kits/algorithm/graphScene";
 import type { TemplatePreviewParams } from "../templatePreviewCases";
 import {
+  codeHighlightFor,
   defineAlgorithmCase,
-  stringParam,
+  definePresetParam,
   type AlgorithmCaseFrame,
   type AlgorithmStepDraft,
 } from "./helpers";
@@ -45,6 +45,15 @@ export const DIJKSTRA_EDGES: ReadonlyArray<readonly [DijkstraNodeId, DijkstraNod
 ];
 
 const DEFAULT_SOURCE: DijkstraNodeId = "A";
+
+const SOURCE_PARAM = definePresetParam<DijkstraNodeId>({
+  id: "source",
+  label: "起点",
+  description: "更换起点后重新运行 Dijkstra。",
+  playbookDescription: "更换起点后在同一张图上重新运行 Dijkstra。",
+  options: DIJKSTRA_NODE_IDS.map((id) => ({ value: id, label: `节点 ${id}` })),
+  defaultValue: DEFAULT_SOURCE,
+});
 
 export const DIJKSTRA_CODE = [
   "function dijkstra(graph: Graph, source: string): Map<string, number> {",
@@ -98,9 +107,7 @@ function neighbors(node: DijkstraNodeId): Array<{ to: DijkstraNodeId; weight: nu
   );
 }
 
-export function resolveDijkstraSource(params: TemplatePreviewParams): DijkstraNodeId {
-  return stringParam(params, "source", DIJKSTRA_NODE_IDS, DEFAULT_SOURCE) as DijkstraNodeId;
-}
+export const resolveDijkstraSource = SOURCE_PARAM.resolve;
 
 /** Pure Dijkstra trace: one entry per settled node, ties broken by node order. */
 export function dijkstraTrace(source: DijkstraNodeId): DijkstraStep[] {
@@ -183,21 +190,7 @@ function dijkstraSnapshot(args: {
   });
 }
 
-function codeHighlight(
-  activeLine: number,
-  variables: Record<string, string>,
-  operationLabel: string,
-  activeLines: number[] = [activeLine],
-): NonNullable<MetaStep["code_highlight"]> {
-  return {
-    language: "typescript",
-    lines: [...DIJKSTRA_CODE],
-    active_lines: activeLines,
-    active_line: activeLine,
-    variables,
-    operation_label: operationLabel,
-  };
-}
+const codeHighlight = codeHighlightFor(DIJKSTRA_CODE);
 
 export function shortestPath(
   parent: Partial<Record<DijkstraNodeId, DijkstraNodeId>>,
@@ -328,12 +321,7 @@ function buildDijkstraSteps(params: TemplatePreviewParams): AlgorithmCaseFrame<G
 
   return {
     steps,
-    controls: [{
-      id: "source",
-      label: "起点",
-      value: source,
-      description: "更换起点后在同一张图上重新运行 Dijkstra。",
-    }],
+    controls: [SOURCE_PARAM.playbookControl(source)],
     initialData: {
       source: [source],
       nodes: [...DIJKSTRA_NODE_IDS],
@@ -347,16 +335,7 @@ export const DIJKSTRA_PREVIEW_CASE = defineAlgorithmCase({
   posterAlt: "Dijkstra 最短路径：带权图上的当前节点、已确定集合与松弛成功的边",
   posterStepIndex: 3,
   defaultParams: { source: DEFAULT_SOURCE },
-  controls: [
-    {
-      id: "source",
-      kind: "select",
-      label: "起点",
-      description: "更换起点后重新运行 Dijkstra。",
-      resetPlayback: true,
-      options: DIJKSTRA_NODE_IDS.map((id) => ({ label: `节点 ${id}`, value: id })),
-    },
-  ],
+  controls: [SOURCE_PARAM.control],
   title: "Dijkstra：贪心确定最短距离",
   summary: "在带权无向图上从可选起点出发，每步确定距离最小的未定节点并松弛邻边，节点标签实时显示距离，最后高亮最短路径树。",
   algorithmId: "dijkstra_shortest_path",
