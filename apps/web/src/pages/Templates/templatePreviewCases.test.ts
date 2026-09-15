@@ -18,6 +18,11 @@ describe("template preview cases", () => {
       "sliding-window",
       "merge-sort",
       "quick-sort",
+      "stack-brackets",
+      "monotonic-stack",
+      "linked-list-reverse",
+      "bst-search",
+      "dijkstra",
     ]));
 
     for (const id of TEMPLATE_PREVIEW_CASE_IDS) {
@@ -43,7 +48,16 @@ describe("template preview cases", () => {
     }
   });
 
-  it.each(["sliding-window", "merge-sort", "quick-sort"])(
+  it.each([
+    "sliding-window",
+    "merge-sort",
+    "quick-sort",
+    "stack-brackets",
+    "monotonic-stack",
+    "linked-list-reverse",
+    "bst-search",
+    "dijkstra",
+  ])(
     "publishes a real poster asset for %s",
     (id) => {
       const item = getTemplatePreviewCase(id)!;

@@ -79,6 +79,25 @@ describe("BarBlockRenderer", () => {
     expect(markup).toContain("height:342px");
   });
 
+  it("shrinks the bar field when auxiliary lanes need room under the pointer row", () => {
+    const snap = makeBars([9, 3], {
+      pointers: { i: 1 },
+      auxiliary_lanes: [
+        { id: "stack", role: "deque", label: "STACK", items: [{ id: "s0", label: "i=0", index: 0 }] },
+        { id: "answer", role: "result", label: "ANSWER", items: [{ id: "a0", label: "?", index: 0 }] },
+      ],
+    });
+    const markup = renderToStaticMarkup(BarBlockRenderer(props(barsStep(snap))));
+    const hs = heightsOf(markup);
+
+    // 342 - 2 lanes * 56 = 230; the value-3 bar keeps its one-third proportion.
+    expect(hs).toContain(230);
+    expect(hs.some((height) => Math.abs(height - 230 / 3) < 0.01)).toBe(true);
+    expect(hs).not.toContain(342);
+    expect(markup).toContain('data-auxiliary-role="deque"');
+    expect(markup).toContain('data-auxiliary-role="result"');
+  });
+
   it("uses a signed zero axis for negative values and still supports range overlays", () => {
     const snap = makeBars([-3, -1, 3], {
       element_states: {

@@ -94,6 +94,48 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
     prompt: "演示对一棵二叉树做 BFS（层序遍历），节点是 1,2,3,4,5,6,7，画出每一步队列的变化",
   },
 
+  // ---- data structures ----
+  {
+    id: "stack-brackets",
+    previewCaseId: "stack-brackets",
+    domain: "algorithm",
+    title: "栈 · 括号匹配",
+    desc: "左括号入栈、右括号与栈顶配对，栈是一条真实轨道",
+    prompt: "用栈判断 {[()]} 的括号是否匹配，逐字符展示入栈、出栈和最终栈是否为空，再对比 ([)] 为什么失败",
+  },
+  {
+    id: "monotonic-stack",
+    previewCaseId: "monotonic-stack",
+    domain: "algorithm",
+    title: "单调栈 · 下一个更大元素",
+    desc: "值递减的下标栈，每个元素只入栈出栈各一次",
+    prompt: "对数组 [4,2,5,1,3,6] 用单调栈求每个元素右边第一个更大的数，每一步展示栈里的下标和已经确定的答案",
+  },
+  {
+    id: "linked-list-reverse",
+    previewCaseId: "linked-list-reverse",
+    domain: "algorithm",
+    title: "链表反转 · 三指针迭代",
+    desc: "prev、curr、next 一次只翻一条指针",
+    prompt: "演示用 prev、curr、next 三个指针迭代反转单链表 1→2→3→4，每一步只翻转一条 next 指针并画出箭头方向",
+  },
+  {
+    id: "bst-search",
+    previewCaseId: "bst-search",
+    domain: "algorithm",
+    title: "二叉搜索树 · 查找与插入",
+    desc: "每个节点比较一次决定方向，落空处就是插入位置",
+    prompt: "按 8,3,10,1,6,14,4,7,13 的顺序建一棵二叉搜索树，然后查找 7，画出比较路径和被排除的子树，再说明不存在的值插在哪里",
+  },
+  {
+    id: "dijkstra",
+    previewCaseId: "dijkstra",
+    domain: "algorithm",
+    title: "Dijkstra 最短路径",
+    desc: "每步确定距离最小的节点并松弛邻边",
+    prompt: "在 6 个节点的带权无向图上从 A 出发运行 Dijkstra，每一步标出被确定的节点、当前距离表和松弛成功的边，最后画出最短路径树",
+  },
+
   // ---- math ----
   publicGoldEntry("derivative-tangent", "math"),
   publicGoldEntry("integral-area", "math"),

@@ -50,11 +50,11 @@ describe("TemplatesPage lesson atlas", () => {
     expect(view.getByLabelText("current-path").textContent).toBe("/templates/binary-search");
   });
 
-  it("publishes twenty-one line-drawn previews and keeps the other templates disabled", () => {
+  it("publishes twenty-nine line-drawn previews and keeps the other templates disabled", () => {
     const { container, getByRole } = renderPage();
 
-    expect(TEMPLATES).toHaveLength(31);
-    expect(container.querySelectorAll("[data-preview]")).toHaveLength(24);
+    expect(TEMPLATES).toHaveLength(36);
+    expect(container.querySelectorAll("[data-preview]")).toHaveLength(29);
     expect((getByRole("button", { name: "斐波那契 · 记忆化，制作中" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -86,6 +86,30 @@ describe("TemplatesPage lesson atlas", () => {
     expect(view.queryByRole("heading", { name: "代码" })).toBeNull();
     expect(view.queryByText("两数之和 · 哈希表")).toBeNull();
     expect(within(algorithmSection as HTMLElement).getByText("斐波那契 · 记忆化")).toBeTruthy();
+  });
+
+  it("groups the data-structure cases under the algorithm domain as playable entries", () => {
+    const view = renderPage();
+    const algorithmSection = view
+      .getByRole("heading", { name: "算法" })
+      .closest("section") as HTMLElement;
+
+    for (const title of [
+      "栈 · 括号匹配",
+      "单调栈 · 下一个更大元素",
+      "链表反转 · 三指针迭代",
+      "二叉搜索树 · 查找与插入",
+      "Dijkstra 最短路径",
+    ]) {
+      expect(within(algorithmSection).getByText(title)).toBeTruthy();
+      expect(
+        (view.getByRole("button", { name: `${title}，展开预览` }) as HTMLButtonElement).disabled,
+      ).toBe(false);
+    }
+
+    fireEvent.click(view.getByRole("button", { name: "Dijkstra 最短路径，展开预览" }));
+    fireEvent.click(view.getByRole("button", { name: "Dijkstra 最短路径，进入完整案例" }));
+    expect(view.getByLabelText("current-path").textContent).toBe("/templates/dijkstra");
   });
 
   it("shows a helpful empty state for unmatched searches", () => {

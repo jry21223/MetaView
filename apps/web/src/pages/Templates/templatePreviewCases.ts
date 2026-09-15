@@ -5,9 +5,14 @@ import type {
   MetaStep,
   PlaybookScript,
 } from "../../features/playbook/engine/types";
+import { BST_SEARCH_PREVIEW_CASE } from "./algorithm-cases/bstSearchCase";
+import { DIJKSTRA_PREVIEW_CASE } from "./algorithm-cases/dijkstraCase";
+import { LINKED_LIST_REVERSE_PREVIEW_CASE } from "./algorithm-cases/linkedListReverseCase";
 import { MERGE_SORT_PREVIEW_CASE } from "./algorithm-cases/mergeSortCase";
+import { MONOTONIC_STACK_PREVIEW_CASE } from "./algorithm-cases/monotonicStackCase";
 import { QUICK_SORT_PREVIEW_CASE } from "./algorithm-cases/quickSortCase";
 import { SLIDING_WINDOW_PREVIEW_CASE } from "./algorithm-cases/slidingWindowCase";
+import { STACK_BRACKETS_PREVIEW_CASE } from "./algorithm-cases/stackBracketsCase";
 import { PUBLIC_GOLD_TEMPLATES } from "./gold-templates/publicGoldTemplates";
 import { manifestToPreviewCase } from "./gold-templates/manifest";
 import type { ConicFollowupCommand } from "../../features/playbook/interaction/types";
@@ -540,6 +545,11 @@ const TEMPLATE_PREVIEW_CASES: Record<TemplatePreviewCaseId, TemplatePreviewCase>
   "sliding-window": SLIDING_WINDOW_PREVIEW_CASE,
   "merge-sort": MERGE_SORT_PREVIEW_CASE,
   "quick-sort": QUICK_SORT_PREVIEW_CASE,
+  "stack-brackets": STACK_BRACKETS_PREVIEW_CASE,
+  "monotonic-stack": MONOTONIC_STACK_PREVIEW_CASE,
+  "linked-list-reverse": LINKED_LIST_REVERSE_PREVIEW_CASE,
+  "bst-search": BST_SEARCH_PREVIEW_CASE,
+  dijkstra: DIJKSTRA_PREVIEW_CASE,
   "binary-search": {
     id: "binary-search",
     templateId: "binary-search",

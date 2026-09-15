@@ -14,6 +14,7 @@ import type {
   SceneCellValue,
   StatsChartSceneSnapshot,
   TableSceneSnapshot,
+  SceneEmphasis,
 } from "../types";
 import { clamp01 } from "../foundation";
 import { sanitizeKatex } from "../../../../shared/lib/sanitizeKatex";
@@ -604,8 +605,13 @@ function GraphSvg({
       data-graph-id={graph.asset_id ?? undefined}
     >
       <defs>
-        <marker id="graph-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
-          <path d="M0,0 L0,6 L9,3 z" fill={colors.muted} />
+        {/* Fixed-size heads (userSpaceOnUse) so an active 4px edge does not
+            grow a head that swallows the node it points at. */}
+        <marker id="graph-arrow" markerWidth="12" markerHeight="12" refX="11" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+          <path d="M0,0 L0,8 L12,4 z" fill={colors.line} />
+        </marker>
+        <marker id="graph-arrow-active" markerWidth="12" markerHeight="12" refX="11" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+          <path d="M0,0 L0,8 L12,4 z" fill={colors.accent} />
         </marker>
       </defs>
       {(graph.edges ?? []).map((edge, index) => {
@@ -614,6 +620,11 @@ function GraphSvg({
         if (!a || !b) return null;
         const edgeId = edge.id ?? `${edge.source}-${edge.target}`;
         const active = edge.emphasis === "accent" || activeEdges.has(edgeId);
+        // Directed edges stop at the node rim so the arrow head stays visible
+        // instead of being painted over by the target circle.
+        const ends = graph.directed
+          ? trimEdgeToNodeRims(a, b, graphNodeRadius(a, currentNodes), graphNodeRadius(b, currentNodes))
+          : { x1: a.x, y1: a.y, x2: b.x, y2: b.y };
         return (
           <g
             key={`${edge.source}-${edge.target}-${index}`}
@@ -622,14 +633,14 @@ function GraphSvg({
             data-edge-state={active ? "active" : "idle"}
           >
             <line
-              x1={a.x}
-              y1={a.y}
-              x2={b.x}
-              y2={b.y}
+              x1={ends.x1}
+              y1={ends.y1}
+              x2={ends.x2}
+              y2={ends.y2}
               stroke={active ? colors.accent : colors.line}
               strokeWidth={active ? 4 : 2}
               strokeLinecap="round"
-              markerEnd={graph.directed ? "url(#graph-arrow)" : undefined}
+              markerEnd={graph.directed ? (active ? "url(#graph-arrow-active)" : "url(#graph-arrow)") : undefined}
             />
             {edge.label || edge.weight != null ? (
               <text x={(a.x + b.x) / 2} y={(a.y + b.y) / 2 - 8} fill={colors.muted} fontSize={14} textAnchor="middle">
@@ -642,7 +653,7 @@ function GraphSvg({
       {layoutPositioned.map((node) => {
         const state = graphNodeState(node.id, currentNodes, visitedNodes, queueNodes);
         const active = state === "current" || node.emphasis === "accent";
-        const radius = active ? 32 : 29;
+        const radius = active ? GRAPH_NODE_RADIUS_ACTIVE : GRAPH_NODE_RADIUS;
         const nodeFill =
           state === "current"
             ? softCanvasColor(colors.accent, 18)
@@ -826,6 +837,41 @@ function GraphAlgorithmStatePanel({
 }
 
 type GraphNodeVisualState = "current" | "queue" | "visited" | "default";
+
+const GRAPH_NODE_RADIUS = 29;
+const GRAPH_NODE_RADIUS_ACTIVE = 32;
+
+function graphNodeRadius(
+  node: { id: string; emphasis?: SceneEmphasis },
+  currentNodes: Set<string>,
+): number {
+  return currentNodes.has(node.id) || node.emphasis === "accent"
+    ? GRAPH_NODE_RADIUS_ACTIVE
+    : GRAPH_NODE_RADIUS;
+}
+
+/** Shorten a center-to-center segment so it starts and ends just outside each node rim. */
+function trimEdgeToNodeRims(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  sourceRadius: number,
+  targetRadius: number,
+): { x1: number; y1: number; x2: number; y2: number } {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const length = Math.hypot(dx, dy);
+  if (length <= sourceRadius + targetRadius + 8) return { x1: a.x, y1: a.y, x2: b.x, y2: b.y };
+  const ux = dx / length;
+  const uy = dy / length;
+  const startGap = sourceRadius + 1;
+  const endGap = targetRadius + 3;
+  return {
+    x1: a.x + ux * startGap,
+    y1: a.y + uy * startGap,
+    x2: b.x - ux * endGap,
+    y2: b.y - uy * endGap,
+  };
+}
 
 interface GraphProjection {
   centerX: number;

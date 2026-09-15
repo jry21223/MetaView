@@ -203,6 +203,41 @@ describe("advanced math renderers", () => {
     expect(markup).not.toContain("graph-node.svg");
   });
 
+  it("stops directed edges at the node rim and keeps arrow heads a fixed size", () => {
+    const markup = render({
+      kind: "graph_scene",
+      nodes: [
+        { id: "1", label: "1", x: -2, y: 0 },
+        { id: "2", label: "2", x: 2, y: 0 },
+      ],
+      edges: [{ id: "1-2", source: "1", target: "2" }],
+      directed: true,
+      current_node_id: "2",
+      active_edge_ids: ["1-2"],
+    });
+
+    // Node 1 sits at x = 450 - 240 = 210, node 2 at 690: the edge must start
+    // past node 1's rim (29 + 1) and end before node 2's active rim (32 + 3).
+    expect(markup).toContain('x1="240"');
+    expect(markup).toContain('x2="655"');
+    expect(markup).toContain('marker-end="url(#graph-arrow-active)"');
+    expect(markup).toContain('markerUnits="userSpaceOnUse"');
+
+    const undirected = render({
+      kind: "graph_scene",
+      nodes: [
+        { id: "1", label: "1", x: -2, y: 0 },
+        { id: "2", label: "2", x: 2, y: 0 },
+      ],
+      edges: [{ id: "1-2", source: "1", target: "2" }],
+      directed: false,
+      current_node_id: "2",
+    });
+    expect(undirected).toContain('x1="210"');
+    expect(undirected).toContain('x2="690"');
+    expect(undirected).not.toContain("marker-end");
+  });
+
   it("shows an explicit waiting state until BFS dequeues a current node", () => {
     const waitingMarkup = render({
       kind: "graph_scene",

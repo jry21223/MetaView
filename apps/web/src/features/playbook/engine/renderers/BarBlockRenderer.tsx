@@ -72,6 +72,11 @@ const ENTER_BEZIER = Easing.bezier(0.16, 1, 0.3, 1);
 const MOVE_FRAMES = 22;
 const MAX_BAR_HEIGHT = 342;
 const MIN_BAR_HEIGHT = 6;
+// Auxiliary lanes (a stack, a result row) sit under the pointer row; each
+// one borrows this much from the bar field so the lanes stay inside the
+// 16:9 stage instead of sliding under the caption strip.
+const LANE_FIELD_RESERVE = 56;
+const MIN_BAR_FIELD_HEIGHT = 200;
 // Headroom above the tallest bar so its value label (top: -22) never rides
 // into the step title when the centered column overflows a short scene.
 const BAR_FIELD_TOP_PAD = 42;
@@ -133,7 +138,11 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
   const domainMin = Math.min(0, ...snap.numeric_values);
   const domainMax = Math.max(0, ...snap.numeric_values);
   const domainSpan = Math.max(domainMax - domainMin, 1);
-  const pixelsPerUnit = MAX_BAR_HEIGHT / domainSpan;
+  const laneCount = snap.auxiliary_lanes?.length ?? 0;
+  const maxBarHeight = laneCount > 0
+    ? Math.max(MIN_BAR_FIELD_HEIGHT, MAX_BAR_HEIGHT - laneCount * LANE_FIELD_RESERVE)
+    : MAX_BAR_HEIGHT;
+  const pixelsPerUnit = maxBarHeight / domainSpan;
   const zeroAxisY = domainMax * pixelsPerUnit;
   const barW = Math.max(10, Math.min(72, Math.floor(960 / n) - 8));
   const barGap = Math.max(4, Math.min(14, Math.floor(barW * 0.18)));
@@ -191,7 +200,7 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
           display: "flex",
           gap: barGap,
           position: "relative",
-          height: MAX_BAR_HEIGHT + 8,
+          height: maxBarHeight + 8,
           paddingTop: BAR_FIELD_TOP_PAD,
         }}
       >
@@ -209,7 +218,7 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
         {snap.numeric_values.map((val, i) => {
           const label = snap.array_values[i] ?? String(val);
           const rawBarHeight = Math.abs(val) * pixelsPerUnit;
-          const t = rawBarHeight / MAX_BAR_HEIGHT;
+          const t = rawBarHeight / maxBarHeight;
           const fillRatio = 0.35 + 0.65 * t; // 0.35..1
           const barH = Math.max(MIN_BAR_HEIGHT, rawBarHeight);
 
@@ -360,7 +369,7 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
               style={{
                 position: "relative",
                 width: barW,
-                height: MAX_BAR_HEIGHT,
+                height: maxBarHeight,
                 transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
                 transformOrigin: `center ${zeroAxisY}px`,
                 opacity: finalOpacity,
@@ -449,7 +458,7 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
           previousRanges={prevSnap?.ranges}
           itemWidth={barW}
           gap={barGap}
-          itemHeight={MAX_BAR_HEIGHT}
+          itemHeight={maxBarHeight}
           elapsed={elapsed}
           theme={theme}
         />
