@@ -8,14 +8,14 @@ import type {
   TemplatePreviewControl,
   TemplatePreviewFollowups,
   TemplatePreviewParams,
-  TemplatePreviewQuestion,
 } from "../templatePreviewCases";
 import { applyNarrationTimeline, posterFrameForStep } from "../narrationTiming";
 
-export const ALGORITHM_CASE_FPS = 30;
-export const ALGORITHM_CASE_STEP_FRAMES = 90;
+const ALGORITHM_CASE_FPS = 30;
+/** Placeholder step length; `applyNarrationTimeline` replaces it with the reading time. */
+const ALGORITHM_CASE_STEP_FRAMES = 90;
 
-export function algorithmStep<T extends MetaStep["snapshot"]>(
+function algorithmStep<T extends MetaStep["snapshot"]>(
   index: number,
   value: Omit<MetaStep<T>, "end_frame" | "tokens">,
 ): MetaStep<T> {
@@ -24,19 +24,6 @@ export function algorithmStep<T extends MetaStep["snapshot"]>(
     end_frame: (index + 1) * ALGORITHM_CASE_STEP_FRAMES,
     tokens: [],
   };
-}
-
-export function algorithmQuestions(
-  stepId: string,
-  first: [string, string],
-  second: [string, string],
-  third?: [string, string],
-): TemplatePreviewQuestion[] {
-  return [first, second, ...(third ? [third] : [])].map(([question, answer], index) => ({
-    id: `${stepId}-q${index + 1}`,
-    question,
-    answer,
-  }));
 }
 
 export function finiteNumber(
@@ -58,7 +45,7 @@ export function stringParam(
   return allowed.includes(value) ? value : fallback;
 }
 
-export function buildAlgorithmPlaybook(args: {
+function buildAlgorithmPlaybook(args: {
   domain?: string;
   title: string;
   summary: string;
