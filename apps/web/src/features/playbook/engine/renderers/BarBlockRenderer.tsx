@@ -77,8 +77,10 @@ const MIN_BAR_HEIGHT = 6;
 // Auxiliary lanes (a stack, a result row) sit under the pointer row; each
 // one borrows this much from the bar field so the lanes stay inside the
 // 16:9 stage instead of sliding under the caption strip.
-const LANE_FIELD_RESERVE = 56;
-const MIN_BAR_FIELD_HEIGHT = 200;
+// 110 per lane keeps title, bars, pointer row and one lane inside a 16:9
+// stage even under a three-line subtitle (≈448px of usable height).
+const LANE_FIELD_RESERVE = 110;
+const MIN_BAR_FIELD_HEIGHT = 180;
 // Headroom above the tallest bar so its value label (top: -22) never rides
 // into the step title when the centered column overflows a short scene.
 const BAR_FIELD_TOP_PAD = 42;
@@ -206,6 +208,9 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
           display: "flex",
           gap: barGap,
           position: "relative",
+          // The global border-box reset would otherwise fold the label
+          // headroom into the height and push the bars past the field.
+          boxSizing: "content-box",
           height: maxBarHeight + 8,
           paddingTop: BAR_FIELD_TOP_PAD,
         }}
@@ -470,15 +475,19 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
         />
       </div>
 
-      {Object.entries(snap.pointers).length > 0 && (
-        <div
-          style={{
-            position: "relative",
-            width: n * barW + (n - 1) * barGap,
-            height: 34,
-            marginTop: 8,
-          }}
-        >
+      {/* Always reserve the pointer row so the stage does not jump when a
+          step has no pointers (the result step, typically). */}
+      <div
+        data-pointer-row={pointerGroups.length}
+        style={{
+          position: "relative",
+          width: n * barW + (n - 1) * barGap,
+          height: 34,
+          marginTop: 8,
+        }}
+      >
+        {pointerGroups.length > 0 && (
+        <div style={{ position: "absolute", inset: 0 }}>
           {pointerGroups.map(([idx, names]) => {
             const pointerOpacity = prevSnap
               ? 1
@@ -515,7 +524,8 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
             );
           })}
         </div>
-      )}
+        )}
+      </div>
 
       <AlgorithmAuxiliaryLanes
         lanes={snap.auxiliary_lanes ?? []}

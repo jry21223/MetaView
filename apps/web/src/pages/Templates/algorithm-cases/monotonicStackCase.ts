@@ -87,15 +87,18 @@ function monotonicSnapshot(args: {
   cursor: number | null;
   stack: readonly number[];
   answer: readonly number[];
-  popped?: readonly number[];
   resolvedNow?: readonly number[];
   entering?: number | null;
+  /** Result step: unresolved answers are final and read as -1, not "?". */
+  final?: boolean;
 }): MetaStep["snapshot"] {
-  const elementStates: Record<number, Array<"entering" | "leaving">> = {};
-  for (const index of args.popped ?? []) elementStates[index] = ["leaving"];
-  if (args.entering != null) {
-    elementStates[args.entering] = [...(elementStates[args.entering] ?? []), "entering"];
-  }
+  const elementStates: Record<number, Array<"entering">> = {};
+  if (args.entering != null) elementStates[args.entering] = ["entering"];
+  // A bar whose answer is known is settled: it keeps the ✓ mark from here on,
+  // so progress accumulates instead of flashing for one step.
+  const settled = args.answer
+    .map((value, index) => (value !== -1 || args.final ? index : -1))
+    .filter((index) => index >= 0);
   const pointers: Record<string, number> = {};
   if (args.cursor != null) pointers.i = args.cursor;
   const topIndex = args.stack.at(-1);
@@ -107,7 +110,7 @@ function monotonicSnapshot(args: {
     numeric_values: [...args.values],
     active_indices: args.cursor == null ? [] : [args.cursor],
     swap_indices: [],
-    sorted_indices: [],
+    sorted_indices: settled,
     pointers,
     element_states: elementStates,
     auxiliary_lanes: [
@@ -129,10 +132,10 @@ function monotonicSnapshot(args: {
         label: "ANSWER",
         items: args.answer.map((value, index) => ({
           id: `answer-${index}`,
-          label: value === -1 ? "?" : String(value),
+          label: value === -1 ? (args.final ? "-1" : "?") : String(value),
           value: `i=${index}`,
           index,
-          emphasis: resolvedNow.has(index) ? "accent" : value === -1 ? "muted" : "secondary",
+          emphasis: resolvedNow.has(index) ? "accent" : value === -1 && !args.final ? "muted" : "secondary",
         })),
       },
     ],
@@ -241,7 +244,6 @@ export function buildMonotonicStackScript(params: TemplatePreviewParams): Playbo
         cursor: frame.index,
         stack: frame.stack,
         answer: frame.answer,
-        popped: frame.popped,
         resolvedNow: frame.popped,
         entering: frame.index,
       }),
@@ -273,6 +275,7 @@ export function buildMonotonicStackScript(params: TemplatePreviewParams): Playbo
       stack: unresolved,
       answer: finalAnswer,
       resolvedNow: unresolved,
+      final: true,
     }),
     code_highlight: codeHighlight(
       9,

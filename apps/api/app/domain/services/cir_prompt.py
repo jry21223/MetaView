@@ -23,7 +23,9 @@ VISUAL + PEDAGOGY RULES for algorithms:
 - Set primary_relation on every array step. When uncertain, use "position".
 - Use ranges for continuous index intervals such as a window, search range, or partition.
   Use auxiliary_lanes for deques, result sequences, or auxiliary arrays instead of hiding
-  those states in narration. Do not reuse sorted_indices for elements that merely left a window.
+  those states in narration. A stack must use role "stack": it renders as a vertical slot
+  column beside the sequence (top of stack on top); never lay a stack out as a horizontal lane.
+  Do not reuse sorted_indices for elements that merely left a window.
 - Use visual_kind="graph" ONLY for explicit tree/graph traversal (BFS, DFS, BST operations).
 - For graph steps, populate the "edges" array with explicit parent→child refs like
   {"from_id": "node_root", "to_id": "node_left"}. Do NOT rely on token id naming conventions.

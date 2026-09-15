@@ -139,9 +139,21 @@ export function stackBracketTrace(expression: string): StackBracketTrace {
   return { expression, events, verdict, leftover: verdict === "unclosed" ? [...stack] : [] };
 }
 
+/** Characters of every pair matched before the current step: they read as consumed. */
+function consumedIndices(
+  pairs: ReadonlyArray<readonly [number, number]>,
+  currentPair?: readonly [number, number] | null,
+): number[] {
+  return pairs
+    .filter((pair) => !currentPair || pair[0] !== currentPair[0])
+    .flatMap(([open, close]) => [open, close]);
+}
+
 function bracketSnapshot(args: {
   chars: readonly string[];
   cursor: number | null;
+  /** Intro shows the cursor without lighting the cell: nothing has been read yet. */
+  cursorActive?: boolean;
   stack: readonly number[];
   pairs: ReadonlyArray<readonly [number, number]>;
   entering?: number | null;
@@ -152,8 +164,9 @@ function bracketSnapshot(args: {
 }): MetaStep["snapshot"] {
   const elementStates: Record<number, Array<"entering" | "leaving">> = {};
   if (args.entering != null) elementStates[args.entering] = ["entering"];
-  if (args.leaving != null) {
-    elementStates[args.leaving] = [...(elementStates[args.leaving] ?? []), "leaving"];
+  for (const index of [...consumedIndices(args.pairs, args.currentPair), ...(args.leaving == null ? [] : [args.leaving])]) {
+    if (index === args.cursor) continue;
+    elementStates[index] = [...(elementStates[index] ?? []).filter((state) => state !== "leaving"), "leaving"];
   }
   const pointers: Record<string, number> = {};
   if (args.cursor != null) pointers.i = args.cursor;
@@ -185,7 +198,7 @@ function bracketSnapshot(args: {
   return {
     kind: "algorithm_array",
     array_values: [...args.chars],
-    active_indices: args.cursor == null ? [] : [args.cursor],
+    active_indices: args.cursor == null || args.cursorActive === false ? [] : [args.cursor],
     swap_indices: [],
     sorted_indices: [],
     pointers,
@@ -281,6 +294,7 @@ export function buildStackBracketsScript(params: TemplatePreviewParams): Playboo
       snapshot: bracketSnapshot({
         chars,
         cursor: 0,
+        cursorActive: false,
         stack: [],
         pairs: [],
         scanRange: [0, lastIndex],
@@ -325,13 +339,14 @@ export function buildStackBracketsScript(params: TemplatePreviewParams): Playboo
         step_id: `bracket-read-${event.index}`,
         title: `读入 ${event.char}，与栈顶 ${chars[partner]} 配对`,
         voiceover_text: `第 ${event.index} 个字符是${bracketName(event.char)}。栈顶是第 ${partner} 个字符${bracketName(chars[partner]!)}，类型正好相同，于是弹出栈顶，两者完成配对。弹出后栈${event.stack.length ? `里${stackSpoken(chars, event.stack)}` : "已经空了"}。`,
+        // No scan range here: it would sit flush against the pair box and
+        // draw a double border. The cursor already shows where we are.
         snapshot: bracketSnapshot({
           chars,
           cursor: event.index,
           stack: event.stack,
           pairs: event.pairs,
           leaving: partner,
-          scanRange: nextScan,
           currentPair: [partner, event.index],
         }),
         code_highlight: codeHighlight(

@@ -238,6 +238,86 @@ describe("advanced math renderers", () => {
     expect(undirected).not.toContain("marker-end");
   });
 
+  it("keeps unchanged nodes and edges opaque across steps and fades only what changed", () => {
+    const nodes = [
+      { id: "A", label: "A", x: -2, y: 0 },
+      { id: "B", label: "B", x: 0, y: 0 },
+      { id: "C", label: "C", x: 2, y: 0 },
+    ];
+    const edges = [
+      { id: "A-B", source: "A", target: "B" },
+      { id: "B-C", source: "B", target: "C" },
+    ];
+    const previous = step({ kind: "graph_scene", nodes, edges, directed: true, current_node_id: "A" });
+    const current = step({
+      kind: "graph_scene",
+      nodes,
+      edges,
+      directed: true,
+      current_node_id: "B",
+      visited_node_ids: ["A"],
+      active_edge_ids: ["A-B"],
+    });
+    const Renderer = rendererRegistry.get("graph_scene")!;
+    // Frame 1 of the new step: the entrance fade has barely started.
+    const markup = renderToStaticMarkup(
+      <Renderer {...props(current.snapshot)} step={current} prevStep={previous} frame={91} stepStartFrame={90} />,
+    );
+
+    expect(markup).toMatch(/data-node-id="C"[^>]*data-node-transition="settled"/);
+    expect(markup).toMatch(/data-node-id="A"[^>]*data-node-transition="enter"/);
+    expect(markup).toMatch(/data-node-id="B"[^>]*data-node-transition="enter"/);
+    expect(markup).toMatch(/data-edge-id="B-C"[^>]*data-edge-transition="settled"/);
+    expect(markup).toMatch(/data-edge-id="A-B"[^>]*data-edge-transition="enter"/);
+    expect(markup).toMatch(/opacity="1"[^>]*data-node-id="C"/);
+
+    // Without a previous graph step everything enters.
+    const first = renderToStaticMarkup(
+      <Renderer {...props(current.snapshot)} step={current} prevStep={null} frame={91} stepStartFrame={90} />,
+    );
+    expect(first).not.toContain('data-node-transition="settled"');
+  });
+
+  it("draws queued nodes with a dashed secondary stroke and offsets edge labels off the line", () => {
+    const markup = render({
+      kind: "graph_scene",
+      nodes: [
+        { id: "U", label: "U", x: 0, y: -1 },
+        { id: "V", label: "V", x: 0, y: 1 },
+        { id: "W", label: "W", x: 2, y: 1 },
+      ],
+      edges: [
+        { id: "U-V", source: "U", target: "V", weight: 7 },
+        { id: "V-W", source: "V", target: "W", weight: 3 },
+      ],
+      weighted: true,
+      queue_node_ids: ["V"],
+    });
+
+    expect(markup).toMatch(/data-node-state="queue"[^]*?stroke-dasharray="6 4"/);
+    // Vertical edge U-V (x = 450): its label moves to the right of the line.
+    expect(markup).toMatch(/<text x="463" y="(?:[0-9.]+)"[^>]*paint-order="stroke"[^>]*>7<\/text>/);
+    // Horizontal edge V-W: label stays above the line.
+    expect(markup).toMatch(/<text x="570" y="294"[^>]*>3<\/text>/);
+  });
+
+  it("keeps a short arrow stub visible when directed nodes almost touch", () => {
+    const markup = render({
+      kind: "graph_scene",
+      nodes: [
+        { id: "P", label: "P", x: 0, y: 0 },
+        { id: "Q", label: "Q", x: 0.5, y: 0 },
+      ],
+      edges: [{ id: "P-Q", source: "P", target: "Q" }],
+      directed: true,
+    });
+
+    // Centres 60px apart: each gap is capped at 45% so a 6px stub remains.
+    expect(markup).toContain('x1="477"');
+    expect(markup).toContain('x2="483"');
+    expect(markup).toContain('marker-end="url(#graph-arrow)"');
+  });
+
   it("shows an explicit waiting state until BFS dequeues a current node", () => {
     const waitingMarkup = render({
       kind: "graph_scene",

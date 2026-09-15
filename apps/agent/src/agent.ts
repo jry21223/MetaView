@@ -109,7 +109,9 @@ Workflow you MUST follow:
    only for magnitude/order/swap teaching. Never choose bars merely because the values are numeric.
    Express a window, search interval, or partition through
    \`add_algorithm_range\`; use \`add_algorithm_auxiliary_lane\` for a deque,
-   result sequence, or helper array instead of hiding it in narration.
+   result sequence, or helper array instead of hiding it in narration. A stack
+   takes role "stack" and is drawn as a vertical slot column beside the
+   sequence (top on top); never lay a stack out as a horizontal lane.
    For math families, first identify only the parameters that remain free after
    every stated condition is applied. Call \`add_parameter_control\` once per
    surviving free parameter before the first curve that uses it, and reference

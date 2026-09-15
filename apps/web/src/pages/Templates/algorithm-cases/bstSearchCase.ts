@@ -123,7 +123,9 @@ function subtreeValues(tree: BstTree, root: number | null): number[] {
   return [...subtreeValues(tree, node.left), node.value, ...subtreeValues(tree, node.right)];
 }
 
-const X_PITCH = 0.8;
+// 0.7 keeps an inserted leaf beside node 1 or 14 (targets 0 / 15) inside the
+// 900px viewBox: |x| ≤ 2.8 + 0.45 → cx within 60..840 with a 32px radius.
+const X_PITCH = 0.7;
 const Y_TOP = -2.05;
 const Y_PITCH = 0.95;
 

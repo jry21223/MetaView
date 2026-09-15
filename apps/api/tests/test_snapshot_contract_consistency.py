@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from collections import Counter
 from functools import lru_cache
@@ -10,7 +11,7 @@ from typing import Any
 from pydantic import TypeAdapter
 
 from app.domain.contracts.playbook_contract import SUPPORTED_SNAPSHOT_KINDS
-from app.domain.models.playbook import AnySnapshot, PlaybookScript
+from app.domain.models.playbook import AlgorithmAuxiliaryLane, AnySnapshot, PlaybookScript
 from app.domain.services.playbook_quality import quality_gate_playbook
 from app.domain.services.scene_blueprint_compiler import compile_scene_blueprint_to_playbook
 
@@ -112,3 +113,41 @@ def test_shared_issue_codes_keep_api_severity_semantics() -> None:
     assert agent_contract[("step.does_not_answer_prompt", '"steps[-1]"')] == api_severity[
         "step.does_not_answer_prompt"
     ]
+
+
+def _quoted_words(block: str) -> set[str]:
+    return set(re.findall(r'"([a-z_]+)"', block))
+
+
+def _lane_role_union(source: str, interface_name: str) -> set[str]:
+    body = re.search(interface_name + r"\s*\{([^}]*)\}", source, re.S)
+    assert body, f"{interface_name} not found"
+    role = re.search(r"role:\s*([^;]+);", body.group(1))
+    assert role, f"{interface_name} has no role union"
+    return _quoted_words(role.group(1))
+
+
+def test_auxiliary_lane_roles_match_across_runtimes() -> None:
+    """The lane role enum is hand-copied into five files; keep them in lockstep."""
+    from typing import get_args
+
+    expected = set(get_args(AlgorithmAuxiliaryLane.model_fields["role"].annotation))
+    assert "stack" in expected
+
+    web = (ROOT / "apps/web/src/features/playbook/engine/types.ts").read_text(encoding="utf-8")
+    agent = (ROOT / "apps/agent/src/state/types.ts").read_text(encoding="utf-8")
+    drawing = (ROOT / "apps/agent/src/tools/drawing.ts").read_text(encoding="utf-8")
+    prompt = (ROOT / "apps/api/app/domain/services/cir_prompt.py").read_text(encoding="utf-8")
+
+    assert _lane_role_union(web, "interface AlgorithmAuxiliaryLane") == expected
+    assert _lane_role_union(agent, "interface AlgorithmAuxiliaryLaneBuilder") == expected
+
+    tool = drawing.split('"add_algorithm_auxiliary_lane"', 1)[1]
+    role_union = re.search(r"role:\s*Type\.Union\(\[(.*?)\]\)", tool, re.S)
+    assert role_union
+    assert set(re.findall(r'Type\.Literal\("([a-z_]+)"\)', role_union.group(1))) == expected
+
+    lanes_block = prompt.split('"auxiliary_lanes"', 1)[1]
+    prompt_roles = re.search(r'"role":\s*"([^"]+)"', lanes_block)
+    assert prompt_roles
+    assert {item.strip() for item in prompt_roles.group(1).split("|")} == expected

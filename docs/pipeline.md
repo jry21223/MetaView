@@ -205,7 +205,8 @@ end_frame_i = (i+1) * 60                               # 无 execution_map（兼
 `algorithm_array`；只有明确需要编码大小、顺序或交换关系时才使用柱状图。
 `algorithm_array` 与 `algorithm_bars` 共享 `ranges`、`element_states` 和
 `auxiliary_lanes`：窗口、搜索区间和 partition 使用 `ranges`，deque、结果序列与辅助数组
-使用独立轨道，不得借用 `sorted_indices` 表达“已经离开窗口”。
+使用独立的横向轨道，栈使用 `stack` 角色（渲染为主序列右侧的竖直槽位列，栈顶在上），
+不得借用 `sorted_indices` 表达“已经离开窗口”。
 
 ## 6. Math 函数图（`visual_kind="function"`）
 

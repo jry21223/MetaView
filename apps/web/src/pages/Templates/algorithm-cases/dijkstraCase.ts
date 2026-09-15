@@ -230,14 +230,14 @@ export function buildDijkstraScript(params: TemplatePreviewParams): PlaybookScri
     algorithmStep(0, {
       step_id: "dijkstra-intro",
       title: `从 ${source} 出发，其他距离都是 ∞`,
-      voiceover_text: `图有 ${DIJKSTRA_NODE_IDS.length} 个节点、${DIJKSTRA_EDGES.length} 条带权边，要求 ${source} 到每个节点的最短距离。初始化：${source} 的距离是 0，其余都是无穷大。Dijkstra 的核心是贪心：每次把当前距离最小且尚未确定的节点确定下来，再用它去更新邻居。`,
+      voiceover_text: `图有 ${DIJKSTRA_NODE_IDS.length} 个节点、${DIJKSTRA_EDGES.length} 条带权边，要求 ${source} 到每个节点的最短距离。初始化：${source} 的距离是 0，其余都是无穷大。Dijkstra 的核心是贪心：每次把当前距离最小且尚未确定的节点确定下来，再用它去更新邻居。画面里橙色是当前节点，灰色是已经确定的节点，虚线描边的是有了距离、还在候选的节点。`,
       snapshot: dijkstraSnapshot({
         dist: initialDist,
         current: null,
         settled: [],
         frontier: [source],
         activeEdges: [],
-        caption: `dist: ${distText(initialDist)}`,
+        caption: `dist: ${distText(initialDist)} · 橙=当前 灰=已确定 虚线=候选`,
       }),
       code_highlight: codeHighlight(
         2,

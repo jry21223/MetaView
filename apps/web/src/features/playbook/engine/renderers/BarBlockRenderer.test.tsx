@@ -90,9 +90,9 @@ describe("BarBlockRenderer", () => {
     const markup = renderToStaticMarkup(BarBlockRenderer(props(barsStep(snap))));
     const hs = heightsOf(markup);
 
-    // 342 - 2 lanes * 56 = 230; the value-3 bar keeps its one-third proportion.
-    expect(hs).toContain(230);
-    expect(hs.some((height) => Math.abs(height - 230 / 3) < 0.01)).toBe(true);
+    // 342 - 2 lanes * 110 = 122 → clamped to the 180px floor; the value-3 bar keeps its one-third proportion.
+    expect(hs).toContain(180);
+    expect(hs).toContain(60);
     expect(hs).not.toContain(342);
     expect(markup).toContain('data-auxiliary-role="deque"');
     expect(markup).toContain('data-auxiliary-role="result"');
@@ -109,13 +109,25 @@ describe("BarBlockRenderer", () => {
     const markup = renderToStaticMarkup(BarBlockRenderer(props(barsStep(snap))));
     const hs = heightsOf(markup);
 
-    // Only the result row borrows height: 342 - 1 * 56 = 286.
-    expect(hs).toContain(286);
+    // Only the result row borrows height: 342 - 1 * 110 = 232.
+    expect(hs).toContain(232);
     expect(markup).toContain('data-stack-lane="stack"');
     expect(markup).toContain('data-stack-capacity="2"');
     expect(markup).toContain('data-stack-top="0"');
     expect(markup).not.toContain('data-auxiliary-role="stack"');
     expect(markup).toContain('data-auxiliary-role="result"');
+  });
+
+  it("keeps the bar field content-box and reserves the pointer row without pointers", () => {
+    const markup = renderToStaticMarkup(BarBlockRenderer(props(barsStep(makeBars([9, 3], {
+      auxiliary_lanes: [{ id: "answer", role: "result", label: "ANSWER", items: [{ id: "a0", label: "?" }] }],
+    })))));
+
+    // Headroom padding must add to the field height, not eat into it, or the
+    // bars (and their index labels) overflow into the lanes below.
+    expect(markup).toMatch(/data-zero-axis="232"[^>]*box-sizing:content-box/);
+    expect(markup).toContain('data-pointer-row="0"');
+    expect(markup).toMatch(/data-pointer-row="0"[^>]*height:34px/);
   });
 
   it("uses a signed zero axis for negative values and still supports range overlays", () => {

@@ -56,15 +56,23 @@ describe("stackBracketsCase", () => {
     expect(deepest.auxiliary_lanes?.[0]?.items.map((item) => item.label)).toEqual(["{", "[", "("]);
     expect(deepest.pointers).toEqual({ i: 2 });
 
+    const intro = asArray(script.steps[0]?.snapshot);
+    expect(intro.active_indices).toEqual([]);
+    expect(intro.pointers).toEqual({ i: 0 });
+
     const firstPop = asArray(script.steps.find((step) => step.step_id === "bracket-read-3")?.snapshot);
     expect(firstPop.ranges).toEqual([
-      expect.objectContaining({ id: "scan-range", role: "search_range", start: 4, end: 5 }),
       expect.objectContaining({ id: "matched-pair", role: "current_subarray", start: 2, end: 3 }),
     ]);
     expect(firstPop.element_states).toEqual({ 2: ["leaving"] });
+
+    // Once a pair is matched both of its characters stay dimmed as consumed.
+    const secondPop = asArray(script.steps.find((step) => step.step_id === "bracket-read-4")?.snapshot);
+    expect(secondPop.element_states).toEqual({ 1: ["leaving"], 2: ["leaving"], 3: ["leaving"] });
+    const result = asArray(script.steps.at(-1)?.snapshot);
+    expect(Object.keys(result.element_states ?? {}).map(Number).sort()).toEqual([0, 1, 2, 3, 4, 5]);
     expect(firstPop.auxiliary_lanes?.[1]?.items.map((item) => item.label)).toEqual(["()"]);
 
-    const result = asArray(script.steps.at(-1)?.snapshot);
     expect(result.auxiliary_lanes?.[0]?.items).toEqual([]);
     expect(script.steps.at(-1)?.title).toBe("栈为空，表达式合法");
   });

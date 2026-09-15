@@ -163,6 +163,33 @@ describe("AlgorithmRenderer", () => {
     expect(markup).toContain("top = 1 · size = 2");
   });
 
+  it("squeezes a tall stack column so it stays on stage", () => {
+    const markup = render(defaultSnap({
+      auxiliary_lanes: [{
+        id: "stack",
+        role: "stack",
+        label: "STACK",
+        items: Array.from({ length: 12 }, (_, index) => ({ id: `s${index}`, label: `i=${index}`, value: `v${index}` })),
+      }],
+    }));
+
+    expect(markup).toContain('data-stack-capacity="12"');
+    // (300 - 11 * 6) / 12 = 19.5 → floored to 19, then clamped to the 22px floor.
+    expect(markup).toContain('data-stack-slot-height="22"');
+    expect(markup.match(/data-stack-slot-state="filled"/g)).toHaveLength(12);
+    // Compact slots drop the secondary value line.
+    expect(markup).not.toContain(">v3<");
+  });
+
+  it("reserves the pointer row even when a step has no pointers", () => {
+    const withPointers = render(defaultSnap());
+    const without = render(defaultSnap({ pointers: {} }));
+
+    expect(withPointers).toContain('data-pointer-row="2"');
+    expect(without).toContain('data-pointer-row="0"');
+    expect(without).toMatch(/data-pointer-row="0"[^>]*height:34px/);
+  });
+
   it("shows an empty stack column with every slot open", () => {
     const markup = render(defaultSnap({
       auxiliary_lanes: [{ id: "stack", role: "stack", label: "STACK", items: [] }],

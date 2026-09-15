@@ -88,11 +88,12 @@ describe("TemplatesPage lesson atlas", () => {
     expect(within(algorithmSection as HTMLElement).getByText("斐波那契 · 记忆化")).toBeTruthy();
   });
 
-  it("groups the data-structure cases under the algorithm domain as playable entries", () => {
+  it("lists the data-structure cases in their own playable section", () => {
     const view = renderPage();
     const algorithmSection = view
-      .getByRole("heading", { name: "算法" })
+      .getByRole("heading", { name: "数据结构" })
       .closest("section") as HTMLElement;
+    expect(view.getByRole("button", { name: "数据结构" })).toBeTruthy();
 
     for (const title of [
       "栈 · 括号匹配",

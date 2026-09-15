@@ -59,7 +59,7 @@ export interface LinkedListFrame {
   next: number;
   /** Values whose pointer has been flipped after this step. */
   reversed: number[];
-  /** Forward list read from the new head after this step. */
+  /** List read from the new head after this step (the untouched suffix is no longer reachable from it). */
   order: number[];
 }
 
@@ -77,7 +77,7 @@ export function linkedListReverseTrace(length: number): LinkedListFrame[] {
       prevBefore: prev,
       next,
       reversed: [...reversed],
-      order: [...reversed].reverse().concat(next === 0 ? [] : Array.from({ length: length - curr }, (_, i) => curr + 1 + i)),
+      order: [...reversed].reverse(),
     });
     prev = curr;
     curr = next;
@@ -131,23 +131,62 @@ export function listEdges(length: number, reversedCount: number): GraphSceneEdge
   return edges;
 }
 
+export type PointerName = "prev" | "curr" | "next";
+
+export function pointerMarkerId(name: PointerName): string {
+  return `ptr-${name}`;
+}
+
+const POINTER_ROW_Y = -1.75;
+
+/**
+ * The three pointers drawn as labelled markers above the row, each with an
+ * arrow down to the node it references — so prev / curr / next are visible
+ * on stage, not only in the caption.
+ */
+function pointerMarkers(
+  nodes: readonly GraphSceneNode[],
+  pointers: Partial<Record<PointerName, string>>,
+): { nodes: GraphSceneNode[]; edges: GraphSceneEdge[] } {
+  const markerNodes: GraphSceneNode[] = [];
+  const markerEdges: GraphSceneEdge[] = [];
+  for (const name of ["prev", "curr", "next"] as const) {
+    const targetId = pointers[name];
+    if (!targetId) continue;
+    const target = nodes.find((node) => node.id === targetId);
+    if (!target) continue;
+    markerNodes.push({ id: pointerMarkerId(name), label: name, x: target.x, y: POINTER_ROW_Y });
+    markerEdges.push({
+      id: `${pointerMarkerId(name)}-edge`,
+      source: pointerMarkerId(name),
+      target: targetId,
+      emphasis: name === "curr" ? "accent" : undefined,
+    });
+  }
+  return { nodes: markerNodes, edges: markerEdges };
+}
+
 function listSnapshot(args: {
   length: number;
   reversedCount: number;
   current: number | null;
   next?: number | null;
+  pointers: Partial<Record<PointerName, string>>;
   activeEdges?: readonly string[];
   visited?: readonly number[];
+  active?: readonly number[];
   caption: string;
 }): GraphSceneSnapshot {
+  const nodes = listNodes(args.length);
+  const markers = pointerMarkers(nodes, args.pointers);
   return {
     kind: "graph_scene",
-    nodes: listNodes(args.length),
-    edges: listEdges(args.length, args.reversedCount),
+    nodes: [...nodes, ...markers.nodes],
+    edges: [...listEdges(args.length, args.reversedCount), ...markers.edges],
     directed: true,
     weighted: false,
     current_node_id: args.current == null ? null : `n${args.current}`,
-    active_node_ids: [],
+    active_node_ids: (args.active ?? []).map((value) => `n${value}`),
     active_edge_ids: [...(args.activeEdges ?? [])],
     visited_node_ids: (args.visited ?? []).map((value) => `n${value}`),
     queue_node_ids: [],
@@ -200,6 +239,7 @@ export function buildLinkedListReverseScript(params: TemplatePreviewParams): Pla
         reversedCount: 0,
         current: 1,
         next: length > 1 ? 2 : null,
+        pointers: { prev: HEAD_NULL_ID, curr: "n1" },
         caption: `prev = ∅，curr = 1，链表 ${chain(original)}`,
       }),
       code_highlight: codeHighlight(
@@ -225,6 +265,11 @@ export function buildLinkedListReverseScript(params: TemplatePreviewParams): Pla
         reversedCount: frame.reversed.length,
         current: frame.curr,
         next: frame.next || null,
+        pointers: {
+          prev: nodeId(frame.prevBefore),
+          curr: `n${frame.curr}`,
+          next: frame.next === 0 ? TAIL_NULL_ID : `n${frame.next}`,
+        },
         activeEdges: [flippedEdgeId(frame.curr)],
         visited: frame.reversed.slice(0, -1),
         caption: `next = ${nextLabel}，${frame.curr}.next = ${prevLabel}；然后 prev = ${frame.curr}，curr = ${nextLabel}`,
@@ -252,7 +297,9 @@ export function buildLinkedListReverseScript(params: TemplatePreviewParams): Pla
       length,
       reversedCount: length,
       current: null,
+      pointers: { prev: `n${last.curr}`, curr: TAIL_NULL_ID },
       visited: last.reversed,
+      active: [last.curr],
       activeEdges: last.reversed.map((value) => flippedEdgeId(value)),
       caption: `返回 prev = ${last.curr}；新链表 ${chain(last.order)}`,
     }),

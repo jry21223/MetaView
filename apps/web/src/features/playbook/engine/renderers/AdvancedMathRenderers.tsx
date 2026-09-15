@@ -514,16 +514,19 @@ export const IterationTraceSceneRenderer: React.FC<RendererProps> = ({ step, fra
 
 export const GraphSceneRenderer: React.FC<RendererProps> = ({
   step,
+  prevStep,
   frame,
   stepStartFrame,
   theme,
   onInteraction,
 }) => {
   const snap = step.snapshot as GraphSceneSnapshot;
+  const previous = prevStep?.snapshot.kind === "graph_scene" ? (prevStep.snapshot as GraphSceneSnapshot) : null;
   return (
     <Shell title={step.title} caption={snap.caption} theme={theme}>
       <GraphSvg
         graph={snap}
+        previous={previous}
         theme={theme}
         opacity={progressOpacity(frame, stepStartFrame)}
         onNodeSelect={onInteraction ? (nodeId) => onInteraction({
@@ -540,16 +543,21 @@ export const GraphSceneRenderer: React.FC<RendererProps> = ({
 
 function GraphSvg({
   graph,
+  previous = null,
   theme,
   opacity = 1,
   onNodeSelect,
 }: {
   graph: GraphSceneSnapshot;
+  /** Previous step's graph, so unchanged nodes and edges stay put instead of fading in again. */
+  previous?: GraphSceneSnapshot | null;
   theme: ThemeName;
   opacity?: number;
   onNodeSelect?: (nodeId: string) => void;
 }) {
   const colors = canvasPalette(theme);
+  const settledNodes = previousNodeSignatures(previous);
+  const settledEdges = previousEdgeSignatures(previous);
   const nodes = graph.nodes ?? [];
   const projectCompactCoords = shouldProjectCompactGraphCoords(nodes);
   const positioned = nodes.map((node, index) => {
@@ -625,12 +633,15 @@ function GraphSvg({
         const ends = graph.directed
           ? trimEdgeToNodeRims(a, b, graphNodeRadius(a, currentNodes), graphNodeRadius(b, currentNodes))
           : { x1: a.x, y1: a.y, x2: b.x, y2: b.y };
+        const settled = settledEdges.get(edgeId) === edgeSignature(edge, active);
+        const labelAnchor = edgeLabelAnchor(a, b);
         return (
           <g
             key={`${edge.source}-${edge.target}-${index}`}
-            opacity={opacity}
+            opacity={settled ? 1 : opacity}
             data-edge-id={edgeId}
             data-edge-state={active ? "active" : "idle"}
+            data-edge-transition={settled ? "settled" : "enter"}
           >
             <line
               x1={ends.x1}
@@ -643,7 +654,17 @@ function GraphSvg({
               markerEnd={graph.directed ? (active ? "url(#graph-arrow-active)" : "url(#graph-arrow)") : undefined}
             />
             {edge.label || edge.weight != null ? (
-              <text x={(a.x + b.x) / 2} y={(a.y + b.y) / 2 - 8} fill={colors.muted} fontSize={14} textAnchor="middle">
+              <text
+                x={labelAnchor.x}
+                y={labelAnchor.y}
+                fill={colors.muted}
+                fontSize={14}
+                textAnchor="middle"
+                stroke={colors.bg}
+                strokeWidth={5}
+                strokeLinejoin="round"
+                paintOrder="stroke"
+              >
                 {edge.label ?? edge.weight}
               </text>
             ) : null}
@@ -663,13 +684,17 @@ function GraphSvg({
                 ? colors.card
                 : colors.bg;
         const nodeStroke =
-          state === "current" ? colors.accent : state === "visited" ? colors.secondary : colors.line;
+          state === "current" || state === "queue"
+            ? state === "current" ? colors.accent : colors.secondary
+            : state === "visited" ? colors.secondary : colors.line;
+        const settled = settledNodes.get(node.id) === nodeSignature(node, state);
         return (
           <g
             key={node.id}
-            opacity={opacity}
+            opacity={settled ? 1 : opacity}
             data-node-id={node.id}
             data-node-state={state}
+            data-node-transition={settled ? "settled" : "enter"}
             data-interaction-target={onNodeSelect ? "start-node" : undefined}
             role={onNodeSelect ? "button" : undefined}
             aria-label={onNodeSelect ? `从 ${node.label ?? node.id} 开始 BFS` : undefined}
@@ -694,6 +719,7 @@ function GraphSvg({
               fill={nodeFill}
               stroke={nodeStroke}
               strokeWidth={active ? 3 : 2}
+              strokeDasharray={state === "queue" ? "6 4" : undefined}
             />
             <text
               x={node.x}
@@ -850,6 +876,72 @@ function graphNodeRadius(
     : GRAPH_NODE_RADIUS;
 }
 
+/**
+ * What a node looked like on the previous step. A node whose signature is
+ * unchanged is already on screen and must not fade in again; only nodes that
+ * appear or change state get the entrance fade, so the eye follows the change.
+ */
+function nodeSignature(
+  node: { label?: string | null; id: string; emphasis?: SceneEmphasis },
+  state: GraphNodeVisualState,
+): string {
+  return `${state}|${node.emphasis ?? ""}|${node.label ?? node.id}`;
+}
+
+function edgeSignature(edge: { source: string; target: string; label?: string | null; weight?: number | null }, active: boolean): string {
+  return `${edge.source}>${edge.target}|${active ? "active" : "idle"}|${edge.label ?? edge.weight ?? ""}`;
+}
+
+function previousNodeSignatures(previous: GraphSceneSnapshot | null): Map<string, string> {
+  const signatures = new Map<string, string>();
+  if (!previous) return signatures;
+  const activeNodes = new Set(previous.active_node_ids ?? []);
+  const currentNodes = new Set([...activeNodes, ...(previous.current_node_id ? [previous.current_node_id] : [])]);
+  const visitedNodes = new Set(previous.visited_node_ids ?? []);
+  const queueNodes = new Set([...(previous.queue_node_ids ?? []), ...(previous.frontier_node_ids ?? [])]);
+  for (const node of previous.nodes ?? []) {
+    signatures.set(node.id, nodeSignature(node, graphNodeState(node.id, currentNodes, visitedNodes, queueNodes)));
+  }
+  return signatures;
+}
+
+function previousEdgeSignatures(previous: GraphSceneSnapshot | null): Map<string, string> {
+  const signatures = new Map<string, string>();
+  if (!previous) return signatures;
+  const activeEdges = new Set(previous.active_edge_ids ?? []);
+  for (const edge of previous.edges ?? []) {
+    const edgeId = edge.id ?? `${edge.source}-${edge.target}`;
+    signatures.set(edgeId, edgeSignature(edge, edge.emphasis === "accent" || activeEdges.has(edgeId)));
+  }
+  return signatures;
+}
+
+const EDGE_LABEL_OFFSET = 13;
+
+/**
+ * Edge labels sit beside the edge along its normal (above a horizontal edge,
+ * to the right of a vertical one) instead of a fixed 8px above the midpoint,
+ * which put vertical edges' weights right on the line.
+ */
+function edgeLabelAnchor(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+): { x: number; y: number } {
+  const mx = (a.x + b.x) / 2;
+  const my = (a.y + b.y) / 2;
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const length = Math.hypot(dx, dy) || 1;
+  let nx = -dy / length;
+  let ny = dx / length;
+  if (ny > 0 || (ny === 0 && nx < 0)) {
+    nx = -nx;
+    ny = -ny;
+  }
+  // +5 re-centres the 14px text on its anchor vertically.
+  return { x: mx + nx * EDGE_LABEL_OFFSET, y: my + ny * EDGE_LABEL_OFFSET + 5 };
+}
+
 /** Shorten a center-to-center segment so it starts and ends just outside each node rim. */
 function trimEdgeToNodeRims(
   a: { x: number; y: number },
@@ -860,11 +952,13 @@ function trimEdgeToNodeRims(
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   const length = Math.hypot(dx, dy);
-  if (length <= sourceRadius + targetRadius + 8) return { x1: a.x, y1: a.y, x2: b.x, y2: b.y };
+  if (length < 4) return { x1: a.x, y1: a.y, x2: b.x, y2: b.y };
   const ux = dx / length;
   const uy = dy / length;
-  const startGap = sourceRadius + 1;
-  const endGap = targetRadius + 3;
+  // Nodes drawn almost touching still get a short visible stub with its head
+  // outside the target rim, instead of falling back to a hidden centre line.
+  const startGap = Math.min(sourceRadius + 1, length * 0.45);
+  const endGap = Math.min(targetRadius + 3, length * 0.45);
   return {
     x1: a.x + ux * startGap,
     y1: a.y + uy * startGap,

@@ -210,11 +210,14 @@ export function AlgorithmAuxiliaryLanes({
   );
 }
 
-const STACK_SLOT_WIDTH = 76;
-const STACK_SLOT_HEIGHT = 34;
+const STACK_SLOT_WIDTH = 84;
+const STACK_SLOT_HEIGHT = 38;
+const STACK_SLOT_GAP = 6;
 const STACK_INDEX_GUTTER = 18;
 const STACK_MARKER_WIDTH = 64;
 const STACK_DROP_FRAMES = 10;
+/** Slot columns taller than this squeeze their slots so the column stays on stage. */
+const STACK_COLUMN_MAX_HEIGHT = 300;
 
 /**
  * A stack drawn the way it is taught: a vertical column of slots with slot 0
@@ -237,6 +240,11 @@ export function AlgorithmStackColumn({
 }) {
   const colors = overlayPalette(theme);
   const slots = Math.max(capacity, lane.items.length, 1);
+  const slotHeight = Math.max(
+    22,
+    Math.min(STACK_SLOT_HEIGHT, Math.floor((STACK_COLUMN_MAX_HEIGHT - (slots - 1) * STACK_SLOT_GAP) / slots)),
+  );
+  const compact = slotHeight < 30;
   const previousIds = new Set((previousLane?.items ?? []).map((item) => item.id));
   const topIndex = lane.items.length - 1;
   const drop = interpolate(elapsed, [0, STACK_DROP_FRAMES], [0, 1], {
@@ -260,7 +268,7 @@ export function AlgorithmStackColumn({
       <span
         style={{
           color: colors.muted,
-          fontSize: 9.5,
+          fontSize: 11,
           fontWeight: 700,
           letterSpacing: "0.06em",
           whiteSpace: "nowrap",
@@ -269,11 +277,12 @@ export function AlgorithmStackColumn({
         {lane.label}
       </span>
       <div
+        data-stack-slot-height={slotHeight}
         style={{
           display: "grid",
           gridTemplateColumns: `${STACK_INDEX_GUTTER}px ${STACK_SLOT_WIDTH}px ${STACK_MARKER_WIDTH}px`,
           columnGap: 8,
-          rowGap: 6,
+          rowGap: STACK_SLOT_GAP,
           alignItems: "center",
         }}
       >
@@ -290,17 +299,17 @@ export function AlgorithmStackColumn({
                 : colors.secondary;
           return (
             <React.Fragment key={slot}>
-              <span style={{ color: colors.muted, fontSize: 10, textAlign: "right" }}>{slot}</span>
+              <span style={{ color: colors.muted, fontSize: 11, textAlign: "right" }}>{slot}</span>
               <div
                 data-stack-slot={slot}
                 data-stack-slot-state={item ? "filled" : "empty"}
                 data-stack-item={item?.id}
                 style={{
                   boxSizing: "border-box",
-                  height: STACK_SLOT_HEIGHT,
+                  height: slotHeight,
                   border: item
                     ? `1.5px solid color-mix(in srgb, ${color} 70%, ${colors.line})`
-                    : `1px dashed ${colors.line}`,
+                    : `1.5px dashed color-mix(in srgb, ${colors.muted} 55%, ${colors.line})`,
                   borderRadius: 6,
                   background: item
                     ? `color-mix(in srgb, ${color} ${isTop ? 12 : 7}%, ${colors.surface})`
@@ -316,17 +325,17 @@ export function AlgorithmStackColumn({
                 }}
               >
                 {item && (
-                  <div style={{ color, fontSize: 11, fontWeight: 700 }}>{item.label}</div>
+                  <div style={{ color, fontSize: compact ? 11 : 13, fontWeight: 700 }}>{item.label}</div>
                 )}
-                {item?.value && (
-                  <div style={{ color: colors.muted, fontSize: 9 }}>{item.value}</div>
+                {item?.value && !compact && (
+                  <div style={{ color: colors.muted, fontSize: 10.5 }}>{item.value}</div>
                 )}
               </div>
               <span
                 data-stack-marker={isTop ? "top" : undefined}
                 style={{
                   color: colors.focus,
-                  fontSize: 10,
+                  fontSize: 11.5,
                   fontWeight: 700,
                   whiteSpace: "nowrap",
                   visibility: isTop ? "visible" : "hidden",
@@ -338,7 +347,7 @@ export function AlgorithmStackColumn({
           );
         })}
       </div>
-      <span style={{ color: colors.muted, fontSize: 9.5, whiteSpace: "nowrap" }}>
+      <span style={{ color: colors.muted, fontSize: 10.5, whiteSpace: "nowrap" }}>
         {lane.items.length > 0 ? `top = ${topIndex} · size = ${lane.items.length}` : "空栈 · top = -1"}
       </span>
     </div>

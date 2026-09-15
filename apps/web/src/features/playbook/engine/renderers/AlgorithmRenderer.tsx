@@ -399,16 +399,19 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
         />
       </div>
 
-      {/* Pointer arrows */}
-      {Object.entries(snap.pointers).length > 0 && (
-        <div
-          style={{
-            position: "relative",
-            width: snap.array_values.length * cellW + (snap.array_values.length - 1) * cellGap,
-            height: 34,
-            marginTop: 8,
-          }}
-        >
+      {/* Pointer arrows — the row is always reserved so a step without
+          pointers does not shift the sequence and lanes upward. */}
+      <div
+        data-pointer-row={pointerGroups.length}
+        style={{
+          position: "relative",
+          width: snap.array_values.length * cellW + (snap.array_values.length - 1) * cellGap,
+          height: 34,
+          marginTop: 8,
+        }}
+      >
+        {pointerGroups.length > 0 && (
+        <div style={{ position: "absolute", inset: 0 }}>
           {pointerGroups.map(([idx, names]) => {
             const pointerOpacity = prevSnap
               ? 1
@@ -444,7 +447,8 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
             );
           })}
         </div>
-      )}
+        )}
+      </div>
 
       <AlgorithmAuxiliaryLanes
         lanes={snap.auxiliary_lanes ?? []}

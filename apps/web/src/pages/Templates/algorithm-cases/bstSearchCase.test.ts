@@ -35,6 +35,20 @@ describe("bstSearchCase", () => {
     }
   });
 
+  it("keeps every inserted leaf inside the 900px stage for every target", () => {
+    // Compact graph coords project to 450 + x * 120 with a 32px accent radius.
+    const maxX = (450 - 32) / 120;
+    for (let target = 0; target <= 15; target += 1) {
+      const script = buildBstSearchScript({ target });
+      for (const step of script.steps) {
+        const snapshot = asGraph(step.snapshot);
+        for (const node of snapshot.nodes) {
+          expect(Math.abs(node.x as number), `target ${target} node ${node.id}`).toBeLessThanOrEqual(maxX);
+        }
+      }
+    }
+  });
+
   it("traces found and missing targets along one root-to-leaf path", () => {
     const found = bstSearchTrace(BST_TREE, 8, 7);
     expect(found.found).toBe(true);

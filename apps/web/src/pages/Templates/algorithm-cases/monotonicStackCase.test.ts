@@ -43,21 +43,25 @@ describe("monotonicStackCase", () => {
     for (const step of script.steps) {
       const snapshot = asBars(step.snapshot);
       expect(snapshot.numeric_values).toEqual([4, 2, 5, 1, 3, 6]);
-      expect(snapshot.sorted_indices).toEqual([]);
       expect(snapshot.auxiliary_lanes?.map((lane) => lane.role)).toEqual(["stack", "result"]);
       expect(snapshot.auxiliary_lanes?.[1]?.items).toHaveLength(6);
     }
 
     const doublePop = asBars(script.steps.find((step) => step.step_id === "monotonic-visit-2")?.snapshot);
     expect(doublePop.pointers).toEqual({ i: 2 });
-    expect(doublePop.element_states).toEqual({ 0: ["leaving"], 1: ["leaving"], 2: ["entering"] });
+    expect(doublePop.element_states).toEqual({ 2: ["entering"] });
+    // Bars whose answer is known stay settled from now on.
+    expect(doublePop.sorted_indices).toEqual([0, 1]);
+    const afterFour = asBars(script.steps.find((step) => step.step_id === "monotonic-visit-4")?.snapshot);
+    expect(afterFour.sorted_indices).toEqual([0, 1, 3]);
     expect(doublePop.auxiliary_lanes?.[0]?.items.map((item) => item.index)).toEqual([2]);
     expect(doublePop.auxiliary_lanes?.[1]?.items.map((item) => item.label)).toEqual(["5", "5", "?", "?", "?", "?"]);
     expect(doublePop.auxiliary_lanes?.[1]?.items.slice(0, 2).every((item) => item.emphasis === "accent")).toBe(true);
 
     const result = asBars(script.steps.at(-1)?.snapshot);
     expect(result.pointers).toEqual({});
-    expect(result.auxiliary_lanes?.[1]?.items.map((item) => item.label)).toEqual(["5", "5", "6", "3", "6", "?"]);
+    expect(result.auxiliary_lanes?.[1]?.items.map((item) => item.label)).toEqual(["5", "5", "6", "3", "6", "-1"]);
+    expect(result.sorted_indices).toEqual([0, 1, 2, 3, 4, 5]);
     expect(script.steps.at(-1)?.voiceover_text).toContain("[5, 5, 6, 3, 6, -1]");
   });
 
