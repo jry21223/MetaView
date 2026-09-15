@@ -3,6 +3,7 @@ import type {
   AlgorithmRange,
   MetaStep,
 } from "../../../features/playbook/engine/types";
+import { bracketSpokenName, spokenList } from "../../../shared/lib/spokenText";
 import type { TemplatePreviewParams } from "../templatePreviewCases";
 import {
   defineAlgorithmCase,
@@ -27,18 +28,7 @@ export const STACK_BRACKET_PRESETS = [
 ] as const;
 
 /** Spoken names for the six bracket glyphs: narration must stay readable by TTS. */
-const CHAR_NAMES: Record<string, string> = {
-  "(": "左圆括号",
-  ")": "右圆括号",
-  "[": "左方括号",
-  "]": "右方括号",
-  "{": "左花括号",
-  "}": "右花括号",
-};
-
-export function bracketName(char: string): string {
-  return CHAR_NAMES[char] ?? char;
-}
+export { bracketSpokenName as bracketName };
 
 export type StackBracketPresetId = (typeof STACK_BRACKET_PRESETS)[number]["id"];
 
@@ -251,7 +241,7 @@ function stackText(chars: readonly string[], stack: readonly number[]): string {
 /** Bottom-to-top stack contents in spoken form for narration. */
 function stackSpoken(chars: readonly string[], stack: readonly number[]): string {
   return stack.length
-    ? `从底到顶依次是${stack.map((index) => bracketName(chars[index]!)).join("、")}`
+    ? `从底到顶依次是${spokenList(stack.map((index) => bracketSpokenName(chars[index]!)))}`
     : "已经空了";
 }
 
@@ -317,7 +307,7 @@ function buildStackBracketSteps(params: TemplatePreviewParams): AlgorithmCaseFra
       steps.push({
         step_id: stepId,
         title: `读入 ${event.char}，入栈`,
-        voiceover_text: `第 ${event.index} 个字符是${bracketName(event.char)}。它还没有配对对象，先压入栈顶等待。此时栈里${stackSpoken(chars, event.stack)}，栈顶总是最近一个尚未闭合的左括号。`,
+        voiceover_text: `第 ${event.index} 个字符是${bracketSpokenName(event.char)}。它还没有配对对象，先压入栈顶等待。此时栈里${stackSpoken(chars, event.stack)}，栈顶总是最近一个尚未闭合的左括号。`,
         snapshot: bracketSnapshot({
           chars,
           cursor: event.index,
@@ -345,7 +335,7 @@ function buildStackBracketSteps(params: TemplatePreviewParams): AlgorithmCaseFra
       steps.push({
         step_id: stepId,
         title: `读入 ${event.char}，与栈顶 ${chars[partner]} 配对`,
-        voiceover_text: `第 ${event.index} 个字符是${bracketName(event.char)}。栈顶是第 ${partner} 个字符${bracketName(chars[partner]!)}，类型正好相同，于是弹出栈顶，两者完成配对。弹出后栈${event.stack.length ? `里${stackSpoken(chars, event.stack)}` : "已经空了"}。`,
+        voiceover_text: `第 ${event.index} 个字符是${bracketSpokenName(event.char)}。栈顶是第 ${partner} 个字符${bracketSpokenName(chars[partner]!)}，类型正好相同，于是弹出栈顶，两者完成配对。弹出后栈${event.stack.length ? `里${stackSpoken(chars, event.stack)}` : "已经空了"}。`,
         // No scan range here: it would sit flush against the pair box and
         // draw a double border. The cursor already shows where we are.
         snapshot: bracketSnapshot({
@@ -381,7 +371,7 @@ function buildStackBracketSteps(params: TemplatePreviewParams): AlgorithmCaseFra
       steps.push({
         step_id: stepId,
         title: `读入 ${event.char}，栈顶是 ${chars[partner]}：不匹配`,
-        voiceover_text: `第 ${event.index} 个字符是${bracketName(event.char)}，需要配对的是${bracketName(PAIR[event.char]!)}，可栈顶却是第 ${partner} 个字符${bracketName(chars[partner]!)}。栈只能和最近一个尚未闭合的左括号配对，类型不同就说明括号交叉了，立即返回 false。`,
+        voiceover_text: `第 ${event.index} 个字符是${bracketSpokenName(event.char)}，需要配对的是${bracketSpokenName(PAIR[event.char]!)}，可栈顶却是第 ${partner} 个字符${bracketSpokenName(chars[partner]!)}。栈只能和最近一个尚未闭合的左括号配对，类型不同就说明括号交叉了，立即返回 false。`,
         snapshot: bracketSnapshot({
           chars,
           cursor: event.index,
@@ -412,7 +402,7 @@ function buildStackBracketSteps(params: TemplatePreviewParams): AlgorithmCaseFra
     steps.push({
       step_id: stepId,
       title: `读入 ${event.char}，栈已空`,
-      voiceover_text: `第 ${event.index} 个字符是${bracketName(event.char)}，但栈里已经没有任何左括号。没有可配对的对象，函数立即返回 false。`,
+      voiceover_text: `第 ${event.index} 个字符是${bracketSpokenName(event.char)}，但栈里已经没有任何左括号。没有可配对的对象，函数立即返回 false。`,
       snapshot: bracketSnapshot({
         chars,
         cursor: event.index,

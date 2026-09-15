@@ -9,6 +9,7 @@ import {
   graphSceneSnapshot,
   inorderTreeLayout,
 } from "../../../features/playbook/engine/kits/algorithm/graphScene";
+import { spokenPath } from "../../../shared/lib/spokenText";
 import type { TemplatePreviewParams } from "../templatePreviewCases";
 import {
   defineAlgorithmCase,
@@ -230,7 +231,7 @@ function pathText(path: readonly BstComparison[]): string {
 
 /** The same path for narration, without arrow glyphs. */
 function pathSpoken(path: readonly BstComparison[]): string {
-  return path.map((item) => item.node).join("、");
+  return spokenPath(path.map((item) => item.node));
 }
 
 function buildBstSearchSteps(params: TemplatePreviewParams): AlgorithmCaseFrame<GraphSceneSnapshot> {

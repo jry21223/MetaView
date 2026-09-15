@@ -2,6 +2,7 @@ import type {
   AlgorithmBarsSnapshot,
   MetaStep,
 } from "../../../features/playbook/engine/types";
+import { spokenList } from "../../../shared/lib/spokenText";
 import type { TemplatePreviewParams } from "../templatePreviewCases";
 import {
   defineAlgorithmCase,
@@ -167,7 +168,7 @@ function answerSpoken(answer: readonly number[]): string {
     .map((value, index) => ({ value, index }))
     .filter((item) => item.value !== -1);
   const pending = answer.length - resolved.length;
-  const known = resolved.map((item) => `下标 ${item.index} 是 ${item.value}`).join("、");
+  const known = spokenList(resolved.map((item) => `下标 ${item.index} 是 ${item.value}`));
   return pending > 0 ? `${known}，其余 ${pending} 个还在等待` : known;
 }
 

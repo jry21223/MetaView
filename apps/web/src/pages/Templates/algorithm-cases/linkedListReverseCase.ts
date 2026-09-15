@@ -10,6 +10,7 @@ import {
   pointerMarkerId,
   rowLayout,
 } from "../../../features/playbook/engine/kits/algorithm/graphScene";
+import { SPOKEN_NULL, spokenList } from "../../../shared/lib/spokenText";
 import type { TemplatePreviewParams } from "../templatePreviewCases";
 import {
   defineAlgorithmCase,
@@ -197,11 +198,11 @@ function chain(values: readonly number[]): string {
 
 /** The same chain for narration: TTS cannot read arrows or the null glyph. */
 function chainSpoken(values: readonly number[]): string {
-  return values.length ? `${values.join("、")}，末尾指向空` : "空";
+  return values.length ? `${spokenList(values)}，末尾指向${SPOKEN_NULL}` : SPOKEN_NULL;
 }
 
 function spokenNode(value: number): string {
-  return value === 0 ? "空" : String(value);
+  return value === 0 ? SPOKEN_NULL : String(value);
 }
 
 function buildLinkedListReverseSteps(
