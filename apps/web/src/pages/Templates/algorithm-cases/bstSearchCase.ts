@@ -3,18 +3,13 @@ import type {
   GraphSceneNode,
   GraphSceneSnapshot,
   MetaStep,
-  PlaybookScript,
 } from "../../../features/playbook/engine/types";
-import type {
-  TemplatePreviewFollowups,
-  TemplatePreviewParams,
-} from "../templatePreviewCases";
+import type { TemplatePreviewParams } from "../templatePreviewCases";
 import {
-  algorithmQuestions,
-  algorithmStep,
-  buildAlgorithmPlaybook,
-  defineAlgorithmPreviewCase,
+  defineAlgorithmCase,
   finiteNumber,
+  type AlgorithmCaseFrame,
+  type AlgorithmStepDraft,
 } from "./helpers";
 
 /**
@@ -235,7 +230,7 @@ function pathSpoken(path: readonly BstComparison[]): string {
   return path.map((item) => item.node).join("、");
 }
 
-export function buildBstSearchScript(params: TemplatePreviewParams): PlaybookScript {
+function buildBstSearchSteps(params: TemplatePreviewParams): AlgorithmCaseFrame<GraphSceneSnapshot> {
   const target = resolveBstTarget(params);
   const root = BST_INSERT_ORDER[0];
   const trace = bstSearchTrace(BST_TREE, root, target);
@@ -244,8 +239,8 @@ export function buildBstSearchScript(params: TemplatePreviewParams): PlaybookScr
   const rightValues = subtreeValues(BST_TREE, rootNode.right);
   const visitedBefore = (index: number) => trace.path.slice(0, index).map((item) => item.node);
 
-  const steps: MetaStep[] = [
-    algorithmStep(0, {
+  const steps: Array<AlgorithmStepDraft<GraphSceneSnapshot>> = [
+    {
       step_id: "bst-intro",
       title: "一棵按插入顺序建成的二叉搜索树",
       voiceover_text: `这棵树按 ${BST_INSERT_ORDER.join("、")} 的顺序依次插入建成，根是 ${root}。任务是查找 ${target}：从根出发，每到一个节点只做一次比较，就能决定往左还是往右，不必看另一半子树。`,
@@ -259,8 +254,13 @@ export function buildBstSearchScript(params: TemplatePreviewParams): PlaybookScr
         "start at root",
         [0, 1],
       ),
-    }),
-    algorithmStep(1, {
+      questions: [
+        ["为什么根是 8？", `插入顺序的第一个值成为根；之后的每个值都从根出发按大小找到自己的空位。`],
+        ["同样这些数换个插入顺序，树会一样吗？", "不一样。BST 的形状由插入顺序决定，先插 1、3、4、6 会长出一条向右的链。"],
+        ["查找和有序数组的二分有什么关系？", "思想相同：每次比较排除一半；BST 把“中点”固化成了节点，插入删除也不必移动元素。"],
+      ],
+    },
+    {
       step_id: "bst-property",
       title: "左子树都更小，右子树都更大",
       voiceover_text: `二叉搜索树的性质：任意节点的左子树所有值都小于它，右子树所有值都大于它。以根 ${root} 为例，左子树是 ${leftValues.join("、")}，右子树是 ${rightValues.join("、")}。画面里节点的横坐标就是中序位置，所以性质在左右方向上直接可见。`,
@@ -276,7 +276,12 @@ export function buildBstSearchScript(params: TemplatePreviewParams): PlaybookScr
         "BST ordering invariant",
         [4],
       ),
-    }),
+      questions: [
+        ["性质只对根成立吗？", "对每个节点都成立：任意节点的左子树整体更小、右子树整体更大，递归定义。"],
+        ["画面的横坐标代表什么？", "节点按中序遍历的次序从左到右排列，所以对 BST 来说横坐标就是大小次序。"],
+        ["中序遍历会得到什么？", `恰好是升序序列：${subtreeValues(BST_TREE, root).join(", ")}。`],
+      ],
+    },
   ];
 
   trace.path.forEach((comparison, index) => {
@@ -291,7 +296,10 @@ export function buildBstSearchScript(params: TemplatePreviewParams): PlaybookScr
       : nextValue == null
         ? `来到节点 ${comparison.node}，目标 ${target} ${relation} ${comparison.node}，应该往${comparison.direction === "left" ? "左" : "右"}走，但那一侧是空的。第 ${index + 1} 次比较后可以确定：${target} 不在树中。`
         : `来到节点 ${comparison.node}，目标 ${target} ${relation} ${comparison.node}，所以整棵${comparison.direction === "left" ? "右" : "左"}子树都不用看，沿${comparison.direction === "left" ? "左" : "右"}孩子进入 ${nextValue}。这是第 ${index + 1} 次比较。`;
-    steps.push(algorithmStep(steps.length, {
+    const skipped = comparison.direction === "found"
+      ? []
+      : subtreeValues(BST_TREE, comparison.direction === "left" ? node.right : node.left);
+    steps.push({
       step_id: `bst-compare-${comparison.node}`,
       title,
       voiceover_text: narration,
@@ -313,13 +321,24 @@ export function buildBstSearchScript(params: TemplatePreviewParams): PlaybookScr
         comparison.direction === "found" ? "target found" : `go ${comparison.direction}`,
         comparison.direction === "found" ? [2, 3] : [3, 4],
       ),
-    }));
+      questions: [
+        ["这一步做了什么比较？", comparison.direction === "found"
+          ? `${target} 等于当前节点 ${comparison.node}，查找结束。`
+          : `${target} ${comparison.direction === "left" ? "<" : ">"} ${comparison.node}，于是往${comparison.direction === "left" ? "左" : "右"}走。`],
+        ["哪些节点因此不用再看？", comparison.direction === "found"
+          ? "已经命中，后面的节点都不需要再访问。"
+          : skipped.length
+            ? `${comparison.node} 的${comparison.direction === "left" ? "右" : "左"}子树 {${skipped.join(", ")}} 整体被排除。`
+            : `${comparison.node} 的另一侧没有节点，这一步没有额外排除。`],
+        ["到目前为止比较了几次？", `${index + 1} 次，路径是 ${pathText(trace.path.slice(0, index + 1))}。`],
+      ],
+    });
   });
 
   const pathNodes = trace.path.map((item) => item.node);
   const lastNode = pathNodes.at(-1)!;
   if (trace.found) {
-    steps.push(algorithmStep(steps.length, {
+    steps.push({
       step_id: "bst-result",
       title: `找到 ${target}，共比较 ${trace.path.length} 次`,
       voiceover_text: `目标 ${target} 就在路径末端。整条路径依次经过 ${pathSpoken(trace.path)}，只有 ${trace.path.length} 个节点，其余 ${BST_TREE.size - trace.path.length} 个节点一次都没有访问。`,
@@ -335,10 +354,15 @@ export function buildBstSearchScript(params: TemplatePreviewParams): PlaybookScr
         { result: `node(${target})`, comparisons: String(trace.path.length), skipped: String(BST_TREE.size - trace.path.length) },
         "return node",
       ),
-    }));
+      questions: [
+        ["最终结果是什么？", `找到 ${target}，路径 ${pathText(trace.path)}，共比较 ${trace.path.length} 次。`],
+        ["为什么其他节点没有被访问？", "每次比较都把另一侧子树整体排除，路径之外的节点根本没有机会进入循环。"],
+        ["如果要删除这个节点呢？", "先用同样的路径找到它；若有两个孩子，用右子树最小值（中序后继）替换后再删。"],
+      ],
+    });
   } else {
     const insert = trace.insertUnder!;
-    steps.push(algorithmStep(steps.length, {
+    steps.push({
       step_id: "bst-result",
       title: `${target} 不在树中，可作为 ${insert.parent} 的${insert.side === "left" ? "左" : "右"}孩子插入`,
       voiceover_text: `查找落空的位置恰好就是插入位置：把 ${target} 挂到 ${insert.parent} 的${insert.side === "left" ? "左" : "右"}侧空位上，树仍然满足左小右大。插入和查找走的是同一条路径，依次经过 ${pathSpoken(trace.path)}，代价相同。`,
@@ -354,11 +378,18 @@ export function buildBstSearchScript(params: TemplatePreviewParams): PlaybookScr
         { result: "null", insertUnder: String(insert.parent), side: insert.side, comparisons: String(trace.path.length) },
         "return null / insert here",
       ),
-    }));
+      questions: [
+        ["插入位置为什么就是查找落空的位置？", "查找沿大小关系一路向下，落空处正是唯一能保持左小右大的空位。"],
+        ["插入后树高会变吗？", BST_TREE.get(insert.parent)!.depth + 2 > Math.max(...[...BST_TREE.values()].map((n) => n.depth)) + 1
+          ? "会。新叶子挂在最深的位置之下，树高加一。"
+          : "不会。新叶子的深度没有超过当前树高。"],
+        ["插入的代价是多少？", `与查找相同：${trace.path.length} 次比较加一次指针赋值，O(h)。`],
+      ],
+    });
   }
 
   const height = Math.max(...[...BST_TREE.values()].map((node) => node.depth)) + 1;
-  steps.push(algorithmStep(steps.length, {
+  steps.push({
     step_id: "bst-complexity",
     title: "比较次数等于路径长度，最坏是树高",
     voiceover_text: `这次查找比较了 ${trace.path.length} 次，正好是路径上的节点数。任何一次查找都不会超过树高 ${height}，所以复杂度是 O(h)。树越平衡，h 越接近 log₂n；如果按有序序列插入，树会退化成链，h 变成 n——这正是平衡树要解决的问题。`,
@@ -374,12 +405,14 @@ export function buildBstSearchScript(params: TemplatePreviewParams): PlaybookScr
       "loop runs at most h times",
       [2, 4],
     ),
-  }));
+    questions: [
+      ["为什么是 O(h) 而不是 O(log n)？", "只有树足够平衡时 h 才约等于 log₂n；退化成链时 h = n，查找也退化为线性。"],
+      ["怎样保证 h 接近 log n？", "使用自平衡树（AVL、红黑树）在插入删除时旋转调整，或者随机化插入顺序。"],
+      ["这棵树的 9 个节点最多比较几次？", `树高为 ${Math.max(...[...BST_TREE.values()].map((n) => n.depth)) + 1}，任何查找最多比较这么多次。`],
+    ],
+  });
 
-  return buildAlgorithmPlaybook({
-    title: "二叉搜索树：一次比较砍掉一半",
-    summary: "在固定插入序列建成的 BST 上查找目标值：每个节点只比较一次决定方向，落空处就是插入位置，比较次数不超过树高。",
-    algorithmId: "bst_search_insert",
+  return {
     steps,
     controls: [{
       id: "target",
@@ -393,76 +426,10 @@ export function buildBstSearchScript(params: TemplatePreviewParams): PlaybookScr
       path: pathNodes.map(String),
       result: [trace.found ? "found" : "insert"],
     },
-  });
-}
-
-export function buildBstSearchFollowups(params: TemplatePreviewParams): TemplatePreviewFollowups {
-  const target = resolveBstTarget(params);
-  const root = BST_INSERT_ORDER[0];
-  const trace = bstSearchTrace(BST_TREE, root, target);
-
-  const followups: TemplatePreviewFollowups = {
-    "bst-intro": algorithmQuestions(
-      "bst-intro",
-      ["为什么根是 8？", `插入顺序的第一个值成为根；之后的每个值都从根出发按大小找到自己的空位。`],
-      ["同样这些数换个插入顺序，树会一样吗？", "不一样。BST 的形状由插入顺序决定，先插 1、3、4、6 会长出一条向右的链。"],
-      ["查找和有序数组的二分有什么关系？", "思想相同：每次比较排除一半；BST 把“中点”固化成了节点，插入删除也不必移动元素。"],
-    ),
-    "bst-property": algorithmQuestions(
-      "bst-property",
-      ["性质只对根成立吗？", "对每个节点都成立：任意节点的左子树整体更小、右子树整体更大，递归定义。"],
-      ["画面的横坐标代表什么？", "节点按中序遍历的次序从左到右排列，所以对 BST 来说横坐标就是大小次序。"],
-      ["中序遍历会得到什么？", `恰好是升序序列：${subtreeValues(BST_TREE, root).join(", ")}。`],
-    ),
   };
-
-  trace.path.forEach((comparison, index) => {
-    const stepId = `bst-compare-${comparison.node}`;
-    const node = BST_TREE.get(comparison.node)!;
-    const skipped = comparison.direction === "found"
-      ? []
-      : subtreeValues(BST_TREE, comparison.direction === "left" ? node.right : node.left);
-    followups[stepId] = algorithmQuestions(
-      stepId,
-      ["这一步做了什么比较？", comparison.direction === "found"
-        ? `${target} 等于当前节点 ${comparison.node}，查找结束。`
-        : `${target} ${comparison.direction === "left" ? "<" : ">"} ${comparison.node}，于是往${comparison.direction === "left" ? "左" : "右"}走。`],
-      ["哪些节点因此不用再看？", comparison.direction === "found"
-        ? "已经命中，后面的节点都不需要再访问。"
-        : skipped.length
-          ? `${comparison.node} 的${comparison.direction === "left" ? "右" : "左"}子树 {${skipped.join(", ")}} 整体被排除。`
-          : `${comparison.node} 的另一侧没有节点，这一步没有额外排除。`],
-      ["到目前为止比较了几次？", `${index + 1} 次，路径是 ${pathText(trace.path.slice(0, index + 1))}。`],
-    );
-  });
-
-  followups["bst-result"] = trace.found
-    ? algorithmQuestions(
-      "bst-result",
-      ["最终结果是什么？", `找到 ${target}，路径 ${pathText(trace.path)}，共比较 ${trace.path.length} 次。`],
-      ["为什么其他节点没有被访问？", "每次比较都把另一侧子树整体排除，路径之外的节点根本没有机会进入循环。"],
-      ["如果要删除这个节点呢？", "先用同样的路径找到它；若有两个孩子，用右子树最小值（中序后继）替换后再删。"],
-    )
-    : algorithmQuestions(
-      "bst-result",
-      ["插入位置为什么就是查找落空的位置？", "查找沿大小关系一路向下，落空处正是唯一能保持左小右大的空位。"],
-      ["插入后树高会变吗？", trace.insertUnder && BST_TREE.get(trace.insertUnder.parent)!.depth + 2 > Math.max(...[...BST_TREE.values()].map((n) => n.depth)) + 1
-        ? "会。新叶子挂在最深的位置之下，树高加一。"
-        : "不会。新叶子的深度没有超过当前树高。"],
-      ["插入的代价是多少？", `与查找相同：${trace.path.length} 次比较加一次指针赋值，O(h)。`],
-    );
-
-  followups["bst-complexity"] = algorithmQuestions(
-    "bst-complexity",
-    ["为什么是 O(h) 而不是 O(log n)？", "只有树足够平衡时 h 才约等于 log₂n；退化成链时 h = n，查找也退化为线性。"],
-    ["怎样保证 h 接近 log n？", "使用自平衡树（AVL、红黑树）在插入删除时旋转调整，或者随机化插入顺序。"],
-    ["这棵树的 9 个节点最多比较几次？", `树高为 ${Math.max(...[...BST_TREE.values()].map((n) => n.depth)) + 1}，任何查找最多比较这么多次。`],
-  );
-
-  return followups;
 }
 
-export const BST_SEARCH_PREVIEW_CASE = defineAlgorithmPreviewCase({
+export const BST_SEARCH_PREVIEW_CASE = defineAlgorithmCase({
   id: "bst-search",
   posterAlt: "二叉搜索树查找：从根出发的比较路径、被排除的子树与命中节点",
   posterStepIndex: 4,
@@ -479,6 +446,11 @@ export const BST_SEARCH_PREVIEW_CASE = defineAlgorithmPreviewCase({
       resetPlayback: true,
     },
   ],
-  buildScript: buildBstSearchScript,
-  buildFollowups: buildBstSearchFollowups,
+  title: "二叉搜索树：一次比较砍掉一半",
+  summary: "在固定插入序列建成的 BST 上查找目标值：每个节点只比较一次决定方向，落空处就是插入位置，比较次数不超过树高。",
+  algorithmId: "bst_search_insert",
+  buildSteps: buildBstSearchSteps,
 });
+
+export const buildBstSearchScript = BST_SEARCH_PREVIEW_CASE.buildScript;
+export const buildBstSearchFollowups = BST_SEARCH_PREVIEW_CASE.buildFollowups;

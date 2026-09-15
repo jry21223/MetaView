@@ -1,14 +1,13 @@
-import type { MetaStep, PlaybookScript } from "../../../features/playbook/engine/types";
 import type {
-  TemplatePreviewFollowups,
-  TemplatePreviewParams,
-} from "../templatePreviewCases";
+  AlgorithmBarsSnapshot,
+  MetaStep,
+} from "../../../features/playbook/engine/types";
+import type { TemplatePreviewParams } from "../templatePreviewCases";
 import {
-  algorithmQuestions,
-  algorithmStep,
-  buildAlgorithmPlaybook,
-  defineAlgorithmPreviewCase,
+  defineAlgorithmCase,
   stringParam,
+  type AlgorithmCaseFrame,
+  type AlgorithmStepDraft,
 } from "./helpers";
 
 /** Catalog sample array from the quick-sort template prompt. */
@@ -286,7 +285,7 @@ function barsSnapshot(args: {
   swap?: readonly number[];
   sorted?: readonly number[];
   pointers?: Record<string, number>;
-}): MetaStep["snapshot"] {
+}): AlgorithmBarsSnapshot {
   const pointers = sanitizePointers(args.pointers ?? {});
   const lo = pointers.lo;
   const hi = pointers.hi;
@@ -330,15 +329,6 @@ function codeOverlay(args: {
   };
 }
 
-interface ScriptStepDraft {
-  step_id: string;
-  title: string;
-  voiceover_text: string;
-  snapshot: MetaStep["snapshot"];
-  code_highlight: NonNullable<MetaStep["code_highlight"]>;
-  questions: Array<[string, string]>;
-}
-
 function pickTeachingEvents(trace: readonly QuickSortTraceEvent[]): QuickSortTraceEvent[] {
   const firstPartition = trace.filter((event) => event.partitionId === 0);
   const firstCompares = firstPartition.filter((event) => event.kind === "compare");
@@ -380,7 +370,10 @@ function pickTeachingEvents(trace: readonly QuickSortTraceEvent[]): QuickSortTra
   return selected;
 }
 
-function draftFromEvent(event: QuickSortTraceEvent, index: number): ScriptStepDraft {
+function draftFromEvent(
+  event: QuickSortTraceEvent,
+  index: number,
+): AlgorithmStepDraft<AlgorithmBarsSnapshot> {
   const sorted = event.sorted;
   const rangeText = `[${event.lo}, ${event.hi}]`;
 
@@ -619,38 +612,14 @@ function resolvePivotStrategy(params: TemplatePreviewParams): QuickSortPivotStra
   return stringParam(params, "pivotStrategy", PIVOT_STRATEGIES, "last") as QuickSortPivotStrategy;
 }
 
-export function buildQuickSortScript(params: TemplatePreviewParams = {}): PlaybookScript {
+function buildQuickSortSteps(params: TemplatePreviewParams): AlgorithmCaseFrame<AlgorithmBarsSnapshot> {
   const pivotStrategy = resolvePivotStrategy(params);
-  void pivotStrategy; // v1 only supports last/Lomuto; param kept for catalog controls
   const values = [...QUICK_SORT_VALUES];
   const trace = buildQuickSortTrace(values);
   const teachingEvents = pickTeachingEvents(trace);
-  const drafts = teachingEvents.map((event, index) => draftFromEvent(event, index));
 
-  // Ensure unique step ids even if picker collides on labels.
-  const usedIds = new Set<string>();
-  const steps: MetaStep[] = drafts.map((draft, index) => {
-    let stepId = draft.step_id;
-    if (usedIds.has(stepId)) {
-      stepId = `${draft.step_id}-n${index}`;
-    }
-    usedIds.add(stepId);
-    return algorithmStep(index, {
-      step_id: stepId,
-      title: draft.title,
-      voiceover_text: draft.voiceover_text,
-      snapshot: draft.snapshot,
-      code_highlight: draft.code_highlight,
-    });
-  });
-
-  return buildAlgorithmPlaybook({
-    domain: "algorithm",
-    title: "快速排序：Lomuto 分区与递归",
-    summary:
-      "用 last-element pivot 的 Lomuto 分区演示 [3,6,1,8,2,5,4,7]：选 pivot、扫描交换、pivot 归位，再递归左右区间。平均 O(n log n)，最坏 O(n²)。",
-    algorithmId: "quick_sort",
-    steps,
+  return {
+    steps: teachingEvents.map((event, index) => draftFromEvent(event, index)),
     // v1 has a single deterministic pivot strategy (Lomuto, last element),
     // so no user-facing control is exposed until a second real option exists.
     controls: [],
@@ -660,46 +629,22 @@ export function buildQuickSortScript(params: TemplatePreviewParams = {}): Playbo
       scene_blueprint: ["quick_sort"],
       teaching_phases: ["观察", "分区", "递归", "总结"],
     },
-  });
+  };
 }
 
-export function buildQuickSortFollowups(
-  params: TemplatePreviewParams = {},
-  script?: PlaybookScript,
-): TemplatePreviewFollowups {
-  const pivotStrategy = resolvePivotStrategy(params);
-  void pivotStrategy;
-  const resolved = script ?? buildQuickSortScript(params);
-  const values = [...QUICK_SORT_VALUES];
-  const trace = buildQuickSortTrace(values);
-  const teachingEvents = pickTeachingEvents(trace);
-  const drafts = teachingEvents.map((event, index) => draftFromEvent(event, index));
-
-  const followups: TemplatePreviewFollowups = {};
-  resolved.steps.forEach((step, index) => {
-    const draft = drafts[index];
-    const triples = draft?.questions ?? [
-      ["这一步在做什么？", step.voiceover_text],
-      ["pivot 策略是什么？", "Lomuto，pivot 取区间最后一个元素。"],
-      ["复杂度如何？", "平均 O(n log n)，最坏 O(n²)。"],
-    ];
-    const [first, second, third] = triples;
-    followups[step.step_id] = algorithmQuestions(
-      step.step_id,
-      first ?? ["这一步在做什么？", step.voiceover_text],
-      second ?? ["pivot 策略是什么？", "Lomuto，pivot 取区间最后一个元素。"],
-      third,
-    );
-  });
-  return followups;
-}
-
-export const QUICK_SORT_PREVIEW_CASE = defineAlgorithmPreviewCase({
+export const QUICK_SORT_PREVIEW_CASE = defineAlgorithmCase({
   id: "quick-sort",
   posterAlt: "快速排序 Lomuto 分区演示：pivot、扫描指针与归位",
   posterStepIndex: 2,
   defaultParams: {},
   controls: [],
-  buildScript: buildQuickSortScript,
-  buildFollowups: buildQuickSortFollowups,
+  domain: "algorithm",
+  title: "快速排序：Lomuto 分区与递归",
+  summary:
+    "用 last-element pivot 的 Lomuto 分区演示 [3,6,1,8,2,5,4,7]：选 pivot、扫描交换、pivot 归位，再递归左右区间。平均 O(n log n)，最坏 O(n²)。",
+  algorithmId: "quick_sort",
+  buildSteps: buildQuickSortSteps,
 });
+
+export const buildQuickSortScript = QUICK_SORT_PREVIEW_CASE.buildScript;
+export const buildQuickSortFollowups = QUICK_SORT_PREVIEW_CASE.buildFollowups;

@@ -1,14 +1,13 @@
-import type { MetaStep, PlaybookScript } from "../../../features/playbook/engine/types";
 import type {
-  TemplatePreviewFollowups,
-  TemplatePreviewParams,
-} from "../templatePreviewCases";
+  AlgorithmArraySnapshot,
+  MetaStep,
+} from "../../../features/playbook/engine/types";
+import type { TemplatePreviewParams } from "../templatePreviewCases";
 import {
-  algorithmQuestions,
-  algorithmStep,
-  buildAlgorithmPlaybook,
-  defineAlgorithmPreviewCase,
+  defineAlgorithmCase,
   finiteNumber,
+  type AlgorithmCaseFrame,
+  type AlgorithmStepDraft,
 } from "./helpers";
 
 /** Classic fixed-window demo array. */
@@ -107,7 +106,7 @@ function slidingSnapshot(args: {
   maxima?: readonly number[];
   enteringIndex?: number;
   leavingIndex?: number;
-}): MetaStep["snapshot"] {
+}): AlgorithmArraySnapshot {
   const values = [...SLIDING_WINDOW_VALUES];
   const { left, right, maxIndex } = args;
 
@@ -183,7 +182,7 @@ function codeHighlight(
   variables: Record<string, string>,
   operationLabel: string,
   activeLines: number[] = [activeLine],
-) {
+): NonNullable<MetaStep["code_highlight"]> {
   return {
     language: "typescript",
     lines: SLIDING_WINDOW_CODE,
@@ -194,15 +193,17 @@ function codeHighlight(
   };
 }
 
-export function buildSlidingWindowScript(params: TemplatePreviewParams): PlaybookScript {
+function buildSlidingWindowSteps(
+  params: TemplatePreviewParams,
+): AlgorithmCaseFrame<AlgorithmArraySnapshot> {
   const windowSize = resolveWindowSize(params);
   const values = [...SLIDING_WINDOW_VALUES];
   const frames = slidingWindowTrace(values, windowSize);
   const first = frames[0];
   const last = frames.at(-1);
 
-  const steps: MetaStep[] = [
-    algorithmStep(0, {
+  const steps: Array<AlgorithmStepDraft<AlgorithmArraySnapshot>> = [
+    {
       step_id: "sliding-intro",
       title: "固定窗口最大值",
       voiceover_text: `给定数组 [${values.join(", ")}]，窗口大小 k 等于 ${windowSize}。目标是求每个连续长度为 k 的子数组的最大值。`,
@@ -218,99 +219,149 @@ export function buildSlidingWindowScript(params: TemplatePreviewParams): Playboo
         { k: String(windowSize), n: String(values.length) },
         "define sliding window max",
       ),
-    }),
+      questions: [
+        [
+          "固定窗口最大值要求什么？",
+          `对长度为 ${values.length} 的数组，依次求每个长度为 ${windowSize} 的连续子数组的最大值。`,
+        ],
+        [
+          "为什么叫固定窗口？",
+          `窗口长度始终等于 k=${windowSize}，只是整体向右平移，不会伸缩。`,
+        ],
+        [
+          "一共会产出多少个答案？",
+          `答案个数等于 n-k+1，这里是 ${values.length - windowSize + 1} 个。`,
+        ],
+      ],
+    },
   ];
 
   if (first) {
-    steps.push(
-      algorithmStep(steps.length, {
-        step_id: "sliding-first-window",
-        title: "形成第一个窗口",
-        voiceover_text: `右指针推进到 ${first.right}，窗口覆盖 [${first.left}, ${first.right}]。单调队列前端给出当前最大值 ${first.maxValue}。`,
-        snapshot: slidingSnapshot({
-          left: first.left,
-          right: first.right,
-          maxIndex: first.maxIndex,
-          deque: first.deque,
-          maxima: first.maxima,
-        }),
-        code_highlight: codeHighlight(
-          7,
-          {
-            k: String(windowSize),
-            left: String(first.left),
-            right: String(first.right),
-            max: String(first.maxValue),
-            result: `[${first.maxima.join(", ")}]`,
-          },
-          "record first window max",
-          [4, 5, 6, 7],
-        ),
+    steps.push({
+      step_id: "sliding-first-window",
+      title: "形成第一个窗口",
+      voiceover_text: `右指针推进到 ${first.right}，窗口覆盖 [${first.left}, ${first.right}]。单调队列前端给出当前最大值 ${first.maxValue}。`,
+      snapshot: slidingSnapshot({
+        left: first.left,
+        right: first.right,
+        maxIndex: first.maxIndex,
+        deque: first.deque,
+        maxima: first.maxima,
       }),
-    );
+      code_highlight: codeHighlight(
+        7,
+        {
+          k: String(windowSize),
+          left: String(first.left),
+          right: String(first.right),
+          max: String(first.maxValue),
+          result: `[${first.maxima.join(", ")}]`,
+        },
+        "record first window max",
+        [4, 5, 6, 7],
+      ),
+      questions: [
+        [
+          "第一个窗口覆盖哪些下标？",
+          `覆盖闭区间 [${first.left}, ${first.right}]，对应元素 [${values
+            .slice(first.left, first.right + 1)
+            .join(", ")}]。`,
+        ],
+        [
+          "当前最大值为什么是这个数？",
+          `窗口内最大值是 ${first.maxValue}，对应下标 ${first.maxIndex}，由单调队列前端给出。`,
+        ],
+        [
+          "单调队列里存什么？",
+          "存下标，并保持对应值单调递减，这样队头始终是当前窗口最大值的候选。",
+        ],
+      ],
+    });
   }
 
   frames.slice(1).forEach((frame, index) => {
     const slideNumber = index + 1;
-    steps.push(
-      algorithmStep(steps.length, {
-        step_id: `sliding-slide-${slideNumber}`,
-        title: `窗口右移到 ${frame.right}`,
-        voiceover_text: `窗口整体右移一格，变为 [${frame.left}, ${frame.right}]。过期下标离开队列，新元素入队后，当前最大值是 ${frame.maxValue}。`,
-        snapshot: slidingSnapshot({
-          left: frame.left,
-          right: frame.right,
-          maxIndex: frame.maxIndex,
-          deque: frame.deque,
-          maxima: frame.maxima,
-          enteringIndex: frame.right,
-          leavingIndex: frames[index]?.left,
-        }),
-        code_highlight: codeHighlight(
-          7,
-          {
-            k: String(windowSize),
-            left: String(frame.left),
-            right: String(frame.right),
-            max: String(frame.maxValue),
-            result: `[${frame.maxima.join(", ")}]`,
-          },
-          "slide and record max",
-          [4, 5, 6, 7],
-        ),
+    const prev = frames[index]!;
+    steps.push({
+      step_id: `sliding-slide-${slideNumber}`,
+      title: `窗口右移到 ${frame.right}`,
+      voiceover_text: `窗口整体右移一格，变为 [${frame.left}, ${frame.right}]。过期下标离开队列，新元素入队后，当前最大值是 ${frame.maxValue}。`,
+      snapshot: slidingSnapshot({
+        left: frame.left,
+        right: frame.right,
+        maxIndex: frame.maxIndex,
+        deque: frame.deque,
+        maxima: frame.maxima,
+        enteringIndex: frame.right,
+        leavingIndex: prev.left,
       }),
-    );
+      code_highlight: codeHighlight(
+        7,
+        {
+          k: String(windowSize),
+          left: String(frame.left),
+          right: String(frame.right),
+          max: String(frame.maxValue),
+          result: `[${frame.maxima.join(", ")}]`,
+        },
+        "slide and record max",
+        [4, 5, 6, 7],
+      ),
+      questions: [
+        [
+          "这一步窗口如何变化？",
+          `左边界从 ${prev.left} 移到 ${frame.left}，右边界从 ${prev.right} 移到 ${frame.right}。`,
+        ],
+        [
+          "为什么要弹出过期下标？",
+          `任何小于等于 ${frame.right - windowSize} 的下标已经不在窗口内，必须从队头移除。`,
+        ],
+        [
+          "这一轮写入的最大值是？",
+          `写入 ${frame.maxValue}，目前结果序列是 [${frame.maxima.join(", ")}]。`,
+        ],
+      ],
+    });
   });
 
   const resultMaxima = last?.maxima ?? [];
-  steps.push(
-    algorithmStep(steps.length, {
-      step_id: "sliding-result",
-      title: "汇总全部窗口最大值",
-      voiceover_text: `所有窗口最大值依次是 [${resultMaxima.join(", ")}]。每个下标最多进出单调队列一次，因此整体时间复杂度是 O(n)。`,
-      snapshot: slidingSnapshot({
-        left: last?.left ?? null,
-        right: last?.right ?? null,
-        maxIndex: last?.maxIndex ?? null,
-        deque: last?.deque ?? [],
-        maxima: resultMaxima,
-      }),
-      code_highlight: codeHighlight(
-        9,
-        {
-          k: String(windowSize),
-          result: `[${resultMaxima.join(", ")}]`,
-          windows: String(frames.length),
-        },
-        "return result",
-      ),
+  steps.push({
+    step_id: "sliding-result",
+    title: "汇总全部窗口最大值",
+    voiceover_text: `所有窗口最大值依次是 [${resultMaxima.join(", ")}]。每个下标最多进出单调队列一次，因此整体时间复杂度是 O(n)。`,
+    snapshot: slidingSnapshot({
+      left: last?.left ?? null,
+      right: last?.right ?? null,
+      maxIndex: last?.maxIndex ?? null,
+      deque: last?.deque ?? [],
+      maxima: resultMaxima,
     }),
-  );
+    code_highlight: codeHighlight(
+      9,
+      {
+        k: String(windowSize),
+        result: `[${resultMaxima.join(", ")}]`,
+        windows: String(frames.length),
+      },
+      "return result",
+    ),
+    questions: [
+      [
+        "最终答案是什么？",
+        `窗口大小 ${windowSize} 时，最大值序列为 [${resultMaxima.join(", ")}]。`,
+      ],
+      [
+        "为什么时间复杂度是 O(n)？",
+        "每个下标最多入队一次、出队一次，摊还复杂度与数组长度成线性关系。",
+      ],
+      [
+        "如果改成暴力扫窗口会怎样？",
+        `每个窗口单独找最大值大约是 O(nk)，窗口很多时会明显慢于单调队列的 O(n)。`,
+      ],
+    ],
+  });
 
-  return buildAlgorithmPlaybook({
-    title: "滑动窗口最大值：固定窗口如何滑动",
-    summary: "用单调队列维护当前窗口候选最大值，解释固定窗口右移时如何在 O(n) 内得到每个窗口的答案。",
-    algorithmId: "sliding_window_maximum",
+  return {
     steps,
     controls: [
       {
@@ -325,98 +376,10 @@ export function buildSlidingWindowScript(params: TemplatePreviewParams): Playboo
       windowSize: [String(windowSize)],
       result: resultMaxima.map(String),
     },
-  });
-}
-
-export function buildSlidingWindowFollowups(
-  params: TemplatePreviewParams,
-): TemplatePreviewFollowups {
-  const windowSize = resolveWindowSize(params);
-  const values = [...SLIDING_WINDOW_VALUES];
-  const frames = slidingWindowTrace(values, windowSize);
-  const first = frames[0];
-  const last = frames.at(-1);
-  const resultMaxima = last?.maxima ?? [];
-
-  const followups: TemplatePreviewFollowups = {
-    "sliding-intro": algorithmQuestions(
-      "sliding-intro",
-      [
-        "固定窗口最大值要求什么？",
-        `对长度为 ${values.length} 的数组，依次求每个长度为 ${windowSize} 的连续子数组的最大值。`,
-      ],
-      [
-        "为什么叫固定窗口？",
-        `窗口长度始终等于 k=${windowSize}，只是整体向右平移，不会伸缩。`,
-      ],
-      [
-        "一共会产出多少个答案？",
-        `答案个数等于 n-k+1，这里是 ${values.length - windowSize + 1} 个。`,
-      ],
-    ),
   };
-
-  if (first) {
-    followups["sliding-first-window"] = algorithmQuestions(
-      "sliding-first-window",
-      [
-        "第一个窗口覆盖哪些下标？",
-        `覆盖闭区间 [${first.left}, ${first.right}]，对应元素 [${values
-          .slice(first.left, first.right + 1)
-          .join(", ")}]。`,
-      ],
-      [
-        "当前最大值为什么是这个数？",
-        `窗口内最大值是 ${first.maxValue}，对应下标 ${first.maxIndex}，由单调队列前端给出。`,
-      ],
-      [
-        "单调队列里存什么？",
-        "存下标，并保持对应值单调递减，这样队头始终是当前窗口最大值的候选。",
-      ],
-    );
-  }
-
-  frames.slice(1).forEach((frame, index) => {
-    const slideNumber = index + 1;
-    const stepId = `sliding-slide-${slideNumber}`;
-    const prev = frames[index]!;
-    followups[stepId] = algorithmQuestions(
-      stepId,
-      [
-        "这一步窗口如何变化？",
-        `左边界从 ${prev.left} 移到 ${frame.left}，右边界从 ${prev.right} 移到 ${frame.right}。`,
-      ],
-      [
-        "为什么要弹出过期下标？",
-        `任何小于等于 ${frame.right - windowSize} 的下标已经不在窗口内，必须从队头移除。`,
-      ],
-      [
-        "这一轮写入的最大值是？",
-        `写入 ${frame.maxValue}，目前结果序列是 [${frame.maxima.join(", ")}]。`,
-      ],
-    );
-  });
-
-  followups["sliding-result"] = algorithmQuestions(
-    "sliding-result",
-    [
-      "最终答案是什么？",
-      `窗口大小 ${windowSize} 时，最大值序列为 [${resultMaxima.join(", ")}]。`,
-    ],
-    [
-      "为什么时间复杂度是 O(n)？",
-      "每个下标最多入队一次、出队一次，摊还复杂度与数组长度成线性关系。",
-    ],
-    [
-      "如果改成暴力扫窗口会怎样？",
-      `每个窗口单独找最大值大约是 O(nk)，窗口很多时会明显慢于单调队列的 O(n)。`,
-    ],
-  );
-
-  return followups;
 }
 
-export const SLIDING_WINDOW_PREVIEW_CASE = defineAlgorithmPreviewCase({
+export const SLIDING_WINDOW_PREVIEW_CASE = defineAlgorithmCase({
   id: "sliding-window",
   posterAlt: "滑动窗口最大值：固定窗口在数组上右移并维护当前最大值",
   posterStepIndex: 4,
@@ -434,6 +397,11 @@ export const SLIDING_WINDOW_PREVIEW_CASE = defineAlgorithmPreviewCase({
       })),
     },
   ],
-  buildScript: buildSlidingWindowScript,
-  buildFollowups: buildSlidingWindowFollowups,
+  title: "滑动窗口最大值：固定窗口如何滑动",
+  summary: "用单调队列维护当前窗口候选最大值，解释固定窗口右移时如何在 O(n) 内得到每个窗口的答案。",
+  algorithmId: "sliding_window_maximum",
+  buildSteps: buildSlidingWindowSteps,
 });
+
+export const buildSlidingWindowScript = SLIDING_WINDOW_PREVIEW_CASE.buildScript;
+export const buildSlidingWindowFollowups = SLIDING_WINDOW_PREVIEW_CASE.buildFollowups;

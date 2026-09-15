@@ -1,18 +1,11 @@
-import type {
-  AlgorithmBarsSnapshot,
-  MetaStep,
-  PlaybookScript,
-} from "../../../features/playbook/engine/types";
-import type {
-  TemplatePreviewFollowups,
-  TemplatePreviewParams,
-} from "../templatePreviewCases";
+import type { AlgorithmBarsSnapshot } from "../../../features/playbook/engine/types";
+import type { TemplatePreviewParams } from "../templatePreviewCases";
 import {
-  algorithmQuestions,
-  algorithmStep,
-  buildAlgorithmPlaybook,
-  defineAlgorithmPreviewCase,
+  defineAlgorithmCase,
   stringParam,
+  type AlgorithmCaseFrame,
+  type AlgorithmQuestionSet,
+  type AlgorithmStepDraft,
 } from "./helpers";
 
 /** Catalog prompt array: 分治与合并全程可读，步数可控。 */
@@ -123,6 +116,8 @@ interface ScriptBeat {
   active_lines: number[];
   variables: Record<string, string>;
   operation_label: string;
+  /** Follow-ups written next to the beat they belong to. */
+  questions: AlgorithmQuestionSet;
 }
 
 /**
@@ -147,6 +142,11 @@ export function buildMergeSortBeats(): ScriptBeat[] {
       active_lines: [0],
       variables: { n: String(n), array: values.join(",") },
       operation_label: "observe input",
+      questions: [
+        ["归并排序的基本思路是什么？", "先把区间对半划分，递归排序两侧，再把两段有序序列合并。"],
+        ["为什么先观察整段数组？", "先建立问题规模与无序现状，后续每一步都对照同一数组下标。"],
+        ["长度为 1 时为什么不用再分？", "单元素天然有序，是递归的基本情况。"],
+      ],
     },
     {
       step_id: "merge-first-split",
@@ -161,6 +161,11 @@ export function buildMergeSortBeats(): ScriptBeat[] {
       active_lines: [2, 3, 4],
       variables: { left: "[5,2,8,1]", right: "[9,3,7,4]", mid: "4" },
       operation_label: "split full range",
+      questions: [
+        ["mid 为什么取 4？", "长度 8 时 mid = floor(8/2) = 4，左右各 4 个元素。"],
+        ["左右半区各自会做什么？", "各自递归执行同样的划分与合并，直到长度为 1。"],
+        ["划分本身会排序吗？", "不会。划分只缩小问题，真正产生有序性的是合并阶段。"],
+      ],
     },
     {
       step_id: "merge-left-depth",
@@ -175,6 +180,11 @@ export function buildMergeSortBeats(): ScriptBeat[] {
       active_lines: [1, 2, 3],
       variables: { range: "[0,4)", left: "[5,2]", right: "[8,1]" },
       operation_label: "split left half",
+      questions: [
+        ["左半区如何继续划分？", "把 [5,2,8,1] 再分成 [5,2] 与 [8,1]。"],
+        ["何时开始合并？", "当子区间已经是有序段（含单点）时，回溯过程中开始 merge。"],
+        ["指针 left/mid/right 表示什么？", "当前关注的子区间端点与中点，方便对照数组下标。"],
+      ],
     },
   ];
 
@@ -195,6 +205,11 @@ export function buildMergeSortBeats(): ScriptBeat[] {
       active_lines: [7, 9, 10],
       variables: { left: "5", right: "2", written: "2,5" },
       operation_label: "merge pair [0,2)",
+      questions: [
+        ["这一步写入顺序为什么是 2、5？", "2 小于 5，升序合并时较小头元素先进入结果。"],
+        ["合并后的不变量是什么？", "区间 [0,2) 被覆盖为有序，且包含原有全部元素。"],
+        ["sorted_indices 标出了什么？", "已经完成合并、在当前子问题中保持有序的下标。"],
+      ],
     });
   }
 
@@ -215,6 +230,11 @@ export function buildMergeSortBeats(): ScriptBeat[] {
       active_lines: [7, 9, 10],
       variables: { left: "8", right: "1", written: "1,8" },
       operation_label: "merge pair [2,4)",
+      questions: [
+        ["[8,1] 合并后为何是 [1,8]？", "1 更小先写，再写 8，得到升序局部结果。"],
+        ["左半区现在处于什么状态？", "两段长度为 2 的有序子数组，等待更高层合并。"],
+        ["active_indices 为何指向 2 和 3？", "本步正在处理并写回的是这两个位置。"],
+      ],
     });
   }
 
@@ -236,6 +256,11 @@ export function buildMergeSortBeats(): ScriptBeat[] {
       active_lines: [9, 10],
       variables: { leftHead: "2", rightHead: "1", outPrefix: midFrame.slice(0, 2).join(",") },
       operation_label: "merge left half progress",
+      questions: [
+        ["双指针如何选择下一个写入值？", "比较两段当前头元素，取较小者写入并推进该侧指针。"],
+        ["为什么可以相信合并结果正确？", "两侧输入已有序，头元素比较就能决定全局下一最小值。"],
+        ["这一步展示了什么教学重点？", "合并过程是线性扫描，而不是重新排序整个半区。"],
+      ],
     });
     values = frames.at(-1)!;
     beats.push({
@@ -251,6 +276,11 @@ export function buildMergeSortBeats(): ScriptBeat[] {
       active_lines: [5, 12],
       variables: { leftSorted: "1,2,5,8", rightPending: "9,3,7,4" },
       operation_label: "left half sorted",
+      questions: [
+        ["左半最终结果是什么？", "[1, 2, 5, 8]，覆盖原下标 [0,4)。"],
+        ["右半为什么还没动完？", "分治是先深入一侧或按递归回溯顺序处理，本示意先完成左半代表路径。"],
+        ["代码高亮为何落在 return merge？", "左半递归与合并已经得到返回值，准备处理右半。"],
+      ],
     });
   }
 
@@ -270,6 +300,11 @@ export function buildMergeSortBeats(): ScriptBeat[] {
       active_lines: [7, 10],
       variables: { pair: "9,3", written: "3,9" },
       operation_label: "merge pair [4,6)",
+      questions: [
+        ["右半第一步合并了谁？", "相邻单点 9 与 3，结果为 [3, 9]。"],
+        ["与左半的成对合并有何相同？", "都是把两个有序段（此处是单点）合成更长有序段。"],
+        ["为何左侧 sorted 仍然保留？", "已完成的左半有序段在后续步骤中继续标记，便于对照进度。"],
+      ],
     });
   }
 
@@ -288,6 +323,11 @@ export function buildMergeSortBeats(): ScriptBeat[] {
       active_lines: [7, 10],
       variables: { pair: "7,4", written: "4,7" },
       operation_label: "merge pair [6,8)",
+      questions: [
+        ["[7,4] 合并结果是什么？", "[4, 7]。"],
+        ["右半此时有几段有序子数组？", "两段：[3,9] 与 [4,7]，长度均为 2。"],
+        ["下一步要做什么？", "把这两段合并成完整右半区 [3,4,7,9]。"],
+      ],
     });
   }
 
@@ -312,6 +352,11 @@ export function buildMergeSortBeats(): ScriptBeat[] {
         outPrefix: midFrame.slice(4, 4 + written).join(","),
       },
       operation_label: "merge right half progress",
+      questions: [
+        ["合并右半时扫描次数与区间长度关系？", "每个元素最多被读写常数次，总工作量与区间长度成正比。"],
+        ["active 下标在强调什么？", "当前正在比较或刚写入的位置，帮助学生跟踪双指针。"],
+        ["能否打乱左半已排序结果？", "不能。合并只写回当前目标区间，左半已完成段保持不变。"],
+      ],
     });
     values = frames.at(-1)!;
     beats.push({
@@ -327,6 +372,11 @@ export function buildMergeSortBeats(): ScriptBeat[] {
       active_lines: [4, 5],
       variables: { leftSorted: "1,2,5,8", rightSorted: "3,4,7,9" },
       operation_label: "right half sorted",
+      questions: [
+        ["右半最终结果是什么？", "[3, 4, 7, 9]。"],
+        ["为何现在可以做全局合并？", "因为左右两大段都已各自有序，满足 merge 的前置条件。"],
+        ["若缺了右半排序会怎样？", "最终 merge 不能保证正确的全局升序。"],
+      ],
     });
   }
 
@@ -351,6 +401,11 @@ export function buildMergeSortBeats(): ScriptBeat[] {
         outPrefix: early.slice(0, 3).join(","),
       },
       operation_label: "final merge progress",
+      questions: [
+        ["最终合并比较的是哪两个头？", "左段头 1 与右段头 3，先写入 1。"],
+        ["sorted 前缀扩大说明什么？", "已经确定最终位置的元素在增多，结果逐步稳定。"],
+        ["这一层合并的代价大约是多少？", "大约 O(n)，因为要扫描全部 n 个元素一次。"],
+      ],
     });
 
     const late = frames[Math.min(5, frames.length - 1)];
@@ -370,6 +425,11 @@ export function buildMergeSortBeats(): ScriptBeat[] {
         outPrefix: late.slice(0, 6).join(","),
       },
       operation_label: "final merge tail",
+      questions: [
+        ["一侧耗尽后如何处理？", "把另一侧剩余元素按原顺序追加到结果。"],
+        ["为什么剩余段可以直接接上？", "剩余段内部已有序，且不小于已写入的所有值。"],
+        ["收尾阶段还需要比较吗？", "不需要，直接拷贝剩余元素即可。"],
+      ],
     });
 
     values = frames.at(-1)!;
@@ -388,6 +448,11 @@ export function buildMergeSortBeats(): ScriptBeat[] {
     active_lines: [5, 12],
     variables: { result: values.join(","), n: String(n) },
     operation_label: "sorted result",
+    questions: [
+      ["最终数组是什么？", "[1, 2, 3, 4, 5, 7, 8, 9]。"],
+      ["归并排序正确性依赖什么？", "递归子问题正确，加上 merge 能把两段有序序列合成更长有序序列。"],
+      ["与原地交换类排序相比特点是什么？", "主要靠额外缓冲做稳定合并，而不是元素两两交换。"],
+    ],
   });
 
   beats.push({
@@ -407,13 +472,18 @@ export function buildMergeSortBeats(): ScriptBeat[] {
       levels: String(Math.log2(n)),
     },
     operation_label: "complexity summary",
+    questions: [
+      ["为什么时间是 O(n log n)？", "约 log n 层划分，每层合并总量为 O(n)，相乘得到 O(n log n)。"],
+      ["空间为什么是 O(n)？", "合并时通常需要与区间等长的辅助数组存放写回结果。"],
+      ["层数从哪里来？", "每次对半划分，深度约为 log2(n)；本例 n=8，约 3 层。"],
+    ],
   });
 
   return beats;
 }
 
-function beatToStep(index: number, beat: ScriptBeat): MetaStep {
-  return algorithmStep(index, {
+function beatToDraft(beat: ScriptBeat): AlgorithmStepDraft<AlgorithmBarsSnapshot> {
+  return {
     step_id: beat.step_id,
     title: beat.title,
     voiceover_text: beat.voiceover_text,
@@ -430,21 +500,14 @@ function beatToStep(index: number, beat: ScriptBeat): MetaStep {
       variables: beat.variables,
       operation_label: beat.operation_label,
     },
-  });
+    questions: beat.questions,
+  };
 }
 
-export function buildMergeSortScript(params: TemplatePreviewParams): PlaybookScript {
+function buildMergeSortSteps(params: TemplatePreviewParams): AlgorithmCaseFrame<AlgorithmBarsSnapshot> {
   const order = resolveMergeSortOrder(params);
-  const beats = buildMergeSortBeats();
-  const steps = beats.map((beat, index) => beatToStep(index, beat));
-
-  return buildAlgorithmPlaybook({
-    domain: "algorithm",
-    title: "归并排序：分治与合并",
-    summary:
-      "用固定数组展示划分、两两合并、半区合并与最终归并，强调合并后子区间保持有序。",
-    algorithmId: "merge_sort",
-    steps,
+  return {
+    steps: buildMergeSortBeats().map(beatToDraft),
     // v1 only demonstrates the ascending merge, so no user-facing control is
     // exposed until a real descending variant exists.
     controls: [],
@@ -454,127 +517,22 @@ export function buildMergeSortScript(params: TemplatePreviewParams): PlaybookScr
       scene_blueprint: ["merge_sort"],
       teaching_phases: ["观察", "划分", "合并", "总结"],
     },
-  });
-}
-
-export function buildMergeSortFollowups(
-  _params: TemplatePreviewParams,
-  script: PlaybookScript,
-): TemplatePreviewFollowups {
-  const followups: TemplatePreviewFollowups = {
-    "merge-intro": algorithmQuestions(
-      "merge-intro",
-      ["归并排序的基本思路是什么？", "先把区间对半划分，递归排序两侧，再把两段有序序列合并。"],
-      ["为什么先观察整段数组？", "先建立问题规模与无序现状，后续每一步都对照同一数组下标。"],
-      ["长度为 1 时为什么不用再分？", "单元素天然有序，是递归的基本情况。"],
-    ),
-    "merge-first-split": algorithmQuestions(
-      "merge-first-split",
-      ["mid 为什么取 4？", "长度 8 时 mid = floor(8/2) = 4，左右各 4 个元素。"],
-      ["左右半区各自会做什么？", "各自递归执行同样的划分与合并，直到长度为 1。"],
-      ["划分本身会排序吗？", "不会。划分只缩小问题，真正产生有序性的是合并阶段。"],
-    ),
-    "merge-left-depth": algorithmQuestions(
-      "merge-left-depth",
-      ["左半区如何继续划分？", "把 [5,2,8,1] 再分成 [5,2] 与 [8,1]。"],
-      ["何时开始合并？", "当子区间已经是有序段（含单点）时，回溯过程中开始 merge。"],
-      ["指针 left/mid/right 表示什么？", "当前关注的子区间端点与中点，方便对照数组下标。"],
-    ),
-    "merge-pair-02": algorithmQuestions(
-      "merge-pair-02",
-      ["这一步写入顺序为什么是 2、5？", "2 小于 5，升序合并时较小头元素先进入结果。"],
-      ["合并后的不变量是什么？", "区间 [0,2) 被覆盖为有序，且包含原有全部元素。"],
-      ["sorted_indices 标出了什么？", "已经完成合并、在当前子问题中保持有序的下标。"],
-    ),
-    "merge-pair-18": algorithmQuestions(
-      "merge-pair-18",
-      ["[8,1] 合并后为何是 [1,8]？", "1 更小先写，再写 8，得到升序局部结果。"],
-      ["左半区现在处于什么状态？", "两段长度为 2 的有序子数组，等待更高层合并。"],
-      ["active_indices 为何指向 2 和 3？", "本步正在处理并写回的是这两个位置。"],
-    ),
-    "merge-left-progress": algorithmQuestions(
-      "merge-left-progress",
-      ["双指针如何选择下一个写入值？", "比较两段当前头元素，取较小者写入并推进该侧指针。"],
-      ["为什么可以相信合并结果正确？", "两侧输入已有序，头元素比较就能决定全局下一最小值。"],
-      ["这一步展示了什么教学重点？", "合并过程是线性扫描，而不是重新排序整个半区。"],
-    ),
-    "merge-left-done": algorithmQuestions(
-      "merge-left-done",
-      ["左半最终结果是什么？", "[1, 2, 5, 8]，覆盖原下标 [0,4)。"],
-      ["右半为什么还没动完？", "分治是先深入一侧或按递归回溯顺序处理，本示意先完成左半代表路径。"],
-      ["代码高亮为何落在 return merge？", "左半递归与合并已经得到返回值，准备处理右半。"],
-    ),
-    "merge-pair-93": algorithmQuestions(
-      "merge-pair-93",
-      ["右半第一步合并了谁？", "相邻单点 9 与 3，结果为 [3, 9]。"],
-      ["与左半的成对合并有何相同？", "都是把两个有序段（此处是单点）合成更长有序段。"],
-      ["为何左侧 sorted 仍然保留？", "已完成的左半有序段在后续步骤中继续标记，便于对照进度。"],
-    ),
-    "merge-pair-74": algorithmQuestions(
-      "merge-pair-74",
-      ["[7,4] 合并结果是什么？", "[4, 7]。"],
-      ["右半此时有几段有序子数组？", "两段：[3,9] 与 [4,7]，长度均为 2。"],
-      ["下一步要做什么？", "把这两段合并成完整右半区 [3,4,7,9]。"],
-    ),
-    "merge-right-progress": algorithmQuestions(
-      "merge-right-progress",
-      ["合并右半时扫描次数与区间长度关系？", "每个元素最多被读写常数次，总工作量与区间长度成正比。"],
-      ["active 下标在强调什么？", "当前正在比较或刚写入的位置，帮助学生跟踪双指针。"],
-      ["能否打乱左半已排序结果？", "不能。合并只写回当前目标区间，左半已完成段保持不变。"],
-    ),
-    "merge-right-done": algorithmQuestions(
-      "merge-right-done",
-      ["右半最终结果是什么？", "[3, 4, 7, 9]。"],
-      ["为何现在可以做全局合并？", "因为左右两大段都已各自有序，满足 merge 的前置条件。"],
-      ["若缺了右半排序会怎样？", "最终 merge 不能保证正确的全局升序。"],
-    ),
-    "merge-final-progress": algorithmQuestions(
-      "merge-final-progress",
-      ["最终合并比较的是哪两个头？", "左段头 1 与右段头 3，先写入 1。"],
-      ["sorted 前缀扩大说明什么？", "已经确定最终位置的元素在增多，结果逐步稳定。"],
-      ["这一层合并的代价大约是多少？", "大约 O(n)，因为要扫描全部 n 个元素一次。"],
-    ),
-    "merge-final-tail": algorithmQuestions(
-      "merge-final-tail",
-      ["一侧耗尽后如何处理？", "把另一侧剩余元素按原顺序追加到结果。"],
-      ["为什么剩余段可以直接接上？", "剩余段内部已有序，且不小于已写入的所有值。"],
-      ["收尾阶段还需要比较吗？", "不需要，直接拷贝剩余元素即可。"],
-    ),
-    "merge-result": algorithmQuestions(
-      "merge-result",
-      ["最终数组是什么？", "[1, 2, 3, 4, 5, 7, 8, 9]。"],
-      ["归并排序正确性依赖什么？", "递归子问题正确，加上 merge 能把两段有序序列合成更长有序序列。"],
-      ["与原地交换类排序相比特点是什么？", "主要靠额外缓冲做稳定合并，而不是元素两两交换。"],
-    ),
-    "merge-complexity": algorithmQuestions(
-      "merge-complexity",
-      ["为什么时间是 O(n log n)？", "约 log n 层划分，每层合并总量为 O(n)，相乘得到 O(n log n)。"],
-      ["空间为什么是 O(n)？", "合并时通常需要与区间等长的辅助数组存放写回结果。"],
-      ["层数从哪里来？", "每次对半划分，深度约为 log2(n)；本例 n=8，约 3 层。"],
-    ),
   };
-
-  // 保证 script 中每个 step 都有 follow-up（防止漏配）
-  for (const step of script.steps) {
-    if (!followups[step.step_id]) {
-      followups[step.step_id] = algorithmQuestions(
-        step.step_id,
-        ["这一步在做什么？", step.voiceover_text],
-        ["和前后步骤如何衔接？", "延续分治或合并的同一条执行路径。"],
-        ["需要记住的不变量是什么？", "已合并子区间保持有序。"],
-      );
-    }
-  }
-
-  return followups;
 }
 
-export const MERGE_SORT_PREVIEW_CASE = defineAlgorithmPreviewCase({
+export const MERGE_SORT_PREVIEW_CASE = defineAlgorithmCase({
   id: "merge-sort",
   posterAlt: "归并排序分治与合并过程示意",
   posterStepIndex: 5,
   defaultParams: {},
   controls: [],
-  buildScript: buildMergeSortScript,
-  buildFollowups: buildMergeSortFollowups,
+  domain: "algorithm",
+  title: "归并排序：分治与合并",
+  summary:
+    "用固定数组展示划分、两两合并、半区合并与最终归并，强调合并后子区间保持有序。",
+  algorithmId: "merge_sort",
+  buildSteps: buildMergeSortSteps,
 });
+
+export const buildMergeSortScript = MERGE_SORT_PREVIEW_CASE.buildScript;
+export const buildMergeSortFollowups = MERGE_SORT_PREVIEW_CASE.buildFollowups;

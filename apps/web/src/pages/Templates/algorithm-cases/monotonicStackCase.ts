@@ -1,14 +1,13 @@
-import type { MetaStep, PlaybookScript } from "../../../features/playbook/engine/types";
 import type {
-  TemplatePreviewFollowups,
-  TemplatePreviewParams,
-} from "../templatePreviewCases";
+  AlgorithmBarsSnapshot,
+  MetaStep,
+} from "../../../features/playbook/engine/types";
+import type { TemplatePreviewParams } from "../templatePreviewCases";
 import {
-  algorithmQuestions,
-  algorithmStep,
-  buildAlgorithmPlaybook,
-  defineAlgorithmPreviewCase,
+  defineAlgorithmCase,
   stringParam,
+  type AlgorithmCaseFrame,
+  type AlgorithmStepDraft,
 } from "./helpers";
 
 /**
@@ -91,7 +90,7 @@ function monotonicSnapshot(args: {
   entering?: number | null;
   /** Result step: unresolved answers are final and read as -1, not "?". */
   final?: boolean;
-}): MetaStep["snapshot"] {
+}): AlgorithmBarsSnapshot {
   const elementStates: Record<number, Array<"entering">> = {};
   if (args.entering != null) elementStates[args.entering] = ["entering"];
   // A bar whose answer is known is settled: it keeps the ✓ mark from here on,
@@ -176,14 +175,16 @@ function stackText(stack: readonly number[], values: readonly number[]): string 
   return stack.length ? `[${stack.map((index) => values[index]).join(", ")}]` : "[]";
 }
 
-export function buildMonotonicStackScript(params: TemplatePreviewParams): PlaybookScript {
+function buildMonotonicStackSteps(
+  params: TemplatePreviewParams,
+): AlgorithmCaseFrame<AlgorithmBarsSnapshot> {
   const presetId = resolveMonotonicPreset(params);
   const values = monotonicValues(presetId);
   const frames = monotonicStackTrace(values);
   const initialAnswer = values.map(() => -1);
 
-  const steps: MetaStep[] = [
-    algorithmStep(0, {
+  const steps: Array<AlgorithmStepDraft<AlgorithmBarsSnapshot>> = [
+    {
       step_id: "monotonic-intro",
       title: "为每个元素找右侧第一个更大值",
       voiceover_text: `给定数组 [${values.join(", ")}]，要为每个元素找到它右边第一个比它大的数，找不到记为 -1。暴力做法对每个元素向右扫描，是 O(n²)。单调栈的思路是：把“还在等答案”的下标存进栈，栈里对应的值保持递减。`,
@@ -199,7 +200,12 @@ export function buildMonotonicStackScript(params: TemplatePreviewParams): Playbo
         "initialize answer and stack",
         [1, 2],
       ),
-    }),
+      questions: [
+        ["暴力解法慢在哪里？", "每个元素都要向右扫描到第一个更大值，最坏每次扫到结尾，总共 O(n²)。"],
+        ["栈里存的是下标还是值？", "存下标。答案要按下标写回，同时通过 nums[下标] 随时能查到值。"],
+        ["为什么栈内的值会保持递减？", "只要新元素比栈顶大，栈顶就会被弹出；留下来的必然都不小于新元素，于是自底向上递减。"],
+      ],
+    },
   ];
 
   frames.forEach((frame) => {
@@ -207,7 +213,7 @@ export function buildMonotonicStackScript(params: TemplatePreviewParams): Playbo
     const stackBefore = previous?.stack ?? [];
     const stepId = `monotonic-visit-${frame.index}`;
     if (frame.popped.length === 0) {
-      steps.push(algorithmStep(steps.length, {
+      steps.push({
         step_id: stepId,
         title: `读入 ${frame.value}，直接入栈`,
         voiceover_text: stackBefore.length === 0
@@ -231,11 +237,16 @@ export function buildMonotonicStackScript(params: TemplatePreviewParams): Playbo
           "push index",
           [4, 7],
         ),
-      }));
+        questions: [
+          ["为什么这一步没有弹出？", frame.index === 0 ? "栈是空的，没有元素在等待答案。" : `栈顶的值 ${values[frame.stack.at(-2)!]} 不小于 ${frame.value}，${frame.value} 不是它的“更大值”。`],
+          ["它自己的答案什么时候确定？", `要等右边第一个比 ${frame.value} 大的元素出现，把它从栈里弹出时才写答案。`],
+          ["此时栈里的值是什么？", `${stackText(frame.stack, values)}，从底到顶递减。`],
+        ],
+      });
       return;
     }
     const poppedValues = frame.popped.map((index) => values[index]);
-    steps.push(algorithmStep(steps.length, {
+    steps.push({
       step_id: stepId,
       title: `读入 ${frame.value}，弹出 ${frame.popped.length} 个更小的元素`,
       voiceover_text: `下标 ${frame.index} 的值是 ${frame.value}，比栈顶的 ${poppedValues[0]} 大。栈顶等的“右侧第一个更大值”就是它：弹出并写下答案。${frame.popped.length > 1 ? `新的栈顶 ${poppedValues.slice(1).join("、")} 也比 ${frame.value} 小，同样依次弹出记答案。` : ""}直到栈顶不再小于 ${frame.value}，再把下标 ${frame.index} 压入。目前已确定的答案：${answerSpoken(frame.answer)}。`,
@@ -259,13 +270,18 @@ export function buildMonotonicStackScript(params: TemplatePreviewParams): Playbo
         "pop smaller, record answer, push",
         [4, 5, 7],
       ),
-    }));
+      questions: [
+        ["为什么弹出的元素答案就是当前值？", `它们在栈里等的是右侧第一个更大值；从它们入栈到现在没有更大的数出现过，${frame.value} 是第一个。`],
+        ["为什么可以连续弹出多个？", "栈内值递减，栈顶最小；只要栈顶小于当前值就弹，直到遇到不小于当前值的元素为止。"],
+        ["这一步之后答案数组是什么？", answerText(frame.answer)],
+      ],
+    });
   });
 
   const last = frames.at(-1);
   const finalAnswer = last?.answer ?? initialAnswer;
   const unresolved = last?.stack ?? [];
-  steps.push(algorithmStep(steps.length, {
+  steps.push({
     step_id: "monotonic-result",
     title: "扫描结束，栈里的元素答案为 -1",
     voiceover_text: `数组扫描完毕。${unresolved.length ? `栈里还剩 ${stackText(unresolved, values)}，它们右边再没有更大的数，答案保持 -1。` : "栈已清空，每个元素都找到了答案。"}最终答案是 [${finalAnswer.join(", ")}]。每个下标只入栈一次、出栈最多一次，整体是 O(n)，而不是暴力的 O(n²)。`,
@@ -286,12 +302,14 @@ export function buildMonotonicStackScript(params: TemplatePreviewParams): Playbo
       },
       "return answer",
     ),
-  }));
+    questions: [
+      ["最终答案是什么？", `[${(last?.answer ?? []).join(", ")}]`],
+      ["为什么留在栈里的元素是 -1？", "扫描结束都没有元素把它们弹出，说明右边不存在更大的数。"],
+      ["为什么总时间是 O(n)？", "每个下标恰好入栈一次、出栈最多一次，两项操作合计不超过 2n 次。"],
+    ],
+  });
 
-  return buildAlgorithmPlaybook({
-    title: "单调栈：下一个更大元素",
-    summary: "用一条值递减的下标栈保存“还在等答案”的元素，解释为什么每个元素只需入栈出栈各一次就能在 O(n) 内找到右侧第一个更大值。",
-    algorithmId: "monotonic_stack_next_greater",
+  return {
     steps,
     controls: [{
       id: "preset",
@@ -304,54 +322,10 @@ export function buildMonotonicStackScript(params: TemplatePreviewParams): Playbo
       preset: [presetId],
       result: finalAnswer.map(String),
     },
-  });
-}
-
-export function buildMonotonicStackFollowups(params: TemplatePreviewParams): TemplatePreviewFollowups {
-  const presetId = resolveMonotonicPreset(params);
-  const values = monotonicValues(presetId);
-  const frames = monotonicStackTrace(values);
-  const last = frames.at(-1);
-
-  const followups: TemplatePreviewFollowups = {
-    "monotonic-intro": algorithmQuestions(
-      "monotonic-intro",
-      ["暴力解法慢在哪里？", "每个元素都要向右扫描到第一个更大值，最坏每次扫到结尾，总共 O(n²)。"],
-      ["栈里存的是下标还是值？", "存下标。答案要按下标写回，同时通过 nums[下标] 随时能查到值。"],
-      ["为什么栈内的值会保持递减？", "只要新元素比栈顶大，栈顶就会被弹出；留下来的必然都不小于新元素，于是自底向上递减。"],
-    ),
   };
-
-  frames.forEach((frame) => {
-    const stepId = `monotonic-visit-${frame.index}`;
-    if (frame.popped.length === 0) {
-      followups[stepId] = algorithmQuestions(
-        stepId,
-        ["为什么这一步没有弹出？", frame.index === 0 ? "栈是空的，没有元素在等待答案。" : `栈顶的值 ${values[frame.stack.at(-2)!]} 不小于 ${frame.value}，${frame.value} 不是它的“更大值”。`],
-        ["它自己的答案什么时候确定？", `要等右边第一个比 ${frame.value} 大的元素出现，把它从栈里弹出时才写答案。`],
-        ["此时栈里的值是什么？", `${stackText(frame.stack, values)}，从底到顶递减。`],
-      );
-      return;
-    }
-    followups[stepId] = algorithmQuestions(
-      stepId,
-      ["为什么弹出的元素答案就是当前值？", `它们在栈里等的是右侧第一个更大值；从它们入栈到现在没有更大的数出现过，${frame.value} 是第一个。`],
-      ["为什么可以连续弹出多个？", "栈内值递减，栈顶最小；只要栈顶小于当前值就弹，直到遇到不小于当前值的元素为止。"],
-      ["这一步之后答案数组是什么？", answerText(frame.answer)],
-    );
-  });
-
-  followups["monotonic-result"] = algorithmQuestions(
-    "monotonic-result",
-    ["最终答案是什么？", `[${(last?.answer ?? []).join(", ")}]`],
-    ["为什么留在栈里的元素是 -1？", "扫描结束都没有元素把它们弹出，说明右边不存在更大的数。"],
-    ["为什么总时间是 O(n)？", "每个下标恰好入栈一次、出栈最多一次，两项操作合计不超过 2n 次。"],
-  );
-
-  return followups;
 }
 
-export const MONOTONIC_STACK_PREVIEW_CASE = defineAlgorithmPreviewCase({
+export const MONOTONIC_STACK_PREVIEW_CASE = defineAlgorithmCase({
   id: "monotonic-stack",
   posterAlt: "单调栈求下一个更大元素：柱状数组、递减栈轨道与逐格填入的答案",
   posterStepIndex: 3,
@@ -369,6 +343,11 @@ export const MONOTONIC_STACK_PREVIEW_CASE = defineAlgorithmPreviewCase({
       })),
     },
   ],
-  buildScript: buildMonotonicStackScript,
-  buildFollowups: buildMonotonicStackFollowups,
+  title: "单调栈：下一个更大元素",
+  summary: "用一条值递减的下标栈保存“还在等答案”的元素，解释为什么每个元素只需入栈出栈各一次就能在 O(n) 内找到右侧第一个更大值。",
+  algorithmId: "monotonic_stack_next_greater",
+  buildSteps: buildMonotonicStackSteps,
 });
+
+export const buildMonotonicStackScript = MONOTONIC_STACK_PREVIEW_CASE.buildScript;
+export const buildMonotonicStackFollowups = MONOTONIC_STACK_PREVIEW_CASE.buildFollowups;

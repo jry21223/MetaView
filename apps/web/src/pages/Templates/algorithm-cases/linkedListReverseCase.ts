@@ -3,18 +3,13 @@ import type {
   GraphSceneNode,
   GraphSceneSnapshot,
   MetaStep,
-  PlaybookScript,
 } from "../../../features/playbook/engine/types";
-import type {
-  TemplatePreviewFollowups,
-  TemplatePreviewParams,
-} from "../templatePreviewCases";
+import type { TemplatePreviewParams } from "../templatePreviewCases";
 import {
-  algorithmQuestions,
-  algorithmStep,
-  buildAlgorithmPlaybook,
-  defineAlgorithmPreviewCase,
+  defineAlgorithmCase,
   stringParam,
+  type AlgorithmCaseFrame,
+  type AlgorithmStepDraft,
 } from "./helpers";
 
 /**
@@ -224,13 +219,15 @@ function spokenNode(value: number): string {
   return value === 0 ? "空" : String(value);
 }
 
-export function buildLinkedListReverseScript(params: TemplatePreviewParams): PlaybookScript {
+function buildLinkedListReverseSteps(
+  params: TemplatePreviewParams,
+): AlgorithmCaseFrame<GraphSceneSnapshot> {
   const length = resolveLinkedListLength(params);
   const frames = linkedListReverseTrace(length);
   const original = Array.from({ length }, (_, index) => index + 1);
 
-  const steps: MetaStep[] = [
-    algorithmStep(0, {
+  const steps: Array<AlgorithmStepDraft<GraphSceneSnapshot>> = [
+    {
       step_id: "list-intro",
       title: "三个指针：prev、curr、next",
       voiceover_text: `链表依次是 ${chainSpoken(original)}，每个节点只知道自己的后继。反转的目标是让每个 next 指针掉头。迭代法用三个指针：prev 指向已经反转好的部分（开始时为空），curr 指向正在处理的节点，next 提前保存后继，否则指针一掉头就找不到后面的节点了。`,
@@ -248,7 +245,12 @@ export function buildLinkedListReverseScript(params: TemplatePreviewParams): Pla
         "initialize prev and curr",
         [1, 2],
       ),
-    }),
+      questions: [
+        ["为什么需要 next 这个指针？", "curr.next 一旦改成指向 prev，原来的后继就丢了；先保存 next 才能继续向后走。"],
+        ["prev 一开始为什么是空？", "第一个节点反转后要成为尾节点，尾节点的 next 必须是 ∅，所以 prev 从 ∅ 开始。"],
+        ["能不能用递归？", "可以：先反转 head.next 之后的部分，再把 head.next.next 指回 head；但递归深度是 O(n)。"],
+      ],
+    },
   ];
 
   frames.forEach((frame) => {
@@ -256,7 +258,7 @@ export function buildLinkedListReverseScript(params: TemplatePreviewParams): Pla
     const nextLabel = nodeLabel(frame.next);
     const prevSpoken = spokenNode(frame.prevBefore);
     const nextSpoken = spokenNode(frame.next);
-    steps.push(algorithmStep(steps.length, {
+    steps.push({
       step_id: `list-flip-${frame.curr}`,
       title: `翻转节点 ${frame.curr} 的指针：${frame.curr} → ${prevLabel}`,
       voiceover_text: `curr 在节点 ${frame.curr}。先把后继保存进 next，也就是 ${nextSpoken}；再让节点 ${frame.curr} 的 next 指向 prev，也就是 ${prevSpoken}。指针掉头之后，prev 前进到 ${frame.curr}，curr 前进到保存好的 ${nextSpoken}。${frame.next === 0 ? "next 为空，循环即将结束。" : `此刻已反转的前缀依次是 ${chainSpoken([...frame.reversed].reverse())}。`}`,
@@ -285,11 +287,16 @@ export function buildLinkedListReverseScript(params: TemplatePreviewParams): Pla
         `flip ${frame.curr}.next`,
         [4, 5, 6, 7],
       ),
-    }));
+      questions: [
+        ["这一步改动了哪条指针？", `只有 ${frame.curr}.next：从 ${nodeLabel(frame.next)} 改为指向 ${nodeLabel(frame.prevBefore)}。`],
+        ["四行代码的顺序能换吗？", "保存 next 必须最先做；改 curr.next 要在 prev 前进之前；prev 和 curr 的前进顺序不能颠倒，否则 prev 会跳过当前节点。"],
+        ["此刻链表分成了哪两段？", `已反转段 ${chain([...frame.reversed].reverse())}，${frame.next === 0 ? "剩余段为空。" : `未处理段 ${chain(Array.from({ length: length - frame.curr }, (_, i) => frame.curr + 1 + i))}。`}`],
+      ],
+    });
   });
 
   const last = frames.at(-1)!;
-  steps.push(algorithmStep(steps.length, {
+  steps.push({
     step_id: "list-result",
     title: `curr 为空，新头结点是 ${last.curr}`,
     voiceover_text: `curr 走到空，循环结束。prev 停在原来的尾节点 ${last.curr}，它就是新的头结点，返回 prev。现在链表依次是 ${chainSpoken(last.order)}。每个节点恰好被访问一次、翻转一条指针，时间 O(n)，只用了三个指针的额外空间。`,
@@ -308,12 +315,14 @@ export function buildLinkedListReverseScript(params: TemplatePreviewParams): Pla
       { prev: String(last.curr), curr: "null", result: chain(last.order), complexity: "O(n)" },
       "return new head",
     ),
-  }));
+    questions: [
+      ["为什么返回 prev 而不是 curr？", "循环结束时 curr 已经是 ∅，prev 停在最后一个被处理的节点，也就是原尾、新头。"],
+      ["最终链表是什么？", chain(last.order)],
+      ["复杂度是多少？", `每个节点处理一次，共 ${length} 次迭代，时间 O(n)；额外空间只有三个指针，O(1)。`],
+    ],
+  });
 
-  return buildAlgorithmPlaybook({
-    title: "链表反转：一次只翻一条指针",
-    summary: "用 prev、curr、next 三个指针迭代反转单链表，每一步只让一条 next 指针掉头，箭头方向就是全部状态。",
-    algorithmId: "linked_list_reverse",
+  return {
     steps,
     controls: [{
       id: "length",
@@ -326,44 +335,10 @@ export function buildLinkedListReverseScript(params: TemplatePreviewParams): Pla
       length: [String(length)],
       result: last.order.map(String),
     },
-  });
-}
-
-export function buildLinkedListReverseFollowups(params: TemplatePreviewParams): TemplatePreviewFollowups {
-  const length = resolveLinkedListLength(params);
-  const frames = linkedListReverseTrace(length);
-  const last = frames.at(-1)!;
-
-  const followups: TemplatePreviewFollowups = {
-    "list-intro": algorithmQuestions(
-      "list-intro",
-      ["为什么需要 next 这个指针？", "curr.next 一旦改成指向 prev，原来的后继就丢了；先保存 next 才能继续向后走。"],
-      ["prev 一开始为什么是空？", "第一个节点反转后要成为尾节点，尾节点的 next 必须是 ∅，所以 prev 从 ∅ 开始。"],
-      ["能不能用递归？", "可以：先反转 head.next 之后的部分，再把 head.next.next 指回 head；但递归深度是 O(n)。"],
-    ),
   };
-
-  frames.forEach((frame) => {
-    const stepId = `list-flip-${frame.curr}`;
-    followups[stepId] = algorithmQuestions(
-      stepId,
-      ["这一步改动了哪条指针？", `只有 ${frame.curr}.next：从 ${nodeLabel(frame.next)} 改为指向 ${nodeLabel(frame.prevBefore)}。`],
-      ["四行代码的顺序能换吗？", "保存 next 必须最先做；改 curr.next 要在 prev 前进之前；prev 和 curr 的前进顺序不能颠倒，否则 prev 会跳过当前节点。"],
-      ["此刻链表分成了哪两段？", `已反转段 ${chain([...frame.reversed].reverse())}，${frame.next === 0 ? "剩余段为空。" : `未处理段 ${chain(Array.from({ length: length - frame.curr }, (_, i) => frame.curr + 1 + i))}。`}`],
-    );
-  });
-
-  followups["list-result"] = algorithmQuestions(
-    "list-result",
-    ["为什么返回 prev 而不是 curr？", "循环结束时 curr 已经是 ∅，prev 停在最后一个被处理的节点，也就是原尾、新头。"],
-    ["最终链表是什么？", chain(last.order)],
-    ["复杂度是多少？", `每个节点处理一次，共 ${length} 次迭代，时间 O(n)；额外空间只有三个指针，O(1)。`],
-  );
-
-  return followups;
 }
 
-export const LINKED_LIST_REVERSE_PREVIEW_CASE = defineAlgorithmPreviewCase({
+export const LINKED_LIST_REVERSE_PREVIEW_CASE = defineAlgorithmCase({
   id: "linked-list-reverse",
   posterAlt: "链表反转：带箭头的节点排、已翻转的前缀与正在掉头的指针",
   posterStepIndex: 2,
@@ -378,6 +353,11 @@ export const LINKED_LIST_REVERSE_PREVIEW_CASE = defineAlgorithmPreviewCase({
       options: LINKED_LIST_LENGTHS.map((value) => ({ label: `${value} 个节点`, value })),
     },
   ],
-  buildScript: buildLinkedListReverseScript,
-  buildFollowups: buildLinkedListReverseFollowups,
+  title: "链表反转：一次只翻一条指针",
+  summary: "用 prev、curr、next 三个指针迭代反转单链表，每一步只让一条 next 指针掉头，箭头方向就是全部状态。",
+  algorithmId: "linked_list_reverse",
+  buildSteps: buildLinkedListReverseSteps,
 });
+
+export const buildLinkedListReverseScript = LINKED_LIST_REVERSE_PREVIEW_CASE.buildScript;
+export const buildLinkedListReverseFollowups = LINKED_LIST_REVERSE_PREVIEW_CASE.buildFollowups;

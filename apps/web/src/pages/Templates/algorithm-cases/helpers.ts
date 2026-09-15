@@ -84,27 +84,127 @@ export function buildAlgorithmPlaybook(args: {
   };
 }
 
-export function defineAlgorithmPreviewCase(args: {
+/** One follow-up as it is written next to the step it belongs to. */
+export type AlgorithmQuestionPair = readonly [question: string, answer: string];
+
+/**
+ * Every step ships at least three follow-ups (观察 / 机制 / 检验), and the
+ * tuple says so in the type system: a draft with two questions will not
+ * compile, so the rule is checked before any test runs.
+ */
+export type AlgorithmQuestionSet = readonly [
+  AlgorithmQuestionPair,
+  AlgorithmQuestionPair,
+  AlgorithmQuestionPair,
+  ...AlgorithmQuestionPair[],
+];
+
+/**
+ * A step and its follow-ups written together, so both come out of one pass
+ * over the trace. The old shape asked each case for `buildScript` and
+ * `buildFollowups` separately, which meant re-running the trace and keeping
+ * two lists of step ids in sync by hand.
+ */
+export interface AlgorithmStepDraft<T extends MetaStep["snapshot"] = MetaStep["snapshot"]> {
+  step_id: string;
+  title: string;
+  voiceover_text: string;
+  snapshot: T;
+  code_highlight: NonNullable<MetaStep["code_highlight"]>;
+  questions: AlgorithmQuestionSet;
+}
+
+/** Everything one parameter set produces: the step drafts plus script fields derived from the same trace. */
+export interface AlgorithmCaseFrame<T extends MetaStep["snapshot"] = MetaStep["snapshot"]> {
+  steps: ReadonlyArray<AlgorithmStepDraft<T>>;
+  controls?: PlaybookScript["parameter_controls"];
+  initialData?: PlaybookScript["initial_data"];
+}
+
+export interface AlgorithmPreviewCase extends TemplatePreviewCase {
+  buildScript: (params?: TemplatePreviewParams) => PlaybookScript;
+  buildFollowups: (
+    params?: TemplatePreviewParams,
+    script?: PlaybookScript,
+  ) => TemplatePreviewFollowups;
+}
+
+/** Step ids stay unique even if a draft picker collides on labels. */
+function uniqueStepIds(drafts: ReadonlyArray<AlgorithmStepDraft>): string[] {
+  const used = new Set<string>();
+  return drafts.map((draft, index) => {
+    const stepId = used.has(draft.step_id) ? `${draft.step_id}-n${index}` : draft.step_id;
+    used.add(stepId);
+    return stepId;
+  });
+}
+
+/**
+ * Define an algorithm preview case from a single `buildSteps(params)` pass.
+ *
+ * `buildSteps` walks the trace once and returns each step together with its
+ * follow-ups; `buildScript`, `buildFollowups` and `posterFrame` are all
+ * derived from that one list, so the step ids cannot drift apart.
+ */
+export function defineAlgorithmCase<T extends MetaStep["snapshot"] = MetaStep["snapshot"]>(args: {
   id: string;
   posterAlt: string;
   posterStepIndex: number;
   defaultParams: TemplatePreviewParams;
   controls: TemplatePreviewControl[];
-  buildScript: (params: TemplatePreviewParams) => PlaybookScript;
-  buildFollowups: (
-    params: TemplatePreviewParams,
-    script: PlaybookScript,
-  ) => TemplatePreviewFollowups;
-}): TemplatePreviewCase {
+  domain?: string;
+  title: string;
+  summary: string;
+  algorithmId: string;
+  buildSteps: (params: TemplatePreviewParams) => AlgorithmCaseFrame<T>;
+}): AlgorithmPreviewCase {
+  const buildScript = (params: TemplatePreviewParams = {}): PlaybookScript => {
+    const frame = args.buildSteps(params);
+    const stepIds = uniqueStepIds(frame.steps);
+    const steps: MetaStep[] = frame.steps.map((draft, index) =>
+      algorithmStep(index, {
+        step_id: stepIds[index]!,
+        title: draft.title,
+        voiceover_text: draft.voiceover_text,
+        snapshot: draft.snapshot,
+        code_highlight: draft.code_highlight,
+      }),
+    );
+    return buildAlgorithmPlaybook({
+      domain: args.domain,
+      title: args.title,
+      summary: args.summary,
+      algorithmId: args.algorithmId,
+      steps,
+      controls: frame.controls,
+      initialData: frame.initialData,
+    });
+  };
+
+  const buildFollowups = (params: TemplatePreviewParams = {}): TemplatePreviewFollowups => {
+    const frame = args.buildSteps(params);
+    const stepIds = uniqueStepIds(frame.steps);
+    const followups: TemplatePreviewFollowups = {};
+    frame.steps.forEach((draft, index) => {
+      const stepId = stepIds[index]!;
+      followups[stepId] = draft.questions.map(([question, answer], questionIndex) => ({
+        id: `${stepId}-q${questionIndex + 1}`,
+        question,
+        answer,
+      }));
+    });
+    return followups;
+  };
+
   return {
     id: args.id,
     templateId: args.id,
     posterUrl: `/template-previews/${args.id}/poster.webp`,
     posterAlt: args.posterAlt,
-    posterFrame: posterFrameForStep(args.buildScript(args.defaultParams), args.posterStepIndex),
+    posterFrame: posterFrameForStep(buildScript(args.defaultParams), args.posterStepIndex),
     defaultParams: args.defaultParams,
     controls: args.controls,
-    buildScript: args.buildScript,
-    buildFollowups: args.buildFollowups,
+    buildScript,
+    buildFollowups,
   };
 }

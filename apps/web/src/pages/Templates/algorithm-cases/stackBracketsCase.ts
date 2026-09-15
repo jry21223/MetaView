@@ -1,18 +1,14 @@
 import type {
+  AlgorithmArraySnapshot,
   AlgorithmRange,
   MetaStep,
-  PlaybookScript,
 } from "../../../features/playbook/engine/types";
-import type {
-  TemplatePreviewFollowups,
-  TemplatePreviewParams,
-} from "../templatePreviewCases";
+import type { TemplatePreviewParams } from "../templatePreviewCases";
 import {
-  algorithmQuestions,
-  algorithmStep,
-  buildAlgorithmPlaybook,
-  defineAlgorithmPreviewCase,
+  defineAlgorithmCase,
   stringParam,
+  type AlgorithmCaseFrame,
+  type AlgorithmStepDraft,
 } from "./helpers";
 
 /**
@@ -161,7 +157,7 @@ function bracketSnapshot(args: {
   conflict?: number | null;
   scanRange?: [number, number] | null;
   currentPair?: readonly [number, number] | null;
-}): MetaStep["snapshot"] {
+}): AlgorithmArraySnapshot {
   const elementStates: Record<number, Array<"entering" | "leaving">> = {};
   if (args.entering != null) elementStates[args.entering] = ["entering"];
   for (const index of [...consumedIndices(args.pairs, args.currentPair), ...(args.leaving == null ? [] : [args.leaving])]) {
@@ -279,15 +275,15 @@ function verdictNarration(trace: StackBracketTrace, chars: readonly string[]): s
   return "栈顶的左括号与当前右括号类型不同。栈只允许与最近一个尚未闭合的左括号配对，所以交叉的括号一定失败，函数在这里直接返回 false。";
 }
 
-export function buildStackBracketsScript(params: TemplatePreviewParams): PlaybookScript {
+function buildStackBracketSteps(params: TemplatePreviewParams): AlgorithmCaseFrame<AlgorithmArraySnapshot> {
   const presetId = resolveBracketPreset(params);
   const expression = bracketExpression(presetId);
   const chars = [...expression];
   const trace = stackBracketTrace(expression);
   const lastIndex = chars.length - 1;
 
-  const steps: MetaStep[] = [
-    algorithmStep(0, {
+  const steps: Array<AlgorithmStepDraft<AlgorithmArraySnapshot>> = [
+    {
       step_id: "bracket-intro",
       title: "准备一个空栈",
       voiceover_text: `要判断这个表达式的括号是否匹配：${bracketSpoken(presetId)}。规则只有一条：每个右括号必须与最近一个尚未闭合的左括号类型相同。“最近的尚未闭合”正是后进先出，所以用栈来记录还没配对的左括号，从左到右逐字符扫描。`,
@@ -305,15 +301,21 @@ export function buildStackBracketsScript(params: TemplatePreviewParams): Playboo
         "initialize empty stack",
         [0, 1, 2],
       ),
-    }),
+      questions: [
+        ["为什么用栈而不是计数器？", "只数左右括号的个数分不出 ([)] 这种交叉；栈保存的是“哪一个左括号还没闭合”，配对时才能检查类型。"],
+        ["栈顶代表什么？", "栈顶永远是最近一个尚未闭合的左括号，下一个右括号只能和它配对。"],
+        ["扫描的顺序重要吗？", "重要。从左到右读，才能保证先入栈的是更外层的括号，后入栈的内层括号先被配对。"],
+      ],
+    },
   ];
 
   trace.events.forEach((event) => {
     const stackAfter = stackText(chars, event.stack);
     const nextScan: [number, number] | null = event.index < lastIndex ? [event.index + 1, lastIndex] : null;
+    const stepId = `bracket-read-${event.index}`;
     if (event.kind === "push") {
-      steps.push(algorithmStep(steps.length, {
-        step_id: `bracket-read-${event.index}`,
+      steps.push({
+        step_id: stepId,
         title: `读入 ${event.char}，入栈`,
         voiceover_text: `第 ${event.index} 个字符是${bracketName(event.char)}。它还没有配对对象，先压入栈顶等待。此时栈里${stackSpoken(chars, event.stack)}，栈顶总是最近一个尚未闭合的左括号。`,
         snapshot: bracketSnapshot({
@@ -330,13 +332,18 @@ export function buildStackBracketsScript(params: TemplatePreviewParams): Playboo
           "push opener",
           [4, 5],
         ),
-      }));
+        questions: [
+          ["为什么左括号直接入栈？", "左括号此刻还看不到自己的右括号，只能先记下来等待，栈就是这份等待名单。"],
+          ["现在栈里有几个元素？", `${event.stack.length} 个：${stackText(chars, event.stack)}，最后压入的在最上面，是栈顶。`],
+          ["下一个字符若是右括号会怎样？", `它会和栈顶 ${event.char} 比较类型：相同就弹出配对，不同就直接返回 false。`],
+        ],
+      });
       return;
     }
     if (event.kind === "pop") {
       const partner = event.partnerIndex!;
-      steps.push(algorithmStep(steps.length, {
-        step_id: `bracket-read-${event.index}`,
+      steps.push({
+        step_id: stepId,
         title: `读入 ${event.char}，与栈顶 ${chars[partner]} 配对`,
         voiceover_text: `第 ${event.index} 个字符是${bracketName(event.char)}。栈顶是第 ${partner} 个字符${bracketName(chars[partner]!)}，类型正好相同，于是弹出栈顶，两者完成配对。弹出后栈${event.stack.length ? `里${stackSpoken(chars, event.stack)}` : "已经空了"}。`,
         // No scan range here: it would sit flush against the pair box and
@@ -361,13 +368,18 @@ export function buildStackBracketsScript(params: TemplatePreviewParams): Playboo
           "pop matching opener",
           [6, 7, 8],
         ),
-      }));
+        questions: [
+          ["这一对为什么能配上？", `右括号 ${event.char} 需要的左括号是 ${PAIR[event.char]}，栈顶正好是第 ${partner} 个字符 ${chars[partner]}。`],
+          ["为什么要弹出栈顶？", "配对完成的左括号已经闭合，不能再被后面的右括号使用，必须离开等待名单。"],
+          ["弹出后栈顶变成了谁？", event.stack.length ? `变成第 ${event.stack.at(-1)} 个字符 ${chars[event.stack.at(-1)!]}，也就是外一层的括号。` : "栈已经为空，说明当前没有未闭合的括号。"],
+        ],
+      });
       return;
     }
     if (event.kind === "mismatch") {
       const partner = event.partnerIndex!;
-      steps.push(algorithmStep(steps.length, {
-        step_id: `bracket-read-${event.index}`,
+      steps.push({
+        step_id: stepId,
         title: `读入 ${event.char}，栈顶是 ${chars[partner]}：不匹配`,
         voiceover_text: `第 ${event.index} 个字符是${bracketName(event.char)}，需要配对的是${bracketName(PAIR[event.char]!)}，可栈顶却是第 ${partner} 个字符${bracketName(chars[partner]!)}。栈只能和最近一个尚未闭合的左括号配对，类型不同就说明括号交叉了，立即返回 false。`,
         snapshot: bracketSnapshot({
@@ -389,11 +401,16 @@ export function buildStackBracketsScript(params: TemplatePreviewParams): Playboo
           "mismatch, return false",
           [6, 7],
         ),
-      }));
+        questions: [
+          ["为什么不能跳过栈顶去找更早的左括号？", "括号必须正确嵌套，内层先闭合。跳过栈顶等于允许交叉，那正是要判定为非法的情况。"],
+          ["冲突的两个字符是哪两个？", `第 ${event.index} 个字符 ${event.char} 与栈顶第 ${partner} 个字符 ${chars[partner]}。`],
+          ["后面的字符还要读吗？", "不用。一旦出现类型不匹配，整个表达式已经不可能合法，提前返回可以省掉剩余扫描。"],
+        ],
+      });
       return;
     }
-    steps.push(algorithmStep(steps.length, {
-      step_id: `bracket-read-${event.index}`,
+    steps.push({
+      step_id: stepId,
       title: `读入 ${event.char}，栈已空`,
       voiceover_text: `第 ${event.index} 个字符是${bracketName(event.char)}，但栈里已经没有任何左括号。没有可配对的对象，函数立即返回 false。`,
       snapshot: bracketSnapshot({
@@ -408,12 +425,17 @@ export function buildStackBracketsScript(params: TemplatePreviewParams): Playboo
         "empty stack, return false",
         [6],
       ),
-    }));
+      questions: [
+        ["栈为空意味着什么？", "此前的左括号都已闭合，这个右括号找不到任何等待中的左括号。"],
+        ["这和“多一个右括号”是一回事吗？", "是。栈空时遇到右括号，说明右括号比左括号多，表达式不可能合法。"],
+        ["代码里对应哪一行？", "stack.length === 0 的判断：先检查空栈，再比较类型，避免读取不存在的栈顶。"],
+      ],
+    });
   });
 
   const lastEvent = trace.events.at(-1);
   const finalStack = trace.verdict === "unclosed" ? trace.leftover : lastEvent?.stack ?? [];
-  steps.push(algorithmStep(steps.length, {
+  steps.push({
     step_id: "bracket-result",
     title: verdictTitle(trace.verdict),
     voiceover_text: verdictNarration(trace, chars),
@@ -432,12 +454,14 @@ export function buildStackBracketsScript(params: TemplatePreviewParams): Playboo
       },
       trace.verdict === "valid" ? "stack empty, return true" : "return false",
     ),
-  }));
+    questions: [
+      ["最终结论是什么？", trace.verdict === "valid" ? `${expression} 合法，返回 true。` : `${expression} 不合法，返回 false。`],
+      ["为什么结束时还要检查栈是否为空？", "配对全部成功只说明右括号都有着落；栈里若还剩左括号，就是有左括号没有闭合。"],
+      ["时间和空间复杂度是多少？", "每个字符最多入栈、出栈各一次，时间 O(n)；最坏情况全是左括号，栈占 O(n) 空间。"],
+    ],
+  });
 
-  return buildAlgorithmPlaybook({
-    title: "栈与括号匹配：后进先出如何配对",
-    summary: "逐字符扫描表达式，左括号入栈、右括号与栈顶配对出栈，用一条真实的栈轨道解释为什么后进先出恰好对应“最近的尚未闭合”。",
-    algorithmId: "stack_bracket_matching",
+  return {
     steps,
     controls: [{
       id: "expression",
@@ -450,74 +474,10 @@ export function buildStackBracketsScript(params: TemplatePreviewParams): Playboo
       preset: [presetId],
       result: [trace.verdict === "valid" ? "true" : "false"],
     },
-  });
-}
-
-export function buildStackBracketsFollowups(params: TemplatePreviewParams): TemplatePreviewFollowups {
-  const presetId = resolveBracketPreset(params);
-  const expression = bracketExpression(presetId);
-  const chars = [...expression];
-  const trace = stackBracketTrace(expression);
-
-  const followups: TemplatePreviewFollowups = {
-    "bracket-intro": algorithmQuestions(
-      "bracket-intro",
-      ["为什么用栈而不是计数器？", "只数左右括号的个数分不出 ([)] 这种交叉；栈保存的是“哪一个左括号还没闭合”，配对时才能检查类型。"],
-      ["栈顶代表什么？", "栈顶永远是最近一个尚未闭合的左括号，下一个右括号只能和它配对。"],
-      ["扫描的顺序重要吗？", "重要。从左到右读，才能保证先入栈的是更外层的括号，后入栈的内层括号先被配对。"],
-    ),
   };
-
-  trace.events.forEach((event) => {
-    const stepId = `bracket-read-${event.index}`;
-    if (event.kind === "push") {
-      followups[stepId] = algorithmQuestions(
-        stepId,
-        ["为什么左括号直接入栈？", "左括号此刻还看不到自己的右括号，只能先记下来等待，栈就是这份等待名单。"],
-        ["现在栈里有几个元素？", `${event.stack.length} 个：${stackText(chars, event.stack)}，最后压入的在最上面，是栈顶。`],
-        ["下一个字符若是右括号会怎样？", `它会和栈顶 ${event.char} 比较类型：相同就弹出配对，不同就直接返回 false。`],
-      );
-      return;
-    }
-    if (event.kind === "pop") {
-      const partner = event.partnerIndex!;
-      followups[stepId] = algorithmQuestions(
-        stepId,
-        ["这一对为什么能配上？", `右括号 ${event.char} 需要的左括号是 ${PAIR[event.char]}，栈顶正好是第 ${partner} 个字符 ${chars[partner]}。`],
-        ["为什么要弹出栈顶？", "配对完成的左括号已经闭合，不能再被后面的右括号使用，必须离开等待名单。"],
-        ["弹出后栈顶变成了谁？", event.stack.length ? `变成第 ${event.stack.at(-1)} 个字符 ${chars[event.stack.at(-1)!]}，也就是外一层的括号。` : "栈已经为空，说明当前没有未闭合的括号。"],
-      );
-      return;
-    }
-    if (event.kind === "mismatch") {
-      const partner = event.partnerIndex!;
-      followups[stepId] = algorithmQuestions(
-        stepId,
-        ["为什么不能跳过栈顶去找更早的左括号？", "括号必须正确嵌套，内层先闭合。跳过栈顶等于允许交叉，那正是要判定为非法的情况。"],
-        ["冲突的两个字符是哪两个？", `第 ${event.index} 个字符 ${event.char} 与栈顶第 ${partner} 个字符 ${chars[partner]}。`],
-        ["后面的字符还要读吗？", "不用。一旦出现类型不匹配，整个表达式已经不可能合法，提前返回可以省掉剩余扫描。"],
-      );
-      return;
-    }
-    followups[stepId] = algorithmQuestions(
-      stepId,
-      ["栈为空意味着什么？", "此前的左括号都已闭合，这个右括号找不到任何等待中的左括号。"],
-      ["这和“多一个右括号”是一回事吗？", "是。栈空时遇到右括号，说明右括号比左括号多，表达式不可能合法。"],
-      ["代码里对应哪一行？", "stack.length === 0 的判断：先检查空栈，再比较类型，避免读取不存在的栈顶。"],
-    );
-  });
-
-  followups["bracket-result"] = algorithmQuestions(
-    "bracket-result",
-    ["最终结论是什么？", trace.verdict === "valid" ? `${expression} 合法，返回 true。` : `${expression} 不合法，返回 false。`],
-    ["为什么结束时还要检查栈是否为空？", "配对全部成功只说明右括号都有着落；栈里若还剩左括号，就是有左括号没有闭合。"],
-    ["时间和空间复杂度是多少？", "每个字符最多入栈、出栈各一次，时间 O(n)；最坏情况全是左括号，栈占 O(n) 空间。"],
-  );
-
-  return followups;
 }
 
-export const STACK_BRACKETS_PREVIEW_CASE = defineAlgorithmPreviewCase({
+export const STACK_BRACKETS_PREVIEW_CASE = defineAlgorithmCase({
   id: "stack-brackets",
   posterAlt: "栈与括号匹配：表达式扫描指针、栈轨道与已配对的括号",
   posterStepIndex: 4,
@@ -535,6 +495,11 @@ export const STACK_BRACKETS_PREVIEW_CASE = defineAlgorithmPreviewCase({
       })),
     },
   ],
-  buildScript: buildStackBracketsScript,
-  buildFollowups: buildStackBracketsFollowups,
+  title: "栈与括号匹配：后进先出如何配对",
+  summary: "逐字符扫描表达式，左括号入栈、右括号与栈顶配对出栈，用一条真实的栈轨道解释为什么后进先出恰好对应“最近的尚未闭合”。",
+  algorithmId: "stack_bracket_matching",
+  buildSteps: buildStackBracketSteps,
 });
+
+export const buildStackBracketsScript = STACK_BRACKETS_PREVIEW_CASE.buildScript;
+export const buildStackBracketsFollowups = STACK_BRACKETS_PREVIEW_CASE.buildFollowups;

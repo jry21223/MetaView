@@ -3,18 +3,13 @@ import type {
   GraphSceneNode,
   GraphSceneSnapshot,
   MetaStep,
-  PlaybookScript,
 } from "../../../features/playbook/engine/types";
-import type {
-  TemplatePreviewFollowups,
-  TemplatePreviewParams,
-} from "../templatePreviewCases";
+import type { TemplatePreviewParams } from "../templatePreviewCases";
 import {
-  algorithmQuestions,
-  algorithmStep,
-  buildAlgorithmPlaybook,
-  defineAlgorithmPreviewCase,
+  defineAlgorithmCase,
   stringParam,
+  type AlgorithmCaseFrame,
+  type AlgorithmStepDraft,
 } from "./helpers";
 
 /**
@@ -221,13 +216,13 @@ export function shortestPath(
   return path;
 }
 
-export function buildDijkstraScript(params: TemplatePreviewParams): PlaybookScript {
+function buildDijkstraSteps(params: TemplatePreviewParams): AlgorithmCaseFrame<GraphSceneSnapshot> {
   const source = resolveDijkstraSource(params);
   const trace = dijkstraTrace(source);
   const initialDist = Object.fromEntries(DIJKSTRA_NODE_IDS.map((id) => [id, id === source ? 0 : Infinity])) as DistanceTable;
 
-  const steps: MetaStep[] = [
-    algorithmStep(0, {
+  const steps: Array<AlgorithmStepDraft<GraphSceneSnapshot>> = [
+    {
       step_id: "dijkstra-intro",
       title: `从 ${source} 出发，其他距离都是 ∞`,
       voiceover_text: `图有 ${DIJKSTRA_NODE_IDS.length} 个节点、${DIJKSTRA_EDGES.length} 条带权边，要求 ${source} 到每个节点的最短距离。初始化：${source} 的距离是 0，其余都是无穷大。Dijkstra 的核心是贪心：每次把当前距离最小且尚未确定的节点确定下来，再用它去更新邻居。画面里橙色是当前节点，灰色是已经确定的节点，虚线描边的是有了距离、还在候选的节点。`,
@@ -245,7 +240,12 @@ export function buildDijkstraScript(params: TemplatePreviewParams): PlaybookScri
         "initialize distances",
         [1, 2, 3],
       ),
-    }),
+      questions: [
+        ["为什么除起点外都初始化为 ∞？", "还没有找到任何路径时距离未知，用 ∞ 表示“暂时不可达”，任何真实路径都会比它短。"],
+        ["Dijkstra 和 BFS 有什么关系？", "BFS 按边数扩展，是所有边权为 1 的 Dijkstra；边权不同时必须按累计距离而不是层数扩展。"],
+        ["什么情况下不能用 Dijkstra？", "存在负权边时贪心会失效——已经确定的节点可能被负边再次缩短。"],
+      ],
+    },
   ];
 
   trace.forEach((item, index) => {
@@ -256,7 +256,10 @@ export function buildDijkstraScript(params: TemplatePreviewParams): PlaybookScri
           : `${relax.to} 首次到达，距离 ${relax.after}`)
         .join("，")
       : "没有邻居的距离被缩短";
-    steps.push(algorithmStep(steps.length, {
+    const rival = item.frontier.length
+      ? item.frontier.reduce((best, id) => (item.dist[id] < item.dist[best] ? id : best), item.frontier[0]!)
+      : null;
+    steps.push({
       step_id: `dijkstra-settle-${item.current}`,
       title: `确定 ${item.current}（距离 ${item.dist[item.current]}），松弛邻边`,
       voiceover_text: index === 0
@@ -281,7 +284,14 @@ export function buildDijkstraScript(params: TemplatePreviewParams): PlaybookScri
         `settle ${item.current}`,
         item.relaxed.length ? [5, 6, 7, 8] : [5, 6, 7],
       ),
-    }));
+      questions: [
+        ["为什么这一步选 " + item.current + "？", index === 0
+          ? `起点的距离是 0，是唯一确定的候选。`
+          : `未确定节点中它的距离 ${item.dist[item.current]} 最小；其他候选都不小于它。`],
+        ["为什么它的距离不会再被缩短？", "边权非负：任何别的路径都要先经过某个未确定节点，而那些节点的距离都已经不小于它。"],
+        ["下一个会确定谁？", rival ? `候选里距离最小的是 ${rival}（${item.dist[rival]}）。` : "所有节点都已确定。"],
+      ],
+    });
   });
 
   const last = trace.at(-1)!;
@@ -291,7 +301,7 @@ export function buildDijkstraScript(params: TemplatePreviewParams): PlaybookScri
   });
   const farthest = DIJKSTRA_NODE_IDS.filter((id) => id !== source)
     .reduce((best, id) => (last.dist[id] > last.dist[best] ? id : best), DIJKSTRA_NODE_IDS.find((id) => id !== source)!);
-  steps.push(algorithmStep(steps.length, {
+  steps.push({
     step_id: "dijkstra-result",
     title: "所有节点确定，最短路径树成形",
     voiceover_text: `六个节点全部确定，最终距离是 ${distText(last.dist)}。把每个节点的“最后一次更新来自谁”连起来，就得到从 ${source} 出发的最短路径树；例如到 ${farthest} 的路径依次经过 ${shortestPath(last.parent, source, farthest).join("、")}，长度 ${last.dist[farthest]}。贪心成立的前提是边权非负，有负权边时要改用 Bellman-Ford。`,
@@ -312,12 +322,14 @@ export function buildDijkstraScript(params: TemplatePreviewParams): PlaybookScri
       },
       "return dist",
     ),
-  }));
+    questions: [
+      ["最终距离表是什么？", distText(last.dist)],
+      ["最短路径树是怎么来的？", "每个节点记住最后一次把它缩短的前驱，沿前驱回溯就是最短路径，所有回溯边合起来是一棵树。"],
+      ["复杂度是多少？", "用二叉堆维护候选时是 O((V+E) log V)；本例只有 6 个节点，线性扫描也足够。"],
+    ],
+  });
 
-  return buildAlgorithmPlaybook({
-    title: "Dijkstra：贪心确定最短距离",
-    summary: "在带权无向图上从可选起点出发，每步确定距离最小的未定节点并松弛邻边，节点标签实时显示距离，最后高亮最短路径树。",
-    algorithmId: "dijkstra_shortest_path",
+  return {
     steps,
     controls: [{
       id: "source",
@@ -330,49 +342,10 @@ export function buildDijkstraScript(params: TemplatePreviewParams): PlaybookScri
       nodes: [...DIJKSTRA_NODE_IDS],
       result: DIJKSTRA_NODE_IDS.map((id) => `${id}=${distLabel(last.dist[id])}`),
     },
-  });
-}
-
-export function buildDijkstraFollowups(params: TemplatePreviewParams): TemplatePreviewFollowups {
-  const source = resolveDijkstraSource(params);
-  const trace = dijkstraTrace(source);
-  const last = trace.at(-1)!;
-
-  const followups: TemplatePreviewFollowups = {
-    "dijkstra-intro": algorithmQuestions(
-      "dijkstra-intro",
-      ["为什么除起点外都初始化为 ∞？", "还没有找到任何路径时距离未知，用 ∞ 表示“暂时不可达”，任何真实路径都会比它短。"],
-      ["Dijkstra 和 BFS 有什么关系？", "BFS 按边数扩展，是所有边权为 1 的 Dijkstra；边权不同时必须按累计距离而不是层数扩展。"],
-      ["什么情况下不能用 Dijkstra？", "存在负权边时贪心会失效——已经确定的节点可能被负边再次缩短。"],
-    ),
   };
-
-  trace.forEach((item, index) => {
-    const stepId = `dijkstra-settle-${item.current}`;
-    const rival = item.frontier.length
-      ? item.frontier.reduce((best, id) => (item.dist[id] < item.dist[best] ? id : best), item.frontier[0]!)
-      : null;
-    followups[stepId] = algorithmQuestions(
-      stepId,
-      ["为什么这一步选 " + item.current + "？", index === 0
-        ? `起点的距离是 0，是唯一确定的候选。`
-        : `未确定节点中它的距离 ${item.dist[item.current]} 最小；其他候选都不小于它。`],
-      ["为什么它的距离不会再被缩短？", "边权非负：任何别的路径都要先经过某个未确定节点，而那些节点的距离都已经不小于它。"],
-      ["下一个会确定谁？", rival ? `候选里距离最小的是 ${rival}（${item.dist[rival]}）。` : "所有节点都已确定。"],
-    );
-  });
-
-  followups["dijkstra-result"] = algorithmQuestions(
-    "dijkstra-result",
-    ["最终距离表是什么？", distText(last.dist)],
-    ["最短路径树是怎么来的？", "每个节点记住最后一次把它缩短的前驱，沿前驱回溯就是最短路径，所有回溯边合起来是一棵树。"],
-    ["复杂度是多少？", "用二叉堆维护候选时是 O((V+E) log V)；本例只有 6 个节点，线性扫描也足够。"],
-  );
-
-  return followups;
 }
 
-export const DIJKSTRA_PREVIEW_CASE = defineAlgorithmPreviewCase({
+export const DIJKSTRA_PREVIEW_CASE = defineAlgorithmCase({
   id: "dijkstra",
   posterAlt: "Dijkstra 最短路径：带权图上的当前节点、已确定集合与松弛成功的边",
   posterStepIndex: 3,
@@ -387,6 +360,11 @@ export const DIJKSTRA_PREVIEW_CASE = defineAlgorithmPreviewCase({
       options: DIJKSTRA_NODE_IDS.map((id) => ({ label: `节点 ${id}`, value: id })),
     },
   ],
-  buildScript: buildDijkstraScript,
-  buildFollowups: buildDijkstraFollowups,
+  title: "Dijkstra：贪心确定最短距离",
+  summary: "在带权无向图上从可选起点出发，每步确定距离最小的未定节点并松弛邻边，节点标签实时显示距离，最后高亮最短路径树。",
+  algorithmId: "dijkstra_shortest_path",
+  buildSteps: buildDijkstraSteps,
 });
+
+export const buildDijkstraScript = DIJKSTRA_PREVIEW_CASE.buildScript;
+export const buildDijkstraFollowups = DIJKSTRA_PREVIEW_CASE.buildFollowups;
