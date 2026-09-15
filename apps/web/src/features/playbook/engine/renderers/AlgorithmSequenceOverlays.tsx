@@ -5,8 +5,168 @@ import type {
   AlgorithmAuxiliaryLane,
   AlgorithmRange,
 } from "../types";
+import { stackColumnCapacity } from "./stackColumnLayout";
 
 const RANGE_MOVE_FRAMES = 12;
+const POINTER_ENTER_FRAMES = 12;
+/** Gap between the main sequence column and the stack columns beside it. */
+const SEQUENCE_STACK_GAP = 40;
+/**
+ * Pointers a reader scans left to right. Anything else keeps the order the
+ * snapshot declared it in.
+ */
+const POINTER_LABEL_ORDER = ["low", "mid", "high"];
+
+function pointerLabelRank(name: string): number {
+  const rank = POINTER_LABEL_ORDER.indexOf(name);
+  return rank === -1 ? POINTER_LABEL_ORDER.length : rank;
+}
+
+/** Pointers sharing one index are drawn as a single `i · j` marker. */
+function groupPointersByIndex(pointers: Record<string, number>): Array<[number, string[]]> {
+  return Array.from(
+    Object.entries(pointers).reduce((groups, [name, index]) => {
+      const names = groups.get(index) ?? [];
+      names.push(name);
+      groups.set(index, names);
+      return groups;
+    }, new Map<number, string[]>()),
+  );
+}
+
+/**
+ * The ▲ markers under a sequence. The row keeps its height even when a step
+ * declares no pointers, so the sequence and the lanes below it do not jump.
+ *
+ * `indexAttribute` and `noWrapLabels` exist because the two sequence
+ * renderers were written apart and differ in exactly these two details; they
+ * are kept as they are so extracting this component changed no markup.
+ */
+export function AlgorithmPointerRow({
+  pointers,
+  itemCount,
+  itemWidth,
+  gap,
+  color,
+  elapsed,
+  settled,
+  indexAttribute = false,
+  noWrapLabels = false,
+}: {
+  pointers: Record<string, number>;
+  itemCount: number;
+  itemWidth: number;
+  gap: number;
+  color: string;
+  elapsed: number;
+  /** True once a previous snapshot exists: the markers are already on screen. */
+  settled: boolean;
+  indexAttribute?: boolean;
+  noWrapLabels?: boolean;
+}) {
+  const groups = groupPointersByIndex(pointers);
+  const pitch = itemWidth + gap;
+  const opacity = settled
+    ? 1
+    : interpolate(elapsed, [0, POINTER_ENTER_FRAMES], [0, 1], {
+        easing: Easing.bezier(0.16, 1, 0.3, 1),
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+      });
+
+  return (
+    <div
+      data-pointer-row={groups.length}
+      style={{
+        position: "relative",
+        width: itemCount * itemWidth + (itemCount - 1) * gap,
+        height: 34,
+        marginTop: 8,
+      }}
+    >
+      {groups.length > 0 && (
+      <div style={{ position: "absolute", inset: 0 }}>
+        {groups.map(([idx, names]) => (
+          <div
+            key={idx}
+            data-pointer-index={indexAttribute ? idx : undefined}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              color,
+              fontSize: 13,
+              fontWeight: 600,
+              opacity,
+              position: "absolute",
+              left: idx * pitch + itemWidth / 2,
+              top: 0,
+              transform: "translateX(-50%)",
+            }}
+          >
+            ▲
+            <span style={noWrapLabels ? { whiteSpace: "nowrap" } : undefined}>
+              {[...names]
+                .sort((left, right) => pointerLabelRank(left) - pointerLabelRank(right))
+                .join(" · ")}
+            </span>
+          </div>
+        ))}
+      </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Main sequence on the left, stack columns on the right.
+ *
+ * Both sequence renderers lay themselves out this way and both used to repeat
+ * the previous-lane lookup and the capacity call for every stack column.
+ */
+export function AlgorithmSequenceLayout({
+  columnGap,
+  stackLanes,
+  previousLanes,
+  sequenceLength,
+  elapsed,
+  theme,
+  children,
+}: {
+  /** Vertical gap inside the sequence column — bars sit tighter than cells. */
+  columnGap: number;
+  stackLanes: readonly AlgorithmAuxiliaryLane[];
+  previousLanes?: readonly AlgorithmAuxiliaryLane[];
+  sequenceLength: number;
+  elapsed: number;
+  theme: "dark" | "light";
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: SEQUENCE_STACK_GAP }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: columnGap,
+        }}
+      >
+        {children}
+      </div>
+      {stackLanes.map((lane) => (
+        <AlgorithmStackColumn
+          key={lane.id}
+          lane={lane}
+          previousLane={previousLanes?.find((candidate) => candidate.id === lane.id) ?? null}
+          capacity={stackColumnCapacity(lane, sequenceLength)}
+          elapsed={elapsed}
+          theme={theme}
+        />
+      ))}
+    </div>
+  );
+}
 
 function overlayPalette(theme: "dark" | "light") {
   const palette = THEME_PALETTE[theme];

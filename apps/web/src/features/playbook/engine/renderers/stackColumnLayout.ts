@@ -11,3 +11,15 @@ export const STACK_COLUMN_RESERVE = 220;
 export function stackColumnCapacity(lane: AlgorithmAuxiliaryLane, sequenceLength: number): number {
   return Math.max(1, lane.items.length, Math.min(8, sequenceLength));
 }
+
+/** The stack columns of a snapshot, in declaration order. */
+export function stackLanesIn(
+  lanes: readonly AlgorithmAuxiliaryLane[] | undefined,
+): AlgorithmAuxiliaryLane[] {
+  return (lanes ?? []).filter((lane) => lane.role === "stack");
+}
+
+/** Total horizontal room the stack columns take away from the sequence. */
+export function stackColumnReserve(stackLanes: readonly AlgorithmAuxiliaryLane[]): number {
+  return stackLanes.length * STACK_COLUMN_RESERVE;
+}
