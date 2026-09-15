@@ -29,5 +29,8 @@ algorithm explanations.
 ## Teaching Pattern
 
 - Explain the invariant before the step changes state.
+- A stack is an auxiliary lane with role `stack`: it is drawn as a vertical slot
+  column beside the sequence with the top of the stack on top. Deque, result, and
+  helper-array lanes are horizontal rows; never lay a stack out horizontally.
 - Show one comparison, swap, enqueue, dequeue, visit, or pointer move at a time.
 - Ask the learner to predict the next state before revealing it when appropriate.

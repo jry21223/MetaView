@@ -5,8 +5,12 @@ import type { RendererProps } from "./types";
 import { THEME_PALETTE } from "../../../../shared/config/themePalette";
 import {
   AlgorithmAuxiliaryLanes,
+  AlgorithmPointerRow,
   AlgorithmRangeOverlay,
+  AlgorithmSequenceLayout,
 } from "./AlgorithmSequenceOverlays";
+import { buildPrevIndexMap } from "./prevIndexMap";
+import { stackColumnReserve, stackLanesIn } from "./stackColumnLayout";
 
 function soft(color: string, strength: number): string {
   return `color-mix(in srgb, ${color} ${strength}%, transparent)`;
@@ -46,57 +50,6 @@ const POP_BEZIER = Easing.bezier(0.34, 1.56, 0.64, 1);
 const MOVE_FRAMES = 12;
 const POP_FRAMES = 10;
 const BREATH_PERIOD = 40; // frames per cycle, ~1.3s @30fps
-const POINTER_LABEL_ORDER = ["low", "mid", "high"];
-
-function pointerLabelRank(name: string): number {
-  const rank = POINTER_LABEL_ORDER.indexOf(name);
-  return rank === -1 ? POINTER_LABEL_ORDER.length : rank;
-}
-
-/**
- * Greedy index map: for each currentIndex find a unique prevIndex with the same
- * value (so that real cell migration can be animated). Newly written values
- * (no remaining match) yield -1, signalling a "pop-in".
- */
-function buildPrevIndexMap(
-  current: readonly string[],
-  prev: readonly string[] | null,
-): number[] {
-  if (!prev) return current.map(() => -1);
-  const used = new Array(prev.length).fill(false) as boolean[];
-  const result: number[] = [];
-  // First pass: prefer matching same index when value unchanged (stable).
-  for (let i = 0; i < current.length; i++) {
-    if (i < prev.length && !used[i] && prev[i] === current[i]) {
-      result.push(i);
-      used[i] = true;
-    } else {
-      result.push(-2); // sentinel: needs second-pass match
-    }
-  }
-  // Second pass: greedy nearest unused match by value.
-  for (let i = 0; i < current.length; i++) {
-    if (result[i] !== -2) continue;
-    let best = -1;
-    let bestDist = Infinity;
-    for (let j = 0; j < prev.length; j++) {
-      if (used[j]) continue;
-      if (prev[j] !== current[i]) continue;
-      const d = Math.abs(j - i);
-      if (d < bestDist) {
-        bestDist = d;
-        best = j;
-      }
-    }
-    if (best >= 0) {
-      result[i] = best;
-      used[best] = true;
-    } else {
-      result[i] = -1; // truly new
-    }
-  }
-  return result;
-}
 
 export const AlgorithmRenderer: React.FC<RendererProps> = ({
   step,
@@ -123,7 +76,9 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
     );
   }
 
-  const cellW = Math.min(80, Math.floor(880 / snap.array_values.length));
+  const stackLanes = stackLanesIn(snap.auxiliary_lanes);
+  const stackReserve = stackColumnReserve(stackLanes);
+  const cellW = Math.min(80, Math.floor((880 - stackReserve) / snap.array_values.length));
   const cellH = 64;
   const cellGap = 4;
   const cellPitch = cellW + cellGap;
@@ -142,14 +97,6 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
       });
   // Used to draw arc Y-offset only for swap pairs (two cells in swap_indices that exchange).
   const swapSet = new Set(snap.swap_indices);
-  const pointerGroups = Array.from(
-    Object.entries(snap.pointers).reduce((groups, [name, index]) => {
-      const names = groups.get(index) ?? [];
-      names.push(name);
-      groups.set(index, names);
-      return groups;
-    }, new Map<number, string[]>()),
-  );
 
   return (
     <div
@@ -178,6 +125,14 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
         {step.title}
       </h2>
 
+      <AlgorithmSequenceLayout
+        columnGap={32}
+        stackLanes={stackLanes}
+        previousLanes={prevSnap?.auxiliary_lanes}
+        sequenceLength={snap.array_values.length}
+        elapsed={elapsed}
+        theme={theme}
+      >
       {/* Array cells */}
       <div style={{ display: "flex", gap: cellGap, position: "relative" }}>
         {snap.array_values.map((val, i) => {
@@ -393,58 +348,22 @@ export const AlgorithmRenderer: React.FC<RendererProps> = ({
         />
       </div>
 
-      {/* Pointer arrows */}
-      {Object.entries(snap.pointers).length > 0 && (
-        <div
-          style={{
-            position: "relative",
-            width: snap.array_values.length * cellW + (snap.array_values.length - 1) * cellGap,
-            height: 34,
-            marginTop: 8,
-          }}
-        >
-          {pointerGroups.map(([idx, names]) => {
-            const pointerOpacity = prevSnap
-              ? 1
-              : interpolate(elapsed, [0, 12], [0, 1], {
-                  easing: ENTER_BEZIER,
-                  extrapolateLeft: "clamp",
-                  extrapolateRight: "clamp",
-                });
-            return (
-              <div
-                key={idx}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  color: colors.pointer,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  opacity: pointerOpacity,
-                  position: "absolute",
-                  left: idx * cellPitch + cellW / 2,
-                  top: 0,
-                  transform: "translateX(-50%)",
-                }}
-              >
-                ▲
-                <span>
-                  {[...names]
-                    .sort((left, right) => pointerLabelRank(left) - pointerLabelRank(right))
-                    .join(" · ")}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <AlgorithmPointerRow
+        pointers={snap.pointers}
+        itemCount={snap.array_values.length}
+        itemWidth={cellW}
+        gap={cellGap}
+        color={colors.pointer}
+        elapsed={elapsed}
+        settled={Boolean(prevSnap)}
+      />
 
       <AlgorithmAuxiliaryLanes
         lanes={snap.auxiliary_lanes ?? []}
         width={snap.array_values.length * cellW + (snap.array_values.length - 1) * cellGap}
         theme={theme}
       />
+      </AlgorithmSequenceLayout>
 
     </div>
   );

@@ -72,7 +72,7 @@ class AlgorithmAuxiliaryItem(BaseModel):
 
 class AlgorithmAuxiliaryLane(BaseModel):
     id: str
-    role: Literal["deque", "result", "auxiliary_array"]
+    role: Literal["deque", "result", "auxiliary_array", "stack"]
     label: str
     items: list[AlgorithmAuxiliaryItem] = Field(default_factory=list)
 

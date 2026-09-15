@@ -391,13 +391,14 @@ export function makeDrawingTools(deps: DrawingToolDeps): AgentTool[] {
     defineTool(
       "add_algorithm_auxiliary_lane",
       "Add algorithm auxiliary lane",
-      "Add a semantic deque, result, or auxiliary-array lane beneath the main sequence.",
+      "Add a semantic deque, result, or auxiliary-array lane beneath the main sequence, or a stack column beside it (top of stack rendered on top).",
       Type.Object({
         id: Type.String({ minLength: 1 }),
         role: Type.Union([
           Type.Literal("deque"),
           Type.Literal("result"),
           Type.Literal("auxiliary_array"),
+          Type.Literal("stack"),
         ]),
         label: Type.String({ minLength: 1 }),
         items: Type.Array(Type.Object({

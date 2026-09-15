@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { visualQualityGate } from "../../../features/playbook/engine/assets/visualQualityGate";
 import {
   QUICK_SORT_PREVIEW_CASE,
   QUICK_SORT_VALUES,
@@ -10,6 +9,11 @@ import {
   lomutoPartition,
   quickSortLomuto,
 } from "./quickSortCase";
+import { expectDeterministicCase } from "./testing/expectDeterministicCase";
+
+// v1 has one deterministic pivot strategy; the unsupported value is in the
+// matrix so the clamp is covered by the shared invariants too.
+const PARAM_MATRIX = [{}, { pivotStrategy: "last" }, { pivotStrategy: "median" }];
 
 describe("quickSortCase helpers", () => {
   it("partitions the catalog sample with Lomuto last-element pivot", () => {
@@ -69,6 +73,10 @@ describe("quickSortCase helpers", () => {
 });
 
 describe("quickSortCase playbook", () => {
+  it("holds the shared preview-case invariants", () => {
+    expectDeterministicCase(QUICK_SORT_PREVIEW_CASE, PARAM_MATRIX);
+  });
+
   it("exports the catalog case id quick-sort", () => {
     expect(QUICK_SORT_PREVIEW_CASE.id).toBe("quick-sort");
     expect(QUICK_SORT_PREVIEW_CASE.templateId).toBe("quick-sort");
@@ -82,27 +90,10 @@ describe("quickSortCase playbook", () => {
     const script = buildQuickSortScript({ pivotStrategy: "last" });
     const followups = buildQuickSortFollowups({ pivotStrategy: "last" }, script);
 
-    expect(script.schema_version).toBe("2.0.0");
-    expect(script.fps).toBe(30);
     expect(script.algorithm_id).toBe("quick_sort");
-    expect(script.steps.length).toBeGreaterThanOrEqual(5);
-    expect(script.total_frames).toBe(script.steps.at(-1)?.end_frame);
-
-    const snapshotKeys = new Set(script.steps.map((step) => JSON.stringify(step.snapshot)));
-    expect(snapshotKeys.size).toBeGreaterThanOrEqual(5);
-    expect(new Set(script.steps.map((step) => step.step_id)).size).toBe(script.steps.length);
-
+    expect(Object.keys(followups)).toEqual(script.steps.map((step) => step.step_id));
     for (const step of script.steps) {
       expect(step.snapshot.kind).toBe("algorithm_bars");
-      expect(step.code_highlight).toBeTruthy();
-      if (!step.code_highlight) continue;
-      expect(step.code_highlight.active_line).toBeGreaterThanOrEqual(0);
-      expect(step.code_highlight.active_line).toBeLessThan(step.code_highlight.lines.length);
-      for (const line of step.code_highlight.active_lines) {
-        expect(line).toBeGreaterThanOrEqual(0);
-        expect(line).toBeLessThan(step.code_highlight.lines.length);
-      }
-      expect(followups[step.step_id]?.length).toBeGreaterThanOrEqual(3);
     }
 
     const result = script.steps.at(-1);
@@ -135,12 +126,6 @@ describe("quickSortCase playbook", () => {
     }
   });
 
-  it("keeps every teaching step visually focused", () => {
-    const script = buildQuickSortScript({ pivotStrategy: "last" });
-
-    expect(visualQualityGate(script)).toEqual([]);
-  });
-
   it("falls back to last when pivotStrategy is unsupported", () => {
     const script = buildQuickSortScript({ pivotStrategy: "median" });
     expect(script.parameter_controls).toEqual([]);
@@ -151,12 +136,4 @@ describe("quickSortCase playbook", () => {
     );
   });
 
-  it("keeps preview case builders pure across repeated calls", () => {
-    const a = QUICK_SORT_PREVIEW_CASE.buildScript(QUICK_SORT_PREVIEW_CASE.defaultParams);
-    const b = QUICK_SORT_PREVIEW_CASE.buildScript(QUICK_SORT_PREVIEW_CASE.defaultParams);
-    expect(a).toEqual(b);
-    const fa = QUICK_SORT_PREVIEW_CASE.buildFollowups(QUICK_SORT_PREVIEW_CASE.defaultParams, a);
-    const fb = QUICK_SORT_PREVIEW_CASE.buildFollowups(QUICK_SORT_PREVIEW_CASE.defaultParams, b);
-    expect(fa).toEqual(fb);
-  });
 });

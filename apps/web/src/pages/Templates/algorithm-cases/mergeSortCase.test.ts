@@ -8,11 +8,15 @@ import {
   MERGE_SORT_VALUES,
   barsSnapshot,
   buildMergeSortBeats,
-  buildMergeSortFollowups,
   buildMergeSortScript,
   mergeRangeSteps,
   resolveMergeSortOrder,
 } from "./mergeSortCase";
+import { expectDeterministicCase } from "./testing/expectDeterministicCase";
+
+// v1 demonstrates the ascending merge only; the rejected value keeps the
+// clamp inside the shared invariants.
+const PARAM_MATRIX = [{}, { order: "ascending" }, { order: "descending" }];
 
 function asBars(snapshot: unknown): AlgorithmBarsSnapshot {
   expect(snapshot).toMatchObject({ kind: "algorithm_bars" });
@@ -20,38 +24,25 @@ function asBars(snapshot: unknown): AlgorithmBarsSnapshot {
 }
 
 describe("mergeSortCase", () => {
-  it("publishes a complete deterministic Playbook with step-aware follow-ups", () => {
+  it("holds the shared preview-case invariants", () => {
+    // Known gap: `merge-result` and `merge-complexity` show the same sorted
+    // array, so the complexity step adds narration but no new picture.
+    expectDeterministicCase(MERGE_SORT_PREVIEW_CASE, PARAM_MATRIX, {
+      allowedRepeatedSnapshots: 1,
+    });
+  });
+
+  it("publishes a readable number of bars steps against the one listing", () => {
     const item = MERGE_SORT_PREVIEW_CASE;
-    expect(item.id).toBe("merge-sort");
-    expect(item.templateId).toBe("merge-sort");
-
     const script = item.buildScript(item.defaultParams);
-    const followups = item.buildFollowups(item.defaultParams, script);
 
-    expect(script.schema_version).toBe("2.0.0");
-    expect(script.fps).toBe(30);
     expect(script.algorithm_id).toBe("merge_sort");
-    expect(script.steps.length).toBeGreaterThanOrEqual(5);
+    // The whole recursion is compressed into representative beats on purpose.
     expect(script.steps.length).toBeLessThanOrEqual(16);
-    expect(script.total_frames).toBe(script.steps.at(-1)?.end_frame);
-    expect(new Set(script.steps.map((step) => step.step_id)).size).toBe(script.steps.length);
-    expect(
-      new Set(script.steps.map((step) => JSON.stringify(step.snapshot))).size,
-    ).toBeGreaterThanOrEqual(5);
 
     for (const step of script.steps) {
-      expect(followups[step.step_id]?.length).toBeGreaterThanOrEqual(3);
-      expect(step.end_frame).toBeGreaterThan(0);
-      expect(step.code_highlight).toBeTruthy();
-      if (!step.code_highlight) continue;
-      expect(step.code_highlight.lines).toEqual([...MERGE_SORT_CODE]);
-      expect(step.code_highlight.active_line).toBeGreaterThanOrEqual(0);
-      expect(step.code_highlight.active_line).toBeLessThan(step.code_highlight.lines.length);
-      for (const line of step.code_highlight.active_lines) {
-        expect(line).toBeGreaterThanOrEqual(0);
-        expect(line).toBeLessThan(step.code_highlight.lines.length);
-      }
       expect(step.snapshot.kind).toBe("algorithm_bars");
+      expect(step.code_highlight?.lines).toEqual([...MERGE_SORT_CODE]);
     }
   });
 
@@ -133,14 +124,6 @@ describe("mergeSortCase", () => {
     expect(resolveMergeSortOrder({ order: "ascending" })).toBe("ascending");
     expect(resolveMergeSortOrder({ order: "descending" })).toBe("ascending");
     expect(resolveMergeSortOrder({})).toBe("ascending");
-  });
-
-  it("exposes follow-ups for every generated step id", () => {
-    const script = buildMergeSortScript({ order: "ascending" });
-    const followups = buildMergeSortFollowups({ order: "ascending" }, script);
-    for (const step of script.steps) {
-      expect(followups[step.step_id]).toHaveLength(3);
-    }
   });
 
   it("starts from the catalog prompt array", () => {

@@ -2,7 +2,7 @@
 
 Status: Active
 
-`/templates` 是模板和正式案例的权威目录。它当前展示 31 个模板条目，其中 24 个已登记为可交互正式案例；尚未完成的模板必须显示“制作中”并保持禁用，不能退回旧的生成入口。随课包聚焦（圆锥曲线、微积分、高中物理 + 高校生态学试点），`two-sum`、`redox-electron`、`monsoon` 及中和占位已从目录隐藏：Gold Manifest、隐藏变体与海报全部保留，仅不再出现在 `/templates`，直链访问显示不可用状态。生态学五案例（种群双课 + 种间双课 + 群落一课）归入独立的“生态学”分区。
+`/templates` 是模板和正式案例的权威目录。它当前展示 36 个模板条目，其中 29 个已登记为可交互正式案例；尚未完成的模板必须显示“制作中”并保持禁用，不能退回旧的生成入口。随课包聚焦（圆锥曲线、微积分、高中物理 + 高校生态学试点），`two-sum`、`redox-electron`、`monsoon` 及中和占位已从目录隐藏：Gold Manifest、隐藏变体与海报全部保留，仅不再出现在 `/templates`，直链访问显示不可用状态。生态学五案例（种群双课 + 种间双课 + 群落一课）归入独立的“生态学”分区。五个数据结构案例（栈 · 括号匹配、单调栈、链表反转、二叉搜索树、Dijkstra）归入独立的“数据结构”分区，与滑动窗口、归并、快排、二分查找、BFS 一样由 `algorithm-cases/` 下的纯函数 trace 驱动：栈走 `algorithm_array` / `algorithm_bars` 的 `stack` 辅助轨道（渲染为主序列右侧的竖直槽位列），结果序列走横向的 `result` 轨道，树、链表与带权图走带显式坐标的 `graph_scene`（坐标投影、舞台边界与 `graphSceneSnapshot` / `rowLayout` / `inorderTreeLayout` / `pointerMarkers` 统一在 `features/playbook/engine/kits/algorithm/graphScene.ts`，渲染器读同一份常量）。
 
 ## 路由与交互
 
@@ -15,7 +15,7 @@ Status: Active
 
 ## 静态运行边界
 
-普通正式案例仍由 `apps/web/src/pages/Templates/templatePreviewCases.ts` 提供；教师级 Gold 案例由 `apps/web/src/pages/Templates/gold-templates/` 中统一的 `GoldTemplateManifest` 注册，再派生为同一 `TemplatePreviewCase`。Manifest 同时记录 `archetypeId`、数学事实、视觉不变量和教学 rubric。每项包含默认参数、参数控件、确定性 `PlaybookScript` 构建器和按步骤组织的本地 Follow-up 操作；它不建立第二套 Director 或播放器契约。
+`apps/web/src/pages/Templates/templatePreviewCases.ts` 只保留契约类型与注册表；十个算法案例各自成文件放在 `algorithm-cases/`，用 `defineAlgorithmCase` 声明：案例只写一个 `buildSteps(params)`，一次遍历 trace 就把每一步和它的三个问题写在一起，`buildScript`、`buildFollowups`、`posterFrame` 全部由这份草稿派生。教师级 Gold 案例由 `apps/web/src/pages/Templates/gold-templates/` 中统一的 `GoldTemplateManifest` 注册，再派生为同一 `TemplatePreviewCase`。Manifest 同时记录 `archetypeId`、数学事实、视觉不变量和教学 rubric。每项包含默认参数、参数控件、确定性 `PlaybookScript` 构建器和按步骤组织的本地 Follow-up 操作；它不建立第二套 Director 或播放器契约。
 
 以下行为全部在浏览器本地完成：
 
@@ -43,6 +43,11 @@ Status: Active
 | `quick-sort` | Lomuto 分区、pivot 归位、递归区间、`O(n log n)` 平均 | 无（v1 固定 Lomuto 末元素） |
 | `binary-search` | low/mid/high 收缩、命中或未命中、代码同步、`O(log n)` | 目标值 |
 | `bfs-tree` | 当前节点、队列、访问集合、活动边和代码行 | 起始节点 |
+| `stack-brackets` | 逐字符扫描表达式、左括号入栈、右括号与栈顶配对出栈、主序列右侧的竖直栈列（栈顶在上、空槽可见）、匹配对轨道、交叉 / 未闭合 / 多余右括号三种失败、`O(n)` | 表达式预设 |
+| `monotonic-stack` | 柱状数组、右侧竖直栈列保存值递减的下标、弹出即写答案的结果轨道、全递减 / 全递增两种极端、`O(n)` | 输入数组预设 |
+| `linked-list-reverse` | 带箭头的节点排与两端 ∅、prev / curr / next 三指针、每步只翻一条 `next`、新头结点、`O(n)` / `O(1)` 空间 | 链表长度 |
+| `bst-search` | 固定插入序列建树、中序横坐标体现左小右大、逐节点比较路径与被排除子树、落空处即插入位置、`O(h)` 与退化 | 目标值 |
+| `dijkstra` | 六节点带权无向图、节点标签实时显示距离、每步确定最小距离节点并松弛邻边、已确定 / 候选 / 当前三态、最短路径树、非负权前提 | 起点 |
 | `derivative-tangent` | 伽利略 1604 斜面八拍数据、奇数律、割线极限、导函数 `f'(t)=2t` 与中点速度验证 | 切点 `a`、间隔 `h` |
 | `integral-area` | 阿基米德穷竭开场、上下矩形和夹逼、平方和闭式、`∫` 记号与微积分基本定理双路验证 | 矩形数 `n`、积分上限 `b` |
 | `projectile` | 两颗子弹同落实验、分运动独立性、同一时钟合成轨迹、`sin2θ` 射程与 45°、伽利略 1638 抛物线证明、月球弹道边界 | 初速度 `v₀`、抛射角 `θ`、重力加速度 `g` |
@@ -63,7 +68,7 @@ Status: Active
 | `competition-exclusion` | Gause 1934 双草履虫实验、L-V 竞争方程、零增长停线几何、排斥/共存/先到者赢三种结局、绿草履虫生态位分化（高校生态学试点） | 竞争系数 `α`、`β`、初始 `N₁₀`、`N₂₀` |
 | `island-biogeography` | 喀拉喀托 1883 灭岛与留鸟普查、迁入-灭绝均衡 S*≈30、动态周转、面积/距离效应、种-面积规律 z≈0.3、保护区设计与模型边界（高校生态学试点） | 岛面积 `A`、距离 `D`、物种池 `P` |
 
-每个默认案例至少有五个实际状态不同的步骤。九个 Gold 圆锥曲线案例每一步提供上述 5 个可执行且与当前步骤绑定的语义操作；其余 Gold 案例（微积分、物理、跨学科与生态学）以及普通正式案例每一步保留 3 个固定问题（观察、机制、检验）。案例数据必须继续符合 `PlaybookScript`；不要为公开模板引入第二套播放器或渲染协议。
+每个默认案例至少有五个实际状态不同的步骤。算法案例的这些不变量（步数、step_id 唯一、快照互异、`total_frames`、代码行范围、每步三问、`visualQualityGate`、旁白可朗读）由 `algorithm-cases/testing/expectDeterministicCase` 统一断言，并按案例声明的参数矩阵逐组检查，而不只在默认参数下。九个 Gold 圆锥曲线案例每一步提供上述 5 个可执行且与当前步骤绑定的语义操作；其余 Gold 案例（微积分、物理、跨学科与生态学）以及普通正式案例每一步保留 3 个固定问题（观察、机制、检验）。案例数据必须继续符合 `PlaybookScript`；不要为公开模板引入第二套播放器或渲染协议。
 
 Gold 的公开冻结 Playbook 只用于展示和视觉基线，不能作为真实生成 Benchmark 的输入。隐藏变体及隔离规则见 [gold-template-system.md](./gold-template-system.md)。
 
@@ -84,3 +89,25 @@ apps/web/public/template-previews/<templateId>/poster.webp
 ```
 
 导出的 JSON、PNG 审核图和其他中间产物留在已忽略的 `apps/web/data/`、`eval/shots/` 或 `eval/reports/`，不要提交。
+
+## 逐步审查图
+
+改动案例或渲染器后，用 `apps/web/scripts/render-template-shots.mjs` 把每一步渲染成 PNG 逐帧对照。它直接调用案例的 `buildScript`，所以**不必先导出**，也能渲染非默认参数下的画面：
+
+```bash
+cd apps/web
+export REMOTION_BROWSER_EXECUTABLE=/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell
+npm run template-shots -- stack-brackets monotonic-stack --themes light,dark
+npm run template-shots -- bst-search --params '{"target": 5}'
+npm run template-shots -- bst-search dijkstra --params '{"bst-search": {"target": 0}, "dijkstra": {"source": "F"}}'
+```
+
+- 位置参数是案例 id（`TEMPLATE_PREVIEW_CASE_IDS` 里的任意一个，不限于数据结构案例）；
+- `--themes`：`light` / `dark`，逗号分隔，默认 `light`；
+- `--params`：键为案例 id 的映射，或直接给一份参数对象对所有案例生效，都会覆盖在 `defaultParams` 之上；
+- `--out`：输出根目录，默认 `../../eval/shots`；
+- `--frame-ratio`：在每步窗口里取样的位置，默认 `0.85`（入场动画已结束、下一步还没开始）。
+
+输出到 `eval/shots/<案例 id>/<主题>/step-NN.png`，是已忽略目录，不要提交。
+
+`REMOTION_BROWSER_EXECUTABLE` 在本仓库的开发环境里必须设置：容器下载不到 Remotion 自带的 headless shell，而 PATH 上的 chromium 已移除旧版 headless 模式，直接启动会失败。上面那个 Playwright 自带的 `headless_shell` 可用；不设置时脚本会先打印警告再尝试，通常会在启动浏览器时报错。

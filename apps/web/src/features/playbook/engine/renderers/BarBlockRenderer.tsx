@@ -13,8 +13,11 @@ import { buildPrevIndexMap } from "./prevIndexMap";
 import { THEME_PALETTE } from "../../../../shared/config/themePalette";
 import {
   AlgorithmAuxiliaryLanes,
+  AlgorithmPointerRow,
   AlgorithmRangeOverlay,
+  AlgorithmSequenceLayout,
 } from "./AlgorithmSequenceOverlays";
+import { stackColumnReserve, stackLanesIn } from "./stackColumnLayout";
 
 /**
  * Theme-reactive palette built on the app's CSS variables (see
@@ -72,15 +75,16 @@ const ENTER_BEZIER = Easing.bezier(0.16, 1, 0.3, 1);
 const MOVE_FRAMES = 22;
 const MAX_BAR_HEIGHT = 342;
 const MIN_BAR_HEIGHT = 6;
+// Auxiliary lanes (a stack, a result row) sit under the pointer row; each
+// one borrows this much from the bar field so the lanes stay inside the
+// 16:9 stage instead of sliding under the caption strip.
+// 110 per lane keeps title, bars, pointer row and one lane inside a 16:9
+// stage even under a three-line subtitle (≈448px of usable height).
+const LANE_FIELD_RESERVE = 110;
+const MIN_BAR_FIELD_HEIGHT = 180;
 // Headroom above the tallest bar so its value label (top: -22) never rides
 // into the step title when the centered column overflows a short scene.
 const BAR_FIELD_TOP_PAD = 42;
-const POINTER_LABEL_ORDER = ["low", "mid", "high"];
-
-function pointerLabelRank(name: string): number {
-  const rank = POINTER_LABEL_ORDER.indexOf(name);
-  return rank === -1 ? POINTER_LABEL_ORDER.length : rank;
-}
 
 export const BarBlockRenderer: React.FC<RendererProps> = ({
   step,
@@ -133,9 +137,15 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
   const domainMin = Math.min(0, ...snap.numeric_values);
   const domainMax = Math.max(0, ...snap.numeric_values);
   const domainSpan = Math.max(domainMax - domainMin, 1);
-  const pixelsPerUnit = MAX_BAR_HEIGHT / domainSpan;
+  const stackLanes = stackLanesIn(snap.auxiliary_lanes);
+  const laneCount = (snap.auxiliary_lanes?.length ?? 0) - stackLanes.length;
+  const maxBarHeight = laneCount > 0
+    ? Math.max(MIN_BAR_FIELD_HEIGHT, MAX_BAR_HEIGHT - laneCount * LANE_FIELD_RESERVE)
+    : MAX_BAR_HEIGHT;
+  const pixelsPerUnit = maxBarHeight / domainSpan;
   const zeroAxisY = domainMax * pixelsPerUnit;
-  const barW = Math.max(10, Math.min(72, Math.floor(960 / n) - 8));
+  const stackReserve = stackColumnReserve(stackLanes);
+  const barW = Math.max(10, Math.min(72, Math.floor((960 - stackReserve) / n) - 8));
   const barGap = Math.max(4, Math.min(14, Math.floor(barW * 0.18)));
   const pitch = barW + barGap;
 
@@ -143,14 +153,6 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
   const swapSet = new Set(snap.swap_indices);
   const activeSet = new Set(snap.active_indices);
   const sortedSet = new Set(snap.sorted_indices);
-  const pointerGroups = Array.from(
-    Object.entries(snap.pointers).reduce((groups, [name, index]) => {
-      const names = groups.get(index) ?? [];
-      names.push(name);
-      groups.set(index, names);
-      return groups;
-    }, new Map<number, string[]>()),
-  );
 
   const labelFont = Math.max(10, Math.min(16, barW * 0.32));
 
@@ -184,6 +186,14 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
         {step.title}
       </h2>
 
+      <AlgorithmSequenceLayout
+        columnGap={18}
+        stackLanes={stackLanes}
+        previousLanes={prevSnap?.auxiliary_lanes}
+        sequenceLength={n}
+        elapsed={elapsed}
+        theme={theme}
+      >
       {/* Bar field — signed values share a real zero axis. */}
       <div
         data-zero-axis={zeroAxisY}
@@ -191,7 +201,10 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
           display: "flex",
           gap: barGap,
           position: "relative",
-          height: MAX_BAR_HEIGHT + 8,
+          // The global border-box reset would otherwise fold the label
+          // headroom into the height and push the bars past the field.
+          boxSizing: "content-box",
+          height: maxBarHeight + 8,
           paddingTop: BAR_FIELD_TOP_PAD,
         }}
       >
@@ -209,7 +222,7 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
         {snap.numeric_values.map((val, i) => {
           const label = snap.array_values[i] ?? String(val);
           const rawBarHeight = Math.abs(val) * pixelsPerUnit;
-          const t = rawBarHeight / MAX_BAR_HEIGHT;
+          const t = rawBarHeight / maxBarHeight;
           const fillRatio = 0.35 + 0.65 * t; // 0.35..1
           const barH = Math.max(MIN_BAR_HEIGHT, rawBarHeight);
 
@@ -360,7 +373,7 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
               style={{
                 position: "relative",
                 width: barW,
-                height: MAX_BAR_HEIGHT,
+                height: maxBarHeight,
                 transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
                 transformOrigin: `center ${zeroAxisY}px`,
                 opacity: finalOpacity,
@@ -449,64 +462,30 @@ export const BarBlockRenderer: React.FC<RendererProps> = ({
           previousRanges={prevSnap?.ranges}
           itemWidth={barW}
           gap={barGap}
-          itemHeight={MAX_BAR_HEIGHT}
+          itemHeight={maxBarHeight}
           elapsed={elapsed}
           theme={theme}
         />
       </div>
 
-      {Object.entries(snap.pointers).length > 0 && (
-        <div
-          style={{
-            position: "relative",
-            width: n * barW + (n - 1) * barGap,
-            height: 34,
-            marginTop: 8,
-          }}
-        >
-          {pointerGroups.map(([idx, names]) => {
-            const pointerOpacity = prevSnap
-              ? 1
-              : interpolate(elapsed, [0, 12], [0, 1], {
-                  easing: ENTER_BEZIER,
-                  extrapolateLeft: "clamp",
-                  extrapolateRight: "clamp",
-                });
-            return (
-              <div
-                key={idx}
-                data-pointer-index={idx}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  color: c.accent(theme),
-                  fontSize: 13,
-                  fontWeight: 600,
-                  opacity: pointerOpacity,
-                  position: "absolute",
-                  left: idx * pitch + barW / 2,
-                  top: 0,
-                  transform: "translateX(-50%)",
-                }}
-              >
-                ▲
-                <span style={{ whiteSpace: "nowrap" }}>
-                  {[...names]
-                    .sort((left, right) => pointerLabelRank(left) - pointerLabelRank(right))
-                    .join(" · ")}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <AlgorithmPointerRow
+        pointers={snap.pointers}
+        itemCount={n}
+        itemWidth={barW}
+        gap={barGap}
+        color={c.accent(theme)}
+        elapsed={elapsed}
+        settled={Boolean(prevSnap)}
+        indexAttribute
+        noWrapLabels
+      />
 
       <AlgorithmAuxiliaryLanes
         lanes={snap.auxiliary_lanes ?? []}
         width={n * barW + (n - 1) * barGap}
         theme={theme}
       />
+      </AlgorithmSequenceLayout>
 
     </div>
   );

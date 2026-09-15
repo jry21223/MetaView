@@ -132,6 +132,75 @@ describe("AlgorithmRenderer", () => {
     expect(markup).toContain("RESULT");
   });
 
+  it("draws a stack lane as a vertical slot column beside the sequence", () => {
+    const markup = render(defaultSnap({
+      auxiliary_lanes: [
+        {
+          id: "stack",
+          role: "stack",
+          label: "STACK",
+          items: [
+            { id: "s0", label: "{", value: "i=0", index: 0 },
+            { id: "s1", label: "[", value: "i=1", index: 1 },
+          ],
+        },
+        { id: "result", role: "result", label: "MATCHED", items: [] },
+      ],
+    }));
+
+    expect(markup).toContain('data-stack-lane="stack"');
+    // Four cells → four slots even though only two are filled.
+    expect(markup).toContain('data-stack-capacity="4"');
+    expect(markup).toContain('data-stack-top="1"');
+    expect(markup.match(/data-stack-slot-state="filled"/g)).toHaveLength(2);
+    expect(markup.match(/data-stack-slot-state="empty"/g)).toHaveLength(2);
+    expect(markup).toContain('data-stack-marker="top"');
+    // Slot 3 renders first (top of the column), slot 0 last (bottom).
+    expect(markup.indexOf('data-stack-slot="3"')).toBeLessThan(markup.indexOf('data-stack-slot="0"'));
+    // The stack must not also appear as a horizontal lane row.
+    expect(markup).not.toContain('data-auxiliary-role="stack"');
+    expect(markup).toContain('data-auxiliary-role="result"');
+    expect(markup).toContain("top = 1 · size = 2");
+  });
+
+  it("squeezes a tall stack column so it stays on stage", () => {
+    const markup = render(defaultSnap({
+      auxiliary_lanes: [{
+        id: "stack",
+        role: "stack",
+        label: "STACK",
+        items: Array.from({ length: 12 }, (_, index) => ({ id: `s${index}`, label: `i=${index}`, value: `v${index}` })),
+      }],
+    }));
+
+    expect(markup).toContain('data-stack-capacity="12"');
+    // (300 - 11 * 6) / 12 = 19.5 → floored to 19, then clamped to the 22px floor.
+    expect(markup).toContain('data-stack-slot-height="22"');
+    expect(markup.match(/data-stack-slot-state="filled"/g)).toHaveLength(12);
+    // Compact slots drop the secondary value line.
+    expect(markup).not.toContain(">v3<");
+  });
+
+  it("reserves the pointer row even when a step has no pointers", () => {
+    const withPointers = render(defaultSnap());
+    const without = render(defaultSnap({ pointers: {} }));
+
+    expect(withPointers).toContain('data-pointer-row="2"');
+    expect(without).toContain('data-pointer-row="0"');
+    expect(without).toMatch(/data-pointer-row="0"[^>]*height:34px/);
+  });
+
+  it("shows an empty stack column with every slot open", () => {
+    const markup = render(defaultSnap({
+      auxiliary_lanes: [{ id: "stack", role: "stack", label: "STACK", items: [] }],
+    }));
+
+    expect(markup).toContain('data-stack-top="-1"');
+    expect(markup.match(/data-stack-slot-state="empty"/g)).toHaveLength(4);
+    expect(markup).not.toContain('data-stack-marker="top"');
+    expect(markup).toContain("空栈 · top = -1");
+  });
+
   it("falls back to the narration string when the array is empty", () => {
     const markup = render(
       defaultSnap({

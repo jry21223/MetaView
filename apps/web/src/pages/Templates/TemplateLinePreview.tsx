@@ -68,6 +68,95 @@ const LINE_PREVIEWS: Record<TemplatePreviewCaseId, ReactNode> = {
       <path className="is-guide" d="M16 50h50m20 0h58" />
     </svg>
   ),
+  "stack-brackets": (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="stack-bracket-matching">
+      {[14, 32, 50, 68, 86, 104].map((x, index) => (
+        <rect
+          key={x}
+          className={index === 3 ? "is-accent" : undefined}
+          x={x}
+          y="20"
+          width="14"
+          height="16"
+          rx="2"
+          data-object="expression-cell"
+        />
+      ))}
+      <path className="is-accent" d="M75 10v6m-3-3 3 3 3-3" data-object="scan-cursor" />
+      <path className="is-guide" d="M14 46h104" />
+      <rect x="128" y="34" width="20" height="10" rx="1.5" data-object="stack-slot" />
+      <rect x="128" y="22" width="20" height="10" rx="1.5" data-object="stack-slot" />
+      <rect className="is-accent" x="128" y="10" width="20" height="10" rx="1.5" data-object="stack-slot" />
+      <path className="is-guide" d="M124 8v40" data-object="stack-wall" />
+    </svg>
+  ),
+  "monotonic-stack": (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="monotonic-stack-next-greater">
+      {[
+        [16, 24],
+        [34, 12],
+        [52, 30],
+        [70, 8],
+        [88, 18],
+        [106, 36],
+      ].map(([x, h], index) => (
+        <rect
+          key={x}
+          className={index === 5 ? "is-accent" : undefined}
+          x={x}
+          y={44 - h}
+          width="12"
+          height={h}
+          rx="2"
+          data-object="value-bar"
+        />
+      ))}
+      <path className="is-guide" d="M14 44h108" />
+      <path className="is-guide is-dashed" d="M58 14h48" data-object="pop-arrow" />
+      <path className="is-accent" d="M112 8v8m-3-3 3 3 3-3" data-object="scan-cursor" />
+      <rect x="130" y="34" width="16" height="9" rx="1.5" data-object="stack-slot" />
+      <rect className="is-accent" x="130" y="22" width="16" height="9" rx="1.5" data-object="stack-slot" />
+      <path className="is-guide" d="M126 12v34" data-object="stack-wall" />
+    </svg>
+  ),
+  "linked-list-reverse": (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="linked-list-reverse">
+      <path className="is-guide" d="M14 28h14M52 28h12" data-object="list-link" />
+      <path className="is-accent" d="M96 28H82m4-4-4 4 4 4M134 28h-14m4-4-4 4 4 4" data-object="reversed-link" />
+      <rect x="28" y="19" width="22" height="18" rx="3" data-object="list-node" />
+      <rect x="66" y="19" width="22" height="18" rx="3" data-object="list-node" />
+      <rect className="is-accent" x="98" y="19" width="22" height="18" rx="3" data-object="list-node" />
+      <rect x="134" y="19" width="12" height="18" rx="3" className="is-guide is-dashed" data-object="null-node" />
+      <path className="is-accent" d="M109 8v6m-3-3 3 3 3-3" data-object="curr-pointer" />
+      <path className="is-guide" d="M14 47h132" />
+    </svg>
+  ),
+  "bst-search": (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="bst-search-path">
+      <path className="is-guide" d="M80 12 48 27m32-15 32 15M48 27 32 42m16-15 16 15m48-15-16 15m16-15 16 15" data-object="tree-edge" />
+      <path className="is-accent" d="M80 12 48 27 64 42" data-object="search-path" />
+      <circle cx="80" cy="10" r="5" data-object="tree-node" />
+      <circle className="is-accent" cx="48" cy="27" r="4.5" data-object="tree-node" />
+      <circle cx="112" cy="27" r="4" data-object="tree-node" />
+      <circle cx="32" cy="44" r="3.5" data-object="tree-node" />
+      <circle className="is-accent" cx="64" cy="44" r="4" data-object="target-node" />
+      <circle cx="96" cy="44" r="3.5" data-object="tree-node" />
+      <circle cx="128" cy="44" r="3.5" data-object="tree-node" />
+      <path className="is-guide is-dashed" d="M96 20h36" data-object="pruned-subtree" />
+    </svg>
+  ),
+  dijkstra: (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="dijkstra-shortest-path">
+      <path className="is-guide" d="M24 30 56 14m-32 16 32 14M56 14l40 4m-40 26 40-4M96 18l40 10M96 40l40-12M56 14v30M96 18v22" data-object="graph-edge" />
+      <path className="is-accent" d="M24 30 56 44l40-4 40-12" data-object="shortest-path" />
+      <circle className="is-accent" cx="24" cy="30" r="5" data-object="source-node" />
+      <circle cx="56" cy="14" r="4" data-object="graph-node" />
+      <circle className="is-accent" cx="56" cy="44" r="4" data-object="graph-node" />
+      <circle cx="96" cy="18" r="4" data-object="graph-node" />
+      <circle className="is-accent" cx="96" cy="40" r="4" data-object="graph-node" />
+      <circle className="is-accent" cx="136" cy="28" r="4.5" data-object="target-node" />
+    </svg>
+  ),
   "derivative-tangent": (
     <svg viewBox="0 0 160 56" fill="none">
       <path className="is-guide" d="M18 45h124M40 50V7" />

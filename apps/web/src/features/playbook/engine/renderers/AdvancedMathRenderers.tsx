@@ -14,23 +14,37 @@ import type {
   SceneCellValue,
   StatsChartSceneSnapshot,
   TableSceneSnapshot,
+  SceneEmphasis,
 } from "../types";
 import { clamp01 } from "../foundation";
 import { sanitizeKatex } from "../../../../shared/lib/sanitizeKatex";
 import type { RendererProps } from "./types";
 import { THEME_PALETTE } from "../../../../shared/config/themePalette";
+import {
+  GRAPH_FALLBACK_RING,
+  GRAPH_NODE_RADIUS,
+  GRAPH_NODE_RADIUS_ACTIVE,
+  GRAPH_SCENE_PROJECTION,
+  GRAPH_SCENE_VIEWBOX,
+  GRAPH_STATE_PANEL_PROJECTION,
+  projectGraphPoint,
+  shouldProjectCompactGraphCoords,
+} from "../kits/algorithm/graphScene";
 
 type ThemeName = "dark" | "light";
 
-const SVG_W = 900;
 /**
  * Same fitting arithmetic as the math plot: the Shell's middle row is roughly
  * 904×336 CSS px (2.7:1), so a 520-tall canvas was height-fitted and handed a
  * third of the width back as blank paper. 440 keeps the drawn figure close to
  * its established proportions — a phase portrait reads badly once flattened —
  * while spending most of that margin on the figure.
+ *
+ * The graph kit projects compact case coordinates against this same stage, so
+ * both read it from `GRAPH_SCENE_VIEWBOX` instead of keeping two copies.
  */
-const SVG_H = 440;
+const SVG_W = GRAPH_SCENE_VIEWBOX.width;
+const SVG_H = GRAPH_SCENE_VIEWBOX.height;
 const PLOT = { left: 78, right: 34, top: 42, bottom: 50 };
 
 interface Palette {
@@ -513,16 +527,19 @@ export const IterationTraceSceneRenderer: React.FC<RendererProps> = ({ step, fra
 
 export const GraphSceneRenderer: React.FC<RendererProps> = ({
   step,
+  prevStep,
   frame,
   stepStartFrame,
   theme,
   onInteraction,
 }) => {
   const snap = step.snapshot as GraphSceneSnapshot;
+  const previous = prevStep?.snapshot.kind === "graph_scene" ? (prevStep.snapshot as GraphSceneSnapshot) : null;
   return (
     <Shell title={step.title} caption={snap.caption} theme={theme}>
       <GraphSvg
         graph={snap}
+        previous={previous}
         theme={theme}
         opacity={progressOpacity(frame, stepStartFrame)}
         onNodeSelect={onInteraction ? (nodeId) => onInteraction({
@@ -539,23 +556,28 @@ export const GraphSceneRenderer: React.FC<RendererProps> = ({
 
 function GraphSvg({
   graph,
+  previous = null,
   theme,
   opacity = 1,
   onNodeSelect,
 }: {
   graph: GraphSceneSnapshot;
+  /** Previous step's graph, so unchanged nodes and edges stay put instead of fading in again. */
+  previous?: GraphSceneSnapshot | null;
   theme: ThemeName;
   opacity?: number;
   onNodeSelect?: (nodeId: string) => void;
 }) {
   const colors = canvasPalette(theme);
+  const settledNodes = previousNodeSignatures(previous);
+  const settledEdges = previousEdgeSignatures(previous);
   const nodes = graph.nodes ?? [];
   const projectCompactCoords = shouldProjectCompactGraphCoords(nodes);
   const positioned = nodes.map((node, index) => {
     const angle = (index / Math.max(nodes.length, 1)) * Math.PI * 2 - Math.PI / 2;
     const fallback = {
-      x: 450 + Math.cos(angle) * 260,
-      y: 245 + Math.sin(angle) * 170,
+      x: GRAPH_FALLBACK_RING.centerX + Math.cos(angle) * GRAPH_FALLBACK_RING.radiusX,
+      y: GRAPH_FALLBACK_RING.centerY + Math.sin(angle) * GRAPH_FALLBACK_RING.radiusY,
     };
     const hasExplicitPosition = typeof node.x === "number" && typeof node.y === "number";
     const projected = hasExplicitPosition
@@ -579,9 +601,7 @@ function GraphSvg({
   ]);
   const activeEdges = new Set(graph.active_edge_ids ?? []);
   const showStatePanel = shouldRenderGraphAlgorithmStatePanel(graph, currentNodes, visitedNodes, queueNodes);
-  const projection = showStatePanel
-    ? { centerX: 312, centerY: 258, xScale: 78, yScale: 66 }
-    : { centerX: SVG_W / 2, centerY: SVG_H / 2, xScale: 120, yScale: 82 };
+  const projection = showStatePanel ? GRAPH_STATE_PANEL_PROJECTION : GRAPH_SCENE_PROJECTION;
   const layoutPositioned = positioned.map((node) => {
     if (!projectCompactCoords || !showStatePanel || typeof node.x !== "number" || typeof node.y !== "number") {
       return node;
@@ -604,8 +624,13 @@ function GraphSvg({
       data-graph-id={graph.asset_id ?? undefined}
     >
       <defs>
-        <marker id="graph-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
-          <path d="M0,0 L0,6 L9,3 z" fill={colors.muted} />
+        {/* Fixed-size heads (userSpaceOnUse) so an active 4px edge does not
+            grow a head that swallows the node it points at. */}
+        <marker id="graph-arrow" markerWidth="12" markerHeight="12" refX="11" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+          <path d="M0,0 L0,8 L12,4 z" fill={colors.line} />
+        </marker>
+        <marker id="graph-arrow-active" markerWidth="12" markerHeight="12" refX="11" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+          <path d="M0,0 L0,8 L12,4 z" fill={colors.accent} />
         </marker>
       </defs>
       {(graph.edges ?? []).map((edge, index) => {
@@ -614,25 +639,43 @@ function GraphSvg({
         if (!a || !b) return null;
         const edgeId = edge.id ?? `${edge.source}-${edge.target}`;
         const active = edge.emphasis === "accent" || activeEdges.has(edgeId);
+        // Directed edges stop at the node rim so the arrow head stays visible
+        // instead of being painted over by the target circle.
+        const ends = graph.directed
+          ? trimEdgeToNodeRims(a, b, graphNodeRadius(a, currentNodes), graphNodeRadius(b, currentNodes))
+          : { x1: a.x, y1: a.y, x2: b.x, y2: b.y };
+        const settled = settledEdges.get(edgeId) === edgeSignature(edge, active);
+        const labelAnchor = edgeLabelAnchor(a, b);
         return (
           <g
             key={`${edge.source}-${edge.target}-${index}`}
-            opacity={opacity}
+            opacity={settled ? 1 : opacity}
             data-edge-id={edgeId}
             data-edge-state={active ? "active" : "idle"}
+            data-edge-transition={settled ? "settled" : "enter"}
           >
             <line
-              x1={a.x}
-              y1={a.y}
-              x2={b.x}
-              y2={b.y}
+              x1={ends.x1}
+              y1={ends.y1}
+              x2={ends.x2}
+              y2={ends.y2}
               stroke={active ? colors.accent : colors.line}
               strokeWidth={active ? 4 : 2}
               strokeLinecap="round"
-              markerEnd={graph.directed ? "url(#graph-arrow)" : undefined}
+              markerEnd={graph.directed ? (active ? "url(#graph-arrow-active)" : "url(#graph-arrow)") : undefined}
             />
             {edge.label || edge.weight != null ? (
-              <text x={(a.x + b.x) / 2} y={(a.y + b.y) / 2 - 8} fill={colors.muted} fontSize={14} textAnchor="middle">
+              <text
+                x={labelAnchor.x}
+                y={labelAnchor.y}
+                fill={colors.muted}
+                fontSize={14}
+                textAnchor="middle"
+                stroke={colors.bg}
+                strokeWidth={5}
+                strokeLinejoin="round"
+                paintOrder="stroke"
+              >
                 {edge.label ?? edge.weight}
               </text>
             ) : null}
@@ -642,7 +685,7 @@ function GraphSvg({
       {layoutPositioned.map((node) => {
         const state = graphNodeState(node.id, currentNodes, visitedNodes, queueNodes);
         const active = state === "current" || node.emphasis === "accent";
-        const radius = active ? 32 : 29;
+        const radius = active ? GRAPH_NODE_RADIUS_ACTIVE : GRAPH_NODE_RADIUS;
         const nodeFill =
           state === "current"
             ? softCanvasColor(colors.accent, 18)
@@ -652,13 +695,17 @@ function GraphSvg({
                 ? colors.card
                 : colors.bg;
         const nodeStroke =
-          state === "current" ? colors.accent : state === "visited" ? colors.secondary : colors.line;
+          state === "current" || state === "queue"
+            ? state === "current" ? colors.accent : colors.secondary
+            : state === "visited" ? colors.secondary : colors.line;
+        const settled = settledNodes.get(node.id) === nodeSignature(node, state);
         return (
           <g
             key={node.id}
-            opacity={opacity}
+            opacity={settled ? 1 : opacity}
             data-node-id={node.id}
             data-node-state={state}
+            data-node-transition={settled ? "settled" : "enter"}
             data-interaction-target={onNodeSelect ? "start-node" : undefined}
             role={onNodeSelect ? "button" : undefined}
             aria-label={onNodeSelect ? `从 ${node.label ?? node.id} 开始 BFS` : undefined}
@@ -683,6 +730,7 @@ function GraphSvg({
               fill={nodeFill}
               stroke={nodeStroke}
               strokeWidth={active ? 3 : 2}
+              strokeDasharray={state === "queue" ? "6 4" : undefined}
             />
             <text
               x={node.x}
@@ -827,11 +875,104 @@ function GraphAlgorithmStatePanel({
 
 type GraphNodeVisualState = "current" | "queue" | "visited" | "default";
 
-interface GraphProjection {
-  centerX: number;
-  centerY: number;
-  xScale: number;
-  yScale: number;
+function graphNodeRadius(
+  node: { id: string; emphasis?: SceneEmphasis },
+  currentNodes: Set<string>,
+): number {
+  return currentNodes.has(node.id) || node.emphasis === "accent"
+    ? GRAPH_NODE_RADIUS_ACTIVE
+    : GRAPH_NODE_RADIUS;
+}
+
+/**
+ * What a node looked like on the previous step. A node whose signature is
+ * unchanged is already on screen and must not fade in again; only nodes that
+ * appear or change state get the entrance fade, so the eye follows the change.
+ */
+function nodeSignature(
+  node: { label?: string | null; id: string; emphasis?: SceneEmphasis },
+  state: GraphNodeVisualState,
+): string {
+  return `${state}|${node.emphasis ?? ""}|${node.label ?? node.id}`;
+}
+
+function edgeSignature(edge: { source: string; target: string; label?: string | null; weight?: number | null }, active: boolean): string {
+  return `${edge.source}>${edge.target}|${active ? "active" : "idle"}|${edge.label ?? edge.weight ?? ""}`;
+}
+
+function previousNodeSignatures(previous: GraphSceneSnapshot | null): Map<string, string> {
+  const signatures = new Map<string, string>();
+  if (!previous) return signatures;
+  const activeNodes = new Set(previous.active_node_ids ?? []);
+  const currentNodes = new Set([...activeNodes, ...(previous.current_node_id ? [previous.current_node_id] : [])]);
+  const visitedNodes = new Set(previous.visited_node_ids ?? []);
+  const queueNodes = new Set([...(previous.queue_node_ids ?? []), ...(previous.frontier_node_ids ?? [])]);
+  for (const node of previous.nodes ?? []) {
+    signatures.set(node.id, nodeSignature(node, graphNodeState(node.id, currentNodes, visitedNodes, queueNodes)));
+  }
+  return signatures;
+}
+
+function previousEdgeSignatures(previous: GraphSceneSnapshot | null): Map<string, string> {
+  const signatures = new Map<string, string>();
+  if (!previous) return signatures;
+  const activeEdges = new Set(previous.active_edge_ids ?? []);
+  for (const edge of previous.edges ?? []) {
+    const edgeId = edge.id ?? `${edge.source}-${edge.target}`;
+    signatures.set(edgeId, edgeSignature(edge, edge.emphasis === "accent" || activeEdges.has(edgeId)));
+  }
+  return signatures;
+}
+
+const EDGE_LABEL_OFFSET = 13;
+
+/**
+ * Edge labels sit beside the edge along its normal (above a horizontal edge,
+ * to the right of a vertical one) instead of a fixed 8px above the midpoint,
+ * which put vertical edges' weights right on the line.
+ */
+function edgeLabelAnchor(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+): { x: number; y: number } {
+  const mx = (a.x + b.x) / 2;
+  const my = (a.y + b.y) / 2;
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const length = Math.hypot(dx, dy) || 1;
+  let nx = -dy / length;
+  let ny = dx / length;
+  if (ny > 0 || (ny === 0 && nx < 0)) {
+    nx = -nx;
+    ny = -ny;
+  }
+  // +5 re-centres the 14px text on its anchor vertically.
+  return { x: mx + nx * EDGE_LABEL_OFFSET, y: my + ny * EDGE_LABEL_OFFSET + 5 };
+}
+
+/** Shorten a center-to-center segment so it starts and ends just outside each node rim. */
+function trimEdgeToNodeRims(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  sourceRadius: number,
+  targetRadius: number,
+): { x1: number; y1: number; x2: number; y2: number } {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const length = Math.hypot(dx, dy);
+  if (length < 4) return { x1: a.x, y1: a.y, x2: b.x, y2: b.y };
+  const ux = dx / length;
+  const uy = dy / length;
+  // Nodes drawn almost touching still get a short visible stub with its head
+  // outside the target rim, instead of falling back to a hidden centre line.
+  const startGap = Math.min(sourceRadius + 1, length * 0.45);
+  const endGap = Math.min(targetRadius + 3, length * 0.45);
+  return {
+    x1: a.x + ux * startGap,
+    y1: a.y + uy * startGap,
+    x2: b.x - ux * endGap,
+    y2: b.y - uy * endGap,
+  };
 }
 
 function graphNodeState(
@@ -844,25 +985,6 @@ function graphNodeState(
   if (queueNodes.has(nodeId)) return "queue";
   if (visitedNodes.has(nodeId)) return "visited";
   return "default";
-}
-
-function shouldProjectCompactGraphCoords(nodes: GraphSceneSnapshot["nodes"]): boolean {
-  const positioned = nodes.filter((node) => typeof node.x === "number" && typeof node.y === "number");
-  if (!positioned.length) return false;
-  return positioned.every((node) => Math.abs(node.x as number) <= 12 && Math.abs(node.y as number) <= 12);
-}
-
-function projectGraphPoint(
-  x: number,
-  y: number,
-  compact: boolean,
-  projection: GraphProjection = { centerX: SVG_W / 2, centerY: SVG_H / 2, xScale: 120, yScale: 82 },
-): { x: number; y: number } {
-  if (!compact) return { x, y };
-  return {
-    x: projection.centerX + x * projection.xScale,
-    y: projection.centerY + y * projection.yScale,
-  };
 }
 
 export const PhasePortraitSceneRenderer: React.FC<RendererProps> = ({ step, theme, progress }) => {

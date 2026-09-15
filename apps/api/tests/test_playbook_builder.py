@@ -238,6 +238,25 @@ class TestBuildPlaybook:
         assert snap.auxiliary_lanes[0].role == "deque"
         assert snap.auxiliary_lanes[0].items[0].index == 1
 
+    def test_stack_lane_role_is_part_of_the_contract(self):
+        """A `stack` lane renders as a vertical slot column on the web side; the
+        backend model must accept it so generated and static cases agree."""
+        from pydantic import ValidationError
+
+        from app.domain.models.playbook import AlgorithmAuxiliaryLane
+
+        lane = AlgorithmAuxiliaryLane(
+            id="bracket-stack",
+            role="stack",
+            label="STACK",
+            items=[{"id": "s0", "label": "(", "value": "i=0", "index": 0}],
+        )
+        assert lane.role == "stack"
+        assert lane.items[0].index == 0
+
+        with pytest.raises(ValidationError):
+            AlgorithmAuxiliaryLane(id="q", role="queue", label="QUEUE", items=[])
+
     def test_non_numeric_array_stays_as_cells(self):
         cir = CirDocument(
             title="字符串数组",

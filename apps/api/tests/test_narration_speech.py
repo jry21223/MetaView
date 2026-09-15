@@ -14,10 +14,17 @@ from pathlib import Path
 
 import pytest
 
+from app.infrastructure.tts import narration
 from app.infrastructure.tts.narration import to_spoken
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 TEMPLATES = REPO_ROOT / "data" / "template-previews"
+WEB_SPOKEN_TEXT = REPO_ROOT / "apps/web/src/shared/lib/spokenText.ts"
+
+# Punctuation a synthesizer reads or safely ignores. The web guard
+# (`spokenText.ts`) has to accept exactly this set, or one side will pass
+# narration the other rejects.
+READABLE_PUNCTUATION = set("。，、；：？！“”‘’（）()【】[]《》—…/+-*=<>.,:;%\'\"$&#@_ \n\t")
 
 
 def test_the_root_that_used_to_vanish_is_spoken() -> None:
@@ -94,8 +101,6 @@ def test_plain_prose_is_left_alone_and_the_rewrite_is_idempotent() -> None:
 
 def test_no_shipped_narration_still_carries_an_unreadable_symbol() -> None:
     """The corpus-wide guarantee — a new lesson cannot quietly reintroduce one."""
-    readable_punctuation = set("。，、；：？！“”‘’（）()【】[]《》—…/+-*=<>.,:;%'\"$&#@_ \n\t")
-
     steps = [
         text
         for path in sorted(TEMPLATES.glob("*.playbook.json"))
@@ -117,7 +122,80 @@ def test_no_shipped_narration_still_carries_an_unreadable_symbol() -> None:
         for char in to_spoken(text):
             if char.isalnum() or "一" <= char <= "鿿":
                 continue
-            if char in readable_punctuation:
+            if char in READABLE_PUNCTUATION:
                 continue
             residual[char] = residual.get(char, 0) + 1
     assert residual == {}, f"unreadable symbols reach TTS: {residual}"
+
+
+
+ESCAPES = {"n": "\n", "t": "\t", "r": "\r", '"': '"', "\\": "\\", "'": "'"}
+
+
+def _web_char_set(constant: str) -> set[str]:
+    """Characters of an `export const NAME = "..." + "...";` string in the web guard.
+
+    Scanned rather than regexed: the punctuation set itself contains `;` and
+    `"`, so a lazy `(.*?);` stops in the middle of the literal.
+    """
+    source = WEB_SPOKEN_TEXT.read_text(encoding="utf-8")
+    anchor = source.find(f"export const {constant} =")
+    assert anchor >= 0, f"{constant} not found in {WEB_SPOKEN_TEXT}"
+    index = source.index("=", anchor) + 1
+
+    chars: list[str] = []
+    in_string = False
+    while index < len(source):
+        char = source[index]
+        if not in_string:
+            if char == ";":
+                break
+            if char == '"':
+                in_string = True
+            index += 1
+            continue
+        if char == "\\":
+            escape = source[index + 1]
+            assert escape in ESCAPES, f"unsupported escape \\{escape} in {constant}"
+            chars.append(ESCAPES[escape])
+            index += 2
+            continue
+        if char == '"':
+            in_string = False
+            index += 1
+            continue
+        chars.append(char)
+        index += 1
+
+    assert chars, f"{constant} has no string literal"
+    return set(chars)
+
+
+def test_web_narration_guard_accepts_the_same_punctuation() -> None:
+    """`spokenText.ts` is the pre-export guard; a wider set there lets a glyph through."""
+    assert _web_char_set("READABLE_PUNCTUATION") == READABLE_PUNCTUATION
+
+
+def test_web_narration_guard_knows_every_glyph_to_spoken_rewrites() -> None:
+    """A glyph this module rewrites is safe to write; the web guard must not reject it."""
+    rewritten = {chr(code) for code in narration._SUPERSCRIPT_DIGITS}
+    rewritten |= {chr(code) for code in narration._SUBSCRIPT_DIGITS}
+    rewritten |= set(narration._SUBSCRIPT_LETTERS)
+    rewritten |= set(narration._GREEK)
+    rewritten |= set(narration._OPERATORS)
+    rewritten |= set(narration._SUFFIXES)
+    # Handled by regex / replace rather than a table: ion charges, the arrow in
+    # both its spellings, and the magnitude bars.
+    rewritten |= {"⁺", "⁻", "→", "|"}
+
+    assert _web_char_set("SPOKEN_REWRITTEN_GLYPHS") == rewritten
+
+
+def test_every_glyph_the_web_guard_allows_really_is_rewritten() -> None:
+    """Nothing may be added to the web allow-list that `to_spoken` leaves in place."""
+    for glyph in _web_char_set("SPOKEN_REWRITTEN_GLYPHS"):
+        if glyph == "|":
+            # Only rewritten in pairs (|v| -> "v 的大小"); a lone bar stays.
+            assert to_spoken("|v|") == "v 的大小"
+            continue
+        assert to_spoken(glyph) != glyph, f"{glyph!r} reaches TTS unchanged"

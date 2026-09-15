@@ -1,72 +1,41 @@
 import { describe, expect, it } from "vitest";
 
-import { visualQualityGate } from "../../../features/playbook/engine/assets/visualQualityGate";
 import {
   SLIDING_WINDOW_PREVIEW_CASE,
+  SLIDING_WINDOW_SIZES,
   SLIDING_WINDOW_VALUES,
-  buildSlidingWindowFollowups,
   buildSlidingWindowScript,
   resolveWindowSize,
   slidingWindowTrace,
 } from "./slidingWindowCase";
+import { expectDeterministicCase } from "./testing/expectDeterministicCase";
+
+const PARAM_MATRIX = SLIDING_WINDOW_SIZES.map((windowSize) => ({ windowSize }));
 
 describe("slidingWindowCase", () => {
-  it("builds a default script around indexed cells, a window range, and auxiliary lanes", () => {
+  it("holds the shared preview-case invariants for every window size", () => {
+    expectDeterministicCase(SLIDING_WINDOW_PREVIEW_CASE, PARAM_MATRIX);
+  });
+
+  it("draws indexed cells, a window range and the deque / result lanes", () => {
     const script = buildSlidingWindowScript(SLIDING_WINDOW_PREVIEW_CASE.defaultParams);
 
-    expect(script.schema_version).toBe("2.0.0");
-    expect(script.fps).toBe(30);
-    expect(script.steps.length).toBeGreaterThanOrEqual(5);
-    expect(script.total_frames).toBe(script.steps.at(-1)?.end_frame);
-    expect(new Set(script.steps.map((step) => step.step_id)).size).toBe(script.steps.length);
-
-    const snapshotKeys = script.steps.map((step) => JSON.stringify(step.snapshot));
-    expect(new Set(snapshotKeys).size).toBeGreaterThanOrEqual(5);
+    expect(script.algorithm_id).toBe("sliding_window_maximum");
+    expect(script.parameter_controls.some((control) => control.id === "windowSize")).toBe(true);
 
     for (const step of script.steps) {
       expect(step.snapshot.kind).toBe("algorithm_array");
       if (step.snapshot.kind !== "algorithm_array") continue;
       expect(step.snapshot.array_values).toEqual(SLIDING_WINDOW_VALUES.map(String));
+      // Nothing is ever "sorted" here; the window is a shared range overlay.
       expect(step.snapshot.sorted_indices).toEqual([]);
       expect(step.snapshot.ranges).toEqual([
-        expect.objectContaining({
-          id: "active-window",
-          role: "window",
-        }),
+        expect.objectContaining({ id: "active-window", role: "window" }),
       ]);
       expect(step.snapshot.auxiliary_lanes?.map((lane) => lane.role)).toEqual([
         "deque",
         "result",
       ]);
-      expect(step.end_frame).toBeGreaterThan(0);
-
-      if (step.code_highlight) {
-        expect(step.code_highlight.active_line).toBeGreaterThanOrEqual(0);
-        expect(step.code_highlight.active_line).toBeLessThan(step.code_highlight.lines.length);
-        for (const line of step.code_highlight.active_lines) {
-          expect(line).toBeGreaterThanOrEqual(0);
-          expect(line).toBeLessThan(step.code_highlight.lines.length);
-        }
-      }
-    }
-
-    expect(script.parameter_controls.some((control) => control.id === "windowSize")).toBe(true);
-    expect(SLIDING_WINDOW_PREVIEW_CASE.posterFrame).toBeLessThan(script.total_frames);
-  });
-
-  it("keeps every teaching step visually focused", () => {
-    const script = buildSlidingWindowScript(SLIDING_WINDOW_PREVIEW_CASE.defaultParams);
-
-    expect(visualQualityGate(script)).toEqual([]);
-  });
-
-  it("covers every step with at least three follow-up questions", () => {
-    const params = SLIDING_WINDOW_PREVIEW_CASE.defaultParams;
-    const script = buildSlidingWindowScript(params);
-    const followups = buildSlidingWindowFollowups(params);
-
-    for (const step of script.steps) {
-      expect(followups[step.step_id]?.length).toBeGreaterThanOrEqual(3);
     }
   });
 
@@ -104,16 +73,5 @@ describe("slidingWindowCase", () => {
   it("exposes a preview case wired to the pure builders", () => {
     expect(SLIDING_WINDOW_PREVIEW_CASE.id).toBe("sliding-window");
     expect(SLIDING_WINDOW_PREVIEW_CASE.controls[0]?.id).toBe("windowSize");
-
-    const script = SLIDING_WINDOW_PREVIEW_CASE.buildScript(
-      SLIDING_WINDOW_PREVIEW_CASE.defaultParams,
-    );
-    const followups = SLIDING_WINDOW_PREVIEW_CASE.buildFollowups(
-      SLIDING_WINDOW_PREVIEW_CASE.defaultParams,
-      script,
-    );
-
-    expect(script.algorithm_id).toBe("sliding_window_maximum");
-    expect(Object.keys(followups).length).toBe(script.steps.length);
   });
 });

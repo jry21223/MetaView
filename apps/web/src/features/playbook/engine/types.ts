@@ -61,7 +61,11 @@ export interface AlgorithmAuxiliaryItem {
 
 export interface AlgorithmAuxiliaryLane {
   id: string;
-  role: "deque" | "result" | "auxiliary_array";
+  /**
+   * `stack` lanes render as a vertical slot column beside the main sequence
+   * (top of stack on top); the other roles render as horizontal rows below it.
+   */
+  role: "deque" | "result" | "auxiliary_array" | "stack";
   label: string;
   items: AlgorithmAuxiliaryItem[];
 }
