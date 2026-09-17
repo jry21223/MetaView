@@ -17,6 +17,9 @@ jobs:
   templates:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      VITE_APP_EDITION: self
+      VITE_API_BASE_URL: ""
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -36,11 +39,9 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Export existing deterministic template fixtures
         run: npm --workspace apps/web run template-previews:export
-      - name: Browser regression (desktop and narrow mobile)
-        run: >-
-          npm --workspace apps/web run test:visual:conics --
-          --grep 'desktop-light|mobile-light|mobile-narrow-light'
-      - name: Core flows against isolated API and all template cases
+      - name: Browser regression (all conic viewports and themes)
+        run: npm --workspace apps/web run test:visual:conics
+      - name: Core flows against isolated API and published template cases
         run: cd apps/web && npx playwright test --config playwright.e2e.config.ts
       - name: Package reproducible source snapshot
         if: always()

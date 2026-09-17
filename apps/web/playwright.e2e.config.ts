@@ -48,13 +48,15 @@ export default defineConfig({
         METAVIEW_LLM_API_KEY: "",
         METAVIEW_TTS_API_KEY: "",
         METAVIEW_RATE_LIMIT_ENABLED: "false",
-        METAVIEW_HISTORY_DB_PATH: path.join(root, "data/e2e/browser.db"),
+        METAVIEW_HISTORY_DB_PATH: path.join(root, "data/e2e", `browser-${process.pid}.db`),
       },
     },
     {
-      command: "npm run preview -- --host 127.0.0.1 --port 4173 --strictPort",
+      command: "npm run build && npm run preview -- --host 127.0.0.1 --port 4173 --strictPort",
       url: "http://127.0.0.1:4173/templates",
       reuseExistingServer: false,
+      timeout: 120_000,
+      env: { VITE_APP_EDITION: "self", VITE_API_BASE_URL: "" },
     },
   ],
 });

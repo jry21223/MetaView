@@ -79,3 +79,12 @@
     height: auto;
   }
 }
+
+/* A long step strip must not overlap the adjacent transport buttons.
+   Keep an explicit local scrollbar rather than hiding unreachable steps. */
+.playbook-player--portrait .playbook-player__progress {
+  height: 36px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
