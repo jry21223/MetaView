@@ -2,7 +2,7 @@ name: Browser E2E
 
 on:
   push:
-    branches: ["test/e2e-20260917"]
+    branches: ["main", "test/e2e-20260917"]
   pull_request:
     branches: ["main"]
 
@@ -23,14 +23,25 @@ jobs:
         with:
           node-version: "22"
           cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: "apps/api/requirements*.txt"
+      - name: Install API test dependencies
+        run: python -m pip install -r apps/api/requirements-dev.txt
       - name: Install locked dependencies
         run: npm ci
       - name: Install browser
         run: npx playwright install --with-deps chromium
+      - name: Export existing deterministic template fixtures
+        run: npm --workspace apps/web run template-previews:export
       - name: Browser regression (desktop and narrow mobile)
         run: >-
           npm --workspace apps/web run test:visual:conics --
           --grep 'desktop-light|mobile-light|mobile-narrow-light'
+      - name: Core flows against isolated API and all template cases
+        run: cd apps/web && npx playwright test --config playwright.e2e.config.ts
       - name: Package reproducible source snapshot
         if: always()
         run: |
@@ -44,6 +55,7 @@ jobs:
           name: browser-e2e-${{ github.run_id }}
           path: |
             eval/shots/conic-playwright/
+            eval/shots/browser-e2e/
             eval/reports/browser-e2e/
             apps/web/dist/
           if-no-files-found: warn
