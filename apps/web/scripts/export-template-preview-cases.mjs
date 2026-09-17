@@ -6,6 +6,8 @@ import {
   getTemplatePreviewCase,
 } from "../src/pages/Templates/templatePreviewCases";
 
+import { TEMPLATES } from "../src/pages/Templates/templates";
+
 const outputDirectory = path.resolve(process.argv[2] ?? "../../data/template-previews");
 await fs.mkdir(outputDirectory, { recursive: true });
 
@@ -16,7 +18,10 @@ for (const id of TEMPLATE_PREVIEW_CASE_IDS) {
   const script = item.buildScript(item.defaultParams);
   const playbookPath = path.join(outputDirectory, `${id}.playbook.json`);
   await fs.writeFile(playbookPath, `${JSON.stringify(script, null, 2)}\n`, "utf8");
-  manifest.push({ id, playbookPath, posterFrame: item.posterFrame });
+  manifest.push({
+    id, playbookPath, posterFrame: item.posterFrame,
+    templateId: TEMPLATES.find((template) => template.previewCaseId === id)?.id ?? null,
+  });
 }
 
 await fs.writeFile(

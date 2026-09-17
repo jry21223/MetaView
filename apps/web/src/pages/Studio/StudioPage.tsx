@@ -439,7 +439,7 @@ function ChatPanel({
           headVersionId,
           controller.signal,
         );
-        onPlaybookPatched(result.playbook, result.director);
+        onPlaybookPatched(result.playbook, result.director, result.version_id);
         setHeadVersionId(result.version_id);
         setInteractionEpoch((current) => current + 1);
         setMsgs((current) => [

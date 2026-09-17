@@ -85,6 +85,7 @@ function TemplatePreviewContent({
   };
 
   const resetParams = () => {
+    sandbox.reset();
     setParams({ ...previewCase.defaultParams });
     setPlaybackRevision((current) => current + 1);
   };

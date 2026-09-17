@@ -1,0 +1,63 @@
+name: Browser E2E
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  templates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      VITE_APP_EDITION: self
+      VITE_API_BASE_URL: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: "apps/api/requirements*.txt"
+      - name: Install API test dependencies
+        run: python -m pip install -r apps/api/requirements-dev.txt
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install browser
+        run: npx playwright install --with-deps chromium
+      - name: Export existing deterministic template fixtures
+        run: npm --workspace apps/web run template-previews:export
+      - name: Browser regression (all conic viewports and themes)
+        run: npm --workspace apps/web run test:visual:conics
+      - name: Core flows against isolated API and published template cases
+        run: cd apps/web && npx playwright test --config playwright.e2e.config.ts
+      - name: Package reproducible source snapshot
+        if: always()
+        run: |
+          mkdir -p eval/reports/browser-e2e
+          git rev-parse HEAD > eval/reports/browser-e2e/commit.txt
+          git archive --format=tar.gz HEAD -o eval/reports/browser-e2e/source.tar.gz
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-e2e-${{ github.run_id }}
+          path: |
+            eval/shots/conic-playwright/
+            eval/shots/browser-e2e/
+            eval/reports/browser-e2e/
+            apps/web/dist/
+          if-no-files-found: warn
+          retention-days: 7
