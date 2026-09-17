@@ -1,0 +1,50 @@
+name: Browser E2E
+
+on:
+  push:
+    branches: ["test/e2e-20260917"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  templates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install browser
+        run: npx playwright install --with-deps chromium
+      - name: Browser regression (desktop and narrow mobile)
+        run: >-
+          npm --workspace apps/web run test:visual:conics --
+          --grep 'desktop-light|mobile-light|mobile-narrow-light'
+      - name: Package reproducible source snapshot
+        if: always()
+        run: |
+          mkdir -p eval/reports/browser-e2e
+          git rev-parse HEAD > eval/reports/browser-e2e/commit.txt
+          git archive --format=tar.gz HEAD -o eval/reports/browser-e2e/source.tar.gz
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-e2e-${{ github.run_id }}
+          path: |
+            eval/shots/conic-playwright/
+            eval/reports/browser-e2e/
+            apps/web/dist/
+          if-no-files-found: warn
+          retention-days: 7
