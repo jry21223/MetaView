@@ -9,7 +9,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0,
-  timeout: 60_000,
+  timeout: 30_000,
   expect: { timeout: 8_000 },
   reporter: [
     ["line"],
@@ -24,6 +24,7 @@ export default defineConfig({
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
     serviceWorkers: "block",
+    actionTimeout: 8_000,
   },
   projects: [
     { name: "desktop", use: { viewport: { width: 1440, height: 900 } } },
@@ -42,7 +43,8 @@ export default defineConfig({
         METAVIEW_GENERATION_MODE: "single",
         METAVIEW_ROUTER_MODE: "heuristic",
         METAVIEW_REVIEWER_MODE: "off",
-        METAVIEW_OPENAI_API_KEY: "",
+        METAVIEW_OPENAI_API_KEY: "e2e-not-a-real-key",
+        METAVIEW_OPENAI_BASE_URL: "http://127.0.0.1:8000/e2e-provider-not-enabled",
         METAVIEW_LLM_API_KEY: "",
         METAVIEW_TTS_API_KEY: "",
         METAVIEW_RATE_LIMIT_ENABLED: "false",
