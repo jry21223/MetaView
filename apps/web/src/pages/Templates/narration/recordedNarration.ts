@@ -15,6 +15,16 @@ export const RECORDED_NARRATION_VOICE = "zh_male_m191_uranus_bigtts";
 export const RECORDED_NARRATION: Readonly<
   Record<string, readonly RecordedNarrationEntry[]>
 > = Object.freeze({
+  "bst-search": [
+    { step_id: "bst-intro", file: "bst-intro.mp3", text: "这棵树按 8、3、10、1、6、14、4、7、13 的顺序依次插入建成，根是 8。任务是查找 7：从根出发，每到一个节点只做一次比较，就能决定往左还是往右，不必看另一半子树。" },
+    { step_id: "bst-property", file: "bst-property.mp3", text: "二叉搜索树的性质：任意节点的左子树所有值都小于它，右子树所有值都大于它。以根 8 为例，左子树是 1、3、4、6、7，右子树是 10、13、14。画面里节点的横坐标就是中序位置，所以性质在左右方向上直接可见。" },
+    { step_id: "bst-compare-8", file: "bst-compare-8.mp3", text: "来到节点 8，目标 7 小于 8，所以整棵右子树都不用看，沿左孩子进入 3。这是第 1 次比较。" },
+    { step_id: "bst-compare-3", file: "bst-compare-3.mp3", text: "来到节点 3，目标 7 大于 3，所以整棵左子树都不用看，沿右孩子进入 6。这是第 2 次比较。" },
+    { step_id: "bst-compare-6", file: "bst-compare-6.mp3", text: "来到节点 6，目标 7 大于 6，所以整棵左子树都不用看，沿右孩子进入 7。这是第 3 次比较。" },
+    { step_id: "bst-compare-7", file: "bst-compare-7.mp3", text: "来到节点 7，目标 7 正好等于它，查找结束。这是第 4 次比较，走过的路径依次是 8、3、6、7。" },
+    { step_id: "bst-result", file: "bst-result.mp3", text: "目标 7 就在路径末端。整条路径依次经过 8、3、6、7，只有 4 个节点，其余 5 个节点一次都没有访问。" },
+    { step_id: "bst-complexity", file: "bst-complexity.mp3", text: "这次查找比较了 4 次，正好是路径上的节点数。任何一次查找都不会超过树高 4，所以复杂度是 O(h)。树越平衡，h 越接近 log₂n；如果按有序序列插入，树会退化成链，h 变成 n——这正是平衡树要解决的问题。" },
+  ],
   "competition-exclusion": [
     { step_id: "comp-alone", file: "comp-alone.mp3", text: "1934 年，Gause 把两种草履虫分别放进 0.5 毫升培养液，每天投喂定量细菌、每天计数。双小核草履虫稳稳爬到约 105 的平台，大草履虫爬到约 64——各是一条标准的 logistic 曲线，各有各的 K。上一课的方程，在显微镜下活着。" },
     { step_id: "comp-together", file: "comp-together.mp3", text: "再把它们放进同一瓶，食物不变。前一周相安无事——大草履虫第 8 天冲到约 24，好像也要起飞。然后曲线调头：第 16 天跌回 15，第 24 天只剩约 8，一路滑向清零。它单独活得好好的，没有谁吃谁，为什么一起养就消失？" },
@@ -25,6 +35,16 @@ export const RECORDED_NARRATION: Readonly<
     { step_id: "comp-founder", file: "comp-founder.mp3", text: "还有一种排布：α=1.8、β=0.9，双方压对方都比压自己狠。停线仍然交叉，但交点 (16, 49) 是个鞍点——理论上能停住，任何风吹草动都会滑落。从 (40,10) 出发，双小核赢；从 (10,40) 出发，大草履虫赢。同样的规则，不同的开局，相反的结局：历史也被写进了方程。" },
     { step_id: "comp-bursaria", file: "comp-bursaria.mp3", text: "Gause 还做了一组常被忽略的对照：把大草履虫换成绿草履虫，再混养。这次没有清零——双小核占据上层水体吃悬浮细菌，绿草履虫沉到瓶底吃酵母，两条曲线都停在了正数上。同一间瓶子，两份工作。竞争排斥原理因此有了下半句：完全重叠的生态位不能共存，而差异——哪怕只是一瓶水的上下——就是共存的通行证。" },
     { step_id: "comp-sandbox", file: "comp-sandbox.mp3", text: "α、β、两个起点，全部归你。当前 α=1.5、β=0.7，判定：双小核草履虫稳赢。读图口诀：先看两条停线交不交叉，交叉再问谁让着自己。把 α 推过 1.64、β 推过 0.61，四种世界依次路过。下一课离开双人对局，去数一整座岛的物种。" },
+  ],
+  "dijkstra": [
+    { step_id: "dijkstra-intro", file: "dijkstra-intro.mp3", text: "图有 6 个节点、9 条带权边，要求 A 到每个节点的最短距离。初始化：A 的距离是 0，其余都是无穷大。Dijkstra 的核心是贪心：每次把当前距离最小且尚未确定的节点确定下来，再用它去更新邻居。画面里橙色是当前节点，灰色是已经确定的节点，虚线描边的是有了距离、还在候选的节点。" },
+    { step_id: "dijkstra-settle-A", file: "dijkstra-settle-A.mp3", text: "未确定的节点里 A 的距离最小，把它确定为 0。然后检查它的每条邻边：经由 A 到达邻居的距离若更短就更新。B 首次到达，距离 4，C 首次到达，距离 2。" },
+    { step_id: "dijkstra-settle-C", file: "dijkstra-settle-C.mp3", text: "尚未确定的节点中距离最小的是 C，距离 2。它不可能再被缩短——任何别的路径都要先经过一个距离不小于它的节点。确定它之后松弛邻边：B 从 4 缩短到 3，D 首次到达，距离 10，E 首次到达，距离 12。" },
+    { step_id: "dijkstra-settle-B", file: "dijkstra-settle-B.mp3", text: "尚未确定的节点中距离最小的是 B，距离 3。它不可能再被缩短——任何别的路径都要先经过一个距离不小于它的节点。确定它之后松弛邻边：D 从 10 缩短到 8。" },
+    { step_id: "dijkstra-settle-D", file: "dijkstra-settle-D.mp3", text: "尚未确定的节点中距离最小的是 D，距离 8。它不可能再被缩短——任何别的路径都要先经过一个距离不小于它的节点。确定它之后松弛邻边：E 从 12 缩短到 10，F 首次到达，距离 14。" },
+    { step_id: "dijkstra-settle-E", file: "dijkstra-settle-E.mp3", text: "尚未确定的节点中距离最小的是 E，距离 10。它不可能再被缩短——任何别的路径都要先经过一个距离不小于它的节点。确定它之后松弛邻边：F 从 14 缩短到 13。" },
+    { step_id: "dijkstra-settle-F", file: "dijkstra-settle-F.mp3", text: "尚未确定的节点中距离最小的是 F，距离 13。它不可能再被缩短——任何别的路径都要先经过一个距离不小于它的节点。确定它之后松弛邻边：没有邻居的距离被缩短。" },
+    { step_id: "dijkstra-result", file: "dijkstra-result.mp3", text: "六个节点全部确定，最终距离：A 是 0、B 是 3、C 是 2、D 是 8、E 是 10、F 是 13。把每个节点的“最后一次更新来自谁”连起来，就得到从 A 出发的最短路径树；例如到 F 的路径依次经过 A、C、B、D、E、F，长度 13。贪心成立的前提是边权非负，有负权边时要改用 Bellman-Ford。" },
   ],
   "island-biogeography": [
     { step_id: "ibg-eruption", file: "ibg-eruption.mp3", text: "1883 年 8 月，喀拉喀托火山把自己炸掉了大半，幸存的拉卡塔岛被灼热的火山灰埋了几十米——确认无一生还。此后博物学家一次次登岛点名：25 年后有 13 种留鸟，37 年后 28 种，50 年后 29 种。曲线在 30 附近躺平了。可这座岛远远没有住满，为什么停在 30？" },
@@ -37,6 +57,14 @@ export const RECORDED_NARRATION: Readonly<
     { step_id: "ibg-reserves", file: "ibg-reserves.mp3", text: "理论出圈了：被农田与公路切碎的森林，就是一片人造群岛。种-面积曲线立刻给出严厉的提醒——保护区缩小十倍，长期物种数减半，哪怕一棵树都没再砍。“一大还是几小”（SLOSS）因此争论了半个世纪：四个 A=25 的碎片各养约 40 种，一块 A=100 养约 57 种，孰优取决于碎片间的物种是否重复。模型不判决，但它把该问的问题亮了出来：廊道抬高迁入 λ，连片扩大压低灭绝 μ。" },
     { step_id: "ibg-boundary", file: "ibg-boundary.mp3", text: "回到拉卡塔。模型曲线在头 25 年明显高于数据——鸟不能落在光秃秃的浮石上，草和林先用几十年铺路，均衡论却把演替整个抹平了。后来的重访又发现，真实的年灭绝率比理论预言低了一个量级：普查会看漏，过客会被记成居民。它还把物种当成可互换的粒子——没有食物网，没有演化。骨架的价值在于它先回答了第一性的问题：多大的岛、多远的岛、养得起多少种。偏离骨架的部分，正是下一层生态学的开始。" },
   ],
+  "linked-list-reverse": [
+    { step_id: "list-intro", file: "list-intro.mp3", text: "链表依次是 1、2、3、4，末尾指向空，每个节点只知道自己的后继。反转的目标是让每个 next 指针掉头。迭代法用三个指针：prev 指向已经反转好的部分（开始时为空），curr 指向正在处理的节点，next 提前保存后继，否则指针一掉头就找不到后面的节点了。" },
+    { step_id: "list-flip-1", file: "list-flip-1.mp3", text: "curr 在节点 1。先把后继保存进 next，也就是 2；再让节点 1 的 next 指向 prev，也就是 空。指针掉头之后，prev 前进到 1，curr 前进到保存好的 2。此刻已反转的前缀依次是 1，末尾指向空。" },
+    { step_id: "list-flip-2", file: "list-flip-2.mp3", text: "curr 在节点 2。先把后继保存进 next，也就是 3；再让节点 2 的 next 指向 prev，也就是 1。指针掉头之后，prev 前进到 2，curr 前进到保存好的 3。此刻已反转的前缀依次是 2、1，末尾指向空。" },
+    { step_id: "list-flip-3", file: "list-flip-3.mp3", text: "curr 在节点 3。先把后继保存进 next，也就是 4；再让节点 3 的 next 指向 prev，也就是 2。指针掉头之后，prev 前进到 3，curr 前进到保存好的 4。此刻已反转的前缀依次是 3、2、1，末尾指向空。" },
+    { step_id: "list-flip-4", file: "list-flip-4.mp3", text: "curr 在节点 4。先把后继保存进 next，也就是 空；再让节点 4 的 next 指向 prev，也就是 3。指针掉头之后，prev 前进到 4，curr 前进到保存好的 空。next 为空，循环即将结束。" },
+    { step_id: "list-result", file: "list-result.mp3", text: "curr 走到空，循环结束。prev 停在原来的尾节点 4，它就是新的头结点，返回 prev。现在链表依次是 4、3、2、1，末尾指向空。每个节点恰好被访问一次、翻转一条指针，时间 O(n)，只用了三个指针的额外空间。" },
+  ],
   "logistic-growth": [
     { step_id: "logistic-data-puzzle", file: "logistic-data-puzzle.mp3", text: "1913 年，生物学家 Carlson 每小时测一次培养瓶里的酵母量。前 5 个小时它每小时都涨六成以上——照这个势头外推，第 18 小时应该超过七万。可真实的记录在 663 附近停住了。是什么按住了它？" },
     { step_id: "logistic-density-dependence", file: "logistic-density-dependence.mp3", text: "是拥挤本身。瓶里的糖被越来越多的细胞分食，人均资源随 N 下降——写成最简单的形式：人均增长率从 r 线性降到 0，即给 rN 乘上刹车项 (1−N/K)。K 就是这瓶环境长期养得起的上限。" },
@@ -46,6 +74,16 @@ export const RECORDED_NARRATION: Readonly<
     { step_id: "logistic-msy", file: "logistic-msy.mp3", text: "换个问题：长期每小时最多能捞走多少？平衡时的产量 Y=E·K(1−E/r) 是一条开口向下的抛物线，在 E=r/2=0.275 处到顶，最大值恰好是 rK/4=91.2——拐点处那个最大再生产速度，就是渔场的天花板。站在顶点还意味着：E 再大一点点，产量和种群就一起下坡。" },
     { step_id: "logistic-st-matthew", file: "logistic-st-matthew.mp3", text: "1944 年，29 只驯鹿被引入白令海的圣马修岛。按前 13 年的增长拟合 logistic、把 K 猜成 3000，模型预言种群平滑贴向天花板。现实是：1963 年夏数到 6000 只，随后一个严冬几乎全数饿死，1966 年只剩 42 只。不是方程算错了，是它的前提塌了——驯鹿吃光了再生要几十年的地衣，K 本身崩了，而模型假设 K 永远不变。" },
     { step_id: "logistic-skeleton", file: "logistic-skeleton.mp3", text: "回到酵母。Logistic 抓住的是密度制约这一根骨架：数据里的波动、时滞，圣马修岛那样的过冲崩溃，都是骨架上的偏离项。会用模型的意思，是同时知道它何时成立、何时失效。下一课把时间切成一年一代——同一个方程，将一路通向混沌。" },
+  ],
+  "monotonic-stack": [
+    { step_id: "monotonic-intro", file: "monotonic-intro.mp3", text: "给定数组 [4, 2, 5, 1, 3, 6]，要为每个元素找到它右边第一个比它大的数，找不到记为 -1。暴力做法对每个元素向右扫描，是 O(n²)。单调栈的思路是：把“还在等答案”的下标存进栈，栈里对应的值保持递减。" },
+    { step_id: "monotonic-visit-0", file: "monotonic-visit-0.mp3", text: "下标 0 的值是 4。栈是空的，没有谁在等它，把下标 0 压入栈。" },
+    { step_id: "monotonic-visit-1", file: "monotonic-visit-1.mp3", text: "下标 1 的值是 2，不大于栈顶的 4，栈里的元素都还等不到答案。把下标 1 压入栈，栈内的值继续保持递减：[4, 2]。" },
+    { step_id: "monotonic-visit-2", file: "monotonic-visit-2.mp3", text: "下标 2 的值是 5，比栈顶的 2 大。栈顶等的“右侧第一个更大值”就是它：弹出并写下答案。新的栈顶 4 也比 5 小，同样依次弹出记答案。直到栈顶不再小于 5，再把下标 2 压入。目前已确定的答案：下标 0 是 5、下标 1 是 5，其余 4 个还在等待。" },
+    { step_id: "monotonic-visit-3", file: "monotonic-visit-3.mp3", text: "下标 3 的值是 1，不大于栈顶的 5，栈里的元素都还等不到答案。把下标 3 压入栈，栈内的值继续保持递减：[5, 1]。" },
+    { step_id: "monotonic-visit-4", file: "monotonic-visit-4.mp3", text: "下标 4 的值是 3，比栈顶的 1 大。栈顶等的“右侧第一个更大值”就是它：弹出并写下答案。直到栈顶不再小于 3，再把下标 4 压入。目前已确定的答案：下标 0 是 5、下标 1 是 5、下标 3 是 3，其余 3 个还在等待。" },
+    { step_id: "monotonic-visit-5", file: "monotonic-visit-5.mp3", text: "下标 5 的值是 6，比栈顶的 3 大。栈顶等的“右侧第一个更大值”就是它：弹出并写下答案。新的栈顶 5 也比 6 小，同样依次弹出记答案。直到栈顶不再小于 6，再把下标 5 压入。目前已确定的答案：下标 0 是 5、下标 1 是 5、下标 2 是 6、下标 3 是 3、下标 4 是 6，其余 1 个还在等待。" },
+    { step_id: "monotonic-result", file: "monotonic-result.mp3", text: "数组扫描完毕。栈里还剩 [6]，它们右边再没有更大的数，答案保持 -1。最终答案是 [5, 5, 6, 3, 6, -1]。每个下标只入栈一次、出栈最多一次，整体是 O(n)，而不是暴力的 O(n²)。" },
   ],
   "predator-prey": [
     { step_id: "lv-data-pelts", file: "lv-data-pelts.mp3", text: "换一本账本：哈德逊湾公司收购毛皮的记录，1900 到 1920 年。雪兔大约十年一个峰，猞猁跟着起落，但它的峰总是晚一到两年。两条曲线互相追了二十年，谁也没甩开谁，谁也没吃光谁。是谁在驱动谁？" },
@@ -69,5 +107,15 @@ export const RECORDED_NARRATION: Readonly<
     { step_id: "chaos-lorenz-shape", file: "chaos-lorenz-shape.mp3", text: "混沌不只住在兔群里。1963 年，气象学家洛伦兹在三条大气对流方程里看到同样的东西——轨迹永远绕着两翼盘旋，永不重复。你看到的交叉是三维轨迹拍进平面的投影假象，这恰好说明它活在三维里。" },
     { step_id: "chaos-lorenz-divergence", file: "chaos-lorenz-divergence.mp3", text: "还是那个 0.000001：两条洛伦兹轨迹的 x 分量，前二十多秒完全重合，之后各自绕向不同的翼。天气预报的两周上限，就是这条曲线定的——不是仪器不行，是大气本身在放大误差。" },
     { step_id: "chaos-sandbox", file: "chaos-sandbox.mp3", text: "旁白到此为止。右侧的 r 和 N₀ 现在归你：把 r 从 0.5 慢慢推到 3，找一找周期 8；进了混沌带再把 N₀ 挪一格，数一数轨迹几年后面目全非。这张图你已经会读了。" },
+  ],
+  "stack-brackets": [
+    { step_id: "bracket-intro", file: "bracket-intro.mp3", text: "要判断这个表达式的括号是否匹配：花括号里套着方括号，方括号里再套着圆括号。规则只有一条：每个右括号必须与最近一个尚未闭合的左括号类型相同。“最近的尚未闭合”正是后进先出，所以用栈来记录还没配对的左括号，从左到右逐字符扫描。" },
+    { step_id: "bracket-read-0", file: "bracket-read-0.mp3", text: "第 0 个字符是左花括号。它还没有配对对象，先压入栈顶等待。此时栈里从底到顶依次是左花括号，栈顶总是最近一个尚未闭合的左括号。" },
+    { step_id: "bracket-read-1", file: "bracket-read-1.mp3", text: "第 1 个字符是左方括号。它还没有配对对象，先压入栈顶等待。此时栈里从底到顶依次是左花括号、左方括号，栈顶总是最近一个尚未闭合的左括号。" },
+    { step_id: "bracket-read-2", file: "bracket-read-2.mp3", text: "第 2 个字符是左圆括号。它还没有配对对象，先压入栈顶等待。此时栈里从底到顶依次是左花括号、左方括号、左圆括号，栈顶总是最近一个尚未闭合的左括号。" },
+    { step_id: "bracket-read-3", file: "bracket-read-3.mp3", text: "第 3 个字符是右圆括号。栈顶是第 2 个字符左圆括号，类型正好相同，于是弹出栈顶，两者完成配对。弹出后栈里从底到顶依次是左花括号、左方括号。" },
+    { step_id: "bracket-read-4", file: "bracket-read-4.mp3", text: "第 4 个字符是右方括号。栈顶是第 1 个字符左方括号，类型正好相同，于是弹出栈顶，两者完成配对。弹出后栈里从底到顶依次是左花括号。" },
+    { step_id: "bracket-read-5", file: "bracket-read-5.mp3", text: "第 5 个字符是右花括号。栈顶是第 0 个字符左花括号，类型正好相同，于是弹出栈顶，两者完成配对。弹出后栈已经空了。" },
+    { step_id: "bracket-result", file: "bracket-result.mp3", text: "扫描完 6 个字符，栈恰好为空：每个右括号都找到了最近的、类型相同的左括号。返回 true。整个过程每个字符只入栈、出栈各最多一次，时间复杂度 O(n)，栈的额外空间最坏也是 O(n)。" },
   ],
 });

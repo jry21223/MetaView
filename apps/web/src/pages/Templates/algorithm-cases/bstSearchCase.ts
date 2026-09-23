@@ -277,6 +277,8 @@ function buildBstSearchSteps(params: TemplatePreviewParams): AlgorithmCaseFrame<
   trace.path.forEach((comparison, index) => {
     const node = BST_TREE.get(comparison.node)!;
     const relation = comparison.direction === "found" ? "=" : comparison.direction === "left" ? "<" : ">";
+    // Narration spells the comparison out: a bare "<" is not reliably spoken.
+    const spokenRelation = comparison.direction === "left" ? "小于" : "大于";
     const nextValue = comparison.direction === "found" ? null : node[comparison.direction];
     const title = comparison.direction === "found"
       ? `在 ${comparison.node} 处比较：${target} = ${comparison.node}，命中`
@@ -284,8 +286,8 @@ function buildBstSearchSteps(params: TemplatePreviewParams): AlgorithmCaseFrame<
     const narration = comparison.direction === "found"
       ? `来到节点 ${comparison.node}，目标 ${target} 正好等于它，查找结束。这是第 ${index + 1} 次比较，走过的路径依次是 ${pathSpoken(trace.path)}。`
       : nextValue == null
-        ? `来到节点 ${comparison.node}，目标 ${target} ${relation} ${comparison.node}，应该往${comparison.direction === "left" ? "左" : "右"}走，但那一侧是空的。第 ${index + 1} 次比较后可以确定：${target} 不在树中。`
-        : `来到节点 ${comparison.node}，目标 ${target} ${relation} ${comparison.node}，所以整棵${comparison.direction === "left" ? "右" : "左"}子树都不用看，沿${comparison.direction === "left" ? "左" : "右"}孩子进入 ${nextValue}。这是第 ${index + 1} 次比较。`;
+        ? `来到节点 ${comparison.node}，目标 ${target} ${spokenRelation} ${comparison.node}，应该往${comparison.direction === "left" ? "左" : "右"}走，但那一侧是空的。第 ${index + 1} 次比较后可以确定：${target} 不在树中。`
+        : `来到节点 ${comparison.node}，目标 ${target} ${spokenRelation} ${comparison.node}，所以整棵${comparison.direction === "left" ? "右" : "左"}子树都不用看，沿${comparison.direction === "left" ? "左" : "右"}孩子进入 ${nextValue}。这是第 ${index + 1} 次比较。`;
     const skipped = comparison.direction === "found"
       ? []
       : subtreeValues(BST_TREE, comparison.direction === "left" ? node.right : node.left);

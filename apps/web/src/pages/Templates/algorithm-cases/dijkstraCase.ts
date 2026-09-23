@@ -12,6 +12,7 @@ import {
   type AlgorithmCaseFrame,
   type AlgorithmStepDraft,
 } from "./helpers";
+import { spokenList } from "../../../shared/lib/spokenText";
 
 /**
  * Dijkstra 最短路径。
@@ -148,6 +149,11 @@ export function dijkstraTrace(source: DijkstraNodeId): DijkstraStep[] {
 
 function distLabel(value: number): string {
   return Number.isFinite(value) ? String(value) : "∞";
+}
+
+/** The distance table read aloud: "A 是 0、B 是 3" rather than "A=0 B=3". */
+function distSpoken(dist: DistanceTable): string {
+  return spokenList(DIJKSTRA_NODE_IDS.map((id) => `${id} 是 ${Number.isFinite(dist[id]) ? dist[id] : "无穷大"}`));
 }
 
 function distText(dist: DistanceTable): string {
@@ -294,7 +300,7 @@ function buildDijkstraSteps(params: TemplatePreviewParams): AlgorithmCaseFrame<G
   steps.push({
     step_id: "dijkstra-result",
     title: "所有节点确定，最短路径树成形",
-    voiceover_text: `六个节点全部确定，最终距离是 ${distText(last.dist)}。把每个节点的“最后一次更新来自谁”连起来，就得到从 ${source} 出发的最短路径树；例如到 ${farthest} 的路径依次经过 ${shortestPath(last.parent, source, farthest).join("、")}，长度 ${last.dist[farthest]}。贪心成立的前提是边权非负，有负权边时要改用 Bellman-Ford。`,
+    voiceover_text: `六个节点全部确定，最终距离：${distSpoken(last.dist)}。把每个节点的“最后一次更新来自谁”连起来，就得到从 ${source} 出发的最短路径树；例如到 ${farthest} 的路径依次经过 ${shortestPath(last.parent, source, farthest).join("、")}，长度 ${last.dist[farthest]}。贪心成立的前提是边权非负，有负权边时要改用 Bellman-Ford。`,
     snapshot: dijkstraSnapshot({
       dist: last.dist,
       current: null,
