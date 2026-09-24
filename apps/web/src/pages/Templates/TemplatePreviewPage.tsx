@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 import { PlaybookPlayer } from "../../features/playbook/engine/player/PlaybookPlayer";
 import type { PlaybookScript } from "../../features/playbook/engine/types";
 import { useInteractionSandbox } from "../../features/playbook/interaction/useInteractionSandbox";
-import { TEMPLATES } from "./templates";
+import { RETIRED_TEMPLATE_REDIRECTS, TEMPLATES } from "./templates";
 import { StaticFollowupPanel } from "./StaticFollowupPanel";
 import { TemplatePreviewControls } from "./TemplatePreviewControls";
 import {
@@ -24,6 +24,10 @@ export function TemplatePreviewPage({
   onToggleTopbar,
 }: TemplatePreviewPageProps) {
   const { templateId = "" } = useParams<{ templateId: string }>();
+  const retiredTarget = Object.hasOwn(RETIRED_TEMPLATE_REDIRECTS, templateId)
+    ? RETIRED_TEMPLATE_REDIRECTS[templateId]
+    : null;
+  if (retiredTarget) return <Navigate replace to={`/templates/${retiredTarget}`} />;
   const template = TEMPLATES.find((item) => item.id === templateId) ?? null;
   const previewCase = getTemplatePreviewCase(templateId);
 

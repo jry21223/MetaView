@@ -11,7 +11,6 @@ describe("cross-subject public Gold Templates", () => {
   it("publishes one deterministic teacher case for each requested subject", () => {
     expect(CROSS_SUBJECT_PUBLIC_GOLD_TEMPLATES.map((item) => item.caseId)).toEqual([
       "two-sum",
-      "redox-electron",
       "dna-replication",
       "monsoon",
       "logistic-growth",
@@ -19,7 +18,6 @@ describe("cross-subject public Gold Templates", () => {
     ]);
     expect(new Set(CROSS_SUBJECT_PUBLIC_GOLD_TEMPLATES.map((item) => item.subject))).toEqual(new Set([
       "computer_science",
-      "high_school_chemistry",
       "high_school_biology",
       "high_school_geography",
       "university_ecology",
@@ -202,22 +200,6 @@ describe("cross-subject public Gold Templates", () => {
       expect(script.steps.find((step) => step.step_id === "two-sum-verify")?.voiceover_text)
         .toContain(`=${target}`);
       expect(script.steps.every((step) => step.snapshot.kind === "code_trace_scene")).toBe(true);
-    }
-  });
-
-  it("balances the zinc-copper redox explanation through two-electron half reactions", () => {
-    const item = CROSS_SUBJECT_PUBLIC_GOLD_TEMPLATES.find((entry) => entry.caseId === "redox-electron")!;
-    const script = item.buildPublicPlaybook({});
-    expect(script.steps.map((step) => step.snapshot.kind)).toEqual(Array(6).fill("reaction_scene"));
-    expect(script.steps[2].voiceover_text).toContain("Zn → Zn²⁺ + 2e⁻");
-    expect(script.steps[3].voiceover_text).toContain("Cu²⁺ + 2e⁻ → Cu");
-    expect(script.steps[5].voiceover_text).toContain("总电荷都为 +2");
-    const transfer = script.steps[4].snapshot;
-    expect(transfer.kind).toBe("reaction_scene");
-    if (transfer.kind === "reaction_scene") {
-      expect(transfer.electron_flows).toEqual(expect.arrayContaining([
-        expect.objectContaining({ semantic_role: "electron_flow", label: "2e⁻" }),
-      ]));
     }
   });
 

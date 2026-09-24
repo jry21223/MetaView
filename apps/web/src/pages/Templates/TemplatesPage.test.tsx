@@ -50,11 +50,11 @@ describe("TemplatesPage lesson atlas", () => {
     expect(view.getByLabelText("current-path").textContent).toBe("/templates/binary-search");
   });
 
-  it("publishes twenty-nine line-drawn previews and keeps the other templates disabled", () => {
+  it("publishes thirty-four line-drawn previews and keeps the other templates disabled", () => {
     const { container, getByRole } = renderPage();
 
-    expect(TEMPLATES).toHaveLength(36);
-    expect(container.querySelectorAll("[data-preview]")).toHaveLength(29);
+    expect(TEMPLATES).toHaveLength(41);
+    expect(container.querySelectorAll("[data-preview]")).toHaveLength(34);
     expect((getByRole("button", { name: "斐波那契 · 记忆化，制作中" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -111,6 +111,29 @@ describe("TemplatesPage lesson atlas", () => {
     fireEvent.click(view.getByRole("button", { name: "Dijkstra 最短路径，展开预览" }));
     fireEvent.click(view.getByRole("button", { name: "Dijkstra 最短路径，进入完整案例" }));
     expect(view.getByLabelText("current-path").textContent).toBe("/templates/dijkstra");
+  });
+
+  it("lists the chemistry coursepack in its own playable section, in textbook order", () => {
+    const view = renderPage();
+    const section = view.getByRole("heading", { name: "化学" }).closest("section") as HTMLElement;
+    const titles = [
+      "锌铜原电池 · 电子与离子",
+      "酯化反应 · ¹⁸O 示踪与机理",
+      "碰撞理论与活化能",
+      "合成氨与勒夏特列原理",
+      "酸碱中和滴定 · pH 突变",
+    ];
+    const text = section.textContent ?? "";
+    const positions = titles.map((title) => text.indexOf(title));
+    expect(positions.every((position) => position >= 0)).toBe(true);
+    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+    for (const title of titles) {
+      expect((view.getByRole("button", { name: `${title}，展开预览` }) as HTMLButtonElement).disabled).toBe(false);
+    }
+    expect(view.queryByText("氧化还原 · 电子转移")).toBeNull();
+    fireEvent.click(view.getByRole("button", { name: "锌铜原电池 · 电子与离子，展开预览" }));
+    fireEvent.click(view.getByRole("button", { name: "锌铜原电池 · 电子与离子，进入完整案例" }));
+    expect(view.getByLabelText("current-path").textContent).toBe("/templates/galvanic-cell");
   });
 
   it("shows a helpful empty state for unmatched searches", () => {
