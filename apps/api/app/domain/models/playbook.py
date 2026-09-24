@@ -33,6 +33,7 @@ class SnapshotKind(str, Enum):
     BIO_PROCESS_SCENE = "bio_process_scene"
     MOLECULE_2D_SCENE = "molecule_2d_scene"
     REACTION_SCENE = "reaction_scene"
+    CHEMISTRY_SCENE = "chemistry_scene"
     GEO_MAP_SCENE = "geo_map_scene"
     PHYSICS_FORCE_SCENE = "physics_force_scene"
     MOTION_SCENE = "motion_scene"
@@ -726,6 +727,55 @@ class ReactionSceneSnapshot(BaseModel):
     caption: str | None = None
 
 
+class ChemistryRect(BaseModel):
+    x: float
+    y: float
+    w: float = Field(gt=0)
+    h: float = Field(gt=0)
+
+
+class ChemistryScenePanel(BaseModel):
+    """One panel of a ``chemistry_scene``.
+
+    The panel envelope (type, id, stage rect) is validated here; each panel
+    type's body (atoms and bonds, particles, apparatus state, chart series…)
+    is kept verbatim. Only the reviewed chemistry templates author this kind
+    today, and the web contract (``kits/chemistry/sceneTypes.ts``) plus its
+    tests own the body shapes.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    type: Literal[
+        "molecules",
+        "particles",
+        "galvanic_cell",
+        "titration",
+        "chart",
+        "energy_profile",
+        "cards",
+    ]
+    id: str
+    rect: ChemistryRect
+
+
+class ChemistryCallout(BaseModel):
+    id: str
+    target: str
+    text: str
+    tone: Literal["primary", "secondary", "focus", "muted", "ink"] | None = None
+    prefer: Literal["above", "below", "left", "right"] | None = None
+
+
+class ChemistrySceneSnapshot(BaseModel):
+    kind: Literal["chemistry_scene"] = "chemistry_scene"
+    scene_id: str
+    equation: str | None = None
+    panels: list[ChemistryScenePanel] = Field(min_length=1)
+    callouts: list[ChemistryCallout] = Field(default_factory=list)
+    caption: str | None = None
+
+
 class GeoMapLayer(BaseModel):
     id: str
     semantic_role: str
@@ -1004,6 +1054,7 @@ AnySnapshot = Annotated[
         BioProcessSceneSnapshot,
         Molecule2DSceneSnapshot,
         ReactionSceneSnapshot,
+        ChemistrySceneSnapshot,
         GeoMapSceneSnapshot,
         PhysicsForceSceneSnapshot,
         MotionSceneSnapshot,

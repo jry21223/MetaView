@@ -16,6 +16,8 @@ interface CoreCalloutLabelProps {
   rendererKind: string;
   stroke?: string;
   textFill?: string;
+  /** Plate behind the text; defaults to white for the renderers that predate tokens. */
+  fill?: string;
   dotRadius?: number;
 }
 
@@ -52,6 +54,7 @@ export function CoreCalloutLabel({
   rendererKind,
   stroke = "#64748b",
   textFill = "#243447",
+  fill = "#ffffff",
   dotRadius = 1.2,
 }: CoreCalloutLabelProps) {
   const geometry = calloutGeometry(anchor, label);
@@ -78,7 +81,7 @@ export function CoreCalloutLabel({
         width={geometry.width}
         height={geometry.height}
         rx="1.4"
-        fill="#ffffff"
+        fill={fill}
         stroke={stroke}
         strokeWidth="0.42"
         opacity="0.96"

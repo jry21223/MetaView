@@ -87,6 +87,7 @@ const SUPPORTED_FRONTEND_SNAPSHOT_KINDS = new Set([
   "bio_process_scene",
   "molecule_2d_scene",
   "reaction_scene",
+  "chemistry_scene",
   "geo_map_scene",
   "physics_force_scene",
   "motion_scene",

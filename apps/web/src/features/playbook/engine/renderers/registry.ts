@@ -13,6 +13,7 @@ import {
   TableSceneRenderer,
 } from "./AdvancedMathRenderers";
 import { BioCellSceneRenderer } from "./BioCellSceneRenderer";
+import { ChemistrySceneRenderer } from "./chemistry/ChemistrySceneRenderer";
 import { BioProcessSceneRenderer } from "./BioProcessSceneRenderer";
 import { CallStackSceneRenderer } from "./CallStackSceneRenderer";
 import { CodeTraceSceneRenderer } from "./CodeTraceSceneRenderer";
@@ -54,6 +55,7 @@ const registry = new Map<SnapshotKind, RendererComponent>([
   ["bio_process_scene", BioProcessSceneRenderer],
   ["molecule_2d_scene", Molecule2DSceneRenderer],
   ["reaction_scene", ReactionSceneRenderer],
+  ["chemistry_scene", ChemistrySceneRenderer],
   ["geo_map_scene", GeoMapSceneRenderer],
   ["physics_force_scene", PhysicsForceSceneRenderer],
   ["motion_scene", MotionSceneRenderer],
