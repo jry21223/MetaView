@@ -47,8 +47,19 @@ function displayFormula(formula: string): string {
     .replace(/\\/g, ""));
 }
 
+/** A participant card is washed with its role colour so it reads as a card, not an outline. */
+const CARD_TINT_OPACITY = 0.16;
+
 function renderParticipant(participant: ReactionParticipant, role: "reactant" | "product", palette: ChemPalette) {
   const x = sx(participant.x);
+  const tone = role === "reactant" ? palette.secondary : palette.primary;
+  const card = {
+    x: x - CARD_WIDTH / 2,
+    y: participant.y - CARD_HEIGHT / 2,
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
+    rx: 3,
+  };
   return (
     <g
       key={participant.id}
@@ -56,16 +67,8 @@ function renderParticipant(participant: ReactionParticipant, role: "reactant" | 
       data-semantic-role={role}
       data-asset-id={participant.asset_id ?? undefined}
     >
-      <rect
-        x={x - CARD_WIDTH / 2}
-        y={participant.y - CARD_HEIGHT / 2}
-        width={CARD_WIDTH}
-        height={CARD_HEIGHT}
-        rx="3"
-        fill={palette.plate}
-        stroke={role === "reactant" ? palette.secondary : palette.primary}
-        strokeWidth="0.8"
-      />
+      <rect {...card} fill={palette.plate} />
+      <rect {...card} fill={tone} fillOpacity={CARD_TINT_OPACITY} stroke={tone} strokeWidth="0.8" />
       <ChemText text={participantFormula(participant)} x={x} y={participant.y - 0.6} fontSize={5.4} fill={palette.ink} anchor="middle" weight={700} />
       {participant.label ? (
         <text x={x} y={participant.y + 6.1} textAnchor="middle" fontSize="2.8" fontWeight="600" fill={palette.ink2}>

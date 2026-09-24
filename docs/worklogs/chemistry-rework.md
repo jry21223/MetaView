@@ -223,3 +223,13 @@ dev server（5195）已停止，临时截图脚本已删除。
 - LOW：重定向目标是否存在只由测试保证、没有类型约束。**接受现状、不改**：目录是运行时数组，测试已在目标失效时失败，再加类型体操属于过度设计。
 - 文档同步（docs-reviewer 子代理，只读）：新增改动“无需更新”；规格、`template-previews.md` 与日志的描述逐条对得上代码。
 - `make check` 之后只改了 `TemplatePreviewPage.tsx` 的一行换行：随后 `apps/web` 的 `npx tsc --noEmit` 与 `src/pages/Templates` 全部测试复跑通过（见下）。
+
+### CI visual-check 修复（PR #293）
+
+- CI `visual-check`（run 35954109904）在 `showcase:smoke` 失败：`reaction_synthesis_water` 内容像素占比 4.6% < 阈值 5%。
+  原因：本分支把旧 `ReactionSceneRenderer` 的参与物卡片改成与舞台同色的 `palette.plate` 底，只剩描边，被判为“接近空白”。
+- 修复：卡片在 plate 上叠一层角色色（反应物 `--canvas-secondary`、生成物 `--canvas-primary`）16% 透明度（`CARD_TINT_OPACITY`），浅色、深色都看过。
+- 本地验证：`showcase:export` 通过；`showcase:smoke` 对除 `projectile_motion` 外的 13 个 fixture 全部通过（`reaction_synthesis_water` 9.5%）。
+  `projectile_motion` 在本机失败（物理渲染器，本分支未改；同一 PR 的 CI 已通过该 fixture，它排在反应 fixture 之前），判定为本机字体/环境差异。
+  `showcase:baseline` 只因跳过的 `projectile_motion` 报 missing（driftOk、contractOk 均为 true，其余条目无 issue）；`showcase:review-packet` 通过。
+  反应/分子/showcase fixture/化学 kit 测试 16 个文件 110 个通过；`npx tsc --noEmit` 通过；web eslint 0 error。
