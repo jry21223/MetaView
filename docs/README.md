@@ -27,6 +27,7 @@
 | [template-previews.md](./template-previews.md) | `/templates` 正式案例、统一 PlaybookPlayer、确定性参数与零请求边界 |
 | [seo-geo.md](./seo-geo.md) | 公共路由的索引边界、canonical / social metadata、JSON-LD、sitemap 与构建验证 |
 | [gold-template-system.md](./gold-template-system.md) | Public Gold Template、Hidden Variant、Manifest 与防泄漏边界 |
+| [chemistry-coursepack.md](./chemistry-coursepack.md) | 高中化学课程包：`chemistry_scene` 快照、五个正式案例、审计、参考取舍、假设与待决问题 |
 | [conic-sections-capability.md](./conic-sections-capability.md) | 圆锥曲线题型母版、领域内核、Skill 路由与 V1 能力边界 |
 | [animation-tool-registry.md](./animation-tool-registry.md) | 后端 animation tool registry 的扩展流程、当前工具和新增规则 |
 | [topic-routing.md](./topic-routing.md) | topic routing 模式、自动路由、显式 domain 和 skill override |

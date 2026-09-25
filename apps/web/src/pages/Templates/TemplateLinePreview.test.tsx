@@ -65,6 +65,21 @@ describe("TemplateLinePreview conic descriptors", () => {
     }
   });
 
+  it.each([
+    ["galvanic-cell", { beaker: 2, wire: 1, "salt-bridge": 1, electron: 3 }],
+    ["esterification-mechanism", { "labelled-oxygen": 1, "curly-arrow": 1, water: 1 }],
+    ["collision-activation", { "energy-path": 1, "catalysed-path": 1, "activation-energy": 1 }],
+    ["haber-le-chatelier", { disturbance: 1, "reactant-curve": 1, "product-curve": 1 }],
+    ["acid-base-titration", { burette: 1, flask: 1, "equivalence-jump": 1, "equivalence-point": 1 }],
+  ] as const)("draws the %s chemistry preview with its key objects", (caseId, objects) => {
+    const { container } = render(<TemplateLinePreview caseId={caseId} />);
+    const svg = container.querySelector(`[data-preview='${caseId}'] svg[data-preview-geometry='${caseId}']`);
+    expect(svg).toBeTruthy();
+    for (const [object, count] of Object.entries(objects)) {
+      expect(svg?.querySelectorAll(`[data-object='${object}']`)).toHaveLength(count);
+    }
+  });
+
   it("keeps the pole-polar reference preview unchanged and separate", () => {
     const { container } = render(<TemplateLinePreview caseId="pole-polar" />);
 

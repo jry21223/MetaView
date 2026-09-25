@@ -2,7 +2,7 @@
 
 Status: Active
 
-`/templates` 是模板和正式案例的权威目录。它当前展示 36 个模板条目，其中 29 个已登记为可交互正式案例；尚未完成的模板必须显示“制作中”并保持禁用，不能退回旧的生成入口。随课包聚焦（圆锥曲线、微积分、高中物理 + 高校生态学试点），`two-sum`、`redox-electron`、`monsoon` 及中和占位已从目录隐藏：Gold Manifest、隐藏变体与海报全部保留，仅不再出现在 `/templates`，直链访问显示不可用状态。生态学五案例（种群双课 + 种间双课 + 群落一课）归入独立的“生态学”分区。五个数据结构案例（栈 · 括号匹配、单调栈、链表反转、二叉搜索树、Dijkstra）归入独立的“数据结构”分区，与滑动窗口、归并、快排、二分查找、BFS 一样由 `algorithm-cases/` 下的纯函数 trace 驱动：栈走 `algorithm_array` / `algorithm_bars` 的 `stack` 辅助轨道（渲染为主序列右侧的竖直槽位列），结果序列走横向的 `result` 轨道，树、链表与带权图走带显式坐标的 `graph_scene`（坐标投影、舞台边界与 `graphSceneSnapshot` / `rowLayout` / `inorderTreeLayout` / `pointerMarkers` 统一在 `features/playbook/engine/kits/algorithm/graphScene.ts`，渲染器读同一份常量）。
+`/templates` 是模板和正式案例的权威目录。它当前展示 41 个模板条目，其中 34 个已登记为可交互正式案例；尚未完成的模板必须显示“制作中”并保持禁用，不能退回旧的生成入口。随课包聚焦（圆锥曲线、微积分、高中物理 + 高校生态学试点），`two-sum`、`monsoon` 已从目录隐藏：Gold Manifest、隐藏变体与海报全部保留，仅不再出现在 `/templates`，直链访问显示不可用状态。原来的 `redox-electron` 与中和占位已被高中化学课程包取代（`redox-electron` 的 manifest、线描与海报已删除，旧直链经 `templates.ts` 的 `RETIRED_TEMPLATE_REDIRECTS` 跳转到 `/templates/galvanic-cell`）：五个化学案例（锌铜原电池、酯化 ¹⁸O 示踪与机理、碰撞理论与活化能、合成氨与勒夏特列原理、酸碱中和滴定）按课本顺序归入独立的“化学”分区，全部由 `chemistry_scene` 快照渲染——伪 3D 分子、粒子放大图、原电池与滴定装置、曲线与能量图在同一舞台联动，详见 [chemistry-coursepack.md](./chemistry-coursepack.md)。生态学五案例（种群双课 + 种间双课 + 群落一课）归入独立的“生态学”分区。五个数据结构案例（栈 · 括号匹配、单调栈、链表反转、二叉搜索树、Dijkstra）归入独立的“数据结构”分区，与滑动窗口、归并、快排、二分查找、BFS 一样由 `algorithm-cases/` 下的纯函数 trace 驱动：栈走 `algorithm_array` / `algorithm_bars` 的 `stack` 辅助轨道（渲染为主序列右侧的竖直槽位列），结果序列走横向的 `result` 轨道，树、链表与带权图走带显式坐标的 `graph_scene`（坐标投影、舞台边界与 `graphSceneSnapshot` / `rowLayout` / `inorderTreeLayout` / `pointerMarkers` 统一在 `features/playbook/engine/kits/algorithm/graphScene.ts`，渲染器读同一份常量）。
 
 ## 路由与交互
 
@@ -61,6 +61,11 @@ Status: Active
 | `line-ellipse-position` | 相交、相切、相离、竖直直线与判别式 | 直线类型及参数 |
 | `ellipse-chord-midpoint-locus` | 动弦、中点尾迹、理论轨迹与韦达关系 | 定点、斜率 |
 | `pole-polar` | 圆外点、两条切线、接触弦与极线方程 | 外点坐标 `k` |
+| `galvanic-cell` | 锌片直接置换只放热、无盐桥无电流、盐桥闭合回路；负极/正极表面放大、盐桥离子迁移与电中性、电子守恒算电极质量、E° 差与构成条件 | 负极金属 Zn/Fe、通过电子 `n(e⁻)` |
+| `esterification-mechanism` | 实验现象与试剂作用、两种断键假设、¹⁸O 示踪（Mr 90）、酸催化五步机理（断键/成键动画 + 弯箭头）、可逆与提高产率 | 醇（乙醇/甲醇）、模型（球棍/比例） |
+| `collision-activation` | 2HI 分解：碰撞取向、过渡态半键、Ea 184 与 ΔH +9.5 kJ/mol、活化分子比例、升温与 Pt 催化的定量效果 | 温度 `T`、催化剂（无/Pt） |
+| `haber-le-chatelier` | 键能估算 ΔH、动态平衡与 K、同一时间轴上加 N₂/压缩/升温三次扰动与 Q–K 判断、催化剂、工业条件 | 加入 N₂、压缩倍数、升温幅度 |
+| `acid-base-titration` | 滴定装置、H⁺ + OH⁻ 微观本质、19.98→20.02 mL 的 pH 4.30→9.70 突变、指示剂变色范围与终点误差、浓度影响、自由滴定 | 浓度、指示剂、加入体积 |
 | `dna-replication` | 模板链、复制叉、互补配对与新链生成 | 固定教学过程 |
 | `logistic-growth` | Carlson 1913 酵母数据、指数假设检验、S 形拟合、K/2 拐点、恒定努力捕捞与 rK/4 最大可持续产量、圣马修岛模型边界（高校生态学试点） | `r`、`K`、`N₀`、捕捞强度 `E` |
 | `rabbit-chaos` | 一年一代离散 logistic 映射、过冲与周期 2/4、混沌、蝴蝶效应双轨迹、分岔图全景、洛伦兹吸引子（高校生态学试点） | 年增长率 `r`、初始兔群 `N₀` |
@@ -68,7 +73,7 @@ Status: Active
 | `competition-exclusion` | Gause 1934 双草履虫实验、L-V 竞争方程、零增长停线几何、排斥/共存/先到者赢三种结局、绿草履虫生态位分化（高校生态学试点） | 竞争系数 `α`、`β`、初始 `N₁₀`、`N₂₀` |
 | `island-biogeography` | 喀拉喀托 1883 灭岛与留鸟普查、迁入-灭绝均衡 S*≈30、动态周转、面积/距离效应、种-面积规律 z≈0.3、保护区设计与模型边界（高校生态学试点） | 岛面积 `A`、距离 `D`、物种池 `P` |
 
-每个默认案例至少有五个实际状态不同的步骤。算法案例的这些不变量（步数、step_id 唯一、快照互异、`total_frames`、代码行范围、每步三问、`visualQualityGate`、旁白可朗读）由 `algorithm-cases/testing/expectDeterministicCase` 统一断言，并按案例声明的参数矩阵逐组检查，而不只在默认参数下。九个 Gold 圆锥曲线案例每一步提供上述 5 个可执行且与当前步骤绑定的语义操作；其余 Gold 案例（微积分、物理、跨学科与生态学）以及普通正式案例每一步保留 3 个固定问题（观察、机制、检验）。案例数据必须继续符合 `PlaybookScript`；不要为公开模板引入第二套播放器或渲染协议。
+每个默认案例至少有五个实际状态不同的步骤。算法案例的这些不变量（步数、step_id 唯一、快照互异、`total_frames`、代码行范围、每步三问、`visualQualityGate`、旁白可朗读）由 `algorithm-cases/testing/expectDeterministicCase` 统一断言，并按案例声明的参数矩阵逐组检查，而不只在默认参数下。九个 Gold 圆锥曲线案例每一步提供上述 5 个可执行且与当前步骤绑定的语义操作；其余 Gold 案例（微积分、物理、跨学科与生态学）以及普通正式案例每一步保留 3 个固定问题（观察、机制、检验）。化学课程包同样每步 3 问（看什么、为什么、怎样自己检查），但题面与答案逐步写成、引用当前参数下的数字；其共享契约（6–10 步、旁白可朗读、每步原子守恒、标签不压形状/不出舞台）由 `gold-templates/chemistry/chemistryGoldTemplates.test.ts` 按参数矩阵断言。案例数据必须继续符合 `PlaybookScript`；不要为公开模板引入第二套播放器或渲染协议。
 
 Gold 的公开冻结 Playbook 只用于展示和视觉基线，不能作为真实生成 Benchmark 的输入。隐藏变体及隔离规则见 [gold-template-system.md](./gold-template-system.md)。
 

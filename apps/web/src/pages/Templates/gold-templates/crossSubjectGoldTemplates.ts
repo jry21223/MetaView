@@ -6,10 +6,8 @@ import type {
   MetaStep,
   PhasePortraitSceneSnapshot,
   PlaybookScript,
-  ReactionSceneSnapshot,
 } from "../../../features/playbook/engine/types";
 import { compileBioProcessLayout } from "../../../features/playbook/engine/kits/biology/biologyLayouts";
-import { compileReactionLayout } from "../../../features/playbook/engine/kits/chemistry/chemistryLayouts";
 import { compileGeoMapLayout } from "../../../features/playbook/engine/kits/geography/geographyLayouts";
 import type {
   TemplatePreviewFollowups,
@@ -259,71 +257,6 @@ export function buildTwoSumGoldPlaybook(params: TemplatePreviewParams): Playbook
     "code_two_sum_hash_table",
     steps,
     [{ id: "target", label: "目标和 target", value: String(target), description: "可选 9、18 或 26；均有唯一演示解" }],
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Chemistry · Zinc / copper ion redox
-
-type RedoxStage = "observe" | "states" | "oxidation" | "reduction" | "transfer" | "verify";
-
-function redoxSnapshot(stage: RedoxStage, caption: string): ReactionSceneSnapshot {
-  const showFlow = stage === "transfer" || stage === "verify";
-  const formulaByStage: Record<RedoxStage, string> = {
-    observe: "Zn + Cu²⁺ → Zn²⁺ + Cu",
-    states: "Zn⁰ → Zn²⁺ ; Cu²⁺ → Cu⁰",
-    oxidation: "Zn → Zn²⁺ + 2e⁻",
-    reduction: "Cu²⁺ + 2e⁻ → Cu",
-    transfer: "Zn + Cu²⁺ → Zn²⁺ + Cu",
-    verify: "Zn + CuSO₄ → ZnSO₄ + Cu",
-  };
-  const calloutsByStage: Record<RedoxStage, Array<{ id: string; targetId: string; label: string; side: "top" | "bottom" | "left" | "right" }>> = {
-    observe: [{ id: "observe-change", targetId: "main-arrow", label: "置换反应", side: "top" }],
-    states: [
-      { id: "zn-state", targetId: "zn", label: "0 → +2，失电子", side: "top" },
-      { id: "cu-state", targetId: "cu2", label: "+2 → 0，得电子", side: "top" },
-    ],
-    oxidation: [{ id: "zn-oxidized", targetId: "zn", label: "还原剂 Zn 被氧化", side: "top" }],
-    reduction: [{ id: "cu-reduced", targetId: "cu2", label: "氧化剂 Cu²⁺ 被还原", side: "top" }],
-    transfer: [{ id: "two-electrons", targetId: "main-arrow", label: "转移 2e⁻", side: "top" }],
-    verify: [{ id: "sulfate", targetId: "main-arrow", label: "SO₄²⁻ 是旁观离子", side: "top" }],
-  };
-  return compileReactionLayout({
-    packId: "chemistry-basic",
-    reactionId: "zinc_copper_redox",
-    reactants: [
-      { id: "zn", formulaLatex: "Zn", label: "锌，0价", x: 18, y: 51 },
-      { id: "cu2", formulaLatex: "Cu²⁺", label: "铜离子，+2价", x: 38, y: 51 },
-    ],
-    products: [
-      { id: "zn2", formulaLatex: "Zn²⁺", label: "锌离子，+2价", x: 72, y: 51 },
-      { id: "cu", formulaLatex: "Cu", label: "铜，0价", x: 88, y: 51 },
-    ],
-    arrows: [{ id: "main-arrow", semanticRole: "reaction_arrow", from: [47, 51], to: [63, 51], label: "发生氧化还原" }],
-    electronFlows: showFlow
-      ? [{ id: "zn-to-cu", semanticRole: "electron_flow", from: [21, 42], to: [36, 42], label: "2e⁻" }]
-      : [],
-    callouts: calloutsByStage[stage],
-    formulaLatex: formulaByStage[stage],
-    caption,
-  });
-}
-
-export function buildRedoxGoldPlaybook(): PlaybookScript {
-  const steps = [
-    sceneStep(0, "redox-observe", "观察反应前后", "锌进入溶液，铜离子转化为铜单质；需要解释的是谁失去电子、谁得到电子。", redoxSnapshot("observe", "先把可观察变化对应到粒子 Zn、Cu²⁺、Zn²⁺、Cu。")),
-    sceneStep(1, "redox-oxidation-states", "标出氧化数变化", "Zn 从 0 价升到 +2 价，Cu 从 +2 价降到 0 价；氧化数一升一降。", redoxSnapshot("states", "氧化数升高对应氧化，降低对应还原。")),
-    sceneStep(2, "redox-oxidation-half", "写出氧化半反应", "Zn 失去 2 个电子形成 Zn²⁺：Zn → Zn²⁺ + 2e⁻，因此 Zn 是还原剂。", redoxSnapshot("oxidation", "Zn → Zn²⁺ + 2e⁻。")),
-    sceneStep(3, "redox-reduction-half", "写出还原半反应", "Cu²⁺ 得到 2 个电子形成 Cu：Cu²⁺ + 2e⁻ → Cu，因此 Cu²⁺ 是氧化剂。", redoxSnapshot("reduction", "Cu²⁺ + 2e⁻ → Cu。")),
-    sceneStep(4, "redox-electron-transfer", "配平并连接电子转移", "两个半反应的电子数都是 2，可以直接相加消去电子，得到净离子方程式 Zn + Cu²⁺ → Zn²⁺ + Cu。", redoxSnapshot("transfer", "电子由 Zn 转移给 Cu²⁺，转移数为 2。")),
-    sceneStep(5, "redox-verify", "验证守恒并还原完整方程", "净离子方程两侧 Zn、Cu 原子各一个，总电荷都为 +2；补回旁观离子 SO₄²⁻，得到 Zn + CuSO₄ → ZnSO₄ + Cu。", redoxSnapshot("verify", "原子守恒、电荷守恒，SO₄²⁻ 在反应前后不变。")),
-  ];
-  return playbook(
-    "chemistry",
-    "氧化还原 · 电子转移",
-    "从氧化数变化出发，用半反应配平电子并验证原子与电荷守恒。",
-    "chemistry_zinc_copper_redox",
-    steps,
   );
 }
 
@@ -982,7 +915,7 @@ export function buildRabbitChaosGoldPlaybook(params: TemplatePreviewParams): Pla
 function standalone(args: {
   caseId: string;
   archetypeId: string;
-  subject: "computer_science" | "high_school_chemistry" | "high_school_biology" | "high_school_geography" | "university_ecology";
+  subject: "computer_science" | "high_school_biology" | "high_school_geography" | "university_ecology";
   domain: string;
   topic: string;
   title: string;
@@ -1063,29 +996,6 @@ export const CROSS_SUBJECT_PUBLIC_GOLD_TEMPLATES: readonly GoldTemplateManifest[
     mechanism: "先查 complement，未命中后才写入当前值；seen 因而只包含更早的元素。",
     transfer: "代回 nums 检查两个下标不同且两数之和等于 target。",
     posterStepIndex: 4,
-  }),
-  standalone({
-    caseId: "redox-electron",
-    archetypeId: "chemistry.redox.zinc-copper-electron-transfer",
-    subject: "high_school_chemistry",
-    domain: "chemistry",
-    topic: "氧化还原",
-    title: "氧化还原 · 电子转移",
-    description: "由氧化数变化写出半反应并检查电子、电荷和原子守恒",
-    prompt: "讲解 Zn + CuSO₄ → ZnSO₄ + Cu，标出电子转移、氧化剂和还原剂。",
-    defaults: {},
-    controls: [],
-    requiredCapabilities: ["reaction_scene", "reaction_participants", "electron_flow", "formula_card"],
-    expectedFacts: [
-      { id: "redox-oxidation", description: "Zn 失去两个电子并被氧化", anyOf: ["Zn → Zn²⁺ + 2e⁻", "Zn 从 0 价升到 +2 价"] },
-      { id: "redox-reduction", description: "Cu2+ 得到两个电子并被还原", anyOf: ["Cu²⁺ + 2e⁻ → Cu", "Cu 从 +2 价降到 0 价"] },
-      { id: "redox-balance", description: "净离子反应原子与电荷守恒", anyOf: ["Zn + Cu²⁺ → Zn²⁺ + Cu", "总电荷都为 +2"] },
-    ],
-    visualInvariants: [{ id: "redox-electron-flow", description: "反应物、生成物、反应箭头和电子流保持同一空间关系", requiredSemanticRoles: ["reaction_arrow", "electron_flow", "reactant", "product"], requiredStateFields: ["reactants", "products", "arrows", "electron_flows"] }],
-    objective: "把宏观置换反应解释为可配平的电子得失过程。",
-    builder: () => buildRedoxGoldPlaybook(),
-    mechanism: "氧化数升高表示失电子，降低表示得电子；两个半反应必须消去相同数目的电子。",
-    transfer: "分别核对 Zn、Cu 原子数与净电荷，再判断 SO₄²⁻ 是否在两侧保持不变。",
   }),
   standalone({
     caseId: "dna-replication",
