@@ -34,6 +34,21 @@ function frameToStepIndex(frame: number, steps: MetaStep[]): number {
   return lo;
 }
 
+/**
+ * The step whose settled (last) frame playback reached moving from
+ * `fromFrame` to `toFrame`, or null. The final step has no boundary to stop
+ * at. A playhead already resting on a settled frame moves past it without
+ * reaching it again, which is what lets playback resume from a hold.
+ */
+function settledFrameReached(steps: MetaStep[], fromFrame: number, toFrame: number): number | null {
+  for (let index = 0; index < steps.length - 1; index += 1) {
+    const settledFrame = resolveStepSettledFrame(steps, index);
+    if (settledFrame > toFrame) return null;
+    if (settledFrame > fromFrame) return index;
+  }
+  return null;
+}
+
 function deferFrame(fn: () => void): void {
   if (typeof window === "undefined") {
     fn();
@@ -127,39 +142,62 @@ export function usePlaybookController(
   useEffect(() => {
     const player = playerRef.current;
     if (!player) return;
+    const showStep = (index: number) => {
+      setCurrentStepIndex((current) => (current === index ? current : index));
+    };
+    // Stop on a finished step's settled frame, where every entrance has
+    // faded in. Playback resumes from here straight into the next step's
+    // first frame, since that move does not reach this settled frame again.
+    const holdSettledFrame = (step: number, frame: number) => {
+      const settledFrame = resolveStepSettledFrame(script.steps, step);
+      prevFrameRef.current = settledFrame;
+      player.pause();
+      // A dropped frame can carry playback past the boundary.
+      if (frame !== settledFrame) player.seekTo(settledFrame);
+    };
+    // `frameupdate` fires for every frame; `timeupdate` is throttled to one
+    // per 250 ms, which left auto-pauses up to 7 frames into the next step
+    // with its changed nodes still half faded in.
     const handler = ({ detail }: { detail: { frame: number } }) => {
       const frame = detail.frame;
-      const idx = frameToStepIndex(frame, script.steps);
-
-      // Detect crossing into a new step boundary (forward direction only).
       const prevFrame = prevFrameRef.current;
-      const prevIdx = frameToStepIndex(prevFrame, script.steps);
-      const crossedForward = frame > prevFrame && idx > prevIdx;
+      // The controller's own seeks (step jumps, rewinds, holds) already
+      // recorded their frame and step.
+      if (frame === prevFrame) return;
       prevFrameRef.current = frame;
 
-      setCurrentStepIndex((current) => (current === idx ? current : idx));
-
-      if (crossedForward) {
+      const finishedStep = player.isPlaying()
+        ? settledFrameReached(script.steps, prevFrame, frame)
+        : null;
+      if (finishedStep != null) {
         if (stepThroughRef.current) {
-          // Pause exactly at the start of the new step for step-through behavior.
-          player.pause();
-        } else if (gateRef.current?.ttsEnabled && gateRef.current.isSpeaking) {
-          // Continuous mode: video must wait for the previous step's voiceover
-          // to finish before advancing into the next step's animation.
-          player.pause();
+          // The finished step stays current, with its narration, until the
+          // viewer plays on.
+          holdSettledFrame(finishedStep, frame);
+          showStep(finishedStep);
+          return;
+        }
+        if (gateRef.current?.ttsEnabled && gateRef.current.isSpeaking) {
+          // Continuous mode: video must wait for the voiceover to finish
+          // before advancing into the next step's animation. The step index
+          // still advances now, so the next step's line starts during the hold.
+          holdSettledFrame(finishedStep, frame);
           awaitingAudioRef.current = true;
+          showStep(finishedStep + 1);
+          return;
         }
       }
+      showStep(frameToStepIndex(frame, script.steps));
     };
     // Playback started some other way (e.g. the Remotion space key) has left
     // the parked frame behind, so a later play must not rewind to it.
     const unpark = () => {
       parkedStepRef.current = null;
     };
-    player.addEventListener("timeupdate", handler);
+    player.addEventListener("frameupdate", handler);
     player.addEventListener("play", unpark);
     return () => {
-      player.removeEventListener("timeupdate", handler);
+      player.removeEventListener("frameupdate", handler);
       player.removeEventListener("play", unpark);
     };
     // Only re-register when the script timeline changes — previous/step/gate
@@ -169,7 +207,7 @@ export function usePlaybookController(
     // (Issue #50.)
   }, [script.steps, playerRef]);
 
-  // Resume playback when TTS finishes the previous step's voiceover.
+  // Resume playback from a gate hold once the voiceover finishes.
   // Skipped in step-through mode (each step always pauses) and when there is
   // no gate / TTS is disabled.
   useEffect(() => {

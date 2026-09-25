@@ -84,7 +84,7 @@ const calculateMetadata: CalculateMetadataFunction<Props> = async () => {
 
 我们用 **浏览器实时 TTS**（SpeechSynthesis 或 OpenAI TTS 流），**没有预渲染 mp3**，所以无法预知时长 → `calculateMetadata` 路径不适用。改用 runtime 方案：
 
-1. Player 在 `step.end_frame` 时 pause
+1. Player 播到该步最后一帧（`step.end_frame - 1`，入场已全部淡入）时 pause
 2. 监听 `tts.speaking` 由 true → false
 3. 触发 `play()`，进入下一步
 
