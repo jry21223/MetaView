@@ -13,6 +13,23 @@ export function resolveInitialPreviewFrame(
   return Math.min(preferred, firstStepLastFrame, lastFrame);
 }
 
+/** First frame of a step: where the previous step ends. */
+export function resolveStepStartFrame(steps: PlaybookScript["steps"], index: number): number {
+  return index > 0 ? steps[index - 1]?.end_frame ?? 0 : 0;
+}
+
+/**
+ * The frame a paused viewer should see for a step: its last one, after every
+ * entrance transition has finished. The first frame is the wrong picture to
+ * hold still — nodes and panels that changed state are still fading in from
+ * zero opacity there, so they look missing.
+ */
+export function resolveStepSettledFrame(steps: PlaybookScript["steps"], index: number): number {
+  const start = resolveStepStartFrame(steps, index);
+  const end = steps[index]?.end_frame ?? start + 1;
+  return Math.max(start, end - 1);
+}
+
 /**
  * Map a frame from one timeline onto a reshaped one (parameter edits change
  * narration lengths, shifting every end frame): same step — matched by id,
