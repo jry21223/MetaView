@@ -1,5 +1,8 @@
 import type { ExecutionParameterControl } from "../../../entities/execution/types";
 import type { MotionSceneSnapshot } from "./motion/types";
+import type { ChemistrySceneSnapshot } from "./kits/chemistry/sceneTypes";
+
+export type { ChemistrySceneSnapshot } from "./kits/chemistry/sceneTypes";
 
 export type SnapshotKind =
   | "algorithm_array"
@@ -25,6 +28,7 @@ export type SnapshotKind =
   | "bio_process_scene"
   | "molecule_2d_scene"
   | "reaction_scene"
+  | "chemistry_scene"
   | "geo_map_scene"
   | "physics_force_scene"
   | "motion_scene"
@@ -895,6 +899,7 @@ export type AnySnapshot =
   | BioProcessSceneSnapshot
   | Molecule2DSceneSnapshot
   | ReactionSceneSnapshot
+  | ChemistrySceneSnapshot
   | GeoMapSceneSnapshot
   | PhysicsForceSceneSnapshot
   | MotionSceneSnapshot

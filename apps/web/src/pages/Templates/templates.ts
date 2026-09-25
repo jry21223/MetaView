@@ -193,9 +193,10 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
     prompt: "质量 2kg 物体在 30° 斜面上，摩擦系数 0.2，重力加速度 10m/s²，分析受力并求沿斜面方向的加速度",
   },
 
-  // ---- chemistry ----
-  // Hidden while the catalog narrows to the coursepack focus (redox-electron
-  // and the neutralization placeholder); manifests stay registered.
+  // ---- chemistry (high-school coursepack, textbook order) ----
+  // Replaces the retired redox-electron template and the neutralization
+  // placeholder; see docs/chemistry-coursepack.md.
+  ...PUBLIC_GOLD_TEMPLATES.filter((item) => item.domain === "chemistry").map((item) => publicGoldEntry(item.caseId, "chemistry")),
 
   // ---- ecology (university pilot) ----
   publicGoldEntry("logistic-growth", "ecology"),
@@ -224,6 +225,14 @@ export const TEMPLATES: ReadonlyArray<TemplateDef> = [
     prompt: "讲解板块构造的三种边界（生长 / 消亡 / 转换），每种对应的典型地貌和地震分布",
   },
 ];
+
+/**
+ * Public template ids that left the catalog, mapped to the case that replaced
+ * them, so shared or bookmarked links keep working.
+ */
+export const RETIRED_TEMPLATE_REDIRECTS: Readonly<Record<string, string>> = Object.freeze({
+  "redox-electron": "galvanic-cell",
+});
 
 export function templatesByDomain(): Array<{ domain: TemplateDomain; items: TemplateDef[] }> {
   const map = new Map<TemplateDomain, TemplateDef[]>();

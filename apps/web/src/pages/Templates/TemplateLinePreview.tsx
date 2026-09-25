@@ -343,15 +343,58 @@ const LINE_PREVIEWS: Record<TemplatePreviewCaseId, ReactNode> = {
       <circle className="is-accent" cx="23" cy="33" r="3" />
     </svg>
   ),
-  "redox-electron": (
-    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="redox-electron-transfer">
-      <circle cx="31" cy="28" r="13" />
-      <circle cx="129" cy="28" r="13" />
-      <path className="is-guide" d="M48 28h64" />
-      <path className="is-accent" d="M48 20c18-15 46-15 64 0m-6-6 6 6-8 1" />
-      <circle className="is-accent" cx="70" cy="12" r="2.4" />
-      <circle className="is-accent" cx="89" cy="12" r="2.4" />
-      <path className="is-guide" d="m25 28 5 5 8-11m84 6 5 5 8-11" />
+  "galvanic-cell": (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="galvanic-cell">
+      <path d="M18 24v26h44V24" data-object="beaker" />
+      <path d="M98 24v26h44V24" data-object="beaker" />
+      <path d="M34 44V6h40m12 0h40v38" data-object="wire" />
+      <circle cx="80" cy="6" r="5" data-object="meter" />
+      <path className="is-guide" d="M54 46V18h52v28" data-object="salt-bridge" />
+      <circle className="is-accent" cx="46" cy="6" r="2.2" data-object="electron" />
+      <circle className="is-accent" cx="100" cy="6" r="2.2" data-object="electron" />
+      <circle className="is-accent" cx="114" cy="6" r="2.2" data-object="electron" />
+    </svg>
+  ),
+  "esterification-mechanism": (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="esterification-mechanism">
+      <path d="M22 32h14m0 0 7-10m-4 11 7-10m-7 9 6 10m18-10h12m0 0 12-7" />
+      <circle cx="22" cy="32" r="3.2" data-object="atom" />
+      <circle cx="36" cy="32" r="3.2" data-object="atom" />
+      <circle cx="44" cy="20" r="3.2" data-object="atom" />
+      <circle cx="44" cy="43" r="3.2" data-object="atom" />
+      <circle className="is-accent" cx="66" cy="32" r="3.8" data-object="labelled-oxygen" />
+      <circle cx="80" cy="32" r="3.2" data-object="atom" />
+      <circle cx="92" cy="25" r="3.2" data-object="atom" />
+      <path className="is-accent" d="M63 27c-4-9-12-10-18-5m1-4-1 4 4 1" data-object="curly-arrow" />
+      <path className="is-guide is-dashed" d="M112 44h32" />
+      <circle className="is-guide" cx="126" cy="44" r="3.4" data-object="water" />
+    </svg>
+  ),
+  "collision-activation": (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="collision-activation">
+      <path className="is-guide" d="M16 50h128M16 50V6" />
+      <path d="M18 44h26c16 0 20-34 36-34s20 28 36 28h26" data-object="energy-path" />
+      <path className="is-accent is-dashed" d="M44 44c16 0 20-18 36-18s20 12 36 12" data-object="catalysed-path" />
+      <path className="is-accent" d="M80 42V13m-3 3 3-3 3 3m-6 23 3 3 3-3" data-object="activation-energy" />
+    </svg>
+  ),
+  "haber-le-chatelier": (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="haber-le-chatelier">
+      <path className="is-guide" d="M14 50h132M14 50V6" />
+      <path className="is-guide is-dashed" d="M58 8v42M102 8v42" data-object="disturbance" />
+      <path d="M16 12c14 10 26 14 42 14v-8c12 3 28 6 44 6v-6c12 3 26 5 42 5" data-object="reactant-curve" />
+      <path className="is-accent" d="M16 48c14-14 26-18 42-18 12 2 28 4 44 4v-10c12 2 26 3 42 3" data-object="product-curve" />
+    </svg>
+  ),
+  "acid-base-titration": (
+    <svg viewBox="0 0 160 56" fill="none" data-preview-geometry="acid-base-titration">
+      <path d="M24 4v24m-4-24v24m0 0 2 5h0l2-5" data-object="burette" />
+      <path d="M17 38h6v4l7 10H10l7-10z" data-object="flask" />
+      <path className="is-guide" d="M44 50h104M44 50V6" />
+      <path d="M46 46c26-2 40-4 48-9" data-object="ph-curve" />
+      <path className="is-accent" d="M94 37V15" data-object="equivalence-jump" />
+      <path d="M94 15c6-4 24-6 52-7" data-object="ph-curve" />
+      <circle className="is-accent" cx="94" cy="26" r="2.6" data-object="equivalence-point" />
     </svg>
   ),
   "dna-replication": (

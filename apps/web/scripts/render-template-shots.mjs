@@ -129,15 +129,12 @@ for (const caseId of caseIds) {
   const params = { ...item.defaultParams, ...paramsFor(caseId, options.params) };
   const script = item.buildScript(params);
   const shots = stepShots(script, options.frameRatio);
-  const composition = await selectComposition({
-    serveUrl,
-    id: "playbook",
-    inputProps: { script, director: null, theme: options.themes[0], showSubtitles: true, audioFiles: [] },
-    browserExecutable,
-  });
 
   for (const theme of options.themes) {
     const inputProps = { script, director: null, theme, showSubtitles: true, audioFiles: [] };
+    // Select per theme: renderStill draws with the props resolved here, so a
+    // composition selected once for themes[0] rendered every theme identically.
+    const composition = await selectComposition({ serveUrl, id: "playbook", inputProps, browserExecutable });
     const directory = path.join(outputRoot, caseId, theme);
     await fs.mkdir(directory, { recursive: true });
     for (const shot of shots) {
