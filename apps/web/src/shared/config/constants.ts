@@ -18,14 +18,31 @@ export const RECHARGE_USAGE_ESTIMATE = {
   UNIT_LABEL: "基础生成",
 } as const;
 
+const SUBTITLE_MAX_LINES = 3;
+const SUBTITLE_FONT_SIZE = 14;
+const SUBTITLE_LINE_HEIGHT = 1.5;
+const SUBTITLE_PADDING_Y = 8;
+const SUBTITLE_BORDER_TOP = 1;
+
 export const PLAYBOOK_LAYOUT = {
   /** Fraction of width allocated to the viz panel when code track is present (0–1) */
   VIZ_SPLIT_RATIO: 0.5,
-  /** Minimum height of the subtitle bar in px (within the composition canvas).
-   *  The actual row grows up to MAX_LINES * line-height when narration wraps. */
-  SUBTITLE_HEIGHT: 52,
   /** Maximum number of subtitle lines before truncating with ellipsis. */
-  SUBTITLE_MAX_LINES: 3,
+  SUBTITLE_MAX_LINES,
+  /** Subtitle text size in px; with LINE_HEIGHT it fixes one line box (21px). */
+  SUBTITLE_FONT_SIZE,
+  SUBTITLE_LINE_HEIGHT,
+  /** Vertical padding of the subtitle row in px. */
+  SUBTITLE_PADDING_Y,
+  SUBTITLE_BORDER_TOP,
+  /** Fixed border-box height of the subtitle row in px: always MAX_LINES
+   *  tall, whatever the narration length. A row that grew with the text
+   *  shrank the flex:1 visual track, so centred renderers jumped between
+   *  steps. Export and the in-browser player share this composition. */
+  SUBTITLE_HEIGHT:
+    SUBTITLE_MAX_LINES * SUBTITLE_FONT_SIZE * SUBTITLE_LINE_HEIGHT +
+    2 * SUBTITLE_PADDING_Y +
+    SUBTITLE_BORDER_TOP,
   /** Frames for subtitle fade-in at the start of each step */
   SUBTITLE_FADE_FRAMES: 12,
 } as const;

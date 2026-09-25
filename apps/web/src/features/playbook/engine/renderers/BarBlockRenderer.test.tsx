@@ -62,8 +62,8 @@ describe("BarBlockRenderer", () => {
     const markup = renderToStaticMarkup(BarBlockRenderer(props(barsStep(makeBars([9, 3])))));
     const hs = heightsOf(markup);
     // tallest bar reaches the max bar height; the value-3 bar is one third of it
-    expect(hs).toContain(342);
-    expect(hs).toContain(114);
+    expect(hs).toContain(288);
+    expect(hs).toContain(96);
   });
 
   it("keeps unchanged bars visible at the exact start of a later step", () => {
@@ -76,7 +76,7 @@ describe("BarBlockRenderer", () => {
     })));
 
     expect(markup).toMatch(/data-bar-index="0"[^>]*opacity:1/);
-    expect(markup).toContain("height:342px");
+    expect(markup).toContain("height:288px");
   });
 
   it("shrinks the bar field when auxiliary lanes need room under the pointer row", () => {
@@ -90,10 +90,10 @@ describe("BarBlockRenderer", () => {
     const markup = renderToStaticMarkup(BarBlockRenderer(props(barsStep(snap))));
     const hs = heightsOf(markup);
 
-    // 342 - 2 lanes * 110 = 122 → clamped to the 180px floor; the value-3 bar keeps its one-third proportion.
+    // 288 - 2 lanes * 56 = 176 → clamped to the 180px floor; the value-3 bar keeps its one-third proportion.
     expect(hs).toContain(180);
     expect(hs).toContain(60);
-    expect(hs).not.toContain(342);
+    expect(hs).not.toContain(288);
     expect(markup).toContain('data-auxiliary-role="deque"');
     expect(markup).toContain('data-auxiliary-role="result"');
   });
@@ -109,7 +109,7 @@ describe("BarBlockRenderer", () => {
     const markup = renderToStaticMarkup(BarBlockRenderer(props(barsStep(snap))));
     const hs = heightsOf(markup);
 
-    // Only the result row borrows height: 342 - 1 * 110 = 232.
+    // Only the result row borrows height: 288 - 1 * 56 = 232.
     expect(hs).toContain(232);
     expect(markup).toContain('data-stack-lane="stack"');
     expect(markup).toContain('data-stack-capacity="2"');
@@ -149,9 +149,9 @@ describe("BarBlockRenderer", () => {
 
     expect(markup.match(/data-bar-direction="negative"/g)).toHaveLength(2);
     expect(markup.match(/data-bar-direction="positive"/g)).toHaveLength(1);
-    expect(markup).toContain('data-zero-axis="171"');
-    expect(markup).toContain("height:171px");
-    expect(markup).toContain("height:57px");
+    expect(markup).toContain('data-zero-axis="144"');
+    expect(markup).toContain("height:144px");
+    expect(markup).toContain("height:48px");
     expect(markup).toContain('data-range-role="search_range"');
     expect(markup).toContain('data-element-states="leaving"');
     expect(markup).toContain('data-element-states="entering pivot"');
