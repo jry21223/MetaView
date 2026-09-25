@@ -74,10 +74,11 @@ const VAR = {
 const ENTER_BEZIER = Easing.bezier(0.16, 1, 0.3, 1);
 const MOVE_FRAMES = 22;
 // The subtitle strip always reserves three lines, so the visual track is a
-// fixed 457px of the 540px frame. Title, bar field and pointer row add
-// 156px around the bars; 288 keeps that column at ~444px, inside the track
-// with a few px to spare — the old 342 overflowed it by ~40px and clipped
-// the step title of every lane-free case.
+// fixed 457px of the 540px frame (3px progress strip + 80px caption row, see
+// PLAYBOOK_LAYOUT). Title, bar field and pointer row add 156px around the
+// bars; 288 keeps that column at ~444px, inside the track with a few px to
+// spare — the old 342 overflowed it by ~40px and clipped the step title of
+// every lane-free case. BarBlockRenderer.test guards the fit.
 const MAX_BAR_HEIGHT = 288;
 const MIN_BAR_HEIGHT = 6;
 // Auxiliary lanes (a stack, a result row) sit under the pointer row; each

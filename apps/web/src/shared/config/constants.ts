@@ -27,6 +27,8 @@ const SUBTITLE_BORDER_TOP = 1;
 export const PLAYBOOK_LAYOUT = {
   /** Fraction of width allocated to the viz panel when code track is present (0–1) */
   VIZ_SPLIT_RATIO: 0.5,
+  /** Height in px of the lesson progress strip that sits on top of the subtitle row. */
+  PROGRESS_STRIP_HEIGHT: 3,
   /** Maximum number of subtitle lines before truncating with ellipsis. */
   SUBTITLE_MAX_LINES,
   /** Subtitle text size in px; with LINE_HEIGHT it fixes one line box (21px). */

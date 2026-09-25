@@ -5,6 +5,7 @@ import { DomainArrayRenderer } from "./DomainArrayRenderer";
 import { rendererRegistry } from "./registry";
 import type { AlgorithmBarsSnapshot, MetaStep } from "../types";
 import type { RendererProps } from "./types";
+import { PLAYBOOK_DEFAULTS, PLAYBOOK_LAYOUT } from "../../../../shared/config/constants";
 
 function barsStep(snapshot: AlgorithmBarsSnapshot): MetaStep {
   return {
@@ -96,6 +97,23 @@ describe("BarBlockRenderer", () => {
     expect(hs).not.toContain(288);
     expect(markup).toContain('data-auxiliary-role="deque"');
     expect(markup).toContain('data-auxiliary-role="result"');
+  });
+
+  it("keeps the lane-free column inside the visual track above the subtitle strip", () => {
+    // Everything in the column except the bars, measured in the browser: the
+    // 28px title line, its 18px gap, 42px label headroom plus 8px field slack,
+    // and 60px for the pointer row with its spacing. The bars are centred, so
+    // any overflow clips the step title.
+    const COLUMN_CHROME = 156;
+    const track =
+      PLAYBOOK_DEFAULTS.COMPOSITION_HEIGHT -
+      PLAYBOOK_LAYOUT.PROGRESS_STRIP_HEIGHT -
+      PLAYBOOK_LAYOUT.SUBTITLE_HEIGHT;
+    const markup = renderToStaticMarkup(BarBlockRenderer(props(barsStep(makeBars([9, 3])))));
+    // With only positive values the zero axis sits at the full field height.
+    const fieldHeight = Number(markup.match(/data-zero-axis="(\d+)"/)?.[1]);
+
+    expect(fieldHeight + COLUMN_CHROME).toBeLessThanOrEqual(track);
   });
 
   it("keeps the full bar field when the only extra lane is a stack column", () => {

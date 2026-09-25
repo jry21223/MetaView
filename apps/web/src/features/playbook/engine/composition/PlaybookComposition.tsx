@@ -450,7 +450,7 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
         {/* Progress bar */}
         <div
           style={{
-            height: 3,
+            height: PLAYBOOK_LAYOUT.PROGRESS_STRIP_HEIGHT,
             background: isDark
               ? "var(--line, #1d2a23)"
               : "var(--line, #e6e2d5)",
