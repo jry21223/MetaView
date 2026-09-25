@@ -40,10 +40,10 @@ const GO_KEYWORDS = new Set([
 ]);
 
 const C_KEYWORDS = new Set([
-  "auto", "break", "case", "char", "class", "const", "continue", "default",
+  "auto", "bool", "break", "case", "char", "class", "const", "continue", "default",
   "delete", "do", "double", "else", "enum", "explicit", "extern", "false",
   "float", "for", "friend", "goto", "if", "inline", "int", "long",
-  "mutable", "namespace", "new", "nullptr", "operator", "private", "protected",
+  "mutable", "namespace", "new", "NULL", "nullptr", "operator", "private", "protected",
   "public", "register", "return", "short", "signed", "sizeof", "static",
   "struct", "switch", "template", "this", "throw", "true", "try", "typedef",
   "union", "unsigned", "using", "virtual", "void", "volatile", "while",

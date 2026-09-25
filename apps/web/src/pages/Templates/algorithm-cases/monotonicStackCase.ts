@@ -36,16 +36,16 @@ const PRESET_PARAM = definePresetParam<MonotonicStackPresetId>({
 });
 
 export const MONOTONIC_STACK_CODE = [
-  "function nextGreater(nums: number[]): number[] {",
-  "  const answer = new Array(nums.length).fill(-1);",
-  "  const stack: number[] = [];",
-  "  for (let i = 0; i < nums.length; i++) {",
-  "    while (stack.length && nums[stack.at(-1)!] < nums[i]) {",
-  "      answer[stack.pop()!] = nums[i];",
+  "void nextGreater(const int nums[], int n, int answer[]) {",
+  "  int stack[MAXSIZE];  /* 存下标，对应的值自底向上递减 */",
+  "  int top = -1;",
+  "  for (int i = 0; i < n; i++) {",
+  "    while (top != -1 && nums[stack[top]] < nums[i]) {",
+  "      answer[stack[top--]] = nums[i];  /* 出栈并写答案 */",
   "    }",
-  "    stack.push(i);",
+  "    stack[++top] = i;",
   "  }",
-  "  return answer;",
+  "  while (top != -1) answer[stack[top--]] = -1;  /* 右侧没有更大值 */",
   "}",
 ] as const;
 
@@ -146,7 +146,7 @@ function monotonicSnapshot(args: {
   };
 }
 
-const codeHighlight = codeHighlightFor(MONOTONIC_STACK_CODE);
+const codeHighlight = codeHighlightFor(MONOTONIC_STACK_CODE, "c");
 
 function answerText(answer: readonly number[]): string {
   return `[${answer.map((value) => (value === -1 ? "?" : String(value))).join(", ")}]`;
@@ -187,8 +187,8 @@ function buildMonotonicStackSteps(
       }),
       code_highlight: codeHighlight(
         2,
-        { nums: `[${values.join(",")}]`, answer: answerText(initialAnswer), stack: "[]" },
-        "initialize answer and stack",
+        { nums: `[${values.join(",")}]`, answer: answerText(initialAnswer), top: "-1", stack: "[]" },
+        "initialize empty stack",
         [1, 2],
       ),
       questions: [
@@ -222,7 +222,7 @@ function buildMonotonicStackSteps(
           {
             i: String(frame.index),
             "nums[i]": String(frame.value),
-            top: stackBefore.length ? String(values[stackBefore.at(-1)!]) : "—",
+            "nums[stack[top]]": stackBefore.length ? String(values[stackBefore.at(-1)!]) : "—",
             stack: stackText(frame.stack, values),
           },
           "push index",
@@ -291,7 +291,7 @@ function buildMonotonicStackSteps(
         unresolved: stackText(unresolved, values),
         complexity: "O(n)",
       },
-      "return answer",
+      "remaining get -1",
     ),
     questions: [
       ["最终答案是什么？", `[${(last?.answer ?? []).join(", ")}]`],

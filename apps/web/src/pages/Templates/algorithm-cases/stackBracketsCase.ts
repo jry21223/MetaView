@@ -44,17 +44,17 @@ const EXPRESSION_PARAM = definePresetParam<StackBracketPresetId>({
 });
 
 export const STACK_BRACKET_CODE = [
-  "function isValid(s: string): boolean {",
-  "  const stack: string[] = [];",
-  '  const pair = { ")": "(", "]": "[", "}": "{" };',
-  "  for (let i = 0; i < s.length; i++) {",
-  "    const ch = s[i];",
-  '    if (ch === "(" || ch === "[" || ch === "{") { stack.push(ch); continue; }',
-  "    if (stack.length === 0) return false;",
-  "    if (stack.at(-1) !== pair[ch]) return false;",
-  "    stack.pop();",
+  "bool isValid(const char *s) {",
+  "  char stack[MAXSIZE];  /* 顺序栈 */",
+  "  int top = -1;         /* top == -1 表示栈空 */",
+  "  for (int i = 0; s[i] != '\\0'; i++) {",
+  "    char ch = s[i];",
+  "    if (ch == '(' || ch == '[' || ch == '{') { stack[++top] = ch; continue; }",
+  "    if (top == -1) return false;",
+  "    if (stack[top] != match(ch)) return false;  /* match: 对应的左括号 */",
+  "    top--;  /* 出栈 */",
   "  }",
-  "  return stack.length === 0;",
+  "  return top == -1;",
   "}",
 ] as const;
 
@@ -224,7 +224,7 @@ function bracketSnapshot(args: {
   };
 }
 
-const codeHighlight = codeHighlightFor(STACK_BRACKET_CODE);
+const codeHighlight = codeHighlightFor(STACK_BRACKET_CODE, "c");
 
 function stackText(chars: readonly string[], stack: readonly number[]): string {
   return stack.length ? `[${stack.map((index) => chars[index]).join(", ")}]` : "[]";
@@ -279,7 +279,7 @@ function buildStackBracketSteps(params: TemplatePreviewParams): AlgorithmCaseFra
       }),
       code_highlight: codeHighlight(
         1,
-        { s: expression, n: String(chars.length), stack: "[]" },
+        { s: expression, n: String(chars.length), top: "-1", stack: "[]" },
         "initialize empty stack",
         [0, 1, 2],
       ),
@@ -310,7 +310,7 @@ function buildStackBracketSteps(params: TemplatePreviewParams): AlgorithmCaseFra
         }),
         code_highlight: codeHighlight(
           5,
-          { i: String(event.index), ch: event.char, stack: stackAfter },
+          { i: String(event.index), ch: event.char, top: String(event.stack.length - 1), stack: stackAfter },
           "push opener",
           [4, 5],
         ),
@@ -343,8 +343,8 @@ function buildStackBracketSteps(params: TemplatePreviewParams): AlgorithmCaseFra
           {
             i: String(event.index),
             ch: event.char,
-            top: chars[partner]!,
-            "pair[ch]": PAIR[event.char]!,
+            "stack[top]": chars[partner]!,
+            "match(ch)": PAIR[event.char]!,
             stack: stackAfter,
           },
           "pop matching opener",
@@ -376,8 +376,8 @@ function buildStackBracketSteps(params: TemplatePreviewParams): AlgorithmCaseFra
           {
             i: String(event.index),
             ch: event.char,
-            top: chars[partner]!,
-            "pair[ch]": PAIR[event.char]!,
+            "stack[top]": chars[partner]!,
+            "match(ch)": PAIR[event.char]!,
             result: "false",
           },
           "mismatch, return false",
@@ -403,14 +403,14 @@ function buildStackBracketSteps(params: TemplatePreviewParams): AlgorithmCaseFra
       }),
       code_highlight: codeHighlight(
         6,
-        { i: String(event.index), ch: event.char, "stack.length": "0", result: "false" },
+        { i: String(event.index), ch: event.char, top: "-1", result: "false" },
         "empty stack, return false",
         [6],
       ),
       questions: [
         ["栈为空意味着什么？", "此前的左括号都已闭合，这个右括号找不到任何等待中的左括号。"],
         ["这和“多一个右括号”是一回事吗？", "是。栈空时遇到右括号，说明右括号比左括号多，表达式不可能合法。"],
-        ["代码里对应哪一行？", "stack.length === 0 的判断：先检查空栈，再比较类型，避免读取不存在的栈顶。"],
+        ["代码里对应哪一行？", "top == -1 的判断：先检查空栈，再比较类型，避免读取 stack[-1] 这个越界的栈顶。"],
       ],
     });
   });

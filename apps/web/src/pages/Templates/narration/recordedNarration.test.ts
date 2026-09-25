@@ -1,7 +1,10 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { RECORDED_NARRATION, RECORDED_NARRATION_VOICE } from "./recordedNarration";
-import { PUBLIC_GOLD_TEMPLATES } from "../gold-templates/publicGoldTemplates";
+import { getTemplatePreviewCase } from "../templatePreviewCases";
 
 /**
  * The recordings are made from the default-parameter playbook and then played
@@ -13,9 +16,10 @@ import { PUBLIC_GOLD_TEMPLATES } from "../gold-templates/publicGoldTemplates";
 describe("recorded template narration", () => {
   it("matches, line for line, the narration each case ships at its defaults", () => {
     for (const [caseId, entries] of Object.entries(RECORDED_NARRATION)) {
-      const manifest = PUBLIC_GOLD_TEMPLATES.find((item) => item.caseId === caseId);
-      expect(manifest, `no public case named ${caseId}`).toBeDefined();
-      const script = manifest!.buildPublicPlaybook(manifest!.parameterSchema?.defaults ?? {});
+      // Any published template case can carry recordings, Gold or not.
+      const previewCase = getTemplatePreviewCase(caseId);
+      expect(previewCase, `no template case named ${caseId}`).toBeDefined();
+      const script = previewCase!.buildScript(previewCase!.defaultParams);
       const spoken = script.steps.filter((step) => step.voiceover_text.trim());
 
       expect(entries.map((entry) => entry.step_id)).toEqual(
@@ -37,6 +41,15 @@ describe("recorded template narration", () => {
       expect(entries.length, caseId).toBeGreaterThan(0);
       for (const entry of entries) {
         expect(entry.file).toBe(`${entry.step_id}.mp3`);
+      }
+    }
+  });
+
+  it("ships an audio file for every recorded line", () => {
+    for (const [caseId, entries] of Object.entries(RECORDED_NARRATION)) {
+      for (const entry of entries) {
+        const audio = path.resolve(process.cwd(), "public/template-narration", caseId, entry.file);
+        expect(existsSync(audio), `${caseId}/${entry.file} is missing`).toBe(true);
       }
     }
   });

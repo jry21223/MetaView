@@ -23,7 +23,7 @@ import {
  * 链表反转（迭代三指针）。
  *
  * 链表画成一排带箭头的节点，两端各放一个 ∅ 表示空指针。每一步只翻转一条
- * 指针：curr.next 从指向后继改为指向 prev。已翻转的前缀、当前节点、被保存
+ * 指针：curr->next 从指向后继改为指向 prev。已翻转的前缀、当前节点、被保存
  * 的 next 各自用状态区分，箭头方向就是唯一需要盯住的东西。
  */
 export const LINKED_LIST_LENGTHS = ["3", "4", "5"] as const;
@@ -41,16 +41,16 @@ const LENGTH_PARAM = definePresetParam<LinkedListLength>({
 });
 
 export const LINKED_LIST_CODE = [
-  "function reverseList(head: ListNode | null): ListNode | null {",
-  "  let prev: ListNode | null = null;",
-  "  let curr = head;",
-  "  while (curr !== null) {",
-  "    const next = curr.next;",
-  "    curr.next = prev;",
+  "ListNode *reverseList(ListNode *head) {",
+  "  ListNode *prev = NULL;",
+  "  ListNode *curr = head;",
+  "  while (curr != NULL) {",
+  "    ListNode *next = curr->next;  /* 先保存后继 */",
+  "    curr->next = prev;            /* 指针掉头 */",
   "    prev = curr;",
   "    curr = next;",
   "  }",
-  "  return prev;",
+  "  return prev;  /* 原尾节点成为新头 */",
   "}",
 ] as const;
 
@@ -185,7 +185,7 @@ function listSnapshot(args: {
   });
 }
 
-const codeHighlight = codeHighlightFor(LINKED_LIST_CODE);
+const codeHighlight = codeHighlightFor(LINKED_LIST_CODE, "c");
 
 function chain(values: readonly number[]): string {
   return [...values.map(String), "∅"].join(" → ");
@@ -222,14 +222,14 @@ function buildLinkedListReverseSteps(
       }),
       code_highlight: codeHighlight(
         2,
-        { head: "1", prev: "null", curr: "1", list: chain(original) },
+        { head: "1", prev: "NULL", curr: "1", list: chain(original) },
         "initialize prev and curr",
         [1, 2],
       ),
       questions: [
-        ["为什么需要 next 这个指针？", "curr.next 一旦改成指向 prev，原来的后继就丢了；先保存 next 才能继续向后走。"],
+        ["为什么需要 next 这个指针？", "curr->next 一旦改成指向 prev，原来的后继就丢了；先保存 next 才能继续向后走。"],
         ["prev 一开始为什么是空？", "第一个节点反转后要成为尾节点，尾节点的 next 必须是 ∅，所以 prev 从 ∅ 开始。"],
-        ["能不能用递归？", "可以：先反转 head.next 之后的部分，再把 head.next.next 指回 head；但递归深度是 O(n)。"],
+        ["能不能用递归？", "可以：先反转 head->next 之后的部分，再令 head->next->next = head、head->next = NULL；但递归深度是 O(n)。"],
       ],
     },
   ];
@@ -261,8 +261,8 @@ function buildLinkedListReverseSteps(
         5,
         {
           curr: String(frame.curr),
-          next: frame.next === 0 ? "null" : String(frame.next),
-          "curr.next": frame.prevBefore === 0 ? "null" : String(frame.prevBefore),
+          next: frame.next === 0 ? "NULL" : String(frame.next),
+          "curr->next": frame.prevBefore === 0 ? "NULL" : String(frame.prevBefore),
           prev: String(frame.curr),
         },
         `flip ${frame.curr}.next`,
@@ -270,7 +270,7 @@ function buildLinkedListReverseSteps(
       ),
       questions: [
         ["这一步改动了哪条指针？", `只有 ${frame.curr}.next：从 ${nodeLabel(frame.next)} 改为指向 ${nodeLabel(frame.prevBefore)}。`],
-        ["四行代码的顺序能换吗？", "保存 next 必须最先做；改 curr.next 要在 prev 前进之前；prev 和 curr 的前进顺序不能颠倒，否则 prev 会跳过当前节点。"],
+        ["四行代码的顺序能换吗？", "保存 next 必须最先做；改 curr->next 要在 prev 前进之前；prev 和 curr 的前进顺序不能颠倒，否则 prev 会跳过当前节点。"],
         ["此刻链表分成了哪两段？", `已反转段 ${chain([...frame.reversed].reverse())}，${frame.next === 0 ? "剩余段为空。" : `未处理段 ${chain(Array.from({ length: length - frame.curr }, (_, i) => frame.curr + 1 + i))}。`}`],
       ],
     });
@@ -293,7 +293,7 @@ function buildLinkedListReverseSteps(
     }),
     code_highlight: codeHighlight(
       9,
-      { prev: String(last.curr), curr: "null", result: chain(last.order), complexity: "O(n)" },
+      { prev: String(last.curr), curr: "NULL", result: chain(last.order), complexity: "O(n)" },
       "return new head",
     ),
     questions: [
