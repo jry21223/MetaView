@@ -450,7 +450,7 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
         {/* Progress bar */}
         <div
           style={{
-            height: 3,
+            height: PLAYBOOK_LAYOUT.PROGRESS_STRIP_HEIGHT,
             background: isDark
               ? "var(--line, #1d2a23)"
               : "var(--line, #e6e2d5)",
@@ -494,17 +494,20 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
           })}
         </div>
 
-        {/* Subtitle row — minHeight so short narration uses the compact row,
-            longer text wraps up to PLAYBOOK_LAYOUT.SUBTITLE_MAX_LINES before
-            the ellipsis kicks in. */}
+        {/* Subtitle row — always SUBTITLE_MAX_LINES tall so the visual track
+            above keeps one height for the whole lesson; shorter narration
+            sits centred in the reserved space, longer text is ellipsised. */}
         <div
+          data-playbook-subtitle-row="true"
           style={{
-            minHeight: subtitleHeight,
+            height: subtitleHeight,
+            boxSizing: "border-box",
+            overflow: "hidden",
             display: "flex",
             alignItems: "center",
-            padding: "8px 20px",
+            padding: `${PLAYBOOK_LAYOUT.SUBTITLE_PADDING_Y}px 20px`,
             background: subtitleBg,
-            borderTop: `1px solid ${dividerColor}`,
+            borderTop: `${PLAYBOOK_LAYOUT.SUBTITLE_BORDER_TOP}px solid ${dividerColor}`,
             gap: 12,
           }}
         >
@@ -512,8 +515,8 @@ export const PlaybookComposition: React.FC<PlaybookCompositionProps> = ({
             style={{
               color: subtitleColor,
               fontFamily: "system-ui, -apple-system, sans-serif",
-              fontSize: 14,
-              lineHeight: 1.5,
+              fontSize: PLAYBOOK_LAYOUT.SUBTITLE_FONT_SIZE,
+              lineHeight: PLAYBOOK_LAYOUT.SUBTITLE_LINE_HEIGHT,
               flex: 1,
               display: "-webkit-box",
               WebkitBoxOrient: "vertical",

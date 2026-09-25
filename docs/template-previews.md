@@ -93,6 +93,15 @@ npm --workspace apps/web run template-previews:export
 apps/web/public/template-previews/<templateId>/poster.webp
 ```
 
+浅色海报可以一步出 WebP：在 `apps/web` 下运行 `node scripts/render-template-preview-posters.mjs ../../data/template-previews public/template-previews <案例 id…>`，它按 manifest 的 `posterFrame` 渲染。这个脚本固定用浅色主题；生态学五张海报（`logistic-growth`、`rabbit-chaos`、`predator-prey`、`competition-exclusion`、`island-biogeography`）一直是深色，要在仓库根目录用 `render-shots.mjs` 单独出，再转成 WebP（质量 90），否则重出时会被悄悄换成浅色：
+
+```bash
+SHOT_THEME=dark SHOT_FRAME=<posterFrame> SHOT_LABEL=poster \
+  node apps/web/scripts/render-shots.mjs data/template-previews/<templateId>.playbook.json eval/shots/posters/<templateId>
+```
+
+海报帧是带字幕的整帧，所以字幕条和渲染器的版式改动都会改变海报；改完后对每个案例比较改动前后的渲染，只替换真正变化的海报。
+
 导出的 JSON、PNG 审核图和其他中间产物留在已忽略的 `apps/web/data/`、`eval/shots/` 或 `eval/reports/`，不要提交。
 
 ## 逐步审查图
@@ -114,5 +123,7 @@ npm run template-shots -- bst-search dijkstra --params '{"bst-search": {"target"
 - `--frame-ratio`：在每步窗口里取样的位置，默认 `0.85`（入场动画已结束、下一步还没开始）。
 
 输出到 `eval/shots/<案例 id>/<主题>/step-NN.png`，是已忽略目录，不要提交。
+
+看图时以固定的视觉轨道为准：播放合成的字幕条始终预留三行（3px 进度条 + 80px 字幕行，见 `PLAYBOOK_LAYOUT`），960×540 的画面里视觉轨道恒为 457px 高，导出和浏览器播放一致。相邻步骤的标题与主体不应因旁白长短而移动；如果标题贴边或被裁，说明渲染器的内容超出了这 457px，要改的是渲染器。
 
 `REMOTION_BROWSER_EXECUTABLE` 在本仓库的开发环境里必须设置：容器下载不到 Remotion 自带的 headless shell，而 PATH 上的 chromium 已移除旧版 headless 模式，直接启动会失败。上面那个 Playwright 自带的 `headless_shell` 可用；不设置时脚本会先打印警告再尝试，通常会在启动浏览器时报错。
