@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { PlaybookPlayer } from "../../features/playbook/engine/player/PlaybookPlayer";
+import { resolveStepSettledFrame } from "../../features/playbook/engine/player/previewFrame";
 import type { PlaybookScript } from "../../features/playbook/engine/types";
 import { useInteractionSandbox } from "../../features/playbook/interaction/useInteractionSandbox";
 import { RETIRED_TEMPLATE_REDIRECTS, TEMPLATES } from "./templates";
@@ -78,7 +79,7 @@ function TemplatePreviewContent({
     () => previewCase.buildFollowups(renderedParams, script),
     [renderedParams, previewCase, script],
   );
-  const settledOpeningFrame = Math.max(0, (script.steps[0]?.end_frame ?? 1) - 1);
+  const settledOpeningFrame = resolveStepSettledFrame(script.steps, 0);
   // Rings mark the case's curated hands-on moments (1–3 per template), not
   // every step a parameter merely touches — scarcity keeps the cue readable.
   const parametricStepIds = previewCase.handsOnStepIds;
