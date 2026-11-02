@@ -225,12 +225,12 @@ describe("App edition shells", () => {
     window.history.pushState({}, "", "/admin");
 
     const { App } = await import("./App");
-    const { container, queryByText } = render(<App />);
+    const { container, queryByRole, queryByText } = render(<App />);
 
     await waitFor(() => expect(window.location.pathname).toBe("/"));
     expect(dashboardHits).toBe(0);
     expect(queryByText("运营后台仅在")).toBeNull();
-    expect(container.textContent).not.toContain("全局运营");
+    expect(queryByRole("heading", { level: 1, name: "全局总览", exact: true })).toBeNull();
     expect(container.querySelectorAll(".mv-landing-header")).toHaveLength(1);
     expect(container.querySelectorAll(".mv-top")).toHaveLength(0);
   });
@@ -247,13 +247,14 @@ describe("App edition shells", () => {
     window.history.pushState({}, "", "/admin");
 
     const { App } = await import("./App");
-    const { container, queryByText } = render(<App />);
+    const { getByRole, queryByText } = render(<App />);
 
     // The admin shell is a lazy chunk; wait for it to mount and fetch.
     await waitFor(() => expect(dashboardHits).toBe(1), { timeout: 30000 });
-    await waitFor(() => expect(container.textContent).toContain("全局运营"), {
-      timeout: 30000,
-    });
+    await waitFor(
+      () => expect(getByRole("heading", { level: 1, name: "全局总览", exact: true })).toBeTruthy(),
+      { timeout: 30000 },
+    );
     expect(queryByText("运营面板")).toBeNull();
   }, 60000);
 });

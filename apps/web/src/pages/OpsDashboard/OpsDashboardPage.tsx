@@ -1,102 +1,58 @@
-import React, { useMemo, useState } from "react";
-import AccountCircleIcon from "@mui/icons-material/AccountCircle";
-import DashboardIcon from "@mui/icons-material/Dashboard";
-import FactCheckIcon from "@mui/icons-material/FactCheck";
-import MenuIcon from "@mui/icons-material/Menu";
-import MonitorHeartIcon from "@mui/icons-material/MonitorHeart";
-import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
+import React, { useMemo, useRef, useState } from "react";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import CloseIcon from "@mui/icons-material/Close";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import Avatar from "@mui/material/Avatar";
-import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
-import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
-import Divider from "@mui/material/Divider";
-import Drawer from "@mui/material/Drawer";
+import Collapse from "@mui/material/Collapse";
+import Dialog from "@mui/material/Dialog";
+import DialogContent from "@mui/material/DialogContent";
 import IconButton from "@mui/material/IconButton";
-import List from "@mui/material/List";
-import ListItemButton from "@mui/material/ListItemButton";
-import ListItemIcon from "@mui/material/ListItemIcon";
-import ListItemText from "@mui/material/ListItemText";
-import Paper from "@mui/material/Paper";
 import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
 import TextField from "@mui/material/TextField";
 import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import { ThemeProvider } from "@mui/material/styles";
-import { DataGrid, type GridColDef } from "@mui/x-data-grid";
-import { zhCN as dataGridZhCN } from "@mui/x-data-grid/locales";
-import {
-  BarChart,
-  LineChart,
-  PieChart,
-} from "@mui/x-charts";
-
 import {
   useOpsAccounts,
   useOpsDashboard,
-  type OpsAccountRow,
   type OpsDashboardResponse,
   type OpsDashboardWindowDays,
-  type OpsHealthStatus,
   type OpsHealthTreeItem,
   type OpsMetricCard,
   type OpsOrderRow,
   type OpsRunRow,
 } from "../../features/ops-dashboard";
 import { usePrefersReducedMotion } from "../../shared/hooks/usePrefersReducedMotion";
-import { OPS_THEME_VARS, opsDashboardTheme } from "./opsDashboardTheme";
-
-const windowOptions: OpsDashboardWindowDays[] = [7, 30, 90];
-const dataGridLocaleText = dataGridZhCN.components.MuiDataGrid.defaultProps.localeText;
-
-/**
- * Admin destinations of the `/admin` surface. Kept local to the admin shell
- * area on purpose: these are NOT user shell stages and must not join the
- * shared Stage type used by the public GlobalTopbar navigation.
- */
-export type AdminSection = "overview" | "accounts" | "runs" | "health";
+import {
+  OPS_MOTION,
+  OPS_THEME_VARS,
+  opsDashboardTheme,
+} from "./opsDashboardTheme";
+import { DailyData, OpsTimeline } from "./OpsTimeline";
+import {
+  alignDashboardTrends,
+  domainLabel,
+  findHealthItem,
+  formatUtc,
+  healthLabel,
+  money,
+  statusLabel,
+  statusTone,
+} from "./opsDashboardView";
 
 interface OpsDashboardPageProps {
   accountName?: string | null;
   accountBalanceYuan?: string | null;
   accountAvatarUrl?: string | null;
   onOpenProviderSettings?: () => void;
-  /** When provided, the permission panel renders a primary WeChat login CTA that invokes it. */
   onRequireLogin?: () => void;
 }
-
-type TableTab = "runs" | "orders";
-type StatusTone = "positive" | "negative" | "warning" | "neutral";
-
-interface RunTableRow {
-  id: string;
-  title: string;
-  status: string;
-  domain: string;
-  createdAt: string;
-}
-
-interface OrderTableRow {
-  id: string;
-  order: string;
-  amount: string;
-  status: string;
-  createdAt: string;
-}
-
-interface AccountTableRow {
-  id: string;
-  userId: string;
-  displayName: string;
-  loginProvider: string;
-  status: string;
-  role: string;
-  balanceYuan: string;
-  createdAt: string;
-}
+type RecordTab = "runs" | "orders";
+type DetailPanel = "health" | "definitions" | "daily" | "domains" | null;
 
 export function OpsDashboardPage({
   accountName,
@@ -106,740 +62,726 @@ export function OpsDashboardPage({
   onRequireLogin,
 }: OpsDashboardPageProps) {
   const [windowDays, setWindowDays] = useState<OpsDashboardWindowDays>(30);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [tableTab, setTableTab] = useState<TableTab>("runs");
-  const [activeSection, setActiveSection] = useState<AdminSection>("overview");
+  const [accountsOpen, setAccountsOpen] = useState(false);
   const { dashboard, isLoading, error, errorStatus, refresh } =
     useOpsDashboard(windowDays);
-  const isPermissionError = errorStatus === 403;
-
-  const handleSelectSection = (section: AdminSection) => {
-    setActiveSection(section);
-    setMobileOpen(false);
-  };
-
-  const drawer = (
-    <SideMenu
-      accountName={accountName}
-      accountBalanceYuan={accountBalanceYuan}
-      accountAvatarUrl={accountAvatarUrl}
-      activeSection={activeSection}
-      onSelectSection={handleSelectSection}
-      onOpenProviderSettings={onOpenProviderSettings}
-    />
-  );
-
+  const denied = errorStatus === 403;
   return (
     <ThemeProvider theme={opsDashboardTheme}>
-      <Box
+      <div
         className="mv-root mv-light mv-theme-light mv-density-compact mv-ops-dashboard"
         style={OPS_THEME_VARS}
       >
-        <Box component="nav" className="mv-ops-nav-desktop" aria-label="运营导航">
-          <Drawer
-            variant="permanent"
-            open
-            slotProps={{
-              paper: { className: "mv-ops-sidebar", style: OPS_THEME_VARS },
-            }}
-          >
-            {drawer}
-          </Drawer>
-        </Box>
-
-        <Drawer
-          variant="temporary"
-          open={mobileOpen}
-          onClose={() => setMobileOpen(false)}
-          ModalProps={{ keepMounted: true }}
-          slotProps={{
-            paper: { className: "mv-ops-sidebar", style: OPS_THEME_VARS },
-          }}
-        >
-          {drawer}
-        </Drawer>
-
-        <Box component="main" className="mv-ops-main">
-          <MobileHeader onOpenMenu={() => setMobileOpen(true)} />
-          <div className="mv-ops-content" aria-busy={isLoading}>
-            {isPermissionError ? (
-              <PermissionPanel onRequireLogin={onRequireLogin} />
-            ) : activeSection === "overview" ? (
-              <>
-                <Header
-                  windowDays={windowDays}
-                  generatedAt={dashboard?.generated_at ?? null}
-                  onWindowChange={(_, value) => {
-                    if (value !== null) setWindowDays(value);
-                  }}
-                  onRefresh={refresh}
-                  isLoading={isLoading}
-                />
-                {isLoading && !dashboard && <LoadingPanel />}
-                {error && dashboard && <ErrorBanner error={error} onRefresh={refresh} />}
-                {error && !dashboard && <ErrorPanel error={error} onRefresh={refresh} />}
-                {dashboard && (
-                  <DashboardContent
-                    dashboard={dashboard}
-                    tableTab={tableTab}
-                    onTableTabChange={setTableTab}
-                  />
-                )}
-              </>
-            ) : activeSection === "accounts" ? (
-              <AccountsSection />
-            ) : (
-              <SectionPlaceholder section={activeSection} />
+        <header className="mv-ops-appbar">
+          <div className="mv-ops-brand">
+            <img src="/brand/metaview-mark.svg" alt="" />
+            <span>
+              MetaView<small>OPERATIONS</small>
+            </span>
+          </div>
+          <nav className="mv-ops-appnav" aria-label="运营导航">
+            <span aria-current="page">运营总览</span>
+            {!denied && (
+              <Button variant="text" onClick={() => setAccountsOpen(true)}>
+                账户
+              </Button>
+            )}
+          </nav>
+          <div className="mv-ops-identity">
+            <Avatar
+              src={accountAvatarUrl ?? undefined}
+              alt={accountAvatarUrl ? `${accountName ?? "管理员"}头像` : ""}
+              slotProps={{ img: { referrerPolicy: "no-referrer" } }}
+            >
+              {(accountName ?? "管理员").slice(0, 1)}
+            </Avatar>
+            <div>
+              <span>{accountName ?? "管理员"}</span>
+              <small>
+                {accountBalanceYuan != null
+                  ? `余额 ¥ ${accountBalanceYuan}`
+                  : "ADMIN ACCESS"}
+              </small>
+            </div>
+            {onOpenProviderSettings && (
+              <Button
+                className="mv-ops-identity__action"
+                onClick={onOpenProviderSettings}
+                aria-label="账户与充值"
+              >
+                账户与充值
+              </Button>
             )}
           </div>
-        </Box>
-      </Box>
+        </header>
+        <main className="mv-ops-content">
+          <header className="mv-ops-toolbar">
+            <div>
+              <h1>全局总览</h1>
+              <p>
+                {dashboard
+                  ? `近 ${dashboard.window_days} 天 · UTC 自然日`
+                  : "任务、资金、账户与规则检查"}
+                <span>
+                  {dashboard
+                    ? `最近同步 ${formatUtc(dashboard.generated_at)}`
+                    : "等待同步"}
+                </span>
+              </p>
+            </div>
+            {!denied && (
+              <div className="mv-ops-toolbar__actions">
+                <ToggleButtonGroup
+                  exclusive
+                  size="small"
+                  value={windowDays}
+                  onChange={(_, value: OpsDashboardWindowDays | null) => {
+                    if (value !== null) setWindowDays(value);
+                  }}
+                  aria-label="运营统计窗口"
+                >
+                  {([7, 30, 90] as const).map((days) => (
+                    <ToggleButton
+                      key={days}
+                      value={days}
+                      aria-label={`${days} 天`}
+                    >
+                      {days} 天
+                    </ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={
+                    <RefreshIcon
+                      className={isLoading ? "mv-ops-refreshing" : undefined}
+                    />
+                  }
+                  onClick={refresh}
+                  disabled={isLoading}
+                  aria-label="刷新运营数据"
+                >
+                  {isLoading ? "同步中" : "刷新"}
+                </Button>
+              </div>
+            )}
+          </header>
+          {denied ? (
+            <PermissionPanel onRequireLogin={onRequireLogin} />
+          ) : (
+            <>
+              {isLoading && dashboard && (
+                <p className="mv-ops-loading-note" role="status">
+                  正在读取近 {windowDays} 天数据，当前保留近{" "}
+                  {dashboard.window_days} 天的上次成功结果。
+                </p>
+              )}
+              {error && dashboard && (
+                <ErrorBanner error={error} onRefresh={refresh} />
+              )}
+              {!dashboard &&
+                (error ? (
+                  <StatePanel title="加载失败" description={error}>
+                    <Button variant="outlined" onClick={refresh}>
+                      重新加载
+                    </Button>
+                  </StatePanel>
+                ) : (
+                  <StatePanel
+                    title="同步运营数据"
+                    description="正在汇总任务、资金与账户数据。"
+                  >
+                    <CircularProgress size={24} />
+                  </StatePanel>
+                ))}
+              {dashboard && (
+                <Overview
+                  dashboard={dashboard}
+                  onOpenAccounts={() => setAccountsOpen(true)}
+                />
+              )}
+            </>
+          )}
+        </main>
+        {accountsOpen && !denied && (
+          <OpsDialog
+            title="账户查询"
+            subtitle="全站账户 · 按注册时间倒序 · 只读"
+            onClose={() => setAccountsOpen(false)}
+            wide
+          >
+            <AccountsSection />
+          </OpsDialog>
+        )}
+      </div>
     </ThemeProvider>
   );
 }
 
-function MobileHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
-  return (
-    <header className="mv-ops-mobile-header">
-      <IconButton
-        className="mv-ops-mobile-header__menu"
-        aria-label="打开运营导航"
-        onClick={onOpenMenu}
-      >
-        <MenuIcon fontSize="small" />
-      </IconButton>
-      <img
-        className="mv-ops-mobile-header__mark"
-        src="/brand/metaview-mark.svg"
-        alt=""
-      />
-      <span className="mv-ops-mobile-header__title">MetaView 运营</span>
-    </header>
-  );
-}
-
-function Header({
-  windowDays,
-  generatedAt,
-  onWindowChange,
-  onRefresh,
-  isLoading,
-}: {
-  windowDays: OpsDashboardWindowDays;
-  generatedAt: string | null;
-  onWindowChange: (
-    event: React.MouseEvent<HTMLElement>,
-    value: OpsDashboardWindowDays | null,
-  ) => void;
-  onRefresh: () => void;
-  isLoading: boolean;
-}) {
-  return (
-    <header className="mv-ops-page-header">
-      <div className="mv-ops-page-header__copy">
-        <span className="mv-ops-eyebrow">OPS / 全局运营</span>
-        <h1 className="mv-ops-page-title">运营总览</h1>
-        <p className="mv-ops-page-summary">
-          <span>任务、收入、账户与平台状态</span>
-          <span className="mv-ops-sync-time" aria-live="polite">
-            最近同步：
-            {generatedAt ? (
-              <time dateTime={generatedAt}>{formatDateTime(generatedAt)}</time>
-            ) : (
-              "等待同步"
-            )}
-          </span>
-        </p>
-      </div>
-
-      <div className="mv-ops-header-actions">
-        <ToggleButtonGroup
-          className="mv-ops-window-toggle"
-          exclusive
-          size="small"
-          value={windowDays}
-          onChange={onWindowChange}
-          aria-label="运营统计窗口"
-        >
-          {windowOptions.map((days) => (
-            <ToggleButton key={days} value={days} aria-label={`${days} 天`}>
-              {days} 天
-            </ToggleButton>
-          ))}
-        </ToggleButtonGroup>
-        <Button
-          className="mv-ops-refresh"
-          variant="outlined"
-          size="small"
-          startIcon={
-            <RefreshIcon
-              className={`mv-ops-refresh__icon${isLoading ? " is-spinning" : ""}`}
-              fontSize="small"
-            />
-          }
-          onClick={onRefresh}
-          disabled={isLoading}
-          aria-label="刷新运营数据"
-        >
-          <span className="mv-ops-refresh__label">刷新</span>
-        </Button>
-      </div>
-    </header>
-  );
-}
-
-function DashboardContent({
+function Overview({
   dashboard,
-  tableTab,
-  onTableTabChange,
+  onOpenAccounts,
 }: {
   dashboard: OpsDashboardResponse;
-  tableTab: TableTab;
-  onTableTabChange: (tab: TableTab) => void;
+  onOpenAccounts: () => void;
 }) {
-  const prefersReducedMotion = usePrefersReducedMotion();
-  const runLabels = dashboard.run_trend.map((point) => shortDate(point.date));
-  const revenueLabels = dashboard.revenue_trend.map((point) => shortDate(point.date));
-  const runRows = useMemo(
-    () => dashboard.recent_runs.map(runTableRow),
-    [dashboard.recent_runs],
-  );
-  const orderRows = useMemo(
-    () => dashboard.recent_orders.map(orderTableRow),
-    [dashboard.recent_orders],
-  );
+  const [panel, setPanel] = useState<DetailPanel>(null);
+  const [tableTab, setTableTab] = useState<RecordTab>("runs");
+  const [filter, setFilter] = useState("all");
+  const recordsRef = useRef<HTMLElement>(null);
+  const points = useMemo(() => alignDashboardTrends(dashboard), [dashboard]);
+  const metric = (id: string) => dashboard.kpis.find((item) => item.id === id);
+  const refund = findHealthItem(dashboard.health_tree, "billing-refund");
   const paidOrders = dashboard.revenue_trend.reduce(
     (total, point) => total + point.paid_orders,
     0,
   );
-  const revenueValue =
-    dashboard.kpis.find((metric) => metric.id === "revenue")?.value ?? "¥ 0.00";
+  const changeTab = (next: RecordTab) => {
+    setTableTab(next);
+    setFilter("all");
+  };
+  return (
+    <div className="mv-ops-overview">
+      <section className="mv-ops-atlas" aria-label="生成、资金与全站存量">
+        <div className="mv-ops-tracks">
+          <section
+            className="mv-ops-track"
+            aria-labelledby="ops-generation-title"
+          >
+            <div className="mv-ops-track__summary">
+              <h2 id="ops-generation-title">生成任务</h2>
+              <strong className="mv-ops-track__number">
+                {metric("runs")?.value ?? "—"}
+              </strong>
+              <MetricDelta metric={metric("runs")} />
+              <p className="mv-ops-track__helper">
+                {metric("runs")?.helper ?? "暂无任务指标"}
+              </p>
+              <div className="mv-ops-terminal">
+                <span>终态成功率</span>
+                <strong>{metric("success_rate")?.value ?? "—"}</strong>
+                <small>
+                  {metric("success_rate")?.helper ??
+                    "仅统计成功 / 失败终态任务"}
+                </small>
+              </div>
+            </div>
+            <div className="mv-ops-track__chart">
+              <div className="mv-ops-chart-caption">
+                <span>按任务创建日 · 个</span>
+                <div className="mv-ops-legend">
+                  <span data-series="succeeded">完成</span>
+                  <span data-series="failed">失败</span>
+                  <span data-series="in_flight">进行中</span>
+                </div>
+              </div>
+              <OpsTimeline points={points} kind="runs" />
+              <div
+                className="mv-ops-window-status"
+                role="group"
+                aria-label="窗口任务状态分布"
+              >
+                {dashboard.status_distribution.length ? (
+                  dashboard.status_distribution.map((item) => (
+                    <span key={item.id} data-status={item.id}>
+                      <i data-tone={statusTone(item.id)} aria-hidden="true" />
+                      {item.label}
+                      <strong>{item.count}</strong>
+                    </span>
+                  ))
+                ) : (
+                  <span>窗口内暂无任务</span>
+                )}
+                <Button
+                  size="small"
+                  onClick={() => {
+                    setTableTab("runs");
+                    setFilter("failed");
+                    recordsRef.current?.scrollIntoView?.({
+                      block: "nearest",
+                      behavior: "auto",
+                    });
+                  }}
+                >
+                  核查最近失败
+                </Button>
+              </div>
+            </div>
+          </section>
+          <section className="mv-ops-track" aria-labelledby="ops-revenue-title">
+            <div className="mv-ops-track__summary">
+              <h2 id="ops-revenue-title">充值收入</h2>
+              <strong className="mv-ops-track__number mv-ops-track__number--money">
+                {metric("revenue")?.value ?? "—"}
+              </strong>
+              <MetricDelta metric={metric("revenue")} />
+              <p className="mv-ops-track__helper">
+                {metric("revenue")?.helper ?? "暂无充值指标"}
+              </p>
+              <div className="mv-ops-paid">
+                <span>已支付订单</span>
+                <strong>
+                  {paidOrders} <small>笔</small>
+                </strong>
+              </div>
+            </div>
+            <div className="mv-ops-track__chart">
+              <div className="mv-ops-chart-caption">
+                <span>按支付日 · 人民币元</span>
+                <span>与生成轨道共用日期尺</span>
+              </div>
+              <OpsTimeline points={points} kind="revenue" />
+              <div className="mv-ops-money-facts">
+                <div>
+                  <span>生成消耗</span>
+                  <strong>{metric("consumption")?.value ?? "—"}</strong>
+                </div>
+                <div>
+                  <span>退款回补</span>
+                  <strong>{refund?.value ?? "—"}</strong>
+                </div>
+                <Button size="small" onClick={() => setPanel("definitions")}>
+                  金额口径
+                </Button>
+              </div>
+            </div>
+          </section>
+          <div className="mv-ops-tracks__footnote">
+            <span>消耗 / 回补各按独立账本汇总，不由任务数推算。</span>
+            <Button size="small" onClick={() => setPanel("daily")}>
+              逐日数据
+            </Button>
+          </div>
+        </div>
+        <aside className="mv-ops-snapshot" aria-label="全站当前快照">
+          <header>
+            <h2>账户与余额</h2>
+            <span>全站当前存量</span>
+          </header>
+          <div>
+            <span className="mv-ops-snapshot__label">
+              {metric("users")?.label ?? "用户数"}
+              <small>微信账户</small>
+            </span>
+            <strong className="mv-ops-snapshot__number">
+              {metric("users")?.value ?? "—"}
+            </strong>
+            <p>{metric("users")?.helper ?? "暂无账户统计"}</p>
+            <small>活跃指窗口内创建过生成任务</small>
+          </div>
+          <div className="mv-ops-snapshot__balance">
+            <span className="mv-ops-snapshot__label">未消费余额</span>
+            <strong className="mv-ops-snapshot__number">
+              {metric("balance")?.value ?? "—"}
+            </strong>
+            <p>{metric("balance")?.helper ?? "全站账户未消费余额"}</p>
+            <small>存量不随窗口裁剪</small>
+          </div>
+          <Button
+            variant="outlined"
+            onClick={onOpenAccounts}
+            endIcon={<ArrowForwardIcon />}
+          >
+            查询账户
+          </Button>
+        </aside>
+      </section>
+      <section className="mv-ops-rules" aria-label="规则检查">
+        <span className="mv-ops-rules__label">
+          规则检查<small>依据现有数据，非在线监测</small>
+        </span>
+        <div>
+          {dashboard.health_tree.map((item) => (
+            <button
+              type="button"
+              key={item.id}
+              data-health-id={item.id}
+              data-health-status={item.status}
+              onClick={() => setPanel("health")}
+            >
+              <i data-tone={statusTone(item.status)} aria-hidden="true" />
+              <span>{item.label}</span>
+              <strong>{healthLabel(item.status)}</strong>
+              <ExpandMoreIcon />
+            </button>
+          ))}
+        </div>
+        <Button size="small" onClick={() => setPanel("health")}>
+          全部依据
+        </Button>
+      </section>
+      <section
+        className="mv-ops-records"
+        ref={recordsRef}
+        aria-label="全站最近记录"
+      >
+        <header className="mv-ops-records__header">
+          <div>
+            <h2>最近记录</h2>
+            <p>全站按创建时间倒序，独立于统计窗口</p>
+          </div>
+          <Tabs
+            value={tableTab}
+            onChange={(_, value: RecordTab) => changeTab(value)}
+            aria-label="运营明细表"
+          >
+            <Tab value="runs" label="任务" />
+            <Tab value="orders" label="订单" />
+          </Tabs>
+        </header>
+        <RecentRecords
+          key={`${tableTab}-${filter}`}
+          dashboard={dashboard}
+          tab={tableTab}
+          filter={filter}
+          onFilter={setFilter}
+        />
+      </section>
+      <footer className="mv-ops-overview__footer">
+        <span>
+          窗口学科{" "}
+          {dashboard.domain_distribution.length
+            ? dashboard.domain_distribution
+                .map((item) => `${item.label} ${item.count}`)
+                .join(" · ")
+            : "暂无数据"}
+        </span>
+        <Button size="small" onClick={() => setPanel("domains")}>
+          学科分布与口径
+        </Button>
+      </footer>
+      {panel && (
+        <OpsDialog
+          title={
+            panel === "health"
+              ? "规则检查依据"
+              : panel === "definitions"
+                ? "数据口径"
+                : panel === "daily"
+                  ? "逐日数据"
+                  : "窗口学科分布"
+          }
+          subtitle={`近 ${dashboard.window_days} 天 · UTC 自然日`}
+          onClose={() => setPanel(null)}
+        >
+          {panel === "health" && (
+            <>
+              <HealthTree items={dashboard.health_tree} />
+              <p className="mv-ops-definition">
+                父级与每个子项各有自己的状态，不按最严重子项自动上卷。待支付或禁用账户会触发关注，但不能据此判断支付故障或违规。这里不监测服务是否在线。
+              </p>
+            </>
+          )}
+          {panel === "definitions" && <Definitions dashboard={dashboard} />}
+          {panel === "daily" && (
+            <>
+              <p className="mv-ops-definition">
+                任务按创建日；充值按支付日，缺失支付时间时回退创建日。两条轨道使用各自纵轴。
+              </p>
+              <DailyData dashboard={dashboard} />
+            </>
+          )}
+          {panel === "domains" && (
+            <>
+              <ul className="mv-ops-domains">
+                {dashboard.domain_distribution.map((item) => (
+                  <li key={item.id}>
+                    <span>{item.label}</span>
+                    <span className="mv-ops-domains__track">
+                      <i
+                        style={{
+                          width: `${(item.count / Math.max(1, ...dashboard.domain_distribution.map((point) => point.count))) * 100}%`,
+                        }}
+                      />
+                    </span>
+                    <strong>{item.count}</strong>
+                  </li>
+                ))}
+              </ul>
+              <p className="mv-ops-definition">
+                学科取自持久化的 Playbook
+                元数据，缺失为未识别；失败或进行中的任务可能尚无内容。未识别不能归为某门学科。
+              </p>
+            </>
+          )}
+        </OpsDialog>
+      )}
+    </div>
+  );
+}
 
+function MetricDelta({ metric }: { metric: OpsMetricCard | undefined }) {
+  return (
+    <span className="mv-ops-delta" data-trend={metric?.trend ?? "neutral"}>
+      {metric?.delta_percent == null
+        ? "暂无环比"
+        : `较前窗 ${metric.delta_percent > 0 ? "+" : ""}${metric.delta_percent}%`}
+    </span>
+  );
+}
+function StatusBadge({ status }: { status: string }) {
+  return (
+    <span
+      className="mv-ops-status"
+      data-tone={statusTone(status)}
+      data-status={status}
+    >
+      <i aria-hidden="true" />
+      {statusLabel(status)}
+    </span>
+  );
+}
+
+function RecentRecords({
+  dashboard,
+  tab,
+  filter,
+  onFilter,
+}: {
+  dashboard: OpsDashboardResponse;
+  tab: RecordTab;
+  filter: string;
+  onFilter: (filter: string) => void;
+}) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const reducedMotion = usePrefersReducedMotion();
+  const source: Array<OpsRunRow | OpsOrderRow> =
+    tab === "runs" ? dashboard.recent_runs : dashboard.recent_orders;
+  const rows = source.filter(
+    (row) =>
+      filter === "all" ||
+      (filter === "in_flight"
+        ? ["queued", "running", "reviewing"].includes(row.status)
+        : row.status === filter),
+  );
+  const filters =
+    tab === "runs"
+      ? [
+          ["all", "全部"],
+          ["failed", "失败"],
+          ["in_flight", "进行中"],
+        ]
+      : [
+          ["all", "全部"],
+          ["pending", "待支付"],
+          ["paid", "已支付"],
+        ];
+  const pages = Math.max(1, Math.ceil(rows.length / 10));
+  const currentPage = Math.min(page, pages);
+  const visible = rows.slice((currentPage - 1) * 10, currentPage * 10);
   return (
     <>
-      <section className="mv-ops-kpi-rail" aria-label="核心运营指标">
-        {dashboard.kpis.map((metric) => (
-          <MetricPanel key={metric.id} metric={metric} />
-        ))}
-      </section>
-
-      <div className="mv-ops-analytics-grid">
-        <Panel
-          title="任务趋势"
-          subtitle={`近 ${dashboard.window_days} 天生成状态`}
-          action={<RunTrendLegend />}
-        >
-          <div role="img" aria-label={`近 ${dashboard.window_days} 天任务趋势图`}>
-            <LineChart
-              height={306}
-              margin={{ top: 18, right: 18, bottom: 30, left: 12 }}
-              xAxis={[
-                {
-                  scaleType: "point",
-                  data: runLabels,
-                  tickLabelStyle: { fontSize: 10, fill: "var(--ink-3)" },
-                },
-              ]}
-              yAxis={[
-                {
-                  width: 38,
-                  tickLabelStyle: { fontSize: 10, fill: "var(--ink-3)" },
-                },
-              ]}
-              grid={{ horizontal: true }}
-              hideLegend
-              skipAnimation={prefersReducedMotion}
-              series={[
-                {
-                  data: dashboard.run_trend.map((point) => point.total),
-                  label: "全部任务",
-                  color: "var(--accent)",
-                  curve: "monotoneX",
-                  showMark: false,
-                },
-                {
-                  data: dashboard.run_trend.map((point) => point.succeeded),
-                  label: "完成",
-                  color: "var(--mv-ops-positive)",
-                  curve: "monotoneX",
-                  showMark: false,
-                },
-                {
-                  data: dashboard.run_trend.map((point) => point.failed),
-                  label: "失败",
-                  color: "var(--mv-ops-negative)",
-                  curve: "monotoneX",
-                  showMark: false,
-                },
-                {
-                  data: dashboard.run_trend.map((point) => point.in_flight),
-                  label: "进行中",
-                  color: "var(--warn)",
-                  curve: "monotoneX",
-                  showMark: false,
-                },
-              ]}
-            />
-          </div>
-        </Panel>
-
-        <Panel title="收入趋势" subtitle="按支付完成时间统计">
-          <div className="mv-ops-revenue-summary" aria-label="收入摘要">
-            <div className="mv-ops-revenue-stat">
-              <span className="mv-ops-revenue-stat__label">窗口收入</span>
-              <strong className="mv-ops-revenue-stat__value">{revenueValue}</strong>
-            </div>
-            <div className="mv-ops-revenue-stat">
-              <span className="mv-ops-revenue-stat__label">已支付订单</span>
-              <strong className="mv-ops-revenue-stat__value">{paidOrders}</strong>
-            </div>
-          </div>
-          <div role="img" aria-label={`近 ${dashboard.window_days} 天充值收入趋势图`}>
-            <BarChart
-              height={242}
-              margin={{ top: 18, right: 12, bottom: 30, left: 10 }}
-              xAxis={[
-                {
-                  scaleType: "band",
-                  data: revenueLabels,
-                  tickLabelStyle: { fontSize: 10, fill: "var(--ink-3)" },
-                },
-              ]}
-              yAxis={[
-                {
-                  width: 48,
-                  tickLabelStyle: { fontSize: 10, fill: "var(--ink-3)" },
-                  valueFormatter: (value: number) => `¥${value}`,
-                },
-              ]}
-              grid={{ horizontal: true }}
-              hideLegend
-              skipAnimation={prefersReducedMotion}
-              series={[
-                {
-                  data: dashboard.revenue_trend.map((point) =>
-                    Number((point.revenue_cents / 100).toFixed(2)),
-                  ),
-                  label: "充值收入",
-                  color: "var(--accent)",
-                  valueFormatter: (value) => `¥ ${Number(value ?? 0).toFixed(2)}`,
-                },
-              ]}
-            />
-          </div>
-        </Panel>
-      </div>
-
-      <div className="mv-ops-activity-grid">
-        <Panel
-          title={tableTab === "runs" ? "最近任务" : "最近订单"}
-          subtitle="全站最新记录，按创建时间倒序"
-          action={
-            <Tabs
-              className="mv-ops-tabs"
-              value={tableTab}
-              onChange={(_, value: TableTab) => onTableTabChange(value)}
-              aria-label="运营明细表"
+      <div className="mv-ops-records__filters">
+        <div>
+          {filters.map(([value, label]) => (
+            <Button
+              key={value}
+              size="small"
+              variant={filter === value ? "contained" : "text"}
+              aria-pressed={filter === value}
+              onClick={() => onFilter(value)}
             >
-              <Tab value="runs" label="任务" />
-              <Tab value="orders" label="订单" />
-            </Tabs>
-          }
-          flush
-        >
-          <div className="mv-ops-table">
-            {tableTab === "runs" ? (
-              <DataGrid
-                rows={runRows}
-                columns={runColumns}
-                getRowClassName={({ row }) =>
-                  row.status === "failed" ? "is-failed" : ""
-                }
-                density="compact"
-                initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
-                pageSizeOptions={[10, 20, 50]}
-                disableColumnMenu
-                disableRowSelectionOnClick
-                rowHeight={42}
-                columnHeaderHeight={42}
-                localeText={{ ...dataGridLocaleText, noRowsLabel: "暂无任务记录" }}
-              />
-            ) : (
-              <DataGrid
-                rows={orderRows}
-                columns={orderColumns}
-                getRowClassName={({ row }) =>
-                  row.status === "pending" ? "is-pending" : ""
-                }
-                density="compact"
-                initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
-                pageSizeOptions={[10, 20, 50]}
-                disableColumnMenu
-                disableRowSelectionOnClick
-                rowHeight={42}
-                columnHeaderHeight={42}
-                localeText={{ ...dataGridLocaleText, noRowsLabel: "暂无订单记录" }}
-              />
-            )}
-          </div>
-        </Panel>
-
-        <div className="mv-ops-side-stack">
-          <HealthPanel items={dashboard.health_tree} />
-          <TaskStructurePanel
-            statusDistribution={dashboard.status_distribution}
-            domainDistribution={dashboard.domain_distribution}
-            skipAnimation={prefersReducedMotion}
-          />
+              {label}
+            </Button>
+          ))}
+        </div>
+        <p role="status">
+          已载 {source.length} 条 · 最多 50 条
+          {filter !== "all" && ` · 匹配 ${rows.length} 条`}
+        </p>
+      </div>
+      <div className="mv-ops-record-grid" aria-hidden="true">
+        <span>{tab === "runs" ? "任务 / ID" : "订单 / 渠道"}</span>
+        <span>状态</span>
+        <span>{tab === "runs" ? "学科" : "金额"}</span>
+        <span>创建时间 · UTC</span>
+        <span />
+      </div>
+      {visible.map((row) => {
+        const run = "run_id" in row ? row : null;
+        const order = "order_id" in row ? row : null;
+        const id = run?.run_id ?? order!.order_id;
+        const open = expanded === id;
+        return (
+          <article
+            key={id}
+            className={`mv-ops-record${open ? " is-open" : ""}`}
+            data-status={row.status}
+          >
+            <div className="mv-ops-record-grid">
+              <div className="mv-ops-record__object">
+                <strong>
+                  {run ? run.title || run.prompt || "未命名任务" : id}
+                </strong>
+                <small>{run ? id : order!.channel}</small>
+              </div>
+              <StatusBadge status={row.status} />
+              <span className="mv-ops-record__context">
+                {run ? domainLabel(run.domain) : money(order!.amount_cents)}
+              </span>
+              <time dateTime={row.created_at}>{formatUtc(row.created_at)}</time>
+              <Button
+                size="small"
+                variant={open ? "contained" : "outlined"}
+                aria-expanded={open}
+                aria-controls={`ops-record-${id}`}
+                onClick={() => setExpanded(open ? null : id)}
+              >
+                {open ? "收起" : "核查"}
+              </Button>
+            </div>
+            <Collapse
+              in={open}
+              timeout={reducedMotion ? 0 : OPS_MOTION.panel}
+              unmountOnExit
+            >
+              <div id={`ops-record-${id}`} className="mv-ops-record-detail">
+                <h3>{run ? "任务核查" : "订单核查"}</h3>
+                <dl>
+                  {run ? (
+                    <>
+                      <dt>原始输入</dt>
+                      <dd>{run.prompt || "—"}</dd>
+                      <dt>错误记录</dt>
+                      <dd>{run.error || "— 未记录错误"}</dd>
+                    </>
+                  ) : (
+                    <>
+                      <dt>支付时间</dt>
+                      <dd>
+                        {order!.paid_at ? formatUtc(order!.paid_at) : "—"}
+                      </dd>
+                      <dt>渠道</dt>
+                      <dd>{order!.channel}</dd>
+                      <dt>金额</dt>
+                      <dd>{money(order!.amount_cents)}</dd>
+                    </>
+                  )}
+                  <dt>完整 ID</dt>
+                  <dd className="mv-ops-mono">{id}</dd>
+                  <dt>原始状态</dt>
+                  <dd className="mv-ops-mono">{row.status}</dd>
+                </dl>
+              </div>
+            </Collapse>
+          </article>
+        );
+      })}
+      {!visible.length && (
+        <p className="mv-ops-empty">
+          {source.length
+            ? "已载最近记录中没有匹配项，窗口聚合不受此筛选影响。"
+            : tab === "runs"
+              ? "暂无任务记录"
+              : "暂无订单记录"}
+        </p>
+      )}
+      <div className="mv-ops-records__foot">
+        <span>筛选只作用已载记录，不代表窗口内全部记录。</span>
+        <div>
+          <Button
+            size="small"
+            disabled={currentPage === 1}
+            onClick={() => {
+              setPage(currentPage - 1);
+              setExpanded(null);
+            }}
+            aria-label="最近记录上一页"
+          >
+            上一页
+          </Button>
+          <span>
+            {currentPage} / {pages}
+          </span>
+          <Button
+            size="small"
+            disabled={currentPage === pages}
+            onClick={() => {
+              setPage(currentPage + 1);
+              setExpanded(null);
+            }}
+            aria-label="最近记录下一页"
+          >
+            下一页
+          </Button>
         </div>
       </div>
     </>
   );
 }
 
-function MetricPanel({
-  metric,
-}: {
-  metric: OpsMetricCard;
-}) {
-  const deltaLabel =
-    metric.delta_percent == null
-      ? "—"
-      : `${metric.delta_percent > 0 ? "+" : ""}${metric.delta_percent}%`;
+function HealthTree({ items }: { items: OpsHealthTreeItem[] }) {
+  if (!items.length) return <p className="mv-ops-empty">暂无规则检查结果</p>;
   return (
-    <article className="mv-ops-metric">
-      <div className="mv-ops-metric__topline">
-        <span className="mv-ops-metric__label">{metric.label}</span>
-        <Chip
-          className="mv-ops-delta"
-          size="small"
-          label={deltaLabel}
-          data-trend={metric.trend}
-          aria-label={
-            metric.delta_percent == null ? "暂无环比" : `较前一窗口 ${deltaLabel}`
-          }
-        />
-      </div>
-      <div className="mv-ops-metric__value">{metric.value}</div>
-      <div className="mv-ops-metric__helper">{metric.helper}</div>
-      {metric.data.length > 0 ? (
-        <MetricSparkline values={metric.data} />
-      ) : (
-        <div className="mv-ops-sparkline mv-ops-sparkline--empty" aria-hidden="true" />
-      )}
-    </article>
-  );
-}
-
-function MetricSparkline({ values }: { values: number[] }) {
-  const max = Math.max(...values, 1);
-  return (
-    <div className="mv-ops-sparkline" aria-hidden="true">
-      {values.map((value, index) => (
-        <span
-          key={`${index}-${value}`}
-          className="mv-ops-sparkline__bar"
-          data-latest={index === values.length - 1 ? "true" : undefined}
-          style={{ height: `${Math.max(8, (value / max) * 100)}%` }}
-        />
-      ))}
-    </div>
-  );
-}
-
-function RunTrendLegend() {
-  const items: Array<{ label: string; tone: string }> = [
-    { label: "全部", tone: "total" },
-    { label: "完成", tone: "positive" },
-    { label: "失败", tone: "negative" },
-    { label: "进行中", tone: "warning" },
-  ];
-  return (
-    <div className="mv-ops-chart-legend" aria-label="任务趋势图例">
+    <ul className="mv-ops-health-tree">
       {items.map((item) => (
-        <span key={item.label} className="mv-ops-chart-legend__item">
-          <span
-            className="mv-ops-chart-legend__swatch"
-            data-tone={item.tone}
-            aria-hidden="true"
-          />
-          {item.label}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function Panel({
-  title,
-  subtitle,
-  action,
-  children,
-  flush = false,
-}: {
-  title: string;
-  subtitle: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-  flush?: boolean;
-}) {
-  return (
-    <Paper component="section" variant="outlined" className="mv-ops-panel">
-      <header className="mv-ops-panel__header">
-        <div>
-          <h2 className="mv-ops-panel__title">{title}</h2>
-          <span className="mv-ops-panel__subtitle">{subtitle}</span>
-        </div>
-        {action}
-      </header>
-      <div
-        className={`mv-ops-panel__body${flush ? " mv-ops-panel__body--flush" : ""}`}
-      >
-        {children}
-      </div>
-    </Paper>
-  );
-}
-
-function TaskStructurePanel({
-  statusDistribution,
-  domainDistribution,
-  skipAnimation,
-}: {
-  statusDistribution: OpsDashboardResponse["status_distribution"];
-  domainDistribution: OpsDashboardResponse["domain_distribution"];
-  skipAnimation: boolean;
-}) {
-  const statusTotal = statusDistribution.reduce((total, item) => total + item.count, 0);
-  const maxDomainCount = Math.max(...domainDistribution.map((item) => item.count), 1);
-
-  return (
-    <Panel title="任务结构" subtitle="状态与学科分布">
-      <div className="mv-ops-structure">
-        {statusTotal > 0 ? (
-          <div className="mv-ops-status-layout">
-            <div className="mv-ops-donut" aria-hidden="true">
-              <PieChart
-                height={132}
-                hideLegend
-                skipAnimation={skipAnimation}
-                margin={0}
-                series={[
-                  {
-                    data: statusDistribution.map((item) => ({
-                      id: item.id,
-                      value: item.count,
-                      label: item.label,
-                      color: statusColor(item.id),
-                    })),
-                    innerRadius: 45,
-                    outerRadius: 59,
-                    paddingAngle: 2,
-                    cornerRadius: 2,
-                  },
-                ]}
-              />
-              <div className="mv-ops-donut__center">
-                <strong className="mv-ops-donut__value">{statusTotal}</strong>
-                <span className="mv-ops-donut__label">窗口任务</span>
-              </div>
-            </div>
-            <ul className="mv-ops-status-list" aria-label="任务状态分布">
-              {statusDistribution.map((item) => (
-                <li key={item.id} className="mv-ops-status-list__item">
-                  <span
-                    className="mv-ops-status-dot"
-                    data-tone={statusTone(item.id)}
-                    aria-hidden="true"
-                  />
-                  <span>{item.label}</span>
-                  <strong className="mv-ops-status-list__count">{item.count}</strong>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : (
-          <div className="mv-ops-empty-inline">窗口内暂无任务</div>
-        )}
-
-        <div>
-          <span className="mv-ops-section-label">学科分布</span>
-          {domainDistribution.length > 0 ? (
-            <ul className="mv-ops-domain-list">
-              {domainDistribution.map((item) => (
-                <li key={item.id} className="mv-ops-domain-row">
-                  <span>{item.label}</span>
-                  <span className="mv-ops-domain-track" aria-hidden="true">
-                    <span
-                      className="mv-ops-domain-fill"
-                      style={{ width: `${(item.count / maxDomainCount) * 100}%` }}
-                    />
-                  </span>
-                  <strong className="mv-ops-domain-count">{item.count}</strong>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="mv-ops-empty-inline">暂无学科数据</div>
-          )}
-        </div>
-      </div>
-    </Panel>
-  );
-}
-
-function HealthPanel({ items }: { items: OpsHealthTreeItem[] }) {
-  return (
-    <Panel title="运行健康" subtitle="任务、计费与账户检查">
-      {items.length > 0 ? (
-        <ul className="mv-ops-health-list">
-          {items.map((item) => (
-            <li key={item.id} className="mv-ops-health-group">
-              <HealthRow item={item} group />
-              {item.children.length > 0 && (
-                <ul className="mv-ops-health-children">
-                  {item.children.map((child) => (
-                    <li key={child.id}>
-                      <HealthRow item={child} />
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <div className="mv-ops-empty-inline">暂无健康检查结果</div>
-      )}
-    </Panel>
-  );
-}
-
-function HealthRow({ item, group = false }: { item: OpsHealthTreeItem; group?: boolean }) {
-  const tone = healthTone(item.status);
-  return (
-    <div className={`mv-ops-health-row${group ? " mv-ops-health-row--group" : ""}`}>
-      <span className="mv-ops-status-dot" data-tone={tone} aria-hidden="true" />
-      <span>{item.label}</span>
-      <strong className="mv-ops-health-value">{item.value}</strong>
-      <span className="mv-ops-health-state" data-tone={tone}>
-        {healthStatusLabel(item.status)}
-      </span>
-    </div>
-  );
-}
-
-interface SideMenuProps {
-  accountName?: string | null;
-  accountBalanceYuan?: string | null;
-  accountAvatarUrl?: string | null;
-  activeSection: AdminSection;
-  onSelectSection: (section: AdminSection) => void;
-  onOpenProviderSettings?: () => void;
-}
-
-function SideMenu({
-  accountName,
-  accountBalanceYuan,
-  accountAvatarUrl,
-  activeSection,
-  onSelectSection,
-  onOpenProviderSettings,
-}: SideMenuProps) {
-  const navItems: Array<{ section: AdminSection; label: string; icon: React.ReactNode }> = [
-    { section: "overview", label: "运营总览", icon: <DashboardIcon /> },
-    { section: "accounts", label: "账户", icon: <AccountCircleIcon /> },
-    { section: "runs", label: "任务审计", icon: <FactCheckIcon /> },
-    { section: "health", label: "平台状态", icon: <MonitorHeartIcon /> },
-  ];
-
-  return (
-    <div className="mv-ops-sidebar-inner">
-      <div className="mv-ops-brand">
-        <img className="mv-ops-brand__mark" src="/brand/metaview-mark.svg" alt="" />
-        <div>
-          <p className="mv-ops-brand__name">MetaView</p>
-          <span className="mv-ops-brand__meta">OPERATIONS</span>
-        </div>
-      </div>
-      <Divider />
-      <span className="mv-ops-nav-label">Admin</span>
-      <List className="mv-ops-nav-list">
-        {navItems.map((item) => (
-          <ListItemButton
-            key={item.section}
-            className="mv-ops-nav-item"
-            selected={item.section === activeSection}
-            aria-current={item.section === activeSection ? "page" : undefined}
-            onClick={() => onSelectSection(item.section)}
-          >
-            <ListItemIcon>{item.icon}</ListItemIcon>
-            <ListItemText primary={item.label} />
-          </ListItemButton>
-        ))}
-      </List>
-      <div className="mv-ops-account">
-        <Avatar
-          className="mv-ops-account__avatar"
-          src={accountAvatarUrl ?? undefined}
-          alt={accountAvatarUrl ? `${accountName ?? "管理员"}头像` : ""}
-          slotProps={{ img: { referrerPolicy: "no-referrer" } }}
+        <li
+          key={item.id}
+          data-health-id={item.id}
+          data-health-status={item.status}
         >
-          {(accountName ?? "管理员").slice(0, 1)}
-        </Avatar>
-        <div>
-          <div className="mv-ops-account__name">{accountName ?? "管理员"}</div>
-          <div className="mv-ops-account__meta">
-            {accountBalanceYuan ? `余额 ¥ ${accountBalanceYuan}` : "ADMIN ACCESS"}
+          <div>
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
+            <small data-tone={statusTone(item.status)}>
+              {healthLabel(item.status)} · {item.status}
+            </small>
           </div>
-        </div>
-        {onOpenProviderSettings && (
-          <IconButton
-            className="mv-ops-account__action"
-            size="small"
-            aria-label="账户与充值"
-            onClick={onOpenProviderSettings}
-          >
-            <ReceiptLongIcon fontSize="small" />
-          </IconButton>
-        )}
-      </div>
-    </div>
+          {item.children.length > 0 && <HealthTree items={item.children} />}
+        </li>
+      ))}
+    </ul>
   );
 }
 
-const PLACEHOLDER_SECTIONS: Record<
-  Exclude<AdminSection, "overview" | "accounts">,
-  { title: string; description: string }
-> = {
-  runs: {
-    title: "任务审计",
-    description: "全站任务审计视图尚未落地。",
-  },
-  health: {
-    title: "平台状态",
-    description: "平台服务与依赖健康状态视图尚未落地。",
-  },
-};
-
-/**
- * Minimal placeholder for admin sections whose real views ship in later
- * tickets. The account view landed in #232 — nothing more than this belongs
- * in the admin shell yet.
- */
-function SectionPlaceholder({ section }: { section: Exclude<AdminSection, "overview" | "accounts"> }) {
-  const content = PLACEHOLDER_SECTIONS[section];
+function Definitions({ dashboard }: { dashboard: OpsDashboardResponse }) {
   return (
-    <Paper component="section" variant="outlined" className="mv-ops-state-panel">
-      <div className="mv-ops-state-panel__content">
-        <h2 className="mv-ops-state-panel__title">{content.title}</h2>
-        <p className="mv-ops-state-panel__body">{content.description}</p>
+    <>
+      <dl className="mv-ops-definitions">
+        <dt>窗口与最近记录</dt>
+        <dd>
+          统计覆盖近 {dashboard.window_days} 个 UTC 自然日，含当天。最近任务 /
+          订单是全站按创建时间倒序返回的至多 50
+          条记录，独立于窗口，不能当作完整历史。
+        </dd>
+        <dt>充值收入</dt>
+        <dd>仅已支付订单，按支付时间统计；支付时间缺失时回退创建时间。</dd>
+        <dt>生成消耗 / 退款回补</dt>
+        <dd>
+          分别读取 consume / refund 账本汇总，不由任务 /
+          失败数推算。消耗不是供应商成本，回补另计，不据此计算利润。
+        </dd>
+        <dt>未消费余额</dt>
+        <dd>全站账户当前余额汇总，不随统计窗口裁剪。</dd>
+        <dt>成功率</dt>
+        <dd>仅成功 / 失败终态进入分母，排队 / 生成中 / 审核中不参与。</dd>
+        <dt>环比</dt>
+        <dd>
+          任务、充值和消耗对比前一等长窗口。用户指标的 delta
+          是窗口新增相对此前存量，不能当作前窗用户增幅。
+        </dd>
+      </dl>
+      <div className="mv-ops-metric-notes">
+        {dashboard.kpis.map((metric) => (
+          <p key={metric.id}>
+            <strong>
+              {metric.label} {metric.value}
+            </strong>
+            <span>{metric.helper}</span>
+            {metric.delta_percent != null && (
+              <small>
+                原始变化值 {metric.delta_percent > 0 ? "+" : ""}
+                {metric.delta_percent}%
+              </small>
+            )}
+          </p>
+        ))}
       </div>
-    </Paper>
+    </>
   );
 }
-
-const ACCOUNTS_PAGE_SIZES = [10, 20, 50];
 
 function AccountsSection() {
   const [searchDraft, setSearchDraft] = useState("");
@@ -851,11 +793,6 @@ function AccountsSection() {
     page,
     pageSize,
   });
-  const rows = useMemo(
-    () => (accounts?.items ?? []).map(accountTableRow),
-    [accounts],
-  );
-
   const commitSearch = () => {
     const term = searchDraft.trim();
     if (term !== search) {
@@ -863,113 +800,212 @@ function AccountsSection() {
       setPage(1);
     }
   };
-
   return (
-    <Panel
-      title="账户列表"
-      subtitle={
-        accounts
-          ? `全站账户，共 ${accounts.total} 个，按注册时间倒序`
-          : "全站账户，按注册时间倒序"
-      }
-      action={
+    <section aria-label="账户列表" aria-busy={isLoading}>
+      <div className="mv-ops-accounts-toolbar">
         <TextField
           size="small"
-          placeholder="搜索昵称 / 用户 ID，回车确认"
+          label="昵称 / 用户 ID"
+          placeholder="回车确认搜索"
           value={searchDraft}
           onChange={(event) => setSearchDraft(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") commitSearch();
           }}
           onBlur={commitSearch}
-          slotProps={{ htmlInput: { "aria-label": "搜索账户" } }}
-          sx={{ width: { xs: 180, sm: 240 } }}
+          slotProps={{
+            htmlInput: { "aria-label": "搜索账户", maxLength: 100 },
+          }}
         />
-      }
-      flush
-    >
+        <Button onClick={commitSearch} variant="outlined">
+          查询
+        </Button>
+        <span>{accounts ? `共 ${accounts.total} 个账户` : "加载账户…"}</span>
+      </div>
       {error && accounts && <ErrorBanner error={error} onRefresh={refresh} />}
       {error && !accounts ? (
-        <ErrorPanel error={error} onRefresh={refresh} />
+        <StatePanel title="加载失败" description={error}>
+          <Button onClick={refresh}>重试</Button>
+        </StatePanel>
       ) : (
-        <div className="mv-ops-table">
-          <DataGrid
-            rows={rows}
-            columns={accountColumns}
-            loading={isLoading}
-            rowCount={accounts?.total ?? 0}
-            paginationMode="server"
-            paginationModel={{ page: page - 1, pageSize }}
-            onPaginationModelChange={({ page: nextPage, pageSize: nextSize }) => {
-              setPage(nextSize === pageSize ? nextPage + 1 : 1);
-              setPageSize(nextSize);
-            }}
-            density="compact"
-            pageSizeOptions={ACCOUNTS_PAGE_SIZES}
-            disableColumnMenu
-            disableRowSelectionOnClick
-            rowHeight={42}
-            columnHeaderHeight={42}
-            localeText={{ ...dataGridLocaleText, noRowsLabel: "暂无账户记录" }}
-          />
-        </div>
+        <>
+          <div className="mv-ops-account-head" aria-hidden="true">
+            <span>账户</span>
+            <span>登录方式</span>
+            <span>状态 / 角色</span>
+            <span>余额</span>
+            <span>注册 / 最近登录 · UTC</span>
+          </div>
+          {accounts?.items.map((account) => (
+            <article className="mv-ops-account-row" key={account.user_id}>
+              <div>
+                <strong>{account.display_name}</strong>
+                <small className="mv-ops-mono">{account.user_id}</small>
+              </div>
+              <span>
+                {account.login_provider === "wechat"
+                  ? "微信"
+                  : account.login_provider === "guest"
+                    ? "游客"
+                    : account.login_provider}
+              </span>
+              <div>
+                <StatusBadge status={account.status} />
+                <small>
+                  {account.role === "admin"
+                    ? "管理员"
+                    : account.role === "user"
+                      ? "用户"
+                      : account.role}
+                </small>
+              </div>
+              <strong>¥ {account.balance_yuan}</strong>
+              <div>
+                <time dateTime={account.created_at}>
+                  {formatUtc(account.created_at)}
+                </time>
+                <small>
+                  最近登录{" "}
+                  {account.last_active_at
+                    ? formatUtc(account.last_active_at)
+                    : "—"}
+                </small>
+              </div>
+            </article>
+          ))}
+          {isLoading && !accounts && (
+            <p className="mv-ops-empty" role="status">
+              加载账户…
+            </p>
+          )}
+          {accounts && !accounts.items.length && (
+            <p className="mv-ops-empty">暂无账户记录</p>
+          )}
+          <div className="mv-ops-account-pagination">
+            <label>
+              每页{" "}
+              <select
+                aria-label="每页账户数"
+                value={pageSize}
+                onChange={(event) => {
+                  setPageSize(Number(event.target.value));
+                  setPage(1);
+                }}
+              >
+                {[10, 20, 50].map((size) => (
+                  <option value={size} key={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div>
+              <Button
+                onClick={() => setPage(page - 1)}
+                disabled={page === 1 || isLoading}
+                aria-label="上一页"
+              >
+                上一页
+              </Button>
+              <span>{accounts?.page ?? page}</span>
+              <Button
+                onClick={() => setPage(page + 1)}
+                disabled={
+                  isLoading || !accounts || page * pageSize >= accounts.total
+                }
+                aria-label="下一页"
+              >
+                下一页
+              </Button>
+            </div>
+          </div>
+        </>
       )}
-    </Panel>
+      <p className="mv-ops-definition">
+        最近登录来自登录或会话记录，不等同于窗口内的生成活跃。
+      </p>
+    </section>
   );
 }
 
-function LoadingPanel() {
+function OpsDialog({
+  title,
+  subtitle,
+  onClose,
+  wide = false,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  onClose: () => void;
+  wide?: boolean;
+  children: React.ReactNode;
+}) {
+  const reducedMotion = usePrefersReducedMotion();
   return (
-    <Paper
-      component="section"
-      variant="outlined"
-      className="mv-ops-state-panel"
-      role="status"
-      aria-live="polite"
+    <Dialog
+      open
+      onClose={onClose}
+      fullWidth
+      maxWidth={wide ? "lg" : "md"}
+      className="mv-ops-dialog"
+      style={OPS_THEME_VARS}
+      transitionDuration={reducedMotion ? 0 : OPS_MOTION.panel}
+      aria-labelledby="ops-dialog-title"
     >
-      <div className="mv-ops-state-panel__content">
-        <CircularProgress size={26} />
-        <h2 className="mv-ops-state-panel__title">同步运营数据</h2>
-        <p className="mv-ops-state-panel__body">正在汇总最近窗口的任务与计费状态。</p>
-      </div>
-    </Paper>
+      <header className="mv-ops-dialog__header">
+        <div>
+          <h2 id="ops-dialog-title">{title}</h2>
+          <p>{subtitle}</p>
+        </div>
+        <IconButton onClick={onClose} aria-label={`关闭${title}`}>
+          <CloseIcon />
+        </IconButton>
+      </header>
+      <DialogContent>
+        <div className="mv-ops-dialog__body">{children}</div>
+      </DialogContent>
+    </Dialog>
   );
 }
-
+function StatePanel({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <section className="mv-ops-state-panel" role="status">
+      <h2>{title}</h2>
+      <p>{description}</p>
+      {children}
+    </section>
+  );
+}
 function PermissionPanel({ onRequireLogin }: { onRequireLogin?: () => void }) {
   return (
-    <Paper component="section" variant="outlined" className="mv-ops-state-panel">
-      <div className="mv-ops-state-panel__content">
-        <WarningAmberIcon className="mv-ops-state-panel__icon" />
-        <h2 className="mv-ops-state-panel__title">需要管理员权限</h2>
-        <p className="mv-ops-state-panel__body">
-          当前会话不是启用状态的 admin 账户，无法查看全站运营数据。
-        </p>
-        {onRequireLogin && (
-          <Button variant="contained" onClick={onRequireLogin}>
-            微信登录
-          </Button>
-        )}
-      </div>
-    </Paper>
-  );
-}
-
-function ErrorPanel({ error, onRefresh }: { error: string; onRefresh: () => void }) {
-  return (
-    <Paper component="section" variant="outlined" className="mv-ops-state-panel">
-      <div className="mv-ops-state-panel__content">
-        <h2 className="mv-ops-state-panel__title">加载失败</h2>
-        <p className="mv-ops-state-panel__body">{error}</p>
-        <Button variant="outlined" startIcon={<RefreshIcon />} onClick={onRefresh}>
-          重新加载
+    <StatePanel
+      title="需要管理员权限"
+      description="仅运营版启用状态的绑定管理员可查看全站数据。请使用绑定的微信账户登录。"
+    >
+      {onRequireLogin && (
+        <Button variant="contained" onClick={onRequireLogin}>
+          微信登录
         </Button>
-      </div>
-    </Paper>
+      )}
+    </StatePanel>
   );
 }
-
-function ErrorBanner({ error, onRefresh }: { error: string; onRefresh: () => void }) {
+function ErrorBanner({
+  error,
+  onRefresh,
+}: {
+  error: string;
+  onRefresh: () => void;
+}) {
   return (
     <div className="mv-ops-error-banner" role="alert">
       <p>刷新失败，当前仍显示上次成功数据：{error}</p>
@@ -978,190 +1014,4 @@ function ErrorBanner({ error, onRefresh }: { error: string; onRefresh: () => voi
       </Button>
     </div>
   );
-}
-
-const runColumns: GridColDef<RunTableRow>[] = [
-  { field: "title", headerName: "任务", flex: 1.25, minWidth: 180 },
-  {
-    field: "status",
-    headerName: "状态",
-    width: 100,
-    renderCell: ({ value }) => <StatusChip status={String(value)} kind="run" />,
-  },
-  { field: "domain", headerName: "学科", width: 100 },
-  { field: "createdAt", headerName: "创建时间", width: 142 },
-];
-
-const orderColumns: GridColDef<OrderTableRow>[] = [
-  {
-    field: "order",
-    headerName: "订单",
-    flex: 1,
-    minWidth: 170,
-    cellClassName: "mv-ops-id-cell",
-  },
-  { field: "amount", headerName: "金额", width: 112 },
-  {
-    field: "status",
-    headerName: "状态",
-    width: 100,
-    renderCell: ({ value }) => <StatusChip status={String(value)} kind="order" />,
-  },
-  { field: "createdAt", headerName: "创建时间", width: 142 },
-];
-
-const accountColumns: GridColDef<AccountTableRow>[] = [
-  {
-    field: "userId",
-    headerName: "用户 ID",
-    flex: 1.1,
-    minWidth: 170,
-    cellClassName: "mv-ops-id-cell",
-  },
-  { field: "displayName", headerName: "昵称", flex: 1, minWidth: 120 },
-  { field: "loginProvider", headerName: "登录方式", width: 92 },
-  {
-    field: "status",
-    headerName: "状态",
-    width: 88,
-    renderCell: ({ value }) => <StatusChip status={String(value)} kind="account" />,
-  },
-  { field: "role", headerName: "角色", width: 88 },
-  { field: "balanceYuan", headerName: "余额", width: 96 },
-  { field: "createdAt", headerName: "注册时间", width: 142 },
-];
-
-function StatusChip({ status, kind }: { status: string; kind: "run" | "order" | "account" }) {
-  return (
-    <Chip
-      className="mv-ops-status"
-      size="small"
-      label={
-        kind === "run"
-          ? statusLabel(status)
-          : kind === "order"
-            ? orderStatusLabel(status)
-            : accountStatusLabel(status)
-      }
-      data-tone={statusTone(status)}
-    />
-  );
-}
-
-function runTableRow(row: OpsRunRow): RunTableRow {
-  return {
-    id: row.run_id,
-    title: row.title || row.prompt || "未命名任务",
-    status: row.status,
-    domain: row.domain ?? "未识别",
-    createdAt: formatDateTime(row.created_at),
-  };
-}
-
-function orderTableRow(row: OpsOrderRow): OrderTableRow {
-  return {
-    id: row.order_id,
-    order: row.order_id,
-    amount: `¥ ${row.amount_yuan}`,
-    status: row.status,
-    createdAt: formatDateTime(row.created_at),
-  };
-}
-
-function accountTableRow(row: OpsAccountRow): AccountTableRow {
-  return {
-    id: row.user_id,
-    userId: row.user_id,
-    displayName: row.display_name,
-    loginProvider:
-      row.login_provider === "wechat"
-        ? "微信"
-        : row.login_provider === "guest"
-          ? "游客"
-          : row.login_provider,
-    status: row.status,
-    role: row.role === "admin" ? "管理员" : row.role === "user" ? "用户" : row.role,
-    balanceYuan: `¥ ${row.balance_yuan}`,
-    createdAt: formatDateTime(row.created_at),
-  };
-}
-
-function statusTone(status: string): StatusTone {
-  if (status === "succeeded" || status === "paid" || status === "enabled") {
-    return "positive";
-  }
-  if (status === "failed" || status === "disabled") return "negative";
-  if (
-    status === "queued" ||
-    status === "running" ||
-    status === "reviewing" ||
-    status === "pending"
-  ) {
-    return "warning";
-  }
-  return "neutral";
-}
-
-function healthTone(status: OpsHealthStatus): StatusTone {
-  if (status === "ok") return "positive";
-  if (status === "bad") return "negative";
-  if (status === "warn") return "warning";
-  return "neutral";
-}
-
-function healthStatusLabel(status: OpsHealthStatus): string {
-  if (status === "ok") return "正常";
-  if (status === "bad") return "异常";
-  if (status === "warn") return "关注";
-  return "记录";
-}
-
-function statusColor(status: string): string {
-  const tone = statusTone(status);
-  if (tone === "positive") return "var(--mv-ops-positive)";
-  if (tone === "negative") return "var(--mv-ops-negative)";
-  if (tone === "warning") return "var(--warn)";
-  return "var(--mv-ops-neutral)";
-}
-
-function statusLabel(status: string): string {
-  return {
-    queued: "排队",
-    running: "生成中",
-    reviewing: "审核中",
-    succeeded: "完成",
-    failed: "失败",
-  }[status] ?? status;
-}
-
-function orderStatusLabel(status: string): string {
-  return {
-    pending: "待支付",
-    paid: "已支付",
-    closed: "已关闭",
-  }[status] ?? status;
-}
-
-function accountStatusLabel(status: string): string {
-  return {
-    enabled: "启用",
-    disabled: "禁用",
-  }[status] ?? status;
-}
-
-function formatDateTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function shortDate(value: string): string {
-  const parts = value.split("-");
-  if (parts.length === 3) return `${parts[1]}/${parts[2]}`;
-  return value;
 }

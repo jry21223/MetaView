@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import React from "react";
 import { http, HttpResponse } from "msw";
 import { MemoryRouter } from "react-router-dom";
@@ -74,15 +80,18 @@ describe("OpsDashboardPage", () => {
       ),
     );
 
-    const { findByText, getAllByText, getByText } = renderPage();
+    const { findByText, getByText, getByRole } = renderPage();
 
     expect(await findByText("用户数")).toBeTruthy();
-    expect(getAllByText("¥ 15.00")).toHaveLength(2);
-    expect(getByText("任务趋势")).toBeTruthy();
-    expect(getByText("收入趋势")).toBeTruthy();
+    expect(getByText("¥ 15.00")).toBeTruthy();
+    expect(getByRole("img", { name: "逐日生成任务趋势" })).toBeTruthy();
+    expect(getByRole("img", { name: "逐日充值收入趋势" })).toBeTruthy();
     expect(getByText("矩阵特征值")).toBeTruthy();
     expect(getByText("数学")).toBeTruthy();
-    expect(getByText("窗口任务")).toBeTruthy();
+    expect(getByRole("region", { name: "生成、资金与全站存量" })).toBeTruthy();
+    expect(getByText("¥ 4.25")).toBeTruthy();
+    expect(getByText("¥ 2.25")).toBeTruthy();
+    expect(getByText("¥ 11.50")).toBeTruthy();
   });
 
   it("marks failed tasks and pending orders for fast scanning", async () => {
@@ -97,11 +106,15 @@ describe("OpsDashboardPage", () => {
 
     const { container, findByText, getByRole } = renderPage();
     await findByText("矩阵特征值");
-    expect(container.querySelector(".MuiDataGrid-row.is-failed")).toBeTruthy();
+    expect(
+      container.querySelector("article.mv-ops-record[data-status='failed']"),
+    ).toBeTruthy();
 
     fireEvent.click(getByRole("tab", { name: "订单" }));
     await waitFor(() =>
-      expect(container.querySelector(".MuiDataGrid-row.is-pending")).toBeTruthy(),
+      expect(
+        container.querySelector("article.mv-ops-record[data-status='pending']"),
+      ).toBeTruthy(),
     );
   });
 
@@ -215,33 +228,35 @@ describe("OpsDashboardPage", () => {
     await waitFor(() => expect(seenUrls).toHaveLength(2), { timeout: 10_000 });
 
     fireEvent.click(getByRole("button", { name: "90 天" }));
-    await waitFor(
-      () => expect(seenUrls.at(-1)).toContain("window_days=90"),
-      { timeout: 10_000 },
-    );
+    await waitFor(() => expect(seenUrls.at(-1)).toContain("window_days=90"), {
+      timeout: 10_000,
+    });
   }, 15_000);
 
-  it("renders admin-only nav destinations without user shell navigation", async () => {
+  it("keeps the global overview and account query without placeholder destinations", async () => {
     server.use(
       http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>
         HttpResponse.json(sampleDashboard()),
       ),
     );
 
-    const { findAllByText, getAllByText, queryByText } = renderPage();
-
-    // Page title plus both drawer copies of the nav item.
-    await findAllByText("运营总览");
-    expect(getAllByText("运营总览").length).toBeGreaterThanOrEqual(3);
-    for (const label of ["账户", "任务审计", "平台状态"]) {
-      expect(getAllByText(label).length).toBeGreaterThanOrEqual(2);
-    }
-    for (const label of ["工作台", "任务历史", "模板", "设置"]) {
+    const { findByText, getByRole, queryByText } = renderPage();
+    await findByText("用户数");
+    expect(getByRole("navigation", { name: "运营导航" })).toBeTruthy();
+    expect(getByRole("button", { name: "账户", exact: true })).toBeTruthy();
+    for (const label of [
+      "工作台",
+      "任务历史",
+      "模板",
+      "设置",
+      "任务审计",
+      "平台状态",
+    ]) {
       expect(queryByText(label)).toBeNull();
     }
   });
 
-  it("switches between admin sections and renders section content", async () => {
+  it("opens account lookup over the global overview and returns to it", async () => {
     server.use(
       http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>
         HttpResponse.json(sampleDashboard()),
@@ -251,21 +266,15 @@ describe("OpsDashboardPage", () => {
       ),
     );
 
-    const { findByText, getAllByRole, queryByText } = renderPage();
+    const { findByText, getByRole, getByText, queryByRole } = renderPage();
     await findByText("用户数");
 
-    fireEvent.click(getAllByRole("button", { name: "账户" })[0]);
+    fireEvent.click(getByRole("button", { name: "账户", exact: true }));
     expect(await findByText("王小甲")).toBeTruthy();
-    expect(queryByText("用户数")).toBeNull();
-
-    fireEvent.click(getAllByRole("button", { name: "任务审计" })[0]);
-    expect(await findByText("全站任务审计视图尚未落地。")).toBeTruthy();
-
-    fireEvent.click(getAllByRole("button", { name: "平台状态" })[0]);
-    expect(await findByText("平台服务与依赖健康状态视图尚未落地。")).toBeTruthy();
-
-    fireEvent.click(getAllByRole("button", { name: "运营总览" })[0]);
-    expect(await findByText("用户数")).toBeTruthy();
+    expect(getByText("用户数")).toBeTruthy();
+    fireEvent.click(getByRole("button", { name: "关闭账户查询" }));
+    await waitFor(() => expect(queryByRole("dialog")).toBeNull());
+    expect(getByText("用户数")).toBeTruthy();
   }, 20_000);
 
   it("defers the accounts request until the 账户 section opens", async () => {
@@ -331,7 +340,9 @@ describe("OpsDashboardPage", () => {
       timeout: 10_000,
     });
     expect(await findByText("王小甲")).toBeTruthy();
-    await waitFor(() => expect(queryByText("账户 2")).toBeNull(), { timeout: 10_000 });
+    await waitFor(() => expect(queryByText("账户 2")).toBeNull(), {
+      timeout: 10_000,
+    });
   }, 20_000);
 
   it("requests the next accounts page from the grid pagination", async () => {
@@ -353,7 +364,9 @@ describe("OpsDashboardPage", () => {
     await findByText("王小甲");
 
     fireEvent.click(getByRole("button", { name: "下一页" }));
-    await waitFor(() => expect(requestedPages).toContain("2"), { timeout: 10_000 });
+    await waitFor(() => expect(requestedPages).toContain("2"), {
+      timeout: 10_000,
+    });
   }, 20_000);
 
   it("shows the empty state when the accounts API returns no accounts", async () => {
@@ -388,9 +401,12 @@ describe("OpsDashboardPage", () => {
     fireEvent.click(getAllByRole("button", { name: "账户" })[0]);
 
     expect(await findByText("加载失败")).toBeTruthy();
-    await waitFor(() => expect(getByText("database unavailable")).toBeTruthy(), {
-      timeout: 10_000,
-    });
+    await waitFor(
+      () => expect(getByText("database unavailable")).toBeTruthy(),
+      {
+        timeout: 10_000,
+      },
+    );
   }, 20_000);
 
   it("renders the admin account identity and balance in the sidebar", async () => {
@@ -429,6 +445,99 @@ describe("OpsDashboardPage", () => {
     await findByText("用户数");
     expect(getAllByText("管理员")[0]).toBeTruthy();
     expect(getAllByText("ADMIN ACCESS")[0]).toBeTruthy();
+  });
+
+  it("preserves all window statuses and independent parent/leaf health states", async () => {
+    const dashboard = sampleDashboard();
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>
+        HttpResponse.json(dashboard),
+      ),
+    );
+    const { findByText, getByRole, container } = renderPage();
+    await findByText("用户数");
+    const statuses = getByRole("group", { name: "窗口任务状态分布" });
+    for (const item of dashboard.status_distribution) {
+      expect(
+        statuses.querySelector(`[data-status='${item.id}']`)?.textContent,
+      ).toContain(String(item.count));
+    }
+    expect(
+      container
+        .querySelector("[data-health-id='billing']")
+        ?.getAttribute("data-health-status"),
+    ).toBe("ok");
+    fireEvent.click(getByRole("button", { name: "全部依据" }));
+    const dialog = getByRole("dialog");
+    expect(dialog.querySelectorAll("[data-health-id]")).toHaveLength(11);
+    expect(
+      dialog
+        .querySelector("[data-health-id='billing']")
+        ?.getAttribute("data-health-status"),
+    ).toBe("ok");
+    expect(
+      dialog
+        .querySelector("[data-health-id='billing-refund']")
+        ?.getAttribute("data-health-status"),
+    ).toBe("warn");
+    expect(within(dialog).getByText("¥ 2.25")).toBeTruthy();
+    expect(
+      within(dialog).getAllByText("记录 · neutral").length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("filters loaded records without changing window aggregates and expands raw details", async () => {
+    const dashboard = sampleDashboard();
+    dashboard.kpis.find((item) => item.id === "runs")!.value = "8";
+    dashboard.status_distribution.find((item) => item.id === "failed")!.count =
+      6;
+    dashboard.run_trend[1] = {
+      date: "2026-06-07",
+      total: 6,
+      succeeded: 0,
+      failed: 6,
+      in_flight: 0,
+    };
+    dashboard.recent_runs[0].status = "failed";
+    dashboard.recent_runs[0].error = "计划生成未通过质量门";
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () =>
+        HttpResponse.json(dashboard),
+      ),
+    );
+    const { findByText, getByRole, getByText, container } = renderPage();
+    await findByText("矩阵特征值");
+    fireEvent.click(getByRole("button", { name: "核查最近失败" }));
+    expect(getByText("已载 1 条 · 最多 50 条 · 匹配 1 条")).toBeTruthy();
+    expect(
+      container.querySelector(".mv-ops-window-status [data-status='failed']")
+        ?.textContent,
+    ).toContain("6");
+    fireEvent.click(getByRole("button", { name: "核查", exact: true }));
+    expect(await findByText("计划生成未通过质量门")).toBeTruthy();
+    expect(getByText("讲解矩阵")).toBeTruthy();
+    expect(container.querySelectorAll("a[href^='/run/']")).toHaveLength(0);
+  });
+
+  it("keeps old response scope and values when a requested new window fails", async () => {
+    let requestCount = 0;
+    server.use(
+      http.get(`${API_BASE_URL}/api/v1/ops/dashboard`, () => {
+        requestCount += 1;
+        return requestCount === 1
+          ? HttpResponse.json(sampleDashboard())
+          : HttpResponse.json({ detail: "offline" }, { status: 500 });
+      }),
+    );
+    const { findByText, getByRole, getByText } = renderPage();
+    await findByText("矩阵特征值");
+    fireEvent.click(getByRole("button", { name: "90 天" }));
+    expect(
+      await findByText("刷新失败，当前仍显示上次成功数据：offline"),
+    ).toBeTruthy();
+    expect(getByText("近 30 天 · UTC 自然日")).toBeTruthy();
+    expect(getByText("¥ 4.25")).toBeTruthy();
+    expect(getByText("矩阵特征值")).toBeTruthy();
   });
 });
 
@@ -505,7 +614,11 @@ describe("AdminShell login CTA from /admin permission panel", () => {
       </MemoryRouter>,
     );
 
-    expect((await findAllByText("运营管理员")).length).toBeGreaterThanOrEqual(1);
-    expect((await findAllByText("余额 ¥ 3.50")).length).toBeGreaterThanOrEqual(1);
+    expect((await findAllByText("运营管理员")).length).toBeGreaterThanOrEqual(
+      1,
+    );
+    expect((await findAllByText("余额 ¥ 3.50")).length).toBeGreaterThanOrEqual(
+      1,
+    );
   });
 });
