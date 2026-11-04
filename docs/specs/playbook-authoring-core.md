@@ -59,6 +59,6 @@ Implemented: registry/document validation, stable element references distinct fr
 
 The graph fixture computes shortest-path comparisons at the captured weight, including direct, indirect and tied paths. Child parameters start from the question snapshot; returning restores the parent's visit state and conversation. Preset content is a local fixture adapter; unsupported questions explicitly report that limitation.
 
-The presentation layer uses an optional View Transition between the selected source element and the destination scene's declared focus element. Motion never decides navigation or source identity. Unsupported browsers and Reduced Motion use the same completed navigation without the animation.
+The presentation layer declares a destination focus element and optionally animates the stage and panel with View Transitions. Shared-object morphing remains a presentation experiment pending visual acceptance. Motion never decides navigation or source identity. Unsupported browsers and Reduced Motion use the same completed navigation without the animation.
 
 Open: public publication projection/hosting, backend authorization and persistence, production player migration, real AI, arbitrary generated components, richer authoring controls and the full set of renderers. The lab is local and separate from app navigation. No deployment or public publication is included.
