@@ -53,50 +53,61 @@ export const ringScene = scene("astronomy.rings", (context) => {
   marks.push(label("scale-note", 62, 515, "运动、大小与距离为示意，非精密模拟"));
   return finish(context, marks, "saturn", ["内环碎片绕行更快，外环碎片更慢。", "调节播放速度，再选择一粒碎片继续观察。"]);
 });
+// An oblique sheet separates the two routes in space. Displayed distances
+// are arbitrary; the weights on the edges determine the comparison.
+const routeSheet = mark({
+  elementId: "route-sheet", shape: "polygon", tone: "primary", opacity: .54,
+  points: [[56, 248], [400, 41], [942, 143], [596, 364]],
+}, "路径对照平面");
 export const graphScene = scene("algorithm.weighted-graph", (context) => {
   const weight = Number(context.inputs.amount);
-  const indirect = weight > 4;
-  const tied = weight === 4;
-  const a = { id: "A", x: 95, y: 340 };
-  const b = { id: "B", x: 445, y: 105 };
-  const c = { id: "C", x: 795, y: 340 };
-  const radius = 30;
-  function edge(from: typeof a, to: typeof a, active: boolean) {
+  const a = { id: "A", x: 176, y: 231 }, b = { id: "B", x: 437, y: 93 }, c = { id: "C", x: 814, y: 172 };
+  const marks = [routeSheet];
+  const nodeRadius = 27;
+  function edge(from: typeof a, to: typeof a, direct: boolean) {
     const id = `edge-${from.id.toLowerCase()}${to.id.toLowerCase()}`;
-    const length = Math.hypot(to.x - from.x, to.y - from.y);
-    const dx = (to.x - from.x) * radius / length;
-    const dy = (to.y - from.y) * radius / length;
-    return mark({
-      elementId: id, shape: "line", x: from.x + dx, y: from.y + dy,
-      x2: to.x - dx, y2: to.y - dy, tone: active ? "primary" : "muted",
-    }, id === "edge-ac" ? "直接边 A–C" : `边 ${from.id}–${to.id}`, [id]);
+    const distance = Math.hypot(to.x - from.x, to.y - from.y);
+    const dx = (to.x - from.x) * nodeRadius / distance;
+    const dy = (to.y - from.y) * nodeRadius / distance;
+    const tone = direct ? "focus" : "secondary";
+    const shortest = direct ? weight <= 4 : weight >= 4;
+    marks.push(mark({ elementId: id, shape: "line", x: from.x + dx, y: from.y + dy, x2: to.x - dx, y2: to.y - dy, tone, opacity: shortest ? 1 : .48 }, direct ? "直接边 A–C" : `边 ${from.id}–${to.id}`, [id]));
+    const x = (from.x + to.x) / 2, y = (from.y + to.y) / 2;
+    marks.push(mark({ elementId: id + ".weight", shape: "circle", x, y, r: 13, tone: direct ? "focus" : "secondary" }, `边 ${from.id}–${to.id} 的权重`, [id]));
+    marks.push(mark({ elementId: id + ".label", shape: "text", x: x - 6, y: y + 7, text: String(direct ? weight : 2), fontSize: 20 }, `边权 ${direct ? weight : 2}`, [id]));
   }
-  const marks: AuthoredMark[] = [
-    mark({ elementId: "route-region", shape: "polygon", points: [[95,340],[445,105],[795,340]], tone: "primary", opacity: .35 }, "两条候选路径围成的区域"),
-    label("route-via-caption", 380, 45, "途经 B · 2 段路程"),
-    edge(a, b, indirect || tied), edge(b, c, indirect || tied), edge(a, c, !indirect),
-    mark({ elementId: "edge-ab.weight", shape: "circle", x: 270, y: 222, r: 17, tone: "secondary" }, "边 A–B 的权重", ["edge-ab"]),
-    label("edge-ab.label", 265, 228, "2", ["edge-ab"]),
-    mark({ elementId: "edge-bc.weight", shape: "circle", x: 620, y: 222, r: 17, tone: "secondary" }, "边 B–C 的权重", ["edge-bc"]),
-    label("edge-bc.label", 615, 228, "2", ["edge-bc"]),
-    mark({ elementId: "edge-ac.weight", shape: "circle", x: 445, y: 340, r: 19, tone: "focus" }, "直接边权重", ["edge-ac"]),
-    label("edge-ac.label", 440, 346, String(weight), ["edge-ac"]),
-  ];
+  edge(a, b, false); edge(b, c, false); edge(a, c, true);
+  // Both tracers spend the same time per unit of weight and wait at C.
+  const elapsed = (context.frame / 24) % (Math.max(4, weight) + 1);
+  function traveler(id: string, from: typeof a, to: typeof a, progress: number, direct: boolean) {
+    const fraction = Math.min(progress, 1);
+    marks.push(mark({ elementId: id, shape: "circle", x: from.x + (to.x - from.x) * fraction, y: from.y + (to.y - from.y) * fraction, r: 7, tone: direct ? "focus" : "primary" }, direct ? "直达路线的行进点" : "经 B 路线的行进点", direct ? ["edge-ac"] : ["edge-ab", "edge-bc"]));
+  }
+  traveler("traveler-direct", a, c, weight === 0 ? 1 : elapsed / weight, true);
+  traveler("traveler-via", elapsed < 2 ? a : b, elapsed < 2 ? b : c, elapsed < 2 ? elapsed / 2 : (elapsed - 2) / 2, false);
   for (const node of [a, b, c]) {
-    marks.push(mark({ elementId: `node-${node.id}`, shape: "circle", x: node.x, y: node.y, r: radius, tone: "secondary" }, `节点 ${node.id}`, [`node-${node.id}`]));
-    marks.push(mark({ elementId: `node-${node.id}.label`, shape: "text", x: node.x - 8, y: node.y + 7, text: node.id, fontSize: 20 }, `节点 ${node.id} 的名称`, [`node-${node.id}`]));
-    if (node.id !== "B") marks.push(label(`node-${node.id}.role`, node.x - 15, node.y + 60, node.id === "A" ? "起点" : "终点", [`node-${node.id}`]));
+    const id = "node-" + node.id;
+    marks.push(mark({ elementId: id + ".stem", shape: "line", x: node.x, y: node.y + 8, x2: node.x, y2: node.y + 49, tone: "secondary" }, `节点 ${node.id} 的定位针`, [id]));
+    marks.push(mark({ elementId: id, shape: "circle", x: node.x, y: node.y, r: nodeRadius, tone: "primary" }, `节点 ${node.id}`, [id]));
+    marks.push(mark({ elementId: id + ".label", shape: "text", x: node.x - 12, y: node.y + 12, text: node.id, fontSize: 34 }, `节点 ${node.id} 的名称`, [id]));
+    const role = node.id === "A" ? "起点" : node.id === "B" ? "中转" : "终点";
+    marks.push(label(id + ".role", node.x - 16, node.y - 42, role, [id]));
   }
-  const summary = tied ? "直达 4  ·  经 B 也是 4" : indirect ? `直达 ${weight}  ·  经 B 只需 4` : `经 B 需要 4  ·  直达只需 ${weight}`;
-  marks.push(mark({ elementId: "path-summary", shape: "text", x: 95, y: 435, text: summary, fontSize: 20 }, summary));
-  const comparison = tied ? "两条路径长度相同，都是 4。" : indirect ? `经 B 的长度是 2 + 2 = 4，小于直接边的 ${weight}。` : `直接边长度是 ${weight}，小于经 B 的 4。`;
-  marks.push(label("route-distance-caption", 95, 485, "途经 B"));
-  marks.push(label("route-direct-caption", 95, 530, "直接到达"));
-  marks.push(mark({ elementId: "comparison-via", shape: "polygon", points: [[505,470],[505+4*19,470],[505+4*19,486],[505,486]], tone: "primary" }, "经 B 的总权重 4", ["edge-ab", "edge-bc"]));
-  marks.push(label("comparison-via.label", 710, 485, "2 + 2 = 4", ["edge-ab", "edge-bc"]));
-  marks.push(mark({ elementId: "comparison-direct", shape: "polygon", points: [[505,515],[505+weight*19,515],[505+weight*19,531],[505,531]], tone: "focus" }, `直接边总权重 ${weight}`, ["edge-ac"]));
-  marks.push(label("comparison-direct.label", 710, 530, `直达 ${weight}`, ["edge-ac"]));
-  return finish(context, marks, "edge-ac", [comparison, "改变直接边的权重，观察最短路径什么时候切换。"]);
+  const comparison = weight === 4 ? "两条路径的总权重相同。" : weight > 4 ? `经 B 的路线少 ${weight - 4} 个权重单位。` : `直达路线少 ${4 - weight} 个权重单位。`;
+  const stats = [
+    { id: "via", x: 62, value: 4, caption: "途经 B", expression: "A → B → C", tone: "secondary" as const, objects: ["edge-ab", "edge-bc"] },
+    { id: "direct", x: 560, value: weight, caption: "直接到达", expression: "A → C", tone: "focus" as const, objects: ["edge-ac"] },
+  ];
+  for (const stat of stats) {
+    const { id, x, value, objects } = stat;
+    marks.push(mark({ elementId: "comparison-" + id, shape: "text", x, y: 520, text: String(value), fontSize: 34 }, `${stat.caption}的总权重 ${value}`, objects));
+    marks.push(mark({ elementId: "comparison-" + id + ".route", shape: "text", x: x + 50, y: 483, text: stat.expression, fontSize: 20 }, stat.caption, objects));
+    const result = value === Math.min(4, weight) ? weight === 4 ? "并列最短" : "当前最短" : "备选路线";
+    marks.push(label("comparison-" + id + ".label", x + 50, 515, result + " · 总权重", objects));
+    marks.push(mark({ elementId: "comparison-" + id + ".bar", shape: "line", x, y: 543, x2: x + value * 35, y2: 543, tone: stat.tone }, `${stat.caption}的权重刻度`, objects));
+  }
+  const explanation = weight === 4 ? "两条路径长度相同，都是 4。" : weight > 4 ? `经 B 的长度是 2 + 2 = 4，小于直接边的 ${weight}。` : `直接边长度是 ${weight}，小于经 B 的 4。`;
+  return finish(context, marks, "edge-ac", [comparison, explanation]);
 });
 export const numberControl: ComponentDefinition<AuthoringFrame> = {
   id: "control.number", version: "1", kind: "control",

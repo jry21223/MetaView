@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { flushSync } from "react-dom";
 import { Player } from "@remotion/player";
 import { createExplorationSession, type ElementRef, type ExplorationSession } from "../../../../shared/playbook";
@@ -7,7 +7,6 @@ import { PlaybookComposition } from "../../engine/composition/PlaybookCompositio
 import { exampleCatalog, exampleRegistry, type AuthoringExample } from "../exampleCatalog";
 import { compileAuthoringScript } from "../renderBridge";
 import type { AuthoringFrame, AuthoringPrimitive } from "../types";
-import { includeEndNodes, placePanel } from "./panelPlacement";
 import "./authoringLab.css";
 
 type Session = ExplorationSession<AuthoringFrame>;
@@ -61,7 +60,7 @@ function WorkCanvas({ view, onSelect, disabled }: { view: View; onSelect(ref: El
         const element = view.work.elements.find((entry) => entry.ref.componentId === id && entry.id === mark.elementId);
         if (!element) return null;
         const active = selection?.componentId === id && selection.elementId === mark.elementId;
-        return <g key={`${id}:${mark.elementId}`} role="button" tabIndex={disabled ? -1 : 0} aria-label={`选择${element.label}${element.role === "text" ? "文字" : ""}`} aria-pressed={active} aria-disabled={disabled} className={`authoring-hit ${active ? "is-selected" : ""} ${mark.shape === "ellipse" || mark.shape === "line" ? "is-hollow" : ""}`} style={active ? { viewTransitionName: "exploration-focus" } : undefined} onClick={() => !disabled && onSelect(element.ref)} onKeyDown={(event) => { if (!disabled && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onSelect(element.ref); } }}>
+        return <g key={`${id}:${mark.elementId}`} role="button" data-text-size={mark.shape === "text" ? (mark.fontSize ?? 16) : undefined} tabIndex={disabled ? -1 : 0} aria-label={`选择${element.label}${element.role === "text" ? "文字" : ""}`} aria-pressed={active} aria-disabled={disabled} className={`authoring-hit ${active ? "is-selected" : ""} ${mark.shape === "ellipse" || mark.shape === "line" ? "is-hollow" : ""}`} style={active ? { viewTransitionName: "exploration-focus" } : undefined} onClick={() => !disabled && onSelect(element.ref)} onKeyDown={(event) => { if (!disabled && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onSelect(element.ref); } }}>
           {active && <g className="authoring-selection-glow" aria-hidden="true"><HitShape mark={mark} /></g>}
           <g className="authoring-interaction-outline" aria-hidden="true"><HitShape mark={mark} /></g>
           <HitShape mark={mark} picking />
@@ -82,47 +81,13 @@ export function AuthoringLab({ initialExampleId }: { initialExampleId?: string }
   const [error, setError] = useState("");
   const operation = useRef(0);
   const paperRef = useRef<HTMLDivElement>(null);
-  const panelRef = useRef<HTMLElement>(null);
   const [panelOpen, setPanelOpen] = useState(true);
   const child = view.ancestors.length > 0;
   const turn = view.turns.at(-1);
   const frames = outputs(view);
+  const question = frames.find(({ frame }) => frame.description)?.frame.description ?? view.document.title;
   const selectedRef = view.work.state.selection[0];
   const selected = view.work.elements.find((element) => element.ref.componentId === selectedRef?.componentId && element.id === selectedRef?.elementId);
-  useLayoutEffect(() => {
-    const paper = paperRef.current;
-    const panel = panelRef.current;
-    if (!paper || !panel) return;
-    const shape = paper.querySelector(".authoring-hit.is-selected > :last-child");
-    function position() {
-      if (!paper || !panel || !shape) return;
-      const bounds = paper.getBoundingClientRect();
-      const rect = shape.getBoundingClientRect();
-      let extent = { left: rect.left, right: rect.right };
-      if (typeof SVGLineElement !== "undefined" && shape instanceof SVGLineElement) {
-        const matrix = shape.getScreenCTM();
-        if (matrix) {
-          const endpoints = [
-            [shape.x1.baseVal.value, shape.y1.baseVal.value],
-            [shape.x2.baseVal.value, shape.y2.baseVal.value],
-          ].map(([x, y]) => ({ x: matrix.a * x + matrix.c * y + matrix.e, y: matrix.b * x + matrix.d * y + matrix.f }));
-          const nodes = Array.from(paper.querySelectorAll(".authoring-hit > circle:last-child"), (node) => node.getBoundingClientRect());
-          extent = includeEndNodes(rect, endpoints, nodes);
-        }
-      }
-      const { x, y } = placePanel(bounds, panel.getBoundingClientRect(), {
-        left: extent.left - bounds.left, right: extent.right - bounds.left,
-        centerY: (rect.top + rect.bottom) / 2 - bounds.top,
-      });
-      panel.style.setProperty("--panel-x", `${x}px`);
-      panel.style.setProperty("--panel-y", `${y}px`);
-    }
-    position();
-    const observer = new ResizeObserver(position);
-    observer.observe(paper);
-    observer.observe(panel);
-    return () => observer.disconnect();
-  }, [view, panelOpen]);
   function closePanel() {
     setPanelOpen(false);
     paperRef.current?.querySelector<SVGGElement>(".authoring-hit.is-selected")?.focus();
@@ -182,12 +147,15 @@ export function AuthoringLab({ initialExampleId }: { initialExampleId?: string }
   return <main className="authoring-lab" style={lightTheme}>
     <header className="authoring-top"><span className="authoring-brand">MetaView</span><span className="authoring-slogan">探索你想看的世界</span><label className="authoring-example-label">示例作品<select aria-label="示例作品" value={example.id} onChange={(event) => switchExample(event.target.value)} disabled={working}>{exampleCatalog.map((entry) => <option key={entry.id} value={entry.id}>{entry.title}</option>)}</select></label></header>
     <section className="authoring-work-heading"><div>{child && <button aria-label="返回父作品" onClick={() => void back()} disabled={working}>← {view.ancestors.at(-1)?.title}</button>}<span className="authoring-breadcrumb">{child ? "/" : "我的作品 /"}</span><h1>{view.document.title}</h1><span className="authoring-draft">草稿</span></div><span className="authoring-local">本地探索预览</span></section>
-    <section className="authoring-workspace">
-      <div className="authoring-canvas-copy"><span className="authoring-canvas-kicker"><i /> 交互探索 <span> / </span> {view.document.title}</span><h2>{frames.find(({ frame }) => frame.description)?.frame.description ?? view.document.title}</h2><p>改变一个条件，看看答案如何变化。</p></div>
-      <div className="authoring-body" ref={paperRef}>
-        <WorkCanvas view={view} disabled={working} onSelect={pick} />
-        {panelOpen && <aside ref={panelRef} className="authoring-panel" aria-label="元素对话与探索" onKeyDown={(event) => { if (event.key === "Escape" && !working) closePanel(); }}>
-          <div className="authoring-panel-kicker">从这个对象开始</div><div className="authoring-reference"><i /><strong>{selected?.label ?? "当前作品"}</strong><button className="authoring-close" aria-label="收起提问框" onClick={closePanel} disabled={working}>×</button></div>
+    <section className="authoring-workspace" ref={paperRef}>
+      <div className="authoring-notes">
+        <div className="authoring-canvas-copy">
+          <h2>{question.split(/(?<=[，。！？])/u).filter(Boolean).map((clause, index) => <span key={index}>{clause}</span>)}</h2>
+          <p>{frames.find(({ frame }) => frame.primitives.length && frame.info.length)?.frame.info[0] ?? "选中画布上的对象，从你的问题开始探索。"}</p>
+        </div>
+        {panelOpen && <aside className="authoring-panel" aria-label="元素对话与探索" onKeyDown={(event) => { if (event.key === "Escape" && !working) closePanel(); }}>
+          <div className="authoring-panel-kicker"><span>选中对象</span><button className="authoring-close" aria-label="收起提问框" onClick={closePanel} disabled={working}>×</button></div>
+          <div className="authoring-reference"><i aria-hidden="true" /><strong>{selected?.label ?? "当前作品"}</strong></div>
           {child && <div className="authoring-observation"><span className="authoring-eyebrow">观察与实验</span>{frames.flatMap(({ id, frame }) => frame.info.map((line, index) => <p key={`${id}:${index}`}>{line}</p>))}</div>}
           {turn && <div className="authoring-conversation" data-testid="conversation"><div className="authoring-user-question"><small>你 · 针对{turn.request.elements.map((element) => element.label).join("、") || "当前作品"}</small><p>{turn.request.prompt}</p></div><strong className="authoring-answer-name">MetaView</strong>{turn.reply.paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}{turn.reply.references?.map((reference) => <a key={reference.url} href={reference.url} target="_blank" rel="noreferrer">{reference.label} ↗</a>)}
             {turn.reply.proposal && (!proposalOpen ? <button className="authoring-explore-invite" aria-label="查看探索提案" onClick={() => { setPlaying(false); setProposalOpen(true); }}>＋ 把它做成一个交互探索 <span>→</span></button> : <section className="authoring-proposal"><span className="authoring-eyebrow">新的探索作品</span><h3>{turn.reply.proposal.title}</h3><p>{turn.reply.proposal.summary}</p><ul>{turn.reply.proposal.capabilities.map((capability) => <li key={capability}>{capability}</li>)}</ul><button className="authoring-primary" aria-label="创建探索作品" onClick={() => void explore()} disabled={working}>创建探索作品 <span>↗</span></button><button className="authoring-cancel" onClick={() => setProposalOpen(false)} disabled={working}>先留在这里</button></section>)}
@@ -198,8 +166,11 @@ export function AuthoringLab({ initialExampleId }: { initialExampleId?: string }
           {working && <span className="authoring-busy" role="status">正在准备探索内容…</span>}
         </aside>}
       </div>
-      <footer className="authoring-controls"><button aria-label={playing ? "暂停探索" : "播放探索"} onClick={() => setPlaying(!playing)} disabled={working}>{playing ? "Ⅱ" : "▷"}</button><span>{playing ? "播放中" : "已暂停"}</span>{frames.flatMap(({ frame }) => frame.controls.map((control) => <label key={`${control.componentId}:${control.portId}`}>{control.label}<input aria-label={control.label} type="range" value={control.value} min={control.min} max={control.max} step={control.step} disabled={working} onChange={(event) => { session.runtime().dispatch({ type: "emit", componentId: control.componentId, portId: control.portId, value: Number(event.target.value) }); setView(session.read()); }} /><output>{control.value}</output></label>))}<span className="authoring-frame-note">点击元素继续探索</span></footer>
+      <div className="authoring-instrument">
+        <div className="authoring-field"><WorkCanvas view={view} disabled={working} onSelect={pick} /></div>
+      <footer className="authoring-controls"><button aria-label={playing ? "暂停探索" : "播放探索"} onClick={() => setPlaying(!playing)} disabled={working}>{playing ? "Ⅱ" : "▷"}</button><span>{playing ? "播放中" : "已暂停"}</span>{frames.flatMap(({ frame }) => frame.controls.map((control) => <label key={`${control.componentId}:${control.portId}`}>{control.label}<input aria-label={control.label} type="range" value={control.value} min={control.min} max={control.max} step={control.step} disabled={working} onChange={(event) => { session.runtime().dispatch({ type: "emit", componentId: control.componentId, portId: control.portId, value: Number(event.target.value) }); setView(session.read()); }} /><output>{control.value}</output></label>))}</footer>
+      </div>
     </section>
-    <footer className="authoring-foot"><span>{child && `来自：${view.ancestors.at(-1)?.title}`}</span><span>预置内容 · 未连接真实 AI</span></footer>
+    <footer className="authoring-foot"><span>{child ? `来自：${view.ancestors.at(-1)?.title}` : "选择图中的对象，打开它的笔记。"}</span><span>预置内容 · 未连接真实 AI</span></footer>
   </main>;
 }
