@@ -93,4 +93,8 @@
 |------|------|
 | [agents/issue-tracker.md](./agents/issue-tracker.md) | Issue tracker 约定：GitHub + `gh` CLI 操作、wayfinding 依赖图 |
 | [agents/triage-labels.md](./agents/triage-labels.md) | 五个标准 triage 角色到实际 label 字符串的映射 |
-| [agents/domain.md](./agents/domain.md) | 领域文档消费规则：CONTEXT.md、ADR 与词汇表 |
+| [agents/domain.md](./agents/domain.md) | 领域文档消费规则：GLOSSARY.md、ADR 与词汇表 |
+
+| [specs/playbook-authoring-core.md](./specs/playbook-authoring-core.md) | 自由创作、全元素上下文、连续探索与发布核心契约 |
+
+Local interactive authoring checkpoint: run the web dev server and open `/authoring-lab.html`. It uses registered example kits and an offline provider; it does not call AI or publishing services.

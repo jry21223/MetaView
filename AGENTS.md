@@ -103,3 +103,14 @@ direct instructions first, then this file, then the rest of the repo docs.
   commands passed.
 - Mention anything not verified and why.
 - Call out remaining risk without inflating certainty.
+
+## Agent skills
+
+### Issue tracker
+Issues and specs live in jry21223/MetaView GitHub Issues. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+Use the default five triage roles. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+A shared glossary and root ADRs cover the web, API and agent applications. See `docs/agents/domain.md`.

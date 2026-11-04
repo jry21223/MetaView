@@ -764,6 +764,17 @@ styles/
 
 ---
 
+### 17.1 本地创作与连续探索预览
+
+`authoring-lab.html` 是独立的本地开发入口，不改变官网导航。预览宿主默认变量集中在
+`shared/config/authoringPreviewTheme.ts`，沿用暖白、ThemePalette、12px 卡片与 8px 输入角色；
+页面消费语义变量，主按钮前景使用 `--accent-contrast`。元素拾取层只提供透明命中区域与
+选择反馈，作品仍由 PlaybookScript / Composition 渲染。
+
+选中态使用 `--canvas-focus` 橙色细轮廓与 3.6 秒弱呼吸光，物体本身不缩放；空心轨道仅按描边拾取。
+跨作品的知识焦点过渡使用 `--exploration-time: 780ms`，只用于从来源对象进入子作品及返回，
+普通面板仍使用 180ms。动画不承担导航状态提交；Reduced Motion 或不支持的浏览器直接显示目标状态。
+
 ## 18. Review Checklist
 
 ### 品牌
