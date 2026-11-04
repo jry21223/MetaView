@@ -60,7 +60,7 @@ export const graphScene = scene("algorithm.weighted-graph", (context) => {
   const a = { id: "A", x: 95, y: 340 };
   const b = { id: "B", x: 445, y: 105 };
   const c = { id: "C", x: 795, y: 340 };
-  const radius = 25;
+  const radius = 30;
   function edge(from: typeof a, to: typeof a, active: boolean) {
     const id = `edge-${from.id.toLowerCase()}${to.id.toLowerCase()}`;
     const length = Math.hypot(to.x - from.x, to.y - from.y);
@@ -72,18 +72,30 @@ export const graphScene = scene("algorithm.weighted-graph", (context) => {
     }, id === "edge-ac" ? "直接边 A–C" : `边 ${from.id}–${to.id}`, [id]);
   }
   const marks: AuthoredMark[] = [
+    mark({ elementId: "route-region", shape: "polygon", points: [[95,340],[445,105],[795,340]], tone: "primary", opacity: .35 }, "两条候选路径围成的区域"),
+    label("route-via-caption", 380, 45, "途经 B · 2 段路程"),
     edge(a, b, indirect || tied), edge(b, c, indirect || tied), edge(a, c, !indirect),
-    label("edge-ab.label", 255, 215, "2", ["edge-ab"]),
-    label("edge-bc.label", 624, 215, "2", ["edge-bc"]),
-    label("edge-ac.label", 440, 369, String(weight), ["edge-ac"]),
+    mark({ elementId: "edge-ab.weight", shape: "circle", x: 270, y: 222, r: 17, tone: "secondary" }, "边 A–B 的权重", ["edge-ab"]),
+    label("edge-ab.label", 265, 228, "2", ["edge-ab"]),
+    mark({ elementId: "edge-bc.weight", shape: "circle", x: 620, y: 222, r: 17, tone: "secondary" }, "边 B–C 的权重", ["edge-bc"]),
+    label("edge-bc.label", 615, 228, "2", ["edge-bc"]),
+    mark({ elementId: "edge-ac.weight", shape: "circle", x: 445, y: 340, r: 19, tone: "focus" }, "直接边权重", ["edge-ac"]),
+    label("edge-ac.label", 440, 346, String(weight), ["edge-ac"]),
   ];
   for (const node of [a, b, c]) {
     marks.push(mark({ elementId: `node-${node.id}`, shape: "circle", x: node.x, y: node.y, r: radius, tone: "secondary" }, `节点 ${node.id}`, [`node-${node.id}`]));
-    marks.push(label(`node-${node.id}.label`, node.x - 5, node.y + 5, node.id, [`node-${node.id}`]));
+    marks.push(mark({ elementId: `node-${node.id}.label`, shape: "text", x: node.x - 8, y: node.y + 7, text: node.id, fontSize: 20 }, `节点 ${node.id} 的名称`, [`node-${node.id}`]));
+    if (node.id !== "B") marks.push(label(`node-${node.id}.role`, node.x - 15, node.y + 60, node.id === "A" ? "起点" : "终点", [`node-${node.id}`]));
   }
   const summary = tied ? "直达 4  ·  经 B 也是 4" : indirect ? `直达 ${weight}  ·  经 B 只需 4` : `经 B 需要 4  ·  直达只需 ${weight}`;
-  marks.push(mark({ elementId: "path-summary", shape: "text", x: 310, y: 436, text: summary, fontSize: 20 }, summary));
+  marks.push(mark({ elementId: "path-summary", shape: "text", x: 95, y: 435, text: summary, fontSize: 20 }, summary));
   const comparison = tied ? "两条路径长度相同，都是 4。" : indirect ? `经 B 的长度是 2 + 2 = 4，小于直接边的 ${weight}。` : `直接边长度是 ${weight}，小于经 B 的 4。`;
+  marks.push(label("route-distance-caption", 95, 485, "途经 B"));
+  marks.push(label("route-direct-caption", 95, 530, "直接到达"));
+  marks.push(mark({ elementId: "comparison-via", shape: "polygon", points: [[505,470],[505+4*19,470],[505+4*19,486],[505,486]], tone: "primary" }, "经 B 的总权重 4", ["edge-ab", "edge-bc"]));
+  marks.push(label("comparison-via.label", 710, 485, "2 + 2 = 4", ["edge-ab", "edge-bc"]));
+  marks.push(mark({ elementId: "comparison-direct", shape: "polygon", points: [[505,515],[505+weight*19,515],[505+weight*19,531],[505,531]], tone: "focus" }, `直接边总权重 ${weight}`, ["edge-ac"]));
+  marks.push(label("comparison-direct.label", 710, 530, `直达 ${weight}`, ["edge-ac"]));
   return finish(context, marks, "edge-ac", [comparison, "改变直接边的权重，观察最短路径什么时候切换。"]);
 });
 export const numberControl: ComponentDefinition<AuthoringFrame> = {
