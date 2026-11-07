@@ -5,10 +5,14 @@ import {
   themeVars,
 } from "../../features/studio-editor/hooks/useTweaks";
 
-export const OPS_THEME_VARS = themeVars({
-  ...TWEAK_DEFAULTS,
-  density: "compact",
-});
+export const OPS_MOTION = { feedback: 160, panel: 180, refresh: 900 } as const;
+
+export const OPS_THEME_VARS: Record<string, string> = {
+  ...themeVars({ ...TWEAK_DEFAULTS, density: "compact" }),
+  "--mv-ops-motion-feedback": `${OPS_MOTION.feedback}ms`,
+  "--mv-ops-motion-panel": `${OPS_MOTION.panel}ms`,
+  "--mv-ops-motion-refresh": `${OPS_MOTION.refresh}ms`,
+};
 
 export const opsDashboardTheme = createTheme({
   palette: {
@@ -105,7 +109,8 @@ export const opsDashboardTheme = createTheme({
             color: "var(--ink)",
           },
           "&.Mui-selected:hover": {
-            backgroundColor: "color-mix(in srgb, var(--accent) 20%, transparent)",
+            backgroundColor:
+              "color-mix(in srgb, var(--accent) 20%, transparent)",
           },
         },
       },
