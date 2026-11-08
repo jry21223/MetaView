@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from typing import Annotated
+from urllib.parse import SplitResult, urlencode, urlsplit, urlunsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import PlainTextResponse, RedirectResponse
@@ -104,6 +105,30 @@ def _maybe_set_session_cookie(
         _set_session_cookie(response, settings, session)
 
 
+def _ops_login_origin(settings: Settings) -> SplitResult:
+    host = settings.ops_host or ""
+    try:
+        origin = urlsplit(f"https://{host}")
+        # Accessing .port also rejects malformed or out-of-range ports.
+        _ = origin.port
+    except ValueError as exc:
+        raise HTTPException(status_code=503, detail="管理端登录域名配置无效") from exc
+    if (
+        not origin.hostname
+        or origin.netloc != host
+        or origin.username is not None
+        or origin.password is not None
+        or origin.path
+        or origin.query
+        or origin.fragment
+        or host.endswith(":")
+        or "\\" in host
+        or any(character.isspace() or ord(character) < 32 for character in host)
+    ):
+        raise HTTPException(status_code=503, detail="管理端登录域名配置无效")
+    return origin
+
+
 def _account_response(
     settings: Settings,
     use_case: AccountUseCase,
@@ -194,6 +219,30 @@ async def wechat_callback(
     state = request.query_params.get("state")
     if not code or not state:
         raise HTTPException(status_code=400, detail="微信登录回调缺少 code/state")
+    redirect_headers = {"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"}
+    success_url = settings.wechat_login_success_url
+    if settings.app_edition == "ops":
+        origin = _ops_login_origin(settings)
+        # The registered WeChat callback can remain on the apex domain. Move
+        # it to the ops host before consuming state or issuing a host-only
+        # session cookie. The return target always comes from trusted config.
+        if request.url.hostname != origin.hostname:
+            callback_url = urlunsplit(
+                (
+                    "https",
+                    origin.netloc,
+                    request.url.path,
+                    urlencode({"code": code, "state": state}),
+                    "",
+                )
+            )
+            return RedirectResponse(callback_url, headers=redirect_headers)
+        # Compare hosts, not the request scheme: an HTTPS reverse proxy can
+        # legitimately forward the callback over internal HTTP.
+        success = urlsplit(success_url)
+        success_url = urlunsplit(
+            ("https", origin.netloc, success.path or "/", success.query, success.fragment)
+        )
     try:
         session = await use_case.complete_wechat_login(code=code, state=state)
     except OAuthNotConfiguredError as exc:
@@ -202,7 +251,7 @@ async def wechat_callback(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-    response = RedirectResponse(settings.wechat_login_success_url)
+    response = RedirectResponse(success_url, headers=redirect_headers)
     _set_session_cookie(response, settings, session)
     return response
 
