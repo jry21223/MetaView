@@ -52,14 +52,19 @@ from app.infrastructure.tts import (  # noqa: E402
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-# The ecology pilot is the pack we narrate online; other cases can opt in by
-# passing their ids explicitly.
+# The cases narrated online: the ecology pilot and the data-structure pack.
+# Others can opt in by passing their ids explicitly.
 DEFAULT_CASES = (
     "logistic-growth",
     "rabbit-chaos",
     "predator-prey",
     "competition-exclusion",
     "island-biogeography",
+    "stack-brackets",
+    "monotonic-stack",
+    "linked-list-reverse",
+    "bst-search",
+    "dijkstra",
 )
 
 
@@ -116,6 +121,21 @@ def _read_registry(path: Path) -> dict[str, dict[str, dict[str, str]]]:
                 "text": json.loads(entry.group("text")),
             }
     return recovered
+
+
+def _merge_untouched(
+    recorded: dict[str, list[dict[str, str]]],
+    already_recorded: dict[str, dict[str, dict[str, str]]],
+) -> dict[str, list[dict[str, str]]]:
+    """Keep every case this run did not touch.
+
+    The registry is rewritten whole, so a run over a few case ids used to
+    drop every other case's entries — the player then went silent on them
+    even though their audio was still on disk.
+    """
+    merged = {case_id: list(steps.values()) for case_id, steps in already_recorded.items()}
+    merged.update(recorded)
+    return merged
 
 
 def _write_registry(
@@ -262,7 +282,11 @@ async def main() -> int:
 
             recorded[case_id] = entries
 
-    _write_registry(registry_path, recorded, voice=settings.tts_default_voice)
+    _write_registry(
+        registry_path,
+        _merge_untouched(recorded, already_recorded),
+        voice=settings.tts_default_voice,
+    )
     elapsed = time.monotonic() - started
     print(
         f"\n{total_lines} line(s) across {len(cases)} case(s) → {out_root}"

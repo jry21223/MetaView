@@ -12,6 +12,7 @@ import {
   type AlgorithmCaseFrame,
   type AlgorithmStepDraft,
 } from "./helpers";
+import { spokenList } from "../../../shared/lib/spokenText";
 
 /**
  * Dijkstra 最短路径。
@@ -56,18 +57,18 @@ const SOURCE_PARAM = definePresetParam<DijkstraNodeId>({
 });
 
 export const DIJKSTRA_CODE = [
-  "function dijkstra(graph: Graph, source: string): Map<string, number> {",
-  "  const dist = new Map(nodes.map((n) => [n, Infinity]));",
-  "  dist.set(source, 0);",
-  "  const settled = new Set<string>();",
-  "  while (settled.size < nodes.length) {",
-  "    const u = closestUnsettled(dist, settled);",
-  "    settled.add(u);",
-  "    for (const [v, w] of graph[u]) {",
-  "      if (dist.get(u)! + w < dist.get(v)!) dist.set(v, dist.get(u)! + w);",
+  "void Dijkstra(int G[][MAXV], int n, int s, int dist[]) {",
+  "  for (int v = 0; v < n; v++) dist[v] = INF;  /* INF = 0x3f3f3f3f，无边也记 INF，相加不溢出 */",
+  "  dist[s] = 0;",
+  "  bool final[MAXV] = {false};  /* final[v]：v 的最短距离已确定 */",
+  "  for (int k = 0; k < n; k++) {",
+  "    int u = minUnsettled(dist, final, n);  /* 未确定顶点中 dist 最小 */",
+  "    final[u] = true;",
+  "    for (int v = 0; v < n; v++) {",
+  "      if (!final[v] && dist[u] + G[u][v] < dist[v]) dist[v] = dist[u] + G[u][v];",
   "    }",
   "  }",
-  "  return dist;",
+  "  /* 结束时 dist[v] 即 s 到 v 的最短距离 */",
   "}",
 ] as const;
 
@@ -150,6 +151,11 @@ function distLabel(value: number): string {
   return Number.isFinite(value) ? String(value) : "∞";
 }
 
+/** The distance table read aloud: "A 是 0、B 是 3" rather than "A=0 B=3". */
+function distSpoken(dist: DistanceTable): string {
+  return spokenList(DIJKSTRA_NODE_IDS.map((id) => `${id} 是 ${Number.isFinite(dist[id]) ? dist[id] : "无穷大"}`));
+}
+
 function distText(dist: DistanceTable): string {
   return DIJKSTRA_NODE_IDS.map((id) => `${id}=${distLabel(dist[id])}`).join(" ");
 }
@@ -190,7 +196,7 @@ function dijkstraSnapshot(args: {
   });
 }
 
-const codeHighlight = codeHighlightFor(DIJKSTRA_CODE);
+const codeHighlight = codeHighlightFor(DIJKSTRA_CODE, "c");
 
 export function shortestPath(
   parent: Partial<Record<DijkstraNodeId, DijkstraNodeId>>,
@@ -226,7 +232,7 @@ function buildDijkstraSteps(params: TemplatePreviewParams): AlgorithmCaseFrame<G
       }),
       code_highlight: codeHighlight(
         2,
-        { source, dist: distText(initialDist), settled: "{}" },
+        { s: source, dist: distText(initialDist), final: "{}" },
         "initialize distances",
         [1, 2, 3],
       ),
@@ -269,7 +275,7 @@ function buildDijkstraSteps(params: TemplatePreviewParams): AlgorithmCaseFrame<G
           u: item.current,
           "dist[u]": String(item.dist[item.current]),
           relaxed: item.relaxed.length ? item.relaxed.map((relax) => `${relax.to}=${relax.after}`).join(",") : "none",
-          settled: `{${item.settledAfter.join(",")}}`,
+          final: `{${item.settledAfter.join(",")}}`,
         },
         `settle ${item.current}`,
         item.relaxed.length ? [5, 6, 7, 8] : [5, 6, 7],
@@ -294,7 +300,7 @@ function buildDijkstraSteps(params: TemplatePreviewParams): AlgorithmCaseFrame<G
   steps.push({
     step_id: "dijkstra-result",
     title: "所有节点确定，最短路径树成形",
-    voiceover_text: `六个节点全部确定，最终距离是 ${distText(last.dist)}。把每个节点的“最后一次更新来自谁”连起来，就得到从 ${source} 出发的最短路径树；例如到 ${farthest} 的路径依次经过 ${shortestPath(last.parent, source, farthest).join("、")}，长度 ${last.dist[farthest]}。贪心成立的前提是边权非负，有负权边时要改用 Bellman-Ford。`,
+    voiceover_text: `六个节点全部确定，最终距离：${distSpoken(last.dist)}。把每个节点的“最后一次更新来自谁”连起来，就得到从 ${source} 出发的最短路径树；例如到 ${farthest} 的路径依次经过 ${shortestPath(last.parent, source, farthest).join("、")}，长度 ${last.dist[farthest]}。贪心成立的前提是边权非负，有负权边时要改用 Bellman-Ford。`,
     snapshot: dijkstraSnapshot({
       dist: last.dist,
       current: null,
@@ -308,14 +314,14 @@ function buildDijkstraSteps(params: TemplatePreviewParams): AlgorithmCaseFrame<G
       {
         dist: distText(last.dist),
         [`path(${farthest})`]: shortestPath(last.parent, source, farthest).join("→"),
-        complexity: "O((V+E) log V)",
+        complexity: "O(V²)",
       },
-      "return dist",
+      "dist[] holds shortest distances",
     ),
     questions: [
       ["最终距离表是什么？", distText(last.dist)],
       ["最短路径树是怎么来的？", "每个节点记住最后一次把它缩短的前驱，沿前驱回溯就是最短路径，所有回溯边合起来是一棵树。"],
-      ["复杂度是多少？", "用二叉堆维护候选时是 O((V+E) log V)；本例只有 6 个节点，线性扫描也足够。"],
+      ["复杂度是多少？", "这段代码用邻接矩阵、每轮线性扫描找最小 dist，是 O(V²)；改用邻接表加二叉堆可降到 O((V+E) log V)，适合稀疏图。"],
     ],
   });
 

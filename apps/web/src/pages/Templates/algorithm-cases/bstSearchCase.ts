@@ -33,13 +33,13 @@ export const BST_TARGET_MAX = 15;
 const DEFAULT_TARGET = 7;
 
 export const BST_SEARCH_CODE = [
-  "function search(root: Node | null, target: number): Node | null {",
-  "  let node = root;",
-  "  while (node !== null) {",
-  "    if (target === node.value) return node;",
-  "    node = target < node.value ? node.left : node.right;",
+  "BSTNode *search(BSTNode *root, int target) {",
+  "  BSTNode *p = root;",
+  "  while (p != NULL) {",
+  "    if (target == p->data) return p;",
+  "    p = (target < p->data) ? p->lchild : p->rchild;",
   "  }",
-  "  return null;",
+  "  return NULL;  /* 查找失败：落空处就是插入位置 */",
   "}",
 ] as const;
 
@@ -209,7 +209,7 @@ function bstSnapshot(args: {
   });
 }
 
-const codeHighlight = codeHighlightFor(BST_SEARCH_CODE);
+const codeHighlight = codeHighlightFor(BST_SEARCH_CODE, "c");
 
 function pathText(path: readonly BstComparison[]): string {
   return path.map((item) => item.node).join(" → ");
@@ -262,7 +262,7 @@ function buildBstSearchSteps(params: TemplatePreviewParams): AlgorithmCaseFrame<
       }),
       code_highlight: codeHighlight(
         4,
-        { "node.value": String(root), left: `{${leftValues.join(",")}}`, right: `{${rightValues.join(",")}}` },
+        { "root->data": String(root), left: `{${leftValues.join(",")}}`, right: `{${rightValues.join(",")}}` },
         "BST ordering invariant",
         [4],
       ),
@@ -277,6 +277,8 @@ function buildBstSearchSteps(params: TemplatePreviewParams): AlgorithmCaseFrame<
   trace.path.forEach((comparison, index) => {
     const node = BST_TREE.get(comparison.node)!;
     const relation = comparison.direction === "found" ? "=" : comparison.direction === "left" ? "<" : ">";
+    // Narration spells the comparison out: a bare "<" is not reliably spoken.
+    const spokenRelation = comparison.direction === "left" ? "小于" : "大于";
     const nextValue = comparison.direction === "found" ? null : node[comparison.direction];
     const title = comparison.direction === "found"
       ? `在 ${comparison.node} 处比较：${target} = ${comparison.node}，命中`
@@ -284,8 +286,8 @@ function buildBstSearchSteps(params: TemplatePreviewParams): AlgorithmCaseFrame<
     const narration = comparison.direction === "found"
       ? `来到节点 ${comparison.node}，目标 ${target} 正好等于它，查找结束。这是第 ${index + 1} 次比较，走过的路径依次是 ${pathSpoken(trace.path)}。`
       : nextValue == null
-        ? `来到节点 ${comparison.node}，目标 ${target} ${relation} ${comparison.node}，应该往${comparison.direction === "left" ? "左" : "右"}走，但那一侧是空的。第 ${index + 1} 次比较后可以确定：${target} 不在树中。`
-        : `来到节点 ${comparison.node}，目标 ${target} ${relation} ${comparison.node}，所以整棵${comparison.direction === "left" ? "右" : "左"}子树都不用看，沿${comparison.direction === "left" ? "左" : "右"}孩子进入 ${nextValue}。这是第 ${index + 1} 次比较。`;
+        ? `来到节点 ${comparison.node}，目标 ${target} ${spokenRelation} ${comparison.node}，应该往${comparison.direction === "left" ? "左" : "右"}走，但那一侧是空的。第 ${index + 1} 次比较后可以确定：${target} 不在树中。`
+        : `来到节点 ${comparison.node}，目标 ${target} ${spokenRelation} ${comparison.node}，所以整棵${comparison.direction === "left" ? "右" : "左"}子树都不用看，沿${comparison.direction === "left" ? "左" : "右"}孩子进入 ${nextValue}。这是第 ${index + 1} 次比较。`;
     const skipped = comparison.direction === "found"
       ? []
       : subtreeValues(BST_TREE, comparison.direction === "left" ? node.right : node.left);
@@ -304,9 +306,9 @@ function buildBstSearchSteps(params: TemplatePreviewParams): AlgorithmCaseFrame<
         comparison.direction === "found" ? 3 : 4,
         {
           target: String(target),
-          "node.value": String(comparison.node),
+          "p->data": String(comparison.node),
           compare: `${target} ${relation} ${comparison.node}`,
-          next: comparison.direction === "found" ? "return node" : nextValue == null ? "null" : String(nextValue),
+          next: comparison.direction === "found" ? "return p" : nextValue == null ? "NULL" : String(nextValue),
         },
         comparison.direction === "found" ? "target found" : `go ${comparison.direction}`,
         comparison.direction === "found" ? [2, 3] : [3, 4],
@@ -341,8 +343,8 @@ function buildBstSearchSteps(params: TemplatePreviewParams): AlgorithmCaseFrame<
       }),
       code_highlight: codeHighlight(
         3,
-        { result: `node(${target})`, comparisons: String(trace.path.length), skipped: String(BST_TREE.size - trace.path.length) },
-        "return node",
+        { result: `p->data = ${target}`, comparisons: String(trace.path.length), skipped: String(BST_TREE.size - trace.path.length) },
+        "return p",
       ),
       questions: [
         ["最终结果是什么？", `找到 ${target}，路径 ${pathText(trace.path)}，共比较 ${trace.path.length} 次。`],
@@ -365,8 +367,8 @@ function buildBstSearchSteps(params: TemplatePreviewParams): AlgorithmCaseFrame<
       }),
       code_highlight: codeHighlight(
         6,
-        { result: "null", insertUnder: String(insert.parent), side: insert.side, comparisons: String(trace.path.length) },
-        "return null / insert here",
+        { result: "NULL", insertUnder: String(insert.parent), side: insert.side, comparisons: String(trace.path.length) },
+        "return NULL / insert here",
       ),
       questions: [
         ["插入位置为什么就是查找落空的位置？", "查找沿大小关系一路向下，落空处正是唯一能保持左小右大的空位。"],

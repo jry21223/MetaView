@@ -91,6 +91,13 @@ describe("tokenize — block comments (#32)", () => {
     expect(tokens.find((t) => t.text === "int")?.kind).toBe("keyword");
   });
 
+  it("highlights C's bool and NULL alongside char literals", () => {
+    const tokens = tokenize("bool ok = p != NULL && ch == '(';", "c");
+    expect(tokens.find((t) => t.text === "bool")?.kind).toBe("keyword");
+    expect(tokens.find((t) => t.text === "NULL")?.kind).toBe("keyword");
+    expect(tokens.find((t) => t.text === "'('")?.kind).toBe("string");
+  });
+
   it("recognizes /* */ inline in Java", () => {
     const tokens = tokenize("public /* note */ void run() {}", "java");
     expect(tokens.find((t) => t.text === "/* note */")?.kind).toBe("comment");
