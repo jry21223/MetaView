@@ -29,6 +29,7 @@ vi.mock("remotion", async () => {
 
 import { PlaybookComposition } from "./PlaybookComposition";
 import { THEME_PALETTE } from "../../../../shared/config/themePalette";
+import { PLAYBOOK_LAYOUT } from "../../../../shared/config/constants";
 
 function plotSnapshot(expression = "x^2"): MathPlotSnapshot {
   return {
@@ -380,6 +381,10 @@ function layerOpenTag(markup: string, kind: string): string {
   return markup.match(new RegExp(`<div[^>]*data-layer-kind="${kind}"[^>]*>`))?.[0] ?? "";
 }
 
+function subtitleRowTag(markup: string): string {
+  return markup.match(/<div[^>]*data-playbook-subtitle-row="true"[^>]*>/)?.[0] ?? "";
+}
+
 describe("PlaybookComposition", () => {
   beforeEach(() => {
     remotionState.frame = 0;
@@ -445,6 +450,31 @@ describe("PlaybookComposition", () => {
     const markup = renderToStaticMarkup(<PlaybookComposition script={mathScript()} />);
     const matches = markup.match(/观察斜率变化/g) ?? [];
     expect(matches).toHaveLength(1);
+  });
+
+  it("reserves the full subtitle height so narration length never resizes the stage", () => {
+    // A row that grew with the narration shrank the flex:1 visual track under
+    // it, so every vertically centred renderer jumped whenever a caption
+    // wrapped onto another line.
+    const {
+      SUBTITLE_HEIGHT,
+      SUBTITLE_MAX_LINES,
+      SUBTITLE_FONT_SIZE,
+      SUBTITLE_LINE_HEIGHT,
+      SUBTITLE_PADDING_Y,
+    } = PLAYBOOK_LAYOUT;
+    const markup = renderToStaticMarkup(<PlaybookComposition script={mathScript()} />);
+    const row = subtitleRowTag(markup);
+
+    expect(row).toContain(`height:${SUBTITLE_HEIGHT}px`);
+    expect(row).toContain("box-sizing:border-box");
+    expect(row).not.toContain("min-height");
+    expect(markup).toContain(
+      `font-size:${SUBTITLE_FONT_SIZE}px;line-height:${SUBTITLE_LINE_HEIGHT}`,
+    );
+    expect(SUBTITLE_HEIGHT).toBeGreaterThanOrEqual(
+      SUBTITLE_MAX_LINES * SUBTITLE_FONT_SIZE * SUBTITLE_LINE_HEIGHT + 2 * SUBTITLE_PADDING_Y,
+    );
   });
 
   it("uses semantic theme colors for the stage progress bar", () => {
