@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { PlayerRef } from "@remotion/player";
 import type { MetaStep, PlaybookScript } from "../types";
+import { resolveStepSettledFrame, resolveStepStartFrame } from "./previewFrame";
 
 export interface PlaybackGate {
   isSpeaking: boolean;
@@ -14,6 +15,8 @@ export interface PlaybookController {
   stepThrough: boolean;
   setStepThrough: (v: boolean) => void;
   goToStep: (index: number) => void;
+  /** Starts playback; a playhead parked on a step's settled frame first rewinds to that step's start. */
+  play: () => void;
   prev: () => void;
   next: () => void;
 }
@@ -57,6 +60,12 @@ export function usePlaybookController(
   // True when the player paused at a step boundary waiting for TTS to finish.
   // Cleared when the audio ends and we resume playback.
   const awaitingAudioRef = useRef(false);
+  // The step whose settled frame the playhead is parked on — the opening
+  // poster frame (always inside the first step) or a manual step jump — or
+  // null once playback has moved on. Playing from a settled frame would cross
+  // into the next step almost immediately and skip this step's entrance and
+  // narration, so the next play rewinds to the parked step's start instead.
+  const parkedStepRef = useRef<number | null>(0);
   const gateRef = useRef<PlaybackGate | undefined>(gate);
   useLayoutEffect(() => {
     stepThroughRef.current = stepThrough;
@@ -70,31 +79,42 @@ export function usePlaybookController(
     return () => clearTimeout(id);
   }, [script.steps.length]);
 
-  const stepStartFrame = useCallback(
-    (index: number): number => {
-      if (index <= 0) return 0;
-      return script.steps[index - 1]?.end_frame ?? 0;
-    },
-    [script.steps]
-  );
-
   const goToStep = useCallback(
     (index: number) => {
       const clamped = clampStepIndex(index, script.steps.length);
-      const startFrame = stepStartFrame(clamped);
+      const settledFrame = resolveStepSettledFrame(script.steps, clamped);
       const player = playerRef.current;
 
       awaitingAudioRef.current = false;
-      prevFrameRef.current = startFrame;
+      parkedStepRef.current = clamped;
+      prevFrameRef.current = settledFrame;
       // Manual step jumps should be a stable seek, not a new autoplay cycle.
       // Pausing before seek avoids the brief blank frame users saw when the
       // Remotion Player had to repaint while playback was still advancing.
+      // The paused picture is the step's settled frame: on its first frame the
+      // nodes that just changed state are still at zero opacity.
       player?.pause();
-      player?.seekTo(startFrame);
+      player?.seekTo(settledFrame);
       deferFrame(() => setCurrentStepIndex((current) => (current === clamped ? current : clamped)));
     },
-    [script.steps.length, stepStartFrame, playerRef]
+    [script.steps, playerRef]
   );
+
+  const play = useCallback(() => {
+    const player = playerRef.current;
+    if (!player) return;
+    const parkedStep = parkedStepRef.current;
+    if (parkedStep != null) {
+      const startFrame = resolveStepStartFrame(
+        script.steps,
+        clampStepIndex(parkedStep, script.steps.length),
+      );
+      parkedStepRef.current = null;
+      prevFrameRef.current = startFrame;
+      player.seekTo(startFrame);
+    }
+    player.play();
+  }, [script.steps, playerRef]);
 
   const prev = useCallback(() => {
     goToStep(currentStepIndex - 1);
@@ -131,9 +151,16 @@ export function usePlaybookController(
         }
       }
     };
+    // Playback started some other way (e.g. the Remotion space key) has left
+    // the parked frame behind, so a later play must not rewind to it.
+    const unpark = () => {
+      parkedStepRef.current = null;
+    };
     player.addEventListener("timeupdate", handler);
+    player.addEventListener("play", unpark);
     return () => {
       player.removeEventListener("timeupdate", handler);
+      player.removeEventListener("play", unpark);
     };
     // Only re-register when the script timeline changes — previous/step/gate
     // state already flows through refs (see useLayoutEffect above), so the
@@ -161,6 +188,7 @@ export function usePlaybookController(
     stepThrough,
     setStepThrough,
     goToStep,
+    play,
     prev,
     next,
   };

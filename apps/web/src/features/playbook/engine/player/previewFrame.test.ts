@@ -5,6 +5,8 @@ import {
   mapFrameAcrossTimelines,
   resolveInitialPreviewFrame,
   resolvePlayerTimelineKey,
+  resolveStepSettledFrame,
+  resolveStepStartFrame,
 } from "./previewFrame";
 
 function script(overrides: Partial<PlaybookScript> = {}): PlaybookScript {
@@ -42,6 +44,23 @@ function script(overrides: Partial<PlaybookScript> = {}): PlaybookScript {
     ...overrides,
   };
 }
+
+describe("step frames", () => {
+  it("starts each step where the previous one ends and settles it on its last frame", () => {
+    const steps = script().steps;
+    expect(resolveStepStartFrame(steps, 0)).toBe(0);
+    expect(resolveStepSettledFrame(steps, 0)).toBe(59);
+    expect(resolveStepStartFrame(steps, 1)).toBe(60);
+    expect(resolveStepSettledFrame(steps, 1)).toBe(119);
+  });
+
+  it("never settles a zero-length step before its own start", () => {
+    const steps = script({
+      steps: [script().steps[0], { ...script().steps[1], end_frame: 60 }],
+    }).steps;
+    expect(resolveStepSettledFrame(steps, 1)).toBe(60);
+  });
+});
 
 describe("mapFrameAcrossTimelines", () => {
   it("preserves the fractional position inside the matching step", () => {

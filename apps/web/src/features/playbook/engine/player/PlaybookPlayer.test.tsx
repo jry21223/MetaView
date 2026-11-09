@@ -835,11 +835,7 @@ describe("PlaybookPlayer", () => {
     fireEvent.click(getByRole("button", { name: "播放" }));
     expect(playerMockState.play).toHaveBeenCalledTimes(1);
 
-    const onPlay = playerMockState.addEventListener.mock.calls.find(
-      ([event]) => event === "play",
-    )?.[1] as (() => void) | undefined;
-    expect(onPlay).toBeTruthy();
-    act(() => onPlay?.());
+    act(() => latestPlayerListener("play")());
 
     fireEvent.click(getByRole("button", { name: "暂停" }));
     expect(playerMockState.pause).toHaveBeenCalledTimes(1);

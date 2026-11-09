@@ -232,6 +232,7 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
     stepThrough,
     setStepThrough,
     goToStep,
+    play,
     prev,
     next,
   } = usePlaybookController(script, playerRef, {
@@ -347,26 +348,16 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   }, [script, isPlaying]);
   useEffect(() => cancelScrubHold, [cancelScrubHold]);
 
-  // The page lands on the opening step's settled poster frame (a fully drawn
-  // picture, not frame zero), so the very first play press must rewind to the
-  // current step's start — otherwise playback crosses into the next step
-  // almost immediately and the opening narration is skipped.
-  const hasEverPlayedRef = useRef(false);
+  // The opening poster and every manual step jump park on a settled frame (a
+  // fully drawn picture); play() rewinds from there to the step's start.
   const handlePlayPause = useCallback(() => {
     cancelScrubHold();
-    const player = playerRef.current;
-    if (!player) return;
     if (isPlaying) {
-      player.pause();
+      playerRef.current?.pause();
       return;
     }
-    if (!hasEverPlayedRef.current) {
-      hasEverPlayedRef.current = true;
-      const stepStart = safeStepIndex > 0 ? script.steps[safeStepIndex - 1]?.end_frame ?? 0 : 0;
-      player.seekTo(stepStart);
-    }
-    player.play();
-  }, [cancelScrubHold, isPlaying, safeStepIndex, script.steps]);
+    play();
+  }, [cancelScrubHold, isPlaying, play]);
 
   // Manual navigation is a deliberate pause — it must also drop any pending
   // scrub auto-resume so the lesson does not restart under the user.
@@ -387,7 +378,6 @@ export const PlaybookPlayer: React.FC<PlaybookPlayerProps> = ({
   }, [cancelScrubHold, next]);
 
   const handleReset = useCallback(() => {
-    playerRef.current?.seekTo(0);
     goToStepManual(0);
     setIsPlaying(false);
   }, [goToStepManual]);
